@@ -46,7 +46,7 @@ lazy_static::lazy_static! {
 #[async_trait]
 pub trait TransactionExecutor {
     /// Executes ticket redemption transaction given a ticket.
-    async fn redeem_ticket(&self, ticket: AcknowledgedTicket, domain_separator: Hash) -> Result<Hash>;
+    async fn redeem_ticket(&self, ticket: RedeemableTicket, domain_separator: Hash) -> Result<Hash>;
 
     /// Executes channel funding transaction (or channel opening) to the given `destination` and stake.
     /// Channel funding and channel opening are both same transactions.

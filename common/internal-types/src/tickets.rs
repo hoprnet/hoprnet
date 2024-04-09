@@ -8,9 +8,8 @@ use hex_literal::hex;
 use bindings::hopr_channels::RedeemTicketCall;
 use ethers::contract::EthCall;
 
-use crate::{channels, errors, errors::Result as CoreTypesResult};
+use crate::{channels, errors};
 use crate::errors::CoreTypesError;
-
 
 /// Size-optimized encoding of the ticket, used for both,
 /// network transfer and in the smart contract.
@@ -285,29 +284,40 @@ impl Ticket {
     }
 
     /// Verifies the signature of this ticket, turning this ticket into `VerifiedTicket`.
+    /// If the verification fails, `Self` is returned in the error.
     ///
     /// This is done by recovering the signer from the signature and verifying that it matches
     /// the given `issuer` argument. This is possible due this specific instantiation of the ECDSA
     /// over the secp256k1 curve.
     /// The operation can fail if a public key cannot be recovered from the ticket signature.
-    pub fn verify(self, issuer: &Address, domain_separator: &Hash) -> hopr_crypto_types::errors::Result<VerifiedTicket> {
+    pub fn verify(self, issuer: &Address, domain_separator: &Hash) -> Result<VerifiedTicket, Ticket> {
         let ticket_hash = self.get_hash(domain_separator);
 
-        // Verify that the recovered signature matches the issuer's address
-        PublicKey::from_signature_hash(
-            ticket_hash.as_ref(),
-            self.signature.as_ref().ok_or(CryptoError::SignatureVerification)?,
-        )?
-            .to_address()
-            .eq(issuer)
-            .then_some(VerifiedTicket(self, ticket_hash, *issuer))
-            .ok_or(CryptoError::SignatureVerification)
+        if let Some(signature) = &self.signature {
+            match PublicKey::from_signature_hash(
+                ticket_hash.as_ref(),
+                signature) {
+                Ok(pk) if pk.to_address().eq(issuer) => Ok(VerifiedTicket(self, ticket_hash, *issuer)),
+                Err(e) => {
+                    error!("failed to verify ticket signature: {e}");
+                    Err(self)
+                }
+                _ => Err(self),
+            }
+        } else {
+            Err(self)
+        }
     }
 
     /// Returns true if this ticket aggregates multiple tickets.
     pub fn is_aggregated(&self) -> bool {
         // Aggregated tickets have always an index offset > 1
         self.index_offset > 1
+    }
+
+    /// Returns the encoded winning probability of the ticket
+    pub fn win_prob(&self) -> f64 {
+        win_prob_to_f64(&self.encoded_win_prob)
     }
 }
 
@@ -458,7 +468,7 @@ impl VerifiedTicket {
 
     /// Returns the verified encoded winning probability of the ticket
     pub fn win_prob(&self) -> f64 {
-        win_prob_to_f64(&self.0.encoded_win_prob)
+        self.0.win_prob()
     }
 
     /// Checks if this ticket is considered a win.
@@ -556,6 +566,16 @@ impl VerifiedTicket {
     pub fn into_unacknowledged(self, own_key: HalfKey) -> UnacknowledgedTicket {
         UnacknowledgedTicket { ticket: self, own_key }
     }
+
+    /// Shorthand to acknowledge the ticket if the response is already known.
+    /// This is used upon receiving an aggregated ticket.
+    pub fn into_acknowledged(self, response: Response) -> AcknowledgedTicket {
+        AcknowledgedTicket {
+            status: AcknowledgedTicketStatus::Untouched,
+            ticket: self,
+            response,
+        }
+    }
 }
 
 impl Display for VerifiedTicket {
@@ -629,7 +649,9 @@ pub fn f64_to_win_prob(win_prob: f64) -> errors::Result<EncodedWinProb> {
     Ok(res)
 }
 
-/// Wrapper for a **verified** unacknowledged ticket and the half-key for the ticket's challenge.
+/// Represents a [VerifiedTicket] with an unknown other part of the [HalfKey].
+/// Once the other [HalfKey] is known (forming a [Response]),
+/// it can be [acknowledged](UnacknowledgedTicket::acknowledge).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct UnacknowledgedTicket {
     pub ticket: VerifiedTicket,
@@ -649,7 +671,7 @@ impl UnacknowledgedTicket {
     pub fn acknowledge(
         self,
         acknowledgement: &HalfKey,
-    ) -> CoreTypesResult<AcknowledgedTicket> {
+    ) -> crate::errors::Result<AcknowledgedTicket> {
         let response = Response::from_half_keys(&self.own_key, acknowledgement)?;
         debug!("acknowledging ticket using response {}", response.to_hex());
 
@@ -747,6 +769,7 @@ impl AcknowledgedTicket {
             ticket: self.ticket,
             response: self.response,
             vrf_params,
+            channel_dst: *domain_separator,
         })
     }
 
@@ -765,15 +788,30 @@ impl Display for AcknowledgedTicket {
 /// Represents a winning ticket that can be successfully redeemed on chain.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RedeemableTicket {
+    /// Verified ticket that can be redeemed.
     pub ticket: VerifiedTicket,
+    /// Solution to the PoR challenge in the ticket.
     pub response: Response,
+    /// VRF parameters required for redeeming.
     pub vrf_params: VrfParameters,
+    /// Channel domain separator used to compute the VRF parameters.
+    pub channel_dst: Hash,
 }
 
 impl RedeemableTicket {
     /// Convenience method to retrieve a reference to the underlying verified [Ticket].
     #[inline]
     pub fn verified_ticket(&self) -> &Ticket { self.ticket.verified_ticket() }
+}
+
+impl From<RedeemableTicket> for AcknowledgedTicket {
+    fn from(value: RedeemableTicket) -> Self {
+        Self {
+            status: AcknowledgedTicketStatus::Untouched,
+            ticket: value.ticket,
+            response: value.response,
+        }
+    }
 }
 
 /// Represents a ticket that could be transferred over the wire
@@ -803,7 +841,8 @@ impl TransferableWinningTicket {
             return Err(crate::errors::CoreTypesError::InvalidInputData("invalid ticket issuer".into()))
         }
 
-        let verified_ticket = self.ticket.verify(&self.signer, domain_separator)?;
+        let verified_ticket = self.ticket.verify(&self.signer, domain_separator)
+            .map_err(|_| CoreTypesError::CryptoError(CryptoError::SignatureVerification.into()))?;
 
         if check_ticket_win(
             verified_ticket.verified_hash(),

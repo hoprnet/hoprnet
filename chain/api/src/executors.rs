@@ -122,7 +122,7 @@ where
 {
     async fn redeem_ticket(
         &self,
-        acked_ticket: AcknowledgedTicket,
+        acked_ticket: RedeemableTicket,
         domain_separator: Hash,
     ) -> chain_actions::errors::Result<Hash> {
         let payload = self.payload_generator.redeem_ticket(acked_ticket, domain_separator)?;

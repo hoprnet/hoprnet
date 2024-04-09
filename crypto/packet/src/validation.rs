@@ -1,9 +1,6 @@
 use tracing::{debug, trace};
 
-use crate::errors::{
-    PacketError::{OutOfFunds, TicketValidation},
-    Result,
-};
+use crate::errors::{PacketError::{OutOfFunds, TicketValidation}, PacketError};
 use hopr_crypto_types::types::Hash;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
@@ -18,47 +15,47 @@ pub async fn validate_unacknowledged_ticket(
     required_win_prob: f64,
     unrealized_balance: Option<Balance>,
     domain_separator: &Hash,
-) -> Result<VerifiedTicket> {
+) -> std::result::Result<VerifiedTicket, (PacketError, Ticket)> {
     debug!("validating unack ticket from {sender}");
 
     // ticket signer MUST be the sender
     let ticket = ticket
         .verify(sender, domain_separator)
-        .map_err(|e| TicketValidation(format!("ticket signer does not match the sender: {e}")))?;
+        .map_err(|t| (TicketValidation(format!("ticket signer does not match the sender: {t}")), t))?;
 
     let verified_ticket = ticket.verified_ticket();
 
     // ticket amount MUST be greater or equal to minTicketAmount
     if !verified_ticket.amount.ge(&min_ticket_amount) {
-        return Err(TicketValidation(format!(
+        return Err((TicketValidation(format!(
             "ticket amount {} in not at least {min_ticket_amount}",
             verified_ticket.amount
-        )));
+        )), verified_ticket.clone()));
     }
 
     // ticket must have at least required winning probability
     if ticket.win_prob() < required_win_prob {
-        return Err(TicketValidation(format!(
+        return Err((TicketValidation(format!(
             "ticket winning probability {} is lower than required winning probability {required_win_prob}",
             ticket.win_prob()
-        )));
+        )), verified_ticket.clone()));
     }
 
     // channel MUST be open or pending to close
     if channel.status == ChannelStatus::Closed {
-        return Err(TicketValidation(format!(
+        return Err((TicketValidation(format!(
             "payment channel with {sender} is not opened or pending to close"
-        )));
+        )), verified_ticket.clone()));
     }
 
     // ticket's channelEpoch MUST match the current channel's epoch
     if !channel.channel_epoch.eq(&verified_ticket.channel_epoch.into()) {
-        return Err(TicketValidation(format!(
+        return Err((TicketValidation(format!(
             "ticket was created for a different channel iteration {} != {} of channel {}",
             verified_ticket.channel_epoch,
             channel.channel_epoch,
             channel.get_id()
-        )));
+        )), verified_ticket.clone()));
     }
 
     if let Some(unrealized_balance) = unrealized_balance {
@@ -70,7 +67,7 @@ pub async fn validate_unacknowledged_ticket(
                 "Ticket value is higher than remaining unrealized balance for channel {}",
                 channel.get_id().to_string(),
             );
-            return Err(OutOfFunds(channel.get_id().to_string()));
+            return Err((OutOfFunds(channel.get_id().to_string()), verified_ticket.clone()));
         }
     }
 

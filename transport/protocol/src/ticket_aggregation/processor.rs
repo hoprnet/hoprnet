@@ -51,7 +51,7 @@ pub const TICKET_AGGREGATION_RX_QUEUE_SIZE: usize = 2048;
 #[allow(clippy::large_enum_variant)] // TODO: refactor the large types used in the enum
 #[derive(Debug)]
 pub enum TicketAggregationToProcess<T, U> {
-    ToReceive(PeerId, std::result::Result<TransferableWinningTicket, String>, U),
+    ToReceive(PeerId, std::result::Result<Ticket, String>, U),
     ToProcess(PeerId, Vec<TransferableWinningTicket>, T),
     ToSend(Hash, AggregationPrerequisites, TicketAggregationFinalizer),
 }
@@ -60,7 +60,7 @@ pub enum TicketAggregationToProcess<T, U> {
 #[allow(clippy::large_enum_variant)] // TODO: refactor the large types used in the enum
 #[derive(Debug)]
 pub enum TicketAggregationProcessed<T, U> {
-    Receive(PeerId, TransferableWinningTicket, U),
+    Receive(PeerId, AcknowledgedTicket, U),
     Reply(PeerId, std::result::Result<TransferableWinningTicket, String>, T),
     Send(
         PeerId,

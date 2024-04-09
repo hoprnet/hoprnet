@@ -1,17 +1,10 @@
-use crate::errors::{CoreTypesError, Result};
-use bindings::hopr_channels::RedeemTicketCall;
-use ethers::contract::EthCall;
-use hex_literal::hex;
 use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, SystemTime};
 use std::{
-    cmp::Ordering,
     fmt::{Display, Formatter},
 };
-use tracing::error;
-use crate::prelude::UnacknowledgedTicket;
 
 /// Describes status of a channel
 #[derive(Copy, Clone, Debug, smart_default::SmartDefault, Serialize, Deserialize, strum::Display)]

@@ -23,7 +23,7 @@ pub trait HoprDbProtocolOperations {
     /// 1. There is an unacknowledged ticket and we are awaiting a half key.
     /// 2. We were the creator of the packet, hence we do not wait for any half key
     /// 3. The acknowledgement is unexpected and stems from a protocol bug or an attacker
-    async fn handle_acknowledgement(&self, ack: Acknowledgement, me: ChainKeypair) -> crate::errors::Result<AckResult>;
+    async fn handle_acknowledgement(&self, ack: Acknowledgement, me: &ChainKeypair) -> crate::errors::Result<AckResult>;
 
     /// Process the data into an outgoing packet
     async fn to_send(
@@ -96,8 +96,9 @@ impl From<ResolvedAcknowledgement> for AckResult {
 #[async_trait]
 impl HoprDbProtocolOperations for HoprDb {
     #[instrument(level = "trace", skip(self))]
-    async fn handle_acknowledgement(&self, ack: Acknowledgement, me: ChainKeypair) -> crate::errors::Result<AckResult> {
+    async fn handle_acknowledgement(&self, ack: Acknowledgement, me: &ChainKeypair) -> crate::errors::Result<AckResult> {
         let myself = self.clone();
+        let me_ckp = me.clone();
 
         let result = self
             .begin_transaction()
@@ -145,7 +146,7 @@ impl HoprDbProtocolOperations for HoprDb {
                             // and should not be done for bogus unacknowledged tickets
                             let ack_ticket = unacknowledged.acknowledge(&ack.ack_key_share)?;
 
-                            if ack_ticket.is_winning(&myself.chain_key, &domain_separator) {
+                            if ack_ticket.is_winning(&me_ckp, &domain_separator) {
                                 debug!(ticket = tracing::field::display(&ack_ticket), "winning ticket");
                                 Ok(ResolvedAcknowledgement::RelayingWin(ack_ticket))
                             } else {
@@ -367,11 +368,9 @@ impl HoprDbProtocolOperations for HoprDb {
                             )
                             .await {
                                 Ok(ticket) => ticket,
-                                Err(e) => {
+                                Err((e, ticket)) => {
                                     return Err(crate::errors::DbError::TicketValidationError(
-                                        Box::new((
-                                            ticket,
-                                            e.to_string(),
+                                        Box::new((ticket, e.to_string(),
                                     ))));
                                 }
                             };

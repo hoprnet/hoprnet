@@ -353,9 +353,9 @@ pub trait HoprDbTicketOperations {
     /// Replace the aggregated tickets locally with an aggregated ticket from the counterparty.
     async fn process_received_aggregated_ticket(
         &self,
-        aggregated_ticket: TransferableWinningTicket,
+        aggregated_ticket: Ticket,
         chain_keypair: &ChainKeypair,
-    ) -> Result<RedeemableTicket>;
+    ) -> Result<AcknowledgedTicket>;
 
     /// Performs ticket aggregation as an issuing party of the given tickets.
     async fn aggregate_tickets(
@@ -583,12 +583,6 @@ impl HoprDbTicketOperations for HoprDb {
         selector: TicketSelector,
         new_state: AcknowledgedTicketStatus,
     ) -> Result<BoxStream<'a, AcknowledgedTicket>> {
-        let channel_dst = self
-            .get_indexer_data(None)
-            .await?
-            .channels_dst
-            .ok_or(LogicalError("missing channel dst".into()))?;
-
         Ok(Box::pin(stream! {
             match ticket::Entity::find()
                 .filter(selector)
@@ -894,6 +888,7 @@ impl HoprDbTicketOperations for HoprDb {
                 })
                 .await?;
 
+        let myself = self.clone();
         let tickets = self
             .ticket_manager
             .with_write_locked_db(|tx| {
@@ -939,13 +934,13 @@ impl HoprDbTicketOperations for HoprDb {
                         .map(|model| {
                             AcknowledgedTicket::try_from(model)
                                 .map_err(DbError::from)
-                                .and_then(|ack| ack.into_transferable(&self.chain_key, &domain_separator).map_err(DbError::from))
+                                .and_then(|ack| ack.into_transferable(&myself.chain_key, &domain_separator).map_err(DbError::from))
                         })
                         .collect::<Result<Vec<_>>>()?;
 
                     // mark all tickets with appropriate characteristics as being aggregated
                     if !to_be_aggregated.is_empty() {
-                        let last_idx_to_take = to_be_aggregated.last().unwrap().verified_ticket().index;
+                        let last_idx_to_take = to_be_aggregated.last().unwrap().ticket.index;
                         let marked: sea_orm::UpdateResult = ticket::Entity::update_many()
                             .filter(TicketSelector::from(&channel_entry))
                             .filter(ticket::Column::Index.gte(first_idx_to_take.to_be_bytes().to_vec()))
@@ -1002,24 +997,17 @@ impl HoprDbTicketOperations for HoprDb {
 
     async fn process_received_aggregated_ticket(
         &self,
-        aggregated_ticket: TransferableWinningTicket,
+        aggregated_ticket: Ticket,
         chain_keypair: &ChainKeypair,
-    ) -> Result<RedeemableTicket> {
-        // TODO: remove this once `self.me_onchain` is removed
+    ) -> Result<AcknowledgedTicket> {
         if chain_keypair.public().to_address() != self.me_onchain {
             return Err(DbError::LogicalError(
                 "chain key for ticket aggregation does not match the DB public address".into(),
             ));
         }
 
-        if aggregated_ticket.win_prob() != 1.0f64 {
-            return Err(DbError::LogicalError(
-                "Aggregated tickets must have 100% win probability".into(),
-            ));
-        }
-
         let myself = self.clone();
-        let channel_id = aggregated_ticket.ticket.channel_id;
+        let channel_id = aggregated_ticket.channel_id;
 
         let (channel_entry, domain_separator) =
             self.nest_transaction_in_db(None, TargetDb::Index)
@@ -1047,10 +1035,16 @@ impl HoprDbTicketOperations for HoprDb {
                 })
                 .await?;
 
-        // Verify that we can turn this ticket into redeemable
-        let aggregated_ticket = aggregated_ticket
-            .into_redeemable(&channel_entry.source, &domain_separator)
+        // Verify the ticket first
+        let aggregated_ticket = aggregated_ticket.verify(&channel_entry.source, &domain_separator)
             .map_err(|e| DbError::LogicalError(format!("failed to verify received aggregated ticket in {channel_id}: {e}")))?;
+
+        // Aggregated tickets always have 100% winning probability
+        if aggregated_ticket.win_prob() != 1.0f64 {
+            return Err(DbError::LogicalError(
+                "Aggregated tickets must have 100% win probability".into(),
+            ));
+        }
 
         let acknowledged_tickets = self
             .nest_transaction_in_db(None, TargetDb::Tickets)
@@ -1099,15 +1093,9 @@ impl HoprDbTicketOperations for HoprDb {
         // calculate the new current ticket index
         #[allow(unused_variables)]
         let current_ticket_index_from_aggregated_ticket =
-            U256::from(aggregated_ticket.index).add(aggregated_ticket.index_offset);
+            U256::from(aggregated_ticket.verified_ticket().index).add(aggregated_ticket.verified_ticket().index_offset);
 
-        let acked_aggregated_ticket = AcknowledgedTicket::new(
-            aggregated_ticket,
-            first_stored_ticket.response.clone(),
-            first_stored_ticket.signer,
-            chain_keypair,
-            &domain_separator,
-        )?;
+        let acked_aggregated_ticket = aggregated_ticket.into_acknowledged(first_stored_ticket.response.clone());
 
         let ticket = acked_aggregated_ticket.clone();
         self.ticket_manager
@@ -1128,7 +1116,7 @@ impl HoprDbTicketOperations for HoprDb {
                         )));
                     }
 
-                    ticket::Entity::insert::<hopr_db_entity::ticket::ActiveModel>(ticket.into())
+                    ticket::Entity::insert::<ticket::ActiveModel>(ticket.into())
                         .exec(tx.as_ref())
                         .await?;
 
@@ -1157,7 +1145,7 @@ impl HoprDbTicketOperations for HoprDb {
             .get_indexer_data(None)
             .await?
             .domain_separator(DomainSeparator::Channel)
-            .ok_or_else(|| crate::errors::DbError::LogicalError("domain separator missing".into()))?;
+            .ok_or_else(|| DbError::LogicalError("domain separator missing".into()))?;
 
         if acked_tickets.is_empty() {
             return Err(DbError::LogicalError(
@@ -1270,7 +1258,7 @@ impl HoprDbTicketOperations for HoprDb {
             first_acked_ticket.verified_ticket().index.into(),
             (last_acked_ticket.verified_ticket().index - first_acked_ticket.verified_ticket().index + 1) as u32,
             1.0, // Aggregated tickets have always 100% winning probability
-            channel_epoch.as_u32())?;
+            channel_epoch)?;
 
         ticket.challenge = first_acked_ticket.verified_ticket().challenge.clone();
         Ok(ticket.sign(me, &domain_separator))
