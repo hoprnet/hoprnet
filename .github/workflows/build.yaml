@@ -91,8 +91,34 @@ jobs:
           GOOGLE_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
           IMAGE_TARGET: europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/${{ matrix.target }}:${{ steps.update.outputs.DOCKER_TAG_PR }}
 
+  deploy:
+    runs-on: self-hosted-hoprnet-small
+    needs: build
+    if: contains(github.event.pull_request.labels.*.name, 'deploy_nodes') 
+    steps:
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@v4
+
+      - name: Set up Google Cloud Credentials
+        uses: google-github-actions/auth@v1
+        with:
+          token_format: "access_token"
+          credentials_json: ${{ secrets.GCP_SA_TERRAFORM_JSON }}
+
+      - name: Set up Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v1
+        with:
+          project_id: hopr-staging
+          install_components: beta
+
+      - name: Get credentials
+        uses: google-github-actions/get-gke-credentials@v2
+        with:
+          cluster_name: cluster-staging
+          location: europe-west3
+          project_id: hopr-staging
+
       - name: "Restart PR deployment"
-        if: contains(github.event.pull_request.labels.*.name, 'deploy_nodes') && matrix.target == 'hoprd'
         run: |
           base_branch="${{ github.event.pull_request.base.ref }}"
           # Identify parameters depending on branch
@@ -105,7 +131,7 @@ jobs:
           cluster_name=pr-${{ github.event.pull_request.number }}
           echo "[INFO] Restarting deployments on ${namespace} from pr-${{ github.event.pull_request.number }}"
           # Get list of deployments to restart
-          export deployments=($(kubectl get deployments -n ${namespace} -l hoprds.hoprnet.org/cluster=${cluster_name},app.kubernetes.io/name=hoprd-operator,hoprds.hoprnet.org/identitypool=${identity_pool} -o jsonpath="{.items[*].metadata.name}"))
+          export deployments=($(kubectl get deployments -n core-team -o json | jq -r --arg cluster_name $cluster_name '.items[] | select(.metadata.name | test($cluster_name)).metadata.name'))
           for deployment in "${deployments[@]}"; do
             echo "[INFO] Restarting hoprd node ${namespace}/${deployments}"
             kubectl rollout restart deployments -n ${namespace} $deployment;
