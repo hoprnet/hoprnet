@@ -229,9 +229,7 @@ impl BinarySerializable for ChannelEntry {
             U256::from(match self.status {
                 ChannelStatus::Closed => 0_u64, // We do not store the closure time value anymore once already closed
                 ChannelStatus::Open => 0_u64,
-                ChannelStatus::PendingToClose(closure_time) => {
-                    closure_time.saturating_sub(SystemTime::UNIX_EPOCH).as_secs()
-                }
+                ChannelStatus::PendingToClose(closure_time) => closure_time.as_unix_timestamp().as_secs(),
             })
             .to_bytes()
             .as_ref(),

@@ -1534,7 +1534,7 @@ mod messages {
             }
         }
 
-        let timestamp = std::time::SystemTime::now().saturating_sub(std::time::UNIX_EPOCH);
+        let timestamp = std::time::SystemTime::now().as_unix_timestamp();
 
         match hopr
             .send_message(msg_body, args.peer_id, args.path, args.hops, Some(args.tag))
