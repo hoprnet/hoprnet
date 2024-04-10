@@ -2,6 +2,7 @@ use std::collections::hash_set::HashSet;
 use std::time::{Duration, SystemTime};
 
 use futures::StreamExt;
+use hopr_primitive_types::traits::SaturatingSub;
 use libp2p_identity::PeerId;
 
 use multiaddr::Multiaddr;
@@ -400,7 +401,7 @@ where
 
     pub(crate) fn should_still_be_ignored(&self, peer: &PeerStatus) -> bool {
         peer.ignored
-            .map(|t| current_time().duration_since(t).unwrap_or_default() < self.cfg.ignore_timeframe)
+            .map(|t| current_time().saturating_sub(t) < self.cfg.ignore_timeframe)
             .unwrap_or(false)
     }
 }

@@ -478,8 +478,7 @@ impl PacketInteraction {
                             if let MsgProcessed::Forward(_, _, _, _) = &processed_msg {
                                 METRIC_RELAYED_PACKET_IN_MIXER_TIME.observe(
                                     hopr_platform::time::native::current_time()
-                                        .duration_since(metadata.start_time)
-                                        .unwrap_or_default()
+                                        .saturating_sub(metadata.start_time)
                                         .as_secs_f64(),
                                 )
                             };
