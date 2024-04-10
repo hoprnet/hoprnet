@@ -115,6 +115,32 @@ jobs:
     needs:
       - tag
     steps:
+
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@v4
+        with:
+          repository: hoprnet/hoprnet-ci
+
+      - name: Set up Google Cloud Credentials
+        id: auth
+        uses: google-github-actions/auth@v1
+        with:
+          token_format: "access_token"
+          credentials_json: ${{ secrets.GCP_SA_TERRAFORM_JSON }}
+
+      - name: Set up Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v1
+        with:
+          project_id: hopr-staging
+          install_components: beta
+
+      - name: Get credentials
+        uses: google-github-actions/get-gke-credentials@v2
+        with:
+          cluster_name: cluster-staging
+          location: europe-west3
+          project_id: hopr-staging
+
       - name: "Restart deployments"
         run: |
           base_branch="${{ github.event.pull_request.base.ref }}"

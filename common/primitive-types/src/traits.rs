@@ -104,6 +104,18 @@ pub trait AsUnixTimestamp {
 
 impl AsUnixTimestamp for std::time::SystemTime {
     fn as_unix_timestamp(&self) -> std::time::Duration {
-        self.duration_since(std::time::SystemTime::UNIX_EPOCH).unwrap()
+        self.saturating_sub(std::time::SystemTime::UNIX_EPOCH)
+    }
+}
+
+/// A trait that adds extension method to perform saturated substractions on `SystemTime` instances.
+pub trait SaturatingSub {
+    /// Performs saturated substraction on `SystemTime` instances.
+    fn saturating_sub(&self, earlier: std::time::SystemTime) -> std::time::Duration;
+}
+
+impl SaturatingSub for std::time::SystemTime {
+    fn saturating_sub(&self, earlier: std::time::SystemTime) -> std::time::Duration {
+        self.duration_since(earlier).unwrap_or(std::time::Duration::ZERO)
     }
 }

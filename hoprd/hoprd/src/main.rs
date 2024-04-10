@@ -180,7 +180,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     // TODO: remove RLP in 3.0
                     match hopr_lib::rlp::decode(&data.plain_text) {
                         Ok((msg, sent)) => {
-                            let latency = recv_at.duration_since(SystemTime::UNIX_EPOCH).unwrap() - sent;
+                            let latency = recv_at.as_unix_timestamp() - sent;
 
                             info!(
                                 r#"
