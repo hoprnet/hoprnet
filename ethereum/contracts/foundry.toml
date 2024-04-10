@@ -4,10 +4,10 @@
 # Don't commit changes to this line which point to /nix/store/...
 # These are part of the `nix develop` shell setup.
 # This must be: 0.8.19
-solc = "/nix/store/rvhqi1j75gnf0md4x9bvy9wvyy9k2ax8-solc-default/bin/solc"
+solc = "0.8.19"
 src = 'src'
-out = 'out'
 test = 'test'
+out = 'out'
 libs = ['lib']
 verbosity = 3
 fs_permissions = [{ access = "read-write", path = "./"}] # to write logs into a local `./test.txt` file
