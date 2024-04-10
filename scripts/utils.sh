@@ -293,4 +293,7 @@ update_protocol_config_addresses() {
   log "contract addresses are updated in protocol configuration"
 }
 
+get_eth_block_number() {
+}
+
 setup_colors
