@@ -37,7 +37,7 @@ use futures::{
 use futures_concurrency::stream::Merge;
 use libp2p::request_response::RequestId;
 use std::collections::{HashMap, HashSet};
-use utils_log::{debug, error, info};
+use utils_log::{debug, error, info, warn};
 
 #[derive(Debug)]
 pub enum Inputs {
@@ -259,17 +259,28 @@ pub(crate) async fn p2p_loop(
                 },
                 Inputs::TicketAggregation(task) => match task {
                     TicketAggregationProcessed::Send(peer, acked_tickets, finalizer) => {
+                        let encoded = cbor4ii::serde::to_vec(Vec::with_capacity(3000), &acked_tickets).unwrap();
+                        warn!("Aggregation request to {peer}: {}", hex::encode(&encoded));
+                        
                         let request_id = swarm.behaviour_mut().ticket_aggregation.send_request(&peer, acked_tickets);
+                        
                         info!("Ticket aggregation: Sent request (#{request_id}) to {peer}");
                         active_aggregation_requests.insert(request_id, finalizer);
                     },
                     TicketAggregationProcessed::Reply(peer, ticket, response) => {
                         info!("Ticket aggregation: serving request from {peer}");
+
+                        let encoded = cbor4ii::serde::to_vec(Vec::with_capacity(3000), &ticket).unwrap();
+                        warn!("Aggregation response to {peer}: {}", hex::encode(&encoded));
+
                         if let Err(_) = swarm.behaviour_mut().ticket_aggregation.send_response(response, ticket) {
                             error!("Ticket aggregation: Failed to send reply to {peer}");
                         }
                     },
-                    TicketAggregationProcessed::Receive(_peer, acked_ticket, request) => {
+                    TicketAggregationProcessed::Receive(peer, acked_ticket, request) => {
+                        let encoded = cbor4ii::serde::to_vec(Vec::with_capacity(3000), &acked_ticket).unwrap();
+                        warn!("Aggregation response from {peer}: {}", hex::encode(&encoded));
+
                         if let Err(e) = on_acknowledged_ticket.unbounded_send(acked_ticket) {
                             error!("Ticket aggregation: failed to emit acknowledged aggregated ticket: {e}");
                         }
