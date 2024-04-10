@@ -72,6 +72,7 @@ pub struct AcknowledgedTicket {
 impl AcknowledgedTicket {
     pub fn new(
         value: crate::acknowledgement::AcknowledgedTicket,
+        me: &hopr_primitive_types::primitives::Address,
         domain_separator: &hopr_crypto_types::types::Hash,
     ) -> Self {
         let mut response = Response::default();
@@ -91,7 +92,7 @@ impl AcknowledgedTicket {
                 &value
                     .vrf_params
                     .get_s_b_witness(
-                        &value.signer,
+                        me,
                         &value.ticket.get_hash(domain_separator).into(),
                         domain_separator.as_slice(),
                     )
