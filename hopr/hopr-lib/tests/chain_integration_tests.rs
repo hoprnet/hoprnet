@@ -21,12 +21,7 @@ use ethers::providers::Middleware;
 use ethers::utils::AnvilInstance;
 use futures::StreamExt;
 use hopr_crypto_types::prelude::*;
-use hopr_db_api::accounts::HoprDbAccountOperations;
-use hopr_db_api::channels::HoprDbChannelOperations;
-use hopr_db_api::db::HoprDb;
-use hopr_db_api::info::{DomainSeparator, HoprDbInfoOperations};
-use hopr_db_api::tickets::HoprDbTicketOperations;
-use hopr_db_api::HoprDbGeneralModelOperations;
+use hopr_db_api::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use std::time::Duration;
@@ -148,7 +143,7 @@ type TestRpc = RpcOperations<JsonRpcProviderClient<SurfRequestor, SimpleJsonRpcR
 
 struct ChainNode {
     chain_key: ChainKeypair,
-    _offchain_key: OffchainKeypair,
+    offchain_key: OffchainKeypair,
     db: HoprDb,
     actions: ChainActions<HoprDb>,
     _indexer: Indexer<TestRpc, ContractEventHandlers<HoprDb>, HoprDb>,
@@ -229,7 +224,7 @@ async fn start_node_chain_logic(
     indexer.start().await.expect("indexer should sync");
 
     ChainNode {
-        _offchain_key: offchain_key.clone(),
+        offchain_key: offchain_key.clone(),
         chain_key: chain_key.clone(),
         db,
         actions,
@@ -370,10 +365,9 @@ async fn integration_test_indexer() {
 
     // Announce the node by Alice
     let maddr: Multiaddr = "/ip4/127.0.0.1/tcp/10000".parse().unwrap();
-    let offchain_key = OffchainKeypair::random();
     let confirmation = alice_node
         .actions
-        .announce(&[maddr.clone()], &offchain_key)
+        .announce(&[maddr.clone()], &alice_node.offchain_key)
         .await
         .expect("should submit announcement tx")
         .await
@@ -382,7 +376,7 @@ async fn integration_test_indexer() {
     assert!(
         matches!(confirmation.event,
             Some(ChainEventType::Announcement{ peer, address, multiaddresses })
-            if peer == offchain_key.public().into() &&
+            if peer == alice_node.offchain_key.public().into() &&
             address == alice_chain_key.public().to_address() &&
             multiaddresses.contains(&maddr)
         ),
@@ -395,10 +389,9 @@ async fn integration_test_indexer() {
 
     // Announce the node by Bob
     let maddr: Multiaddr = "/ip4/127.0.0.1/tcp/20000".parse().unwrap();
-    let offchain_key = OffchainKeypair::random();
     let confirmation = bob_node
         .actions
-        .announce(&[maddr.clone()], &offchain_key)
+        .announce(&[maddr.clone()], &bob_node.offchain_key)
         .await
         .expect("should submit announcement tx")
         .await
@@ -407,7 +400,7 @@ async fn integration_test_indexer() {
     assert!(
         matches!(confirmation.event,
             Some(ChainEventType::Announcement{ peer, address, multiaddresses })
-            if peer == offchain_key.public().into() &&
+            if peer == bob_node.offchain_key.public().into() &&
             address == bob_chain_key.public().to_address() &&
             multiaddresses.contains(&maddr)
         ),
@@ -416,6 +409,48 @@ async fn integration_test_indexer() {
     info!(
         "--> Bob's node {} has been announced as {maddr}",
         bob_chain_key.public().to_address()
+    );
+
+    async_std::task::sleep(Duration::from_millis(1000)).await;
+
+    assert_eq!(
+        Some(alice_node.chain_key.public().to_address()),
+        bob_node
+            .db
+            .resolve_chain_key(alice_node.offchain_key.public())
+            .await
+            .expect("resolve should not fail"),
+        "bob must resolve alice's chain key correctly"
+    );
+
+    assert_eq!(
+        Some(*alice_node.offchain_key.public()),
+        bob_node
+            .db
+            .resolve_packet_key(&alice_node.chain_key.public().to_address())
+            .await
+            .expect("resolve should not fail"),
+        "bob must resolve alice's offchain key correctly"
+    );
+
+    assert_eq!(
+        Some(bob_node.chain_key.public().to_address()),
+        alice_node
+            .db
+            .resolve_chain_key(bob_node.offchain_key.public())
+            .await
+            .expect("resolve should not fail"),
+        "alice must resolve bob's chain key correctly"
+    );
+
+    assert_eq!(
+        Some(*bob_node.offchain_key.public()),
+        alice_node
+            .db
+            .resolve_packet_key(&bob_node.chain_key.public().to_address())
+            .await
+            .expect("resolve should not fail"),
+        "alice must resolve bob's offchain key correctly"
     );
 
     // Open channel (from Alice to Bob) with 1 HOPR
@@ -486,6 +521,8 @@ async fn integration_test_indexer() {
         _ => panic!("invalid confirmation"),
     };
 
+    async_std::task::sleep(Duration::from_millis(100)).await;
+
     // After the funding, read channel_alice_bob again and compare its balance
     let channel_alice_bob = alice_node
         .db
@@ -549,7 +586,7 @@ async fn integration_test_indexer() {
         _ => panic!("invalid confirmation"),
     };
 
-    async_std::task::sleep(Duration::from_millis(100)).await;
+    async_std::task::sleep(Duration::from_millis(1000)).await;
 
     let channel_bob_alice = alice_node
         .db
@@ -654,6 +691,8 @@ async fn integration_test_indexer() {
         _ => panic!("invalid confirmation"),
     };
 
+    async_std::task::sleep(Duration::from_millis(1000)).await;
+
     let bob_ack_tickets = alice_node
         .db
         .get_tickets(None, channel_bob_alice.into())
@@ -665,8 +704,6 @@ async fn integration_test_indexer() {
         bob_ack_tickets.len(),
         "Bob must have no acknowledged tickets after redeeming"
     );
-
-    async_std::task::sleep(Duration::from_millis(100)).await;
 
     let channel_bob_alice = alice_node
         .db
@@ -761,6 +798,8 @@ async fn integration_test_indexer() {
         }
         _ => panic!("invalid confirmation"),
     }
+
+    async_std::task::sleep(Duration::from_millis(1000)).await;
 
     let channel_alice_bob = alice_node
         .db

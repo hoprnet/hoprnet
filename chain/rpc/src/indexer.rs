@@ -137,7 +137,7 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                                     }
 
                                     debug!("retrieved {log}");
-                                    current_block_log.logs.push(log);
+                                    current_block_log.logs.insert(log);
                                 },
                                 Ok(None) => {
                                     trace!("done processing batch #{from_block} - #{latest_block}");
@@ -162,7 +162,11 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                                         from_block = current_block_log.block_id;
                                         continue 'outer;
                                     } else {
-                                        panic!("cannot advance due to unrecoverable RPC error: {e}");
+                                        panic!("!!! Cannot advance the chain indexing due to unrecoverable RPC errors.
+
+                                        The RPC provider does not seem to be working correctly. 
+                                        
+                                        The last encountered error was: {e}");
                                     }
                                 }
                             }

@@ -13,6 +13,8 @@ mod m20240301_000010_tickets_create_ticket;
 mod m20240301_000011_tickets_create_ticket_stats;
 mod m20240301_000012_tickets_create_outgoing_ticket_index;
 mod m20240301_000013_initial_seed_tickets;
+mod m20240301_000014_create_ticket_stats_with_channel_id;
+mod m20240326_000015_recreate_ticket_stats;
 
 #[derive(PartialEq)]
 pub enum BackendType {
@@ -22,7 +24,8 @@ pub enum BackendType {
 
 pub struct Migrator;
 
-/// Used to instantiate all tables to generate the corresponding entities
+/// Used to instantiate all tables to generate the corresponding entities in
+/// a non-SQLite database (such as Postgres).
 #[async_trait::async_trait]
 impl MigratorTrait for Migrator {
     fn migrations() -> Vec<Box<dyn MigrationTrait>> {
@@ -36,12 +39,16 @@ impl MigratorTrait for Migrator {
             Box::new(m20240226_000007_index_initial_seed::Migration),
             Box::new(m20240226_000008_node_create_settings::Migration),
             Box::new(m20240226_000009_peers_create_peer_store::Migration),
-            Box::new(m20240301_000010_tickets_create_ticket::Migration(BackendType::SQLite)),
+            Box::new(m20240301_000010_tickets_create_ticket::Migration(BackendType::Postgres)),
             Box::new(m20240301_000011_tickets_create_ticket_stats::Migration),
             Box::new(m20240301_000012_tickets_create_outgoing_ticket_index::Migration(
-                BackendType::SQLite,
+                BackendType::Postgres,
             )),
             Box::new(m20240301_000013_initial_seed_tickets::Migration),
+            Box::new(m20240301_000014_create_ticket_stats_with_channel_id::Migration(
+                BackendType::Postgres,
+            )),
+            Box::new(m20240326_000015_recreate_ticket_stats::Migration(BackendType::Postgres)),
         ]
     }
 }
@@ -90,6 +97,10 @@ impl MigratorTrait for MigratorTickets {
                 BackendType::SQLite,
             )),
             Box::new(m20240301_000013_initial_seed_tickets::Migration),
+            Box::new(m20240301_000014_create_ticket_stats_with_channel_id::Migration(
+                BackendType::SQLite,
+            )),
+            Box::new(m20240326_000015_recreate_ticket_stats::Migration(BackendType::SQLite)),
         ]
     }
 }

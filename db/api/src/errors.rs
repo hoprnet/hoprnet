@@ -2,6 +2,7 @@ use hopr_crypto_types::{prelude::CryptoError, types::Hash};
 use hopr_db_entity::errors::DbEntityError;
 use hopr_internal_types::{channels::Ticket, errors::CoreTypesError};
 use sea_orm::TransactionError;
+use std::sync::Arc;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -15,7 +16,6 @@ pub enum DbError {
     #[error("missing fixed entry in table {0}")]
     MissingFixedTableEntry(String),
 
-    // TODO: use this for TA related issues
     #[error("ticket aggregation error: {0}")]
     TicketAggregationError(String),
 
@@ -45,6 +45,9 @@ pub enum DbError {
 
     #[error(transparent)]
     EntityError(#[from] DbEntityError),
+
+    #[error("error while inserting into cache: {0}")]
+    CacheError(#[from] Arc<Self>),
 
     #[error(transparent)]
     NonSpecificError(#[from] hopr_primitive_types::errors::GeneralError),

@@ -22,6 +22,8 @@ use std::{pin::Pin, task::Poll};
 use tracing::{error, warn};
 
 use async_std::task::{sleep, spawn};
+use hopr_db_api::errors::DbError;
+use hopr_db_api::prelude::HoprDbInfoOperations;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleCounter;
@@ -51,7 +53,7 @@ pub const TICKET_AGGREGATION_RX_QUEUE_SIZE: usize = 2048;
 pub enum TicketAggregationToProcess<T, U> {
     ToReceive(PeerId, std::result::Result<Ticket, String>, U),
     ToProcess(PeerId, Vec<AcknowledgedTicket>, T),
-    ToSend(Hash, Option<AggregationPrerequisites>, TicketAggregationFinalizer),
+    ToSend(Hash, AggregationPrerequisites, TicketAggregationFinalizer),
 }
 
 /// Emitted by the processor background pipeline once processed
@@ -60,7 +62,11 @@ pub enum TicketAggregationToProcess<T, U> {
 pub enum TicketAggregationProcessed<T, U> {
     Receive(PeerId, AcknowledgedTicket, U),
     Reply(PeerId, std::result::Result<Ticket, String>, T),
-    Send(PeerId, Vec<AcknowledgedTicket>, TicketAggregationFinalizer),
+    Send(
+        PeerId,
+        Vec<hopr_internal_types::legacy::AcknowledgedTicket>,
+        TicketAggregationFinalizer,
+    ),
 }
 
 #[derive(Debug)]
@@ -115,12 +121,12 @@ where
     pub async fn aggregate_tickets_in_the_channel(
         &self,
         channel: &Hash,
-        prerequisites: Option<AggregationPrerequisites>,
+        prerequisites: AggregationPrerequisites,
     ) -> Result<()> {
         let mut awaiter = self.writer.clone().aggregate_tickets(channel, prerequisites)?;
 
         if let Err(e) = awaiter.consume_and_wait(self.agg_timeout).await {
-            error!("Error occured on ticket aggregation for '{channel}', performing a rollback: {e}");
+            warn!("Error occured on ticket aggregation for '{channel}', performing a rollback: {e}");
             self.db.rollback_aggregation_in_channel(*channel).await?;
         }
 
@@ -221,7 +227,7 @@ impl<T, U> TicketAggregationActions<T, U> {
     pub fn aggregate_tickets(
         &mut self,
         channel: &Hash,
-        prerequisites: Option<AggregationPrerequisites>,
+        prerequisites: AggregationPrerequisites,
     ) -> Result<TicketAggregationAwaiter> {
         let (tx, rx) = oneshot::channel::<()>();
 
@@ -269,7 +275,7 @@ where
     /// Creates a new instance given the DB to process the ticket aggregation requests.
     pub fn new<Db>(db: Db, chain_key: &ChainKeypair) -> Self
     where
-        Db: HoprDbTicketOperations + Send + Sync + Clone + std::fmt::Debug + 'static,
+        Db: HoprDbTicketOperations + HoprDbInfoOperations + Send + Sync + Clone + std::fmt::Debug + 'static,
     {
         let (processing_in_tx, processing_in_rx) = channel::<TicketAggregationToProcess<T, U>>(
             TICKET_AGGREGATION_RX_QUEUE_SIZE + TICKET_AGGREGATION_TX_QUEUE_SIZE,
@@ -334,20 +340,36 @@ where
                     }
                     TicketAggregationToProcess::ToSend(channel, prerequsites, finalizer) => {
                         match db.prepare_aggregation_in_channel(&channel, prerequsites).await {
-                            Ok(Some((source, tickets))) => {
+                            Ok(Some((source, tickets))) if !tickets.is_empty() => {
                                 #[cfg(all(feature = "prometheus", not(test)))]
                                 {
                                     METRIC_AGGREGATED_TICKETS.increment_by(tickets.len() as u64);
                                     METRIC_AGGREGATION_COUNT.increment();
                                 }
 
-                                Some(TicketAggregationProcessed::Send(source.into(), tickets, finalizer))
-                            }
-                            Ok(None) => { finalizer.finalize(); None },
+                                // TODO: remove this transformation in 3.0 once proper aggregation protocol format is introduced
+                                match db.get_indexer_data(None)
+                                    .await
+                                    .and_then(|data| data.channels_dst.ok_or(DbError::LogicalError("missing channels domain separator".into()))) {
+                                    Ok(dst) => {
+                                        let tickets = tickets.into_iter()
+                                            .map(|t| hopr_internal_types::legacy::AcknowledgedTicket::new(t, &dst))
+                                            .collect::<Vec<_>>();
+                                        Some(TicketAggregationProcessed::Send(source.into(), tickets, finalizer))
+                                    }
+                                    Err(e) => {
+                                        error!("An error occured when preparing the channel aggregation: {e}");
+                                        None
+                                    }
+                                }
+                            },
                             Err(e) => {
                                 error!("An error occured when preparing the channel aggregation: {e}");
                                 None
                             },
+                            _ => {
+                                finalizer.finalize(); None
+                            }
                         }
                     }
                 };
@@ -558,7 +580,7 @@ mod tests {
 
         let mut awaiter = bob
             .writer()
-            .aggregate_tickets(&channel_alice_bob.get_id(), None)
+            .aggregate_tickets(&channel_alice_bob.get_id(), Default::default())
             .unwrap();
 
         let mut finalizer = None;
@@ -567,7 +589,11 @@ mod tests {
                 let _ = finalizer.insert(request_finalizer);
                 alice
                     .writer()
-                    .receive_aggregation_request(bob_packet_key, acked_tickets, ())
+                    .receive_aggregation_request(
+                        bob_packet_key,
+                        acked_tickets.into_iter().map(AcknowledgedTicket::from).collect(),
+                        (),
+                    )
                     .unwrap();
             }
             _ => panic!("unexpected action happened while sending agg request by Bob"),

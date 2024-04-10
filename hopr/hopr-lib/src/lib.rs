@@ -24,7 +24,7 @@ pub mod errors;
 mod helpers;
 
 pub use {
-    chain::{Network as ChainNetwork, ProtocolsConfig},
+    chain::{Addresses as NetworkContractAddresses, EnvironmentType, Network as ChainNetwork, ProtocolsConfig},
     chain_actions::errors::ChainActionsError,
     core_strategy::Strategy,
     core_transport::{
@@ -79,7 +79,6 @@ use hopr_platform::file::native::{join, read_file, remove_dir_all, write};
 use tracing::{debug, error, info};
 
 use crate::chain::ChainNetworkConfig;
-use crate::chain::SmartContractConfig;
 use crate::config::HoprLibConfig;
 use crate::config::SafeModule;
 use crate::constants::{MIN_NATIVE_BALANCE, SUGGESTED_NATIVE_BALANCE};
@@ -627,7 +626,7 @@ impl Hopr {
             &mut cfg.chain.protocols,
         )
         .expect("Failed to resolve blockchain environment");
-        let contract_addresses = SmartContractConfig::from(&resolved_environment);
+        let contract_addresses = ContractAddresses::from(&resolved_environment);
         info!(
             "Resolved contract addresses for myself as '{}': {:?}",
             me_onchain.public().to_hex(),
@@ -812,32 +811,6 @@ impl Hopr {
         info!("Start the indexer and sync the chain");
         self.chain_api.sync_chain().await?;
 
-        // NOTE: strategy ticks must start after the chain is synced, otherwise
-        // the strategy would react to historical data and drain through the native
-        // balance on chain operations not relevant for the present network state
-        let multi_strategy_clone = self.multistrategy.clone();
-        spawn(async move {
-            execute_on_tick(Duration::from_secs(60), move || {
-                let multistrategy_clone = multi_strategy_clone.clone();
-
-                async move {
-                    info!("doing strategy tick");
-                    let _ = multistrategy_clone.on_tick().await;
-                    info!("strategy tick done");
-                }
-            })
-            .await;
-
-            error!(
-                "CRITICAL: the core chain loop unexpectedly stopped: '{}'",
-                HoprLoopComponents::StrategyTick
-            );
-            panic!(
-                "CRITICAL: the core chain loop unexpectedly stopped: '{}'",
-                HoprLoopComponents::StrategyTick
-            );
-        });
-
         info!("Loading initial peers from the storage");
         self.transport_api.init_from_db().await?;
 
@@ -930,6 +903,32 @@ impl Hopr {
             ],
             1.0,
         );
+
+        // NOTE: strategy ticks must start after the chain is synced, otherwise
+        // the strategy would react to historical data and drain through the native
+        // balance on chain operations not relevant for the present network state
+        let multi_strategy = self.multistrategy.clone();
+        spawn(async move {
+            execute_on_tick(Duration::from_secs(60), move || {
+                let multi_strategy = multi_strategy.clone();
+
+                async move {
+                    info!("doing strategy tick");
+                    let _ = multi_strategy.on_tick().await;
+                    info!("strategy tick done");
+                }
+            })
+            .await;
+
+            error!(
+                "CRITICAL: the core chain loop unexpectedly stopped: '{}'",
+                HoprLoopComponents::StrategyTick
+            );
+            panic!(
+                "CRITICAL: the core chain loop unexpectedly stopped: '{}'",
+                HoprLoopComponents::StrategyTick
+            );
+        });
 
         Ok(futures::future::pending())
     }

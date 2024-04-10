@@ -4,7 +4,7 @@ use async_std::task::spawn;
 use futures::{stream, StreamExt};
 use tracing::{debug, error, info, trace};
 
-use chain_rpc::{HoprIndexerRpcOperations, Log, LogFilter};
+use chain_rpc::{HoprIndexerRpcOperations, LogFilter};
 use chain_types::chain_events::SignificantChainEvent;
 use hopr_crypto_types::types::Hash;
 use hopr_db_api::info::HoprDbInfoOperations;
@@ -27,20 +27,6 @@ lazy_static::lazy_static! {
             "hopr_indexer_sync_progress",
             " Sync progress of the historical data by the indexer",
     ).unwrap();
-}
-
-fn log_comparator(left: &Log, right: &Log) -> std::cmp::Ordering {
-    let blocks = left.block_number.cmp(&right.block_number);
-    if blocks == std::cmp::Ordering::Equal {
-        let tx_indices = left.tx_index.cmp(&right.tx_index);
-        if tx_indices == std::cmp::Ordering::Equal {
-            left.log_index.cmp(&right.log_index)
-        } else {
-            tx_indices
-        }
-    } else {
-        blocks
-    }
 }
 
 /// Indexer
@@ -110,7 +96,7 @@ where
         let db_processor = self.db_processor.take().expect("db_processor should be present");
         let tx_significant_events = self.egress.clone();
 
-        let db_latest_block = self.db.get_indexer_data(None).await?.last_indexed_block as u64;
+        let db_latest_block = self.db.get_last_indexed_block(None).await? as u64;
 
         let latest_block_in_db = self.cfg.start_block_number.max(db_latest_block);
 
@@ -137,13 +123,12 @@ where
         info!("Building indexer background process");
         let (tx, mut rx) = futures::channel::mpsc::channel::<()>(1);
 
-        let db = self.db.clone();
         spawn(async move {
             let is_synced = Arc::new(std::sync::atomic::AtomicBool::new(false));
 
             let mut chain_head = 0;
 
-            let block_stream = rpc
+            let event_stream = rpc
                 .try_stream_logs(latest_block_in_db, log_filter)
                 .expect("block stream should be constructible")
                 .then(|block_with_logs| {
@@ -190,56 +175,41 @@ where
                         block_with_logs
                     }
                 })
-                .then(|block_with_logs| async {
-                    if let Err(error) = db.set_last_indexed_block(None, block_with_logs.block_id as u32).await {
-                        error!("failed to write the latest block number into the database: {error}");
-                    }
-
-                    block_with_logs
-                })
-                .flat_map(|mut block_with_logs| {
-                    // Assuming sorted and properly organized blocks,
-                    // the following lines are just a sanity safety mechanism
-                    block_with_logs.logs.sort_by(log_comparator);
-                    stream::iter(block_with_logs.logs)
-                })
-                .then(|log| async {
-                    let tx_hash = log.tx_hash;
-
-                    db_processor
-                        .on_event(log.address, log.block_number as u32, log.into())
-                        .await
-                        .map(|v| {
-                            v.map(|event_type| {
-                                // Pair the event type with the TX hash here
-                                let significant_event = SignificantChainEvent { tx_hash, event_type };
-                                debug!("indexer got {significant_event}");
-                                significant_event
-                            })
-                        })
-                        .map_err(|e| {
-                            error!("failed to process logs: {e}");
-                            e
-                        })
-                });
-
-            futures::pin_mut!(block_stream);
-            while let Some(event) = block_stream.next().await {
-                trace!("Processing an onchain event: {event:?}");
-                if is_synced.load(std::sync::atomic::Ordering::Relaxed) {
-                    match event {
-                        Ok(Some(e)) => {
-                            if let Err(e) = tx_significant_events.unbounded_send(e) {
-                                error!("failed to pass a significant chain event further: {e}");
-                            }
+                .filter_map(|block_with_logs| async {
+                    debug!("processing events in {block_with_logs} ...");
+                    let block_num = block_with_logs.block_id;
+                    match db_processor.collect_block_events(block_with_logs).await {
+                        Ok(events) => {
+                            debug!(
+                                "retrieved {} significant chain events from block #{block_num}",
+                                events.len()
+                            );
+                            Some(events)
                         }
-                        Ok(None) => {}
                         Err(e) => {
-                            error!("failed to process on-chain event into a recognizable chain event: {e}")
+                            error!("failed to process logs in block #{block_num} into events: {e}");
+                            None
                         }
+                    }
+                })
+                .flat_map(stream::iter);
+
+            futures::pin_mut!(event_stream);
+            while let Some(event) = event_stream.next().await {
+                trace!("Processing an onchain event: {event:?}");
+                // Pass the events further only once we're fully synced
+                if is_synced.load(std::sync::atomic::Ordering::Relaxed) {
+                    if let Err(e) = tx_significant_events.unbounded_send(event) {
+                        error!("failed to pass a significant chain event further: {e}");
                     }
                 }
             }
+
+            panic!(
+                "Indexer event stream has been terminated, cannot proceed further!\n\
+                This error indicates that an issue has occurred at the RPC provider!\n\
+                The node cannot function without a good RPC connection."
+            );
         });
 
         if std::future::poll_fn(|cx| futures::Stream::poll_next(std::pin::Pin::new(&mut rx), cx))
@@ -257,11 +227,12 @@ where
 
 #[cfg(test)]
 pub mod tests {
+    use std::collections::BTreeSet;
     use std::pin::Pin;
 
     use async_trait::async_trait;
     use bindings::hopr_announcements::AddressAnnouncementFilter;
-    use chain_rpc::BlockWithLogs;
+    use chain_rpc::{BlockWithLogs, Log};
     use chain_types::chain_events::ChainEventType;
     use ethers::{
         abi::{encode, Token},
@@ -399,45 +370,6 @@ pub mod tests {
     }
 
     #[async_std::test]
-    async fn test_indexer_should_not_pass_blocks_unless_finalized() {
-        let mut handlers = MockChainLogHandler::new();
-        let mut rpc = MockHoprIndexerOps::new();
-        let db = create_stub_db().await;
-
-        handlers.expect_contract_addresses().return_const(vec![]);
-
-        let head_block = 1000;
-        rpc.expect_block_number().return_once(move || Ok(head_block));
-
-        let (mut tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
-        rpc.expect_try_stream_logs()
-            .times(1)
-            .withf(move |x: &u64, _y: &chain_rpc::LogFilter| *x == 0)
-            .return_once(move |_, _| Ok(Box::pin(rx)));
-
-        let expected = BlockWithLogs {
-            block_id: head_block - 1,
-            logs: vec![],
-        };
-
-        handlers.expect_on_event().times(0);
-
-        assert!(tx.start_send(expected.clone()).is_ok());
-
-        let mut indexer = Indexer::new(
-            rpc,
-            handlers,
-            db.clone(),
-            IndexerConfig::default(),
-            futures::channel::mpsc::unbounded().0,
-        );
-        let _ = join!(indexer.start(), async move {
-            async_std::task::sleep(std::time::Duration::from_millis(200)).await;
-            tx.close_channel()
-        });
-    }
-
-    #[async_std::test]
     async fn test_indexer_should_pass_blocks_that_are_finalized() {
         let mut handlers = MockChainLogHandler::new();
         let mut rpc = MockHoprIndexerOps::new();
@@ -459,17 +391,17 @@ pub mod tests {
 
         let finalized_block = BlockWithLogs {
             block_id: head_block - 1,
-            logs: build_announcement_logs(*BOB, 4, head_block - 1, U256::from(23u8)),
+            logs: BTreeSet::from_iter(build_announcement_logs(*BOB, 4, head_block - 1, U256::from(23u8))),
         };
         let head_allowing_finalization = BlockWithLogs {
             block_id: head_block,
-            logs: vec![],
+            logs: BTreeSet::new(),
         };
 
         handlers
-            .expect_on_event()
+            .expect_collect_block_events()
             .times(finalized_block.logs.len())
-            .returning(|_, _, _| Ok(None));
+            .returning(|_| Ok(vec![]));
 
         assert!(tx.start_send(finalized_block.clone()).is_ok());
         assert!(tx.start_send(head_allowing_finalization.clone()).is_ok());
@@ -503,17 +435,17 @@ pub mod tests {
             // head - 1 sync block
             BlockWithLogs {
                 block_id: head_block - 1,
-                logs: build_announcement_logs(*ALICE, 1, head_block - 1, U256::from(23u8)),
+                logs: BTreeSet::from_iter(build_announcement_logs(*ALICE, 1, head_block - 1, U256::from(23u8))),
             },
             // head sync block
             BlockWithLogs {
                 block_id: head_block,
-                logs: build_announcement_logs(*BOB, 1, head_block, U256::from(23u8)),
+                logs: BTreeSet::from_iter(build_announcement_logs(*BOB, 1, head_block, U256::from(23u8))),
             },
             // post-sync block
             BlockWithLogs {
                 block_id: head_block,
-                logs: build_announcement_logs(*CHRIS, 1, head_block, U256::from(23u8)),
+                logs: BTreeSet::from_iter(build_announcement_logs(*CHRIS, 1, head_block, U256::from(23u8))),
             },
         ];
 
@@ -522,9 +454,14 @@ pub mod tests {
         }
 
         handlers
-            .expect_on_event()
+            .expect_collect_block_events()
             .times(blocks.len())
-            .returning(|_, _, _| Ok(Some(RANDOM_ANNOUNCEMENT_CHAIN_EVENT.clone())));
+            .returning(|_| {
+                Ok(vec![SignificantChainEvent {
+                    tx_hash: Default::default(),
+                    event_type: RANDOM_ANNOUNCEMENT_CHAIN_EVENT.clone(),
+                }])
+            });
 
         for block in blocks.iter() {
             assert!(tx.start_send(block.clone()).is_ok());

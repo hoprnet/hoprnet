@@ -8,7 +8,7 @@ use sea_orm::Set;
 /// TODO: implement as TryFrom trait once https://github.com/hoprnet/hoprnet/pull/6018 is merged
 pub fn model_to_acknowledged_ticket(
     db_ticket: &ticket::Model,
-    domain_separator: Hash,
+    domain_separator: &Hash,
     chain_keypair: &ChainKeypair,
 ) -> crate::errors::Result<AcknowledgedTicket> {
     let response = Response::from_bytes(&db_ticket.response)?;
@@ -28,9 +28,9 @@ pub fn model_to_acknowledged_ticket(
     ticket.challenge = response.to_challenge().to_ethereum_challenge();
     ticket.signature = Some(Signature::from_bytes(&db_ticket.signature)?);
 
-    let signer = ticket.recover_signer(&domain_separator)?.to_address();
+    let signer = ticket.recover_signer(domain_separator)?.to_address();
 
-    let mut ticket = AcknowledgedTicket::new(ticket, response, signer, chain_keypair, &domain_separator)?;
+    let mut ticket = AcknowledgedTicket::new(ticket, response, signer, chain_keypair, domain_separator)?;
     ticket.status = AcknowledgedTicketStatus::try_from(db_ticket.state as u8)
         .map_err(|_| DbEntityError::ConversionError("invalid ticket state".into()))?;
 

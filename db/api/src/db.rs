@@ -1,21 +1,19 @@
 use std::sync::Arc;
 
+use crate::cache::HoprDbCaches;
 use hopr_crypto_types::keypairs::Keypair;
 use hopr_crypto_types::prelude::ChainKeypair;
-use hopr_crypto_types::types::{HalfKeyChallenge, Hash};
 use hopr_db_entity::ticket;
-use hopr_internal_types::acknowledgement::PendingAcknowledgement;
 use hopr_internal_types::prelude::AcknowledgedTicketStatus;
 use hopr_primitive_types::primitives::Address;
 use migration::{MigratorIndex, MigratorPeers, MigratorTickets, MigratorTrait};
-use moka::{future::Cache, Expiry};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, SqlxSqliteConnector};
 use sea_query::Expr;
 use sqlx::sqlite::{SqliteAutoVacuum, SqliteConnectOptions, SqliteJournalMode, SqliteSynchronous};
 use sqlx::{ConnectOptions, SqlitePool};
 use std::path::Path;
-use std::sync::atomic::AtomicU64;
 use std::time::Duration;
+use tracing::debug;
 use tracing::log::LevelFilter;
 
 use crate::ticket_manager::TicketManager;
@@ -30,21 +28,6 @@ pub struct HoprDbConfig {
     pub log_slow_queries: Duration,
 }
 
-pub struct ExpiryNever;
-
-impl<K, V> Expiry<K, V> for ExpiryNever {
-    fn expire_after_create(&self, _key: &K, _value: &V, _current_time: std::time::Instant) -> Option<Duration> {
-        None
-    }
-}
-
-// TODO: hide these behind a single Arc to simplify the clone process on the HoprDb object
-// pub struct DbCaches {
-//     pub(crate) unrealized_value: Cache<Hash, Balance>,
-//     pub(crate) ticket_index: Cache<Hash, std::sync::Arc<AtomicUsize>>,
-//     pub(crate) unacked_tickets: Cache<HalfKeyChallenge, PendingAcknowledgement>,
-// }
-
 #[derive(Debug, Clone)]
 pub struct HoprDb {
     pub(crate) db: sea_orm::DatabaseConnection,
@@ -53,9 +36,7 @@ pub struct HoprDb {
     pub(crate) ticket_manager: Arc<TicketManager>,
     pub(crate) chain_key: ChainKeypair, // TODO: remove this once chain keypairs are not needed to reconstruct tickets
     pub(crate) me_onchain: Address,
-    // TODO: move these caches to a separate object
-    pub(crate) unacked_tickets: Cache<HalfKeyChallenge, PendingAcknowledgement>,
-    pub(crate) ticket_index: Cache<Hash, Arc<AtomicU64>>,
+    pub(crate) caches: Arc<HoprDbCaches>,
 }
 
 pub const SQL_DB_INDEX_FILE_NAME: &str = "hopr_index.db";
@@ -130,15 +111,13 @@ impl HoprDb {
             .await
             .expect("cannot apply database migration");
 
-        let unacked_tickets = Cache::builder()
-            .time_to_idle(std::time::Duration::from_secs(30))
-            .max_capacity(1_000_000_000)
-            .build();
-
-        let ticket_index = Cache::builder()
-            .expire_after(ExpiryNever {})
-            .max_capacity(10_000)
-            .build();
+        // Reset the peer network information
+        let res = hopr_db_entity::network_peer::Entity::delete_many()
+            .filter(sea_orm::Condition::all())
+            .exec(&peers_db)
+            .await
+            .expect("must reset peers on init");
+        debug!("Cleaned up {} rows from the 'peers' table", res.rows_affected);
 
         // Reset all BeingAggregated ticket states to Untouched
         ticket::Entity::update_many()
@@ -151,15 +130,17 @@ impl HoprDb {
             .await
             .expect("must reset ticket state on init");
 
+        let caches = Arc::new(HoprDbCaches::default());
+        caches.invalidate_all();
+
         Self {
             me_onchain: chain_key.public().to_address(),
             chain_key,
             db: index_db,
             peers_db,
-            unacked_tickets,
-            ticket_index,
-            ticket_manager: Arc::new(TicketManager::new(tickets_db.clone())),
+            ticket_manager: Arc::new(TicketManager::new(tickets_db.clone(), caches.clone())),
             tickets_db,
+            caches,
         }
     }
 }
@@ -169,10 +150,14 @@ impl HoprDbAllOperations for HoprDb {}
 #[cfg(test)]
 mod tests {
     use crate::db::HoprDb;
+    use crate::peers::{HoprDbPeersOperations, PeerOrigin};
     use crate::{HoprDbGeneralModelOperations, TargetDb};
-    use hopr_crypto_types::keypairs::ChainKeypair;
+    use hopr_crypto_types::keypairs::{ChainKeypair, OffchainKeypair};
     use hopr_crypto_types::prelude::Keypair;
+    use libp2p_identity::PeerId;
     use migration::{MigratorIndex, MigratorPeers, MigratorTickets, MigratorTrait};
+    use multiaddr::Multiaddr;
+    use rand::{distributions::Alphanumeric, Rng}; // 0.8
 
     #[async_std::test]
     async fn test_basic_db_init() {
@@ -188,5 +173,53 @@ mod tests {
         MigratorPeers::status(db.conn(TargetDb::Peers))
             .await
             .expect("status must be ok");
+    }
+
+    #[async_std::test]
+    async fn test_peer_cleanup_on_database_start() {
+        let random_filename: String = rand::thread_rng()
+            .sample_iter(&Alphanumeric)
+            .take(15)
+            .map(char::from)
+            .collect();
+        let random_tmp_file = format!("/tmp/{random_filename}.sqlite");
+
+        let peer_id: PeerId = OffchainKeypair::random().public().into();
+        let ma_1: Multiaddr = format!("/ip4/127.0.0.1/tcp/10000/p2p/{peer_id}").parse().unwrap();
+        let ma_2: Multiaddr = format!("/ip4/127.0.0.1/tcp/10002/p2p/{peer_id}").parse().unwrap();
+
+        {
+            let db = HoprDb::new(
+                random_tmp_file.clone(),
+                ChainKeypair::random(),
+                crate::db::HoprDbConfig::default(),
+            )
+            .await;
+
+            db.add_network_peer(
+                &peer_id,
+                PeerOrigin::IncomingConnection,
+                vec![ma_1.clone(), ma_2.clone()],
+                0.0,
+                25,
+            )
+            .await
+            .expect("should add peer");
+        }
+        {
+            let db = HoprDb::new(
+                random_tmp_file,
+                ChainKeypair::random(),
+                crate::db::HoprDbConfig::default(),
+            )
+            .await;
+
+            let not_found_peer = db
+                .get_network_peer(&peer_id)
+                .await
+                .expect("should not encounter a DB issue");
+
+            assert_eq!(not_found_peer, None);
+        }
     }
 }

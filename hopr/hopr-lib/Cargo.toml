@@ -37,7 +37,7 @@ chain-rpc = { workspace = true }
 chain-types = { workspace = true }
 chain-indexer = { workspace = true }
 hopr-platform = { workspace = true }
-hopr-db-api = { workspace = true, features = ["accounts", "peers", "registry", "resolver", "ticket"]}
+hopr-db-api = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-internal-types = { workspace = true }
 hopr-primitive-types = { workspace = true }
@@ -51,4 +51,4 @@ ethers = { workspace = true }
 
 [features]
 default = ["prometheus"]
-prometheus = ["dep:hopr-metrics", "core-transport/prometheus", "chain-api/prometheus", "chain-indexer/prometheus", "chain-rpc/prometheus",  ]
+prometheus = ["dep:hopr-metrics", "core-transport/prometheus", "chain-api/prometheus", "chain-indexer/prometheus", "chain-rpc/prometheus", "hopr-db-api/prometheus" ]

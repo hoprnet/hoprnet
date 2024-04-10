@@ -1,23 +1,81 @@
 use async_trait::async_trait;
+use futures::TryFutureExt;
 use hopr_crypto_types::prelude::OffchainPublicKey;
 use hopr_internal_types::prelude::AccountEntry;
 use multiaddr::Multiaddr;
 use sea_orm::sea_query::Expr;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DbErr, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder, Related, Set,
+    ActiveModelTrait, ColumnTrait, DbErr, EntityTrait, IntoActiveModel, ModelTrait, QueryFilter, QueryOrder, Related,
+    Set,
 };
-use sea_query::OnConflict;
+use sea_query::{Condition, IntoCondition, OnConflict};
 
 use hopr_db_entity::prelude::{Account, Announcement};
 use hopr_db_entity::{account, announcement};
 use hopr_internal_types::account::AccountType;
-use hopr_internal_types::ChainOrPacketKey;
+use hopr_primitive_types::errors::GeneralError;
 use hopr_primitive_types::prelude::{Address, ToHex};
 
 use crate::db::HoprDb;
 use crate::errors::DbError::MissingAccount;
 use crate::errors::{DbError, Result};
 use crate::{HoprDbGeneralModelOperations, OptTx};
+
+/// A type that can represent both [chain public key](Address) and [packet public key](OffchainPublicKey).
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum ChainOrPacketKey {
+    /// Represents [chain public key](Address).
+    ChainKey(Address),
+    /// Represents [packet public key](OffchainPublicKey).
+    PacketKey(OffchainPublicKey),
+}
+
+impl From<Address> for ChainOrPacketKey {
+    fn from(value: Address) -> Self {
+        Self::ChainKey(value)
+    }
+}
+
+impl From<OffchainPublicKey> for ChainOrPacketKey {
+    fn from(value: OffchainPublicKey) -> Self {
+        Self::PacketKey(value)
+    }
+}
+
+impl TryFrom<ChainOrPacketKey> for OffchainPublicKey {
+    type Error = GeneralError;
+
+    fn try_from(value: ChainOrPacketKey) -> std::result::Result<Self, Self::Error> {
+        match value {
+            ChainOrPacketKey::ChainKey(_) => Err(GeneralError::InvalidInput),
+            ChainOrPacketKey::PacketKey(k) => Ok(k),
+        }
+    }
+}
+
+impl TryFrom<ChainOrPacketKey> for Address {
+    type Error = GeneralError;
+
+    fn try_from(value: ChainOrPacketKey) -> std::result::Result<Self, Self::Error> {
+        match value {
+            ChainOrPacketKey::ChainKey(k) => Ok(k),
+            ChainOrPacketKey::PacketKey(_) => Err(GeneralError::InvalidInput),
+        }
+    }
+}
+
+impl IntoCondition for ChainOrPacketKey {
+    fn into_condition(self) -> Condition {
+        match self {
+            ChainOrPacketKey::ChainKey(chain_key) => {
+                account::Column::ChainKey.eq(chain_key.to_string()).into_condition()
+            }
+            ChainOrPacketKey::PacketKey(packet_key) => {
+                account::Column::PacketKey.eq(packet_key.to_string()).into_condition()
+            }
+        }
+    }
+}
 
 /// Defines DB API for accessing HOPR accounts and corresponding on-chain announcements.
 ///
@@ -109,14 +167,7 @@ impl HoprDbAccountOperations for HoprDb {
                 Box::pin(async move {
                     let maybe_model = Account::find()
                         .find_with_related(Announcement)
-                        .filter(match cpk {
-                            ChainOrPacketKey::ChainKey(chain_key) => {
-                                account::Column::ChainKey.eq(chain_key.to_string())
-                            }
-                            ChainOrPacketKey::PacketKey(packet_key) => {
-                                account::Column::PacketKey.eq(packet_key.to_string())
-                            }
-                        })
+                        .filter(cpk)
                         .order_by_desc(announcement::Column::AtBlock)
                         .all(tx.as_ref())
                         .await?
@@ -182,6 +233,17 @@ impl HoprDbAccountOperations for HoprDb {
                     {
                         // Proceed if succeeded or already exists
                         Ok(_) | Err(DbErr::RecordNotInserted) => {
+                            myself
+                                .caches
+                                .chain_to_offchain
+                                .insert(account.chain_addr, Some(account.public_key))
+                                .await;
+                            myself
+                                .caches
+                                .offchain_to_chain
+                                .insert(account.public_key, Some(account.chain_addr))
+                                .await;
+
                             if let AccountType::Announced {
                                 multiaddr,
                                 updated_block,
@@ -217,12 +279,7 @@ impl HoprDbAccountOperations for HoprDb {
                 Box::pin(async move {
                     let (existing_account, mut existing_announcements) = account::Entity::find()
                         .find_with_related(announcement::Entity)
-                        .filter(match cpk {
-                            ChainOrPacketKey::ChainKey(chain_key) => account::Column::ChainKey.eq(chain_key.to_hex()),
-                            ChainOrPacketKey::PacketKey(packet_key) => {
-                                account::Column::PacketKey.eq(packet_key.to_hex())
-                            }
-                        })
+                        .filter(cpk)
                         .order_by_desc(announcement::Column::AtBlock)
                         .all(tx.as_ref())
                         .await?
@@ -270,10 +327,7 @@ impl HoprDbAccountOperations for HoprDb {
             .perform(|tx| {
                 Box::pin(async move {
                     let to_delete = account::Entity::find_related()
-                        .filter(match cpk {
-                            ChainOrPacketKey::ChainKey(a) => account::Column::ChainKey.eq(a.to_hex()),
-                            ChainOrPacketKey::PacketKey(k) => account::Column::PacketKey.eq(k.to_hex()),
-                        })
+                        .filter(cpk)
                         .all(tx.as_ref())
                         .await?
                         .into_iter()
@@ -299,19 +353,26 @@ impl HoprDbAccountOperations for HoprDb {
     where
         T: Into<ChainOrPacketKey> + Send + Sync,
     {
+        let myself = self.clone();
         let cpk = key.into();
         self.nest_transaction(tx)
             .await?
             .perform(|tx| {
                 Box::pin(async move {
-                    let r = account::Entity::delete_many()
-                        .filter(match cpk {
-                            ChainOrPacketKey::ChainKey(a) => account::Column::ChainKey.eq(a.to_hex()),
-                            ChainOrPacketKey::PacketKey(k) => account::Column::PacketKey.eq(k.to_hex()),
-                        })
-                        .exec(tx.as_ref())
-                        .await?;
-                    if r.rows_affected != 0 {
+                    if let Some(entry) = account::Entity::find().filter(cpk).one(tx.as_ref()).await? {
+                        let account_entry = model_to_account_entry(entry.clone(), vec![])?;
+                        entry.delete(tx.as_ref()).await?;
+
+                        myself
+                            .caches
+                            .chain_to_offchain
+                            .invalidate(&account_entry.chain_addr)
+                            .await;
+                        myself
+                            .caches
+                            .offchain_to_chain
+                            .invalidate(&account_entry.public_key)
+                            .await;
                         Ok::<_, DbError>(())
                     } else {
                         Err(MissingAccount)
@@ -326,38 +387,54 @@ impl HoprDbAccountOperations for HoprDb {
         tx: OptTx<'a>,
         key: T,
     ) -> Result<Option<ChainOrPacketKey>> {
-        let cpk = key.into();
-        self.nest_transaction(tx)
-            .await?
-            .perform(|tx| {
-                Box::pin(async move {
-                    Ok::<_, DbError>(match cpk {
-                        ChainOrPacketKey::ChainKey(chain_key) => {
-                            let maybe_model = Account::find()
-                                .filter(account::Column::ChainKey.eq(chain_key.to_string()))
-                                .one(tx.as_ref())
-                                .await?;
-                            if let Some(m) = maybe_model {
-                                Some(OffchainPublicKey::from_hex(&m.packet_key)?.into())
-                            } else {
-                                None
-                            }
-                        }
-                        ChainOrPacketKey::PacketKey(packet_key) => {
-                            let maybe_model = Account::find()
-                                .filter(account::Column::PacketKey.eq(packet_key.to_string()))
-                                .one(tx.as_ref())
-                                .await?;
-                            if let Some(m) = maybe_model {
-                                Some(Address::from_hex(&m.chain_key)?.into())
-                            } else {
-                                None
-                            }
-                        }
-                    })
-                })
-            })
-            .await
+        Ok(match key.into() {
+            ChainOrPacketKey::ChainKey(chain_key) => self
+                .caches
+                .chain_to_offchain
+                .try_get_with_by_ref(
+                    &chain_key,
+                    self.nest_transaction(tx).and_then(|op| {
+                        op.perform(|tx| {
+                            Box::pin(async move {
+                                let maybe_model = Account::find()
+                                    .filter(account::Column::ChainKey.eq(chain_key.to_string()))
+                                    .one(tx.as_ref())
+                                    .await?;
+                                if let Some(m) = maybe_model {
+                                    Ok(Some(OffchainPublicKey::from_hex(&m.packet_key)?))
+                                } else {
+                                    Ok(None)
+                                }
+                            })
+                        })
+                    }),
+                )
+                .await?
+                .map(ChainOrPacketKey::PacketKey),
+            ChainOrPacketKey::PacketKey(packey_key) => self
+                .caches
+                .offchain_to_chain
+                .try_get_with_by_ref(
+                    &packey_key,
+                    self.nest_transaction(tx).and_then(|op| {
+                        op.perform(|tx| {
+                            Box::pin(async move {
+                                let maybe_model = Account::find()
+                                    .filter(account::Column::PacketKey.eq(packey_key.to_string()))
+                                    .one(tx.as_ref())
+                                    .await?;
+                                if let Some(m) = maybe_model {
+                                    Ok(Some(Address::from_hex(&m.chain_key)?))
+                                } else {
+                                    Ok(None)
+                                }
+                            })
+                        })
+                    }),
+                )
+                .await?
+                .map(ChainOrPacketKey::ChainKey),
+        })
     }
 }
 
@@ -631,6 +708,62 @@ mod tests {
             })
             .await
             .expect("tx should not fail");
+
+        let a: Address = db
+            .translate_key(None, packet_1)
+            .await
+            .expect("must translate")
+            .expect("must contain key")
+            .try_into()
+            .expect("must be chain key");
+
+        let b: OffchainPublicKey = db
+            .translate_key(None, chain_2)
+            .await
+            .expect("must translate")
+            .expect("must contain key")
+            .try_into()
+            .expect("must be chain key");
+
+        assert_eq!(chain_1, a, "chain keys must match");
+        assert_eq!(packet_2, b, "chain keys must match");
+    }
+
+    #[async_std::test]
+    async fn test_translate_key_no_cache() {
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
+
+        let chain_1 = ChainKeypair::random().public().to_address();
+        let packet_1 = OffchainKeypair::random().public().clone();
+
+        let chain_2 = ChainKeypair::random().public().to_address();
+        let packet_2 = OffchainKeypair::random().public().clone();
+
+        let db_clone = db.clone();
+        db.begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| {
+                Box::pin(async move {
+                    db_clone
+                        .insert_account(
+                            Some(tx),
+                            AccountEntry::new(packet_1, chain_1, AccountType::NotAnnounced),
+                        )
+                        .await?;
+                    db_clone
+                        .insert_account(
+                            Some(tx),
+                            AccountEntry::new(packet_2, chain_2, AccountType::NotAnnounced),
+                        )
+                        .await?;
+                    Ok::<(), DbError>(())
+                })
+            })
+            .await
+            .expect("tx should not fail");
+
+        db.caches.invalidate_all();
 
         let a: Address = db
             .translate_key(None, packet_1)

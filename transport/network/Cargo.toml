@@ -17,7 +17,6 @@ futures-lite = { workspace = true }
 lazy_static = { workspace = true }
 libp2p-identity = { workspace = true }
 multiaddr = { workspace = true }
-sea-query = { version = "0", default-features = false, features = ["with-chrono", "derive", "backend-sqlite", "attr"]}
 serde = { workspace = true }
 serde_with = { workspace = true }
 smart-default = { workspace = true }
@@ -29,7 +28,7 @@ validator = { workspace = true }
 hopr-crypto-sphinx = { workspace = true }
 hopr-crypto-random = { workspace = true }
 hopr-crypto-types = { workspace = true }
-hopr-db-api = { workspace = true, features = ["peers"] }
+hopr-db-api = { workspace = true }
 hopr-db-entity = { workspace = true }
 hopr-platform = { workspace = true }
 hopr-metrics = { workspace = true, optional = true}

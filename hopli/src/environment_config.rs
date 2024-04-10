@@ -1,64 +1,49 @@
+//! This module contains definiation of arguments that specify the environment
+//! and networks that a HOPR node runs in.
+//!
+//! [EnvironmentType] defines the environment type. EnvironmentType of a network is defined in
+//! `contracts-address.json` under the foundry contract root. Different environment type uses
+//! a different foundry profile.
+//!
+//! Network is a collection of several major/minor releases.
+//!
+//! [NetworkDetail] specifies the environment type of the network, the starting block number, and
+//! the deployed contract addresses in [NetworkContractAddresses]
+
+use crate::utils::HelperErrors;
+use chain_api::{DefaultHttpPostRequestor, JsonRpcClient};
+use chain_rpc::{client::SimpleJsonRpcRetryPolicy, errors::RpcError, rpc::RpcOperationsConfig};
+use clap::Parser;
+use ethers::{
+    core::k256::ecdsa::SigningKey,
+    middleware::{MiddlewareBuilder, NonceManagerMiddleware, SignerMiddleware},
+    providers::{Middleware, Provider},
+    signers::{LocalWallet, Signer, Wallet},
+};
+use hopr_crypto_types::keypairs::ChainKeypair;
+use hopr_crypto_types::keypairs::Keypair;
+use hopr_lib::{EnvironmentType, NetworkContractAddresses};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fmt, path::Path};
+use serde_with::{serde_as, DisplayFromStr};
+use std::{
+    collections::HashMap,
+    ffi::OsStr,
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
-/// Type of environment that HOPR node is running in
-#[derive(Debug, Deserialize, Serialize, Clone, Copy, PartialEq)]
-#[serde(rename_all(deserialize = "lowercase"))]
-pub enum EnvironmentType {
-    /// Production environment, on Gnosis chain
-    Production,
-    /// Staging environment, on Gnosis chain
-    Staging,
-    /// Development environment, on Gnosis chain
-    Development,
-    /// Local environment, on anvil-localhost
-    Local,
-}
-
-impl fmt::Display for EnvironmentType {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Self::Production => write!(f, "production"),
-            Self::Staging => write!(f, "staging"),
-            Self::Development => write!(f, "development"),
-            Self::Local => write!(f, "local"),
-        }
-    }
-}
-
-/// Contract addresses and configuration associated with a environment
-#[derive(Debug, Clone, Serialize, Deserialize)]
+// replace NetworkConfig with ProtocolConfig
+#[serde_as]
+#[derive(Debug, Clone, Deserialize, Serialize, Eq, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct NetworkDetail {
-    /// block number from which the indexer starts
+    /// block number to start the indexer from
     pub indexer_start_block_number: u32,
     /// Type of environment
+    #[serde_as(as = "DisplayFromStr")]
     pub environment_type: EnvironmentType,
-    /// Contract addresses
-    pub addresses: Addresses,
-}
-
-/// Contract addresses (directly from deployment logic)
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Addresses {
-    /// address of contract that manages authorization to access the Hopr network
-    pub network_registry: String,
-    /// address of contract that maps to the requirements that need to be fulfilled
-    /// in order to access the network, upgradeable
-    pub network_registry_proxy: String,
-    /// HoprChannels contract address, implementation of mixnet incentives
-    pub channels: String,
-    /// Hopr token contract address
-    pub token: String,
-    /// contract address of Safe capability module implementation
-    pub module_implementation: String,
-    /// address of contract that maps between Safe instances and node addresses
-    pub node_safe_registry: String,
-    /// address of contract that allows Hopr Association to dictate price per packet in Hopr
-    pub ticket_price_oracle: String,
-    /// address of contract that manages transport announcements in the hopr network
-    pub announcements: String,
-    /// factory contract to produce Safe instances
-    pub node_stake_v2_factory: String,
+    /// contract addresses used by the network
+    pub addresses: NetworkContractAddresses,
 }
 
 /// mapping of networks with its details
@@ -68,28 +53,101 @@ pub struct NetworkConfig {
     networks: HashMap<String, NetworkDetail>,
 }
 
+/// Arguments for getting network and ethereum RPC provider.
+///
+/// RPC provider specifies an endpoint that enables an application to communicate with a blockchain network
+/// If not specified, it uses the default value according to the environment config
+/// Network specifies a set of contracts used in HOPR network.
+#[derive(Debug, Clone, Parser)]
+pub struct NetworkProviderArgs {
+    /// Name of the network that the node is running on
+    #[clap(help = "Network name. E.g. monte_rosa", long, short)]
+    network: String,
+
+    /// Path to the root of foundry project (etehereum/contracts), where all the contracts and `contracts-addresses.json` are stored
+    #[clap(
+        help = "Specify path pointing to the contracts root",
+        long,
+        short,
+        default_value = None
+    )]
+    contracts_root: Option<String>,
+
+    /// Customized RPC provider endpoint
+    #[clap(help = "Blockchain RPC provider endpoint.", long, short = 'r')]
+    provider_url: String,
+}
+
+impl Default for NetworkProviderArgs {
+    fn default() -> Self {
+        Self {
+            network: "anvil-localhost".into(),
+            contracts_root: None,
+            provider_url: "http://127.0.0.1:8545".into(),
+        }
+    }
+}
+
+impl NetworkProviderArgs {
+    /// Get the NetworkDetail (contract addresses, environment type) from network names
+    pub fn get_network_details_from_name(&self) -> Result<NetworkDetail, HelperErrors> {
+        // read `contracts-addresses.json` at make_root_dir_path
+        let contract_environment_config_path = self
+            .contracts_root
+            .as_ref()
+            .map_or_else(|| std::env::current_dir().unwrap(), |p| PathBuf::from(OsStr::new(&p)))
+            .to_owned()
+            .join("contracts-addresses.json");
+
+        let file_read =
+            std::fs::read_to_string(contract_environment_config_path).map_err(HelperErrors::UnableToReadFromPath)?;
+
+        let network_config = serde_json::from_str::<NetworkConfig>(&file_read).map_err(HelperErrors::SerdeJson)?;
+
+        network_config
+            .networks
+            .get(&self.network)
+            .cloned()
+            .ok_or_else(|| HelperErrors::UnknownNetwork)
+    }
+
+    /// get the provider object
+    pub async fn get_provider_with_signer(
+        &self,
+        chain_key: &ChainKeypair,
+    ) -> Result<Arc<NonceManagerMiddleware<SignerMiddleware<Provider<JsonRpcClient>, Wallet<SigningKey>>>>, HelperErrors>
+    {
+        // Build JSON RPC client
+        let rpc_client = JsonRpcClient::new(
+            self.provider_url.as_str(),
+            DefaultHttpPostRequestor::new(chain_rpc::client::native::HttpPostRequestorConfig::default()),
+            SimpleJsonRpcRetryPolicy::default(),
+        );
+        // Build default JSON RPC provider
+        let provider = Provider::new(rpc_client).interval(RpcOperationsConfig::default().tx_polling_interval);
+
+        let chain_id = provider.get_chainid().await.map_err(RpcError::ProviderError)?;
+
+        let wallet = LocalWallet::from_bytes(chain_key.secret().as_ref())?.with_chain_id(chain_id.as_u64());
+
+        Ok(Arc::new(
+            provider
+                .with_signer(wallet)
+                .nonce_manager(chain_key.public().to_address().into()),
+        ))
+    }
+}
+
 /// ensures that the network and environment_type exist
 /// in `contracts-addresses.json` and are matched
 pub fn ensure_environment_and_network_are_set(
     make_root_dir_path: &Path,
     network: &str,
     environment_type: &str,
-) -> Result<bool, String> {
-    // read `contracts-addresses.json` at make_root_dir_path
-    let contract_environment_config_path = make_root_dir_path.join("contracts-addresses.json");
+) -> Result<bool, HelperErrors> {
+    let network_detail = get_network_details_from_name(make_root_dir_path, network)?;
 
-    let file_read = std::fs::read_to_string(contract_environment_config_path)
-        .expect("Unable to read contracts-addresses.json file");
-
-    let env_config =
-        serde_json::from_str::<NetworkConfig>(&file_read).expect("Unable to deserialize environment config");
-
-    let env_detail = env_config
-        .networks
-        .get(network)
-        .expect("Unable to find environment details");
-
-    if env_detail.environment_type.to_string() == environment_type {
+    if network_detail.environment_type.to_string() == environment_type {
         Ok(true)
     } else {
         Ok(false)
@@ -98,28 +156,48 @@ pub fn ensure_environment_and_network_are_set(
 
 /// Returns the environment type from the network name
 /// according to `contracts-addresses.json`
-pub fn get_environment_type_from_name(make_root_dir_path: &Path, network: &str) -> Result<EnvironmentType, String> {
+pub fn get_environment_type_from_name(
+    make_root_dir_path: &Path,
+    network: &str,
+) -> Result<EnvironmentType, HelperErrors> {
+    let network_detail = get_network_details_from_name(make_root_dir_path, network)?;
+    Ok(network_detail.environment_type)
+}
+
+/// Get the NetworkDetail (contract addresses, environment type) from network names
+pub fn get_network_details_from_name(make_root_dir_path: &Path, network: &str) -> Result<NetworkDetail, HelperErrors> {
     // read `contracts-addresses.json` at make_root_dir_path
     let contract_environment_config_path = make_root_dir_path.join("contracts-addresses.json");
 
-    let file_read = std::fs::read_to_string(contract_environment_config_path)
-        .expect("Unable to read contracts-addresses.json file");
+    let file_read =
+        std::fs::read_to_string(contract_environment_config_path).map_err(HelperErrors::UnableToReadFromPath)?;
 
-    let env_config =
-        serde_json::from_str::<NetworkConfig>(&file_read).expect("Unable to deserialize environment config");
+    let network_config = serde_json::from_str::<NetworkConfig>(&file_read).map_err(HelperErrors::SerdeJson)?;
 
-    let env_detail = env_config
+    network_config
         .networks
         .get(network)
-        .expect("Unable to find environment details");
-
-    Ok(env_detail.environment_type)
+        .cloned()
+        .ok_or_else(|| HelperErrors::UnknownNetwork)
 }
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
+
+    fn create_anvil_at_port(default: bool) -> ethers::utils::AnvilInstance {
+        let mut anvil = ethers::utils::Anvil::new();
+
+        if !default {
+            let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+            let random_port = listener.local_addr().unwrap().port();
+            anvil = anvil.port(random_port);
+            anvil = anvil.chain_id(random_port);
+        } else {
+            anvil = anvil.port(8545u16);
+        }
+        anvil.spawn()
+    }
 
     #[test]
     fn read_anvil_localhost_at_right_path() {
@@ -144,7 +222,7 @@ mod tests {
         let environment_type = "local";
         let result =
             std::panic::catch_unwind(|| ensure_environment_and_network_are_set(wrong_dir, network, environment_type));
-        assert!(result.is_err());
+        assert!(result.unwrap().is_err());
     }
 
     #[test]
@@ -159,7 +237,7 @@ mod tests {
         let result = std::panic::catch_unwind(|| {
             ensure_environment_and_network_are_set(correct_dir, "non-existing", "development")
         });
-        assert!(result.is_err());
+        assert!(result.unwrap().is_err());
     }
 
     #[test]
@@ -176,5 +254,28 @@ mod tests {
             Ok(result) => assert!(!result),
             _ => assert!(false),
         }
+    }
+
+    #[async_std::test]
+    async fn test_network_provider_with_signer() {
+        // create an identity
+        let chain_key = ChainKeypair::random();
+
+        // launch local anvil instance
+        let anvil = create_anvil_at_port(false);
+
+        let network_provider_args = NetworkProviderArgs {
+            network: "anvil-localhost".into(),
+            contracts_root: Some("../ethereum/contracts".into()),
+            provider_url: anvil.endpoint().into(),
+        };
+
+        let provider = network_provider_args
+            .get_provider_with_signer(&chain_key)
+            .await
+            .unwrap();
+
+        let chain_id = provider.get_chainid().await.unwrap();
+        assert_eq!(chain_id, anvil.chain_id().into());
     }
 }

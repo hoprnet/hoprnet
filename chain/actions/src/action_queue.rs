@@ -104,6 +104,7 @@ pub struct ActionSender(Sender<(Action, ActionFinisher)>);
 
 impl ActionSender {
     /// Delivers the future action into the `ActionQueue` for processing.
+    #[tracing::instrument(level = "debug", skip(self))]
     pub async fn send(&self, action: Action) -> Result<PendingAction> {
         let completer = futures::channel::oneshot::channel();
         let mut sender = self.0.clone();
@@ -160,6 +161,7 @@ where
     S: ActionState,
     TxExec: TransactionExecutor,
 {
+    #[tracing::instrument(level = "debug", skip(self))]
     pub async fn execute_action(self, action: Action, channel_dst: Hash) -> Result<ActionConfirmation> {
         let expectation = match action.clone() {
             Action::RedeemTicket(ack) => match ack.status {
@@ -344,6 +346,7 @@ where
     /// Consumes self and runs the main queue processing loop until the queue is closed.
     ///
     /// The method will panic if Channel Domain Separator is not yet populated in the DB.
+    #[tracing::instrument(level = "debug", skip(self))]
     pub async fn action_loop(mut self) {
         while let Some((act, tx_finisher)) = self.queue_recv.next().await {
             // Some minimum separation to avoid batching txs

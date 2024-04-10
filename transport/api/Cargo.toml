@@ -40,7 +40,7 @@ core-path = { workspace = true }
 core-p2p = { workspace = true }
 hopr-crypto-packet = { workspace = true }
 core-protocol = { workspace = true }
-hopr-db-api = { workspace = true, features = ["peers", "resolver"]}
+hopr-db-api = { workspace = true }
 hopr-platform = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-internal-types = { workspace = true }

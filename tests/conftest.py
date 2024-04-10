@@ -29,6 +29,7 @@ NODE_NAME_PREFIX = f"{FIXTURES_PREFIX}-node"
 
 NETWORK1 = "anvil-localhost"
 NETWORK2 = "anvil-localhost2"
+ANVIL_ENDPOINT = "localhost:8545"
 
 API_TOKEN = "e2e-API-token^^"
 PASSWORD = "e2e-test"
@@ -249,6 +250,10 @@ def fund_nodes(private_key: str):
             "./ethereum/contracts",
             "--hopr-amount",
             "0.0",
+            "--native-amount",
+            "10.0",
+            "--provider-url",
+            ANVIL_ENDPOINT,
         ],
         env=os.environ | custom_env,
         check=True,
@@ -304,7 +309,7 @@ async def swarm7(request):
     safe_custom_env: dict = {
         "ETHERSCAN_API_KEY": "anykey",
         "IDENTITY_PASSWORD": PASSWORD,
-        "DEPLOYER_PRIVATE_KEY": private_key,
+        "MANAGER_PRIVATE_KEY": private_key,
         "PRIVATE_KEY": private_key,
         "PATH": os.environ["PATH"],
     }

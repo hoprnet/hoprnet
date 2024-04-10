@@ -1,27 +1,18 @@
+//! Crate for accessing database(s) of a HOPR node.
+//! Functionality defined here is meant to be used mostly by other higher-level crates.
+
+pub mod accounts;
+mod cache;
 pub mod channels;
 pub mod db;
 pub mod errors;
-
-#[cfg(feature = "peers")]
-pub mod peers;
-
-#[cfg(feature = "ticket")]
-pub mod tickets;
-
-#[cfg(feature = "accounts")]
-pub mod accounts;
-
-#[cfg(feature = "registry")]
-pub mod registry;
-
-#[cfg(feature = "resolver")]
-pub mod resolver;
-
-#[cfg(feature = "info")]
 pub mod info;
-pub mod ticket_manager;
-
-pub const SINGULAR_TABLE_FIXED_ID: i32 = 1;
+pub mod peers;
+pub mod protocol;
+pub mod registry;
+pub mod resolver;
+mod ticket_manager;
+pub mod tickets;
 
 pub use sea_orm::DatabaseConnection;
 pub use sea_orm::DatabaseTransaction;
@@ -36,16 +27,22 @@ use crate::db::HoprDb;
 use crate::errors::{DbError, Result};
 use crate::info::HoprDbInfoOperations;
 use crate::peers::HoprDbPeersOperations;
+use crate::protocol::HoprDbProtocolOperations;
 use crate::registry::HoprDbRegistryOperations;
 use crate::resolver::HoprDbResolverOperations;
 use crate::tickets::HoprDbTicketOperations;
 
+/// Primary key used in tables that contain only a single row.
+pub const SINGULAR_TABLE_FIXED_ID: i32 = 1;
+
+/// Shorthand for the `chrono` based timestamp type used in the database.
 pub type DbTimestamp = chrono::DateTime<chrono::Utc>;
 
 /// Represents an already opened transaction.
 /// This is a thin wrapper over [DatabaseTransaction].
 /// The wrapping behavior is needed to allow transaction agnostic functionalities
 /// of the DB traits.
+#[derive(Debug)]
 pub struct OpenTransaction(DatabaseTransaction, TargetDb);
 
 impl OpenTransaction {
@@ -150,6 +147,7 @@ pub trait HoprDbGeneralModelOperations {
 
 #[async_trait]
 impl HoprDbGeneralModelOperations for HoprDb {
+    /// Retrieves raw database connection to the given [DB](TargetDb).
     fn conn(&self, target_db: TargetDb) -> &DatabaseConnection {
         match target_db {
             TargetDb::Index => &self.db,
@@ -158,6 +156,7 @@ impl HoprDbGeneralModelOperations for HoprDb {
         }
     }
 
+    /// Starts a new transaction in the given [DB](TargetDb).
     async fn begin_transaction_in_db(&self, target_db: TargetDb) -> Result<OpenTransaction> {
         match target_db {
             TargetDb::Index => Ok(OpenTransaction(self.db.begin_with_config(None, None).await?, target_db)),
@@ -174,6 +173,7 @@ impl HoprDbGeneralModelOperations for HoprDb {
     }
 }
 
+/// Convenience trait that contain all HOPR DB operations crates.
 pub trait HoprDbAllOperations:
     HoprDbGeneralModelOperations
     + HoprDbAccountOperations
@@ -183,5 +183,21 @@ pub trait HoprDbAllOperations:
     + HoprDbTicketOperations
     + HoprDbPeersOperations
     + HoprDbResolverOperations
+    + HoprDbProtocolOperations
 {
+}
+
+#[doc(hidden)]
+pub mod prelude {
+    pub use super::*;
+    pub use crate::accounts::*;
+    pub use crate::channels::*;
+    pub use crate::db::*;
+    pub use crate::errors::*;
+    pub use crate::info::*;
+    pub use crate::peers::*;
+    pub use crate::protocol::*;
+    pub use crate::registry::*;
+    pub use crate::resolver::*;
+    pub use crate::tickets::*;
 }
