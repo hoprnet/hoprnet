@@ -18,7 +18,7 @@ jobs:
 
   build:
     name: docker
-    runs-on: ubuntu-2-core
+    runs-on: self-hosted-hoprnet-big
     timeout-minutes: 60
     steps:
       - name: Checkout hoprnet repository
