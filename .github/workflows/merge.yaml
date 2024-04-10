@@ -136,7 +136,6 @@ jobs:
           install_components: beta
 
       - name: Get credentials
-        id: get-credentials
         uses: google-github-actions/get-gke-credentials@v2
         with:
           cluster_name: cluster-staging
