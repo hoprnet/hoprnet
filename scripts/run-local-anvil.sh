@@ -123,7 +123,7 @@ if ! lsof -i ":8545" -s TCP:LISTEN; then
     # notice
     nohup nice anvil ${flags} > "${log_file}" 2>&1 &
   fi
-  wait_for_regex "${log_file}" "Listening on 0.0.0.0:8545"
+  get_eth_block_number "http://localhost:8545"
   log "Anvil chain started (0.0.0.0:8545)"
 else
   log "Anvil chain already running, skipping"
