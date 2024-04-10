@@ -1415,7 +1415,7 @@ mod channels {
 mod messages {
     use std::time::Duration;
 
-    use hopr_lib::{HalfKeyChallenge, SaturatingSub};
+    use hopr_lib::{AsUnixTimestamp, HalfKeyChallenge};
 
     use super::*;
 
