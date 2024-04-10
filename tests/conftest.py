@@ -14,6 +14,9 @@ import pytest
 
 from .node import Node
 
+# prepend the timestamp in front of any log line
+logging.basicConfig(format="%(asctime)s %(message)s")
+
 SEED = int.from_bytes(os.urandom(8), byteorder="big")
 random.seed(SEED)
 
