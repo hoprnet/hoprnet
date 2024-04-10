@@ -85,6 +85,8 @@
 //! of one of the HOPR smart contracts deployed on-chain.
 //!
 //! See the [payload] module for details.
+use hopr_crypto_types::keypairs::ChainKeypair;
+use hopr_crypto_types::prelude::Keypair;
 use hopr_primitive_types::prelude::*;
 
 use crate::action_queue::ActionSender;
@@ -105,6 +107,7 @@ where
     Db: Clone + std::fmt::Debug,
 {
     me: Address,
+    chain_key: ChainKeypair,
     db: Db,
     tx_sender: ActionSender,
 }
@@ -114,8 +117,8 @@ where
     Db: Clone + std::fmt::Debug,
 {
     ///! Creates new instance.
-    pub fn new(me: Address, db: Db, tx_sender: ActionSender) -> Self {
-        Self { me, db, tx_sender }
+    pub fn new(me: &ChainKeypair, db: Db, tx_sender: ActionSender) -> Self {
+        Self { me: me.public().to_address(), chain_key: me.clone(), db, tx_sender }
     }
 
     ///! On-chain address of this node

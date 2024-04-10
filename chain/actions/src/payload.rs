@@ -73,7 +73,7 @@ pub trait PayloadGenerator<T: Into<TypedTransaction>> {
     fn finalize_outgoing_channel_closure(&self, destination: Address) -> Result<T>;
 
     /// Used to create the payload to claim incentives for relaying a mixnet packet.
-    fn redeem_ticket(&self, acked_ticket: RedeemableTicket, domain_separator: &Hash) -> Result<T>;
+    fn redeem_ticket(&self, acked_ticket: RedeemableTicket) -> Result<T>;
 
     /// Creates a transaction payload to register a Safe instance which is used
     /// to manage the node's funds
@@ -275,10 +275,10 @@ impl PayloadGenerator<TypedTransaction> for BasicPayloadGenerator {
         Ok(tx)
     }
 
-    fn redeem_ticket(&self, acked_ticket: RedeemableTicket, domain_separator: &Hash) -> Result<TypedTransaction> {
+    fn redeem_ticket(&self, acked_ticket: RedeemableTicket) -> Result<TypedTransaction> {
         let redeemable = convert_acknowledged_ticket(&acked_ticket)?;
 
-        let params = convert_vrf_parameters(&acked_ticket.vrf_params, &self.me, &acked_ticket.ticket.verified_hash(), &domain_separator);
+        let params = convert_vrf_parameters(&acked_ticket.vrf_params, &self.me, &acked_ticket.ticket.verified_hash(), &acked_ticket.channel_dst);
         let mut tx = create_eip1559_transaction();
         tx.set_data(RedeemTicketCall { redeemable, params }.encode().into());
         tx.set_to(NameOrAddress::Address(self.contract_addrs.channels.into()));
@@ -471,10 +471,10 @@ impl PayloadGenerator<TypedTransaction> for SafePayloadGenerator {
         Ok(tx)
     }
 
-    fn redeem_ticket(&self, acked_ticket: RedeemableTicket, domain_separator: &Hash) -> Result<TypedTransaction> {
+    fn redeem_ticket(&self, acked_ticket: RedeemableTicket) -> Result<TypedTransaction> {
         let redeemable = convert_acknowledged_ticket(&acked_ticket)?;
 
-        let params = convert_vrf_parameters(&acked_ticket.vrf_params, &self.me, &acked_ticket.ticket.verified_hash(), &domain_separator);
+        let params = convert_vrf_parameters(&acked_ticket.vrf_params, &self.me, &acked_ticket.ticket.verified_hash(), &acked_ticket.channel_dst);
 
         let call_data = RedeemTicketSafeCall {
             self_: self.me.into(),

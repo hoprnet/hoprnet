@@ -30,9 +30,11 @@ use hopr_db_api::tickets::{HoprDbTicketOperations, TicketSelector};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use tracing::{debug, error, info, warn};
+use hopr_db_api::info::DomainSeparator;
+use hopr_db_api::prelude::HoprDbInfoOperations;
 
 use crate::action_queue::PendingAction;
-use crate::errors::ChainActionsError::ChannelDoesNotExist;
+use crate::errors::ChainActionsError::{ChannelDoesNotExist, InvalidState};
 use crate::errors::{ChainActionsError::WrongTicketState, Result};
 use crate::ChainActions;
 
@@ -69,7 +71,7 @@ pub trait TicketRedeemActions {
 #[async_trait]
 impl<Db> TicketRedeemActions for ChainActions<Db>
 where
-    Db: HoprDbChannelOperations + HoprDbTicketOperations + Clone + Send + Sync + std::fmt::Debug,
+    Db: HoprDbChannelOperations + HoprDbTicketOperations + HoprDbInfoOperations + Clone + Send + Sync + std::fmt::Debug,
 {
     #[tracing::instrument(level = "debug", skip(self))]
     async fn redeem_all_tickets(&self, only_aggregated: bool) -> Result<Vec<PendingAction>> {
@@ -145,6 +147,12 @@ where
             return Ok(vec![]);
         }
 
+        let channel_dst = self
+            .db
+            .get_indexer_data(None).await?
+            .domain_separator(DomainSeparator::Channel)
+            .ok_or(InvalidState("missing channel dst".into()))?;
+
         let mut redeem_stream = self
             .db
             .update_ticket_states_and_fetch(selector, AcknowledgedTicketStatus::BeingRedeemed)
@@ -152,14 +160,19 @@ where
         let mut receivers: Vec<PendingAction> = vec![];
         while let Some(ack_ticket) = redeem_stream.next().await {
             let ticket_id = ack_ticket.to_string();
-            let action = self.tx_sender.send(Action::RedeemTicket(ack_ticket)).await;
-            match action {
-                Ok(successful_tx) => {
-                    receivers.push(successful_tx);
+
+            if let Ok(redeemable) = ack_ticket.into_redeemable(&self.chain_key, &channel_dst) {
+                let action = self.tx_sender.send(Action::RedeemTicket(redeemable)).await;
+                match action {
+                    Ok(successful_tx) => {
+                        receivers.push(successful_tx);
+                    }
+                    Err(e) => {
+                        error!("Failed to submit transaction that redeems {ticket_id}: {e}",);
+                    }
                 }
-                Err(e) => {
-                    error!("Failed to submit transaction that redeems {ticket_id}: {e}",);
-                }
+            } else {
+                error!("failed to extract redeemable ticket");
             }
         }
 
@@ -175,9 +188,9 @@ where
     /// Otherwise, the transaction hash of the on-chain redemption is returned.
     #[tracing::instrument(level = "debug", skip(self))]
     async fn redeem_ticket(&self, ack_ticket: AcknowledgedTicket) -> Result<PendingAction> {
-        if let Some(channel) = self.db.get_channel_by_id(None, &ack_ticket.ticket.channel_id).await? {
+        if let Some(channel) = self.db.get_channel_by_id(None, &ack_ticket.verified_ticket().channel_id).await? {
             let selector = TicketSelector::from(&channel)
-                .with_index(ack_ticket.ticket.index)
+                .with_index(ack_ticket.verified_ticket().index)
                 .with_state(AcknowledgedTicketStatus::Untouched);
 
             if let Some(ticket) = self
@@ -187,6 +200,13 @@ where
                 .next()
                 .await
             {
+                let channel_dst = self
+                    .db
+                    .get_indexer_data(None).await?
+                    .domain_separator(DomainSeparator::Channel)
+                    .ok_or(InvalidState("missing channel dst".into()))?;
+
+                let redeemable = ticket.into_redeemable(&self.chain_key, &channel_dst)?;
                 Ok(self.tx_sender.send(Action::RedeemTicket(ticket)).await?)
             } else {
                 Err(WrongTicketState(ack_ticket.to_string()))
