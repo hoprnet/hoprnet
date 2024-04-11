@@ -2214,6 +2214,7 @@ mod tickets {
 
 mod node {
     use super::*;
+    use futures::stream::FuturesUnordered;
     use futures::StreamExt;
     use hopr_lib::{AsUnixTimestamp, Health, Multiaddr};
 
@@ -2410,16 +2411,23 @@ mod node {
             .await?
             .into_iter()
             .map(|announced| {
-                // WARNING: Only in Providence and Saint-Louis are all peers public
-                let multiaddresses = hopr.multiaddresses_announced_to_dht(&announced.public_key.into()).await;
+                let hopr_clone = hopr.clone();
+                async move {
+                    // WARNING: Only in Providence and Saint-Louis are all peers public
+                    let multiaddresses = hopr_clone
+                        .multiaddresses_announced_to_dht(&announced.public_key.into())
+                        .await;
 
-                AnnouncedPeer {
-                    peer_id: announced.public_key.into(),
-                    peer_address: announced.chain_addr,
-                    multiaddr: multiaddresses.first().cloned(),
+                    AnnouncedPeer {
+                        peer_id: announced.public_key.into(),
+                        peer_address: announced.chain_addr,
+                        multiaddr: multiaddresses.first().cloned(),
+                    }
                 }
             })
-            .collect::<Vec<_>>();
+            .collect::<FuturesUnordered<_>>()
+            .collect()
+            .await;
 
         let body = NodePeersResponse {
             connected: all_network_peers,
