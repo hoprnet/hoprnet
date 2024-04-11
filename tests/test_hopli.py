@@ -308,13 +308,13 @@ async def test_hopli_should_be_able_to_fund_nodes(peer: str, swarm7: dict[str, N
         private_key = data.get("private_keys", [""])[0]
 
     balance_before = await swarm7[peer].api.balances()
-    logging.debug(f"balance_before of {peer}: {balance_before}")
+    logging.debug(f"balance_before of {peer} / {swarm7[peer].address}: {balance_before}")
 
     # fund node with 1 HOPR token and 10 native token
     faucet(private_key, "1.0", "10.0")
 
     balance_after = await swarm7[peer].api.balances()
-    logging.debug(f"balance_after of {peer}: {balance_after}")
+    logging.debug(f"balance_after of {peer} / {swarm7[peer].address}: {balance_after}")
 
     # Check if `hopli faucet` funds node to the desired amount
     # on the native token

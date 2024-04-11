@@ -679,6 +679,10 @@ async def test_hoprd_strategy_automatic_ticket_aggregation_and_redeeming(route, 
         await asyncio.wait_for(aggregate_and_redeem_tickets(), 60.0)
 
 
+# FIXME: This test depends on side-effects and cannot be run on its own. It
+# should be redesigned.
+
+
 @pytest.mark.asyncio
 async def test_hoprd_sanity_check_channel_status(swarm7: dict[str, Node]):
     """

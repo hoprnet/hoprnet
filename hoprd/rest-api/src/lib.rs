@@ -2313,6 +2313,9 @@ mod node {
         #[serde_as(as = "DisplayFromStr")]
         #[schema(value_type = String)]
         pub peer_address: Address,
+        #[serde_as(as = "Option<DisplayFromStr>")]
+        #[schema(value_type = Option<String>)]
+        pub multiaddr: Option<Multiaddr>,
     }
 
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
@@ -2406,9 +2409,15 @@ mod node {
             .accounts_announced_on_chain()
             .await?
             .into_iter()
-            .map(|announced| AnnouncedPeer {
-                peer_id: announced.public_key.into(),
-                peer_address: announced.chain_addr,
+            .map(|announced| {
+                // WARNING: Only in Providence and Saint-Louis are all peers public
+                let multiaddresses = hopr.multiaddresses_announced_to_dht(&announced.public_key.into()).await;
+
+                AnnouncedPeer {
+                    peer_id: announced.public_key.into(),
+                    peer_address: announced.chain_addr,
+                    multiaddr: multiaddresses.first().cloned(),
+                }
             })
             .collect::<Vec<_>>();
 
