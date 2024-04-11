@@ -116,7 +116,7 @@ def manager_register(private_key: str, node_addr: str, safe_addr: str):
     )
 
 
-def manager_force_sync(private_key: str, nodes: str, eligibility: str):
+def manager_force_sync(private_key: str, safes: str, eligibility: str):
     custom_env = {
         "ETHERSCAN_API_KEY": "anykey",
         "IDENTITY_PASSWORD": PASSWORD,
@@ -131,7 +131,7 @@ def manager_force_sync(private_key: str, nodes: str, eligibility: str):
             "--network",
             NETWORK1,
             "--safe-address",
-            nodes,
+            safes,
             "--contracts-root",
             "./ethereum/contracts",
             "--eligibility",
