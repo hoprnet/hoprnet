@@ -1,10 +1,11 @@
 use crate::inbox::{InboxBackend, TimestampFn};
 use async_trait::async_trait;
+
 use ringbuffer::{AllocRingBuffer, RingBuffer};
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::hash::Hash;
-use std::time::{Duration, SystemTime};
+use std::time::Duration;
 
 /// Acts a simple wrapper of a message with added insertion timestamp.
 struct PayloadWrapper<M: std::marker::Send> {
@@ -35,7 +36,7 @@ where
     pub fn new(capacity: usize) -> Self {
         Self::new_with_capacity(capacity, || {
             hopr_platform::time::native::current_time()
-                .duration_since(SystemTime::UNIX_EPOCH)
+                .duration_since(std::time::UNIX_EPOCH)
                 .unwrap_or_default()
         })
     }

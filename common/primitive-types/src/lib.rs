@@ -60,10 +60,12 @@ mod tests {
     use hex_literal::hex;
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+    use crate::traits::{AsUnixTimestamp, SaturatingSub};
+
     #[test]
     fn test_rlp() {
         let mut b_1 = [0u8; 100];
-        let ts_1 = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+        let ts_1 = SystemTime::now().as_unix_timestamp();
 
         hopr_crypto_random::random_fill(&mut b_1);
 
@@ -101,8 +103,7 @@ mod tests {
     #[test]
     fn test_rlp_zero() {
         let b_1 = [0u8; 0];
-        let ts_1 = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
-
+        let ts_1 = SystemTime::now().as_unix_timestamp();
         let (b_2, ts_2) = crate::rlp::decode(crate::rlp::encode(&b_1, ts_1).as_ref()).expect("must decode");
 
         assert_eq!(&b_1, b_2.as_ref(), "data must be equal");
