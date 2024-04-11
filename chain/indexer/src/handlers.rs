@@ -710,7 +710,7 @@ where
 pub mod tests {
     use std::sync::atomic::Ordering;
     use std::sync::Arc;
-    use std::time::{SystemTime, UNIX_EPOCH};
+    use std::time::SystemTime;
 
     use super::ContractEventHandlers;
     use async_std;
