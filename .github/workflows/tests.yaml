@@ -26,7 +26,7 @@ jobs:
     timeout-minutes: 60
     if: github.event.pull_request.draft == false
     env:
-      needs_nix_setup: false
+      needs_nix_setup: ${{ false }}
     steps:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4
@@ -64,7 +64,7 @@ jobs:
     runs-on: self-hosted-hoprnet-big
     timeout-minutes: 60
     env:
-      needs_nix_setup: true
+      needs_nix_setup: ${{ true }}
     if: github.event.pull_request.draft == false
     steps:
       - name: Checkout hoprnet repository
