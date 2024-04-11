@@ -93,7 +93,7 @@ jobs:
   deploy:
     runs-on: self-hosted-hoprnet-small
     needs: build
-    if: contains(github.event.pull_request.labels.*.name, 'deploy_nodes') 
+    if: contains(github.event.pull_request.labels.*.name, 'deploy_nodes')
     steps:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4

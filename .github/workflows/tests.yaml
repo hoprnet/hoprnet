@@ -7,7 +7,6 @@ name: Test
 env:
   RUST_BACKTRACE: "1"
   FOUNDRY_PROFILE: ci
-  needs_nix_setup: false
 
 on:
   merge_group:
@@ -22,16 +21,12 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  tests:
-    strategy:
-      fail-fast: false
-      matrix:
-        target:
-          - unit
-          - smoke
+  tests-unit:
     runs-on: self-hosted-hoprnet-bigger
     timeout-minutes: 60
     if: github.event.pull_request.draft == false
+    env:
+      needs_nix_setup: false
     steps:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4
@@ -58,21 +53,49 @@ jobs:
           USER: runner
 
       - name: Run unit tests
-        if: matrix.target == 'unit'
         run: |
           nix develop -c make -j smart-contract-test
           nix build .#hoprd-test
           nix build .#hopli-test
         env:
           HOPR_NETWORK: anvil-localhost
+  tests-smoke:
+    # FIXME: smoke tests currently cannot be executed on the bigger runners
+    runs-on: self-hosted-hoprnet-big
+    timeout-minutes: 60
+    env:
+      needs_nix_setup: true
+    if: github.event.pull_request.draft == false
+    steps:
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@v4
+
+      - name: Set up Google Cloud Credentials
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          token_format: "access_token"
+          credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+
+      - name: Install Nix
+        if: env.needs_nix_setup == true
+        uses: cachix/install-nix-action@v25
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: cachix/cachix-action@v14
+        if: env.needs_nix_setup == true
+        with:
+          name: hoprnet
+          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
+        env:
+          USER: runner
 
       - name: Run smoke tests
-        if: matrix.target == 'smoke'
-        run: |
-          nix develop .#smoke-tests -c make smoke-tests
+        run: nix develop .#smoke-tests -c make smoke-tests
 
       - name: Compress test logs
-        if: matrix.target == 'smoke' && always()
+        if: always()
         run: |
           # Copy all the logs to a directory to avoid log file changes and simplify tar command
           test_path=/tmp/test-smoke-${{ github.run_id }}-${{ github.run_number }}
@@ -84,7 +107,7 @@ jobs:
 
       - name: Upload test logs
         uses: "google-github-actions/upload-cloud-storage@v1"
-        if: matrix.target == 'smoke' && always()
+        if: always()
         with:
           path: /tmp/
           glob: "test-smoke-*"
