@@ -510,6 +510,10 @@ where
                     .set_access_in_network_registry(Some(tx), node_address, true)
                     .await?;
 
+                if node_address == self.chain_key.public().to_address() {
+                    info!("Your node has been added to the registry and you can now continue the node activation process on http://hub.hoprnet.org/.");
+                }
+
                 return Ok(Some(ChainEventType::NetworkRegistryUpdate(
                     node_address,
                     NetworkRegistryStatus::Allowed,
@@ -520,6 +524,10 @@ where
                 self.db
                     .set_access_in_network_registry(Some(tx), node_address, true)
                     .await?;
+
+                if node_address == self.chain_key.public().to_address() {
+                    info!("Your node has been added to the registry and you can now continue the node activation process on http://hub.hoprnet.org/.");
+                }
 
                 return Ok(Some(ChainEventType::NetworkRegistryUpdate(
                     node_address,
@@ -702,7 +710,7 @@ where
 pub mod tests {
     use std::sync::atomic::Ordering;
     use std::sync::Arc;
-    use std::time::{SystemTime, UNIX_EPOCH};
+    use std::time::SystemTime;
 
     use super::ContractEventHandlers;
     use async_std;
@@ -2150,7 +2158,7 @@ pub mod tests {
                 OutgoingChannelClosureInitiatedFilter::signature(),
                 H256::from_slice(channel.get_id().as_ref()),
             ],
-            data: Vec::from(U256::from(timestamp.duration_since(UNIX_EPOCH).unwrap().as_secs()).to_be_bytes()).into(),
+            data: Vec::from(U256::from(timestamp.as_unix_timestamp().as_secs()).to_bytes()).into(),
             ..test_log()
         };
 

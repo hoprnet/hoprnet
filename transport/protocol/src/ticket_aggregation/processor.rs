@@ -347,13 +347,14 @@ where
                                     METRIC_AGGREGATION_COUNT.increment();
                                 }
 
-                                // TODO: remove this transformation in 3.0 once proper aggregation protocol format is introduced
+                                // TODO: remove this transformation in 3.0 once proper aggregation protocol format is introduc
+                                let addr = chain_key.public().to_address();
                                 match db.get_indexer_data(None)
                                     .await
                                     .and_then(|data| data.channels_dst.ok_or(DbError::LogicalError("missing channels domain separator".into()))) {
                                     Ok(dst) => {
                                         let tickets = tickets.into_iter()
-                                            .map(|t| hopr_internal_types::legacy::AcknowledgedTicket::new(t, &dst))
+                                            .map(|t| hopr_internal_types::legacy::AcknowledgedTicket::new(t, &addr, &dst))
                                             .collect::<Vec<_>>();
                                         Some(TicketAggregationProcessed::Send(source.into(), tickets, finalizer))
                                     }

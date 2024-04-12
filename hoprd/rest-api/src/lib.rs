@@ -482,6 +482,7 @@ enum ApiErrorStatus {
     Timeout,
     Unauthorized,
     InvalidQuality,
+    InvalidAddress,
     #[strum(serialize = "UNKNOWN_FAILURE")]
     UnknownFailure(String),
 }
@@ -1204,6 +1205,7 @@ mod channels {
             content_type = "application/json"),
         responses(
             (status = 201, description = "Channel successfully opened", body = OpenChannelResponse),
+            (status = 400, description = "Invalid counterparty address", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 403, description = "Failed to open the channel because of insufficient HOPR balance or allowance.", body = ApiError),
             (status = 409, description = "Failed to open the channel because the channel between this nodes already exists.", body = ApiError),
@@ -1218,7 +1220,10 @@ mod channels {
     pub(super) async fn open_channel(mut req: Request<InternalState>) -> tide::Result<Response> {
         let hopr = req.state().hopr.clone();
 
-        let open_req: OpenChannelBodyRequest = req.body_json().await?;
+        let open_req: OpenChannelBodyRequest = match req.body_json().await {
+            Ok(r) => r,
+            Err(_) => return Ok(Response::builder(400).body(ApiErrorStatus::InvalidAddress).build()),
+        };
 
         match hopr
             .open_channel(
@@ -1372,6 +1377,7 @@ mod channels {
             (status = 200, description = "Channel funded successfully", body = String),
             (status = 400, description = "Invalid channel id.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
+            (status = 403, description = "Failed to fund the channel because of insufficient HOPR balance or allowance.", body = ApiError),
             (status = 404, description = "Channel not found.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
@@ -1393,6 +1399,12 @@ mod channels {
                 Err(HoprLibError::ChainError(ChainActionsError::ChannelDoesNotExist)) => {
                     Ok(Response::builder(404).body(ApiErrorStatus::ChannelNotFound).build())
                 }
+                Err(HoprLibError::ChainError(ChainActionsError::NotEnoughAllowance)) => {
+                    Ok(Response::builder(403).body(ApiErrorStatus::NotEnoughAllowance).build())
+                }
+                Err(HoprLibError::ChainError(ChainActionsError::BalanceTooLow)) => {
+                    Ok(Response::builder(403).body(ApiErrorStatus::NotEnoughBalance).build())
+                }
                 Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
             },
             Err(_) => Ok(Response::builder(400).body(ApiErrorStatus::InvalidChannelId).build()),
@@ -1403,7 +1415,7 @@ mod channels {
 mod messages {
     use std::time::Duration;
 
-    use hopr_lib::HalfKeyChallenge;
+    use hopr_lib::{AsUnixTimestamp, HalfKeyChallenge};
 
     use super::*;
 
@@ -1522,9 +1534,7 @@ mod messages {
             }
         }
 
-        let timestamp = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap();
+        let timestamp = std::time::SystemTime::now().as_unix_timestamp();
 
         match hopr
             .send_message(msg_body, args.peer_id, args.path, args.hops, Some(args.tag))
@@ -2204,6 +2214,7 @@ mod tickets {
 
 mod node {
     use super::*;
+    use futures::stream::FuturesUnordered;
     use futures::StreamExt;
     use hopr_lib::{AsUnixTimestamp, Health, Multiaddr};
 
@@ -2303,6 +2314,9 @@ mod node {
         #[serde_as(as = "DisplayFromStr")]
         #[schema(value_type = String)]
         pub peer_address: Address,
+        #[serde_as(as = "Option<DisplayFromStr>")]
+        #[schema(value_type = Option<String>)]
+        pub multiaddr: Option<Multiaddr>,
     }
 
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
@@ -2396,11 +2410,24 @@ mod node {
             .accounts_announced_on_chain()
             .await?
             .into_iter()
-            .map(|announced| AnnouncedPeer {
-                peer_id: announced.public_key.into(),
-                peer_address: announced.chain_addr,
+            .map(|announced| {
+                let hopr_clone = hopr.clone();
+                async move {
+                    // WARNING: Only in Providence and Saint-Louis are all peers public
+                    let multiaddresses = hopr_clone
+                        .multiaddresses_announced_to_dht(&announced.public_key.into())
+                        .await;
+
+                    AnnouncedPeer {
+                        peer_id: announced.public_key.into(),
+                        peer_address: announced.chain_addr,
+                        multiaddr: multiaddresses.first().cloned(),
+                    }
+                }
             })
-            .collect::<Vec<_>>();
+            .collect::<FuturesUnordered<_>>()
+            .collect()
+            .await;
 
         let body = NodePeersResponse {
             connected: all_network_peers,

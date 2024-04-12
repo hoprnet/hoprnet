@@ -1,20 +1,20 @@
 # See more config options https://github.com/foundry-rs/foundry/tree/master/config
 
 [profile.default]
-# Don't commit changes to this line which point to /nix/store/...
-# These are part of the `nix develop` shell setup.
-# This must be: 0.8.19
-solc = "0.8.19"
+# solc = PLACEHOLDER
 src = 'src'
 test = 'test'
 out = 'out'
-libs = ['lib']
+libs = []
 verbosity = 3
 fs_permissions = [{ access = "read-write", path = "./"}] # to write logs into a local `./test.txt` file
 allow_paths = ["../../vendor/solidity"]
 offline = false
-build_info = true
-build_info_path = "build-info"
+cache = true
+cache_path = 'cache'
+# must be disabled to use cache
+build_info = false
+build_info_path = 'build-info'
 optimizer = true
 optimizer_runs = 200
 

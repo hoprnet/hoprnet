@@ -308,7 +308,7 @@ async def test_hoprd_ping_should_not_be_able_to_ping_nodes_in_other_network_UNFI
 
 @pytest.mark.asyncio
 async def test_hoprd_ping_should_not_be_able_to_ping_nodes_not_present_in_the_registry_UNFINISHED(
-    swarm7: dict[str, Node]
+    swarm7: dict[str, Node],
 ):
     """
     # log "Node 7 should not be able to talk to Node 1 (Node 7 is not in the register)"
@@ -571,7 +571,7 @@ async def test_hoprd_should_aggregate_and_redeem_tickets_in_channel_on_api_reque
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "route",
-    [shuffled(default_nodes())[:3] for _ in range(PARAMETERIZED_SAMPLE_SIZE)]
+    [shuffled(default_nodes())[:3] for _ in range(PARAMETERIZED_SAMPLE_SIZE)],
     # + [shuffled(nodes())[:5] for _ in range(PARAMETERIZED_SAMPLE_SIZE)],
 )
 async def test_hoprd_should_create_redeemable_tickets_on_routing_in_general_n_hop(route, swarm7: dict[str, Node]):
@@ -677,6 +677,10 @@ async def test_hoprd_strategy_automatic_ticket_aggregation_and_redeeming(route, 
                     await asyncio.sleep(0.1)
 
         await asyncio.wait_for(aggregate_and_redeem_tickets(), 60.0)
+
+
+# FIXME: This test depends on side-effects and cannot be run on its own. It
+# should be redesigned.
 
 
 @pytest.mark.asyncio

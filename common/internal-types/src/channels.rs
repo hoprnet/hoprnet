@@ -1,10 +1,8 @@
 use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use serde::{Deserialize, Serialize};
+use std::fmt::{Display, Formatter};
 use std::time::{Duration, SystemTime};
-use std::{
-    fmt::{Display, Formatter},
-};
 
 /// Describes status of a channel
 #[derive(Copy, Clone, Debug, smart_default::SmartDefault, Serialize, Deserialize, strum::Display)]
@@ -40,7 +38,7 @@ impl PartialEq for ChannelStatus {
             (Self::Open, Self::Open) => true,
             (Self::Closed, Self::Closed) => true,
             (Self::PendingToClose(ct_1), Self::PendingToClose(ct_2)) => {
-                let diff = ct_1.max(ct_2).duration_since(*ct_1.min(ct_2)).unwrap();
+                let diff = ct_1.max(ct_2).saturating_sub(*ct_1.min(ct_2));
                 diff.as_secs() == 0
             }
             _ => false,
@@ -115,9 +113,7 @@ impl ChannelEntry {
     pub fn remaining_closure_time(&self, current_time: SystemTime) -> Option<Duration> {
         match self.status {
             ChannelStatus::Open => None,
-            ChannelStatus::PendingToClose(closure_time) => {
-                Some(closure_time.duration_since(current_time).unwrap_or(Duration::ZERO))
-            }
+            ChannelStatus::PendingToClose(closure_time) => Some(closure_time.saturating_sub(current_time)),
             ChannelStatus::Closed => Some(Duration::ZERO),
         }
     }
@@ -249,13 +245,13 @@ impl ChannelChange {
 #[cfg(test)]
 pub mod tests {
     use crate::channels::{generate_channel_id, ChannelEntry, ChannelStatus};
+    use crate::tickets::{f64_to_win_prob, Ticket};
     use hex_literal::hex;
     use hopr_crypto_types::prelude::*;
     use hopr_primitive_types::prelude::*;
     use std::ops::Add;
     use std::str::FromStr;
     use std::time::{Duration, SystemTime};
-    use crate::tickets::{f64_to_win_prob, Ticket};
 
     lazy_static::lazy_static! {
         static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).unwrap();

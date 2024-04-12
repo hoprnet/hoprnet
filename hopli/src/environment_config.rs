@@ -2,7 +2,7 @@
 //! and networks that a HOPR node runs in.
 //!
 //! [EnvironmentType] defines the environment type. EnvironmentType of a network is defined in
-//! `contracts-address.json` under the foundry contract root. Different environment type uses
+//! `contracts-addresses.json` under the foundry contract root. Different environment type uses
 //! a different foundry profile.
 //!
 //! Network is a collection of several major/minor releases.
@@ -66,6 +66,7 @@ pub struct NetworkProviderArgs {
 
     /// Path to the root of foundry project (etehereum/contracts), where all the contracts and `contracts-addresses.json` are stored
     #[clap(
+        env = "HOPLI_CONTRACTS_ROOT",
         help = "Specify path pointing to the contracts root",
         long,
         short,
@@ -123,10 +124,17 @@ impl NetworkProviderArgs {
             DefaultHttpPostRequestor::new(chain_rpc::client::native::HttpPostRequestorConfig::default()),
             SimpleJsonRpcRetryPolicy::default(),
         );
+
         // Build default JSON RPC provider
-        let provider = Provider::new(rpc_client).interval(RpcOperationsConfig::default().tx_polling_interval);
+        let mut provider = Provider::new(rpc_client);
 
         let chain_id = provider.get_chainid().await.map_err(RpcError::ProviderError)?;
+        let default_tx_polling_interval = if chain_id.eq(&ethers::types::U256::from(31337u32)) {
+            std::time::Duration::from_millis(10)
+        } else {
+            RpcOperationsConfig::default().tx_polling_interval
+        };
+        provider.set_interval(default_tx_polling_interval);
 
         let wallet = LocalWallet::from_bytes(chain_key.secret().as_ref())?.with_chain_id(chain_id.as_u64());
 

@@ -340,6 +340,7 @@ impl PacketInteraction {
                 let processor = processor.clone();
 
                 async move {
+                    #[cfg_attr(not(all(feature = "prometheus", not(test))), allow(unused_mut))]
                     let (packet, mut metadata) = processor.to_transport_packet_with_metadata(event).await;
 
                     #[cfg(all(feature = "prometheus", not(test)))]
@@ -472,14 +473,12 @@ impl PacketInteraction {
 
                 async move {
                     match processed {
-                        #[cfg_attr(test, allow(unused_variables))]
-                        Ok((processed_msg, metadata)) => {
+                        Ok((processed_msg, _metadata)) => {
                             #[cfg(all(feature = "prometheus", not(test)))]
                             if let MsgProcessed::Forward(_, _, _, _) = &processed_msg {
                                 METRIC_RELAYED_PACKET_IN_MIXER_TIME.observe(
                                     hopr_platform::time::native::current_time()
-                                        .duration_since(metadata.start_time)
-                                        .unwrap_or_default()
+                                        .saturating_sub(_metadata.start_time)
                                         .as_secs_f64(),
                                 )
                             };

@@ -2,7 +2,7 @@
 #################################################################################
 # Pipeline triggered on every merged pull request to:
 # 1. Cleanup the pull request cache
-# 2. Update the latest docker tag and the release docker tag if it is part of a release 
+# 2. Update the latest docker tag and the release docker tag if it is part of a release
 # 3. Deploy the pull request in rotsee network
 # 4. Create the github release with changelog if it is labeled with 'release'. Close the associated milestone and notify in Element
 # 5. Create the new release pull request
@@ -14,7 +14,6 @@ on:
     types:
       - closed
       # - synchronize
-
 
 concurrency:
   group: merge
@@ -63,7 +62,7 @@ jobs:
 
       - name: Set up Google Cloud Credentials
         id: auth
-        uses: google-github-actions/auth@v1
+        uses: google-github-actions/auth@v2
         with:
           token_format: "access_token"
           credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
@@ -116,6 +115,32 @@ jobs:
     needs:
       - tag
     steps:
+
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@v4
+        with:
+          repository: hoprnet/hoprnet-ci
+
+      - name: Set up Google Cloud Credentials
+        id: auth
+        uses: google-github-actions/auth@v1
+        with:
+          token_format: "access_token"
+          credentials_json: ${{ secrets.GCP_SA_TERRAFORM_JSON }}
+
+      - name: Set up Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v1
+        with:
+          project_id: hopr-staging
+          install_components: beta
+
+      - name: Get credentials
+        uses: google-github-actions/get-gke-credentials@v2
+        with:
+          cluster_name: cluster-staging
+          location: europe-west3
+          project_id: hopr-staging
+
       - name: "Restart deployments"
         run: |
           base_branch="${{ github.event.pull_request.base.ref }}"
@@ -149,7 +174,7 @@ jobs:
 
       - name: Set up Google Cloud Credentials
         id: auth
-        uses: google-github-actions/auth@v1
+        uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
 
