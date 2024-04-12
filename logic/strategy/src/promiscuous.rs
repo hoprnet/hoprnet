@@ -35,6 +35,7 @@ use hopr_db_api::errors::DbError;
 use hopr_db_api::peers::PeerSelector;
 use hopr_db_api::HoprDbAllOperations;
 use rand::seq::SliceRandom;
+use semver::Version;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use std::fmt::{Debug, Display, Formatter};
@@ -206,11 +207,11 @@ where
             .await?
             .filter_map(|status| async move {
                 // Check if peer reports any version
-                if let Some(version) = status
-                    .peer_version
-                    .clone()
-                    .and_then(|v| semver::Version::from_str(&v).ok())
-                {
+                if let Some(version) = status.peer_version.clone().and_then(|v| {
+                    semver::Version::from_str(&v)
+                        .ok() // Workaround for https://github.com/dtolnay/semver/issues/315
+                        .map(|v| Version::new(v.major, v.major, v.patch))
+                }) {
                     // Check if the reported version matches the version semver expression
                     if self.cfg.minimum_peer_version.matches(&version) {
                         if let Ok(offchain_key) = OffchainPublicKey::try_from(status.id) {
@@ -629,6 +630,15 @@ mod tests {
         }
     }
 
+    #[test]
+    fn test_semver() {
+        // See https://github.com/dtolnay/semver/issues/315
+        let ver: semver::Version = "2.1.0-rc.3+commit.f75bc6c8".parse().expect("should be valid version");
+        let stripped = semver::Version::new(ver.major, ver.minor, ver.patch);
+        let req = semver::VersionReq::from_str(">=2.0.0").unwrap();
+        assert!(req.matches(&stripped), "constraint must match");
+    }
+
     #[async_std::test]
     async fn test_promiscuous_strategy_tick_decisions() {
         let _ = env_logger::builder().is_test(true).try_init();
@@ -645,6 +655,11 @@ mod tests {
         mock_channel(db.clone(), PEERS[1].0, balance).await;
         mock_channel(db.clone(), PEERS[2].0, balance).await;
         let for_closing = mock_channel(db.clone(), PEERS[5].0, balance).await;
+
+        // Peer 3 has an accepted pre-release version
+        let mut status_3 = db.get_network_peer(&PEERS[3].1).await.unwrap().unwrap();
+        status_3.peer_version = Some("2.1.0-rc.3+commit.f75bc6c8".into());
+        db.update_network_peer(status_3).await.unwrap();
 
         // Peer 10 has an old node version
         let mut status_10 = db.get_network_peer(&PEERS[9].1).await.unwrap().unwrap();
