@@ -136,11 +136,11 @@ impl From<AcknowledgedTicket> for crate::tickets::TransferableWinningTicket {
 
 #[cfg(test)]
 mod tests {
-    use crate::tickets::{AcknowledgedTicket, Ticket, UnacknowledgedTicket};
+    use crate::tickets::{TicketBuilder, TransferableWinningTicket};
     use ethers::utils::hex;
     use hex_literal::hex;
     use hopr_crypto_types::prelude::{ChainKeypair, Challenge, CurvePoint, HalfKey, Hash, Keypair};
-    use hopr_primitive_types::prelude::{BalanceType, EthereumChallenge};
+    use hopr_primitive_types::prelude::EthereumChallenge;
     use hopr_primitive_types::primitives::Address;
     use lazy_static::lazy_static;
 
@@ -161,24 +161,21 @@ mod tests {
 
     #[test]
     fn test_legacy_binary_compatibility_with_2_0_8() {
-        let domain_separator = Hash::new(CHANNEL_DST.as_ref());
+        let domain_separator = Hash::from(*CHANNEL_DST);
 
-        let mut ticket = Ticket::new_partial(
-            &ALICE.public().to_address(),
-            &Address::new(DESTINATION.as_ref()),
-            BalanceType::HOPR.balance(1000000_u64),
-            10,
-            2,
-            1.0_f64,
-            2,
-        )
-        .unwrap();
-
-        ticket.challenge = EthereumChallenge::new(&ETHEREUM_CHALLENGE);
-        let ticket = ticket.sign(&ALICE, &domain_separator.into());
+        let ticket = TicketBuilder::default()
+            .direction(&ALICE.public().to_address(), &Address::new(DESTINATION.as_ref()))
+            .amount(1000000_u64)
+            .index(10)
+            .index_offset(2)
+            .win_prob(1.0)
+            .channel_epoch(2)
+            .challenge(EthereumChallenge::new(ETHEREUM_CHALLENGE.as_ref()))
+            .build_signed(&ALICE, &domain_separator)
+            .expect("should build ticket");
 
         let mut signer = crate::legacy::Address::default();
-        signer.addr.copy_from_slice(&ALICE.public().to_address().to_bytes());
+        signer.addr.copy_from_slice(ALICE.public().to_address().as_ref());
 
         let ack_ticket = crate::legacy::AcknowledgedTicket {
             status: crate::legacy::AcknowledgedTicketStatus::BeingAggregated { start: 0, end: 0 },
@@ -198,59 +195,47 @@ mod tests {
 
     #[test]
     fn test_legacy_must_serialize_deserialize_correctly() {
-        let hk1 = HalfKey::new(&hex!(
-            "3477d7de923ba3a7d5d72a7d6c43fd78395453532d03b2a1e2b9a7cc9b61bafa"
-        ));
-        let hk2 = HalfKey::new(&hex!(
-            "4471496ef88d9a7d86a92b7676f3c8871a60792a37fae6fc3abc347c3aa3b16b"
-        ));
+        let hk1 = HalfKey::try_from(hex!("3477d7de923ba3a7d5d72a7d6c43fd78395453532d03b2a1e2b9a7cc9b61bafa").as_ref())
+            .unwrap();
+        let hk2 = HalfKey::try_from(hex!("4471496ef88d9a7d86a92b7676f3c8871a60792a37fae6fc3abc347c3aa3b16b").as_ref())
+            .unwrap();
 
-        let cp1: CurvePoint = hk1.to_challenge().into();
-        let cp2: CurvePoint = hk2.to_challenge().into();
+        let cp1: CurvePoint = hk1.to_challenge().try_into().unwrap();
+        let cp2: CurvePoint = hk2.to_challenge().try_into().unwrap();
         let cp_sum = CurvePoint::combine(&[&cp1, &cp2]);
 
-        let domain_separator = Hash::new(CHANNEL_DST.as_ref());
+        let domain_separator = Hash::try_from(CHANNEL_DST.as_ref()).unwrap();
 
-        let ticket = Ticket::new(
-            &BOB.public().to_address(),
-            &BalanceType::HOPR.balance(1000000_u64),
-            10.into(),
-            2.into(),
-            1.0_f64,
-            2.into(),
-            Challenge::from(cp_sum).to_ethereum_challenge(),
-            &ALICE,
-            &domain_separator,
-        )
-        .unwrap();
+        let ticket = TicketBuilder::default()
+            .direction(&ALICE.public().to_address(), &BOB.public().to_address())
+            .amount(1000000_u64)
+            .index(10)
+            .index_offset(2)
+            .win_prob(1.0)
+            .channel_epoch(2)
+            .challenge(Challenge::from(cp_sum).to_ethereum_challenge())
+            .build_signed(&ALICE, &domain_separator)
+            .expect("should build ticket");
 
-        let unack = UnacknowledgedTicket::new(ticket, hk1, ALICE.public().to_address());
-        let acked = unack.acknowledge(&hk2, &BOB, &domain_separator).unwrap();
+        let unack = ticket.into_unacknowledged(hk1);
+        let acked = unack.acknowledge(&hk2).expect("should acknowledge");
 
-        assert!(
-            acked
-                .verify(
-                    &ALICE.public().to_address(),
-                    &BOB.public().to_address(),
-                    &domain_separator
-                )
-                .is_ok(),
-            "ack ticket should be valid"
-        );
+        let transferable = acked
+            .into_transferable(&ALICE, &domain_separator)
+            .expect("should convert to transferable");
 
-        let serialized = crate::legacy::AcknowledgedTicket::new(acked, &BOB.public().to_address(), &domain_separator);
+        transferable
+            .clone()
+            .into_redeemable(&ALICE.public().to_address(), &domain_separator)
+            .expect("should be transformable to redeemable");
 
-        let deserialized = AcknowledgedTicket::from(serialized);
+        let serialized =
+            crate::legacy::AcknowledgedTicket::new(transferable, &BOB.public().to_address(), &domain_separator);
 
-        assert!(
-            deserialized
-                .verify(
-                    &ALICE.public().to_address(),
-                    &BOB.public().to_address(),
-                    &domain_separator
-                )
-                .is_ok(),
-            "deserialized ack ticket should be valid"
-        );
+        let deserialized = TransferableWinningTicket::from(serialized);
+
+        deserialized
+            .into_redeemable(&ALICE.public().to_address(), &domain_separator)
+            .expect("should be transformable to redeemable");
     }
 }

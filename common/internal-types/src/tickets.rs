@@ -395,7 +395,7 @@ impl Ticket {
         self.index_offset > 1
     }
 
-    /// Returns the encoded winning probability of the ticket
+    /// Returns the decoded winning probability of the ticket
     pub fn win_prob(&self) -> f64 {
         win_prob_to_f64(&self.encoded_win_prob)
     }
@@ -544,6 +544,7 @@ impl VerifiedTicket {
     pub fn verified_ticket(&self) -> &Ticket {
         &self.0
     }
+
     /// Fixed ticket hash that is guaranteed to be equal to
     /// [`Ticket::get_hash`] of [`VerifiedTicket::verified_ticket`].
     pub fn verified_hash(&self) -> &Hash {
@@ -905,14 +906,14 @@ impl From<RedeemableTicket> for TransferableWinningTicket {
 #[cfg(test)]
 pub mod test {
     use super::*;
-    use crate::tickets::{AcknowledgedTicket, UnacknowledgedTicket};
+    use crate::tickets::AcknowledgedTicket;
     use hex_literal::hex;
     use hopr_crypto_types::{
         keypairs::{ChainKeypair, Keypair},
         types::{Challenge, CurvePoint, HalfKey, Hash, Response},
     };
     use hopr_primitive_types::prelude::UnitaryFloatOps;
-    use hopr_primitive_types::primitives::{Address, Balance, BalanceType, EthereumChallenge, U256};
+    use hopr_primitive_types::primitives::{Address, BalanceType, EthereumChallenge, U256};
 
     lazy_static::lazy_static! {
         static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).unwrap();
@@ -963,40 +964,54 @@ pub mod test {
     }
 
     #[test]
+    pub fn test_ticket_builder_zero_hop() {
+        let ticket = TicketBuilder::zero_hop()
+            .direction(&ALICE.public().to_address(), &BOB.public().to_address())
+            .build()
+            .expect("should build ticket");
+        assert_eq!(0, ticket.index);
+        assert_eq!(0.0, ticket.win_prob());
+        assert_eq!(0, ticket.channel_epoch);
+        assert_eq!(
+            generate_channel_id(&ALICE.public().to_address(), &BOB.public().to_address()),
+            ticket.channel_id
+        );
+    }
+
+    #[test]
     pub fn test_ticket_serialize_deserialize() {
-        let initial_ticket = super::Ticket::new(
-            &BOB.public().to_address(),
-            Balance::new(U256::one(), BalanceType::HOPR),
-            0,
-            1,
-            1.0,
-            1,
-            EthereumChallenge::default(),
-            &ALICE,
-            &Hash::default(),
-        )
-        .unwrap();
+        let initial_ticket = TicketBuilder::default()
+            .direction(&ALICE.public().to_address(), &BOB.public().to_address())
+            .balance(BalanceType::HOPR.one())
+            .index(0)
+            .index_offset(1)
+            .win_prob(1.0)
+            .channel_epoch(1)
+            .challenge(Default::default())
+            .build_signed(&ALICE, &Default::default())
+            .expect("should build ticket");
 
-        assert_ne!(*initial_ticket.get_hash(&Hash::default()).as_ref(), [0u8; Hash::SIZE]);
+        assert_ne!(initial_ticket.verified_hash().as_ref(), [0u8; Hash::SIZE]);
 
-        let ticket_bytes: [u8; Ticket::SIZE] = initial_ticket.clone().into();
-        assert_eq!(initial_ticket, Ticket::try_from(ticket_bytes.as_ref()).unwrap());
+        let ticket_bytes: [u8; Ticket::SIZE] = initial_ticket.verified_ticket().clone().into();
+        assert_eq!(
+            initial_ticket.verified_ticket(),
+            &Ticket::try_from(ticket_bytes.as_ref()).unwrap()
+        );
     }
 
     #[test]
     pub fn test_ticket_serialize_deserialize_serde() {
-        let initial_ticket = super::Ticket::new(
-            &BOB.public().to_address(),
-            Balance::new(U256::one(), BalanceType::HOPR),
-            0,
-            1,
-            1.0,
-            1,
-            EthereumChallenge::default(),
-            &ALICE,
-            &Hash::default(),
-        )
-        .unwrap();
+        let initial_ticket = TicketBuilder::default()
+            .direction(&ALICE.public().to_address(), &BOB.public().to_address())
+            .balance(BalanceType::HOPR.one())
+            .index(0)
+            .index_offset(1)
+            .win_prob(1.0)
+            .channel_epoch(1)
+            .challenge(Default::default())
+            .build_signed(&ALICE, &Default::default())
+            .expect("should build ticket");
 
         assert_eq!(
             initial_ticket,
@@ -1006,105 +1021,84 @@ pub mod test {
 
     #[test]
     pub fn test_ticket_sign_verify() {
-        let initial_ticket = super::Ticket::new(
-            &BOB.public().to_address(),
-            Balance::new(U256::one(), BalanceType::HOPR),
-            0,
-            1,
-            1.0,
-            1,
-            EthereumChallenge::default(),
-            &ALICE,
-            &Hash::default(),
-        )
-        .unwrap();
+        let initial_ticket = TicketBuilder::default()
+            .direction(&ALICE.public().to_address(), &BOB.public().to_address())
+            .balance(BalanceType::HOPR.one())
+            .index(0)
+            .index_offset(1)
+            .win_prob(1.0)
+            .channel_epoch(1)
+            .challenge(Default::default())
+            .build_signed(&ALICE, &Default::default())
+            .expect("should build ticket");
 
-        assert_ne!(*initial_ticket.get_hash(&Hash::default()).as_ref(), [0u8; Hash::SIZE]);
+        assert_ne!(initial_ticket.verified_hash().as_ref(), [0u8; Hash::SIZE]);
 
-        assert!(initial_ticket
-            .verify(&ALICE.public().to_address(), &Hash::default())
-            .is_ok());
-    }
-
-    #[test]
-    pub fn test_ticket_expected_payout() {
-        let mut ticket = Ticket::new_partial(
-            &ALICE.public().to_address(),
-            &BOB.public().to_address(),
-            Balance::new(U256::one(), BalanceType::HOPR),
-            0,
-            1,
-            1.0,
-            1,
-        )
-        .unwrap();
-
-        assert_eq!(U256::one(), ticket.get_expected_payout());
-
-        ticket.encoded_win_prob = f64_to_win_prob(0.0).unwrap();
-        assert_eq!(U256::zero(), ticket.get_expected_payout());
-
-        ticket.amount = Balance::new(100000000000_u64, BalanceType::HOPR);
-        ticket.encoded_win_prob = f64_to_win_prob(0.00000000001f64).unwrap();
-
-        assert_eq!(U256::one(), ticket.get_expected_payout());
+        let ticket = initial_ticket.leak();
+        assert!(ticket.verify(&ALICE.public().to_address(), &Default::default()).is_ok());
     }
 
     #[test]
     pub fn test_path_position() {
-        let mut ticket = Ticket::new_partial(
-            &ALICE.public().to_address(),
-            &BOB.public().to_address(),
-            Balance::new(U256::one(), BalanceType::HOPR),
-            0,
-            1,
-            1.0,
-            1,
-        )
-        .unwrap();
+        let builder = TicketBuilder::default()
+            .direction(&ALICE.public().to_address(), &BOB.public().to_address())
+            .balance(BalanceType::HOPR.one())
+            .index(0)
+            .index_offset(1)
+            .win_prob(1.0)
+            .channel_epoch(1)
+            .challenge(Default::default());
 
-        assert_eq!(1u8, ticket.get_path_position(U256::one()).unwrap());
+        let ticket = builder
+            .clone()
+            .build_signed(&ALICE, &Default::default())
+            .expect("should build ticket");
 
-        ticket.amount = Balance::new(U256::from(34u64), BalanceType::HOPR);
+        assert_eq!(1u8, ticket.get_path_position(1_32.into()).unwrap());
 
-        assert_eq!(2u8, ticket.get_path_position(U256::from(17u64)).unwrap());
+        let ticket = builder
+            .clone()
+            .amount(34_u64)
+            .build_signed(&ALICE, &Default::default())
+            .expect("should build ticket");
 
-        ticket.amount = Balance::new(U256::from(30u64), BalanceType::HOPR);
-        ticket.encoded_win_prob = f64_to_win_prob(0.2).unwrap();
+        assert_eq!(2u8, ticket.get_path_position(17_u64.into()).unwrap());
 
-        assert_eq!(U256::from(6u64), ticket.get_expected_payout());
+        let ticket = builder
+            .clone()
+            .amount(30_u64)
+            .win_prob(0.2)
+            .build_signed(&ALICE, &Default::default())
+            .expect("should build ticket");
 
-        assert_eq!(2u8, ticket.get_path_position(U256::from(3u64)).unwrap());
-
-        ticket.encoded_win_prob = f64_to_win_prob(0.0).unwrap();
-        assert_eq!(U256::zero(), ticket.get_expected_payout());
+        assert_eq!(2u8, ticket.get_path_position(3_u64.into()).unwrap());
     }
 
     #[test]
-    pub fn test_path_position_bad_examples() {
-        let ticket = Ticket::new_partial(
-            &ALICE.public().to_address(),
-            &BOB.public().to_address(),
-            Balance::new(256_u64, BalanceType::HOPR),
-            0,
-            1,
-            1.0,
-            1,
-        )
-        .unwrap();
+    pub fn test_path_position_mismatch() {
+        let ticket = TicketBuilder::default()
+            .direction(&ALICE.public().to_address(), &BOB.public().to_address())
+            .balance(BalanceType::HOPR.one())
+            .index(0)
+            .index_offset(1)
+            .win_prob(1.0)
+            .channel_epoch(1)
+            .challenge(Default::default())
+            .build_signed(&ALICE, &Default::default())
+            .expect("should build ticket");
 
-        assert!(ticket.get_path_position(U256::from(1u64)).is_err());
+        assert!(ticket.get_path_position(1_u64.into()).is_err());
     }
 
     #[test]
     pub fn test_zero_hop() {
-        let zero_hop_ticket = Ticket::new_zero_hop(
-            &BOB.public().to_address(),
-            &ALICE.public().to_address(),
-            &Hash::default(),
-        )
-        .unwrap();
-        assert!(zero_hop_ticket
+        let ticket = TicketBuilder::zero_hop()
+            .direction(&ALICE.public().to_address(), &BOB.public().to_address())
+            .build_signed(&ALICE, &Default::default())
+            .expect("should build ticket");
+
+        assert!(ticket
+            .leak()
             .verify(&ALICE.public().to_address(), &Hash::default())
             .is_ok());
     }
@@ -1114,36 +1108,21 @@ pub mod test {
         counterparty: &Address,
         domain_separator: Option<Hash>,
         challenge: Option<EthereumChallenge>,
-    ) -> Ticket {
+    ) -> VerifiedTicket {
         let win_prob = 1.0f64; // 100 %
         let price_per_packet: U256 = 10000000000000000u128.into(); // 0.01 HOPR
         let path_pos = 5u64;
 
-        Ticket::new(
-            counterparty,
-            Balance::new(
-                price_per_packet.div_f64(win_prob).unwrap() * U256::from(path_pos),
-                BalanceType::HOPR,
-            ),
-            0,
-            1,
-            1.0f64,
-            4,
-            challenge.unwrap_or_default(),
-            pk,
-            &domain_separator.unwrap_or_default(),
-        )
-        .unwrap()
-    }
-
-    #[test]
-    fn test_unacknowledged_ticket_sign_verify() {
-        let unacked_ticket = UnacknowledgedTicket::new(
-            mock_ticket(&ALICE, &BOB.public().to_address(), None, None),
-            HalfKey::default(),
-        );
-
-        assert!(unacked_ticket.verify_signature(&Hash::default()).is_ok());
+        TicketBuilder::default()
+            .direction(&pk.public().to_address(), counterparty)
+            .amount(price_per_packet.div_f64(win_prob).unwrap() * U256::from(path_pos))
+            .index(0)
+            .index_offset(1)
+            .win_prob(1.0)
+            .channel_epoch(4)
+            .challenge(challenge.unwrap_or_default())
+            .build_signed(pk, &domain_separator.unwrap_or_default())
+            .expect("should build ticket")
     }
 
     #[test]
@@ -1158,49 +1137,18 @@ pub mod test {
         let cp2: CurvePoint = hk2.to_challenge().try_into().unwrap();
         let cp_sum = CurvePoint::combine(&[&cp1, &cp2]);
 
-        let ticket = mock_ticket(
+        let dst = Hash::default();
+        let ack = mock_ticket(
             &ALICE,
             &BOB.public().to_address(),
-            None,
+            Some(dst),
             Some(Challenge::from(cp_sum).to_ethereum_challenge()),
-        );
+        )
+        .into_unacknowledged(hk1)
+        .acknowledge(&hk2)
+        .expect("must be able to acknowledge ticket");
 
-        let unacked_ticket = UnacknowledgedTicket::new(ticket, hk1, ALICE.public().to_address());
-
-        assert!(unacked_ticket.verify_signature(&Hash::default()).is_ok());
-        assert!(unacked_ticket.verify_challenge(&hk2).is_ok())
-    }
-
-    #[test]
-    fn test_unack_transformation() {
-        let hk1 = HalfKey::try_from(hex!("3477d7de923ba3a7d5d72a7d6c43fd78395453532d03b2a1e2b9a7cc9b61bafa").as_ref())
-            .unwrap();
-
-        let hk2 = HalfKey::try_from(hex!("4471496ef88d9a7d86a92b7676f3c8871a60792a37fae6fc3abc347c3aa3b16b").as_ref())
-            .unwrap();
-
-        let cp1: CurvePoint = hk1.to_challenge().try_into().unwrap();
-        let cp2: CurvePoint = hk2.to_challenge().try_into().unwrap();
-        let cp_sum = CurvePoint::combine(&[&cp1, &cp2]);
-
-        let ticket = mock_ticket(
-            &ALICE,
-            &BOB.public().to_address(),
-            None,
-            Some(Challenge::from(cp_sum).to_ethereum_challenge()),
-        );
-
-        let unacked_ticket = UnacknowledgedTicket::new(ticket, hk1, ALICE.public().to_address());
-
-        let acked_ticket = unacked_ticket.acknowledge(&hk2, &BOB, &Hash::default()).unwrap();
-
-        assert!(acked_ticket
-            .verify(
-                &ALICE.public().to_address(),
-                &BOB.public().to_address(),
-                &Hash::default()
-            )
-            .is_ok());
+        assert!(ack.is_winning(&BOB, &dst), "ticket must be winning");
     }
 
     #[test]
@@ -1209,27 +1157,22 @@ pub mod test {
             Response::try_from(hex!("876a41ee5fb2d27ac14d8e8d552692149627c2f52330ba066f9e549aef762f73").as_ref())
                 .unwrap();
 
+        let dst = Hash::default();
+
         let ticket = mock_ticket(
             &ALICE,
             &BOB.public().to_address(),
-            None,
+            Some(dst),
             Some(response.to_challenge().into()),
         );
 
-        let acked_ticket =
-            AcknowledgedTicket::new(ticket, response, ALICE.public().to_address(), &BOB, &Hash::default()).unwrap();
+        let acked_ticket = ticket.into_acknowledged(response);
 
         let mut deserialized_ticket =
             bincode::deserialize::<AcknowledgedTicket>(&bincode::serialize(&acked_ticket).unwrap()).unwrap();
         assert_eq!(acked_ticket, deserialized_ticket);
 
-        assert!(deserialized_ticket
-            .verify(
-                &ALICE.public().to_address(),
-                &BOB.public().to_address(),
-                &Hash::default()
-            )
-            .is_ok());
+        assert!(deserialized_ticket.is_winning(&BOB, &dst));
 
         deserialized_ticket.status = super::AcknowledgedTicketStatus::BeingAggregated;
 
@@ -1238,4 +1181,7 @@ pub mod test {
             bincode::deserialize(&bincode::serialize(&deserialized_ticket).unwrap()).unwrap()
         );
     }
+
+    #[test]
+    fn test_ticket_entire_ticket_transfer_flow() {}
 }

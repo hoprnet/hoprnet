@@ -245,7 +245,6 @@ impl ChannelChange {
 #[cfg(test)]
 pub mod tests {
     use crate::channels::{generate_channel_id, ChannelEntry, ChannelStatus};
-    use crate::tickets::{f64_to_win_prob, Ticket};
     use hex_literal::hex;
     use hopr_crypto_types::prelude::*;
     use hopr_primitive_types::prelude::*;
