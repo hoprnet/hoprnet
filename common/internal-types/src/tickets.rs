@@ -9,6 +9,8 @@ use std::fmt::{Display, Formatter};
 use tracing::{debug, error};
 
 use crate::errors::CoreTypesError;
+use crate::prelude::generate_channel_id;
+use crate::prelude::CoreTypesError::InvalidInputData;
 use crate::{channels, errors};
 
 /// Size-optimized encoding of the ticket, used for both,
@@ -54,6 +56,122 @@ pub(crate) fn check_ticket_win(
     );
 
     u64::from_be_bytes(computed_ticket_luck) <= u64::from_be_bytes(signed_ticket_luck)
+}
+
+#[derive(Debug, Clone, smart_default::SmartDefault)]
+pub struct TicketBuilder {
+    channel_id: Option<Hash>,
+    amount: Option<Balance>,
+    index: Option<u64>,
+    #[default = 1]
+    index_offset: u32,
+    epoch: Option<u32>,
+    #[default = 1.0]
+    win_prob: f64,
+    challenge: Option<EthereumChallenge>,
+}
+
+impl TicketBuilder {
+    pub fn zero_hop() -> Self {
+        Self {
+            index: Some(0),
+            index_offset: 0,
+            win_prob: 0.0,
+            epoch: Some(0),
+            ..Default::default()
+        }
+    }
+
+    pub fn direction(mut self, source: &Address, destination: &Address) -> Self {
+        self.channel_id = Some(generate_channel_id(source, destination));
+        self
+    }
+
+    pub fn id(mut self, channel_id: Hash) -> Self {
+        self.channel_id = Some(channel_id);
+        self
+    }
+
+    pub fn amount<T: Into<U256>>(mut self, amount: T) -> Self {
+        self.amount = Some(BalanceType::HOPR.balance(amount));
+        self
+    }
+
+    pub fn index(mut self, index: u64) -> Self {
+        self.index = Some(index);
+        self
+    }
+
+    pub fn index_offset(mut self, index_offset: u32) -> Self {
+        self.index_offset = index_offset;
+        self
+    }
+
+    pub fn channel_epoch(mut self, channel_epoch: u32) -> Self {
+        self.epoch = Some(channel_epoch);
+        self
+    }
+
+    pub fn win_prob(mut self, win_prob: f64) -> Self {
+        self.win_prob = win_prob;
+        self
+    }
+
+    pub fn challenge(mut self, challenge: EthereumChallenge) -> Self {
+        self.challenge = Some(challenge);
+        self
+    }
+
+    pub fn build(self) -> errors::Result<Ticket> {
+        if self.amount.balance_type().ne(&BalanceType::HOPR) {
+            return Err(CoreTypesError::InvalidInputData(
+                "Tickets can only have HOPR balance".into(),
+            ));
+        }
+
+        if amount.amount().ge(&10_u128.pow(25).into()) {
+            return Err(CoreTypesError::InvalidInputData(
+                "Tickets may not have more than 1% of total supply".into(),
+            ));
+        }
+
+        if index > (1_u64 << 48) {
+            return Err(CoreTypesError::InvalidInputData(
+                "Cannot hold ticket indices larger than 2^48".into(),
+            ));
+        }
+
+        if channel_epoch > (1_u32 << 24) {
+            return Err(CoreTypesError::InvalidInputData(
+                "Cannot hold channel epoch larger than 2^24".into(),
+            ));
+        }
+
+        if !(0.0..=1.0).contains(&win_prob) {
+            return Err(CoreTypesError::InvalidInputData(
+                "Winning probability must be between 0 and 1".into(),
+            ));
+        }
+
+        Ok(Ticket {
+            channel_id: self.channel_id.ok_or(InvalidInputData("missing channel id".into()))?,
+            amount: self.amount.ok_or(InvalidInputData("missing amount".into()))?,
+            index: self.index.ok_or(InvalidInputData("missing index".into()))?,
+            index_offset: self.index_offset,
+            encoded_win_prob: self.win_prob,
+            channel_epoch: self.epoch.ok_or(InvalidInputData("missing channel epoch".into()))?,
+            challenge: self
+                .challenge
+                .ok_or(InvalidInputData("missing ticket challenge".into()))?,
+            signature: None,
+        })
+    }
+
+    pub fn build_signed(self, signature: Signature) -> errors::Result<Ticket> {
+        let mut ret = self.build()?;
+        ret.signature = Some(signature);
+        Ok(ret)
+    }
 }
 
 /// Contains the overall description of a ticket with a signature.
@@ -108,21 +226,6 @@ impl Ord for Ticket {
     }
 }
 
-impl Default for Ticket {
-    fn default() -> Self {
-        Self {
-            channel_id: Hash::default(),
-            amount: Balance::new(U256::zero(), BalanceType::HOPR),
-            index: 0u64,
-            index_offset: 1u32,
-            encoded_win_prob: f64_to_win_prob(1.0f64).expect("failed creating 100% winning probability"),
-            channel_epoch: 1u32,
-            challenge: EthereumChallenge::default(),
-            signature: None,
-        }
-    }
-}
-
 impl Display for Ticket {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -134,95 +237,6 @@ impl Display for Ticket {
 }
 
 impl Ticket {
-    /// Creates a ticket *without* signature and *without* a challenge set.
-    /// This sets a default value as challenge.
-    // TODO: refactor this so it uses the Builder pattern
-    pub fn new_partial(
-        own_address: &Address,
-        counterparty: &Address,
-        amount: Balance,
-        index: u64,
-        index_offset: u32,
-        win_prob: f64,
-        channel_epoch: u32,
-    ) -> errors::Result<Self> {
-        if own_address.eq(counterparty) {
-            return Err(CoreTypesError::InvalidInputData(
-                "Source and destination must be different".into(),
-            ));
-        }
-
-        let channel_id = channels::generate_channel_id(own_address, counterparty);
-
-        Self::new_partial_with_id(channel_id, amount, index, index_offset, win_prob, channel_epoch)
-    }
-
-    // TODO: refactor this so it uses the Builder pattern
-    pub fn new_partial_with_id(
-        channel_id: Hash,
-        amount: Balance,
-        index: u64,
-        index_offset: u32,
-        win_prob: f64,
-        channel_epoch: u32,
-    ) -> errors::Result<Self> {
-        Ticket::check_value_boundaries(&amount, index, win_prob, channel_epoch)?;
-
-        Ok(Self {
-            channel_id,
-            amount: amount.to_owned(),
-            index,
-            index_offset,
-            channel_epoch,
-            challenge: EthereumChallenge::default(),
-            encoded_win_prob: f64_to_win_prob(win_prob).expect("error encoding winning probability"),
-            signature: None,
-        })
-    }
-
-    /// Convenience method for creating a zero-hop ticket
-    pub fn new_zero_hop(source: &Address, destination: &Address) -> Self {
-        Self::new_partial(source, destination, BalanceType::HOPR.zero(), 0, 0, 0.0, 0)
-            .expect("zero hop ticket must always satisfy the ticket value boundaries")
-    }
-
-    /// Tickets 2.0 come with meaningful boundaries to fit into 2 EVM slots.
-    /// This method checks whether they are met and prevents from unintended
-    /// usage.
-    fn check_value_boundaries(amount: &Balance, index: u64, win_prob: f64, channel_epoch: u32) -> errors::Result<()> {
-        if amount.balance_type().ne(&BalanceType::HOPR) {
-            return Err(CoreTypesError::InvalidInputData(
-                "Tickets can only have HOPR balance".into(),
-            ));
-        }
-
-        if amount.amount().ge(&10_u128.pow(25).into()) {
-            return Err(CoreTypesError::InvalidInputData(
-                "Tickets may not have more than 1% of total supply".into(),
-            ));
-        }
-
-        if index > (1_u64 << 48) {
-            return Err(CoreTypesError::InvalidInputData(
-                "Cannot hold ticket indices larger than 2^48".into(),
-            ));
-        }
-
-        if channel_epoch > (1_u32 << 24) {
-            return Err(CoreTypesError::InvalidInputData(
-                "Cannot hold channel epoch larger than 2^24".into(),
-            ));
-        }
-
-        if !(0.0..=1.0).contains(&win_prob) {
-            return Err(CoreTypesError::InvalidInputData(
-                "Winning probability must be between 0 and 1".into(),
-            ));
-        }
-
-        Ok(())
-    }
-
     fn encode_without_signature(&self) -> [u8; Self::SIZE - Signature::SIZE] {
         let mut ret = [0u8; Self::SIZE - Signature::SIZE];
         let mut offset = 0;
@@ -349,24 +363,16 @@ impl TryFrom<&[u8]> for Ticket {
                     ..ENCODED_TICKET_LENGTH + EthereumChallenge::SIZE + Signature::SIZE],
             )?;
 
-            let amount = BalanceType::HOPR.balance_bytes(amount);
-            let index = u64::from_be_bytes(index);
-            let channel_epoch = u32::from_be_bytes(channel_epoch);
-
             // Validate the boundaries of the parsed values
-            Ticket::check_value_boundaries(&amount, index, win_prob_to_f64(&encoded_win_prob), channel_epoch)
-                .map_err(|_| GeneralError::InvalidInput)?;
-
-            Ok(Self {
-                channel_id,
-                amount,
-                index,
-                index_offset: u32::from_be_bytes(index_offset),
-                encoded_win_prob,
-                channel_epoch,
-                challenge,
-                signature: Some(signature),
-            })
+            Ok(TicketBuilder::default()
+                .id(channel_id)
+                .amount(amount)?
+                .index(u64::from_be_bytes(index))?
+                .index_offset(u32::from_be_bytes(index_offset))?
+                .channel_epoch(u32::from_be_bytes(channel_epoch))?
+                .win_prob_encoded(encoded_win_prob)
+                .challenge(challenge)
+                .build_signed(signature)?)
         } else {
             Err(hopr_primitive_types::errors::GeneralError::ParseError)
         }
