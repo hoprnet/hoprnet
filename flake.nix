@@ -427,11 +427,11 @@
               # remove existing crate entries (to remove old crates)
               yq 'with_entries(select(.key != "crate:*"))' .github/labeler.yml > labeler.yml.new
               # add new crate entries for known crates
-              for f in `find . -mindepth 2 -name "Cargo.toml" -type f ! -path "./vendor/*"`; do
+              for f in `find . -mindepth 2 -name "Cargo.toml" -type f ! -path "./vendor/*" -printf '%P\n'`; do
               	env \
               		name="crate:`yq '.package.name' $f`" \
               		dir="`dirname $f`/**" \
-              		yq -n '.[strenv(name)][0]."changed-files"[0]."any-glob-to-any-file"[0] = env(dir)' >> labeler.yml.new
+              		yq -n '.[strenv(name)][0]."changed-files"[0]."any-glob-to-any-file" = env(dir)' >> labeler.yml.new
               done
               mv labeler.yml.new .github/labeler.yml
             '';

@@ -24,125 +24,88 @@ testing:
           - "tests/**/*"
 crate:core-path:
   - changed-files:
-      - any-glob-to-any-file:
-          - ./logic/path/**
+      - any-glob-to-any-file: logic/path/**
 crate:core-strategy:
   - changed-files:
-      - any-glob-to-any-file:
-          - ./logic/strategy/**
+      - any-glob-to-any-file: logic/strategy/**
 crate:hopr-internal-types:
   - changed-files:
-      - any-glob-to-any-file:
-          - ./common/internal-types/**
+      - any-glob-to-any-file: common/internal-types/**
 crate:hopr-primitive-types:
   - changed-files:
-      - any-glob-to-any-file:
-          - ./common/primitive-types/**
+      - any-glob-to-any-file: common/primitive-types/**
 crate:hopli:
   - changed-files:
-      - any-glob-to-any-file:
-          - ./hopli/**
+      - any-glob-to-any-file: hopli/**
 crate:hopr-db-entity:
   - changed-files:
-      - any-glob-to-any-file:
-          - ./db/entity/**
+      - any-glob-to-any-file: db/entity/**
 crate:hopr-db-api:
   - changed-files:
-      - any-glob-to-any-file:
-          - ./db/api/**
+      - any-glob-to-any-file: db/api/**
 crate:hopr-db-migration:
   - changed-files:
-      - any-glob-to-any-file:
-          - ./db/migration/**
+      - any-glob-to-any-file: db/migration/**
 crate:hopr-crypto-random:
   - changed-files:
-      - any-glob-to-any-file:
-          - ./crypto/random/**
+      - any-glob-to-any-file: crypto/random/**
 crate:hopr-crypto-sphinx:
   - changed-files:
-      - any-glob-to-any-file:
-          - ./crypto/sphinx/**
+      - any-glob-to-any-file: crypto/sphinx/**
 crate:hopr-crypto-types:
   - changed-files:
-      - any-glob-to-any-file:
-          - ./crypto/types/**
+      - any-glob-to-any-file: crypto/types/**
+crate:hopr-crypto-packet:
+  - changed-files:
+      - any-glob-to-any-file: crypto/packet/**
 crate:hopr-lib:
   - changed-files:
-      - any-glob-to-any-file:
-          - ./hopr/hopr-lib/**
+      - any-glob-to-any-file: hopr/hopr-lib/**
 crate:hopr-metrics:
   - changed-files:
-      - any-glob-to-any-file:
-          - ./misc/metrics/**
+      - any-glob-to-any-file: misc/metrics/**
 crate:hopr-platform:
   - changed-files:
-      - any-glob-to-any-file:
-          - ./misc/platform/**
-crate:utils-db:
-  - changed-files:
-      - any-glob-to-any-file:
-          - ./misc/utils-db/**
+      - any-glob-to-any-file: misc/platform/**
 crate:chain-actions:
   - changed-files:
-      - any-glob-to-any-file:
-          - ./chain/actions/**
+      - any-glob-to-any-file: chain/actions/**
 crate:chain-api:
   - changed-files:
-      - any-glob-to-any-file:
-          - ./chain/api/**
-crate:chain-db:
-  - changed-files:
-      - any-glob-to-any-file:
-          - ./chain/db/**
+      - any-glob-to-any-file: chain/api/**
 crate:chain-indexer:
   - changed-files:
-      - any-glob-to-any-file:
-          - ./chain/indexer/**
+      - any-glob-to-any-file: chain/indexer/**
 crate:chain-rpc:
   - changed-files:
-      - any-glob-to-any-file:
-          - ./chain/rpc/**
+      - any-glob-to-any-file: chain/rpc/**
 crate:chain-types:
   - changed-files:
-      - any-glob-to-any-file:
-          - ./chain/types/**
+      - any-glob-to-any-file: chain/types/**
 crate:bindings:
   - changed-files:
-      - any-glob-to-any-file:
-          - ./ethereum/bindings/**
+      - any-glob-to-any-file: ethereum/bindings/**
 crate:core-transport:
   - changed-files:
-      - any-glob-to-any-file:
-          - ./transport/api/**
+      - any-glob-to-any-file: transport/api/**
 crate:core-network:
   - changed-files:
-      - any-glob-to-any-file:
-          - ./transport/network/**
+      - any-glob-to-any-file: transport/network/**
 crate:core-p2p:
   - changed-files:
-      - any-glob-to-any-file:
-          - ./transport/p2p/**
-crate:core-packet:
-  - changed-files:
-      - any-glob-to-any-file:
-          - ./transport/packet/**
+      - any-glob-to-any-file: transport/p2p/**
 crate:core-protocol:
   - changed-files:
-      - any-glob-to-any-file:
-          - ./transport/protocol/**
+      - any-glob-to-any-file: transport/protocol/**
 crate:hoprd:
   - changed-files:
-      - any-glob-to-any-file:
-          - ./hoprd/hoprd/**
+      - any-glob-to-any-file: hoprd/hoprd/**
 crate:hoprd-inbox:
   - changed-files:
-      - any-glob-to-any-file:
-          - ./hoprd/inbox/**
+      - any-glob-to-any-file: hoprd/inbox/**
 crate:hoprd-keypair:
   - changed-files:
-      - any-glob-to-any-file:
-          - ./hoprd/keypair/**
+      - any-glob-to-any-file: hoprd/keypair/**
 crate:hoprd-api:
   - changed-files:
-      - any-glob-to-any-file:
-          - ./hoprd/rest-api/**
+      - any-glob-to-any-file: hoprd/rest-api/**
