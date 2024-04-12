@@ -1,10 +1,9 @@
-version: '3.9'
-
+---
+version: "3.9"
 networks:
   hoprd-isolated:
-    name: 'hoprd-isolated'
+    name: "hoprd-isolated"
     external: true
-
 services:
   hoprd-public-relay:
     build: docker-runner/
@@ -18,10 +17,10 @@ services:
           --apiToken MyT0ken123^ --password switzerland --testPreferLocalAddresses \
           --identity /var/hopr/identities/local-public.id --announce
     volumes:
-      - '/var/hopr/identities:/var/hopr/identities'
+      - "/var/hopr/identities:/var/hopr/identities"
     networks:
-      - 'hoprd-isolated'
+      - "hoprd-isolated"
     ports:
-      - '3011:3001'
+      - "3011:3001"
     environment:
-      - 'DEBUG=hopr*'
+      - "DEBUG=hopr*"

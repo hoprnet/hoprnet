@@ -2,7 +2,7 @@
 //! and networks that a HOPR node runs in.
 //!
 //! [EnvironmentType] defines the environment type. EnvironmentType of a network is defined in
-//! `contracts-address.json` under the foundry contract root. Different environment type uses
+//! `contracts-addresses.json` under the foundry contract root. Different environment type uses
 //! a different foundry profile.
 //!
 //! Network is a collection of several major/minor releases.
@@ -66,6 +66,7 @@ pub struct NetworkProviderArgs {
 
     /// Path to the root of foundry project (etehereum/contracts), where all the contracts and `contracts-addresses.json` are stored
     #[clap(
+        env = "HOPLI_CONTRACTS_ROOT",
         help = "Specify path pointing to the contracts root",
         long,
         short,

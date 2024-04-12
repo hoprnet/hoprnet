@@ -1,7 +1,0 @@
-#!/usr/bin/env sh
-
-# exit on errors, undefined variables, ensure errors in pipes are not hidden
-set -Eeuo pipefail
-
-# run linter, fail if issues are found
-make lint || { echo -e "\nRun 'make fmt' to fix formatting"; exit 1; }

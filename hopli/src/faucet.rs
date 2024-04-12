@@ -128,7 +128,12 @@ impl FaucetArgs {
                 .enumerate()
                 .map(|(i, h)| {
                     if h.gt(&token_balances[i]) {
-                        h.sub(token_balances[i])
+                        let diff = h.sub(token_balances[i]);
+                        info!(
+                            "{:?} hopr-token to be transferred to {:?} to top up {:?}",
+                            diff, eth_addresses_all[i], &token_balances[i]
+                        );
+                        diff
                     } else {
                         U256::zero()
                     }
@@ -142,7 +147,12 @@ impl FaucetArgs {
                 .enumerate()
                 .map(|(i, n)| {
                     if n.gt(&native_balances[i]) {
-                        n.sub(native_balances[i])
+                        let diff = n.sub(native_balances[i]);
+                        info!(
+                            "{:?} native-token to be transferred to {:?}, to top up {:?}",
+                            diff, eth_addresses_all[i], &native_balances[i]
+                        );
+                        diff
                     } else {
                         U256::zero()
                     }

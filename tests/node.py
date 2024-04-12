@@ -81,6 +81,7 @@ class Node:
         api_token_param = f"--api-token={self.api_token}" if self.api_token else "--disableApiAuthentication"
         custom_env = {
             "RUST_LOG": "debug,libp2p_mplex=info,multistream_select=info,isahc::handler=error,isahc::client=error",
+            "RUST_BACKTRACE": "full",
             "HOPRD_HEARTBEAT_INTERVAL": "2500",
             "HOPRD_HEARTBEAT_THRESHOLD": "2500",
             "HOPRD_HEARTBEAT_VARIANCE": "1000",

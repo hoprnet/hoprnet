@@ -1,5 +1,4 @@
 ---
-
 hopr:
   host:
     # NOTE: adapt this to reflect your public IP
@@ -53,8 +52,8 @@ hopr:
     announce_local_addresses: false
     prefer_local_addresses: false
 identity:
-  file: '/app/hoprd.id'
-  password: 'mySAFEpl4ce'
+  file: "/app/hoprd.id"
+  password: "mySAFEpl4ce"
 api:
   enable: true
   auth: !Token ^Pr1vacyasafirstCLASSpr0ductfe4turemadeEASY^
