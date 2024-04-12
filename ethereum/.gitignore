@@ -1,6 +1,7 @@
 contracts/cache/
 contracts/out/
 contracts/build-info
+contracts/foundry.toml
 
 # Ignore Environment Variables!
 .env

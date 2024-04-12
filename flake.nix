@@ -12,6 +12,9 @@
   inputs.foundry.url = github:shazow/foundry.nix/monthly;
   # use change to add solc 0.8.24
   inputs.solc.url = github:hoprnet/solc.nix/tb/20240129-solc-0.8.24;
+  inputs.pre-commit.url = github:cachix/pre-commit-hooks.nix;
+  inputs.treefmt-nix.url = github:numtide/treefmt-nix;
+  inputs.flake-root.url = github:srid/flake-root;
 
   inputs.rust-overlay.inputs.nixpkgs.follows = "nixpkgs";
   inputs.rust-overlay.inputs.flake-utils.follows = "flake-utils";
@@ -20,9 +23,17 @@
   inputs.foundry.inputs.flake-utils.follows = "flake-utils";
   inputs.solc.inputs.nixpkgs.follows = "nixpkgs";
   inputs.solc.inputs.flake-utils.follows = "flake-utils";
+  inputs.treefmt-nix.inputs.nixpkgs.follows = "nixpkgs";
+  inputs.pre-commit.inputs.nixpkgs.follows = "nixpkgs";
+  inputs.pre-commit.inputs.nixpkgs-stable.follows = "nixpkgs";
+  inputs.pre-commit.inputs.flake-utils.follows = "flake-utils";
 
-  outputs = { self, nixpkgs, flake-utils, flake-parts, rust-overlay, crane, foundry, solc, ... }@inputs:
+  outputs = { self, nixpkgs, flake-utils, flake-parts, flake-root, rust-overlay, crane, foundry, solc, pre-commit, treefmt-nix, ... }@inputs:
     flake-parts.lib.mkFlake { inherit inputs; } {
+      imports = [
+        inputs.treefmt-nix.flakeModule
+        inputs.flake-root.flakeModule
+      ];
       perSystem = { config, lib, self', inputs', system, ... }:
         let
           fs = lib.fileset;
@@ -30,6 +41,7 @@
           pkgs = import nixpkgs {
             inherit system overlays;
           };
+          solcDefault = with pkgs; (solc.mkDefault pkgs solc_0_8_19);
           rustToolchain = pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
           rustNightly = pkgs.rust-bin.selectLatestNightlyWith (toolchain: toolchain.default);
           craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchain;
@@ -44,7 +56,6 @@
             version = pkgs.lib.strings.concatStringsSep "."
               (pkgs.lib.lists.take 3 (builtins.splitVersion hoprdCrateInfoOriginal.version));
           };
-          solcDefault = with pkgs; (solc.mkDefault pkgs solc_0_8_19);
           depsSrc = fs.toSource {
             root = ./.;
             fileset = fs.unions [
@@ -63,7 +74,9 @@
               ./README.md
               ./hopr/hopr-lib/data
               ./ethereum/contracts/contracts-addresses.json
+              ./ethereum/contracts/foundry.toml.in
               ./ethereum/contracts/remappings.txt
+              ./hoprd/hoprd/example_cfg.yaml
               (fs.fileFilter (file: file.hasExt "rs") ./.)
               (fs.fileFilter (file: file.hasExt "toml") ./.)
               (fs.fileFilter (file: file.hasExt "sol") ./vendor/solidity)
@@ -71,11 +84,12 @@
             ];
           };
           nativeBuildInputs = with pkgs; [
-            pkg-config
-            openssl # required to build curl rust bindings
+            foundry-bin
+            solcDefault
           ];
           buildInputs = with pkgs; [
-            foundry-bin
+            pkg-config
+            openssl # required to build curl rust bindings
           ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin (
             with darwin.apple_sdk.frameworks; [
               CoreServices
@@ -91,6 +105,16 @@
             # prevent nix from changing config.sub files under vendor/cargo
             dontUpdateAutotoolsGnuConfigScripts = true;
           };
+          commonPhases = {
+            preConfigure = ''
+              # respect the amount of available cores for building
+              export CARGO_BUILD_JOBS=$NIX_BUILD_CORES
+              echo "# placeholder" > vendor/cargo/config.toml
+              sed "s|# solc = .*|solc = \"${solcDefault}/bin/solc\"|g" \
+                ethereum/contracts/foundry.toml.in > \
+                ethereum/contracts/foundry.toml
+            '';
+          };
           hopliCrateInfo = craneLib.crateNameFromCargoToml {
             cargoToml = ./hopli/Cargo.toml;
           };
@@ -100,27 +124,24 @@
             cargoExtraArgs = "--offline -p ${pname}";
             extraDummyScript = ''
               mkdir -p $out/vendor/cargo
-              cp -r --no-preserve=mode,ownership ${src}/vendor/cargo $out/vendor/
+              cp -r --no-preserve=mode,ownership ${depsSrc}/vendor/cargo $out/vendor/
               echo "# placeholder" > $out/vendor/cargo/config.toml
             '';
           });
-          rustPackage = { pname, version, cargoArtifacts, CARGO_PROFILE ? "release", postInstall ? null }: craneLib.buildPackage (commonArgs // {
+          rustPackage = { pname, version, cargoArtifacts, CARGO_PROFILE ? "release", postInstall ? null }: craneLib.buildPackage (commonArgs // commonPhases // {
             inherit pname version cargoArtifacts src postInstall CARGO_PROFILE;
             cargoExtraArgs = "--offline -p ${pname}";
-            preConfigure = ''
-              echo "# placeholder" > vendor/cargo/config.toml
-              sed -i "s|solc = .*|solc = \"${solcDefault}/bin/solc\"|g" ethereum/contracts/foundry.toml
-            '';
           });
-          rustPackageTest = { pname, version, cargoArtifacts }: craneLib.cargoTest (commonArgs // {
+          rustPackageTest = { pname, version, cargoArtifacts }: craneLib.cargoTest (commonArgs // commonPhases // {
             inherit pname version cargoArtifacts src;
             cargoExtraArgs = "--offline -p ${pname}";
-            preConfigure = ''
-              echo "# placeholder" > vendor/cargo/config.toml
-              sed -i "s|solc = .*|solc = \"${solcDefault}/bin/solc\"|g" ethereum/contracts/foundry.toml
-            '';
             # this ensures the tests are run as part of the build process
             doCheck = true;
+          });
+          rustPackageClippy = { pname, version, cargoArtifacts }: craneLib.cargoClippy (commonArgs // commonPhases // {
+            inherit pname version cargoArtifacts src;
+            cargoExtraArgs = "--offline -p ${pname}";
+            cargoClippyExtraArgs = "-- -Dwarnings";
           });
           hoprd = rustPackage (hoprdCrateInfo // { cargoArtifacts = rustPackageDeps hoprdCrateInfo; });
           hoprd-debug = rustPackage (hoprdCrateInfo // {
@@ -129,6 +150,8 @@
             });
             CARGO_PROFILE = "dev";
           });
+          hoprd-test = rustPackageTest (hoprdCrateInfo // { cargoArtifacts = rustPackageDeps hoprdCrateInfo; });
+          hoprd-clippy = rustPackageClippy (hoprdCrateInfo // { cargoArtifacts = rustPackageDeps hoprdCrateInfo; });
           hopliPackageConfig = {
             cargoArtifacts = rustPackageDeps hopliCrateInfo;
             postInstall = ''
@@ -137,8 +160,14 @@
             '';
           };
           hopli = rustPackage (hopliCrateInfo // hopliPackageConfig);
-          hoprd-test = rustPackageTest (hoprdCrateInfo // { cargoArtifacts = rustPackageDeps hoprdCrateInfo; });
+          hopli-debug = rustPackage (hopliCrateInfo // {
+            cargoArtifacts = rustPackageDeps (hopliCrateInfo // {
+              CARGO_PROFILE = "dev";
+            });
+            CARGO_PROFILE = "dev";
+          });
           hopli-test = rustPackageTest (hopliCrateInfo // { cargoArtifacts = rustPackageDeps hopliCrateInfo; });
+          hopli-clippy = rustPackageClippy (hopliCrateInfo // { cargoArtifacts = rustPackageDeps hopliCrateInfo; });
           # FIXME: the docker image built is not working on macOS arm platforms
           # and will simply lead to a non-working image. Likely, some form of
           # cross-compilation or distributed build is required.
@@ -272,17 +301,13 @@
           hopli-docker-build-and-upload = flake-utils.lib.mkApp {
             drv = dockerImageUploadScript hopli-docker;
           };
-          docs = craneLibNightly.cargoDoc (commonArgs // {
+          docs = craneLibNightly.cargoDoc (commonArgs // commonPhases // {
             inherit src;
             pname = "hopr";
             version = hoprdCrateInfo.version;
             cargoArtifacts = null;
             buildPhaseCargoCommand = "cargo doc --offline --no-deps";
             RUSTDOCFLAGS = "--enable-index-page -Z unstable-options";
-            preConfigure = ''
-              echo "# placeholder" > vendor/cargo/config.toml
-              sed -i "s|solc = .*|solc = \"${solcDefault}/bin/solc\"|g" ethereum/contracts/foundry.toml
-            '';
             postBuild = ''
               ${pkgs.pandoc}/bin/pandoc -f markdown+hard_line_breaks -t html README.md > readme.html
               ${pkgs.html-tidy}/bin/tidy -q -i target/doc/index.html > index.html || :
@@ -299,7 +324,7 @@
                 (fs.fileFilter (file: file.hasExt "sol") ./ethereum/contracts/src)
                 ./tests
                 ./scripts
-                ./ethereum/contracts/foundry.toml
+                ./ethereum/contracts/foundry.toml.in
                 ./ethereum/contracts/remappings.txt
               ];
             };
@@ -323,12 +348,23 @@
             '';
             doCheck = true;
           };
+          pre-commit-check = pre-commit.lib.${system}.run {
+            src = ./.;
+            hooks = {
+              treefmt.enable = true;
+              treefmt.package = config.treefmt.build.wrapper;
+            };
+            tools = pkgs;
+          };
           buildDevShell = extraPackages: craneLib.devShell {
             packages = with pkgs; [
               # testing utilities
               jq
               yq-go
               curl
+              bash
+              gnumake
+              which
 
               # test Github automation
               act
@@ -347,7 +383,11 @@
               ## python is required by integration tests
               python39
               python39Packages.venvShellHook
+
+              ## formatting
+              config.treefmt.build.wrapper
             ] ++ buildInputs ++ nativeBuildInputs ++
+            (lib.attrValues config.treefmt.build.programs) ++
             lib.optionals stdenv.isLinux [ autoPatchelfHook ] ++ extraPackages;
             venvDir = "./.venv";
             postVenvCreation = ''
@@ -358,27 +398,115 @@
               autoPatchelf ./.venv
             '';
             preShellHook = ''
-              sed -i "s|solc = .*|solc = \"${solcDefault}/bin/solc\"|g" ethereum/contracts/foundry.toml
+              sed "s|# solc = .*|solc = \"${solcDefault}/bin/solc\"|g" \
+                ethereum/contracts/foundry.toml.in > \
+                ethereum/contracts/foundry.toml
+            '';
+            postShellHook = ''
+              ${pre-commit-check.shellHook}
             '';
           };
           defaultDevShell = buildDevShell [ ];
           smoketestsDevShell = buildDevShell [ hoprd hopli ];
+          run-check = flake-utils.lib.mkApp {
+            drv = pkgs.writeShellScriptBin "run-check" ''
+              set -e
+              check=$1
+              if [ -z "$check" ]; then
+                nix flake show --json 2>/dev/null | \
+                  jq -r '.checks."${system}" | to_entries | .[].key' | \
+                  xargs -I '{}' nix build ".#checks."${system}".{}"
+              else
+              	nix build ".#checks."${system}".$check"
+              fi
+            '';
+          };
+          update-github-labels = flake-utils.lib.mkApp {
+            drv = pkgs.writeShellScriptBin "update-github-labels" ''
+              set -eu
+              # remove existing crate entries (to remove old crates)
+              yq 'with_entries(select(.key != "crate:*"))' .github/labeler.yml > labeler.yml.new
+              # add new crate entries for known crates
+              for f in `find . -mindepth 2 -name "Cargo.toml" -type f ! -path "./vendor/*"`; do
+              	env \
+              		name="crate:`yq '.package.name' $f`" \
+              		dir="`dirname $f`/**" \
+              		yq -n '.[strenv(name)][0]."changed-files"[0]."any-glob-to-any-file"[0] = env(dir)' >> labeler.yml.new
+              done
+              mv labeler.yml.new .github/labeler.yml
+            '';
+          };
         in
         {
+          treefmt = {
+            inherit (config.flake-root) projectRootFile;
+
+            programs.yamlfmt.enable = true;
+            settings.formatter.yamlfmt.includes = [ "./.github/labeler.yml" "./.github/workflows/*.yaml" ];
+            settings.formatter.yamlfmt.excludes = [ "./vendor/*" ];
+
+            programs.prettier.enable = true;
+            settings.formatter.prettier.includes = [ "*.md" "*.json" ];
+            settings.formatter.prettier.excludes = [ "./vendor/*" "./ethereum/contracts/broadcast/*" "*.yml" "*.yaml" ];
+
+            programs.rustfmt.enable = true;
+            settings.formatter.rustfmt.excludes = [ "./vendor/*" ];
+
+            programs.nixpkgs-fmt.enable = true;
+            settings.formatter.nixpkgs-fmt.excludes = [ "./vendor/*" ];
+
+            programs.ruff.enable = true;
+            programs.ruff.format = true;
+            settings.formatter.ruff.excludes = [ "./vendor/*" ];
+
+            settings.formatter.solc = {
+              command = "sh";
+              options = [
+                "-euc"
+                ''
+                  # must generate the foundry.toml here, since this step could
+                  # be executed in isolation
+                  sed "s|# solc = .*|solc = \"${solcDefault}/bin/solc\"|g" \
+                    ./ethereum/contracts/foundry.toml.in > \
+                    ./ethereum/contracts/foundry.toml
+
+                  for file in "$@"; do
+                    ${pkgs.foundry-bin}/bin/forge fmt $file \
+                      --root ./ethereum/contracts;
+                  done
+                ''
+                "--"
+              ];
+              includes = [ "*.sol" ];
+              excludes = [ "./vendor/*" "./ethereum/contracts/src/static/*" ];
+            };
+          };
+
+          checks = {
+            inherit hoprd-clippy hopli-clippy;
+          };
+
           apps = {
             inherit hoprd-docker-build-and-upload;
             inherit hoprd-debug-docker-build-and-upload;
             inherit hopli-docker-build-and-upload;
+            inherit update-github-labels;
+            check = run-check;
           };
+
           packages = {
             inherit hoprd hoprd-debug hoprd-test hoprd-docker hoprd-debug-docker;
-            inherit hopli hopli-test hopli-docker;
+            inherit hopli hopli-debug hopli-test hopli-docker;
             inherit anvil-docker;
             inherit smoke-tests docs;
+            inherit pre-commit-check;
             default = hoprd;
           };
+
           devShells.default = defaultDevShell;
           devShells.smoke-tests = smoketestsDevShell;
+
+          formatter = config.treefmt.build.wrapper;
         };
       systems = [ "x86_64-linux" "aarch64-linux" "aarch64-darwin" "x86_64-darwin" ];
     };

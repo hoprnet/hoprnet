@@ -1,5 +1,3 @@
 # use image with standard tools installed
--P ubuntu=catthehacker/ubuntu:custom-22.04-20231215
--P ubuntu-4-core=catthehacker/ubuntu:custom-22.04-20231215
--P ubuntu-8-core=catthehacker/ubuntu:custom-22.04-20231215
--P ubuntu-16-core=catthehacker/ubuntu:custom-22.04-20231215
+-P self-hosted-hoprnet-big=catthehacker/ubuntu:custom-22.04-20231215
+-P self-hosted-hoprnet-bigger=catthehacker/ubuntu:custom-22.04-20231215

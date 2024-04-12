@@ -242,7 +242,7 @@ where
     pub async fn get(&self, peer: &PeerId) -> crate::errors::Result<Option<PeerStatus>> {
         if peer == &self.me {
             Ok(Some({
-                let mut ps = PeerStatus::new(*peer, PeerOrigin::Initialization, 0.0f64, 0u32);
+                let mut ps = PeerStatus::new(*peer, PeerOrigin::Initialization, 0.0f64, 2u32);
                 ps.multiaddresses = self.me_addresses.clone();
                 ps
             }))
