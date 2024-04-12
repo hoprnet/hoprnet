@@ -26,12 +26,12 @@ use chain_types::actions::Action;
 use futures::StreamExt;
 use hopr_crypto_types::types::Hash;
 use hopr_db_api::channels::HoprDbChannelOperations;
+use hopr_db_api::info::DomainSeparator;
+use hopr_db_api::prelude::HoprDbInfoOperations;
 use hopr_db_api::tickets::{HoprDbTicketOperations, TicketSelector};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use tracing::{debug, error, info, warn};
-use hopr_db_api::info::DomainSeparator;
-use hopr_db_api::prelude::HoprDbInfoOperations;
 
 use crate::action_queue::PendingAction;
 use crate::errors::ChainActionsError::{ChannelDoesNotExist, InvalidState};
@@ -149,7 +149,8 @@ where
 
         let channel_dst = self
             .db
-            .get_indexer_data(None).await?
+            .get_indexer_data(None)
+            .await?
             .domain_separator(DomainSeparator::Channel)
             .ok_or(InvalidState("missing channel dst".into()))?;
 
@@ -188,7 +189,11 @@ where
     /// Otherwise, the transaction hash of the on-chain redemption is returned.
     #[tracing::instrument(level = "debug", skip(self))]
     async fn redeem_ticket(&self, ack_ticket: AcknowledgedTicket) -> Result<PendingAction> {
-        if let Some(channel) = self.db.get_channel_by_id(None, &ack_ticket.verified_ticket().channel_id).await? {
+        if let Some(channel) = self
+            .db
+            .get_channel_by_id(None, &ack_ticket.verified_ticket().channel_id)
+            .await?
+        {
             let selector = TicketSelector::from(&channel)
                 .with_index(ack_ticket.verified_ticket().index)
                 .with_state(AcknowledgedTicketStatus::Untouched);
@@ -202,12 +207,13 @@ where
             {
                 let channel_dst = self
                     .db
-                    .get_indexer_data(None).await?
+                    .get_indexer_data(None)
+                    .await?
                     .domain_separator(DomainSeparator::Channel)
                     .ok_or(InvalidState("missing channel dst".into()))?;
 
                 let redeemable = ticket.into_redeemable(&self.chain_key, &channel_dst)?;
-                Ok(self.tx_sender.send(Action::RedeemTicket(ticket)).await?)
+                Ok(self.tx_sender.send(Action::RedeemTicket(redeemable)).await?)
             } else {
                 Err(WrongTicketState(ack_ticket.to_string()))
             }

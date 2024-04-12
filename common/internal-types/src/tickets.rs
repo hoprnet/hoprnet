@@ -1,15 +1,15 @@
-use std::cmp::Ordering;
+use bindings::hopr_channels::RedeemTicketCall;
+use ethers::contract::EthCall;
+use hex_literal::hex;
 use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use serde::{Deserialize, Serialize};
+use std::cmp::Ordering;
 use std::fmt::{Display, Formatter};
 use tracing::{debug, error};
-use hex_literal::hex;
-use bindings::hopr_channels::RedeemTicketCall;
-use ethers::contract::EthCall;
 
-use crate::{channels, errors};
 use crate::errors::CoreTypesError;
+use crate::{channels, errors};
 
 /// Size-optimized encoding of the ticket, used for both,
 /// network transfer and in the smart contract.
@@ -30,7 +30,13 @@ const ALWAYS_WINNING: EncodedWinProb = hex!("ffffffffffffff");
 const NEVER_WINNING: EncodedWinProb = hex!("00000000000000");
 
 /// Helper function to checks if the given ticket values belong to a winning ticket.
-pub(crate) fn check_ticket_win(ticket_hash: &Hash, ticket_signature: &Signature, win_prob: &EncodedWinProb, response: &Response, vrf_params: &VrfParameters) -> bool {
+pub(crate) fn check_ticket_win(
+    ticket_hash: &Hash,
+    ticket_signature: &Signature,
+    win_prob: &EncodedWinProb,
+    response: &Response,
+    vrf_params: &VrfParameters,
+) -> bool {
     // Signed winning probability
     let mut signed_ticket_luck = [0u8; 8];
     signed_ticket_luck[1..].copy_from_slice(win_prob);
@@ -44,7 +50,7 @@ pub(crate) fn check_ticket_win(ticket_hash: &Hash, ticket_signature: &Signature,
             response.as_ref(),
             ticket_signature.as_ref(),
         ])
-            .as_ref()[0..7],
+        .as_ref()[0..7],
     );
 
     u64::from_be_bytes(computed_ticket_luck) <= u64::from_be_bytes(signed_ticket_luck)
@@ -61,19 +67,19 @@ pub struct Ticket {
     pub channel_id: Hash,
     /// Amount of HOPR tokens this ticket is worth.
     /// Always between 0 and 2^92.
-    pub amount: Balance,                  // 92 bits
+    pub amount: Balance, // 92 bits
     /// Ticket index.
     /// Always between 0 and 2^48.
-    pub index: u64,                       // 48 bits
+    pub index: u64, // 48 bits
     /// Ticket index offset.
     /// Always between 1 and 2^32.
     /// For normal tickets this is always equal to 1, for aggregated this is always > 1.
-    pub index_offset: u32,                // 32 bits
+    pub index_offset: u32, // 32 bits
     /// Encoded winning probability represented via 56-bit number.
     pub encoded_win_prob: EncodedWinProb, // 56 bits
     /// Epoch of the channel this ticket belongs to.
     /// Always between 0 and 2^24.
-    pub channel_epoch: u32,               // 24 bits
+    pub channel_epoch: u32, // 24 bits
     /// Represent the Proof of Relay challenge encoded as Ethereum address.
     pub challenge: EthereumChallenge,
     /// ECDSA secp256k1 signature of all the above values.
@@ -158,14 +164,9 @@ impl Ticket {
         index: u64,
         index_offset: u32,
         win_prob: f64,
-        channel_epoch: u32
+        channel_epoch: u32,
     ) -> errors::Result<Self> {
-        Ticket::check_value_boundaries(
-            &amount,
-            index,
-            win_prob,
-            channel_epoch,
-        )?;
+        Ticket::check_value_boundaries(&amount, index, win_prob, channel_epoch)?;
 
         Ok(Self {
             channel_id,
@@ -181,26 +182,14 @@ impl Ticket {
 
     /// Convenience method for creating a zero-hop ticket
     pub fn new_zero_hop(source: &Address, destination: &Address) -> Self {
-        Self::new_partial(
-            source,
-            destination,
-            BalanceType::HOPR.zero(),
-            0,
-            0,
-            0.0,
-            0,
-        ).expect("zero hop ticket must always satisfy the ticket value boundaries")
+        Self::new_partial(source, destination, BalanceType::HOPR.zero(), 0, 0, 0.0, 0)
+            .expect("zero hop ticket must always satisfy the ticket value boundaries")
     }
 
     /// Tickets 2.0 come with meaningful boundaries to fit into 2 EVM slots.
     /// This method checks whether they are met and prevents from unintended
     /// usage.
-    fn check_value_boundaries(
-        amount: &Balance,
-        index: u64,
-        win_prob: f64,
-        channel_epoch: u32,
-    ) -> errors::Result<()> {
+    fn check_value_boundaries(amount: &Balance, index: u64, win_prob: f64, channel_epoch: u32) -> errors::Result<()> {
         if amount.balance_type().ne(&BalanceType::HOPR) {
             return Err(CoreTypesError::InvalidInputData(
                 "Tickets can only have HOPR balance".into(),
@@ -275,11 +264,7 @@ impl Ticket {
     /// Signs the ticket using the given private key, turning this ticket into [VerifiedTicket].
     pub fn sign(mut self, signing_key: &ChainKeypair, domain_separator: &Hash) -> VerifiedTicket {
         let ticket_hash = self.get_hash(domain_separator);
-        self.signature = Some(Signature::sign_hash(
-            ticket_hash.as_ref(),
-            signing_key,
-        )
-        );
+        self.signature = Some(Signature::sign_hash(ticket_hash.as_ref(), signing_key));
         VerifiedTicket(self, ticket_hash, signing_key.public().to_address())
     }
 
@@ -294,9 +279,7 @@ impl Ticket {
         let ticket_hash = self.get_hash(domain_separator);
 
         if let Some(signature) = &self.signature {
-            match PublicKey::from_signature_hash(
-                ticket_hash.as_ref(),
-                signature) {
+            match PublicKey::from_signature_hash(ticket_hash.as_ref(), signature) {
                 Ok(pk) if pk.to_address().eq(issuer) => Ok(VerifiedTicket(self, ticket_hash, *issuer)),
                 Err(e) => {
                     error!("failed to verify ticket signature: {e}");
@@ -371,7 +354,7 @@ impl TryFrom<&[u8]> for Ticket {
             let channel_epoch = u32::from_be_bytes(channel_epoch);
 
             // Validate the boundaries of the parsed values
-            Ticket::check_value_boundaries(&amount, index, win_prob_to_f64(&encoded_win_prob) , channel_epoch)
+            Ticket::check_value_boundaries(&amount, index, win_prob_to_f64(&encoded_win_prob), channel_epoch)
                 .map_err(|_| GeneralError::InvalidInput)?;
 
             Ok(Self {
@@ -422,7 +405,7 @@ impl VerifiedTicket {
             index,
             index_offset,
             win_prob,
-            channel_epoch
+            channel_epoch,
         )?;
         ret.challenge = challenge;
         Ok(ret.sign(signing_key, domain_separator))
@@ -440,28 +423,23 @@ impl VerifiedTicket {
         signature: Signature,
         hash: Hash,
     ) -> errors::Result<Self> {
-        let mut ret = Ticket::new_partial_with_id(
-            channel_id,
-            amount,
-            index,
-            index_offset,
-            win_prob,
-            channel_epoch
-        )?;
+        let mut ret = Ticket::new_partial_with_id(channel_id, amount, index, index_offset, win_prob, channel_epoch)?;
         ret.challenge = challenge;
         ret.signature = Some(signature);
 
-        let issuer = PublicKey::from_signature_hash(
-            hash.as_ref(),
-            &signature,
-        )?.to_address();
+        let issuer = PublicKey::from_signature_hash(hash.as_ref(), &signature)?.to_address();
 
         Ok(Self(ret, hash, issuer))
     }
 
     /// Convenience method for creating a zero-hop ticket
-    pub fn new_zero_hop(destination: &Address, challenge: EthereumChallenge, private_key: &ChainKeypair, domain_separator: &Hash) -> Self {
-        let mut ticket= Ticket::new_zero_hop(&private_key.public().to_address(), destination);
+    pub fn new_zero_hop(
+        destination: &Address,
+        challenge: EthereumChallenge,
+        private_key: &ChainKeypair,
+        domain_separator: &Hash,
+    ) -> Self {
+        let mut ticket = Ticket::new_zero_hop(&private_key.public().to_address(), destination);
         ticket.challenge = challenge;
         ticket.sign(private_key, domain_separator)
     }
@@ -489,17 +467,16 @@ impl VerifiedTicket {
     /// probability. If the ticket's luck value is greater than
     /// the stated probability, it is considered a winning ticket.
     pub fn is_winning(&self, response: &Response, chain_keypair: &ChainKeypair, domain_separator: &Hash) -> bool {
-        if let Ok(vrf_params) = derive_vrf_parameters(
-            self.1,
-            chain_keypair,
-            domain_separator.as_ref(),
-        ) {
+        if let Ok(vrf_params) = derive_vrf_parameters(self.1, chain_keypair, domain_separator.as_ref()) {
             check_ticket_win(
                 &self.1,
-                self.0.signature.as_ref().expect("verified ticket have always a signature"),
+                self.0
+                    .signature
+                    .as_ref()
+                    .expect("verified ticket have always a signature"),
                 &self.0.encoded_win_prob,
                 response,
-                &vrf_params
+                &vrf_params,
             )
         } else {
             error!("cannot derive vrf parameters for {self}");
@@ -528,9 +505,7 @@ impl VerifiedTicket {
             .as_u64()
             .try_into() // convert to u8
             .map_err(|_| {
-                CoreTypesError::ArithmeticError(format!("Cannot convert {} to u8",
-                                                        price_per_packet / expected_payout
-                ))
+                CoreTypesError::ArithmeticError(format!("Cannot convert {} to u8", price_per_packet / expected_payout))
             })
     }
 
@@ -553,7 +528,10 @@ impl VerifiedTicket {
 
     /// Shorthand to retrieve reference to the verified ticket signature
     pub fn verified_signature(&self) -> &Signature {
-        self.0.signature.as_ref().expect("verified ticket always has a signature")
+        self.0
+            .signature
+            .as_ref()
+            .expect("verified ticket always has a signature")
     }
 
     /// Deconstructs self back into the unverified [Ticket].
@@ -668,10 +646,7 @@ impl UnacknowledgedTicket {
     /// Verifies that the given acknowledgement solves this ticket's challenge and then
     /// turns this unacknowledged ticket into an acknowledged ticket by adding
     /// the received acknowledgement of the forwarded packet.
-    pub fn acknowledge(
-        self,
-        acknowledgement: &HalfKey,
-    ) -> crate::errors::Result<AcknowledgedTicket> {
+    pub fn acknowledge(self, acknowledgement: &HalfKey) -> crate::errors::Result<AcknowledgedTicket> {
         let response = Response::from_half_keys(&self.own_key, acknowledgement)?;
         debug!("acknowledging ticket using response {}", response.to_hex());
 
@@ -733,10 +708,7 @@ impl Ord for AcknowledgedTicket {
 
 impl AcknowledgedTicket {
     /// Creates an acknowledged ticket out of a plain ticket.
-    pub fn new(
-        ticket: VerifiedTicket,
-        response: Response,
-    ) -> AcknowledgedTicket {
+    pub fn new(ticket: VerifiedTicket, response: Response) -> AcknowledgedTicket {
         Self {
             // new tickets are always untouched
             status: AcknowledgedTicketStatus::Untouched,
@@ -758,12 +730,12 @@ impl AcknowledgedTicket {
 
     /// Transforms this ticket into [RedeemableTicket] that can be redeemed on-chain
     /// or transformed into [TransferableWinningTicket] that can be sent for aggregation.
-    pub fn into_redeemable(self, chain_keypair: &ChainKeypair, domain_separator: &Hash) -> crate::errors::Result<RedeemableTicket> {
-        let vrf_params = derive_vrf_parameters(
-            self.ticket.verified_hash(),
-            chain_keypair,
-            domain_separator.as_ref(),
-        )?;
+    pub fn into_redeemable(
+        self,
+        chain_keypair: &ChainKeypair,
+        domain_separator: &Hash,
+    ) -> crate::errors::Result<RedeemableTicket> {
+        let vrf_params = derive_vrf_parameters(self.ticket.verified_hash(), chain_keypair, domain_separator.as_ref())?;
 
         Ok(RedeemableTicket {
             ticket: self.ticket,
@@ -774,8 +746,13 @@ impl AcknowledgedTicket {
     }
 
     /// Shorthand for transforming this ticket into [TransferableWinningTicket].
-    pub fn into_transferable(self, chain_keypair: &ChainKeypair, domain_separator: &Hash) -> errors::Result<TransferableWinningTicket> {
-        self.into_redeemable(chain_keypair, domain_separator).map(TransferableWinningTicket::from)
+    pub fn into_transferable(
+        self,
+        chain_keypair: &ChainKeypair,
+        domain_separator: &Hash,
+    ) -> errors::Result<TransferableWinningTicket> {
+        self.into_redeemable(chain_keypair, domain_separator)
+            .map(TransferableWinningTicket::from)
     }
 }
 
@@ -801,7 +778,15 @@ pub struct RedeemableTicket {
 impl RedeemableTicket {
     /// Convenience method to retrieve a reference to the underlying verified [Ticket].
     #[inline]
-    pub fn verified_ticket(&self) -> &Ticket { self.ticket.verified_ticket() }
+    pub fn verified_ticket(&self) -> &Ticket {
+        self.ticket.verified_ticket()
+    }
+}
+
+impl Display for RedeemableTicket {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "redeemable {}", self.ticket)
+    }
 }
 
 impl From<RedeemableTicket> for AcknowledgedTicket {
@@ -836,12 +821,20 @@ impl TransferableWinningTicket {
     /// ticket has valid signature from the `signer`.
     /// Then it verifies if the ticket is winning and therefore if it can be successfully
     /// redeemed on-chain.
-    pub fn into_redeemable(self, expected_issuer: &Address, domain_separator: &Hash) -> errors::Result<RedeemableTicket> {
+    pub fn into_redeemable(
+        self,
+        expected_issuer: &Address,
+        domain_separator: &Hash,
+    ) -> errors::Result<RedeemableTicket> {
         if !self.signer.eq(expected_issuer) {
-            return Err(crate::errors::CoreTypesError::InvalidInputData("invalid ticket issuer".into()))
+            return Err(crate::errors::CoreTypesError::InvalidInputData(
+                "invalid ticket issuer".into(),
+            ));
         }
 
-        let verified_ticket = self.ticket.verify(&self.signer, domain_separator)
+        let verified_ticket = self
+            .ticket
+            .verify(&self.signer, domain_separator)
             .map_err(|_| CoreTypesError::CryptoError(CryptoError::SignatureVerification.into()))?;
 
         if check_ticket_win(
@@ -849,15 +842,18 @@ impl TransferableWinningTicket {
             &verified_ticket.verified_signature(),
             &verified_ticket.verified_ticket().encoded_win_prob,
             &self.response,
-            &self.vrf_params
+            &self.vrf_params,
         ) {
             Ok(RedeemableTicket {
                 ticket: verified_ticket,
                 response: self.response,
                 vrf_params: Default::default(),
+                channel_dst: *domain_separator,
             })
         } else {
-            Err(crate::errors::CoreTypesError::InvalidInputData("ticket is not a win".into()))
+            Err(crate::errors::CoreTypesError::InvalidInputData(
+                "ticket is not a win".into(),
+            ))
         }
     }
 }
@@ -888,9 +884,7 @@ impl From<RedeemableTicket> for TransferableWinningTicket {
 #[cfg(test)]
 pub mod test {
     use super::*;
-    use crate::{
-        tickets::{AcknowledgedTicket, UnacknowledgedTicket},
-    };
+    use crate::tickets::{AcknowledgedTicket, UnacknowledgedTicket};
     use hex_literal::hex;
     use hopr_crypto_types::{
         keypairs::{ChainKeypair, Keypair},
@@ -903,7 +897,6 @@ pub mod test {
         static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).unwrap();
         static ref BOB: ChainKeypair = ChainKeypair::from_secret(&hex!("48680484c6fc31bc881a0083e6e32b6dc789f9eaba0f8b981429fd346c697f8c")).unwrap();
     }
-
 
     #[test]
     pub fn test_win_prob_to_f64() {
@@ -961,7 +954,7 @@ pub mod test {
             &ALICE,
             &Hash::default(),
         )
-            .unwrap();
+        .unwrap();
 
         assert_ne!(*initial_ticket.get_hash(&Hash::default()).as_ref(), [0u8; Hash::SIZE]);
 
@@ -982,7 +975,7 @@ pub mod test {
             &ALICE,
             &Hash::default(),
         )
-            .unwrap();
+        .unwrap();
 
         assert_eq!(
             initial_ticket,
@@ -1003,7 +996,7 @@ pub mod test {
             &ALICE,
             &Hash::default(),
         )
-            .unwrap();
+        .unwrap();
 
         assert_ne!(*initial_ticket.get_hash(&Hash::default()).as_ref(), [0u8; Hash::SIZE]);
 
@@ -1023,7 +1016,7 @@ pub mod test {
             1.0,
             1,
         )
-            .unwrap();
+        .unwrap();
 
         assert_eq!(U256::one(), ticket.get_expected_payout());
 
@@ -1047,7 +1040,7 @@ pub mod test {
             1.0,
             1,
         )
-            .unwrap();
+        .unwrap();
 
         assert_eq!(1u8, ticket.get_path_position(U256::one()).unwrap());
 
@@ -1077,19 +1070,23 @@ pub mod test {
             1.0,
             1,
         )
-            .unwrap();
+        .unwrap();
 
         assert!(ticket.get_path_position(U256::from(1u64)).is_err());
     }
 
     #[test]
     pub fn test_zero_hop() {
-        let zero_hop_ticket = Ticket::new_zero_hop(&BOB.public().to_address(), &ALICE.public().to_address(), &Hash::default()).unwrap();
+        let zero_hop_ticket = Ticket::new_zero_hop(
+            &BOB.public().to_address(),
+            &ALICE.public().to_address(),
+            &Hash::default(),
+        )
+        .unwrap();
         assert!(zero_hop_ticket
             .verify(&ALICE.public().to_address(), &Hash::default())
             .is_ok());
     }
-
 
     fn mock_ticket(
         pk: &ChainKeypair,

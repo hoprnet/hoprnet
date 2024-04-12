@@ -125,6 +125,18 @@ impl From<&AcknowledgedTicket> for TicketSelector {
     }
 }
 
+impl From<&RedeemableTicket> for TicketSelector {
+    fn from(value: &RedeemableTicket) -> Self {
+        Self {
+            channel_id: value.verified_ticket().channel_id,
+            epoch: value.verified_ticket().channel_epoch.into(),
+            index: Some(value.verified_ticket().index),
+            state: None,
+            only_aggregated: value.verified_ticket().index_offset > 1,
+        }
+    }
+}
+
 impl From<&ChannelEntry> for TicketSelector {
     fn from(value: &ChannelEntry) -> Self {
         Self {
@@ -934,7 +946,10 @@ impl HoprDbTicketOperations for HoprDb {
                         .map(|model| {
                             AcknowledgedTicket::try_from(model)
                                 .map_err(DbError::from)
-                                .and_then(|ack| ack.into_transferable(&myself.chain_key, &domain_separator).map_err(DbError::from))
+                                .and_then(|ack| {
+                                    ack.into_transferable(&myself.chain_key, &domain_separator)
+                                        .map_err(DbError::from)
+                                })
                         })
                         .collect::<Result<Vec<_>>>()?;
 
@@ -1036,8 +1051,13 @@ impl HoprDbTicketOperations for HoprDb {
                 .await?;
 
         // Verify the ticket first
-        let aggregated_ticket = aggregated_ticket.verify(&channel_entry.source, &domain_separator)
-            .map_err(|e| DbError::LogicalError(format!("failed to verify received aggregated ticket in {channel_id}: {e}")))?;
+        let aggregated_ticket = aggregated_ticket
+            .verify(&channel_entry.source, &domain_separator)
+            .map_err(|e| {
+                DbError::LogicalError(format!(
+                    "failed to verify received aggregated ticket in {channel_id}: {e}"
+                ))
+            })?;
 
         // Aggregated tickets always have 100% winning probability
         if aggregated_ticket.win_prob() != 1.0f64 {
@@ -1154,12 +1174,16 @@ impl HoprDbTicketOperations for HoprDb {
         }
 
         if acked_tickets.len() == 1 {
-            let single = acked_tickets.pop()
+            let single = acked_tickets
+                .pop()
                 .unwrap()
                 .into_redeemable(&self.me_onchain, &domain_separator)?;
 
-            self.compare_and_set_outgoing_ticket_index(single.verified_ticket().channel_id, single.verified_ticket().index + 1)
-                .await?;
+            self.compare_and_set_outgoing_ticket_index(
+                single.verified_ticket().channel_id,
+                single.verified_ticket().index + 1,
+            )
+            .await?;
 
             return Ok(single.ticket);
         }
@@ -1193,7 +1217,6 @@ impl HoprDbTicketOperations for HoprDb {
                         return Err(DbError::LogicalError(format!("{entry} is not outgoing")));
                     }
 
-
                     Ok((entry, address))
                 })
             })
@@ -1210,7 +1233,9 @@ impl HoprDbTicketOperations for HoprDb {
             .into_iter()
             .map(|t| t.into_redeemable(&self.me_onchain, &domain_separator))
             .collect::<hopr_internal_types::errors::Result<Vec<_>>>()
-            .map_err(|e| DbError::LogicalError(format!("trying to aggregate an invalid or a non-winning ticket: {e}")))?;
+            .map_err(|e| {
+                DbError::LogicalError(format!("trying to aggregate an invalid or a non-winning ticket: {e}"))
+            })?;
 
         // Perform additional consistency check on the verified tickets
         for (i, acked_ticket) in verified_tickets.iter().enumerate() {
@@ -1258,7 +1283,8 @@ impl HoprDbTicketOperations for HoprDb {
             first_acked_ticket.verified_ticket().index.into(),
             (last_acked_ticket.verified_ticket().index - first_acked_ticket.verified_ticket().index + 1) as u32,
             1.0, // Aggregated tickets have always 100% winning probability
-            channel_epoch)?;
+            channel_epoch,
+        )?;
 
         ticket.challenge = first_acked_ticket.verified_ticket().challenge.clone();
         Ok(ticket.sign(me, &domain_separator))

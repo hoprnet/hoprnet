@@ -313,8 +313,8 @@ where
                                 .filter(|ticket| {
                                     // The ticket that has been redeemed at this point has: index + index_offset - 1 == new_ticket_index - 1
                                     // Since unaggregated tickets have index_offset = 1, for the unagg case this leads to: index == new_ticket_index - 1
-                                    let ticket_idx = ticket.ticket.index;
-                                    let ticket_off = ticket.ticket.index_offset as u64;
+                                    let ticket_idx = ticket.verified_ticket().index;
+                                    let ticket_off = ticket.verified_ticket().index_offset as u64;
 
                                     ticket_idx + ticket_off == ticket_redeemed.new_ticket_index
                                 })

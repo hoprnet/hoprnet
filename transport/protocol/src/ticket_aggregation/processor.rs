@@ -61,7 +61,7 @@ pub enum TicketAggregationToProcess<T, U> {
 #[derive(Debug)]
 pub enum TicketAggregationProcessed<T, U> {
     Receive(PeerId, AcknowledgedTicket, U),
-    Reply(PeerId, std::result::Result<TransferableWinningTicket, String>, T),
+    Reply(PeerId, std::result::Result<Ticket, String>, T),
     Send(
         PeerId,
         Vec<hopr_internal_types::legacy::AcknowledgedTicket>,
@@ -207,7 +207,7 @@ impl<T, U> TicketAggregationActions<T, U> {
     pub fn receive_ticket(
         &mut self,
         source: PeerId,
-        ticket: std::result::Result<TransferableWinningTicket, String>,
+        ticket: std::result::Result<Ticket, String>,
         request: U,
     ) -> Result<()> {
         self.process(TicketAggregationToProcess::ToReceive(source, ticket, request))
@@ -298,8 +298,8 @@ where
                             destination.try_into();
                         match opk {
                             Ok(opk) => match db.aggregate_tickets(opk, acked_tickets, &chain_key).await {
-                                Ok(tickets) => {
-                                    Some(TicketAggregationProcessed::Reply(destination, Ok(tickets), response))
+                                Ok(ticket) => {
+                                    Some(TicketAggregationProcessed::Reply(destination, Ok(ticket.leak()), response))
                                 }
                                 Err(hopr_db_api::errors::DbError::TicketAggregationError(e)) => {
                                     // forward error to counterparty
