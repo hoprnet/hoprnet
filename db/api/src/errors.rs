@@ -1,10 +1,10 @@
 use hopr_crypto_types::{prelude::CryptoError, types::Hash};
 use hopr_db_entity::errors::DbEntityError;
-use hopr_internal_types::{errors::CoreTypesError};
+use hopr_internal_types::errors::CoreTypesError;
+use hopr_internal_types::tickets::Ticket;
 use sea_orm::TransactionError;
 use std::sync::Arc;
 use thiserror::Error;
-use hopr_internal_types::tickets::Ticket;
 
 #[derive(Debug, Error)]
 pub enum DbError {

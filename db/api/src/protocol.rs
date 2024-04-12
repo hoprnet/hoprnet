@@ -23,7 +23,8 @@ pub trait HoprDbProtocolOperations {
     /// 1. There is an unacknowledged ticket and we are awaiting a half key.
     /// 2. We were the creator of the packet, hence we do not wait for any half key
     /// 3. The acknowledgement is unexpected and stems from a protocol bug or an attacker
-    async fn handle_acknowledgement(&self, ack: Acknowledgement, me: &ChainKeypair) -> crate::errors::Result<AckResult>;
+    async fn handle_acknowledgement(&self, ack: Acknowledgement, me: &ChainKeypair)
+        -> crate::errors::Result<AckResult>;
 
     /// Process the data into an outgoing packet
     async fn to_send(
@@ -96,7 +97,11 @@ impl From<ResolvedAcknowledgement> for AckResult {
 #[async_trait]
 impl HoprDbProtocolOperations for HoprDb {
     #[instrument(level = "trace", skip(self))]
-    async fn handle_acknowledgement(&self, ack: Acknowledgement, me: &ChainKeypair) -> crate::errors::Result<AckResult> {
+    async fn handle_acknowledgement(
+        &self,
+        ack: Acknowledgement,
+        me: &ChainKeypair,
+    ) -> crate::errors::Result<AckResult> {
         let myself = self.clone();
         let me_ckp = me.clone();
 
@@ -125,9 +130,15 @@ impl HoprDbProtocolOperations for HoprDb {
 
                         PendingAcknowledgement::WaitingAsRelayer(unacknowledged) => {
                             if myself
-                                .get_channel_by_parties(Some(tx), &unacknowledged.ticket.verified_issuer(), &myself.me_onchain)
+                                .get_channel_by_parties(
+                                    Some(tx),
+                                    &unacknowledged.ticket.verified_issuer(),
+                                    &myself.me_onchain,
+                                )
                                 .await?
-                                .is_some_and(|c| c.channel_epoch.as_u32() != unacknowledged.verified_ticket().channel_epoch)
+                                .is_some_and(|c| {
+                                    c.channel_epoch.as_u32() != unacknowledged.verified_ticket().channel_epoch
+                                })
                             {
                                 return Err(crate::errors::DbError::LogicalError(format!(
                                     "no channel found for  address '{}'",
@@ -151,7 +162,9 @@ impl HoprDbProtocolOperations for HoprDb {
                                 Ok(ResolvedAcknowledgement::RelayingWin(ack_ticket))
                             } else {
                                 trace!(ticket = tracing::field::display(&ack_ticket), "losing ticket");
-                                Ok(ResolvedAcknowledgement::RelayingLoss(ack_ticket.ticket.verified_ticket().channel_id))
+                                Ok(ResolvedAcknowledgement::RelayingLoss(
+                                    ack_ticket.ticket.verified_ticket().channel_id,
+                                ))
                             }
                         }
                     }
@@ -366,11 +379,13 @@ impl HoprDbProtocolOperations for HoprDb {
                                 Some(remaining_balance),
                                 &domain_separator,
                             )
-                            .await {
+                            .await
+                            {
                                 Ok(ticket) => ticket,
                                 Err((e, ticket)) => {
-                                    return Err(crate::errors::DbError::TicketValidationError(
-                                        Box::new((ticket, e.to_string(),
+                                    return Err(crate::errors::DbError::TicketValidationError(Box::new((
+                                        ticket,
+                                        e.to_string(),
                                     ))));
                                 }
                             };
@@ -382,7 +397,9 @@ impl HoprDbProtocolOperations for HoprDb {
                                 .unacked_tickets
                                 .insert(
                                     ack_challenge,
-                                    PendingAcknowledgement::WaitingAsRelayer(ticket.clone().into_unacknowledged(own_key)),
+                                    PendingAcknowledgement::WaitingAsRelayer(
+                                        ticket.clone().into_unacknowledged(own_key),
+                                    ),
                                 )
                                 .await;
 
@@ -396,18 +413,10 @@ impl HoprDbProtocolOperations for HoprDb {
 
                             // Create next ticket for the packet
                             let mut ticket = if ticket_path_pos == 1 {
-                                Ok(Ticket::new_zero_hop(
-                                    &myself.me_onchain,
-                                    &next_hop_addr,
-                                ))
+                                Ok(Ticket::new_zero_hop(&myself.me_onchain, &next_hop_addr))
                             } else {
                                 myself
-                                    .create_multihop_ticket(
-                                        Some(tx),
-                                        myself.me_onchain,
-                                        next_hop_addr,
-                                        ticket_path_pos,
-                                    )
+                                    .create_multihop_ticket(Some(tx), myself.me_onchain, next_hop_addr, ticket_path_pos)
                                     .await
                             }?;
 

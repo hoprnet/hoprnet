@@ -6,8 +6,8 @@
 use async_trait::async_trait;
 use chain_actions::redeem::TicketRedeemActions;
 use hopr_db_api::tickets::HoprDbTicketOperations;
-use hopr_internal_types::tickets::{AcknowledgedTicket, AcknowledgedTicketStatus};
 use hopr_internal_types::prelude::*;
+use hopr_internal_types::tickets::{AcknowledgedTicket, AcknowledgedTicketStatus};
 use hopr_primitive_types::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
@@ -80,7 +80,7 @@ where
     Db: HoprDbTicketOperations + Send + Sync,
 {
     async fn on_acknowledged_winning_ticket(&self, ack: &AcknowledgedTicket) -> crate::errors::Result<()> {
-        if !self.cfg.redeem_only_aggregated || ack.ticket.is_aggregated() {
+        if !self.cfg.redeem_only_aggregated || ack.verified_ticket().is_aggregated() {
             info!("redeeming {ack}");
 
             #[cfg(all(feature = "prometheus", not(test)))]
@@ -118,13 +118,13 @@ where
                 .into_iter()
                 .filter(|t| {
                     t.status == AcknowledgedTicketStatus::Untouched
-                        && t.ticket.amount >= self.cfg.on_close_redeem_single_tickets_value_min
+                        && t.verified_ticket().amount >= self.cfg.on_close_redeem_single_tickets_value_min
                 })
                 .collect::<Vec<_>>();
 
             if ack_ticket_in_db.len() == 1 {
                 let ack = ack_ticket_in_db.pop().unwrap();
-                info!("redeeming single {ack} worth {}", ack.ticket.amount);
+                info!("redeeming single {ack} worth {}", ack.verified_ticket().amount);
 
                 #[cfg(all(feature = "prometheus", not(test)))]
                 METRIC_COUNT_AUTO_REDEEMS.increment();

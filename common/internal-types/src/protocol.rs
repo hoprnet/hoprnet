@@ -1,3 +1,4 @@
+use crate::tickets::UnacknowledgedTicket;
 use bloomfilter::Bloom;
 use ethers::utils::hex;
 use hopr_crypto_random::random_bytes;
@@ -6,7 +7,6 @@ use hopr_primitive_types::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use tracing::warn;
-use crate::tickets::UnacknowledgedTicket;
 
 use crate::errors::{CoreTypesError, CoreTypesError::PayloadSizeExceeded, Result};
 
@@ -272,4 +272,3 @@ mod tests {
         );
     }
 }
-

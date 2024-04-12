@@ -1,9 +1,9 @@
-use sea_orm::Set;
+use crate::errors::DbEntityError;
 use crate::ticket;
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use crate::errors::DbEntityError;
+use sea_orm::Set;
 
 impl TryFrom<&ticket::Model> for AcknowledgedTicket {
     type Error = DbEntityError;
@@ -16,19 +16,20 @@ impl TryFrom<&ticket::Model> for AcknowledgedTicket {
             BalanceType::HOPR.balance_bytes(&value.amount),
             U256::from_be_bytes(&value.index).as_u64(),
             value.index_offset as u32,
-            win_prob_to_f64(value
-                .winning_probability
-                 .as_slice()
-                .try_into()
-                .map_err(|_| DbEntityError::ConversionError("invalid winning probability".into()))?
+            win_prob_to_f64(
+                value
+                    .winning_probability
+                    .as_slice()
+                    .try_into()
+                    .map_err(|_| DbEntityError::ConversionError("invalid winning probability".into()))?,
             ),
             U256::from_be_bytes(&value.channel_epoch).as_u32(),
             response.to_challenge().to_ethereum_challenge(),
             Signature::try_from(value.signature.as_ref())?,
-            Hash::try_from(value.hash.as_slice()).map_err(|_| DbEntityError::ConversionError("invalid ticket hash".into()))?
+            Hash::try_from(value.hash.as_slice())
+                .map_err(|_| DbEntityError::ConversionError("invalid ticket hash".into()))?,
         )
         .map_err(|_| DbEntityError::ConversionError("could not validate ticket from the db".into()))?;
-
 
         let mut ticket = AcknowledgedTicket::new(ticket, response);
         ticket.status = AcknowledgedTicketStatus::try_from(value.state as u8)

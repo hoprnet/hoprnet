@@ -118,7 +118,12 @@ where
 {
     ///! Creates new instance.
     pub fn new(me: &ChainKeypair, db: Db, tx_sender: ActionSender) -> Self {
-        Self { me: me.public().to_address(), chain_key: me.clone(), db, tx_sender }
+        Self {
+            me: me.public().to_address(),
+            chain_key: me.clone(),
+            db,
+            tx_sender,
+        }
     }
 
     ///! On-chain address of this node

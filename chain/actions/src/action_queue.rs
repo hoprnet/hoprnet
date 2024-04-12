@@ -171,7 +171,7 @@ where
                     tx_hash,
                     move |event| matches!(event, ChainEventType::TicketRedeemed(channel, _) if ticket_channel_id == channel.get_id()),
                 )
-            },
+            }
 
             Action::OpenChannel(address, stake) => {
                 let tx_hash = self.tx_exec.fund_channel(address, stake).await?;

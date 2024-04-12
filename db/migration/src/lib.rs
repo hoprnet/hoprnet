@@ -50,7 +50,9 @@ impl MigratorTrait for Migrator {
                 BackendType::Postgres,
             )),
             Box::new(m20240326_000015_recreate_ticket_stats::Migration(BackendType::Postgres)),
-            Box::new(m20240404_000016_tickets_recreate_ticket::Migration(BackendType::Postgres)),
+            Box::new(m20240404_000016_tickets_recreate_ticket::Migration(
+                BackendType::Postgres,
+            )),
         ]
     }
 }

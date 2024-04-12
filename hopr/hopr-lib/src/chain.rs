@@ -18,7 +18,7 @@ use chain_rpc::rpc::{RpcOperations, RpcOperationsConfig};
 use chain_types::chain_events::SignificantChainEvent;
 use chain_types::{ContractAddresses, TypedTransaction};
 use core_path::channel_graph::ChannelGraph;
-use core_transport::{ChainKeypair, Keypair};
+use core_transport::ChainKeypair;
 use hopr_db_api::HoprDbAllOperations;
 use hopr_primitive_types::primitives::Address;
 
@@ -361,7 +361,7 @@ where
     );
 
     // Instantiate Chain Actions
-    let chain_actions = ChainActions::new(me_onchain.public().to_address(), db, action_queue.new_sender());
+    let chain_actions = ChainActions::new(&me_onchain, db, action_queue.new_sender());
 
     (action_queue, chain_actions, rpc_operations)
 }

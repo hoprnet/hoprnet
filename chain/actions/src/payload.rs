@@ -278,7 +278,12 @@ impl PayloadGenerator<TypedTransaction> for BasicPayloadGenerator {
     fn redeem_ticket(&self, acked_ticket: RedeemableTicket) -> Result<TypedTransaction> {
         let redeemable = convert_acknowledged_ticket(&acked_ticket)?;
 
-        let params = convert_vrf_parameters(&acked_ticket.vrf_params, &self.me, &acked_ticket.ticket.verified_hash(), &acked_ticket.channel_dst);
+        let params = convert_vrf_parameters(
+            &acked_ticket.vrf_params,
+            &self.me,
+            &acked_ticket.ticket.verified_hash(),
+            &acked_ticket.channel_dst,
+        );
         let mut tx = create_eip1559_transaction();
         tx.set_data(RedeemTicketCall { redeemable, params }.encode().into());
         tx.set_to(NameOrAddress::Address(self.contract_addrs.channels.into()));
@@ -474,7 +479,12 @@ impl PayloadGenerator<TypedTransaction> for SafePayloadGenerator {
     fn redeem_ticket(&self, acked_ticket: RedeemableTicket) -> Result<TypedTransaction> {
         let redeemable = convert_acknowledged_ticket(&acked_ticket)?;
 
-        let params = convert_vrf_parameters(&acked_ticket.vrf_params, &self.me, &acked_ticket.ticket.verified_hash(), &acked_ticket.channel_dst);
+        let params = convert_vrf_parameters(
+            &acked_ticket.vrf_params,
+            &self.me,
+            &acked_ticket.ticket.verified_hash(),
+            &acked_ticket.channel_dst,
+        );
 
         let call_data = RedeemTicketSafeCall {
             self_: self.me.into(),

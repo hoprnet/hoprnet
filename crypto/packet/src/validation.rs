@@ -1,6 +1,9 @@
 use tracing::{debug, trace};
 
-use crate::errors::{PacketError::{OutOfFunds, TicketValidation}, PacketError};
+use crate::errors::{
+    PacketError,
+    PacketError::{OutOfFunds, TicketValidation},
+};
 use hopr_crypto_types::types::Hash;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
@@ -19,43 +22,58 @@ pub async fn validate_unacknowledged_ticket(
     debug!("validating unack ticket from {sender}");
 
     // ticket signer MUST be the sender
-    let ticket = ticket
-        .verify(sender, domain_separator)
-        .map_err(|t| (TicketValidation(format!("ticket signer does not match the sender: {t}")), t))?;
+    let ticket = ticket.verify(sender, domain_separator).map_err(|t| {
+        (
+            TicketValidation(format!("ticket signer does not match the sender: {t}")),
+            t,
+        )
+    })?;
 
     let verified_ticket = ticket.verified_ticket();
 
     // ticket amount MUST be greater or equal to minTicketAmount
     if !verified_ticket.amount.ge(&min_ticket_amount) {
-        return Err((TicketValidation(format!(
-            "ticket amount {} in not at least {min_ticket_amount}",
-            verified_ticket.amount
-        )), verified_ticket.clone()));
+        return Err((
+            TicketValidation(format!(
+                "ticket amount {} in not at least {min_ticket_amount}",
+                verified_ticket.amount
+            )),
+            verified_ticket.clone(),
+        ));
     }
 
     // ticket must have at least required winning probability
     if ticket.win_prob() < required_win_prob {
-        return Err((TicketValidation(format!(
-            "ticket winning probability {} is lower than required winning probability {required_win_prob}",
-            ticket.win_prob()
-        )), verified_ticket.clone()));
+        return Err((
+            TicketValidation(format!(
+                "ticket winning probability {} is lower than required winning probability {required_win_prob}",
+                ticket.win_prob()
+            )),
+            verified_ticket.clone(),
+        ));
     }
 
     // channel MUST be open or pending to close
     if channel.status == ChannelStatus::Closed {
-        return Err((TicketValidation(format!(
-            "payment channel with {sender} is not opened or pending to close"
-        )), verified_ticket.clone()));
+        return Err((
+            TicketValidation(format!(
+                "payment channel with {sender} is not opened or pending to close"
+            )),
+            verified_ticket.clone(),
+        ));
     }
 
     // ticket's channelEpoch MUST match the current channel's epoch
     if !channel.channel_epoch.eq(&verified_ticket.channel_epoch.into()) {
-        return Err((TicketValidation(format!(
-            "ticket was created for a different channel iteration {} != {} of channel {}",
-            verified_ticket.channel_epoch,
-            channel.channel_epoch,
-            channel.get_id()
-        )), verified_ticket.clone()));
+        return Err((
+            TicketValidation(format!(
+                "ticket was created for a different channel iteration {} != {} of channel {}",
+                verified_ticket.channel_epoch,
+                channel.channel_epoch,
+                channel.get_id()
+            )),
+            verified_ticket.clone(),
+        ));
     }
 
     if let Some(unrealized_balance) = unrealized_balance {
@@ -189,7 +207,10 @@ mod tests {
     async fn test_ticket_validation_should_fail_if_ticket_chance_is_low() {
         let mut ticket = create_valid_ticket();
         ticket.encoded_win_prob = f64_to_win_prob(0.5f64).unwrap();
-        let ticket = ticket.sign(&SENDER_PRIV_KEY, &Hash::default()).verified_ticket().clone();
+        let ticket = ticket
+            .sign(&SENDER_PRIV_KEY, &Hash::default())
+            .verified_ticket()
+            .clone();
 
         let channel = create_channel_entry();
 
@@ -239,7 +260,10 @@ mod tests {
     async fn test_ticket_validation_should_fail_if_ticket_epoch_does_not_match_2() {
         let mut ticket = create_valid_ticket();
         ticket.channel_epoch = 2u32;
-        let ticket = ticket.sign(&SENDER_PRIV_KEY, &Hash::default()).verified_ticket().clone();
+        let ticket = ticket
+            .sign(&SENDER_PRIV_KEY, &Hash::default())
+            .verified_ticket()
+            .clone();
 
         let channel = create_channel_entry();
 

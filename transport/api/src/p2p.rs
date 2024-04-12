@@ -469,7 +469,7 @@ pub async fn p2p_loop<T>(
                     },
                 })) => {
                     debug!("transport protocol - p2p - ticket aggregation - received an aggregation request {request_id} from '{peer}'");
-                    let request = request.into_iter().map(|t| AcknowledgedTicket::from).collect::<Vec<_>>();
+                    let request = request.into_iter().map(TransferableWinningTicket::from).collect::<Vec<_>>();
                     if let Err(e) = aggregation_writer.receive_aggregation_request(peer, request, channel) {
                         error!("transport protocol - p2p - ticket aggregation - failed to aggregate tickets for '{peer}': {e}");
                     }
