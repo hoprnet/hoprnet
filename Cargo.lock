@@ -3624,7 +3624,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-lib"
-version = "2.1.0-rc.3"
+version = "2.1.0-rc.4"
 dependencies = [
  "async-lock 3.3.0",
  "async-std",
