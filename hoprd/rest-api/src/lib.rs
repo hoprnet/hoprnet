@@ -1415,7 +1415,7 @@ mod channels {
 mod messages {
     use std::time::Duration;
 
-    use hopr_lib::HalfKeyChallenge;
+    use hopr_lib::{AsUnixTimestamp, HalfKeyChallenge};
 
     use super::*;
 
@@ -1534,9 +1534,7 @@ mod messages {
             }
         }
 
-        let timestamp = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap();
+        let timestamp = std::time::SystemTime::now().as_unix_timestamp();
 
         match hopr
             .send_message(msg_body, args.peer_id, args.path, args.hops, Some(args.tag))
