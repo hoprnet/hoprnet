@@ -1,27 +1,22 @@
+---
 # Main node's identity that defined the on-chain and off-chain keys
 identity:
   # Path to the identity file
   # A new identity file will be created if it does not exist
   file: path/to/identity.file
-
   # Password for the identity file
-  password: 'change_me'
-
+  password: "change_me"
   # If specified, the above identity file is ignored and the node
   # directly uses the provided private key.
   # private_key: ''
-
 # Configuration of the REST API
 api:
-
   # Indicates whether the REST API should be enabled.
   enable: false
-
   # What kind of authentication the REST API should use.
   # Possible value is `None` or `!Token <some token>` which will
   # enforce Bearer token authentication.
   auth: None
-
   # Defines the local interface host where the API should
   # listen on.
   host:
@@ -29,248 +24,200 @@ api:
     address: !IPv4 127.0.0.1
     # REST API TCP listen port
     port: 3001
-
 # Configuration of the HOPR protocol
 hopr:
-
   # Specifies host to listen on for the HOPR P2P protocol
   host:
     # Specifies the external IP address of the local interface
     # that is connected to the Internet. This address will be
     # announced on-chain.
     address: !IPv4 1.2.3.4
-
     # Listen TCP port
     port: 9091
-
   # Specifies details for the database used by the HOPR node
   db:
     # Path to the directory with the database
     data: /app/db
-
     # If set, database will be created (if it does not exist).
     # Otherwise, if false is given and database is not present,
     # the node will fail to start.
     initialize: true
-
     # If set, will overwrite and re-initialize any existing database
     # in the given directory.
     force_initialize: false
-
   # Configuration of node's Safe
   safe_module:
     # Node's safe transaction provider
     # Such as https://safe-transaction.prod.hoprtech.net/
     safe_transaction_service_provider: https:://provider.com/
-
     # Node's safe address, this must be provided by the user
-    safe_address: '0x0000000000000000000000000000000000000000'
-
+    safe_address: "0x0000000000000000000000000000000000000000"
     # Node's safe module address, this must be provided by the user
-    module_address: '0x0000000000000000000000000000000000000000'
-
+    module_address: "0x0000000000000000000000000000000000000000"
   # Configuration of HOPR channel strategies.
   strategy:
-
     # Will not continue executing the next strategy in the chain
     # if one of them failed.
     on_fail_continue: true
-
     # Allows nesting strategy chains via !MultiStrategy
     allow_recursive: false
-
     # Contains the actual chain of strategies to execute in the given order.
     # If left empty, the node will behave as if only `!Passive` strategy
     # was given.
     strategies:
-      # Defines a promiscuous strategy that automatically manages HOPR channels
-      # based on measured network qualities of HOPR nodes in the network.
-      #- !Promiscuous
-      #
-      # # Maximum number of opened channels the strategy should maintain.
-      # max_channels: 10
-      #
-      # # A quality threshold between 0 and 1 used to determine whether the strategy should open channel with the peer.
-      # network_quality_threshold: 0.5
-      #
-      # # A stake of tokens that should be allocated to a channel opened by the strategy.
-      # new_channel_stake: "1000000 HOPR"
-      #
-      # # Minimum token balance of the node. When reached, the strategy will not open any new channels.
-      # minimum_node_balance: "10000000 HOPR"
-      #
-      # # Minimum number of network quality samples before the strategy can start making decisions.
-      # min_network_size_samples: 20
-      #
-      # # If set, the strategy will aggressively close channels (even with peers above the `network_quality_threshold`)
-      # # if the number of opened outgoing channels (regardless if opened by the strategy or manually) exceeds the
-      # enforce_max_channels: true
-      #
-      # # Specifies minimum version of the peer the strategy should open a channel to.
-      # # Accepts semver syntax.
-      # minimum_peer_version: ">=2.0.0"
-
-      # Channel auto-funding strategy.
-      # Automatically funds channels with the given funding amount
-      # if the stake on any channel drops below the given threshold
       - !AutoFunding
+        # Channel auto-funding strategy.
+        # Automatically funds channels with the given funding amount
+        # if the stake on any channel drops below the given threshold
         # Amount to automatically fund a channel that dropped
         # below the threshold
         funding_amount: "10000000000000000000 HOPR"
+        # Defines a promiscuous strategy that automatically manages HOPR channels
+        # based on measured network qualities of HOPR nodes in the network.
+        #- !Promiscuous
+        #
+        # # Maximum number of opened channels the strategy should maintain.
+        # max_channels: 10
+        #
+        # # A quality threshold between 0 and 1 used to determine whether the strategy should open channel with the peer.
+        # network_quality_threshold: 0.5
+        #
+        # # A stake of tokens that should be allocated to a channel opened by the strategy.
+        # new_channel_stake: "1000000 HOPR"
+        #
+        # # Minimum token balance of the node. When reached, the strategy will not open any new channels.
+        # minimum_node_balance: "10000000 HOPR"
+        #
+        # # Minimum number of network quality samples before the strategy can start making decisions.
+        # min_network_size_samples: 20
+        #
+        # # If set, the strategy will aggressively close channels (even with peers above the `network_quality_threshold`)
+        # # if the number of opened outgoing channels (regardless if opened by the strategy or manually) exceeds the
+        # enforce_max_channels: true
+        #
+        # # Specifies minimum version of the peer the strategy should open a channel to.
+        # # Accepts semver syntax.
+        # minimum_peer_version: ">=2.0.0"
 
         # Auto funding threshold
         min_stake_threshold: "1000000000000000000 HOPR"
-
-      # Strategy performing automatic ticket aggregation
-      # once the amount of unredeemed tickets in a channel goes
-      # over the given threshold.
       - !Aggregating
-
+        # Strategy performing automatic ticket aggregation
+        # once the amount of unredeemed tickets in a channel goes
+        # over the given threshold.
         # Number of acknowledged winning tickets in a channel that triggers the ticket aggregation
         # in that channel when exceeded.
         # This condition is independent of `unrealized_balance_ratio`.
         aggregation_threshold: 100
-
         # Percentage of unrealized balance in unaggregated tickets in a channel
         # that triggers the ticket aggregation when exceeded.
         # The unrealized balance in this case is the proportion of the channel balance allocated in unredeemed unaggregated tickets.
         # This condition is independent of `aggregation_threshold`.
         unrealized_balance_ratio: 0.9
-
         # Maximum time to wait for the ticket aggregation to complete.
         # This does not affect the runtime of the strategy `on_acknowledged_ticket` event processing.
         aggregation_timeout: 60
-
         # If set, the strategy will automatically aggregate tickets in channel that has transitioned
         # to the `PendingToClose` state. This happens regardless if `aggregation_threshold`
         # or `unrealized_balance_ratio` thresholds are met on that channel.
         # If the aggregation on-close fails, the tickets are automatically sent for redeeming instead.
         aggregate_on_channel_close: true
-
-      # Channel strategy that performs automatic redemption of
-      # a winning acknowledged ticket
       - !AutoRedeeming
-
+        # Channel strategy that performs automatic redemption of
+        # a winning acknowledged ticket
         # If set, the strategy will redeem only aggregated tickets.
         redeem_only_aggregated: true
-
         # The strategy will automatically redeem if there's a single ticket left when a channel
         # transitions to `PendingToClose` and it has at least this value of HOPR.
         # This happens regardless the `redeem_only_aggregated` setting.
         on_close_redeem_single_tickets_value_min: "2000000000000000000 HOPR"
-
-      # Passive strategy does nothing. This is equivalent as leaving
-      # the `strategies` array empty.
-      #- !Passive
-
-      # Strategy that monitors channels that are in `PendingToClose` state and
-      # their channel closure grace period has already elapsed, and on more issuing
-      # channel close transaction on these channels to finalize the closure.
-      # - !ClosureFinalizer
-        # Do not attempt to finalize closure of channels that have been overdue for closure for more than
-        # this amount of seconds.
-        # max_closure_overdue: 3600
+        # Passive strategy does nothing. This is equivalent as leaving
+        # the `strategies` array empty.
+        #- !Passive
+  # Strategy that monitors channels that are in `PendingToClose` state and
+  # their channel closure grace period has already elapsed, and on more issuing
+  # channel close transaction on these channels to finalize the closure.
+  # - !ClosureFinalizer
+  # Do not attempt to finalize closure of channels that have been overdue for closure for more than
+  # this amount of seconds.
+  # max_closure_overdue: 3600
 
   # Configuration of the heartbeat mechanism for probing
   # other nodes in the HOPR network.
   heartbeat:
     # Interval in which the heartbeat is triggered in seconds
     interval: 60
-
     # The time interval for which to consider peer heartbeat renewal in seconds
     threshold: 60
-
     # Round-to-round variance to complicate network sync in seconds
     variance: 2
-
   # Defines how quality of nodes in the HOPR network
   # is evaluated and criteria for nodes to be considered of good/bad quality.
   # This is closely related to the heartbeat mechanism.
   network_options:
-
     # Minimum delay (seconds) will be multiplied by backoff, it will be half the actual minimum value.
     min_delay: 1
-
     # Maximum delay in seconds
     max_delay: 300
-
     # Quality threshold since a node is considered having "bad" connectivity
     quality_bad_threshold: 0.2
-
     # Quality threshold from which a node is considered available enough to be used
     quality_offline_threshold: 0.5
-
     # Quality step on failed/successful ping probe
     quality_step: 0.1
-
     # Size of the quality moving average window.
     quality_avg_window_size: 25
-
     # Indicates how long (in seconds) a node is considered "ignored"
     ignore_timeframe: 600
-
     # Backoff exponent when probing nodes
     backoff_exponent: 1.5
-
     # Minimum backoff (in seconds) when probing nodes
     backoff_min: 2.0
-
     # Maximum backoff (in seconds) when probing nodes
     backoff_max: 300.0
-
   # Transport related configuration
   transport:
     # Should local addresses be announced on chain?
     # Set to true for testing only
     announce_local_addresses: false
-
     # Should local addresses be preferred when dialing a peer?
     # Set to true for testing only
     prefer_local_addresses: false
-
   # Configuration of various HOPR sub-protocols.
   protocol:
-
     # Message acknowledgement sub-protocol configuration.
     ack:
       # Timeout in seconds
       timeout: 15
-
     # Heartbeat sub-protocol configuration
     heartbeat:
       # Timeout in seconds
       timeout: 15
-
     # Message sub-protocol configuration
     msg:
       # Timeout in seconds
       timeout: 15
-
     # Ticket aggregation sub-protocol configuration
     ticket_aggregation:
       # Timeout in seconds
       timeout: 15
-
   # Blockchain specific configuration
   chain:
     # Indicates whether node should announce itself on-chain
     announce: true
-
     # Which blockchain network should be used by the node
     # Must be one of `protocols.networks`.
     network: anvil-localhost
-
     # RPC provider URL to use.
     # If not given, it will use the network's chain default one.
     provider: null
-
     protocols:
       # Enumerates different HOPR on-chain network deployments the node can use.
       networks:
         anvil-localhost:
           chain: anvil
           environment_type: local
-          version_range: '*'
+          version_range: "*"
           indexer_start_block_number: 5
           tags: []
           addresses:
@@ -286,7 +233,6 @@ hopr:
           confirmations: 2
           tx_polling_interval: 1000
           max_block_range: 200
-
       # Lists actual blockchains that HOPR networks can be deployed at
       chains:
         anvil:
@@ -301,20 +247,16 @@ hopr:
           hopr_token_name: wxHOPR
           block_time: 5000
           tags: []
-
     # Indicates whether node should check channel unrealized balance
     # when validating acknowledged tickets.
     # Strongly recommended to leave this enabled.
     check_unrealized_balance: true
-
 # HOPRd Message Inbox configuration
 inbox:
   # Capacity of messages in the Inbox, per message tag.
   capacity: 512
-
   # Maximum age of a message in Inbox in seconds
   # Older messages are automatically purged
   max_age: 900
-
   # Tags which are not allowed into the Inbox
-  excluded_tags: [ 0 ]
+  excluded_tags: [0]

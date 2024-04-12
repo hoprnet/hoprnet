@@ -14,6 +14,9 @@ import pytest
 
 from .node import Node
 
+# prepend the timestamp in front of any log line
+logging.basicConfig(format="%(asctime)s %(message)s")
+
 SEED = int.from_bytes(os.urandom(8), byteorder="big")
 random.seed(SEED)
 
@@ -337,15 +340,40 @@ async def swarm7(request):
     logging.info("Funding nodes")
     fund_nodes(private_key)
 
-    # FINAL WAIT FOR NODES TO BE UP
+    # WAIT FOR NODES TO BE UP
     logging.info("Node setup finished, waiting for nodes to be ready")
     for node in nodes.values():
-        await asyncio.wait_for(node.api.readyz(), timeout=60)
+        while not await asyncio.wait_for(node.api.readyz(), timeout=60):
+            logging.info(f"Node {node} not ready yet, retrying")
+            await asyncio.sleep(1)
 
         addresses = await node.api.addresses()
         node.peer_id = addresses["hopr"]
         node.address = addresses["native"]
         logging.info(f"Node {node} is ready")
+
+    # WAIT FOR NODES TO CONNECT TO ALL PEERS
+    logging.info("Waiting for nodes to connect to all peers")
+    for node in nodes.values():
+
+        def is_same_node(a, b):
+            return a.peer_id == b.peer_id
+
+        def is_in_same_network(a, b):
+            return a.network == b.network
+
+        required_peers = [
+            n.peer_id for n in nodes.values() if not is_same_node(n, node) and is_in_same_network(n, node)
+        ]
+
+        async def all_peers_connected():
+            peers = [p["peer_id"] for p in await asyncio.wait_for(node.api.peers(), timeout=60)]
+            missing_peers = [p for p in required_peers if p not in peers]
+            return len(missing_peers) == 0
+
+        while not await all_peers_connected():
+            logging.info(f"Node {node} does not have all peers connected yet, retrying")
+            await asyncio.sleep(1)
 
     # YIELD NODES
     yield nodes

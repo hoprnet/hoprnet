@@ -8,11 +8,11 @@
 # To use this workflow, you will need to set up a .github/labeler.yml
 # file with configuration.  For more information, see:
 # https://github.com/actions/labeler
-
 name: Labeler
 
 on:
   pull_request:
+  pull_request_target:
 
 concurrency:
   group: ${{ github.head_ref }}-label
@@ -25,10 +25,8 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-
     steps:
       - uses: actions/labeler@v5
         with:
           repo-token: "${{ secrets.GITHUB_TOKEN }}"
           sync-labels: true
-

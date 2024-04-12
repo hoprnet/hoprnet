@@ -4,6 +4,9 @@
 #################################################################################
 name: "Build docs"
 
+env:
+  needs_nix_setup: false
+
 # yamllint disable-line rule:truthy
 on:
   push:
@@ -20,23 +23,23 @@ jobs:
   rust:
     name: Rust docs
     # big runner is needed because building docs involves building Rust code
-    runs-on: self-hosted-hoprnet-big
+    runs-on: self-hosted-hoprnet-bigger
     timeout-minutes: 60
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
 
       - name: Install Nix
+        if: env.needs_nix_setup == true
         uses: cachix/install-nix-action@v25
         with:
-          extra_nix_config: |
-            access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: cachix/cachix-action@v14
-        if: ${{ !env.ACT }}
+        if: env.needs_nix_setup == true
         with:
           name: hoprnet
-          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
         env:
           USER: runner
 

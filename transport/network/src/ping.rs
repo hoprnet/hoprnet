@@ -3,6 +3,7 @@ use std::{collections::hash_map::Entry, ops::Div};
 
 use async_trait::async_trait;
 use futures::{future::poll_fn, StreamExt};
+use hopr_primitive_types::traits::SaturatingSub;
 use libp2p_identity::PeerId;
 
 use tracing::{debug, error, trace, warn};
@@ -214,7 +215,7 @@ impl<T: PingExternalAPI + std::marker::Send> Pinging for Ping<T> {
                 .on_finished_ping(&peer, result.map(|v| v.as_millis() as u64), version)
                 .await;
 
-            if current_time().duration_since(start_all_peers).unwrap_or_default() < self.config.timeout {
+            if current_time().saturating_sub(start_all_peers) < self.config.timeout {
                 while let Some(peer) = waiting.pop_front() {
                     if let Entry::Vacant(e) = active_pings.entry(peer) {
                         match self.initiate_peer_ping(&peer) {
@@ -239,6 +240,7 @@ mod tests {
     use super::*;
     use crate::messaging::ControlMessage;
     use crate::ping::Ping;
+    use hopr_primitive_types::traits::SaturatingSub;
     use mockall::*;
     use more_asserts::*;
 
@@ -446,9 +448,6 @@ mod tests {
         futures::join!(pinger.ping(peers), ideal_twice_usable_linearly_delaying_channel);
         let end = current_time();
 
-        assert_ge!(
-            end.duration_since(start).unwrap_or_default(),
-            std::time::Duration::from_millis(ping_delay)
-        );
+        assert_ge!(end.saturating_sub(start), std::time::Duration::from_millis(ping_delay));
     }
 }
