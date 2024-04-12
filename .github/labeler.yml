@@ -4,10 +4,10 @@ toolchain:
       - any-glob-to-any-file:
           - "flake.lock"
           - "flake.nix"
-          - ".github/**/*"
-          - ".githooks/**/*"
-          - ".processes/**/*"
-          - "scripts/**/*"
+          - ".github/**"
+          - ".githooks/**"
+          - ".processes/**"
+          - "scripts/**"
           - "rust-toolchain.toml"
 dependencies:
   - changed-files:
@@ -17,11 +17,11 @@ dependencies:
 documentation:
   - changed-files:
       - any-glob-to-any-file:
-          - "docs/**/*"
+          - "docs/**"
 testing:
   - changed-files:
       - any-glob-to-any-file:
-          - "tests/**/*"
+          - "tests/**"
 crate:core-path:
   - changed-files:
       - any-glob-to-any-file: logic/path/**
