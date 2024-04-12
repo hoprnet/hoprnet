@@ -128,8 +128,8 @@
               echo "# placeholder" > $out/vendor/cargo/config.toml
             '';
           });
-          rustPackage = { pname, version, cargoArtifacts, CARGO_PROFILE ? "release" }: craneLib.buildPackage (commonArgs // commonPhases // {
-            inherit pname version cargoArtifacts src CARGO_PROFILE;
+          rustPackage = { pname, version, cargoArtifacts, CARGO_PROFILE ? "release", postInstall ? null }: craneLib.buildPackage (commonArgs // commonPhases // {
+            inherit pname version cargoArtifacts src postInstall CARGO_PROFILE;
             cargoExtraArgs = "--offline -p ${pname}";
           });
           rustPackageTest = { pname, version, cargoArtifacts }: craneLib.cargoTest (commonArgs // commonPhases // {
@@ -152,7 +152,14 @@
           });
           hoprd-test = rustPackageTest (hoprdCrateInfo // { cargoArtifacts = rustPackageDeps hoprdCrateInfo; });
           hoprd-clippy = rustPackageClippy (hoprdCrateInfo // { cargoArtifacts = rustPackageDeps hoprdCrateInfo; });
-          hopli = rustPackage (hopliCrateInfo // { cargoArtifacts = rustPackageDeps hopliCrateInfo; });
+          hopliPackageConfig = {
+            cargoArtifacts = rustPackageDeps hopliCrateInfo;
+            postInstall = ''
+              mkdir -p $out/ethereum/contracts
+              cp ethereum/contracts/contracts-addresses.json $out/ethereum/contracts/
+            '';
+          };
+          hopli = rustPackage (hopliCrateInfo // hopliPackageConfig);
           hopli-debug = rustPackage (hopliCrateInfo // {
             cargoArtifacts = rustPackageDeps (hopliCrateInfo // {
               CARGO_PROFILE = "dev";
@@ -210,7 +217,7 @@
                 "RUST_BACKTRACE=full"
                 "NO_COLOR=true" # suppress colored log output
                 "ETHERSCAN_API_KEY=placeholder"
-                "CONTRACTS_ROOT=${hopli}/ethereum/contracts"
+                "HOPLI_CONTRACTS_ROOT=${hopli}/ethereum/contracts"
               ];
             };
           };
