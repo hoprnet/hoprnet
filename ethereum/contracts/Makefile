@@ -1,13 +1,3 @@
-# Gets all solidity files which the bindings depend on
-SOLIDITY_SRC_FILES := $(shell find ./src -type f -name "*.sol")
-SOLIDITY_DEP_FILES := $(shell find ./../../vendor/solidity -type f -name "*.sol")
-SOLIDITY_FILES := $(SOLIDITY_SRC_FILES) $(SOLIDITY_DEP_FILES)
-
-# Use local foundry directory (for binaries)
-FOUNDRY_DIR ?= ${CURDIR}/../../.foundry
-# add local Foundry install path (only once)
-PATH := $(subst :${FOUNDRY_DIR}/bin,,$(PATH)):${FOUNDRY_DIR}/bin
-
 SHELL := env $(shell which bash)
 
 # utility wrapper for forge script to use same options on every invocation

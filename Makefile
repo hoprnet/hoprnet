@@ -67,7 +67,7 @@ install:
 .PHONY: clean
 clean: # Cleanup build directories
 	cargo clean
-	find ethereum/bindings/src -delete
+	find ethereum/bindings/src -type f ! -name "lib.rs" -delete
 
 .PHONY: test
 test: smart-contract-test ## run unit tests for all packages, or a single package if package= is set

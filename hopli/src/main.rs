@@ -17,7 +17,7 @@ pub mod safe_module;
 pub mod utils;
 
 #[derive(Parser, Debug)]
-#[clap(name = "hopli")]
+#[command(author, version, about, long_about = None)]
 struct Cli {
     #[command(subcommand)]
     pub command: Commands,
@@ -25,12 +25,6 @@ struct Cli {
 
 /// Helper for running your HOPR nodes
 #[derive(Subcommand, Debug)]
-#[clap(
-    name = "HOPR ethereum package helper",
-    author = "HOPR <tech@hoprnet.org>",
-    version = "0.1",
-    about = "Helper to create node identities, fund nodes, manage network registry, manage HOPR staking safes and modules, etc."
-)]
 enum Commands {
     /// Commands around identity
     #[command(visible_alias = "id")]
