@@ -235,7 +235,9 @@ impl HoprDbProtocolOperations for HoprDb {
 
                     // Decide whether to create 0-hop or multihop ticket
                     let next_ticket = if path.len() == 1 {
-                        Ok(Ticket::new_zero_hop(&myself.me_onchain, &next_peer))
+                        Ok(TicketBuilder::zero_hop()
+                            .direction(&myself.me_onchain, &next_peer)
+                            .build()?)
                     } else {
                         myself
                             .create_multihop_ticket(Some(tx), me.public().to_address(), next_peer, path.len() as u8)
@@ -413,7 +415,9 @@ impl HoprDbProtocolOperations for HoprDb {
 
                             // Create next ticket for the packet
                             let mut ticket = if ticket_path_pos == 1 {
-                                Ok(Ticket::new_zero_hop(&myself.me_onchain, &next_hop_addr))
+                                Ok(TicketBuilder::zero_hop()
+                                    .direction(&myself.me_onchain, &next_hop_addr)
+                                    .build()?)
                             } else {
                                 myself
                                     .create_multihop_ticket(Some(tx), myself.me_onchain, next_hop_addr, ticket_path_pos)
@@ -526,19 +530,15 @@ impl HoprDb {
             )));
         }
 
-        let ticket = Ticket::new_partial(
-            &me_onchain,
-            &destination,
-            amount,
-            self.increment_outgoing_ticket_index(channel.get_id()).await?.into(),
-            1, // unaggregated always have index_offset == 1
-            TICKET_WIN_PROB,
-            channel.channel_epoch.as_u32(),
-        )
-        .map_err(|e| crate::errors::DbError::LogicalError(format!("failed to construct a ticket: {e}")))?;
-
-        //         #[cfg(all(feature = "prometheus", not(test)))]
-        //         METRIC_TICKETS_COUNT.increment();
+        let ticket = TicketBuilder::default()
+            .direction(&me_onchain, &destination)
+            .balance(amount)
+            .index(self.increment_outgoing_ticket_index(channel.get_id()).await?)
+            .index_offset(1) // unaggregated always have index_offset == 1
+            .win_prob(TICKET_WIN_PROB)
+            .channel_epoch(channel.channel_epoch.as_u32())
+            .build()
+            .map_err(|e| crate::errors::DbError::LogicalError(format!("failed to construct a ticket: {e}")))?;
 
         Ok(ticket)
     }

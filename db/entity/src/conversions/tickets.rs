@@ -11,27 +11,37 @@ impl TryFrom<&ticket::Model> for AcknowledgedTicket {
     fn try_from(value: &ticket::Model) -> Result<Self, Self::Error> {
         let response = Response::try_from(value.response.as_ref())?;
 
-        let ticket = VerifiedTicket::new_trusted(
-            Hash::from_hex(&value.channel_id)?,
-            BalanceType::HOPR.balance_bytes(&value.amount),
-            U256::from_be_bytes(&value.index).as_u64(),
-            value.index_offset as u32,
-            win_prob_to_f64(
+        let mut ticket = TicketBuilder::default()
+            .channel_id(Hash::from_hex(&value.channel_id)?)
+            .amount(U256::from_be_bytes(&value.amount))
+            .index(U256::from_be_bytes(&value.index).as_u64())
+            .index_offset(value.index_offset as u32)
+            .win_prob_encoded(
                 value
                     .winning_probability
                     .as_slice()
                     .try_into()
                     .map_err(|_| DbEntityError::ConversionError("invalid winning probability".into()))?,
-            ),
-            U256::from_be_bytes(&value.channel_epoch).as_u32(),
-            response.to_challenge().to_ethereum_challenge(),
-            Signature::try_from(value.signature.as_ref())?,
-            Hash::try_from(value.hash.as_slice())
-                .map_err(|_| DbEntityError::ConversionError("invalid ticket hash".into()))?,
-        )
-        .map_err(|_| DbEntityError::ConversionError("could not validate ticket from the db".into()))?;
+            )
+            .channel_epoch(U256::from_be_bytes(&value.channel_epoch).as_u32())
+            .challenge(response.to_challenge().to_ethereum_challenge())
+            .signature(
+                value
+                    .signature
+                    .as_slice()
+                    .try_into()
+                    .map_err(|_| DbEntityError::ConversionError("invalid signature format".into()))?,
+            )
+            .build_verified(
+                value
+                    .hash
+                    .as_slice()
+                    .try_into()
+                    .map_err(|_| DbEntityError::ConversionError("invalid ticket hash".into()))?,
+            )
+            .map_err(|e| DbEntityError::ConversionError(format!("invalid ticket in the db: {e}")))?
+            .into_acknowledged(response);
 
-        let mut ticket = AcknowledgedTicket::new(ticket, response);
         ticket.status = AcknowledgedTicketStatus::try_from(value.state as u8)
             .map_err(|_| DbEntityError::ConversionError("invalid ticket state".into()))?;
 

@@ -68,7 +68,7 @@ pub enum AcknowledgedTicketStatus {
     BeingAggregated { start: u64, end: u64 },
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AcknowledgedTicket {
     #[serde(default)]
     pub status: AcknowledgedTicketStatus,

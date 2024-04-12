@@ -8,10 +8,10 @@ use std::cmp::Ordering;
 use std::fmt::{Display, Formatter};
 use tracing::{debug, error};
 
+use crate::errors;
 use crate::errors::CoreTypesError;
 use crate::prelude::generate_channel_id;
 use crate::prelude::CoreTypesError::InvalidInputData;
-use crate::{channels, errors};
 
 /// Size-optimized encoding of the ticket, used for both,
 /// network transfer and in the smart contract.
@@ -58,119 +58,201 @@ pub(crate) fn check_ticket_win(
     u64::from_be_bytes(computed_ticket_luck) <= u64::from_be_bytes(signed_ticket_luck)
 }
 
+/// Builder for [Ticket] and [VerifiedTicket].
+///
+/// A new builder is created via [TicketBuilder::default] or [TicketBuilder::zero_hop].
+///
+/// Input validation is performed upon calling [TicketBuilder::build], [TicketBuilder::build_signed]
+/// and [TicketBuilder::build_verified].
 #[derive(Debug, Clone, smart_default::SmartDefault)]
 pub struct TicketBuilder {
     channel_id: Option<Hash>,
-    amount: Option<Balance>,
+    amount: Option<U256>,
+    balance: Option<Balance>,
     index: Option<u64>,
     #[default = 1]
     index_offset: u32,
-    epoch: Option<u32>,
-    #[default = 1.0]
-    win_prob: f64,
+    channel_epoch: Option<u32>,
+    #[default(Some(1.0))]
+    win_prob: Option<f64>,
+    win_prob_enc: Option<EncodedWinProb>,
     challenge: Option<EthereumChallenge>,
+    signature: Option<Signature>,
 }
 
 impl TicketBuilder {
+    /// Initializes the builder for a zero hop ticket.
     pub fn zero_hop() -> Self {
         Self {
             index: Some(0),
             index_offset: 0,
-            win_prob: 0.0,
-            epoch: Some(0),
+            win_prob: Some(0.0),
+            channel_epoch: Some(0),
             ..Default::default()
         }
     }
 
+    /// Sets channel id based on the `source` and `destination`.
+    /// This or [TicketBuilder::channel_id] must be set.
     pub fn direction(mut self, source: &Address, destination: &Address) -> Self {
         self.channel_id = Some(generate_channel_id(source, destination));
         self
     }
 
-    pub fn id(mut self, channel_id: Hash) -> Self {
+    /// Sets the channel id.
+    /// This or [TicketBuilder::direction] must be set.
+    pub fn channel_id(mut self, channel_id: Hash) -> Self {
         self.channel_id = Some(channel_id);
         self
     }
 
+    /// Sets the ticket amount.
+    /// This or [TicketBuilder::balance] must be set and be less or equal to 10^25.
     pub fn amount<T: Into<U256>>(mut self, amount: T) -> Self {
-        self.amount = Some(BalanceType::HOPR.balance(amount));
+        self.amount = Some(amount.into());
+        self.balance = None;
         self
     }
 
+    /// Sets the ticket amount as HOPR balance.
+    /// This or [TicketBuilder::amount] must be set and be less or equal to 10^25.
+    pub fn balance(mut self, balance: Balance) -> Self {
+        self.balance = Some(balance);
+        self.amount = None;
+        self
+    }
+
+    /// Sets the ticket index.
+    /// Must be set and be less or equal to 2^48.
     pub fn index(mut self, index: u64) -> Self {
         self.index = Some(index);
         self
     }
 
+    /// Sets the index offset.
+    /// Must be set and be greater or equal 1.
     pub fn index_offset(mut self, index_offset: u32) -> Self {
         self.index_offset = index_offset;
         self
     }
 
+    /// Sets the channel epoch.
+    /// Must be set and be less or equal to 2^24.
     pub fn channel_epoch(mut self, channel_epoch: u32) -> Self {
-        self.epoch = Some(channel_epoch);
+        self.channel_epoch = Some(channel_epoch);
         self
     }
 
+    /// Sets the ticket winning probability.
+    /// This or [TicketBuilder::win_prob_encoded] must be set.
     pub fn win_prob(mut self, win_prob: f64) -> Self {
-        self.win_prob = win_prob;
+        self.win_prob = Some(win_prob);
+        self.win_prob_enc = None;
         self
     }
 
+    /// Sets the encoded ticket winning probability.
+    /// This or [TicketBuilder::win_prob] must be set.
+    pub fn win_prob_encoded(mut self, win_prob: EncodedWinProb) -> Self {
+        self.win_prob = None;
+        self.win_prob_enc = Some(win_prob);
+        self
+    }
+
+    /// Sets the [EthereumChallenge] for Proof of Relay.
+    /// Must be set.
     pub fn challenge(mut self, challenge: EthereumChallenge) -> Self {
         self.challenge = Some(challenge);
         self
     }
 
+    /// Set the signature of this ticket.
+    /// This is optional.
+    pub fn signature(mut self, signature: Signature) -> Self {
+        self.signature = Some(signature);
+        self
+    }
+
+    /// Verifies all inputs and builds the [Ticket].
+    /// This does not perform signature verification, if a [signature](TicketBuilder::signature)
+    /// was set.
     pub fn build(self) -> errors::Result<Ticket> {
-        if self.amount.balance_type().ne(&BalanceType::HOPR) {
-            return Err(CoreTypesError::InvalidInputData(
-                "Tickets can only have HOPR balance".into(),
-            ));
-        }
+        let amount = match (self.amount, self.balance) {
+            (Some(amount), None) if amount.lt(&10_u128.pow(25).into()) => BalanceType::HOPR.balance(amount),
+            (None, Some(amount)) if amount.amount().lt(&10_u128.pow(25).into()) => amount,
+            (None, None) => return Err(InvalidInputData("missing ticket amount".into())),
+            (Some(_), Some(_)) => {
+                return Err(InvalidInputData(
+                    "either amount or balance must be set but not both".into(),
+                ))
+            }
+            _ => {
+                return Err(InvalidInputData(
+                    "tickets may not have more than 1% of total supply".into(),
+                ))
+            }
+        };
 
-        if amount.amount().ge(&10_u128.pow(25).into()) {
-            return Err(CoreTypesError::InvalidInputData(
-                "Tickets may not have more than 1% of total supply".into(),
-            ));
-        }
+        let index = match self.index {
+            Some(index) if index <= (1_u64 << 48) => index,
+            None => return Err(InvalidInputData("missing ticket index".into())),
+            _ => return Err(InvalidInputData("cannot hold ticket indices larger than 2^48".into())),
+        };
 
-        if index > (1_u64 << 48) {
-            return Err(CoreTypesError::InvalidInputData(
-                "Cannot hold ticket indices larger than 2^48".into(),
-            ));
-        }
+        let channel_epoch = match self.channel_epoch {
+            Some(epoch) if epoch <= (1_u32 << 24) => epoch,
+            None => return Err(InvalidInputData("missing ticket index".into())),
+            _ => return Err(InvalidInputData("cannot hold channel epoch larger than 2^24".into())),
+        };
 
-        if channel_epoch > (1_u32 << 24) {
-            return Err(CoreTypesError::InvalidInputData(
-                "Cannot hold channel epoch larger than 2^24".into(),
-            ));
-        }
+        let encoded_win_prob = match (self.win_prob, self.win_prob_enc) {
+            (Some(win_prob), None) => f64_to_win_prob(win_prob)?,
+            (None, Some(win_prob)) => win_prob,
+            (Some(_), Some(_)) => return Err(InvalidInputData("conflicting winning probabilities".into())),
+            (None, None) => return Err(InvalidInputData("missing ticket winning probability".into())),
+        };
 
-        if !(0.0..=1.0).contains(&win_prob) {
-            return Err(CoreTypesError::InvalidInputData(
-                "Winning probability must be between 0 and 1".into(),
+        if self.index_offset < 1 {
+            return Err(InvalidInputData(
+                "ticket index offset must be greater or equal to 1".into(),
             ));
         }
 
         Ok(Ticket {
             channel_id: self.channel_id.ok_or(InvalidInputData("missing channel id".into()))?,
-            amount: self.amount.ok_or(InvalidInputData("missing amount".into()))?,
-            index: self.index.ok_or(InvalidInputData("missing index".into()))?,
+            amount,
+            index,
             index_offset: self.index_offset,
-            encoded_win_prob: self.win_prob,
-            channel_epoch: self.epoch.ok_or(InvalidInputData("missing channel epoch".into()))?,
+            encoded_win_prob,
+            channel_epoch,
             challenge: self
                 .challenge
                 .ok_or(InvalidInputData("missing ticket challenge".into()))?,
-            signature: None,
+            signature: self.signature,
         })
     }
 
-    pub fn build_signed(self, signature: Signature) -> errors::Result<Ticket> {
-        let mut ret = self.build()?;
-        ret.signature = Some(signature);
-        Ok(ret)
+    /// Validates all inputs and builds the [VerifiedTicket] by signing the ticket data
+    /// with the given key. Fails if [signature](TicketBuilder::signature) was previously set.
+    pub fn build_signed(self, signer: &ChainKeypair, domain_separator: &Hash) -> errors::Result<VerifiedTicket> {
+        if self.signature.is_none() {
+            Ok(self.build()?.sign(signer, domain_separator))
+        } else {
+            Err(InvalidInputData("signature already set".into()))
+        }
+    }
+
+    /// Validates all input and builds the [VerifiedTicket] by **assuming** the previously
+    /// set [signature](TicketBuilder::signature) is valid and belongs to the given ticket `hash`.
+    /// It does **not** check whether `hash` matches the input data nor that the signature verifies
+    /// the given hash.
+    pub fn build_verified(self, hash: Hash) -> errors::Result<VerifiedTicket> {
+        if let Some(signature) = self.signature {
+            let issuer = PublicKey::from_signature_hash(hash.as_ref(), &signature)?.to_address();
+            Ok(VerifiedTicket(self.build()?, hash, issuer))
+        } else {
+            Err(InvalidInputData("signature is missing".into()))
+        }
     }
 }
 
@@ -276,6 +358,7 @@ impl Ticket {
     }
 
     /// Signs the ticket using the given private key, turning this ticket into [VerifiedTicket].
+    /// If a signature was already present, it will be replaced.
     pub fn sign(mut self, signing_key: &ChainKeypair, domain_separator: &Hash) -> VerifiedTicket {
         let ticket_hash = self.get_hash(domain_separator);
         self.signature = Some(Signature::sign_hash(ticket_hash.as_ref(), signing_key));
@@ -364,17 +447,19 @@ impl TryFrom<&[u8]> for Ticket {
             )?;
 
             // Validate the boundaries of the parsed values
-            Ok(TicketBuilder::default()
-                .id(channel_id)
-                .amount(amount)?
-                .index(u64::from_be_bytes(index))?
-                .index_offset(u32::from_be_bytes(index_offset))?
-                .channel_epoch(u32::from_be_bytes(channel_epoch))?
+            TicketBuilder::default()
+                .channel_id(channel_id)
+                .amount(amount)
+                .index(u64::from_be_bytes(index))
+                .index_offset(u32::from_be_bytes(index_offset))
+                .channel_epoch(u32::from_be_bytes(channel_epoch))
                 .win_prob_encoded(encoded_win_prob)
                 .challenge(challenge)
-                .build_signed(signature)?)
+                .signature(signature)
+                .build()
+                .map_err(|_| GeneralError::ParseError)
         } else {
-            Err(hopr_primitive_types::errors::GeneralError::ParseError)
+            Err(GeneralError::ParseError)
         }
     }
 }
@@ -390,66 +475,6 @@ impl BytesEncodable<TICKET_SIZE> for Ticket {}
 pub struct VerifiedTicket(Ticket, Hash, Address);
 
 impl VerifiedTicket {
-    /// Creates a new [VerifiedTicket] by creating a new [Ticket] with
-    /// the given raw [EthereumChallenge] and signing it with the given `signing_key`.
-    #[allow(clippy::too_many_arguments)] // TODO: Refactor using future Ticket's builder pattern
-    pub fn new(
-        counterparty: &Address,
-        amount: Balance,
-        index: u64,
-        index_offset: u32,
-        win_prob: f64,
-        channel_epoch: u32,
-        challenge: EthereumChallenge,
-        signing_key: &ChainKeypair,
-        domain_separator: &Hash,
-    ) -> errors::Result<Self> {
-        let mut ret = Ticket::new_partial(
-            &signing_key.public().to_address(),
-            counterparty,
-            amount,
-            index,
-            index_offset,
-            win_prob,
-            channel_epoch,
-        )?;
-        ret.challenge = challenge;
-        Ok(ret.sign(signing_key, domain_separator))
-    }
-
-    #[allow(clippy::too_many_arguments)] // TODO: Refactor using future Ticket's builder pattern
-    pub fn new_trusted(
-        channel_id: Hash,
-        amount: Balance,
-        index: u64,
-        index_offset: u32,
-        win_prob: f64,
-        channel_epoch: u32,
-        challenge: EthereumChallenge,
-        signature: Signature,
-        hash: Hash,
-    ) -> errors::Result<Self> {
-        let mut ret = Ticket::new_partial_with_id(channel_id, amount, index, index_offset, win_prob, channel_epoch)?;
-        ret.challenge = challenge;
-        ret.signature = Some(signature);
-
-        let issuer = PublicKey::from_signature_hash(hash.as_ref(), &signature)?.to_address();
-
-        Ok(Self(ret, hash, issuer))
-    }
-
-    /// Convenience method for creating a zero-hop ticket
-    pub fn new_zero_hop(
-        destination: &Address,
-        challenge: EthereumChallenge,
-        private_key: &ChainKeypair,
-        domain_separator: &Hash,
-    ) -> Self {
-        let mut ticket = Ticket::new_zero_hop(&private_key.public().to_address(), destination);
-        ticket.challenge = challenge;
-        ticket.sign(private_key, domain_separator)
-    }
-
     /// Returns the verified encoded winning probability of the ticket
     pub fn win_prob(&self) -> f64 {
         self.0.win_prob()
@@ -551,7 +576,7 @@ impl VerifiedTicket {
         UnacknowledgedTicket { ticket: self, own_key }
     }
 
-    /// Shorthand to acknowledge the ticket if the response is already known.
+    /// Shorthand to acknowledge the ticket if the matching response is already known.
     /// This is used upon receiving an aggregated ticket.
     pub fn into_acknowledged(self, response: Response) -> AcknowledgedTicket {
         AcknowledgedTicket {
@@ -657,7 +682,7 @@ impl UnacknowledgedTicket {
         debug!("acknowledging ticket using response {}", response.to_hex());
 
         if self.ticket.verified_ticket().challenge == response.to_challenge().into() {
-            Ok(AcknowledgedTicket::new(self.ticket, response))
+            Ok(self.ticket.into_acknowledged(response))
         } else {
             Err(CryptoError::InvalidChallenge.into())
         }
@@ -713,16 +738,6 @@ impl Ord for AcknowledgedTicket {
 }
 
 impl AcknowledgedTicket {
-    /// Creates an acknowledged ticket out of a plain ticket.
-    pub fn new(ticket: VerifiedTicket, response: Response) -> AcknowledgedTicket {
-        Self {
-            // new tickets are always untouched
-            status: AcknowledgedTicketStatus::Untouched,
-            ticket,
-            response,
-        }
-    }
-
     /// Convenience method to retrieve a reference to the underlying verified [Ticket].
     #[inline]
     pub fn verified_ticket(&self) -> &Ticket {

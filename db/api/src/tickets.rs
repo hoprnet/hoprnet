@@ -1276,18 +1276,17 @@ impl HoprDbTicketOperations for HoprDb {
         self.compare_and_set_outgoing_ticket_index(channel_id, current_ticket_index_from_acked_tickets)
             .await?;
 
-        let mut ticket = Ticket::new_partial(
-            &self.me_onchain,
-            &destination,
-            final_value,
-            first_acked_ticket.verified_ticket().index.into(),
-            (last_acked_ticket.verified_ticket().index - first_acked_ticket.verified_ticket().index + 1) as u32,
-            1.0, // Aggregated tickets have always 100% winning probability
-            channel_epoch,
-        )?;
-
-        ticket.challenge = first_acked_ticket.verified_ticket().challenge.clone();
-        Ok(ticket.sign(me, &domain_separator))
+        Ok(TicketBuilder::default()
+            .direction(&self.me_onchain, &destination)
+            .balance(final_value)
+            .index(first_acked_ticket.verified_ticket().index)
+            .index_offset(
+                (last_acked_ticket.verified_ticket().index - first_acked_ticket.verified_ticket().index + 1) as u32,
+            )
+            .win_prob(1.0) // Aggregated tickets have always 100% winning probability
+            .channel_epoch(channel_epoch)
+            .challenge(first_acked_ticket.verified_ticket().challenge)
+            .build_signed(me, &domain_separator)?)
     }
 }
 
