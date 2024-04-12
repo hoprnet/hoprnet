@@ -179,7 +179,11 @@ impl TicketBuilder {
     pub fn build(self) -> errors::Result<Ticket> {
         let amount = match (self.amount, self.balance) {
             (Some(amount), None) if amount.lt(&10_u128.pow(25).into()) => BalanceType::HOPR.balance(amount),
-            (None, Some(amount)) if amount.amount().lt(&10_u128.pow(25).into()) => amount,
+            (None, Some(balance))
+                if balance.balance_type() == BalanceType::HOPR && balance.amount().lt(&10_u128.pow(25).into()) =>
+            {
+                balance
+            }
             (None, None) => return Err(InvalidInputData("missing ticket amount".into())),
             (Some(_), Some(_)) => {
                 return Err(InvalidInputData(
@@ -1183,5 +1187,7 @@ pub mod test {
     }
 
     #[test]
-    fn test_ticket_entire_ticket_transfer_flow() {}
+    fn test_ticket_entire_ticket_transfer_flow() {
+
+    }
 }
