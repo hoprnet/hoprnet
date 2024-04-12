@@ -58,9 +58,9 @@ pub mod prelude {
 #[cfg(test)]
 mod tests {
     use hex_literal::hex;
-    use std::time::{Duration, SystemTime, UNIX_EPOCH};
+    use std::time::{Duration, SystemTime};
 
-    use crate::traits::{AsUnixTimestamp, SaturatingSub};
+    use crate::traits::AsUnixTimestamp;
 
     #[test]
     fn test_rlp() {
