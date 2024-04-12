@@ -1687,7 +1687,7 @@ dependencies = [
 
 [[package]]
 name = "core-strategy"
-version = "0.9.0"
+version = "0.9.1"
 dependencies = [
  "async-lock 3.3.0",
  "async-std",

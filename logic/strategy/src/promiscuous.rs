@@ -656,6 +656,11 @@ mod tests {
         mock_channel(db.clone(), PEERS[2].0, balance).await;
         let for_closing = mock_channel(db.clone(), PEERS[5].0, balance).await;
 
+        // Peer 3 has an accepted pre-release version
+        let mut status_3 = db.get_network_peer(&PEERS[3].1).await.unwrap().unwrap();
+        status_3.peer_version = Some("2.1.0-rc.3+commit.f75bc6c8".into());
+        db.update_network_peer(status_3).await.unwrap();
+
         // Peer 10 has an old node version
         let mut status_10 = db.get_network_peer(&PEERS[9].1).await.unwrap().unwrap();
         status_10.peer_version = Some("1.92.0".into());
