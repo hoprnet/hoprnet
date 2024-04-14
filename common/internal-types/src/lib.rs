@@ -5,7 +5,7 @@
 pub mod account;
 /// Implements types for on-chain announcement of nodes.
 pub mod announcement;
-/// Implements types for ticket acknowledgement.
+/// Implements types for tickets.
 pub mod tickets;
 
 /// Implements types related to HOPR payment channels.

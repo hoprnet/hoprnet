@@ -260,10 +260,27 @@ impl TicketBuilder {
     }
 }
 
+#[cfg_attr(doc, aquamarine::aquamarine)]
 /// Contains the overall description of a ticket with a signature.
 ///
 /// This structure is not considered [verified](VerifiedTicket), unless
 /// the [Ticket::verify] or [Ticket::sign] methods are called.
+///
+/// # Ticket state machine
+/// See the entire state machine describing the relations of different ticket types below:
+///```mermaid
+///flowchart TB
+///     A[Ticket] -->|verify| B(VerifiedTicket)
+///     B --> |leak| A
+///     A --> |sign| B
+///     B --> |into_unacknowledged| C(UnacknowledgedTicket)
+///     B --> |into_acknowledged| D(AcknowledgedTicket)
+///     C --> |acknowledge| D
+///     D --> |into_redeemable| E(RedeemableTicket)
+///     D --> |into_transferable| F(TransferableWinningTicket)
+///     E --> |into_transferable| F
+///     F --> |into_redeemable| E
+///```
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Ticket {
     /// Channel ID.
@@ -1187,7 +1204,5 @@ pub mod test {
     }
 
     #[test]
-    fn test_ticket_entire_ticket_transfer_flow() {
-
-    }
+    fn test_ticket_entire_ticket_transfer_flow() {}
 }
