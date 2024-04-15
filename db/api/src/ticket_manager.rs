@@ -241,21 +241,16 @@ mod tests {
         let cp2: CurvePoint = hk2.to_challenge().try_into().unwrap();
         let cp_sum = CurvePoint::combine(&[&cp1, &cp2]);
 
-        let ticket = Ticket::new(
-            &ALICE.public().to_address(),
-            &BalanceType::HOPR.balance(TICKET_VALUE),
-            index.into(),
-            1_u32.into(),
-            1.0f64,
-            4u64.into(),
-            Challenge::from(cp_sum).to_ethereum_challenge(),
-            &BOB,
-            &Hash::default(),
-        )
-        .unwrap();
+        let ticket = TicketBuilder::default()
+            .direction(&BOB.public().to_address(), &ALICE.public().to_address())
+            .amount(TICKET_VALUE)
+            .index(index as u64)
+            .channel_epoch(4)
+            .challenge(Challenge::from(cp_sum).to_ethereum_challenge())
+            .build_signed(&BOB, &Hash::default())
+            .unwrap();
 
-        let unacked_ticket = UnacknowledgedTicket::new(ticket, hk1, BOB.public().to_address());
-        unacked_ticket.acknowledge(&hk2, &ALICE, &Hash::default()).unwrap()
+        ticket.into_acknowledged(Response::from_half_keys(&hk1, &hk2).unwrap())
     }
 
     #[async_std::test]

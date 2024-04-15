@@ -69,10 +69,12 @@ pub struct TicketBuilder {
     channel_id: Option<Hash>,
     amount: Option<U256>,
     balance: Option<Balance>,
-    index: Option<u64>,
+    #[default = 0]
+    index: u64,
     #[default = 1]
     index_offset: u32,
-    channel_epoch: Option<u32>,
+    #[default = 1]
+    channel_epoch: u32,
     #[default(Some(1.0))]
     win_prob: Option<f64>,
     win_prob_enc: Option<EncodedWinProb>,
@@ -84,10 +86,10 @@ impl TicketBuilder {
     /// Initializes the builder for a zero hop ticket.
     pub fn zero_hop() -> Self {
         Self {
-            index: Some(0),
+            index: 0,
             index_offset: 0,
             win_prob: Some(0.0),
-            channel_epoch: Some(0),
+            channel_epoch: 0,
             ..Default::default()
         }
     }
@@ -123,28 +125,32 @@ impl TicketBuilder {
     }
 
     /// Sets the ticket index.
-    /// Must be set and be less or equal to 2^48.
+    /// Must be less or equal to 2^48.
+    /// Defaults to 0.
     pub fn index(mut self, index: u64) -> Self {
-        self.index = Some(index);
+        self.index = index;
         self
     }
 
     /// Sets the index offset.
-    /// Must be set and be greater or equal 1.
+    /// Must be greater or equal 1.
+    /// Defaults to 1.
     pub fn index_offset(mut self, index_offset: u32) -> Self {
         self.index_offset = index_offset;
         self
     }
 
     /// Sets the channel epoch.
-    /// Must be set and be less or equal to 2^24.
+    /// Must be less or equal to 2^24.
+    /// Defaults to 1.
     pub fn channel_epoch(mut self, channel_epoch: u32) -> Self {
-        self.channel_epoch = Some(channel_epoch);
+        self.channel_epoch = channel_epoch;
         self
     }
 
     /// Sets the ticket winning probability.
-    /// This or [TicketBuilder::win_prob_encoded] must be set.
+    /// Mutually exclusive with [TicketBuilder::win_prob_encoded].
+    /// Defaults to 1.0
     pub fn win_prob(mut self, win_prob: f64) -> Self {
         self.win_prob = Some(win_prob);
         self.win_prob_enc = None;
@@ -152,7 +158,8 @@ impl TicketBuilder {
     }
 
     /// Sets the encoded ticket winning probability.
-    /// This or [TicketBuilder::win_prob] must be set.
+    /// Mutually exlusive with [TicketBuilder::win_prob].
+    /// Defaults to [ALWAYS_WINNING].
     pub fn win_prob_encoded(mut self, win_prob: EncodedWinProb) -> Self {
         self.win_prob = None;
         self.win_prob_enc = Some(win_prob);
@@ -167,7 +174,7 @@ impl TicketBuilder {
     }
 
     /// Set the signature of this ticket.
-    /// This is optional.
+    /// Defaults to `None`.
     pub fn signature(mut self, signature: Signature) -> Self {
         self.signature = Some(signature);
         self
@@ -197,17 +204,13 @@ impl TicketBuilder {
             }
         };
 
-        let index = match self.index {
-            Some(index) if index <= (1_u64 << 48) => index,
-            None => return Err(InvalidInputData("missing ticket index".into())),
-            _ => return Err(InvalidInputData("cannot hold ticket indices larger than 2^48".into())),
-        };
+        if self.index > (1_u64 << 48) {
+            return Err(InvalidInputData("cannot hold ticket indices larger than 2^48".into()));
+        }
 
-        let channel_epoch = match self.channel_epoch {
-            Some(epoch) if epoch <= (1_u32 << 24) => epoch,
-            None => return Err(InvalidInputData("missing ticket index".into())),
-            _ => return Err(InvalidInputData("cannot hold channel epoch larger than 2^24".into())),
-        };
+        if self.channel_epoch > (1_u32 << 24) {
+            return Err(InvalidInputData("cannot hold channel epoch larger than 2^24".into()));
+        }
 
         let encoded_win_prob = match (self.win_prob, self.win_prob_enc) {
             (Some(win_prob), None) => f64_to_win_prob(win_prob)?,
@@ -225,10 +228,10 @@ impl TicketBuilder {
         Ok(Ticket {
             channel_id: self.channel_id.ok_or(InvalidInputData("missing channel id".into()))?,
             amount,
-            index,
+            index: self.index,
             index_offset: self.index_offset,
             encoded_win_prob,
-            channel_epoch,
+            channel_epoch: self.channel_epoch,
             challenge: self
                 .challenge
                 .ok_or(InvalidInputData("missing ticket challenge".into()))?,

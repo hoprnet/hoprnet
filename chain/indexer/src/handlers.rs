@@ -1869,20 +1869,17 @@ pub mod tests {
         )
         .unwrap();
 
-        let ticket = Ticket::new(
-            &destination.into(),
-            &Balance::new(price_per_packet.div_f64(ticket_win_prob).unwrap(), BalanceType::HOPR),
-            index.into(),
-            1u64.into(),
-            ticket_win_prob,
-            1u64.into(),
-            response.to_challenge().into(),
-            signer,
-            &domain_separator,
-        )
-        .unwrap();
-
-        AcknowledgedTicket::new(ticket, response, signer.into(), destination, &domain_separator).unwrap()
+        TicketBuilder::default()
+            .direction(&signer.into(), &destination.into())
+            .amount(price_per_packet.div_f64(ticket_win_prob).unwrap())
+            .index(index)
+            .index_offset(1)
+            .win_prob(ticket_win_prob)
+            .channel_epoch(1)
+            .challenge(response.to_challenge().into())
+            .build_signed(signer, &domain_separator)
+            .unwrap()
+            .into_acknowledged(response)
     }
 
     #[async_std::test]
@@ -2158,7 +2155,7 @@ pub mod tests {
                 OutgoingChannelClosureInitiatedFilter::signature(),
                 H256::from_slice(channel.get_id().as_ref()),
             ],
-            data: Vec::from(U256::from(timestamp.as_unix_timestamp().as_secs()).to_bytes()).into(),
+            data: Vec::from(U256::from(timestamp.as_unix_timestamp().as_secs()).to_be_bytes()).into(),
             ..test_log()
         };
 
