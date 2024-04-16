@@ -207,41 +207,43 @@ where
             .await?
             .filter_map(|status| async move {
                 // Check if peer reports any version
-                if let Some(version) = status.peer_version.clone().and_then(|v| {
-                    semver::Version::from_str(&v)
-                        .ok() // Workaround for https://github.com/dtolnay/semver/issues/315
-                        .map(|v| Version::new(v.major, v.major, v.patch))
-                }) {
-                    // Check if the reported version matches the version semver expression
-                    if self.cfg.minimum_peer_version.matches(&version) {
-                        if let Ok(offchain_key) = OffchainPublicKey::try_from(status.id) {
-                            // Resolve peer's chain key and average quality
-                            if let Ok(addr) = self
-                                .db
-                                .resolve_chain_key(&offchain_key)
-                                .await
-                                .and_then(|addr| addr.ok_or(DbError::MissingAccount))
-                            {
-                                Some((addr, status.get_average_quality()))
+                if let Some(version) = status.peer_version.clone()
+                    .and_then(|v| {
+                        semver::Version::from_str(&v)
+                            .ok() // Workaround for https://github.com/dtolnay/semver/issues/315
+                            .map(|v| Version::new(v.major, v.major, v.patch))
+                    }) {
+                        // Check if the reported version matches the version semver expression
+                        if self.cfg.minimum_peer_version.matches(&version) {
+                            if let Ok(offchain_key) = OffchainPublicKey::try_from(status.id) {
+                                // Resolve peer's chain key and average quality
+                                if let Ok(addr) = self
+                                    .db
+                                    .resolve_chain_key(&offchain_key)
+                                    .await
+                                    .and_then(|addr| addr.ok_or(DbError::MissingAccount))
+                                {
+                                    Some((addr, status.get_average_quality()))
+                                } else {
+                                    error!("could not find on-chain address for {}", status.id);
+                                    None
+                                }
                             } else {
-                                error!("could not find on-chain address for {}", status.id);
+                                error!("encountered invalid peer id: {}", status.id);
                                 None
                             }
                         } else {
-                            error!("encountered invalid peer id: {}", status.id);
+                            debug!("version of peer {} reports non-matching version {version}", status.id);
                             None
                         }
                     } else {
-                        debug!("version of peer {} reports non-matching version {version}", status.id);
+                        error!("cannot get version for peer id: {}", status.id);
                         None
                     }
-                } else {
-                    error!("cannot get version for peer id: {}", status.id);
-                    None
-                }
             })
             .collect()
-            .await)
+            .await
+        )
     }
 
     async fn collect_tick_decision(&self) -> Result<ChannelDecision> {
@@ -301,7 +303,7 @@ where
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_MAX_AUTO_CHANNELS.set(max_auto_channels as f64);
 
-        // Count all the effectively opened channels (ie. after the decision has been made)
+        // Count all the effectively opened channels (i.e. after the decision has been made)
         let occupied = outgoing_open_channels
             .len()
             .saturating_sub(tick_decision.get_to_close().len());
