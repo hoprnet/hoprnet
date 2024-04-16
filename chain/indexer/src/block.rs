@@ -177,11 +177,11 @@ where
                 })
                 .filter_map(|block_with_logs| async {
                     debug!("processing events in {block_with_logs} ...");
-                    let block_num = block_with_logs.block_id;
+                    let block_id = block_with_logs.to_string();
                     match db_processor.collect_block_events(block_with_logs).await {
                         Ok(events) => {
-                            debug!(
-                                "retrieved {} significant chain events from block #{block_num}",
+                            info!(
+                                "retrieved {} significant chain events from {block_id}",
                                 events.len()
                             );
                             Some(events)
