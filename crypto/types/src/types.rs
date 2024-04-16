@@ -18,7 +18,6 @@ use k256::{
     },
     AffinePoint, Secp256k1,
 };
-use libp2p_identity::PeerId;
 use serde::{Deserialize, Serialize};
 use sha2::Sha512;
 use std::fmt::Debug;
@@ -38,6 +37,8 @@ use crate::{
     keypairs::{ChainKeypair, Keypair, OffchainKeypair},
     primitives::{DigestLike, EthDigest},
 };
+
+pub use libp2p_identity::PeerId;
 
 /// Extend support for arbitrary array sizes in serde
 ///

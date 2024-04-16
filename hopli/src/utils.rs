@@ -16,7 +16,7 @@ pub enum HelperErrors {
     UnableToReadFromPath(#[from] std::io::Error),
 
     /// Error in parsing provided comma-separated addresses
-    #[error("error parsig address: {0:?}")]
+    #[error("error parsing address: {0:?}")]
     UnableToParseAddress(String),
 
     /// System time rrror
