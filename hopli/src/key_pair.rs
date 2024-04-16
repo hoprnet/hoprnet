@@ -203,7 +203,7 @@ pub struct ManagerPrivateKeyArgs {
     #[clap(
         long,
         short = 'q',
-        help = "Private key to unlock the account with priviledge that broadcasts the transaction",
+        help = "Private key to unlock the account with privilege that broadcasts the transaction",
         name = "manager_private_key",
         value_name = "MANAGER_PRIVATE_KEY"
     )]
