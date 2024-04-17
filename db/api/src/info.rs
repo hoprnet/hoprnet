@@ -147,7 +147,7 @@ impl HoprDbInfoOperations for HoprDb {
                             safe_balance: Set(new_balance.amount().to_be_bytes().into()),
                             ..Default::default()
                         }
-                        .update(tx.as_ref())
+                        .save(tx.as_ref())
                         .await?,
                     )
                 })
@@ -326,7 +326,7 @@ impl HoprDbInfoOperations for HoprDb {
                         }
                     }
 
-                    active_model.update(tx.as_ref()).await?;
+                    active_model.save(tx.as_ref()).await?;
 
                     Ok::<(), DbError>(())
                 })
@@ -350,7 +350,7 @@ impl HoprDbInfoOperations for HoprDb {
                         ticket_price: Set(Some(price.amount().to_be_bytes().into())),
                         ..Default::default()
                     }
-                    .update(tx.as_ref())
+                    .save(tx.as_ref())
                     .await?;
 
                     Ok::<(), DbError>(())

@@ -76,7 +76,7 @@ use core_transport::{
 use core_transport::{ChainKeypair, Hash, HoprTransport, OffchainKeypair};
 use core_transport::{IndexerToProcess, Network, PeerEligibility, PeerOrigin};
 use hopr_platform::file::native::{join, read_file, remove_dir_all, write};
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, warn};
 
 use crate::chain::ChainNetworkConfig;
 use crate::config::HoprLibConfig;
@@ -88,6 +88,7 @@ use hopr_db_api::{
     db::{HoprDb, HoprDbConfig},
     info::{HoprDbInfoOperations, SafeInfo},
     resolver::HoprDbResolverOperations,
+    HoprDbGeneralModelOperations,
 };
 use hopr_db_api::{channels::HoprDbChannelOperations, HoprDbAllOperations};
 
@@ -736,10 +737,26 @@ impl Hopr {
     }
 
     pub async fn get_safe_balance(&self, balance_type: BalanceType) -> errors::Result<Balance> {
-        Ok(self
+        let safe_balance = self
             .chain_api
             .get_safe_balance(self.safe_module_cfg.safe_address, balance_type)
-            .await?)
+            .await?;
+
+        let my_db = self.db.clone();
+        self.db
+            .begin_transaction()
+            .await?
+            .perform(|tx| {
+                Box::pin(async move {
+                    let db_safe_balance = my_db.get_safe_balance(Some(tx)).await?;
+                    if safe_balance != db_safe_balance {
+                        warn!("Safe balance in the DB {db_safe_balance} mismatches on chain balance: {safe_balance}");
+                        my_db.set_safe_balance(Some(tx), safe_balance).await?;
+                    }
+                    Ok(safe_balance)
+                })
+            })
+            .await
     }
 
     pub fn get_safe_config(&self) -> SafeModule {
@@ -831,28 +848,27 @@ impl Hopr {
                 ));
             }
 
-            if self
+            if let Err(e) = self
                 .chain_api
                 .actions_ref()
                 .register_safe_by_node(self.safe_module_cfg.safe_address)
                 .await?
                 .await
-                .is_ok()
             {
-                self.db
-                    .set_safe_info(
-                        None,
-                        SafeInfo {
-                            safe_address: self.safe_module_cfg.safe_address,
-                            module_address: self.safe_module_cfg.module_address,
-                        },
-                    )
-                    .await?;
-            } else {
                 // Intentionally ignoring the errored state
-                error!("Failed to register node with safe")
+                error!("Failed to register node with safe: {e}")
             }
         }
+
+        self.db
+            .set_safe_info(
+                None,
+                SafeInfo {
+                    safe_address: self.safe_module_cfg.safe_address,
+                    module_address: self.safe_module_cfg.module_address,
+                },
+            )
+            .await?;
 
         if self.is_public {
             // At this point the node is already registered with Safe, so

@@ -160,7 +160,7 @@ impl ChannelGraph {
                 .remove_edge(channel.source, channel.destination)
                 .map(|old_value| ChannelChange::diff_channels(&old_value.channel, &channel));
 
-            info!("removed {channel}");
+            debug!("removed {channel}");
 
             return ret;
         }
@@ -170,7 +170,7 @@ impl ChannelGraph {
             old_value.channel = channel;
 
             let ret = ChannelChange::diff_channels(&old_channel, &channel);
-            info!(
+            debug!(
                 "updated {channel}: {}",
                 ret.iter().map(ChannelChange::to_string).collect::<Vec<_>>().join(",")
             );
@@ -178,7 +178,7 @@ impl ChannelGraph {
         } else {
             let weighted = ChannelEdge { channel, quality: None };
             self.graph.add_edge(channel.source, channel.destination, weighted);
-            info!("new {channel}");
+            debug!("new {channel}");
 
             None
         }
@@ -209,10 +209,15 @@ impl ChannelGraph {
     where
         I: IntoIterator<Item = ChannelEntry>,
     {
-        channels.into_iter().for_each(|c| {
-            self.update_channel(c);
-        });
-        info!("synced {} channels to the graph", self.graph.edge_count());
+        let changes: usize = channels
+            .into_iter()
+            .map(|c| self.update_channel(c).map(|v| v.len()).unwrap_or(0))
+            .sum();
+        info!(
+            "synced {} channels to the graph: {} changes total",
+            self.graph.edge_count(),
+            changes
+        );
         Ok(())
     }
 
