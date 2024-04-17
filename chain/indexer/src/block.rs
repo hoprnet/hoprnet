@@ -156,8 +156,13 @@ where
                         }
 
                         if !is_synced.load(std::sync::atomic::Ordering::Relaxed) {
-                            let progress =
-                                (current_block - latest_block_in_db) as f64 / (chain_head - latest_block_in_db) as f64;
+                            let block_difference = chain_head - latest_block_in_db;
+                            let progress = if block_difference == 0 {
+                                1_f64
+                            } else {
+                                (current_block - latest_block_in_db) as f64 / block_difference as f64
+                            };
+
                             info!("Sync progress {:.2}% @ block {}", progress * 100_f64, current_block);
 
                             #[cfg(all(feature = "prometheus", not(test)))]
