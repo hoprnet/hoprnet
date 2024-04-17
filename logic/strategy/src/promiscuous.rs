@@ -301,7 +301,7 @@ where
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_MAX_AUTO_CHANNELS.set(max_auto_channels as f64);
 
-        // Count all the effectively opened channels (ie. after the decision has been made)
+        // Count all the effectively opened channels (i.e. after the decision has been made)
         let occupied = outgoing_open_channels
             .len()
             .saturating_sub(tick_decision.get_to_close().len());
