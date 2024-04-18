@@ -77,7 +77,7 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                                 // it to the latest
                                 from_block = latest_block;
                             } else if past_diff <= MAX_RPC_PAST_BLOCKS as u64 {
-                                // If we came here early (we tolerate only off-by one), wait some more
+                                // If we came here early (we tolerate only off-by MAX_RPC_PAST_BLOCKS), wait some more
                                 warn!("too early query, RPC provider still at block {latest_block}, diff to DB: {past_diff}");
                                 futures_timer::Delay::new(past_diff as u32 * self.cfg.expected_block_time / 3).await;
                                 continue;
