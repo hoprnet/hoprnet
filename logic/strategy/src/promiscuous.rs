@@ -7,7 +7,7 @@
 //!   - the number of channels opened by this strategy does not exceed `max_channels`
 //!
 //! Also, the candidates for opening (quality > `network_quality_threshold`), are sorted by best quality first.
-//! So that means if some nodes cannot have channel opened to them, because we hit `minimum_node_balance` or `max_channels`,
+//! So that means if some nodes cannot have a channel opened to them, because we hit `minimum_node_balance` or `max_channels`,
 //! the better quality ones were taking precedence.
 //!
 //! The sorting algorithm is intentionally unstable, so that the nodes which have the same quality get random order.
@@ -148,7 +148,7 @@ pub struct PromiscuousStrategyConfig {
     #[default = true]
     pub enforce_max_channels: bool,
 
-    /// Specifies minimum version (in semver syntax) of the peer the strategy should open a channel to.
+    /// Specifies a minimum version (in semver syntax) of the peer the strategy should open a channel to.
     ///
     /// Default is ">=2.0.0"
     #[serde_as(as = "DisplayFromStr")]
@@ -306,12 +306,12 @@ where
             .len()
             .saturating_sub(tick_decision.get_to_close().len());
 
-        // If there is still more channels opened than we allow, close some
-        // lowest-quality ones which passed the threshold
+        // If there are still more channels opened than we allow, close some
+        // lowest-quality ones that passed the threshold
         if occupied > max_auto_channels && self.cfg.enforce_max_channels {
             warn!("there are {occupied} effectively opened channels, but the strategy allows only {max_auto_channels}");
 
-            // Get all open channels which are not planned to be closed
+            // Get all open channels that are not planned to be closed
             let mut sorted_channels = outgoing_open_channels
                 .iter()
                 .filter(|c| !tick_decision.will_channel_be_closed(&c.destination))
@@ -345,8 +345,8 @@ where
                     tick_decision.add_to_close(*channel);
                 });
         } else if max_auto_channels > occupied {
-            // Sort the new channel candidates by best quality first, then truncate to the number of available slots
-            // This way, we'll prefer candidates with higher quality, when we don't have enough node balance
+            // Sort the new channel candidates by the best quality first, then truncate to the number of available slots
+            // This way, we'll prefer candidates with higher quality, when we don't have enough node balance.
             // Shuffle first, so the equal candidates are randomized and then use unstable sorting for that purpose.
             new_channel_candidates.shuffle(&mut OsRng);
             new_channel_candidates.sort_unstable_by(|(_, q1), (_, q2)| q1.partial_cmp(q2).unwrap().reverse());
