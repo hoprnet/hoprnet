@@ -9,10 +9,6 @@ pub const APP_VERSION_COERCED: &str = const_format::formatcp!(
     env!("CARGO_PKG_VERSION_PATCH")
 );
 
-/// Tag for the DB version replacing the migration mechanism that is to come
-/// with SQL native migrations.
-pub const DB_VERSION_TAG: &str = "main_4";
-
 /// Minimum native token balance to start the node.
 pub const MIN_NATIVE_BALANCE: &str = "1000000000000000"; // 0.001
 /// Balance that is suggested for funding the node the first time in order to make it start.

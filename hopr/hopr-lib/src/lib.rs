@@ -596,8 +596,7 @@ impl Hopr {
             }
         };
 
-        let db_path: String =
-            join(&[&cfg.db.data, "db", crate::constants::DB_VERSION_TAG]).expect("Could not create a db storage path");
+        let db_path: String = join(&[&cfg.db.data, "db"]).expect("Could not create a db storage path");
         info!("Initiating the DB at: {db_path}");
 
         if cfg.db.force_initialize {
