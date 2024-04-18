@@ -280,7 +280,6 @@ async fn integration_test_indexer() {
 
     let indexer_cfg = IndexerConfig {
         start_block_number: 1,
-        fetch_token_transactions: true,
     };
 
     // Setup ALICE

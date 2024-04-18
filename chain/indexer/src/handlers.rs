@@ -682,6 +682,8 @@ where
                     // In the worst case, each log contains a single event
                     let mut ret = Vec::with_capacity(block_with_logs.logs.len());
 
+                    let mut log_tx_hashes = Vec::with_capacity(block_with_logs.logs.len());
+
                     // Process all logs in the block
                     for log in block_with_logs.logs {
                         let tx_hash = log.tx_hash;
@@ -692,12 +694,20 @@ where
                             debug!("indexer got {significant_event}");
                             ret.push(significant_event);
                         }
+
+                        log_tx_hashes.push(tx_hash);
                     }
 
                     // Once we're done with the block, update the DB
                     myself
                         .db
-                        .set_last_indexed_block(Some(tx), block_with_logs.block_id as u32)
+                        .set_last_indexed_block(Some(tx), block_with_logs.block_id as u32,
+                                                Hash::create(log_tx_hashes
+                                                    .iter()
+                                                    .map(|h| h.as_slice())
+                                                    .collect::<Vec<_>>()
+                                                    .as_slice()
+                                                ))
                         .await?;
                     Ok(ret)
                 })

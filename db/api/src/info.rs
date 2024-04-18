@@ -10,6 +10,7 @@ use crate::db::HoprDb;
 use crate::cache::{CachedValue, CachedValueDiscriminants};
 use crate::errors::{DbError, Result};
 use crate::{HoprDbGeneralModelOperations, OptTx, SINGULAR_TABLE_FIXED_ID};
+use crate::errors::DbError::MissingFixedTableEntry;
 
 /// Contains various on-chain information collected by Indexer,
 /// such as domain separators, ticket price, Network Registry status...etc.
@@ -98,10 +99,10 @@ pub trait HoprDbInfoOperations {
     async fn update_ticket_price<'a>(&'a self, tx: OptTx<'a>, price: Balance) -> Result<()>;
 
     /// Retrieves the last indexed block number.
-    async fn get_last_indexed_block<'a>(&'a self, tx: OptTx<'a>) -> Result<u32>;
+    async fn get_last_indexed_block<'a>(&'a self, tx: OptTx<'a>) -> Result<(u32, Hash)>;
 
     /// Updates the last indexed block number.
-    async fn set_last_indexed_block<'a>(&'a self, tx: OptTx<'a>, block_num: u32) -> Result<()>;
+    async fn set_last_indexed_block<'a>(&'a self, tx: OptTx<'a>, block_num: u32, updated_block_hash: Hash) -> Result<()>;
 
     /// Updates the network registry state.
     /// To retrieve stored network registry state, use [`HoprDbInfoOperations::get_indexer_data`],
@@ -147,7 +148,7 @@ impl HoprDbInfoOperations for HoprDb {
                             safe_balance: Set(new_balance.amount().to_be_bytes().into()),
                             ..Default::default()
                         }
-                        .save(tx.as_ref())
+                        .update(tx.as_ref()) // DB is primed in the migration, so only update is needed
                         .await?,
                     )
                 })
@@ -182,7 +183,7 @@ impl HoprDbInfoOperations for HoprDb {
                         safe_allowance: Set(new_allowance.amount().to_be_bytes().to_vec()),
                         ..Default::default()
                     }
-                    .save(tx.as_ref())
+                    .update(tx.as_ref()) // DB is primed in the migration, so only update is needed
                     .await?;
 
                     Ok::<_, DbError>(())
@@ -238,7 +239,7 @@ impl HoprDbInfoOperations for HoprDb {
                         module_address: Set(Some(safe_info.module_address.to_hex())),
                         ..Default::default()
                     }
-                    .save(tx.as_ref())
+                    .update(tx.as_ref()) // DB is primed in the migration, so only update is needed
                     .await?;
                     Ok::<_, DbError>(())
                 })
@@ -326,7 +327,8 @@ impl HoprDbInfoOperations for HoprDb {
                         }
                     }
 
-                    active_model.save(tx.as_ref()).await?;
+                    // DB is primed in the migration, so only update is needed
+                    active_model.update(tx.as_ref()).await?;
 
                     Ok::<(), DbError>(())
                 })
@@ -350,7 +352,7 @@ impl HoprDbInfoOperations for HoprDb {
                         ticket_price: Set(Some(price.amount().to_be_bytes().into())),
                         ..Default::default()
                     }
-                    .save(tx.as_ref())
+                    .update(tx.as_ref())
                     .await?;
 
                     Ok::<(), DbError>(())
@@ -365,7 +367,7 @@ impl HoprDbInfoOperations for HoprDb {
         Ok(())
     }
 
-    async fn get_last_indexed_block<'a>(&'a self, tx: OptTx<'a>) -> Result<u32> {
+    async fn get_last_indexed_block<'a>(&'a self, tx: OptTx<'a>) -> Result<(u32, Hash)> {
         self.nest_transaction(tx)
             .await?
             .perform(|tx| {
@@ -373,25 +375,43 @@ impl HoprDbInfoOperations for HoprDb {
                     chain_info::Entity::find_by_id(SINGULAR_TABLE_FIXED_ID)
                         .one(tx.as_ref())
                         .await?
-                        .ok_or(DbError::MissingFixedTableEntry("node_info".into()))
-                        .map(|m| m.last_indexed_block as u32)
+                        .ok_or(DbError::MissingFixedTableEntry("chain_info".into()))
+                        .map(|m| {
+                            let chain_checksum = if let Some(b) = m.chain_checksum {
+                                Hash::from_bytes(&b).expect("invalid chain checksum in the db")
+                            } else {
+                                Hash::default()
+                            };
+                            (m.last_indexed_block as u32, chain_checksum)
+                        })
                 })
             })
             .await
     }
 
-    async fn set_last_indexed_block<'a>(&'a self, tx: OptTx<'a>, block_num: u32) -> Result<()> {
+    async fn set_last_indexed_block<'a>(&'a self, tx: OptTx<'a>, block_num: u32, latest_block_checksum: Hash) -> Result<()> {
         self.nest_transaction(tx)
             .await?
             .perform(|tx| {
                 Box::pin(async move {
-                    chain_info::ActiveModel {
-                        id: Set(SINGULAR_TABLE_FIXED_ID),
-                        last_indexed_block: Set(block_num as i32),
-                        ..Default::default()
-                    }
-                    .save(tx.as_ref())
-                    .await?;
+                    let model = chain_info::Entity::find_by_id(SINGULAR_TABLE_FIXED_ID)
+                        .one(tx.as_ref())
+                        .await?
+                        .ok_or(MissingFixedTableEntry("chain_info".into()))?;
+
+                    let current_checksum = model
+                            .chain_checksum
+                            .clone()
+                            .map(|v| Hash::from_bytes(v.as_ref()))
+                            .unwrap_or(Ok(Hash::default()))?;
+
+                    let new_hash = Hash::create(&[current_checksum.as_slice(), latest_block_checksum.as_slice()]);
+
+                    let mut active_model = model.into_active_model();
+                    active_model.last_indexed_block = Set(block_num as i32);
+                    active_model.chain_checksum = Set(Some(new_hash.as_slice().to_vec()));
+                    active_model.update(tx.as_ref()).await?;
+
                     Ok::<_, DbError>(())
                 })
             })
@@ -408,7 +428,7 @@ impl HoprDbInfoOperations for HoprDb {
                         network_registry_enabled: Set(enabled),
                         ..Default::default()
                     }
-                    .save(tx.as_ref())
+                    .update(tx.as_ref())
                     .await?;
                     Ok::<_, DbError>(())
                 })
@@ -477,6 +497,7 @@ mod tests {
     use hex_literal::hex;
     use hopr_crypto_types::keypairs::ChainKeypair;
     use hopr_crypto_types::prelude::Keypair;
+    use hopr_crypto_types::types::Hash;
     use hopr_primitive_types::prelude::{Address, BalanceType};
 
     use crate::db::HoprDb;
@@ -579,12 +600,19 @@ mod tests {
     async fn test_set_last_indexed_block() {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
 
-        assert_eq!(0, db.get_last_indexed_block(None).await.unwrap());
+        let (block_num, last_checksum) = db.get_last_indexed_block(None).await.unwrap();
+        assert_eq!(0, block_num);
 
-        let block_num = 100000;
-        db.set_last_indexed_block(None, block_num).await.unwrap();
+        let checksum = Hash::default().hash();
+        let expexted_block_num = 100000;
 
-        assert_eq!(block_num, db.get_last_indexed_block(None).await.unwrap());
+        db.set_last_indexed_block(None, expexted_block_num, checksum).await.unwrap();
+
+        let (next_block_num, next_checksum) = db.get_last_indexed_block(None).await.unwrap();
+        assert_eq!(expexted_block_num, next_block_num);
+
+        let expected_next_checksum = Hash::create(&[last_checksum.as_slice(), checksum.as_slice()]);
+        assert_eq!(expected_next_checksum, next_checksum);
     }
 
     #[async_std::test]

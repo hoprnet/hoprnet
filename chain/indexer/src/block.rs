@@ -96,7 +96,7 @@ where
         let db_processor = self.db_processor.take().expect("db_processor should be present");
         let tx_significant_events = self.egress.clone();
 
-        let db_latest_block = self.db.get_last_indexed_block(None).await? as u64;
+        let db_latest_block = self.db.get_last_indexed_block(None).await?.0 as u64;
 
         let latest_block_in_db = self.cfg.start_block_number.max(db_latest_block);
 
@@ -111,9 +111,7 @@ where
         topics.extend(crate::constants::topics::node_safe_registry());
         topics.extend(crate::constants::topics::network_registry());
         topics.extend(crate::constants::topics::ticket_price_oracle());
-        if self.cfg.fetch_token_transactions {
-            topics.extend(crate::constants::topics::token());
-        }
+        topics.extend(crate::constants::topics::token());
 
         let log_filter = LogFilter {
             address: db_processor.contract_addresses(),
@@ -349,7 +347,7 @@ pub mod tests {
 
         let head_block = 1000;
         let latest_block = 15u64;
-        db.set_last_indexed_block(None, latest_block as u32).await.unwrap();
+        db.set_last_indexed_block(None, latest_block as u32, Hash::default()).await.unwrap();
         rpc.expect_block_number().return_once(move || Ok(head_block));
 
         let (tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
