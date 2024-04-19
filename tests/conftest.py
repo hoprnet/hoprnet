@@ -56,6 +56,7 @@ NODES = {
         FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_1"),
         "localhost",
         NETWORK1,
+        FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_barebone.cfg.yaml"),
     ),
     "2": Node(
         19092,
@@ -64,6 +65,7 @@ NODES = {
         FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_2"),
         LOCALHOST,
         NETWORK1,
+        FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_barebone.cfg.yaml"),
     ),
     "3": Node(
         19093,
@@ -72,6 +74,7 @@ NODES = {
         FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_3"),
         "localhost",
         NETWORK1,
+        FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_barebone.cfg.yaml"),
     ),
     "4": Node(
         19094,
@@ -80,6 +83,7 @@ NODES = {
         FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_4"),
         LOCALHOST,
         NETWORK1,
+        FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_default.cfg.yaml"),
     ),
     "5": Node(
         19095,
@@ -97,6 +101,7 @@ NODES = {
         FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_6"),
         LOCALHOST,
         NETWORK2,
+        FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_barebone.cfg.yaml"),
     ),
     "7": Node(
         19097,
@@ -105,6 +110,7 @@ NODES = {
         FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_7"),
         "localhost",
         NETWORK1,
+        FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_barebone.cfg.yaml"),
     ),
 }
 
@@ -149,14 +155,19 @@ def cmd_line_args(request: pytest.FixtureRequest):
     return args
 
 
-def default_nodes():
-    """All nodes within the same network as specified in the swarm7 fixture"""
-    return ["1", "2", "3", "4"]
+def barebone_nodes():
+    """Nodes using only the barebones autofunding strategy"""
+    return ["1", "2", "3"]
 
 
-def default_nodes_with_auth():
+def barebone_nodes_with_auth():
     """All nodes within the same network as specified in the swarm7 fixture"""
     return ["1", "3", "4"]
+
+
+def default_nodes():
+    """A node that uses the default strategies"""
+    return ["4"]
 
 
 def passive_node():

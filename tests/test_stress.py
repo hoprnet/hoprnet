@@ -4,7 +4,7 @@ import random
 
 import pytest
 
-from .conftest import TICKET_PRICE_PER_HOP, default_nodes, passive_node
+from .conftest import TICKET_PRICE_PER_HOP, barebone_nodes, passive_node
 from .hopr import HoprdAPI
 from .test_integration import create_channel, send_and_receive_packets_with_pop
 
@@ -21,7 +21,7 @@ async def check_connected_peer_count(me, count):
 @pytest.mark.skipif(
     os.getenv("CI", "false") == "true", reason="stress tests fail randomly on CI due to resource constraints"
 )
-@pytest.mark.parametrize("src,dest", [(random.choice(default_nodes()), passive_node())])
+@pytest.mark.parametrize("src,dest", [(random.choice(barebone_nodes()), passive_node())])
 async def test_hoprd_stress_1_hop_to_self(src, dest, swarm7, cmd_line_args):
     STRESS_1_HOP_TO_SELF_MESSAGE_COUNT = cmd_line_args["stress_seq_request_count"]
 
