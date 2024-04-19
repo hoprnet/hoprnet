@@ -15,6 +15,7 @@ mod m20240301_000012_tickets_create_outgoing_ticket_index;
 mod m20240301_000013_initial_seed_tickets;
 mod m20240301_000014_create_ticket_stats_with_channel_id;
 mod m20240326_000015_recreate_ticket_stats;
+mod m20240418_000016_add_rolling_tx_hash;
 
 #[derive(PartialEq)]
 pub enum BackendType {
@@ -49,11 +50,12 @@ impl MigratorTrait for Migrator {
                 BackendType::Postgres,
             )),
             Box::new(m20240326_000015_recreate_ticket_stats::Migration(BackendType::Postgres)),
+            Box::new(m20240418_000016_add_rolling_tx_hash::Migration),
         ]
     }
 }
 
-/// SQLite does not allow to write lock tables only and the write lock
+/// SQLite does not allow writing lock tables only, and the write lock
 /// will apple to the entire database file. It is therefore beneficial
 /// to separate the exclusive concurrently accessing components into
 /// separate database files to benefit from multiple write locks over
@@ -72,6 +74,7 @@ impl MigratorTrait for MigratorIndex {
             Box::new(m20240226_000006_index_create_network_eligibility::Migration),
             Box::new(m20240226_000008_node_create_settings::Migration),
             Box::new(m20240226_000007_index_initial_seed::Migration),
+            Box::new(m20240418_000016_add_rolling_tx_hash::Migration),
         ]
     }
 }

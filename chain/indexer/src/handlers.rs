@@ -444,9 +444,11 @@ where
                     return Ok(None);
                 } else if to.eq(&self.safe_address) {
                     // This + is internally defined as saturating add
+                    info!("Safe balance {current_balance} increased by {transferred_value}");
                     current_balance = current_balance + transferred_value;
                 } else if from.eq(&self.safe_address) {
                     // This - is internally defined as saturating sub
+                    info!("Safe balance {current_balance} decreased by {transferred_value}");
                     current_balance = current_balance - transferred_value;
                 }
 
@@ -682,6 +684,8 @@ where
                     // In the worst case, each log contains a single event
                     let mut ret = Vec::with_capacity(block_with_logs.logs.len());
 
+                    let mut log_tx_hashes = Vec::with_capacity(block_with_logs.logs.len());
+
                     // Process all logs in the block
                     for log in block_with_logs.logs {
                         let tx_hash = log.tx_hash;
@@ -692,12 +696,24 @@ where
                             debug!("indexer got {significant_event}");
                             ret.push(significant_event);
                         }
+
+                        log_tx_hashes.push(tx_hash);
                     }
 
                     // Once we're done with the block, update the DB
                     myself
                         .db
-                        .set_last_indexed_block(Some(tx), block_with_logs.block_id as u32)
+                        .set_last_indexed_block(
+                            Some(tx),
+                            block_with_logs.block_id as u32,
+                            Hash::create(
+                                log_tx_hashes
+                                    .iter()
+                                    .map(|h| h.as_slice())
+                                    .collect::<Vec<_>>()
+                                    .as_slice(),
+                            ),
+                        )
                         .await?;
                     Ok(ret)
                 })

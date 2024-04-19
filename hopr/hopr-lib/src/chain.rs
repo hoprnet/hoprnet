@@ -380,7 +380,6 @@ pub fn build_chain_api<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::
 ) -> chain_api::HoprChain<T> {
     let indexer_cfg = chain_indexer::IndexerConfig {
         start_block_number: indexer_start_block,
-        ..Default::default()
     };
 
     chain_api::HoprChain::new(

@@ -94,11 +94,13 @@ where
 
         let rpc = self.rpc.take().expect("rpc should be present");
         let db_processor = self.db_processor.take().expect("db_processor should be present");
+        let db = self.db.clone();
         let tx_significant_events = self.egress.clone();
 
-        let db_latest_block = self.db.get_last_indexed_block(None).await? as u64;
+        let (db_latest_block, checksum) = self.db.get_last_indexed_block(None).await?;
+        info!("Loaded indexer state at block #{db_latest_block} with checksum: {checksum}");
 
-        let latest_block_in_db = self.cfg.start_block_number.max(db_latest_block);
+        let latest_block_in_db = self.cfg.start_block_number.max(db_latest_block as u64);
 
         info!(
             "DB latest block: {:?}, Latest block {:?}",
@@ -111,9 +113,7 @@ where
         topics.extend(crate::constants::topics::node_safe_registry());
         topics.extend(crate::constants::topics::network_registry());
         topics.extend(crate::constants::topics::ticket_price_oracle());
-        if self.cfg.fetch_token_transactions {
-            topics.extend(crate::constants::topics::token());
-        }
+        topics.extend(crate::constants::topics::token());
 
         let log_filter = LogFilter {
             address: db_processor.contract_addresses(),
@@ -183,7 +183,8 @@ where
                 .filter_map(|block_with_logs| async {
                     debug!("processing events in {block_with_logs} ...");
                     let block_id = block_with_logs.to_string();
-                    match db_processor.collect_block_events(block_with_logs).await {
+                    let block_num = block_with_logs.block_id;
+                    let outgoing_events = match db_processor.collect_block_events(block_with_logs).await {
                         Ok(events) => {
                             info!("retrieved {} significant chain events from {block_id}", events.len());
                             Some(events)
@@ -192,7 +193,19 @@ where
                             error!("failed to process logs in {block_id} into events: {e}");
                             None
                         }
+                    };
+
+                    // Printout indexer state roughly every 5 processed blocks which had relevant events
+                    if block_num % 5 == 0 {
+                        match db.get_last_indexed_block(None).await {
+                            Ok((block_num, checksum)) => {
+                                info!("Current indexer state at block #{block_num} with checksum: {checksum}")
+                            }
+                            Err(e) => error!("Cannot retrieve indexer state: {e}"),
+                        }
                     }
+
+                    outgoing_events
                 })
                 .flat_map(stream::iter);
 
@@ -349,7 +362,9 @@ pub mod tests {
 
         let head_block = 1000;
         let latest_block = 15u64;
-        db.set_last_indexed_block(None, latest_block as u32).await.unwrap();
+        db.set_last_indexed_block(None, latest_block as u32, Hash::default())
+            .await
+            .unwrap();
         rpc.expect_block_number().return_once(move || Ok(head_block));
 
         let (tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
