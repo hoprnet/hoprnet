@@ -8,9 +8,9 @@ use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, Query
 use crate::db::HoprDb;
 
 use crate::cache::{CachedValue, CachedValueDiscriminants};
+use crate::errors::DbError::MissingFixedTableEntry;
 use crate::errors::{DbError, Result};
 use crate::{HoprDbGeneralModelOperations, OptTx, SINGULAR_TABLE_FIXED_ID};
-use crate::errors::DbError::MissingFixedTableEntry;
 
 /// Contains various on-chain information collected by Indexer,
 /// such as domain separators, ticket price, Network Registry status...etc.
@@ -101,8 +101,10 @@ pub trait HoprDbInfoOperations {
     /// Retrieves the last indexed block number.
     async fn get_last_indexed_block<'a>(&'a self, tx: OptTx<'a>) -> Result<(u32, Hash)>;
 
-    /// Updates the last indexed block number.
-    async fn set_last_indexed_block<'a>(&'a self, tx: OptTx<'a>, block_num: u32, updated_block_hash: Hash) -> Result<()>;
+    /// Updates the last indexed block number together with the checksum of log TXs processed
+    /// in that block.
+    async fn set_last_indexed_block<'a>(&'a self, tx: OptTx<'a>, block_num: u32, block_log_tx_hash: Hash)
+        -> Result<()>;
 
     /// Updates the network registry state.
     /// To retrieve stored network registry state, use [`HoprDbInfoOperations::get_indexer_data`],
@@ -389,7 +391,12 @@ impl HoprDbInfoOperations for HoprDb {
             .await
     }
 
-    async fn set_last_indexed_block<'a>(&'a self, tx: OptTx<'a>, block_num: u32, latest_block_checksum: Hash) -> Result<()> {
+    async fn set_last_indexed_block<'a>(
+        &'a self,
+        tx: OptTx<'a>,
+        block_num: u32,
+        block_log_tx_hash: Hash,
+    ) -> Result<()> {
         self.nest_transaction(tx)
             .await?
             .perform(|tx| {
@@ -400,12 +407,12 @@ impl HoprDbInfoOperations for HoprDb {
                         .ok_or(MissingFixedTableEntry("chain_info".into()))?;
 
                     let current_checksum = model
-                            .chain_checksum
-                            .clone()
-                            .map(|v| Hash::from_bytes(v.as_ref()))
-                            .unwrap_or(Ok(Hash::default()))?;
+                        .chain_checksum
+                        .clone()
+                        .map(|v| Hash::from_bytes(v.as_ref()))
+                        .unwrap_or(Ok(Hash::default()))?;
 
-                    let new_hash = Hash::create(&[current_checksum.as_slice(), latest_block_checksum.as_slice()]);
+                    let new_hash = Hash::create(&[current_checksum.as_slice(), block_log_tx_hash.as_slice()]);
 
                     let mut active_model = model.into_active_model();
                     active_model.last_indexed_block = Set(block_num as i32);
@@ -606,7 +613,9 @@ mod tests {
         let checksum = Hash::default().hash();
         let expexted_block_num = 100000;
 
-        db.set_last_indexed_block(None, expexted_block_num, checksum).await.unwrap();
+        db.set_last_indexed_block(None, expexted_block_num, checksum)
+            .await
+            .unwrap();
 
         let (next_block_num, next_checksum) = db.get_last_indexed_block(None).await.unwrap();
         assert_eq!(expexted_block_num, next_block_num);

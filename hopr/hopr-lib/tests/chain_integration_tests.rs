@@ -278,9 +278,7 @@ async fn integration_test_indexer() {
         max_action_confirmation_wait: Duration::from_secs(60), // lower action confirmation limit
     };
 
-    let indexer_cfg = IndexerConfig {
-        start_block_number: 1,
-    };
+    let indexer_cfg = IndexerConfig { start_block_number: 1 };
 
     // Setup ALICE
     info!("Setting up ALICE");

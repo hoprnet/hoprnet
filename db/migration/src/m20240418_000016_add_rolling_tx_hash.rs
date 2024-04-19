@@ -6,27 +6,27 @@ pub struct Migration;
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-       manager
-           .alter_table(
-               Table::alter()
-                   .table(ChainInfo::Table)
-                   .add_column_if_not_exists(
-                       ColumnDef::new(ChainInfo::ChainChecksum)
-                           .binary_len(32)
-                           .default(vec![0u8; 32])
-                   )
-                   .to_owned()
-           )
-           .await
+        manager
+            .alter_table(
+                Table::alter()
+                    .table(ChainInfo::Table)
+                    .add_column_if_not_exists(
+                        ColumnDef::new(ChainInfo::ChainChecksum)
+                            .binary_len(32)
+                            .default(vec![0u8; 32]),
+                    )
+                    .to_owned(),
+            )
+            .await
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
             .alter_table(
-                 Table::alter()
-                     .table(ChainInfo::Table)
-                     .drop_column(ChainInfo::ChainChecksum)
-                     .to_owned()
+                Table::alter()
+                    .table(ChainInfo::Table)
+                    .drop_column(ChainInfo::ChainChecksum)
+                    .to_owned(),
             )
             .await
     }
@@ -35,5 +35,5 @@ impl MigrationTrait for Migration {
 #[derive(DeriveIden)]
 enum ChainInfo {
     Table,
-    ChainChecksum
+    ChainChecksum,
 }
