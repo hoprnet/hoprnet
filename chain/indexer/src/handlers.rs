@@ -444,9 +444,11 @@ where
                     return Ok(None);
                 } else if to.eq(&self.safe_address) {
                     // This + is internally defined as saturating add
+                    info!("Safe balance {current_balance} increased by {transferred_value}");
                     current_balance = current_balance + transferred_value;
                 } else if from.eq(&self.safe_address) {
                     // This - is internally defined as saturating sub
+                    info!("Safe balance {current_balance} decreased by {transferred_value}");
                     current_balance = current_balance - transferred_value;
                 }
 
