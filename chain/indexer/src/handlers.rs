@@ -29,6 +29,19 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tracing::{debug, error, info, trace, warn};
 
+#[cfg(all(feature = "prometheus", not(test)))]
+use hopr_metrics::metrics::MultiCounter;
+
+#[cfg(all(feature = "prometheus", not(test)))]
+lazy_static::lazy_static! {
+    static ref METRIC_INDEXER_LOG_COUNTERS: MultiCounter =
+        MultiCounter::new(
+            "hopr_indexer_contract_log_counters",
+            "Counts of different HOPR contract logs processed by the Indexer",
+            &["contract"]
+    ).unwrap();
+}
+
 /// Event handling object for on-chain operations
 ///
 /// Once an on-chain operation is recorded by the [crate::block::Indexer], it is pre-processed
@@ -83,6 +96,9 @@ where
         event: HoprAnnouncementsEvents,
         block_number: u32,
     ) -> Result<Option<ChainEventType>> {
+        #[cfg(all(feature = "prometheus", not(test)))]
+        METRIC_INDEXER_LOG_COUNTERS.increment(&["announcements"]);
+
         match event {
             HoprAnnouncementsEvents::AddressAnnouncementFilter(address_announcement) => {
                 trace!(
@@ -159,6 +175,9 @@ where
         tx: &OpenTransaction,
         event: HoprChannelsEvents,
     ) -> Result<Option<ChainEventType>> {
+        #[cfg(all(feature = "prometheus", not(test)))]
+        METRIC_INDEXER_LOG_COUNTERS.increment(&["channels"]);
+
         match event {
             HoprChannelsEvents::ChannelBalanceDecreasedFilter(balance_decreased) => {
                 let maybe_channel = channel_model_from_id(tx, balance_decreased.channel_id.into()).await?;
@@ -427,6 +446,9 @@ where
     }
 
     async fn on_token_event(&self, tx: &OpenTransaction, event: HoprTokenEvents) -> Result<Option<ChainEventType>> {
+        #[cfg(all(feature = "prometheus", not(test)))]
+        METRIC_INDEXER_LOG_COUNTERS.increment(&["token"]);
+
         match event {
             HoprTokenEvents::TransferFilter(transferred) => {
                 let from: Address = transferred.from.into();
@@ -483,6 +505,9 @@ where
         tx: &OpenTransaction,
         event: HoprNetworkRegistryEvents,
     ) -> Result<Option<ChainEventType>> {
+        #[cfg(all(feature = "prometheus", not(test)))]
+        METRIC_INDEXER_LOG_COUNTERS.increment(&["network_registry"]);
+
         match event {
             HoprNetworkRegistryEvents::DeregisteredByManagerFilter(deregistered) => {
                 let node_address: Address = deregistered.node_address.into();
@@ -558,6 +583,9 @@ where
         tx: &OpenTransaction,
         event: HoprNodeSafeRegistryEvents,
     ) -> Result<Option<ChainEventType>> {
+        #[cfg(all(feature = "prometheus", not(test)))]
+        METRIC_INDEXER_LOG_COUNTERS.increment(&["safe_registry"]);
+
         match event {
             HoprNodeSafeRegistryEvents::RegisteredNodeSafeFilter(registered) => {
                 if self.chain_key.public().to_address() == registered.node_address.into() {
@@ -591,6 +619,9 @@ where
         _db: &OpenTransaction,
         _event: HoprNodeManagementModuleEvents,
     ) -> Result<Option<ChainEventType>> {
+        #[cfg(all(feature = "prometheus", not(test)))]
+        METRIC_INDEXER_LOG_COUNTERS.increment(&["node_management_module"]);
+
         // Don't care at the moment
         Ok(None)
     }
@@ -600,6 +631,9 @@ where
         tx: &OpenTransaction,
         event: HoprTicketPriceOracleEvents,
     ) -> Result<Option<ChainEventType>> {
+        #[cfg(all(feature = "prometheus", not(test)))]
+        METRIC_INDEXER_LOG_COUNTERS.increment(&["price_oracle"]);
+
         match event {
             HoprTicketPriceOracleEvents::TicketPriceUpdatedFilter(update) => {
                 trace!(
@@ -648,6 +682,9 @@ where
             let event = HoprTicketPriceOracleEvents::decode_log(&log.into())?;
             self.on_ticket_price_oracle_event(tx, event).await
         } else {
+            #[cfg(all(feature = "prometheus", not(test)))]
+            METRIC_INDEXER_LOG_COUNTERS.increment(&["unknown"]);
+
             error!(
                 "on_event error - unknown contract address: {} - received log: {log:?}",
                 log.address
