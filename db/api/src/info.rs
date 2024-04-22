@@ -78,17 +78,17 @@ pub enum DomainSeparator {
 ///
 #[async_trait]
 pub trait HoprDbInfoOperations {
-    /// Gets node's Safe balance.
-    async fn get_safe_balance<'a>(&'a self, tx: OptTx<'a>) -> Result<Balance>;
+    /// Gets node's Safe balance of HOPR tokens.
+    async fn get_safe_hopr_balance<'a>(&'a self, tx: OptTx<'a>) -> Result<Balance>;
 
-    /// Sets node's Safe balance.
-    async fn set_safe_balance<'a>(&'a self, tx: OptTx<'a>, new_balance: Balance) -> Result<()>;
+    /// Sets node's Safe balance of HOPR tokens.
+    async fn set_safe_hopr_balance<'a>(&'a self, tx: OptTx<'a>, new_balance: Balance) -> Result<()>;
 
-    /// Gets node's Safe allowance.
-    async fn get_safe_allowance<'a>(&'a self, tx: OptTx<'a>) -> Result<Balance>;
+    /// Gets node's Safe allowance of HOPR tokens.
+    async fn get_safe_hopr_allowance<'a>(&'a self, tx: OptTx<'a>) -> Result<Balance>;
 
-    /// Sets node's Safe allowance.
-    async fn set_safe_allowance<'a>(&'a self, tx: OptTx<'a>, new_allowance: Balance) -> Result<()>;
+    /// Sets node's Safe allowance of HOPR tokens.
+    async fn set_safe_hopr_allowance<'a>(&'a self, tx: OptTx<'a>, new_allowance: Balance) -> Result<()>;
 
     /// Gets node's Safe addresses info.
     async fn get_safe_info<'a>(&'a self, tx: OptTx<'a>) -> Result<Option<SafeInfo>>;
@@ -139,7 +139,7 @@ pub trait HoprDbInfoOperations {
 
 #[async_trait]
 impl HoprDbInfoOperations for HoprDb {
-    async fn get_safe_balance<'a>(&'a self, tx: OptTx<'a>) -> Result<Balance> {
+    async fn get_safe_hopr_balance<'a>(&'a self, tx: OptTx<'a>) -> Result<Balance> {
         self.nest_transaction(tx)
             .await?
             .perform(|tx| {
@@ -154,7 +154,7 @@ impl HoprDbInfoOperations for HoprDb {
             .await
     }
 
-    async fn set_safe_balance<'a>(&'a self, tx: OptTx<'a>, new_balance: Balance) -> Result<()> {
+    async fn set_safe_hopr_balance<'a>(&'a self, tx: OptTx<'a>, new_balance: Balance) -> Result<()> {
         self.nest_transaction(tx)
             .await?
             .perform(|tx| {
@@ -175,7 +175,7 @@ impl HoprDbInfoOperations for HoprDb {
         Ok(())
     }
 
-    async fn get_safe_allowance<'a>(&'a self, tx: OptTx<'a>) -> Result<Balance> {
+    async fn get_safe_hopr_allowance<'a>(&'a self, tx: OptTx<'a>) -> Result<Balance> {
         self.nest_transaction(tx)
             .await?
             .perform(|tx| {
@@ -190,7 +190,7 @@ impl HoprDbInfoOperations for HoprDb {
             .await
     }
 
-    async fn set_safe_allowance<'a>(&'a self, tx: OptTx<'a>, new_allowance: Balance) -> Result<()> {
+    async fn set_safe_hopr_allowance<'a>(&'a self, tx: OptTx<'a>, new_allowance: Balance) -> Result<()> {
         self.nest_transaction(tx)
             .await?
             .perform(|tx| {
@@ -536,16 +536,16 @@ mod tests {
 
         assert_eq!(
             BalanceType::HOPR.zero(),
-            db.get_safe_balance(None).await.unwrap(),
+            db.get_safe_hopr_balance(None).await.unwrap(),
             "balance must be 0"
         );
 
         let balance = BalanceType::HOPR.balance(10_000);
-        db.set_safe_balance(None, balance).await.unwrap();
+        db.set_safe_hopr_balance(None, balance).await.unwrap();
 
         assert_eq!(
             balance,
-            db.get_safe_balance(None).await.unwrap(),
+            db.get_safe_hopr_balance(None).await.unwrap(),
             "balance must be {balance}"
         );
     }
@@ -556,16 +556,16 @@ mod tests {
 
         assert_eq!(
             BalanceType::HOPR.zero(),
-            db.get_safe_allowance(None).await.unwrap(),
+            db.get_safe_hopr_allowance(None).await.unwrap(),
             "balance must be 0"
         );
 
         let balance = BalanceType::HOPR.balance(10_000);
-        db.set_safe_allowance(None, balance).await.unwrap();
+        db.set_safe_hopr_allowance(None, balance).await.unwrap();
 
         assert_eq!(
             balance,
-            db.get_safe_allowance(None).await.unwrap(),
+            db.get_safe_hopr_allowance(None).await.unwrap(),
             "balance must be {balance}"
         );
     }

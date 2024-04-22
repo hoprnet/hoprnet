@@ -459,7 +459,7 @@ where
                     &self.safe_address,
                 );
 
-                let mut current_balance = self.db.get_safe_balance(Some(tx)).await?;
+                let mut current_balance = self.db.get_safe_hopr_balance(Some(tx)).await?;
                 let transferred_value = transferred.value;
 
                 if to.ne(&self.safe_address) && from.ne(&self.safe_address) {
@@ -474,7 +474,7 @@ where
                     current_balance = current_balance - transferred_value;
                 }
 
-                self.db.set_safe_balance(Some(tx), current_balance).await?;
+                self.db.set_safe_hopr_balance(Some(tx), current_balance).await?;
             }
             HoprTokenEvents::ApprovalFilter(approved) => {
                 let owner: Address = approved.owner.into();
@@ -488,7 +488,7 @@ where
                 // if approval is for tokens on Safe contract to be spent by HoprChannels
                 if owner.eq(&self.safe_address) && spender.eq(&self.addresses.channels) {
                     self.db
-                        .set_safe_allowance(Some(tx), BalanceType::HOPR.balance(approved.value))
+                        .set_safe_hopr_allowance(Some(tx), BalanceType::HOPR.balance(approved.value))
                         .await?;
                 } else {
                     return Ok(None);
@@ -1161,7 +1161,7 @@ pub mod tests {
         assert!(event_type.is_none(), "token transfer does not have chain event type");
 
         assert_eq!(
-            db.get_safe_balance(None).await.unwrap(),
+            db.get_safe_hopr_balance(None).await.unwrap(),
             Balance::new(value, BalanceType::HOPR)
         )
     }
@@ -1174,7 +1174,7 @@ pub mod tests {
 
         let value = U256::max_value();
 
-        db.set_safe_balance(None, BalanceType::HOPR.balance(value))
+        db.set_safe_hopr_balance(None, BalanceType::HOPR.balance(value))
             .await
             .unwrap();
 
@@ -1199,7 +1199,7 @@ pub mod tests {
 
         assert!(event_type.is_none(), "token transfer does not have chain event type");
 
-        assert_eq!(db.get_safe_balance(None).await.unwrap(), BalanceType::HOPR.zero())
+        assert_eq!(db.get_safe_hopr_balance(None).await.unwrap(), BalanceType::HOPR.zero())
     }
 
     #[async_std::test]
@@ -1220,7 +1220,7 @@ pub mod tests {
         };
 
         assert_eq!(
-            db.get_safe_allowance(None).await.unwrap(),
+            db.get_safe_hopr_allowance(None).await.unwrap(),
             Balance::new(U256::from(0u64), BalanceType::HOPR)
         );
 
@@ -1239,16 +1239,16 @@ pub mod tests {
         assert!(event_type.is_none(), "token approval does not have chain event type");
 
         assert_eq!(
-            db.get_safe_allowance(None).await.unwrap(),
+            db.get_safe_hopr_allowance(None).await.unwrap(),
             Balance::new(U256::from(1000u64), BalanceType::HOPR)
         );
 
         // reduce allowance manually to verify a second time
         let _ = db
-            .set_safe_allowance(None, Balance::new(U256::from(10u64), BalanceType::HOPR))
+            .set_safe_hopr_allowance(None, Balance::new(U256::from(10u64), BalanceType::HOPR))
             .await;
         assert_eq!(
-            db.get_safe_allowance(None).await.unwrap(),
+            db.get_safe_hopr_allowance(None).await.unwrap(),
             Balance::new(U256::from(10u64), BalanceType::HOPR)
         );
 
@@ -1264,7 +1264,7 @@ pub mod tests {
         assert!(event_type.is_none(), "token approval does not have chain event type");
 
         assert_eq!(
-            db.get_safe_allowance(None).await.unwrap(),
+            db.get_safe_hopr_allowance(None).await.unwrap(),
             Balance::new(U256::from(1000u64), BalanceType::HOPR)
         );
     }

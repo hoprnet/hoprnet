@@ -204,8 +204,6 @@ where
             return Err(crate::errors::NetworkingError::DisallowedOperationOnOwnPeerIdError);
         }
 
-        debug!("Adding '{peer}' from {origin} with multiaddresses {addrs:?}");
-
         if let Some(mut peer_status) = self.db.get_network_peer(peer).await? {
             if !self.should_still_be_ignored(&peer_status) {
                 peer_status.ignored = None;
@@ -219,6 +217,8 @@ where
                 self.db.update_network_peer(peer_status).await?;
             }
         } else {
+            debug!("Adding '{peer}' from {origin} with multiaddresses {addrs:?}");
+
             self.db
                 .add_network_peer(
                     peer,

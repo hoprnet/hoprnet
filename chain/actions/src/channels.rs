@@ -76,13 +76,13 @@ where
             .await?
             .perform(|tx| {
                 Box::pin(async move {
-                    let allowance = db_clone.get_safe_allowance(Some(tx)).await?;
+                    let allowance = db_clone.get_safe_hopr_allowance(Some(tx)).await?;
                     debug!("current staking safe allowance is {allowance}");
                     if allowance.lt(&amount) {
                         return Err(NotEnoughAllowance);
                     }
 
-                    let hopr_balance = db_clone.get_safe_balance(Some(tx)).await?;
+                    let hopr_balance = db_clone.get_safe_hopr_balance(Some(tx)).await?;
                     debug!("current Safe HOPR balance is {hopr_balance}");
                     if hopr_balance.lt(&amount) {
                         return Err(BalanceTooLow);
@@ -126,13 +126,13 @@ where
             .await?
             .perform(|tx| {
                 Box::pin(async move {
-                    let allowance = db_clone.get_safe_allowance(Some(tx)).await?;
+                    let allowance = db_clone.get_safe_hopr_allowance(Some(tx)).await?;
                     debug!("current staking safe allowance is {allowance}");
                     if allowance.lt(&amount) {
                         return Err(NotEnoughAllowance);
                     }
 
-                    let hopr_balance = db_clone.get_safe_balance(Some(tx)).await?;
+                    let hopr_balance = db_clone.get_safe_hopr_balance(Some(tx)).await?;
                     debug!("current Safe HOPR balance is {hopr_balance}");
                     if hopr_balance.lt(&amount) {
                         return Err(BalanceTooLow);
@@ -267,10 +267,10 @@ mod tests {
             .perform(|tx| {
                 Box::pin(async move {
                     db_clone
-                        .set_safe_allowance(Some(tx), Balance::new(10_000_000_u64, BalanceType::HOPR))
+                        .set_safe_hopr_allowance(Some(tx), Balance::new(10_000_000_u64, BalanceType::HOPR))
                         .await?;
                     db_clone
-                        .set_safe_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR))
+                        .set_safe_hopr_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR))
                         .await?;
                     db_clone
                         .set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default())
@@ -344,10 +344,10 @@ mod tests {
             .perform(|tx| {
                 Box::pin(async move {
                     db_clone
-                        .set_safe_allowance(Some(tx), Balance::new(10_000_000_u64, BalanceType::HOPR))
+                        .set_safe_hopr_allowance(Some(tx), Balance::new(10_000_000_u64, BalanceType::HOPR))
                         .await?;
                     db_clone
-                        .set_safe_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR))
+                        .set_safe_hopr_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR))
                         .await?;
                     db_clone.set_network_registry_enabled(Some(tx), false).await?;
                     db_clone
@@ -391,10 +391,10 @@ mod tests {
             .perform(|tx| {
                 Box::pin(async move {
                     db_clone
-                        .set_safe_allowance(Some(tx), Balance::new(10_000_000_u64, BalanceType::HOPR))
+                        .set_safe_hopr_allowance(Some(tx), Balance::new(10_000_000_u64, BalanceType::HOPR))
                         .await?;
                     db_clone
-                        .set_safe_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR))
+                        .set_safe_hopr_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR))
                         .await?;
                     db_clone.set_network_registry_enabled(Some(tx), false).await?;
                     db_clone
@@ -435,10 +435,10 @@ mod tests {
             .perform(|tx| {
                 Box::pin(async move {
                     db_clone
-                        .set_safe_allowance(Some(tx), Balance::new(10_000_000_u64, BalanceType::HOPR))
+                        .set_safe_hopr_allowance(Some(tx), Balance::new(10_000_000_u64, BalanceType::HOPR))
                         .await?;
                     db_clone
-                        .set_safe_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR))
+                        .set_safe_hopr_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR))
                         .await?;
                     db_clone.set_network_registry_enabled(Some(tx), false).await?;
                     db_clone
@@ -491,10 +491,10 @@ mod tests {
             .perform(|tx| {
                 Box::pin(async move {
                     db_clone
-                        .set_safe_allowance(Some(tx), Balance::new(1_000_u64, BalanceType::HOPR))
+                        .set_safe_hopr_allowance(Some(tx), Balance::new(1_000_u64, BalanceType::HOPR))
                         .await?;
                     db_clone
-                        .set_safe_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR))
+                        .set_safe_hopr_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR))
                         .await?;
                     db_clone.set_network_registry_enabled(Some(tx), false).await?;
                     db_clone
@@ -537,10 +537,10 @@ mod tests {
             .perform(|tx| {
                 Box::pin(async move {
                     db_clone
-                        .set_safe_allowance(Some(tx), Balance::new(10_000_000_u64, BalanceType::HOPR))
+                        .set_safe_hopr_allowance(Some(tx), Balance::new(10_000_000_u64, BalanceType::HOPR))
                         .await?;
                     db_clone
-                        .set_safe_balance(Some(tx), Balance::new(1_u64, BalanceType::HOPR))
+                        .set_safe_hopr_balance(Some(tx), Balance::new(1_u64, BalanceType::HOPR))
                         .await?;
                     db_clone.set_network_registry_enabled(Some(tx), false).await?;
                     db_clone
@@ -585,10 +585,10 @@ mod tests {
             .perform(|tx| {
                 Box::pin(async move {
                     db_clone
-                        .set_safe_allowance(Some(tx), Balance::new(10_000_000_u64, BalanceType::HOPR))
+                        .set_safe_hopr_allowance(Some(tx), Balance::new(10_000_000_u64, BalanceType::HOPR))
                         .await?;
                     db_clone
-                        .set_safe_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR))
+                        .set_safe_hopr_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR))
                         .await?;
                     db_clone.set_network_registry_enabled(Some(tx), false).await?;
                     db_clone
@@ -659,10 +659,10 @@ mod tests {
             .perform(|tx| {
                 Box::pin(async move {
                     db_clone
-                        .set_safe_allowance(Some(tx), Balance::new(10_000_000_u64, BalanceType::HOPR))
+                        .set_safe_hopr_allowance(Some(tx), Balance::new(10_000_000_u64, BalanceType::HOPR))
                         .await?;
                     db_clone
-                        .set_safe_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR))
+                        .set_safe_hopr_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR))
                         .await?;
                     db_clone.set_network_registry_enabled(Some(tx), false).await?;
                     db_clone
@@ -705,10 +705,10 @@ mod tests {
             .perform(|tx| {
                 Box::pin(async move {
                     db_clone
-                        .set_safe_allowance(Some(tx), Balance::new(10_000_000_u64, BalanceType::HOPR))
+                        .set_safe_hopr_allowance(Some(tx), Balance::new(10_000_000_u64, BalanceType::HOPR))
                         .await?;
                     db_clone
-                        .set_safe_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR))
+                        .set_safe_hopr_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR))
                         .await?;
                     db_clone.set_network_registry_enabled(Some(tx), false).await?;
                     db_clone
@@ -760,10 +760,10 @@ mod tests {
             .perform(|tx| {
                 Box::pin(async move {
                     db_clone
-                        .set_safe_allowance(Some(tx), Balance::new(1_000_u64, BalanceType::HOPR))
+                        .set_safe_hopr_allowance(Some(tx), Balance::new(1_000_u64, BalanceType::HOPR))
                         .await?;
                     db_clone
-                        .set_safe_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR))
+                        .set_safe_hopr_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR))
                         .await?;
                     db_clone.set_network_registry_enabled(Some(tx), false).await?;
                     db_clone
@@ -806,10 +806,10 @@ mod tests {
             .perform(|tx| {
                 Box::pin(async move {
                     db_clone
-                        .set_safe_allowance(Some(tx), Balance::new(100_000_u64, BalanceType::HOPR))
+                        .set_safe_hopr_allowance(Some(tx), Balance::new(100_000_u64, BalanceType::HOPR))
                         .await?;
                     db_clone
-                        .set_safe_balance(Some(tx), Balance::new(1_u64, BalanceType::HOPR))
+                        .set_safe_hopr_balance(Some(tx), Balance::new(1_u64, BalanceType::HOPR))
                         .await?;
                     db_clone.set_network_registry_enabled(Some(tx), false).await?;
                     db_clone
@@ -855,10 +855,10 @@ mod tests {
             .perform(|tx| {
                 Box::pin(async move {
                     db_clone
-                        .set_safe_allowance(Some(tx), Balance::new(1_000_u64, BalanceType::HOPR))
+                        .set_safe_hopr_allowance(Some(tx), Balance::new(1_000_u64, BalanceType::HOPR))
                         .await?;
                     db_clone
-                        .set_safe_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR))
+                        .set_safe_hopr_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR))
                         .await?;
                     db_clone.set_network_registry_enabled(Some(tx), false).await?;
                     db_clone
@@ -975,10 +975,10 @@ mod tests {
             .perform(|tx| {
                 Box::pin(async move {
                     db_clone
-                        .set_safe_allowance(Some(tx), Balance::new(1_000_u64, BalanceType::HOPR))
+                        .set_safe_hopr_allowance(Some(tx), Balance::new(1_000_u64, BalanceType::HOPR))
                         .await?;
                     db_clone
-                        .set_safe_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR))
+                        .set_safe_hopr_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR))
                         .await?;
                     db_clone.set_network_registry_enabled(Some(tx), false).await?;
                     db_clone
@@ -1057,10 +1057,10 @@ mod tests {
             .perform(|tx| {
                 Box::pin(async move {
                     db_clone
-                        .set_safe_allowance(Some(tx), Balance::new(1_000_u64, BalanceType::HOPR))
+                        .set_safe_hopr_allowance(Some(tx), Balance::new(1_000_u64, BalanceType::HOPR))
                         .await?;
                     db_clone
-                        .set_safe_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR))
+                        .set_safe_hopr_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR))
                         .await?;
                     db_clone.set_network_registry_enabled(Some(tx), false).await?;
                     db_clone
@@ -1106,10 +1106,10 @@ mod tests {
             .perform(|tx| {
                 Box::pin(async move {
                     db_clone
-                        .set_safe_allowance(Some(tx), Balance::new(1_000_u64, BalanceType::HOPR))
+                        .set_safe_hopr_allowance(Some(tx), Balance::new(1_000_u64, BalanceType::HOPR))
                         .await?;
                     db_clone
-                        .set_safe_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR))
+                        .set_safe_hopr_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR))
                         .await?;
                     db_clone.set_network_registry_enabled(Some(tx), false).await?;
                     db_clone
@@ -1156,10 +1156,10 @@ mod tests {
             .perform(|tx| {
                 Box::pin(async move {
                     db_clone
-                        .set_safe_allowance(Some(tx), Balance::new(1_000_u64, BalanceType::HOPR))
+                        .set_safe_hopr_allowance(Some(tx), Balance::new(1_000_u64, BalanceType::HOPR))
                         .await?;
                     db_clone
-                        .set_safe_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR))
+                        .set_safe_hopr_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR))
                         .await?;
                     db_clone.set_network_registry_enabled(Some(tx), false).await?;
                     db_clone
