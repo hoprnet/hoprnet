@@ -5,7 +5,7 @@ import { HoprNodeSafeRegistry, HoprNodeSafeRegistryEvents } from "../../src/node
 import { PrecompileUtils } from "../utils/Precompiles.sol";
 import { ECDSA } from "openzeppelin-contracts/utils/cryptography/ECDSA.sol";
 import { Address } from "openzeppelin-contracts/utils/Address.sol";
-import { Test } from "forge-std/Test.sol";
+import { Test } from "forge-std-latest/Test.sol";
 
 import { Address } from "openzeppelin-contracts/utils/Address.sol";
 

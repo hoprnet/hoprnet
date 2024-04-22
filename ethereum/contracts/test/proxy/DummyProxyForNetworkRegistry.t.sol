@@ -2,7 +2,7 @@
 pragma solidity >=0.6.0 <0.9.0;
 
 import "../../src/proxy/DummyProxyForNetworkRegistry.sol";
-import "forge-std/Test.sol";
+import "forge-std-latest/Test.sol";
 
 contract HoprDummyProxyForNetworkRegistryTest is Test {
     HoprDummyProxyForNetworkRegistry public hoprDummyProxyForNetworkRegistry;

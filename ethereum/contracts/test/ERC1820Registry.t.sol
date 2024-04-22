@@ -2,7 +2,7 @@
 pragma solidity >=0.6.0 <0.9.0;
 
 import { ERC1820RegistryFixtureTest } from "./utils/ERC1820Registry.sol";
-import { Test } from "forge-std/Test.sol";
+import { Test } from "forge-std-latest/Test.sol";
 
 contract ERC1820RegistryTest is Test, ERC1820RegistryFixtureTest {
     function setUp() public virtual override {

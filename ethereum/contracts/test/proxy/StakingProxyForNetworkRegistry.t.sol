@@ -2,7 +2,7 @@
 pragma solidity >=0.6.0 <0.9.0;
 
 import { HoprStakingProxyForNetworkRegistry } from "../../src/proxy/StakingProxyForNetworkRegistry.sol";
-import "forge-std/Test.sol";
+import "forge-std-latest/Test.sol";
 
 contract HoprStakingProxyForNetworkRegistryTest is Test {
     HoprStakingProxyForNetworkRegistry public hoprStakingProxyForNetworkRegistry;

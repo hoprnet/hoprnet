@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity >=0.8.0 <0.9.0;
 
-import { Script } from "forge-std-latest/Script.sol";
-import { stdJson } from "forge-std-latest/StdJson.sol";
+import "forge-std-latest/Script.sol";
 
 /**
  * Get environment_type from the environment variable `FOUNDRY_PROFILE`
@@ -124,21 +123,21 @@ contract NetworkConfig is Script {
         string memory addresses = "";
         string memory obj = "";
 
-        vm.serializeString(addresses, "token", networkDetail.addresses.tokenContractAddress);
-        vm.serializeString(addresses, "channels", networkDetail.addresses.channelsContractAddress);
-        vm.serializeString(addresses, "node_stake_v2_factory", networkDetail.addresses.nodeStakeV2FactoryAddress);
-        vm.serializeString(addresses, "module_implementation", networkDetail.addresses.moduleImplementationAddress);
-        vm.serializeString(addresses, "node_safe_registry", networkDetail.addresses.nodeSafeRegistryAddress);
-        vm.serializeString(
-            addresses, "network_registry_proxy", networkDetail.addresses.networkRegistryProxyContractAddress
-        );
-        vm.serializeString(addresses, "ticket_price_oracle", networkDetail.addresses.ticketPriceOracleContractAddress);
-        vm.serializeString(addresses, "announcements", networkDetail.addresses.announcements);
-        vm.serializeString(addresses, "network_registry", networkDetail.addresses.networkRegistryContractAddress);
-        vm.serializeString(obj, "environment_type", parseEnvironmentTypeToString(networkDetail.environmentType));
-        vm.serializeString(obj, "indexer_start_block_number", networkDetail.indexerStartBlockNumber);
-        vm.serializeString(obj, "addresses", addresses);
-        vm.writeJson(obj, pathToDeploymentFile);
+        addresses.serialize("token", networkDetail.addresses.tokenContractAddress);
+        addresses.serialize("channels", networkDetail.addresses.channelsContractAddress);
+        addresses.serialize("node_stake_v2_factory", networkDetail.addresses.nodeStakeV2FactoryAddress);
+        addresses.serialize("module_implementation", networkDetail.addresses.moduleImplementationAddress);
+        addresses.serialize("node_safe_registry", networkDetail.addresses.nodeSafeRegistryAddress);
+        addresses.serialize("network_registry_proxy", networkDetail.addresses.networkRegistryProxyContractAddress);
+        addresses.serialize("ticket_price_oracle", networkDetail.addresses.ticketPriceOracleContractAddress);
+        addresses.serialize("announcements", networkDetail.addresses.announcements);
+        addresses = addresses.serialize("network_registry", networkDetail.addresses.networkRegistryContractAddress);
+
+        obj.serialize("environment_type", parseEnvironmentTypeToString(networkDetail.environmentType));
+        obj.serialize("indexer_start_block_number", networkDetail.indexerStartBlockNumber);
+        obj = obj.serialize("addresses", addresses);
+
+        vm.writeJson(obj, pathToDeploymentFile, configKey);
     }
 
     function writeCurrentNetwork() internal {
