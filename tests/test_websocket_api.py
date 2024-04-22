@@ -8,7 +8,7 @@ import pytest
 import websocket
 import websockets
 
-from .conftest import API_TOKEN, barebone_nodes_with_auth, random_distinct_pairs_from
+from .conftest import API_TOKEN, nodes_with_auth, random_distinct_pairs_from
 from .node import Node
 
 
@@ -19,7 +19,7 @@ def url(host, port):
 EXTRA_HEADERS = [("X-Auth-Token", API_TOKEN)]
 
 
-@pytest.mark.parametrize("peer", random.sample(barebone_nodes_with_auth(), 1))
+@pytest.mark.parametrize("peer", random.sample(nodes_with_auth(), 1))
 def test_hoprd_websocket_api_should_reject_a_connection_without_a_valid_token(peer: str, swarm7: dict[str, Node]):
     ws = websocket.WebSocket()
     try:
@@ -30,7 +30,7 @@ def test_hoprd_websocket_api_should_reject_a_connection_without_a_valid_token(pe
         assert False
 
 
-@pytest.mark.parametrize("peer", random.sample(barebone_nodes_with_auth(), 1))
+@pytest.mark.parametrize("peer", random.sample(nodes_with_auth(), 1))
 def test_hoprd_websocket_api_should_reject_a_connection_with_an_invalid_token(peer: str, swarm7: dict[str, Node]):
     ws = websocket.WebSocket()
     try:
@@ -44,7 +44,7 @@ def test_hoprd_websocket_api_should_reject_a_connection_with_an_invalid_token(pe
         assert False, "Failed to raise 401 on invalid token"
 
 
-@pytest.mark.parametrize("peer", random.sample(barebone_nodes_with_auth(), 1))
+@pytest.mark.parametrize("peer", random.sample(nodes_with_auth(), 1))
 def test_hoprd_websocket_api_should_accept_a_connection_with_an_invalid_token_passed_through_websocket_protocol(
     peer: str, swarm7: dict[str, Node]
 ):
@@ -60,7 +60,7 @@ def test_hoprd_websocket_api_should_accept_a_connection_with_an_invalid_token_pa
         assert False, "Failed to raise 401 on invalid token"
 
 
-@pytest.mark.parametrize("peer", random.sample(barebone_nodes_with_auth(), 1))
+@pytest.mark.parametrize("peer", random.sample(nodes_with_auth(), 1))
 def test_hoprd_websocket_api_should_reject_a_connection_with_an_invalid_bearer_token(
     peer: str, swarm7: dict[str, Node]
 ):
@@ -76,7 +76,7 @@ def test_hoprd_websocket_api_should_reject_a_connection_with_an_invalid_bearer_t
         assert False, "Failed to raise 401 on invalid token"
 
 
-@pytest.mark.parametrize("peer", random.sample(barebone_nodes_with_auth(), 1))
+@pytest.mark.parametrize("peer", random.sample(nodes_with_auth(), 1))
 def test_hoprd_websocket_api_should_accept_a_connection_with_a_valid_token(peer: str, swarm7: dict[str, Node]):
     ws = websocket.WebSocket()
     ws.connect(
@@ -87,7 +87,7 @@ def test_hoprd_websocket_api_should_accept_a_connection_with_a_valid_token(peer:
     time.sleep(0.5)
 
 
-@pytest.mark.parametrize("peer", random.sample(barebone_nodes_with_auth(), 1))
+@pytest.mark.parametrize("peer", random.sample(nodes_with_auth(), 1))
 def test_hoprd_websocket_api_should_accept_a_connection_with_a_valid_token_passed_through_websocket_protocol(
     peer: str, swarm7: dict[str, Node]
 ):
@@ -99,7 +99,7 @@ def test_hoprd_websocket_api_should_accept_a_connection_with_a_valid_token_passe
     time.sleep(0.5)
 
 
-@pytest.mark.parametrize("peer", random.sample(barebone_nodes_with_auth(), 1))
+@pytest.mark.parametrize("peer", random.sample(nodes_with_auth(), 1))
 def test_hoprd_websocket_api_should_accept_a_connection_with_a_valid_bearer_token(peer: str, swarm7: dict[str, Node]):
     ws = websocket.WebSocket()
     ws.connect(
@@ -110,7 +110,7 @@ def test_hoprd_websocket_api_should_accept_a_connection_with_a_valid_bearer_toke
     time.sleep(0.5)
 
 
-@pytest.mark.parametrize("peer", random.sample(barebone_nodes_with_auth(), 1))
+@pytest.mark.parametrize("peer", random.sample(nodes_with_auth(), 1))
 def test_hoprd_websocket_api_should_reject_connection_on_invalid_path(peer: str, swarm7: dict[str, Node]):
     ws = websocket.WebSocket()
     try:
@@ -137,7 +137,7 @@ async def ws_connections(swarm7: dict[str, Node]):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("src,dest", random_distinct_pairs_from(barebone_nodes_with_auth(), count=1))
+@pytest.mark.parametrize("src,dest", random_distinct_pairs_from(nodes_with_auth(), count=1))
 async def test_websocket_send_receive_messages(src: str, dest: str, swarm7: dict[str, Node], ws_connections):
     tag = random.randint(30000, 60000)
     message_target_count = 10

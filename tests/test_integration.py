@@ -12,9 +12,8 @@ from .conftest import (
     TICKET_AGGREGATION_THRESHOLD,
     TICKET_PRICE_PER_HOP,
     barebone_nodes,
-    barebone_nodes_with_auth,
+    nodes_with_auth,
     default_nodes,
-    passive_node,
     random_distinct_pairs_from,
 )
 from .hopr import HoprdAPI
@@ -220,7 +219,7 @@ async def test_hoprd_swarm_connectivity(swarm7: dict[str, Node]):
         print("Could not get ticket price from API, using default value")
 
 
-@pytest.mark.parametrize("peer", random.sample(barebone_nodes_with_auth(), 1))
+@pytest.mark.parametrize("peer", random.sample(nodes_with_auth(), 1))
 def test_hoprd_rest_api_should_reject_connection_without_any_auth(swarm7: dict[str, Node], peer: str):
     url = f"http://{swarm7[peer].host_addr}:{swarm7[peer].api_port}/api/v3/node/version"
 
@@ -229,7 +228,7 @@ def test_hoprd_rest_api_should_reject_connection_without_any_auth(swarm7: dict[s
     assert r.status_code == 401
 
 
-@pytest.mark.parametrize("peer", random.sample(barebone_nodes_with_auth(), 1))
+@pytest.mark.parametrize("peer", random.sample(nodes_with_auth(), 1))
 def test_hoprd_rest_api_should_reject_connection_with_invalid_token(peer: str, swarm7: dict[str, Node]):
     url = f"http://{swarm7[peer].host_addr}:{swarm7[peer].api_port}/api/v3/node/version"
     headers = {"X-Auth-Token": "DefiNItEly_A_baD_TokEn"}
@@ -239,7 +238,7 @@ def test_hoprd_rest_api_should_reject_connection_with_invalid_token(peer: str, s
     assert r.status_code == 401
 
 
-@pytest.mark.parametrize("peer", random.sample(barebone_nodes_with_auth(), 1))
+@pytest.mark.parametrize("peer", random.sample(nodes_with_auth(), 1))
 def test_hoprd_rest_api_should_accept_connection_with_valid_token(peer: str, swarm7: dict[str, Node]):
     url = f"http://{swarm7[peer].host_addr}:{swarm7[peer].api_port}/api/v3/node/version"
     headers = {"X-Auth-Token": f"{API_TOKEN}"}
@@ -343,9 +342,7 @@ async def test_hoprd_should_be_able_to_send_0_hop_messages_without_open_channels
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "src,dest", [(passive_node(), random.choice(barebone_nodes())) for _ in range(PARAMETERIZED_SAMPLE_SIZE)]
-)
+@pytest.mark.parametrize("src,dest", [tuple(shuffled(barebone_nodes())[:2]) for _ in range(PARAMETERIZED_SAMPLE_SIZE)])
 async def test_hoprd_api_channel_should_register_fund_increase_using_fund_endpoint(
     src: str, dest: str, swarm7: dict[str, Node]
 ):
@@ -382,9 +379,7 @@ async def test_hoprd_api_channel_should_register_fund_increase_using_fund_endpoi
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "src,dest", [(random.choice(barebone_nodes()), passive_node()) for _ in range(PARAMETERIZED_SAMPLE_SIZE)]
-)
+@pytest.mark.parametrize("src,dest", [tuple(shuffled(barebone_nodes())[:2]) for _ in range(PARAMETERIZED_SAMPLE_SIZE)])
 async def test_hoprd_api_should_redeem_tickets_in_channel_using_redeem_endpoint(
     src: Node, dest: Node, swarm7: dict[str, Node]
 ):
@@ -414,9 +409,7 @@ async def test_hoprd_api_should_redeem_tickets_in_channel_using_redeem_endpoint(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "src,dest", [(passive_node(), random.choice(barebone_nodes())) for _ in range(PARAMETERIZED_SAMPLE_SIZE)]
-)
+@pytest.mark.parametrize("src,dest", [tuple(shuffled(barebone_nodes())[:2]) for _ in range(PARAMETERIZED_SAMPLE_SIZE)])
 async def test_hoprd_should_fail_sending_a_message_when_the_channel_is_out_of_funding(
     src: str, dest: Node, swarm7: dict[str, Node]
 ):
@@ -489,9 +482,7 @@ async def test_hoprd_should_fail_sending_a_message_when_the_channel_is_out_of_fu
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "src,dest", [(random.choice(barebone_nodes()), passive_node()) for _ in range(PARAMETERIZED_SAMPLE_SIZE)]
-)
+@pytest.mark.parametrize("src,dest", [tuple(shuffled(barebone_nodes())[:2]) for _ in range(PARAMETERIZED_SAMPLE_SIZE)])
 async def test_hoprd_should_create_redeemable_tickets_on_routing_in_1_hop_to_self_scenario(
     src: str, dest: str, swarm7: dict[str, Node]
 ):
@@ -539,9 +530,7 @@ async def test_hoprd_should_create_redeemable_tickets_on_routing_in_1_hop_to_sel
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "src,dest", [(random.choice(barebone_nodes()), passive_node()) for _ in range(PARAMETERIZED_SAMPLE_SIZE)]
-)
+@pytest.mark.parametrize("src,dest", [tuple(shuffled(barebone_nodes())[:2]) for _ in range(PARAMETERIZED_SAMPLE_SIZE)])
 async def test_hoprd_should_aggregate_and_redeem_tickets_in_channel_on_api_request(
     src: str, dest: str, swarm7: dict[str, Node]
 ):

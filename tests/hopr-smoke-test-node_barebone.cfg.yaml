@@ -3,7 +3,4 @@ hopr:
   strategy:
     on_fail_continue: true
     allow_recursive: false
-    strategies:
-      - !AutoFunding
-        funding_amount: "10000000000000000000 HOPR"
-        min_stake_threshold: "1000000000000000000 HOPR"
+    strategies: []

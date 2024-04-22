@@ -592,7 +592,7 @@ pub async fn p2p_loop<T>(
                     local_addr,
                     send_back_addr,
                 } => {
-                    trace!("transport - p2p - incoming connection at {local_addr} from {send_back_addr} ({connection_id:?})");
+                    debug!("transport - p2p - incoming connection at {local_addr} from {send_back_addr} ({connection_id:?})");
                 },
                 SwarmEvent::IncomingConnectionError {
                     local_addr,
