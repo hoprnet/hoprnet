@@ -1,7 +1,7 @@
 pragma solidity ^0.8.0;
 
 import "../../src/static/stake/mocks/ERC677Mock.sol";
-import "forge-std/Test.sol";
+import { Test, stdStorage, StdStorage } from "forge-std-latest/Test.sol";
 
 /**
  * @title Simplified tests for ERC677 mock

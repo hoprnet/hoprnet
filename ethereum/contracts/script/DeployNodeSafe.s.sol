@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity >=0.8.0 <0.9.0;
 
-import "forge-std/Script.sol";
+import { Script } from "forge-std-latest/Script.sol";
+import { Test } from "forge-std-latest/Test.sol";
+
 import "./utils/NetworkConfig.s.sol";
 import "./DeployAll.s.sol";
 import "../src/utils/TargetUtils.sol";
-import "forge-std/Test.sol";
 
 contract DeployNodeSafeScript is Script, Test, NetworkConfig {
     using TargetUtils for address;

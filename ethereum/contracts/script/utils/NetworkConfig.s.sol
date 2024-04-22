@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity >=0.8.0 <0.9.0;
 
-import "forge-std/Script.sol";
-import "forge-std/StdJson.sol";
+import { Script } from "forge-std-latest/Script.sol";
+import { stdJson } from "forge-std-latest/StdJson.sol";
 
 /**
  * Get environment_type from the environment variable `FOUNDRY_PROFILE`
@@ -121,66 +121,27 @@ contract NetworkConfig is Script {
         // write parsedNewEnvDetail to corresponding key
         string memory configKey = string(abi.encodePacked(".networks.", _networkName));
 
-        // use vm.writeJson to preserve order of JSON properties
-        vm.writeJson(
-            vm.toString(networkDetail.addresses.tokenContractAddress),
-            pathToDeploymentFile,
-            string(abi.encodePacked(configKey, ".addresses.token"))
-        );
-        vm.writeJson(
-            vm.toString(networkDetail.addresses.channelsContractAddress),
-            pathToDeploymentFile,
-            string(abi.encodePacked(configKey, ".addresses.channels"))
-        );
-        vm.writeJson(
-            vm.toString(networkDetail.addresses.nodeStakeV2FactoryAddress),
-            pathToDeploymentFile,
-            string(abi.encodePacked(configKey, ".addresses.node_stake_v2_factory"))
-        );
-        vm.writeJson(
-            vm.toString(networkDetail.addresses.moduleImplementationAddress),
-            pathToDeploymentFile,
-            string(abi.encodePacked(configKey, ".addresses.module_implementation"))
-        );
-        vm.writeJson(
-            vm.toString(networkDetail.addresses.nodeSafeRegistryAddress),
-            pathToDeploymentFile,
-            string(abi.encodePacked(configKey, ".addresses.node_safe_registry"))
-        );
-        vm.writeJson(
-            vm.toString(networkDetail.addresses.networkRegistryProxyContractAddress),
-            pathToDeploymentFile,
-            string(abi.encodePacked(configKey, ".addresses.network_registry_proxy"))
-        );
-        vm.writeJson(
-            vm.toString(networkDetail.addresses.ticketPriceOracleContractAddress),
-            pathToDeploymentFile,
-            string(abi.encodePacked(configKey, ".addresses.ticket_price_oracle"))
-        );
-        vm.writeJson(
-            vm.toString(networkDetail.addresses.announcements),
-            pathToDeploymentFile,
-            string(abi.encodePacked(configKey, ".addresses.announcements"))
-        );
-        vm.writeJson(
-            vm.toString(networkDetail.addresses.networkRegistryContractAddress),
-            pathToDeploymentFile,
-            string(abi.encodePacked(configKey, ".addresses.network_registry"))
-        );
+        string memory addresses = "";
+        string memory obj = "";
 
-        vm.writeJson(
-            parseEnvironmentTypeToString(networkDetail.environmentType),
-            pathToDeploymentFile,
-            string(abi.encodePacked(configKey, ".environment_type"))
+        vm.serializeString(addresses, "token", networkDetail.addresses.tokenContractAddress);
+        vm.serializeString(addresses, "channels", networkDetail.addresses.channelsContractAddress);
+        vm.serializeString(addresses, "node_stake_v2_factory", networkDetail.addresses.nodeStakeV2FactoryAddress);
+        vm.serializeString(addresses, "module_implementation", networkDetail.addresses.moduleImplementationAddress);
+        vm.serializeString(addresses, "node_safe_registry", networkDetail.addresses.nodeSafeRegistryAddress);
+        vm.serializeString(
+            addresses, "network_registry_proxy", networkDetail.addresses.networkRegistryProxyContractAddress
         );
-        vm.writeJson(
-            vm.toString(networkDetail.indexerStartBlockNumber),
-            pathToDeploymentFile,
-            string(abi.encodePacked(configKey, ".indexer_start_block_number"))
-        );
+        vm.serializeString(addresses, "ticket_price_oracle", networkDetail.addresses.ticketPriceOracleContractAddress);
+        vm.serializeString(addresses, "announcements", networkDetail.addresses.announcements);
+        vm.serializeString(addresses, "network_registry", networkDetail.addresses.networkRegistryContractAddress);
+        vm.serializeString(obj, "environment_type", parseEnvironmentTypeToString(networkDetail.environmentType));
+        vm.serializeString(obj, "indexer_start_block_number", networkDetail.indexerStartBlockNumber);
+        vm.serializeString(obj, "addresses", addresses);
+        vm.writeJson(obj, pathToDeploymentFile);
     }
 
-    function writeCurrentNetworkDirect() external {
+    function writeCurrentNetwork() internal {
         // if currentNetworkId is anvil-localhost, update both `anvil-localhost` and `anvil-localhost2`
 
         if (keccak256(bytes(currentNetworkId)) == keccak256(bytes("anvil-localhost"))) {

@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity >=0.6.0 <0.9.0;
 
+import { Test } from "forge-std-latest/Test.sol";
+
 import "../../../src/static/stake/HoprStakeSeason8.sol";
 import "../../utils/ERC1820Registry.sol";
 import "../../utils/PermittableToken.sol";
-import "forge-std/Test.sol";
 
 contract HoprStakeSeason8Test is Test, ERC1820RegistryFixtureTest, PermittableTokenFixtureTest {
     // to alter the storage

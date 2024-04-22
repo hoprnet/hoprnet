@@ -2,7 +2,8 @@
 pragma solidity >=0.8.0 <0.9.0;
 pragma abicoder v2;
 
-import "forge-std/Script.sol";
+import { Script } from "forge-std-latest/Script.sol";
+
 import "../test/utils/ERC1820Registry.sol";
 import "../test/utils/PermittableToken.sol";
 import "./utils/NetworkConfig.s.sol";
@@ -100,21 +101,6 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
 
         // write to file
         writeCurrentNetwork();
-    }
-
-    function writeCurrentNetwork() external {
-        // this IO might fail in CI, so we retry up to 5 times
-        for (uint256 i = 0; i < 5; i++) {
-            if (i == 4) {
-                writeCurrentNetworkDirect();
-            } else {
-                try writeCurrentNetworkDirect() {
-                    break;
-                } catch Error(string memory _reason) {
-                    continue;
-                }
-            }
-        }
     }
 
     /**

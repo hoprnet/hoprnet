@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity >=0.6.0 <0.9.0;
 
+import { Test } from "forge-std-latest/Test.sol";
+
 import "../../src/static/HoprToken.sol";
 import "./ERC1820Registry.sol";
 import "./Accounts.sol";
-import "forge-std/Test.sol";
 
 contract HoprTokenFixtureTest is Test, ERC1820RegistryFixtureTest, AccountsFixtureTest {
     HoprToken public hoprToken;

@@ -1,5 +1,6 @@
 ds-test/=../../vendor/solidity/forge-std-1.6.0/lib/ds-test/src/
 forge-std/=../../vendor/solidity/forge-std-1.6.0/src/
+forge-std-latest/=../../vendor/solidity/forge-std-1.8.1/src/
 openzeppelin-contracts-4.4.2/=../../vendor/solidity/openzeppelin-contracts-4.4.2/contracts/
 openzeppelin-contracts/=../../vendor/solidity/openzeppelin-contracts-4.9.2/contracts/
 safe-contracts/=../../vendor/solidity/safe-contracts-1.4.1/contracts/
