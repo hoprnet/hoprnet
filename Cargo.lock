@@ -3249,19 +3249,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4271d37baee1b8c7e4b708028c57d816cf9d2434acb33a549475f78c181f6253"
 
 [[package]]
-name = "git2"
-version = "0.18.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "232e6a7bfe35766bf715e55a88b39a700596c0ccfd88cd3680b4cdb40d66ef70"
-dependencies = [
- "bitflags 2.4.2",
- "libc",
- "libgit2-sys",
- "log",
- "url",
-]
-
-[[package]]
 name = "glob"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3790,7 +3777,7 @@ dependencies = [
  "tracing-opentelemetry",
  "tracing-subscriber",
  "validator",
- "vergen-git2",
+ "vergen-gitcl",
 ]
 
 [[package]]
@@ -4360,18 +4347,6 @@ name = "libc"
 version = "0.2.152"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "13e3bf6590cbc649f4d1a3eefc9d5d6eb746f5200ffb04e5e142700b8faa56e7"
-
-[[package]]
-name = "libgit2-sys"
-version = "0.16.2+1.7.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ee4126d8b4ee5c9d9ea891dd875cfdc1e9d0950437179104b183d7d8a74d24e8"
-dependencies = [
- "cc",
- "libc",
- "libz-sys",
- "pkg-config",
-]
 
 [[package]]
 name = "libm"
@@ -9030,14 +9005,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "vergen-git2"
+name = "vergen-gitcl"
 version = "1.0.0-beta.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8875c5d71074bb67118774e3d795ab6fe77c3ae3161cb54e19104cabc49487f1"
+checksum = "237ec19e307c303b26fdd234aa89bdf629dd7d91189dddff8591e531b05901bb"
 dependencies = [
  "anyhow",
  "derive_builder",
- "git2",
  "rustversion",
  "time 0.3.31",
  "vergen",

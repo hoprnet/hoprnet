@@ -49,7 +49,7 @@ hopr-metrics = { workspace = true, optional = true }
 tempfile = { workspace = true }
 
 [build-dependencies]
-vergen-git2 = { version = "1.0.0-beta.0", features = ["build"] }
+vergen-gitcl = { version = "1.0.0-beta.2", features = ["build"] }
 anyhow = "1"
 
 [features]
