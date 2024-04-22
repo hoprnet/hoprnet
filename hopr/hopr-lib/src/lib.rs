@@ -93,6 +93,7 @@ use hopr_db_api::{
 use hopr_db_api::{channels::HoprDbChannelOperations, HoprDbAllOperations};
 
 use hopr_crypto_types::prelude::OffchainPublicKey;
+use hopr_db_api::prelude::DbError;
 #[cfg(all(feature = "prometheus", not(test)))]
 use {
     hopr_metrics::metrics::{MultiGauge, SimpleCounter, SimpleGauge},
@@ -756,7 +757,7 @@ impl Hopr {
                             );
                             my_db.set_safe_hopr_balance(Some(tx), safe_balance).await?;
                         }
-                        Ok(())
+                        Ok::<_, DbError>(())
                     })
                 })
                 .await?;
