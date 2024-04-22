@@ -560,16 +560,18 @@ pub async fn p2p_loop<T>(
                         METRIC_TRANSPORT_P2P_OPEN_CONNECTION_COUNT.increment(1.0);
                     }
 
-                    if allowed_peers.contains(&peer_id) {
-                        let network = network.clone();
-                        async_std::task::spawn(async move {
-                            if let Err(e) = network.add(&peer_id, PeerOrigin::IncomingConnection, vec![]).await {
-                                error!("transport - p2p - failed to update the record for '{peer_id}': {e}")
-                            }
-                        });
-                    } else {
+                    if !allowed_peers.contains(&peer_id) {
                         info!("transport - p2p - DISCONNECTING '{peer_id}': not allowed in the network registry)");
                         let _ = swarm.disconnect_peer_id(peer_id);
+                    } else {
+                        let network = network.clone();
+                        async_std::task::block_on(async move {
+                            if !network.has(&peer_id).await {
+                                if let Err(e) = network.add(&peer_id, PeerOrigin::IncomingConnection, vec![]).await {
+                                    error!("transport - p2p - failed to update the record for '{peer_id}': {e}")
+                                }
+                            }
+                        });
                     }
                 },
                 SwarmEvent::ConnectionClosed {
@@ -642,7 +644,14 @@ pub async fn p2p_loop<T>(
                     peer_id,
                     connection_id,
                 } => {
-                    debug!("transport - p2p - dialing peer {peer_id:?} ({connection_id:?}")
+                    if let Some(peer_id) = peer_id {
+                        if !allowed_peers.contains(&peer_id) {
+                            info!("transport - p2p - dialing '{peer_id}': not allowed in the network registry)");
+                            let _ = swarm.disconnect_peer_id(peer_id);
+                        } else {
+                            debug!("transport - p2p - dialing peer {peer_id:?} ({connection_id:?}")
+                        }
+                    }
                 },
                 _ => error!("transport - p2p - unimplemented message type in p2p processing chain encountered")
             }
