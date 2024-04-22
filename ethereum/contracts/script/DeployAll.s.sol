@@ -102,6 +102,21 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
         writeCurrentNetwork();
     }
 
+    function writeCurrentNetwork() external {
+        // this IO might fail in CI, so we retry up to 5 times
+        for (uint256 i = 0; i < 5; i++) {
+            if (i == 4) {
+                writeCurrentNetworkDirect();
+            } else {
+                try writeCurrentNetworkDirect() {
+                    break;
+                } catch Error(string memory _reason) {
+                    continue;
+                }
+            }
+        }
+    }
+
     /**
      * @dev deploy node safe factory
      */

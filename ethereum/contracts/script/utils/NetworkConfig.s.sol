@@ -180,8 +180,9 @@ contract NetworkConfig is Script {
         );
     }
 
-    function writeCurrentNetwork() internal {
+    function writeCurrentNetworkDirect() external {
         // if currentNetworkId is anvil-localhost, update both `anvil-localhost` and `anvil-localhost2`
+
         if (keccak256(bytes(currentNetworkId)) == keccak256(bytes("anvil-localhost"))) {
             writeNetwork("anvil-localhost2", currentNetworkDetail);
         }
