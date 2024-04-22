@@ -353,7 +353,7 @@ where
             new_channel_candidates.truncate(max_auto_channels - occupied);
             debug!("got {} new channel candidates", new_channel_candidates.len());
 
-            let mut remaining_balance = self.db.get_safe_balance(None).await?;
+            let mut remaining_balance = self.db.get_safe_hopr_balance(None).await?;
 
             // Go through the new candidates for opening channels allow them to open based on our available node balance
             for (address, _) in new_channel_candidates {
@@ -585,8 +585,8 @@ mod tests {
             .unwrap()
             .perform(|tx| {
                 Box::pin(async move {
-                    db.set_safe_balance(Some(tx), node_balance).await?;
-                    db.set_safe_allowance(Some(tx), node_balance).await?;
+                    db.set_safe_hopr_balance(Some(tx), node_balance).await?;
+                    db.set_safe_hopr_allowance(Some(tx), node_balance).await?;
                     for (chain_key, peer_id) in PEERS.iter() {
                         db.insert_account(
                             Some(tx),
