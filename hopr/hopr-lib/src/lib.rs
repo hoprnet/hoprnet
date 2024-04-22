@@ -964,6 +964,7 @@ impl Hopr {
             );
         });
 
+        // TODO: return JoinHandles here
         Ok(futures::future::pending())
     }
 
