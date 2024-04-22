@@ -93,6 +93,7 @@ use hopr_db_api::{
 use hopr_db_api::{channels::HoprDbChannelOperations, HoprDbAllOperations};
 
 use hopr_crypto_types::prelude::OffchainPublicKey;
+use hopr_db_api::prelude::DbError;
 #[cfg(all(feature = "prometheus", not(test)))]
 use {
     hopr_metrics::metrics::{MultiGauge, SimpleCounter, SimpleGauge},
@@ -742,21 +743,26 @@ impl Hopr {
             .get_safe_balance(self.safe_module_cfg.safe_address, balance_type)
             .await?;
 
-        let my_db = self.db.clone();
-        self.db
-            .begin_transaction()
-            .await?
-            .perform(|tx| {
-                Box::pin(async move {
-                    let db_safe_balance = my_db.get_safe_balance(Some(tx)).await?;
-                    if safe_balance != db_safe_balance {
-                        warn!("Safe balance in the DB {db_safe_balance} mismatches on chain balance: {safe_balance}");
-                        my_db.set_safe_balance(Some(tx), safe_balance).await?;
-                    }
-                    Ok(safe_balance)
+        if balance_type == BalanceType::HOPR {
+            let my_db = self.db.clone();
+            self.db
+                .begin_transaction()
+                .await?
+                .perform(|tx| {
+                    Box::pin(async move {
+                        let db_safe_balance = my_db.get_safe_hopr_balance(Some(tx)).await?;
+                        if safe_balance != db_safe_balance {
+                            warn!(
+                                "Safe balance in the DB {db_safe_balance} mismatches on chain balance: {safe_balance}"
+                            );
+                            my_db.set_safe_hopr_balance(Some(tx), safe_balance).await?;
+                        }
+                        Ok::<_, DbError>(())
+                    })
                 })
-            })
-            .await
+                .await?;
+        }
+        Ok(safe_balance)
     }
 
     pub fn get_safe_config(&self) -> SafeModule {

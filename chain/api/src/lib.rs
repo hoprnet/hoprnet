@@ -204,7 +204,7 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
     }
 
     pub async fn safe_allowance(&self) -> errors::Result<Balance> {
-        Ok(self.db.get_safe_allowance(None).await?)
+        Ok(self.db.get_safe_hopr_allowance(None).await?)
     }
 
     pub fn actions_ref(&self) -> &ChainActions<T> {
