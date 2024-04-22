@@ -162,7 +162,7 @@ def barebone_nodes():
 
 def nodes_with_auth():
     """All nodes within the same network as specified in the swarm7 fixture"""
-    return ["1", "3", "4", "5"]
+    return ["1", "3", "4"]
 
 
 def default_nodes():
