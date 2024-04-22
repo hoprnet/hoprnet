@@ -546,14 +546,14 @@ pub async fn p2p_loop<T>(
                 SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::KeepAlive(_)) => {}
                 SwarmEvent::ConnectionEstablished {
                     peer_id,
+                    connection_id,
                     ..
-                    // connection_id,
                     // endpoint,
                     // num_established,
                     // concurrent_dial_errors,
                     // established_in,
                 } => {
-                    debug!("transport - p2p - connection established with {peer_id}");
+                    debug!("transport - p2p - connection ({connection_id}) established with {peer_id}");
 
                     #[cfg(all(feature = "prometheus", not(test)))]
                     {
