@@ -91,7 +91,6 @@ class Node:
             "hoprd",
             "--announce",
             "--api",
-            "--disableTicketAutoRedeem",
             "--init",
             "--testAnnounceLocalAddresses",
             "--testPreferLocalAddresses",

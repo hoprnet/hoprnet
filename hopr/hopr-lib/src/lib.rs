@@ -980,6 +980,7 @@ impl Hopr {
     /// @param hops optional number of required intermediate nodes
     /// @param applicationTag optional tag identifying the sending application
     /// @returns ack challenge
+    #[tracing::instrument(level = "debug", skip(self, msg))]
     pub async fn send_message(
         &self,
         msg: Box<[u8]>,
