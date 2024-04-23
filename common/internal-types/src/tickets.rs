@@ -95,14 +95,21 @@ impl TicketBuilder {
     }
 
     /// Sets channel id based on the `source` and `destination`.
-    /// This or [TicketBuilder::channel_id] must be set.
+    /// This, [TicketBuilder::channel_id] or [TicketBuilder::addresses] must be set.
     pub fn direction(mut self, source: &Address, destination: &Address) -> Self {
         self.channel_id = Some(generate_channel_id(source, destination));
         self
     }
 
+    /// Sets channel id based on the `source` and `destination`.
+    /// This, [TicketBuilder::channel_id] or [TicketBuilder::direction] must be set.
+    pub fn addresses<T: Into<Address>>(mut self, source: T, destination: T) -> Self {
+        self.channel_id = Some(generate_channel_id(&source.into(), &destination.into()));
+        self
+    }
+
     /// Sets the channel id.
-    /// This or [TicketBuilder::direction] must be set.
+    /// This, [TicketBuilder::addresses] or [TicketBuilder::direction] must be set.
     pub fn channel_id(mut self, channel_id: Hash) -> Self {
         self.channel_id = Some(channel_id);
         self
@@ -127,24 +134,24 @@ impl TicketBuilder {
     /// Sets the ticket index.
     /// Must be less or equal to 2^48.
     /// Defaults to 0.
-    pub fn index(mut self, index: u64) -> Self {
-        self.index = index;
+    pub fn index<T: Into<u64>>(mut self, index: T) -> Self {
+        self.index = index.into();
         self
     }
 
     /// Sets the index offset.
     /// Must be greater or equal 1.
     /// Defaults to 1.
-    pub fn index_offset(mut self, index_offset: u32) -> Self {
-        self.index_offset = index_offset;
+    pub fn index_offset<T: Into<u32>>(mut self, index_offset: T) -> Self {
+        self.index_offset = index_offset.into();
         self
     }
 
     /// Sets the channel epoch.
     /// Must be less or equal to 2^24.
     /// Defaults to 1.
-    pub fn channel_epoch(mut self, channel_epoch: u32) -> Self {
-        self.channel_epoch = channel_epoch;
+    pub fn channel_epoch<T: Into<u32>>(mut self, channel_epoch: T) -> Self {
+        self.channel_epoch = channel_epoch.into();
         self
     }
 

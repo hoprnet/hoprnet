@@ -2600,27 +2600,27 @@ mod tests {
 
         let (db, channel, tickets) = create_alice_db_with_tickets_from_bob(COUNT_TICKETS).await?;
 
-        let aggregated_ticket = hopr_internal_types::channels::Ticket::new(
-            &ALICE.public().to_address(),
-            &tickets
-                .iter()
-                .fold(Balance::zero(BalanceType::HOPR), |acc, v| acc + v.ticket.amount),
-            tickets.first().expect("should contain tickets").ticket.index.into(),
-            (tickets.last().expect("should contain tickets").ticket.index
-                - tickets.first().expect("should contain tickets").ticket.index
-                + 1)
-            .into(),
-            1.0, // 100% winning probability
-            (tickets.first().expect("should contain tickets").ticket.channel_epoch).into(),
-            tickets
-                .first()
-                .expect("should contain tickets")
-                .ticket
-                .challenge
-                .clone(),
-            &BOB,
-            &Hash::default(),
-        )?;
+        let aggregated_ticket = TicketBuilder::default()
+            .addresses(&*ALICE, &*BOB)
+            .amount(&tickets.iter().fold(Balance::zero(BalanceType::HOPR), |acc, v| {
+                acc + v.verified_ticket().amount
+            }))
+            .index(tickets.first().expect("should contain tickets").verified_ticket().index)
+            .index_offset(
+                tickets.last().expect("should contain tickets").verified_ticket().index
+                    - tickets.first().expect("should contain tickets").verified_ticket().index
+                    + 1,
+            )
+            .win_prob(1.0)
+            .channel_epoch(
+                tickets
+                    .first()
+                    .expect("should contain tickets")
+                    .verified_ticket()
+                    .channel_epoch,
+            )
+            .build_signed(&*BOB, Default::default())
+            .unwrap();
 
         assert_eq!(tickets.len(), COUNT_TICKETS);
 

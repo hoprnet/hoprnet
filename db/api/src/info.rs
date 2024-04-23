@@ -635,7 +635,7 @@ mod tests {
         let (next_block_num, next_checksum) = db.get_last_indexed_block(None).await.unwrap();
         assert_eq!(expexted_block_num, next_block_num);
 
-        let expected_next_checksum = Hash::create(&[last_checksum.as_slice(), checksum.as_slice()]);
+        let expected_next_checksum = Hash::create(&[last_checksum.as_ref(), checksum.as_ref()]);
         assert_eq!(expected_next_checksum, next_checksum);
     }
 
