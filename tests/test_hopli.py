@@ -18,7 +18,7 @@ from .conftest import (
     ANVIL_ENDPOINT,
     DEPLOYMENTS_SUMMARY_FILE,
     PWD,
-    default_nodes,
+    barebone_nodes,
 )
 from .test_integration import (
     balance_str_to_int,
@@ -298,7 +298,7 @@ def migrate_safe_module(private_key: str, manager_private_key: str, safe: str, m
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("peer", random.sample(default_nodes(), 1))
+@pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
 @pytest.mark.xfail(reason="race-conditions lead to incorrect balances on nodes")
 async def test_hopli_should_be_able_to_fund_nodes(peer: str, swarm7: dict[str, Node]):
     # READ AUTO_GENERATED PRIVATE-KEY FROM ANVIL CONFIGURATION
@@ -330,7 +330,7 @@ async def test_hopli_should_be_able_to_fund_nodes(peer: str, swarm7: dict[str, N
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("peer", random.sample(default_nodes(), 1))
+@pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
 async def test_hopli_should_be_able_to_deregister_nodes_and_register_it(peer: str, swarm7: dict[str, Node]):
     # READ AUTO_GENERATED PRIVATE-KEY FROM ANVIL CONFIGURATION
     with open(ANVIL_CFG_FILE, "r") as file:
@@ -383,7 +383,7 @@ async def test_hopli_should_be_able_to_deregister_nodes_and_register_it(peer: st
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("peer", random.sample(default_nodes(), 1))
+@pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
 async def test_hopli_should_be_able_to_sync_eligibility_for_all_nodes(peer: str, swarm7: dict[str, Node]):
     # READ AUTO_GENERATED PRIVATE-KEY FROM ANVIL CONFIGURATION
     with open(ANVIL_CFG_FILE, "r") as file:

@@ -8,6 +8,7 @@ use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, Query
 use crate::db::HoprDb;
 
 use crate::cache::{CachedValue, CachedValueDiscriminants};
+use crate::errors::DbError::MissingFixedTableEntry;
 use crate::errors::{DbError, Result};
 use crate::{HoprDbGeneralModelOperations, OptTx, SINGULAR_TABLE_FIXED_ID};
 
@@ -60,19 +61,34 @@ pub enum DomainSeparator {
 }
 
 /// Defines DB access API for various node information.
+///
+/// # Checksum computation
+///
+/// $H$ denotes Keccak256 hash function and $||$  byte string concatenation.
+///
+/// For a block $b_1$ containing logs $L_1, L_2, \ldots L_n$ corresponding to tx hashes $Tx_1, Tx_2, \ldots Tx_n$, a block hash is computed as:
+///```math
+/// H_{b_1} = H(Tx_1 || Tx_2 || \ldots || Tx_n)
+///```
+/// Given $C_0 = H(0x00...0)$ , the checksum $C_{k+1}$ after processing block $b_{k+1}$ is given as follows:
+///
+/// ```math
+/// C_{k+1} = H(C_k || H_{b_{k+1}})
+/// ```
+///
 #[async_trait]
 pub trait HoprDbInfoOperations {
-    /// Gets node's Safe balance.
-    async fn get_safe_balance<'a>(&'a self, tx: OptTx<'a>) -> Result<Balance>;
+    /// Gets node's Safe balance of HOPR tokens.
+    async fn get_safe_hopr_balance<'a>(&'a self, tx: OptTx<'a>) -> Result<Balance>;
 
-    /// Sets node's Safe balance.
-    async fn set_safe_balance<'a>(&'a self, tx: OptTx<'a>, new_balance: Balance) -> Result<()>;
+    /// Sets node's Safe balance of HOPR tokens.
+    async fn set_safe_hopr_balance<'a>(&'a self, tx: OptTx<'a>, new_balance: Balance) -> Result<()>;
 
-    /// Gets node's Safe allowance.
-    async fn get_safe_allowance<'a>(&'a self, tx: OptTx<'a>) -> Result<Balance>;
+    /// Gets node's Safe allowance of HOPR tokens.
+    async fn get_safe_hopr_allowance<'a>(&'a self, tx: OptTx<'a>) -> Result<Balance>;
 
-    /// Sets node's Safe allowance.
-    async fn set_safe_allowance<'a>(&'a self, tx: OptTx<'a>, new_allowance: Balance) -> Result<()>;
+    /// Sets node's Safe allowance of HOPR tokens.
+    async fn set_safe_hopr_allowance<'a>(&'a self, tx: OptTx<'a>, new_allowance: Balance) -> Result<()>;
 
     /// Gets node's Safe addresses info.
     async fn get_safe_info<'a>(&'a self, tx: OptTx<'a>) -> Result<Option<SafeInfo>>;
@@ -98,10 +114,12 @@ pub trait HoprDbInfoOperations {
     async fn update_ticket_price<'a>(&'a self, tx: OptTx<'a>, price: Balance) -> Result<()>;
 
     /// Retrieves the last indexed block number.
-    async fn get_last_indexed_block<'a>(&'a self, tx: OptTx<'a>) -> Result<u32>;
+    async fn get_last_indexed_block<'a>(&'a self, tx: OptTx<'a>) -> Result<(u32, Hash)>;
 
-    /// Updates the last indexed block number.
-    async fn set_last_indexed_block<'a>(&'a self, tx: OptTx<'a>, block_num: u32) -> Result<()>;
+    /// Updates the last indexed block number together with the checksum of log TXs processed
+    /// in that block.
+    async fn set_last_indexed_block<'a>(&'a self, tx: OptTx<'a>, block_num: u32, block_log_tx_hash: Hash)
+        -> Result<()>;
 
     /// Updates the network registry state.
     /// To retrieve stored network registry state, use [`HoprDbInfoOperations::get_indexer_data`],
@@ -121,7 +139,7 @@ pub trait HoprDbInfoOperations {
 
 #[async_trait]
 impl HoprDbInfoOperations for HoprDb {
-    async fn get_safe_balance<'a>(&'a self, tx: OptTx<'a>) -> Result<Balance> {
+    async fn get_safe_hopr_balance<'a>(&'a self, tx: OptTx<'a>) -> Result<Balance> {
         self.nest_transaction(tx)
             .await?
             .perform(|tx| {
@@ -136,7 +154,7 @@ impl HoprDbInfoOperations for HoprDb {
             .await
     }
 
-    async fn set_safe_balance<'a>(&'a self, tx: OptTx<'a>, new_balance: Balance) -> Result<()> {
+    async fn set_safe_hopr_balance<'a>(&'a self, tx: OptTx<'a>, new_balance: Balance) -> Result<()> {
         self.nest_transaction(tx)
             .await?
             .perform(|tx| {
@@ -147,7 +165,7 @@ impl HoprDbInfoOperations for HoprDb {
                             safe_balance: Set(new_balance.amount().to_be_bytes().into()),
                             ..Default::default()
                         }
-                        .update(tx.as_ref())
+                        .update(tx.as_ref()) // DB is primed in the migration, so only update is needed
                         .await?,
                     )
                 })
@@ -157,7 +175,7 @@ impl HoprDbInfoOperations for HoprDb {
         Ok(())
     }
 
-    async fn get_safe_allowance<'a>(&'a self, tx: OptTx<'a>) -> Result<Balance> {
+    async fn get_safe_hopr_allowance<'a>(&'a self, tx: OptTx<'a>) -> Result<Balance> {
         self.nest_transaction(tx)
             .await?
             .perform(|tx| {
@@ -172,7 +190,7 @@ impl HoprDbInfoOperations for HoprDb {
             .await
     }
 
-    async fn set_safe_allowance<'a>(&'a self, tx: OptTx<'a>, new_allowance: Balance) -> Result<()> {
+    async fn set_safe_hopr_allowance<'a>(&'a self, tx: OptTx<'a>, new_allowance: Balance) -> Result<()> {
         self.nest_transaction(tx)
             .await?
             .perform(|tx| {
@@ -182,7 +200,7 @@ impl HoprDbInfoOperations for HoprDb {
                         safe_allowance: Set(new_allowance.amount().to_be_bytes().to_vec()),
                         ..Default::default()
                     }
-                    .save(tx.as_ref())
+                    .update(tx.as_ref()) // DB is primed in the migration, so only update is needed
                     .await?;
 
                     Ok::<_, DbError>(())
@@ -238,7 +256,7 @@ impl HoprDbInfoOperations for HoprDb {
                         module_address: Set(Some(safe_info.module_address.to_hex())),
                         ..Default::default()
                     }
-                    .save(tx.as_ref())
+                    .update(tx.as_ref()) // DB is primed in the migration, so only update is needed
                     .await?;
                     Ok::<_, DbError>(())
                 })
@@ -326,6 +344,7 @@ impl HoprDbInfoOperations for HoprDb {
                         }
                     }
 
+                    // DB is primed in the migration, so only update is needed
                     active_model.update(tx.as_ref()).await?;
 
                     Ok::<(), DbError>(())
@@ -365,7 +384,7 @@ impl HoprDbInfoOperations for HoprDb {
         Ok(())
     }
 
-    async fn get_last_indexed_block<'a>(&'a self, tx: OptTx<'a>) -> Result<u32> {
+    async fn get_last_indexed_block<'a>(&'a self, tx: OptTx<'a>) -> Result<(u32, Hash)> {
         self.nest_transaction(tx)
             .await?
             .perform(|tx| {
@@ -373,25 +392,48 @@ impl HoprDbInfoOperations for HoprDb {
                     chain_info::Entity::find_by_id(SINGULAR_TABLE_FIXED_ID)
                         .one(tx.as_ref())
                         .await?
-                        .ok_or(DbError::MissingFixedTableEntry("node_info".into()))
-                        .map(|m| m.last_indexed_block as u32)
+                        .ok_or(DbError::MissingFixedTableEntry("chain_info".into()))
+                        .map(|m| {
+                            let chain_checksum = if let Some(b) = m.chain_checksum {
+                                Hash::from_bytes(&b).expect("invalid chain checksum in the db")
+                            } else {
+                                Hash::default()
+                            };
+                            (m.last_indexed_block as u32, chain_checksum)
+                        })
                 })
             })
             .await
     }
 
-    async fn set_last_indexed_block<'a>(&'a self, tx: OptTx<'a>, block_num: u32) -> Result<()> {
+    async fn set_last_indexed_block<'a>(
+        &'a self,
+        tx: OptTx<'a>,
+        block_num: u32,
+        block_log_tx_hash: Hash,
+    ) -> Result<()> {
         self.nest_transaction(tx)
             .await?
             .perform(|tx| {
                 Box::pin(async move {
-                    chain_info::ActiveModel {
-                        id: Set(SINGULAR_TABLE_FIXED_ID),
-                        last_indexed_block: Set(block_num as i32),
-                        ..Default::default()
-                    }
-                    .save(tx.as_ref())
-                    .await?;
+                    let model = chain_info::Entity::find_by_id(SINGULAR_TABLE_FIXED_ID)
+                        .one(tx.as_ref())
+                        .await?
+                        .ok_or(MissingFixedTableEntry("chain_info".into()))?;
+
+                    let current_checksum = model
+                        .chain_checksum
+                        .clone()
+                        .map(|v| Hash::from_bytes(v.as_ref()))
+                        .unwrap_or(Ok(Hash::default()))?;
+
+                    let new_hash = Hash::create(&[current_checksum.as_slice(), block_log_tx_hash.as_slice()]);
+
+                    let mut active_model = model.into_active_model();
+                    active_model.last_indexed_block = Set(block_num as i32);
+                    active_model.chain_checksum = Set(Some(new_hash.as_slice().to_vec()));
+                    active_model.update(tx.as_ref()).await?;
+
                     Ok::<_, DbError>(())
                 })
             })
@@ -408,7 +450,7 @@ impl HoprDbInfoOperations for HoprDb {
                         network_registry_enabled: Set(enabled),
                         ..Default::default()
                     }
-                    .save(tx.as_ref())
+                    .update(tx.as_ref())
                     .await?;
                     Ok::<_, DbError>(())
                 })
@@ -477,6 +519,7 @@ mod tests {
     use hex_literal::hex;
     use hopr_crypto_types::keypairs::ChainKeypair;
     use hopr_crypto_types::prelude::Keypair;
+    use hopr_crypto_types::types::Hash;
     use hopr_primitive_types::prelude::{Address, BalanceType};
 
     use crate::db::HoprDb;
@@ -493,16 +536,16 @@ mod tests {
 
         assert_eq!(
             BalanceType::HOPR.zero(),
-            db.get_safe_balance(None).await.unwrap(),
+            db.get_safe_hopr_balance(None).await.unwrap(),
             "balance must be 0"
         );
 
         let balance = BalanceType::HOPR.balance(10_000);
-        db.set_safe_balance(None, balance).await.unwrap();
+        db.set_safe_hopr_balance(None, balance).await.unwrap();
 
         assert_eq!(
             balance,
-            db.get_safe_balance(None).await.unwrap(),
+            db.get_safe_hopr_balance(None).await.unwrap(),
             "balance must be {balance}"
         );
     }
@@ -513,16 +556,16 @@ mod tests {
 
         assert_eq!(
             BalanceType::HOPR.zero(),
-            db.get_safe_allowance(None).await.unwrap(),
+            db.get_safe_hopr_allowance(None).await.unwrap(),
             "balance must be 0"
         );
 
         let balance = BalanceType::HOPR.balance(10_000);
-        db.set_safe_allowance(None, balance).await.unwrap();
+        db.set_safe_hopr_allowance(None, balance).await.unwrap();
 
         assert_eq!(
             balance,
-            db.get_safe_allowance(None).await.unwrap(),
+            db.get_safe_hopr_allowance(None).await.unwrap(),
             "balance must be {balance}"
         );
     }
@@ -579,12 +622,21 @@ mod tests {
     async fn test_set_last_indexed_block() {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
 
-        assert_eq!(0, db.get_last_indexed_block(None).await.unwrap());
+        let (block_num, last_checksum) = db.get_last_indexed_block(None).await.unwrap();
+        assert_eq!(0, block_num);
 
-        let block_num = 100000;
-        db.set_last_indexed_block(None, block_num).await.unwrap();
+        let checksum = Hash::default().hash();
+        let expexted_block_num = 100000;
 
-        assert_eq!(block_num, db.get_last_indexed_block(None).await.unwrap());
+        db.set_last_indexed_block(None, expexted_block_num, checksum)
+            .await
+            .unwrap();
+
+        let (next_block_num, next_checksum) = db.get_last_indexed_block(None).await.unwrap();
+        assert_eq!(expexted_block_num, next_block_num);
+
+        let expected_next_checksum = Hash::create(&[last_checksum.as_slice(), checksum.as_slice()]);
+        assert_eq!(expected_next_checksum, next_checksum);
     }
 
     #[async_std::test]

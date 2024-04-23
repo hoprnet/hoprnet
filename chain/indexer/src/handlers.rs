@@ -29,6 +29,19 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tracing::{debug, error, info, trace, warn};
 
+#[cfg(all(feature = "prometheus", not(test)))]
+use hopr_metrics::metrics::MultiCounter;
+
+#[cfg(all(feature = "prometheus", not(test)))]
+lazy_static::lazy_static! {
+    static ref METRIC_INDEXER_LOG_COUNTERS: MultiCounter =
+        MultiCounter::new(
+            "hopr_indexer_contract_log_counters",
+            "Counts of different HOPR contract logs processed by the Indexer",
+            &["contract"]
+    ).unwrap();
+}
+
 /// Event handling object for on-chain operations
 ///
 /// Once an on-chain operation is recorded by the [crate::block::Indexer], it is pre-processed
@@ -83,6 +96,9 @@ where
         event: HoprAnnouncementsEvents,
         block_number: u32,
     ) -> Result<Option<ChainEventType>> {
+        #[cfg(all(feature = "prometheus", not(test)))]
+        METRIC_INDEXER_LOG_COUNTERS.increment(&["announcements"]);
+
         match event {
             HoprAnnouncementsEvents::AddressAnnouncementFilter(address_announcement) => {
                 trace!(
@@ -159,6 +175,9 @@ where
         tx: &OpenTransaction,
         event: HoprChannelsEvents,
     ) -> Result<Option<ChainEventType>> {
+        #[cfg(all(feature = "prometheus", not(test)))]
+        METRIC_INDEXER_LOG_COUNTERS.increment(&["channels"]);
+
         match event {
             HoprChannelsEvents::ChannelBalanceDecreasedFilter(balance_decreased) => {
                 let maybe_channel = channel_model_from_id(tx, balance_decreased.channel_id.into()).await?;
@@ -427,6 +446,9 @@ where
     }
 
     async fn on_token_event(&self, tx: &OpenTransaction, event: HoprTokenEvents) -> Result<Option<ChainEventType>> {
+        #[cfg(all(feature = "prometheus", not(test)))]
+        METRIC_INDEXER_LOG_COUNTERS.increment(&["token"]);
+
         match event {
             HoprTokenEvents::TransferFilter(transferred) => {
                 let from: Address = transferred.from.into();
@@ -437,20 +459,22 @@ where
                     &self.safe_address,
                 );
 
-                let mut current_balance = self.db.get_safe_balance(Some(tx)).await?;
+                let mut current_balance = self.db.get_safe_hopr_balance(Some(tx)).await?;
                 let transferred_value = transferred.value;
 
                 if to.ne(&self.safe_address) && from.ne(&self.safe_address) {
                     return Ok(None);
                 } else if to.eq(&self.safe_address) {
                     // This + is internally defined as saturating add
+                    info!("Safe balance {current_balance} increased by {transferred_value}");
                     current_balance = current_balance + transferred_value;
                 } else if from.eq(&self.safe_address) {
                     // This - is internally defined as saturating sub
+                    info!("Safe balance {current_balance} decreased by {transferred_value}");
                     current_balance = current_balance - transferred_value;
                 }
 
-                self.db.set_safe_balance(Some(tx), current_balance).await?;
+                self.db.set_safe_hopr_balance(Some(tx), current_balance).await?;
             }
             HoprTokenEvents::ApprovalFilter(approved) => {
                 let owner: Address = approved.owner.into();
@@ -464,7 +488,7 @@ where
                 // if approval is for tokens on Safe contract to be spent by HoprChannels
                 if owner.eq(&self.safe_address) && spender.eq(&self.addresses.channels) {
                     self.db
-                        .set_safe_allowance(Some(tx), BalanceType::HOPR.balance(approved.value))
+                        .set_safe_hopr_allowance(Some(tx), BalanceType::HOPR.balance(approved.value))
                         .await?;
                 } else {
                     return Ok(None);
@@ -481,6 +505,9 @@ where
         tx: &OpenTransaction,
         event: HoprNetworkRegistryEvents,
     ) -> Result<Option<ChainEventType>> {
+        #[cfg(all(feature = "prometheus", not(test)))]
+        METRIC_INDEXER_LOG_COUNTERS.increment(&["network_registry"]);
+
         match event {
             HoprNetworkRegistryEvents::DeregisteredByManagerFilter(deregistered) => {
                 let node_address: Address = deregistered.node_address.into();
@@ -556,6 +583,9 @@ where
         tx: &OpenTransaction,
         event: HoprNodeSafeRegistryEvents,
     ) -> Result<Option<ChainEventType>> {
+        #[cfg(all(feature = "prometheus", not(test)))]
+        METRIC_INDEXER_LOG_COUNTERS.increment(&["safe_registry"]);
+
         match event {
             HoprNodeSafeRegistryEvents::RegisteredNodeSafeFilter(registered) => {
                 if self.chain_key.public().to_address() == registered.node_address.into() {
@@ -589,6 +619,9 @@ where
         _db: &OpenTransaction,
         _event: HoprNodeManagementModuleEvents,
     ) -> Result<Option<ChainEventType>> {
+        #[cfg(all(feature = "prometheus", not(test)))]
+        METRIC_INDEXER_LOG_COUNTERS.increment(&["node_management_module"]);
+
         // Don't care at the moment
         Ok(None)
     }
@@ -598,6 +631,9 @@ where
         tx: &OpenTransaction,
         event: HoprTicketPriceOracleEvents,
     ) -> Result<Option<ChainEventType>> {
+        #[cfg(all(feature = "prometheus", not(test)))]
+        METRIC_INDEXER_LOG_COUNTERS.increment(&["price_oracle"]);
+
         match event {
             HoprTicketPriceOracleEvents::TicketPriceUpdatedFilter(update) => {
                 trace!(
@@ -646,6 +682,9 @@ where
             let event = HoprTicketPriceOracleEvents::decode_log(&log.into())?;
             self.on_ticket_price_oracle_event(tx, event).await
         } else {
+            #[cfg(all(feature = "prometheus", not(test)))]
+            METRIC_INDEXER_LOG_COUNTERS.increment(&["unknown"]);
+
             error!(
                 "on_event error - unknown contract address: {} - received log: {log:?}",
                 log.address
@@ -682,6 +721,8 @@ where
                     // In the worst case, each log contains a single event
                     let mut ret = Vec::with_capacity(block_with_logs.logs.len());
 
+                    let mut log_tx_hashes = Vec::with_capacity(block_with_logs.logs.len());
+
                     // Process all logs in the block
                     for log in block_with_logs.logs {
                         let tx_hash = log.tx_hash;
@@ -692,12 +733,24 @@ where
                             debug!("indexer got {significant_event}");
                             ret.push(significant_event);
                         }
+
+                        log_tx_hashes.push(tx_hash);
                     }
 
                     // Once we're done with the block, update the DB
                     myself
                         .db
-                        .set_last_indexed_block(Some(tx), block_with_logs.block_id as u32)
+                        .set_last_indexed_block(
+                            Some(tx),
+                            block_with_logs.block_id as u32,
+                            Hash::create(
+                                log_tx_hashes
+                                    .iter()
+                                    .map(|h| h.as_slice())
+                                    .collect::<Vec<_>>()
+                                    .as_slice(),
+                            ),
+                        )
                         .await?;
                     Ok(ret)
                 })
@@ -1108,7 +1161,7 @@ pub mod tests {
         assert!(event_type.is_none(), "token transfer does not have chain event type");
 
         assert_eq!(
-            db.get_safe_balance(None).await.unwrap(),
+            db.get_safe_hopr_balance(None).await.unwrap(),
             Balance::new(value, BalanceType::HOPR)
         )
     }
@@ -1121,7 +1174,7 @@ pub mod tests {
 
         let value = U256::max_value();
 
-        db.set_safe_balance(None, BalanceType::HOPR.balance(value))
+        db.set_safe_hopr_balance(None, BalanceType::HOPR.balance(value))
             .await
             .unwrap();
 
@@ -1146,7 +1199,7 @@ pub mod tests {
 
         assert!(event_type.is_none(), "token transfer does not have chain event type");
 
-        assert_eq!(db.get_safe_balance(None).await.unwrap(), BalanceType::HOPR.zero())
+        assert_eq!(db.get_safe_hopr_balance(None).await.unwrap(), BalanceType::HOPR.zero())
     }
 
     #[async_std::test]
@@ -1167,7 +1220,7 @@ pub mod tests {
         };
 
         assert_eq!(
-            db.get_safe_allowance(None).await.unwrap(),
+            db.get_safe_hopr_allowance(None).await.unwrap(),
             Balance::new(U256::from(0u64), BalanceType::HOPR)
         );
 
@@ -1186,16 +1239,16 @@ pub mod tests {
         assert!(event_type.is_none(), "token approval does not have chain event type");
 
         assert_eq!(
-            db.get_safe_allowance(None).await.unwrap(),
+            db.get_safe_hopr_allowance(None).await.unwrap(),
             Balance::new(U256::from(1000u64), BalanceType::HOPR)
         );
 
         // reduce allowance manually to verify a second time
         let _ = db
-            .set_safe_allowance(None, Balance::new(U256::from(10u64), BalanceType::HOPR))
+            .set_safe_hopr_allowance(None, Balance::new(U256::from(10u64), BalanceType::HOPR))
             .await;
         assert_eq!(
-            db.get_safe_allowance(None).await.unwrap(),
+            db.get_safe_hopr_allowance(None).await.unwrap(),
             Balance::new(U256::from(10u64), BalanceType::HOPR)
         );
 
@@ -1211,7 +1264,7 @@ pub mod tests {
         assert!(event_type.is_none(), "token approval does not have chain event type");
 
         assert_eq!(
-            db.get_safe_allowance(None).await.unwrap(),
+            db.get_safe_hopr_allowance(None).await.unwrap(),
             Balance::new(U256::from(1000u64), BalanceType::HOPR)
         );
     }

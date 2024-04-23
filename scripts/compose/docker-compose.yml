@@ -40,11 +40,12 @@ services:
       - 3001:3001
     environment:
       - RUST_BACKTRACE=full
+      - RUST_LOG=info
       - HOPRD_CONFIGURATION_FILE_PATH=/app/hoprd.cfg.yaml
     volumes:
       - ./hoprd.cfg.yaml:/app/hoprd.cfg.yaml
       - ./hoprd.id:/app/hoprd.id
-      - hoprd_data:/app/hoprd-db
+      - hoprd_data:/app/hoprd
       - "/var/run/docker.sock:/var/run/docker.sock"
     logging:
       driver: json-file
@@ -52,7 +53,7 @@ services:
         max-size: 1000M
         max-file: 5
   cadvisor:
-    image: gcr.io/cadvisor/cadvisor:v0.47.2@sha256:78cf73632de30193dc249923fdfdb1d43ee7cfccbf64662991de89ff7c4b1fda
+    image: gcr.io/cadvisor/cadvisor:v0.47.2@sha256:e6c562b5e983f13624898b5b6a902c71999580dc362022fc327c309234c485d7
     container_name: cadvisor
     hostname: cadvisor
     volumes:

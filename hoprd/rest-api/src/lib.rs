@@ -622,6 +622,7 @@ mod alias {
     )]
     pub async fn get_alias(req: Request<InternalState>) -> tide::Result<Response> {
         let alias = req.param("alias")?.parse::<String>()?;
+        let alias = urlencoding::decode(&alias)?.into_owned();
         let aliases = req.state().aliases.clone();
 
         let aliases = aliases.read().await;
@@ -654,6 +655,7 @@ mod alias {
     )]
     pub async fn delete_alias(req: Request<InternalState>) -> tide::Result<Response> {
         let alias = req.param("alias")?.parse::<String>()?;
+        let alias = urlencoding::decode(&alias)?.into_owned();
         let aliases = req.state().aliases.clone();
 
         let _ = aliases.write().await.remove(&alias);

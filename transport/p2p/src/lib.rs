@@ -217,7 +217,9 @@ pub async fn build_p2p_network(
             // FIXME: benchmark and find appropriate values
             mplex_config.set_max_buffer_behaviour(libp2p_mplex::MaxBufferBehaviour::Block);
 
-            mplex_config
+            let yamux_config: libp2p::yamux::Config = libp2p::yamux::Config::default();
+
+            libp2p::core::upgrade::SelectUpgrade::new(yamux_config, mplex_config)
         })
         .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?
         .with_dns()

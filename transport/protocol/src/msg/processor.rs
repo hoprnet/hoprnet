@@ -68,18 +68,45 @@ lazy_static::lazy_static! {
 const PACKET_TX_QUEUE_SIZE: usize = 2048;
 const PACKET_RX_QUEUE_SIZE: usize = 2048;
 
-#[derive(Debug)]
 pub enum MsgToProcess {
     ToReceive(Box<[u8]>, PeerId),
     ToSend(ApplicationData, TransportPath, PacketSendFinalizer),
     ToForward(Box<[u8]>, PeerId),
 }
 
-#[derive(Debug)]
+// Custom implementation of Debug used by tracing, the data content
+// itself should not be displayed for any case.
+impl std::fmt::Debug for MsgToProcess {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::ToReceive(_, peer) => f.debug_tuple("ToReceive").field(peer).finish(),
+            Self::ToSend(_, path, _) => f.debug_tuple("ToSend").field(path).finish(),
+            Self::ToForward(_, peer) => f.debug_tuple("ToForward").field(peer).finish(),
+        }
+    }
+}
+
 pub enum MsgProcessed {
     Receive(PeerId, ApplicationData, Acknowledgement),
     Send(PeerId, Box<[u8]>),
     Forward(PeerId, Box<[u8]>, PeerId, Acknowledgement),
+}
+
+// Custom implementation of Debug used by tracing, the data content
+// itself should not be displayed for any case.
+impl std::fmt::Debug for MsgProcessed {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Receive(peer, _, ack) => f.debug_tuple("Receive").field(peer).field(ack).finish(),
+            Self::Send(peer, _) => f.debug_tuple("Send").field(peer).finish(),
+            Self::Forward(source_peer, _, dest_peer, ack) => f
+                .debug_tuple("Forward")
+                .field(source_peer)
+                .field(dest_peer)
+                .field(ack)
+                .finish(),
+        }
+    }
 }
 
 /// Implements protocol acknowledgement logic for msg packets

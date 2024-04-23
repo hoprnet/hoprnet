@@ -35,6 +35,11 @@ impl MigrationTrait for Migration {
                             .not_null()
                             .default(false),
                     )
+                    .col(
+                        ColumnDef::new(ChainInfo::ChainChecksum)
+                            .binary_len(32)
+                            .default(vec![0u8; 32]),
+                    )
                     .to_owned(),
             )
             .await
@@ -57,4 +62,5 @@ enum ChainInfo {
     LedgerDST,
     SafeRegistryDST,
     NetworkRegistryEnabled,
+    ChainChecksum,
 }

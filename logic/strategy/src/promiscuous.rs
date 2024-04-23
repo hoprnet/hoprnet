@@ -7,7 +7,7 @@
 //!   - the number of channels opened by this strategy does not exceed `max_channels`
 //!
 //! Also, the candidates for opening (quality > `network_quality_threshold`), are sorted by best quality first.
-//! So that means if some nodes cannot have channel opened to them, because we hit `minimum_node_balance` or `max_channels`,
+//! So that means if some nodes cannot have a channel opened to them, because we hit `minimum_node_balance` or `max_channels`,
 //! the better quality ones were taking precedence.
 //!
 //! The sorting algorithm is intentionally unstable, so that the nodes which have the same quality get random order.
@@ -148,7 +148,7 @@ pub struct PromiscuousStrategyConfig {
     #[default = true]
     pub enforce_max_channels: bool,
 
-    /// Specifies minimum version (in semver syntax) of the peer the strategy should open a channel to.
+    /// Specifies a minimum version (in semver syntax) of the peer the strategy should open a channel to.
     ///
     /// Default is ">=2.0.0"
     #[serde_as(as = "DisplayFromStr")]
@@ -301,17 +301,17 @@ where
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_MAX_AUTO_CHANNELS.set(max_auto_channels as f64);
 
-        // Count all the effectively opened channels (ie. after the decision has been made)
+        // Count all the effectively opened channels (i.e. after the decision has been made)
         let occupied = outgoing_open_channels
             .len()
             .saturating_sub(tick_decision.get_to_close().len());
 
-        // If there is still more channels opened than we allow, close some
-        // lowest-quality ones which passed the threshold
+        // If there are still more channels opened than we allow, close some
+        // lowest-quality ones that passed the threshold
         if occupied > max_auto_channels && self.cfg.enforce_max_channels {
             warn!("there are {occupied} effectively opened channels, but the strategy allows only {max_auto_channels}");
 
-            // Get all open channels which are not planned to be closed
+            // Get all open channels that are not planned to be closed
             let mut sorted_channels = outgoing_open_channels
                 .iter()
                 .filter(|c| !tick_decision.will_channel_be_closed(&c.destination))
@@ -345,15 +345,15 @@ where
                     tick_decision.add_to_close(*channel);
                 });
         } else if max_auto_channels > occupied {
-            // Sort the new channel candidates by best quality first, then truncate to the number of available slots
-            // This way, we'll prefer candidates with higher quality, when we don't have enough node balance
+            // Sort the new channel candidates by the best quality first, then truncate to the number of available slots
+            // This way, we'll prefer candidates with higher quality, when we don't have enough node balance.
             // Shuffle first, so the equal candidates are randomized and then use unstable sorting for that purpose.
             new_channel_candidates.shuffle(&mut OsRng);
             new_channel_candidates.sort_unstable_by(|(_, q1), (_, q2)| q1.partial_cmp(q2).unwrap().reverse());
             new_channel_candidates.truncate(max_auto_channels - occupied);
             debug!("got {} new channel candidates", new_channel_candidates.len());
 
-            let mut remaining_balance = self.db.get_safe_balance(None).await?;
+            let mut remaining_balance = self.db.get_safe_hopr_balance(None).await?;
 
             // Go through the new candidates for opening channels allow them to open based on our available node balance
             for (address, _) in new_channel_candidates {
@@ -585,8 +585,8 @@ mod tests {
             .unwrap()
             .perform(|tx| {
                 Box::pin(async move {
-                    db.set_safe_balance(Some(tx), node_balance).await?;
-                    db.set_safe_allowance(Some(tx), node_balance).await?;
+                    db.set_safe_hopr_balance(Some(tx), node_balance).await?;
+                    db.set_safe_hopr_allowance(Some(tx), node_balance).await?;
                     for (chain_key, peer_id) in PEERS.iter() {
                         db.insert_account(
                             Some(tx),

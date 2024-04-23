@@ -7,6 +7,7 @@ description = "Contains the main entry point of HOPR daemon application"
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"
+build = "build.rs"
 
 [dependencies]
 async-broadcast = { workspace = true }
@@ -46,6 +47,10 @@ hopr-metrics = { workspace = true, optional = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
+
+[build-dependencies]
+vergen-gitcl = { version = "1.0.0-beta.2", features = ["build"] }
+anyhow = "1"
 
 [features]
 default = ["prometheus"]

@@ -43,8 +43,12 @@ use crate::key_pair::{
     create_identity, read_identities, read_identity, update_identity_password, ArgEnvReader, IdentityFileArgs,
     NewPasswordArgs,
 };
+use crate::utils::HelperErrors::UnableToParseAddress;
 use crate::utils::{Cmd, HelperErrors};
+use hopr_crypto_types::prelude::{OffchainPublicKey, PeerId};
+use hopr_primitive_types::prelude::ToHex;
 use std::collections::HashMap;
+use std::str::FromStr;
 
 /// CLI arguments for `hopli identity`
 #[derive(Clone, Debug, Parser)]
@@ -86,6 +90,28 @@ pub enum IdentitySubcommands {
         #[command(flatten)]
         new_password: NewPasswordArgs,
     },
+
+    /// Converts PeerId from base58 to public key as hex or vice-versa
+    #[command(visible_alias = "conv")]
+    ConvertPeer {
+        /// PeerID or Public key
+        #[command(flatten)]
+        peer_or_key: ConvertPeerArgs,
+    },
+}
+
+/// Arguments for PeerID or Public key
+#[derive(Debug, Clone, Parser, Default)]
+pub struct ConvertPeerArgs {
+    /// Either provide a PeerID in Base58 or public key as hex starting with 0x
+    #[clap(
+        short,
+        long,
+        help = "PeerID in Base58 or public key as hex starting with 0x",
+        name = "peer_or_key",
+        value_name = "PEER_ID_OR_PUBLIC_KEY"
+    )]
+    pub peer_or_key: String,
 }
 
 impl IdentitySubcommands {
@@ -182,6 +208,22 @@ impl Cmd for IdentitySubcommands {
                 local_identity,
                 new_password,
             } => IdentitySubcommands::execute_identity_update(local_identity, new_password),
+            IdentitySubcommands::ConvertPeer { peer_or_key } => {
+                if peer_or_key.peer_or_key.to_lowercase().starts_with("0x") {
+                    let pk = OffchainPublicKey::from_hex(&peer_or_key.peer_or_key)
+                        .map_err(|_| UnableToParseAddress(peer_or_key.peer_or_key))?;
+                    println!("{}", pk.to_peerid_str());
+                    Ok(())
+                } else {
+                    let pk = PeerId::from_str(&peer_or_key.peer_or_key)
+                        .map_err(|_| UnableToParseAddress(peer_or_key.peer_or_key.clone()))
+                        .and_then(|p| {
+                            OffchainPublicKey::try_from(p).map_err(|_| UnableToParseAddress(peer_or_key.peer_or_key))
+                        })?;
+                    println!("{}", pk.to_hex());
+                    Ok(())
+                }
+            }
         }
     }
 

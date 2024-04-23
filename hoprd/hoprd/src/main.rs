@@ -94,7 +94,9 @@ fn init_logger() -> Result<(), Box<dyn std::error::Error>> {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let _ = init_logger();
 
-    info!("This is HOPRd {}", hopr_lib::constants::APP_VERSION);
+    let git_hash = option_env!("VERGEN_GIT_SHA").unwrap_or("unknown");
+    info!("This is HOPRd {} ({})", hopr_lib::constants::APP_VERSION, git_hash);
+
     let args = <CliArgs as clap::Parser>::parse();
 
     // TOOD: add proper signal handling
