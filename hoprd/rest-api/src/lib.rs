@@ -6,6 +6,7 @@ use std::str::FromStr;
 use std::{collections::HashMap, sync::Arc};
 
 use async_lock::RwLock;
+use bimap::BiHashMap;
 // use base64::{engine::general_purpose::STANDARD_NO_PAD, Engine as _};
 use futures::StreamExt;
 use futures_concurrency::stream::Merge;
@@ -72,7 +73,7 @@ pub struct InternalState {
     pub auth: Arc<Auth>,
     pub hopr: Arc<Hopr>,
     pub inbox: Arc<RwLock<hoprd_inbox::Inbox>>,
-    pub aliases: Arc<RwLock<HashMap<String, PeerId>>>,
+    pub aliases: Arc<RwLock<BiHashMap<String, PeerId>>>,
     pub websocket_rx: async_broadcast::InactiveReceiver<TransportOutput>,
     pub msg_encoder: Option<MessageEncoder>,
 }
@@ -278,7 +279,7 @@ pub async fn run_hopr_api(
     msg_encoder: Option<MessageEncoder>,
 ) {
     // Prepare alias part of the state
-    let aliases: Arc<RwLock<HashMap<String, PeerId>>> = Arc::new(RwLock::new(HashMap::new()));
+    let aliases: Arc<RwLock<BiHashMap<String, PeerId>>> = Arc::new(RwLock::new(BiHashMap::new()));
     aliases.write().await.insert("me".to_owned(), hopr.me_peer_id());
 
     let state = State {
@@ -584,6 +585,7 @@ mod alias {
             (status = 201, description = "Alias set successfully.", body = PeerIdResponse),
             (status = 400, description = "Invalid PeerId: The format or length of the peerId is incorrect.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
+            (status = 409, description = "Given PeerId is already aliased.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
@@ -596,10 +598,13 @@ mod alias {
         let args: AliasPeerIdBodyRequest = req.body_json().await?;
         let aliases = req.state().aliases.clone();
 
-        aliases.write().await.insert(args.alias, args.peer_id);
-        Ok(Response::builder(201)
-            .body(json!(PeerIdResponse { peer_id: args.peer_id }))
-            .build())
+        let inserted = aliases.write().await.insert_no_overwrite(args.alias, args.peer_id);
+        match inserted {
+            Ok(_) => Ok(Response::builder(201)
+                .body(json!(PeerIdResponse { peer_id: args.peer_id }))
+                .build()),
+            Err(_) => Ok(Response::builder(409).body(ApiErrorStatus::InvalidInput).build()),
+        }
     }
 
     /// Get alias for the PeerId (Hopr address) that have this alias assigned to it.
@@ -626,7 +631,7 @@ mod alias {
         let aliases = req.state().aliases.clone();
 
         let aliases = aliases.read().await;
-        if let Some(peer_id) = aliases.get(&alias) {
+        if let Some(peer_id) = aliases.get_by_left(&alias) {
             Ok(Response::builder(200)
                 .body(json!(PeerIdResponse { peer_id: *peer_id }))
                 .build())
@@ -658,7 +663,7 @@ mod alias {
         let alias = urlencoding::decode(&alias)?.into_owned();
         let aliases = req.state().aliases.clone();
 
-        let _ = aliases.write().await.remove(&alias);
+        let _ = aliases.write().await.remove_by_left(&alias);
 
         Ok(Response::builder(204).build())
     }
