@@ -235,14 +235,12 @@ impl HoprDbProtocolOperations for HoprDb {
 
                     // Decide whether to create 0-hop or multihop ticket
                     let next_ticket = if path.len() == 1 {
-                        Ok(TicketBuilder::zero_hop()
-                            .direction(&myself.me_onchain, &next_peer)
-                            .build()?)
+                        TicketBuilder::zero_hop().direction(&myself.me_onchain, &next_peer)
                     } else {
                         myself
                             .create_multihop_ticket(Some(tx), me.public().to_address(), next_peer, path.len() as u8)
-                            .await
-                    }?;
+                            .await?
+                    };
 
                     ChainPacketComponents::into_outgoing(&data, &path, &me, next_ticket, &domain_separator).map_err(
                         |e| {
@@ -414,19 +412,18 @@ impl HoprDbProtocolOperations for HoprDb {
                             }
 
                             // Create next ticket for the packet
-                            let mut ticket = if ticket_path_pos == 1 {
-                                Ok(TicketBuilder::zero_hop()
-                                    .direction(&myself.me_onchain, &next_hop_addr)
-                                    .build()?)
+                            let ticket = if ticket_path_pos == 1 {
+                                TicketBuilder::zero_hop().direction(&myself.me_onchain, &next_hop_addr)
                             } else {
                                 myself
                                     .create_multihop_ticket(Some(tx), myself.me_onchain, next_hop_addr, ticket_path_pos)
-                                    .await
-                            }?;
+                                    .await?
+                            }
+                            .challenge(next_challenge.to_ethereum_challenge())
+                            .build_signed(&me, &domain_separator)?;
 
                             // forward packet
-                            ticket.challenge = next_challenge.to_ethereum_challenge();
-                            Ok(ticket.sign(&me, &domain_separator))
+                            Ok(ticket)
                         })
                     })
                     .await
@@ -482,7 +479,7 @@ impl HoprDb {
         me_onchain: Address,
         destination: Address,
         path_pos: u8,
-    ) -> crate::errors::Result<Ticket> {
+    ) -> crate::errors::Result<TicketBuilder> {
         let myself = self.clone();
         let (channel, ticket_price): (ChannelEntry, U256) = self
             .nest_transaction(tx)
@@ -536,9 +533,7 @@ impl HoprDb {
             .index(self.increment_outgoing_ticket_index(channel.get_id()).await?)
             .index_offset(1) // unaggregated always have index_offset == 1
             .win_prob(TICKET_WIN_PROB)
-            .channel_epoch(channel.channel_epoch.as_u32())
-            .build()
-            .map_err(|e| crate::errors::DbError::LogicalError(format!("failed to construct a ticket: {e}")))?;
+            .channel_epoch(channel.channel_epoch.as_u32());
 
         Ok(ticket)
     }

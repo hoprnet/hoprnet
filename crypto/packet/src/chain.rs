@@ -70,7 +70,7 @@ impl ChainPacketComponents {
         msg: &[u8],
         public_keys_path: &[OffchainPublicKey],
         chain_keypair: &ChainKeypair,
-        mut ticket: Ticket,
+        ticket: TicketBuilder,
         domain_separator: &Hash,
     ) -> Result<Self> {
         let shared_keys = CurrentSphinxSuite::new_shared_keys(public_keys_path)?;
@@ -78,8 +78,10 @@ impl ChainPacketComponents {
         let por_strings = ProofOfRelayString::from_shared_secrets(&shared_keys.secrets);
 
         // Update the ticket with the challenge
-        ticket.challenge = por_values.ticket_challenge.to_ethereum_challenge();
-        let ticket = ticket.sign(chain_keypair, domain_separator).leak();
+        let ticket = ticket
+            .challenge(por_values.ticket_challenge.to_ethereum_challenge())
+            .build_signed(chain_keypair, domain_separator)?
+            .leak();
 
         Ok(Self::Outgoing {
             packet: MetaPacket::<CurrentSphinxSuite>::new(
@@ -161,7 +163,7 @@ impl ChainPacketComponents {
 pub fn forward(
     packet: ChainPacketComponents,
     chain_keypair: &ChainKeypair,
-    mut next_ticket: Ticket,
+    next_ticket: TicketBuilder,
     domain_separator: &Hash,
 ) -> ChainPacketComponents {
     match packet {
@@ -177,8 +179,11 @@ pub fn forward(
             path_pos,
             ..
         } => {
-            next_ticket.challenge = next_challenge.to_ethereum_challenge();
-            let ticket = next_ticket.sign(chain_keypair, domain_separator).leak();
+            let ticket = next_ticket
+                .challenge(next_challenge.to_ethereum_challenge())
+                .build_signed(chain_keypair, domain_separator)
+                .expect("ticket should create")
+                .leak();
             ChainPacketComponents::Forwarded {
                 packet,
                 ticket,
@@ -240,7 +245,7 @@ mod tests {
         }
     }
 
-    fn mock_ticket(next_peer_channel_key: &PublicKey, path_len: usize, private_key: &ChainKeypair) -> Ticket {
+    fn mock_ticket(next_peer_channel_key: &PublicKey, path_len: usize, private_key: &ChainKeypair) -> TicketBuilder {
         assert!(path_len > 0);
         let price_per_packet: U256 = 10000000000000000u128.into();
 
@@ -253,15 +258,8 @@ mod tests {
                 .win_prob(1.0)
                 .channel_epoch(1)
                 .challenge(Default::default())
-                .build_signed(private_key, &Hash::default())
-                .unwrap()
-                .leak()
         } else {
-            TicketBuilder::zero_hop()
-                .direction(&private_key.public().to_address(), &next_peer_channel_key.to_address())
-                .build_signed(private_key, &Hash::default())
-                .unwrap()
-                .leak()
+            TicketBuilder::zero_hop().direction(&private_key.public().to_address(), &next_peer_channel_key.to_address())
         }
     }
     async fn resolve_mock_path(me: Address, peers_offchain: Vec<PeerId>, peers_onchain: Vec<Address>) -> TransportPath {

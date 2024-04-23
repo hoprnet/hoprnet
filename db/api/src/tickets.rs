@@ -1,5 +1,6 @@
 use async_stream::stream;
 use hopr_db_entity::ticket_statistics;
+use std::cmp;
 use std::fmt::{Display, Formatter};
 use std::ops::Add;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -1188,7 +1189,7 @@ impl HoprDbTicketOperations for HoprDb {
             return Ok(single.ticket);
         }
 
-        acked_tickets.sort();
+        acked_tickets.sort_by(|a, b| a.partial_cmp(b).unwrap_or(cmp::Ordering::Equal));
         acked_tickets.dedup();
 
         let myself = self.clone();
@@ -2392,7 +2393,7 @@ mod tests {
         let (db, channel, tickets) = create_alice_db_with_tickets_from_bob(COUNT_TICKETS).await?;
         let tickets = tickets
             .into_iter()
-            .map(|t| t.into_transferable(&BOB, &Hash::default()).unwrap())
+            .map(|t| t.into_transferable(&ALICE, &Hash::default()).unwrap())
             .collect::<Vec<_>>();
 
         assert_eq!(tickets.len(), COUNT_TICKETS);
@@ -2425,7 +2426,7 @@ mod tests {
         let (db, channel, tickets) = create_alice_db_with_tickets_from_bob(COUNT_TICKETS).await?;
         let mut tickets = tickets
             .into_iter()
-            .map(|t| t.into_transferable(&BOB, &Hash::default()).unwrap())
+            .map(|t| t.into_transferable(&ALICE, &Hash::default()).unwrap())
             .collect::<Vec<_>>();
 
         assert_eq!(tickets.len(), COUNT_TICKETS);
@@ -2466,7 +2467,7 @@ mod tests {
         let (db, channel, tickets) = create_alice_db_with_tickets_from_bob(COUNT_TICKETS).await?;
         let tickets = tickets
             .into_iter()
-            .map(|t| t.into_transferable(&BOB, &Hash::default()).unwrap())
+            .map(|t| t.into_transferable(&ALICE, &Hash::default()).unwrap())
             .collect::<Vec<_>>();
 
         assert_eq!(tickets.len(), COUNT_TICKETS);
@@ -2619,7 +2620,7 @@ mod tests {
         let (db, channel, tickets) = create_alice_db_with_tickets_from_bob(COUNT_TICKETS).await?;
         let tickets = tickets
             .into_iter()
-            .map(|t| t.into_transferable(&BOB, &Hash::default()).unwrap())
+            .map(|t| t.into_transferable(&ALICE, &Hash::default()).unwrap())
             .collect::<Vec<_>>();
 
         let first_ticket = tickets.first().expect("should contain tickets").ticket.clone();
@@ -2672,7 +2673,7 @@ mod tests {
         let (db, channel, tickets) = create_alice_db_with_tickets_from_bob(COUNT_TICKETS).await?;
         let tickets = tickets
             .into_iter()
-            .map(|t| t.into_transferable(&BOB, &Hash::default()).unwrap())
+            .map(|t| t.into_transferable(&ALICE, &Hash::default()).unwrap())
             .collect::<Vec<_>>();
 
         let first_ticket = tickets.first().expect("should contain tickets").ticket.clone();
@@ -2715,7 +2716,7 @@ mod tests {
         let (db, channel, tickets) = create_alice_db_with_tickets_from_bob(COUNT_TICKETS).await?;
         let tickets = tickets
             .into_iter()
-            .map(|t| t.into_transferable(&BOB, &Hash::default()).unwrap())
+            .map(|t| t.into_transferable(&ALICE, &Hash::default()).unwrap())
             .collect::<Vec<_>>();
 
         let first_ticket = tickets.first().expect("should contain tickets").ticket.clone();
@@ -2791,7 +2792,7 @@ mod tests {
             .into_iter()
             .map(|i| {
                 generate_random_ack_ticket(&BOB, &ALICE, i as u64, None)
-                    .into_transferable(&BOB, &Hash::default())
+                    .into_transferable(&ALICE, &Hash::default())
                     .unwrap()
             })
             .collect::<Vec<_>>();
@@ -2883,7 +2884,7 @@ mod tests {
             .into_iter()
             .map(|i| {
                 generate_random_ack_ticket(&BOB, &ALICE, i as u64, None)
-                    .into_transferable(&BOB, &Hash::default())
+                    .into_transferable(&ALICE, &Hash::default())
                     .unwrap()
             })
             .collect::<Vec<_>>();
@@ -2915,7 +2916,7 @@ mod tests {
             .into_iter()
             .map(|i| {
                 generate_random_ack_ticket(&BOB, &ALICE, i as u64, None)
-                    .into_transferable(&BOB, &Hash::default())
+                    .into_transferable(&ALICE, &Hash::default())
                     .unwrap()
             })
             .collect::<Vec<_>>();
@@ -2944,7 +2945,7 @@ mod tests {
             .into_iter()
             .map(|i| {
                 generate_random_ack_ticket(&BOB, &ALICE, i as u64, None)
-                    .into_transferable(&BOB, &Hash::default())
+                    .into_transferable(&ALICE, &Hash::default())
                     .unwrap()
             })
             .collect::<Vec<_>>();
@@ -2973,13 +2974,13 @@ mod tests {
             .into_iter()
             .map(|i| {
                 generate_random_ack_ticket(&BOB, &ALICE, i as u64, None)
-                    .into_transferable(&BOB, &Hash::default())
+                    .into_transferable(&ALICE, &Hash::default())
                     .unwrap()
             })
             .collect::<Vec<_>>();
 
         tickets[2] = generate_random_ack_ticket(&BOB, &ChainKeypair::random(), 2, None)
-            .into_transferable(&BOB, &Hash::default())
+            .into_transferable(&ALICE, &Hash::default())
             .unwrap();
 
         db.aggregate_tickets(*ALICE_OFFCHAIN.public(), tickets.clone(), &BOB)
@@ -3006,7 +3007,7 @@ mod tests {
             .into_iter()
             .map(|i| {
                 generate_random_ack_ticket(&BOB, &ALICE, i as u64, None)
-                    .into_transferable(&BOB, &Hash::default())
+                    .into_transferable(&ALICE, &Hash::default())
                     .unwrap()
             })
             .collect::<Vec<_>>();
@@ -3035,13 +3036,13 @@ mod tests {
             .into_iter()
             .map(|i| {
                 generate_random_ack_ticket(&BOB, &ALICE, i as u64, None)
-                    .into_transferable(&BOB, &Hash::default())
+                    .into_transferable(&ALICE, &Hash::default())
                     .unwrap()
             })
             .collect::<Vec<_>>();
 
         tickets[1] = generate_random_ack_ticket(&BOB, &ALICE, 1, Some(2))
-            .into_transferable(&BOB, &Hash::default())
+            .into_transferable(&ALICE, &Hash::default())
             .unwrap();
 
         db.aggregate_tickets(*ALICE_OFFCHAIN.public(), tickets.clone(), &BOB)
@@ -3068,7 +3069,7 @@ mod tests {
             .into_iter()
             .map(|i| {
                 generate_random_ack_ticket(&BOB, &ALICE, i as u64, None)
-                    .into_transferable(&BOB, &Hash::default())
+                    .into_transferable(&ALICE, &Hash::default())
                     .unwrap()
             })
             .collect::<Vec<_>>();
@@ -3100,7 +3101,7 @@ mod tests {
             .into_iter()
             .map(|i| {
                 generate_random_ack_ticket(&BOB, &ALICE, i as u64, None)
-                    .into_transferable(&BOB, &Hash::default())
+                    .into_transferable(&ALICE, &Hash::default())
                     .unwrap()
             })
             .collect::<Vec<_>>();

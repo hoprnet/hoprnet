@@ -5,9 +5,10 @@
 use ethers::core::k256::AffinePoint;
 use ethers::prelude::k256::elliptic_curve::sec1::FromEncodedPoint;
 use ethers::prelude::k256::Scalar;
-use serde::{Deserialize, Serialize};
+use serde::de::Visitor;
+use serde::{de, Deserialize, Deserializer, Serialize};
 
-use crate::tickets::Ticket;
+use hopr_primitive_types::prelude::{BytesEncodable, GeneralError, IntoEndian, U256};
 
 #[derive(Debug, Default, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Hash, PartialOrd, Ord)]
 pub struct Address {
@@ -24,9 +25,19 @@ pub struct Response {
     response: [u8; 32],
 }
 
-#[derive(Clone, Default, Eq, PartialEq, Debug, Serialize, Deserialize)]
+#[derive(Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
 pub struct CurvePoint {
     affine: AffinePoint,
+}
+
+impl Default for CurvePoint {
+    fn default() -> Self {
+        Self {
+            affine: hopr_crypto_types::types::CurvePoint::from_exponent(&U256::one().to_be_bytes())
+                .unwrap()
+                .into(),
+        }
+    }
 }
 
 impl From<AffinePoint> for CurvePoint {
@@ -59,13 +70,60 @@ impl From<VrfParameters> for hopr_crypto_types::vrf::VrfParameters {
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub enum AcknowledgedTicketStatus {
-    /// The ticket is available for redeeming or aggregating
     #[default]
     Untouched,
-    /// Ticket is currently being redeemed in and on-going redemption process
-    BeingRedeemed { tx_hash: Hash },
-    /// Ticket is currently being aggregated in and on-going aggregation process
-    BeingAggregated { start: u64, end: u64 },
+    BeingRedeemed {
+        tx_hash: Hash,
+    },
+    BeingAggregated {
+        start: u64,
+        end: u64,
+    },
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Ticket(crate::tickets::Ticket);
+
+impl Serialize for Ticket {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_bytes(&self.0.clone().into_encoded())
+    }
+}
+
+struct TicketVisitor {}
+
+impl<'de> Visitor<'de> for TicketVisitor {
+    type Value = Ticket;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_fmt(format_args!(
+            "a byte-array with {} elements",
+            crate::tickets::Ticket::SIZE
+        ))
+    }
+
+    fn visit_bytes<E>(self, v: &[u8]) -> std::result::Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        Ok(Ticket(
+            v.try_into()
+                .map_err(|e: GeneralError| de::Error::custom(e.to_string()))?,
+        ))
+    }
+}
+
+// Use compact deserialization for tickets as they are used very often
+impl<'de> Deserialize<'de> for Ticket {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        deserializer.deserialize_bytes(TicketVisitor {})
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -115,7 +173,7 @@ impl AcknowledgedTicket {
 
         Self {
             status: AcknowledgedTicketStatus::BeingAggregated { start: 0, end: 0 }, // values not  used
-            ticket: value.ticket,
+            ticket: Ticket(value.ticket),
             response,
             vrf_params,
             signer,
@@ -126,7 +184,7 @@ impl AcknowledgedTicket {
 impl From<AcknowledgedTicket> for crate::tickets::TransferableWinningTicket {
     fn from(value: AcknowledgedTicket) -> Self {
         Self {
-            ticket: value.ticket,
+            ticket: value.ticket.0,
             response: value.response.response.into(),
             vrf_params: value.vrf_params.into(),
             signer: hopr_primitive_types::primitives::Address::new(&value.signer.addr),
@@ -136,6 +194,7 @@ impl From<AcknowledgedTicket> for crate::tickets::TransferableWinningTicket {
 
 #[cfg(test)]
 mod tests {
+    use crate::legacy::Ticket;
     use crate::tickets::{TicketBuilder, TransferableWinningTicket};
     use ethers::utils::hex;
     use hex_literal::hex;
@@ -179,7 +238,7 @@ mod tests {
 
         let ack_ticket = crate::legacy::AcknowledgedTicket {
             status: crate::legacy::AcknowledgedTicketStatus::BeingAggregated { start: 0, end: 0 },
-            ticket: ticket.verified_ticket().clone(),
+            ticket: Ticket(ticket.verified_ticket().clone()),
             response: crate::legacy::Response { response: *RESPONSE },
             vrf_params: Default::default(),
             signer,
@@ -221,7 +280,7 @@ mod tests {
         let acked = unack.acknowledge(&hk2).expect("should acknowledge");
 
         let transferable = acked
-            .into_transferable(&ALICE, &domain_separator)
+            .into_transferable(&BOB, &domain_separator)
             .expect("should convert to transferable");
 
         transferable

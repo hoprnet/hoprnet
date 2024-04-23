@@ -18,7 +18,7 @@ use crate::utils::k256_scalar_from_bytes;
 ///
 /// The VRF is thereby needed because it generates on-demand deterministic
 /// entropy that can only be derived by the ticket redeemer.
-#[derive(Clone, Default, Eq)]
+#[derive(Clone, Default)]
 pub struct VrfParameters {
     /// the pseudo-random point
     pub v: CurvePoint,
@@ -60,13 +60,6 @@ impl<'de> Deserialize<'de> for VrfParameters {
         D: Deserializer<'de>,
     {
         deserializer.deserialize_bytes(VrfParametersVisitor {})
-    }
-}
-
-impl PartialEq for VrfParameters {
-    fn eq(&self, other: &Self) -> bool {
-        // Exclude cached properties
-        self.v == other.v && self.h == other.h && self.s == other.s
     }
 }
 
@@ -170,7 +163,7 @@ impl VrfParameters {
     /// `ExpandMsgXmd` algorithm (https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-16.html#name-expand_message_xmd)
     /// and applies the hash-to-curve function to it.
     ///
-    /// Finally, returns a elliptic curve point on Secp256k1.
+    /// Finally, returns an elliptic curve point on Secp256k1.
     fn get_encoded_payload<const T: usize>(
         &self,
         creator: &Address,
@@ -260,8 +253,10 @@ mod test {
             .verify(&*ALICE_ADDR, &*TEST_MSG, Hash::default().as_ref())
             .is_ok());
 
+        // PartialEq is intentionally not implemented for VrfParameters
         let vrf: [u8; VrfParameters::SIZE] = vrf_values.clone().into();
-        assert_eq!(vrf_values, VrfParameters::try_from(vrf.as_ref()).unwrap());
+        let other = VrfParameters::try_from(vrf.as_ref()).unwrap();
+        assert!(vrf_values.s == other.s && vrf_values.v == other.v && vrf_values.h == other.h);
     }
 
     #[test]

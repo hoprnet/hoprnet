@@ -87,7 +87,8 @@ impl TicketBuilder {
     pub fn zero_hop() -> Self {
         Self {
             index: 0,
-            index_offset: 0,
+            amount: Some(U256::zero()),
+            index_offset: 1,
             win_prob: Some(0.0),
             channel_epoch: 0,
             ..Default::default()
@@ -806,7 +807,7 @@ impl AcknowledgedTicket {
 
     /// Transforms this ticket into [RedeemableTicket] that can be redeemed on-chain
     /// or transformed into [TransferableWinningTicket] that can be sent for aggregation.
-    /// The `chain_keypair` must not be ticket's issuer.
+    /// The `chain_keypair` must not be of the ticket's issuer.
     pub fn into_redeemable(
         self,
         chain_keypair: &ChainKeypair,
@@ -846,7 +847,7 @@ impl Display for AcknowledgedTicket {
 }
 
 /// Represents a winning ticket that can be successfully redeemed on chain.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct RedeemableTicket {
     /// Verified ticket that can be redeemed.
     pub ticket: VerifiedTicket,
@@ -863,6 +864,12 @@ impl RedeemableTicket {
     #[inline]
     pub fn verified_ticket(&self) -> &Ticket {
         self.ticket.verified_ticket()
+    }
+}
+
+impl PartialEq for RedeemableTicket {
+    fn eq(&self, other: &Self) -> bool {
+        self.ticket == other.ticket && self.channel_dst == other.channel_dst && self.response == other.response
     }
 }
 
@@ -889,7 +896,7 @@ impl From<RedeemableTicket> for AcknowledgedTicket {
 /// information about verification.
 /// [TransferableWinningTicket] can be attempted to be converted back to [RedeemableTicket] only
 /// when verified via [`TransferableWinningTicket::into_redeemable`] again.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TransferableWinningTicket {
     pub ticket: Ticket,
     pub response: Response,
@@ -941,15 +948,15 @@ impl TransferableWinningTicket {
     }
 }
 
-impl PartialOrd<Self> for TransferableWinningTicket {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
+impl PartialEq for TransferableWinningTicket {
+    fn eq(&self, other: &Self) -> bool {
+        self.ticket == other.ticket && self.signer == other.signer && self.response == other.response
     }
 }
 
-impl Ord for TransferableWinningTicket {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.ticket.cmp(&other.ticket)
+impl PartialOrd<Self> for TransferableWinningTicket {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.ticket.cmp(&other.ticket))
     }
 }
 
@@ -1028,6 +1035,7 @@ pub mod test {
     pub fn test_ticket_builder_zero_hop() {
         let ticket = TicketBuilder::zero_hop()
             .direction(&ALICE.public().to_address(), &BOB.public().to_address())
+            .challenge(Default::default())
             .build()
             .expect("should build ticket");
         assert_eq!(0, ticket.index);
@@ -1115,7 +1123,7 @@ pub mod test {
             .build_signed(&ALICE, &Default::default())
             .expect("should build ticket");
 
-        assert_eq!(1u8, ticket.get_path_position(1_32.into()).unwrap());
+        assert_eq!(1u8, ticket.get_path_position(1_u32.into()).unwrap());
 
         let ticket = builder
             .clone()
@@ -1139,7 +1147,7 @@ pub mod test {
     pub fn test_path_position_mismatch() {
         let ticket = TicketBuilder::default()
             .direction(&ALICE.public().to_address(), &BOB.public().to_address())
-            .balance(BalanceType::HOPR.one())
+            .amount(256)
             .index(0)
             .index_offset(1)
             .win_prob(1.0)
@@ -1155,6 +1163,7 @@ pub mod test {
     pub fn test_zero_hop() {
         let ticket = TicketBuilder::zero_hop()
             .direction(&ALICE.public().to_address(), &BOB.public().to_address())
+            .challenge(Default::default())
             .build_signed(&ALICE, &Default::default())
             .expect("should build ticket");
 
