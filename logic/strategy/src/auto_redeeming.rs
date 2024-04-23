@@ -175,8 +175,7 @@ mod tests {
         static ref PRICE_PER_PACKET: U256 = 10000000000000000_u128.into(); // 0.01 HOPR
     }
 
-    fn generate_random_ack_ticket(idx_offset: u32, worth_packets: u32) -> AcknowledgedTicket {
-        let counterparty = &BOB;
+    fn generate_random_ack_ticket(index: u64, idx_offset: u32, worth_packets: u32) -> AcknowledgedTicket {
         let hk1 = HalfKey::random();
         let hk2 = HalfKey::random();
 
@@ -184,24 +183,17 @@ mod tests {
         let cp2: CurvePoint = hk2.to_challenge().try_into().unwrap();
         let cp_sum = CurvePoint::combine(&[&cp1, &cp2]);
 
-        let ticket = Ticket::new(
-            &ALICE.public().to_address(),
-            &Balance::new(
-                PRICE_PER_PACKET.div_f64(1.0f64).unwrap() * worth_packets,
-                BalanceType::HOPR,
-            ),
-            0_u32.into(),
-            idx_offset.into(),
-            1.0f64,
-            4u64.into(),
-            Challenge::from(cp_sum).to_ethereum_challenge(),
-            counterparty,
-            &Hash::default(),
-        )
-        .unwrap();
-
-        let unacked_ticket = UnacknowledgedTicket::new(ticket, hk1, counterparty.public().to_address());
-        unacked_ticket.acknowledge(&hk2, &ALICE, &Hash::default()).unwrap()
+        TicketBuilder::default()
+            .addresses(&*BOB, &*ALICE)
+            .amount(PRICE_PER_PACKET.div_f64(1.0f64).unwrap() * worth_packets)
+            .index(index)
+            .index_offset(idx_offset)
+            .win_prob(1.0)
+            .channel_epoch(4)
+            .challenge(Challenge::from(cp_sum).into())
+            .build_signed(&BOB, &Hash::default())
+            .unwrap()
+            .into_acknowledged(Response::from_half_keys(&hk1, &hk2).unwrap())
     }
 
     mock! {
@@ -238,7 +230,7 @@ mod tests {
                 ),
                 Some(ack.clone()),
             )),
-            action: Action::RedeemTicket(ack.clone()),
+            action: Action::RedeemTicket(ack.into_redeemable(&ALICE, &Hash::default()).unwrap()),
         }
     }
 
@@ -249,7 +241,7 @@ mod tests {
             .await
             .unwrap();
 
-        let ack_ticket = generate_random_ack_ticket(1, 5);
+        let ack_ticket = generate_random_ack_ticket(0, 1, 5);
         let ack_clone = ack_ticket.clone();
         let ack_clone_2 = ack_ticket.clone();
 
@@ -276,8 +268,8 @@ mod tests {
             .await
             .unwrap();
 
-        let ack_ticket_unagg = generate_random_ack_ticket(1, 5);
-        let ack_ticket_agg = generate_random_ack_ticket(3, 5);
+        let ack_ticket_unagg = generate_random_ack_ticket(0, 1, 5);
+        let ack_ticket_agg = generate_random_ack_ticket(0, 3, 5);
 
         let ack_clone_agg = ack_ticket_agg.clone();
         let ack_clone_agg_2 = ack_ticket_agg.clone();
@@ -319,7 +311,7 @@ mod tests {
         );
 
         // Make ticket worth exactly the threshold
-        let ack_ticket = generate_random_ack_ticket(1, 5);
+        let ack_ticket = generate_random_ack_ticket(0, 1, 5);
 
         db.upsert_channel(None, channel).await.unwrap();
         db.upsert_ticket(None, ack_ticket.clone()).await.unwrap();
@@ -369,7 +361,7 @@ mod tests {
         );
 
         // Make this ticket worth less than the threshold
-        let ack_ticket = generate_random_ack_ticket(1, 3);
+        let ack_ticket = generate_random_ack_ticket(0, 1, 3);
 
         db.upsert_channel(None, channel).await.unwrap();
         db.upsert_ticket(None, ack_ticket).await.unwrap();
@@ -419,14 +411,10 @@ mod tests {
             .unwrap()
             .perform(|tx| {
                 Box::pin(async move {
-                    // Make this ticket worth exactly the threshold
-                    let mut ack_ticket = generate_random_ack_ticket(1, 5);
-                    ack_ticket.ticket.index = 1;
+                    let ack_ticket = generate_random_ack_ticket(1, 1, 5);
                     db_clone.upsert_ticket(Some(tx), ack_ticket).await?;
 
-                    // Make one more ticket worth exactly the threshold
-                    let mut ack_ticket = generate_random_ack_ticket(1, 5);
-                    ack_ticket.ticket.index = 2;
+                    let ack_ticket = generate_random_ack_ticket(2, 1, 5);
                     db_clone.upsert_ticket(Some(tx), ack_ticket).await
                 })
             })

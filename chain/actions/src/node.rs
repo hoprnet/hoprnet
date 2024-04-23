@@ -163,7 +163,7 @@ mod tests {
             tx_queue.action_loop().await;
         });
 
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_sender.clone());
         let tx_res = actions
             .announce(&[announce_multiaddr], &ALICE_OFFCHAIN)
             .await
@@ -212,7 +212,7 @@ mod tests {
         );
         let tx_sender = tx_queue.new_sender();
 
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_sender.clone());
 
         let res = actions.announce(&[announce_multiaddr], &*ALICE_OFFCHAIN).await;
         assert!(
@@ -249,7 +249,7 @@ mod tests {
             tx_queue.action_loop().await;
         });
 
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_sender.clone());
 
         let tx_res = actions
             .withdraw(*BOB, stake)
@@ -284,7 +284,7 @@ mod tests {
             MockTransactionExecutor::new(),
             Default::default(),
         );
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_queue.new_sender());
 
         assert!(
             matches!(

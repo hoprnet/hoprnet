@@ -134,24 +134,24 @@ impl TicketBuilder {
     /// Sets the ticket index.
     /// Must be less or equal to 2^48.
     /// Defaults to 0.
-    pub fn index<T: Into<u64>>(mut self, index: T) -> Self {
-        self.index = index.into();
+    pub fn index(mut self, index: u64) -> Self {
+        self.index = index;
         self
     }
 
     /// Sets the index offset.
     /// Must be greater or equal 1.
     /// Defaults to 1.
-    pub fn index_offset<T: Into<u32>>(mut self, index_offset: T) -> Self {
-        self.index_offset = index_offset.into();
+    pub fn index_offset(mut self, index_offset: u32) -> Self {
+        self.index_offset = index_offset;
         self
     }
 
     /// Sets the channel epoch.
     /// Must be less or equal to 2^24.
     /// Defaults to 1.
-    pub fn channel_epoch<T: Into<u32>>(mut self, channel_epoch: T) -> Self {
-        self.channel_epoch = channel_epoch.into();
+    pub fn channel_epoch(mut self, channel_epoch: u32) -> Self {
+        self.channel_epoch = channel_epoch;
         self
     }
 
@@ -267,6 +267,29 @@ impl TicketBuilder {
         } else {
             Err(InvalidInputData("signature is missing".into()))
         }
+    }
+}
+
+impl From<&Ticket> for TicketBuilder {
+    fn from(value: &Ticket) -> Self {
+        Self {
+            channel_id: Some(value.channel_id),
+            amount: None,
+            balance: Some(value.amount),
+            index: value.index,
+            index_offset: value.index_offset,
+            channel_epoch: value.channel_epoch,
+            win_prob: None,
+            win_prob_enc: Some(value.encoded_win_prob),
+            challenge: Some(value.challenge),
+            signature: None,
+        }
+    }
+}
+
+impl From<Ticket> for TicketBuilder {
+    fn from(value: Ticket) -> Self {
+        Self::from(&value)
     }
 }
 
@@ -403,7 +426,7 @@ impl Ticket {
     /// the given `issuer` argument. This is possible due this specific instantiation of the ECDSA
     /// over the secp256k1 curve.
     /// The operation can fail if a public key cannot be recovered from the ticket signature.
-    pub fn verify(self, issuer: &Address, domain_separator: &Hash) -> Result<VerifiedTicket, Ticket> {
+    pub fn verify(self, issuer: &Address, domain_separator: &Hash) -> Result<VerifiedTicket, Box<Ticket>> {
         let ticket_hash = self.get_hash(domain_separator);
 
         if let Some(signature) = &self.signature {
@@ -411,12 +434,12 @@ impl Ticket {
                 Ok(pk) if pk.to_address().eq(issuer) => Ok(VerifiedTicket(self, ticket_hash, *issuer)),
                 Err(e) => {
                     error!("failed to verify ticket signature: {e}");
-                    Err(self)
+                    Err(self.into())
                 }
-                _ => Err(self),
+                _ => Err(self.into()),
             }
         } else {
-            Err(self)
+            Err(self.into())
         }
     }
 
@@ -783,11 +806,17 @@ impl AcknowledgedTicket {
 
     /// Transforms this ticket into [RedeemableTicket] that can be redeemed on-chain
     /// or transformed into [TransferableWinningTicket] that can be sent for aggregation.
+    /// The `chain_keypair` must not be ticket's issuer.
     pub fn into_redeemable(
         self,
         chain_keypair: &ChainKeypair,
         domain_separator: &Hash,
     ) -> crate::errors::Result<RedeemableTicket> {
+        // This function must be called by ticket recipient, and not the issuer
+        if chain_keypair.public().to_address().eq(self.ticket.verified_issuer()) {
+            return Err(errors::CoreTypesError::LoopbackTicket);
+        }
+
         let vrf_params = derive_vrf_parameters(self.ticket.verified_hash(), chain_keypair, domain_separator.as_ref())?;
 
         Ok(RedeemableTicket {
@@ -799,6 +828,7 @@ impl AcknowledgedTicket {
     }
 
     /// Shorthand for transforming this ticket into [TransferableWinningTicket].
+    /// See [`AcknowledgedTicket::into_redeemable`] for details.
     pub fn into_transferable(
         self,
         chain_keypair: &ChainKeypair,
@@ -888,11 +918,11 @@ impl TransferableWinningTicket {
         let verified_ticket = self
             .ticket
             .verify(&self.signer, domain_separator)
-            .map_err(|_| CoreTypesError::CryptoError(CryptoError::SignatureVerification.into()))?;
+            .map_err(|_| CoreTypesError::CryptoError(CryptoError::SignatureVerification))?;
 
         if check_ticket_win(
             verified_ticket.verified_hash(),
-            &verified_ticket.verified_signature(),
+            verified_ticket.verified_signature(),
             &verified_ticket.verified_ticket().encoded_win_prob,
             &self.response,
             &self.vrf_params,

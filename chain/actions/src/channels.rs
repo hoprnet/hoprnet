@@ -309,7 +309,7 @@ mod tests {
             tx_queue.action_loop().await;
         });
 
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_sender.clone());
 
         let tx_res = actions
             .open_channel(*BOB, stake)
@@ -366,7 +366,7 @@ mod tests {
             Default::default(),
         );
 
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_queue.new_sender());
 
         assert!(
             matches!(
@@ -412,7 +412,7 @@ mod tests {
             Default::default(),
         );
 
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_queue.new_sender());
 
         assert!(
             matches!(
@@ -456,7 +456,7 @@ mod tests {
             Default::default(),
         );
 
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_queue.new_sender());
         let stake = Balance::new(10_u32, BalanceType::Native);
         assert!(
             matches!(
@@ -512,7 +512,7 @@ mod tests {
             Default::default(),
         );
 
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_queue.new_sender());
 
         assert!(
             matches!(
@@ -558,7 +558,7 @@ mod tests {
             Default::default(),
         );
 
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_queue.new_sender());
 
         assert!(
             matches!(
@@ -625,7 +625,7 @@ mod tests {
             tx_queue.action_loop().await;
         });
 
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_sender.clone());
 
         let tx_res = actions
             .fund_channel(channel.get_id(), stake)
@@ -680,7 +680,7 @@ mod tests {
             Default::default(),
         );
 
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_queue.new_sender());
         let stake = Balance::new(10_u32, BalanceType::HOPR);
         assert!(
             matches!(
@@ -726,7 +726,7 @@ mod tests {
             Default::default(),
         );
 
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_queue.new_sender());
         let stake = Balance::new(10_u32, BalanceType::Native);
         assert!(
             matches!(
@@ -781,7 +781,7 @@ mod tests {
             Default::default(),
         );
 
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_queue.new_sender());
         let stake = Balance::new(10_000_u32, BalanceType::HOPR);
         assert!(
             matches!(
@@ -827,7 +827,7 @@ mod tests {
             Default::default(),
         );
 
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_queue.new_sender());
         let stake = Balance::new(10_000_u32, BalanceType::HOPR);
         assert!(
             matches!(
@@ -918,7 +918,7 @@ mod tests {
             tx_queue.action_loop().await;
         });
 
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_sender.clone());
 
         let tx_res = actions
             .close_channel(*BOB, ChannelDirection::Outgoing, false)
@@ -1016,7 +1016,7 @@ mod tests {
             tx_queue.action_loop().await;
         });
 
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_sender.clone());
 
         let tx_res = actions
             .close_channel(*BOB, ChannelDirection::Incoming, false)
@@ -1079,7 +1079,7 @@ mod tests {
             Default::default(),
         );
 
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_queue.new_sender());
 
         assert!(
             matches!(
@@ -1126,7 +1126,7 @@ mod tests {
             MockTransactionExecutor::new(),
             Default::default(),
         );
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_queue.new_sender());
 
         assert!(
             matches!(
@@ -1178,7 +1178,7 @@ mod tests {
             Default::default(),
         );
 
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_queue.new_sender());
 
         assert!(
             matches!(

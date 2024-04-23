@@ -43,23 +43,17 @@ async fn generate_the_first_ack_ticket<M: Middleware>(
 
     let domain_separator: Hash = instances.channels.domain_separator().call().await.unwrap().into();
 
-    let ticket = Ticket::new(
-        &myself.chain_key.public().to_address(),
-        &price,
-        U256::zero(),
-        U256::one(),
-        1.0f64,
-        U256::one(),
-        Challenge::from(cp_sum).to_ethereum_challenge(),
-        counterparty,
-        &domain_separator,
-    )
-    .unwrap();
-
-    let unacked_ticket = UnacknowledgedTicket::new(ticket, hk1, counterparty.public().to_address());
-    let ack_ticket = unacked_ticket
-        .acknowledge(&hk2, &myself.chain_key, &domain_separator)
-        .unwrap();
+    let ack_ticket = TicketBuilder::default()
+        .addresses(counterparty, &myself.chain_key)
+        .balance(price)
+        .index(0)
+        .index_offset(1)
+        .win_prob(1.0)
+        .channel_epoch(1)
+        .challenge(Challenge::from(cp_sum).into())
+        .build_signed(counterparty, &domain_separator)
+        .unwrap()
+        .into_acknowledged(Response::from_half_keys(&hk1, &hk2).unwrap());
 
     myself
         .db
@@ -202,7 +196,7 @@ async fn start_node_chain_logic(
     // Actions
     let action_queue = ActionQueue::new(db.clone(), IndexerActionTracker::default(), tx_exec, actions_cfg);
     let action_state = action_queue.action_state();
-    let actions = ChainActions::new(chain_key.public().to_address(), db.clone(), action_queue.new_sender());
+    let actions = ChainActions::new(chain_key, db.clone(), action_queue.new_sender());
 
     let mut node_tasks = Vec::new();
 
@@ -677,11 +671,11 @@ async fn integration_test_indexer() {
             );
             let ack_ticket = ack_ticket.clone().expect("event must contain ack ticket");
             assert_eq!(
-                ack_ticket.ticket.channel_id,
+                ack_ticket.verified_ticket().channel_id,
                 channel_alice_bob.get_id(),
                 "channel id on ticket must match"
             );
-            assert_eq!(0, ack_ticket.ticket.index, "ticket index must match");
+            assert_eq!(0, ack_ticket.verified_ticket().index, "ticket index must match");
 
             info!("--> Bob successfully redeemed {ack_ticket}");
         }

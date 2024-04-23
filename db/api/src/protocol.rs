@@ -132,7 +132,7 @@ impl HoprDbProtocolOperations for HoprDb {
                             if myself
                                 .get_channel_by_parties(
                                     Some(tx),
-                                    &unacknowledged.ticket.verified_issuer(),
+                                    unacknowledged.ticket.verified_issuer(),
                                     &myself.me_onchain,
                                 )
                                 .await?
@@ -175,10 +175,10 @@ impl HoprDbProtocolOperations for HoprDb {
         match &result {
             ResolvedAcknowledgement::RelayingWin(ack_ticket) => {
                 self.ticket_manager.insert_ticket(ack_ticket.clone()).await?;
-                let verified_ticket = ack_ticket.ticket.verified_ticket();
 
                 #[cfg(all(feature = "prometheus", not(test)))]
                 {
+                    let verified_ticket = ack_ticket.ticket.verified_ticket();
                     let channel = verified_ticket.channel_id.to_string();
                     crate::tickets::METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(
                         &[&channel, "unredeemed"],
@@ -386,7 +386,7 @@ impl HoprDbProtocolOperations for HoprDb {
                                 Ok(ticket) => ticket,
                                 Err((e, ticket)) => {
                                     return Err(crate::errors::DbError::TicketValidationError(Box::new((
-                                        ticket,
+                                        *ticket,
                                         e.to_string(),
                                     ))));
                                 }

@@ -361,7 +361,7 @@ where
     );
 
     // Instantiate Chain Actions
-    let chain_actions = ChainActions::new(&me_onchain, db, action_queue.new_sender());
+    let chain_actions = ChainActions::new(me_onchain, db, action_queue.new_sender());
 
     (action_queue, chain_actions, rpc_operations)
 }

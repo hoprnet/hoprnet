@@ -243,26 +243,25 @@ mod tests {
     fn mock_ticket(next_peer_channel_key: &PublicKey, path_len: usize, private_key: &ChainKeypair) -> Ticket {
         assert!(path_len > 0);
         let price_per_packet: U256 = 10000000000000000u128.into();
-        let ticket_win_prob = 1.0f64;
 
         if path_len > 1 {
-            Ticket::new(
-                &next_peer_channel_key.to_address(),
-                &Balance::new(
-                    price_per_packet.div_f64(ticket_win_prob).unwrap() * U256::from(path_len as u64 - 1),
-                    BalanceType::HOPR,
-                ),
-                1u64.into(),
-                1u64.into(),
-                ticket_win_prob,
-                1u64.into(),
-                EthereumChallenge::default(),
-                private_key,
-                &Hash::default(),
-            )
-            .unwrap()
+            TicketBuilder::default()
+                .direction(&private_key.public().to_address(), &next_peer_channel_key.to_address())
+                .amount(price_per_packet.div_f64(1.0).unwrap() * U256::from(path_len as u64 - 1))
+                .index(1)
+                .index_offset(1)
+                .win_prob(1.0)
+                .channel_epoch(1)
+                .challenge(Default::default())
+                .build_signed(private_key, &Hash::default())
+                .unwrap()
+                .leak()
         } else {
-            Ticket::new_zero_hop(&next_peer_channel_key.to_address(), private_key, &Hash::default()).unwrap()
+            TicketBuilder::zero_hop()
+                .direction(&private_key.public().to_address(), &next_peer_channel_key.to_address())
+                .build_signed(private_key, &Hash::default())
+                .unwrap()
+                .leak()
         }
     }
     async fn resolve_mock_path(me: Address, peers_offchain: Vec<PeerId>, peers_onchain: Vec<Address>) -> TransportPath {

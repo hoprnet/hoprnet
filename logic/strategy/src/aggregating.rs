@@ -327,7 +327,12 @@ mod tests {
         .collect();
     }
 
-    fn mock_acknowledged_ticket(signer: &ChainKeypair, destination: &ChainKeypair, index: u64) -> AcknowledgedTicket {
+    fn mock_acknowledged_ticket(
+        signer: &ChainKeypair,
+        destination: &ChainKeypair,
+        index: u64,
+        index_offset: u32,
+    ) -> AcknowledgedTicket {
         let price_per_packet: U256 = 20_u32.into();
         let ticket_win_prob = 1.0f64;
 
@@ -341,20 +346,17 @@ mod tests {
         )
         .unwrap();
 
-        let ticket = Ticket::new(
-            &destination.into(),
-            &Balance::new(price_per_packet.div_f64(ticket_win_prob).unwrap(), BalanceType::HOPR),
-            index.into(),
-            1u64.into(),
-            ticket_win_prob,
-            1u64.into(),
-            response.to_challenge().into(),
-            signer,
-            &domain_separator,
-        )
-        .unwrap();
-
-        AcknowledgedTicket::new(ticket, response, signer.into(), destination, &domain_separator).unwrap()
+        TicketBuilder::default()
+            .addresses(signer, destination)
+            .amount(price_per_packet.div_f64(ticket_win_prob).unwrap())
+            .index(index)
+            .index_offset(index_offset)
+            .win_prob(ticket_win_prob)
+            .channel_epoch(1)
+            .challenge(response.to_challenge().into())
+            .build_signed(signer, &domain_separator)
+            .unwrap()
+            .into_acknowledged(response)
     }
 
     async fn populate_db_with_ack_tickets(db: HoprDb, amount: usize) -> (Vec<AcknowledgedTicket>, ChannelEntry) {
@@ -369,12 +371,12 @@ mod tests {
                     let mut total_value = Balance::zero(BalanceType::HOPR);
 
                     for i in 0..amount {
-                        let acked_ticket = mock_acknowledged_ticket(&PEERS_CHAIN[0], &PEERS_CHAIN[1], i as u64);
+                        let acked_ticket = mock_acknowledged_ticket(&PEERS_CHAIN[0], &PEERS_CHAIN[1], i as u64, 1);
                         debug!("inserting {acked_ticket}");
 
                         db_clone.upsert_ticket(Some(tx), acked_ticket.clone()).await?;
 
-                        total_value = total_value.add(&acked_ticket.ticket.amount);
+                        total_value = total_value.add(&acked_ticket.verified_ticket().amount);
                         acked_tickets.push(acked_ticket);
                     }
 
@@ -455,7 +457,7 @@ mod tests {
                     let _ = finalizer.insert(request_finalizer);
                     match alice.writer().receive_aggregation_request(
                         PEERS[1].public().into(),
-                        acked_tickets.into_iter().map(AcknowledgedTicket::from).collect(),
+                        acked_tickets.into_iter().map(TransferableWinningTicket::from).collect(),
                         (),
                     ) {
                         Ok(_) => {}
@@ -601,8 +603,7 @@ mod tests {
             spawn_aggregation_interaction(db_alice.clone(), db_bob.clone(), &PEERS_CHAIN[0], &PEERS_CHAIN[1]);
 
         // Make this ticket aggregated
-        acked_tickets[0].ticket.index_offset = 2;
-        acked_tickets[0].ticket.sign(&PEERS_CHAIN[0], &Hash::default());
+        acked_tickets[0] = mock_acknowledged_ticket(&PEERS_CHAIN[0], &PEERS_CHAIN[1], 0, 2);
 
         debug!("upserting {}", acked_tickets[0]);
         db_bob.upsert_ticket(None, acked_tickets[0].clone()).await.unwrap();

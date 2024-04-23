@@ -1370,7 +1370,12 @@ mod tests {
         Ok(())
     }
 
-    fn generate_random_ack_ticket(src: &ChainKeypair, dst: &ChainKeypair, index: u32) -> AcknowledgedTicket {
+    fn generate_random_ack_ticket(
+        src: &ChainKeypair,
+        dst: &ChainKeypair,
+        index: u64,
+        index_offset: Option<u32>,
+    ) -> AcknowledgedTicket {
         let hk1 = HalfKey::random();
         let hk2 = HalfKey::random();
 
@@ -1378,21 +1383,17 @@ mod tests {
         let cp2: CurvePoint = hk2.to_challenge().try_into().unwrap();
         let cp_sum = CurvePoint::combine(&[&cp1, &cp2]);
 
-        let ticket = Ticket::new(
-            &dst.public().to_address(),
-            &BalanceType::HOPR.balance(TICKET_VALUE),
-            index.into(),
-            1_u32.into(),
-            1.0f64,
-            4u64.into(),
-            Challenge::from(cp_sum).to_ethereum_challenge(),
-            src,
-            &Hash::default(),
-        )
-        .unwrap();
-
-        let unacked_ticket = UnacknowledgedTicket::new(ticket, hk1, src.public().to_address());
-        unacked_ticket.acknowledge(&hk2, &dst, &Hash::default()).unwrap()
+        TicketBuilder::default()
+            .addresses(src, dst)
+            .amount(TICKET_VALUE)
+            .index(index)
+            .index_offset(index_offset.unwrap_or(1))
+            .win_prob(1.0)
+            .channel_epoch(4)
+            .challenge(Challenge::from(cp_sum).to_ethereum_challenge())
+            .build_signed(src, &Hash::default())
+            .expect("should sign a ticket")
+            .into_acknowledged(Response::from_half_keys(&hk1, &hk2).unwrap())
     }
 
     async fn init_db_with_tickets(db: &HoprDb, count_tickets: u64) -> (ChannelEntry, Vec<AcknowledgedTicket>) {
@@ -1409,7 +1410,7 @@ mod tests {
 
         let tickets = (0..count_tickets)
             .into_iter()
-            .map(|i| generate_random_ack_ticket(&BOB, &ALICE, i as u32))
+            .map(|i| generate_random_ack_ticket(&BOB, &ALICE, i, None))
             .collect::<Vec<_>>();
 
         let db_clone = db.clone();
@@ -1441,10 +1442,14 @@ mod tests {
         let (channel, mut tickets) = init_db_with_tickets(&db, 1).await;
         let ack_ticket = tickets.pop().unwrap();
 
-        assert_eq!(channel.get_id(), ack_ticket.ticket.channel_id, "channel ids must match");
+        assert_eq!(
+            channel.get_id(),
+            ack_ticket.verified_ticket().channel_id,
+            "channel ids must match"
+        );
         assert_eq!(
             channel.channel_epoch.as_u32(),
-            ack_ticket.ticket.channel_epoch,
+            ack_ticket.verified_ticket().channel_epoch,
             "epochs must match"
         );
 
@@ -1610,10 +1615,10 @@ mod tests {
             "per channel stats must be same"
         );
 
-        db.mark_ticket_rejected(&ticket).await.unwrap();
+        db.mark_ticket_rejected(ticket.verified_ticket()).await.unwrap();
 
         let stats = db.get_ticket_statistics(None, None).await.unwrap();
-        assert_eq!(ticket.amount, stats.rejected_value);
+        assert_eq!(ticket.verified_ticket().amount, stats.rejected_value);
         assert_eq!(
             stats,
             db.get_ticket_statistics(None, Some(*CHANNEL_ID)).await.unwrap(),
@@ -1657,7 +1662,7 @@ mod tests {
 
         assert_eq!(9, v.len(), "only specific tickets must have state set");
         assert!(
-            v.iter().all(|t| t.ticket.index != 5),
+            v.iter().all(|t| t.verified_ticket().index != 5),
             "only tickets with different state must update"
         );
         assert!(
@@ -1774,10 +1779,10 @@ mod tests {
 
         db.upsert_channel(None, channel_2).await.unwrap();
 
-        let t1 = generate_random_ack_ticket(&BOB, &ALICE, 1);
-        let t2 = generate_random_ack_ticket(&ALICE, &BOB, 1);
+        let t1 = generate_random_ack_ticket(&BOB, &ALICE, 1, None);
+        let t2 = generate_random_ack_ticket(&ALICE, &BOB, 1, None);
 
-        let value = t1.ticket.amount;
+        let value = t1.verified_ticket().amount;
 
         db.upsert_ticket(None, t1).await.unwrap();
         db.upsert_ticket(None, t2).await.unwrap();
@@ -1985,6 +1990,7 @@ mod tests {
             signature: vec![],
             response: vec![],
             state: 0,
+            hash: vec![],
         }
     }
 
@@ -2384,6 +2390,10 @@ mod tests {
         const COUNT_TICKETS: usize = 2;
 
         let (db, channel, tickets) = create_alice_db_with_tickets_from_bob(COUNT_TICKETS).await?;
+        let tickets = tickets
+            .into_iter()
+            .map(|t| t.into_transferable(&BOB, &Hash::default()).unwrap())
+            .collect::<Vec<_>>();
 
         assert_eq!(tickets.len(), COUNT_TICKETS);
 
@@ -2412,7 +2422,11 @@ mod tests {
 
         const COUNT_TICKETS: usize = 5;
 
-        let (db, channel, mut tickets) = create_alice_db_with_tickets_from_bob(COUNT_TICKETS).await?;
+        let (db, channel, tickets) = create_alice_db_with_tickets_from_bob(COUNT_TICKETS).await?;
+        let mut tickets = tickets
+            .into_iter()
+            .map(|t| t.into_transferable(&BOB, &Hash::default()).unwrap())
+            .collect::<Vec<_>>();
 
         assert_eq!(tickets.len(), COUNT_TICKETS);
 
@@ -2450,6 +2464,10 @@ mod tests {
         const COUNT_TICKETS: usize = 5;
 
         let (db, channel, tickets) = create_alice_db_with_tickets_from_bob(COUNT_TICKETS).await?;
+        let tickets = tickets
+            .into_iter()
+            .map(|t| t.into_transferable(&BOB, &Hash::default()).unwrap())
+            .collect::<Vec<_>>();
 
         assert_eq!(tickets.len(), COUNT_TICKETS);
 
@@ -2599,27 +2617,27 @@ mod tests {
         const COUNT_TICKETS: usize = 5;
 
         let (db, channel, tickets) = create_alice_db_with_tickets_from_bob(COUNT_TICKETS).await?;
+        let tickets = tickets
+            .into_iter()
+            .map(|t| t.into_transferable(&BOB, &Hash::default()).unwrap())
+            .collect::<Vec<_>>();
 
+        let first_ticket = tickets.first().expect("should contain tickets").ticket.clone();
         let aggregated_ticket = TicketBuilder::default()
-            .addresses(&*ALICE, &*BOB)
-            .amount(&tickets.iter().fold(Balance::zero(BalanceType::HOPR), |acc, v| {
-                acc + v.verified_ticket().amount
-            }))
-            .index(tickets.first().expect("should contain tickets").verified_ticket().index)
+            .addresses(&*BOB, &*ALICE)
+            .amount(
+                &tickets
+                    .iter()
+                    .fold(U256::zero(), |acc, v| acc + v.ticket.amount.amount()),
+            )
+            .index(first_ticket.index)
             .index_offset(
-                tickets.last().expect("should contain tickets").verified_ticket().index
-                    - tickets.first().expect("should contain tickets").verified_ticket().index
-                    + 1,
+                tickets.last().expect("should contain tickets").ticket.index as u32 - first_ticket.index as u32 + 1,
             )
             .win_prob(1.0)
-            .channel_epoch(
-                tickets
-                    .first()
-                    .expect("should contain tickets")
-                    .verified_ticket()
-                    .channel_epoch,
-            )
-            .build_signed(&*BOB, Default::default())
+            .channel_epoch(first_ticket.channel_epoch)
+            .challenge(first_ticket.challenge)
+            .build_signed(&BOB, &Hash::default())
             .unwrap();
 
         assert_eq!(tickets.len(), COUNT_TICKETS);
@@ -2632,7 +2650,9 @@ mod tests {
 
         assert_eq!(actual, Some((BOB_OFFCHAIN.public().clone(), tickets)));
 
-        let _ = db.process_received_aggregated_ticket(aggregated_ticket, &ALICE).await?;
+        let _ = db
+            .process_received_aggregated_ticket(aggregated_ticket.leak(), &ALICE)
+            .await?;
 
         let actual_being_aggregated_count = hopr_db_entity::ticket::Entity::find()
             .filter(hopr_db_entity::ticket::Column::State.eq(AcknowledgedTicketStatus::BeingAggregated as u8))
@@ -2650,26 +2670,24 @@ mod tests {
         const COUNT_TICKETS: usize = 5;
 
         let (db, channel, tickets) = create_alice_db_with_tickets_from_bob(COUNT_TICKETS).await?;
+        let tickets = tickets
+            .into_iter()
+            .map(|t| t.into_transferable(&BOB, &Hash::default()).unwrap())
+            .collect::<Vec<_>>();
 
-        let aggregated_ticket = hopr_internal_types::channels::Ticket::new(
-            &ALICE.public().to_address(),
-            &Balance::zero(BalanceType::HOPR),
-            tickets.first().expect("should contain tickets").ticket.index.into(),
-            (tickets.last().expect("should contain tickets").ticket.index
-                - tickets.first().expect("should contain tickets").ticket.index
-                + 1)
-            .into(),
-            1.0, // 100% winning probability
-            (tickets.first().expect("should contain tickets").ticket.channel_epoch).into(),
-            tickets
-                .first()
-                .expect("should contain tickets")
-                .ticket
-                .challenge
-                .clone(),
-            &BOB,
-            &Hash::default(),
-        )?;
+        let first_ticket = tickets.first().expect("should contain tickets").ticket.clone();
+        let aggregated_ticket = TicketBuilder::default()
+            .addresses(&*BOB, &*ALICE)
+            .amount(0)
+            .index(first_ticket.index)
+            .index_offset(
+                tickets.last().expect("should contain tickets").ticket.index as u32 - first_ticket.index as u32 + 1,
+            )
+            .win_prob(1.0)
+            .channel_epoch(first_ticket.channel_epoch)
+            .challenge(first_ticket.challenge)
+            .build_signed(&BOB, &Hash::default())
+            .unwrap();
 
         assert_eq!(tickets.len(), COUNT_TICKETS);
 
@@ -2682,7 +2700,7 @@ mod tests {
         assert_eq!(actual, Some((BOB_OFFCHAIN.public().clone(), tickets)));
 
         assert!(db
-            .process_received_aggregated_ticket(aggregated_ticket, &ALICE)
+            .process_received_aggregated_ticket(aggregated_ticket.leak(), &ALICE)
             .await
             .is_err());
 
@@ -2695,28 +2713,24 @@ mod tests {
         const COUNT_TICKETS: usize = 5;
 
         let (db, channel, tickets) = create_alice_db_with_tickets_from_bob(COUNT_TICKETS).await?;
+        let tickets = tickets
+            .into_iter()
+            .map(|t| t.into_transferable(&BOB, &Hash::default()).unwrap())
+            .collect::<Vec<_>>();
 
-        let aggregated_ticket = hopr_internal_types::channels::Ticket::new(
-            &ALICE.public().to_address(),
-            &tickets
-                .iter()
-                .fold(Balance::zero(BalanceType::HOPR), |acc, v| acc + v.ticket.amount),
-            tickets.first().expect("should contain tickets").ticket.index.into(),
-            (tickets.last().expect("should contain tickets").ticket.index
-                - tickets.first().expect("should contain tickets").ticket.index
-                + 1)
-            .into(),
-            0.5, // 50% winning probability
-            (tickets.first().expect("should contain tickets").ticket.channel_epoch).into(),
-            tickets
-                .first()
-                .expect("should contain tickets")
-                .ticket
-                .challenge
-                .clone(),
-            &BOB,
-            &Hash::default(),
-        )?;
+        let first_ticket = tickets.first().expect("should contain tickets").ticket.clone();
+        let aggregated_ticket = TicketBuilder::default()
+            .addresses(&*BOB, &*ALICE)
+            .amount(0)
+            .index(first_ticket.index)
+            .index_offset(
+                tickets.last().expect("should contain tickets").ticket.index as u32 - first_ticket.index as u32 + 1,
+            )
+            .win_prob(0.5) // 50% winning prob
+            .channel_epoch(first_ticket.channel_epoch)
+            .challenge(first_ticket.challenge)
+            .build_signed(&BOB, &Hash::default())
+            .unwrap();
 
         assert_eq!(tickets.len(), COUNT_TICKETS);
 
@@ -2729,7 +2743,7 @@ mod tests {
         assert_eq!(actual, Some((BOB_OFFCHAIN.public().clone(), tickets)));
 
         assert!(db
-            .process_received_aggregated_ticket(aggregated_ticket, &ALICE)
+            .process_received_aggregated_ticket(aggregated_ticket.leak(), &ALICE)
             .await
             .is_err());
 
@@ -2775,7 +2789,11 @@ mod tests {
 
         let tickets = (0..COUNT_TICKETS)
             .into_iter()
-            .map(|i| generate_random_ack_ticket(&BOB, &ALICE, i as u32))
+            .map(|i| {
+                generate_random_ack_ticket(&BOB, &ALICE, i as u64, None)
+                    .into_transferable(&BOB, &Hash::default())
+                    .unwrap()
+            })
             .collect::<Vec<_>>();
 
         let sum_value = tickets
@@ -2789,23 +2807,22 @@ mod tests {
             .await
             .expect("should aggregate");
 
-        aggregated
-            .verify(&BOB.public().to_address(), &Hash::default())
-            .expect("ticket must be valid");
         assert_eq!(
-            BOB.public().to_address(),
-            aggregated.recover_signer(&Hash::default()).unwrap().to_address(),
+            &BOB.public().to_address(),
+            aggregated.verified_issuer(),
             "must have correct signer"
         );
 
-        assert!(aggregated.is_aggregated(), "must be aggregated");
+        assert!(aggregated.verified_ticket().is_aggregated(), "must be aggregated");
 
         assert_eq!(
-            COUNT_TICKETS, aggregated.index_offset as usize,
+            COUNT_TICKETS,
+            aggregated.verified_ticket().index_offset as usize,
             "aggregated ticket must have correct offset"
         );
         assert_eq!(
-            sum_value, aggregated.amount,
+            sum_value,
+            aggregated.verified_ticket().amount,
             "aggregated ticket token amount must be sum of individual tickets"
         );
         assert_eq!(
@@ -2813,15 +2830,19 @@ mod tests {
             aggregated.win_prob(),
             "aggregated ticket must have winning probability 1"
         );
-        assert_eq!(min_idx, aggregated.index, "aggregated ticket must have correct index");
+        assert_eq!(
+            min_idx,
+            aggregated.verified_ticket().index,
+            "aggregated ticket must have correct index"
+        );
         assert_eq!(
             channel.get_id(),
-            aggregated.channel_id,
+            aggregated.verified_ticket().channel_id,
             "aggregated ticket must have correct channel id"
         );
         assert_eq!(
             channel.channel_epoch.as_u32(),
-            aggregated.channel_epoch,
+            aggregated.verified_ticket().channel_epoch,
             "aggregated ticket must have correct channel epoch"
         );
 
@@ -2860,7 +2881,11 @@ mod tests {
 
         let mut tickets = (0..COUNT_TICKETS)
             .into_iter()
-            .map(|i| generate_random_ack_ticket(&BOB, &ALICE, i as u32))
+            .map(|i| {
+                generate_random_ack_ticket(&BOB, &ALICE, i as u64, None)
+                    .into_transferable(&BOB, &Hash::default())
+                    .unwrap()
+            })
             .collect::<Vec<_>>();
 
         let aggregated = db
@@ -2868,7 +2893,7 @@ mod tests {
             .await
             .expect("should aggregate");
 
-        assert_eq!(tickets.pop().unwrap().ticket, aggregated);
+        assert_eq!(&tickets.pop().unwrap().ticket, aggregated.verified_ticket());
     }
 
     #[async_std::test]
@@ -2888,7 +2913,11 @@ mod tests {
 
         let tickets = (0..COUNT_TICKETS)
             .into_iter()
-            .map(|i| generate_random_ack_ticket(&BOB, &ALICE, i as u32))
+            .map(|i| {
+                generate_random_ack_ticket(&BOB, &ALICE, i as u64, None)
+                    .into_transferable(&BOB, &Hash::default())
+                    .unwrap()
+            })
             .collect::<Vec<_>>();
 
         db.aggregate_tickets(*ALICE_OFFCHAIN.public(), tickets.clone(), &BOB)
@@ -2913,7 +2942,11 @@ mod tests {
 
         let tickets = (0..COUNT_TICKETS)
             .into_iter()
-            .map(|i| generate_random_ack_ticket(&BOB, &ALICE, i as u32))
+            .map(|i| {
+                generate_random_ack_ticket(&BOB, &ALICE, i as u64, None)
+                    .into_transferable(&BOB, &Hash::default())
+                    .unwrap()
+            })
             .collect::<Vec<_>>();
 
         db.aggregate_tickets(*ALICE_OFFCHAIN.public(), tickets.clone(), &BOB)
@@ -2938,10 +2971,16 @@ mod tests {
 
         let mut tickets = (0..COUNT_TICKETS)
             .into_iter()
-            .map(|i| generate_random_ack_ticket(&BOB, &ALICE, i as u32))
+            .map(|i| {
+                generate_random_ack_ticket(&BOB, &ALICE, i as u64, None)
+                    .into_transferable(&BOB, &Hash::default())
+                    .unwrap()
+            })
             .collect::<Vec<_>>();
 
-        tickets[2] = generate_random_ack_ticket(&BOB, &ChainKeypair::random(), 2);
+        tickets[2] = generate_random_ack_ticket(&BOB, &ChainKeypair::random(), 2, None)
+            .into_transferable(&BOB, &Hash::default())
+            .unwrap();
 
         db.aggregate_tickets(*ALICE_OFFCHAIN.public(), tickets.clone(), &BOB)
             .await
@@ -2965,7 +3004,11 @@ mod tests {
 
         let tickets = (0..COUNT_TICKETS)
             .into_iter()
-            .map(|i| generate_random_ack_ticket(&BOB, &ALICE, i as u32))
+            .map(|i| {
+                generate_random_ack_ticket(&BOB, &ALICE, i as u64, None)
+                    .into_transferable(&BOB, &Hash::default())
+                    .unwrap()
+            })
             .collect::<Vec<_>>();
 
         db.aggregate_tickets(*ALICE_OFFCHAIN.public(), tickets.clone(), &BOB)
@@ -2990,11 +3033,16 @@ mod tests {
 
         let mut tickets = (0..COUNT_TICKETS)
             .into_iter()
-            .map(|i| generate_random_ack_ticket(&BOB, &ALICE, i as u32))
+            .map(|i| {
+                generate_random_ack_ticket(&BOB, &ALICE, i as u64, None)
+                    .into_transferable(&BOB, &Hash::default())
+                    .unwrap()
+            })
             .collect::<Vec<_>>();
 
-        tickets[1].ticket.index_offset = 2;
-        tickets[1].ticket.sign(&BOB, &Hash::default());
+        tickets[1] = generate_random_ack_ticket(&BOB, &ALICE, 1, Some(2))
+            .into_transferable(&BOB, &Hash::default())
+            .unwrap();
 
         db.aggregate_tickets(*ALICE_OFFCHAIN.public(), tickets.clone(), &BOB)
             .await
@@ -3018,7 +3066,11 @@ mod tests {
 
         let mut tickets = (0..COUNT_TICKETS)
             .into_iter()
-            .map(|i| generate_random_ack_ticket(&BOB, &ALICE, i as u32))
+            .map(|i| {
+                generate_random_ack_ticket(&BOB, &ALICE, i as u64, None)
+                    .into_transferable(&BOB, &Hash::default())
+                    .unwrap()
+            })
             .collect::<Vec<_>>();
 
         // Modify the ticket and do not sign it
@@ -3046,12 +3098,23 @@ mod tests {
 
         let mut tickets = (0..COUNT_TICKETS)
             .into_iter()
-            .map(|i| generate_random_ack_ticket(&BOB, &ALICE, i as u32))
+            .map(|i| {
+                generate_random_ack_ticket(&BOB, &ALICE, i as u64, None)
+                    .into_transferable(&BOB, &Hash::default())
+                    .unwrap()
+            })
             .collect::<Vec<_>>();
 
         // Set winning probability to zero and sign the ticket again
-        tickets[1].ticket.encoded_win_prob = [0u8; 7];
-        tickets[1].ticket.sign(&BOB, &Hash::default());
+        let resp = Response::from_half_keys(&HalfKey::random(), &HalfKey::random()).unwrap();
+        tickets[1] = TicketBuilder::from(tickets[1].ticket.clone())
+            .win_prob(0.0)
+            .challenge(resp.to_challenge().into())
+            .build_signed(&BOB, &Hash::default())
+            .unwrap()
+            .into_acknowledged(resp)
+            .into_transferable(&ALICE, &Hash::default())
+            .unwrap();
 
         db.aggregate_tickets(*ALICE_OFFCHAIN.public(), tickets.clone(), &BOB)
             .await

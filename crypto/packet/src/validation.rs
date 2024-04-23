@@ -18,7 +18,7 @@ pub async fn validate_unacknowledged_ticket(
     required_win_prob: f64,
     unrealized_balance: Option<Balance>,
     domain_separator: &Hash,
-) -> std::result::Result<VerifiedTicket, (PacketError, Ticket)> {
+) -> std::result::Result<VerifiedTicket, (PacketError, Box<Ticket>)> {
     debug!("validating unack ticket from {sender}");
 
     // ticket signer MUST be the sender
@@ -38,7 +38,7 @@ pub async fn validate_unacknowledged_ticket(
                 "ticket amount {} in not at least {min_ticket_amount}",
                 verified_ticket.amount
             )),
-            verified_ticket.clone(),
+            verified_ticket.clone().into(),
         ));
     }
 
@@ -49,7 +49,7 @@ pub async fn validate_unacknowledged_ticket(
                 "ticket winning probability {} is lower than required winning probability {required_win_prob}",
                 ticket.win_prob()
             )),
-            verified_ticket.clone(),
+            verified_ticket.clone().into(),
         ));
     }
 
@@ -59,7 +59,7 @@ pub async fn validate_unacknowledged_ticket(
             TicketValidation(format!(
                 "payment channel with {sender} is not opened or pending to close"
             )),
-            verified_ticket.clone(),
+            verified_ticket.clone().into(),
         ));
     }
 
@@ -72,7 +72,7 @@ pub async fn validate_unacknowledged_ticket(
                 channel.channel_epoch,
                 channel.get_id()
             )),
-            verified_ticket.clone(),
+            verified_ticket.clone().into(),
         ));
     }
 
@@ -85,7 +85,7 @@ pub async fn validate_unacknowledged_ticket(
                 "Ticket value is higher than remaining unrealized balance for channel {}",
                 channel.get_id().to_string(),
             );
-            return Err((OutOfFunds(channel.get_id().to_string()), verified_ticket.clone()));
+            return Err((OutOfFunds(channel.get_id().to_string()), verified_ticket.clone().into()));
         }
     }
 
@@ -112,18 +112,17 @@ mod tests {
     }
 
     fn create_valid_ticket() -> Ticket {
-        Ticket::new(
-            &TARGET_PRIV_KEY.public().to_address(),
-            &Balance::new(1_u64, BalanceType::HOPR),
-            1u64.into(),
-            1u64.into(),
-            1.0f64,
-            1u64.into(),
-            EthereumChallenge::default(),
-            &SENDER_PRIV_KEY,
-            &Hash::default(),
-        )
-        .unwrap()
+        TicketBuilder::default()
+            .addresses(&*SENDER_PRIV_KEY, &*TARGET_PRIV_KEY)
+            .amount(1)
+            .index(1)
+            .index_offset(1)
+            .win_prob(1.0)
+            .channel_epoch(1)
+            .challenge(Default::default())
+            .build_signed(&SENDER_PRIV_KEY, &Hash::default())
+            .unwrap()
+            .leak()
     }
 
     fn create_channel_entry() -> ChannelEntry {
@@ -175,7 +174,7 @@ mod tests {
 
         assert!(ret.is_err());
         match ret.unwrap_err() {
-            PacketError::TicketValidation(_) => {}
+            (PacketError::TicketValidation(_), _) => {}
             _ => panic!("invalid error type"),
         }
     }
@@ -198,7 +197,7 @@ mod tests {
 
         assert!(ret.is_err());
         match ret.unwrap_err() {
-            PacketError::TicketValidation(_) => {}
+            (PacketError::TicketValidation(_), _) => {}
             _ => panic!("invalid error type"),
         }
     }
@@ -227,7 +226,7 @@ mod tests {
 
         assert!(ret.is_err());
         match ret.unwrap_err() {
-            PacketError::TicketValidation(_) => {}
+            (PacketError::TicketValidation(_), _) => {}
             _ => panic!("invalid error type"),
         }
     }
@@ -251,7 +250,7 @@ mod tests {
 
         assert!(ret.is_err());
         match ret.unwrap_err() {
-            PacketError::TicketValidation(_) => {}
+            (PacketError::TicketValidation(_), _) => {}
             _ => panic!("invalid error type"),
         }
     }
@@ -280,7 +279,7 @@ mod tests {
 
         assert!(ret.is_err());
         match ret.unwrap_err() {
-            PacketError::TicketValidation(_) => {}
+            (PacketError::TicketValidation(_), _) => {}
             _ => panic!("invalid error type"),
         }
     }
@@ -306,7 +305,7 @@ mod tests {
         assert!(ret.is_err());
         // assert_eq!(ret.unwrap_err().to_string(), "");
         match ret.unwrap_err() {
-            PacketError::OutOfFunds(_) => {}
+            (PacketError::OutOfFunds(_), _) => {}
             _ => panic!("invalid error type"),
         }
     }

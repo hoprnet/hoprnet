@@ -281,7 +281,7 @@ impl PayloadGenerator<TypedTransaction> for BasicPayloadGenerator {
         let params = convert_vrf_parameters(
             &acked_ticket.vrf_params,
             &self.me,
-            &acked_ticket.ticket.verified_hash(),
+            acked_ticket.ticket.verified_hash(),
             &acked_ticket.channel_dst,
         );
         let mut tx = create_eip1559_transaction();
@@ -482,7 +482,7 @@ impl PayloadGenerator<TypedTransaction> for SafePayloadGenerator {
         let params = convert_vrf_parameters(
             &acked_ticket.vrf_params,
             &self.me,
-            &acked_ticket.ticket.verified_hash(),
+            acked_ticket.ticket.verified_hash(),
             &acked_ticket.channel_dst,
         );
 
@@ -599,7 +599,6 @@ pub mod tests {
     use hex_literal::hex;
     use hopr_crypto_types::prelude::*;
     use hopr_internal_types::prelude::*;
-    use hopr_primitive_types::prelude::*;
     use multiaddr::Multiaddr;
     use std::str::FromStr;
 
@@ -700,34 +699,26 @@ pub mod tests {
         let response = Response::try_from(RESPONSE_TO_CHALLENGE.as_ref()).unwrap();
 
         // Alice issues a ticket to Bob
-        let ticket = Ticket::new(
-            &(&chain_key_bob).into(),
-            &Balance::new(U256::one(), BalanceType::HOPR),
-            U256::one(),
-            U256::one(),
-            1.0_f64,
-            U256::one(),
-            response.to_challenge().to_ethereum_challenge(),
-            &chain_key_alice,
-            &domain_separator,
-        )
-        .unwrap();
+        let ticket = TicketBuilder::default()
+            .addresses(&chain_key_alice, &chain_key_bob)
+            .amount(1)
+            .index(1)
+            .index_offset(1)
+            .win_prob(1.0)
+            .channel_epoch(1)
+            .challenge(response.to_challenge().into())
+            .build_signed(&chain_key_alice, &domain_separator)
+            .unwrap();
 
         // Bob acknowledges the ticket using the HalfKey from the Response
-        let acked_ticket = AcknowledgedTicket::new(
-            ticket,
-            response,
-            (&chain_key_alice).into(),
-            &chain_key_bob,
-            &domain_separator,
-        )
-        .unwrap();
+        let acked_ticket = ticket
+            .into_acknowledged(response)
+            .into_redeemable(&chain_key_bob, &domain_separator)
+            .expect("should create a redeemable ticket");
 
         // Bob redeems the ticket
         let generator = BasicPayloadGenerator::new((&chain_key_bob).into(), (&contract_instances).into());
-        let redeem_ticket_tx = generator
-            .redeem_ticket(acked_ticket, domain_separator)
-            .expect("should create tx");
+        let redeem_ticket_tx = generator.redeem_ticket(acked_ticket).expect("should create tx");
         let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &chain_key_bob);
         println!(
             "{:?}",
