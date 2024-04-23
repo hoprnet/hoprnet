@@ -395,7 +395,7 @@ impl HoprDbInfoOperations for HoprDb {
                         .ok_or(DbError::MissingFixedTableEntry("chain_info".into()))
                         .map(|m| {
                             let chain_checksum = if let Some(b) = m.chain_checksum {
-                                Hash::from_bytes(&b).expect("invalid chain checksum in the db")
+                                Hash::try_from(b.as_slice()).expect("invalid chain checksum in the db")
                             } else {
                                 Hash::default()
                             };
@@ -424,14 +424,14 @@ impl HoprDbInfoOperations for HoprDb {
                     let current_checksum = model
                         .chain_checksum
                         .clone()
-                        .map(|v| Hash::from_bytes(v.as_ref()))
+                        .map(|v| Hash::try_from(v.as_ref()))
                         .unwrap_or(Ok(Hash::default()))?;
 
-                    let new_hash = Hash::create(&[current_checksum.as_slice(), block_log_tx_hash.as_slice()]);
+                    let new_hash = Hash::create(&[current_checksum.as_ref(), block_log_tx_hash.as_ref()]);
 
                     let mut active_model = model.into_active_model();
                     active_model.last_indexed_block = Set(block_num as i32);
-                    active_model.chain_checksum = Set(Some(new_hash.as_slice().to_vec()));
+                    active_model.chain_checksum = Set(Some(new_hash.as_ref().to_vec()));
                     active_model.update(tx.as_ref()).await?;
 
                     Ok::<_, DbError>(())

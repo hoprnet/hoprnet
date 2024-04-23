@@ -743,13 +743,7 @@ where
                         .set_last_indexed_block(
                             Some(tx),
                             block_with_logs.block_id as u32,
-                            Hash::create(
-                                log_tx_hashes
-                                    .iter()
-                                    .map(|h| h.as_slice())
-                                    .collect::<Vec<_>>()
-                                    .as_slice(),
-                            ),
+                            Hash::create(log_tx_hashes.iter().map(|h| h.as_ref()).collect::<Vec<_>>().as_slice()),
                         )
                         .await?;
                     Ok(ret)
