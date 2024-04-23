@@ -484,6 +484,7 @@ enum ApiErrorStatus {
     Unauthorized,
     InvalidQuality,
     InvalidAddress,
+    AliasAlreadyExists,
     #[strum(serialize = "UNKNOWN_FAILURE")]
     UnknownFailure(String),
 }
@@ -603,7 +604,7 @@ mod alias {
             Ok(_) => Ok(Response::builder(201)
                 .body(json!(PeerIdResponse { peer_id: args.peer_id }))
                 .build()),
-            Err(_) => Ok(Response::builder(409).body(ApiErrorStatus::InvalidInput).build()),
+            Err(_) => Ok(Response::builder(409).body(ApiErrorStatus::AliasAlreadyExists).build()),
         }
     }
 
