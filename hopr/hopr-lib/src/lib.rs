@@ -13,8 +13,6 @@
 //! For most of the practical use cases, the `hoprd` application should be a preferable
 //! choice.
 
-/// Types specific for blockchain deployments of HOPR.
-mod chain;
 /// Configuration related public types
 pub mod config;
 /// Various public constants.
@@ -24,8 +22,10 @@ pub mod errors;
 mod helpers;
 
 pub use {
-    chain::{Addresses as NetworkContractAddresses, EnvironmentType, Network as ChainNetwork, ProtocolsConfig},
     chain_actions::errors::ChainActionsError,
+    chain_api::config::{
+        Addresses as NetworkContractAddresses, EnvironmentType, Network as ChainNetwork, ProtocolsConfig,
+    },
     core_strategy::Strategy,
     core_transport::{
         config::{looks_like_domain, HostConfig, HostType},
@@ -59,6 +59,7 @@ use chain_actions::{
     node::NodeActions,
     redeem::TicketRedeemActions,
 };
+use chain_api::config::ChainNetworkConfig;
 use chain_api::HoprChain;
 use chain_api::{can_register_with_safe, wait_for_funds, SignificantChainEvent};
 use chain_types::chain_events::ChainEventType;
@@ -78,7 +79,6 @@ use core_transport::{IndexerToProcess, Network, PeerEligibility, PeerOrigin};
 use hopr_platform::file::native::{join, read_file, remove_dir_all, write};
 use tracing::{debug, error, info, warn};
 
-use crate::chain::ChainNetworkConfig;
 use crate::config::HoprLibConfig;
 use crate::config::SafeModule;
 use crate::constants::{MIN_NATIVE_BALANCE, SUGGESTED_NATIVE_BALANCE};
@@ -364,7 +364,7 @@ where
 
     let (tx_indexer_events, rx_indexer_events) = futures::channel::mpsc::unbounded();
 
-    let (action_queue, chain_actions, rpc_operations) = crate::chain::build_chain_components(
+    let (action_queue, chain_actions, rpc_operations) = chain_api::build_chain_components(
         &me_onchain,
         chain_config.clone(),
         contract_addrs,
@@ -401,12 +401,14 @@ where
         network.clone(),
     );
 
-    let hopr_chain_api: HoprChain<T> = crate::chain::build_chain_api(
+    let hopr_chain_api = chain_api::HoprChain::new(
         me_onchain.clone(),
         db.clone(),
         contract_addrs,
         cfg.safe_module.safe_address,
-        chain_config.channel_contract_deploy_block as u64,
+        chain_indexer::IndexerConfig {
+            start_block_number: chain_config.channel_contract_deploy_block as u64,
+        },
         tx_indexer_events,
         chain_actions.clone(),
         rpc_operations.clone(),
@@ -622,8 +624,9 @@ impl Hopr {
         let db = async_std::task::block_on(HoprDb::new(db_path.clone(), me_onchain.clone(), db_cfg));
 
         info!("Creating chain components using provider URL: {:?}", cfg.chain.provider);
-        let resolved_environment = crate::chain::ChainNetworkConfig::new(
+        let resolved_environment = chain_api::config::ChainNetworkConfig::new(
             &cfg.chain.network,
+            crate::constants::APP_VERSION_COERCED,
             cfg.chain.provider.as_deref(),
             &mut cfg.chain.protocols,
         )

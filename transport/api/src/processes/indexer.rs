@@ -103,7 +103,7 @@ impl IndexerActions {
                                             }
                                         }
                                     } else {
-                                        warn!("Could not convert the peer id '{}' to an offchain public key", peer);
+                                        warn!("Could not convert the peer id '{peer}' to an offchain public key");
                                         continue;
                                     }
                                 };

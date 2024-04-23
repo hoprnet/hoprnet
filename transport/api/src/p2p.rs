@@ -198,10 +198,7 @@ pub async fn p2p_loop<T>(
                     match replace_transport_with_unspecified(&ma) {
                         Ok(ma) => {
                             if let Err(e) = swarm.listen_on(ma.clone()) {
-                                error!(
-                                    "Failed to listen_on also using the unspecified multiaddress '{}': {}",
-                                    ma, e
-                                );
+                                error!("Failed to listen_on also using the unspecified multiaddress '{ma}': {e}",);
                             } else {
                                 info!("Successfully started listening on {ma} (from {multiaddress})");
                                 swarm.add_external_address(multiaddress.clone());

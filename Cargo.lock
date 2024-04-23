@@ -1238,10 +1238,15 @@ dependencies = [
  "hopr-db-api",
  "hopr-internal-types",
  "hopr-primitive-types",
+ "semver 1.0.21",
  "serde",
+ "serde_json",
+ "serde_with",
  "smart-default",
+ "strum 0.25.0",
  "thiserror",
  "tracing",
+ "validator",
 ]
 
 [[package]]
@@ -3697,9 +3702,7 @@ dependencies = [
  "hopr-platform",
  "hopr-primitive-types",
  "lazy_static",
- "semver 1.0.21",
  "serde",
- "serde_json",
  "serde_with",
  "serde_yaml",
  "smart-default",
