@@ -168,7 +168,7 @@ impl IdentitySubcommands {
 
         info!("Identities: {:?}", node_identities);
         println!("Identity addresses: {:?}", node_addresses);
-        println!("Identity peerids: {:?}", peer_ids);
+        println!("Identity peerids: [{}]", peer_ids.join(", "));
         Ok(())
     }
 
