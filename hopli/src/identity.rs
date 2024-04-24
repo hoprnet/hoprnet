@@ -161,8 +161,14 @@ impl IdentitySubcommands {
             .map(|n| n.chain_key.public().to_address())
             .collect();
 
+        let peer_ids: Vec<String> = node_identities
+            .values()
+            .map(|n| n.packet_key.public().to_peerid_str())
+            .collect();
+
         info!("Identities: {:?}", node_identities);
-        info!("Identity addresses: {:?}", node_addresses);
+        println!("Identity addresses: {:?}", node_addresses);
+        println!("Identity peerids: {:?}", peer_ids);
         Ok(())
     }
 
