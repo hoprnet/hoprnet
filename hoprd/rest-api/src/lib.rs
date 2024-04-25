@@ -2047,7 +2047,7 @@ mod tickets {
         }
     }
 
-    /// Endpoint is depreciated and will be removed in the future. It will return an empty array.
+    /// Endpoint is deprecated and will be removed in the future. Returns an empty array.
     #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/tickets"),
