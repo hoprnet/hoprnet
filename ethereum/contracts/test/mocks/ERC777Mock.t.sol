@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import "../../src/static/stake/mocks/ERC777Mock.sol";
 import "../utils/ERC1820Registry.sol";
-import { Test } from "forge-std-latest/Test.sol";
+import { Test } from "forge-std/Test.sol";
 
 /**
  * @title Simplified tests for ERC777 mock

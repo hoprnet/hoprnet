@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity >=0.8.0 <0.9.0;
 
-import { Test } from "forge-std-latest/Test.sol";
+import { Test } from "forge-std/Test.sol";
 
 import "../../script/DeployAll.s.sol";
 import "../utils/ERC1820Registry.sol";

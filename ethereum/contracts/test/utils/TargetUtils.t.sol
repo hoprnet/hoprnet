@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity ^0.8.0;
 
-import { Test, stdError } from "forge-std-latest/Test.sol";
+import { Test, stdError } from "forge-std/Test.sol";
 
 import "../mocks/TargetUtilsMock.sol";
 

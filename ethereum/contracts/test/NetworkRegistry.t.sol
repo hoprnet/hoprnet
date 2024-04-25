@@ -4,7 +4,7 @@ pragma solidity >=0.6.0 <0.9.0;
 import {
     IHoprNetworkRegistryRequirement, HoprNetworkRegistry, HoprNetworkRegistryEvents
 } from "../src/NetworkRegistry.sol";
-import { Test, stdStorage, StdStorage } from "forge-std-latest/Test.sol";
+import { Test, stdStorage, StdStorage } from "forge-std/Test.sol";
 
 contract HoprNetworkRegistryTest is Test, HoprNetworkRegistryEvents {
     // to alter the storage

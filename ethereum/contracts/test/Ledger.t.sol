@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity >=0.6.0 <0.9.0;
 
-import { Test, console2 } from "forge-std-latest/Test.sol";
+import { Test, console2 } from "forge-std/Test.sol";
 import { HoprChannelsEvents } from "../src/Channels.sol";
 import { HoprLedgerEvents, HoprLedger } from "../src/Ledger.sol";
 import { CryptoUtils } from "./utils/Crypto.sol";

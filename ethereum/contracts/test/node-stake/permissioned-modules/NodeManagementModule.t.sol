@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity >=0.8.0 <0.9.0;
 
-import { Test, stdStorage, StdStorage } from "forge-std-latest/Test.sol";
+import { Test, stdStorage, StdStorage } from "forge-std/Test.sol";
 
 import "../../../src/node-stake/permissioned-module/NodeManagementModule.sol";
 import "../../../src/node-stake/permissioned-module/CapabilityPermissions.sol";

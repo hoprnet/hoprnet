@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity >=0.8.0 <0.9.0;
 
-import "forge-std-latest/Script.sol";
+import "forge-std/Script.sol";
 
 /**
  * Get environment_type from the environment variable `FOUNDRY_PROFILE`
