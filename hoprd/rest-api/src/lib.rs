@@ -544,7 +544,7 @@ mod alias {
         pub peer_id: PeerId,
     }
 
-    /// Get each previously set alias and its corresponding PeerId
+    /// Get each previously set alias and its corresponding PeerId.
     #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/aliases"),
@@ -2047,7 +2047,7 @@ mod tickets {
         }
     }
 
-    /// Returns all the tickets in all the channels.
+    /// Endpoint is depreciated and will be removed in the future. It will return an empty array.
     #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/tickets"),
@@ -2664,7 +2664,7 @@ mod checks {
         is_running(req).await
     }
 
-    /// Check whether the node is healthy
+    /// Check whether the node is healthy.
     #[utoipa::path(
         get,
         path = "/healthyz",
