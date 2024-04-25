@@ -14,6 +14,7 @@ dependencies:
       - any-glob-to-any-file:
           - "Cargo.lock"
           - "**/Cargo.toml"
+          - "vendor/**"
 documentation:
   - changed-files:
       - any-glob-to-any-file:
@@ -26,10 +27,6 @@ smart-contracts:
   - changed-files:
       - any-glob-to-any-file:
           - "ethereum/contracts/**"
-dependencies:
-  - changed-files:
-      - any-glob-to-any-file:
-          - "vendor/**"
 crate:core-path:
   - changed-files:
       - any-glob-to-any-file: logic/path/**
