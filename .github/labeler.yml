@@ -22,6 +22,14 @@ testing:
   - changed-files:
       - any-glob-to-any-file:
           - "tests/**"
+smart-contracts:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "ethereum/contracts/**"
+dependencies:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "vendor/**"
 crate:core-path:
   - changed-files:
       - any-glob-to-any-file: logic/path/**
