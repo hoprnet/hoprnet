@@ -824,12 +824,8 @@ async fn integration_test_indexer() {
     info!("bob completed at {:?}", bob_checksum);
 
     assert_eq!(
-        alice_checksum.0, bob_checksum.0,
-        "alice and bob must be at the same indexed block"
-    );
-    assert_eq!(
-        alice_checksum.1, bob_checksum.1,
-        "alice and bob must have same indexer checksum"
+        alice_checksum, bob_checksum,
+        "alice and bob must be at the same indexed block and checksum"
     );
 
     futures::future::join_all(alice_node.node_tasks.into_iter().map(|t| t.cancel())).await;
