@@ -2,7 +2,7 @@
 name: Bug Template
 about: Create a bug report to help us improve
 title: ''
-labels: 'bug, new issue'
+labels: 'bug, status:new'
 assignees: ''
 ---
 

@@ -1,24 +1,52 @@
+//! This module contains arguments and functions to fund some Ethereum wallets
+//! with native tokens and HOPR tokens
+//!
+//! Despite HOPR contracts are mainly deployed on Gnosis chain,
+//! HOPR token contract addresses vary on the network.
+//!
+//! Attention! Do not use this function to distribute large amount of tokens
+//!
+//! Note that to save gas in batch funding, multicall is used to facilitate token distribution, via `transferFrom`
+//! To use this functionality, caller must grant Multicall3 contract the exact allowance equal to the sum of tokens
+//! to be transferred. As it's a separate function, there is a window between granting the allowance and executing
+//! the transactin. Attacker may take advantage of this window and steal tokens from the caller's account.
+//!
+//! A sample command:
+//! ```text
+//! hopli faucet \
+//!     --network anvil-localhost \
+//!     --contracts-root "../ethereum/contracts" \
+//!     --address 0x0aa7420c43b8c1a7b165d216948870c8ecfe1ee1,0xd057604a14982fe8d88c5fc25aac3267ea142a08 \
+//!     --identity-directory "./test" --identity-prefix node_ \
+//!     --password-path "./test/pwd" \
+//!     --private-key ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+//!     --hopr-amount 10 --native-amount 0.1 \
+//!     --provider-url "http://localhost:8545"
+//! ```
 use crate::{
-    identity_input::LocalIdentityArgs,
-    key_pair::read_identities,
-    password::PasswordArgs,
-    process::{child_process_call_foundry_faucet, set_process_path_env},
+    environment_config::NetworkProviderArgs,
+    key_pair::{ArgEnvReader, IdentityFileArgs, PrivateKeyArgs},
+    methods::{get_native_and_token_balances, transfer_native_tokens, transfer_or_mint_tokens},
     utils::{Cmd, HelperErrors},
 };
+use bindings::hopr_token::HoprToken;
 use clap::Parser;
-use ethers::{types::U256, utils::parse_units};
-use hopr_crypto_types::keypairs::Keypair;
-use hopr_crypto_types::types::ToChecksum;
-use hopr_primitive_types::primitives::Address;
-use std::{env, str::FromStr};
+use ethers::{
+    types::{H160, U256},
+    utils::parse_units,
+};
+// use ethers::types::Address;
+use std::{ops::Sub, str::FromStr};
 use tracing::info;
 
 /// CLI arguments for `hopli faucet`
 #[derive(Parser, Default, Debug)]
 pub struct FaucetArgs {
-    #[clap(help = "Network name. E.g. monte_rosa", long)]
-    network: String,
+    /// Network name, contracts config file root, and customized provider, if available
+    #[clap(flatten)]
+    pub network_provider: NetworkProviderArgs,
 
+    /// Additional addresses (comma-separated) to receive funds.
     #[clap(
         help = "Comma-separated Ethereum addresses of nodes that will receive funds",
         long,
@@ -27,20 +55,11 @@ pub struct FaucetArgs {
     )]
     address: Option<String>,
 
+    /// Argument to locate identity file(s)
     #[clap(flatten)]
-    password: PasswordArgs,
+    local_identity: IdentityFileArgs,
 
-    #[clap(flatten)]
-    local_identity: LocalIdentityArgs,
-
-    #[clap(
-        help = "Specify path pointing to the contracts root",
-        long,
-        short,
-        default_value = None
-    )]
-    contracts_root: Option<String>,
-
+    /// The amount of HOPR tokens (in floating number) to be funded per wallet
     #[clap(
         help = "Hopr amount in ether, e.g. 10",
         long,
@@ -50,89 +69,115 @@ pub struct FaucetArgs {
     )]
     hopr_amount: f64,
 
+    /// The amount of native tokens (in floating number) to be funded per wallet
     #[clap(
         help = "Native token amount in ether, e.g. 1",
         long,
-        short = 'n',
+        short = 'g',
         value_parser = clap::value_parser!(f64),
         default_value_t = 10.0
     )]
     native_amount: f64,
+
+    /// Access to the private key, of which the wallet either contains sufficient assets
+    /// as the source of funds or it can mint necessary tokens
+    #[clap(flatten)]
+    pub private_key: PrivateKeyArgs,
 }
 
 impl FaucetArgs {
-    /// Execute the command with given parameters
-    /// `PRIVATE_KEY` env variable is required to send on-chain transactions
-    fn execute_faucet(self) -> Result<(), HelperErrors> {
+    /// Execute the faucet command, which funds addresses with required amount of tokens
+    async fn execute_faucet(self) -> Result<(), HelperErrors> {
         let FaucetArgs {
-            network,
+            network_provider,
             address,
-            password,
             local_identity,
-            contracts_root,
             hopr_amount,
             native_amount,
+            private_key,
         } = self;
 
-        // `PRIVATE_KEY` - Private key is required to send on-chain transactions
-        if env::var("PRIVATE_KEY").is_err() {
-            return Err(HelperErrors::UnableToReadPrivateKey);
-        }
-
         // Include provided address
-        let mut addresses_all = Vec::new();
-
-        // validate and arrayfy provided list of addresses
+        let mut eth_addresses_all: Vec<H160> = Vec::new();
         if let Some(addresses) = address {
-            let provided_addresses: Vec<String> = addresses
-                .split(',')
-                .map(|addr| Address::from_str(addr).unwrap().to_checksum())
+            eth_addresses_all.extend(addresses.split(',').map(|addr| H160::from_str(addr).unwrap()));
+        }
+        // if local identity dirs/path is provided, read addresses from identity files
+        eth_addresses_all.extend(local_identity.to_addresses().unwrap().into_iter().map(H160::from));
+        info!("All the addresses: {:?}", eth_addresses_all);
+
+        // `PRIVATE_KEY` - Private key is required to send on-chain transactions
+        let signer_private_key = private_key.read_default()?;
+
+        // get RPC provider for the given network and environment
+        let rpc_provider = network_provider.get_provider_with_signer(&signer_private_key).await?;
+        let contract_addresses = network_provider.get_network_details_from_name()?;
+
+        let hopr_token = HoprToken::new(contract_addresses.addresses.token, rpc_provider.clone());
+
+        // complete actions as defined in `transferOrMintHoprAndSendNativeToAmount` in `SingleActions.s.sol`
+        // get token and native balances for addresses
+        let (native_balances, token_balances) =
+            get_native_and_token_balances(hopr_token.clone(), eth_addresses_all.clone())
+                .await
+                .unwrap();
+        // Get the amount of HOPR tokens that addresses need to receive to reach the desired amount
+        let hopr_token_amounts: Vec<U256> =
+            vec![U256::from(parse_units(hopr_amount, "ether").unwrap()); eth_addresses_all.len()]
+                .into_iter()
+                .enumerate()
+                .map(|(i, h)| {
+                    if h.gt(&token_balances[i]) {
+                        let diff = h.sub(token_balances[i]);
+                        info!(
+                            "{:?} hopr-token to be transferred to {:?} to top up {:?}",
+                            diff, eth_addresses_all[i], &token_balances[i]
+                        );
+                        diff
+                    } else {
+                        U256::zero()
+                    }
+                })
                 .collect();
-            addresses_all.extend(provided_addresses);
-        }
 
-        // if local identity dirs/path is provided, read files
-        let local_files = local_identity.get_files();
-        if !local_files.is_empty() {
-            // check if password is provided
-            let pwd = match password.read_password() {
-                Ok(read_pwd) => read_pwd,
-                Err(e) => return Err(e),
-            };
+        // Get the amount of native tokens that addresses need to receive to reach the desired amount
+        let native_token_amounts: Vec<U256> =
+            vec![U256::from(parse_units(native_amount, "ether").unwrap()); eth_addresses_all.len()]
+                .into_iter()
+                .enumerate()
+                .map(|(i, n)| {
+                    if n.gt(&native_balances[i]) {
+                        let diff = n.sub(native_balances[i]);
+                        info!(
+                            "{:?} native-token to be transferred to {:?}, to top up {:?}",
+                            diff, eth_addresses_all[i], &native_balances[i]
+                        );
+                        diff
+                    } else {
+                        U256::zero()
+                    }
+                })
+                .collect();
 
-            match read_identities(local_files, &pwd) {
-                Ok(node_identities) => {
-                    addresses_all.extend(
-                        node_identities
-                            .values()
-                            .map(|ni| ni.chain_key.public().0.to_address().to_string()),
-                    );
-                }
-                Err(e) => return Err(e),
-            }
-        }
-
-        info!(target: "faucet", "All the addresses: {:?}", addresses_all);
-
-        // set directory and environment variables
-        set_process_path_env(&contracts_root, &network)?;
-
-        // convert hopr_amount and native_amount from f64 to uint256 string
-        let hopr_amount_uint256 = parse_units(hopr_amount, "ether").unwrap();
-        let hopr_amount_uint256_string = U256::from(hopr_amount_uint256).to_string();
-        let native_amount_uint256 = parse_units(native_amount, "ether").unwrap();
-        let native_amount_uint256_string = U256::from(native_amount_uint256).to_string();
-
-        // iterate and collect execution result. If error occurs, the entire operation failes.
-        addresses_all.into_iter().try_for_each(|a| {
-            child_process_call_foundry_faucet(&network, &a, &hopr_amount_uint256_string, &native_amount_uint256_string)
-        })
+        // transfer of mint HOPR tokens
+        let total_transferred_hopr_token =
+            transfer_or_mint_tokens(hopr_token, eth_addresses_all.clone(), hopr_token_amounts).await?;
+        info!("total transferred hopr-token is {:?}", total_transferred_hopr_token);
+        // send native tokens
+        let total_transferred_native_token =
+            transfer_native_tokens(rpc_provider, eth_addresses_all, native_token_amounts).await?;
+        info!("total transferred native-token is {:?}", total_transferred_native_token);
+        Ok(())
     }
 }
 
 impl Cmd for FaucetArgs {
     /// Run the execute_faucet function
     fn run(self) -> Result<(), HelperErrors> {
-        self.execute_faucet()
+        Ok(())
+    }
+
+    async fn async_run(self) -> Result<(), HelperErrors> {
+        self.execute_faucet().await
     }
 }

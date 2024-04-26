@@ -9,19 +9,19 @@ pub enum HoprLibError {
     #[error("HOPR lib status error: '{0}'")]
     StatusError(String),
 
-    #[error("'{0}'")]
+    #[error(transparent)]
+    DatabaseError(#[from] hopr_db_api::errors::DbError),
+
+    #[error(transparent)]
     TransportError(#[from] core_transport::errors::HoprTransportError),
 
-    #[error("'{0}'")]
+    #[error(transparent)]
     ChainError(#[from] chain_actions::errors::ChainActionsError),
 
-    #[error("'{0}'")]
+    #[error(transparent)]
     ChainApi(#[from] chain_api::errors::HoprChainError),
 
-    #[error("'{0}'")]
-    DbError(#[from] utils_db::errors::DbError),
-
-    #[error("'{0}'")]
+    #[error(transparent)]
     TypeError(#[from] hopr_primitive_types::errors::GeneralError),
 }
 

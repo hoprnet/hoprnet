@@ -12,6 +12,15 @@ pub enum NetworkingError {
     #[error("error while decoding message data")]
     DecodingError,
 
+    #[error("performing an operation on own PeerId")]
+    DisallowedOperationOnOwnPeerIdError,
+
+    #[error("backend error: {0}")]
+    BackendError(#[from] hopr_db_api::errors::DbError),
+
+    #[error("peer does not exist")]
+    NonExistingPeer,
+
     #[error("{0}")]
     Other(String),
 }

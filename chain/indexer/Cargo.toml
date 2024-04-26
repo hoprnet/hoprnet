@@ -1,6 +1,6 @@
 [package]
 name = "chain-indexer"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Core-Ethereum-specific interaction with the backend database"
@@ -20,14 +20,15 @@ futures = { workspace = true }
 lazy_static = { workspace = true }
 multiaddr = "0.18"
 smart-default = { workspace = true }
+sea-orm = { workspace = true }
 thiserror = { workspace = true }
 
 bindings = { workspace = true }
 hopr-crypto-types = { workspace = true }
-chain-db = { workspace = true }
+hopr-db-entity = { workspace = true }
+hopr-db-api = { workspace = true }
 chain-rpc = { workspace = true }
 chain-types = { workspace = true}
-utils-db = { workspace = true }
 tracing = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-internal-types = { workspace = true }
@@ -37,6 +38,7 @@ hopr-primitive-types = { workspace = true }
 hex-literal = { workspace = true }
 mockall = "0.11"
 primitive-types = "0.12.2"
+hopr-crypto-random = { workspace = true }
 
 [features]
 default = ["prometheus"]

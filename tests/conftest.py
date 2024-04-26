@@ -14,6 +14,9 @@ import pytest
 
 from .node import Node
 
+# prepend the timestamp in front of any log line
+logging.basicConfig(format="%(asctime)s %(message)s")
+
 SEED = int.from_bytes(os.urandom(8), byteorder="big")
 random.seed(SEED)
 
@@ -29,6 +32,7 @@ NODE_NAME_PREFIX = f"{FIXTURES_PREFIX}-node"
 
 NETWORK1 = "anvil-localhost"
 NETWORK2 = "anvil-localhost2"
+ANVIL_ENDPOINT = "localhost:8545"
 
 API_TOKEN = "e2e-API-token^^"
 PASSWORD = "e2e-test"
@@ -52,6 +56,7 @@ NODES = {
         FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_1"),
         "localhost",
         NETWORK1,
+        FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_barebone.cfg.yaml"),
     ),
     "2": Node(
         19092,
@@ -60,6 +65,7 @@ NODES = {
         FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_2"),
         LOCALHOST,
         NETWORK1,
+        FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_barebone.cfg.yaml"),
     ),
     "3": Node(
         19093,
@@ -68,6 +74,7 @@ NODES = {
         FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_3"),
         "localhost",
         NETWORK1,
+        FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_barebone.cfg.yaml"),
     ),
     "4": Node(
         19094,
@@ -76,6 +83,7 @@ NODES = {
         FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_4"),
         LOCALHOST,
         NETWORK1,
+        FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_barebone.cfg.yaml"),
     ),
     "5": Node(
         19095,
@@ -84,7 +92,7 @@ NODES = {
         FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_5"),
         "localhost",
         NETWORK1,
-        FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_5.cfg.yaml"),
+        FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_default.cfg.yaml"),
     ),
     "6": Node(
         19096,
@@ -93,6 +101,7 @@ NODES = {
         FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_6"),
         LOCALHOST,
         NETWORK2,
+        FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_barebone.cfg.yaml"),
     ),
     "7": Node(
         19097,
@@ -101,6 +110,7 @@ NODES = {
         FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_7"),
         "localhost",
         NETWORK1,
+        FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_barebone.cfg.yaml"),
     ),
 }
 
@@ -145,19 +155,19 @@ def cmd_line_args(request: pytest.FixtureRequest):
     return args
 
 
-def default_nodes():
-    """All nodes within the same network as specified in the swarm7 fixture"""
+def barebone_nodes():
+    """Nodes using only the barebones config without any strategies"""
     return ["1", "2", "3", "4"]
 
 
-def default_nodes_with_auth():
+def nodes_with_auth():
     """All nodes within the same network as specified in the swarm7 fixture"""
     return ["1", "3", "4"]
 
 
-def passive_node():
-    """A node that uses no strategy"""
-    return "5"
+def default_nodes():
+    """A node that uses the default strategies"""
+    return ["5"]
 
 
 def random_distinct_pairs_from(values: list, count: int):
@@ -249,6 +259,10 @@ def fund_nodes(private_key: str):
             "./ethereum/contracts",
             "--hopr-amount",
             "0.0",
+            "--native-amount",
+            "10.0",
+            "--provider-url",
+            ANVIL_ENDPOINT,
         ],
         env=os.environ | custom_env,
         check=True,
@@ -304,7 +318,7 @@ async def swarm7(request):
     safe_custom_env: dict = {
         "ETHERSCAN_API_KEY": "anykey",
         "IDENTITY_PASSWORD": PASSWORD,
-        "DEPLOYER_PRIVATE_KEY": private_key,
+        "MANAGER_PRIVATE_KEY": private_key,
         "PRIVATE_KEY": private_key,
         "PATH": os.environ["PATH"],
     }
@@ -332,15 +346,40 @@ async def swarm7(request):
     logging.info("Funding nodes")
     fund_nodes(private_key)
 
-    # FINAL WAIT FOR NODES TO BE UP
+    # WAIT FOR NODES TO BE UP
     logging.info("Node setup finished, waiting for nodes to be ready")
     for node in nodes.values():
-        await asyncio.wait_for(node.api.readyz(), timeout=60)
+        while not await asyncio.wait_for(node.api.readyz(), timeout=60):
+            logging.info(f"Node {node} not ready yet, retrying")
+            await asyncio.sleep(1)
 
         addresses = await node.api.addresses()
         node.peer_id = addresses["hopr"]
         node.address = addresses["native"]
         logging.info(f"Node {node} is ready")
+
+    # WAIT FOR NODES TO CONNECT TO ALL PEERS
+    logging.info("Waiting for nodes to connect to all peers")
+    for node in nodes.values():
+
+        def is_same_node(a, b):
+            return a.peer_id == b.peer_id
+
+        def is_in_same_network(a, b):
+            return a.network == b.network
+
+        required_peers = [
+            n.peer_id for n in nodes.values() if not is_same_node(n, node) and is_in_same_network(n, node)
+        ]
+
+        async def all_peers_connected():
+            peers = [p["peer_id"] for p in await asyncio.wait_for(node.api.peers(), timeout=60)]
+            missing_peers = [p for p in required_peers if p not in peers]
+            return len(missing_peers) == 0
+
+        while not await all_peers_connected():
+            logging.info(f"Node {node} does not have all peers connected yet, retrying")
+            await asyncio.sleep(1)
 
     # YIELD NODES
     yield nodes

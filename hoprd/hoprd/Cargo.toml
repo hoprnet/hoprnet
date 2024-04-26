@@ -7,28 +7,36 @@ description = "Contains the main entry point of HOPR daemon application"
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"
+build = "build.rs"
 
 [dependencies]
 async-broadcast = { workspace = true }
 async-lock = { workspace = true }
-async-std = { workspace = true, features = ["attributes"] }
-clap = { version = "4.4", features = ["derive", "env", "string"] }
+async-std = { workspace = true, features = ["attributes", "tokio1"] }
+clap = { workspace = true }
 chrono = "0.4.26"
-fern = "0.6.2"
+env_logger = { workspace = true, optional = true }
 futures = { workspace = true }
 hex = { workspace = true }
 home = "0.5"
 humantime = "2.1.0"
 lazy_static = { workspace = true, optional = true }
 proc-macro-regex = "~1.1.0"
+prost = "0.12.3"
 serde = { workspace = true }
 serde_yaml = "0.9"
 serde_json = "1.0"
 strum = { workspace = true }
 thiserror = { workspace = true }
+tokio = "1.36.0"
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 validator = { workspace = true }
+
+opentelemetry = { version = "0.22" }
+opentelemetry-otlp = { version = "0.15", default-features = false, features = ["trace", "reqwest-client", "tls-roots", "http-proto", "grpc-tonic"] }
+opentelemetry_sdk = { version = "0.22", features = ["rt-async-std"] }
+tracing-opentelemetry = "0.23"
 
 hopr-lib = { workspace = true }
 hoprd-api = { workspace = true }
@@ -38,7 +46,11 @@ hopr-platform = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 
 [dev-dependencies]
-tempfile = "3"
+tempfile = { workspace = true }
+
+[build-dependencies]
+vergen-gitcl = { version = "1.0.0-beta.2", features = ["build"] }
+anyhow = "1"
 
 [features]
 default = ["prometheus"]
@@ -48,3 +60,4 @@ prometheus = [
     "hopr-lib/prometheus",
     "hoprd-api/prometheus"
 ]
+simple_log = ["dep:env_logger"]

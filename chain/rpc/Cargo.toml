@@ -1,6 +1,6 @@
 [package]
 name = "chain-rpc"
-version = "0.2.1"
+version = "0.2.2"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Abstraction over Ethereum RPC provider client"
@@ -14,7 +14,7 @@ crate-type = ["rlib"]
 [dependencies]
 async-trait = { workspace = true }
 async-std = { workspace = true, features = ["unstable"] }
-async-stream = "0.3.5"
+async-stream = { workspace = true }
 ethers = { workspace = true }
 futures = { workspace = true }
 futures-timer = { workspace = true }
@@ -39,7 +39,7 @@ surf = { version = "2.3.2" }
 
 [dev-dependencies]
 async-std = { version = "1.12.0", features = ["attributes", "unstable"] }
-env_logger = "0.10"
+env_logger = { workspace = true }
 mockall = "0.11.4"
 mockito = "1.2.0"
 hex-literal = { workspace = true }

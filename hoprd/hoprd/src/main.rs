@@ -9,11 +9,13 @@ use hopr_lib::{ApplicationData, AsUnixTimestamp, ToHex, TransportOutput};
 use hoprd::cli::CliArgs;
 use hoprd_api::run_hopr_api;
 use hoprd_keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
+use opentelemetry_otlp::WithExportConfig as _;
+use opentelemetry_sdk::trace::{RandomIdGenerator, Sampler};
 use tracing::{error, info, warn};
+use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleHistogram;
-use tracing_subscriber::layer::SubscriberExt;
 
 const ONBOARDING_INFORMATION_INTERVAL: std::time::Duration = std::time::Duration::from_secs(30);
 const WEBSOCKET_EVENT_BROADCAST_CAPACITY: usize = 10000;
@@ -27,8 +29,13 @@ lazy_static::lazy_static! {
     ).unwrap();
 }
 
-#[async_std::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+#[cfg(feature = "simple_log")]
+fn init_logger() {
+    env_logger::init();
+}
+
+#[cfg(not(feature = "simple_log"))]
+fn init_logger() -> Result<(), Box<dyn std::error::Error>> {
     let env_filter = match tracing_subscriber::EnvFilter::try_from_default_env() {
         Ok(filter) => filter,
         Err(_) => tracing_subscriber::filter::EnvFilter::new("info")
@@ -45,11 +52,51 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_thread_ids(true)
         .with_thread_names(false);
 
-    let subscriber = tracing_subscriber::Registry::default().with(env_filter).with(format);
+    if let Ok(telemetry_url) = std::env::var("HOPRD_OPENTELEMETRY_COLLECTOR_URL") {
+        let tracer = opentelemetry_otlp::new_pipeline()
+            .tracing()
+            .with_exporter(
+                opentelemetry_otlp::new_exporter()
+                    .http()
+                    .with_endpoint(telemetry_url)
+                    .with_protocol(opentelemetry_otlp::Protocol::HttpBinary)
+                    .with_timeout(std::time::Duration::from_secs(5)),
+            )
+            .with_trace_config(
+                opentelemetry_sdk::trace::config()
+                    .with_sampler(Sampler::AlwaysOn)
+                    .with_id_generator(RandomIdGenerator::default())
+                    .with_max_events_per_span(64)
+                    .with_max_attributes_per_span(16)
+                    .with_resource(opentelemetry_sdk::Resource::new(vec![opentelemetry::KeyValue::new(
+                        "service.name",
+                        env!("CARGO_PKG_NAME"),
+                    )])),
+            )
+            .install_batch(opentelemetry_sdk::runtime::AsyncStd)?;
 
-    tracing::subscriber::set_global_default(subscriber).expect("Failed to set tracing subscriber");
+        tracing::subscriber::set_global_default(
+            tracing_subscriber::Registry::default()
+                .with(env_filter)
+                .with(format)
+                .with(tracing_opentelemetry::layer().with_tracer(tracer)),
+        )
+        .expect("Failed to set tracing subscriber");
+    } else {
+        tracing::subscriber::set_global_default(tracing_subscriber::Registry::default().with(env_filter).with(format))
+            .expect("Failed to set tracing subscriber");
+    };
 
-    info!("This is HOPRd {}", hopr_lib::constants::APP_VERSION);
+    Ok(())
+}
+
+#[async_std::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let _ = init_logger();
+
+    let git_hash = option_env!("VERGEN_GIT_SHA").unwrap_or("unknown");
+    info!("This is HOPRd {} ({})", hopr_lib::constants::APP_VERSION, git_hash);
+
     let args = <CliArgs as clap::Parser>::parse();
 
     // TOOD: add proper signal handling
@@ -130,7 +177,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     // TODO: remove RLP in 3.0
                     match hopr_lib::rlp::decode(&data.plain_text) {
                         Ok((msg, sent)) => {
-                            let latency = recv_at.duration_since(SystemTime::UNIX_EPOCH).unwrap() - sent;
+                            let latency = recv_at.as_unix_timestamp() - sent;
 
                             info!(
                                 r#"
@@ -195,7 +242,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let my_peer_id = (*hopr_lib::Keypair::public(&hopr_keys.packet_key)).into();
         let version = hopr_lib::constants::APP_VERSION;
 
-        while !hopr_clone.is_allowed_to_access_network(&my_peer_id).await {
+        while !hopr_clone
+            .is_allowed_to_access_network(&my_peer_id)
+            .await
+            .unwrap_or(false)
+        {
             info!("
                 Once you become eligible to join the HOPR network, you can continue your onboarding by using the following URL: https://hub.hoprnet.org/staking/onboarding?HOPRdNodeAddressForOnboarding={my_ethereum_address}, or by manually entering the node address of your node on https://hub.hoprnet.org/.
             ");
@@ -236,6 +287,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             node_ingress,
             run_hopr_api(
                 &host_listen,
+                cfg.as_redacted_string()?,
                 &cfg.api,
                 node,
                 inbox.clone(),

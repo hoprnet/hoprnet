@@ -4,13 +4,6 @@
 space := $(subst ,, )
 mydir := $(dir $(abspath $(firstword $(MAKEFILE_LIST))))
 
-
-# Gets all solidity files which can be modified
-SOLIDITY_SRC_FILES := $(shell find ./ethereum/contracts/src -type f -name "*.sol" ! -path "*/static/*")
-SOLIDITY_TEST_FILES := $(shell find ./ethereum/contracts/test -type f -name "*.sol")
-SOLIDITY_SCRIPT_FILES := $(shell find ./ethereum/contracts/script -type f -name "*.sol")
-SOLIDITY_FILES := $(SOLIDITY_SRC_FILES) $(SOLIDITY_TEST_FILES) $(SOLIDITY_SCRIPT_FILES)
-
 # Set local cargo directory (for binaries)
 # note: $(mydir) ends with '/'
 CARGO_DIR := $(mydir).cargo
@@ -74,7 +67,7 @@ install:
 .PHONY: clean
 clean: # Cleanup build directories
 	cargo clean
-	find ethereum/bindings/src -delete
+	find ethereum/bindings/src -type f ! -name "lib.rs" -delete
 
 .PHONY: test
 test: smart-contract-test ## run unit tests for all packages, or a single package if package= is set
@@ -87,45 +80,6 @@ smoke-tests: ## run smoke tests
 .PHONY: smart-contract-test
 smart-contract-test: # forge test smart contracts
 	$(MAKE) -C ethereum/contracts/ sc-test
-
-.PHONY: lint
-lint: lint-python lint-sol lint-rust 
-lint:
-
-.PHONY: lint-sol
-lint-sol: ## run linter for Solidity
-	for f in $(SOLIDITY_FILES); do \
-		forge fmt --root ./ethereum/contracts --check $${f} || exit 1; \
-	done
-	# FIXME: disabled until all linter errors are resolved
-	# npx solhint $${f} || exit 1; \
-
-.PHONY: lint-rust
-lint-rust: ## run linter for Rust
-	cargo fmt --check
-	cargo clippy -- -Dwarnings
-
-.PHONY: lint-python
-lint-python: ## run linter for Python
-	source .venv/bin/activate && ruff --fix . && black --check tests/
-
-.PHONY: fmt
-fmt: fmt-rust fmt-python fmt-sol
-fmt: ## run code formatter for TS, Rust, Python, Solidity
-
-.PHONY: fmt-sol
-fmt-sol: ## run code formatter for Solidity
-	for f in $(SOLIDITY_FILES); do \
-		forge fmt $${f} --root ./ethereum/contracts; \
-	done
-
-.PHONY: fmt-rust
-fmt-rust: ## run code formatter for Rust
-	cargo fmt
-
-.PHONY: fmt-python
-fmt-python: ## run code formatter for Python
-	source .venv/bin/activate && black tests/
 
 .PHONY: run-anvil
 run-anvil: args=
@@ -149,8 +103,7 @@ create-local-identity: id_count=1
 create-local-identity: ## run HOPRd from local repo
 	if [ ! -f "${id_dir}${id_prefix}0.id" ]; then \
 		ETHERSCAN_API_KEY="anykey" IDENTITY_PASSWORD="${id_password}" \
-		hopli identity \
-		--action create \
+		hopli identity create \
 		--identity-directory "${id_dir}" \
 		--identity-prefix "${id_prefix}" \
 		--number ${id_count}; \
@@ -194,24 +147,26 @@ fund-local-all: id_dir=/tmp/
 fund-local-all: id_password=local
 fund-local-all: id_prefix=
 fund-local-all: ## use faucet script to fund all the local identities
-	ETHERSCAN_API_KEY="anykey" IDENTITY_PASSWORD="${id_password}" PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+	ETHERSCAN_API_KEY="anykey" IDENTITY_PASSWORD="${id_password}" PRIVATE_KEY=ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
 		hopli faucet \
 		--network anvil-localhost \
+		--contracts-root "./ethereum/contracts" \
 		--identity-prefix "${id_prefix}" \
-		--identity-directory "${id_dir}" \
-		--contracts-root "./ethereum/contracts"
+		--identity-directory "${id_dir}"
 
 .PHONY: create-safe-module-all
 create-safe-module-all: id_dir=/tmp/
 create-safe-module-all: id_password=local
 create-safe-module-all: id_prefix=
 create-safe-module-all: ## create a safe and a module and add all the nodes from local identities to the module
-	ETHERSCAN_API_KEY="anykey" IDENTITY_PASSWORD="${id_password}" PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
-		hopli create-safe-module \
+	ETHERSCAN_API_KEY="anykey" IDENTITY_PASSWORD="${id_password}" PRIVATE_KEY=ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+		hopli safe-module create \
 		--network anvil-localhost \
+		--contracts-root "./ethereum/contracts" \
 		--identity-prefix "${id_prefix}" \
 		--identity-directory "${id_dir}" \
-		--contracts-root "./ethereum/contracts"
+		--hopr-amount 1000 --native-amount 1 \
+		--manager-private-key ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
 
 .PHONY: create-safe-module
 create-safe-module: id_password=local
@@ -219,12 +174,13 @@ create-safe-module: id_path=/tmp/local-alice.id
 create-safe-module: hopr_amount=10
 create-safe-module: native_amount=1
 create-safe-module: ## create a safe and a module, and add a node to the module
-	ETHERSCAN_API_KEY="anykey" IDENTITY_PASSWORD="${id_password}" PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
-		hopli create-safe-module \
+	ETHERSCAN_API_KEY="anykey" IDENTITY_PASSWORD="${id_password}" PRIVATE_KEY=ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+		hopli safe-module create \
 		--network anvil-localhost \
+		--contracts-root "./ethereum/contracts" \
 		--identity-from-path "${id_path}" \
 		--hopr-amount ${hopr_amount} --native-amount ${native_amount} \
-		--contracts-root "./ethereum/contracts"
+		--manager-private-key ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
 
 .PHONY: deploy-safe-module
 deploy-safe-module: id_password=local
@@ -235,10 +191,11 @@ ifeq ($(origin PRIVATE_KEY),undefined)
 	echo "<PRIVATE_KEY> environment variable missing" >&2 && exit 1
 endif
 	ETHERSCAN_API_KEY="anykey" IDENTITY_PASSWORD="${id_password}" PRIVATE_KEY="${PRIVATE_KEY}" \
-		hopli create-safe-module \
+		hopli safe-module create \
 		--network "${network}" \
 		--identity-from-path "${id_path}" \
-		--contracts-root "./ethereum/contracts"
+		--contracts-root "./ethereum/contracts" \
+		--manager-private-key ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
 
 .PHONY: docker-build-local
 docker-build-local: ## build Docker images locally, or single image if image= is set
@@ -409,10 +366,10 @@ generate-python-sdk: ## generate Python SDK via Swagger Codegen, not using the o
 generate-python-sdk:
 	$(cargo) run --bin hoprd-api-schema >| /tmp/openapi.spec.json
 	echo '{"packageName":"hoprd_sdk","projectName":"hoprd-sdk","packageVersion":"'$(shell ./scripts/get-current-version.sh docker)'","packageUrl":"https://github.com/hoprnet/hoprd-sdk-python"}' >| /tmp/python-sdk-config.json
-    
+
 	mkdir -p ./hoprd-sdk-python/
 	rm -rf ./hoprd-sdk-python/*
-	
+
 	swagger-codegen3 generate \
 		-l python \
 		-o hoprd-sdk-python \

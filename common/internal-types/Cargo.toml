@@ -16,6 +16,7 @@ async-trait = { workspace = true }
 bloomfilter = { version = "1.0.12", features = ["serde"] }
 ethers = { workspace = true, default-features = false }
 hex-literal = { workspace = true }
+num_enum = { workspace = true }
 multiaddr = "0.18"
 serde = { version = "1.0", features = ["derive"] }
 serde_repr = "0.1"
@@ -32,6 +33,7 @@ hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
 bincode = "1.3.3"
+cbor4ii = { version = "0.3.2", features = ["serde1", "use_std"] }
 lazy_static = { workspace = true }
 
 [features]

@@ -1,118 +1,239 @@
-use crate::identity_input::LocalIdentityArgs;
-use crate::key_pair::{create_identity, read_identities};
-use crate::password::PasswordArgs;
-use crate::utils::{Cmd, HelperErrors};
+//! This module contains subcommands for `hopli identity`,
+//! This command contains subcommands to read, create or update identity files, providing correct [crate::key_pair::PasswordArgs]
+//!
+//! For all three actions around identity files, at least two arguments are needed:
+//! - Path to files
+//! - Password to encrypt or decrypt the file
+//! To update identity files, a new password must be provided.
+//!
+//! Some sample commands:
+//!
+//! - To create identities
+//! ```text
+//! hopli identity create \
+//!     --identity-directory "./test" \
+//!     --identity-prefix nodes_ \
+//!     --number 2 \
+//!     --password-path "./test/pwd"
+//! ```
+//!
+//! - To read identities
+//! ```text
+//! hopli identity read \
+//!     --identity-directory "./test" \
+//!     --identity-prefix node_ \
+//!     --password-path "./test/pwd"
+//! ```
+//!
+//! - To update password of identities
+//! ```text
+//!     hopli identity update \
+//!     --identity-directory "./test" \
+//!     --identity-prefix node_ \
+//!     --password-path "./test/pwd" \
+//!     --new-password-path "./test/newpwd"
+//! ```
 use clap::{builder::RangedU64ValueParser, Parser};
+use hopr_crypto_types::keypairs::Keypair;
+use hopr_primitive_types::primitives::Address;
 use hoprd_keypair::key_pair::HoprKeys;
+use tracing::{debug, info};
+
+use crate::key_pair::{
+    create_identity, read_identities, read_identity, update_identity_password, ArgEnvReader, IdentityFileArgs,
+    NewPasswordArgs,
+};
+use crate::utils::HelperErrors::UnableToParseAddress;
+use crate::utils::{Cmd, HelperErrors};
+use hopr_crypto_types::prelude::{OffchainPublicKey, PeerId};
+use hopr_primitive_types::prelude::ToHex;
 use std::collections::HashMap;
 use std::str::FromStr;
-use tracing::{debug, error, info};
-
-#[derive(clap::ValueEnum, Debug, Clone, PartialEq, Eq)]
-pub enum IdentityActionType {
-    Create,
-    Read,
-}
-
-impl FromStr for IdentityActionType {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "c" | "create" => Ok(IdentityActionType::Create),
-            "r" | "read" => Ok(IdentityActionType::Read),
-            _ => Err(format!("Unknown identity action: {s}")),
-        }
-    }
-}
 
 /// CLI arguments for `hopli identity`
-#[derive(Parser, Clone, Debug)]
-pub struct IdentityArgs {
-    #[clap(
-        value_enum,
-        long,
-        short,
-        help_heading = "Identity action",
-        help = "Action with identity `create` or `read`"
-    )]
-    pub action: IdentityActionType,
+#[derive(Clone, Debug, Parser)]
+pub enum IdentitySubcommands {
+    /// Create safe and module proxy if nothing exists
+    #[command(visible_alias = "cr")]
+    Create {
+        /// Arguments to locate identity file(s) of HOPR node(s)
+        #[command(flatten)]
+        local_identity: IdentityFileArgs,
 
-    #[clap(flatten)]
-    password: PasswordArgs,
+        /// Number of identities to be generated
+        #[clap(
+            help = "Number of identities to be generated, e.g. 1",
+            long,
+            short,
+            value_parser = RangedU64ValueParser::<u32>::new().range(1..),
+            default_value_t = 1
+        )]
+        number: u32,
+    },
 
-    #[clap(flatten)]
-    local_identity: LocalIdentityArgs,
+    /// Migrate safe and module to a new network
+    #[command(visible_alias = "rd")]
+    Read {
+        /// Arguments to locate identity file(s) of HOPR node(s)
+        #[command(flatten)]
+        local_identity: IdentityFileArgs,
+    },
 
-    #[clap(
-        help = "Number of identities to be generated, e.g. 1",
-        long,
-        short,
-        value_parser = RangedU64ValueParser::<u32>::new().range(1..),
-        default_value_t = 1
-    )]
-    number: u32,
+    /// Update the password of identity files
+    #[command(visible_alias = "up")]
+    Update {
+        /// Arguments to locate identity files of HOPR node(s)
+        #[command(flatten)]
+        local_identity: IdentityFileArgs,
+
+        /// New password
+        #[command(flatten)]
+        new_password: NewPasswordArgs,
+    },
+
+    /// Converts PeerId from base58 to public key as hex or vice-versa
+    #[command(visible_alias = "conv")]
+    ConvertPeer {
+        /// PeerID or Public key
+        #[command(flatten)]
+        peer_or_key: ConvertPeerArgs,
+    },
 }
 
-impl IdentityArgs {
-    /// Execute the command with given parameters
-    fn execute_identity_creation_loop(self) -> Result<(), HelperErrors> {
-        let IdentityArgs {
-            action,
-            password,
-            local_identity,
-            number,
-        } = self;
+/// Arguments for PeerID or Public key
+#[derive(Debug, Clone, Parser, Default)]
+pub struct ConvertPeerArgs {
+    /// Either provide a PeerID in Base58 or public key as hex starting with 0x
+    #[clap(
+        short,
+        long,
+        help = "PeerID in Base58 or public key as hex starting with 0x",
+        name = "peer_or_key",
+        value_name = "PEER_ID_OR_PUBLIC_KEY"
+    )]
+    pub peer_or_key: String,
+}
 
+impl IdentitySubcommands {
+    /// Execute the command to create identities
+    fn execute_identity_creation_loop(local_identity: IdentityFileArgs, number: u32) -> Result<(), HelperErrors> {
         // check if password is provided
-        let pwd = match password.read_password() {
-            Ok(read_pwd) => read_pwd,
-            Err(e) => return Err(e),
-        };
+        let pwd = local_identity.clone().password.read_default()?;
 
         let mut node_identities: HashMap<String, HoprKeys> = HashMap::new();
 
-        match action {
-            IdentityActionType::Create => {
-                if local_identity.identity_from_directory.is_none() {
-                    error!("Does not support file. Must provide an identity-directory");
-                    return Err(HelperErrors::MissingIdentityDirectory);
-                }
-                let local_id = local_identity.identity_from_directory.unwrap();
-                let id_dir = local_id.identity_directory.unwrap();
-                for index in 0..=number - 1 {
-                    // build file name
-                    let file_prefix = local_id
-                        .identity_prefix
-                        .as_ref()
-                        .map(|provided_name| provided_name.to_owned() + &index.to_string());
+        let local_id = local_identity
+            .identity_from_directory
+            .ok_or(HelperErrors::MissingIdentityDirectory)
+            .unwrap();
 
-                    match create_identity(&id_dir, &pwd, &file_prefix) {
-                        Ok((id_filename, identity)) => _ = node_identities.insert(id_filename, identity),
-                        Err(_) => return Err(HelperErrors::UnableToCreateIdentity),
-                    }
-                }
-            }
-            IdentityActionType::Read => {
-                // read ids
-                let files = local_identity.get_files();
-                debug!("Identities read {:?}", files.len());
-                match read_identities(files, &pwd) {
-                    Ok(identities) => node_identities = identities,
-                    Err(_) => return Err(HelperErrors::UnableToReadIdentity),
-                }
-            }
+        let id_dir = local_id.identity_directory.unwrap();
+        for index in 0..=number - 1 {
+            // build file name
+            let file_prefix = local_id
+                .identity_prefix
+                .as_ref()
+                .map(|provided_name| provided_name.to_owned() + &index.to_string());
+
+            let (id_filename, identity) =
+                create_identity(&id_dir, &pwd, &file_prefix).map_err(|_| HelperErrors::UnableToCreateIdentity)?;
+            node_identities.insert(id_filename, identity);
         }
 
         info!("Identities: {:?}", node_identities);
-        println!("{}", serde_json::to_string(&node_identities).unwrap());
+        Ok(())
+    }
+
+    /// Execute the command to read identities
+    fn execute_identity_read_loop(local_identity: IdentityFileArgs) -> Result<(), HelperErrors> {
+        // check if password is provided
+        let pwd = local_identity.clone().password.read_default()?;
+
+        // read ids
+        let files = local_identity.get_files();
+        debug!("Identities read {:?}", files.len());
+
+        let node_identities: HashMap<String, HoprKeys> =
+            read_identities(files, &pwd).map_err(|_| HelperErrors::UnableToReadIdentity)?;
+
+        let node_addresses: Vec<Address> = node_identities
+            .values()
+            .map(|n| n.chain_key.public().to_address())
+            .collect();
+
+        let peer_ids: Vec<String> = node_identities
+            .values()
+            .map(|n| n.packet_key.public().to_peerid_str())
+            .collect();
+
+        info!("Identities: {:?}", node_identities);
+        println!("Identity addresses: {:?}", node_addresses);
+        println!("Identity peerids: [{}]", peer_ids.join(", "));
+        Ok(())
+    }
+
+    /// update the password of an identity file
+    fn execute_identity_update(
+        local_identity: IdentityFileArgs,
+        new_password: NewPasswordArgs,
+    ) -> Result<(), HelperErrors> {
+        // check if old password is provided
+        let pwd = local_identity.clone().password.read_default()?;
+        // check if new password is provided
+        let new_pwd = new_password.read_default()?;
+
+        // read ids
+        let files = local_identity.get_files();
+        debug!("Identities read {:?}", files.len());
+
+        let _ = files
+            .iter()
+            .map(|file| {
+                read_identity(file, &pwd)
+                    .map_err(|_| HelperErrors::UnableToUpdateIdentityPassword)
+                    .and_then(|(_, keys)| update_identity_password(keys, file, &new_pwd))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        info!("Updated password for {:?} identity files", files.len());
         Ok(())
     }
 }
 
-impl Cmd for IdentityArgs {
+impl Cmd for IdentitySubcommands {
     /// Run the execute_identity_creation_loop function
     fn run(self) -> Result<(), HelperErrors> {
-        self.execute_identity_creation_loop()
+        match self {
+            IdentitySubcommands::Create { local_identity, number } => {
+                IdentitySubcommands::execute_identity_creation_loop(local_identity, number)
+            }
+            IdentitySubcommands::Read { local_identity } => {
+                IdentitySubcommands::execute_identity_read_loop(local_identity)
+            }
+            IdentitySubcommands::Update {
+                local_identity,
+                new_password,
+            } => IdentitySubcommands::execute_identity_update(local_identity, new_password),
+            IdentitySubcommands::ConvertPeer { peer_or_key } => {
+                if peer_or_key.peer_or_key.to_lowercase().starts_with("0x") {
+                    let pk = OffchainPublicKey::from_hex(&peer_or_key.peer_or_key)
+                        .map_err(|_| UnableToParseAddress(peer_or_key.peer_or_key))?;
+                    println!("{}", pk.to_peerid_str());
+                    Ok(())
+                } else {
+                    let pk = PeerId::from_str(&peer_or_key.peer_or_key)
+                        .map_err(|_| UnableToParseAddress(peer_or_key.peer_or_key.clone()))
+                        .and_then(|p| {
+                            OffchainPublicKey::try_from(p).map_err(|_| UnableToParseAddress(peer_or_key.peer_or_key))
+                        })?;
+                    println!("{}", pk.to_hex());
+                    Ok(())
+                }
+            }
+        }
+    }
+
+    async fn async_run(self) -> Result<(), HelperErrors> {
+        Ok(())
     }
 }

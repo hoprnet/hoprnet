@@ -1,5 +1,5 @@
 ---
-version: '3.8'
+version: "3.8"
 
 networks:
   hopr-net:
@@ -19,13 +19,13 @@ services:
     networks:
       - hopr-net
     extra_hosts:
-      - 'host.docker.internal:host-gateway'
+      - "host.docker.internal:host-gateway"
     deploy:
       resources:
         limits:
           memory: 256M
   cadvisor:
-    image: gcr.io/cadvisor/cadvisor:v0.47.2@sha256:78cf73632de30193dc249923fdfdb1d43ee7cfccbf64662991de89ff7c4b1fda
+    image: gcr.io/cadvisor/cadvisor:v0.47.2@sha256:e6c562b5e983f13624898b5b6a902c71999580dc362022fc327c309234c485d7
     container_name: cadvisor
     hostname: cadvisor
     volumes:
@@ -38,7 +38,7 @@ services:
     expose:
       - 9093
     ports:
-      - '9093:8080'
+      - "9093:8080"
     networks:
       - hopr-net
     devices:
@@ -52,15 +52,15 @@ services:
       - /sys:/host/sys:ro
       - /:/rootfs:ro
     command:
-      - '--path.procfs=/host/proc'
-      - '--path.rootfs=/rootfs'
-      - '--path.sysfs=/host/sys'
-      - '--collector.filesystem.ignored-mount-points=^/(sys|proc|dev|host|etc)($$|/)'
+      - "--path.procfs=/host/proc"
+      - "--path.rootfs=/rootfs"
+      - "--path.sysfs=/host/sys"
+      - "--collector.filesystem.ignored-mount-points=^/(sys|proc|dev|host|etc)($$|/)"
     restart: unless-stopped
     expose:
       - 9100
     ports:
-      - '9100:9100'
+      - "9100:9100"
     networks:
       - hopr-net
   prometheus:
@@ -75,7 +75,7 @@ services:
       --web.console.libraries=/usr/share/prometheus/console_libraries
       --web.console.templates=/usr/share/prometheus/consoles
     ports:
-      - '9090:9090'
+      - "9090:9090"
     volumes:
       - ./prometheus/prometheus.local-dev.yml:/etc/prometheus/prometheus.yml
       - prometheus_data:/prometheus
@@ -84,20 +84,20 @@ services:
     networks:
       - hopr-net
     extra_hosts:
-      - 'host.docker.internal:host-gateway'
+      - "host.docker.internal:host-gateway"
   grafana:
     image: grafana/grafana:10.3.1@sha256:1adbcc2df3866ff5ec1d836e9d2220c904c7f98901b918d3cc5e1118ab1af991
-    user: '472'
+    user: "472"
     restart: always
     environment:
-      GF_INSTALL_PLUGINS: 'grafana-clock-panel,grafana-simple-json-datasource'
+      GF_INSTALL_PLUGINS: "grafana-clock-panel,grafana-simple-json-datasource"
     volumes:
       - grafana_data:/var/lib/grafana
       - ./grafana/provisioning/:/etc/grafana/provisioning/
     env_file:
       - ./grafana/config.monitoring
     ports:
-      - '3030:3000'
+      - "3030:3000"
     depends_on:
       - prometheus
     networks:

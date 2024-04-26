@@ -28,7 +28,7 @@ jobs:
 
   open-release:
     name: Open Release
-    runs-on: ubuntu-2-core
+    runs-on: self-hosted-hoprnet-small
     steps:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4

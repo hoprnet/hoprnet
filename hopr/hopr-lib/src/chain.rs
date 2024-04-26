@@ -13,15 +13,14 @@ use chain_actions::payload::SafePayloadGenerator;
 use chain_actions::{action_queue::ActionQueue, ChainActions};
 use chain_api::executors::{EthereumTransactionExecutor, RpcEthereumClient, RpcEthereumClientConfig};
 use chain_api::{DefaultHttpPostRequestor, JsonRpcClient};
-use chain_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
 use chain_rpc::client::SimpleJsonRpcRetryPolicy;
 use chain_rpc::rpc::{RpcOperations, RpcOperationsConfig};
 use chain_types::chain_events::SignificantChainEvent;
 use chain_types::{ContractAddresses, TypedTransaction};
 use core_path::channel_graph::ChannelGraph;
 use core_transport::{ChainKeypair, Keypair};
+use hopr_db_api::HoprDbAllOperations;
 use hopr_primitive_types::primitives::Address;
-use utils_db::CurrentDbShim;
 
 use crate::errors::HoprLibError;
 
@@ -223,28 +222,18 @@ impl ChainNetworkConfig {
     }
 }
 
-// TODO: parts to be replaced by chain_types::ContractAddresses
-#[derive(Debug, Serialize, Clone)]
-pub struct SmartContractConfig {
-    pub hopr_announcements_address: Address,
-    pub hopr_token_address: Address,
-    pub hopr_channels_address: Address,
-    pub hopr_network_registry_address: Address,
-    pub hopr_node_safe_registry_address: Address,
-    pub hopr_ticket_price_oracle_address: Address,
-    pub indexer_start_block_number: u32,
-}
-
-impl From<&ChainNetworkConfig> for SmartContractConfig {
+impl From<&ChainNetworkConfig> for ContractAddresses {
     fn from(network: &ChainNetworkConfig) -> Self {
         Self {
-            hopr_announcements_address: network.announcements,
-            hopr_token_address: network.token,
-            hopr_channels_address: network.channels,
-            hopr_network_registry_address: network.network_registry,
-            hopr_node_safe_registry_address: network.node_safe_registry,
-            hopr_ticket_price_oracle_address: network.ticket_price_oracle,
-            indexer_start_block_number: network.channel_contract_deploy_block,
+            token: network.token,
+            channels: network.channels,
+            announcements: network.announcements,
+            network_registry: network.network_registry,
+            network_registry_proxy: network.network_registry_proxy,
+            safe_registry: network.node_safe_registry,
+            price_oracle: network.ticket_price_oracle,
+            stake_factory: network.node_stake_v2_factory,
+            module_implementation: network.module_implementation,
         }
     }
 }
@@ -309,20 +298,23 @@ pub fn build_chain_components<Db>(
     chain_config: ChainNetworkConfig,
     contract_addrs: ContractAddresses,
     module_address: Address,
-    db: Arc<RwLock<Db>>,
+    db: Db,
 ) -> (
     ActionQueue<Db, IndexerActionTracker, ActiveTxExecutor>,
     ChainActions<Db>,
     RpcOperations<JsonRpcClient>,
 )
 where
-    Db: HoprCoreEthereumDbActions + Clone + Send + Sync + 'static,
+    Db: HoprDbAllOperations + Clone + Send + Sync + std::fmt::Debug + 'static,
 {
     // TODO: extract this from the global config type
     let rpc_http_config = chain_rpc::client::native::HttpPostRequestorConfig::default();
 
     // TODO: extract this from the global config type
-    let rpc_http_retry_policy = SimpleJsonRpcRetryPolicy::default();
+    let rpc_http_retry_policy = SimpleJsonRpcRetryPolicy {
+        min_retries: Some(2),
+        ..SimpleJsonRpcRetryPolicy::default()
+    };
 
     // TODO: extract this from the global config type
     let rpc_cfg = RpcOperationsConfig {
@@ -375,25 +367,24 @@ where
 }
 
 #[allow(clippy::too_many_arguments)] // TODO: refactor this function into a reasonable group of components once fully rearchitected
-pub fn build_chain_api(
+pub fn build_chain_api<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static>(
     me_onchain: ChainKeypair,
-    db: Arc<RwLock<CoreEthereumDb<CurrentDbShim>>>,
+    new_db: T,
     contract_addrs: ContractAddresses,
     safe_address: Address,
     indexer_start_block: u64,
     indexer_events_tx: futures::channel::mpsc::UnboundedSender<SignificantChainEvent>,
-    chain_actions: ChainActions<CoreEthereumDb<CurrentDbShim>>,
+    chain_actions: ChainActions<T>,
     rpc_operations: RpcOperations<JsonRpcClient>,
     channel_graph: Arc<RwLock<ChannelGraph>>,
-) -> chain_api::HoprChain {
+) -> chain_api::HoprChain<T> {
     let indexer_cfg = chain_indexer::IndexerConfig {
         start_block_number: indexer_start_block,
-        ..Default::default()
     };
 
     chain_api::HoprChain::new(
         me_onchain,
-        db,
+        new_db,
         contract_addrs,
         safe_address,
         indexer_cfg,

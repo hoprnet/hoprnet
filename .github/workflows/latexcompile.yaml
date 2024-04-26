@@ -16,7 +16,7 @@ on:
 
 jobs:
   build_latex:
-    runs-on: ubuntu-2-core
+    runs-on: self-hosted-hoprnet-small
     steps:
       - name: Set up Git repository
         uses: actions/checkout@v4

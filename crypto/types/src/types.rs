@@ -18,7 +18,6 @@ use k256::{
     },
     AffinePoint, Secp256k1,
 };
-use libp2p_identity::PeerId;
 use serde::{Deserialize, Serialize};
 use sha2::Sha512;
 use std::fmt::Debug;
@@ -38,6 +37,8 @@ use crate::{
     keypairs::{ChainKeypair, Keypair, OffchainKeypair},
     primitives::{DigestLike, EthDigest},
 };
+
+pub use libp2p_identity::PeerId;
 
 /// Extend support for arbitrary array sizes in serde
 ///
@@ -428,6 +429,12 @@ impl BinarySerializable for HalfKeyChallenge {
     }
 }
 
+impl std::hash::Hash for HalfKeyChallenge {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.hkc.hash(state);
+    }
+}
+
 impl FromStr for HalfKeyChallenge {
     type Err = GeneralError;
 
@@ -553,7 +560,7 @@ impl From<primitive_types::H256> for Hash {
 }
 
 /// Represents an Ed25519 public key.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Hash)]
 pub struct OffchainPublicKey {
     compressed: CompressedEdwardsY,
 }

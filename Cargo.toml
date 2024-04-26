@@ -9,15 +9,18 @@ resolver = "2"
 members = [
     "common/internal-types",
     "common/primitive-types",
-    "crypto/sphinx",
+    "crypto/packet",
     "crypto/random",
+    "crypto/sphinx",
     "crypto/types",
     "chain/actions",
     "chain/api",
-    "chain/db",
     "chain/indexer",
     "chain/types",
     "chain/rpc",
+    "db/api",
+    "db/migration",
+    "db/entity",
     "ethereum/bindings",
     "hopli",
     "hopr/hopr-lib",
@@ -29,21 +32,24 @@ members = [
     "logic/strategy",
     "misc/metrics",
     "misc/platform",
-    "misc/utils-db",
     "transport/network",
-    "transport/packet",
     "transport/protocol",
     "transport/p2p",
-    "transport/api",
+    "transport/api", "db/api",
 ]
 
 [workspace.dependencies]
 async-broadcast = "0.6.0"
-async-lock = "2.7.0"
+async-lock = "3.3"
 async-std = { version = "1.12.0", features = ["attributes"] }
+async-stream = "0.3.5"
 async-trait = "0.1"
+atomic_enum = "0.2.0"
 base64 = "0.21.7"
+clap = { version = "4.4", features = ["derive", "env", "string"] }
+chrono = { version = "0.4" }
 ethers = { version = "2.0.10", default-features = false }
+env_logger = "0.11.3"
 futures = "0.3.28"
 futures-lite = "1.12.0"
 futures-concurrency = "7.3.0"
@@ -55,7 +61,9 @@ lazy_static = "1.4.0"
 libp2p-identity = { version = "0.2.5", features = ["peerid", "ed25519", "rand"] }
 libp2p-mplex = "0.41.0"
 libp2p = { version = "0.53.2" }
+moka = { version = "0.12", features = ["future"] }
 multiaddr = "0.18.0"
+num_enum = "0.7"
 regex = "1"
 rust-stream-ext-concurrent = "1"
 serde = { version = "1.0", features = ["derive"] }
@@ -63,38 +71,47 @@ serde_bytes = "0.11"
 serde_json = "1.0"
 serde_with = { version = "3.3" }
 smart-default = "0.7"
+sea-orm = { version = "0.12", features = ["sqlx-sqlite", "runtime-async-std", "with-chrono", "debug-print"] }
+sea-orm-cli = { version = "0.12", features = ["codegen", "runtime-async-std-rustls"] }
+sea-orm-migration = { version = "0.12", features = ["runtime-async-std-rustls", "sqlx-sqlite", "with-chrono"]}
+sqlx = { version = "0.7.3", default-features = false, features = ["runtime-async-std", "sqlite", "macros", "migrate"] }
 strum = { version = "0.25.0", features = ["derive"] }
+tempfile = "3"
 thiserror = "1.0"
 tracing = { version = "0.1" }
+tracing-futures = { version = "0.2" }
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "registry", "std"]}
+tracing-test = { version = "0.2.4", features = ["no-env-filter"] }
+uuid = { version = "1.7.0" }
 validator = { version = "0.16.1", features = ["derive"] }
 
 bindings = { path = "ethereum/bindings", default-features = false }
 chain-actions = { path = "chain/actions", default-features = false }
 chain-api = { path = "chain/api", default-features = false }
-chain-db = { path = "chain/db", default-features = false }
 chain-rpc = { path = "chain/rpc", default-features = false }
 chain-types = { path = "chain/types", default-features = false }
 chain-indexer = { path = "chain/indexer", default-features = false }
 hopr-crypto-random = { path = "crypto/random", default-features = false }
+hopr-crypto-packet = { path = "crypto/packet", default-features = false }
 hopr-crypto-sphinx = { path = "crypto/sphinx", default-features = false, features = ["x25519"] }
 hopr-crypto-types = { path = "crypto/types", default-features = false }
 core-network = { path = "transport/network", default-features = false }
-core-packet = { path = "transport/packet", default-features = false }
 core-path = { path = "logic/path", default-features = false }
 core-protocol = { path = "transport/protocol", default-features = false }
 core-p2p = { path = "transport/p2p", default-features = false }
 core-strategy = { path = "logic/strategy", default-features = false }
 core-transport = { path = "transport/api", default-features = false }
 hopr-internal-types = { path = "common/internal-types", default-features = false }
+hopr-db-api = { path = "db/api" }
+hopr-db-entity = { path = "db/entity" }
+hopr-db-migration = { path = "db/migration" }
 hopr-lib = { path = "hopr/hopr-lib", default-features = false }
-hoprd-api = { path = "hoprd/rest-api", default-features = false }
-hoprd-inbox = { path = "hoprd/inbox", default-features = false }
-hoprd-keypair = { path = "hoprd/keypair", default-features = false }
 hopr-metrics = { path = "misc/metrics", default-features = false }
 hopr-platform = { path = "misc/platform" }
 hopr-primitive-types = { path = "common/primitive-types", default-features = false }
-utils-db = { path = "misc/utils-db", default-features = false, features = ['sqlite'] }
+hoprd-api = { path = "hoprd/rest-api", default-features = false }
+hoprd-inbox = { path = "hoprd/inbox", default-features = false }
+hoprd-keypair = { path = "hoprd/keypair", default-features = false }
 
 # [build]
 # rustflags = ["-C", "link-arg=-fuse-ld=lld"]       # needs the "pkgs.llvmPackages.bintools" nix package

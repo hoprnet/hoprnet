@@ -1,5 +1,4 @@
 use crate::errors::Result;
-use chain_db::traits::HoprCoreEthereumDbActions;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::primitives::Address;
 use petgraph::algo::has_path_connecting;
@@ -161,7 +160,7 @@ impl ChannelGraph {
                 .remove_edge(channel.source, channel.destination)
                 .map(|old_value| ChannelChange::diff_channels(&old_value.channel, &channel));
 
-            info!("removed {channel}");
+            debug!("removed {channel}");
 
             return ret;
         }
@@ -171,7 +170,7 @@ impl ChannelGraph {
             old_value.channel = channel;
 
             let ret = ChannelChange::diff_channels(&old_channel, &channel);
-            info!(
+            debug!(
                 "updated {channel}: {}",
                 ret.iter().map(ChannelChange::to_string).collect::<Vec<_>>().join(",")
             );
@@ -179,7 +178,7 @@ impl ChannelGraph {
         } else {
             let weighted = ChannelEdge { channel, quality: None };
             self.graph.add_edge(channel.source, channel.destination, weighted);
-            info!("new {channel}");
+            debug!("new {channel}");
 
             None
         }
@@ -204,12 +203,21 @@ impl ChannelGraph {
     }
 
     /// Synchronizes the channel entries in this graph with the database.
+    ///
     /// The synchronization is one-way from DB to the graph, not vice versa.
-    pub async fn sync_channels<Db: HoprCoreEthereumDbActions>(&mut self, db: &Db) -> Result<()> {
-        db.get_channels().await?.into_iter().for_each(|c| {
-            self.update_channel(c);
-        });
-        info!("synced {} channels to the graph", self.graph.edge_count());
+    pub fn sync_channels<I>(&mut self, channels: I) -> Result<()>
+    where
+        I: IntoIterator<Item = ChannelEntry>,
+    {
+        let changes: usize = channels
+            .into_iter()
+            .map(|c| self.update_channel(c).map(|v| v.len()).unwrap_or(0))
+            .sum();
+        info!(
+            "synced {} channels to the graph: {} changes total",
+            self.graph.edge_count(),
+            changes
+        );
         Ok(())
     }
 
@@ -222,16 +230,14 @@ impl ChannelGraph {
 #[cfg(test)]
 mod tests {
     use crate::channel_graph::ChannelGraph;
-    use chain_db::db::CoreEthereumDb;
-    use chain_db::traits::HoprCoreEthereumDbActions;
+    use hopr_crypto_types::prelude::{ChainKeypair, Keypair};
+    use hopr_db_api::channels::HoprDbChannelOperations;
     use hopr_internal_types::channels::{ChannelChange, ChannelEntry, ChannelStatus};
     use hopr_primitive_types::prelude::*;
     use lazy_static::lazy_static;
     use std::ops::Add;
     use std::str::FromStr;
     use std::time::{Duration, SystemTime};
-    use utils_db::db::DB;
-    use utils_db::CurrentDbShim;
 
     lazy_static! {
         static ref ADDRESSES: [Address; 6] = [
@@ -427,28 +433,24 @@ mod tests {
 
     #[async_std::test]
     async fn test_channel_graph_sync() {
-        let testing_snapshot = Snapshot::default();
         let mut last_addr = ADDRESSES[0];
-        let mut db = CoreEthereumDb::new(DB::new(CurrentDbShim::new_in_memory().await), last_addr);
+        let db = hopr_db_api::db::HoprDb::new_in_memory(ChainKeypair::random()).await;
 
         for current_addr in ADDRESSES.iter().skip(1) {
             // Open channel from last node to us
             let channel = dummy_channel(last_addr, *current_addr, ChannelStatus::Open);
-            db.update_channel_and_snapshot(&channel.get_id(), &channel, &testing_snapshot)
-                .await
-                .unwrap();
+            db.upsert_channel(None, channel).await.unwrap();
 
             last_addr = *current_addr;
         }
 
         // Add a pending to close channel between 4 -> 0
         let channel = dummy_channel(ADDRESSES[4], ADDRESSES[0], ChannelStatus::Closed);
-        db.update_channel_and_snapshot(&channel.get_id(), &channel, &testing_snapshot)
-            .await
-            .unwrap();
+        db.upsert_channel(None, channel).await.unwrap();
 
         let mut cg = ChannelGraph::new(ADDRESSES[0]);
-        cg.sync_channels(&db).await.expect("should sync graph");
+        cg.sync_channels(db.get_all_channels(None).await.expect("channels should be present"))
+            .expect("should sync graph");
 
         assert!(cg.has_path(ADDRESSES[0], ADDRESSES[4]), "must have path from 0 -> 4");
         assert!(
@@ -456,7 +458,7 @@ mod tests {
             "must not sync closed channel"
         );
         assert!(
-            db.get_channels()
+            db.get_all_channels(None)
                 .await
                 .unwrap()
                 .into_iter()

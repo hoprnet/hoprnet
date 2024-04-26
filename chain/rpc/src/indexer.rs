@@ -14,7 +14,7 @@ use ethers::providers::{JsonRpcClient, Middleware};
 use ethers::types::BlockNumber;
 use futures::{Stream, StreamExt, TryStreamExt};
 use std::pin::Pin;
-use tracing::{debug, warn};
+use tracing::{debug, info, warn};
 use tracing::{error, trace};
 
 use crate::errors::{Result, RpcError::FilterIsEmpty};
@@ -64,23 +64,26 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
             let mut from_block = start_block_number;
 
             const MAX_LOOP_FAILURES: usize = 5;
+            const MAX_RPC_PAST_BLOCKS: usize = 50;
             let mut count_failures = 0;
 
             'outer: loop {
                 match self.block_number().await {
                     Ok(latest_block) => {
                         if from_block > latest_block {
+                            let past_diff = from_block - latest_block;
                             if from_block == start_block_number {
-                                // If on first iteration the start block is in the future, just set it to latest
+                                // If on first iteration the start block is in the future, just set
+                                // it to the latest
                                 from_block = latest_block;
-                            } else if from_block - 1 == latest_block {
-                                // If we came here early (we tolerate only off-by one), wait some more
-                                debug!("too early query, still at block {latest_block}");
-                                futures_timer::Delay::new(self.cfg.expected_block_time / 3).await;
+                            } else if past_diff <= MAX_RPC_PAST_BLOCKS as u64 {
+                                // If we came here early (we tolerate only off-by MAX_RPC_PAST_BLOCKS), wait some more
+                                warn!("too early query, RPC provider still at block {latest_block}, diff to DB: {past_diff}");
+                                futures_timer::Delay::new(past_diff as u32 * self.cfg.expected_block_time / 3).await;
                                 continue;
                             } else {
-                                // This is a hard-failure on subsequent iterations which is unrecoverable
-                                panic!("indexer start block number {from_block} is greater than the chain latest block number {latest_block} =>
+                                // This is a hard-failure on later iterations which is unrecoverable
+                                panic!("indexer start block number {from_block} is greater than the chain latest block number {latest_block} (diff {past_diff}) =>
                                 possible causes: chain reorg, RPC provider out of sync, corrupted DB =>
                                 possible solutions: change the RPC provider, reinitialize the DB");
                             }
@@ -89,14 +92,14 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                         #[cfg(all(feature = "prometheus", not(test)))]
                         METRIC_RPC_CHAIN_HEAD.set(latest_block as f64);
 
-                        // Range is inclusive
+                        // The range is inclusive
                         let range_filter = ethers::types::Filter::from(filter.clone())
                             .from_block(BlockNumber::Number(from_block.into()))
                             .to_block(BlockNumber::Number(latest_block.into()));
 
-                        // Range of blocks to fetch is always bounded
+                        // The range of blocks to fetch is always bounded
                         let range_size = self.cfg.max_block_range_fetch_size.min(latest_block - from_block);
-                        debug!("polling logs from blocks #{from_block} - #{latest_block} (range size {range_size})");
+                        info!("polling logs from blocks #{from_block} - #{latest_block} (range size {range_size})");
 
                         // If we're fetching logs from wide block range, we'll use the pagination log query.
                         let mut retrieved_logs = if range_size >= self.cfg.min_block_range_fetch_size {
@@ -121,7 +124,7 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                                 Ok(Some(log)) => {
                                     let log = Log::from(log);
 
-                                    // This in general should not happen, but handle such case to be safe
+                                    // This in general should not happen, but handle such a case to be safe
                                     if log.block_number > latest_block {
                                         warn!("got {log} that has not yet reached the finalized tip at {latest_block}");
                                         break;
@@ -137,7 +140,7 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                                     }
 
                                     debug!("retrieved {log}");
-                                    current_block_log.logs.push(log);
+                                    current_block_log.logs.insert(log);
                                 },
                                 Ok(None) => {
                                     trace!("done processing batch #{from_block} - #{latest_block}");
@@ -145,7 +148,7 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                                 },
                                 Err(e) => {
                                     // Workaround for some RPC providers complaining about
-                                    // ethers pagination algorithm that might be requesting blocks
+                                    // Ethers pagination algorithm that might be requesting blocks
                                     // from the outside of the given range (in future).
                                     if is_missing_block_error(&e) {
                                         warn!("pagination requested future blocks when processing range #{from_block} - #{latest_block}");
@@ -162,7 +165,11 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                                         from_block = current_block_log.block_id;
                                         continue 'outer;
                                     } else {
-                                        panic!("cannot advance due to unrecoverable RPC error: {e}");
+                                        panic!("!!! Cannot advance the chain indexing due to unrecoverable RPC errors.
+
+                                        The RPC provider does not seem to be working correctly. 
+                                        
+                                        The last encountered error was: {e}");
                                     }
                                 }
                             }

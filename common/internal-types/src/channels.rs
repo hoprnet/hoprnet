@@ -38,6 +38,17 @@ pub enum ChannelStatus {
     PendingToClose(SystemTime),
 }
 
+// Cannot use #[repr(u8)] due to PendingToClose
+impl From<ChannelStatus> for u8 {
+    fn from(value: ChannelStatus) -> Self {
+        match value {
+            ChannelStatus::Closed => 0,
+            ChannelStatus::Open => 1,
+            ChannelStatus::PendingToClose(_) => 2,
+        }
+    }
+}
+
 // Manual implementation of PartialEq, because we need only precision up to seconds in PendingToClose
 impl PartialEq for ChannelStatus {
     fn eq(&self, other: &Self) -> bool {
@@ -46,7 +57,7 @@ impl PartialEq for ChannelStatus {
             (Self::Open, Self::Open) => true,
             (Self::Closed, Self::Closed) => true,
             (Self::PendingToClose(ct_1), Self::PendingToClose(ct_2)) => {
-                let diff = ct_1.max(ct_2).duration_since(*ct_1.min(ct_2)).unwrap();
+                let diff = ct_1.max(ct_2).saturating_sub(*ct_1.min(ct_2));
                 diff.as_secs() == 0
             }
             _ => false,
@@ -107,6 +118,7 @@ impl ChannelEntry {
 
     /// Checks if the closure time of this channel has passed.
     /// Also returns `false` if the channel closure has not been initiated (it is in `Open` state).
+    /// Returns also `true`, if the channel is in `Closed` state.
     pub fn closure_time_passed(&self, current_time: SystemTime) -> bool {
         match self.status {
             ChannelStatus::Open => false,
@@ -120,9 +132,7 @@ impl ChannelEntry {
     pub fn remaining_closure_time(&self, current_time: SystemTime) -> Option<Duration> {
         match self.status {
             ChannelStatus::Open => None,
-            ChannelStatus::PendingToClose(closure_time) => {
-                Some(closure_time.duration_since(current_time).unwrap_or(Duration::ZERO))
-            }
+            ChannelStatus::PendingToClose(closure_time) => Some(closure_time.saturating_sub(current_time)),
             ChannelStatus::Closed => Some(Duration::ZERO),
         }
     }
@@ -219,9 +229,7 @@ impl BinarySerializable for ChannelEntry {
             U256::from(match self.status {
                 ChannelStatus::Closed => 0_u64, // We do not store the closure time value anymore once already closed
                 ChannelStatus::Open => 0_u64,
-                ChannelStatus::PendingToClose(closure_time) => {
-                    closure_time.duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs()
-                }
+                ChannelStatus::PendingToClose(closure_time) => closure_time.as_unix_timestamp().as_secs(),
             })
             .to_bytes()
             .as_ref(),

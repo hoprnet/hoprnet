@@ -1,6 +1,6 @@
 [package]
 name = "hopr-lib"
-version = "2.1.0-rc.3"
+version = "2.1.0-rc.4"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "HOPR library containing the entire functionality importable without the HOPRd daemon"
@@ -14,7 +14,7 @@ crate-type = ["rlib"]
 [dependencies]
 async-lock = { workspace = true }
 async-std = { workspace = true }
-atomic_enum = "0.2.0"
+atomic_enum = { workspace = true }
 const_format = "0.2.32"
 futures = { workspace = true }
 lazy_static = { workspace = true }
@@ -34,20 +34,21 @@ core-strategy = { workspace = true }        # TODO: better organize and cleanup,
 chain-actions = { workspace = true }
 chain-api = { workspace = true }
 chain-rpc = { workspace = true }
-chain-db = { workspace = true }
 chain-types = { workspace = true }
 chain-indexer = { workspace = true }
 hopr-platform = { workspace = true }
-utils-db = { workspace = true }
+hopr-db-api = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-internal-types = { workspace = true }
 hopr-primitive-types = { workspace = true }
+hopr-crypto-types = { workspace = true }
 
 [dev-dependencies]
+env_logger = { workspace = true }
 serde_yaml = { version = "0.9" }
 hopr-crypto-types = { workspace = true }
 ethers = { workspace = true }
 
 [features]
 default = ["prometheus"]
-prometheus = ["dep:hopr-metrics", "core-transport/prometheus", "chain-api/prometheus", "chain-indexer/prometheus", "chain-rpc/prometheus",  ]
+prometheus = ["dep:hopr-metrics", "core-transport/prometheus", "chain-api/prometheus", "chain-indexer/prometheus", "chain-rpc/prometheus", "hopr-db-api/prometheus" ]

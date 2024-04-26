@@ -10,17 +10,18 @@ An example scrape config for Prometheus to collect HOPRd metrics:
 
 ```yaml
 scrape_configs:
-  - job_name: 'hoprd'
+  - job_name: "hoprd"
     scrape_interval: 5s
     static_configs:
-      - targets: ['localhost:3001']
+      - targets: ["localhost:3001"]
     metrics_path: /api/v3/node/metrics
     basic_auth:
       username: ^MYtoken4testing^
-      password: ''
+      password: ""
 ```
 
 ## List of metrics
+
 - `hopr_packets_count`: Number of processed packets of different types (sent, received, forwarded), keys: `type`
 - `hopr_packets_per_peer_count`: Number of processed packets to/from distinct peers, keys: `peer`, `direction`
 - `hopr_created_tickets_count`: Number of created tickets
@@ -67,3 +68,4 @@ scrape_configs:
 - `hopr_indexer_block_number`: Current last processed block number by the indexer
 - `hopr_indexer_sync_progress`: Sync progress of the historical data by the indexer
 - `hopr_chain_actions_count`: Number of different chain actions and their results, keys: `action`, `result`
+- `hopr_indexer_contract_log_counters`: Counts of different HOPR contract logs processed by the Indexer, keys: `contract`
