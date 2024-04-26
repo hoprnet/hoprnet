@@ -9,6 +9,7 @@ toolchain:
           - ".processes/**"
           - "scripts/**"
           - "rust-toolchain.toml"
+          - ".coderabbit.yaml"
 dependencies:
   - changed-files:
       - any-glob-to-any-file:
