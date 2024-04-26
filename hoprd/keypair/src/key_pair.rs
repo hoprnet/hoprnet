@@ -296,7 +296,7 @@ impl HoprKeys {
     /// Reads a keystore file using custom FS operations
     ///
     /// Highly inspired by `<https://github.com/roynalnaruto/eth-keystore-rs>`
-    fn read_eth_keystore(path: &str, password: &str) -> Result<(Self, bool)> {
+    pub fn read_eth_keystore(path: &str, password: &str) -> Result<(Self, bool)> {
         let json_string = read_to_string(path)?;
         let keystore: EthKeystore = from_json_string(&json_string)?;
 
@@ -386,7 +386,7 @@ impl HoprKeys {
     /// Writes a keystore file using custom FS operation and custom entropy source
     ///
     /// Highly inspired by `<https://github.com/roynalnaruto/eth-keystore-rs>`
-    fn write_eth_keystore(&self, path: &str, password: &str) -> Result<()> {
+    pub fn write_eth_keystore(&self, path: &str, password: &str) -> Result<()> {
         if USE_WEAK_CRYPTO {
             warn!("USING WEAK CRYPTO -> this build is not meant for production!");
         }
