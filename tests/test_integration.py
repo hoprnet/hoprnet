@@ -263,13 +263,20 @@ async def test_hoprd_protocol_check_balances_without_prior_tests(swarm7: dict[st
 @pytest.mark.asyncio
 @pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
 async def test_hoprd_node_should_be_able_to_alias_other_peers(peer: str, swarm7: dict[str, Node]):
-    peer_id = swarm7[random.choice(barebone_nodes())].peer_id
+    other_peers = barebone_nodes()
+    other_peers.remove(peer)
+
+    alice_peer_id = swarm7[random.choice(other_peers)].peer_id
+    my_peer_id = swarm7[peer].peer_id
+    assert alice_peer_id != my_peer_id
+
+    assert await swarm7[peer].api.aliases_get_alias("me") == my_peer_id
 
     assert await swarm7[peer].api.aliases_get_alias("Alice") is None
-    assert await swarm7[peer].api.aliases_set_alias("Alice", peer_id) is True
+    assert await swarm7[peer].api.aliases_set_alias("Alice", alice_peer_id) is True
 
-    assert await swarm7[peer].api.aliases_get_alias("Alice") == peer_id
-    assert await swarm7[peer].api.aliases_set_alias("Alice", peer_id) is False
+    assert await swarm7[peer].api.aliases_get_alias("Alice") == alice_peer_id
+    assert await swarm7[peer].api.aliases_set_alias("Alice", alice_peer_id) is False
 
     assert await swarm7[peer].api.aliases_remove_alias("Alice")
     assert await swarm7[peer].api.aliases_get_alias("Alice") is None
