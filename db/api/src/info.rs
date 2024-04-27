@@ -4,6 +4,7 @@ use hopr_crypto_types::prelude::Hash;
 use hopr_db_entity::{chain_info, global_settings, node_info};
 use hopr_primitive_types::prelude::{Address, Balance, BalanceType, BinarySerializable, IntoEndian, ToHex};
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set};
+use tracing::debug;
 
 use crate::db::HoprDb;
 
@@ -117,9 +118,13 @@ pub trait HoprDbInfoOperations {
     async fn get_last_indexed_block<'a>(&'a self, tx: OptTx<'a>) -> Result<(u32, Hash)>;
 
     /// Updates the last indexed block number together with the checksum of log TXs processed
-    /// in that block.
-    async fn set_last_indexed_block<'a>(&'a self, tx: OptTx<'a>, block_num: u32, block_log_tx_hash: Hash)
-        -> Result<()>;
+    /// in that block (if there were any logs in this block).
+    async fn set_last_indexed_block<'a>(
+        &'a self,
+        tx: OptTx<'a>,
+        block_num: u32,
+        block_log_tx_hash: Option<Hash>,
+    ) -> Result<()>;
 
     /// Updates the network registry state.
     /// To retrieve stored network registry state, use [`HoprDbInfoOperations::get_indexer_data`],
@@ -410,7 +415,7 @@ impl HoprDbInfoOperations for HoprDb {
         &'a self,
         tx: OptTx<'a>,
         block_num: u32,
-        block_log_tx_hash: Hash,
+        block_log_tx_hash: Option<Hash>,
     ) -> Result<()> {
         self.nest_transaction(tx)
             .await?
@@ -427,11 +432,15 @@ impl HoprDbInfoOperations for HoprDb {
                         .map(|v| Hash::from_bytes(v.as_ref()))
                         .unwrap_or(Ok(Hash::default()))?;
 
-                    let new_hash = Hash::create(&[current_checksum.as_slice(), block_log_tx_hash.as_slice()]);
-
                     let mut active_model = model.into_active_model();
+
+                    if let Some(block_log_hash) = block_log_tx_hash {
+                        let new_hash = Hash::create(&[current_checksum.as_slice(), block_log_hash.as_slice()]);
+                        active_model.chain_checksum = Set(Some(new_hash.as_slice().to_vec()));
+                        debug!("updating block checksum {current_checksum} -> {new_hash} @ {block_num}");
+                    }
+
                     active_model.last_indexed_block = Set(block_num as i32);
-                    active_model.chain_checksum = Set(Some(new_hash.as_slice().to_vec()));
                     active_model.update(tx.as_ref()).await?;
 
                     Ok::<_, DbError>(())
