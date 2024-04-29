@@ -72,7 +72,7 @@ use core_strategy::{
 use core_transport::libp2p::identity::PeerId;
 use core_transport::{
     build_index_updater, build_network, build_packet_actions, build_ticket_aggregation, build_transport_components,
-    execute_on_tick, p2p_loop,
+    execute_on_tick, SwarmEventLoop,
 };
 use core_transport::{ChainKeypair, Hash, HoprTransport, OffchainKeypair};
 use core_transport::{IndexerToProcess, Network, PeerEligibility, PeerOrigin};
@@ -484,6 +484,18 @@ where
         }
     });
 
+    let swarm_loop = SwarmEventLoop::new(
+        network_events_rx,
+        indexer_update_rx,
+        ack_actions,
+        packet_actions,
+        ticket_aggregation,
+        core_transport::api::HeartbeatRequester::new(hb_ping_rx),
+        core_transport::api::HeartbeatResponder::new(hb_pong_tx),
+        core_transport::api::ManualPingRequester::new(ping_rx),
+        core_transport::api::HeartbeatResponder::new(pong_tx),
+    );
+
     let mut processes: HashMap<HoprLoopComponents, Pin<Box<dyn futures::Future<Output = ()> + Send>>> = HashMap::new();
     processes.insert(
         HoprLoopComponents::Heartbeat,
@@ -491,19 +503,10 @@ where
     );
     processes.insert(
         HoprLoopComponents::Swarm,
-        Box::pin(p2p_loop(
+        Box::pin(swarm_loop.run(
             String::from(constants::APP_VERSION),
             identity,
             swarm_network_clone,
-            network_events_rx,
-            indexer_update_rx,
-            ack_actions,
-            packet_actions,
-            ticket_aggregation,
-            core_transport::api::HeartbeatRequester::new(hb_ping_rx),
-            core_transport::api::HeartbeatResponder::new(hb_pong_tx),
-            core_transport::api::ManualPingRequester::new(ping_rx),
-            core_transport::api::HeartbeatResponder::new(pong_tx),
             my_multiaddresses,
             cfg.protocol,
             transport_output_tx,

@@ -44,7 +44,7 @@ pub use {
     },
     hopr_internal_types::protocol::ApplicationData,
     multiaddr::Multiaddr,
-    p2p::{api, p2p_loop},
+    p2p::{api, SwarmEventLoop},
     timer::execute_on_tick,
 };
 
