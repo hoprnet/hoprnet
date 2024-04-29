@@ -1,6 +1,5 @@
 use std::pin::Pin;
 
-use async_std::task::spawn;
 use futures::channel::mpsc::{channel, Receiver, Sender};
 use futures::future::poll_fn;
 use futures::{stream::Stream, StreamExt};
@@ -202,7 +201,8 @@ impl AcknowledgementInteraction {
             }
         });
 
-        spawn(async move {
+        // the task is terminated by closing all TX instances
+        async_std::task::spawn(async move {
             processing_stream.map(Ok).forward(futures::sink::drain()).await.unwrap();
         });
 

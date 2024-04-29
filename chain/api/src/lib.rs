@@ -4,35 +4,33 @@ pub mod config;
 pub mod errors;
 pub mod executors;
 
+use std::{sync::Arc, time::Duration};
+
+use async_lock::RwLock;
+use async_std::task::sleep;
+use tracing::{debug, error, info, warn};
+
 use chain_actions::action_queue::{ActionQueue, ActionQueueConfig};
 use chain_actions::action_state::IndexerActionTracker;
 use chain_actions::payload::SafePayloadGenerator;
-use chain_rpc::rpc::RpcOperationsConfig;
-pub use chain_types::chain_events::SignificantChainEvent;
-use config::ChainNetworkConfig;
-use executors::{EthereumTransactionExecutor, RpcEthereumClient, RpcEthereumClientConfig};
-pub use hopr_internal_types::channels::ChannelEntry;
-
-use async_lock::RwLock;
-use std::sync::Arc;
-use std::time::Duration;
-
 use chain_actions::ChainActions;
 use chain_indexer::{block::Indexer, handlers::ContractEventHandlers, IndexerConfig};
+use chain_rpc::client::SimpleJsonRpcRetryPolicy;
+use chain_rpc::rpc::RpcOperationsConfig;
 use chain_rpc::HoprRpcOperations;
 use chain_rpc::{rpc::RpcOperations, TypedTransaction};
+pub use chain_types::chain_events::SignificantChainEvent;
 use chain_types::ContractAddresses;
+use config::ChainNetworkConfig;
+use executors::{EthereumTransactionExecutor, RpcEthereumClient, RpcEthereumClientConfig};
 use hopr_crypto_types::prelude::*;
+use hopr_db_api::HoprDbAllOperations;
 use hopr_internal_types::account::AccountEntry;
+pub use hopr_internal_types::channels::ChannelEntry;
+use hopr_internal_types::prelude::ChannelDirection;
 use hopr_primitive_types::prelude::*;
-use tracing::{debug, error, info, warn};
 
 use crate::errors::{HoprChainError, Result};
-
-use async_std::task::sleep;
-use chain_rpc::client::SimpleJsonRpcRetryPolicy;
-use hopr_db_api::HoprDbAllOperations;
-use hopr_internal_types::prelude::ChannelDirection;
 
 /// The default HTTP request engine
 ///
@@ -232,7 +230,7 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
         }
     }
 
-    pub async fn sync_chain(&self) -> errors::Result<()> {
+    pub async fn sync_chain(&self) -> errors::Result<async_std::task::JoinHandle<()>> {
         let db_processor = ContractEventHandlers::new(
             self.contract_addresses,
             self.safe_address,

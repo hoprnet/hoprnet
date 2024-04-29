@@ -389,6 +389,7 @@ where
             }
         });
 
+        // the task is terminated by closing all TX instances
         spawn(async move {
             // poll the stream until it's done
             while processing_stream.next().await.is_some() {}

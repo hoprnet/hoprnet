@@ -9,8 +9,6 @@ use hopr_db_api::{
     peers::HoprDbPeersOperations, registry::HoprDbRegistryOperations, resolver::HoprDbResolverOperations,
 };
 
-use async_std::task::spawn;
-
 use chain_types::chain_events::NetworkRegistryStatus;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -64,7 +62,8 @@ impl IndexerActions {
         let (to_process_tx, mut to_process_rx) =
             futures::channel::mpsc::channel::<IndexerToProcess>(crate::constants::INDEXER_UPDATE_QUEUE_SIZE);
 
-        spawn(async move {
+        // the task is terminated by closing all TX instances
+        async_std::task::spawn(async move {
             let mut emitter = emitter;
             let db_local = db.clone();
 

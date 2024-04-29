@@ -466,7 +466,7 @@ where
             Box::pin(indexer_refreshing_loop.map(|_| HoprLoopComponents::Indexing)),
             Box::pin(async move {
                 action_queue
-                    .action_loop()
+                    .start()
                     .map(|_| HoprLoopComponents::OutgoingOnchainActionQueue)
                     .await
             }),
@@ -892,7 +892,7 @@ impl Hopr {
                 .announce(&multiaddresses_to_announce, &self.me)
                 .await
             {
-                Ok(_) => info!("Announcing node on chain: {:?}", multiaddresses_to_announce),
+                Ok(_) => info!("Announced node on chain: {:?}", multiaddresses_to_announce),
                 Err(ChainActionsError::AlreadyAnnounced) => {
                     info!("Node already announced on chain as {:?}", multiaddresses_to_announce)
                 }

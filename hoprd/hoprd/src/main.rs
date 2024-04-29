@@ -1,18 +1,18 @@
 use std::str::FromStr;
-use std::{future::poll_fn, pin::Pin, sync::Arc, time::SystemTime};
+use std::{sync::Arc, time::SystemTime};
 
 use async_lock::RwLock;
 use chrono::{DateTime, Utc};
-
-use futures::Stream;
-use hopr_lib::{ApplicationData, AsUnixTimestamp, ToHex, TransportOutput};
-use hoprd::cli::CliArgs;
-use hoprd_api::run_hopr_api;
-use hoprd_keypair::key_pair::{HoprKeys, IdentityOptions};
+use futures::StreamExt;
 use opentelemetry_otlp::WithExportConfig as _;
 use opentelemetry_sdk::trace::{RandomIdGenerator, Sampler};
 use tracing::{error, info, warn};
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
+
+use hopr_lib::{ApplicationData, AsUnixTimestamp, ToHex, TransportOutput};
+use hoprd::cli::CliArgs;
+use hoprd_api::run_hopr_api;
+use hoprd_keypair::key_pair::{HoprKeys, IdentityOptions};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleHistogram;
@@ -173,8 +173,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ws_events_tx.set_overflow(true); // Set overflow in case of full the oldest record is discarded
 
     let inbox_clone = inbox.clone();
-    let node_ingress = async_std::task::spawn(async move {
-        while let Some(output) = poll_fn(|cx| Pin::new(&mut ingress).poll_next(cx)).await {
+
+    let node_ingress_to_inbox_proc = async_std::task::spawn(async move {
+        while let Some(output) = ingress.next().await {
             match output {
                 TransportOutput::Received(data) => {
                     let recv_at = SystemTime::now();
@@ -289,7 +290,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         futures::join!(
             run_the_hopr_node,
-            node_ingress,
+            node_ingress_to_inbox_proc,
             run_hopr_api(
                 &host_listen,
                 cfg.as_redacted_string()?,
@@ -303,7 +304,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     } else {
         info!("Running HOPRd without the API...");
 
-        futures::join!(run_the_hopr_node, node_ingress);
+        futures::join!(run_the_hopr_node, node_ingress_to_inbox_proc);
     };
 
     Ok(())
