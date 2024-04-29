@@ -812,5 +812,15 @@ async fn integration_test_indexer() {
 
     info!("--> successfully initiated channel closure for Alice -> Bob");
 
+    let alice_checksum = alice_node.db.get_last_indexed_block(None).await.unwrap();
+    let bob_checksum = bob_node.db.get_last_indexed_block(None).await.unwrap();
+    info!("alice completed at {:?}", alice_checksum);
+    info!("bob completed at {:?}", bob_checksum);
+
+    assert_eq!(
+        alice_checksum, bob_checksum,
+        "alice and bob must be at the same indexed block and checksum"
+    );
+
     futures::future::join_all(alice_node.node_tasks.into_iter().map(|t| t.cancel())).await;
 }

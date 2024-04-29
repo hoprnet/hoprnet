@@ -722,6 +722,7 @@ where
                     let mut ret = Vec::with_capacity(block_with_logs.logs.len());
 
                     let mut log_tx_hashes = Vec::with_capacity(block_with_logs.logs.len());
+                    let block_id = block_with_logs.to_string();
 
                     // Process all logs in the block
                     for log in block_with_logs.logs {
@@ -737,14 +738,26 @@ where
                         log_tx_hashes.push(tx_hash);
                     }
 
+                    // Update the hash only if any logs were processed in this block
+                    let block_hash = if !log_tx_hashes.is_empty() {
+                        debug!("block {block_id} has hashes {:?}", log_tx_hashes);
+                        let h = Hash::create(
+                            log_tx_hashes
+                                .iter()
+                                .map(|h| h.as_slice())
+                                .collect::<Vec<_>>()
+                                .as_ref(),
+                        );
+                        debug!("block hash of {block_id} is {h}");
+                        Some(h)
+                    } else {
+                        None
+                    };
+
                     // Once we're done with the block, update the DB
                     myself
                         .db
-                        .set_last_indexed_block(
-                            Some(tx),
-                            block_with_logs.block_id as u32,
-                            Hash::create(log_tx_hashes.iter().map(|h| h.as_ref()).collect::<Vec<_>>().as_slice()),
-                        )
+                        .set_last_indexed_block(Some(tx), block_with_logs.block_id as u32, block_hash)
                         .await?;
                     Ok(ret)
                 })

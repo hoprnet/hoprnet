@@ -48,9 +48,10 @@ libraries = ["script/utils/BoostUtilsLib.sol:BoostUtilsLib:0x8197525557233031b11
 eth_rpc_url = "https://gnosis-provider.rpch.tech/"
 
 [profile.ci]
-  # disabled for now since the CI nodes are not powerful enough
-  # fuzz = { runs = 10_000 }
-  verbosity = 4
+# disabled for now since the CI nodes are not powerful enough
+# fuzz = { runs = 10_000 }
+verbosity = 4
+offline = false
 
 [fmt]
   bracket_spacing = true
