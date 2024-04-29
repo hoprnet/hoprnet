@@ -741,13 +741,7 @@ where
                     // Update the hash only if any logs were processed in this block
                     let block_hash = if !log_tx_hashes.is_empty() {
                         debug!("block {block_id} has hashes {:?}", log_tx_hashes);
-                        let h = Hash::create(
-                            log_tx_hashes
-                                .iter()
-                                .map(|h| h.as_slice())
-                                .collect::<Vec<_>>()
-                                .as_ref(),
-                        );
+                        let h = Hash::create(log_tx_hashes.iter().map(|h| h.as_ref()).collect::<Vec<_>>().as_ref());
                         debug!("block hash of {block_id} is {h}");
                         Some(h)
                     } else {
