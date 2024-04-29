@@ -56,7 +56,7 @@ jobs:
 
       - name: Get PR labels
         id: pr-labels
-        uses: joerick/pr-labels-action@v1.0.8
+        uses: joerick/pr-labels-action@v1.0.9
 
       - name: "Update version"
         id: update
