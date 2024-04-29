@@ -60,9 +60,8 @@ lazy_static::lazy_static! {
 }
 
 #[derive(Clone)]
-pub struct State<'a> {
-    pub hopr: Arc<Hopr>,         // checks
-    pub config: Arc<Config<'a>>, // swagger
+pub struct State {
+    pub hopr: Arc<Hopr>, // checks
 }
 
 pub type MessageEncoder = fn(&[u8]) -> Box<[u8]>;
@@ -246,12 +245,11 @@ impl<T: Clone + Send + Sync + 'static> Middleware<T> for PrometheusMetricsMiddle
     }
 }
 
-async fn serve_swagger(request: tide::Request<State<'_>>) -> tide::Result<Response> {
-    let config = request.state().config.clone();
+async fn serve_swagger(request: tide::Request<State>) -> tide::Result<Response> {
     let path = request.url().path().to_string();
     let tail = path.strip_prefix("/swagger-ui/").unwrap();
 
-    match utoipa_swagger_ui::serve(tail, config) {
+    match utoipa_swagger_ui::serve(tail, Arc::new(Config::from("/api-docs/openapi.json"))) {
         Ok(swagger_file) => swagger_file
             .map(|file| {
                 Ok(Response::builder(200)
@@ -270,9 +268,9 @@ enum WebSocketInput {
 }
 
 pub async fn run_hopr_api(
-    host: &str,
+    host: String,
     hoprd_cfg: String,
-    cfg: &crate::config::Api,
+    cfg: crate::config::Api,
     hopr: Arc<hopr_lib::Hopr>,
     inbox: Arc<RwLock<hoprd_inbox::Inbox>>,
     websocket_rx: async_broadcast::InactiveReceiver<TransportOutput>,
@@ -282,10 +280,7 @@ pub async fn run_hopr_api(
     let aliases: Arc<RwLock<BiHashMap<String, PeerId>>> = Arc::new(RwLock::new(BiHashMap::new()));
     aliases.write().await.insert("me".to_owned(), hopr.me_peer_id());
 
-    let state = State {
-        hopr,
-        config: Arc::new(Config::from("/api-docs/openapi.json")),
-    };
+    let state = State { hopr };
 
     let mut app = tide::with_state(state.clone());
 
@@ -2646,7 +2641,7 @@ mod checks {
         ),
         tag = "Checks"
     )]
-    pub(super) async fn startedz(req: Request<State<'_>>) -> tide::Result<Response> {
+    pub(super) async fn startedz(req: Request<State>) -> tide::Result<Response> {
         is_running(req).await
     }
 
@@ -2660,7 +2655,7 @@ mod checks {
         ),
         tag = "Checks"
     )]
-    pub(super) async fn readyz(req: Request<State<'_>>) -> tide::Result<Response> {
+    pub(super) async fn readyz(req: Request<State>) -> tide::Result<Response> {
         is_running(req).await
     }
 
@@ -2674,11 +2669,11 @@ mod checks {
         ),
         tag = "Checks"
     )]
-    pub(super) async fn healthyz(req: Request<State<'_>>) -> tide::Result<Response> {
+    pub(super) async fn healthyz(req: Request<State>) -> tide::Result<Response> {
         is_running(req).await
     }
 
-    async fn is_running(req: Request<State<'_>>) -> tide::Result<Response> {
+    async fn is_running(req: Request<State>) -> tide::Result<Response> {
         match req.state().hopr.status() {
             hopr_lib::HoprState::Running => Ok(Response::builder(200).build()),
             _ => Ok(Response::builder(412).build()),

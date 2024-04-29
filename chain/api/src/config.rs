@@ -171,12 +171,12 @@ impl ChainNetworkConfig {
         let network = protocol_config
             .networks
             .get_mut(id)
-            .ok_or(format!("Could not find network {} in protocol config", id))?;
+            .ok_or(format!("Could not find network {id} in protocol config"))?;
 
         let chain = protocol_config
             .chains
             .get_mut(&network.chain)
-            .ok_or(format!("Invalid chain {} for network {}", network.chain, id))?;
+            .ok_or(format!("Invalid chain {} for network {id}", network.chain))?;
 
         if let Some(custom_provider) = maybe_custom_provider {
             chain.default_provider = custom_provider.into();

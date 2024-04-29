@@ -167,6 +167,12 @@ pub struct SwarmEventLoop {
     manual_ping_responds: api::HeartbeatResponder,
 }
 
+impl std::fmt::Debug for SwarmEventLoop {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SwarmEventLoop").finish()
+    }
+}
+
 impl SwarmEventLoop {
     pub fn new(
         network_update_input: Receiver<NetworkTriggeredEvent>,

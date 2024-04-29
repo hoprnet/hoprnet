@@ -131,10 +131,17 @@ where
 ///
 /// This object provides a single public method that can be polled. Once triggered, it will never
 /// return and will only terminate with an unresolvable error or a panic.
+
 pub struct Heartbeat<T: Pinging, API: HeartbeatExternalApi> {
     config: HeartbeatConfig,
     pinger: T,
     external_api: API,
+}
+
+impl<T: Pinging, API: HeartbeatExternalApi> std::fmt::Debug for Heartbeat<T, API> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Heartbeat").field("config", &self.config).finish()
+    }
 }
 
 impl<T: Pinging, API: HeartbeatExternalApi> Heartbeat<T, API> {

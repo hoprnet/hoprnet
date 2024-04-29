@@ -1,7 +1,9 @@
+use std::collections::HashMap;
 use std::str::FromStr;
 use std::{sync::Arc, time::SystemTime};
 
 use async_lock::RwLock;
+use async_std::task::{spawn, JoinHandle};
 use chrono::{DateTime, Utc};
 use futures::StreamExt;
 use opentelemetry_otlp::WithExportConfig as _;
@@ -9,7 +11,7 @@ use opentelemetry_sdk::trace::{RandomIdGenerator, Sampler};
 use tracing::{error, info, warn};
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 
-use hopr_lib::{ApplicationData, AsUnixTimestamp, ToHex, TransportOutput};
+use hopr_lib::{ApplicationData, AsUnixTimestamp, HoprLibProcesses, ToHex, TransportOutput};
 use hoprd::cli::CliArgs;
 use hoprd_api::run_hopr_api;
 use hoprd_keypair::key_pair::{HoprKeys, IdentityOptions};
@@ -90,6 +92,13 @@ fn init_logger() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+enum HoprdProcesses {
+    HoprLib(HoprLibProcesses),
+    Socket,
+    RestApi,
+}
+
 #[async_std::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let _ = init_logger();
@@ -155,10 +164,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("Creating the HOPRd node instance from hopr-lib");
     let hoprlib_cfg: hopr_lib::config::HoprLibConfig = cfg.clone().into();
 
-    let mut node = hopr_lib::Hopr::new(hoprlib_cfg, &hopr_keys.packet_key, &hopr_keys.chain_key);
-    let mut ingress = node.ingress();
-
-    let node = Arc::new(node);
+    let node = Arc::new(hopr_lib::Hopr::new(
+        hoprlib_cfg,
+        &hopr_keys.packet_key,
+        &hopr_keys.chain_key,
+    ));
 
     // Create the message inbox
     let inbox: Arc<RwLock<hoprd_inbox::Inbox>> = Arc::new(RwLock::new(
@@ -174,110 +184,31 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let inbox_clone = inbox.clone();
 
-    let node_ingress_to_inbox_proc = async_std::task::spawn(async move {
-        while let Some(output) = ingress.next().await {
-            match output {
-                TransportOutput::Received(data) => {
-                    let recv_at = SystemTime::now();
-
-                    // TODO: remove RLP in 3.0
-                    match hopr_lib::rlp::decode(&data.plain_text) {
-                        Ok((msg, sent)) => {
-                            let latency = recv_at.as_unix_timestamp().saturating_sub(sent);
-
-                            info!(
-                                r#"
-                            #### NODE RECEIVED MESSAGE [{}] ####
-                            Message: {}
-                            App tag: {}
-                            Latency: {}ms"#,
-                                DateTime::<Utc>::from(recv_at).to_rfc3339(),
-                                String::from_utf8_lossy(&msg),
-                                data.application_tag.unwrap_or(0),
-                                latency.as_millis()
-                            );
-
-                            #[cfg(all(feature = "prometheus", not(test)))]
-                            METRIC_MESSAGE_LATENCY.observe(latency.as_secs_f64());
-
-                            if cfg.api.enable && ws_events_tx.receiver_count() > 0 {
-                                if let Err(e) = ws_events_tx.try_broadcast(TransportOutput::Received(ApplicationData {
-                                    application_tag: data.application_tag,
-                                    plain_text: msg.clone(),
-                                })) {
-                                    error!("failed to notify websockets about a new message: {e}");
-                                }
-                            }
-
-                            if !inbox_clone
-                                .write()
-                                .await
-                                .push(ApplicationData {
-                                    application_tag: data.application_tag,
-                                    plain_text: msg,
-                                })
-                                .await
-                            {
-                                warn!(
-                                    "received a message with an ignored Inbox tag {:?}",
-                                    data.application_tag
-                                )
-                            }
-                        }
-                        Err(_) => error!("RLP decoding failed"),
-                    }
-                }
-                TransportOutput::Sent(ack_challenge) => {
-                    if cfg.api.enable && ws_events_tx.receiver_count() > 0 {
-                        if let Err(e) = ws_events_tx.try_broadcast(TransportOutput::Sent(ack_challenge)) {
-                            error!("failed to notify websockets about a new acknowledgement: {e}");
-                        }
-                    }
-                }
-            }
-        }
-    });
-
-    let hopr_clone = node.clone();
-    let run_the_hopr_node = async move {
-        // start indexing and initiate the node
-        let processes = hopr_clone.run().await.expect("the HOPR node should run without errors");
-
+    {
         // Show onboarding information
         let my_ethereum_address = hopr_lib::Keypair::public(&hopr_keys.chain_key).to_address().to_hex();
         let my_peer_id = (*hopr_lib::Keypair::public(&hopr_keys.packet_key)).into();
-        let version = hopr_lib::constants::APP_VERSION;
+        let my_version = hopr_lib::constants::APP_VERSION;
 
-        while !hopr_clone
-            .is_allowed_to_access_network(&my_peer_id)
-            .await
-            .unwrap_or(false)
-        {
-            info!("
-                Once you become eligible to join the HOPR network, you can continue your onboarding by using the following URL: https://hub.hoprnet.org/staking/onboarding?HOPRdNodeAddressForOnboarding={my_ethereum_address}, or by manually entering the node address of your node on https://hub.hoprnet.org/.
-            ");
+        while !node.is_allowed_to_access_network(&my_peer_id).await.unwrap_or(false) {
+            info!("Once you become eligible to join the HOPR network, you can continue your onboarding by using the following URL: https://hub.hoprnet.org/staking/onboarding?HOPRdNodeAddressForOnboarding={my_ethereum_address}, or by manually entering the node address of your node on https://hub.hoprnet.org/.");
 
             async_std::task::sleep(ONBOARDING_INFORMATION_INTERVAL).await;
 
-            info!(
-                "
-                Node information:
-
-                Node peerID: {my_peer_id}
-                Node Ethereum address: {my_ethereum_address} <- put this into staking hub
-                Node version: {version}
-            "
-            );
+            info!("Node information: peerID => {my_peer_id}, Ethereum address => {my_ethereum_address}, version => {my_version}");
+            info!("Node Ethereum address: {my_ethereum_address} <- put this into staking hub");
         }
+    }
 
-        // now that the node is allowed in the network, run the background processes
-        processes.await;
-    };
+    let node_clone = node.clone();
 
-    // setup API endpoint
+    let mut processes: HashMap<HoprdProcesses, JoinHandle<()>> = HashMap::new();
+    info!(
+        "Node REST API is {}",
+        if cfg.api.enable { "enabled" } else { "disabled" }
+    );
+
     if cfg.api.enable {
-        info!("Running HOPRd with the API...");
-
         // TODO: remove RLP in 3.0
         let msg_encoder =
             |data: &[u8]| hopr_lib::rlp::encode(data, hopr_platform::time::native::current_time().as_unix_timestamp());
@@ -288,24 +219,94 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         };
 
-        futures::join!(
-            run_the_hopr_node,
-            node_ingress_to_inbox_proc,
-            run_hopr_api(
-                &host_listen,
-                cfg.as_redacted_string()?,
-                &cfg.api,
-                node,
-                inbox.clone(),
-                ws_events_rx,
-                Some(msg_encoder)
-            )
-        );
-    } else {
-        info!("Running HOPRd without the API...");
+        let node_cfg_str = cfg.as_redacted_string()?;
+        let api_cfg = cfg.api.clone();
 
-        futures::join!(run_the_hopr_node, node_ingress_to_inbox_proc);
-    };
+        let test = spawn(run_hopr_api(
+            host_listen,
+            node_cfg_str,
+            api_cfg,
+            node_clone,
+            inbox,
+            ws_events_rx,
+            Some(msg_encoder),
+        ));
+
+        processes.insert(HoprdProcesses::RestApi, test);
+    }
+
+    let (hopr_socket, hopr_processes) = node.run().await?;
+
+    // process extracting the received data from the socket
+    let mut ingress = hopr_socket.reader();
+    processes.insert(
+        HoprdProcesses::Socket,
+        spawn(async move {
+            while let Some(output) = ingress.next().await {
+                match output {
+                    TransportOutput::Received(data) => {
+                        let recv_at = SystemTime::now();
+
+                        // TODO: remove RLP in 3.0
+                        match hopr_lib::rlp::decode(&data.plain_text) {
+                            Ok((msg, sent)) => {
+                                let latency = recv_at.as_unix_timestamp().saturating_sub(sent);
+
+                                info!(
+                                    app_tag = data.application_tag.unwrap_or(0),
+                                    latency_in_ms = latency.as_millis(),
+                                    "## NODE RECEIVED MESSAGE [@{}] ##",
+                                    DateTime::<Utc>::from(recv_at).to_rfc3339(),
+                                );
+
+                                #[cfg(all(feature = "prometheus", not(test)))]
+                                METRIC_MESSAGE_LATENCY.observe(latency.as_secs_f64());
+
+                                if cfg.api.enable && ws_events_tx.receiver_count() > 0 {
+                                    if let Err(e) =
+                                        ws_events_tx.try_broadcast(TransportOutput::Received(ApplicationData {
+                                            application_tag: data.application_tag,
+                                            plain_text: msg.clone(),
+                                        }))
+                                    {
+                                        error!("failed to notify websockets about a new message: {e}");
+                                    }
+                                }
+
+                                if !inbox_clone
+                                    .write()
+                                    .await
+                                    .push(ApplicationData {
+                                        application_tag: data.application_tag,
+                                        plain_text: msg,
+                                    })
+                                    .await
+                                {
+                                    warn!(
+                                        "received a message with an ignored Inbox tag {:?}",
+                                        data.application_tag
+                                    )
+                                }
+                            }
+                            Err(_) => error!("RLP decoding failed"),
+                        }
+                    }
+                    TransportOutput::Sent(ack_challenge) => {
+                        if cfg.api.enable && ws_events_tx.receiver_count() > 0 {
+                            if let Err(e) = ws_events_tx.try_broadcast(TransportOutput::Sent(ack_challenge)) {
+                                error!("failed to notify websockets about a new acknowledgement: {e}");
+                            }
+                        }
+                    }
+                }
+            }
+        }),
+    );
+
+    processes.extend(hopr_processes.into_iter().map(|(k, v)| (HoprdProcesses::HoprLib(k), v)));
+
+    // TODO: replace with loop logic to await the signals
+    futures::future::pending::<()>().await;
 
     Ok(())
 }
