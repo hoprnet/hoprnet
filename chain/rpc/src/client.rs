@@ -269,7 +269,10 @@ impl<Req: HttpPostRequestor, R: RetryPolicy<JsonRpcProviderClientError>> JsonRpc
         let next_id = self.id.fetch_add(1, Ordering::SeqCst);
         let payload = Request::new(next_id, method, params);
 
-        debug!("sending rpc request {method}");
+        debug!(
+            "sending RPC {method} request: {}",
+            serde_json::to_string(&payload).expect("request must be serializable")
+        );
 
         // Perform the actual request
         let start = std::time::Instant::now();
@@ -312,7 +315,10 @@ impl<Req: HttpPostRequestor, R: RetryPolicy<JsonRpcProviderClientError>> JsonRpc
         };
 
         // Next, deserialize the data out of the Response object
-        let res = serde_json::from_str(raw.get()).map_err(|err| JsonRpcProviderClientError::SerdeJson {
+        let json_str = raw.get();
+        debug!("RPC {method} response: {json_str}");
+
+        let res = serde_json::from_str(json_str).map_err(|err| JsonRpcProviderClientError::SerdeJson {
             err,
             text: raw.to_string(),
         })?;
