@@ -69,7 +69,7 @@ use core_strategy::{
     strategy::{MultiStrategy, SingularStrategy},
 };
 use core_transport::libp2p::identity::PeerId;
-use core_transport::{build_index_updater, build_network, execute_on_tick, SwarmEventLoop};
+use core_transport::{build_network, execute_on_tick};
 use core_transport::{ChainKeypair, Hash, HoprTransport, OffchainKeypair};
 use core_transport::{IndexerToProcess, Network, PeerEligibility, PeerOrigin};
 use hopr_platform::file::native::{join, read_file, remove_dir_all, write};
@@ -811,11 +811,6 @@ impl Hopr {
         }
 
         let mut processes: HashMap<HoprLibProcesses, JoinHandle<()>> = HashMap::new();
-        // processes.insert(
-        //     HoprLoopComponents::Heartbeat,
-        //     Box::pin(async move { heartbeat.heartbeat_loop().await }),
-        // );
-        //
 
         let socket = HoprSocket::new();
         let transport_output_tx = socket.writer();
@@ -836,20 +831,24 @@ impl Hopr {
             }),
         );
 
-        let identity: core_transport::libp2p::identity::Keypair = (&self.me).into();
-        let swarm_network_clone = self.network.clone();
-        // processes.insert(
-        //     HoprLoopComponents::Swarm,
-        //     Box::pin(swarm_loop.run(
-        //         String::from(constants::APP_VERSION),
-        //         identity,
-        //         swarm_network_clone,
-        //         my_multiaddresses,
-        //         cfg.protocol,
-        //         transport_output_tx,
-        //         on_ack_tkt_tx,
-        //     )),
-        // );
+        for (id, proc) in self
+            .transport_api
+            .run(
+                String::from(constants::APP_VERSION),
+                self.network.clone(),
+                self.cfg.protocol.clone(),
+                transport_output_tx,
+                on_ack_tkt_tx,
+            )
+            .await
+            .into_iter()
+        {
+            let nid = match id {
+                core_transport::HoprTransportProcess::Swarm => HoprLibProcesses::Swarm,
+                core_transport::HoprTransportProcess::Heartbeat => HoprLibProcesses::Heartbeat,
+            };
+            processes.insert(nid, proc);
+        }
 
         let tbf_clone = self.tbf.clone();
         processes.insert(

@@ -92,6 +92,7 @@ pub trait HeartbeatExternalApi {
 /// aggregating all necessary heartbeat resources without leaking them into the
 /// `Heartbeat` object and keeping both the adaptor and the heartbeat object
 /// OCP and SRP compliant.
+#[derive(Debug, Clone)]
 pub struct HeartbeatExternalInteractions<T>
 where
     T: hopr_db_api::peers::HoprDbPeersOperations + Sync + Send + std::fmt::Debug,

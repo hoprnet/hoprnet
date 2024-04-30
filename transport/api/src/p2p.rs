@@ -155,6 +155,8 @@ fn resolve_dns_if_any(ma: &multiaddr::Multiaddr) -> crate::errors::Result<multia
 }
 
 pub struct SwarmEventLoop {
+    me: libp2p::identity::Keypair,
+    my_multiaddresses: Vec<multiaddr::Multiaddr>,
     network_update_input: Receiver<NetworkTriggeredEvent>,
     indexer_update_input: Receiver<IndexerProcessed>,
     ack_interactions: AcknowledgementInteraction,
@@ -175,6 +177,8 @@ impl std::fmt::Debug for SwarmEventLoop {
 
 impl SwarmEventLoop {
     pub fn new(
+        me: libp2p::identity::Keypair,
+        my_multiaddresses: Vec<multiaddr::Multiaddr>,
         network_update_input: Receiver<NetworkTriggeredEvent>,
         indexer_update_input: Receiver<IndexerProcessed>,
         ack_interactions: AcknowledgementInteraction,
@@ -189,6 +193,8 @@ impl SwarmEventLoop {
         manual_ping_responds: api::HeartbeatResponder,
     ) -> Self {
         Self {
+            me,
+            my_multiaddresses,
             network_update_input,
             indexer_update_input,
             ack_interactions,
@@ -210,21 +216,19 @@ impl SwarmEventLoop {
     pub async fn run<T>(
         self,
         version: String,
-        me: libp2p::identity::Keypair,
         network: Arc<Network<T>>,
-        my_multiaddresses: Vec<multiaddr::Multiaddr>,
         protocol_cfg: ProtocolConfig,
         on_transport_output: UnboundedSender<TransportOutput>,
         on_acknowledged_ticket: UnboundedSender<AcknowledgedTicket>,
     ) where
         T: hopr_db_api::peers::HoprDbPeersOperations + Sync + Send + std::fmt::Debug + 'static,
     {
-        let me_peer_id = me.public().to_peer_id();
-        let mut swarm = core_p2p::build_p2p_network(me, protocol_cfg)
+        let me_peer_id = self.me.public().to_peer_id();
+        let mut swarm = core_p2p::build_p2p_network(self.me, protocol_cfg)
             .await
             .expect("swarm must be constructible");
 
-        for multiaddress in my_multiaddresses.iter() {
+        for multiaddress in self.my_multiaddresses.iter() {
             match resolve_dns_if_any(multiaddress) {
                 Ok(ma) => {
                     if let Err(e) = swarm.listen_on(ma.clone()) {

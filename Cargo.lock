@@ -1735,6 +1735,7 @@ dependencies = [
 name = "core-transport"
 version = "0.5.0"
 dependencies = [
+ "async-channel 2.1.1",
  "async-lock 3.3.0",
  "async-std",
  "async-trait",

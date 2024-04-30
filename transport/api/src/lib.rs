@@ -29,7 +29,7 @@ pub enum TransportOutput {
     Sent(HalfKeyChallenge),
 }
 
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 pub use {
     crate::{
         multiaddrs::decapsulate_p2p_protocol,
@@ -49,7 +49,7 @@ pub use {
 };
 
 use async_lock::RwLock;
-use async_std::task::JoinHandle;
+use async_std::task::{spawn, JoinHandle};
 use hopr_db_api::{
     peers::HoprDbPeersOperations, registry::HoprDbRegistryOperations, resolver::HoprDbResolverOperations,
     tickets::HoprDbTicketOperations, HoprDbAllOperations,
@@ -66,7 +66,7 @@ use core_protocol::{
     ticket_aggregation::processor::{TicketAggregationActions, TicketAggregationInteraction},
 };
 use futures::{
-    channel::mpsc::{Receiver, UnboundedReceiver, UnboundedSender},
+    channel::mpsc::{Receiver, UnboundedSender},
     FutureExt, SinkExt,
 };
 use hopr_internal_types::prelude::*;
@@ -118,15 +118,12 @@ where
     (indexer_updater, indexer_update_rx)
 }
 
-type HoprHearbeat<T> = Heartbeat<
-    Ping<adaptors::ping::PingExternalInteractions<T>>,
-    core_network::heartbeat::HeartbeatExternalInteractions<T>,
->;
-
-type HoprHeartbeatComponents<T> = (
-    HoprHearbeat<T>,
-    UnboundedReceiver<(PeerId, ControlMessage)>,
-    UnboundedSender<(PeerId, std::result::Result<(ControlMessage, String), ()>)>,
+pub type HoprTransportProcesses<T> = (
+    Heartbeat<
+        Ping<adaptors::ping::PingExternalInteractions<T>>,
+        core_network::heartbeat::HeartbeatExternalInteractions<T>,
+    >,
+    SwarmEventLoop,
 );
 
 /// Event emitter used by the indexer to emit events when an on-chain change on a
@@ -167,29 +164,43 @@ use core_protocol::errors::ProtocolError;
 use futures::future::{select, Either};
 use futures::pin_mut;
 use hopr_db_api::errors::DbError;
-use hopr_db_api::prelude::{HoprDbInfoOperations, HoprDbProtocolOperations};
 use hopr_internal_types::channels::ChannelStatus;
 use hopr_primitive_types::prelude::*;
+
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
+pub enum HoprTransportProcess {
+    Heartbeat,
+    Swarm,
+}
+
+struct HoprSwarmArgs<T>
+where
+    T: hopr_db_api::peers::HoprDbPeersOperations + Sync + Send + std::fmt::Debug + 'static,
+{
+    pub version: String,
+    pub network: Arc<Network<T>>,
+    pub protocol_cfg: crate::config::ProtocolConfig,
+    pub on_transport_output: UnboundedSender<TransportOutput>,
+    pub on_acknowledged_ticket: UnboundedSender<AcknowledgedTicket>,
+}
 
 /// Interface into the physical transport mechanism allowing all HOPR related tasks on
 /// the transport mechanism, as well as off-chain ticket manipulation.
 #[derive(Debug)]
 pub struct HoprTransport<T>
 where
-    T: HoprDbAllOperations + std::fmt::Debug + Clone + Send + Sync,
+    T: HoprDbAllOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
 {
     me: PeerId,
     me_onchain: Address,
     cfg: config::TransportConfig,
     db: T,
     ping: Arc<RwLock<Ping<adaptors::ping::PingExternalInteractions<T>>>>,
-    heartbeat: Option<
-        Heartbeat<
-            Ping<adaptors::ping::PingExternalInteractions<T>>,
-            core_network::heartbeat::HeartbeatExternalInteractions<T>,
-        >,
-    >,
-    swarm: Option<SwarmEventLoop>,
+    // async_channel rx can be cloned
+    processes: (
+        async_channel::Sender<HoprSwarmArgs<T>>,
+        async_channel::Receiver<HashMap<HoprTransportProcess, JoinHandle<()>>>,
+    ),
     network: Arc<Network<T>>,
     indexer: processes::indexer::IndexerActions,
     pkt_sender: PacketActions,
@@ -284,7 +295,11 @@ where
         let pkt_sender = packet_actions.writer();
         let ticket_aggregate_actions = ticket_aggregation.writer();
 
+        let identity: libp2p::identity::Keypair = (me).into();
+
         let swarm_loop = SwarmEventLoop::new(
+            identity.clone(),
+            my_multiaddresses.clone(),
             network_events_rx,
             indexer_update_rx,
             ack_actions,
@@ -296,15 +311,47 @@ where
             core_p2p::api::HeartbeatResponder::new(pong_tx),
         );
 
-        let identity: libp2p::identity::Keypair = (me).into();
+        // : Some((heartbeat, swarm_loop))
+
+        let (push_tx, push_rx) = async_channel::bounded::<HoprSwarmArgs<T>>(1);
+        let (pull_tx, pull_rx) =
+            async_channel::bounded::<std::collections::HashMap<HoprTransportProcess, JoinHandle<()>>>(1);
+
+        spawn(async move {
+            let mut heartbeat = heartbeat;
+            let swarm_loop = swarm_loop;
+
+            match push_rx.recv().await {
+                Ok(args) => {
+                    let mut r = HashMap::new();
+                    r.insert(
+                        HoprTransportProcess::Heartbeat,
+                        spawn(async move { heartbeat.heartbeat_loop().await }),
+                    );
+                    r.insert(
+                        HoprTransportProcess::Swarm,
+                        spawn(swarm_loop.run(
+                            args.version,
+                            args.network,
+                            args.protocol_cfg,
+                            args.on_transport_output,
+                            args.on_acknowledged_ticket,
+                        )),
+                    );
+                    pull_tx.send(r).await.unwrap();
+                }
+                Err(e) => panic!(
+                    "Failed to receive the push message from HoprTransport object to initiate process spawning: {e}"
+                ),
+            }
+        });
 
         Self {
             me: identity.public().to_peer_id(),
             me_onchain: me_onchain.public().to_address(),
             cfg,
             db,
-            heartbeat: Some(heartbeat),
-            swarm: Some(swarm_loop),
+            processes: (push_tx, pull_rx),
             ping: Arc::new(RwLock::new(ping)),
             network,
             indexer: indexer_updater,
@@ -319,15 +366,35 @@ where
         &self.me
     }
 
-    pub fn extract_heartbeat(
-        &mut self,
-    ) -> Option<
-        Heartbeat<
-            Ping<adaptors::ping::PingExternalInteractions<T>>,
-            core_network::heartbeat::HeartbeatExternalInteractions<T>,
-        >,
-    > {
-        self.heartbeat.take()
+    /// Execute all processes of the [`HoprTransport`] object.
+    ///
+    /// This method will spawn the [`Heartbeat`] and [`SwarmEventLoop`] processes and return
+    /// join handles to the calling function. Both processes are not started immediately, but are
+    /// waiting for a trigger from this piece of code.
+    ///
+    /// This is a hack around the fact that `futures::channel::mpsc::oneshot`
+    pub async fn run(
+        &self,
+        version: String,
+        network: Arc<Network<T>>,
+        protocol_cfg: crate::config::ProtocolConfig,
+        on_transport_output: UnboundedSender<TransportOutput>,
+        on_acknowledged_ticket: UnboundedSender<AcknowledgedTicket>,
+    ) -> std::collections::HashMap<HoprTransportProcess, JoinHandle<()>> {
+        let rx = self.processes.1.clone();
+        self.processes
+            .0
+            .clone()
+            .send(HoprSwarmArgs {
+                version,
+                network,
+                protocol_cfg,
+                on_transport_output,
+                on_acknowledged_ticket,
+            })
+            .await
+            .unwrap();
+        rx.recv().await.unwrap()
     }
 
     pub fn ticket_aggregator_writer(
