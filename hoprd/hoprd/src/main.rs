@@ -308,7 +308,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     processes.extend(hopr_processes.into_iter().map(|(k, v)| (HoprdProcesses::HoprLib(k), v)));
 
     let mut signals = Signals::new([Signal::Hup, Signal::Int])?;
-
     while let Some(Ok(signal)) = signals.next().await {
         match signal {
             Signal::Hup => {
