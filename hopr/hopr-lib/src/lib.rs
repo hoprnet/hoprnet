@@ -357,10 +357,16 @@ pub struct HoprSocket {
     tx: UnboundedSender<TransportOutput>,
 }
 
-impl HoprSocket {
-    pub fn new() -> Self {
+impl Default for HoprSocket {
+    fn default() -> Self {
         let (tx, rx) = unbounded::<TransportOutput>();
         Self { rx, tx }
+    }
+}
+
+impl HoprSocket {
+    pub fn new() -> Self {
+        Self::default()
     }
 
     pub fn reader(self) -> UnboundedReceiver<TransportOutput> {
@@ -468,8 +474,8 @@ impl Hopr {
         let channel_graph = Arc::new(RwLock::new(ChannelGraph::new(me_onchain.public().to_address())));
 
         let hopr_transport_api = HoprTransport::new(
-            &me,
-            &me_onchain,
+            me,
+            me_onchain,
             cfg.transport.clone(),
             cfg.protocol,
             cfg.heartbeat,
@@ -493,7 +499,7 @@ impl Hopr {
         };
 
         let (action_queue, chain_actions, rpc_operations) = chain_api::build_chain_components(
-            &me_onchain,
+            me_onchain,
             resolved_environment.clone(),
             contract_addrs,
             cfg.safe_module.module_address,
@@ -836,7 +842,7 @@ impl Hopr {
             .run(
                 String::from(constants::APP_VERSION),
                 self.network.clone(),
-                self.cfg.protocol.clone(),
+                self.cfg.protocol,
                 transport_output_tx,
                 on_ack_tkt_tx,
             )

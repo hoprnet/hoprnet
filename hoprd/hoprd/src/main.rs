@@ -3,11 +3,13 @@ use std::str::FromStr;
 use std::{sync::Arc, time::SystemTime};
 
 use async_lock::RwLock;
+use async_signal::{Signal, Signals};
 use async_std::task::{spawn, JoinHandle};
 use chrono::{DateTime, Utc};
 use futures::StreamExt;
 use opentelemetry_otlp::WithExportConfig as _;
 use opentelemetry_sdk::trace::{RandomIdGenerator, Sampler};
+use signal_hook::low_level;
 use tracing::{error, info, warn};
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 
@@ -305,8 +307,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     processes.extend(hopr_processes.into_iter().map(|(k, v)| (HoprdProcesses::HoprLib(k), v)));
 
-    // TODO: replace with loop logic to await the signals
-    futures::future::pending::<()>().await;
+    let mut signals = Signals::new([Signal::Hup, Signal::Int])?;
+
+    while let Some(Ok(signal)) = signals.next().await {
+        match signal {
+            Signal::Hup => {
+                info!("Received the HUP signal... not doing anything");
+            }
+            Signal::Int => {
+                info!("Received the INT signal... tearing down the node");
+                futures::stream::iter(processes)
+                    .for_each_concurrent(None, |(name, handle)| async move {
+                        info!("Stopping process: {:?}", name);
+                        handle.cancel().await;
+                    })
+                    .await;
+                low_level::emulate_default_handler(signal as i32)?;
+                break;
+            }
+            _ => {}
+        }
+
+        low_level::emulate_default_handler(signal as i32)?;
+    }
 
     Ok(())
 }
