@@ -345,6 +345,7 @@ where
     /// Consumes self and runs the main queue processing loop until the queue is closed.
     ///
     /// The method will panic if Channel Domain Separator is not yet populated in the DB.
+    #[allow(clippy::async_yields_async)]
     #[tracing::instrument(level = "debug", skip(self))]
     pub async fn start(mut self) -> async_std::task::JoinHandle<()> {
         async_std::task::spawn(async move {

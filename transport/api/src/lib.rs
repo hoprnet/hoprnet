@@ -52,14 +52,13 @@ use async_lock::RwLock;
 use async_std::task::{spawn, JoinHandle};
 use hopr_db_api::{
     peers::HoprDbPeersOperations, registry::HoprDbRegistryOperations, resolver::HoprDbResolverOperations,
-    tickets::HoprDbTicketOperations, HoprDbAllOperations,
+    HoprDbAllOperations,
 };
 use libp2p::request_response::{OutboundRequestId, ResponseChannel};
 use tracing::{debug, error, info, warn};
 
 use core_network::{heartbeat::Heartbeat, messaging::ControlMessage, network::NetworkConfig, ping::Ping};
 use core_network::{heartbeat::HeartbeatConfig, ping::PingConfig, PeerId};
-use core_path::channel_graph::ChannelGraph;
 use core_protocol::{
     ack::processor::AcknowledgementInteraction,
     msg::processor::{PacketActions, PacketInteraction, PacketInteractionConfig},
@@ -118,14 +117,6 @@ where
     (indexer_updater, indexer_update_rx)
 }
 
-pub type HoprTransportProcesses<T> = (
-    Heartbeat<
-        Ping<adaptors::ping::PingExternalInteractions<T>>,
-        core_network::heartbeat::HeartbeatExternalInteractions<T>,
-    >,
-    SwarmEventLoop,
-);
-
 /// Event emitter used by the indexer to emit events when an on-chain change on a
 /// channel is detected.
 #[derive(Clone)]
@@ -173,6 +164,12 @@ pub enum HoprTransportProcess {
     Swarm,
 }
 
+// reason for using `async_channel` is that the rx can be cloned
+type HoprTransportProcessType<T> = (
+    async_channel::Sender<HoprSwarmArgs<T>>,
+    async_channel::Receiver<HashMap<HoprTransportProcess, JoinHandle<()>>>,
+);
+
 struct HoprSwarmArgs<T>
 where
     T: hopr_db_api::peers::HoprDbPeersOperations + Sync + Send + std::fmt::Debug + 'static,
@@ -196,11 +193,7 @@ where
     cfg: config::TransportConfig,
     db: T,
     ping: Arc<RwLock<Ping<adaptors::ping::PingExternalInteractions<T>>>>,
-    // async_channel rx can be cloned
-    processes: (
-        async_channel::Sender<HoprSwarmArgs<T>>,
-        async_channel::Receiver<HashMap<HoprTransportProcess, JoinHandle<()>>>,
-    ),
+    processes: HoprTransportProcessType<T>,
     network: Arc<Network<T>>,
     indexer: processes::indexer::IndexerActions,
     pkt_sender: PacketActions,

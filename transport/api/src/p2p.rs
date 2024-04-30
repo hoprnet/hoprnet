@@ -176,6 +176,7 @@ impl std::fmt::Debug for SwarmEventLoop {
 }
 
 impl SwarmEventLoop {
+    #[allow(clippy::too_many_arguments)] // TODO: refactor this function into a reasonable group of components once fully rearchitected
     pub fn new(
         me: libp2p::identity::Keypair,
         my_multiaddresses: Vec<multiaddr::Multiaddr>,
