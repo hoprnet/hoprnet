@@ -9,15 +9,14 @@
 //! For details on the Indexer see the `chain-indexer` crate.
 use async_stream::stream;
 use async_trait::async_trait;
-use ethers::prelude::{LogQueryError, ProviderError};
 use ethers::providers::{JsonRpcClient, Middleware};
-use ethers::types::BlockNumber;
+use futures::stream::BoxStream;
 use futures::{Stream, StreamExt, TryStreamExt};
 use std::pin::Pin;
 use tracing::{debug, info, warn};
 use tracing::{error, trace};
 
-use crate::errors::{Result, RpcError::FilterIsEmpty};
+use crate::errors::{Result, RpcError, RpcError::FilterIsEmpty};
 use crate::rpc::RpcOperations;
 use crate::{BlockWithLogs, HoprIndexerRpcOperations, Log, LogFilter};
 
@@ -33,14 +32,62 @@ lazy_static::lazy_static! {
     ).unwrap();
 }
 
-fn is_missing_block_error(err: &LogQueryError<ProviderError>) -> bool {
-    match err {
-        LogQueryError::LoadLastBlockError(ProviderError::JsonRpcClientError(e))
-        | LogQueryError::LoadLogsError(ProviderError::JsonRpcClientError(e)) => e
-            .as_error_response()
-            .map(|rpc_err| rpc_err.code == -32001)
-            .unwrap_or(false),
-        _ => false,
+/// Splits the range between `from_block` and `to_block` (inclusive)
+/// to chunks of maximum size `max_chunk_size` and creates [ethers::types::Filter] for each chunk
+/// using the given [LogFilter].
+fn split_range(filter: LogFilter, from_block: u64, to_block: u64, max_chunk_size: u64) -> Vec<ethers::types::Filter> {
+    assert!(from_block <= to_block, "invalid block range");
+    assert!(max_chunk_size > 0, "chunk size must be greater than 0");
+
+    let mut start = from_block;
+    let mut result = Vec::new();
+    while start <= to_block {
+        let end = to_block.min(start + max_chunk_size - 1);
+        result.push(
+            ethers::types::Filter::from(filter.clone())
+                .from_block(start)
+                .to_block(end),
+        );
+        start = end + 1;
+    }
+
+    result
+}
+
+impl<P: JsonRpcClient + 'static> RpcOperations<P> {
+    /// Retrieves logs in the given range (`from_block` and `to_block` are inclusive).
+    fn stream_logs(&self, filter: LogFilter, from_block: u64, to_block: u64) -> BoxStream<Result<Log>> {
+        let fetch_ranges = split_range(filter, from_block, to_block, self.cfg.max_block_range_fetch_size);
+
+        info!(
+            "polling logs from blocks #{from_block} - #{to_block} (via {} chunks)",
+            fetch_ranges.len()
+        );
+
+        futures::stream::iter(fetch_ranges)
+            .then(|subrange| {
+                let prov_clone = self.provider.clone();
+                async move {
+                    match prov_clone.get_logs(&subrange).await {
+                        Ok(logs) => Ok(logs),
+                        Err(e) => {
+                            error!(
+                                "failed to fetch logs in block subrange {:?}-{:?}: {e}",
+                                subrange.get_from_block(),
+                                subrange.get_to_block()
+                            );
+                            Err(e)
+                        }
+                    }
+                }
+            })
+            .flat_map(|result| {
+                futures::stream::iter(match result {
+                    Ok(logs) => logs.into_iter().map(|log| Ok(Log::from(log))).collect::<Vec<_>>(),
+                    Err(e) => vec![Err(RpcError::from(e))],
+                })
+            })
+            .boxed()
     }
 }
 
@@ -92,38 +139,13 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                         #[cfg(all(feature = "prometheus", not(test)))]
                         METRIC_RPC_CHAIN_HEAD.set(latest_block as f64);
 
-                        // The range is inclusive
-                        let range_filter = ethers::types::Filter::from(filter.clone())
-                            .from_block(BlockNumber::Number(from_block.into()))
-                            .to_block(BlockNumber::Number(latest_block.into()));
-
-                        // The range of blocks to fetch is always bounded
-                        let range_size = self.cfg.max_block_range_fetch_size.min(latest_block - from_block);
-                        info!("polling logs from blocks #{from_block} - #{latest_block} (range size {range_size})");
-
-                        // If we're fetching logs from wide block range, we'll use the pagination log query.
-                        let mut retrieved_logs = if range_size >= self.cfg.min_block_range_fetch_size {
-                            self.provider.get_logs_paginated(&range_filter, range_size).boxed()
-                        } else {
-                            // For smaller block ranges, we use the ordinary getLogs call which minimizes RPC calls
-                            futures::stream::iter(self.provider.get_logs(&range_filter)
-                                .await
-                                .unwrap_or_else(|e| {
-                                    error!("polling logs from #{from_block} - #{latest_block} failed: {e}");
-                                    Vec::new()
-                                })
-                                .into_iter()
-                                .map(Ok)
-                            ).boxed()
-                        };
+                        let mut retrieved_logs = self.stream_logs(filter.clone(), from_block, latest_block);
 
                         let mut current_block_log = BlockWithLogs { block_id: from_block, ..Default::default()};
                         trace!("begin processing batch #{from_block} - #{latest_block}");
                         loop {
                             match retrieved_logs.try_next().await {
                                 Ok(Some(log)) => {
-                                    let log = Log::from(log);
-
                                     // This in general should not happen, but handle such a case to be safe
                                     if log.block_number > latest_block {
                                         warn!("got {log} that has not yet reached the finalized tip at {latest_block}");
@@ -147,14 +169,6 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                                     break;
                                 },
                                 Err(e) => {
-                                    // Workaround for some RPC providers complaining about
-                                    // Ethers pagination algorithm that might be requesting blocks
-                                    // from the outside of the given range (in future).
-                                    if is_missing_block_error(&e) {
-                                        warn!("pagination requested future blocks when processing range #{from_block} - #{latest_block}");
-                                        break;
-                                    }
-
                                     error!("failure when processing blocks from RPC: {e}");
                                     count_failures += 1;
 
@@ -206,8 +220,60 @@ mod test {
 
     use crate::client::native::SurfRequestor;
     use crate::client::{create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy};
+    use crate::indexer::split_range;
     use crate::rpc::{RpcOperations, RpcOperationsConfig};
     use crate::{BlockWithLogs, HoprIndexerRpcOperations, LogFilter};
+
+    fn filter_bounds(filter: &ethers::types::Filter) -> (u64, u64) {
+        (
+            filter
+                .block_option
+                .get_from_block()
+                .unwrap()
+                .as_number()
+                .unwrap()
+                .as_u64(),
+            filter
+                .block_option
+                .get_to_block()
+                .unwrap()
+                .as_number()
+                .unwrap()
+                .as_u64(),
+        )
+    }
+
+    #[test]
+    fn test_split_range() {
+        let ranges = split_range(LogFilter::default(), 0, 10, 2);
+
+        assert_eq!(6, ranges.len());
+        assert_eq!((0, 1), filter_bounds(&ranges[0]));
+        assert_eq!((2, 3), filter_bounds(&ranges[1]));
+        assert_eq!((4, 5), filter_bounds(&ranges[2]));
+        assert_eq!((6, 7), filter_bounds(&ranges[3]));
+        assert_eq!((8, 9), filter_bounds(&ranges[4]));
+        assert_eq!((10, 10), filter_bounds(&ranges[5]));
+
+        let ranges = split_range(LogFilter::default(), 0, 0, 2);
+        assert_eq!(1, ranges.len());
+        assert_eq!((0, 0), filter_bounds(&ranges[0]));
+
+        let ranges = split_range(LogFilter::default(), 0, 0, 1);
+        assert_eq!(1, ranges.len());
+        assert_eq!((0, 0), filter_bounds(&ranges[0]));
+
+        let ranges = split_range(LogFilter::default(), 0, 3, 1);
+        assert_eq!(4, ranges.len());
+        assert_eq!((0, 0), filter_bounds(&ranges[0]));
+        assert_eq!((1, 1), filter_bounds(&ranges[1]));
+        assert_eq!((2, 2), filter_bounds(&ranges[2]));
+        assert_eq!((3, 3), filter_bounds(&ranges[3]));
+
+        let ranges = split_range(LogFilter::default(), 0, 3, 10);
+        assert_eq!(1, ranges.len());
+        assert_eq!((0, 3), filter_bounds(&ranges[0]));
+    }
 
     #[async_std::test]
     async fn test_should_get_block_number() {

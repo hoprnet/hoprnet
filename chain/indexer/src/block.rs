@@ -364,7 +364,7 @@ pub mod tests {
 
         let head_block = 1000;
         let latest_block = 15u64;
-        db.set_last_indexed_block(None, latest_block as u32, Hash::default())
+        db.set_last_indexed_block(None, latest_block as u32, Some(Hash::default()))
             .await
             .unwrap();
         rpc.expect_block_number().return_once(move || Ok(head_block));
@@ -507,7 +507,7 @@ pub mod tests {
         let last_processed_block = 100_u64;
 
         let db = create_stub_db().await;
-        db.set_last_indexed_block(None, last_processed_block as u32, Hash::default())
+        db.set_last_indexed_block(None, last_processed_block as u32, Some(Hash::default()))
             .await
             .unwrap();
 
