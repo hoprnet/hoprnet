@@ -100,12 +100,14 @@ where
         let (db_latest_block, checksum) = self.db.get_last_indexed_block(None).await?;
         info!("Loaded indexer state at block #{db_latest_block} with checksum: {checksum}");
 
-        let latest_block_in_db = self.cfg.start_block_number.max(db_latest_block as u64);
+        let next_block_to_process = if self.cfg.start_block_number < db_latest_block as u64 {
+            // If some prior indexing took place already, avoid reprocessing the `db_latest_block`
+            db_latest_block as u64 + 1
+        } else {
+            self.cfg.start_block_number
+        };
 
-        info!(
-            "DB latest block: {:?}, Latest block {:?}",
-            db_latest_block, latest_block_in_db
-        );
+        info!("DB latest processed block: {db_latest_block}, next block to process {next_block_to_process}");
 
         let mut topics = vec![];
         topics.extend(crate::constants::topics::announcement());
@@ -129,7 +131,7 @@ where
             let mut chain_head = 0;
 
             let event_stream = rpc
-                .try_stream_logs(latest_block_in_db, log_filter)
+                .try_stream_logs(next_block_to_process, log_filter)
                 .expect("block stream should be constructible")
                 .then(|block_with_logs| {
                     let rpc = &rpc;
@@ -156,11 +158,11 @@ where
                         }
 
                         if !is_synced.load(std::sync::atomic::Ordering::Relaxed) {
-                            let block_difference = chain_head - latest_block_in_db;
+                            let block_difference = chain_head - next_block_to_process;
                             let progress = if block_difference == 0 {
                                 1_f64
                             } else {
-                                (current_block - latest_block_in_db) as f64 / block_difference as f64
+                                (current_block - next_block_to_process) as f64 / block_difference as f64
                             };
 
                             info!("Sync progress {:.2}% @ block {}", progress * 100_f64, current_block);
@@ -486,7 +488,7 @@ pub mod tests {
 
         let (tx_events, rx_events) = futures::channel::mpsc::unbounded();
         let mut indexer = Indexer::new(rpc, handlers, db.clone(), cfg, tx_events);
-        assert!(indexer.start().await.is_ok());
+        indexer.start().await.expect("indexer should run");
 
         // tx.close_channel();
 
@@ -498,5 +500,46 @@ pub mod tests {
 
         assert!(received.is_ok());
         assert_eq!(received.unwrap().len(), 1)
+    }
+
+    #[async_std::test]
+    async fn test_indexer_should_not_reprocess_last_processed_block() {
+        let last_processed_block = 100_u64;
+
+        let db = create_stub_db().await;
+        db.set_last_indexed_block(None, last_processed_block as u32, Hash::default())
+            .await
+            .unwrap();
+
+        let (mut tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
+
+        let mut rpc = MockHoprIndexerOps::new();
+        rpc.expect_try_stream_logs()
+            .once()
+            .withf(move |x: &u64, _y: &chain_rpc::LogFilter| *x == last_processed_block + 1)
+            .return_once(move |_, _| Ok(Box::pin(rx)));
+
+        rpc.expect_block_number()
+            .once()
+            .return_once(move || Ok(last_processed_block + 1));
+
+        let block = BlockWithLogs {
+            block_id: last_processed_block + 1,
+            logs: BTreeSet::from_iter(build_announcement_logs(
+                *ALICE,
+                1,
+                last_processed_block + 1,
+                U256::from(23u8),
+            )),
+        };
+
+        tx.start_send(block).unwrap();
+
+        let mut handlers = MockChainLogHandler::new();
+        handlers.expect_contract_addresses().return_const(vec![]);
+
+        let (tx_events, _) = futures::channel::mpsc::unbounded();
+        let mut indexer = Indexer::new(rpc, handlers, db.clone(), IndexerConfig::default(), tx_events);
+        indexer.start().await.expect("indexer should run");
     }
 }
