@@ -1,7 +1,6 @@
 pub mod topics {
     use bindings::{
         hopr_announcements::{AddressAnnouncementFilter, KeyBindingFilter, RevokeAnnouncementFilter},
-        hopr_boost::{ApprovalFilter, TransferFilter},
         hopr_channels::{
             ChannelBalanceDecreasedFilter, ChannelBalanceIncreasedFilter, ChannelClosedFilter, ChannelOpenedFilter,
             DomainSeparatorUpdatedFilter, LedgerDomainSeparatorUpdatedFilter, OutgoingChannelClosureInitiatedFilter,
@@ -13,6 +12,7 @@ pub mod topics {
         },
         hopr_node_safe_registry::{DergisteredNodeSafeFilter, RegisteredNodeSafeFilter},
         hopr_ticket_price_oracle::TicketPriceUpdatedFilter,
+        hopr_token::{ApprovalFilter, TransferFilter},
     };
     use ethers::{contract::EthEvent, types::TxHash};
 
