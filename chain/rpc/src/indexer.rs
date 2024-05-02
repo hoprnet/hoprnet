@@ -35,23 +35,28 @@ lazy_static::lazy_static! {
 /// Splits the range between `from_block` and `to_block` (inclusive)
 /// to chunks of maximum size `max_chunk_size` and creates [ethers::types::Filter] for each chunk
 /// using the given [LogFilter].
-fn split_range(filter: LogFilter, from_block: u64, to_block: u64, max_chunk_size: u64) -> Vec<ethers::types::Filter> {
+fn split_range<'a>(
+    filter: LogFilter,
+    from_block: u64,
+    to_block: u64,
+    max_chunk_size: u64,
+) -> BoxStream<'a, ethers::types::Filter> {
     assert!(from_block <= to_block, "invalid block range");
     assert!(max_chunk_size > 0, "chunk size must be greater than 0");
 
-    let mut start = from_block;
-    let mut result = Vec::new();
-    while start <= to_block {
-        let end = to_block.min(start + max_chunk_size - 1);
-        result.push(
-            ethers::types::Filter::from(filter.clone())
-                .from_block(start)
-                .to_block(end),
-        );
-        start = end + 1;
-    }
-
-    result
+    futures::stream::unfold((from_block, to_block), move |(start, to)| {
+        let subfilter = filter.clone();
+        async move {
+            if start <= to {
+                let end = to_block.min(start + max_chunk_size - 1);
+                let filter = ethers::types::Filter::from(subfilter).from_block(start).to_block(end);
+                Some((filter, (end + 1, to)))
+            } else {
+                None
+            }
+        }
+    })
+    .boxed()
 }
 
 impl<P: JsonRpcClient + 'static> RpcOperations<P> {
@@ -60,11 +65,11 @@ impl<P: JsonRpcClient + 'static> RpcOperations<P> {
         let fetch_ranges = split_range(filter, from_block, to_block, self.cfg.max_block_range_fetch_size);
 
         info!(
-            "polling logs from blocks #{from_block} - #{to_block} (via {} chunks)",
-            fetch_ranges.len()
+            "polling logs from blocks #{from_block} - #{to_block} (via {:?} chunks)",
+            (to_block - from_block) / self.cfg.max_block_range_fetch_size + 1
         );
 
-        futures::stream::iter(fetch_ranges)
+        fetch_ranges
             .then(|subrange| {
                 let prov_clone = self.provider.clone();
                 async move {
@@ -243,9 +248,9 @@ mod test {
         )
     }
 
-    #[test]
-    fn test_split_range() {
-        let ranges = split_range(LogFilter::default(), 0, 10, 2);
+    #[async_std::test]
+    async fn test_split_range() {
+        let ranges = split_range(LogFilter::default(), 0, 10, 2).collect::<Vec<_>>().await;
 
         assert_eq!(6, ranges.len());
         assert_eq!((0, 1), filter_bounds(&ranges[0]));
@@ -255,22 +260,22 @@ mod test {
         assert_eq!((8, 9), filter_bounds(&ranges[4]));
         assert_eq!((10, 10), filter_bounds(&ranges[5]));
 
-        let ranges = split_range(LogFilter::default(), 0, 0, 2);
+        let ranges = split_range(LogFilter::default(), 0, 0, 2).collect::<Vec<_>>().await;
         assert_eq!(1, ranges.len());
         assert_eq!((0, 0), filter_bounds(&ranges[0]));
 
-        let ranges = split_range(LogFilter::default(), 0, 0, 1);
+        let ranges = split_range(LogFilter::default(), 0, 0, 1).collect::<Vec<_>>().await;
         assert_eq!(1, ranges.len());
         assert_eq!((0, 0), filter_bounds(&ranges[0]));
 
-        let ranges = split_range(LogFilter::default(), 0, 3, 1);
+        let ranges = split_range(LogFilter::default(), 0, 3, 1).collect::<Vec<_>>().await;
         assert_eq!(4, ranges.len());
         assert_eq!((0, 0), filter_bounds(&ranges[0]));
         assert_eq!((1, 1), filter_bounds(&ranges[1]));
         assert_eq!((2, 2), filter_bounds(&ranges[2]));
         assert_eq!((3, 3), filter_bounds(&ranges[3]));
 
-        let ranges = split_range(LogFilter::default(), 0, 3, 10);
+        let ranges = split_range(LogFilter::default(), 0, 3, 10).collect::<Vec<_>>().await;
         assert_eq!(1, ranges.len());
         assert_eq!((0, 3), filter_bounds(&ranges[0]));
     }
