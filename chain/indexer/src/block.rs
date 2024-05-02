@@ -109,16 +109,19 @@ where
 
         info!("DB latest processed block: {db_latest_block}, next block to process {next_block_to_process}");
 
+        // we skip on addresses which have no topics
+        let mut addresses = vec![];
         let mut topics = vec![];
-        topics.extend(crate::constants::topics::announcement());
-        topics.extend(crate::constants::topics::channel());
-        topics.extend(crate::constants::topics::node_safe_registry());
-        topics.extend(crate::constants::topics::network_registry());
-        topics.extend(crate::constants::topics::ticket_price_oracle());
-        topics.extend(crate::constants::topics::token());
+        db_processor.contract_addresses().iter().for_each(|address| {
+            let contract_topics = db_processor.contract_address_topics(*address);
+            if !contract_topics.is_empty() {
+                addresses.push(*address);
+                topics.extend(contract_topics);
+            }
+        });
 
         let log_filter = LogFilter {
-            address: db_processor.contract_addresses(),
+            address: addresses,
             topics: topics.into_iter().map(Hash::from).collect(),
         };
 
