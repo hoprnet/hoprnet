@@ -64,4 +64,8 @@ pub mod topics {
     pub fn ticket_price_oracle() -> Vec<TxHash> {
         vec![TicketPriceUpdatedFilter::signature()]
     }
+
+    pub fn module_implementation() -> Vec<TxHash> {
+        vec![]
+    }
 }

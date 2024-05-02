@@ -637,7 +637,7 @@ mod tests {
         let checksum = Hash::default().hash();
         let expexted_block_num = 100000;
 
-        db.set_last_indexed_block(None, expexted_block_num, checksum)
+        db.set_last_indexed_block(None, expexted_block_num, Some(checksum))
             .await
             .unwrap();
 
