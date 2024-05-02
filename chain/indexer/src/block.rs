@@ -113,9 +113,9 @@ where
         let mut addresses = vec![];
         let mut topics = vec![];
         db_processor.contract_addresses().iter().for_each(|address| {
-            let contract_topics = db_processor.contract_address_topics(address.clone());
+            let contract_topics = db_processor.contract_address_topics(*address);
             if !contract_topics.is_empty() {
-                addresses.push(address.clone());
+                addresses.push(*address);
                 topics.extend(contract_topics);
             }
         });
