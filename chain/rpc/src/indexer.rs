@@ -45,15 +45,14 @@ fn split_range<'a>(
     assert!(max_chunk_size > 0, "chunk size must be greater than 0");
 
     futures::stream::unfold((from_block, to_block), move |(start, to)| {
-        let subfilter = filter.clone();
-        async move {
-            if start <= to {
-                let end = to_block.min(start + max_chunk_size - 1);
-                let filter = ethers::types::Filter::from(subfilter).from_block(start).to_block(end);
-                Some((filter, (end + 1, to)))
-            } else {
-                None
-            }
+        if start <= to {
+            let end = to_block.min(start + max_chunk_size - 1);
+            let filter = ethers::types::Filter::from(filter.clone())
+                .from_block(start)
+                .to_block(end);
+            futures::future::ready(Some((filter, (end + 1, to))))
+        } else {
+            futures::future::ready(None)
         }
     })
     .boxed()

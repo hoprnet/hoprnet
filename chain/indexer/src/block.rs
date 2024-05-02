@@ -188,7 +188,6 @@ where
                 .filter_map(|block_with_logs| async {
                     debug!("processing events in {block_with_logs} ...");
                     let block_id = block_with_logs.to_string();
-                    let block_num = block_with_logs.block_id;
                     let outgoing_events = match db_processor.collect_block_events(block_with_logs).await {
                         Ok(events) => {
                             info!("retrieved {} significant chain events from {block_id}", events.len());
@@ -200,15 +199,12 @@ where
                         }
                     };
 
-                    // Printout indexer state roughly every 5 processed blocks which had relevant events
-                    //if block_num % 5 == 0 {
                     match db.get_last_indexed_block(None).await {
                         Ok((block_num, checksum)) => {
                             info!("Current indexer state at block #{block_num} with checksum: {checksum}")
                         }
                         Err(e) => error!("Cannot retrieve indexer state: {e}"),
                     }
-                    //}
 
                     outgoing_events
                 })
