@@ -200,15 +200,14 @@ where
                         }
                     };
 
-                    // Printout indexer state
-                    //if block_num % 5 == 0 {
+                    // Printout indexer state, we can do this on every processed block because not
+                    // every block will have events
                     match db.get_last_indexed_block(None).await {
                         Ok((block_num, checksum)) => {
                             info!("Current indexer state at block #{block_num} with checksum: {checksum}")
                         }
                         Err(e) => error!("Cannot retrieve indexer state: {e}"),
                     }
-                    //}
 
                     outgoing_events
                 })
