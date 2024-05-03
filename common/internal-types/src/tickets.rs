@@ -84,6 +84,7 @@ pub struct TicketBuilder {
 
 impl TicketBuilder {
     /// Initializes the builder for a zero hop ticket.
+    #[must_use]
     pub fn zero_hop() -> Self {
         Self {
             index: 0,
@@ -97,6 +98,7 @@ impl TicketBuilder {
 
     /// Sets channel id based on the `source` and `destination`.
     /// This, [TicketBuilder::channel_id] or [TicketBuilder::addresses] must be set.
+    #[must_use]
     pub fn direction(mut self, source: &Address, destination: &Address) -> Self {
         self.channel_id = Some(generate_channel_id(source, destination));
         self
@@ -104,6 +106,7 @@ impl TicketBuilder {
 
     /// Sets channel id based on the `source` and `destination`.
     /// This, [TicketBuilder::channel_id] or [TicketBuilder::direction] must be set.
+    #[must_use]
     pub fn addresses<T: Into<Address>>(mut self, source: T, destination: T) -> Self {
         self.channel_id = Some(generate_channel_id(&source.into(), &destination.into()));
         self
@@ -111,6 +114,7 @@ impl TicketBuilder {
 
     /// Sets the channel id.
     /// This, [TicketBuilder::addresses] or [TicketBuilder::direction] must be set.
+    #[must_use]
     pub fn channel_id(mut self, channel_id: Hash) -> Self {
         self.channel_id = Some(channel_id);
         self
@@ -118,6 +122,7 @@ impl TicketBuilder {
 
     /// Sets the ticket amount.
     /// This or [TicketBuilder::balance] must be set and be less or equal to 10^25.
+    #[must_use]
     pub fn amount<T: Into<U256>>(mut self, amount: T) -> Self {
         self.amount = Some(amount.into());
         self.balance = None;
@@ -126,6 +131,7 @@ impl TicketBuilder {
 
     /// Sets the ticket amount as HOPR balance.
     /// This or [TicketBuilder::amount] must be set and be less or equal to 10^25.
+    #[must_use]
     pub fn balance(mut self, balance: Balance) -> Self {
         self.balance = Some(balance);
         self.amount = None;
@@ -135,6 +141,7 @@ impl TicketBuilder {
     /// Sets the ticket index.
     /// Must be less or equal to 2^48.
     /// Defaults to 0.
+    #[must_use]
     pub fn index(mut self, index: u64) -> Self {
         self.index = index;
         self
@@ -143,6 +150,7 @@ impl TicketBuilder {
     /// Sets the index offset.
     /// Must be greater or equal 1.
     /// Defaults to 1.
+    #[must_use]
     pub fn index_offset(mut self, index_offset: u32) -> Self {
         self.index_offset = index_offset;
         self
@@ -151,6 +159,7 @@ impl TicketBuilder {
     /// Sets the channel epoch.
     /// Must be less or equal to 2^24.
     /// Defaults to 1.
+    #[must_use]
     pub fn channel_epoch(mut self, channel_epoch: u32) -> Self {
         self.channel_epoch = channel_epoch;
         self
@@ -159,6 +168,7 @@ impl TicketBuilder {
     /// Sets the ticket winning probability.
     /// Mutually exclusive with [TicketBuilder::win_prob_encoded].
     /// Defaults to 1.0
+    #[must_use]
     pub fn win_prob(mut self, win_prob: f64) -> Self {
         self.win_prob = Some(win_prob);
         self.win_prob_enc = None;
@@ -168,6 +178,7 @@ impl TicketBuilder {
     /// Sets the encoded ticket winning probability.
     /// Mutually exlusive with [TicketBuilder::win_prob].
     /// Defaults to [ALWAYS_WINNING].
+    #[must_use]
     pub fn win_prob_encoded(mut self, win_prob: EncodedWinProb) -> Self {
         self.win_prob = None;
         self.win_prob_enc = Some(win_prob);
@@ -176,6 +187,7 @@ impl TicketBuilder {
 
     /// Sets the [EthereumChallenge] for Proof of Relay.
     /// Must be set.
+    #[must_use]
     pub fn challenge(mut self, challenge: EthereumChallenge) -> Self {
         self.challenge = Some(challenge);
         self
@@ -183,6 +195,7 @@ impl TicketBuilder {
 
     /// Set the signature of this ticket.
     /// Defaults to `None`.
+    #[must_use]
     pub fn signature(mut self, signature: Signature) -> Self {
         self.signature = Some(signature);
         self
