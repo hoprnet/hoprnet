@@ -13,3 +13,5 @@ pub const APP_VERSION_COERCED: &str = const_format::formatcp!(
 pub const MIN_NATIVE_BALANCE: &str = "1000000000000000"; // 0.001
 /// Balance that is suggested for funding the node the first time in order to make it start.
 pub const SUGGESTED_NATIVE_BALANCE: &str = "10000000000000000"; // 0.01
+
+pub const ONBOARDING_INFORMATION_INTERVAL: std::time::Duration = std::time::Duration::from_secs(30);

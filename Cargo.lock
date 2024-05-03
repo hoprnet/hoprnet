@@ -1225,6 +1225,7 @@ dependencies = [
 name = "chain-api"
 version = "0.2.0"
 dependencies = [
+ "async-channel 2.1.1",
  "async-lock 3.3.0",
  "async-std",
  "async-trait",
@@ -3681,6 +3682,7 @@ dependencies = [
 name = "hopr-lib"
 version = "2.1.0-rc.4"
 dependencies = [
+ "async-channel 2.1.1",
  "async-lock 3.3.0",
  "async-std",
  "atomic_enum",

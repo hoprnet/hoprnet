@@ -12,6 +12,7 @@ license = "GPL-3.0-only"
 crate-type = ["rlib"]
 
 [dependencies]
+async-channel = { workspace = true }
 async-lock = { workspace = true }
 async-std = { workspace = true }
 atomic_enum = { workspace = true }

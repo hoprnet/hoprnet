@@ -21,7 +21,6 @@ use hoprd_keypair::key_pair::{HoprKeys, IdentityOptions};
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleHistogram;
 
-const ONBOARDING_INFORMATION_INTERVAL: std::time::Duration = std::time::Duration::from_secs(30);
 const WEBSOCKET_EVENT_BROADCAST_CAPACITY: usize = 10000;
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -185,22 +184,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ws_events_tx.set_overflow(true); // Set overflow in case of full the oldest record is discarded
 
     let inbox_clone = inbox.clone();
-
-    {
-        // Show onboarding information
-        let my_ethereum_address = hopr_lib::Keypair::public(&hopr_keys.chain_key).to_address().to_hex();
-        let my_peer_id = (*hopr_lib::Keypair::public(&hopr_keys.packet_key)).into();
-        let my_version = hopr_lib::constants::APP_VERSION;
-
-        while !node.is_allowed_to_access_network(&my_peer_id).await.unwrap_or(false) {
-            info!("Once you become eligible to join the HOPR network, you can continue your onboarding by using the following URL: https://hub.hoprnet.org/staking/onboarding?HOPRdNodeAddressForOnboarding={my_ethereum_address}, or by manually entering the node address of your node on https://hub.hoprnet.org/.");
-
-            async_std::task::sleep(ONBOARDING_INFORMATION_INTERVAL).await;
-
-            info!("Node information: peerID => {my_peer_id}, Ethereum address => {my_ethereum_address}, version => {my_version}");
-            info!("Node Ethereum address: {my_ethereum_address} <- put this into staking hub");
-        }
-    }
 
     let node_clone = node.clone();
 

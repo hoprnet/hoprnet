@@ -19,7 +19,6 @@ pub mod config;
 pub mod constants;
 /// Enumerates all errors thrown from this library.
 pub mod errors;
-mod helpers;
 
 pub use {
     chain_actions::errors::ChainActionsError,
@@ -39,7 +38,6 @@ pub use {
 
 use std::{
     collections::HashMap,
-    pin::Pin,
     str::FromStr,
     sync::{atomic::Ordering, Arc},
     time::Duration,
@@ -49,7 +47,7 @@ use async_lock::RwLock;
 use async_std::task::{spawn, JoinHandle};
 use futures::{
     channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender},
-    pin_mut, FutureExt, Stream, StreamExt,
+    pin_mut, Stream, StreamExt,
 };
 
 use chain_actions::{
@@ -58,9 +56,10 @@ use chain_actions::{
     node::NodeActions,
     redeem::TicketRedeemActions,
 };
-use chain_api::config::ChainNetworkConfig;
-use chain_api::HoprChain;
-use chain_api::{can_register_with_safe, wait_for_funds, SignificantChainEvent};
+use chain_api::{
+    can_register_with_safe, config::ChainNetworkConfig, wait_for_funds, HoprChain, HoprChainProcess,
+    SignificantChainEvent,
+};
 use chain_types::chain_events::ChainEventType;
 use chain_types::ContractAddresses;
 use core_path::channel_graph::ChannelGraph;
@@ -75,8 +74,8 @@ use core_transport::{IndexerToProcess, Network, PeerEligibility, PeerOrigin};
 use hopr_platform::file::native::{join, read_file, remove_dir_all, write};
 use tracing::{debug, error, info, warn};
 
-use crate::config::SafeModule;
-use crate::constants::{MIN_NATIVE_BALANCE, SUGGESTED_NATIVE_BALANCE};
+use crate::constants::{MIN_NATIVE_BALANCE, ONBOARDING_INFORMATION_INTERVAL, SUGGESTED_NATIVE_BALANCE};
+use crate::{config::SafeModule, errors::HoprLibError};
 
 use hopr_db_api::{
     accounts::HoprDbAccountOperations,
@@ -156,6 +155,8 @@ pub enum HoprLibProcesses {
     BloomFilterSave,
     #[strum(to_string = "initial indexing operation into the DB")]
     Indexing,
+    #[strum(to_string = "processing of indexed operations in internal components")]
+    IndexReflection,
     #[strum(to_string = "on-chain transaction queue component for outgoing transactions")]
     OutgoingOnchainActionQueue,
     #[strum(to_string = "flush operation of outgoing ticket indices to the DB")]
@@ -173,7 +174,7 @@ impl HoprLibProcesses {
 }
 
 #[allow(clippy::too_many_arguments)] // TODO: refactor this function into a reasonable group of components once fully rearchitected
-pub fn to_chain_events_refresh_process<Db, S, T>(
+pub async fn chain_event_refresh_process<Db, S, T>(
     me: PeerId,
     me_onchain: Address,
     db: Db,
@@ -183,19 +184,17 @@ pub fn to_chain_events_refresh_process<Db, S, T>(
     transport_indexer_actions: core_transport::IndexerActions,
     indexer_action_tracker: Arc<IndexerActionTracker>,
     network: Arc<Network<T>>,
-) -> Pin<Box<dyn futures::Future<Output = ()> + Send>>
-where
+) where
     Db: HoprDbAllOperations + Send + Sync + 'static,
     S: Stream<Item = SignificantChainEvent> + Send + 'static,
     T: HoprDbAllOperations + Sync + Send + std::fmt::Debug + 'static,
 {
-    Box::pin(async move {
-        pin_mut!(event_stream);
-        while let Some(event) = event_stream.next().await {
-            let resolved = indexer_action_tracker.match_and_resolve(&event).await;
-            debug!("resolved {} indexer expectations in {}", resolved.len(), event);
+    pin_mut!(event_stream);
+    while let Some(event) = event_stream.next().await {
+        let resolved = indexer_action_tracker.match_and_resolve(&event).await;
+        debug!("resolved {} indexer expectations in {}", resolved.len(), event);
 
-            match event.event_type {
+        match event.event_type {
                 ChainEventType::Announcement{peer, address, multiaddresses} => {
                     if peer != me {
                         // decapsulate the `p2p/<peer_id>` to remove duplicities
@@ -303,10 +302,7 @@ where
                 }
                 ChainEventType::NodeSafeRegistered(safe_address) => info!("node safe registered {safe_address}"),
             }
-        }
-
-        error!("The chain update process of HOPR objects should never stop")
-    })
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -399,8 +395,10 @@ pub struct Hopr {
     network: Arc<Network<HoprDb>>,
     db: HoprDb,
     chain_cfg: ChainNetworkConfig,
+    channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
     multistrategy: Arc<MultiStrategy>,
     tbf: WrappedTagBloomFilter,
+    rx_indexer_significant_events: async_channel::Receiver<SignificantChainEvent>,
 }
 
 impl Hopr {
@@ -470,6 +468,23 @@ impl Hopr {
         );
 
         let (tx_indexer_events, rx_indexer_events) = futures::channel::mpsc::unbounded();
+        let (tx_indexer_significant_events, rx_indexer_significant_events) =
+            async_channel::unbounded::<SignificantChainEvent>();
+
+        // NOTE: architectural deficiency, needs to be refactored, but for now the remapping
+        // to `async_channel::Receiver` is used, because the `async_channel::Receiver`
+        // implements the `Clone`.
+        //
+        // The task is automatically terminated, when the receiver is closed.
+        spawn(async move {
+            let tx = tx_indexer_significant_events.clone();
+            let mut rx = rx_indexer_events;
+            while let Some(event) = rx.next().await {
+                if let Err(e) = tx.send(event).await {
+                    error!("failed to forward indexer event: {e}");
+                }
+            }
+        });
 
         let channel_graph = Arc::new(RwLock::new(ChannelGraph::new(me_onchain.public().to_address())));
 
@@ -486,30 +501,33 @@ impl Hopr {
             my_multiaddresses.clone(),
         );
 
-        let contract_addrs = ContractAddresses {
-            announcements: resolved_environment.announcements,
-            channels: resolved_environment.channels,
-            token: resolved_environment.token,
-            price_oracle: resolved_environment.ticket_price_oracle,
-            network_registry: resolved_environment.network_registry,
-            network_registry_proxy: resolved_environment.network_registry_proxy,
-            stake_factory: resolved_environment.node_stake_v2_factory,
-            safe_registry: resolved_environment.node_safe_registry,
-            module_implementation: resolved_environment.module_implementation,
-        };
-
-        let (action_queue, chain_actions, rpc_operations) = chain_api::build_chain_components(
-            me_onchain,
-            resolved_environment.clone(),
-            contract_addrs,
-            cfg.safe_module.module_address,
+        let hopr_chain_api = chain_api::HoprChain::new(
+            me_onchain.clone(),
             db.clone(),
+            resolved_environment.clone(),
+            cfg.safe_module.module_address,
+            ContractAddresses {
+                announcements: resolved_environment.announcements,
+                channels: resolved_environment.channels,
+                token: resolved_environment.token,
+                price_oracle: resolved_environment.ticket_price_oracle,
+                network_registry: resolved_environment.network_registry,
+                network_registry_proxy: resolved_environment.network_registry_proxy,
+                stake_factory: resolved_environment.node_stake_v2_factory,
+                safe_registry: resolved_environment.node_safe_registry,
+                module_implementation: resolved_environment.module_implementation,
+            },
+            cfg.safe_module.safe_address,
+            chain_indexer::IndexerConfig {
+                start_block_number: resolved_environment.channel_contract_deploy_block as u64,
+            },
+            tx_indexer_events,
         );
 
         let multi_strategy = Arc::new(MultiStrategy::new(
             cfg.strategy.clone(),
             db.clone(),
-            chain_actions.clone(),
+            hopr_chain_api.actions_ref().clone(),
             AwaitingAggregator::new(
                 db.clone(),
                 me_onchain.clone(),
@@ -518,55 +536,6 @@ impl Hopr {
             ),
         ));
         debug!("Initialized strategies: {multi_strategy:?}");
-
-        let indexer_refreshing_loop = to_chain_events_refresh_process(
-            (*me.public()).into(),
-            me_onchain.public().to_address(),
-            db.clone(),
-            multi_strategy.clone(),
-            rx_indexer_events,
-            channel_graph.clone(),
-            hopr_transport_api.index_updater(),
-            action_queue.action_state(),
-            network.clone(),
-        );
-
-        let hopr_chain_api = chain_api::HoprChain::new(
-            me_onchain.clone(),
-            db.clone(),
-            contract_addrs,
-            cfg.safe_module.safe_address,
-            chain_indexer::IndexerConfig {
-                start_block_number: resolved_environment.channel_contract_deploy_block as u64,
-            },
-            tx_indexer_events,
-            chain_actions.clone(),
-            rpc_operations.clone(),
-            channel_graph.clone(),
-        );
-
-        // TODO: move up, but requires a parallel check to verify
-        spawn(async move {
-            let chain_events: Vec<Pin<Box<dyn futures::Future<Output = HoprLibProcesses> + Send>>> = vec![
-                Box::pin(indexer_refreshing_loop.map(|_| HoprLibProcesses::Indexing)),
-                Box::pin(async move {
-                    action_queue
-                        .start()
-                        .map(|_| HoprLibProcesses::OutgoingOnchainActionQueue)
-                        .await
-                }),
-            ];
-
-            let mut futs = crate::helpers::to_futures_unordered(chain_events);
-
-            while let Some(process) = futs.next().await {
-                if process.can_finish() {
-                    continue;
-                } else {
-                    panic!("CRITICAL: the core chain loop unexpectedly stopped: '{process}'");
-                }
-            }
-        });
 
         #[cfg(all(feature = "prometheus", not(test)))]
         {
@@ -591,9 +560,10 @@ impl Hopr {
             db,
             network,
             chain_cfg: resolved_environment,
+            channel_graph,
             multistrategy: multi_strategy,
             tbf,
-            // heartbeat,
+            rx_indexer_significant_events,
         }
     }
 
@@ -678,6 +648,8 @@ impl Hopr {
             Balance::new_from_str(SUGGESTED_NATIVE_BALANCE, BalanceType::HOPR).to_formatted_string()
         );
 
+        let mut processes: HashMap<HoprLibProcesses, JoinHandle<()>> = HashMap::new();
+
         wait_for_funds(
             self.me_onchain(),
             Balance::new_from_str(MIN_NATIVE_BALANCE, BalanceType::Native),
@@ -723,9 +695,43 @@ impl Hopr {
 
         self.state.store(HoprState::Indexing, Ordering::Relaxed);
 
-        // wait for the indexer sync
-        info!("Start the indexer and sync the chain");
-        self.chain_api.sync_chain().await?;
+        spawn(chain_event_refresh_process(
+            self.me_peer_id(),
+            self.me_onchain(),
+            self.db.clone(),
+            self.multistrategy.clone(),
+            self.rx_indexer_significant_events.clone(),
+            self.channel_graph.clone(),
+            self.transport_api.index_updater(),
+            self.chain_api.action_state(),
+            self.network.clone(),
+        ));
+
+        info!("Start the chain process and sync the indexer");
+        for (id, proc) in self.chain_api.start().await?.into_iter() {
+            let nid = match id {
+                HoprChainProcess::Indexer => HoprLibProcesses::Indexing,
+                HoprChainProcess::OutgoingOnchainActionQueue => HoprLibProcesses::OutgoingOnchainActionQueue,
+            };
+            processes.insert(nid, proc);
+        }
+
+        {
+            // Show onboarding information
+            let my_ethereum_address = self.me_onchain().to_hex();
+            let my_peer_id = self.me_peer_id();
+            let my_version = crate::constants::APP_VERSION;
+
+            while !self.is_allowed_to_access_network(&my_peer_id).await.unwrap_or(false) {
+                info!("Once you become eligible to join the HOPR network, you can continue your onboarding by using the following URL: https://hub.hoprnet.org/staking/onboarding?HOPRdNodeAddressForOnboarding={my_ethereum_address}, or by manually entering the node address of your node on https://hub.hoprnet.org/.");
+
+                async_std::task::sleep(ONBOARDING_INFORMATION_INTERVAL).await;
+
+                info!("Node information: peerID => {my_peer_id}, Ethereum address => {my_ethereum_address}, version => {my_version}");
+                info!("Node Ethereum address: {my_ethereum_address} <- put this into staking hub");
+            }
+        }
+        // TODO: wait here for the confirmation that the node is allowed in the registry
 
         info!("Loading initial peers from the storage");
         self.transport_api.init_from_db().await?;
@@ -793,17 +799,15 @@ impl Hopr {
             }
         }
 
-        self.state.store(HoprState::Running, Ordering::Relaxed);
         {
-            let channel_graph = self.chain_api.channel_graph().clone();
-            let mut cg = channel_graph.write().await;
+            let mut cg = self.channel_graph.clone().write().await;
 
             info!("Syncing channels from the previous runs");
             let channels = self.db.get_all_channels(None).await?;
 
-            if let Err(e) = cg.sync_channels(channels) {
-                error!("failed to initialize channel graph from the DB: {e}");
-            }
+            cg.sync_channels(channels).map_err(|e| {
+                HoprLibError::GeneralError(format!("failed to initialize channel graph from the DB: {e}"))
+            })?;
 
             // Sync all the qualities there too
             let mut peer_stream = self.db.get_network_peers(Default::default(), false).await?;
@@ -815,8 +819,6 @@ impl Hopr {
                 }
             }
         }
-
-        let mut processes: HashMap<HoprLibProcesses, JoinHandle<()>> = HashMap::new();
 
         let socket = HoprSocket::new();
         let transport_output_tx = socket.writer();

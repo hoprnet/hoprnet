@@ -361,7 +361,7 @@ where
 
     /// Execute all processes of the [`HoprTransport`] object.
     ///
-    /// This method will spawn the [`Heartbeat`] and [`SwarmEventLoop`] processes and return
+    /// This method will spawn the [`HoprTransportProcessType::Heartbeat`] and [`HoprTransportProcessType::SwarmEventLoop`] processes and return
     /// join handles to the calling function. Both processes are not started immediately, but are
     /// waiting for a trigger from this piece of code.
     ///
