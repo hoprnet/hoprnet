@@ -18,12 +18,13 @@ pub struct KeyBinding {
 }
 
 impl KeyBinding {
-    fn prepare_for_signing(chain_key: &Address, packet_key: &OffchainPublicKey) -> Box<[u8]> {
-        let mut to_sign = Vec::with_capacity(70);
-        to_sign.extend_from_slice(b"HOPR_KEY_BINDING");
-        to_sign.extend_from_slice(chain_key.as_ref());
-        to_sign.extend_from_slice(packet_key.as_ref());
-        to_sign.into_boxed_slice()
+    const SIGNING_SIZE: usize = 16 + Address::SIZE + OffchainPublicKey::SIZE;
+    fn prepare_for_signing(chain_key: &Address, packet_key: &OffchainPublicKey) -> [u8; Self::SIGNING_SIZE] {
+        let mut to_sign = [0u8; Self::SIGNING_SIZE];
+        to_sign[0..16].copy_from_slice(b"HOPR_KEY_BINDING");
+        to_sign[16..36].copy_from_slice(chain_key.as_ref());
+        to_sign[36..].copy_from_slice(packet_key.as_ref());
+        to_sign
     }
 
     /// Create and sign new key binding of the given chain key and packet key.

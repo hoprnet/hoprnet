@@ -85,8 +85,7 @@
 //! of one of the HOPR smart contracts deployed on-chain.
 //!
 //! See the [payload] module for details.
-use hopr_crypto_types::keypairs::ChainKeypair;
-use hopr_crypto_types::prelude::Keypair;
+use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 
 use crate::action_queue::ActionSender;
