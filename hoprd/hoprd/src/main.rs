@@ -224,17 +224,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let node_cfg_str = cfg.as_redacted_string()?;
         let api_cfg = cfg.api.clone();
 
-        let test = spawn(run_hopr_api(
-            host_listen,
-            node_cfg_str,
-            api_cfg,
-            node_clone,
-            inbox,
-            ws_events_rx,
-            Some(msg_encoder),
-        ));
-
-        processes.insert(HoprdProcesses::RestApi, test);
+        processes.insert(
+            HoprdProcesses::RestApi,
+            spawn(run_hopr_api(
+                host_listen,
+                node_cfg_str,
+                api_cfg,
+                node_clone,
+                inbox,
+                ws_events_rx,
+                Some(msg_encoder),
+            )),
+        );
     }
 
     let (hopr_socket, hopr_processes) = node.run().await?;

@@ -525,7 +525,8 @@ impl PacketInteraction {
                 }
             });
 
-        // the task is terminated by closing all TX instances
+        // NOTE: This spawned task does not need to be explicitly canceled, since it will
+        // be automatically dropped when the event sender object is dropped.
         spawn(async move {
             // poll the stream until it's done
             while processing_stream.next().await.is_some() {}

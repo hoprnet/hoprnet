@@ -62,7 +62,8 @@ impl IndexerActions {
         let (to_process_tx, mut to_process_rx) =
             futures::channel::mpsc::channel::<IndexerToProcess>(crate::constants::INDEXER_UPDATE_QUEUE_SIZE);
 
-        // the task is terminated by closing all TX instances
+        // NOTE: This spawned task does not need to be explicitly canceled, since it will
+        // be automatically dropped when the event sender object is dropped.
         async_std::task::spawn(async move {
             let mut emitter = emitter;
             let db_local = db.clone();

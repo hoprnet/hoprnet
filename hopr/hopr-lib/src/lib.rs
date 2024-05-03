@@ -782,7 +782,7 @@ impl Hopr {
                 .announce(&multiaddresses_to_announce, &self.me)
                 .await
             {
-                Ok(_) => info!("Announced node on chain: {:?}", multiaddresses_to_announce),
+                Ok(_) => info!("Announcing node on chain: {:?}", multiaddresses_to_announce),
                 Err(ChainActionsError::AlreadyAnnounced) => {
                     info!("Node already announced on chain as {:?}", multiaddresses_to_announce)
                 }

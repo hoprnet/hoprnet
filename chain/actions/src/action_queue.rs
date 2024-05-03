@@ -347,67 +347,66 @@ where
     /// The method will panic if Channel Domain Separator is not yet populated in the DB.
     #[allow(clippy::async_yields_async)]
     #[tracing::instrument(level = "debug", skip(self))]
-    pub async fn start(mut self) -> async_std::task::JoinHandle<()> {
-        async_std::task::spawn(async move {
-            while let Some((act, tx_finisher)) = self.queue_recv.next().await {
-                // Some minimum separation to avoid batching txs
-                futures_timer::Delay::new(Duration::from_millis(100)).await;
+    pub async fn start(mut self) {
+        while let Some((act, tx_finisher)) = self.queue_recv.next().await {
+            // Some minimum separation to avoid batching txs
+            futures_timer::Delay::new(Duration::from_millis(100)).await;
 
-                let exec_context = self.ctx.clone();
-                let db_clone = self.db.clone();
-                let channel_dst = self
-                    .db
-                    .get_indexer_data(None)
-                    .await
-                    .map_err(ChainActionsError::from)
-                    .and_then(|data| data.channels_dst.ok_or(InvalidState("missing channels dst".into())))
-                    .unwrap();
+            let exec_context = self.ctx.clone();
+            let db_clone = self.db.clone();
+            let channel_dst = self
+                .db
+                .get_indexer_data(None)
+                .await
+                .map_err(ChainActionsError::from)
+                .and_then(|data| data.channels_dst.ok_or(InvalidState("missing channels dst".into())))
+                .unwrap();
 
-                async_std::task::spawn(async move {
-                    let act_id = act.to_string();
-                    let act_name: &'static str = (&act).into();
-                    trace!("start executing {act_id} ({act_name})");
+            // NOTE: the process is "daemonized" and not awaited, so it will run in the background
+            async_std::task::spawn(async move {
+                let act_id = act.to_string();
+                let act_name: &'static str = (&act).into();
+                trace!("start executing {act_id} ({act_name})");
 
-                    let tx_result = exec_context.execute_action(act.clone(), channel_dst).await;
-                    match &tx_result {
-                        Ok(confirmation) => {
-                            info!("successful {confirmation}");
+                let tx_result = exec_context.execute_action(act.clone(), channel_dst).await;
+                match &tx_result {
+                    Ok(confirmation) => {
+                        info!("successful {confirmation}");
+
+                        #[cfg(all(feature = "prometheus", not(test)))]
+                        METRIC_COUNT_ACTIONS.increment(&[act_name, "success"]);
+                    }
+                    Err(err) => {
+                        // On error in Ticket redeem action, we also need to reset ack ticket state
+                        if let Action::RedeemTicket(ack) = act {
+                            error!("marking the acknowledged ticket as untouched - redeem action failed: {err}");
+
+                            if let Err(e) = db_clone
+                                .update_ticket_states((&ack).into(), AcknowledgedTicketStatus::Untouched)
+                                .await
+                            {
+                                error!("cannot mark {ack} as untouched: {e}");
+                            }
+                        }
+
+                        // Timeout are accounted in different metric
+                        if let Timeout = err {
+                            error!("timeout while waiting for confirmation of {act_id}");
 
                             #[cfg(all(feature = "prometheus", not(test)))]
-                            METRIC_COUNT_ACTIONS.increment(&[act_name, "success"]);
-                        }
-                        Err(err) => {
-                            // On error in Ticket redeem action, we also need to reset ack ticket state
-                            if let Action::RedeemTicket(ack) = act {
-                                error!("marking the acknowledged ticket as untouched - redeem action failed: {err}");
+                            METRIC_COUNT_ACTIONS.increment(&[act_name, "timeout"]);
+                        } else {
+                            error!("{act_id} failed: {err}");
 
-                                if let Err(e) = db_clone
-                                    .update_ticket_states((&ack).into(), AcknowledgedTicketStatus::Untouched)
-                                    .await
-                                {
-                                    error!("cannot mark {ack} as untouched: {e}");
-                                }
-                            }
-
-                            // Timeout are accounted in different metric
-                            if let Timeout = err {
-                                error!("timeout while waiting for confirmation of {act_id}");
-
-                                #[cfg(all(feature = "prometheus", not(test)))]
-                                METRIC_COUNT_ACTIONS.increment(&[act_name, "timeout"]);
-                            } else {
-                                error!("{act_id} failed: {err}");
-
-                                #[cfg(all(feature = "prometheus", not(test)))]
-                                METRIC_COUNT_ACTIONS.increment(&[act_name, "failure"]);
-                            }
+                            #[cfg(all(feature = "prometheus", not(test)))]
+                            METRIC_COUNT_ACTIONS.increment(&[act_name, "failure"]);
                         }
                     }
+                }
 
-                    let _ = tx_finisher.send(tx_result);
-                });
-            }
-            error!("action queue has finished, it should be running for the node to be able to process chain actions");
-        })
+                let _ = tx_finisher.send(tx_result);
+            });
+        }
+        error!("action queue has finished, it should be running for the node to be able to process chain actions");
     }
 }

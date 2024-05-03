@@ -43,6 +43,9 @@ impl TicketManager {
         // and the processing calls triggering such an operation.
         let db_clone = tickets_db.clone();
         let mutex_clone = mutex.clone();
+
+        // NOTE: This spawned task does not need to be explicitly canceled, since it will
+        // be automatically dropped when the event sender object is dropped.
         async_std::task::spawn(async move {
             // TODO: it would be beneficial to check the size hint and extract as much, as possible
             // in this step to avoid relocking for each individual ticket.

@@ -201,7 +201,8 @@ impl AcknowledgementInteraction {
             }
         });
 
-        // the task is terminated by closing all TX instances
+        // NOTE: This spawned task does not need to be explicitly canceled, since it will
+        // be automatically dropped when the event sender object is dropped.
         async_std::task::spawn(async move {
             processing_stream.map(Ok).forward(futures::sink::drain()).await.unwrap();
         });

@@ -304,12 +304,12 @@ where
             core_p2p::api::HeartbeatResponder::new(pong_tx),
         );
 
-        // : Some((heartbeat, swarm_loop))
-
         let (push_tx, push_rx) = async_channel::bounded::<HoprSwarmArgs<T>>(1);
         let (pull_tx, pull_rx) =
             async_channel::bounded::<std::collections::HashMap<HoprTransportProcess, JoinHandle<()>>>(1);
 
+        // NOTE: This spawned task does not need to be explicitly canceled, since it will
+        // be automatically dropped when the event sender object is dropped.
         spawn(async move {
             let mut heartbeat = heartbeat;
             let swarm_loop = swarm_loop;
