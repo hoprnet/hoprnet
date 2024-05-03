@@ -130,8 +130,7 @@ where
 
         spawn(async move {
             let is_synced = Arc::new(std::sync::atomic::AtomicBool::new(false));
-
-            let mut chain_head = 0;
+            let chain_head = Arc::new(std::sync::atomic::AtomicU64::new(0));
 
             let event_stream = rpc
                 .try_stream_logs(next_block_to_process, log_filter)
@@ -139,6 +138,7 @@ where
                 .then(|block_with_logs| {
                     let rpc = &rpc;
                     let mut tx = tx.clone();
+                    let chain_head = chain_head.clone();
                     let is_synced = is_synced.clone();
 
                     async move {
@@ -152,16 +152,20 @@ where
 
                         match rpc.block_number().await {
                             Ok(current_chain_block_number) => {
-                                chain_head = current_chain_block_number;
+                                chain_head.store(current_chain_block_number, std::sync::atomic::Ordering::Relaxed)
                             }
                             Err(error) => {
-                                error!("failed to fetch block number from RPC: {error}");
-                                chain_head = chain_head.max(current_block);
+                                error!(
+                                    "Failed to fetch block number from RPC, cannot continue indexing due to {error}"
+                                );
+                                panic!("Failed to fetch block number from RPC, cannot continue indexing due to {error}")
                             }
-                        }
+                        };
+
+                        let head = chain_head.load(std::sync::atomic::Ordering::Relaxed);
 
                         if !is_synced.load(std::sync::atomic::Ordering::Relaxed) {
-                            let block_difference = chain_head - next_block_to_process;
+                            let block_difference = head - next_block_to_process;
                             let progress = if block_difference == 0 {
                                 1_f64
                             } else {
@@ -173,7 +177,7 @@ where
                             #[cfg(all(feature = "prometheus", not(test)))]
                             METRIC_INDEXER_SYNC_PROGRESS.set(progress);
 
-                            if current_block >= chain_head {
+                            if current_block >= head {
                                 info!("Indexer sync successfully completed");
                                 is_synced.store(true, std::sync::atomic::Ordering::Relaxed);
                                 if let Err(e) = tx.try_send(()) {
@@ -188,7 +192,6 @@ where
                 .filter_map(|block_with_logs| async {
                     debug!("processing events in {block_with_logs} ...");
                     let block_id = block_with_logs.to_string();
-                    let block_num = block_with_logs.block_id;
                     let outgoing_events = match db_processor.collect_block_events(block_with_logs).await {
                         Ok(events) => {
                             info!("retrieved {} significant chain events from {block_id}", events.len());
@@ -200,14 +203,13 @@ where
                         }
                     };
 
-                    // Printout indexer state roughly every 5 processed blocks which had relevant events
-                    if block_num % 5 == 0 {
-                        match db.get_last_indexed_block(None).await {
-                            Ok((block_num, checksum)) => {
-                                info!("Current indexer state at block #{block_num} with checksum: {checksum}")
-                            }
-                            Err(e) => error!("Cannot retrieve indexer state: {e}"),
+                    // Printout indexer state, we can do this on every processed block because not
+                    // every block will have events
+                    match db.get_last_indexed_block(None).await {
+                        Ok((block_num, checksum)) => {
+                            info!("Current indexer state at block #{block_num} with checksum: {checksum}")
                         }
+                        Err(e) => error!("Cannot retrieve indexer state: {e}"),
                     }
 
                     outgoing_events
