@@ -9,6 +9,7 @@ use hopr_primitive_types::primitives::Address;
 use migration::{MigratorIndex, MigratorPeers, MigratorTickets, MigratorTrait};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, SqlxSqliteConnector};
 use sea_query::Expr;
+use sqlx::pool::PoolOptions;
 use sqlx::sqlite::{SqliteAutoVacuum, SqliteConnectOptions, SqliteJournalMode, SqliteSynchronous};
 use sqlx::{ConnectOptions, SqlitePool};
 use std::path::Path;
@@ -62,15 +63,23 @@ impl HoprDb {
             .pragma("cache_size", "-30000") // 32M
             .pragma("busy_timeout", "1000"); // 1000ms
 
-        let index = SqlitePool::connect_with(cfg_template.clone().filename(dir.join(SQL_DB_INDEX_FILE_NAME)))
+        let pool_size = 30;
+
+        let index = PoolOptions::new()
+            .max_connections(pool_size)
+            .connect_with(cfg_template.clone().filename(dir.join(SQL_DB_INDEX_FILE_NAME)))
             .await
             .unwrap_or_else(|e| panic!("failed to create main database: {e}"));
 
-        let peers = SqlitePool::connect_with(cfg_template.clone().filename(dir.join(SQL_DB_PEERS_FILE_NAME)))
+        let peers = PoolOptions::new()
+            .max_connections(pool_size)
+            .connect_with(cfg_template.clone().filename(dir.join(SQL_DB_PEERS_FILE_NAME)))
             .await
             .unwrap_or_else(|e| panic!("failed to create main database: {e}"));
 
-        let tickets = SqlitePool::connect_with(cfg_template.clone().filename(dir.join(SQL_DB_TICKETS_FILE_NAME)))
+        let tickets = PoolOptions::new()
+            .max_connections(pool_size)
+            .connect_with(cfg_template.clone().filename(dir.join(SQL_DB_TICKETS_FILE_NAME)))
             .await
             .unwrap_or_else(|e| panic!("failed to create main database: {e}"));
 

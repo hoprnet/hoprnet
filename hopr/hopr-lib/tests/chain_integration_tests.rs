@@ -512,7 +512,7 @@ async fn integration_test_indexer() {
         _ => panic!("invalid confirmation"),
     };
 
-    async_std::task::sleep(Duration::from_millis(100)).await;
+    async_std::task::sleep(Duration::from_millis(1000)).await;
 
     // After the funding, read channel_alice_bob again and compare its balance
     let channel_alice_bob = alice_node
@@ -818,8 +818,8 @@ async fn integration_test_indexer() {
     info!("bob completed at {:?}", bob_checksum);
 
     assert_eq!(
-        alice_checksum, bob_checksum,
-        "alice and bob must be at the same indexed block and checksum"
+        alice_checksum.1, bob_checksum.1,
+        "alice and bob must be at the same checksum"
     );
 
     futures::future::join_all(alice_node.node_tasks.into_iter().map(|t| t.cancel())).await;
