@@ -302,8 +302,8 @@ where
                 entry.update_quality(0.0_f64.max(entry.get_quality() - self.cfg.quality_step));
 
                 if entry.get_quality() < (self.cfg.quality_step / 2.0) {
-                    self.db.remove_network_peer(&entry.id).await?;
-                    return Ok(Some(NetworkTriggeredEvent::CloseConnection(entry.id)));
+                    self.db.remove_network_peer(&entry.id.1).await?;
+                    return Ok(Some(NetworkTriggeredEvent::CloseConnection(entry.id.1)));
                 } else if entry.get_quality() < self.cfg.quality_bad_threshold {
                     entry.ignored = Some(current_time());
                 }
@@ -318,7 +318,7 @@ where
             }
 
             Ok(Some(NetworkTriggeredEvent::UpdateQuality(
-                entry.id,
+                entry.id.1,
                 entry.get_quality(),
             )))
         } else {
@@ -373,7 +373,7 @@ where
         futures::pin_mut!(stream);
         let mut data: Vec<PeerStatus> = stream
             .filter_map(|v| async move {
-                if v.id == self.me {
+                if v.id.1 == self.me {
                     return None;
                 }
                 let backoff = v.backoff.powf(self.cfg.backoff_exponent);
@@ -396,7 +396,7 @@ where
             }
         });
 
-        Ok(data.into_iter().map(|peer| peer.id).collect())
+        Ok(data.into_iter().map(|peer| peer.id.1).collect())
     }
 
     pub(crate) fn should_still_be_ignored(&self, peer: &PeerStatus) -> bool {

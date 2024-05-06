@@ -83,7 +83,7 @@ impl IndexerActions {
                     // TODO: when is this even triggered? network registry missing?
                     IndexerToProcess::RegisterStatusUpdate => {
                         let peers = network
-                            .peer_filter(|peer| async move { Some(peer.id) })
+                            .peer_filter(|peer| async move { Some(peer.id.1) })
                             .await
                             .unwrap_or(vec![]);
 

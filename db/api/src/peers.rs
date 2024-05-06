@@ -225,23 +225,13 @@ impl HoprDbPeersOperations for HoprDb {
 
     async fn update_network_peer(&self, new_status: PeerStatus) -> Result<()> {
         let row = hopr_db_entity::network_peer::Entity::find()
-            .filter(
-                hopr_db_entity::network_peer::Column::PacketKey.eq(Vec::from(
-                    OffchainPublicKey::try_from(new_status.id)
-                        .map_err(|_| crate::errors::DbError::DecodingError)?
-                        .to_bytes(),
-                )),
-            )
+            .filter(hopr_db_entity::network_peer::Column::PacketKey.eq(Vec::from(new_status.id.0.to_bytes())))
             .one(&self.peers_db)
             .await?;
 
         if let Some(model) = row {
             let mut peer_data: hopr_db_entity::network_peer::ActiveModel = model.into();
-            peer_data.packet_key = sea_orm::ActiveValue::Set(Vec::from(
-                OffchainPublicKey::try_from(new_status.id)
-                    .map_err(|_| crate::errors::DbError::DecodingError)?
-                    .to_bytes(),
-            ));
+            peer_data.packet_key = sea_orm::ActiveValue::Set(Vec::from(new_status.id.0.to_bytes()));
             peer_data.multi_addresses = sea_orm::ActiveValue::Set(
                 new_status
                     .multiaddresses
@@ -272,7 +262,7 @@ impl HoprDbPeersOperations for HoprDb {
         } else {
             Err(crate::errors::DbError::LogicalError(format!(
                 "cannot update a non-existing peer '{}'",
-                new_status.id
+                new_status.id.1
             )))
         }
     }
@@ -379,7 +369,7 @@ impl HoprDbPeersOperations for HoprDb {
 /// Status of the peer as recorded by the [Network].
 #[derive(Debug, Clone, PartialEq)]
 pub struct PeerStatus {
-    pub id: PeerId,
+    pub id: (OffchainPublicKey, PeerId),
     pub origin: PeerOrigin,
     pub is_public: bool,
     pub last_seen: SystemTime,
@@ -397,7 +387,7 @@ pub struct PeerStatus {
 impl PeerStatus {
     pub fn new(id: PeerId, origin: PeerOrigin, backoff: f64, quality_window: u32) -> PeerStatus {
         PeerStatus {
-            id,
+            id: (OffchainPublicKey::try_from(&id).expect("invalid peer id given"), id),
             origin,
             is_public: true,
             heartbeats_sent: 0,
@@ -437,7 +427,7 @@ impl PeerStatus {
 impl std::fmt::Display for PeerStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "Entry: [id={}, origin={}, last seen on={:?}, quality={}, heartbeats sent={}, heartbeats succeeded={}, backoff={}]",
-            self.id, self.origin, self.last_seen, self.quality, self.heartbeats_sent, self.heartbeats_succeeded, self.backoff)
+            self.id.1, self.origin, self.last_seen, self.quality, self.heartbeats_sent, self.heartbeats_succeeded, self.backoff)
     }
 }
 
@@ -445,10 +435,9 @@ impl TryFrom<hopr_db_entity::network_peer::Model> for PeerStatus {
     type Error = crate::errors::DbError;
 
     fn try_from(value: hopr_db_entity::network_peer::Model) -> std::result::Result<Self, Self::Error> {
+        let key = OffchainPublicKey::from_bytes(value.packet_key.as_slice()).map_err(|_| Self::Error::DecodingError)?;
         Ok(PeerStatus {
-            id: OffchainPublicKey::from_bytes(value.packet_key.as_slice())
-                .map_err(|_| Self::Error::DecodingError)?
-                .into(),
+            id: (key, key.into()),
             origin: PeerOrigin::try_from(value.origin as u8).map_err(|_| Self::Error::DecodingError)?,
             is_public: value.public,
             last_seen: chrono::DateTime::<chrono::Utc>::from_str(&value.last_seen)
@@ -682,7 +671,7 @@ mod tests {
             .get_network_peers(Default::default(), false)
             .await
             .expect("should get stream")
-            .map(|s| s.id)
+            .map(|s| s.id.1)
             .collect()
             .await;
 
@@ -730,7 +719,7 @@ mod tests {
             .get_network_peers(PeerSelector::default().with_quality_gte(0.501_f64), false)
             .await
             .expect("should get stream")
-            .map(|s| s.id)
+            .map(|s| s.id.1)
             .collect()
             .await;
 
