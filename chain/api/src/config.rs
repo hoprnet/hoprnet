@@ -293,7 +293,7 @@ mod test {
 
     #[test]
     fn test_version_is_satisfied_should_work_for_glob() {
-        let actual = satisfies(crate::constants::APP_VERSION_COERCED, "*");
+        let actual = satisfies("1.2.3", "*");
         assert!(actual.is_ok());
         assert!(actual.unwrap())
     }

@@ -800,7 +800,8 @@ impl Hopr {
         }
 
         {
-            let mut cg = self.channel_graph.clone().write().await;
+            let channel_graph = self.channel_graph.clone();
+            let mut cg = channel_graph.write().await;
 
             info!("Syncing channels from the previous runs");
             let channels = self.db.get_all_channels(None).await?;
