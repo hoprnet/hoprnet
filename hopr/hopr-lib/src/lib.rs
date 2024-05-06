@@ -93,7 +93,8 @@ use hopr_db_api::{
 use hopr_db_api::{channels::HoprDbChannelOperations, HoprDbAllOperations};
 
 use hopr_crypto_types::prelude::OffchainPublicKey;
-use hopr_db_api::prelude::DbError;
+use hopr_db_api::prelude::ChainOrPacketKey::ChainKey;
+use hopr_db_api::prelude::{DbError, HoprDbPeersOperations};
 #[cfg(all(feature = "prometheus", not(test)))]
 use {
     hopr_metrics::metrics::{MultiGauge, SimpleCounter, SimpleGauge},
@@ -900,13 +901,25 @@ impl Hopr {
         }
 
         self.state.store(HoprState::Running, Ordering::Relaxed);
-
         {
+            let channel_graph = self.chain_api.channel_graph().clone();
+            let mut cg = channel_graph.write().await;
+
             info!("Syncing channels from the previous runs");
             let channels = self.db.get_all_channels(None).await?;
 
-            if let Err(e) = self.chain_api.channel_graph().write().await.sync_channels(channels) {
+            if let Err(e) = cg.sync_channels(channels) {
                 error!("failed to initialize channel graph from the DB: {e}");
+            }
+
+            // Sync all the qualities there too
+            let mut peer_stream = self.db.get_network_peers(Default::default(), false).await?;
+            while let Some(peer) = peer_stream.next().await {
+                if let Some(ChainKey(key)) = self.db.translate_key(None, peer.id.0).await? {
+                    cg.update_channel_quality(self.me_onchain(), key, peer.get_quality());
+                } else {
+                    error!("could not translate peer info: {}", peer.id.1);
+                }
             }
         }
 
