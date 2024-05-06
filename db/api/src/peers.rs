@@ -471,7 +471,7 @@ impl TryFrom<hopr_db_entity::network_peer::Model> for PeerStatus {
             multiaddresses: value
                 .multi_addresses
                 .split(',')
-                .filter(|s| !s.is_empty())
+                .filter(|s| !s.trim().is_empty())
                 .map(Multiaddr::try_from)
                 .collect::<core::result::Result<Vec<_>, multiaddr::Error>>()
                 .map_err(|_| Self::Error::DecodingError)?,
