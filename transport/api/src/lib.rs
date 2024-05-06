@@ -170,6 +170,8 @@ type HoprTransportProcessType<T> = (
     async_channel::Receiver<HashMap<HoprTransportProcess, JoinHandle<()>>>,
 );
 
+/// An object used to collect and pass along the arguments necessary for runtime creation
+/// of the HoprSwarm process inside the `HoprTransport` object.
 struct HoprSwarmArgs<T>
 where
     T: hopr_db_api::peers::HoprDbPeersOperations + Sync + Send + std::fmt::Debug + 'static,
@@ -331,7 +333,10 @@ where
                             args.on_acknowledged_ticket,
                         )),
                     );
-                    pull_tx.send(r).await.unwrap();
+                    pull_tx
+                        .send(r)
+                        .await
+                        .expect("Failed to send process handles to the invocation site");
                 }
                 Err(e) => panic!(
                     "Failed to receive the push message from HoprTransport object to initiate process spawning: {e}"
