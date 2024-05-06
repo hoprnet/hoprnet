@@ -516,6 +516,34 @@ mod tests {
     }
 
     #[async_std::test]
+    async fn test_should_allow_reannouncement() {
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
+
+        let chain_1 = ChainKeypair::random().public().to_address();
+        let packet_1 = OffchainKeypair::random().public().clone();
+
+        db.insert_account(None, AccountEntry::new(packet_1, chain_1, AccountType::NotAnnounced))
+            .await
+            .unwrap();
+
+        db.insert_announcement(None, chain_1, "/ip4/1.2.3.4/tcp/8000".parse().unwrap(), 100)
+            .await
+            .unwrap();
+
+        let ae = db.get_account(None, chain_1).await.unwrap().unwrap();
+
+        assert_eq!("/ip4/1.2.3.4/tcp/8000", ae.get_multiaddr().unwrap().to_string());
+
+        db.insert_announcement(None, chain_1, "/ip4/1.2.3.4/tcp/8001".parse().unwrap(), 110)
+            .await
+            .unwrap();
+
+        let ae = db.get_account(None, chain_1).await.unwrap().unwrap();
+
+        assert_eq!("/ip4/1.2.3.4/tcp/8001", ae.get_multiaddr().unwrap().to_string());
+    }
+
+    #[async_std::test]
     async fn test_should_not_insert_account_announcement_to_nonexisting_account() {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
 
