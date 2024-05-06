@@ -137,9 +137,8 @@ where
             return false;
         }
 
-        // Check node reliability, new nodes are considered reliable
-        // unless the opposite has been observed
-        if channel.quality.unwrap_or(1.0f64) < self.quality_threshold {
+        // Check node reliability, new nodes are NOT considered reliable yet
+        if channel.quality.unwrap_or(0.0f64) < self.quality_threshold {
             // Only use nodes that have shown to be somewhat reliable
             return false;
         }

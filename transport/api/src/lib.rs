@@ -606,7 +606,7 @@ where
 
     #[tracing::instrument(level = "debug", skip(self))]
     pub async fn network_connected_peers(&self) -> errors::Result<Vec<PeerId>> {
-        Ok(self.network.peer_filter(|peer| async move { Some(peer.id) }).await?)
+        Ok(self.network.peer_filter(|peer| async move { Some(peer.id.1) }).await?)
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
