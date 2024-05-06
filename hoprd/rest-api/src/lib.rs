@@ -2391,7 +2391,7 @@ mod node {
                     let address = hopr.peerid_to_chain_key(&peer_id).await.ok().flatten();
 
                     // WARNING: Only in Providence and Saint-Louis are all peers public
-                    let multiaddresses = hopr.multiaddresses_announced_on_chain(&peer_id).await;
+                    let multiaddresses = hopr.network_observed_multiaddresses(&peer_id).await;
 
                     Some((address, peer_id, multiaddresses, info))
                 }
