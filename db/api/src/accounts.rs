@@ -516,7 +516,7 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn test_should_allow_reannouncement() {
+    async fn test_should_allow_reannouncement() -> std::result::Result<(), Box<dyn std::error::Error>> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
 
         let chain_1 = ChainKeypair::random().public().to_address();
@@ -526,11 +526,11 @@ mod tests {
             .await
             .unwrap();
 
-        db.insert_announcement(None, chain_1, "/ip4/1.2.3.4/tcp/8000".parse().unwrap(), 100)
+        db.insert_announcement(None, chain_1, "/ip4/1.2.3.4/tcp/8000".parse()?, 100)
             .await
             .unwrap();
 
-        let ae = db.get_account(None, chain_1).await.unwrap().unwrap();
+        let ae = db.get_account(None, chain_1).await?.ok_or(MissingAccount)?;
 
         assert_eq!("/ip4/1.2.3.4/tcp/8000", ae.get_multiaddr().unwrap().to_string());
 
@@ -538,9 +538,11 @@ mod tests {
             .await
             .unwrap();
 
-        let ae = db.get_account(None, chain_1).await.unwrap().unwrap();
+        let ae = db.get_account(None, chain_1).await?.ok_or(MissingAccount)?;
 
         assert_eq!("/ip4/1.2.3.4/tcp/8001", ae.get_multiaddr().unwrap().to_string());
+
+        Ok(())
     }
 
     #[async_std::test]
