@@ -1042,9 +1042,27 @@ impl Hopr {
         self.transport_api.network_observed_multiaddresses(peer).await
     }
 
-    /// List all multiaddresses for this node announced to DHT
-    pub async fn multiaddresses_announced_to_dht(&self, peer: &PeerId) -> Vec<Multiaddr> {
-        self.transport_api.multiaddresses_announced_to_dht(peer).await
+    /// List all multiaddresses announced on-chain for the given node.
+    pub async fn multiaddresses_announced_on_chain(&self, peer: &PeerId) -> Vec<Multiaddr> {
+        let key = match OffchainPublicKey::try_from(peer) {
+            Ok(k) => k,
+            Err(e) => {
+                error!("failed to convert peer id {peer} to off-chain key: {e}");
+                return vec![];
+            }
+        };
+
+        match self.db.get_account(None, key).await {
+            Ok(Some(entry)) => Vec::from_iter(entry.get_multiaddr()),
+            Ok(None) => {
+                error!("no information about {peer}");
+                vec![]
+            }
+            Err(e) => {
+                error!("failed to retrieve information about {peer}: {e}");
+                vec![]
+            }
+        }
     }
 
     // Network =========
