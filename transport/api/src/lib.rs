@@ -56,7 +56,7 @@ use hopr_db_api::{
 use libp2p::request_response::{OutboundRequestId, ResponseChannel};
 use tracing::{debug, error, info, warn};
 
-use core_network::{heartbeat::Heartbeat, messaging::ControlMessage, network::NetworkConfig, ping::Ping};
+use core_network::{config::NetworkConfig, heartbeat::Heartbeat, messaging::ControlMessage, ping::Ping};
 use core_network::{heartbeat::HeartbeatConfig, ping::PingConfig, PeerId};
 use core_path::channel_graph::ChannelGraph;
 use core_protocol::{
