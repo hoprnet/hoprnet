@@ -893,7 +893,7 @@ mod peers {
         match PeerId::from_str(req.param("peerId")?) {
             Ok(peer) => Ok(Response::builder(200)
                 .body(json!(NodePeerInfoResponse {
-                    announced: hopr.multiaddresses_announced_to_dht(&peer).await,
+                    announced: hopr.multiaddresses_announced_on_chain(&peer).await,
                     observed: hopr.network_observed_multiaddresses(&peer).await
                 }))
                 .build()),
@@ -2391,7 +2391,7 @@ mod node {
                     let address = hopr.peerid_to_chain_key(&peer_id).await.ok().flatten();
 
                     // WARNING: Only in Providence and Saint-Louis are all peers public
-                    let multiaddresses = hopr.multiaddresses_announced_to_dht(&peer_id).await;
+                    let multiaddresses = hopr.network_observed_multiaddresses(&peer_id).await;
 
                     Some((address, peer_id, multiaddresses, info))
                 }
@@ -2418,19 +2418,11 @@ mod node {
             .accounts_announced_on_chain()
             .await?
             .into_iter()
-            .map(|announced| {
-                let hopr_clone = hopr.clone();
-                async move {
-                    // WARNING: Only in Providence and Saint-Louis are all peers public
-                    let multiaddresses = hopr_clone
-                        .multiaddresses_announced_to_dht(&announced.public_key.into())
-                        .await;
-
-                    AnnouncedPeer {
-                        peer_id: announced.public_key.into(),
-                        peer_address: announced.chain_addr,
-                        multiaddr: multiaddresses.first().cloned(),
-                    }
+            .map(|announced| async move {
+                AnnouncedPeer {
+                    peer_id: announced.public_key.into(),
+                    peer_address: announced.chain_addr,
+                    multiaddr: announced.get_multiaddr(),
                 }
             })
             .collect::<FuturesUnordered<_>>()
