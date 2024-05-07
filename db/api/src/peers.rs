@@ -435,7 +435,7 @@ impl TryFrom<hopr_db_entity::network_peer::Model> for PeerStatus {
     type Error = crate::errors::DbError;
 
     fn try_from(value: hopr_db_entity::network_peer::Model) -> std::result::Result<Self, Self::Error> {
-        let key = OffchainPublicKey::from_bytes(value.packet_key.as_slice()).map_err(|_| Self::Error::DecodingError)?;
+        let key = OffchainPublicKey::try_from(value.packet_key.as_slice()).map_err(|_| Self::Error::DecodingError)?;
         Ok(PeerStatus {
             id: (key, key.into()),
             origin: PeerOrigin::try_from(value.origin as u8).map_err(|_| Self::Error::DecodingError)?,
