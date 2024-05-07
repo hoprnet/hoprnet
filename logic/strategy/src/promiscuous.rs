@@ -20,7 +20,6 @@
 //!
 //! For details on default parameters see [PromiscuousStrategyConfig].
 //!
-use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use std::collections::HashMap;
@@ -214,29 +213,24 @@ where
                 }) {
                     // Check if the reported version matches the version semver expression
                     if self.cfg.minimum_peer_version.matches(&version) {
-                        if let Ok(offchain_key) = OffchainPublicKey::try_from(status.id) {
-                            // Resolve peer's chain key and average quality
-                            if let Ok(addr) = self
-                                .db
-                                .resolve_chain_key(&offchain_key)
-                                .await
-                                .and_then(|addr| addr.ok_or(DbError::MissingAccount))
-                            {
-                                Some((addr, status.get_average_quality()))
-                            } else {
-                                error!("could not find on-chain address for {}", status.id);
-                                None
-                            }
+                        // Resolve peer's chain key and average quality
+                        if let Ok(addr) = self
+                            .db
+                            .resolve_chain_key(&status.id.0)
+                            .await
+                            .and_then(|addr| addr.ok_or(DbError::MissingAccount))
+                        {
+                            Some((addr, status.get_average_quality()))
                         } else {
-                            error!("encountered invalid peer id: {}", status.id);
+                            error!("could not find on-chain address for {}", status.id.1);
                             None
                         }
                     } else {
-                        debug!("version of peer {} reports non-matching version {version}", status.id);
+                        debug!("version of peer {} reports non-matching version {version}", status.id.1);
                         None
                     }
                 } else {
-                    error!("cannot get version for peer id: {}", status.id);
+                    error!("cannot get version for peer id: {}", status.id.1);
                     None
                 }
             })

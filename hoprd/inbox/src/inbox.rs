@@ -108,7 +108,7 @@ where
         // Push only if there is no tag, or if the tag is not excluded
         let mut db = self.backend.lock().await;
         db.push(payload.application_tag, payload).await;
-        db.purge((self.time)() - self.cfg.max_age).await;
+        db.purge((self.time)().saturating_sub(self.cfg.max_age)).await;
 
         true
     }
@@ -122,7 +122,7 @@ where
         }
 
         let mut db = self.backend.lock().await;
-        db.purge((self.time)() - self.cfg.max_age).await;
+        db.purge((self.time)().saturating_sub(self.cfg.max_age)).await;
         db.count(tag).await
     }
 
@@ -138,7 +138,7 @@ where
         }
 
         let mut db = self.backend.lock().await;
-        db.purge((self.time)() - self.cfg.max_age).await;
+        db.purge((self.time)().saturating_sub(self.cfg.max_age)).await;
 
         db.pop(tag).await
     }
@@ -155,7 +155,7 @@ where
         }
 
         let mut db = self.backend.lock().await;
-        db.purge((self.time)() - self.cfg.max_age).await;
+        db.purge((self.time)().saturating_sub(self.cfg.max_age)).await;
 
         db.peek(tag).await
     }
@@ -169,7 +169,7 @@ where
         }
 
         let mut db = self.backend.lock().await;
-        db.purge((self.time)() - self.cfg.max_age).await;
+        db.purge((self.time)().saturating_sub(self.cfg.max_age)).await;
         db.peek_all(tag, timestamp).await
     }
 
@@ -182,7 +182,7 @@ where
         }
 
         let mut db = self.backend.lock().await;
-        db.purge((self.time)() - self.cfg.max_age).await;
+        db.purge((self.time)().saturating_sub(self.cfg.max_age)).await;
         db.pop_all(tag).await
     }
 }
