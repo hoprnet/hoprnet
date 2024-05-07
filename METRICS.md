@@ -32,8 +32,7 @@ scrape_configs:
 - `hopr_aggregations_count`: Number of performed ticket aggregations
 - `hopr_received_ack_count`: Number of received acknowledgements, keys: `valid`
 - `hopr_sent_acks_count`: Number of sent message acknowledgements
-- `hopr_winning_tickets_count`: Number of winning tickets
-- `hopr_losing_tickets_count`: Number of losing tickets
+- `hopr_tickets_count`: Number of tickets (winning, losing), keys: `type`
 - `hopr_ping_time_sec`: Measures total time it takes to ping a single node (seconds), buckets: 0.5, 1.0, 2.5, 5.0, 10.0, 15.0, 30.0
 - `hopr_heartbeat_pings_count`: Total number of pings by result, keys: `success`
 - `hopr_heartbeat_round_time_sec`: Measures total time in seconds it takes to probe all other nodes, buckets: 0.5, 1.0, 2.5, 5.0, 10.0, 15.0, 30.0
@@ -57,7 +56,6 @@ scrape_configs:
 - `hopr_http_api_call_count`: Number of different REST API calls and their statuses, keys: `endpoint`, `method`, `status`
 - `hopr_http_api_call_timing_sec`: Timing of different REST API calls in seconds, keys: `endpoint`, `method`, buckets: 0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0
 - `hopr_message_latency_sec`: Histogram of measured received message latencies in seconds, buckets: 0.01, 0.025, 0.050, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 20.0
-- `hopr_failed_send_message_count`: Number of sent messages failures
 - `hopr_up`: The unix timestamp in seconds at which the process was started
 - `hopr_lib_version`: Executed version of hopr-lib, keys: `version`
 - `hopr_node_addresses`: Node on-chain and off-chain addresses, keys: `peerid`, `address`, `safe_address`, `module_address`
@@ -67,5 +65,6 @@ scrape_configs:
 - `hopr_chain_head_block_number`: Current block number of chain head
 - `hopr_indexer_block_number`: Current last processed block number by the indexer
 - `hopr_indexer_sync_progress`: Sync progress of the historical data by the indexer
+- `hopr_indexer_checksum`: Contains an unsigned integer that represents the low 32-bits of the Indexer checksum. 
 - `hopr_chain_actions_count`: Number of different chain actions and their results, keys: `action`, `result`
 - `hopr_indexer_contract_log_counters`: Counts of different HOPR contract logs processed by the Indexer, keys: `contract`

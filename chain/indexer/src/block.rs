@@ -9,6 +9,7 @@ use chain_types::chain_events::SignificantChainEvent;
 use hopr_crypto_types::types::Hash;
 use hopr_db_api::info::HoprDbInfoOperations;
 use hopr_db_api::HoprDbGeneralModelOperations;
+use hopr_primitive_types::prelude::U256;
 
 use crate::{errors::CoreEthereumIndexerError, traits::ChainLogHandler, IndexerConfig};
 
@@ -21,6 +22,11 @@ lazy_static::lazy_static! {
         SimpleGauge::new(
             "hopr_indexer_block_number",
             "Current last processed block number by the indexer",
+    ).unwrap();
+    static ref METRIC_INDEXER_CHECKSUM: SimpleGauge =
+        SimpleGauge::new(
+            "hopr_indexer_checksum",
+            "Contains an unsigned integer that represents the low 32-bits of the Indexer checksum"
     ).unwrap();
     static ref METRIC_INDEXER_SYNC_PROGRESS: SimpleGauge =
         SimpleGauge::new(
@@ -207,7 +213,13 @@ where
                     // every block will have events
                     match db.get_last_indexed_block(None).await {
                         Ok((_, checksum)) => {
-                            info!("Current indexer state at block #{block_id} with checksum: {checksum}")
+                            info!("Current indexer state at block #{block_id} with checksum: {checksum}");
+
+                            #[cfg(all(feature = "prometheus", not(test)))]
+                            {
+                                let low_4_bytes = U256::from_big_endian(checksum.as_slice()).low_u32();
+                                METRIC_INDEXER_CHECKSUM.set(low_4_bytes.into());
+                            }
                         }
                         Err(e) => error!("Cannot retrieve indexer state: {e}"),
                     }
