@@ -9,7 +9,6 @@ use chain_types::chain_events::SignificantChainEvent;
 use hopr_crypto_types::types::Hash;
 use hopr_db_api::info::HoprDbInfoOperations;
 use hopr_db_api::HoprDbGeneralModelOperations;
-use hopr_primitive_types::prelude::U256;
 
 use crate::{errors::CoreEthereumIndexerError, traits::ChainLogHandler, IndexerConfig};
 
@@ -217,7 +216,8 @@ where
 
                             #[cfg(all(feature = "prometheus", not(test)))]
                             {
-                                let low_4_bytes = U256::from_big_endian(checksum.as_slice()).low_u32();
+                                let low_4_bytes =
+                                    hopr_primitive_types::prelude::U256::from_big_endian(checksum.as_slice()).low_u32();
                                 METRIC_INDEXER_CHECKSUM.set(low_4_bytes.into());
                             }
                         }
