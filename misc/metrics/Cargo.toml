@@ -1,6 +1,6 @@
 [package]
 name = "hopr-metrics"
-version = "1.1.0"
+version = "1.2.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Rust module containing support for general hopr-metrics collection"
@@ -12,7 +12,7 @@ license = "GPL-3.0-only"
 crate-type = ["rlib"]
 
 [dependencies]
-prometheus = "0.13"
+prometheus = "0.13.4"
 regex = { workspace = true }
 
 [features]

@@ -97,16 +97,12 @@ use hopr_db_api::prelude::ChainOrPacketKey::ChainKey;
 use hopr_db_api::prelude::{DbError, HoprDbPeersOperations};
 #[cfg(all(feature = "prometheus", not(test)))]
 use {
-    hopr_metrics::metrics::{MultiGauge, SimpleCounter, SimpleGauge},
+    hopr_metrics::metrics::{MultiGauge, SimpleGauge},
     hopr_platform::time::native::current_time,
 };
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_SEND_MESSAGE_FAIL_COUNT: SimpleCounter = SimpleCounter::new(
-        "hopr_failed_send_message_count",
-        "Number of sent messages failures"
-    ).unwrap();
     static ref METRIC_PROCESS_START_TIME: SimpleGauge = SimpleGauge::new(
         "hopr_up",
         "The unix timestamp in seconds at which the process was started"
@@ -1013,11 +1009,6 @@ impl Hopr {
             .transport_api
             .send_message(msg, destination, intermediate_path, hops, application_tag)
             .await;
-
-        #[cfg(all(feature = "prometheus", not(test)))]
-        if result.is_err() {
-            SimpleCounter::increment(&METRIC_SEND_MESSAGE_FAIL_COUNT);
-        }
 
         Ok(result?)
     }
