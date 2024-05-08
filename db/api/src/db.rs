@@ -65,7 +65,7 @@ impl HoprDb {
 
         // Indexer database
         let index = PoolOptions::new()
-            .min_connections(3)
+            .min_connections(0)
             .max_connections(30)
             .connect_with(cfg_template.clone().filename(dir.join(SQL_DB_INDEX_FILE_NAME)))
             .await
@@ -73,7 +73,7 @@ impl HoprDb {
 
         // Peers database
         let peers = PoolOptions::new()
-            .min_connections(10) // Default is 0
+            .min_connections(0) // Default is 0
             .acquire_timeout(Duration::from_secs(60)) // Default is 30
             .idle_timeout(Some(Duration::from_secs(10 * 60))) // This is the default
             .max_lifetime(Some(Duration::from_secs(30 * 60))) // This is the default
@@ -84,7 +84,7 @@ impl HoprDb {
 
         // Tickets database
         let tickets = PoolOptions::new()
-            .min_connections(5)
+            .min_connections(0)
             .max_connections(50)
             .connect_with(cfg_template.clone().filename(dir.join(SQL_DB_TICKETS_FILE_NAME)))
             .await
