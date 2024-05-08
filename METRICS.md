@@ -24,7 +24,6 @@ scrape_configs:
 
 - `hopr_packets_count`: Number of processed packets of different types (sent, received, forwarded), keys: `type`
 - `hopr_packets_per_peer_count`: Number of processed packets to/from distinct peers, keys: `peer`, `direction`
-- `hopr_created_tickets_count`: Number of created tickets
 - `hopr_rejected_tickets_count`: Number of rejected tickets
 - `hopr_mixer_queue_size`: Current mixer queue size
 - `hopr_mixer_average_packet_delay`: Average mixer packet delay averaged over a packet window
