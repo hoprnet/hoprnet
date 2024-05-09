@@ -102,7 +102,7 @@ impl From<AggregatingStrategyConfig> for AggregationPrerequisites {
 }
 
 /// Represents a strategy that starts aggregating tickets in a certain
-/// channel, once the amount of acknowledged tickets in that channel goes
+/// channel, once the number of acknowledged tickets in that channel goes
 /// above the given threshold.
 /// Optionally, the strategy can also redeem the aggregated ticket, if the aggregation
 /// was successful.
@@ -181,6 +181,9 @@ where
                 {
                     Ok(_) => {
                         debug!("tried ticket aggregation in channel {channel_id} without any issues");
+
+                        #[cfg(all(feature = "prometheus", not(test)))]
+                        METRIC_COUNT_AGGREGATIONS.increment();
                     }
                     Err(e) => {
                         error!("cannot complete aggregation in channel {channel_id}: {e}");

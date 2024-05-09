@@ -28,10 +28,8 @@ lazy_static::lazy_static! {
     .unwrap();
     static ref METRIC_SENT_ACKS: SimpleCounter =
         SimpleCounter::new("hopr_sent_acks_count", "Number of sent message acknowledgements").unwrap();
-    static ref METRIC_WINNING_TICKETS_COUNT: SimpleCounter =
-        SimpleCounter::new("hopr_winning_tickets_count", "Number of winning tickets").unwrap();
-    static ref METRIC_LOSING_TICKETS_COUNT: SimpleCounter =
-        SimpleCounter::new("hopr_losing_tickets_count", "Number of losing tickets").unwrap();
+    static ref METRIC_TICKETS_COUNT: MultiCounter =
+        MultiCounter::new("hopr_tickets_count", "Number of winning tickets", &["type"]).unwrap();
 }
 
 // Default sizes of the acknowledgement queues
@@ -111,10 +109,10 @@ impl AcknowledgementActions {
 
 /// Sets up processing of acknowledgement interactions and returns relevant read and write mechanism.
 ///
-/// When a new acknowledgement is delivered from the transport the `receive_acknowledgement`
+/// When a new acknowledgement is delivered from the transport, the `receive_acknowledgement`
 /// method is used to push it into the processing queue of incoming acknowledgements.
 ///
-/// Acknowledgments issued by this node are generated using the `send_acknowledgement` method.
+/// Acknowledgements issued by this node are generated using the `send_acknowledgement` method.
 ///
 /// The result of processing the acknowledgements can be extracted as a stream.
 pub struct AcknowledgementInteraction {
@@ -144,20 +142,20 @@ impl AcknowledgementInteraction {
                                         match &reply {
                                             AckResult::Sender(_) => {
                                                 #[cfg(all(feature = "prometheus", not(test)))]
-                                                METRIC_RECEIVED_ACKS.increment(&["false"]);
+                                                METRIC_RECEIVED_ACKS.increment(&["true"]);
                                             }
                                             AckResult::RelayerWinning(_) => {
                                                 #[cfg(all(feature = "prometheus", not(test)))]
                                                 {
                                                     METRIC_RECEIVED_ACKS.increment(&["true"]);
-                                                    METRIC_WINNING_TICKETS_COUNT.increment();
+                                                    METRIC_TICKETS_COUNT.increment(&["winning"]);
                                                 }
                                             }
                                             AckResult::RelayerLosing => {
                                                 #[cfg(all(feature = "prometheus", not(test)))]
                                                 {
                                                     METRIC_RECEIVED_ACKS.increment(&["true"]);
-                                                    METRIC_LOSING_TICKETS_COUNT.increment();
+                                                    METRIC_TICKETS_COUNT.increment(&["losing"]);
                                                 }
                                             }
                                         }
