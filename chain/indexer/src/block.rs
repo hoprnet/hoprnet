@@ -217,7 +217,7 @@ where
                             #[cfg(all(feature = "prometheus", not(test)))]
                             {
                                 let low_4_bytes =
-                                    hopr_primitive_types::prelude::U256::from_big_endian(checksum.as_slice()).low_u32();
+                                    hopr_primitive_types::prelude::U256::from_big_endian(checksum.as_ref()).low_u32();
                                 METRIC_INDEXER_CHECKSUM.set(low_4_bytes.into());
                             }
                         }
