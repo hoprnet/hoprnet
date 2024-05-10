@@ -124,9 +124,9 @@ Options:
           Specifies the directory to hold all the data [env: HOPRD_DATA=]
       --host <HOST>
           Host to listen on for P2P connections [env: HOPRD_HOST=]
-      --announce
+      --announce...
           Announce the node on chain with a public address [env: HOPRD_ANNOUNCE=]
-      --api
+      --api...
           Expose the API on localhost:3001 [env: HOPRD_API=]
       --apiHost <HOST>
           Set host IP to which the API server will bind [env: HOPRD_API_HOST=]
@@ -136,24 +136,18 @@ Options:
           A REST API token and for user authentication [env: HOPRD_API_TOKEN=]
       --password <PASSWORD>
           A password to encrypt your keys [env: HOPRD_PASSWORD=]
-      --defaultStrategy <DEFAULT_STRATEGY>
-          Default channel strategy to use after node starts up [env: HOPRD_DEFAULT_STRATEGY=] [possible values: promiscuous, aggregating, auto_redeeming, auto_funding, multi, passive]
-      --maxAutoChannels <MAX_AUTO_CHANNELS>
-          Maximum number of channel a strategy can open. If not specified, square root of number of available peers is used. [env: HOPRD_MAX_AUTO_CHANNELS=]
-      --disableTicketAutoRedeem
-          Disables automatic redeeming of winning tickets. [env: HOPRD_DISABLE_AUTO_REDEEEM_TICKETS=]
-      --disableUnrealizedBalanceCheck
+      --disableUnrealizedBalanceCheck...
           Disables checking of unrealized balance before validating unacknowledged tickets. [env: HOPRD_DISABLE_UNREALIZED_BALANCE_CHECK=]
+      --maxBlockRange <MAX_BLOCK_RANGE>
+          Maximum number of blocks that can be fetched in a batch request from the RPC provider. [env: HOPRD_MAX_BLOCK_RANGE=]
       --provider <PROVIDER>
           A custom RPC provider to be used for the node to connect to blockchain [env: HOPRD_PROVIDER=]
-      --init
+      --init...
           initialize a database if it doesn't already exist [env: HOPRD_INIT=]
-      --forceInit
+      --forceInit...
           initialize a database, even if it already exists [env: HOPRD_FORCE_INIT=]
       --inbox-capacity <INBOX_CAPACITY>
           Set maximum capacity of the HOPRd inbox [env: HOPRD_INBOX_CAPACITY=]
-      --testAnnounceLocalAddresses
-          For testing local testnets. Announce local addresses [env: HOPRD_TEST_ANNOUNCE_LOCAL_ADDRESSES=]
       --heartbeatInterval <MILLISECONDS>
           Interval in milliseconds in which the availability of other nodes get measured [env: HOPRD_HEARTBEAT_INTERVAL=]
       --heartbeatThreshold <MILLISECONDS>
@@ -180,6 +174,12 @@ Options:
           DEPRECATED
       --healthCheckPort <HEALTH_CHECK_PORT>
           DEPRECATED
+      --defaultStrategy <DEFAULT_STRATEGY>
+          DEPRECATED [env: HOPRD_DEFAULT_STRATEGY=] [possible values: promiscuous, aggregating, auto_redeeming, auto_funding, closure_finalizer, multi, passive]
+      --maxAutoChannels <MAX_AUTO_CHANNELS>
+          DEPRECATED [env: HOPRD_MAX_AUTO_CHANNELS=]
+      --disableTicketAutoRedeem...
+          DEPRECATED [env: HOPRD_DISABLE_AUTO_REDEEEM_TICKETS=]
   -h, --help
           Print help
   -V, --version
