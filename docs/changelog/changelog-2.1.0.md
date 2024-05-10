@@ -24,9 +24,9 @@ configuration file set through `--configurationFilePath`.
 
 Important changes:
 
-- Deprecation of `--healthCheck`, `--healthCheckHost` and `--healthCheckPort`,
+Deprecation of `--healthCheck`, `--healthCheckHost` and `--healthCheckPort`
   because the underlying functionality has been removed
-- Deprecation of `--dryRun`,
+Deprecation of `--dryRun`
   because the underlying functionality has been removed
 
 For reference check the output of `--help`, see https://hoprnet.github.io/hoprnet/#usage
@@ -50,8 +50,7 @@ the internal default configuration.
 ### HTTP API
 
 The swagger schema for the v3 API has become stricter in terms of input/output
-value definitions. This may break clients which were using values outside of the
-supported ranges, requiring clients to be made compatible with the changed
+value definitions. This may break clients which were using values outside the supported ranges, requiring clients to be made compatible with the changed
 schema.
 
 All supported clients (JS, Python) were fixed and support the HTTP API v3 in
