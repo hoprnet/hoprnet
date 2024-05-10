@@ -5,7 +5,7 @@
 name: Load Tests
 
 on:
-# Starts at 2:00 AM CET
+  # Starts at 2:00 AM CET
   # schedule:
   #   - cron: '00 2 * * *'
   workflow_dispatch:
@@ -43,7 +43,7 @@ jobs:
 
   load-tests:
     name: Load Tests
-    runs-on: ubuntu-2-core
+    runs-on: self-hosted-hoprnet-small
     steps:
 
       - name: Checkout hoprnet repository
@@ -51,6 +51,25 @@ jobs:
         with:
           repository: hoprnet/hoprd-test
           ref: main
+
+      - name: Set up Google Cloud Credentials
+        uses: google-github-actions/auth@v1
+        with:
+          token_format: "access_token"
+          credentials_json: ${{ secrets.GCP_SA_TERRAFORM_JSON }}
+
+      - name: Set up Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v1
+        with:
+          project_id: hopr-staging
+          install_components: beta
+
+      - name: Get credentials
+        uses: google-github-actions/get-gke-credentials@v2
+        with:
+          cluster_name: cluster-staging
+          location: europe-west3
+          project_id: hopr-staging
 
       - name: Setup NodeJs
         uses: actions/setup-node@v3

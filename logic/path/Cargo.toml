@@ -17,15 +17,14 @@ async-trait = { workspace = true }
 futures = { workspace = true }
 lazy_static = { workspace = true }
 libp2p-identity = { workspace = true }
-petgraph = {version = "0.6.4", features = ["serde-1"] }
+petgraph = { version = "0.6.4", features = ["serde-1"] }
 serde = { workspace = true }
 thiserror = { workspace = true }
+tracing = { workspace = true }
 
-chain-db = { workspace = true }
 hopr-crypto-random = { workspace = true }
 hopr-crypto-types = { workspace = true }
-log = { workspace = true }
-utils-db = { workspace = true }
+hopr-db-api = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-internal-types = { workspace = true }
 hopr-primitive-types = { workspace = true }
@@ -33,8 +32,7 @@ hopr-primitive-types = { workspace = true }
 [dev-dependencies]
 async-std = { version = "1.12.0", features = ["unstable", "attributes"] }
 regex = { workspace = true }
-lazy_static = "1.4.0"
-hex-literal = "0.4"
+hex-literal = { workspace = true }
 
 [features]
 default = ["prometheus"]

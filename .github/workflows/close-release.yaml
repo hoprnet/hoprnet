@@ -22,9 +22,9 @@ on:
         required: true
         description: 'Name of the release'
         options:
-          - providence
           - saint-louis
           - singapore
+          - kaunas
 concurrency:
   group: close-release
   cancel-in-progress: true
@@ -32,13 +32,13 @@ concurrency:
 jobs:
   close-release:
     name: Close Release
-    runs-on: ubuntu-2-core
+    runs-on: self-hosted-hoprnet-small
     steps:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4
 
       - name: Install Nix
-        uses: cachix/install-nix-action@v25
+        uses: cachix/install-nix-action@v26
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 

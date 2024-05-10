@@ -10,13 +10,13 @@ on:
       from_tag:
         type: string
         required: true
-        default: 'providence'
-        description: 'Source tag name'
+        default: "saint-louis"
+        description: "Source tag name"
       to_tag:
         type: string
         required: true
-        description: 'Target tag name'
-        default: 'stable'
+        description: "Target tag name"
+        default: "stable"
 
 concurrency:
   group: publish-release
@@ -25,12 +25,11 @@ concurrency:
 jobs:
   publish-release:
     name: Publish Release
-    runs-on: ubuntu-2-core
+    runs-on: self-hosted-hoprnet-small
     steps:
-
       - name: Set up Google Cloud Credentials
         id: auth
-        uses: google-github-actions/auth@v1
+        uses: google-github-actions/auth@v2
         with:
           token_format: "access_token"
           credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}

@@ -1,0 +1,29 @@
+[package]
+name = "hopr-db-entity"
+description = "Contains all HOPR database entities"
+version = "0.1.0"
+edition = "2021"
+homepage = "https://hoprnet.org/"
+repository = "https://github.com/hoprnet/hoprnet"
+license = "GPL-3.0-only"
+
+[features]
+default = ["sqlite"]
+sqlite = []
+
+[build-dependencies]
+async-std = { workspace = true }
+clap = { workspace = true }
+hopr-db-migration = { path = "../migration" }
+sea-orm = { workspace = true }
+sea-orm-cli = { workspace = true }
+sea-orm-migration = { workspace = true }
+
+[dependencies]
+sea-orm = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }
+
+hopr-crypto-types = { workspace = true }
+hopr-internal-types = { workspace = true }
+hopr-primitive-types = { workspace = true }

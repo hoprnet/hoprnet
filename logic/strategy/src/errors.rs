@@ -1,8 +1,9 @@
-use chain_actions::errors::CoreEthereumActionsError;
+use chain_actions::errors::ChainActionsError;
+use hopr_db_api::errors::DbError;
 use hopr_primitive_types::errors::GeneralError;
 use thiserror::Error;
-use utils_db::errors::DbError;
 
+/// Enumerates all errors in this crate.
 #[derive(Debug, Error)]
 pub enum StrategyError {
     #[error("criteria to trigger the strategy were not satisfied")]
@@ -15,7 +16,10 @@ pub enum StrategyError {
     DbError(#[from] DbError),
 
     #[error(transparent)]
-    ActionsError(#[from] CoreEthereumActionsError),
+    ProtocolError(#[from] core_protocol::errors::ProtocolError),
+
+    #[error(transparent)]
+    ActionsError(#[from] ChainActionsError),
 
     #[error("lower-level error: {0}")]
     GeneralError(#[from] GeneralError),

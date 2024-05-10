@@ -5,11 +5,11 @@ use crate::selectors::{EdgeWeighting, PathSelector};
 use hopr_crypto_random::random_float;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use log::warn;
 use petgraph::visit::EdgeRef;
 use std::cmp::{max, Ordering};
 use std::collections::BinaryHeap;
 use std::marker::PhantomData;
+use tracing::warn;
 
 /// Holds a weighted channel path and auxiliary information for the graph traversal.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -137,9 +137,8 @@ where
             return false;
         }
 
-        // Check node reliability, new nodes are considered reliable
-        // unless the opposite has been observed
-        if channel.quality.unwrap_or(1.0f64) < self.quality_threshold {
+        // Check node reliability, new nodes are NOT considered reliable yet
+        if channel.quality.unwrap_or(0.0f64) < self.quality_threshold {
             // Only use nodes that have shown to be somewhat reliable
             return false;
         }
@@ -284,7 +283,7 @@ mod tests {
     }
 
     fn create_channel(src: Address, dst: Address, status: ChannelStatus, stake: Balance) -> ChannelEntry {
-        ChannelEntry::new(src, dst, stake, U256::zero(), status, U256::zero(), U256::zero())
+        ChannelEntry::new(src, dst, stake, U256::zero(), status, U256::zero())
     }
 
     fn check_path(path: &ChannelPath, graph: &ChannelGraph, dst: Address) {

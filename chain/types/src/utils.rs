@@ -1,6 +1,6 @@
 //! Chain utilities used for testing.
+//!
 //! This used in unit and integration tests.
-
 use crate::{create_eip1559_transaction, ContractAddresses, ContractInstances, TypedTransaction};
 use bindings::{
     hopr_channels::HoprChannels,
@@ -15,9 +15,9 @@ use ethers::utils::keccak256;
 use hex_literal::hex;
 use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::primitives::{Address, U256};
-use log::debug;
 use std::str::FromStr;
 use std::sync::Arc;
+use tracing::debug;
 
 // define basic safe abi
 abigen!(

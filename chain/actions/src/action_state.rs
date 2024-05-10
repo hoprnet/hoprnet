@@ -1,24 +1,39 @@
+//! This module adds functionality of tracking the action results via expectations.
+//!
+//! It contains implementation of types necessary to perform tracking the
+//! on-chain state of [Actions](chain_types::actions::Action).
+//! Once an [Action](chain_types::actions::Action) is submitted to the chain, an [IndexerExpectation]
+//! can be created and registered in an object implementing the [ActionState] trait.
+//! The expectation typically consists of a required transaction hash and a predicate of [ChainEventType]
+//! that must match on any chain event log in a block containing the given transaction hash.
+//!
+//! ### Example
+//! Once the [RegisterSafe(`0x0123..ef`)](chain_types::actions::Action) action that has been submitted via [ActionQueue](crate::action_queue::ActionQueue)
+//! in a transaction with hash `0xabcd...00`.
+//! The [IndexerExpectation] is such that whatever block that will contain the TX hash `0xabcd..00` must also contain
+//! a log that matches [NodeSafeRegistered(`0x0123..ef`)](ChainEventType) event type.
+//! If such event is never encountered by the Indexer, the safe registration action naturally times out.
 use async_lock::RwLock;
 use async_trait::async_trait;
 use chain_types::chain_events::{ChainEventType, SignificantChainEvent};
 use futures::{channel, FutureExt, TryFutureExt};
 use hopr_crypto_types::types::Hash;
-use log::{debug, error};
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
+use tracing::{debug, error};
 
-use crate::errors::{CoreEthereumActionsError, Result};
+use crate::errors::{ChainActionsError, Result};
 
-/// Future that resolves once an expectation is matched by some `SignificantChainEvent`
+/// Future that resolves once an expectation is matched by some [SignificantChainEvent].
 /// Also allows mocking in tests.
 pub type ExpectationResolver = Pin<Box<dyn Future<Output = Result<SignificantChainEvent>> + Send>>;
 
-/// Allows tracking state of an `Action` via registering `IndexerExpectation`s on
-/// `SignificantChainEvents` coming from the Indexer and resolving them as they are
+/// Allows tracking state of an [Action](chain_types::actions::Action) via registering [IndexerExpectations](IndexerExpectation) on
+/// [SignificantChainEvents](SignificantChainEvent) coming from the Indexer and resolving them as they are
 /// matched. Once expectations are matched, they are automatically unregistered.
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
@@ -27,7 +42,7 @@ pub trait ActionState {
     /// Each matched expectation is resolved, unregistered and returned.
     async fn match_and_resolve(&self, event: &SignificantChainEvent) -> Vec<IndexerExpectation>;
 
-    /// Registers new `IndexerExpectation`
+    /// Registers new [IndexerExpectation].
     async fn register_expectation(&self, exp: IndexerExpectation) -> Result<ExpectationResolver>;
 
     /// Manually unregisters `IndexerExpectation` given its TX hash.
@@ -69,6 +84,8 @@ impl IndexerExpectation {
 
 type ExpectationTable = HashMap<Hash, (IndexerExpectation, channel::oneshot::Sender<SignificantChainEvent>)>;
 
+/// Implements [action state](ActionState) tracking using a non-persistent in-memory hash table of
+/// assumed [IndexerExpectations](IndexerExpectation).
 #[derive(Debug)]
 pub struct IndexerActionTracker {
     expectations: Arc<RwLock<ExpectationTable>>,
@@ -84,6 +101,7 @@ impl Default for IndexerActionTracker {
 
 #[async_trait]
 impl ActionState for IndexerActionTracker {
+    #[tracing::instrument(level = "debug", skip(self))]
     async fn match_and_resolve(&self, event: &SignificantChainEvent) -> Vec<IndexerExpectation> {
         let matched_keys = self
             .expectations
@@ -98,7 +116,6 @@ impl ActionState for IndexerActionTracker {
         if matched_keys.is_empty() {
             return Vec::new();
         }
-
         let mut db = self.expectations.write().await;
         matched_keys
             .into_iter()
@@ -120,11 +137,12 @@ impl ActionState for IndexerActionTracker {
             .collect()
     }
 
+    #[tracing::instrument(level = "debug", skip(self))]
     async fn register_expectation(&self, exp: IndexerExpectation) -> Result<ExpectationResolver> {
         match self.expectations.write().await.entry(exp.tx_hash) {
             Entry::Occupied(_) => {
                 // TODO: currently cannot register multiple expectations for the same TX hash
-                return Err(CoreEthereumActionsError::InvalidState(format!(
+                return Err(ChainActionsError::InvalidState(format!(
                     "expectation for tx {} already present",
                     exp.tx_hash
                 )));
@@ -132,13 +150,12 @@ impl ActionState for IndexerActionTracker {
             Entry::Vacant(e) => {
                 let (tx, rx) = channel::oneshot::channel();
                 e.insert((exp, tx));
-                Ok(rx
-                    .map_err(|_| CoreEthereumActionsError::ExpectationUnregistered)
-                    .boxed())
+                Ok(rx.map_err(|_| ChainActionsError::ExpectationUnregistered).boxed())
             }
         }
     }
 
+    #[tracing::instrument(level = "debug", skip(self))]
     async fn unregister_expectation(&self, tx_hash: Hash) {
         self.expectations.write().await.remove(&tx_hash);
     }
@@ -147,21 +164,27 @@ impl ActionState for IndexerActionTracker {
 #[cfg(test)]
 mod tests {
     use crate::action_state::{ActionState, IndexerActionTracker, IndexerExpectation};
-    use crate::errors::CoreEthereumActionsError;
+    use crate::errors::ChainActionsError;
     use async_std::prelude::FutureExt;
     use chain_types::chain_events::{ChainEventType, NetworkRegistryStatus, SignificantChainEvent};
+    use hex_literal::hex;
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::types::Hash;
     use hopr_primitive_types::prelude::*;
     use std::sync::Arc;
     use std::time::Duration;
 
+    lazy_static::lazy_static! {
+        // some random address
+        static ref RANDY: Address = hex!("60f8492b6fbaf86ac2b064c90283d8978a491a01").into();
+    }
+
     #[async_std::test]
     async fn test_expectation_should_resolve() {
         let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
         let sample_event = SignificantChainEvent {
             tx_hash: random_hash,
-            event_type: ChainEventType::NodeSafeRegistered(Address::random()),
+            event_type: ChainEventType::NodeSafeRegistered(*RANDY),
         };
 
         let exp = Arc::new(IndexerActionTracker::default());
@@ -197,7 +220,7 @@ mod tests {
     async fn test_expectation_should_error_when_unregistered() {
         let sample_event = SignificantChainEvent {
             tx_hash: Hash::new(&random_bytes::<{ Hash::SIZE }>()),
-            event_type: ChainEventType::NodeSafeRegistered(Address::random()),
+            event_type: ChainEventType::NodeSafeRegistered(*RANDY),
         };
 
         let exp = Arc::new(IndexerActionTracker::default());
@@ -223,7 +246,7 @@ mod tests {
             .expect_err("should return with error");
 
         assert!(
-            matches!(err, CoreEthereumActionsError::ExpectationUnregistered),
+            matches!(err, ChainActionsError::ExpectationUnregistered),
             "should notify on unregistration"
         );
     }
@@ -234,15 +257,15 @@ mod tests {
         let sample_events = vec![
             SignificantChainEvent {
                 tx_hash: Hash::new(&random_bytes::<{ Hash::SIZE }>()),
-                event_type: ChainEventType::NodeSafeRegistered(Address::random()),
+                event_type: ChainEventType::NodeSafeRegistered(*RANDY),
             },
             SignificantChainEvent {
                 tx_hash,
-                event_type: ChainEventType::NetworkRegistryUpdate(Address::random(), NetworkRegistryStatus::Denied),
+                event_type: ChainEventType::NetworkRegistryUpdate(*RANDY, NetworkRegistryStatus::Denied),
             },
             SignificantChainEvent {
                 tx_hash,
-                event_type: ChainEventType::NetworkRegistryUpdate(Address::random(), NetworkRegistryStatus::Allowed),
+                event_type: ChainEventType::NetworkRegistryUpdate(*RANDY, NetworkRegistryStatus::Allowed),
             },
         ];
 
@@ -281,15 +304,15 @@ mod tests {
         let sample_events = vec![
             SignificantChainEvent {
                 tx_hash: Hash::new(&random_bytes::<{ Hash::SIZE }>()),
-                event_type: ChainEventType::NodeSafeRegistered(Address::random()),
+                event_type: ChainEventType::NodeSafeRegistered(*RANDY),
             },
             SignificantChainEvent {
                 tx_hash: Hash::new(&random_bytes::<{ Hash::SIZE }>()),
-                event_type: ChainEventType::NetworkRegistryUpdate(Address::random(), NetworkRegistryStatus::Denied),
+                event_type: ChainEventType::NetworkRegistryUpdate(*RANDY, NetworkRegistryStatus::Denied),
             },
             SignificantChainEvent {
                 tx_hash: Hash::new(&random_bytes::<{ Hash::SIZE }>()),
-                event_type: ChainEventType::NetworkRegistryUpdate(Address::random(), NetworkRegistryStatus::Allowed),
+                event_type: ChainEventType::NetworkRegistryUpdate(*RANDY, NetworkRegistryStatus::Allowed),
             },
         ];
 

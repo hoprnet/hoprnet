@@ -1,8 +1,11 @@
 ---
 #################################################################################
-# Build and publish rust documentation 
+# Build and publish rust documentation
 #################################################################################
 name: "Build docs"
+
+env:
+  needs_nix_setup: false
 
 # yamllint disable-line rule:truthy
 on:
@@ -19,22 +22,24 @@ concurrency:
 jobs:
   rust:
     name: Rust docs
-    runs-on: ubuntu-latest
+    # big runner is needed because building docs involves building Rust code
+    runs-on: self-hosted-hoprnet-bigger
+    timeout-minutes: 60
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
 
       - name: Install Nix
-        uses: cachix/install-nix-action@v25
+        if: env.needs_nix_setup == true
+        uses: cachix/install-nix-action@v26
         with:
-          extra_nix_config: |
-            access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: cachix/cachix-action@v14
-        if: ${{ !env.ACT }}
+        if: env.needs_nix_setup == true
         with:
           name: hoprnet
-          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
         env:
           USER: runner
 
@@ -43,7 +48,7 @@ jobs:
 
       - name: Deploy
         if: github.ref == 'refs/heads/master'
-        uses: peaceiris/actions-gh-pages@v3
+        uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./result/share/doc/

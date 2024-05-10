@@ -1,12 +1,11 @@
 use crate::inbox::{InboxBackend, TimestampFn};
 use async_trait::async_trait;
+
 use ringbuffer::{AllocRingBuffer, RingBuffer};
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::hash::Hash;
 use std::time::Duration;
-
-use hopr_platform::time::native::current_timestamp;
 
 /// Acts a simple wrapper of a message with added insertion timestamp.
 struct PayloadWrapper<M: std::marker::Send> {
@@ -15,6 +14,7 @@ struct PayloadWrapper<M: std::marker::Send> {
 }
 
 /// Ring buffer based heap-allocated backend.
+///
 /// The capacity must be a power-of-two due to optimizations.
 /// Tags `T` must be represented by a type that's also a valid key for the `HashMap`
 pub struct RingBufferInboxBackend<T, M>
@@ -34,7 +34,11 @@ where
 {
     /// Creates new backend with default timestamping function from std::time.
     pub fn new(capacity: usize) -> Self {
-        Self::new_with_capacity(capacity, current_timestamp)
+        Self::new_with_capacity(capacity, || {
+            hopr_platform::time::native::current_time()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+        })
     }
 
     /// Counts only the untagged entries.

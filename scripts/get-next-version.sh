@@ -5,9 +5,9 @@ set -Eeuo pipefail
 
 usage() {
   echo ""
-  echo "Usage: $0 <release_type[Build|ReleaseCandidate|Patch|Minor|Major]> <build_number>"
+  echo "Usage: $0 <release_type[Build|ReleaseCandidate|Patch|Minor|Major]>"
   echo ""
-  echo "$0 Build 1234"
+  echo "$0 Build"
   echo "$0 ReleaseCandidate"
   echo "$0 Patch"
   echo "$0 Minor"
@@ -23,7 +23,6 @@ declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 
 release_type="${1:-}"
-build="${2:-}"
 
 if [ -z "${release_type:-}" ]; then
   echo "Error: Mandatory parameter <release_type> missing"
@@ -33,12 +32,6 @@ fi
 
 if [[ ! "${release_type}" =~ (Build|ReleaseCandidate|Patch|Minor|Major) ]]; then
   echo "Error: Parameter <release_type> contains unsupported value"
-  usage
-  exit 1
-fi
-
-if [ "${release_type}" = "Build" ] && [ -z "${build}" ]; then
-  echo "Error: Parameter <build_number> missing"
   usage
   exit 1
 fi
@@ -100,7 +93,8 @@ fi
 
 # Adds Build information if needed
 if [ "${release_type}" = "Build" ]; then
-    new_version="${new_version}+pr.${build}"
+    short_sha=$(git rev-parse --short "${COMMIT_SHA:-HEAD}")
+    new_version="${new_version}+commit.${short_sha}"
 fi
 
 # Print results

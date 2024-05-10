@@ -1,7 +1,8 @@
+use hopr_db_api::errors::DbError;
 use hopr_primitive_types::errors::GeneralError;
 use thiserror::Error;
-use utils_db::errors::DbError;
 
+/// Enumerates all errors in this crate.
 #[derive(Error, Debug)]
 pub enum PathError {
     #[error("path is not valid")]

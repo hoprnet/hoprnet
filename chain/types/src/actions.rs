@@ -1,8 +1,20 @@
+//! Types related to high-level actions that lead to Ethereum transactions.
+//!
+//! Defines an enumeration of action that can be done by a HOPR node.
+//!
+//! The actions eventually lead to an on-chain transaction.
+//!
+//! See the `chain-actions` crate for details.
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use std::fmt::{Display, Formatter};
 
-/// Enumerates all possible on-chain state change requests
+/// Enumerates all possible on-chain state change requests.
+///
+/// An `Action` is an operation done by the HOPR node that leads
+/// to an on-chain transaction or a contract call. An `Action` is considered complete
+/// until the corresponding [SignificantChainEvent](crate::chain_events::SignificantChainEvent)
+/// is registered by the Indexer or a timeout.
 #[allow(clippy::large_enum_variant)] // TODO: Refactor the large enum variant
 #[derive(Clone, PartialEq, Debug, strum::EnumVariantNames, strum::IntoStaticStr)]
 #[strum(serialize_all = "snake_case")]
@@ -45,7 +57,7 @@ impl Display for Action {
                 direction, channel.source, channel.destination
             ),
             Action::Withdraw(destination, amount) => write!(f, "withdraw action of {amount} to {destination}"),
-            Action::Announce(data) => write!(f, "announce action of {}", data.to_multiaddress_str()),
+            Action::Announce(data) => write!(f, "announce action of {}", data.multiaddress()),
             Action::RegisterSafe(safe_address) => write!(f, "register safe action {safe_address}"),
         }
     }

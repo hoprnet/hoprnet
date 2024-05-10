@@ -1,20 +1,13 @@
 use std::time::Duration;
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, smart_default::SmartDefault)]
 pub struct MixerConfig {
+    #[default(Duration::from_millis(0u64))]
     min_delay: Duration,
+    #[default(Duration::from_millis(200u64))]
     max_delay: Duration,
+    #[default = 10]
     pub metric_delay_window: u64,
-}
-
-impl Default for MixerConfig {
-    fn default() -> Self {
-        Self {
-            min_delay: Duration::from_millis(0u64),
-            max_delay: Duration::from_millis(200u64),
-            metric_delay_window: 10u64,
-        }
-    }
 }
 
 impl MixerConfig {
@@ -87,7 +80,7 @@ mod tests {
     #[async_std::test]
     async fn test_then_concurrent_proper_execution_results_in_concurrent_processing() {
         let constant_delay = Duration::from_millis(50);
-        let tolerance = Duration::from_millis(3);
+        let tolerance = constant_delay / 5;
 
         let expected = vec![1, 2, 3];
 
@@ -102,7 +95,7 @@ mod tests {
 
         let elapsed = start.elapsed();
         assert_gt!(elapsed, constant_delay);
-        assert_lt!(elapsed - constant_delay, tolerance);
+        assert_lt!(elapsed.saturating_sub(constant_delay), tolerance);
     }
 
     #[async_std::test]

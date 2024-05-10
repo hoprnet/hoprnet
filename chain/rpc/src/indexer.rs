@@ -1,13 +1,22 @@
+//! Extends the [RpcOperations] type with functionality needed by the Indexer component.
+//!
+//! The functionality required functionality is defined in the [HoprIndexerRpcOperations] trait,
+//! which is implemented for [RpcOperations] hereof.
+//! The primary goal is to provide a stream of [BlockWithLogs] filtered by the given [LogFilter]
+//! as the new matching blocks are mined in the underlying blockchain. The stream also allows to collect
+//! historical blockchain data.
+//!
+//! For details on the Indexer see the `chain-indexer` crate.
 use async_stream::stream;
 use async_trait::async_trait;
-use ethers::types::BlockNumber;
-use ethers_providers::{JsonRpcClient, Middleware};
+use ethers::providers::{JsonRpcClient, Middleware};
+use futures::stream::BoxStream;
 use futures::{Stream, StreamExt, TryStreamExt};
-use log::error;
-use log::{debug, warn};
 use std::pin::Pin;
+use tracing::{debug, info, warn};
+use tracing::{error, trace};
 
-use crate::errors::{Result, RpcError::FilterIsEmpty};
+use crate::errors::{Result, RpcError, RpcError::FilterIsEmpty};
 use crate::rpc::RpcOperations;
 use crate::{BlockWithLogs, HoprIndexerRpcOperations, Log, LogFilter};
 
@@ -21,6 +30,69 @@ lazy_static::lazy_static! {
             "hopr_chain_head_block_number",
             "Current block number of chain head",
     ).unwrap();
+}
+
+/// Splits the range between `from_block` and `to_block` (inclusive)
+/// to chunks of maximum size `max_chunk_size` and creates [ethers::types::Filter] for each chunk
+/// using the given [LogFilter].
+fn split_range<'a>(
+    filter: LogFilter,
+    from_block: u64,
+    to_block: u64,
+    max_chunk_size: u64,
+) -> BoxStream<'a, ethers::types::Filter> {
+    assert!(from_block <= to_block, "invalid block range");
+    assert!(max_chunk_size > 0, "chunk size must be greater than 0");
+
+    futures::stream::unfold((from_block, to_block), move |(start, to)| {
+        if start <= to {
+            let end = to_block.min(start + max_chunk_size - 1);
+            let filter = ethers::types::Filter::from(filter.clone())
+                .from_block(start)
+                .to_block(end);
+            futures::future::ready(Some((filter, (end + 1, to))))
+        } else {
+            futures::future::ready(None)
+        }
+    })
+    .boxed()
+}
+
+impl<P: JsonRpcClient + 'static> RpcOperations<P> {
+    /// Retrieves logs in the given range (`from_block` and `to_block` are inclusive).
+    fn stream_logs(&self, filter: LogFilter, from_block: u64, to_block: u64) -> BoxStream<Result<Log>> {
+        let fetch_ranges = split_range(filter, from_block, to_block, self.cfg.max_block_range_fetch_size);
+
+        info!(
+            "polling logs from blocks #{from_block} - #{to_block} (via {:?} chunks)",
+            (to_block - from_block) / self.cfg.max_block_range_fetch_size + 1
+        );
+
+        fetch_ranges
+            .then(|subrange| {
+                let prov_clone = self.provider.clone();
+                async move {
+                    match prov_clone.get_logs(&subrange).await {
+                        Ok(logs) => Ok(logs),
+                        Err(e) => {
+                            error!(
+                                "failed to fetch logs in block subrange {:?}-{:?}: {e}",
+                                subrange.get_from_block(),
+                                subrange.get_to_block()
+                            );
+                            Err(e)
+                        }
+                    }
+                }
+            })
+            .flat_map(|result| {
+                futures::stream::iter(match result {
+                    Ok(logs) => logs.into_iter().map(|log| Ok(Log::from(log))).collect::<Vec<_>>(),
+                    Err(e) => vec![Err(RpcError::from(e))],
+                })
+            })
+            .boxed()
+    }
 }
 
 #[async_trait]
@@ -42,20 +114,27 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
             // On first iteration use the given block number as start
             let mut from_block = start_block_number;
 
-            loop {
+            const MAX_LOOP_FAILURES: usize = 5;
+            const MAX_RPC_PAST_BLOCKS: usize = 50;
+            let mut count_failures = 0;
+
+            'outer: loop {
                 match self.block_number().await {
                     Ok(latest_block) => {
                         if from_block > latest_block {
+                            let past_diff = from_block - latest_block;
                             if from_block == start_block_number {
-                                // If on first iteration the start block is in the future, just set it to latest
+                                // If on first iteration the start block is in the future, just set
+                                // it to the latest
                                 from_block = latest_block;
-                            } else if from_block - 1 == latest_block {
-                                // If we came here early (we tolerate only off-by one), wait some more
-                                futures_timer::Delay::new(self.cfg.expected_block_time / 3).await;
+                            } else if past_diff <= MAX_RPC_PAST_BLOCKS as u64 {
+                                // If we came here early (we tolerate only off-by MAX_RPC_PAST_BLOCKS), wait some more
+                                warn!("too early query, RPC provider still at block {latest_block}, diff to DB: {past_diff}");
+                                futures_timer::Delay::new(past_diff as u32 * self.cfg.expected_block_time / 3).await;
                                 continue;
                             } else {
-                                // This is a hard-failure on subsequent iterations which is unrecoverable
-                                panic!("indexer start block number {from_block} is greater than the chain latest block number {latest_block} =>
+                                // This is a hard-failure on later iterations which is unrecoverable
+                                panic!("indexer start block number {from_block} is greater than the chain latest block number {latest_block} (diff {past_diff}) =>
                                 possible causes: chain reorg, RPC provider out of sync, corrupted DB =>
                                 possible solutions: change the RPC provider, reinitialize the DB");
                             }
@@ -64,59 +143,63 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                         #[cfg(all(feature = "prometheus", not(test)))]
                         METRIC_RPC_CHAIN_HEAD.set(latest_block as f64);
 
-                        // Range is inclusive
-                        let range_filter = ethers::types::Filter::from(filter.clone())
-                            .from_block(BlockNumber::Number(from_block.into()))
-                            .to_block(BlockNumber::Number(latest_block.into()));
-
-                        // Range of blocks to fetch is always bounded
-                        let range_size = self.cfg.max_block_range_fetch_size.min(latest_block - from_block);
-                        debug!("polling logs from blocks #{from_block} - #{latest_block} (range size {range_size})");
-
-                        // If we're fetching logs from wide block range, we'll use the pagination log query.
-                        let mut retrieved_logs = if range_size >= self.cfg.min_block_range_fetch_size {
-                            self.provider.get_logs_paginated(&range_filter, range_size).boxed()
-                        } else {
-                            // For smaller block ranges, we use the ordinary getLogs call which minimizes RPC calls
-                            futures::stream::iter(self.provider.get_logs(&range_filter)
-                                .await
-                                .unwrap_or_else(|e| {
-                                    error!("polling logs from #{from_block} - #{latest_block} failed: {e}");
-                                    Vec::new()
-                                })
-                                .into_iter()
-                                .map(Ok)
-                            ).boxed()
-                        };
+                        let mut retrieved_logs = self.stream_logs(filter.clone(), from_block, latest_block);
 
                         let mut current_block_log = BlockWithLogs { block_id: from_block, ..Default::default()};
-                        while let Ok(Some(log)) = retrieved_logs.try_next().await {
-                            let log = Log::from(log);
+                        trace!("begin processing batch #{from_block} - #{latest_block}");
+                        loop {
+                            match retrieved_logs.try_next().await {
+                                Ok(Some(log)) => {
+                                    // This in general should not happen, but handle such a case to be safe
+                                    if log.block_number > latest_block {
+                                        warn!("got {log} that has not yet reached the finalized tip at {latest_block}");
+                                        break;
+                                    }
 
-                            // This in general should not happen, but handle such case to be safe
-                            if log.block_number > latest_block {
-                                warn!("got {log} that has not yet reached the finalized tip at {latest_block}");
-                                break;
+                                    // This assumes the logs are arriving ordered by blocks when fetching a range
+                                    if current_block_log.block_id != log.block_number {
+                                        debug!("completed {current_block_log}");
+                                        yield current_block_log;
+
+                                        current_block_log = BlockWithLogs::default();
+                                        current_block_log.block_id = log.block_number;
+                                    }
+
+                                    debug!("retrieved {log}");
+                                    current_block_log.logs.insert(log);
+                                },
+                                Ok(None) => {
+                                    trace!("done processing batch #{from_block} - #{latest_block}");
+                                    break;
+                                },
+                                Err(e) => {
+                                    error!("failure when processing blocks from RPC: {e}");
+                                    count_failures += 1;
+
+                                    if count_failures < MAX_LOOP_FAILURES {
+                                        // Continue the outer loop, which throws away the current block
+                                        // that may be incomplete due to this error.
+                                        // We will start at this block again to re-query it.
+                                        from_block = current_block_log.block_id;
+                                        continue 'outer;
+                                    } else {
+                                        panic!("!!! Cannot advance the chain indexing due to unrecoverable RPC errors.
+
+                                        The RPC provider does not seem to be working correctly. 
+                                        
+                                        The last encountered error was: {e}");
+                                    }
+                                }
                             }
-
-                            // This assumes the logs are arriving ordered by blocks when fetching a range
-                            if current_block_log.block_id != log.block_number {
-                                debug!("completed {current_block_log}");
-                                yield current_block_log;
-
-                                current_block_log = BlockWithLogs::default();
-                                current_block_log.block_id = log.block_number;
-                            }
-
-                            debug!("retrieved {log}");
-                            current_block_log.logs.push(log);
                         }
 
                         // Yield everything we've collected until this point
                         debug!("completed {current_block_log}");
                         yield current_block_log;
                         from_block = latest_block + 1;
+                        count_failures = 0;
                     }
+
                     Err(e) => error!("failed to obtain current block number from chain: {e}")
                 }
 
@@ -137,12 +220,64 @@ mod test {
     use bindings::hopr_token::{ApprovalFilter, TransferFilter};
     use chain_types::{ContractAddresses, ContractInstances};
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
-    use log::debug;
+    use tracing::debug;
 
     use crate::client::native::SurfRequestor;
     use crate::client::{create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy};
+    use crate::indexer::split_range;
     use crate::rpc::{RpcOperations, RpcOperationsConfig};
     use crate::{BlockWithLogs, HoprIndexerRpcOperations, LogFilter};
+
+    fn filter_bounds(filter: &ethers::types::Filter) -> (u64, u64) {
+        (
+            filter
+                .block_option
+                .get_from_block()
+                .unwrap()
+                .as_number()
+                .unwrap()
+                .as_u64(),
+            filter
+                .block_option
+                .get_to_block()
+                .unwrap()
+                .as_number()
+                .unwrap()
+                .as_u64(),
+        )
+    }
+
+    #[async_std::test]
+    async fn test_split_range() {
+        let ranges = split_range(LogFilter::default(), 0, 10, 2).collect::<Vec<_>>().await;
+
+        assert_eq!(6, ranges.len());
+        assert_eq!((0, 1), filter_bounds(&ranges[0]));
+        assert_eq!((2, 3), filter_bounds(&ranges[1]));
+        assert_eq!((4, 5), filter_bounds(&ranges[2]));
+        assert_eq!((6, 7), filter_bounds(&ranges[3]));
+        assert_eq!((8, 9), filter_bounds(&ranges[4]));
+        assert_eq!((10, 10), filter_bounds(&ranges[5]));
+
+        let ranges = split_range(LogFilter::default(), 0, 0, 2).collect::<Vec<_>>().await;
+        assert_eq!(1, ranges.len());
+        assert_eq!((0, 0), filter_bounds(&ranges[0]));
+
+        let ranges = split_range(LogFilter::default(), 0, 0, 1).collect::<Vec<_>>().await;
+        assert_eq!(1, ranges.len());
+        assert_eq!((0, 0), filter_bounds(&ranges[0]));
+
+        let ranges = split_range(LogFilter::default(), 0, 3, 1).collect::<Vec<_>>().await;
+        assert_eq!(4, ranges.len());
+        assert_eq!((0, 0), filter_bounds(&ranges[0]));
+        assert_eq!((1, 1), filter_bounds(&ranges[1]));
+        assert_eq!((2, 2), filter_bounds(&ranges[2]));
+        assert_eq!((3, 3), filter_bounds(&ranges[3]));
+
+        let ranges = split_range(LogFilter::default(), 0, 3, 10).collect::<Vec<_>>().await;
+        assert_eq!(1, ranges.len());
+        assert_eq!((0, 3), filter_bounds(&ranges[0]));
+    }
 
     #[async_std::test]
     async fn test_should_get_block_number() {

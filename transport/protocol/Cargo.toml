@@ -10,7 +10,7 @@ crate-type = ["rlib"]
 
 [features]
 default = ["prometheus"]
-prometheus = ["dep:hopr-metrics", "core-path/prometheus", "core-packet/prometheus"]
+prometheus = ["dep:hopr-metrics", "core-path/prometheus", "hopr-crypto-packet/prometheus"]
 
 [dependencies]
 async-trait = { workspace = true }
@@ -18,31 +18,31 @@ async-std = { workspace = true, features = ["attributes", "unstable"] }
 async-lock = { workspace = true }
 futures = { workspace = true }
 futures-lite = { workspace = true }
-hex-literal = "0.4"
+hex-literal = { workspace = true }
 lazy_static = { workspace = true }
 libp2p-identity = { workspace = true }
 libp2p = { workspace = true, features = ["noise", "request-response"] }
 rust-stream-ext-concurrent = { workspace = true }
 serde = { workspace = true, features = ["derive"]}
 serde_with = { workspace = true }
+smart-default = { workspace = true }
 thiserror = { workspace = true }
+tracing = { workspace = true }
 validator = { workspace = true }
 
 hopr-crypto-random = { workspace = true }
 hopr-crypto-sphinx = { workspace = true }
 hopr-crypto-types = { workspace = true }
-chain-db = { workspace = true }
-core-packet = { workspace = true }
+hopr-db-api = { workspace = true }
+hopr-crypto-packet = { workspace = true }
 core-path = { workspace = true }
-log = { workspace = true }
 hopr-metrics = { optional = true, workspace = true }
 hopr-platform = { workspace = true }
-utils-db = { workspace = true }
 hopr-internal-types = { workspace = true }
 hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
-env_logger = "0.10.0"
+env_logger = { workspace = true }
 more-asserts = "0.3.1"
 parameterized = "1.0"
 serial_test = "2.0"

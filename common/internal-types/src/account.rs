@@ -37,13 +37,10 @@ impl Display for AccountType {
 pub struct AccountEntry {
     pub public_key: OffchainPublicKey,
     pub chain_addr: Address,
-    entry_type: AccountType,
+    pub entry_type: AccountType,
 }
 
 impl AccountEntry {
-    const MAX_MULTI_ADDR_LENGTH: usize = 200;
-    const MA_LENGTH_PREFIX: usize = std::mem::size_of::<u32>();
-
     pub fn new(public_key: OffchainPublicKey, address: Address, entry_type: AccountType) -> Self {
         Self {
             public_key,
@@ -62,13 +59,10 @@ impl AccountEntry {
 
     /// Is the node announced?
     pub fn has_announced(&self) -> bool {
-        match &self.entry_type {
-            AccountType::NotAnnounced => false,
-            AccountType::Announced { .. } => true,
-        }
+        matches!(self.entry_type, AccountType::Announced { .. })
     }
 
-    /// If the node has announced, did it announce with routing information ?
+    /// If the node has announced, did it announce with routing information?
     pub fn contains_routing_info(&self) -> bool {
         match &self.entry_type {
             AccountType::NotAnnounced => false,
@@ -94,90 +88,6 @@ impl AccountEntry {
     /// - the IP of a PRN has changed, e.g. due to relocation
     pub fn update(&mut self, new_entry_type: AccountType) {
         self.entry_type = new_entry_type;
-    }
-}
-
-impl Display for AccountEntry {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "AccountEntry {}:", self.public_key.to_peerid_str())?;
-        write!(f, " PublicKey: {}", self.public_key.to_hex())?;
-        match &self.entry_type {
-            AccountType::NotAnnounced => {
-                write!(f, " Multiaddr: not announced")?;
-                write!(f, " UpdatedAt: not announced")?;
-                write!(f, " RoutingInfo: false")?;
-            }
-            AccountType::Announced {
-                multiaddr,
-                updated_block,
-            } => {
-                write!(f, " Multiaddr: {}", multiaddr)?;
-                write!(f, " UpdatedAt: {}", updated_block)?;
-                write!(f, " RoutingInfo: {}", self.contains_routing_info())?;
-            }
-        }
-        Ok(())
-    }
-}
-
-impl BinarySerializable for AccountEntry {
-    const SIZE: usize =
-        OffchainPublicKey::SIZE + Address::SIZE + Self::MA_LENGTH_PREFIX + Self::MAX_MULTI_ADDR_LENGTH + 4;
-
-    fn from_bytes(data: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
-        if data.len() == Self::SIZE {
-            let mut buf = data.to_vec();
-            let public_key = OffchainPublicKey::from_bytes(buf.drain(..OffchainPublicKey::SIZE).as_ref())?;
-            let chain_addr = Address::from_bytes(buf.drain(..Address::SIZE).as_ref())?;
-            let ma_len = u32::from_be_bytes(buf.drain(..Self::MA_LENGTH_PREFIX).as_ref().try_into().unwrap()) as usize;
-            let entry_type = if ma_len > 0 {
-                let multiaddr = Multiaddr::try_from(buf.drain(..ma_len).collect::<Vec<u8>>())
-                    .map_err(|_| GeneralError::ParseError)?;
-                buf.drain(..Self::MAX_MULTI_ADDR_LENGTH - ma_len);
-                AccountType::Announced {
-                    multiaddr,
-                    updated_block: u32::from_be_bytes(
-                        buf.drain(..std::mem::size_of::<u32>()).as_ref().try_into().unwrap(),
-                    ),
-                }
-            } else {
-                AccountType::NotAnnounced
-            };
-            Ok(Self {
-                public_key,
-                chain_addr,
-                entry_type,
-            })
-        } else {
-            Err(GeneralError::ParseError)
-        }
-    }
-
-    fn to_bytes(&self) -> Box<[u8]> {
-        let mut ret = Vec::with_capacity(Self::SIZE);
-        ret.extend_from_slice(&self.public_key.to_bytes());
-        ret.extend_from_slice(&self.chain_addr.to_bytes());
-
-        match &self.entry_type {
-            AccountType::NotAnnounced => {
-                ret.extend_from_slice(&(0_u32).to_be_bytes());
-                ret.extend_from_slice(&[0u8; Self::MAX_MULTI_ADDR_LENGTH]);
-                ret.extend_from_slice(&(0_u32).to_be_bytes());
-            }
-            AccountType::Announced {
-                multiaddr,
-                updated_block,
-            } => {
-                let ma_bytes = multiaddr.to_vec();
-                assert!(ma_bytes.len() <= Self::MAX_MULTI_ADDR_LENGTH, "multi address too long");
-                ret.extend_from_slice(&(ma_bytes.len() as u32).to_be_bytes());
-                ret.extend_from_slice(&ma_bytes);
-                ret.extend((0..Self::MAX_MULTI_ADDR_LENGTH - ma_bytes.len()).map(|_| 0u8));
-                ret.extend_from_slice(&updated_block.to_be_bytes());
-            }
-        }
-
-        ret.into_boxed_slice()
     }
 }
 
@@ -214,9 +124,6 @@ mod test {
         assert!(ae1.has_announced());
         assert_eq!(1, ae1.updated_at().unwrap());
         assert!(!ae1.contains_routing_info());
-
-        let ae2 = AccountEntry::from_bytes(&ae1.to_bytes()).unwrap();
-        assert_eq!(ae1, ae2);
     }
 
     #[test]
@@ -238,9 +145,6 @@ mod test {
         assert!(ae1.has_announced());
         assert_eq!(1, ae1.updated_at().unwrap());
         assert!(ae1.contains_routing_info());
-
-        let ae2 = AccountEntry::from_bytes(&ae1.to_bytes()).unwrap();
-        assert_eq!(ae1, ae2);
     }
 
     #[test]
@@ -253,8 +157,5 @@ mod test {
         assert!(!ae1.has_announced());
         assert!(ae1.updated_at().is_none());
         assert!(!ae1.contains_routing_info());
-
-        let ae2 = AccountEntry::from_bytes(&ae1.to_bytes()).unwrap();
-        assert_eq!(ae1, ae2);
     }
 }

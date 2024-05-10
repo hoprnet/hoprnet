@@ -1,5 +1,17 @@
+//! Module defining various Ethereum transaction payload generators for the actions.
+//!
+//! This module defines the basic [PayloadGenerator] trait that describes how an action
+//! is translated into a [TypedTransaction] that can be submitted on-chain (via an RPC provider)
+//! using a [TransactionExecutor](crate::action_queue::TransactionExecutor).
+//!
+//! There are two main implementations:
+//! - [BasicPayloadGenerator] which implements generation of a direct EIP1559 transaction payload. This is currently
+//! not used by a HOPR node.
+//! - [SafePayloadGenerator] which implements generation of a payload that embeds the transaction data into the
+//! SAFE transaction. This is currently the main mode of HOPR node operation.
+//!
 use crate::errors::{
-    CoreEthereumActionsError::{InvalidArguments, InvalidState},
+    ChainActionsError::{InvalidArguments, InvalidState},
     Result,
 };
 use bindings::{
@@ -27,9 +39,9 @@ use hopr_primitive_types::prelude::*;
 
 #[repr(u8)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum Operation {
+enum Operation {
     Call = 0,
-    DelegateCall = 1,
+    // Future use: DelegateCall = 1,
 }
 
 /// Trait for various implementations of generators of common on-chain transaction payloads.
@@ -172,12 +184,12 @@ impl PayloadGenerator<TypedTransaction> for BasicPayloadGenerator {
                         ed_25519_sig_0: H256::from_slice(&serialized_signature[0..32]).into(),
                         ed_25519_sig_1: H256::from_slice(&serialized_signature[32..64]).into(),
                         ed_25519_pub_key: H256::from_slice(&binding.packet_key.to_bytes()).into(),
-                        base_multiaddr: announcement.to_multiaddress_str(),
+                        base_multiaddr: announcement.multiaddress().to_string(),
                     }
                     .encode()
                 }
                 None => AnnounceCall {
-                    base_multiaddr: announcement.to_multiaddress_str(),
+                    base_multiaddr: announcement.multiaddress().to_string(),
                 }
                 .encode(),
             }
@@ -346,13 +358,13 @@ impl PayloadGenerator<TypedTransaction> for SafePayloadGenerator {
                     ed_25519_sig_0: H256::from_slice(&serialized_signature[0..32]).into(),
                     ed_25519_sig_1: H256::from_slice(&serialized_signature[32..64]).into(),
                     ed_25519_pub_key: H256::from_slice(&binding.packet_key.to_bytes()).into(),
-                    base_multiaddr: announcement.to_multiaddress_str(),
+                    base_multiaddr: announcement.multiaddress().to_string(),
                 }
                 .encode()
             }
             None => AnnounceSafeCall {
                 self_: self.me.into(),
-                base_multiaddr: announcement.to_multiaddress_str(),
+                base_multiaddr: announcement.multiaddress().to_string(),
             }
             .encode(),
         };
@@ -518,22 +530,26 @@ pub fn convert_vrf_parameters(
     domain_separator: &Hash,
 ) -> Vrfparameters {
     // skip the secp256k1 curvepoint prefix
-    let v = off_chain.get_decompressed_v().unwrap().to_bytes();
+    let v = off_chain.v.serialize_uncompressed();
     let s_b = off_chain
         .get_s_b_witness(signer, &ticket_hash.into(), domain_separator.as_slice())
-        .to_bytes();
+        // Safe: hash value is always in the allowed length boundaries,
+        //       only fails for longer values
+        // Safe: always encoding to secp256k1 whose field elements are in
+        //       allowed length boundaries
+        .expect("ticket hash exceeded hash2field boundaries or encoding to unsupported curve");
 
-    let h_v = off_chain.get_h_v_witness().to_bytes();
+    let h_v = off_chain.get_h_v_witness();
 
     Vrfparameters {
-        vx: U256::from_big_endian(&v[1..33]),
-        vy: U256::from_big_endian(&v[33..65]),
+        vx: U256::from_big_endian(&v.as_bytes()[1..33]),
+        vy: U256::from_big_endian(&v.as_bytes()[33..65]),
         s: U256::from_big_endian(&off_chain.s.to_bytes()),
         h: U256::from_big_endian(&off_chain.h.to_bytes()),
-        s_bx: U256::from_big_endian(&s_b[1..33]),
-        s_by: U256::from_big_endian(&s_b[33..65]),
-        h_vx: U256::from_big_endian(&h_v[1..33]),
-        h_vy: U256::from_big_endian(&h_v[33..65]),
+        s_bx: U256::from_big_endian(&s_b.as_bytes()[1..33]),
+        s_by: U256::from_big_endian(&s_b.as_bytes()[33..65]),
+        h_vx: U256::from_big_endian(&h_v.as_bytes()[1..33]),
+        h_vy: U256::from_big_endian(&h_v.as_bytes()[33..65]),
     }
 }
 
@@ -602,7 +618,7 @@ pub mod tests {
         let generator = BasicPayloadGenerator::new((&chain_key_0).into(), (&contract_instances).into());
 
         let ad = AnnouncementData::new(
-            &test_multiaddr,
+            test_multiaddr,
             Some(KeyBinding::new(
                 (&chain_key_0).into(),
                 &OffchainKeypair::from_secret(&PRIVATE_KEY).unwrap(),
@@ -622,7 +638,7 @@ pub mod tests {
 
         let test_multiaddr_reannounce = Multiaddr::from_str("/ip4/5.6.7.8/tcp/99").unwrap();
 
-        let ad_reannounce = AnnouncementData::new(&test_multiaddr_reannounce, None).unwrap();
+        let ad_reannounce = AnnouncementData::new(test_multiaddr_reannounce, None).unwrap();
         let reannounce_tx = generator.announce(ad_reannounce).expect("should generate tx");
 
         assert!(client

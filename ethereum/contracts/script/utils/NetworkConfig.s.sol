@@ -2,7 +2,6 @@
 pragma solidity >=0.8.0 <0.9.0;
 
 import "forge-std/Script.sol";
-import "forge-std/StdJson.sol";
 
 /**
  * Get environment_type from the environment variable `FOUNDRY_PROFILE`
@@ -19,26 +18,32 @@ contract NetworkConfig is Script {
     }
 
     struct Addresses {
-        address tokenContractAddress;
+        address announcements;
         address channelsContractAddress;
-        address nodeStakeV2FactoryAddress;
         address moduleImplementationAddress;
-        address nodeSafeRegistryAddress;
         address networkRegistryContractAddress;
         address networkRegistryProxyContractAddress;
+        address nodeSafeRegistryAddress;
+        address nodeStakeV2FactoryAddress;
         address ticketPriceOracleContractAddress;
-        address announcements;
+        address tokenContractAddress;
+    }
+
+    struct NetworkDetailIntermediate {
+        Addresses addresses;
+        string environmentType;
+        uint256 indexerStartBlockNumber;
     }
 
     struct NetworkDetail {
+        Addresses addresses;
         EnvironmentType environmentType;
         uint256 indexerStartBlockNumber;
-        Addresses addresses;
     }
 
     // Deployed contract addresses
-    // address constant PROD_WXHOPR_TOKEN_CONTRACT_ADDRESS = 0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1; // TODO: this
-    // contract is not necessarily the "HoprToken" contract used in releases
+    // address constant PROD_WXHOPR_TOKEN_CONTRACT_ADDRESS = 0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1;
+    // TODO: this contract is not necessarily the "HoprToken" contract used in releases
     bytes32 public constant DEFAULT_ADMIN_ROLE = 0x00;
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
@@ -66,122 +71,55 @@ contract NetworkConfig is Script {
         currentEnvironmentType = parseEnvironmentTypeFromString(profile);
     }
 
-    function readNetwork(string memory _networkName) internal returns (NetworkDetail memory networkDetail) {
+    function readNetwork(string memory networkName) internal returns (NetworkDetail memory networkDetail) {
         string memory json = vm.readFile(pathToDeploymentFile);
-        bytes memory levelToNetworkConfig = abi.encodePacked(".networks.", _networkName);
+        bytes memory networkDetailPath = abi.encodePacked(".networks.", networkName);
 
-        // read all the contract addresses from contracts-addresses.json. This way ensures that the order of attributes
-        // does not affect parsing
-        EnvironmentType envType = parseEnvironmentTypeFromString(
-            json.readString(string(abi.encodePacked(levelToNetworkConfig, ".environment_type")))
+        bytes memory detailRaw = json.parseRaw(string(networkDetailPath));
+
+        // as long as the alphabetical order of the keys in the JSON file is consistent, the ABI encoding will be
+        NetworkDetailIntermediate memory networkDetailIntermediate = abi.decode(detailRaw, (NetworkDetailIntermediate));
+
+        networkDetail = NetworkDetail(
+            networkDetailIntermediate.addresses,
+            parseEnvironmentTypeFromString(networkDetailIntermediate.environmentType),
+            networkDetailIntermediate.indexerStartBlockNumber
         );
-        uint256 indexerStartBlkNum =
-            json.readUint(string(abi.encodePacked(levelToNetworkConfig, ".indexer_start_block_number")));
-
-        bytes memory addresses = abi.encodePacked(levelToNetworkConfig, ".addresses");
-
-        // console2.log_string(addresses);
-
-        address tokenAddr = json.readAddress(string(abi.encodePacked(addresses, ".token")));
-        address channelAddr = json.readAddress(string(abi.encodePacked(addresses, ".channels")));
-        address nodeStakeV2FactoryAddr = json.readAddress(string(abi.encodePacked(addresses, ".node_stake_v2_factory")));
-        address moduleImplementationAddr =
-            json.readAddress(string(abi.encodePacked(addresses, ".module_implementation")));
-        address nodeSafeRegistryAddr = json.readAddress(string(abi.encodePacked(addresses, ".node_safe_registry")));
-        address networkRegistryProxyAddr =
-            json.readAddress(string(abi.encodePacked(addresses, ".network_registry_proxy")));
-        address networkRegistryAddr = json.readAddress(string(abi.encodePacked(addresses, ".network_registry")));
-        address ticketPriceOracleAddress = json.readAddress(string(abi.encodePacked(addresses, ".ticket_price_oracle")));
-        address announcementAdddress = json.readAddress(string(abi.encodePacked(addresses, ".announcements")));
-
-        Addresses memory addressStruct = Addresses({
-            tokenContractAddress: tokenAddr,
-            channelsContractAddress: channelAddr,
-            nodeStakeV2FactoryAddress: nodeStakeV2FactoryAddr,
-            moduleImplementationAddress: moduleImplementationAddr,
-            nodeSafeRegistryAddress: nodeSafeRegistryAddr,
-            networkRegistryContractAddress: networkRegistryAddr,
-            networkRegistryProxyContractAddress: networkRegistryProxyAddr,
-            ticketPriceOracleContractAddress: ticketPriceOracleAddress,
-            announcements: announcementAdddress
-        });
-
-        networkDetail = NetworkDetail({
-            environmentType: envType,
-            indexerStartBlockNumber: indexerStartBlkNum,
-            addresses: addressStruct
-        });
     }
 
     function readCurrentNetwork() internal {
         currentNetworkDetail = readNetwork(currentNetworkId);
     }
 
-    function writeNetwork(string memory _networkName, NetworkDetail memory networkDetail) internal {
+    function writeNetwork(string memory networkName, NetworkDetail memory networkDetail) internal {
         // write parsedNewEnvDetail to corresponding key
-        string memory configKey = string(abi.encodePacked(".networks.", _networkName));
+        string memory configKey = string(abi.encodePacked(".networks.", networkName));
+        string memory configKeyAddresses = string(abi.encodePacked(".networks.", networkName, ".addresses"));
 
-        // use vm.writeJson to preserve order of JSON properties
-        vm.writeJson(
-            vm.toString(networkDetail.addresses.tokenContractAddress),
-            pathToDeploymentFile,
-            string(abi.encodePacked(configKey, ".addresses.token"))
-        );
-        vm.writeJson(
-            vm.toString(networkDetail.addresses.channelsContractAddress),
-            pathToDeploymentFile,
-            string(abi.encodePacked(configKey, ".addresses.channels"))
-        );
-        vm.writeJson(
-            vm.toString(networkDetail.addresses.nodeStakeV2FactoryAddress),
-            pathToDeploymentFile,
-            string(abi.encodePacked(configKey, ".addresses.node_stake_v2_factory"))
-        );
-        vm.writeJson(
-            vm.toString(networkDetail.addresses.moduleImplementationAddress),
-            pathToDeploymentFile,
-            string(abi.encodePacked(configKey, ".addresses.module_implementation"))
-        );
-        vm.writeJson(
-            vm.toString(networkDetail.addresses.nodeSafeRegistryAddress),
-            pathToDeploymentFile,
-            string(abi.encodePacked(configKey, ".addresses.node_safe_registry"))
-        );
-        vm.writeJson(
-            vm.toString(networkDetail.addresses.networkRegistryProxyContractAddress),
-            pathToDeploymentFile,
-            string(abi.encodePacked(configKey, ".addresses.network_registry_proxy"))
-        );
-        vm.writeJson(
-            vm.toString(networkDetail.addresses.ticketPriceOracleContractAddress),
-            pathToDeploymentFile,
-            string(abi.encodePacked(configKey, ".addresses.ticket_price_oracle"))
-        );
-        vm.writeJson(
-            vm.toString(networkDetail.addresses.announcements),
-            pathToDeploymentFile,
-            string(abi.encodePacked(configKey, ".addresses.announcements"))
-        );
-        vm.writeJson(
-            vm.toString(networkDetail.addresses.networkRegistryContractAddress),
-            pathToDeploymentFile,
-            string(abi.encodePacked(configKey, ".addresses.network_registry"))
-        );
+        // the keys must be unique because they are stored in shared memory
+        string memory obj = string(abi.encodePacked("obj-", networkName));
+        string memory addresses = string(abi.encodePacked("addresses-", networkName));
 
-        vm.writeJson(
-            parseEnvironmentTypeToString(networkDetail.environmentType),
-            pathToDeploymentFile,
-            string(abi.encodePacked(configKey, ".environment_type"))
-        );
-        vm.writeJson(
-            vm.toString(networkDetail.indexerStartBlockNumber),
-            pathToDeploymentFile,
-            string(abi.encodePacked(configKey, ".indexer_start_block_number"))
-        );
+        addresses.serialize("token", networkDetail.addresses.tokenContractAddress);
+        addresses.serialize("channels", networkDetail.addresses.channelsContractAddress);
+        addresses.serialize("node_stake_v2_factory", networkDetail.addresses.nodeStakeV2FactoryAddress);
+        addresses.serialize("module_implementation", networkDetail.addresses.moduleImplementationAddress);
+        addresses.serialize("node_safe_registry", networkDetail.addresses.nodeSafeRegistryAddress);
+        addresses.serialize("network_registry_proxy", networkDetail.addresses.networkRegistryProxyContractAddress);
+        addresses.serialize("ticket_price_oracle", networkDetail.addresses.ticketPriceOracleContractAddress);
+        addresses.serialize("announcements", networkDetail.addresses.announcements);
+        addresses = addresses.serialize("network_registry", networkDetail.addresses.networkRegistryContractAddress);
+
+        obj.serialize("environment_type", parseEnvironmentTypeToString(networkDetail.environmentType));
+        obj.serialize("indexer_start_block_number", networkDetail.indexerStartBlockNumber);
+        obj = obj.serialize("addresses", addresses);
+
+        vm.writeJson(obj, pathToDeploymentFile, configKey);
     }
 
     function writeCurrentNetwork() internal {
         // if currentNetworkId is anvil-localhost, update both `anvil-localhost` and `anvil-localhost2`
+
         if (keccak256(bytes(currentNetworkId)) == keccak256(bytes("anvil-localhost"))) {
             writeNetwork("anvil-localhost2", currentNetworkDetail);
         }

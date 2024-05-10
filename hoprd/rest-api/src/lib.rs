@@ -5,29 +5,36 @@ use std::error::Error;
 use std::str::FromStr;
 use std::{collections::HashMap, sync::Arc};
 
-use async_std::sync::RwLock;
+use async_lock::RwLock;
+use bimap::BiHashMap;
+// use base64::{engine::general_purpose::STANDARD_NO_PAD, Engine as _};
 use futures::StreamExt;
 use futures_concurrency::stream::Merge;
-use hopr_lib::TransportOutput;
 use libp2p_identity::PeerId;
-use log::{debug, error, warn};
 use serde_json::json;
 use serde_with::{serde_as, DisplayFromStr, DurationMilliSeconds};
-use tide::http::headers::{HeaderName, AUTHORIZATION};
-use tide::http::mime;
-use tide::utils::async_trait;
-use tide::{http::Mime, Request, Response};
-use tide::{Middleware, Next, StatusCode};
+use tide::{
+    http::{
+        headers::{HeaderName, HeaderValue, AUTHORIZATION},
+        mime, Mime,
+    },
+    security::{CorsMiddleware, Origin},
+    utils::async_trait,
+    Middleware, Next, Request, Response, StatusCode,
+};
+use tide_tracing::TraceMiddleware;
 use tide_websockets::{Message, WebSocket};
+use tracing::{debug, error, warn};
 use utoipa::openapi::security::{ApiKey, ApiKeyValue, HttpAuthScheme, HttpBuilder, SecurityScheme};
 use utoipa::{Modify, OpenApi};
 use utoipa_swagger_ui::Config;
 
-use crate::config::Auth;
 use hopr_lib::{
     errors::HoprLibError,
-    {Address, Balance, BalanceType, Hopr},
+    TransportOutput, {Address, Balance, BalanceType, Hopr},
 };
+
+use crate::config::Auth;
 
 pub const BASE_PATH: &str = "/api/v3";
 pub const API_VERSION: &str = "3.0.0";
@@ -62,10 +69,11 @@ pub type MessageEncoder = fn(&[u8]) -> Box<[u8]>;
 
 #[derive(Clone)]
 pub struct InternalState {
+    pub hoprd_cfg: String,
     pub auth: Arc<Auth>,
     pub hopr: Arc<Hopr>,
     pub inbox: Arc<RwLock<hoprd_inbox::Inbox>>,
-    pub aliases: Arc<RwLock<HashMap<String, PeerId>>>,
+    pub aliases: Arc<RwLock<BiHashMap<String, PeerId>>>,
     pub websocket_rx: async_broadcast::InactiveReceiver<TransportOutput>,
     pub msg_encoder: Option<MessageEncoder>,
 }
@@ -103,6 +111,7 @@ pub struct InternalState {
         tickets::redeem_tickets_in_channel,
         tickets::aggregate_tickets_in_channel,
         node::version,
+        node::configuration,
         node::peers,
         node::metrics,
         node::info,
@@ -123,7 +132,7 @@ pub struct InternalState {
             tickets::NodeTicketStatisticsResponse, tickets::ChannelTicket,
             network::TicketPriceResponse,
             node::EntryNode, node::NodeInfoResponse, node::NodePeersQueryRequest,
-            node::HeartbeatInfo, node::PeerInfo, node::NodePeersResponse, node::NodeVersionResponse
+            node::HeartbeatInfo, node::PeerInfo, node::AnnouncedPeer, node::NodePeersResponse, node::NodeVersionResponse,
         )
     ),
     modifiers(&SecurityAddon),
@@ -169,19 +178,29 @@ impl Middleware<InternalState> for TokenBasedAuthenticationMiddleware {
     async fn handle(&self, request: Request<InternalState>, next: Next<'_, InternalState>) -> tide::Result {
         let auth = request.state().auth.clone();
 
-        let x_auth_header = HeaderName::from_str("x-auth-token").unwrap();
+        let x_auth_header = HeaderName::from_str("x-auth-token")?;
+        let websocket_proto_header = HeaderName::from_str("Sec-Websocket-Protocol")?;
 
         let is_authorized = match auth.as_ref() {
             Auth::Token(expected_token) => {
                 let auth_headers = request
                     .iter()
-                    .filter_map(|(n, v)| (AUTHORIZATION.eq(n) || x_auth_header.eq(n)).then_some((n, v.as_str())))
+                    .filter_map(|(n, v)| {
+                        (AUTHORIZATION.eq(n) || x_auth_header.eq(n) || websocket_proto_header.eq(n))
+                            .then_some((n, v.as_str()))
+                    })
                     .collect::<Vec<_>>();
 
-                // Use "Authorization Bearer <token>" and "X-Auth-Token <token>" headers
-                !auth_headers.is_empty()
+                // Use "Authorization Bearer <token>" and "X-Auth-Token <token>" headers and "Sec-Websocket-Protocol"
+                (!auth_headers.is_empty()
                     && (auth_headers.contains(&(&AUTHORIZATION, &format!("Bearer {}", expected_token)))
                         || auth_headers.contains(&(&x_auth_header, &expected_token)))
+                )
+
+                // TODO: Replace with proper JS compliant solution
+                // The following line would never be needed, if the JavaScript browser was able to properly
+                // pass the x-auth-token or Bearer headers.
+                || request.url().as_str().contains(format!("messages/websocket?apiToken={expected_token}").as_str())
             }
             Auth::None => true,
         };
@@ -200,20 +219,14 @@ impl Middleware<InternalState> for TokenBasedAuthenticationMiddleware {
     }
 }
 
-/// Custom request logging middleware
-struct LogRequestMiddleware(log::Level);
+/// Custom prometheus recording middleware
+#[cfg(all(feature = "prometheus", not(test)))]
+struct PrometheusMetricsMiddleware;
 
+#[cfg(all(feature = "prometheus", not(test)))]
 #[async_trait]
-impl<T: Clone + Send + Sync + 'static> Middleware<T> for LogRequestMiddleware {
-    async fn handle(&self, mut req: Request<T>, next: Next<'_, T>) -> tide::Result {
-        struct LogMiddlewareHasBeenRun;
-
-        if req.ext::<LogMiddlewareHasBeenRun>().is_some() {
-            return Ok(next.run(req).await);
-        }
-        req.set_ext(LogMiddlewareHasBeenRun);
-
-        let peer_addr = req.peer_addr().map(String::from);
+impl<T: Clone + Send + Sync + 'static> Middleware<T> for PrometheusMetricsMiddleware {
+    async fn handle(&self, req: Request<T>, next: Next<'_, T>) -> tide::Result {
         let path = req.url().path().to_owned();
         let method = req.method().to_string();
 
@@ -223,26 +236,13 @@ impl<T: Clone + Send + Sync + 'static> Middleware<T> for LogRequestMiddleware {
 
         let status = response.status();
 
-        #[cfg(all(feature = "prometheus", not(test)))]
-        {
-            // We're not interested on metrics for other endpoints
-            if path.starts_with("/api/v3/") {
-                METRIC_COUNT_API_CALLS.increment(&[&path, &method, &status.to_string()]);
-                METRIC_COUNT_API_CALLS_TIMING.observe(&[&path, &method], response_duration.as_secs_f64());
-            }
+        // We're not interested on metrics for non-functional
+        if path.starts_with("/api/v3/") && !path.contains("node/metrics") {
+            METRIC_COUNT_API_CALLS.increment(&[&path, &method, &status.to_string()]);
+            METRIC_COUNT_API_CALLS_TIMING.observe(&[&path, &method], response_duration.as_secs_f64());
         }
 
-        log::log!(
-            self.0,
-            r#"{} "{method} {path}" {status} {} {}ms"#,
-            peer_addr.as_deref().unwrap_or("-"),
-            response
-                .len()
-                .map(|l| l.to_string())
-                .unwrap_or_else(|| String::from("-")),
-            response_duration.as_millis()
-        );
-        Ok(response)
+        return Ok(response);
     }
 }
 
@@ -271,6 +271,7 @@ enum WebSocketInput {
 
 pub async fn run_hopr_api(
     host: &str,
+    hoprd_cfg: String,
     cfg: &crate::config::Api,
     hopr: Arc<hopr_lib::Hopr>,
     inbox: Arc<RwLock<hoprd_inbox::Inbox>>,
@@ -278,7 +279,7 @@ pub async fn run_hopr_api(
     msg_encoder: Option<MessageEncoder>,
 ) {
     // Prepare alias part of the state
-    let aliases: Arc<RwLock<HashMap<String, PeerId>>> = Arc::new(RwLock::new(HashMap::new()));
+    let aliases: Arc<RwLock<BiHashMap<String, PeerId>>> = Arc::new(RwLock::new(BiHashMap::new()));
     aliases.write().await.insert("me".to_owned(), hopr.me_peer_id());
 
     let state = State {
@@ -288,7 +289,14 @@ pub async fn run_hopr_api(
 
     let mut app = tide::with_state(state.clone());
 
-    app.with(LogRequestMiddleware(log::Level::Debug));
+    app.with(TraceMiddleware::new());
+    app.with(
+        CorsMiddleware::new()
+            .allow_methods("GET, POST, OPTIONS, DELETE".parse::<HeaderValue>().unwrap())
+            .allow_origin(Origin::from("*")),
+    );
+    #[cfg(all(feature = "prometheus", not(test)))]
+    app.with(PrometheusMetricsMiddleware);
 
     app.at("/api-docs/openapi.json")
         .get(|_| async move { Ok(Response::builder(200).body(json!(ApiDoc::openapi()))) });
@@ -302,6 +310,7 @@ pub async fn run_hopr_api(
     app.at(BASE_PATH).nest({
         let mut api = tide::with_state(InternalState {
             auth: Arc::new(cfg.auth.clone()),
+            hoprd_cfg,
             hopr: state.hopr.clone(),
             msg_encoder,
             inbox,
@@ -431,6 +440,7 @@ pub async fn run_hopr_api(
         api.at("/network/price").get(network::price);
 
         api.at("/node/version").get(node::version);
+        api.at("/node/configuration").get(node::configuration);
         api.at("/node/info").get(node::info);
         api.at("/node/peers").get(node::peers);
         api.at("/node/entryNodes").get(node::entry_nodes);
@@ -473,6 +483,8 @@ enum ApiErrorStatus {
     Timeout,
     Unauthorized,
     InvalidQuality,
+    InvalidAddress,
+    AliasAlreadyExists,
     #[strum(serialize = "UNKNOWN_FAILURE")]
     UnknownFailure(String),
 }
@@ -532,7 +544,7 @@ mod alias {
         pub peer_id: PeerId,
     }
 
-    /// Get each previously set alias and its corresponding PeerId
+    /// Get each previously set alias and its corresponding PeerId.
     #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/aliases"),
@@ -544,7 +556,8 @@ mod alias {
             (status = 401, description = "Invalid authorization token.", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Alias",
     )]
@@ -573,10 +586,12 @@ mod alias {
             (status = 201, description = "Alias set successfully.", body = PeerIdResponse),
             (status = 400, description = "Invalid PeerId: The format or length of the peerId is incorrect.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
+            (status = 409, description = "Given PeerId is already aliased.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Alias",
     )]
@@ -584,10 +599,13 @@ mod alias {
         let args: AliasPeerIdBodyRequest = req.body_json().await?;
         let aliases = req.state().aliases.clone();
 
-        aliases.write().await.insert(args.alias, args.peer_id);
-        Ok(Response::builder(200)
-            .body(json!(PeerIdResponse { peer_id: args.peer_id }))
-            .build())
+        let inserted = aliases.write().await.insert_no_overwrite(args.alias, args.peer_id);
+        match inserted {
+            Ok(_) => Ok(Response::builder(201)
+                .body(json!(PeerIdResponse { peer_id: args.peer_id }))
+                .build()),
+            Err(_) => Ok(Response::builder(409).body(ApiErrorStatus::AliasAlreadyExists).build()),
+        }
     }
 
     /// Get alias for the PeerId (Hopr address) that have this alias assigned to it.
@@ -603,16 +621,18 @@ mod alias {
             (status = 404, description = "PeerId not found", body = ApiError),
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Alias",
     )]
     pub async fn get_alias(req: Request<InternalState>) -> tide::Result<Response> {
         let alias = req.param("alias")?.parse::<String>()?;
+        let alias = urlencoding::decode(&alias)?.into_owned();
         let aliases = req.state().aliases.clone();
 
         let aliases = aliases.read().await;
-        if let Some(peer_id) = aliases.get(&alias) {
+        if let Some(peer_id) = aliases.get_by_left(&alias) {
             Ok(Response::builder(200)
                 .body(json!(PeerIdResponse { peer_id: *peer_id }))
                 .build())
@@ -634,21 +654,25 @@ mod alias {
             (status = 422, description = "Unknown failure", body = ApiError)   // This can never happen
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Alias",
     )]
     pub async fn delete_alias(req: Request<InternalState>) -> tide::Result<Response> {
         let alias = req.param("alias")?.parse::<String>()?;
+        let alias = urlencoding::decode(&alias)?.into_owned();
         let aliases = req.state().aliases.clone();
 
-        let _ = aliases.write().await.remove(&alias);
+        let _ = aliases.write().await.remove_by_left(&alias);
 
         Ok(Response::builder(204).build())
     }
 }
 
 mod account {
+    use hopr_lib::U256;
+
     use super::*;
 
     #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
@@ -674,7 +698,8 @@ mod account {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Account",
     )]
@@ -689,11 +714,11 @@ mod account {
 
     #[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
     #[schema(example = json!({
-        "hopr": "2000000000000000000000 HOPR",
-        "native": "9999563581204904000 Native",
-        "safeHopr": "2000000000000000000000 HOPR",
-        "safeHoprAllowance": "115792089237316195423570985008687907853269984665640564039457584007913129639935 HOPR",
-        "safeNative": "10000000000000000000 Native"
+        "hopr": "2000000000000000000000",
+        "native": "9999563581204904000",
+        "safeHopr": "2000000000000000000000",
+        "safeHoprAllowance": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+        "safeNative": "10000000000000000000"
     }))]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct AccountBalancesResponse {
@@ -719,7 +744,8 @@ mod account {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Account",
     )]
@@ -729,27 +755,27 @@ mod account {
         let mut account_balances = AccountBalancesResponse::default();
 
         match hopr.get_balance(BalanceType::Native).await {
-            Ok(v) => account_balances.native = v.to_string(),
+            Ok(v) => account_balances.native = v.to_value_string(),
             Err(e) => return Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
         }
 
         match hopr.get_balance(BalanceType::HOPR).await {
-            Ok(v) => account_balances.hopr = v.to_string(),
+            Ok(v) => account_balances.hopr = v.to_value_string(),
             Err(e) => return Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
         }
 
         match hopr.get_safe_balance(BalanceType::Native).await {
-            Ok(v) => account_balances.safe_native = v.to_string(),
+            Ok(v) => account_balances.safe_native = v.to_value_string(),
             Err(e) => return Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
         }
 
         match hopr.get_safe_balance(BalanceType::HOPR).await {
-            Ok(v) => account_balances.safe_hopr = v.to_string(),
+            Ok(v) => account_balances.safe_hopr = v.to_value_string(),
             Err(e) => return Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
         }
 
         match hopr.safe_allowance().await {
-            Ok(v) => account_balances.safe_hopr_allowance = v.to_string(),
+            Ok(v) => account_balances.safe_hopr_allowance = v.to_value_string(),
             Err(e) => return Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
         }
 
@@ -768,7 +794,9 @@ mod account {
         #[serde_as(as = "DisplayFromStr")]
         #[schema(value_type = String)]
         currency: BalanceType,
-        amount: u128,
+        #[serde_as(as = "DisplayFromStr")]
+        #[schema(value_type = String)]
+        amount: U256,
         #[serde_as(as = "DisplayFromStr")]
         #[schema(value_type = String)]
         address: Address,
@@ -789,7 +817,8 @@ mod account {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Account",
     )]
@@ -813,7 +842,7 @@ mod account {
 
 mod peers {
     use super::*;
-    use hopr_lib::{HoprTransportError, Multiaddr, PEER_METADATA_PROTOCOL_VERSION};
+    use hopr_lib::{HoprTransportError, Multiaddr};
     use serde_with::DurationMilliSeconds;
     use std::str::FromStr;
     use std::time::Duration;
@@ -837,6 +866,10 @@ mod peers {
         pub observed: Vec<Multiaddr>,
     }
 
+    /// Returns transport-related information about the given peer.
+    ///
+    /// This includes the peer ids that the given peer has `announced` on-chain
+    /// and peer ids that are actually `observed` by the transport layer.
     #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/peers/{{peerId}}"),
@@ -850,7 +883,8 @@ mod peers {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Peers",
     )]
@@ -859,7 +893,7 @@ mod peers {
         match PeerId::from_str(req.param("peerId")?) {
             Ok(peer) => Ok(Response::builder(200)
                 .body(json!(NodePeerInfoResponse {
-                    announced: hopr.multiaddresses_announced_to_dht(&peer).await,
+                    announced: hopr.multiaddresses_announced_on_chain(&peer).await,
                     observed: hopr.network_observed_multiaddresses(&peer).await
                 }))
                 .build()),
@@ -881,6 +915,7 @@ mod peers {
         pub reported_version: String,
     }
 
+    /// Directly pings the given peer.
     #[utoipa::path(
         post,
         path = const_format::formatcp!("{BASE_PATH}/peers/{{peerId}}/ping"),
@@ -894,7 +929,8 @@ mod peers {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Peers",
     )]
@@ -907,8 +943,8 @@ mod peers {
                         latency: latency.unwrap_or(Duration::ZERO), // TODO: what should be the correct default ?
                         reported_version: hopr
                             .network_peer_info(&peer)
-                            .await
-                            .and_then(|s| s.metadata().get(PEER_METADATA_PROTOCOL_VERSION).cloned())
+                            .await?
+                            .and_then(|p| p.peer_version)
                             .unwrap_or("unknown".into())
                     }))
                     .build()),
@@ -926,7 +962,7 @@ mod channels {
     use super::*;
     use futures::TryFutureExt;
     use hopr_crypto_types::types::Hash;
-    use hopr_lib::{ChannelEntry, ChannelStatus, CoreEthereumActionsError, ToHex};
+    use hopr_lib::{AsUnixTimestamp, ChainActionsError, ChannelEntry, ChannelStatus, ToHex};
 
     #[serde_as]
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
@@ -942,17 +978,6 @@ mod channels {
         #[schema(value_type = String)]
         pub status: ChannelStatus,
         pub balance: String,
-    }
-
-    impl From<ChannelEntry> for NodeChannel {
-        fn from(value: ChannelEntry) -> Self {
-            Self {
-                id: value.get_id(),
-                peer_address: value.destination,
-                status: value.status,
-                balance: value.balance.amount().to_string(),
-            }
-        }
     }
 
     #[serde_as]
@@ -980,12 +1005,8 @@ mod channels {
         #[serde_as(as = "DisplayFromStr")]
         #[schema(value_type = String)]
         pub destination_address: Address,
-        #[serde_as(as = "DisplayFromStr")]
-        #[schema(value_type = String)]
-        pub source_peer_id: PeerId,
-        #[serde_as(as = "DisplayFromStr")]
-        #[schema(value_type = String)]
-        pub destination_peer_id: PeerId,
+        pub source_peer_id: String,
+        pub destination_peer_id: String,
         pub balance: String,
         #[serde_as(as = "DisplayFromStr")]
         #[schema(value_type = String)]
@@ -995,6 +1016,7 @@ mod channels {
         pub closure_time: u64,
     }
 
+    /// Listing of channels.
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
     #[schema(example = json!({
         "all": [],
@@ -1009,8 +1031,11 @@ mod channels {
         ]
     }))]
     pub(crate) struct NodeChannelsResponse {
+        /// Channels incoming to this node.
         pub incoming: Vec<NodeChannel>,
+        /// Channels outgoing from this node.
         pub outgoing: Vec<NodeChannel>,
+        /// Complete channel topology as seen by this node.
         pub all: Vec<ChannelInfoResponse>,
     }
 
@@ -1022,31 +1047,47 @@ mod channels {
             source_peer_id: node
                 .chain_key_to_peerid(&channel.source)
                 .await?
-                .ok_or(HoprLibError::GeneralError("failed to map to peerid".into()))?,
+                .map(|v| PeerId::to_string(&v))
+                .unwrap_or_else(|| {
+                    warn!("failed to map {} to peerid", channel.source);
+                    "<FAILED_TO_MAP_THE_PEERID>".into()
+                }),
             destination_peer_id: node
                 .chain_key_to_peerid(&channel.destination)
                 .await?
-                .ok_or(HoprLibError::GeneralError("failed to map to peerid".into()))?,
+                .map(|v| PeerId::to_string(&v))
+                .unwrap_or_else(|| {
+                    warn!("failed to map {} to peerid", channel.destination);
+                    "<FAILED_TO_MAP_THE_PEERID>".into()
+                }),
             balance: channel.balance.amount().to_string(),
             status: channel.status,
             ticket_index: channel.ticket_index.as_u32(),
             channel_epoch: channel.channel_epoch.as_u32(),
-            closure_time: channel.closure_time.as_u64(),
+            closure_time: channel
+                .closure_time_at()
+                .map(|ct| ct.as_unix_timestamp().as_secs())
+                .unwrap_or_default(),
         })
     }
 
+    /// Parameters for enumerating channels.
     #[derive(Debug, Default, Copy, Clone, serde::Deserialize, utoipa::IntoParams, utoipa::ToSchema)]
     #[into_params(parameter_in = Query)]
     #[serde(default, rename_all = "camelCase")]
     pub(crate) struct ChannelsQueryRequest {
+        /// Should be the closed channels included?
         #[schema(required = false)]
         #[serde(default)]
         pub including_closed: bool,
+        /// Should all channels (not only the ones concerning this node) be enumerated?
         #[schema(required = false)]
         #[serde(default)]
         pub full_topology: bool,
     }
 
+    /// Lists channels opened to/from this node. Alternatively, it can print all
+    /// the channels in the network as this node sees them.
     #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/channels"),
@@ -1057,7 +1098,8 @@ mod channels {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Channels",
     )]
@@ -1100,12 +1142,22 @@ mod channels {
                         incoming: incoming
                             .into_iter()
                             .filter(|c| query.including_closed || c.status != ChannelStatus::Closed)
-                            .map(NodeChannel::from)
+                            .map(|c| NodeChannel {
+                                id: c.get_id(),
+                                peer_address: c.source,
+                                status: c.status,
+                                balance: c.balance.amount().to_string(),
+                            })
                             .collect(),
                         outgoing: outgoing
                             .into_iter()
                             .filter(|c| query.including_closed || c.status != ChannelStatus::Closed)
-                            .map(NodeChannel::from)
+                            .map(|c| NodeChannel {
+                                id: c.get_id(),
+                                peer_address: c.destination,
+                                status: c.status,
+                                balance: c.balance.amount().to_string(),
+                            })
                             .collect(),
                         all: vec![],
                     };
@@ -1125,9 +1177,11 @@ mod channels {
         "peerAddress": "0xa8194d36e322592d4c707b70dbe96121f5c74c64"
     }))]
     pub(crate) struct OpenChannelBodyRequest {
+        /// On-chain address of the counterparty.
         #[serde_as(as = "DisplayFromStr")]
         #[schema(value_type = String)]
         pub peer_address: Address,
+        /// Initial amount of stake in HOPR tokens.
         pub amount: String,
     }
 
@@ -1139,37 +1193,45 @@ mod channels {
     }))]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct OpenChannelResponse {
+        /// ID of the new channel.
         #[serde_as(as = "DisplayFromStr")]
         #[schema(value_type = String)]
         pub channel_id: Hash,
+        /// Receipt of the channel open transaction.
         #[serde_as(as = "DisplayFromStr")]
         #[schema(value_type = String)]
         pub transaction_receipt: Hash,
     }
 
+    /// Opens a channel to the given on-chain address with the given initial stake of HOPR tokens.
     #[utoipa::path(
         post,
         path = const_format::formatcp!("{BASE_PATH}/channels"),
         request_body(
             content = OpenChannelBodyRequest,
-            description = "Open channel request specification",
+            description = "Open channel request specification: on-chain address of the counterparty and the initial HOPR token stake.",
             content_type = "application/json"),
         responses(
             (status = 201, description = "Channel successfully opened", body = OpenChannelResponse),
+            (status = 400, description = "Invalid counterparty address", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 403, description = "Failed to open the channel because of insufficient HOPR balance or allowance.", body = ApiError),
             (status = 409, description = "Failed to open the channel because the channel between this nodes already exists.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Channels",
     )]
     pub(super) async fn open_channel(mut req: Request<InternalState>) -> tide::Result<Response> {
         let hopr = req.state().hopr.clone();
 
-        let open_req: OpenChannelBodyRequest = req.body_json().await?;
+        let open_req: OpenChannelBodyRequest = match req.body_json().await {
+            Ok(r) => r,
+            Err(_) => return Ok(Response::builder(400).body(ApiErrorStatus::InvalidAddress).build()),
+        };
 
         match hopr
             .open_channel(
@@ -1184,19 +1246,20 @@ mod channels {
                     transaction_receipt: channel_details.tx_hash
                 }))
                 .build()),
-            Err(HoprLibError::ChainError(CoreEthereumActionsError::BalanceTooLow)) => {
+            Err(HoprLibError::ChainError(ChainActionsError::BalanceTooLow)) => {
                 Ok(Response::builder(403).body(ApiErrorStatus::NotEnoughBalance).build())
             }
-            Err(HoprLibError::ChainError(CoreEthereumActionsError::NotEnoughAllowance)) => {
+            Err(HoprLibError::ChainError(ChainActionsError::NotEnoughAllowance)) => {
                 Ok(Response::builder(403).body(ApiErrorStatus::NotEnoughAllowance).build())
             }
-            Err(HoprLibError::ChainError(CoreEthereumActionsError::ChannelAlreadyExists)) => {
+            Err(HoprLibError::ChainError(ChainActionsError::ChannelAlreadyExists)) => {
                 Ok(Response::builder(409).body(ApiErrorStatus::ChannelAlreadyOpen).build())
             }
             Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
         }
     }
 
+    /// Returns information about the given channel.
     #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/channels/{{channelId}}"),
@@ -1211,7 +1274,8 @@ mod channels {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Channels",
     )]
@@ -1238,14 +1302,21 @@ mod channels {
     }))]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct CloseChannelResponse {
+        /// Receipt for the channel close transaction.
         #[serde_as(as = "DisplayFromStr")]
         #[schema(value_type = String)]
         pub receipt: Hash,
+        /// New status of the channel. Will be one of `Closed` or `PendingToClose`.
         #[serde_as(as = "DisplayFromStr")]
         #[schema(value_type = String)]
         pub channel_status: ChannelStatus,
     }
 
+    /// Closes the given channel.
+    ///
+    /// If the channel is currently `Open`, it will transition it to `PendingToClose`.
+    /// If the channels is in `PendingToClose` and the channel closure period has elapsed,
+    /// it will transition it to `Closed`.
     #[utoipa::path(
         delete,
         path = const_format::formatcp!("{BASE_PATH}/channels/{{channelId}}"),
@@ -1260,7 +1331,8 @@ mod channels {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Channels",
     )]
@@ -1275,10 +1347,10 @@ mod channels {
                         receipt: receipt.tx_hash
                     }))
                     .build()),
-                Err(HoprLibError::ChainError(CoreEthereumActionsError::ChannelDoesNotExist)) => {
+                Err(HoprLibError::ChainError(ChainActionsError::ChannelDoesNotExist)) => {
                     Ok(Response::builder(404).body(ApiErrorStatus::ChannelNotFound).build())
                 }
-                Err(HoprLibError::ChainError(CoreEthereumActionsError::InvalidArguments(_))) => {
+                Err(HoprLibError::ChainError(ChainActionsError::InvalidArguments(_))) => {
                     Ok(Response::builder(422).body(ApiErrorStatus::UnsupportedFeature).build())
                 }
                 Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
@@ -1287,14 +1359,17 @@ mod channels {
         }
     }
 
+    /// Specifies the amount of HOPR tokens to fund a channel with.
     #[derive(Debug, Clone, serde::Deserialize, utoipa::ToSchema)]
     #[schema(example = json!({
         "amount": "1000"
     }))]
     pub(crate) struct FundBodyRequest {
+        /// Amount of HOPR tokens to fund the channel with.
         pub amount: String,
     }
 
+    /// Funds the given channel with the given amount of HOPR tokens.
     #[utoipa::path(
         post,
         path = const_format::formatcp!("{BASE_PATH}/channels/{{channelId}}/fund"),
@@ -1303,18 +1378,20 @@ mod channels {
         ),
         request_body(
             content = FundBodyRequest,
-            description = "Amount of HOPR to fund the channel",
+            description = "Specifies the amount of HOPR tokens to fund a channel with.",
             content_type = "application/json",
         ),
         responses(
             (status = 200, description = "Channel funded successfully", body = String),
             (status = 400, description = "Invalid channel id.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
+            (status = 403, description = "Failed to fund the channel because of insufficient HOPR balance or allowance.", body = ApiError),
             (status = 404, description = "Channel not found.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Channels",
     )]
@@ -1327,8 +1404,14 @@ mod channels {
         match Hash::from_hex(req.param("channelId")?) {
             Ok(channel_id) => match hopr.fund_channel(&channel_id, &amount).await {
                 Ok(hash) => Ok(Response::builder(200).body(hash.to_string()).build()),
-                Err(HoprLibError::ChainError(CoreEthereumActionsError::ChannelDoesNotExist)) => {
+                Err(HoprLibError::ChainError(ChainActionsError::ChannelDoesNotExist)) => {
                     Ok(Response::builder(404).body(ApiErrorStatus::ChannelNotFound).build())
+                }
+                Err(HoprLibError::ChainError(ChainActionsError::NotEnoughAllowance)) => {
+                    Ok(Response::builder(403).body(ApiErrorStatus::NotEnoughAllowance).build())
+                }
+                Err(HoprLibError::ChainError(ChainActionsError::BalanceTooLow)) => {
+                    Ok(Response::builder(403).body(ApiErrorStatus::NotEnoughBalance).build())
                 }
                 Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
             },
@@ -1340,7 +1423,7 @@ mod channels {
 mod messages {
     use std::time::Duration;
 
-    use hopr_lib::HalfKeyChallenge;
+    use hopr_lib::{AsUnixTimestamp, HalfKeyChallenge};
 
     use super::*;
 
@@ -1415,7 +1498,7 @@ mod messages {
         pub timestamp: Option<std::time::Duration>,
     }
 
-    /// Send a message to another peer using a given path.
+    /// Send a message to another peer using the given path.
     ///
     /// The message can be sent either over a specified path or using a specified
     /// number of HOPS, if no path is given.
@@ -1432,7 +1515,8 @@ mod messages {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Messages",
     )]
@@ -1458,9 +1542,7 @@ mod messages {
             }
         }
 
-        let timestamp = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap();
+        let timestamp = std::time::SystemTime::now().as_unix_timestamp();
 
         match hopr
             .send_message(msg_body, args.peer_id, args.path, args.hops, Some(args.tag))
@@ -1578,7 +1660,8 @@ mod messages {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Messages",
     )]
@@ -1600,7 +1683,8 @@ mod messages {
         ),
         tag = "Messages",
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         )
     )]
     pub async fn delete_messages(req: Request<InternalState>) -> tide::Result<Response> {
@@ -1621,7 +1705,8 @@ mod messages {
             (status = 401, description = "Invalid authorization token.", body = ApiError),
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Messages"
     )]
@@ -1683,7 +1768,8 @@ mod messages {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Messages"
     )]
@@ -1715,7 +1801,7 @@ mod messages {
         path = const_format::formatcp!("{BASE_PATH}/messages/pop-all"),
         request_body(
             content = TagQueryRequest,
-            description = "Tag of message queue to pop from",
+            description = "Tag of message queue to pop from. When an empty object or an object with a `tag: 0` is provided, it lists and removes all the messages.",
             content_type = "application/json"
         ),
         responses(
@@ -1725,7 +1811,8 @@ mod messages {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Messages"
     )]
@@ -1738,7 +1825,13 @@ mod messages {
             .pop_all(tag.tag)
             .await
             .into_iter()
-            .filter_map(|(data, ts)| to_api_message(data, ts).ok())
+            .filter_map(|(data, ts)| match to_api_message(data, ts) {
+                Ok(msg) => Some(msg),
+                Err(e) => {
+                    error!("failed to pop message: {e}");
+                    None
+                }
+            })
             .collect::<Vec<_>>();
 
         Ok(Response::builder(200)
@@ -1764,7 +1857,8 @@ mod messages {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Messages"
     )]
@@ -1791,7 +1885,7 @@ mod messages {
         path = const_format::formatcp!("{BASE_PATH}/messages/peek-all"),
         request_body(
             content = GetMessageBodyRequest,
-            description = "Tag of message queue and optionally a timestamp since from to start peeking",
+            description = "Tag of message queue and optionally a timestamp since from to start peeking. When an empty object or an object with a `tag: 0` is provided, it fetches all the messages.",
             content_type = "application/json"
         ),
         responses(
@@ -1801,7 +1895,8 @@ mod messages {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Messages"
     )]
@@ -1810,12 +1905,18 @@ mod messages {
         let args: GetMessageBodyRequest = req.body_json().await?;
         let inbox = req.state().inbox.clone();
 
-        let inbox = inbox.write().await;
+        let inbox = inbox.read().await;
         let messages = inbox
             .peek_all(args.tag, args.timestamp)
             .await
             .into_iter()
-            .filter_map(|(data, ts)| to_api_message(data, ts).ok())
+            .filter_map(|(data, ts)| match to_api_message(data, ts) {
+                Ok(msg) => Some(msg),
+                Err(e) => {
+                    error!("failed to peek message: {e}");
+                    None
+                }
+            })
             .collect::<Vec<_>>();
 
         Ok(Response::builder(200)
@@ -1830,9 +1931,11 @@ mod network {
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct TicketPriceResponse {
+        /// Price of the ticket in HOPR tokens.
         pub price: String,
     }
 
+    /// Obtains the current ticket price.
     #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/network/price"),
@@ -1842,7 +1945,8 @@ mod network {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Network"
     )]
@@ -1907,6 +2011,7 @@ mod tickets {
         }
     }
 
+    /// Lists all tickets for the given channel  ID.
     #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/channels/{{channelId}}/tickets"),
@@ -1914,14 +2019,15 @@ mod tickets {
             ("channelId" = String, Path, description = "ID of the channel.")
         ),
         responses(
-            (status = 200, description = "Channel funded successfully", body = [ChannelTicket]),
+            (status = 200, description = "Fetched all tickets for the given channel ID", body = [ChannelTicket]),
             (status = 400, description = "Invalid channel id.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "Channel not found.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Channels"
     )]
@@ -1930,12 +2036,10 @@ mod tickets {
 
         match Hash::from_hex(req.param("channelId")?) {
             Ok(channel_id) => match hopr.tickets_in_channel(&channel_id).await {
-                Ok(Some(tickets)) => Ok(Response::builder(200)
-                    .body(json!(tickets
-                        .into_iter()
-                        .map(|t| ChannelTicket::from(t.ticket))
-                        .collect::<Vec<_>>()))
-                    .build()),
+                Ok(Some(_tickets)) => {
+                    let tickets: Vec<ChannelTicket> = vec![];
+                    Ok(Response::builder(200).body(json!(tickets)).build())
+                }
                 Ok(None) => Ok(Response::builder(404).body(ApiErrorStatus::ChannelNotFound).build()),
                 Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
             },
@@ -1943,73 +2047,56 @@ mod tickets {
         }
     }
 
+    /// Endpoint is deprecated and will be removed in the future. Returns an empty array.
     #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/tickets"),
         responses(
-            (status = 200, description = "Channel funded successfully", body = [ChannelTicket]),
+            (status = 200, description = "Fetched all tickets in all the channels", body = [ChannelTicket]),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Tickets"
     )]
-    pub(super) async fn show_all_tickets(req: Request<InternalState>) -> tide::Result<Response> {
-        let hopr = req.state().hopr.clone();
-        match hopr.all_tickets().await {
-            Ok(tickets) => Ok(Response::builder(200)
-                .body(json!(tickets.into_iter().map(ChannelTicket::from).collect::<Vec<_>>()))
-                .build()),
-            Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
-        }
+    pub(super) async fn show_all_tickets(_req: Request<InternalState>) -> tide::Result<Response> {
+        let tickets: Vec<ChannelTicket> = vec![];
+        Ok(Response::builder(200).body(json!(tickets)).build())
     }
 
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
     #[schema(example = json!({
-        "losingTickets": 0,
-        "neglected": 0,
+        "winning_count": "0",
         "neglectedValue": "0",
-        "redeemed": 1,
         "redeemedValue": "100",
-        "rejected": 0,
         "rejectedValue": "0",
-        "unredeemed": 2,
         "unredeemedValue": "200",
-        "winProportion": 1
     }))]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct NodeTicketStatisticsResponse {
-        pub win_proportion: f64,
-        pub unredeemed: u64,
+        pub winning_count: u64,
         pub unredeemed_value: String,
-        pub redeemed: u64,
         pub redeemed_value: String,
-        pub losing_tickets: u64,
-        pub neglected: u64,
         pub neglected_value: String,
-        pub rejected: u64,
         pub rejected_value: String,
     }
 
     impl From<TicketStatistics> for NodeTicketStatisticsResponse {
         fn from(value: TicketStatistics) -> Self {
             Self {
-                win_proportion: value.win_proportion,
-                unredeemed: value.unredeemed,
+                winning_count: value.winning_count as u64,
                 unredeemed_value: value.unredeemed_value.amount().to_string(),
-                redeemed: value.redeemed,
                 redeemed_value: value.redeemed_value.amount().to_string(),
-                losing_tickets: value.losing,
-                neglected: value.neglected,
                 neglected_value: value.neglected_value.amount().to_string(),
-                rejected: value.rejected,
                 rejected_value: value.rejected_value.amount().to_string(),
             }
         }
     }
 
+    /// Returns current complete statistics on tickets.
     #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/tickets/statistics"),
@@ -2019,7 +2106,8 @@ mod tickets {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Tickets"
     )]
@@ -2031,6 +2119,10 @@ mod tickets {
         }
     }
 
+    /// Starts redeeming of all tickets in all channels.
+    ///
+    /// **WARNING:** this should almost **never** be used as it can issue a large
+    /// number of on-chain transactions. The tickets should almost always be aggregated first.
     #[utoipa::path(
         post,
         path = const_format::formatcp!("{BASE_PATH}/tickets/redeem"),
@@ -2040,7 +2132,8 @@ mod tickets {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Tickets"
     )]
@@ -2052,6 +2145,10 @@ mod tickets {
         }
     }
 
+    /// Starts redeeming all tickets in the given channel.
+    ///
+    /// **WARNING:** this should almost **never** be used as it can issue a large
+    /// number of on-chain transactions. The tickets should almost always be aggregated first.
     #[utoipa::path(
         post,
         path = const_format::formatcp!("{BASE_PATH}/channels/{{channelId}}/tickets/redeem"),
@@ -2066,7 +2163,8 @@ mod tickets {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Channels"
     )]
@@ -2083,6 +2181,7 @@ mod tickets {
         }
     }
 
+    /// Starts aggregation of tickets in the given channel.
     #[utoipa::path(
         post,
         path = const_format::formatcp!("{BASE_PATH}/channels/{{channelId}}/tickets/aggregate"),
@@ -2097,7 +2196,8 @@ mod tickets {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Channels"
     )]
@@ -2122,8 +2222,9 @@ mod tickets {
 
 mod node {
     use super::*;
+    use futures::stream::FuturesUnordered;
     use futures::StreamExt;
-    use hopr_lib::{Health, Multiaddr};
+    use hopr_lib::{AsUnixTimestamp, Health, Multiaddr};
 
     use {std::str::FromStr, tide::Body};
 
@@ -2144,7 +2245,8 @@ mod node {
             (status = 401, description = "Invalid authorization token.", body = ApiError),
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Node"
     )]
@@ -2156,6 +2258,24 @@ mod node {
             .build())
     }
 
+    /// Get the configuration of the running node.
+    #[utoipa::path(
+        get,
+        path = const_format::formatcp!("{BASE_PATH}/node/configuration"),
+        responses(
+            (status = 200, description = "Fetched node configuration", body = String),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
+        ),
+        security(
+            ("api_token" = []),
+            ("bearer_token" = [])
+        ),
+        tag = "Configuration"
+    )]
+    pub(super) async fn configuration(req: Request<InternalState>) -> tide::Result<Response> {
+        Ok(Response::builder(200).body(req.state().hoprd_cfg.clone()).build())
+    }
+
     #[derive(Debug, Clone, serde::Deserialize, utoipa::ToSchema, utoipa::IntoParams)]
     #[into_params(parameter_in = Query)]
     pub(crate) struct NodePeersQueryRequest {
@@ -2163,7 +2283,7 @@ mod node {
         pub quality: Option<f64>,
     }
 
-    #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
+    #[derive(Debug, Default, Clone, serde::Serialize, utoipa::ToSchema)]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct HeartbeatInfo {
         pub sent: u64,
@@ -2192,11 +2312,26 @@ mod node {
         pub reported_version: String,
     }
 
+    #[serde_as]
+    #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
+    #[serde(rename_all = "camelCase")]
+    pub(crate) struct AnnouncedPeer {
+        #[serde_as(as = "DisplayFromStr")]
+        #[schema(value_type = String)]
+        pub peer_id: PeerId,
+        #[serde_as(as = "DisplayFromStr")]
+        #[schema(value_type = String)]
+        pub peer_address: Address,
+        #[serde_as(as = "Option<DisplayFromStr>")]
+        #[schema(value_type = Option<String>)]
+        pub multiaddr: Option<Multiaddr>,
+    }
+
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct NodePeersResponse {
         pub connected: Vec<PeerInfo>,
-        pub announced: Vec<PeerInfo>,
+        pub announced: Vec<AnnouncedPeer>,
     }
 
     /// Lists information for `connected peers` and `announced peers`.
@@ -2216,7 +2351,8 @@ mod node {
             (status = 401, description = "Invalid authorization token.", body = ApiError),
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Node"
     )]
@@ -2232,12 +2368,12 @@ mod node {
         let hopr = req.state().hopr.clone();
 
         let quality = query_params.quality.unwrap_or(0f64);
-        let all_network_peers = futures::stream::iter(hopr.network_connected_peers().await)
+        let all_network_peers = futures::stream::iter(hopr.network_connected_peers().await?)
             .filter_map(|peer| {
                 let hopr = hopr.clone();
 
                 async move {
-                    if let Some(info) = hopr.network_peer_info(&peer).await {
+                    if let Ok(Some(info)) = hopr.network_peer_info(&peer).await {
                         if info.get_average_quality() >= quality {
                             Some((peer, info))
                         } else {
@@ -2254,8 +2390,8 @@ mod node {
                 async move {
                     let address = hopr.peerid_to_chain_key(&peer_id).await.ok().flatten();
 
-                    // WARNING: Only in Providence are all peers public
-                    let multiaddresses = hopr.multiaddresses_announced_to_dht(&peer_id).await;
+                    // WARNING: Only in Providence and Saint-Louis are all peers public
+                    let multiaddresses = hopr.network_observed_multiaddresses(&peer_id).await;
 
                     Some((address, peer_id, multiaddresses, info))
                 }
@@ -2268,23 +2404,34 @@ mod node {
                     sent: info.heartbeats_sent,
                     success: info.heartbeats_succeeded,
                 },
-                last_seen: info.last_seen as u128,
-                last_seen_latency: info.last_seen_latency as u128,
+                last_seen: info.last_seen.as_unix_timestamp().as_millis(),
+                last_seen_latency: info.last_seen_latency.as_millis(),
                 quality: info.get_average_quality(),
                 backoff: info.backoff,
                 is_new: info.heartbeats_sent == 0u64,
-                reported_version: info
-                    .metadata()
-                    .get(&"protocol_version".to_owned())
-                    .cloned()
-                    .unwrap_or("UNKNOWN".to_string()),
+                reported_version: info.peer_version.unwrap_or("UNKNOWN".to_string()),
             })
             .collect::<Vec<_>>()
             .await;
 
+        let announced_peers = hopr
+            .accounts_announced_on_chain()
+            .await?
+            .into_iter()
+            .map(|announced| async move {
+                AnnouncedPeer {
+                    peer_id: announced.public_key.into(),
+                    peer_address: announced.chain_addr,
+                    multiaddr: announced.get_multiaddr(),
+                }
+            })
+            .collect::<FuturesUnordered<_>>()
+            .collect()
+            .await;
+
         let body = NodePeersResponse {
-            connected: all_network_peers.clone(),
-            announced: all_network_peers, // TODO: currently these are the same, since everybody has to announce
+            connected: all_network_peers,
+            announced: announced_peers,
         };
 
         Ok(Response::builder(200).body(json!(body)).build())
@@ -2308,7 +2455,8 @@ mod node {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Node"
     )]
@@ -2364,7 +2512,7 @@ mod node {
         hopr_network_registry: Address,
         #[serde_as(as = "DisplayFromStr")]
         #[schema(value_type = String)]
-        hopr_node_sage_registry: Address,
+        hopr_node_safe_registry: Address,
         #[serde_as(as = "DisplayFromStr")]
         #[schema(value_type = String)]
         hopr_management_module: Address,
@@ -2388,7 +2536,8 @@ mod node {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Node"
     )]
@@ -2409,10 +2558,10 @@ mod node {
                     hopr_token: chain_config.token,
                     hopr_channels: chain_config.channels,
                     hopr_network_registry: chain_config.network_registry,
-                    hopr_node_sage_registry: chain_config.node_safe_registry,
+                    hopr_node_safe_registry: chain_config.node_safe_registry,
                     hopr_management_module: chain_config.module_implementation,
                     hopr_node_safe: safe_config.safe_address,
-                    is_eligible: hopr.is_allowed_to_access_network(&hopr.me_peer_id()).await,
+                    is_eligible: hopr.is_allowed_to_access_network(&hopr.me_peer_id()).await?,
                     connectivity_status: hopr.network_health().await,
                     channel_closure_period: channel_closure_notice_period.as_secs(),
                 };
@@ -2430,7 +2579,7 @@ mod node {
         #[serde_as(as = "Vec<DisplayFromStr>")]
         #[schema(value_type = Vec<String>)]
         pub multiaddrs: Vec<Multiaddr>,
-        pub is_elligible: bool,
+        pub is_eligible: bool,
     }
 
     /// List all known entry nodes with multiaddrs and eligibility.
@@ -2448,7 +2597,8 @@ mod node {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Node"
     )]
@@ -2463,7 +2613,7 @@ mod node {
                         address.to_string(),
                         EntryNode {
                             multiaddrs: mas,
-                            is_elligible: hopr.is_allowed_to_access_network(&peer_id).await,
+                            is_eligible: hopr.is_allowed_to_access_network(&peer_id).await?,
                         },
                     );
                 }
@@ -2506,7 +2656,7 @@ mod checks {
         is_running(req).await
     }
 
-    /// Check whether the node is healthy
+    /// Check whether the node is healthy.
     #[utoipa::path(
         get,
         path = "/healthyz",

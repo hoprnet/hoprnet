@@ -1,5 +1,6 @@
 use thiserror::Error;
 
+/// Enumeration of errors thrown from this library.
 #[derive(Error, Debug)]
 pub enum HoprLibError {
     #[error("HOPR lib Error: '{0}'")]
@@ -8,19 +9,19 @@ pub enum HoprLibError {
     #[error("HOPR lib status error: '{0}'")]
     StatusError(String),
 
-    #[error("'{0}'")]
+    #[error(transparent)]
+    DatabaseError(#[from] hopr_db_api::errors::DbError),
+
+    #[error(transparent)]
     TransportError(#[from] core_transport::errors::HoprTransportError),
 
-    #[error("'{0}'")]
-    ChainError(#[from] chain_actions::errors::CoreEthereumActionsError),
+    #[error(transparent)]
+    ChainError(#[from] chain_actions::errors::ChainActionsError),
 
-    #[error("'{0}'")]
+    #[error(transparent)]
     ChainApi(#[from] chain_api::errors::HoprChainError),
 
-    #[error("'{0}'")]
-    DbError(#[from] utils_db::errors::DbError),
-
-    #[error("'{0}'")]
+    #[error(transparent)]
     TypeError(#[from] hopr_primitive_types::errors::GeneralError),
 }
 

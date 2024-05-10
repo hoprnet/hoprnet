@@ -1,20 +1,21 @@
+use std::collections::{hash_map::RandomState, HashSet};
+use std::fmt::{Display, Formatter};
+use std::hash::Hash;
+
+use futures::future::FutureExt;
+use futures::stream::FuturesOrdered;
+use futures::TryStreamExt;
+use libp2p_identity::PeerId;
+
+use hopr_crypto_types::types::OffchainPublicKey;
+use hopr_db_api::resolver::HoprDbResolverOperations;
+use hopr_internal_types::channels::ChannelStatus;
+use hopr_primitive_types::{primitives::Address, traits::ToHex};
+
 use crate::channel_graph::ChannelGraph;
 use crate::errors::PathError;
 use crate::errors::PathError::{ChannelNotOpened, InvalidPeer, LoopsNotAllowed, MissingChannel, PathNotValid};
 use crate::errors::Result;
-use futures::future::FutureExt;
-use futures::stream::FuturesOrdered;
-use futures::TryStreamExt;
-use hopr_crypto_types::types::OffchainPublicKey;
-use hopr_internal_types::channels::ChannelStatus;
-use hopr_internal_types::protocol::PeerAddressResolver;
-use hopr_primitive_types::primitives::Address;
-use hopr_primitive_types::traits::ToHex;
-use libp2p_identity::PeerId;
-use std::collections::hash_map::RandomState;
-use std::collections::HashSet;
-use std::fmt::{Display, Formatter};
-use std::hash::Hash;
 
 /// Base implementation of an abstract path.
 /// Must contain always at least a single entry.
@@ -46,12 +47,13 @@ where
     }
 }
 
-/// Represents an on-chain path in the `ChannelGraph`.
+/// Represents an on-chain path in the [ChannelGraph].
+///
 /// This path is never allowed to be empty and is always constructed from
-/// `Addresses` that must be known to have open channels between them (at the time of construction).
+/// [Addresses](Address) that must be known to have open channels between them (at the time of construction).
 /// This path is not useful for transport, because it *does never contain the last hop*
 /// to the destination (which does not require and open channel).
-/// To make it useful for transport, it must be converted to a `TransportPath` via `to_path`.
+/// To make it useful for transport, it must be converted to a [TransportPath] via [`ChannelPath::into_path<R>`].
 /// The `ChannelPath` does not allow simple loops (same adjacent hops)
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ChannelPath {
@@ -60,6 +62,7 @@ pub struct ChannelPath {
 
 impl ChannelPath {
     /// Creates a new path by validating the list of addresses using the channel graph.
+    ///
     /// The given list of `hops` *must not* contain the sender node as the first entry,
     /// since this node is always assumed to be the sender.
     /// The list of `hops` also *must not* contain the destination, because an open
@@ -101,16 +104,22 @@ impl ChannelPath {
         Self { hops }
     }
 
-    /// Resolves this on-chain `ChannelPath` into the off-chain `TransportPath` and adds the final hop
+    // TODO: this method could be turned sync once the `PeerAddressResolver` is sync too.
+    /// Resolves this on-chain `ChannelPath` into the off-chain [TransportPath] and adds the final hop
     /// to the given `destination` (which does not require an open channel).
-    pub async fn to_path<R: PeerAddressResolver>(&self, resolver: &R, destination: Address) -> Result<TransportPath> {
+    /// The given [resolver](PeerAddressResolver) is used for the mapping between `PeerId`s and `Address`es.
+    pub async fn into_path<R: HoprDbResolverOperations>(
+        self,
+        resolver: &R,
+        destination: Address,
+    ) -> Result<TransportPath> {
         let mut hops = self
             .hops
             .iter()
             .map(|addr| {
                 resolver
                     .resolve_packet_key(addr)
-                    .map(move |opt| opt.map(PeerId::from).ok_or(InvalidPeer(addr.to_string())))
+                    .map(move |opt| opt?.map(PeerId::from).ok_or(InvalidPeer(addr.to_string())))
             })
             .collect::<FuturesOrdered<_>>()
             .try_collect::<Vec<PeerId>>()
@@ -118,7 +127,7 @@ impl ChannelPath {
 
         let last_hop = resolver
             .resolve_packet_key(&destination)
-            .await
+            .await?
             .ok_or(InvalidPeer(destination.to_string()))?;
 
         hops.push(last_hop.into());
@@ -143,10 +152,11 @@ impl Display for ChannelPath {
     }
 }
 
-/// Represents an off-chain path of `PeerId`s.
+/// Represents an off-chain path of [PeerIds](PeerId).
+///
 /// The path is never allowed to be empty and *always contains the destination*.
 /// In case of the direct path, this path contains only the destination.
-/// In case o multiple hops, it also must represent a valid `ChannelPath`, therefore
+/// In case o multiple hops, it also must represent a valid [ChannelPath], therefore
 /// open channels must exist (at the time of construction) except for the last hop.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TransportPath {
@@ -154,14 +164,16 @@ pub struct TransportPath {
 }
 
 impl TransportPath {
-    /// Resolves vector of `PeerId`s into the corresponding `TransportPath` and optionally an associated `ChannelPath`.
+    /// Resolves vector of [PeerIds](PeerId) into the corresponding [TransportPath] and optionally an associated [ChannelPath].
+    ///
     /// - If `peers` contains only a single entry (destination), the resulting `TransportPath` contains just this entry.
-    /// Since in this case the `ChannelPath` would be empty (0-hop), it is `None`. This case is equivalent to construction with `direct()`.
+    /// Since in this case the [ChannelPath] would be empty (0-hop), it is `None`. This case is equivalent to construction with `direct()`.
     /// - If `peers` contains more than a single entry, it first resolves `PeerId`s into `Address`es and then validates and returns
     ///  also the multi-hop `ChannelPath`.
-    /// To do an inverse resolution, from `Address`es to `PeerId`s, construct the `ChannelPath` and use `ChannelPath::to_path()` to resolve the
+    /// To do an inverse resolution, from [Addresses](Address) to `PeerId`s, construct the [ChannelPath] and use its `to_path()` method to resolve the
     /// on-chain path.
-    pub async fn resolve<R: PeerAddressResolver>(
+    /// The given [resolver](PeerAddressResolver) is used for the mapping between `PeerId`s and `Address`es.
+    pub async fn resolve<R: HoprDbResolverOperations>(
         peers: Vec<PeerId>,
         resolver: &R,
         graph: &ChannelGraph,
@@ -177,7 +189,7 @@ impl TransportPath {
                     let key = OffchainPublicKey::try_from(peer)?;
                     resolver
                         .resolve_chain_key(&key)
-                        .await
+                        .await?
                         .map(|addr| (addr, peer))
                         .ok_or(InvalidPeer(peer.to_string()))
                 })
@@ -192,7 +204,7 @@ impl TransportPath {
         }
     }
 
-    /// Constructs a direct `TransportPath` (= 0-hop `ChannelPath`)
+    /// Constructs a direct `TransportPath` (= 0-hop [ChannelPath])
     pub fn direct(destination: PeerId) -> Self {
         Self {
             hops: vec![destination],
@@ -208,7 +220,7 @@ impl TransportPath {
 
 impl Path<PeerId> for TransportPath {
     /// The `TransportPath` always returns one extra hop to the destination.
-    /// So it contains one more hop than a `ChannelPath` (the final hop does not require a channel).
+    /// So it contains one more hop than a [ChannelPath] (the final hop does not require a channel).
     fn hops(&self) -> &[PeerId] {
         &self.hops
     }
@@ -248,6 +260,8 @@ mod tests {
     use hopr_crypto_types::prelude::*;
     use hopr_internal_types::channels::ChannelEntry;
     use hopr_primitive_types::prelude::*;
+    use std::ops::Add;
+    use std::time::{Duration, SystemTime};
 
     const PEERS_PRIVS: [[u8; 32]; 5] = [
         hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775"),
@@ -265,7 +279,6 @@ mod tests {
             1u32.into(),
             status,
             1u32.into(),
-            0u32.into(),
         )
     }
 
@@ -281,13 +294,15 @@ mod tests {
             })
             .collect::<Vec<_>>();
 
+        let ts = SystemTime::now().add(Duration::from_secs(10));
+
         // Channels: 0 -> 1 -> 2 -> 3 -> 4, 4 /> 0, 3 -> 1
         cg.update_channel(dummy_channel(addrs[0].1, addrs[1].1, ChannelStatus::Open));
         cg.update_channel(dummy_channel(addrs[1].1, addrs[2].1, ChannelStatus::Open));
         cg.update_channel(dummy_channel(addrs[2].1, addrs[3].1, ChannelStatus::Open));
         cg.update_channel(dummy_channel(addrs[3].1, addrs[4].1, ChannelStatus::Open));
         cg.update_channel(dummy_channel(addrs[3].1, addrs[1].1, ChannelStatus::Open));
-        cg.update_channel(dummy_channel(addrs[4].1, addrs[0].1, ChannelStatus::PendingToClose));
+        cg.update_channel(dummy_channel(addrs[4].1, addrs[0].1, ChannelStatus::PendingToClose(ts)));
 
         (cg, addrs)
     }
@@ -395,13 +410,19 @@ mod tests {
     struct TestResolver(Vec<(OffchainPublicKey, Address)>);
 
     #[async_trait]
-    impl PeerAddressResolver for TestResolver {
-        async fn resolve_packet_key(&self, onchain_key: &Address) -> Option<OffchainPublicKey> {
-            self.0.iter().find(|(_, addr)| addr.eq(onchain_key)).map(|(pk, _)| *pk)
+    impl HoprDbResolverOperations for TestResolver {
+        async fn resolve_packet_key(
+            &self,
+            onchain_key: &Address,
+        ) -> hopr_db_api::errors::Result<Option<OffchainPublicKey>> {
+            Ok(self.0.iter().find(|(_, addr)| addr.eq(onchain_key)).map(|(pk, _)| *pk))
         }
 
-        async fn resolve_chain_key(&self, offchain_key: &OffchainPublicKey) -> Option<Address> {
-            self.0.iter().find(|(pk, _)| pk.eq(offchain_key)).map(|(_, addr)| *addr)
+        async fn resolve_chain_key(
+            &self,
+            offchain_key: &OffchainPublicKey,
+        ) -> hopr_db_api::errors::Result<Option<Address>> {
+            Ok(self.0.iter().find(|(pk, _)| pk.eq(offchain_key)).map(|(_, addr)| *addr))
         }
     }
 
@@ -675,7 +696,8 @@ mod tests {
 
         // path: 0 -> 1 -> 2 -> 3 -> 4
         let tp = cp
-            .to_path(&resolver, addrs[4])
+            .clone()
+            .into_path(&resolver, addrs[4])
             .await
             .expect("should convert to transport path");
         assert_eq!(

@@ -293,4 +293,14 @@ update_protocol_config_addresses() {
   log "contract addresses are updated in protocol configuration"
 }
 
+# $1 - rpc endpoint
+get_eth_block_number() {
+  local cmd endpoint
+
+  endpoint="$1"
+  cmd="curl --silent --retry-connrefused --retry 10 --retry-delay 1 --json '{\"jsonrpc\":\"2.0\",\"method\":\"eth_blockNumber\",\"params\":[],\"id\":67}' ${endpoint}"
+
+  try_cmd "${cmd}" 10 1
+}
+
 setup_colors

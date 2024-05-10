@@ -2,7 +2,8 @@
 pragma solidity >=0.8.0 <0.9.0;
 pragma abicoder v2;
 
-import "forge-std/Script.sol";
+import { Script } from "forge-std/Script.sol";
+
 import "../test/utils/ERC1820Registry.sol";
 import "../test/utils/PermittableToken.sol";
 import "./utils/NetworkConfig.s.sol";

@@ -1,19 +1,18 @@
-use async_trait::async_trait;
 use bloomfilter::Bloom;
 use ethers::utils::hex;
 use hopr_crypto_random::random_bytes;
 use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use log::warn;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
+use tracing::warn;
 
 use crate::errors::{CoreTypesError::PayloadSizeExceeded, Result};
 
 /// Number of intermediate hops: 3 relayers and 1 destination
 pub const INTERMEDIATE_HOPS: usize = 3;
 
-/// Maximum size of the packet payload
+/// Maximum size of the packet payload in bytes.
 pub const PAYLOAD_SIZE: usize = 500;
 
 /// Fixed ticket winning probability
@@ -25,16 +24,8 @@ pub type Tag = u16;
 /// Represent a default application tag if none is specified in `send_packet`.
 pub const DEFAULT_APPLICATION_TAG: Tag = 0;
 
-/// Trait for linking and resolving the corresponding `OffchainPublicKey` and on-chain `Address`.
-#[async_trait] // TODO: the resolver should not be async once detached from the DB ?
-pub trait PeerAddressResolver {
-    /// Tries to resolve off-chain public key given the on-chain address
-    async fn resolve_packet_key(&self, onchain_key: &Address) -> Option<OffchainPublicKey>;
-    /// Tries to resolve on-chain public key given the off-chain public key
-    async fn resolve_chain_key(&self, offchain_key: &OffchainPublicKey) -> Option<Address>;
-}
-
 /// Bloom filter for packet tags to detect packet replays.
+///
 /// In addition, this structure also holds the number of items in the filter
 /// to determine if the filter needs to be refreshed. Once this happens, packet replays
 /// of past packets might be possible.

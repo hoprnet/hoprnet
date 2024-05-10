@@ -1,4 +1,14 @@
-// TODO: docs missing
+//! This crate contains types and traits that ensure correct interfacing with Ethereum RPC providers.
+//!
+//! The most important trait is [HoprRpcOperations] which allows to send arbitrary on-chain transactions
+//! and also to perform the selection of HOPR-related smart contract operations.
+//! Secondly, the [HoprIndexerRpcOperations] is a trait that contains all operations required by the
+//! Indexer to subscribe to the block with logs from the chain.
+//!
+//! Both of these traits implemented and realized via the [RpcOperations](rpc::RpcOperations) type,
+//! so this represents the main entry point to all RPC related operations.
+use std::cmp::Ordering;
+use std::collections::BTreeSet;
 use std::fmt::{Display, Formatter};
 use std::future::{Future, IntoFuture};
 use std::marker::PhantomData;
@@ -8,35 +18,27 @@ use std::time::Duration;
 use async_trait::async_trait;
 use futures::{FutureExt, Stream};
 use primitive_types::H256;
+use serde::Serialize;
 
 use hopr_crypto_types::types::Hash;
 use hopr_primitive_types::prelude::*;
 
-use crate::errors::{HttpRequestError, Result};
-
 use crate::errors::RpcError::{ProviderError, TransactionDropped};
+use crate::errors::{HttpRequestError, Result};
 use crate::RetryAction::NoRetry;
-pub use ethers::types::transaction::eip2718::TypedTransaction;
-use serde::Serialize;
 
-/// Extended `JsonRpcClient` abstraction
-/// This module contains custom implementation of `ethers::providers::JsonRpcClient`
-/// which allows usage of non-`reqwest` based HTTP clients.
+pub use ethers::types::transaction::eip2718::TypedTransaction;
+
 pub mod client;
 pub mod errors;
-
-/// Indexer specific trait implementation (`HoprIndexerRpcOperations`)
+mod helper;
 pub mod indexer;
-
-/// General purpose high-level RPC operations implementation (`HoprRpcOperations`)
 pub mod rpc;
 
-/// Helper types required by `client` module.
-mod helper;
-
 /// A type containing selected fields from  the `eth_getLogs` RPC calls.
+///
 /// This is further restricted to already mined blocks.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Log {
     /// Contract address
     pub address: Address,
@@ -86,6 +88,28 @@ impl Display for Log {
             self.address,
             self.topics.len()
         )
+    }
+}
+
+impl Ord for Log {
+    fn cmp(&self, other: &Self) -> Ordering {
+        let blocks = self.block_number.cmp(&other.block_number);
+        if blocks == Ordering::Equal {
+            let tx_indices = self.tx_index.cmp(&other.tx_index);
+            if tx_indices == Ordering::Equal {
+                self.log_index.cmp(&other.log_index)
+            } else {
+                tx_indices
+            }
+        } else {
+            blocks
+        }
+    }
+}
+
+impl PartialOrd<Self> for Log {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
     }
 }
 
@@ -204,6 +228,7 @@ type Resolver<'a> = Box<dyn Future<Output = Result<TransactionReceipt>> + Send +
 /// Represents a pending transaction that can be eventually
 /// resolved until confirmation, which is done by polling
 /// the respective RPC provider.
+///
 /// The polling interval and number of confirmations are defined by the underlying provider.
 pub struct PendingTransaction<'a> {
     tx_hash: Hash,
@@ -220,7 +245,7 @@ impl PendingTransaction<'_> {
 impl<'a, P: ethers::providers::JsonRpcClient> From<ethers::providers::PendingTransaction<'a, P>>
     for PendingTransaction<'a>
 {
-    fn from(value: ethers_providers::PendingTransaction<'a, P>) -> Self {
+    fn from(value: ethers::providers::PendingTransaction<'a, P>) -> Self {
         let tx_hash = Hash::from(value.tx_hash());
         Self {
             tx_hash,
@@ -280,7 +305,7 @@ pub struct BlockWithLogs {
     /// Block number
     pub block_id: u64,
     /// Filtered logs belonging to this block.
-    pub logs: Vec<Log>,
+    pub logs: BTreeSet<Log>,
 }
 
 impl Display for BlockWithLogs {

@@ -6,33 +6,33 @@ name: Cleanup
 
 on:
   schedule:
-    - cron: '30 1 * * *'
+    - cron: "30 1 * * *"
 
 jobs:
   stale:
     name: Close stale issues
-    runs-on: ubuntu-2-core
+    runs-on: self-hosted-hoprnet-small
     timeout-minutes: 10
     steps:
-        # See docs: https://github.com/actions/stale
+      # See docs: https://github.com/actions/stale
       - uses: actions/stale@v9
         with:
-          stale-issue-message: 'This issue is stale because it has been open 60 days with no activity. Remove stale label or comment or this will be closed in 30 days.'
+          stale-issue-message: "This issue is stale because it has been open 60 days with no activity. Remove stale label or comment or this will be closed in 30 days."
           days-before-stale: 60
           days-before-close: 30
-          stale-issue-label: 'stale'
-          stale-pr-label: 'stale'
-          exempt-issue-labels: 'epic'
-          exempt-pr-labels: 'epic'
+          stale-issue-label: "stale"
+          stale-pr-label: "stale"
+          exempt-issue-labels: "epic"
+          exempt-pr-labels: "epic"
 
   cleanup-docker:
     name: Cleanup Docker images
-    runs-on: ubuntu-2-core
+    runs-on: self-hosted-hoprnet-small
     timeout-minutes: 30
     steps:
       - name: Set up Google Cloud Credentials
         id: auth
-        uses: google-github-actions/auth@v1
+        uses: google-github-actions/auth@v2
         with:
           token_format: "access_token"
           credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
@@ -55,7 +55,7 @@ jobs:
           date=`date +%Y-%m-%d'T'%H:%M'Z' -d "60 days ago"`
           images=('hopli' 'hoprd')
           for image in "${images[@]}"; do
-            old_pr_image_tags=$(gcloud artifacts docker images list --include-tags ${docker_registry}/${image} --format="json" 2> /dev/null | jq -r --arg date "$date"  '.[]  | select(.updateTime < $date) | select(.tags | match("-pr.")).version')
+            old_pr_image_tags=$(gcloud artifacts docker images list --include-tags ${docker_registry}/${image} --format="json" 2> /dev/null | jq -r --arg date "$date"  '.[]  | select(.updateTime < $date) | select(.tags | match("-commit.")).version')
             old_untagged_images=$(gcloud artifacts docker images list --include-tags ${docker_registry}/${image} --format="json" 2> /dev/null | jq -r --arg date "$date"  '.[]  | select(.updateTime < $date) | select(.tags | length == 0).version')
             old_image_tags=($(echo -e "${old_pr_image_tags}\n${old_untagged_images}" | sed '/^$/d' | tr '\n' ' '))
             for old_image_tag in "$old_image_tags[@]"; do
@@ -65,7 +65,7 @@ jobs:
 
   # cleanup-git:
   #   name: Cleanup Git
-  #   runs-on: ubuntu-2-core
+  #   runs-on: self-hosted-hoprnet-small
   #   steps:
   #     - name: Checkout hoprnet repository
   #       uses: actions/checkout@v3
