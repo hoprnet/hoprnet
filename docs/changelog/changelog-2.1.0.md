@@ -25,9 +25,9 @@ configuration file set through `--configurationFilePath`.
 Important changes:
 
 Deprecation of `--healthCheck`, `--healthCheckHost` and `--healthCheckPort`
-  because the underlying functionality has been removed
+because the underlying functionality has been removed
 Deprecation of `--dryRun`
-  because the underlying functionality has been removed
+because the underlying functionality has been removed
 
 For reference check the output of `--help`, see https://hoprnet.github.io/hoprnet/#usage
 
