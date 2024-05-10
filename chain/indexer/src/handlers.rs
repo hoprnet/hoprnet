@@ -10,6 +10,7 @@ use chain_rpc::{BlockWithLogs, Log};
 use chain_types::chain_events::{ChainEventType, NetworkRegistryStatus, SignificantChainEvent};
 use chain_types::ContractAddresses;
 use ethers::contract::EthLogDecode;
+use ethers::types::TxHash;
 use hopr_crypto_types::keypairs::ChainKeypair;
 use hopr_crypto_types::prelude::{Hash, Keypair};
 use hopr_crypto_types::types::OffchainSignature;
@@ -701,14 +702,34 @@ where
 {
     fn contract_addresses(&self) -> Vec<Address> {
         vec![
-            self.addresses.channels,
-            self.addresses.token,
-            self.addresses.network_registry,
             self.addresses.announcements,
-            self.addresses.safe_registry,
+            self.addresses.channels,
             self.addresses.module_implementation,
+            self.addresses.network_registry,
             self.addresses.price_oracle,
+            self.addresses.safe_registry,
+            self.addresses.token,
         ]
+    }
+
+    fn contract_address_topics(&self, contract: Address) -> Vec<TxHash> {
+        if contract.eq(&self.addresses.announcements) {
+            crate::constants::topics::announcement()
+        } else if contract.eq(&self.addresses.channels) {
+            crate::constants::topics::channel()
+        } else if contract.eq(&self.addresses.module_implementation) {
+            crate::constants::topics::module_implementation()
+        } else if contract.eq(&self.addresses.network_registry) {
+            crate::constants::topics::network_registry()
+        } else if contract.eq(&self.addresses.price_oracle) {
+            crate::constants::topics::ticket_price_oracle()
+        } else if contract.eq(&self.addresses.safe_registry) {
+            crate::constants::topics::node_safe_registry()
+        } else if contract.eq(&self.addresses.token) {
+            crate::constants::topics::token()
+        } else {
+            vec![]
+        }
     }
 
     async fn collect_block_events(&self, block_with_logs: BlockWithLogs) -> Result<Vec<SignificantChainEvent>> {
@@ -722,6 +743,7 @@ where
                     let mut ret = Vec::with_capacity(block_with_logs.logs.len());
 
                     let mut log_tx_hashes = Vec::with_capacity(block_with_logs.logs.len());
+                    let block_id = block_with_logs.to_string();
 
                     // Process all logs in the block
                     for log in block_with_logs.logs {
@@ -737,20 +759,26 @@ where
                         log_tx_hashes.push(tx_hash);
                     }
 
+                    // Update the hash only if any logs were processed in this block
+                    let block_hash = if !log_tx_hashes.is_empty() {
+                        debug!("block {block_id} has hashes {:?}", log_tx_hashes);
+                        let h = Hash::create(
+                            log_tx_hashes
+                                .iter()
+                                .map(|h| h.as_slice())
+                                .collect::<Vec<_>>()
+                                .as_slice(),
+                        );
+                        debug!("block hash of {block_id} is {h}");
+                        Some(h)
+                    } else {
+                        None
+                    };
+
                     // Once we're done with the block, update the DB
                     myself
                         .db
-                        .set_last_indexed_block(
-                            Some(tx),
-                            block_with_logs.block_id as u32,
-                            Hash::create(
-                                log_tx_hashes
-                                    .iter()
-                                    .map(|h| h.as_slice())
-                                    .collect::<Vec<_>>()
-                                    .as_slice(),
-                            ),
-                        )
+                        .set_last_indexed_block(Some(tx), block_with_logs.block_id as u32, block_hash)
                         .await?;
                     Ok(ret)
                 })

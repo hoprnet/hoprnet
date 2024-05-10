@@ -9,6 +9,7 @@ use hopr_primitive_types::primitives::Address;
 use migration::{MigratorIndex, MigratorPeers, MigratorTickets, MigratorTrait};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, SqlxSqliteConnector};
 use sea_query::Expr;
+use sqlx::pool::PoolOptions;
 use sqlx::sqlite::{SqliteAutoVacuum, SqliteConnectOptions, SqliteJournalMode, SqliteSynchronous};
 use sqlx::{ConnectOptions, SqlitePool};
 use std::path::Path;
@@ -62,15 +63,30 @@ impl HoprDb {
             .pragma("cache_size", "-30000") // 32M
             .pragma("busy_timeout", "1000"); // 1000ms
 
-        let index = SqlitePool::connect_with(cfg_template.clone().filename(dir.join(SQL_DB_INDEX_FILE_NAME)))
+        // Indexer database
+        let index = PoolOptions::new()
+            .min_connections(0)
+            .max_connections(30)
+            .connect_with(cfg_template.clone().filename(dir.join(SQL_DB_INDEX_FILE_NAME)))
             .await
             .unwrap_or_else(|e| panic!("failed to create main database: {e}"));
 
-        let peers = SqlitePool::connect_with(cfg_template.clone().filename(dir.join(SQL_DB_PEERS_FILE_NAME)))
+        // Peers database
+        let peers = PoolOptions::new()
+            .min_connections(0) // Default is 0
+            .acquire_timeout(Duration::from_secs(60)) // Default is 30
+            .idle_timeout(Some(Duration::from_secs(10 * 60))) // This is the default
+            .max_lifetime(Some(Duration::from_secs(30 * 60))) // This is the default
+            .max_connections(300) // Default is 10
+            .connect_with(cfg_template.clone().filename(dir.join(SQL_DB_PEERS_FILE_NAME)))
             .await
             .unwrap_or_else(|e| panic!("failed to create main database: {e}"));
 
-        let tickets = SqlitePool::connect_with(cfg_template.clone().filename(dir.join(SQL_DB_TICKETS_FILE_NAME)))
+        // Tickets database
+        let tickets = PoolOptions::new()
+            .min_connections(0)
+            .max_connections(50)
+            .connect_with(cfg_template.clone().filename(dir.join(SQL_DB_TICKETS_FILE_NAME)))
             .await
             .unwrap_or_else(|e| panic!("failed to create main database: {e}"));
 

@@ -22,6 +22,11 @@ lazy_static::lazy_static! {
             "hopr_indexer_block_number",
             "Current last processed block number by the indexer",
     ).unwrap();
+    static ref METRIC_INDEXER_CHECKSUM: SimpleGauge =
+        SimpleGauge::new(
+            "hopr_indexer_checksum",
+            "Contains an unsigned integer that represents the low 32-bits of the Indexer checksum"
+    ).unwrap();
     static ref METRIC_INDEXER_SYNC_PROGRESS: SimpleGauge =
         SimpleGauge::new(
             "hopr_indexer_sync_progress",
@@ -109,16 +114,19 @@ where
 
         info!("DB latest processed block: {db_latest_block}, next block to process {next_block_to_process}");
 
+        // we skip on addresses which have no topics
+        let mut addresses = vec![];
         let mut topics = vec![];
-        topics.extend(crate::constants::topics::announcement());
-        topics.extend(crate::constants::topics::channel());
-        topics.extend(crate::constants::topics::node_safe_registry());
-        topics.extend(crate::constants::topics::network_registry());
-        topics.extend(crate::constants::topics::ticket_price_oracle());
-        topics.extend(crate::constants::topics::token());
+        db_processor.contract_addresses().iter().for_each(|address| {
+            let contract_topics = db_processor.contract_address_topics(*address);
+            if !contract_topics.is_empty() {
+                addresses.push(*address);
+                topics.extend(contract_topics);
+            }
+        });
 
         let log_filter = LogFilter {
-            address: db_processor.contract_addresses(),
+            address: addresses,
             topics: topics.into_iter().map(Hash::from).collect(),
         };
 
@@ -127,8 +135,7 @@ where
 
         spawn(async move {
             let is_synced = Arc::new(std::sync::atomic::AtomicBool::new(false));
-
-            let mut chain_head = 0;
+            let chain_head = Arc::new(std::sync::atomic::AtomicU64::new(0));
 
             let event_stream = rpc
                 .try_stream_logs(next_block_to_process, log_filter)
@@ -136,6 +143,7 @@ where
                 .then(|block_with_logs| {
                     let rpc = &rpc;
                     let mut tx = tx.clone();
+                    let chain_head = chain_head.clone();
                     let is_synced = is_synced.clone();
 
                     async move {
@@ -149,16 +157,20 @@ where
 
                         match rpc.block_number().await {
                             Ok(current_chain_block_number) => {
-                                chain_head = current_chain_block_number;
+                                chain_head.store(current_chain_block_number, std::sync::atomic::Ordering::Relaxed)
                             }
                             Err(error) => {
-                                error!("failed to fetch block number from RPC: {error}");
-                                chain_head = chain_head.max(current_block);
+                                error!(
+                                    "Failed to fetch block number from RPC, cannot continue indexing due to {error}"
+                                );
+                                panic!("Failed to fetch block number from RPC, cannot continue indexing due to {error}")
                             }
-                        }
+                        };
+
+                        let head = chain_head.load(std::sync::atomic::Ordering::Relaxed);
 
                         if !is_synced.load(std::sync::atomic::Ordering::Relaxed) {
-                            let block_difference = chain_head - next_block_to_process;
+                            let block_difference = head - next_block_to_process;
                             let progress = if block_difference == 0 {
                                 1_f64
                             } else {
@@ -170,7 +182,7 @@ where
                             #[cfg(all(feature = "prometheus", not(test)))]
                             METRIC_INDEXER_SYNC_PROGRESS.set(progress);
 
-                            if current_block >= chain_head {
+                            if current_block >= head {
                                 info!("Indexer sync successfully completed");
                                 is_synced.store(true, std::sync::atomic::Ordering::Relaxed);
                                 if let Err(e) = tx.try_send(()) {
@@ -185,7 +197,6 @@ where
                 .filter_map(|block_with_logs| async {
                     debug!("processing events in {block_with_logs} ...");
                     let block_id = block_with_logs.to_string();
-                    let block_num = block_with_logs.block_id;
                     let outgoing_events = match db_processor.collect_block_events(block_with_logs).await {
                         Ok(events) => {
                             info!("retrieved {} significant chain events from {block_id}", events.len());
@@ -197,14 +208,20 @@ where
                         }
                     };
 
-                    // Printout indexer state roughly every 5 processed blocks which had relevant events
-                    if block_num % 5 == 0 {
-                        match db.get_last_indexed_block(None).await {
-                            Ok((block_num, checksum)) => {
-                                info!("Current indexer state at block #{block_num} with checksum: {checksum}")
+                    // Printout indexer state, we can do this on every processed block because not
+                    // every block will have events
+                    match db.get_last_indexed_block(None).await {
+                        Ok((_, checksum)) => {
+                            info!("Current indexer state at block #{block_id} with checksum: {checksum}");
+
+                            #[cfg(all(feature = "prometheus", not(test)))]
+                            {
+                                let low_4_bytes =
+                                    hopr_primitive_types::prelude::U256::from_big_endian(checksum.as_slice()).low_u32();
+                                METRIC_INDEXER_CHECKSUM.set(low_4_bytes.into());
                             }
-                            Err(e) => error!("Cannot retrieve indexer state: {e}"),
                         }
+                        Err(e) => error!("Cannot retrieve indexer state: {e}"),
                     }
 
                     outgoing_events
@@ -364,7 +381,7 @@ pub mod tests {
 
         let head_block = 1000;
         let latest_block = 15u64;
-        db.set_last_indexed_block(None, latest_block as u32, Hash::default())
+        db.set_last_indexed_block(None, latest_block as u32, Some(Hash::default()))
             .await
             .unwrap();
         rpc.expect_block_number().return_once(move || Ok(head_block));
@@ -507,7 +524,7 @@ pub mod tests {
         let last_processed_block = 100_u64;
 
         let db = create_stub_db().await;
-        db.set_last_indexed_block(None, last_processed_block as u32, Hash::default())
+        db.set_last_indexed_block(None, last_processed_block as u32, Some(Hash::default()))
             .await
             .unwrap();
 

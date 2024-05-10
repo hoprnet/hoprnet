@@ -324,7 +324,6 @@ where
         expected_block_time: Duration::from_millis(chain_config.chain.block_time),
         tx_polling_interval: Duration::from_millis(chain_config.tx_polling_interval),
         finality: chain_config.confirmations,
-        min_block_range_fetch_size: 3,
         max_block_range_fetch_size: chain_config.max_block_range,
     };
 

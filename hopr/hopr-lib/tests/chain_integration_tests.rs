@@ -271,7 +271,6 @@ async fn integration_test_indexer() {
         expected_block_time: block_time,
         tx_polling_interval: Duration::from_millis(100),
         max_block_range_fetch_size: 100,
-        min_block_range_fetch_size: 3,
     };
 
     let actions_cfg = ActionQueueConfig {
@@ -518,7 +517,7 @@ async fn integration_test_indexer() {
         _ => panic!("invalid confirmation"),
     };
 
-    async_std::task::sleep(Duration::from_millis(100)).await;
+    async_std::task::sleep(Duration::from_millis(1000)).await;
 
     // After the funding, read channel_alice_bob again and compare its balance
     let channel_alice_bob = alice_node
@@ -817,6 +816,16 @@ async fn integration_test_indexer() {
     );
 
     info!("--> successfully initiated channel closure for Alice -> Bob");
+
+    let alice_checksum = alice_node.db.get_last_indexed_block(None).await.unwrap();
+    let bob_checksum = bob_node.db.get_last_indexed_block(None).await.unwrap();
+    info!("alice completed at {:?}", alice_checksum);
+    info!("bob completed at {:?}", bob_checksum);
+
+    assert_eq!(
+        alice_checksum.1, bob_checksum.1,
+        "alice and bob must be at the same checksum"
+    );
 
     futures::future::join_all(alice_node.node_tasks.into_iter().map(|t| t.cancel())).await;
 }
