@@ -1,6 +1,6 @@
 [package]
 name = "hopr-lib"
-version = "2.1.0-rc.1"
+version = "2.2.0-rc.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "HOPR library containing the entire functionality importable without the HOPRd daemon"
