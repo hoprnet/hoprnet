@@ -14,10 +14,11 @@ on:
         options:
           - saint-louis
           - singapore
+          - kaunas
       tag_name:
         type: string
         required: true
-        description: 'Git tag name which the release will be branched (v2.0.0)'
+        description: 'Git tag name which the release will be branched (v2.1.0)'
 
 concurrency:
   group: promote-release
@@ -61,7 +62,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
   new_release:
     name: Open new release
-    needs: 
+    needs:
       - promote_release
     uses: ./.github/workflows/open-release.yaml
     with:
