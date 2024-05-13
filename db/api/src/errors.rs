@@ -1,3 +1,4 @@
+use hopr_crypto_packet::errors::TicketValidationError;
 use hopr_crypto_types::{prelude::CryptoError, types::Hash};
 use hopr_db_entity::errors::DbEntityError;
 use hopr_internal_types::errors::CoreTypesError;
@@ -52,6 +53,12 @@ pub enum DbError {
 
     #[error(transparent)]
     NonSpecificError(#[from] hopr_primitive_types::errors::GeneralError),
+}
+
+impl From<TicketValidationError> for DbError {
+    fn from(value: TicketValidationError) -> Self {
+        DbError::TicketValidationError(Box::new((*value.ticket, value.reason)))
+    }
 }
 
 impl<E: std::error::Error + Send + Sync + 'static> From<TransactionError<E>> for DbError {

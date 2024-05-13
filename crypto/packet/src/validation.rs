@@ -1,102 +1,95 @@
 use tracing::{debug, trace};
 
-use crate::errors::{
-    PacketError,
-    PacketError::{OutOfFunds, TicketValidation},
-};
 use hopr_crypto_types::types::Hash;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 
+use crate::errors::TicketValidationError;
+
 /// Performs validations of the given unacknowledged ticket and channel.
-#[allow(clippy::too_many_arguments)] // TODO: The number of arguments and the logic needs to be refactored
-pub async fn validate_unacknowledged_ticket(
+/// This is a higher-level function, hence it is not in `hopr-internal-types` crate.
+pub fn validate_unacknowledged_ticket(
     ticket: Ticket,
     channel: &ChannelEntry,
-    sender: &Address,
     min_ticket_amount: Balance,
     required_win_prob: f64,
-    unrealized_balance: Option<Balance>,
+    unrealized_balance: Balance,
     domain_separator: &Hash,
-) -> std::result::Result<VerifiedTicket, (PacketError, Box<Ticket>)> {
-    debug!("validating unack ticket from {sender}");
+) -> Result<VerifiedTicket, TicketValidationError> {
+    debug!("validating unack ticket from {}", channel.source);
 
     // ticket signer MUST be the sender
-    let ticket = ticket.verify(sender, domain_separator).map_err(|t| {
-        (
-            TicketValidation(format!("ticket signer does not match the sender: {t}")),
-            t,
-        )
-    })?;
+    let verified_ticket = ticket
+        .verify(&channel.source, domain_separator)
+        .map_err(|ticket| TicketValidationError {
+            reason: format!("ticket signer does not match the sender: {ticket}"),
+            ticket,
+        })?;
 
-    let verified_ticket = ticket.verified_ticket();
+    let inner_ticket = verified_ticket.verified_ticket();
 
     // ticket amount MUST be greater or equal to minTicketAmount
-    if !verified_ticket.amount.ge(&min_ticket_amount) {
-        return Err((
-            TicketValidation(format!(
+    if !inner_ticket.amount.ge(&min_ticket_amount) {
+        return Err(TicketValidationError {
+            reason: format!(
                 "ticket amount {} in not at least {min_ticket_amount}",
-                verified_ticket.amount
-            )),
-            verified_ticket.clone().into(),
-        ));
+                inner_ticket.amount
+            ),
+            ticket: inner_ticket.clone().into(),
+        });
     }
 
     // ticket must have at least required winning probability
-    if ticket.win_prob() < required_win_prob {
-        return Err((
-            TicketValidation(format!(
+    if verified_ticket.win_prob() < required_win_prob {
+        return Err(TicketValidationError {
+            reason: format!(
                 "ticket winning probability {} is lower than required winning probability {required_win_prob}",
-                ticket.win_prob()
-            )),
-            verified_ticket.clone().into(),
-        ));
+                verified_ticket.win_prob()
+            ),
+            ticket: inner_ticket.clone().into(),
+        });
     }
 
     // channel MUST be open or pending to close
     if channel.status == ChannelStatus::Closed {
-        return Err((
-            TicketValidation(format!(
-                "payment channel with {sender} is not opened or pending to close"
-            )),
-            verified_ticket.clone().into(),
-        ));
+        return Err(TicketValidationError {
+            reason: format!("payment channel {} is not opened or pending to close", channel.get_id()),
+            ticket: inner_ticket.clone().into(),
+        });
     }
 
     // ticket's channelEpoch MUST match the current channel's epoch
-    if !channel.channel_epoch.eq(&verified_ticket.channel_epoch.into()) {
-        return Err((
-            TicketValidation(format!(
+    if !channel.channel_epoch.eq(&inner_ticket.channel_epoch.into()) {
+        return Err(TicketValidationError {
+            reason: format!(
                 "ticket was created for a different channel iteration {} != {} of channel {}",
-                verified_ticket.channel_epoch,
+                inner_ticket.channel_epoch,
                 channel.channel_epoch,
                 channel.get_id()
-            )),
-            verified_ticket.clone().into(),
-        ));
+            ),
+            ticket: inner_ticket.clone().into(),
+        });
     }
 
-    if let Some(unrealized_balance) = unrealized_balance {
-        // ensure sender has enough funds
-        if verified_ticket.amount.gt(&unrealized_balance) {
-            debug!(
-                ticket_amount = verified_ticket.amount.to_string(),
-                available_balance = unrealized_balance.to_string(),
-                "Ticket value is higher than remaining unrealized balance for channel {}",
-                channel.get_id().to_string(),
-            );
-            return Err((OutOfFunds(channel.get_id().to_string()), verified_ticket.clone().into()));
-        }
+    // ensure sender has enough funds
+    if inner_ticket.amount.gt(&unrealized_balance) {
+        return Err(TicketValidationError {
+            reason: format!(
+                "ticket value {} is greater than remaining unrealized balance {unrealized_balance} for channel {}",
+                inner_ticket.amount,
+                channel.get_id()
+            ),
+            ticket: inner_ticket.clone().into(),
+        });
     }
 
     trace!("ticket validation done");
-    Ok(ticket)
+    Ok(verified_ticket)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::errors::PacketError;
     use crate::validation::validate_unacknowledged_ticket;
     use hex_literal::hex;
     use hopr_crypto_types::prelude::*;
@@ -146,13 +139,12 @@ mod tests {
         let ret = validate_unacknowledged_ticket(
             ticket,
             &channel,
-            &SENDER_PRIV_KEY.public().to_address(),
             Balance::new(1_u64, BalanceType::HOPR),
             1.0f64,
-            Some(more_than_ticket_balance),
+            more_than_ticket_balance,
             &Hash::default(),
-        )
-        .await;
+        );
+
         assert!(ret.is_ok());
     }
 
@@ -164,19 +156,13 @@ mod tests {
         let ret = validate_unacknowledged_ticket(
             ticket,
             &channel,
-            &TARGET_PRIV_KEY.public().to_address(),
             Balance::new(1_u64, BalanceType::HOPR),
             1.0f64,
-            Some(Balance::zero(BalanceType::HOPR)),
+            Balance::zero(BalanceType::HOPR),
             &Hash::default(),
-        )
-        .await;
+        );
 
         assert!(ret.is_err());
-        match ret.unwrap_err() {
-            (PacketError::TicketValidation(_), _) => {}
-            _ => panic!("invalid error type"),
-        }
     }
 
     #[async_std::test]
@@ -187,19 +173,13 @@ mod tests {
         let ret = validate_unacknowledged_ticket(
             ticket,
             &channel,
-            &SENDER_PRIV_KEY.public().to_address(),
             Balance::new(2_u64, BalanceType::HOPR),
             1.0f64,
-            Some(Balance::zero(BalanceType::HOPR)),
+            Balance::zero(BalanceType::HOPR),
             &Hash::default(),
-        )
-        .await;
+        );
 
         assert!(ret.is_err());
-        match ret.unwrap_err() {
-            (PacketError::TicketValidation(_), _) => {}
-            _ => panic!("invalid error type"),
-        }
     }
 
     #[async_std::test]
@@ -216,19 +196,13 @@ mod tests {
         let ret = validate_unacknowledged_ticket(
             ticket,
             &channel,
-            &SENDER_PRIV_KEY.public().to_address(),
             Balance::new(1_u64, BalanceType::HOPR),
             1.0_f64,
-            Some(Balance::zero(BalanceType::HOPR)),
+            Balance::zero(BalanceType::HOPR),
             &Hash::default(),
-        )
-        .await;
+        );
 
         assert!(ret.is_err());
-        match ret.unwrap_err() {
-            (PacketError::TicketValidation(_), _) => {}
-            _ => panic!("invalid error type"),
-        }
     }
 
     #[async_std::test]
@@ -240,19 +214,13 @@ mod tests {
         let ret = validate_unacknowledged_ticket(
             ticket,
             &channel,
-            &SENDER_PRIV_KEY.public().to_address(),
             Balance::new(1_u64, BalanceType::HOPR),
             1.0_f64,
-            Some(Balance::zero(BalanceType::HOPR)),
+            Balance::zero(BalanceType::HOPR),
             &Hash::default(),
-        )
-        .await;
+        );
 
         assert!(ret.is_err());
-        match ret.unwrap_err() {
-            (PacketError::TicketValidation(_), _) => {}
-            _ => panic!("invalid error type"),
-        }
     }
 
     #[async_std::test]
@@ -269,19 +237,13 @@ mod tests {
         let ret = validate_unacknowledged_ticket(
             ticket,
             &channel,
-            &SENDER_PRIV_KEY.public().to_address(),
             Balance::new(1_u64, BalanceType::HOPR),
             1.0_f64,
-            Some(Balance::zero(BalanceType::HOPR)),
+            Balance::zero(BalanceType::HOPR),
             &Hash::default(),
-        )
-        .await;
+        );
 
         assert!(ret.is_err());
-        match ret.unwrap_err() {
-            (PacketError::TicketValidation(_), _) => {}
-            _ => panic!("invalid error type"),
-        }
     }
 
     #[async_std::test]
@@ -294,19 +256,12 @@ mod tests {
         let ret = validate_unacknowledged_ticket(
             ticket,
             &channel,
-            &SENDER_PRIV_KEY.public().to_address(),
             Balance::new(1_u64, BalanceType::HOPR),
             1.0_f64,
-            Some(Balance::zero(BalanceType::HOPR)),
+            Balance::zero(BalanceType::HOPR),
             &Hash::default(),
-        )
-        .await;
+        );
 
         assert!(ret.is_err());
-        // assert_eq!(ret.unwrap_err().to_string(), "");
-        match ret.unwrap_err() {
-            (PacketError::OutOfFunds(_), _) => {}
-            _ => panic!("invalid error type"),
-        }
     }
 }

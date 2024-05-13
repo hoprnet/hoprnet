@@ -1,6 +1,8 @@
 use hopr_crypto_types::errors::CryptoError;
 use hopr_internal_types::errors::CoreTypesError;
+use hopr_internal_types::prelude::Ticket;
 use hopr_primitive_types::errors::GeneralError;
+use std::fmt::{Debug, Display, Formatter};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -21,7 +23,7 @@ pub enum PacketError {
     ChannelNotFound(String),
 
     #[error("ticket validation failed, packet dropped: {0}")]
-    TicketValidation(String),
+    TicketValidation(TicketValidationError),
 
     #[error("received invalid acknowledgement: {0}")]
     AcknowledgementValidation(String),
@@ -58,3 +60,18 @@ pub enum PacketError {
 }
 
 pub type Result<T> = std::result::Result<T, PacketError>;
+
+/// Contains errors returned by [validate_unacknowledged_ticket](crate::validation::validate_unacknowledged_ticket]).
+#[derive(Debug, Clone)]
+pub struct TicketValidationError {
+    /// Error description.
+    pub reason: String,
+    /// Invalid ticket that failed to validate.
+    pub ticket: Box<Ticket>,
+}
+
+impl Display for TicketValidationError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.reason)
+    }
+}

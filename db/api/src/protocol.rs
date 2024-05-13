@@ -331,23 +331,23 @@ impl HoprDbProtocolOperations for HoprDb {
                         Box::pin(async move {
                             let chain_data = myself.get_indexer_data(Some(tx)).await?;
 
-                            let domain_separator = chain_data.channels_dst.ok_or_else(|| {
-                                crate::errors::DbError::LogicalError("failed to fetch the domain separator".into())
-                            })?;
-                            let ticket_price = chain_data.ticket_price.ok_or_else(|| {
-                                crate::errors::DbError::LogicalError("failed to fetch the ticket price".into())
-                            })?;
+                            let domain_separator = chain_data
+                                .channels_dst
+                                .ok_or_else(|| DbError::LogicalError("failed to fetch the domain separator".into()))?;
+                            let ticket_price = chain_data
+                                .ticket_price
+                                .ok_or_else(|| DbError::LogicalError("failed to fetch the ticket price".into()))?;
 
                             let previous_hop_addr =
                                 myself.resolve_chain_key(&previous_hop).await?.ok_or_else(|| {
-                                    crate::errors::DbError::LogicalError(format!(
+                                    DbError::LogicalError(format!(
                                         "failed to find channel key for packet key {} on previous hop",
                                         previous_hop.to_peerid_str()
                                     ))
                                 })?;
 
                             let next_hop_addr = myself.resolve_chain_key(&next_hop).await?.ok_or_else(|| {
-                                crate::errors::DbError::LogicalError(format!(
+                                DbError::LogicalError(format!(
                                     "failed to find channel key for packet key {} on next hop",
                                     next_hop.to_peerid_str()
                                 ))
@@ -358,7 +358,7 @@ impl HoprDbProtocolOperations for HoprDb {
                                 .get_channel_by_parties(Some(tx), &previous_hop_addr, &myself.me_onchain)
                                 .await?
                                 .ok_or_else(|| {
-                                    crate::errors::DbError::LogicalError(format!(
+                                    DbError::LogicalError(format!(
                                         "no channel found for previous hop address '{previous_hop_addr}'"
                                     ))
                                 })?;
@@ -368,27 +368,17 @@ impl HoprDbProtocolOperations for HoprDb {
                                 .sub(myself.ticket_manager.unrealized_value((&channel).into()).await?);
 
                             // Here also the signature on the ticket gets validated,
-                            // so afterward we are sure the `previous_hop_addr` has issued this
+                            // so afterward we are sure the source of the `channel`
+                            // (which is equal to `previous_hop_addr`) has issued this
                             // ticket.
-                            let ticket = match validate_unacknowledged_ticket(
+                            let ticket = validate_unacknowledged_ticket(
                                 ticket,
                                 &channel,
-                                &previous_hop_addr,
                                 ticket_price,
                                 TICKET_WIN_PROB,
-                                Some(remaining_balance),
+                                remaining_balance,
                                 &domain_separator,
-                            )
-                            .await
-                            {
-                                Ok(ticket) => ticket,
-                                Err((e, ticket)) => {
-                                    return Err(crate::errors::DbError::TicketValidationError(Box::new((
-                                        *ticket,
-                                        e.to_string(),
-                                    ))));
-                                }
-                            };
+                            )?;
 
                             myself.increment_outgoing_ticket_index(channel.get_id()).await?;
 
@@ -406,7 +396,7 @@ impl HoprDbProtocolOperations for HoprDb {
                             // Check that the calculated path position from the ticket matches value from the packet header
                             let ticket_path_pos = ticket.get_path_position(ticket_price.amount())?;
                             if !ticket_path_pos.eq(&path_pos) {
-                                return Err(crate::errors::DbError::LogicalError(format!(
+                                return Err(DbError::LogicalError(format!(
                                     "path position mismatch: from ticket {ticket_path_pos}, from packet {path_pos}"
                                 )));
                             }
@@ -429,22 +419,19 @@ impl HoprDbProtocolOperations for HoprDb {
                     .await
                 {
                     Ok(ticket) => Ok(ticket),
-                    Err(crate::errors::DbError::TicketValidationError(boxed_error)) => {
+                    Err(DbError::TicketValidationError(boxed_error)) => {
                         let (rejected_ticket, error) = *boxed_error;
                         let rejected_value = rejected_ticket.amount;
                         warn!("encountered validation error during forwarding for {rejected_ticket} with value: {rejected_value}");
 
                         self.mark_ticket_rejected(&rejected_ticket).await.map_err(|e| {
-                            crate::errors::DbError::TicketValidationError(Box::new((
+                            DbError::TicketValidationError(Box::new((
                                 rejected_ticket.clone(),
                                 format!("during validation error '{error}' update another error occurred: {e}"),
                             )))
                         })?;
 
-                        Err(crate::errors::DbError::TicketValidationError(Box::new((
-                            rejected_ticket,
-                            error,
-                        ))))
+                        Err(DbError::TicketValidationError(Box::new((rejected_ticket, error))))
                     }
                     Err(e) => Err(e),
                 }?;
@@ -465,9 +452,9 @@ impl HoprDbProtocolOperations for HoprDb {
                     ack,
                 })
             }
-            ChainPacketComponents::Outgoing { .. } => Err(crate::errors::DbError::LogicalError(
-                "Cannot receive an outgoing packet".into(),
-            )),
+            ChainPacketComponents::Outgoing { .. } => {
+                Err(DbError::LogicalError("Cannot receive an outgoing packet".into()))
+            }
         }
     }
 }
