@@ -516,6 +516,33 @@ mod tests {
     }
 
     #[async_std::test]
+    async fn test_should_allow_reannouncement() -> std::result::Result<(), Box<dyn std::error::Error>> {
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
+
+        let chain_1 = ChainKeypair::random().public().to_address();
+        let packet_1 = OffchainKeypair::random().public().clone();
+
+        db.insert_account(None, AccountEntry::new(packet_1, chain_1, AccountType::NotAnnounced))
+            .await?;
+
+        db.insert_announcement(None, chain_1, "/ip4/1.2.3.4/tcp/8000".parse()?, 100)
+            .await?;
+
+        let ae = db.get_account(None, chain_1).await?.ok_or(MissingAccount)?;
+
+        assert_eq!("/ip4/1.2.3.4/tcp/8000", ae.get_multiaddr().unwrap().to_string());
+
+        db.insert_announcement(None, chain_1, "/ip4/1.2.3.4/tcp/8001".parse().unwrap(), 110)
+            .await?;
+
+        let ae = db.get_account(None, chain_1).await?.ok_or(MissingAccount)?;
+
+        assert_eq!("/ip4/1.2.3.4/tcp/8001", ae.get_multiaddr().unwrap().to_string());
+
+        Ok(())
+    }
+
+    #[async_std::test]
     async fn test_should_not_insert_account_announcement_to_nonexisting_account() {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
 

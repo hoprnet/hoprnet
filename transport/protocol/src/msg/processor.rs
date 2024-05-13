@@ -40,8 +40,6 @@ lazy_static::lazy_static! {
         "Number of processed packets to/from distinct peers",
         &["peer", "direction"]
     ).unwrap();
-    static ref METRIC_TICKETS_COUNT: SimpleCounter =
-        SimpleCounter::new("hopr_created_tickets_count", "Number of created tickets").unwrap();
     static ref METRIC_REJECTED_TICKETS_COUNT: SimpleCounter =
         SimpleCounter::new("hopr_rejected_tickets_count", "Number of rejected tickets").unwrap();
     // mixer

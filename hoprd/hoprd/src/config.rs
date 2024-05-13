@@ -83,7 +83,7 @@ impl std::fmt::Debug for Identity {
 /// The configuration is composed of individual configuration of corresponding
 /// component configuration objects.
 ///
-/// An always up-to-date config YAML example can be found in [example_cfg.yaml](https://github.com/hoprnet/hoprnet/tree/master/hoprd/example_cfg.yaml)
+/// An always up-to-date config YAML example can be found in [example_cfg.yaml](https://github.com/hoprnet/hoprnet/tree/master/hoprd/hoprd/example_cfg.yaml)
 /// which is always in the root of this crate.
 ///
 #[derive(Debug, Default, Serialize, Deserialize, Validate, Clone, PartialEq)]

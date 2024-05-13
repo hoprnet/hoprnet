@@ -44,7 +44,7 @@ services:
     devices:
       - /dev/kmsg:/dev/kmsg
   nodeexporter:
-    image: prom/node-exporter:v1.7.0@sha256:4cb2b9019f1757be8482419002cb7afe028fdba35d47958829e4cfeaf6246d80
+    image: prom/node-exporter:v1.8.0@sha256:8a57af80a4c77ffb97749b44895248563616fcfd405b5370d5db35fe6c15e4ec
     container_name: nodeexporter
     hostname: nodeexporter
     volumes:
@@ -86,7 +86,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
   grafana:
-    image: grafana/grafana:10.3.1@sha256:1adbcc2df3866ff5ec1d836e9d2220c904c7f98901b918d3cc5e1118ab1af991
+    image: grafana/grafana:10.4.2@sha256:7d5faae481a4c6f436c99e98af11534f7fd5e8d3e35213552dd1dd02bc393d2e
     user: "472"
     restart: always
     environment:

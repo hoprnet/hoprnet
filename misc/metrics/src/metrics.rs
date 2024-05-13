@@ -60,6 +60,11 @@ impl SimpleCounter {
         self.ctr.inc_by(by)
     }
 
+    /// Sets the counter to 0.
+    pub fn reset(&self) {
+        self.ctr.reset()
+    }
+
     /// Increments the counter by 1
     pub fn increment(&self) {
         self.increment_by(1)
@@ -116,6 +121,11 @@ impl MultiCounter {
     /// Increments counter with given labels by 1.
     pub fn increment(&self, label_values: &[&str]) {
         self.increment_by(label_values, 1)
+    }
+
+    /// Sets the values to zero.
+    pub fn reset(&self) {
+        self.ctr.reset();
     }
 
     /// Retrieves the value of the specified counter

@@ -1,9 +1,9 @@
 [package]
 name = "hoprd-api"
-version = "0.2.1"
+version = "3.1.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
-description = "API server using the hopr-lib created HOPR node and exposing it using a HTTP REST API"
+description = "This Rest API enables developers to interact with a hoprd node programatically through HTTP."
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"
@@ -34,7 +34,7 @@ tide = { version = "0.16.0", default-features = false, features = ["h1-server"] 
 tide-websockets = "0.4"
 tide-tracing = "0.1"
 tracing = { workspace = true }
-urlencoding = "2" 
+urlencoding = "2"
 utoipa = { version = "4.1" }
 utoipa-swagger-ui = { version = "5.0.0" }
 validator = { workspace = true }

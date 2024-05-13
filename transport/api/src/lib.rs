@@ -651,16 +651,6 @@ where
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
-    pub async fn multiaddresses_announced_to_dht(&self, peer: &PeerId) -> Vec<Multiaddr> {
-        self.network
-            .get(peer)
-            .await
-            .unwrap_or(None)
-            .map(|peer| peer.multiaddresses)
-            .unwrap_or(vec![])
-    }
-
-    #[tracing::instrument(level = "debug", skip(self))]
     pub async fn network_observed_multiaddresses(&self, peer: &PeerId) -> Vec<Multiaddr> {
         self.network
             .get(peer)
