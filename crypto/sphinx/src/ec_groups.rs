@@ -97,16 +97,16 @@ impl GroupElement<k256::Scalar> for k256::ProjectivePoint {
         let mut ret = Alpha::<typenum::U33>::default();
         ret.copy_from_slice(
             hopr_crypto_types::types::CurvePoint::from(self.to_affine())
-                .serialize_compressed()
+                .as_compressed()
                 .as_ref(),
         );
         ret
     }
 
     fn from_alpha(alpha: Alpha<typenum::U33>) -> Result<Self> {
-        use hopr_primitive_types::traits::BinarySerializable;
-        hopr_crypto_types::types::CurvePoint::from_bytes(&alpha)
-            .map(|c| c.to_projective_point())
+        let v: &[u8] = alpha.as_ref();
+        hopr_crypto_types::types::CurvePoint::try_from(v)
+            .map(|c| c.into_projective_point())
             .map_err(|_| hopr_crypto_types::errors::CryptoError::InvalidInputValue)
     }
 

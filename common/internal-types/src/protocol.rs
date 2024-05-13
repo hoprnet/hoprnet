@@ -1,3 +1,4 @@
+use crate::tickets::UnacknowledgedTicket;
 use bloomfilter::Bloom;
 use ethers::utils::hex;
 use hopr_crypto_random::random_bytes;
@@ -7,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use tracing::warn;
 
-use crate::errors::{CoreTypesError::PayloadSizeExceeded, Result};
+use crate::errors::{CoreTypesError, CoreTypesError::PayloadSizeExceeded, Result};
 
 /// Number of intermediate hops: 3 relayers and 1 destination
 pub const INTERMEDIATE_HOPS: usize = 3;
@@ -23,6 +24,51 @@ pub type Tag = u16;
 
 /// Represent a default application tag if none is specified in `send_packet`.
 pub const DEFAULT_APPLICATION_TAG: Tag = 0;
+
+/// Represents packet acknowledgement
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Acknowledgement {
+    ack_signature: OffchainSignature,
+    pub ack_key_share: HalfKey,
+    validated: bool,
+}
+
+impl Acknowledgement {
+    pub fn new(ack_key_share: HalfKey, node_keypair: &OffchainKeypair) -> Self {
+        Self {
+            ack_signature: OffchainSignature::sign_message(ack_key_share.as_ref(), node_keypair),
+            ack_key_share,
+            validated: true,
+        }
+    }
+
+    /// Validates the acknowledgement. Must be called immediately after deserialization or otherwise
+    /// any operations with the deserialized acknowledgement will panic.
+    pub fn validate(&mut self, sender_node_key: &OffchainPublicKey) -> bool {
+        self.validated = self
+            .ack_signature
+            .verify_message(self.ack_key_share.as_ref(), sender_node_key);
+
+        self.validated
+    }
+
+    /// Obtains the acknowledged challenge out of this acknowledgment.
+    pub fn ack_challenge(&self) -> HalfKeyChallenge {
+        assert!(self.validated, "acknowledgement not validated");
+        self.ack_key_share.to_challenge()
+    }
+}
+
+/// Contains either unacknowledged ticket if we're waiting for the acknowledgement as a relayer
+/// or information if we wait for the acknowledgement as a sender.
+#[allow(clippy::large_enum_variant)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PendingAcknowledgement {
+    /// We're waiting for acknowledgement as a sender
+    WaitingAsSender,
+    /// We're waiting for the acknowledgement as a relayer with a ticket
+    WaitingAsRelayer(UnacknowledgedTicket),
+}
 
 /// Bloom filter for packet tags to detect packet replays.
 ///
@@ -75,9 +121,17 @@ impl TagBloomFilter {
             false
         }
     }
-}
 
-impl AutoBinarySerializable for TagBloomFilter {}
+    pub fn from_bytes(data: &[u8]) -> Result<Self> {
+        bincode::deserialize(data).map_err(|e| CoreTypesError::ParseError(e.to_string()))
+    }
+
+    pub fn to_bytes(&self) -> Box<[u8]> {
+        bincode::serialize(&self)
+            .expect("serialization must not fail")
+            .into_boxed_slice()
+    }
+}
 
 impl Default for TagBloomFilter {
     fn default() -> Self {
@@ -124,10 +178,10 @@ impl Display for ApplicationData {
     }
 }
 
-impl BinarySerializable for ApplicationData {
+impl ApplicationData {
     const SIZE: usize = 2; // minimum size
 
-    fn from_bytes(data: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
+    pub fn from_bytes(data: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
         if data.len() <= PAYLOAD_SIZE && data.len() >= Self::SIZE {
             let mut tag = [0u8; 2];
             tag.copy_from_slice(&data[0..2]);
@@ -145,7 +199,7 @@ impl BinarySerializable for ApplicationData {
         }
     }
 
-    fn to_bytes(&self) -> Box<[u8]> {
+    pub fn to_bytes(&self) -> Box<[u8]> {
         let mut buf = Vec::with_capacity(Self::SIZE + self.plain_text.len());
         let tag = self.application_tag.unwrap_or(DEFAULT_APPLICATION_TAG);
         buf.extend_from_slice(&tag.to_be_bytes());
@@ -158,7 +212,6 @@ impl BinarySerializable for ApplicationData {
 mod tests {
     use crate::protocol::{ApplicationData, TagBloomFilter};
     use hopr_crypto_random::random_bytes;
-    use hopr_primitive_types::traits::BinarySerializable;
 
     #[test]
     fn test_application_data() {

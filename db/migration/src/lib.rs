@@ -12,6 +12,7 @@ mod m20240226_000009_peers_create_peer_store;
 mod m20240301_000010_tickets_create_ticket;
 mod m20240301_000011_tickets_create_ticket_stats;
 mod m20240301_000012_tickets_create_outgoing_ticket_index;
+mod m20240404_000013_tickets_recreate_ticket;
 
 #[derive(PartialEq)]
 pub enum BackendType {
@@ -41,6 +42,9 @@ impl MigratorTrait for Migrator {
                 BackendType::Postgres,
             )),
             Box::new(m20240301_000012_tickets_create_outgoing_ticket_index::Migration(
+                BackendType::Postgres,
+            )),
+            Box::new(m20240404_000013_tickets_recreate_ticket::Migration(
                 BackendType::Postgres,
             )),
         ]
@@ -92,6 +96,7 @@ impl MigratorTrait for MigratorTickets {
             Box::new(m20240301_000012_tickets_create_outgoing_ticket_index::Migration(
                 BackendType::SQLite,
             )),
+            Box::new(m20240404_000013_tickets_recreate_ticket::Migration(BackendType::SQLite)),
         ]
     }
 }

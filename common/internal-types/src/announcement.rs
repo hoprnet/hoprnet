@@ -18,12 +18,13 @@ pub struct KeyBinding {
 }
 
 impl KeyBinding {
-    fn prepare_for_signing(chain_key: &Address, packet_key: &OffchainPublicKey) -> Box<[u8]> {
-        let mut to_sign = Vec::with_capacity(70);
-        to_sign.extend_from_slice(b"HOPR_KEY_BINDING");
-        to_sign.extend_from_slice(&chain_key.to_bytes());
-        to_sign.extend_from_slice(&packet_key.to_bytes());
-        to_sign.into_boxed_slice()
+    const SIGNING_SIZE: usize = 16 + Address::SIZE + OffchainPublicKey::SIZE;
+    fn prepare_for_signing(chain_key: &Address, packet_key: &OffchainPublicKey) -> [u8; Self::SIGNING_SIZE] {
+        let mut to_sign = [0u8; Self::SIGNING_SIZE];
+        to_sign[0..16].copy_from_slice(b"HOPR_KEY_BINDING");
+        to_sign[16..36].copy_from_slice(chain_key.as_ref());
+        to_sign[36..].copy_from_slice(packet_key.as_ref());
+        to_sign
     }
 
     /// Create and sign new key binding of the given chain key and packet key.
@@ -141,12 +142,12 @@ mod tests {
     use crate::prelude::decapsulate_multiaddress;
     use hex_literal::hex;
     use hopr_crypto_types::keypairs::{Keypair, OffchainKeypair};
-    use hopr_primitive_types::{primitives::Address, traits::BinarySerializable};
+    use hopr_primitive_types::primitives::Address;
     use multiaddr::Multiaddr;
 
     lazy_static::lazy_static! {
         static ref KEY_PAIR: OffchainKeypair = OffchainKeypair::from_secret(&hex!("60741b83b99e36aa0c1331578156e16b8e21166d01834abb6c64b103f885734d")).unwrap();
-        static ref CHAIN_ADDR: Address = Address::from_bytes(&hex!("78392d47e3522219e2802e7d6c45ee84b5d5c185")).unwrap();
+        static ref CHAIN_ADDR: Address = Address::try_from(hex!("78392d47e3522219e2802e7d6c45ee84b5d5c185").as_ref()).unwrap();
         static ref SECOND_KEY_PAIR: OffchainKeypair = OffchainKeypair::from_secret(&hex!("c24bd833704dd2abdae3933fcc9962c2ac404f84132224c474147382d4db2299")).unwrap();
     }
 

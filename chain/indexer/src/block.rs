@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use async_std::task::spawn;
 use futures::{stream, StreamExt};
 use tracing::{debug, error, info, trace};
 
@@ -83,7 +82,7 @@ where
         }
     }
 
-    pub async fn start(&mut self) -> crate::errors::Result<()>
+    pub async fn start(&mut self) -> crate::errors::Result<async_std::task::JoinHandle<()>>
     where
         T: HoprIndexerRpcOperations + 'static,
         U: ChainLogHandler + 'static,
@@ -133,7 +132,7 @@ where
         info!("Building indexer background process");
         let (tx, mut rx) = futures::channel::mpsc::channel::<()>(1);
 
-        spawn(async move {
+        let indexing_proc = async_std::task::spawn(async move {
             let is_synced = Arc::new(std::sync::atomic::AtomicBool::new(false));
             let chain_head = Arc::new(std::sync::atomic::AtomicU64::new(0));
 
@@ -217,7 +216,7 @@ where
                             #[cfg(all(feature = "prometheus", not(test)))]
                             {
                                 let low_4_bytes =
-                                    hopr_primitive_types::prelude::U256::from_big_endian(checksum.as_slice()).low_u32();
+                                    hopr_primitive_types::prelude::U256::from_big_endian(checksum.as_ref()).low_u32();
                                 METRIC_INDEXER_CHECKSUM.set(low_4_bytes.into());
                             }
                         }
@@ -250,7 +249,7 @@ where
             .await
             .is_some()
         {
-            Ok(())
+            Ok(indexing_proc)
         } else {
             Err(crate::errors::CoreEthereumIndexerError::ProcessError(
                 "Error during indexing start".into(),
@@ -312,7 +311,7 @@ pub mod tests {
                 address,
                 topics: vec![AddressAnnouncementFilter::signature().into()],
                 data: encode(&[
-                    Token::Address(ethers::abi::Address::from_slice(&address.to_bytes())),
+                    Token::Address(ethers::abi::Address::from_slice(address.as_ref())),
                     Token::String(test_multiaddr.to_string()),
                 ])
                 .into(),

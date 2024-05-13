@@ -18,7 +18,7 @@ use crate::utils::k256_scalar_from_bytes;
 ///
 /// The VRF is thereby needed because it generates on-demand deterministic
 /// entropy that can only be derived by the ticket redeemer.
-#[derive(Clone, Copy, Default, Eq)]
+#[derive(Clone, Default)]
 pub struct VrfParameters {
     /// the pseudo-random point
     pub v: CurvePoint,
@@ -31,7 +31,8 @@ impl Serialize for VrfParameters {
     where
         S: serde::Serializer,
     {
-        serializer.serialize_bytes(self.to_bytes().as_ref())
+        let v: [u8; Self::SIZE] = self.clone().into();
+        serializer.serialize_bytes(v.as_ref())
     }
 }
 
@@ -48,7 +49,7 @@ impl<'de> Visitor<'de> for VrfParametersVisitor {
     where
         E: de::Error,
     {
-        VrfParameters::from_bytes(v).map_err(|e| de::Error::custom(e.to_string()))
+        VrfParameters::try_from(v).map_err(|e| de::Error::custom(e.to_string()))
     }
 }
 
@@ -62,36 +63,40 @@ impl<'de> Deserialize<'de> for VrfParameters {
     }
 }
 
-impl PartialEq for VrfParameters {
-    fn eq(&self, other: &Self) -> bool {
-        // Exclude cached properties
-        self.v == other.v && self.h == other.h && self.s == other.s
-    }
-}
-
 impl std::fmt::Debug for VrfParameters {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("VrfParameters")
-            .field("V", &hex::encode(self.v.serialize_compressed()))
+            .field("V", &hex::encode(self.v.as_compressed()))
             .field("h", &hex::encode(self.h.to_bytes()))
             .field("s", &hex::encode(self.s.to_bytes()))
             .finish()
     }
 }
 
-impl BinarySerializable for VrfParameters {
-    const SIZE: usize = CurvePoint::SIZE_COMPRESSED + 32 + 32;
+impl From<VrfParameters> for [u8; VRF_PARAMETERS_SIZE] {
+    fn from(value: VrfParameters) -> Self {
+        let mut ret = [0u8; VRF_PARAMETERS_SIZE];
+        ret[0..CurvePoint::SIZE_COMPRESSED].copy_from_slice(value.v.as_compressed().as_ref());
+        ret[CurvePoint::SIZE_COMPRESSED..CurvePoint::SIZE_COMPRESSED + 32].copy_from_slice(value.h.to_bytes().as_ref());
+        ret[CurvePoint::SIZE_COMPRESSED + 32..CurvePoint::SIZE_COMPRESSED + 64]
+            .copy_from_slice(value.s.to_bytes().as_ref());
+        ret
+    }
+}
 
-    fn from_bytes(data: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
-        if data.len() == Self::SIZE {
+impl TryFrom<&[u8]> for VrfParameters {
+    type Error = GeneralError;
+
+    fn try_from(value: &[u8]) -> std::result::Result<Self, Self::Error> {
+        if value.len() == Self::SIZE {
             let mut v = [0u8; CurvePoint::SIZE_COMPRESSED];
-            v.copy_from_slice(&data[..CurvePoint::SIZE_COMPRESSED]);
+            v.copy_from_slice(&value[..CurvePoint::SIZE_COMPRESSED]);
             Ok(VrfParameters {
-                v: CurvePoint::from_bytes(&data[..CurvePoint::SIZE_COMPRESSED])?,
-                h: k256_scalar_from_bytes(&data[CurvePoint::SIZE_COMPRESSED..CurvePoint::SIZE_COMPRESSED + 32])
+                v: CurvePoint::try_from(&value[..CurvePoint::SIZE_COMPRESSED])?,
+                h: k256_scalar_from_bytes(&value[CurvePoint::SIZE_COMPRESSED..CurvePoint::SIZE_COMPRESSED + 32])
                     .map_err(|_| GeneralError::ParseError)?,
                 s: k256_scalar_from_bytes(
-                    &data[CurvePoint::SIZE_COMPRESSED + 32..CurvePoint::SIZE_COMPRESSED + 32 + 32],
+                    &value[CurvePoint::SIZE_COMPRESSED + 32..CurvePoint::SIZE_COMPRESSED + 32 + 32],
                 )
                 .map_err(|_| GeneralError::ParseError)?,
             })
@@ -99,27 +104,22 @@ impl BinarySerializable for VrfParameters {
             Err(GeneralError::ParseError)
         }
     }
-
-    fn to_bytes(&self) -> Box<[u8]> {
-        let mut ret = Vec::with_capacity(Self::SIZE);
-        ret.extend_from_slice(self.v.serialize_compressed().as_bytes());
-        ret.extend_from_slice(&self.h.to_bytes());
-        ret.extend_from_slice(&self.s.to_bytes());
-        ret.into_boxed_slice()
-    }
 }
+
+const VRF_PARAMETERS_SIZE: usize = CurvePoint::SIZE_COMPRESSED + 32 + 32;
+impl BytesEncodable<VRF_PARAMETERS_SIZE> for VrfParameters {}
 
 impl VrfParameters {
     /// Verifies that VRF values are valid
     pub fn verify<const T: usize>(&self, creator: &Address, msg: &[u8; T], dst: &[u8]) -> Result<()> {
         let cap_b = self.get_encoded_payload(creator, msg, dst)?;
 
-        let r_v: ProjectivePoint<Secp256k1> = cap_b * self.s - self.v.to_projective_point() * self.h;
+        let r_v: ProjectivePoint<Secp256k1> = cap_b * self.s - self.v.clone().into_projective_point() * self.h;
 
         let h_check = Secp256k1::hash_to_scalar::<ExpandMsgXmd<sha3::Keccak256>>(
             &[
                 &creator.as_ref(),
-                &self.v.serialize_uncompressed().as_bytes()[1..],
+                &self.v.as_uncompressed().as_bytes()[1..],
                 &r_v.to_affine().to_encoded_point(false).as_bytes()[1..],
                 msg,
             ],
@@ -163,7 +163,7 @@ impl VrfParameters {
     /// `ExpandMsgXmd` algorithm (https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-16.html#name-expand_message_xmd)
     /// and applies the hash-to-curve function to it.
     ///
-    /// Finally, returns a elliptic curve point on Secp256k1.
+    /// Finally, returns an elliptic curve point on Secp256k1.
     fn get_encoded_payload<const T: usize>(
         &self,
         creator: &Address,
@@ -178,13 +178,13 @@ impl VrfParameters {
 /// Takes a private key, the corresponding Ethereum address and a payload
 /// and creates all parameters that are required by the smart contract
 /// to prove that a ticket is a win.
-pub fn derive_vrf_parameters<const T: usize>(
-    msg: &[u8; T],
+pub fn derive_vrf_parameters<T: AsRef<[u8]>>(
+    msg: T,
     chain_keypair: &ChainKeypair,
     dst: &[u8],
 ) -> crate::errors::Result<VrfParameters> {
     let chain_addr = chain_keypair.public().to_address();
-    let b = Secp256k1::hash_from_bytes::<ExpandMsgXmd<sha3::Keccak256>>(&[&chain_addr.as_ref(), msg], &[dst])?;
+    let b = Secp256k1::hash_from_bytes::<ExpandMsgXmd<sha3::Keccak256>>(&[&chain_addr.as_ref(), msg.as_ref()], &[dst])?;
 
     let a: Scalar = chain_keypair.into();
 
@@ -210,7 +210,7 @@ pub fn derive_vrf_parameters<const T: usize>(
             &chain_addr.as_ref(),
             &v.to_affine().to_encoded_point(false).as_bytes()[1..],
             &r_v.to_affine().to_encoded_point(false).as_bytes()[1..],
-            msg,
+            msg.as_ref(),
         ],
         &[dst],
     )?;
@@ -243,34 +243,37 @@ mod test {
 
     #[test]
     fn vrf_values_serialize_deserialize() {
-        let vrf_values = derive_vrf_parameters(&*TEST_MSG, &*ALICE, &Hash::default().to_bytes()).unwrap();
+        let vrf_values = derive_vrf_parameters(&*TEST_MSG, &*ALICE, Hash::default().as_ref()).unwrap();
 
-        let deserialized = VrfParameters::from_bytes(&*ALICE_VRF_OUTPUT).unwrap();
+        let deserialized = VrfParameters::try_from(ALICE_VRF_OUTPUT.as_ref()).unwrap();
 
         // check for regressions
         assert_eq!(vrf_values.v, deserialized.v);
         assert!(deserialized
-            .verify(&*ALICE_ADDR, &*TEST_MSG, &Hash::default().to_bytes())
+            .verify(&*ALICE_ADDR, &*TEST_MSG, Hash::default().as_ref())
             .is_ok());
 
-        assert_eq!(vrf_values, VrfParameters::from_bytes(&vrf_values.to_bytes()).unwrap());
+        // PartialEq is intentionally not implemented for VrfParameters
+        let vrf: [u8; VrfParameters::SIZE] = vrf_values.clone().into();
+        let other = VrfParameters::try_from(vrf.as_ref()).unwrap();
+        assert!(vrf_values.s == other.s && vrf_values.v == other.v && vrf_values.h == other.h);
     }
 
     #[test]
     fn vrf_values_serialize_deserialize_bad_examples() {
-        assert!(VrfParameters::from_bytes(&*WRONG_V_POINT_PREFIX).is_err());
+        assert!(VrfParameters::try_from(WRONG_V_POINT_PREFIX.as_ref()).is_err());
 
-        assert!(VrfParameters::from_bytes(&*H_NOT_IN_FIELD).is_err());
+        assert!(VrfParameters::try_from(H_NOT_IN_FIELD.as_ref()).is_err());
 
-        assert!(VrfParameters::from_bytes(&*S_NOT_IN_FIELD).is_err());
+        assert!(VrfParameters::try_from(S_NOT_IN_FIELD.as_ref()).is_err());
     }
 
     #[test]
     fn vrf_values_crypto() {
-        let vrf_values = derive_vrf_parameters(&*TEST_MSG, &*ALICE, &Hash::default().to_bytes()).unwrap();
+        let vrf_values = derive_vrf_parameters(&*TEST_MSG, &*ALICE, Hash::default().as_ref()).unwrap();
 
         assert!(vrf_values
-            .verify(&ALICE_ADDR, &*TEST_MSG, &Hash::default().to_bytes())
+            .verify(&ALICE_ADDR, &*TEST_MSG, Hash::default().as_ref())
             .is_ok());
     }
 }
