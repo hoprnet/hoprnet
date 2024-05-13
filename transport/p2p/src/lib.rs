@@ -194,34 +194,40 @@ pub async fn build_p2p_network(
 ) -> crate::errors::Result<libp2p::Swarm<HoprNetworkBehavior>> {
     Ok(libp2p::SwarmBuilder::with_existing_identity(me)
         .with_async_std()
-        .with_tcp(Default::default(), libp2p::noise::Config::new, || {
-            let mut mplex_config = libp2p_mplex::MplexConfig::new();
+        .with_tcp(
+            // NOTE: more info for TCP_NODELAY enabling in https://brooker.co.za/blog/2024/05/09/nagle.html
+            libp2p::tcp::Config::default().port_reuse(true).nodelay(true),
+            libp2p::noise::Config::new,
+            || {
+                let mut mplex_config = libp2p_mplex::MplexConfig::new();
 
-            // libp2p default is 128
-            // we use more to accomodate many concurrent messages
-            // FIXME: make value configurable
-            mplex_config.set_max_num_streams(1024);
+                // libp2p default is 128
+                // we use more to accomodate many concurrent messages
+                // FIXME: make value configurable
+                mplex_config.set_max_num_streams(1024);
 
-            // libp2p default is 32 Bytes
-            // we use the default for now
-            // FIXME: benchmark and find appropriate values
-            mplex_config.set_max_buffer_size(32);
+                // libp2p default is 32 Bytes
+                // we use the default for now
+                // FIXME: benchmark and find appropriate values
+                mplex_config.set_max_buffer_size(32);
 
-            // libp2p default is 8 KBytes
-            // we use the default for now, max allowed would be 1MB
-            // FIXME: benchmark and find appropriate values
-            mplex_config.set_split_send_size(8 * 1024);
+                // libp2p default is 8 KBytes
+                // we use the default for now, max allowed would be 1MB
+                // FIXME: benchmark and find appropriate values
+                mplex_config.set_split_send_size(8 * 1024);
 
-            // libp2p default is Block
-            // Alternative is ResetStream
-            // FIXME: benchmark and find appropriate values
-            mplex_config.set_max_buffer_behaviour(libp2p_mplex::MaxBufferBehaviour::Block);
+                // libp2p default is Block
+                // Alternative is ResetStream
+                // FIXME: benchmark and find appropriate values
+                mplex_config.set_max_buffer_behaviour(libp2p_mplex::MaxBufferBehaviour::Block);
 
-            let yamux_config: libp2p::yamux::Config = libp2p::yamux::Config::default();
+                let yamux_config: libp2p::yamux::Config = libp2p::yamux::Config::default();
 
-            libp2p::core::upgrade::SelectUpgrade::new(yamux_config, mplex_config)
-        })
+                libp2p::core::upgrade::SelectUpgrade::new(yamux_config, mplex_config)
+            },
+        )
         .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?
+        .with_quic()
         .with_dns()
         .await
         .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?
