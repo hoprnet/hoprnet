@@ -1,62 +1,63 @@
-use serde::{Deserialize, Serialize};
-
 use crate::errors::GeneralError::ParseError;
-use crate::errors::Result;
+use crate::errors::{GeneralError, Result};
 
 /// A generic type that can be converted to a hexadecimal string.
-pub trait ToHex: Sized {
+pub trait ToHex {
     /// Hexadecimal representation of this type.
     fn to_hex(&self) -> String;
 
     /// Tries to parse the type from the hexadecimal representation.
-    fn from_hex(str: &str) -> Result<Self>;
+    fn from_hex(str: &str) -> Result<Self>
+    where
+        Self: Sized;
 }
 
-/// A type that can be serialized and deserialized to a binary form.
+/// Represents a type that can be encoded to/decoded from a fixed sized byte array of size `N`.
+/// This requires processing and memory allocation in order to represent the type in binary encoding.
 ///
-/// Implementing this trait automatically implements ToHex trait
-/// which then uses the serialize method.
-pub trait BinarySerializable: Sized {
-    /// Minimum size of this type in bytes.
+/// Differences between [BytesEncodable] and [BytesRepresentable] :
+/// - [BytesRepresentable] is already internally carrying the encoded representation of the type,
+/// so no additional encoding or allocation is required to represent the type as a byte array.
+/// - [BytesEncodable] requires additional transformation and allocation in order to represent the type as a fixed size
+/// byte array.
+/// - [BytesEncodable] is the strict superset of [BytesRepresentable]: meaning the former can be possibly implemented
+/// for a type that already implements the latter, but it is not possible vice-versa.
+pub trait BytesEncodable<const N: usize>: Into<[u8; N]> + for<'a> TryFrom<&'a [u8], Error = GeneralError> {
+    /// Size of the encoded byte array. Defaults to `N` and should not be overridden.
+    const SIZE: usize = N;
+
+    /// Convenience function to represent the
+    /// A shorthand for `let v: [u8; N] = self.into()`.
+    #[inline]
+    fn into_encoded(self) -> [u8; N] {
+        self.into()
+    }
+
+    /// Convenience function to encode the type into a Box.
+    #[inline]
+    fn into_boxed(self) -> Box<[u8]> {
+        Box::new(self.into_encoded())
+    }
+}
+
+/// Represents a type that is already internally represented by a fixed size byte array,
+/// and therefore requires no memory allocation to represent the type in binary encoding.
+///
+/// This is a strict subset of [BytesEncodable], see its documentation for details.
+pub trait BytesRepresentable: AsRef<[u8]> + for<'a> TryFrom<&'a [u8], Error = GeneralError> {
+    /// Size of the encoded byte array.
     const SIZE: usize;
 
-    /// Deserializes the type from a binary blob.
-    fn from_bytes(data: &[u8]) -> Result<Self>;
-
-    /// Serializes the type into a fixed size binary blob.
-    fn to_bytes(&self) -> Box<[u8]>;
-}
-
-/// Type implementing this trait has automatic binary serialization/deserialization capability
-/// using the default binary format, which is currently `bincode`.
-pub trait AutoBinarySerializable: Serialize + for<'a> Deserialize<'a> {
-    /// Minimum size of an automatically serialized type in bytes is 1.
-    const SIZE: usize = 1;
-}
-
-impl<T> BinarySerializable for T
-where
-    T: AutoBinarySerializable,
-{
-    const SIZE: usize = Self::SIZE;
-
-    /// Deserializes the type from a binary blob.
-    fn from_bytes(data: &[u8]) -> Result<Self> {
-        bincode::deserialize(data).map_err(|_| ParseError)
-    }
-
-    /// Serializes the type into a fixed size binary blob.
-    fn to_bytes(&self) -> Box<[u8]> {
-        bincode::serialize(&self).unwrap().into_boxed_slice()
+    /// Convenience function to copy this type's binary representation into a Box.
+    #[inline]
+    fn into_boxed(self) -> Box<[u8]> {
+        self.as_ref().to_vec().into_boxed_slice()
     }
 }
 
-impl<T> ToHex for T
-where
-    T: BinarySerializable,
-{
+impl<T: BytesRepresentable> ToHex for T {
     fn to_hex(&self) -> String {
-        format!("0x{}", hex::encode(&self.to_bytes()))
+        format!("0x{}", hex::encode(self.as_ref()))
     }
 
     fn from_hex(str: &str) -> Result<Self> {
@@ -69,7 +70,7 @@ where
 
             hex::decode(data)
                 .map_err(|_| ParseError)
-                .and_then(|bytes| T::from_bytes(&bytes))
+                .and_then(|bytes| T::try_from(&bytes))
         } else {
             Err(ParseError)
         }

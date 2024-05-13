@@ -181,7 +181,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_expectation_should_resolve() {
-        let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
+        let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
         let sample_event = SignificantChainEvent {
             tx_hash: random_hash,
             event_type: ChainEventType::NodeSafeRegistered(*RANDY),
@@ -219,7 +219,7 @@ mod tests {
     #[async_std::test]
     async fn test_expectation_should_error_when_unregistered() {
         let sample_event = SignificantChainEvent {
-            tx_hash: Hash::new(&random_bytes::<{ Hash::SIZE }>()),
+            tx_hash: Hash::from(random_bytes::<{ Hash::SIZE }>()),
             event_type: ChainEventType::NodeSafeRegistered(*RANDY),
         };
 
@@ -253,10 +253,10 @@ mod tests {
 
     #[async_std::test]
     async fn test_expectation_should_resolve_and_filter() {
-        let tx_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
+        let tx_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
         let sample_events = vec![
             SignificantChainEvent {
-                tx_hash: Hash::new(&random_bytes::<{ Hash::SIZE }>()),
+                tx_hash: Hash::from(random_bytes::<{ Hash::SIZE }>()),
                 event_type: ChainEventType::NodeSafeRegistered(*RANDY),
             },
             SignificantChainEvent {
@@ -303,15 +303,15 @@ mod tests {
     async fn test_expectation_should_resolve_multiple_expectations() {
         let sample_events = vec![
             SignificantChainEvent {
-                tx_hash: Hash::new(&random_bytes::<{ Hash::SIZE }>()),
+                tx_hash: Hash::from(random_bytes::<{ Hash::SIZE }>()),
                 event_type: ChainEventType::NodeSafeRegistered(*RANDY),
             },
             SignificantChainEvent {
-                tx_hash: Hash::new(&random_bytes::<{ Hash::SIZE }>()),
+                tx_hash: Hash::from(random_bytes::<{ Hash::SIZE }>()),
                 event_type: ChainEventType::NetworkRegistryUpdate(*RANDY, NetworkRegistryStatus::Denied),
             },
             SignificantChainEvent {
-                tx_hash: Hash::new(&random_bytes::<{ Hash::SIZE }>()),
+                tx_hash: Hash::from(random_bytes::<{ Hash::SIZE }>()),
                 event_type: ChainEventType::NetworkRegistryUpdate(*RANDY, NetworkRegistryStatus::Allowed),
             },
         ];

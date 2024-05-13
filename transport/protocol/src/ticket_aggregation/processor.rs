@@ -52,7 +52,7 @@ pub const TICKET_AGGREGATION_RX_QUEUE_SIZE: usize = 2048;
 #[derive(Debug)]
 pub enum TicketAggregationToProcess<T, U> {
     ToReceive(PeerId, std::result::Result<Ticket, String>, U),
-    ToProcess(PeerId, Vec<AcknowledgedTicket>, T),
+    ToProcess(PeerId, Vec<TransferableWinningTicket>, T),
     ToSend(Hash, AggregationPrerequisites, TicketAggregationFinalizer),
 }
 
@@ -217,7 +217,7 @@ impl<T, U> TicketAggregationActions<T, U> {
     pub fn receive_aggregation_request(
         &mut self,
         source: PeerId,
-        tickets: Vec<AcknowledgedTicket>,
+        tickets: Vec<TransferableWinningTicket>,
         request: T,
     ) -> Result<()> {
         self.process(TicketAggregationToProcess::ToProcess(source, tickets, request))
@@ -298,8 +298,8 @@ where
                             destination.try_into();
                         match opk {
                             Ok(opk) => match db.aggregate_tickets(opk, acked_tickets, &chain_key).await {
-                                Ok(tickets) => {
-                                    Some(TicketAggregationProcessed::Reply(destination, Ok(tickets), response))
+                                Ok(ticket) => {
+                                    Some(TicketAggregationProcessed::Reply(destination, Ok(ticket.leak()), response))
                                 }
                                 Err(hopr_db_api::errors::DbError::TicketAggregationError(e)) => {
                                     // forward error to counterparty
@@ -469,29 +469,22 @@ mod tests {
         let channel_epoch = 1u64;
         let domain_separator = Hash::default();
 
-        let response = Response::new(
-            &Hash::create(&[
-                &channel_id.to_bytes(),
-                &channel_epoch.to_be_bytes(),
-                &index.to_be_bytes(),
-            ])
-            .to_bytes(),
-        );
-
-        let ticket = Ticket::new(
-            &destination.into(),
-            &Balance::new(price_per_packet.div_f64(ticket_win_prob).unwrap(), BalanceType::HOPR),
-            index.into(),
-            1u64.into(),
-            ticket_win_prob,
-            1u64.into(),
-            response.to_challenge().into(),
-            signer,
-            &domain_separator,
+        let response = Response::try_from(
+            Hash::create(&[channel_id.as_ref(), &channel_epoch.to_be_bytes(), &index.to_be_bytes()]).as_ref(),
         )
         .unwrap();
 
-        AcknowledgedTicket::new(ticket, response, signer.into(), destination, &domain_separator).unwrap()
+        TicketBuilder::default()
+            .addresses(signer, destination)
+            .amount(price_per_packet.div_f64(ticket_win_prob).unwrap())
+            .index(index)
+            .index_offset(1)
+            .win_prob(ticket_win_prob)
+            .channel_epoch(1)
+            .challenge(response.to_challenge().into())
+            .build_signed(signer, &domain_separator)
+            .unwrap()
+            .into_acknowledged(response)
     }
 
     async fn init_db(db: HoprDb) {
@@ -550,7 +543,7 @@ mod tests {
             if i == 1 {
                 ack_ticket.status = AcknowledgedTicketStatus::BeingRedeemed;
             } else {
-                agg_balance = agg_balance.add(&ack_ticket.ticket.amount);
+                agg_balance = agg_balance.add(&ack_ticket.verified_ticket().amount);
             }
 
             tickets.push(ack_ticket)
@@ -594,7 +587,7 @@ mod tests {
                     .writer()
                     .receive_aggregation_request(
                         bob_packet_key,
-                        acked_tickets.into_iter().map(AcknowledgedTicket::from).collect(),
+                        acked_tickets.into_iter().map(TransferableWinningTicket::from).collect(),
                         (),
                     )
                     .unwrap();
@@ -631,7 +624,7 @@ mod tests {
             "first ticket must being redeemed"
         );
         assert!(
-            stored_acked_tickets[1].ticket.is_aggregated(),
+            stored_acked_tickets[1].verified_ticket().is_aggregated(),
             "aggregated balance invalid"
         );
         assert_eq!(
@@ -640,7 +633,8 @@ mod tests {
             "second ticket must be untouched"
         );
         assert_eq!(
-            agg_balance, stored_acked_tickets[1].ticket.amount,
+            agg_balance,
+            stored_acked_tickets[1].verified_ticket().amount,
             "aggregated balance invalid"
         );
 

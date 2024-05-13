@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use futures::TryFutureExt;
 use hopr_crypto_types::prelude::Hash;
 use hopr_db_entity::{chain_info, global_settings, node_info};
-use hopr_primitive_types::prelude::{Address, Balance, BalanceType, BinarySerializable, IntoEndian, ToHex};
+use hopr_primitive_types::prelude::*;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set};
 use tracing::debug;
 
@@ -294,19 +294,19 @@ impl HoprDbInfoOperations for HoprDb {
                                     .ok_or(DbError::MissingFixedTableEntry("chain_info".into()))?;
 
                                 let ledger_dst = if let Some(b) = model.ledger_dst {
-                                    Some(Hash::from_bytes(&b)?)
+                                    Some(Hash::try_from(b.as_ref())?)
                                 } else {
                                     None
                                 };
 
                                 let safe_registry_dst = if let Some(b) = model.safe_registry_dst {
-                                    Some(Hash::from_bytes(&b)?)
+                                    Some(Hash::try_from(b.as_ref())?)
                                 } else {
                                     None
                                 };
 
                                 let channels_dst = if let Some(b) = model.channels_dst {
-                                    Some(Hash::from_bytes(&b)?)
+                                    Some(Hash::try_from(b.as_ref())?)
                                 } else {
                                     None
                                 };
@@ -339,13 +339,13 @@ impl HoprDbInfoOperations for HoprDb {
 
                     match dst_type {
                         DomainSeparator::Ledger => {
-                            active_model.ledger_dst = Set(Some(value.to_bytes().into()));
+                            active_model.ledger_dst = Set(Some(value.as_ref().into()));
                         }
                         DomainSeparator::SafeRegistry => {
-                            active_model.safe_registry_dst = Set(Some(value.to_bytes().into()));
+                            active_model.safe_registry_dst = Set(Some(value.as_ref().into()));
                         }
                         DomainSeparator::Channel => {
-                            active_model.channels_dst = Set(Some(value.to_bytes().into()));
+                            active_model.channels_dst = Set(Some(value.as_ref().into()));
                         }
                     }
 
@@ -400,7 +400,7 @@ impl HoprDbInfoOperations for HoprDb {
                         .ok_or(DbError::MissingFixedTableEntry("chain_info".into()))
                         .map(|m| {
                             let chain_checksum = if let Some(b) = m.chain_checksum {
-                                Hash::from_bytes(&b).expect("invalid chain checksum in the db")
+                                Hash::try_from(b.as_slice()).expect("invalid chain checksum in the db")
                             } else {
                                 Hash::default()
                             };
@@ -429,14 +429,14 @@ impl HoprDbInfoOperations for HoprDb {
                     let current_checksum = model
                         .chain_checksum
                         .clone()
-                        .map(|v| Hash::from_bytes(v.as_ref()))
+                        .map(|v| Hash::try_from(v.as_ref()))
                         .unwrap_or(Ok(Hash::default()))?;
 
                     let mut active_model = model.into_active_model();
 
                     if let Some(block_log_hash) = block_log_tx_hash {
-                        let new_hash = Hash::create(&[current_checksum.as_slice(), block_log_hash.as_slice()]);
-                        active_model.chain_checksum = Set(Some(new_hash.as_slice().to_vec()));
+                        let new_hash = Hash::create(&[current_checksum.as_ref(), block_log_hash.as_ref()]);
+                        active_model.chain_checksum = Set(Some(new_hash.as_ref().to_vec()));
                         debug!("updating block checksum {current_checksum} -> {new_hash} @ {block_num}");
                     }
 
@@ -644,7 +644,7 @@ mod tests {
         let (next_block_num, next_checksum) = db.get_last_indexed_block(None).await.unwrap();
         assert_eq!(expexted_block_num, next_block_num);
 
-        let expected_next_checksum = Hash::create(&[last_checksum.as_slice(), checksum.as_slice()]);
+        let expected_next_checksum = Hash::create(&[last_checksum.as_ref(), checksum.as_ref()]);
         assert_eq!(expected_next_checksum, next_checksum);
     }
 

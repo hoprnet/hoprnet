@@ -17,9 +17,9 @@ use chain_actions::payload::SafePayloadGenerator;
 use chain_actions::ChainActions;
 use chain_indexer::{block::Indexer, handlers::ContractEventHandlers, IndexerConfig};
 use chain_rpc::client::SimpleJsonRpcRetryPolicy;
+use chain_rpc::rpc::RpcOperations;
 use chain_rpc::rpc::RpcOperationsConfig;
 use chain_rpc::HoprRpcOperations;
-use chain_rpc::{rpc::RpcOperations, TypedTransaction};
 pub use chain_types::chain_events::SignificantChainEvent;
 use chain_types::ContractAddresses;
 use config::ChainNetworkConfig;
@@ -106,84 +106,6 @@ pub async fn wait_for_funds<Rpc: HoprRpcOperations>(
     }
 
     Err(HoprChainError::Api("timeout waiting for funds".into()))
-}
-
-type ActiveTxExecutor = EthereumTransactionExecutor<
-    TypedTransaction,
-    RpcEthereumClient<RpcOperations<JsonRpcClient>>,
-    SafePayloadGenerator,
->;
-
-pub fn build_chain_components<Db>(
-    me_onchain: &ChainKeypair,
-    chain_config: ChainNetworkConfig,
-    contract_addrs: ContractAddresses,
-    module_address: Address,
-    db: Db,
-) -> (
-    ActionQueue<Db, IndexerActionTracker, ActiveTxExecutor>,
-    ChainActions<Db>,
-    RpcOperations<JsonRpcClient>,
-)
-where
-    Db: HoprDbAllOperations + Clone + Send + Sync + std::fmt::Debug + 'static,
-{
-    // TODO: extract this from the global config type
-    let rpc_http_config = chain_rpc::client::native::HttpPostRequestorConfig::default();
-
-    // TODO: extract this from the global config type
-    let rpc_http_retry_policy = SimpleJsonRpcRetryPolicy {
-        min_retries: Some(2),
-        ..SimpleJsonRpcRetryPolicy::default()
-    };
-
-    // TODO: extract this from the global config type
-    let rpc_cfg = RpcOperationsConfig {
-        chain_id: chain_config.chain.chain_id as u64,
-        contract_addrs,
-        module_address,
-        expected_block_time: Duration::from_millis(chain_config.chain.block_time),
-        tx_polling_interval: Duration::from_millis(chain_config.tx_polling_interval),
-        finality: chain_config.confirmations,
-        max_block_range_fetch_size: chain_config.max_block_range,
-    };
-
-    // TODO: extract this from the global config type
-    let rpc_client_cfg = RpcEthereumClientConfig::default();
-
-    // TODO: extract this from the global config type
-    let action_queue_cfg = ActionQueueConfig::default();
-
-    // --- Configs done ---
-
-    // Build JSON RPC client
-    let rpc_client = JsonRpcClient::new(
-        &chain_config.chain.default_provider,
-        DefaultHttpPostRequestor::new(rpc_http_config),
-        rpc_http_retry_policy,
-    );
-
-    // Build RPC operations
-    let rpc_operations = RpcOperations::new(rpc_client, me_onchain, rpc_cfg).expect("failed to initialize RPC");
-
-    // Build the Ethereum Transaction Executor that uses RpcOperations as backend
-    let ethereum_tx_executor = EthereumTransactionExecutor::new(
-        RpcEthereumClient::new(rpc_operations.clone(), rpc_client_cfg),
-        SafePayloadGenerator::new(me_onchain, contract_addrs, module_address),
-    );
-
-    // Build the Action Queue
-    let action_queue = ActionQueue::new(
-        db.clone(),
-        IndexerActionTracker::default(),
-        ethereum_tx_executor,
-        action_queue_cfg,
-    );
-
-    // Instantiate Chain Actions
-    let chain_actions = ChainActions::new(me_onchain.public().to_address(), db, action_queue.new_sender());
-
-    (action_queue, chain_actions, rpc_operations)
 }
 
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
@@ -312,7 +234,7 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
         });
 
         // Instantiate Chain Actions
-        let chain_actions = ChainActions::new(me_onchain.public().to_address(), db.clone(), action_sender);
+        let chain_actions = ChainActions::new(&me_onchain, db.clone(), action_sender);
 
         Self {
             me_onchain,
