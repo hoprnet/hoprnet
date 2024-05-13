@@ -633,6 +633,12 @@ where
 
     #[tracing::instrument(level = "debug", skip(self))]
     pub async fn all_tickets(&self) -> errors::Result<Vec<Ticket>> {
-        Ok(self.db.get_all_tickets().await?.into_iter().map(|v| v.ticket).collect())
+        Ok(self
+            .db
+            .get_all_tickets()
+            .await?
+            .into_iter()
+            .map(|v| v.ticket.leak())
+            .collect())
     }
 }

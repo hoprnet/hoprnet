@@ -1,10 +1,6 @@
 use hopr_crypto_random::random_fill;
-use hopr_crypto_types::errors::CryptoError::TagMismatch;
-use hopr_crypto_types::errors::Result;
-use hopr_crypto_types::keypairs::Keypair;
-use hopr_crypto_types::primitives::{DigestLike, SecretKey, SimpleMac};
-use hopr_crypto_types::utils::xor_inplace;
-use hopr_primitive_types::traits::BinarySerializable;
+use hopr_crypto_types::prelude::*;
+use hopr_primitive_types::prelude::*;
 
 use crate::derivation::derive_mac_key;
 use crate::prg::{PRGParameters, PRG};
@@ -148,7 +144,7 @@ impl RoutingInfo {
                 extended_header.copy_within(0..header_len, routing_info_len);
 
                 let pub_key_size = <S::P as Keypair>::Public::SIZE;
-                extended_header[0..pub_key_size].copy_from_slice(&path[inverted_idx + 1].to_bytes());
+                extended_header[0..pub_key_size].copy_from_slice(path[inverted_idx + 1].as_ref());
                 extended_header[pub_key_size] = idx as u8;
                 extended_header[pub_key_size + PATH_POSITION_LEN..pub_key_size + PATH_POSITION_LEN + SimpleMac::SIZE]
                     .copy_from_slice(&ret.mac);
@@ -213,7 +209,7 @@ pub fn forward_header<S: SphinxSuite>(
     max_hops: usize,
     additional_data_relayer_len: usize,
     additional_data_last_hop_len: usize,
-) -> Result<ForwardedHeader> {
+) -> hopr_crypto_types::errors::Result<ForwardedHeader> {
     assert_eq!(SimpleMac::SIZE, mac.len(), "invalid mac length");
 
     let routing_info_len = routing_information_length::<S>(additional_data_relayer_len);
@@ -225,7 +221,7 @@ pub fn forward_header<S: SphinxSuite>(
     let mut computed_mac = SimpleMac::new(&derive_mac_key(secret));
     computed_mac.update(header);
     if !mac.eq(computed_mac.finalize().as_slice()) {
-        return Err(TagMismatch);
+        return Err(CryptoError::TagMismatch);
     }
 
     // Unmask the header using the keystream
@@ -273,8 +269,7 @@ pub fn forward_header<S: SphinxSuite>(
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::ec_groups::Secp256k1Suite;
-    use hopr_crypto_types::keypairs::{ChainKeypair, OffchainKeypair};
+    use hopr_crypto_types::keypairs::OffchainKeypair;
     use parameterized::parameterized;
 
     #[parameterized(hops = { 3, 4 })]
@@ -364,7 +359,7 @@ pub mod tests {
                         "invalid path position {path_pos}"
                     );
                     assert_eq!(
-                        pub_keys[i + 1].to_bytes().as_ref(),
+                        pub_keys[i + 1].as_ref(),
                         next_node.as_ref(),
                         "invalid public key of the next node"
                     );
@@ -396,7 +391,7 @@ pub mod tests {
     #[cfg(feature = "secp256k1")]
     #[parameterized(amount = { 3, 2, 1 })]
     fn test_secp256k1_generate_routing_info_and_forward(amount: usize) {
-        generic_test_generate_routing_info_and_forward::<Secp256k1Suite>(
+        generic_test_generate_routing_info_and_forward::<crate::ec_groups::Secp256k1Suite>(
             (0..amount).map(|_| ChainKeypair::random()).collect(),
         )
     }

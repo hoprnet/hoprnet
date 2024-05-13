@@ -69,7 +69,7 @@ impl<Db: HoprDbProtocolOperations> AcknowledgementProcessor<Db> {
         &self,
         ack: Acknowledgement,
     ) -> std::result::Result<AckResult, hopr_db_api::errors::DbError> {
-        self.db.handle_acknowledgement(ack, self.chain_key.clone()).await
+        self.db.handle_acknowledgement(ack, &self.chain_key).await
     }
 }
 

@@ -645,7 +645,7 @@ impl Hopr {
 
         let tbf = read_file(&tbf_path)
             .and_then(|data| {
-                TagBloomFilter::from_bytes(&data)
+                TagBloomFilter::from_bytes(data.as_ref())
                     .map_err(|e| hopr_platform::error::PlatformError::GeneralError(e.to_string()))
             })
             .unwrap_or_else(|_| {

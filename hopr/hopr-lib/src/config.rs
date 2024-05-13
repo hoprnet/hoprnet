@@ -54,7 +54,7 @@ pub struct Chain {
 
 #[inline]
 fn default_invalid_address() -> Address {
-    Address::from_bytes(&[0; Address::SIZE]).unwrap()
+    Address::default()
 }
 
 #[inline]

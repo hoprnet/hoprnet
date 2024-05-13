@@ -3,7 +3,7 @@ use std::fmt::{Display, Formatter};
 use hopr_crypto_sphinx::{derivation::derive_ack_key_share, shared_keys::SphinxSuite};
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
-use hopr_primitive_types::traits::BinarySerializable;
+use hopr_primitive_types::prelude::*;
 
 use crate::{
     errors::{PacketError::PacketDecodingError, Result},
@@ -25,7 +25,7 @@ pub enum ChainPacketComponents {
     },
     /// Packet must be forwarded
     Forwarded {
-        packet: Box<[u8]>,
+        packet: MetaPacket<CurrentSphinxSuite>,
         ticket: Ticket,
         ack_challenge: HalfKeyChallenge,
         packet_tag: PacketTag,
@@ -38,7 +38,7 @@ pub enum ChainPacketComponents {
     },
     /// Packet that is being sent out by us
     Outgoing {
-        packet: Box<[u8]>,
+        packet: MetaPacket<CurrentSphinxSuite>,
         ticket: Ticket,
         next_hop: OffchainPublicKey,
         ack_challenge: HalfKeyChallenge,
@@ -70,7 +70,7 @@ impl ChainPacketComponents {
         msg: &[u8],
         public_keys_path: &[OffchainPublicKey],
         chain_keypair: &ChainKeypair,
-        mut ticket: Ticket,
+        ticket: TicketBuilder,
         domain_separator: &Hash,
     ) -> Result<Self> {
         let shared_keys = CurrentSphinxSuite::new_shared_keys(public_keys_path)?;
@@ -78,8 +78,10 @@ impl ChainPacketComponents {
         let por_strings = ProofOfRelayString::from_shared_secrets(&shared_keys.secrets);
 
         // Update the ticket with the challenge
-        ticket.challenge = por_values.ticket_challenge.to_ethereum_challenge();
-        ticket.sign(chain_keypair, domain_separator);
+        let ticket = ticket
+            .challenge(por_values.ticket_challenge.to_ethereum_challenge())
+            .build_signed(chain_keypair, domain_separator)?
+            .leak();
 
         Ok(Self::Outgoing {
             packet: MetaPacket::<CurrentSphinxSuite>::new(
@@ -88,10 +90,9 @@ impl ChainPacketComponents {
                 public_keys_path,
                 INTERMEDIATE_HOPS + 1,
                 POR_SECRET_LENGTH,
-                &por_strings.iter().map(Box::as_ref).collect::<Vec<_>>(),
+                &por_strings.iter().map(|s| s.as_ref()).collect::<Vec<_>>(),
                 None,
-            )
-            .to_bytes(),
+            ),
             ticket,
             next_hop: public_keys_path[0],
             ack_challenge: por_values.ack_challenge,
@@ -105,7 +106,7 @@ impl ChainPacketComponents {
             let (pre_packet, pre_ticket) = data.split_at(PACKET_LENGTH);
 
             let mp: MetaPacket<hopr_crypto_sphinx::ec_groups::X25519Suite> =
-                MetaPacket::<CurrentSphinxSuite>::from_bytes(pre_packet)?;
+                MetaPacket::<CurrentSphinxSuite>::try_from(pre_packet)?;
 
             match mp.into_forwarded(node_keypair, INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0)? {
                 ForwardedMetaPacket::Relayed {
@@ -119,10 +120,10 @@ impl ChainPacketComponents {
                 } => {
                     let ack_key = derive_ack_key_share(&derived_secret);
 
-                    let ticket = Ticket::from_bytes(pre_ticket)?;
+                    let ticket = Ticket::try_from(pre_ticket)?;
                     let verification_output = pre_verify(&derived_secret, &additional_info, &ticket.challenge)?;
                     Ok(Self::Forwarded {
-                        packet: packet.to_bytes(),
+                        packet,
                         ticket,
                         packet_tag,
                         ack_key,
@@ -142,7 +143,7 @@ impl ChainPacketComponents {
                 } => {
                     let ack_key = derive_ack_key_share(&derived_secret);
 
-                    let ticket = Ticket::from_bytes(pre_ticket)?;
+                    let ticket = Ticket::try_from(pre_ticket)?;
                     Ok(Self::Final {
                         ticket,
                         packet_tag,
@@ -162,7 +163,7 @@ impl ChainPacketComponents {
 pub fn forward(
     packet: ChainPacketComponents,
     chain_keypair: &ChainKeypair,
-    mut next_ticket: Ticket,
+    next_ticket: TicketBuilder,
     domain_separator: &Hash,
 ) -> ChainPacketComponents {
     match packet {
@@ -178,11 +179,14 @@ pub fn forward(
             path_pos,
             ..
         } => {
-            next_ticket.challenge = next_challenge.to_ethereum_challenge();
-            next_ticket.sign(chain_keypair, domain_separator);
+            let ticket = next_ticket
+                .challenge(next_challenge.to_ethereum_challenge())
+                .build_signed(chain_keypair, domain_separator)
+                .expect("ticket should create")
+                .leak();
             ChainPacketComponents::Forwarded {
                 packet,
-                ticket: next_ticket,
+                ticket,
                 ack_challenge,
                 packet_tag,
                 ack_key,
@@ -229,41 +233,33 @@ mod tests {
     impl ChainPacketComponents {
         pub fn to_bytes(&self) -> Box<[u8]> {
             let (packet, ticket) = match self {
-                Self::Final { plain_text, ticket, .. } => (plain_text, ticket),
-                Self::Forwarded { packet, ticket, .. } => (packet, ticket),
-                Self::Outgoing { packet, ticket, .. } => (packet, ticket),
+                Self::Final { plain_text, ticket, .. } => (plain_text.clone(), ticket),
+                Self::Forwarded { packet, ticket, .. } => (Vec::from(packet.as_ref()).into_boxed_slice(), ticket),
+                Self::Outgoing { packet, ticket, .. } => (Vec::from(packet.as_ref()).into_boxed_slice(), ticket),
             };
 
             let mut ret = Vec::with_capacity(Self::SIZE);
             ret.extend_from_slice(packet.as_ref());
-            ret.extend_from_slice(&ticket.to_bytes());
+            ret.extend_from_slice(&ticket.clone().into_encoded());
             ret.into_boxed_slice()
         }
     }
 
-    fn mock_ticket(next_peer_channel_key: &PublicKey, path_len: usize, private_key: &ChainKeypair) -> Ticket {
+    fn mock_ticket(next_peer_channel_key: &PublicKey, path_len: usize, private_key: &ChainKeypair) -> TicketBuilder {
         assert!(path_len > 0);
         let price_per_packet: U256 = 10000000000000000u128.into();
-        let ticket_win_prob = 1.0f64;
 
         if path_len > 1 {
-            Ticket::new(
-                &next_peer_channel_key.to_address(),
-                &Balance::new(
-                    price_per_packet.div_f64(ticket_win_prob).unwrap() * U256::from(path_len as u64 - 1),
-                    BalanceType::HOPR,
-                ),
-                1u64.into(),
-                1u64.into(),
-                ticket_win_prob,
-                1u64.into(),
-                EthereumChallenge::default(),
-                private_key,
-                &Hash::default(),
-            )
-            .unwrap()
+            TicketBuilder::default()
+                .direction(&private_key.public().to_address(), &next_peer_channel_key.to_address())
+                .amount(price_per_packet.div_f64(1.0).unwrap() * U256::from(path_len as u64 - 1))
+                .index(1)
+                .index_offset(1)
+                .win_prob(1.0)
+                .channel_epoch(1)
+                .challenge(Default::default())
         } else {
-            Ticket::new_zero_hop(&next_peer_channel_key.to_address(), private_key, &Hash::default()).unwrap()
+            TicketBuilder::zero_hop().direction(&private_key.public().to_address(), &next_peer_channel_key.to_address())
         }
     }
     async fn resolve_mock_path(me: Address, peers_offchain: Vec<PeerId>, peers_onchain: Vec<Address>) -> TransportPath {
