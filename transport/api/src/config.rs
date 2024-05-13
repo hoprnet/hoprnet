@@ -68,7 +68,7 @@ impl FromStr for HostConfig {
 
         let port = str_port.parse().map_err(|e: ParseIntError| e.to_string())?;
 
-        if validator::validate_ip_v4(ip_or_dns) {
+        if validator::ValidateIp::validate_ipv4(&ip_or_dns) {
             Ok(Self {
                 address: HostType::IPv4(ip_or_dns.to_owned()),
                 port,
@@ -91,7 +91,7 @@ impl Display for HostConfig {
 }
 
 fn validate_ipv4_address(s: &str) -> Result<(), ValidationError> {
-    if validator::validate_ip(s) {
+    if validator::ValidateIp::validate_ipv4(&s) {
         let ipv4 = std::net::Ipv4Addr::from_str(s)
             .map_err(|_| ValidationError::new("Failed to deserialize the string into an ipv4 address"))?;
 

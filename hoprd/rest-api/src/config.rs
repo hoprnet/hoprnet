@@ -35,11 +35,11 @@ pub struct Api {
     #[serde(default)]
     pub enable: bool,
     /// Auth enum holding the API auth configuration
-    #[validate(custom = "validate_api_auth")]
+    #[validate(custom(function = "validate_api_auth"))]
     #[serde(default)]
     pub auth: Auth,
     /// Host and port combination where the REST API should be located
-    #[validate]
+    #[validate(nested)]
     #[serde(default = "default_api_host")]
     #[default(default_api_host())]
     pub host: HostConfig,

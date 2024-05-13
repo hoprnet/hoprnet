@@ -16,7 +16,7 @@ use std::fmt::{Display, Formatter};
 /// until the corresponding [SignificantChainEvent](crate::chain_events::SignificantChainEvent)
 /// is registered by the Indexer or a timeout.
 #[allow(clippy::large_enum_variant)] // TODO: Refactor the large enum variant
-#[derive(Clone, PartialEq, Debug, strum::EnumVariantNames, strum::IntoStaticStr)]
+#[derive(Clone, PartialEq, Debug, strum::VariantNames, strum::IntoStaticStr)]
 #[strum(serialize_all = "snake_case")]
 pub enum Action {
     /// Redeem the given acknowledged ticket.

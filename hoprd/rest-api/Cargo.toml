@@ -25,7 +25,7 @@ futures = { workspace = true }
 futures-concurrency = { workspace = true }
 lazy_static = { workspace = true, optional = true }
 libp2p-identity = { workspace = true, features = ["peerid", "ed25519", "serde"] }
-serde = { workspace = true, features = ["derive"] }
+serde = { workspace = true }
 serde_with = { workspace = true }
 serde_json = { workspace = true }
 smart-default = { workspace = true }
@@ -36,7 +36,7 @@ tide-tracing = "0.1"
 tracing = { workspace = true }
 urlencoding = "2"
 utoipa = { version = "4.1" }
-utoipa-swagger-ui = { version = "5.0.0" }
+utoipa-swagger-ui = { version = "7.0.1" }
 validator = { workspace = true }
 
 hopr-lib = { workspace = true }

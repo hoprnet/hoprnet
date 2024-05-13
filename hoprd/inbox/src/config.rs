@@ -24,7 +24,7 @@ pub struct MessageInboxConfiguration {
     /// In the current implementation, the capacity must be a power of two.
     ///
     /// Defaults to 512.
-    #[validate(custom = "validate_is_power_of_two")]
+    #[validate(custom(function = "validate_is_power_of_two"))]
     #[serde(default = "default_capacity")]
     #[default(default_capacity())]
     pub capacity: u32,

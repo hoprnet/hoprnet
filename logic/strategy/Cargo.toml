@@ -43,11 +43,11 @@ hopr-db-api = { workspace = true }
 async-std = { workspace = true }
 chain-types = { workspace = true }
 env_logger = { workspace = true }
-mockall = "0.11.4"
+mockall = { workspace = true }
 hex-literal = { workspace = true }
 hopr-crypto-random = { workspace = true }
 hopr-db-api = { workspace = true }
-futures = "0.3.28"
+futures = { workspace = true }
 
 
 [features]

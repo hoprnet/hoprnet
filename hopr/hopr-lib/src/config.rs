@@ -36,7 +36,7 @@ fn just_true() -> bool {
 #[derive(Debug, Clone, PartialEq, smart_default::SmartDefault, Serialize, Deserialize, Validate)]
 #[serde(deny_unknown_fields)]
 pub struct Chain {
-    #[validate(custom = "validate_announced")]
+    #[validate(custom(function = "validate_announced"))]
     #[serde(default = "just_true")]
     #[default = true]
     pub announce: bool,
@@ -105,45 +105,45 @@ pub struct Db {
 #[derive(Debug, Clone, PartialEq, smart_default::SmartDefault, Serialize, Deserialize, Validate)]
 pub struct HoprLibConfig {
     /// Configuration related to host specifics
-    #[validate]
-    #[validate(custom = "validate_external_host")]
+    #[validate(nested)]
+    #[validate(custom(function = "validate_external_host"))]
     #[serde(default = "default_host")]
     #[default(default_host())]
     pub host: HostConfig,
     /// Configuration of the underlying database engine
-    #[validate]
+    #[validate(nested)]
     #[serde(default)]
     pub db: Db,
     /// Configuration of underlying node behavior in the form strategies
     ///
     /// Strategies represent automatically executable behavior performed by
     /// the node given pre-configured triggers.
-    #[validate]
+    #[validate(nested)]
     #[serde(default = "core_strategy::hopr_default_strategies")]
     #[default(core_strategy::hopr_default_strategies())]
     pub strategy: StrategyConfig,
     /// Configuration of the protocol heartbeat mechanism
-    #[validate]
+    #[validate(nested)]
     #[serde(default)]
     pub heartbeat: HeartbeatConfig,
     /// Configuration of network properties
-    #[validate]
+    #[validate(nested)]
     #[serde(default)]
     pub network_options: NetworkConfig,
     /// Configuration specific to transport mechanics
-    #[validate]
+    #[validate(nested)]
     #[serde(default)]
     pub transport: TransportConfig,
     /// Configuration specific to protocol execution on the p2p layer
-    #[validate]
+    #[validate(nested)]
     #[serde(default)]
     pub protocol: ProtocolConfig,
     /// Blockchain specific configuration
-    #[validate]
+    #[validate(nested)]
     #[serde(default)]
     pub chain: Chain,
     /// Configuration of the `Safe` mechanism
-    #[validate]
+    #[validate(nested)]
     #[serde(default)]
     pub safe_module: SafeModule,
 }

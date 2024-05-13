@@ -15,12 +15,12 @@ crate-type = ["rlib"]
 aes = "0.8"
 ctr = "0.9"
 hex = { workspace = true }
-serde = { version = "1.0", features = ["derive"] }
+serde = { workspace = true }
 serde_json = "1.0"
 scrypt = { version = "0.11.0", default-features = false }
 sha3 = "0.10"
 thiserror = { workspace = true }
-typenum = "1.16.0"
+typenum = { workspace = true }
 uuid = { workspace = true, features = ["serde", "v4"] }
 
 hopr-crypto-random = { workspace = true }

@@ -21,7 +21,7 @@ async-std = { workspace = true }
 async-trait = { workspace = true }
 async-lock = { workspace = true }
 futures = { workspace = true }
-futures-concurrency = "7.3.0"
+futures-concurrency = "7.6.0"
 lazy_static = { workspace = true, optional = true }
 libp2p = { workspace = true, features = ["request-response"] }
 multiaddr = { workspace = true }
