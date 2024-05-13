@@ -3688,7 +3688,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-lib"
-version = "2.1.0"
+version = "2.2.0-rc.1"
 dependencies = [
  "async-lock 3.3.0",
  "async-std",
@@ -3803,7 +3803,7 @@ dependencies = [
 
 [[package]]
 name = "hoprd-api"
-version = "0.2.1"
+version = "3.1.0"
 dependencies = [
  "async-broadcast",
  "async-lock 3.3.0",
