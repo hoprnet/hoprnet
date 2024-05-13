@@ -608,19 +608,19 @@ mod tests {
         let identity_path = identity_dir.to_str().unwrap();
         let id = Uuid::new_v4();
 
-        assert!(super::HoprKeys::init(super::IdentityRetrievalModes::FromIdIntoFile {
+        let keys = HoprKeys::init(super::IdentityRetrievalModes::FromIdIntoFile {
             password: "local",
             id_path: identity_path,
-            id
+            id,
         })
-        .is_ok());
+        .expect("should initialize new key");
 
         let (deserialized, needs_migration) = super::HoprKeys::read_eth_keystore(identity_path, "local").unwrap();
 
         assert!(!needs_migration);
         assert_eq!(
-            deserialized.chain_key.public().0.to_address().to_string(),
-            "0x05801834fd089afe070dab49b2111b92a4725893"
+            deserialized.chain_key.public().to_address(),
+            keys.chain_key.public().to_address()
         );
 
         // Overwriting existing keys must not be possible

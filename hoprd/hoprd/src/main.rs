@@ -16,7 +16,7 @@ use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 use hopr_lib::{ApplicationData, AsUnixTimestamp, HoprLibProcesses, ToHex, TransportOutput};
 use hoprd::cli::CliArgs;
 use hoprd_api::run_hopr_api;
-use hoprd_keypair::key_pair::{HoprKeys, IdentityOptions};
+use hoprd_keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleHistogram;
