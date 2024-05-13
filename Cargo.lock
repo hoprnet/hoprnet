@@ -1239,6 +1239,7 @@ dependencies = [
 name = "chain-api"
 version = "0.2.0"
 dependencies = [
+ "async-channel 2.1.1",
  "async-lock 3.3.0",
  "async-std",
  "async-trait",
@@ -1252,10 +1253,15 @@ dependencies = [
  "hopr-db-api",
  "hopr-internal-types",
  "hopr-primitive-types",
+ "semver 1.0.21",
  "serde",
+ "serde_json",
+ "serde_with",
  "smart-default",
+ "strum 0.25.0",
  "thiserror",
  "tracing",
+ "validator",
 ]
 
 [[package]]
@@ -1744,6 +1750,7 @@ dependencies = [
 name = "core-transport"
 version = "0.5.0"
 dependencies = [
+ "async-channel 2.1.1",
  "async-lock 3.3.0",
  "async-std",
  "async-trait",
@@ -3690,6 +3697,7 @@ dependencies = [
 name = "hopr-lib"
 version = "2.2.0-rc.1"
 dependencies = [
+ "async-channel 2.1.1",
  "async-lock 3.3.0",
  "async-std",
  "atomic_enum",
@@ -3712,9 +3720,7 @@ dependencies = [
  "hopr-platform",
  "hopr-primitive-types",
  "lazy_static",
- "semver 1.0.21",
  "serde",
- "serde_json",
  "serde_with",
  "serde_yaml",
  "smart-default",
@@ -3767,6 +3773,7 @@ dependencies = [
  "anyhow",
  "async-broadcast",
  "async-lock 3.3.0",
+ "async-signal",
  "async-std",
  "chrono",
  "clap",
@@ -3790,6 +3797,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
+ "signal-hook",
  "strum 0.25.0",
  "tempfile",
  "thiserror",
@@ -7404,6 +7412,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "da03fa3b94cc19e3ebfc88c4229c49d8f08cdbd1228870a45f0ffdf84988e14b"
 dependencies = [
  "dirs",
+]
+
+[[package]]
+name = "signal-hook"
+version = "0.3.17"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8621587d4798caf8eb44879d42e56b9a93ea5dcd315a6487c357130095b62801"
+dependencies = [
+ "libc",
+ "signal-hook-registry",
 ]
 
 [[package]]

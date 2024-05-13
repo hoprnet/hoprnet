@@ -1,28 +1,14 @@
-use std::time::Duration;
-use std::{str::FromStr, sync::Arc};
+use std::str::FromStr;
 
-use async_lock::RwLock;
 use semver::{Version, VersionReq};
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use validator::Validate;
 
-use chain_actions::action_queue::ActionQueueConfig;
-use chain_actions::action_state::IndexerActionTracker;
-use chain_actions::payload::SafePayloadGenerator;
-use chain_actions::{action_queue::ActionQueue, ChainActions};
-use chain_api::executors::{EthereumTransactionExecutor, RpcEthereumClient, RpcEthereumClientConfig};
-use chain_api::{DefaultHttpPostRequestor, JsonRpcClient};
-use chain_rpc::client::SimpleJsonRpcRetryPolicy;
-use chain_rpc::rpc::{RpcOperations, RpcOperationsConfig};
-use chain_types::chain_events::SignificantChainEvent;
-use chain_types::{ContractAddresses, TypedTransaction};
-use core_path::channel_graph::ChannelGraph;
-use core_transport::ChainKeypair;
-use hopr_db_api::HoprDbAllOperations;
+use chain_types::ContractAddresses;
 use hopr_primitive_types::primitives::Address;
 
-use crate::errors::HoprLibError;
+use crate::errors::HoprChainError;
 
 /// Types of HOPR network environments.
 #[derive(Debug, Copy, Clone, Deserialize, Serialize, Eq, PartialEq, strum::Display, strum::EnumString)]
@@ -165,10 +151,11 @@ pub struct ChainNetworkConfig {
 /// Check whether the version is allowed
 fn satisfies(version: &str, allowed_versions: &str) -> crate::errors::Result<bool> {
     let allowed_versions = VersionReq::parse(allowed_versions)
-        .map_err(|e| HoprLibError::GeneralError(format!("failed to deserialize allowed version string: {}", e)))?;
+        .map_err(|e| HoprChainError::Configuration(format!("failed to deserialize allowed version string: {}", e)))?;
 
-    let version = Version::from_str(version)
-        .map_err(|e| HoprLibError::GeneralError(format!("failed to deserialize current lib version string: {}", e)))?;
+    let version = Version::from_str(version).map_err(|e| {
+        HoprChainError::Configuration(format!("failed to deserialize current lib version string: {}", e))
+    })?;
 
     Ok(allowed_versions.matches(&version))
 }
@@ -177,24 +164,25 @@ impl ChainNetworkConfig {
     /// Returns the network details, returns an error if network is not supported
     pub fn new(
         id: &str,
+        version: &str,
         maybe_custom_provider: Option<&str>,
         protocol_config: &mut ProtocolsConfig,
     ) -> Result<Self, String> {
         let network = protocol_config
             .networks
             .get_mut(id)
-            .ok_or(format!("Could not find network {} in protocol config", id))?;
+            .ok_or(format!("Could not find network {id} in protocol config"))?;
 
         let chain = protocol_config
             .chains
             .get_mut(&network.chain)
-            .ok_or(format!("Invalid chain {} for network {}", network.chain, id))?;
+            .ok_or(format!("Invalid chain {} for network {id}", network.chain))?;
 
         if let Some(custom_provider) = maybe_custom_provider {
             chain.default_provider = custom_provider.into();
         }
 
-        match satisfies(crate::constants::APP_VERSION_COERCED, network.version_range.as_str()) {
+        match satisfies(version, network.version_range.as_str()) {
             Ok(true) => Ok(ChainNetworkConfig {
                 announcements: network.addresses.announcements.to_owned(),
                 chain: chain.to_owned(),
@@ -215,7 +203,7 @@ impl ChainNetworkConfig {
             }),
             Ok(false) => Err(format!(
                 "network {id} is not supported, supported networks {:?}",
-                protocol_config.supported_networks().join(", ")
+                protocol_config.supported_networks(version).join(", ")
             )),
             Err(e) => Err(e.to_string()),
         }
@@ -249,7 +237,7 @@ pub struct ProtocolsConfig {
 
 impl Default for ProtocolsConfig {
     fn default() -> Self {
-        Self::from_str(include_str!("../data/protocol-config.json"))
+        Self::from_str(include_str!("../../../hopr/hopr-lib/data/protocol-config.json"))
             .expect("bundled protocol config should be always valid")
     }
 }
@@ -272,13 +260,14 @@ impl std::cmp::PartialEq for ProtocolsConfig {
 
 impl ProtocolsConfig {
     /// Returns a list of environments which the node is able to work with
-    pub fn supported_networks(&self) -> Vec<String> {
+    /// TODO: crate::constants::APP_VERSION_COERCED
+    pub fn supported_networks(&self, version: &str) -> Vec<String> {
         let mut allowed = vec![];
 
         for (name, env) in self.networks.iter() {
             let range = env.version_range.to_owned();
 
-            if let Ok(true) = satisfies(crate::constants::APP_VERSION_COERCED, range.as_str()) {
+            if let Ok(true) = satisfies(version, range.as_str()) {
                 allowed.push(name.clone())
             }
         }
@@ -286,114 +275,6 @@ impl ProtocolsConfig {
         allowed
     }
 }
-
-type ActiveTxExecutor = EthereumTransactionExecutor<
-    TypedTransaction,
-    RpcEthereumClient<RpcOperations<JsonRpcClient>>,
-    SafePayloadGenerator,
->;
-
-pub fn build_chain_components<Db>(
-    me_onchain: &ChainKeypair,
-    chain_config: ChainNetworkConfig,
-    contract_addrs: ContractAddresses,
-    module_address: Address,
-    db: Db,
-) -> (
-    ActionQueue<Db, IndexerActionTracker, ActiveTxExecutor>,
-    ChainActions<Db>,
-    RpcOperations<JsonRpcClient>,
-)
-where
-    Db: HoprDbAllOperations + Clone + Send + Sync + std::fmt::Debug + 'static,
-{
-    // TODO: extract this from the global config type
-    let rpc_http_config = chain_rpc::client::native::HttpPostRequestorConfig::default();
-
-    // TODO: extract this from the global config type
-    let rpc_http_retry_policy = SimpleJsonRpcRetryPolicy {
-        min_retries: Some(2),
-        ..SimpleJsonRpcRetryPolicy::default()
-    };
-
-    // TODO: extract this from the global config type
-    let rpc_cfg = RpcOperationsConfig {
-        chain_id: chain_config.chain.chain_id as u64,
-        contract_addrs,
-        module_address,
-        expected_block_time: Duration::from_millis(chain_config.chain.block_time),
-        tx_polling_interval: Duration::from_millis(chain_config.tx_polling_interval),
-        finality: chain_config.confirmations,
-        max_block_range_fetch_size: chain_config.max_block_range,
-    };
-
-    // TODO: extract this from the global config type
-    let rpc_client_cfg = RpcEthereumClientConfig::default();
-
-    // TODO: extract this from the global config type
-    let action_queue_cfg = ActionQueueConfig::default();
-
-    // --- Configs done ---
-
-    // Build JSON RPC client
-    let rpc_client = JsonRpcClient::new(
-        &chain_config.chain.default_provider,
-        DefaultHttpPostRequestor::new(rpc_http_config),
-        rpc_http_retry_policy,
-    );
-
-    // Build RPC operations
-    let rpc_operations = RpcOperations::new(rpc_client, me_onchain, rpc_cfg).expect("failed to initialize RPC");
-
-    // Build the Ethereum Transaction Executor that uses RpcOperations as backend
-    let ethereum_tx_executor = EthereumTransactionExecutor::new(
-        RpcEthereumClient::new(rpc_operations.clone(), rpc_client_cfg),
-        SafePayloadGenerator::new(me_onchain, contract_addrs, module_address),
-    );
-
-    // Build the Action Queue
-    let action_queue = ActionQueue::new(
-        db.clone(),
-        IndexerActionTracker::default(),
-        ethereum_tx_executor,
-        action_queue_cfg,
-    );
-
-    // Instantiate Chain Actions
-    let chain_actions = ChainActions::new(me_onchain, db, action_queue.new_sender());
-
-    (action_queue, chain_actions, rpc_operations)
-}
-
-#[allow(clippy::too_many_arguments)] // TODO: refactor this function into a reasonable group of components once fully rearchitected
-pub fn build_chain_api<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static>(
-    me_onchain: ChainKeypair,
-    new_db: T,
-    contract_addrs: ContractAddresses,
-    safe_address: Address,
-    indexer_start_block: u64,
-    indexer_events_tx: futures::channel::mpsc::UnboundedSender<SignificantChainEvent>,
-    chain_actions: ChainActions<T>,
-    rpc_operations: RpcOperations<JsonRpcClient>,
-    channel_graph: Arc<RwLock<ChannelGraph>>,
-) -> chain_api::HoprChain<T> {
-    let indexer_cfg = chain_indexer::IndexerConfig {
-        start_block_number: indexer_start_block,
-    };
-
-    chain_api::HoprChain::new(
-        me_onchain,
-        new_db,
-        contract_addrs,
-        safe_address,
-        indexer_cfg,
-        indexer_events_tx,
-        chain_actions,
-        rpc_operations,
-        channel_graph,
-    )
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
@@ -412,7 +293,7 @@ mod test {
 
     #[test]
     fn test_version_is_satisfied_should_work_for_glob() {
-        let actual = satisfies(crate::constants::APP_VERSION_COERCED, "*");
+        let actual = satisfies("1.2.3", "*");
         assert!(actual.is_ok());
         assert!(actual.unwrap())
     }

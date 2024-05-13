@@ -9,8 +9,6 @@ use hopr_db_api::{
     peers::HoprDbPeersOperations, registry::HoprDbRegistryOperations, resolver::HoprDbResolverOperations,
 };
 
-use async_std::task::spawn;
-
 use chain_types::chain_events::NetworkRegistryStatus;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -64,7 +62,9 @@ impl IndexerActions {
         let (to_process_tx, mut to_process_rx) =
             futures::channel::mpsc::channel::<IndexerToProcess>(crate::constants::INDEXER_UPDATE_QUEUE_SIZE);
 
-        spawn(async move {
+        // NOTE: This spawned task does not need to be explicitly canceled, since it will
+        // be automatically dropped when the event sender object is dropped.
+        async_std::task::spawn(async move {
             let mut emitter = emitter;
             let db_local = db.clone();
 
@@ -103,7 +103,7 @@ impl IndexerActions {
                                             }
                                         }
                                     } else {
-                                        warn!("Could not convert the peer id '{}' to an offchain public key", peer);
+                                        warn!("Could not convert the peer id '{peer}' to an offchain public key");
                                         continue;
                                     }
                                 };

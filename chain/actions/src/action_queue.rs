@@ -23,7 +23,6 @@ use crate::action_state::{ActionState, IndexerExpectation};
 use crate::errors::ChainActionsError::{ChannelAlreadyClosed, InvalidState, Timeout, TransactionSubmissionFailed};
 use crate::errors::{ChainActionsError, Result};
 
-use async_std::task::spawn;
 use hopr_db_api::info::HoprDbInfoOperations;
 use hopr_db_api::tickets::HoprDbTicketOperations;
 
@@ -344,8 +343,9 @@ where
     /// Consumes self and runs the main queue processing loop until the queue is closed.
     ///
     /// The method will panic if Channel Domain Separator is not yet populated in the DB.
+    #[allow(clippy::async_yields_async)]
     #[tracing::instrument(level = "debug", skip(self))]
-    pub async fn action_loop(mut self) {
+    pub async fn start(mut self) {
         while let Some((act, tx_finisher)) = self.queue_recv.next().await {
             // Some minimum separation to avoid batching txs
             futures_timer::Delay::new(Duration::from_millis(100)).await;
@@ -360,7 +360,8 @@ where
                 .and_then(|data| data.channels_dst.ok_or(InvalidState("missing channels dst".into())))
                 .unwrap();
 
-            spawn(async move {
+            // NOTE: the process is "daemonized" and not awaited, so it will run in the background
+            async_std::task::spawn(async move {
                 let act_id = act.to_string();
                 let act_name: &'static str = (&act).into();
                 trace!("start executing {act_id} ({act_name})");
@@ -404,6 +405,6 @@ where
                 let _ = tx_finisher.send(tx_result);
             });
         }
-        warn!("action queue has finished");
+        error!("action queue has finished, it should be running for the node to be able to process chain actions");
     }
 }

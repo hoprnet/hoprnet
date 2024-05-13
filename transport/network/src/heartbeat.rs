@@ -92,6 +92,7 @@ pub trait HeartbeatExternalApi {
 /// aggregating all necessary heartbeat resources without leaking them into the
 /// `Heartbeat` object and keeping both the adaptor and the heartbeat object
 /// OCP and SRP compliant.
+#[derive(Debug, Clone)]
 pub struct HeartbeatExternalInteractions<T>
 where
     T: hopr_db_api::peers::HoprDbPeersOperations + Sync + Send + std::fmt::Debug,
@@ -131,10 +132,17 @@ where
 ///
 /// This object provides a single public method that can be polled. Once triggered, it will never
 /// return and will only terminate with an unresolvable error or a panic.
+
 pub struct Heartbeat<T: Pinging, API: HeartbeatExternalApi> {
     config: HeartbeatConfig,
     pinger: T,
     external_api: API,
+}
+
+impl<T: Pinging, API: HeartbeatExternalApi> std::fmt::Debug for Heartbeat<T, API> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Heartbeat").field("config", &self.config).finish()
+    }
 }
 
 impl<T: Pinging, API: HeartbeatExternalApi> Heartbeat<T, API> {

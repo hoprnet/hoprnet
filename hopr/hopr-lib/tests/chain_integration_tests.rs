@@ -200,7 +200,9 @@ async fn start_node_chain_logic(
 
     let mut node_tasks = Vec::new();
 
-    node_tasks.push(async_std::task::spawn(action_queue.action_loop()));
+    node_tasks.push(async_std::task::spawn(async move {
+        action_queue.start().await;
+    }));
 
     // Action state tracking
     let (sce_tx, mut sce_rx) = futures::channel::mpsc::unbounded();
