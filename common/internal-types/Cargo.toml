@@ -12,8 +12,10 @@ license = "GPL-3.0-only"
 crate-type = ["rlib"]
 
 [dependencies]
+aquamarine = { workspace = true }
 async-trait = { workspace = true }
 bloomfilter = { version = "1.0.13", features = ["serde"] }
+bincode = { workspace = true }
 ethers = { workspace = true, default-features = false }
 hex-literal = { workspace = true }
 num_enum = { workspace = true }

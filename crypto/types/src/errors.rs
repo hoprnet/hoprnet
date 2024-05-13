@@ -13,6 +13,9 @@ pub enum CryptoError {
     #[error("secret scalar results in an invalid EC point")]
     InvalidSecretScalar,
 
+    #[error("ec point represents and invalid public key")]
+    InvalidPublicKey,
+
     #[error("mac or authentication tag did not match")]
     TagMismatch,
 

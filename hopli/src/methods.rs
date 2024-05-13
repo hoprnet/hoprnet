@@ -1256,7 +1256,8 @@ mod tests {
     use ethers::abi::AbiDecode;
     use ethers::types::TransactionRequest;
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
-    use hopr_primitive_types::{primitives::Address, traits::BinarySerializable};
+    use hopr_primitive_types::prelude::BytesRepresentable;
+    use hopr_primitive_types::primitives::Address;
 
     fn get_random_address_for_testing() -> Address {
         // Creates a random Ethereum address, only used for testing

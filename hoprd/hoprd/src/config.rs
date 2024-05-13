@@ -301,14 +301,17 @@ impl HoprdConfig {
                 .hopr
                 .chain
                 .protocols
-                .supported_networks()
+                .supported_networks(hopr_lib::constants::APP_VERSION_COERCED)
                 .iter()
                 .any(|network| network == &cfg.hopr.chain.network)
             {
                 return Err(crate::errors::HoprdError::ValidationError(format!(
                     "The specified network '{}' is not listed as supported ({:?})",
                     cfg.hopr.chain.network,
-                    cfg.hopr.chain.protocols.supported_networks()
+                    cfg.hopr
+                        .chain
+                        .protocols
+                        .supported_networks(hopr_lib::constants::APP_VERSION_COERCED)
                 )));
             }
 

@@ -119,7 +119,7 @@ mod tests {
     async fn test_announce() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
+        let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
         let announce_multiaddr = Multiaddr::from_str("/ip4/1.2.3.4/tcp/9009").unwrap();
 
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
@@ -160,10 +160,10 @@ mod tests {
         let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
         let tx_sender = tx_queue.new_sender();
         async_std::task::spawn(async move {
-            tx_queue.action_loop().await;
+            tx_queue.start().await;
         });
 
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_sender.clone());
         let tx_res = actions
             .announce(&[announce_multiaddr], &ALICE_OFFCHAIN)
             .await
@@ -212,7 +212,7 @@ mod tests {
         );
         let tx_sender = tx_queue.new_sender();
 
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_sender.clone());
 
         let res = actions.announce(&[announce_multiaddr], &*ALICE_OFFCHAIN).await;
         assert!(
@@ -226,7 +226,7 @@ mod tests {
         let _ = env_logger::builder().is_test(true).try_init();
 
         let stake = Balance::new(10_u32, BalanceType::HOPR);
-        let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
+        let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
 
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
         db.set_domain_separator(None, DomainSeparator::Channel, Default::default())
@@ -246,10 +246,10 @@ mod tests {
         let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
         let tx_sender = tx_queue.new_sender();
         async_std::task::spawn(async move {
-            tx_queue.action_loop().await;
+            tx_queue.start().await;
         });
 
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_sender.clone());
 
         let tx_res = actions
             .withdraw(*BOB, stake)
@@ -284,7 +284,7 @@ mod tests {
             MockTransactionExecutor::new(),
             Default::default(),
         );
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_queue.new_sender());
 
         assert!(
             matches!(

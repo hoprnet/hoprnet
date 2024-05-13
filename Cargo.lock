@@ -240,6 +240,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "aquamarine"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "21cc1548309245035eb18aa7f0967da6bc65587005170c56e6ef2788a4cf3f4e"
+dependencies = [
+ "include_dir",
+ "itertools 0.10.5",
+ "proc-macro-error",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.48",
+]
+
+[[package]]
 name = "arrayref"
 version = "0.3.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1241,6 +1255,7 @@ dependencies = [
 name = "chain-api"
 version = "0.2.0"
 dependencies = [
+ "async-channel 2.1.1",
  "async-lock 3.3.0",
  "async-std",
  "async-trait",
@@ -1254,10 +1269,15 @@ dependencies = [
  "hopr-db-api",
  "hopr-internal-types",
  "hopr-primitive-types",
+ "semver 1.0.21",
  "serde",
+ "serde_json",
+ "serde_with",
  "smart-default",
+ "strum 0.25.0",
  "thiserror",
  "tracing",
+ "validator",
 ]
 
 [[package]]
@@ -1746,6 +1766,7 @@ dependencies = [
 name = "core-transport"
 version = "0.5.0"
 dependencies = [
+ "async-channel 2.1.1",
  "async-lock 3.3.0",
  "async-std",
  "async-trait",
@@ -3639,6 +3660,7 @@ dependencies = [
 name = "hopr-internal-types"
 version = "0.5.0"
 dependencies = [
+ "aquamarine",
  "async-trait",
  "bincode",
  "bindings",
@@ -3665,6 +3687,7 @@ dependencies = [
 name = "hopr-lib"
 version = "2.2.0-rc.1"
 dependencies = [
+ "async-channel 2.1.1",
  "async-lock 3.3.0",
  "async-std",
  "atomic_enum",
@@ -3687,9 +3710,7 @@ dependencies = [
  "hopr-platform",
  "hopr-primitive-types",
  "lazy_static",
- "semver 1.0.21",
  "serde",
- "serde_json",
  "serde_with",
  "serde_yaml",
  "smart-default",
@@ -3742,6 +3763,7 @@ dependencies = [
  "anyhow",
  "async-broadcast",
  "async-lock 3.3.0",
+ "async-signal",
  "async-std",
  "chrono",
  "clap",
@@ -3766,6 +3788,7 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "strum 0.26.2",
+ "signal-hook",
  "tempfile",
  "thiserror",
  "tokio",
@@ -4190,6 +4213,25 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 1.0.109",
+]
+
+[[package]]
+name = "include_dir"
+version = "0.7.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "18762faeff7122e89e0857b02f7ce6fcc0d101d5e9ad2ad7846cc01d61b7f19e"
+dependencies = [
+ "include_dir_macros",
+]
+
+[[package]]
+name = "include_dir_macros"
+version = "0.7.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b139284b5cf57ecfa712bcc66950bb635b31aff41c188e8a4cfc758eca374a3f"
+dependencies = [
+ "proc-macro2",
+ "quote",
 ]
 
 [[package]]
@@ -7476,6 +7518,25 @@ name = "shell-words"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "24188a676b6ae68c3b2cb3a01be17fbf7240ce009799bb56d5b1409051e78fde"
+
+[[package]]
+name = "shellexpand"
+version = "3.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "da03fa3b94cc19e3ebfc88c4229c49d8f08cdbd1228870a45f0ffdf84988e14b"
+dependencies = [
+ "dirs",
+]
+
+[[package]]
+name = "signal-hook"
+version = "0.3.17"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8621587d4798caf8eb44879d42e56b9a93ea5dcd315a6487c357130095b62801"
+dependencies = [
+ "libc",
+ "signal-hook-registry",
+]
 
 [[package]]
 name = "signal-hook-registry"

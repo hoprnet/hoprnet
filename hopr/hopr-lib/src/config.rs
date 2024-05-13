@@ -46,7 +46,7 @@ pub struct Chain {
     #[serde(default)]
     pub provider: Option<String>,
     #[serde(default)]
-    pub protocols: crate::chain::ProtocolsConfig,
+    pub protocols: chain_api::config::ProtocolsConfig,
     #[serde(default = "just_true")]
     #[default = true]
     pub check_unrealized_balance: bool,
@@ -54,7 +54,7 @@ pub struct Chain {
 
 #[inline]
 fn default_invalid_address() -> Address {
-    Address::from_bytes(&[0; Address::SIZE]).unwrap()
+    Address::default()
 }
 
 #[inline]

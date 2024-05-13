@@ -20,7 +20,7 @@ use std::fmt::{Display, Formatter};
 #[strum(serialize_all = "snake_case")]
 pub enum Action {
     /// Redeem the given acknowledged ticket.
-    RedeemTicket(AcknowledgedTicket),
+    RedeemTicket(RedeemableTicket),
 
     /// Open channel to the given destination with the given stake
     OpenChannel(Address, Balance),

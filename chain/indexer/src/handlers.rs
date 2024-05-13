@@ -189,7 +189,7 @@ where
                     let diff = channel_entry.balance.sub(&new_balance);
 
                     let mut updated = channel.into_active_model();
-                    updated.balance = Set(new_balance.amount().to_bytes().to_vec());
+                    updated.balance = Set(new_balance.amount().to_be_bytes().to_vec());
                     let channel = updated.update(tx.as_ref()).await?;
 
                     Ok(Some(ChainEventType::ChannelBalanceDecreased(channel.try_into()?, diff)))
@@ -206,7 +206,7 @@ where
                     let diff = new_balance.sub(&channel_entry.balance);
 
                     let mut updated = channel.into_active_model();
-                    updated.balance = Set(new_balance.amount().to_bytes().to_vec());
+                    updated.balance = Set(new_balance.amount().to_be_bytes().to_vec());
                     let channel = updated.update(tx.as_ref()).await?;
 
                     Ok(Some(ChainEventType::ChannelBalanceIncreased(channel.try_into()?, diff)))
@@ -233,8 +233,8 @@ where
 
                     // set all channel fields like we do on-chain on close
                     let mut active_channel = channel.into_active_model();
-                    active_channel.balance = Set(BalanceType::HOPR.zero().amount().to_bytes().to_vec());
-                    active_channel.ticket_index = Set(U256::zero().to_bytes().to_vec());
+                    active_channel.balance = Set(BalanceType::HOPR.zero().amount().to_be_bytes().to_vec());
+                    active_channel.ticket_index = Set(U256::zero().to_be_bytes().to_vec());
                     active_channel.set_status(ChannelStatus::Closed);
                     let channel = active_channel.update(tx.as_ref()).await?;
 
@@ -333,8 +333,8 @@ where
                                 .filter(|ticket| {
                                     // The ticket that has been redeemed at this point has: index + index_offset - 1 == new_ticket_index - 1
                                     // Since unaggregated tickets have index_offset = 1, for the unagg case this leads to: index == new_ticket_index - 1
-                                    let ticket_idx = ticket.ticket.index;
-                                    let ticket_off = ticket.ticket.index_offset as u64;
+                                    let ticket_idx = ticket.verified_ticket().index;
+                                    let ticket_off = ticket.verified_ticket().index_offset as u64;
 
                                     ticket_idx + ticket_off == ticket_redeemed.new_ticket_index
                                 })
@@ -762,13 +762,7 @@ where
                     // Update the hash only if any logs were processed in this block
                     let block_hash = if !log_tx_hashes.is_empty() {
                         debug!("block {block_id} has hashes {:?}", log_tx_hashes);
-                        let h = Hash::create(
-                            log_tx_hashes
-                                .iter()
-                                .map(|h| h.as_slice())
-                                .collect::<Vec<_>>()
-                                .as_slice(),
-                        );
+                        let h = Hash::create(log_tx_hashes.iter().map(|h| h.as_ref()).collect::<Vec<_>>().as_ref());
                         debug!("block hash of {block_id} is {h}");
                         Some(h)
                     } else {
@@ -837,15 +831,15 @@ pub mod tests {
         static ref COUNTERPARTY_CHAIN_ADDRESS: Address = COUNTERPARTY_CHAIN_KEY.public().to_address();
         static ref SELF_CHAIN_KEY: ChainKeypair = ChainKeypair::random();
         static ref SELF_CHAIN_ADDRESS: Address = SELF_CHAIN_KEY.public().to_address();
-        static ref STAKE_ADDRESS: Address = Address::from_bytes(&hex!("4331eaa9542b6b034c43090d9ec1c2198758dbc3")).unwrap();
-        static ref CHANNELS_ADDR: Address = Address::from_bytes(&hex!("bab20aea98368220baa4e3b7f151273ee71df93b")).unwrap(); // just a dummy
-        static ref TOKEN_ADDR: Address = Address::from_bytes(&hex!("47d1677e018e79dcdd8a9c554466cb1556fa5007")).unwrap(); // just a dummy
-        static ref NETWORK_REGISTRY_ADDR: Address = Address::from_bytes(&hex!("a469d0225f884fb989cbad4fe289f6fd2fb98051")).unwrap(); // just a dummy
-        static ref NODE_SAFE_REGISTRY_ADDR: Address = Address::from_bytes(&hex!("0dcd1bf9a1b36ce34237eeafef220932846bcd82")).unwrap(); // just a dummy
-        static ref ANNOUNCEMENTS_ADDR: Address = Address::from_bytes(&hex!("11db4791bf45ef31a10ea4a1b5cb90f46cc72c7e")).unwrap(); // just a dummy
-        static ref SAFE_MANAGEMENT_MODULE_ADDR: Address = Address::from_bytes(&hex!("9b91245a65ad469163a86e32b2281af7a25f38ce")).unwrap(); // just a dummy
-        static ref SAFE_INSTANCE_ADDR: Address = Address::from_bytes(&hex!("b93d7fdd605fb64fdcc87f21590f950170719d47")).unwrap(); // just a dummy
-        static ref TICKET_PRICE_ORACLE_ADDR: Address = Address::from_bytes(&hex!("11db4391bf45ef31a10ea4a1b5cb90f46cc72c7e")).unwrap(); // just a dummy
+        static ref STAKE_ADDRESS: Address = "4331eaa9542b6b034c43090d9ec1c2198758dbc3".parse().unwrap();
+        static ref CHANNELS_ADDR: Address = "bab20aea98368220baa4e3b7f151273ee71df93b".parse().unwrap(); // just a dummy
+        static ref TOKEN_ADDR: Address = "47d1677e018e79dcdd8a9c554466cb1556fa5007".parse().unwrap(); // just a dummy
+        static ref NETWORK_REGISTRY_ADDR: Address = "a469d0225f884fb989cbad4fe289f6fd2fb98051".parse().unwrap(); // just a dummy
+        static ref NODE_SAFE_REGISTRY_ADDR: Address = "0dcd1bf9a1b36ce34237eeafef220932846bcd82".parse().unwrap(); // just a dummy
+        static ref ANNOUNCEMENTS_ADDR: Address = "11db4791bf45ef31a10ea4a1b5cb90f46cc72c7e".parse().unwrap(); // just a dummy
+        static ref SAFE_MANAGEMENT_MODULE_ADDR: Address = "9b91245a65ad469163a86e32b2281af7a25f38ce".parse().unwrap(); // just a dummy
+        static ref SAFE_INSTANCE_ADDR: Address = "b93d7fdd605fb64fdcc87f21590f950170719d47".parse().unwrap(); // just a dummy
+        static ref TICKET_PRICE_ORACLE_ADDR: Address = "11db4391bf45ef31a10ea4a1b5cb90f46cc72c7e".parse().unwrap(); // just a dummy
     }
 
     async fn create_db() -> HoprDb {
@@ -899,10 +893,10 @@ pub mod tests {
             address: handlers.addresses.announcements.into(),
             topics: vec![KeyBindingFilter::signature()],
             data: encode(&[
-                Token::FixedBytes(Vec::from(keybinding.signature.to_bytes())),
-                Token::FixedBytes(Vec::from(keybinding.packet_key.to_bytes())),
+                Token::FixedBytes(keybinding.signature.as_ref().to_vec()),
+                Token::FixedBytes(keybinding.packet_key.as_ref().to_vec()),
                 Token::Address(EthereumAddress::from_slice(
-                    &SELF_CHAIN_KEY.public().to_address().to_bytes(),
+                    &SELF_CHAIN_KEY.public().to_address().as_ref(),
                 )),
             ])
             .into(),
@@ -946,7 +940,7 @@ pub mod tests {
             address: handlers.addresses.announcements.into(),
             topics: vec![AddressAnnouncementFilter::signature()],
             data: encode(&[
-                Token::Address(EthereumAddress::from_slice(&SELF_CHAIN_ADDRESS.to_bytes())),
+                Token::Address(EthereumAddress::from_slice(&SELF_CHAIN_ADDRESS.as_ref())),
                 Token::String(test_multiaddr_empty.to_string()),
             ])
             .into(),
@@ -988,7 +982,7 @@ pub mod tests {
             block_number: Some(1.into()),
             topics: vec![AddressAnnouncementFilter::signature()],
             data: encode(&[
-                Token::Address(EthereumAddress::from_slice(&SELF_CHAIN_ADDRESS.to_bytes())),
+                Token::Address(EthereumAddress::from_slice(&SELF_CHAIN_ADDRESS.as_ref())),
                 Token::String(test_multiaddr.to_string()),
             ])
             .into(),
@@ -1051,7 +1045,7 @@ pub mod tests {
             block_number: Some(2.into()),
             topics: vec![AddressAnnouncementFilter::signature()],
             data: encode(&[
-                Token::Address(EthereumAddress::from_slice(&SELF_CHAIN_ADDRESS.to_bytes())),
+                Token::Address(EthereumAddress::from_slice(&SELF_CHAIN_ADDRESS.as_ref())),
                 Token::String(test_multiaddr_dns.to_string()),
             ])
             .into(),
@@ -1129,7 +1123,7 @@ pub mod tests {
             address: handlers.addresses.announcements.into(),
             topics: vec![RevokeAnnouncementFilter::signature()],
             data: encode(&[Token::Address(EthereumAddress::from_slice(
-                &SELF_CHAIN_ADDRESS.to_bytes(),
+                &SELF_CHAIN_ADDRESS.as_ref(),
             ))])
             .into(),
             ..test_log()
@@ -1174,7 +1168,7 @@ pub mod tests {
                 H256::from_slice(&Address::default().to_bytes32()),
                 H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()),
             ],
-            data: encode(&[Token::Uint(EthU256::from_big_endian(&value.to_bytes()))]).into(),
+            data: encode(&[Token::Uint(value)]).into(),
             ..test_log()
         };
 
@@ -1213,7 +1207,7 @@ pub mod tests {
                 H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()),
                 H256::from_slice(&Address::default().to_bytes32()),
             ],
-            data: encode(&[Token::Uint(EthU256::from_big_endian(&value.to_bytes()))]).into(),
+            data: encode(&[Token::Uint(value)]).into(),
             ..test_log()
         };
 
@@ -1629,9 +1623,9 @@ pub mod tests {
             address: handlers.addresses.channels.into(),
             topics: vec![
                 ChannelBalanceIncreasedFilter::signature(),
-                H256::from_slice(&channel.get_id().to_bytes()),
+                H256::from_slice(channel.get_id().as_ref()),
             ],
-            data: Vec::from(solidity_balance.amount().to_bytes()).into(),
+            data: Vec::from(solidity_balance.amount().to_be_bytes()).into(),
             ..test_log()
         };
 
@@ -1665,7 +1659,7 @@ pub mod tests {
             address: handlers.addresses.channels.into(),
             topics: vec![
                 DomainSeparatorUpdatedFilter::signature(),
-                H256::from_slice(&separator.to_bytes()),
+                H256::from_slice(separator.as_ref()),
             ],
             data: encode(&[]).into(),
             ..test_log()
@@ -1717,9 +1711,9 @@ pub mod tests {
             address: handlers.addresses.channels.into(),
             topics: vec![
                 ChannelBalanceDecreasedFilter::signature(),
-                H256::from_slice(&channel.get_id().to_bytes()),
+                H256::from_slice(channel.get_id().as_ref()),
             ],
-            data: Vec::from(solidity_balance.to_bytes()).into(),
+            data: Vec::from(solidity_balance.to_be_bytes()).into(),
             ..test_log()
         };
 
@@ -1764,7 +1758,7 @@ pub mod tests {
             address: handlers.addresses.channels.into(),
             topics: vec![
                 ChannelClosedFilter::signature(),
-                H256::from_slice(&channel.get_id().to_bytes()),
+                H256::from_slice(channel.get_id().as_ref()),
             ],
             data: encode(&[]).into(),
             ..test_log()
@@ -1945,29 +1939,22 @@ pub mod tests {
         let channel_epoch = 1u64;
         let domain_separator = Hash::default();
 
-        let response = Response::new(
-            &Hash::create(&[
-                &channel_id.to_bytes(),
-                &channel_epoch.to_be_bytes(),
-                &index.to_be_bytes(),
-            ])
-            .to_bytes(),
-        );
-
-        let ticket = Ticket::new(
-            &destination.into(),
-            &Balance::new(price_per_packet.div_f64(ticket_win_prob).unwrap(), BalanceType::HOPR),
-            index.into(),
-            1u64.into(),
-            ticket_win_prob,
-            1u64.into(),
-            response.to_challenge().into(),
-            signer,
-            &domain_separator,
+        let response = Response::try_from(
+            Hash::create(&[channel_id.as_ref(), &channel_epoch.to_be_bytes(), &index.to_be_bytes()]).as_ref(),
         )
         .unwrap();
 
-        AcknowledgedTicket::new(ticket, response, signer.into(), destination, &domain_separator).unwrap()
+        TicketBuilder::default()
+            .direction(&signer.into(), &destination.into())
+            .amount(price_per_packet.div_f64(ticket_win_prob).unwrap())
+            .index(index)
+            .index_offset(1)
+            .win_prob(ticket_win_prob)
+            .channel_epoch(1)
+            .challenge(response.to_challenge().into())
+            .build_signed(signer, &domain_separator)
+            .unwrap()
+            .into_acknowledged(response)
     }
 
     #[async_std::test]
@@ -2001,9 +1988,9 @@ pub mod tests {
             address: handlers.addresses.channels.into(),
             topics: vec![
                 TicketRedeemedFilter::signature(),
-                H256::from_slice(&channel.get_id().to_bytes()),
+                H256::from_slice(channel.get_id().as_ref()),
             ],
-            data: Vec::from(next_ticket_index.to_bytes()).into(),
+            data: Vec::from(next_ticket_index.to_be_bytes()).into(),
             ..test_log()
         };
 
@@ -2072,9 +2059,9 @@ pub mod tests {
             address: handlers.addresses.channels.into(),
             topics: vec![
                 TicketRedeemedFilter::signature(),
-                H256::from_slice(&channel.get_id().to_bytes()),
+                H256::from_slice(channel.get_id().as_ref()),
             ],
-            data: Vec::from(next_ticket_index.to_bytes()).into(),
+            data: Vec::from(next_ticket_index.to_be_bytes()).into(),
             ..test_log()
         };
 
@@ -2141,9 +2128,9 @@ pub mod tests {
             address: handlers.addresses.channels.into(),
             topics: vec![
                 TicketRedeemedFilter::signature(),
-                H256::from_slice(&channel.get_id().to_bytes()),
+                H256::from_slice(channel.get_id().as_ref()),
             ],
-            data: Vec::from(next_ticket_index.to_bytes()).into(),
+            data: Vec::from(next_ticket_index.to_be_bytes()).into(),
             ..test_log()
         };
 
@@ -2191,9 +2178,9 @@ pub mod tests {
             address: handlers.addresses.channels.into(),
             topics: vec![
                 TicketRedeemedFilter::signature(),
-                H256::from_slice(&channel.get_id().to_bytes()),
+                H256::from_slice(channel.get_id().as_ref()),
             ],
-            data: Vec::from(next_ticket_index.to_bytes()).into(),
+            data: Vec::from(next_ticket_index.to_be_bytes()).into(),
             ..test_log()
         };
 
@@ -2241,9 +2228,9 @@ pub mod tests {
             address: handlers.addresses.channels.into(),
             topics: vec![
                 OutgoingChannelClosureInitiatedFilter::signature(),
-                H256::from_slice(&channel.get_id().to_bytes()),
+                H256::from_slice(channel.get_id().as_ref()),
             ],
-            data: Vec::from(U256::from(timestamp.as_unix_timestamp().as_secs()).to_bytes()).into(),
+            data: Vec::from(U256::from(timestamp.as_unix_timestamp().as_secs()).to_be_bytes()).into(),
             ..test_log()
         };
 

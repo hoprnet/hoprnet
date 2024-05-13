@@ -108,7 +108,7 @@ mod test {
     #[test]
     fn test_account_entry_non_routable() {
         let pub_key = OffchainPublicKey::from_privkey(&PRIVATE_KEY).unwrap();
-        let chain_addr = Address::from_bytes(&CHAIN_ADDR).unwrap();
+        let chain_addr = Address::try_from(CHAIN_ADDR.as_ref()).unwrap();
 
         let ae1 = AccountEntry::new(
             pub_key,
@@ -129,7 +129,7 @@ mod test {
     #[test]
     fn test_account_entry_routable() {
         let pub_key = OffchainPublicKey::from_privkey(&PRIVATE_KEY).unwrap();
-        let chain_addr = Address::from_bytes(&CHAIN_ADDR).unwrap();
+        let chain_addr = Address::try_from(CHAIN_ADDR.as_ref()).unwrap();
 
         let ae1 = AccountEntry::new(
             pub_key,
@@ -150,7 +150,7 @@ mod test {
     #[test]
     fn test_account_entry_not_announced() {
         let pub_key = OffchainPublicKey::from_privkey(&PRIVATE_KEY).unwrap();
-        let chain_addr = Address::from_bytes(&CHAIN_ADDR).unwrap();
+        let chain_addr = Address::try_from(CHAIN_ADDR.as_ref()).unwrap();
 
         let ae1 = AccountEntry::new(pub_key, chain_addr, NotAnnounced);
 

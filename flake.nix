@@ -366,6 +366,9 @@
               gnumake
               which
 
+              # github integration
+              gh
+
               # test Github automation
               act
 

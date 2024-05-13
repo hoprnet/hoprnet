@@ -257,7 +257,7 @@ mod tests {
         let _ = env_logger::builder().is_test(true).try_init();
 
         let stake = Balance::new(10_u32, BalanceType::HOPR);
-        let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
+        let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
 
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
         let db_clone = db.clone();
@@ -305,11 +305,9 @@ mod tests {
         let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
 
         let tx_sender = tx_queue.new_sender();
-        async_std::task::spawn(async move {
-            tx_queue.action_loop().await;
-        });
+        async_std::task::spawn(async move { tx_queue.start().await });
 
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_sender.clone());
 
         let tx_res = actions
             .open_channel(*BOB, stake)
@@ -366,7 +364,7 @@ mod tests {
             Default::default(),
         );
 
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_queue.new_sender());
 
         assert!(
             matches!(
@@ -412,7 +410,7 @@ mod tests {
             Default::default(),
         );
 
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_queue.new_sender());
 
         assert!(
             matches!(
@@ -456,7 +454,7 @@ mod tests {
             Default::default(),
         );
 
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_queue.new_sender());
         let stake = Balance::new(10_u32, BalanceType::Native);
         assert!(
             matches!(
@@ -512,7 +510,7 @@ mod tests {
             Default::default(),
         );
 
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_queue.new_sender());
 
         assert!(
             matches!(
@@ -558,7 +556,7 @@ mod tests {
             Default::default(),
         );
 
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_queue.new_sender());
 
         assert!(
             matches!(
@@ -574,7 +572,7 @@ mod tests {
         let _ = env_logger::builder().is_test(true).try_init();
 
         let stake = Balance::new(10_u32, BalanceType::HOPR);
-        let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
+        let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
         let channel = ChannelEntry::new(*ALICE, *BOB, stake, U256::zero(), ChannelStatus::Open, U256::zero());
 
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
@@ -622,10 +620,10 @@ mod tests {
         let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
         let tx_sender = tx_queue.new_sender();
         async_std::task::spawn(async move {
-            tx_queue.action_loop().await;
+            tx_queue.start().await;
         });
 
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_sender.clone());
 
         let tx_res = actions
             .fund_channel(channel.get_id(), stake)
@@ -680,7 +678,7 @@ mod tests {
             Default::default(),
         );
 
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_queue.new_sender());
         let stake = Balance::new(10_u32, BalanceType::HOPR);
         assert!(
             matches!(
@@ -726,7 +724,7 @@ mod tests {
             Default::default(),
         );
 
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_queue.new_sender());
         let stake = Balance::new(10_u32, BalanceType::Native);
         assert!(
             matches!(
@@ -781,7 +779,7 @@ mod tests {
             Default::default(),
         );
 
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_queue.new_sender());
         let stake = Balance::new(10_000_u32, BalanceType::HOPR);
         assert!(
             matches!(
@@ -827,7 +825,7 @@ mod tests {
             Default::default(),
         );
 
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_queue.new_sender());
         let stake = Balance::new(10_000_u32, BalanceType::HOPR);
         assert!(
             matches!(
@@ -843,7 +841,7 @@ mod tests {
         let _ = env_logger::builder().is_test(true).try_init();
 
         let stake = Balance::new(10_u32, BalanceType::HOPR);
-        let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
+        let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
 
         let mut channel = ChannelEntry::new(*ALICE, *BOB, stake, U256::zero(), ChannelStatus::Open, U256::zero());
 
@@ -915,10 +913,10 @@ mod tests {
         let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
         let tx_sender = tx_queue.new_sender();
         async_std::task::spawn(async move {
-            tx_queue.action_loop().await;
+            tx_queue.start().await;
         });
 
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_sender.clone());
 
         let tx_res = actions
             .close_channel(*BOB, ChannelDirection::Outgoing, false)
@@ -963,7 +961,7 @@ mod tests {
     #[async_std::test]
     async fn test_close_channel_incoming() {
         let stake = Balance::new(10_u32, BalanceType::HOPR);
-        let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
+        let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
 
         let channel = ChannelEntry::new(*BOB, *ALICE, stake, U256::zero(), ChannelStatus::Open, U256::zero());
 
@@ -1013,10 +1011,10 @@ mod tests {
         let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
         let tx_sender = tx_queue.new_sender();
         async_std::task::spawn(async move {
-            tx_queue.action_loop().await;
+            tx_queue.start().await;
         });
 
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_sender.clone());
 
         let tx_res = actions
             .close_channel(*BOB, ChannelDirection::Incoming, false)
@@ -1079,7 +1077,7 @@ mod tests {
             Default::default(),
         );
 
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_queue.new_sender());
 
         assert!(
             matches!(
@@ -1126,7 +1124,7 @@ mod tests {
             MockTransactionExecutor::new(),
             Default::default(),
         );
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_queue.new_sender());
 
         assert!(
             matches!(
@@ -1178,7 +1176,7 @@ mod tests {
             Default::default(),
         );
 
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_queue.new_sender());
 
         assert!(
             matches!(

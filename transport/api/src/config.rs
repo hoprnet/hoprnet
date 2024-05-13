@@ -5,7 +5,7 @@ use std::str::FromStr;
 use serde::{Deserialize, Serialize};
 use validator::{Validate, ValidationError};
 
-pub use core_network::{heartbeat::HeartbeatConfig, network::NetworkConfig};
+pub use core_network::{config::NetworkConfig, heartbeat::HeartbeatConfig};
 pub use core_protocol::config::ProtocolConfig;
 
 use std::net::ToSocketAddrs;

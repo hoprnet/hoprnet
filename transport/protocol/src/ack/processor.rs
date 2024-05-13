@@ -1,6 +1,5 @@
 use std::pin::Pin;
 
-use async_std::task::spawn;
 use futures::channel::mpsc::{channel, Receiver, Sender};
 use futures::future::poll_fn;
 use futures::{stream::Stream, StreamExt};
@@ -69,7 +68,7 @@ impl<Db: HoprDbProtocolOperations> AcknowledgementProcessor<Db> {
         &self,
         ack: Acknowledgement,
     ) -> std::result::Result<AckResult, hopr_db_api::errors::DbError> {
-        self.db.handle_acknowledgement(ack, self.chain_key.clone()).await
+        self.db.handle_acknowledgement(ack, &self.chain_key).await
     }
 }
 
@@ -200,7 +199,9 @@ impl AcknowledgementInteraction {
             }
         });
 
-        spawn(async move {
+        // NOTE: This spawned task does not need to be explicitly canceled, since it will
+        // be automatically dropped when the event sender object is dropped.
+        async_std::task::spawn(async move {
             processing_stream.map(Ok).forward(futures::sink::drain()).await.unwrap();
         });
 
