@@ -127,8 +127,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let hopr_keys: HoprKeys = match &cfg.identity.private_key {
         Some(private_key) => IdentityRetrievalModes::FromPrivateKey { private_key },
         None => IdentityRetrievalModes::FromFile {
-            password: &cfg.identity.file,
-            id_path: &cfg.identity.password,
+            password: &cfg.identity.password,
+            id_path: &cfg.identity.file,
         },
     }
     .try_into()?;
