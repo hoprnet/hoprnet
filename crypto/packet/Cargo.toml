@@ -16,9 +16,9 @@ async-std = { workspace = true }
 async-lock = { workspace = true }
 hex = { workspace = true }
 lazy_static = { workspace = true }
-thiserror = "1.0"
+thiserror = { workspace = true }
 tracing = { workspace = true }
-typenum = "1.16"
+typenum = { workspace = true }
 
 hopr-crypto-sphinx = { workspace = true }
 hopr-crypto-types = { workspace = true }
