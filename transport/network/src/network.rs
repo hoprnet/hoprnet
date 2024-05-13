@@ -6,15 +6,12 @@ use hopr_primitive_types::traits::SaturatingSub;
 use libp2p_identity::PeerId;
 
 use multiaddr::Multiaddr;
-use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, DurationSeconds};
 use tracing::debug;
-use validator::Validate;
 
 pub use hopr_db_api::peers::{PeerOrigin, PeerStatus, Stats};
 use hopr_platform::time::native::current_time;
 
-use crate::constants::DEFAULT_NETWORK_QUALITY_THRESHOLD;
+use crate::config::NetworkConfig;
 
 use hopr_db_api::peers::PeerSelector;
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -37,61 +34,6 @@ lazy_static::lazy_static! {
         "hopr_time_to_green_sec",
         "Time it takes for a node to transition to the GREEN network state"
     ).unwrap();
-}
-
-/// Configuration for the [Network] object
-#[serde_as]
-#[derive(Debug, Clone, Serialize, Deserialize, Validate, PartialEq)]
-#[serde(deny_unknown_fields)]
-pub struct NetworkConfig {
-    /// Minimum delay will be multiplied by backoff, it will be half the actual minimum value
-    #[serde_as(as = "DurationSeconds<u64>")]
-    pub min_delay: Duration,
-
-    /// Maximum delay
-    #[serde_as(as = "DurationSeconds<u64>")]
-    pub max_delay: Duration,
-
-    #[validate(range(min = 0.0, max = 1.0))]
-    pub quality_bad_threshold: f64,
-
-    #[validate(range(min = 0.0, max = 1.0))]
-    pub quality_offline_threshold: f64,
-
-    pub quality_step: f64,
-
-    /// Size of the window for quality moving average
-    #[validate(range(min = 1_u32))]
-    pub quality_avg_window_size: u32,
-
-    #[serde_as(as = "DurationSeconds<u64>")]
-    pub ignore_timeframe: Duration,
-
-    pub backoff_exponent: f64,
-
-    pub backoff_min: f64,
-
-    pub backoff_max: f64,
-}
-
-impl Default for NetworkConfig {
-    fn default() -> Self {
-        let min_delay_in_s = 1;
-        let max_delay_in_s = 300;
-
-        Self {
-            min_delay: Duration::from_secs(min_delay_in_s),
-            max_delay: Duration::from_secs(max_delay_in_s), // 5 minutes
-            quality_bad_threshold: 0.2,
-            quality_offline_threshold: DEFAULT_NETWORK_QUALITY_THRESHOLD,
-            quality_step: 0.1,
-            quality_avg_window_size: 25, // TODO: think about some reasonable default
-            ignore_timeframe: Duration::from_secs(600), // 10 minutes
-            backoff_exponent: 1.5,
-            backoff_min: 2.0,
-            backoff_max: max_delay_in_s as f64 / min_delay_in_s as f64,
-        }
-    }
 }
 
 /// Network health represented with colors, where green is the best and red
