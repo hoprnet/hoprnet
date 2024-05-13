@@ -94,6 +94,14 @@ pub struct HoprKeys {
     id: Uuid,
 }
 
+impl TryFrom<IdentityRetrievalModes<'_>> for HoprKeys {
+    type Error = KeyPairError;
+
+    fn try_from(value: IdentityRetrievalModes) -> std::result::Result<Self, Self::Error> {
+        Self::init(value)
+    }
+}
+
 impl Serialize for HoprKeys {
     /// Serialize without private keys
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
@@ -222,15 +230,8 @@ impl HoprKeys {
         }
     }
 
-    /// Used to derive a UUID as used as a filename in case none
-    /// is specified
-    #[cfg(any(feature = "hopli", test))]
-    pub fn get_random_uuid() -> Uuid {
-        Uuid::new_v4()
-    }
-
     /// Initializes HoprKeys using the provided retrieval mode
-    pub fn init(retrieval_mode: IdentityRetrievalModes) -> Result<Self> {
+    fn init(retrieval_mode: IdentityRetrievalModes) -> Result<Self> {
         match retrieval_mode {
             IdentityRetrievalModes::FromFile { password, id_path } => {
                 let identity_file_exists = metadata(id_path).is_ok();
@@ -475,6 +476,7 @@ mod tests {
 
     use hopr_crypto_types::prelude::*;
     use tempfile::tempdir;
+    use uuid::Uuid;
 
     use super::HoprKeys;
 
@@ -604,7 +606,7 @@ mod tests {
         let tmp = tempdir().unwrap();
         let identity_dir = tmp.path().join("hopr-unit-test-identity");
         let identity_path = identity_dir.to_str().unwrap();
-        let id = super::HoprKeys::get_random_uuid();
+        let id = Uuid::new_v4();
 
         assert!(super::HoprKeys::init(super::IdentityRetrievalModes::FromIdIntoFile {
             password: "local",

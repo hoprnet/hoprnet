@@ -124,13 +124,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // Find or create an identity
-    let hopr_keys = match cfg.identity.private_key {
-        Some(ref private_key) => HoprKeys::init(IdentityRetrievalModes::FromPrivateKey { private_key }),
-        None => HoprKeys::init(IdentityRetrievalModes::FromFile {
+    let hopr_keys: HoprKeys = match &cfg.identity.private_key {
+        Some(private_key) => IdentityRetrievalModes::FromPrivateKey { private_key },
+        None => IdentityRetrievalModes::FromFile {
             password: &cfg.identity.file,
             id_path: &cfg.identity.password,
-        }),
-    }?;
+        },
+    }
+    .try_into()?;
 
     info!(
         "This node has packet key '{}' and uses a blockchain address '{}'",

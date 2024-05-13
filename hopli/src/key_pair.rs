@@ -18,6 +18,7 @@ use std::{
     path::{Path, PathBuf},
 };
 use tracing::{debug, error, info, warn};
+use uuid::Uuid;
 
 pub fn read_identity(file: &Path, password: &str) -> Result<(String, HoprKeys), HelperErrors> {
     let file_str = file
@@ -54,7 +55,7 @@ pub fn read_identities(files: Vec<PathBuf>, password: &str) -> Result<HashMap<St
             .to_str()
             .ok_or(HelperErrors::IncorrectFilename(file.to_string_lossy().to_string()))?;
 
-        match HoprKeys::init(IdentityRetrievalModes::FromFile { password, id_path }) {
+        match HoprKeys::try_from(IdentityRetrievalModes::FromFile { password, id_path }) {
             Ok(keys) => {
                 results.insert(id_path.into(), keys);
             }
@@ -106,7 +107,7 @@ pub fn create_identity(
     // create dir if not exist
     fs::create_dir_all(dir_name)?;
 
-    let id = HoprKeys::get_random_uuid();
+    let id = Uuid::new_v4();
 
     // check if `name` is end with `.id`, if not, append it
     let file_name = match maybe_name {
@@ -133,11 +134,12 @@ pub fn create_identity(
 
     Ok((
         file_path_str.into(),
-        HoprKeys::init(hoprd_keypair::key_pair::IdentityRetrievalModes::FromIdIntoFile {
+        IdentityRetrievalModes::FromIdIntoFile {
             id,
             password,
             id_path: file_path_str,
-        })?,
+        }
+        .try_into()?,
     ))
 }
 

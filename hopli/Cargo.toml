@@ -21,6 +21,7 @@ hopr-primitive-types = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
+uuid = { workspace = true }
 chain-rpc = {workspace = true}
 chain-api = {workspace = true}
 hopr-lib = { workspace = true }
