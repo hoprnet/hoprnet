@@ -7,7 +7,7 @@ use validator::{Validate, ValidationError};
 use hopr_internal_types::prelude::*;
 
 pub fn validate_is_power_of_two(value: u32) -> Result<(), ValidationError> {
-    if (value & (value - 1)) == 0 {
+    if value > 0 && (value & (value - 1)) == 0 {
         Ok(())
     } else {
         Err(ValidationError::new("The value is not power of 2"))
@@ -24,7 +24,7 @@ pub struct MessageInboxConfiguration {
     /// In the current implementation, the capacity must be a power of two.
     ///
     /// Defaults to 512.
-    #[validate(custom = "validate_is_power_of_two")]
+    #[validate(custom(function = "validate_is_power_of_two"))]
     #[serde(default = "default_capacity")]
     #[default(default_capacity())]
     pub capacity: u32,

@@ -15,7 +15,7 @@ async-lock = { workspace = true }
 async-signal = { workspace = true }
 async-std = { workspace = true, features = ["attributes", "tokio1"] }
 clap = { workspace = true }
-chrono = "0.4.26"
+chrono = { workspace = true }
 env_logger = { workspace = true, optional = true }
 futures = { workspace = true }
 hex = { workspace = true }

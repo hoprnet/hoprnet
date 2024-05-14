@@ -17,7 +17,7 @@ async-trait = { workspace = true }
 futures = { workspace = true }
 lazy_static = { workspace = true }
 libp2p-identity = { workspace = true }
-petgraph = { version = "0.6.4", features = ["serde-1"] }
+petgraph = { version = "0.6.5", features = ["serde-1"] }
 serde = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }

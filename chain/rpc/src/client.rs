@@ -106,7 +106,7 @@ pub struct SimpleJsonRpcRetryPolicy {
     /// requests will be retried at a constant rate.
     ///
     /// Default is 1.001
-    #[validate(range(min = 0))]
+    #[validate(range(min = 0.0))]
     #[default(1.001)]
     pub backoff_coefficient: f64,
     /// Maximum backoff value.

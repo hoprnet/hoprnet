@@ -14,12 +14,12 @@ crate-type = ["rlib"]
 [dependencies]
 bincode = "1.3.3"
 hex = { workspace = true }
-primitive-types = { version = "0.12.1", features = ["serde"] }
+primitive-types = { workspace = true }
 rlp = "0.5.2" # TODO: remove in 3.0
 regex = { workspace = true }
 strum = { workspace = true }
 serde = { workspace = true }
-thiserror = "1.0"
+thiserror = { workspace = true }
 
 hopr-crypto-random = { workspace = true }
 
