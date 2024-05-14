@@ -162,6 +162,15 @@ pub struct CliArgs {
     pub max_block_range: Option<u64>,
 
     #[arg(
+        long = "maxRequestsPerSec",
+        help = "Maximum number of RPC requestes that can be performed per second.",
+        env = "HOPRD_MAX_RPC_REQUESTS_PER_SEC",
+        value_name = "MAX_RPC_REQUESTS_PER_SEC",
+        value_parser = clap::value_parser ! (u64)
+    )]
+    pub max_rpc_requests_per_sec: Option<u32>,
+
+    #[arg(
         long,
         help = "A custom RPC provider to be used for the node to connect to blockchain",
         env = "HOPRD_PROVIDER",

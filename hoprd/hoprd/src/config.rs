@@ -220,7 +220,7 @@ impl HoprdConfig {
 
         if cli_args.auto_redeem_tickets == 1 {
             warn!(
-                "DEPRECATION: 'disableTicketAutoRedeem' (HOPRD_DISABLE_AUTO_REDEEEM_TICKETS) \
+                "DEPRECATION: 'disableTicketAutoRedeem' (HOPRD_DISABLE_AUTO_REDEEM_TICKETS) \
             option is now deprecated and has no effect. It will be removed in future releases, \
             please use configuration file to configure strategies"
             );
@@ -253,6 +253,10 @@ impl HoprdConfig {
         //   TODO: custom provider is redundant with the introduction of protocol-config.json
         if let Some(x) = cli_args.provider {
             cfg.hopr.chain.provider = Some(x);
+        }
+
+        if let Some(x) = cli_args.max_rpc_requests_per_sec {
+            cfg.hopr.chain.max_rpc_requests_per_sec = Some(x);
         }
 
         if let Some(x) = cli_args.max_block_range {

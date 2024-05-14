@@ -46,6 +46,8 @@ pub struct Chain {
     #[serde(default)]
     pub provider: Option<String>,
     #[serde(default)]
+    pub max_rpc_requests_per_sec: Option<u32>,
+    #[serde(default)]
     pub protocols: chain_api::config::ProtocolsConfig,
     #[serde(default = "just_true")]
     #[default = true]

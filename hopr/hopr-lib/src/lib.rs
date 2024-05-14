@@ -440,6 +440,7 @@ impl Hopr {
             &cfg.chain.network,
             crate::constants::APP_VERSION_COERCED,
             cfg.chain.provider.as_deref(),
+            cfg.chain.max_rpc_requests_per_sec,
             &mut cfg.chain.protocols,
         )
         .expect("Failed to resolve blockchain environment");
