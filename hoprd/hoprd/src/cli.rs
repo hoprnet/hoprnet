@@ -166,7 +166,7 @@ pub struct CliArgs {
         help = "Maximum number of RPC requestes that can be performed per second.",
         env = "HOPRD_MAX_RPC_REQUESTS_PER_SEC",
         value_name = "MAX_RPC_REQUESTS_PER_SEC",
-        value_parser = clap::value_parser ! (u64)
+        value_parser = clap::value_parser ! (u32)
     )]
     pub max_rpc_requests_per_sec: Option<u32>,
 

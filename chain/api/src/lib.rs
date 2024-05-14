@@ -156,7 +156,7 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
     ) -> Self {
         // TODO: extract this from the global config type
         let rpc_http_config = chain_rpc::client::native::HttpPostRequestorConfig {
-            max_requests_per_sec: chain_config.max_requests_per_sec,
+            max_requests_per_sec: chain_config.max_requests_per_sec.or_else(|| Some(3)),
             ..chain_rpc::client::native::HttpPostRequestorConfig::default()
         };
 
