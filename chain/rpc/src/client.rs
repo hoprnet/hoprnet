@@ -136,7 +136,7 @@ pub struct SimpleJsonRpcRetryPolicy {
     ///
     /// If any additional request fails after this number is attained, it won't be retried.
     ///
-    /// Defaults to 3
+    /// Default is 3
     #[validate(range(min = 1))]
     #[default = 3]
     pub max_retry_queue_size: u32,
@@ -439,6 +439,7 @@ pub mod native {
     use async_trait::async_trait;
     use serde::{Deserialize, Serialize};
     use std::time::Duration;
+    use tracing::error;
 
     use crate::errors::HttpRequestError;
     use crate::HttpPostRequestor;
@@ -457,6 +458,12 @@ pub mod native {
         /// Defaults to 3
         #[default(3)]
         pub max_redirects: u8,
+
+        /// Maximum number of requests per second.
+        ///
+        /// Defaults to None (unlimited)
+        #[default(None)]
+        pub max_requests_per_sec: Option<u32>,
     }
 
     /// HTTP client that uses a non-Tokio runtime based HTTP client library, such as `surf`.
@@ -469,12 +476,16 @@ pub mod native {
 
     impl SurfRequestor {
         pub fn new(cfg: HttpPostRequestorConfig) -> Self {
-            // Here we do not set the timeout into the client's configuration
-            // but rather the timeout is set on the entire Future in `http_post`
-            Self {
-                client: surf::client().with(surf::middleware::Redirect::new(cfg.max_redirects)),
-                cfg,
+            let mut client = surf::client().with(surf::middleware::Redirect::new(cfg.max_redirects));
+
+            if let Some(max) = cfg.max_requests_per_sec {
+                match surf_governor::GovernorMiddleware::per_second(max) {
+                    Ok(rate_limiter) => client = client.with(rate_limiter),
+                    Err(e) => error!("cannot setup rate limiter: {e}"),
+                }
             }
+
+            Self { client, cfg }
         }
     }
 
