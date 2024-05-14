@@ -16,7 +16,7 @@ use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 use hopr_lib::{ApplicationData, AsUnixTimestamp, HoprLibProcesses, ToHex, TransportOutput};
 use hoprd::cli::CliArgs;
 use hoprd_api::run_hopr_api;
-use hoprd_keypair::key_pair::{HoprKeys, IdentityOptions};
+use hoprd_keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleHistogram;
@@ -134,18 +134,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // Find or create an identity
-    let identity_opts = IdentityOptions {
-        initialize: true,
-        id_path: cfg.identity.file.clone(),
-        password: cfg.identity.password.clone(),
-        private_key: cfg
-            .identity
-            .private_key
-            .clone()
-            .and_then(|v| hoprd::cli::parse_private_key(&v).ok()),
-    };
-
-    let hopr_keys = HoprKeys::init(identity_opts)?;
+    let hopr_keys: HoprKeys = match &cfg.identity.private_key {
+        Some(private_key) => IdentityRetrievalModes::FromPrivateKey { private_key },
+        None => IdentityRetrievalModes::FromFile {
+            password: &cfg.identity.password,
+            id_path: &cfg.identity.file,
+        },
+    }
+    .try_into()?;
 
     info!(
         "This node has packet key '{}' and uses a blockchain address '{}'",

@@ -11,13 +11,14 @@ use crate::utils::HelperErrors;
 use clap::{Parser, ValueHint};
 use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
 use hopr_primitive_types::primitives::Address;
-use hoprd_keypair::key_pair::HoprKeys;
+use hoprd_keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
 use std::{
     collections::HashMap,
     env, fs,
     path::{Path, PathBuf},
 };
 use tracing::{debug, error, info, warn};
+use uuid::Uuid;
 
 pub fn read_identity(file: &Path, password: &str) -> Result<(String, HoprKeys), HelperErrors> {
     let file_str = file
@@ -50,20 +51,16 @@ pub fn read_identities(files: Vec<PathBuf>, password: &str) -> Result<HashMap<St
     let mut results: HashMap<String, HoprKeys> = HashMap::with_capacity(files.len());
 
     for file in files.iter() {
-        let file_str = file
+        let id_path = file
             .to_str()
             .ok_or(HelperErrors::IncorrectFilename(file.to_string_lossy().to_string()))?;
 
-        match HoprKeys::read_eth_keystore(file_str, password) {
-            Ok((keys, needs_migration)) => {
-                if needs_migration {
-                    keys.write_eth_keystore(file_str, password)?
-                }
-                let file_key = file.file_name().unwrap();
-                results.insert(String::from(file_key.to_str().unwrap()), keys);
+        match HoprKeys::try_from(IdentityRetrievalModes::FromFile { password, id_path }) {
+            Ok(keys) => {
+                results.insert(id_path.into(), keys);
             }
             Err(e) => {
-                warn!("Could not decrypt keystore file at {}. {}", file_str, e.to_string())
+                warn!("Could not read keystore file at {} due to {}", id_path, e.to_string())
             }
         }
     }
@@ -110,32 +107,40 @@ pub fn create_identity(
     // create dir if not exist
     fs::create_dir_all(dir_name)?;
 
-    let keys = HoprKeys::random();
+    let id = Uuid::new_v4();
 
     // check if `name` is end with `.id`, if not, append it
-    let file_path = match maybe_name {
+    let file_name = match maybe_name {
         Some(name) => {
             // check if ending with `.id`
             if name.ends_with(".id") {
-                format!("{dir_name}/{name}")
+                name.to_owned()
             } else {
-                format!("{dir_name}/{name}.id")
+                format!("{name}.id")
             }
         }
-        None => format!("{dir_name}/{}.id", { keys.id().to_string() }),
+        // if none is specified, use UUID
+        None => format!("{}.id", { id.to_string() }),
     };
 
-    let path = Path::new(&file_path);
-    if path.exists() {
-        return Err(HelperErrors::IdentityFileExists(file_path));
-    } else {
-        keys.write_eth_keystore(&file_path, password)?;
-    }
+    let mut file_path = PathBuf::from(dir_name);
 
-    path.file_name()
-        .and_then(|p| p.to_str())
-        .map(|s| (String::from(s), keys))
-        .ok_or(HelperErrors::UnableToCreateIdentity)
+    // add filename, depending on platform
+    file_path.push(file_name);
+
+    let file_path_str = file_path
+        .to_str()
+        .ok_or(HelperErrors::IncorrectFilename(file_path.to_string_lossy().to_string()))?;
+
+    Ok((
+        file_path_str.into(),
+        IdentityRetrievalModes::FromIdIntoFile {
+            id,
+            password,
+            id_path: file_path_str,
+        }
+        .try_into()?,
+    ))
 }
 
 pub trait ArgEnvReader<T, K> {
