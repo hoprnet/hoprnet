@@ -112,7 +112,7 @@ impl Display for ChannelDecision {
 #[derive(Debug, Clone, PartialEq, smart_default::SmartDefault, Validate, Serialize, Deserialize)]
 pub struct PromiscuousStrategyConfig {
     /// A quality threshold between 0 and 1 used to determine whether the strategy should open channel with the peer.
-    #[validate(range(min = 0_f32, max = 1.0_f32))]
+    #[validate(range(min = 0_f64, max = 1.0_f64))]
     #[default = 0.5]
     pub network_quality_threshold: f64,
 

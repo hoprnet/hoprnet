@@ -29,7 +29,7 @@ validator = { workspace = true }
 
 core-path = { workspace = true }
 core-transport = { workspace = true }
-core-strategy = { workspace = true }        # TODO: better organize and cleanup, due to StrategyConfig
+core-strategy = { workspace = true }
 chain-actions = { workspace = true }
 chain-api = { workspace = true }
 chain-rpc = { workspace = true }

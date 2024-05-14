@@ -44,5 +44,5 @@ hopr-primitive-types = { workspace = true }
 [dev-dependencies]
 env_logger = { workspace = true }
 more-asserts = "0.3.1"
-parameterized = "1.0"
-serial_test = "2.0"
+parameterized = { workspace = true }
+serial_test = "3.1.1"

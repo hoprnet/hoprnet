@@ -39,16 +39,16 @@ members = [
 ]
 
 [workspace.dependencies]
-aquamarine = "0.5.0"
-async-broadcast = "0.6.0"
+async-broadcast = "0.7.0"
 async-channel = "2.1"
 async-lock = "3.3"
 async-signal = "0.2"
 async-std = { version = "1.12.0", features = ["attributes"] }
 async-stream = "0.3.5"
 async-trait = "0.1"
-atomic_enum = "0.2.0"
-base64 = "0.21.7"
+aquamarine = "0.5.0"
+atomic_enum = "0.3.0"
+base64 = "0.22.1"
 bincode = "1.3.3"
 clap = { version = "4.4", features = ["derive", "env", "string"] }
 chrono = { version = "0.4" }
@@ -58,6 +58,7 @@ futures = "0.3.28"
 futures-lite = "1.12.0"
 futures-concurrency = "7.3.0"
 futures-timer = "3.0.2"
+generic-array = { version = "0.14.7", features = ["zeroize"] }
 getrandom = "0.2.10"
 hex = "0.4.3"
 hex-literal = "0.4.1"
@@ -66,8 +67,11 @@ libp2p-identity = { version = "0.2.5", features = ["peerid", "ed25519", "rand"] 
 libp2p-mplex = "0.41.0"
 libp2p = { version = "0.53.2" }
 moka = { version = "0.12", features = ["future"] }
+mockall = "0.12.1"
 multiaddr = "0.18.0"
 num_enum = "0.7"
+parameterized = "2.0.0"
+primitive-types = { version = "0.12.2", features = ["serde"] }
 regex = "1"
 rust-stream-ext-concurrent = "1"
 semver = "1"
@@ -81,15 +85,16 @@ sea-orm-migration = { version = "0.12", features = ["runtime-async-std-rustls", 
 signal-hook = "0.3"
 smart-default = "0.7"
 sqlx = { version = "0.7.3", default-features = false, features = ["runtime-async-std", "sqlite", "macros", "migrate"] }
-strum = { version = "0.25.0", features = ["derive"] }
+strum = { version = "0.26.2", features = ["derive"] }
 tempfile = "3"
 thiserror = "1.0"
 tracing = { version = "0.1" }
 tracing-futures = { version = "0.2" }
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "registry", "std"]}
 tracing-test = { version = "0.2.4", features = ["no-env-filter"] }
+typenum = "1.17.0"
 uuid = { version = "1.7.0" }
-validator = { version = "0.16.1", features = ["derive"] }
+validator = { version = "0.18.1", features = ["derive"] }
 
 bindings = { path = "ethereum/bindings", default-features = false }
 chain-actions = { path = "chain/actions", default-features = false }

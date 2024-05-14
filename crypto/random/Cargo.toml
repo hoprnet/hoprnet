@@ -7,4 +7,4 @@ edition = "2021"
 
 [dependencies]
 rand = "0.8.5"
-generic-array = { version = "0.14.7", features = ["zeroize"] }
+generic-array = { workspace = true }

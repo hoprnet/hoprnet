@@ -55,13 +55,13 @@ fn validate_optional_private_key(s: &str) -> Result<(), ValidationError> {
 #[derive(Default, Serialize, Deserialize, Validate, Clone, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct Identity {
-    #[validate(custom = "validate_file_path")]
+    #[validate(custom(function = "validate_file_path"))]
     #[serde(default)]
     pub file: String,
-    #[validate(custom = "validate_password")]
+    #[validate(custom(function = "validate_password"))]
     #[serde(default)]
     pub password: String,
-    #[validate(custom = "validate_optional_private_key")]
+    #[validate(custom(function = "validate_optional_private_key"))]
     #[serde(default)]
     pub private_key: Option<String>,
 }
@@ -90,19 +90,19 @@ impl std::fmt::Debug for Identity {
 #[serde(deny_unknown_fields)]
 pub struct HoprdConfig {
     /// Configuration related to hopr functionality
-    #[validate]
+    #[validate(nested)]
     #[serde(default)]
     pub hopr: HoprLibConfig,
     /// Configuration regarding the identity of the node
-    #[validate]
+    #[validate(nested)]
     #[serde(default)]
     pub identity: Identity,
     /// Configuration of the underlying database engine
-    #[validate]
+    #[validate(nested)]
     #[serde(default)]
     pub inbox: MessageInboxConfiguration,
     /// Configuration relevant for the API of the node
-    #[validate]
+    #[validate(nested)]
     #[serde(default)]
     pub api: Api,
 }

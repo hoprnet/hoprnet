@@ -40,7 +40,7 @@
 
 use hopr_primitive_types::prelude::*;
 use serde::{Deserialize, Serialize};
-use strum::{Display, EnumString, EnumVariantNames};
+use strum::{Display, EnumString, VariantNames};
 
 use crate::aggregating::AggregatingStrategyConfig;
 use crate::auto_funding::AutoFundingStrategyConfig;
@@ -59,7 +59,7 @@ pub mod promiscuous;
 pub mod strategy;
 
 /// Enumerates all possible strategies with their respective configurations.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Display, EnumString, EnumVariantNames)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Display, EnumString, VariantNames)]
 #[strum(serialize_all = "snake_case")]
 pub enum Strategy {
     Promiscuous(PromiscuousStrategyConfig),
