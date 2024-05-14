@@ -1,34 +1,34 @@
 {
   "networks": {
     "anvil-localhost": {
+      "environment_type": "local",
+      "indexer_start_block_number": 5,
       "addresses": {
-        "announcements": "0x09635F643e140090A9A8Dcd712eD6285858ceBef",
-        "channels": "0x9A9f2CCfdE556A7E9Ff0848998Aa4a0CFD8863AE",
-        "module_implementation": "0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0",
         "network_registry": "0x3Aa5ebB10DC797CAC828524e59A333d0A371443c",
         "network_registry_proxy": "0x68B1D87F95878fE05B998F19b66F4baba5De1aed",
+        "channels": "0x9A9f2CCfdE556A7E9Ff0848998Aa4a0CFD8863AE",
+        "token": "0x9A676e781A523b5d0C0e43731313A708CB607508",
+        "module_implementation": "0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0",
         "node_safe_registry": "0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82",
-        "node_stake_v2_factory": "0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e",
         "ticket_price_oracle": "0x7a2088a1bFc9d81c55368AE168C2C02570cB814F",
-        "token": "0x9A676e781A523b5d0C0e43731313A708CB607508"
-      },
-      "environment_type": "local",
-      "indexer_start_block_number": 5
+        "announcements": "0x09635F643e140090A9A8Dcd712eD6285858ceBef",
+        "node_stake_v2_factory": "0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e"
+      }
     },
     "anvil-localhost2": {
+      "environment_type": "local",
+      "indexer_start_block_number": 5,
       "addresses": {
-        "announcements": "0x09635F643e140090A9A8Dcd712eD6285858ceBef",
-        "channels": "0x9A9f2CCfdE556A7E9Ff0848998Aa4a0CFD8863AE",
-        "module_implementation": "0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0",
         "network_registry": "0x3Aa5ebB10DC797CAC828524e59A333d0A371443c",
         "network_registry_proxy": "0x68B1D87F95878fE05B998F19b66F4baba5De1aed",
+        "channels": "0x9A9f2CCfdE556A7E9Ff0848998Aa4a0CFD8863AE",
+        "token": "0x9A676e781A523b5d0C0e43731313A708CB607508",
+        "module_implementation": "0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0",
         "node_safe_registry": "0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82",
-        "node_stake_v2_factory": "0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e",
         "ticket_price_oracle": "0x7a2088a1bFc9d81c55368AE168C2C02570cB814F",
-        "token": "0x9A676e781A523b5d0C0e43731313A708CB607508"
-      },
-      "environment_type": "local",
-      "indexer_start_block_number": 5
+        "announcements": "0x09635F643e140090A9A8Dcd712eD6285858ceBef",
+        "node_stake_v2_factory": "0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e"
+      }
     },
     "rotsee": {
       "environment_type": "staging",
