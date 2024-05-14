@@ -114,7 +114,7 @@ services:
     networks:
       - hopr-net
   grafana:
-    image: grafana/grafana:10.4.3@sha256:b7fcb534f7b3512801bb3f4e658238846435804deb479d105b5cdc680847c272
+    image: grafana/grafana:11.0.0@sha256:eaa2c06d93f77a77e2c8676b71192b9f2bbd7ea62bbaeeb709825934e92c0173
     user: "472"
     restart: always
     environment:
