@@ -46,6 +46,10 @@ jobs:
       - name: Build docs
         run: nix build .#docs
 
+      - name: Increase git buffer size
+        if: github.ref == 'refs/heads/master'
+        run: git config --global http.postBuffer 524288000
+
       - name: Deploy
         if: github.ref == 'refs/heads/master'
         uses: peaceiris/actions-gh-pages@v4

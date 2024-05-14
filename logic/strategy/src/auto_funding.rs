@@ -147,7 +147,7 @@ mod tests {
     }
 
     fn mock_action_confirmation(channel: ChannelEntry, balance: Balance) -> ActionConfirmation {
-        let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
+        let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
         ActionConfirmation {
             tx_hash: random_hash,
             event: Some(ChainEventType::ChannelBalanceIncreased(channel, balance)),

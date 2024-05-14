@@ -8,7 +8,3 @@ pub const DEFAULT_HEARTBEAT_THRESHOLD: std::time::Duration = std::time::Duration
 /// Randomization of the heartbeat interval to make sure not
 /// all the nodes start their interval at the same time
 pub const DEFAULT_HEARTBEAT_INTERVAL_VARIANCE: std::time::Duration = std::time::Duration::from_secs(2);
-
-/// Network quality threshold since which a node is considered
-/// available enough to be used
-pub const DEFAULT_NETWORK_QUALITY_THRESHOLD: f64 = 0.5;

@@ -166,7 +166,7 @@ mod tests {
     }
 
     fn mock_action_confirmation_closure(channel: ChannelEntry) -> ActionConfirmation {
-        let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
+        let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
         ActionConfirmation {
             tx_hash: random_hash,
             event: Some(ChainEventType::ChannelClosureInitiated(channel)),

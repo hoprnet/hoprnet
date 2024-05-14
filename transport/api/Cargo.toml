@@ -17,6 +17,7 @@ prometheus = [
 ]
 
 [dependencies]
+async-channel = { workspace = true }
 async-std = { workspace = true }
 async-trait = { workspace = true }
 async-lock = { workspace = true }

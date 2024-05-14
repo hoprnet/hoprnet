@@ -3,7 +3,7 @@ use libp2p_identity::PeerId;
 
 use hopr_crypto_packet::errors::Result;
 use hopr_crypto_types::prelude::*;
-use hopr_internal_types::acknowledgement::Acknowledgement;
+use hopr_internal_types::protocol::Acknowledgement;
 pub enum TransportPacket {
     /// Packet is intended for us
     Final {

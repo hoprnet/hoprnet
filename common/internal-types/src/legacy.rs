@@ -5,11 +5,10 @@
 use ethers::core::k256::AffinePoint;
 use ethers::prelude::k256::elliptic_curve::sec1::FromEncodedPoint;
 use ethers::prelude::k256::Scalar;
-use hopr_crypto_types::prelude::*;
-use hopr_primitive_types::prelude::*;
-use serde::{Deserialize, Serialize};
+use serde::de::Visitor;
+use serde::{de, Deserialize, Deserializer, Serialize};
 
-use crate::channels::Ticket;
+use hopr_primitive_types::prelude::{BytesEncodable, GeneralError, IntoEndian, U256};
 
 #[derive(Debug, Default, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Hash, PartialOrd, Ord)]
 pub struct Address {
@@ -26,7 +25,28 @@ pub struct Response {
     response: [u8; 32],
 }
 
-#[derive(Copy, Clone, Default, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
+pub struct CurvePoint {
+    affine: AffinePoint,
+}
+
+impl Default for CurvePoint {
+    fn default() -> Self {
+        Self {
+            affine: hopr_crypto_types::types::CurvePoint::from_exponent(&U256::one().to_be_bytes())
+                .unwrap()
+                .into(),
+        }
+    }
+}
+
+impl From<AffinePoint> for CurvePoint {
+    fn from(value: AffinePoint) -> Self {
+        Self { affine: value }
+    }
+}
+
+#[derive(Clone, Default, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct VrfParameters {
     /// the pseudo-random point
     pub v: CurvePoint,
@@ -41,7 +61,7 @@ pub struct VrfParameters {
 impl From<VrfParameters> for hopr_crypto_types::vrf::VrfParameters {
     fn from(value: VrfParameters) -> Self {
         Self {
-            v: value.v,
+            v: value.v.affine.into(),
             h: value.h,
             s: value.s,
         }
@@ -50,16 +70,63 @@ impl From<VrfParameters> for hopr_crypto_types::vrf::VrfParameters {
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub enum AcknowledgedTicketStatus {
-    /// The ticket is available for redeeming or aggregating
     #[default]
     Untouched,
-    /// Ticket is currently being redeemed in and on-going redemption process
-    BeingRedeemed { tx_hash: Hash },
-    /// Ticket is currently being aggregated in and on-going aggregation process
-    BeingAggregated { start: u64, end: u64 },
+    BeingRedeemed {
+        tx_hash: Hash,
+    },
+    BeingAggregated {
+        start: u64,
+        end: u64,
+    },
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Ticket(crate::tickets::Ticket);
+
+impl Serialize for Ticket {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_bytes(&self.0.clone().into_encoded())
+    }
+}
+
+struct TicketVisitor {}
+
+impl<'de> Visitor<'de> for TicketVisitor {
+    type Value = Ticket;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_fmt(format_args!(
+            "a byte-array with {} elements",
+            crate::tickets::Ticket::SIZE
+        ))
+    }
+
+    fn visit_bytes<E>(self, v: &[u8]) -> std::result::Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        Ok(Ticket(
+            v.try_into()
+                .map_err(|e: GeneralError| de::Error::custom(e.to_string()))?,
+        ))
+    }
+}
+
+// Use compact deserialization for tickets as they are used very often
+impl<'de> Deserialize<'de> for Ticket {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        deserializer.deserialize_bytes(TicketVisitor {})
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AcknowledgedTicket {
     #[serde(default)]
     pub status: AcknowledgedTicketStatus,
@@ -71,18 +138,20 @@ pub struct AcknowledgedTicket {
 
 impl AcknowledgedTicket {
     pub fn new(
-        value: crate::acknowledgement::AcknowledgedTicket,
+        value: crate::tickets::TransferableWinningTicket,
         me: &hopr_primitive_types::primitives::Address,
         domain_separator: &hopr_crypto_types::types::Hash,
     ) -> Self {
         let mut response = Response::default();
-        response.response.copy_from_slice(&value.response.to_bytes());
+        response.response.copy_from_slice(value.response.as_ref());
 
         let mut signer = Address::default();
         signer.addr.copy_from_slice(value.signer.as_ref());
 
         let vrf_params = VrfParameters {
-            v: value.vrf_params.v,
+            v: AffinePoint::from_encoded_point(value.vrf_params.v.as_compressed())
+                .expect("invalid vrf params")
+                .into(),
             h: value.vrf_params.h,
             s: value.vrf_params.s,
             h_v: AffinePoint::from_encoded_point(&value.vrf_params.get_h_v_witness())
@@ -94,7 +163,7 @@ impl AcknowledgedTicket {
                     .get_s_b_witness(
                         me,
                         &value.ticket.get_hash(domain_separator).into(),
-                        domain_separator.as_slice(),
+                        domain_separator.as_ref(),
                     )
                     .expect("invalid vrf params"),
             )
@@ -104,7 +173,7 @@ impl AcknowledgedTicket {
 
         Self {
             status: AcknowledgedTicketStatus::BeingAggregated { start: 0, end: 0 }, // values not  used
-            ticket: value.ticket,
+            ticket: Ticket(value.ticket),
             response,
             vrf_params,
             signer,
@@ -112,12 +181,11 @@ impl AcknowledgedTicket {
     }
 }
 
-impl From<AcknowledgedTicket> for crate::acknowledgement::AcknowledgedTicket {
+impl From<AcknowledgedTicket> for crate::tickets::TransferableWinningTicket {
     fn from(value: AcknowledgedTicket) -> Self {
         Self {
-            status: crate::acknowledgement::AcknowledgedTicketStatus::Untouched,
-            ticket: value.ticket,
-            response: hopr_crypto_types::types::Response::new(&value.response.response),
+            ticket: value.ticket.0,
+            response: value.response.response.into(),
             vrf_params: value.vrf_params.into(),
             signer: hopr_primitive_types::primitives::Address::new(&value.signer.addr),
         }
@@ -126,12 +194,12 @@ impl From<AcknowledgedTicket> for crate::acknowledgement::AcknowledgedTicket {
 
 #[cfg(test)]
 mod tests {
-    use crate::prelude::{AcknowledgedTicket, Ticket, UnacknowledgedTicket};
+    use crate::legacy::Ticket;
+    use crate::tickets::{TicketBuilder, TransferableWinningTicket};
     use ethers::utils::hex;
     use hex_literal::hex;
-    use hopr_crypto_types::prelude::{ChainKeypair, Challenge, CurvePoint, HalfKey, Keypair};
-    use hopr_crypto_types::types::Hash;
-    use hopr_primitive_types::prelude::{BalanceType, BinarySerializable, EthereumChallenge};
+    use hopr_crypto_types::prelude::{ChainKeypair, Challenge, CurvePoint, HalfKey, Hash, Keypair};
+    use hopr_primitive_types::prelude::EthereumChallenge;
     use hopr_primitive_types::primitives::Address;
     use lazy_static::lazy_static;
 
@@ -152,25 +220,25 @@ mod tests {
 
     #[test]
     fn test_legacy_binary_compatibility_with_2_0_8() {
-        let ticket = Ticket::new(
-            &Address::new(DESTINATION.as_ref()),
-            &BalanceType::HOPR.balance(1000000_u64),
-            10.into(),
-            2.into(),
-            1.0_f64,
-            2.into(),
-            EthereumChallenge::new(ETHEREUM_CHALLENGE.as_ref()),
-            &ALICE,
-            &Hash::new(CHANNEL_DST.as_ref()),
-        )
-        .unwrap();
+        let domain_separator = Hash::from(*CHANNEL_DST);
+
+        let ticket = TicketBuilder::default()
+            .direction(&ALICE.public().to_address(), &Address::new(DESTINATION.as_ref()))
+            .amount(1000000_u64)
+            .index(10)
+            .index_offset(2)
+            .win_prob(1.0)
+            .channel_epoch(2)
+            .challenge(EthereumChallenge::new(ETHEREUM_CHALLENGE.as_ref()))
+            .build_signed(&ALICE, &domain_separator)
+            .expect("should build ticket");
 
         let mut signer = crate::legacy::Address::default();
-        signer.addr.copy_from_slice(&ALICE.public().to_address().to_bytes());
+        signer.addr.copy_from_slice(ALICE.public().to_address().as_ref());
 
         let ack_ticket = crate::legacy::AcknowledgedTicket {
             status: crate::legacy::AcknowledgedTicketStatus::BeingAggregated { start: 0, end: 0 },
-            ticket,
+            ticket: Ticket(ticket.verified_ticket().clone()),
             response: crate::legacy::Response { response: *RESPONSE },
             vrf_params: Default::default(),
             signer,
@@ -186,59 +254,47 @@ mod tests {
 
     #[test]
     fn test_legacy_must_serialize_deserialize_correctly() {
-        let hk1 = HalfKey::new(&hex!(
-            "3477d7de923ba3a7d5d72a7d6c43fd78395453532d03b2a1e2b9a7cc9b61bafa"
-        ));
-        let hk2 = HalfKey::new(&hex!(
-            "4471496ef88d9a7d86a92b7676f3c8871a60792a37fae6fc3abc347c3aa3b16b"
-        ));
+        let hk1 = HalfKey::try_from(hex!("3477d7de923ba3a7d5d72a7d6c43fd78395453532d03b2a1e2b9a7cc9b61bafa").as_ref())
+            .unwrap();
+        let hk2 = HalfKey::try_from(hex!("4471496ef88d9a7d86a92b7676f3c8871a60792a37fae6fc3abc347c3aa3b16b").as_ref())
+            .unwrap();
 
-        let cp1: CurvePoint = hk1.to_challenge().into();
-        let cp2: CurvePoint = hk2.to_challenge().into();
+        let cp1: CurvePoint = hk1.to_challenge().try_into().unwrap();
+        let cp2: CurvePoint = hk2.to_challenge().try_into().unwrap();
         let cp_sum = CurvePoint::combine(&[&cp1, &cp2]);
 
-        let domain_separator = Hash::new(CHANNEL_DST.as_ref());
+        let domain_separator = Hash::try_from(CHANNEL_DST.as_ref()).unwrap();
 
-        let ticket = Ticket::new(
-            &BOB.public().to_address(),
-            &BalanceType::HOPR.balance(1000000_u64),
-            10.into(),
-            2.into(),
-            1.0_f64,
-            2.into(),
-            Challenge::from(cp_sum).to_ethereum_challenge(),
-            &ALICE,
-            &domain_separator,
-        )
-        .unwrap();
+        let ticket = TicketBuilder::default()
+            .direction(&ALICE.public().to_address(), &BOB.public().to_address())
+            .amount(1000000_u64)
+            .index(10)
+            .index_offset(2)
+            .win_prob(1.0)
+            .channel_epoch(2)
+            .challenge(Challenge::from(cp_sum).to_ethereum_challenge())
+            .build_signed(&ALICE, &domain_separator)
+            .expect("should build ticket");
 
-        let unack = UnacknowledgedTicket::new(ticket, hk1, ALICE.public().to_address());
-        let acked = unack.acknowledge(&hk2, &BOB, &domain_separator).unwrap();
+        let unack = ticket.into_unacknowledged(hk1);
+        let acked = unack.acknowledge(&hk2).expect("should acknowledge");
 
-        assert!(
-            acked
-                .verify(
-                    &ALICE.public().to_address(),
-                    &BOB.public().to_address(),
-                    &domain_separator
-                )
-                .is_ok(),
-            "ack ticket should be valid"
-        );
+        let transferable = acked
+            .into_transferable(&BOB, &domain_separator)
+            .expect("should convert to transferable");
 
-        let serialized = crate::legacy::AcknowledgedTicket::new(acked, &BOB.public().to_address(), &domain_separator);
+        transferable
+            .clone()
+            .into_redeemable(&ALICE.public().to_address(), &domain_separator)
+            .expect("should be transformable to redeemable");
 
-        let deserialized = AcknowledgedTicket::from(serialized);
+        let serialized =
+            crate::legacy::AcknowledgedTicket::new(transferable, &BOB.public().to_address(), &domain_separator);
 
-        assert!(
-            deserialized
-                .verify(
-                    &ALICE.public().to_address(),
-                    &BOB.public().to_address(),
-                    &domain_separator
-                )
-                .is_ok(),
-            "deserialized ack ticket should be valid"
-        );
+        let deserialized = TransferableWinningTicket::from(serialized);
+
+        deserialized
+            .into_redeemable(&ALICE.public().to_address(), &domain_separator)
+            .expect("should be transformable to redeemable");
     }
 }
