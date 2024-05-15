@@ -394,6 +394,7 @@ mod tests {
                             "native_token_name": "ETH",
                             "hopr_token_name": "wxHOPR",
                             "block_time": 5000,
+                            "max_rpc_requests_per_sec": 100,
                             "tags": [],
                             "etherscan_api_url": null
                           }

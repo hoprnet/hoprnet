@@ -88,9 +88,9 @@ pub struct SimpleJsonRpcRetryPolicy {
     ///
     /// If `None` is given, will keep retrying indefinitely.
     ///
-    /// Default is 7.
+    /// Default is 12.
     #[validate(range(min = 1))]
-    #[default(Some(7))]
+    #[default(Some(12))]
     pub max_retries: Option<u32>,
     /// Initial wait before retries.
     ///
@@ -105,16 +105,16 @@ pub struct SimpleJsonRpcRetryPolicy {
     /// Must be non-negative. If set to `0`, no backoff will be applied and the
     /// requests will be retried at a constant rate.
     ///
-    /// Default is 1.001
+    /// Default is 0.3
     #[validate(range(min = 0.0))]
-    #[default(1.001)]
+    #[default(0.3)]
     pub backoff_coefficient: f64,
     /// Maximum backoff value.
     ///
     /// Once reached, the requests will be retried at a constant rate with this timeout.
     ///
-    /// Default is 120 seconds.
-    #[default(Duration::from_secs(120))]
+    /// Default is 30 seconds.
+    #[default(Duration::from_secs(30))]
     pub max_backoff: Duration,
     /// Indicates whether to also apply backoff to transport and connection errors (such as connection timeouts).
     ///
@@ -136,9 +136,9 @@ pub struct SimpleJsonRpcRetryPolicy {
     ///
     /// If any additional request fails after this number is attained, it won't be retried.
     ///
-    /// Default is 3
-    #[validate(range(min = 1))]
-    #[default = 3]
+    /// Default is 100
+    #[validate(range(min = 5))]
+    #[default = 100]
     pub max_retry_queue_size: u32,
 }
 
@@ -163,6 +163,8 @@ impl RetryPolicy<JsonRpcProviderClientError> for SimpleJsonRpcRetryPolicy {
             warn!("max number of retries {} has been reached", self.max_retries.unwrap());
             return NoRetry;
         }
+
+        debug!("retry queue size is {retry_queue_size}");
 
         if retry_queue_size > self.max_retry_queue_size {
             warn!(
@@ -385,7 +387,8 @@ where
             RetryParams::Value(params)
         };
 
-        let in_queue = self.requests_enqueued.fetch_add(1, Ordering::SeqCst);
+        self.requests_enqueued.fetch_add(1, Ordering::SeqCst);
+        let start = std::time::Instant::now();
 
         let mut num_retries = 0;
         loop {
@@ -406,6 +409,10 @@ where
                         #[cfg(all(feature = "prometheus", not(test)))]
                         METRIC_RETRIES_PER_RPC_CALL.observe(&[method], num_retries as f64);
 
+                        debug!(
+                            "successful request {method} spent {}ms in the retry queue",
+                            start.elapsed().as_millis()
+                        );
                         return Ok(ret);
                     }
                     Err(req_err) => {
@@ -415,7 +422,10 @@ where
                 }
             }
 
-            match self.retry_policy.is_retryable_error(&err, num_retries, in_queue) {
+            match self
+                .retry_policy
+                .is_retryable_error(&err, num_retries, self.requests_enqueued.load(Ordering::SeqCst))
+            {
                 NoRetry => {
                     self.requests_enqueued.fetch_sub(1, Ordering::SeqCst);
                     warn!("no more retries for RPC call {method}");
@@ -423,6 +433,10 @@ where
                     #[cfg(all(feature = "prometheus", not(test)))]
                     METRIC_RETRIES_PER_RPC_CALL.observe(&[method], num_retries as f64);
 
+                    debug!(
+                        "failed request {method} spent {}ms in the retry queue",
+                        start.elapsed().as_millis()
+                    );
                     return Err(err);
                 }
                 RetryAfter(backoff) => {
@@ -439,7 +453,6 @@ pub mod native {
     use async_trait::async_trait;
     use serde::{Deserialize, Serialize};
     use std::time::Duration;
-    use tracing::error;
 
     use crate::errors::HttpRequestError;
     use crate::HttpPostRequestor;
@@ -460,9 +473,10 @@ pub mod native {
         pub max_redirects: u8,
 
         /// Maximum number of requests per second.
+        /// If set to Some(0) or `None`, there will be no limit.
         ///
-        /// Defaults to None (unlimited)
-        #[default(None)]
+        /// Defaults to 10.
+        #[default(Some(10))]
         pub max_requests_per_sec: Option<u32>,
     }
 
@@ -478,11 +492,12 @@ pub mod native {
         pub fn new(cfg: HttpPostRequestorConfig) -> Self {
             let mut client = surf::client().with(surf::middleware::Redirect::new(cfg.max_redirects));
 
-            if let Some(max) = cfg.max_requests_per_sec {
-                match surf_governor::GovernorMiddleware::per_second(max) {
-                    Ok(rate_limiter) => client = client.with(rate_limiter),
-                    Err(e) => error!("cannot setup rate limiter: {e}"),
-                }
+            // Rate limit of 0 also means unlimited as if None was given
+            if let Some(max) = cfg.max_requests_per_sec.and_then(|r| (r > 0).then_some(r)) {
+                client = client.with(
+                    surf_governor::GovernorMiddleware::per_second(max)
+                        .expect("cannot setup http rate limiter middleware"),
+                )
             }
 
             Self { client, cfg }

@@ -121,7 +121,10 @@ impl NetworkProviderArgs {
         // Build JSON RPC client
         let rpc_client = JsonRpcClient::new(
             self.provider_url.as_str(),
-            DefaultHttpPostRequestor::new(chain_rpc::client::native::HttpPostRequestorConfig::default()),
+            DefaultHttpPostRequestor::new(chain_rpc::client::native::HttpPostRequestorConfig {
+                max_requests_per_sec: None,
+                ..Default::default()
+            }),
             SimpleJsonRpcRetryPolicy::default(),
         );
 

@@ -42,6 +42,8 @@ pub struct ChainOptions {
     pub hopr_token_name: String,
     /// expected block time on the chain in milliseconds
     pub block_time: u64,
+    /// optional maximum number of RPC requests per second for this chain provider
+    pub max_rpc_requests_per_sec: Option<u32>,
     pub tags: Option<Vec<String>>,
 }
 
@@ -203,7 +205,7 @@ impl ChainNetworkConfig {
                 token: network.addresses.token.to_owned(),
                 tx_polling_interval: network.tx_polling_interval,
                 max_block_range: network.max_block_range,
-                max_requests_per_sec: max_rpc_requests_per_sec,
+                max_requests_per_sec: max_rpc_requests_per_sec.or(chain.max_rpc_requests_per_sec),
             }),
             Ok(false) => Err(format!(
                 "network {id} is not supported, supported networks {:?}",
