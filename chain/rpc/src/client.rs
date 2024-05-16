@@ -453,6 +453,7 @@ pub mod native {
     use async_trait::async_trait;
     use serde::{Deserialize, Serialize};
     use std::time::Duration;
+    use tracing::info;
 
     use crate::errors::HttpRequestError;
     use crate::HttpPostRequestor;
@@ -497,7 +498,8 @@ pub mod native {
                 client = client.with(
                     surf_governor::GovernorMiddleware::per_second(max)
                         .expect("cannot setup http rate limiter middleware"),
-                )
+                );
+                info!("client will be limited to {max} HTTP requests per second");
             }
 
             Self { client, cfg }
