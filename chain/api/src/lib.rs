@@ -155,7 +155,10 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
         indexer_events_tx: futures::channel::mpsc::UnboundedSender<SignificantChainEvent>,
     ) -> Self {
         // TODO: extract this from the global config type
-        let rpc_http_config = chain_rpc::client::native::HttpPostRequestorConfig::default();
+        let mut rpc_http_config = chain_rpc::client::native::HttpPostRequestorConfig::default();
+        if let Some(max_rpc_req) = chain_config.max_requests_per_sec {
+            rpc_http_config.max_requests_per_sec = Some(max_rpc_req); // override the default if set
+        }
 
         // TODO: extract this from the global config type
         let rpc_http_retry_policy = SimpleJsonRpcRetryPolicy {

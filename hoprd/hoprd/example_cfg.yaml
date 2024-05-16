@@ -245,6 +245,7 @@ hopr:
           max_priority_fee_per_gas: 0.2 gwei
           native_token_name: ETH
           hopr_token_name: wxHOPR
+          max_rpc_requests_per_sec: 100
           block_time: 5000
           tags: []
     # Indicates whether node should check channel unrealized balance

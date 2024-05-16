@@ -42,6 +42,8 @@ pub struct ChainOptions {
     pub hopr_token_name: String,
     /// expected block time on the chain in milliseconds
     pub block_time: u64,
+    /// optional maximum number of RPC requests per second for this chain provider
+    pub max_rpc_requests_per_sec: Option<u32>,
     pub tags: Option<Vec<String>>,
 }
 
@@ -146,6 +148,8 @@ pub struct ChainNetworkConfig {
     pub tx_polling_interval: u64,
     /// maximum block range to fetch when indexing logs
     pub max_block_range: u64,
+    /// maximum number of RPC requests per second
+    pub max_requests_per_sec: Option<u32>,
 }
 
 /// Check whether the version is allowed
@@ -166,6 +170,7 @@ impl ChainNetworkConfig {
         id: &str,
         version: &str,
         maybe_custom_provider: Option<&str>,
+        max_rpc_requests_per_sec: Option<u32>,
         protocol_config: &mut ProtocolsConfig,
     ) -> Result<Self, String> {
         let network = protocol_config
@@ -200,6 +205,7 @@ impl ChainNetworkConfig {
                 token: network.addresses.token.to_owned(),
                 tx_polling_interval: network.tx_polling_interval,
                 max_block_range: network.max_block_range,
+                max_requests_per_sec: max_rpc_requests_per_sec.or(chain.max_rpc_requests_per_sec),
             }),
             Ok(false) => Err(format!(
                 "network {id} is not supported, supported networks {:?}",

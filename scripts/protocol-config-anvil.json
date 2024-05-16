@@ -53,7 +53,8 @@
       "live": false,
       "max_fee_per_gas": "1 gwei",
       "max_priority_fee_per_gas": "0.2 gwei",
-      "native_token_name": "ETH"
+      "native_token_name": "ETH",
+      "max_rpc_requests_per_sec": 100
     }
   }
 }
