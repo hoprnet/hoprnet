@@ -1212,8 +1212,8 @@ mod channels {
             description = "Open channel request specification: on-chain address of the counterparty and the initial HOPR token stake.",
             content_type = "application/json"),
         responses(
-            (status = 201, description = "Channel successfully opened", body = OpenChannelResponse),
-            (status = 400, description = "Invalid counterparty address", body = ApiError),
+            (status = 201, description = "Channel successfully opened.", body = OpenChannelResponse),
+            (status = 400, description = "Invalid counterparty address or stake amount.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 403, description = "Failed to open the channel because of insufficient HOPR balance or allowance.", body = ApiError),
             (status = 409, description = "Failed to open the channel because the channel between this nodes already exists.", body = ApiError),
@@ -1230,7 +1230,7 @@ mod channels {
 
         let open_req: OpenChannelBodyRequest = match req.body_json().await {
             Ok(r) => r,
-            Err(_) => return Ok(Response::builder(400).body(ApiErrorStatus::InvalidAddress).build()),
+            Err(_) => return Ok(Response::builder(400).body(ApiErrorStatus::InvalidInput).build()),
         };
 
         match hopr
