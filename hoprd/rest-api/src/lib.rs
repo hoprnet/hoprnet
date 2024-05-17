@@ -483,7 +483,6 @@ enum ApiErrorStatus {
     Timeout,
     Unauthorized,
     InvalidQuality,
-    InvalidAddress,
     AliasAlreadyExists,
     #[strum(serialize = "UNKNOWN_FAILURE")]
     UnknownFailure(String),
