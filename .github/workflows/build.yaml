@@ -43,7 +43,7 @@ jobs:
           password: ${{ steps.auth.outputs.access_token }}
 
       - name: Install Nix
-        uses: cachix/install-nix-action@v26
+        uses: cachix/install-nix-action@v27
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
