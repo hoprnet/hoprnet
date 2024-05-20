@@ -48,7 +48,7 @@ use crate::auto_redeeming::AutoRedeemingStrategyConfig;
 use crate::channel_finalizer::ClosureFinalizerStrategyConfig;
 use crate::promiscuous::PromiscuousStrategyConfig;
 use crate::strategy::MultiStrategyConfig;
-use crate::Strategy::{Aggregating, AutoFunding, AutoRedeeming};
+use crate::Strategy::{Aggregating, AutoRedeeming};
 
 pub mod aggregating;
 pub mod auto_funding;
