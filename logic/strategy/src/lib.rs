@@ -89,10 +89,10 @@ pub fn hopr_default_strategies() -> MultiStrategyConfig {
         on_fail_continue: true,
         allow_recursive: false,
         strategies: vec![
-            AutoFunding(AutoFundingStrategyConfig {
+            /*AutoFunding(AutoFundingStrategyConfig {
                 min_stake_threshold: Balance::new_from_str("1000000000000000000", BalanceType::HOPR),
                 funding_amount: Balance::new_from_str("10000000000000000000", BalanceType::HOPR),
-            }),
+            }),*/
             Aggregating(AggregatingStrategyConfig {
                 aggregation_threshold: Some(100),
                 unrealized_balance_ratio: Some(0.9),
@@ -100,10 +100,7 @@ pub fn hopr_default_strategies() -> MultiStrategyConfig {
             }),
             AutoRedeeming(AutoRedeemingStrategyConfig {
                 redeem_only_aggregated: true,
-                on_close_redeem_single_tickets_value_min: Balance::new_from_str(
-                    "2000000000000000000",
-                    BalanceType::HOPR,
-                ),
+                on_close_redeem_single_tickets_value_min: Balance::new_from_str("90000000000000000", BalanceType::HOPR),
             }),
         ],
     }
