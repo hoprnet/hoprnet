@@ -38,8 +38,8 @@ hopr:
   db:
     # Path to the directory with the database
     data: /app/db
-    # If set, database will be created (if it does not exist).
-    # Otherwise, if false is given and database is not present,
+    # If set, the database will be created (if it does not exist).
+    # Otherwise, if false is given and the database is not present,
     # the node will fail to start.
     initialize: true
     # If set, will overwrite and re-initialize any existing database
@@ -65,13 +65,13 @@ hopr:
     # If left empty, the node will behave as if only `!Passive` strategy
     # was given.
     strategies:
-      - !AutoFunding
+      #- !AutoFunding
         # Channel auto-funding strategy.
         # Automatically funds channels with the given funding amount
         # if the stake on any channel drops below the given threshold
         # Amount to automatically fund a channel that dropped
         # below the threshold
-        funding_amount: "10000000000000000000 HOPR"
+        # funding_amount: "10000000000000000000 HOPR"
         # Defines a promiscuous strategy that automatically manages HOPR channels
         # based on measured network qualities of HOPR nodes in the network.
         #- !Promiscuous
@@ -95,15 +95,15 @@ hopr:
         # # if the number of opened outgoing channels (regardless if opened by the strategy or manually) exceeds the
         # enforce_max_channels: true
         #
-        # # Specifies minimum version of the peer the strategy should open a channel to.
+        # # Specifies a minimum version of the peer the strategy should open a channel to.
         # # Accepts semver syntax.
         # minimum_peer_version: ">=2.0.0"
 
         # Auto funding threshold
-        min_stake_threshold: "1000000000000000000 HOPR"
+        # min_stake_threshold: "1000000000000000000 HOPR"
       - !Aggregating
         # Strategy performing automatic ticket aggregation
-        # once the amount of unredeemed tickets in a channel goes
+        # once the number of unredeemed tickets in a channel goes
         # over the given threshold.
         # Number of acknowledged winning tickets in a channel that triggers the ticket aggregation
         # in that channel when exceeded.
@@ -129,17 +129,17 @@ hopr:
         redeem_only_aggregated: true
         # The strategy will automatically redeem if there's a single ticket left when a channel
         # transitions to `PendingToClose` and it has at least this value of HOPR.
-        # This happens regardless the `redeem_only_aggregated` setting.
-        on_close_redeem_single_tickets_value_min: "2000000000000000000 HOPR"
-        # Passive strategy does nothing. This is equivalent as leaving
+        # This happens regardless of the `redeem_only_aggregated` setting.
+        on_close_redeem_single_tickets_value_min: "90000000000000000 HOPR"
+        # Passive strategy does nothing. This is equivalent to leaving
         # the `strategies` array empty.
         #- !Passive
   # Strategy that monitors channels that are in `PendingToClose` state and
   # their channel closure grace period has already elapsed, and on more issuing
   # channel close transaction on these channels to finalize the closure.
   # - !ClosureFinalizer
-  # Do not attempt to finalize closure of channels that have been overdue for closure for more than
-  # this amount of seconds.
+  # Does not attempt to finalize closure of channels that have been overdue for closure for more than
+  # this number of seconds.
   # max_closure_overdue: 3600
 
   # Configuration of the heartbeat mechanism for probing
@@ -151,7 +151,7 @@ hopr:
     threshold: 60
     # Round-to-round variance to complicate network sync in seconds
     variance: 2
-  # Defines how quality of nodes in the HOPR network
+  # Defines how the quality of nodes in the HOPR network
   # is evaluated and criteria for nodes to be considered of good/bad quality.
   # This is closely related to the heartbeat mechanism.
   network_options:
@@ -212,7 +212,7 @@ hopr:
     # If not given, it will use the network's chain default one.
     provider: null
     protocols:
-      # Enumerates different HOPR on-chain network deployments the node can use.
+      # Lists different HOPR on-chain network deployments the node can use.
       networks:
         anvil-localhost:
           chain: anvil
@@ -255,7 +255,7 @@ hopr:
 inbox:
   # Capacity of messages in the Inbox, per message tag.
   capacity: 512
-  # Maximum age of a message in Inbox in seconds
+  # The maximum age of a message in Inbox in seconds
   # Older messages are automatically purged
   max_age: 900
   # Tags which are not allowed into the Inbox
