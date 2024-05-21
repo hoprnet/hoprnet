@@ -57,7 +57,7 @@ where
     db_processor: Option<U>,
     db: Db,
     cfg: IndexerConfig,
-    egress: futures::channel::mpsc::UnboundedSender<SignificantChainEvent>,
+    egress: async_channel::Sender<SignificantChainEvent>,
 }
 
 impl<T, U, Db> Indexer<T, U, Db>
@@ -71,7 +71,7 @@ where
         db_processor: U,
         db: Db,
         cfg: IndexerConfig,
-        egress: futures::channel::mpsc::UnboundedSender<SignificantChainEvent>,
+        egress: async_channel::Sender<SignificantChainEvent>,
     ) -> Self {
         Self {
             rpc: Some(rpc),
@@ -232,7 +232,7 @@ where
                 trace!("Processing an onchain event: {event:?}");
                 // Pass the events further only once we're fully synced
                 if is_synced.load(std::sync::atomic::Ordering::Relaxed) {
-                    if let Err(e) = tx_significant_events.unbounded_send(event) {
+                    if let Err(e) = tx_significant_events.try_send(event) {
                         error!("failed to pass a significant chain event further: {e}");
                     }
                 }
@@ -361,7 +361,7 @@ pub mod tests {
             handlers,
             db.clone(),
             IndexerConfig::default(),
-            futures::channel::mpsc::unbounded().0,
+            async_channel::unbounded().0,
         );
         let (indexing, _) = join!(indexer.start(), async move {
             async_std::task::sleep(std::time::Duration::from_millis(200)).await;
@@ -395,7 +395,7 @@ pub mod tests {
             handlers,
             db.clone(),
             IndexerConfig::default(),
-            futures::channel::mpsc::unbounded().0,
+            async_channel::unbounded().0,
         );
         let (indexing, _) = join!(indexer.start(), async move {
             async_std::task::sleep(std::time::Duration::from_millis(200)).await;
@@ -441,7 +441,7 @@ pub mod tests {
         assert!(tx.start_send(finalized_block.clone()).is_ok());
         assert!(tx.start_send(head_allowing_finalization.clone()).is_ok());
 
-        let mut indexer = Indexer::new(rpc, handlers, db.clone(), cfg, futures::channel::mpsc::unbounded().0);
+        let mut indexer = Indexer::new(rpc, handlers, db.clone(), cfg, async_channel::unbounded().0);
         let _ = join!(indexer.start(), async move {
             async_std::task::sleep(std::time::Duration::from_millis(200)).await;
             tx.close_channel()
@@ -502,7 +502,7 @@ pub mod tests {
             assert!(tx.start_send(block.clone()).is_ok());
         }
 
-        let (tx_events, rx_events) = futures::channel::mpsc::unbounded();
+        let (tx_events, rx_events) = async_channel::unbounded();
         let mut indexer = Indexer::new(rpc, handlers, db.clone(), cfg, tx_events);
         indexer.start().await.expect("indexer should run");
 
@@ -554,7 +554,7 @@ pub mod tests {
         let mut handlers = MockChainLogHandler::new();
         handlers.expect_contract_addresses().return_const(vec![]);
 
-        let (tx_events, _) = futures::channel::mpsc::unbounded();
+        let (tx_events, _) = async_channel::unbounded();
         let mut indexer = Indexer::new(rpc, handlers, db.clone(), IndexerConfig::default(), tx_events);
         indexer.start().await.expect("indexer should run");
     }

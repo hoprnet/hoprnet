@@ -100,7 +100,7 @@ impl AcknowledgementActions {
             } else if e.is_disconnected() {
                 TransportError("queue is closed".to_string())
             } else {
-                TransportError(format!("Unknown error: {}", e))
+                TransportError(format!("Unknown error: {e}"))
             }
         })
     }

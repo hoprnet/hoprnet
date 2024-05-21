@@ -114,11 +114,17 @@ pub enum HoprChainProcess {
     OutgoingOnchainActionQueue,
 }
 
-// reason for using `async_channel` is that the rx can be cloned
-type HoprChainProcessType = (
-    async_channel::Sender<()>,
-    async_channel::Receiver<HashMap<HoprChainProcess, JoinHandle<()>>>,
-);
+type ActionQueueType<T> = ActionQueue<
+    T,
+    IndexerActionTracker,
+    EthereumTransactionExecutor<
+        chain_rpc::TypedTransaction,
+        RpcEthereumClient<
+            RpcOperations<chain_rpc::client::JsonRpcProviderClient<DefaultHttpPostRequestor, SimpleJsonRpcRetryPolicy>>,
+        >,
+        SafePayloadGenerator,
+    >,
+>;
 
 /// Represents all chain interactions exported to be used in the hopr-lib
 ///
@@ -132,12 +138,12 @@ pub struct HoprChain<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::De
     safe_address: Address,
     contract_addresses: ContractAddresses,
     indexer_cfg: IndexerConfig,
-    indexer_events_tx: futures::channel::mpsc::UnboundedSender<SignificantChainEvent>,
+    indexer_events_tx: async_channel::Sender<SignificantChainEvent>,
     db: T,
     chain_actions: ChainActions<T>,
+    action_queue: ActionQueueType<T>,
     action_state: Arc<IndexerActionTracker>,
     rpc_operations: RpcOperations<JsonRpcClient>,
-    processes: HoprChainProcessType,
 }
 
 impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> HoprChain<T> {
@@ -152,7 +158,7 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
         contract_addresses: ContractAddresses,
         safe_address: Address,
         indexer_cfg: IndexerConfig,
-        indexer_events_tx: futures::channel::mpsc::UnboundedSender<SignificantChainEvent>,
+        indexer_events_tx: async_channel::Sender<SignificantChainEvent>,
     ) -> Self {
         // TODO: extract this from the global config type
         let mut rpc_http_config = chain_rpc::client::native::HttpPostRequestorConfig::default();
@@ -212,30 +218,6 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
         let action_state = action_queue.action_state();
         let action_sender = action_queue.new_sender();
 
-        let (push_tx, push_rx) = async_channel::bounded::<()>(1);
-        let (pull_tx, pull_rx) =
-            async_channel::bounded::<std::collections::HashMap<HoprChainProcess, JoinHandle<()>>>(1);
-
-        // NOTE: This spawned task does not need to be explicitly canceled, since it will
-        // be automatically dropped when the event sender object is dropped.
-        spawn(async move {
-            let action_queue = action_queue;
-
-            match push_rx.recv().await {
-                Ok(_) => {
-                    let mut r = HashMap::new();
-                    r.insert(
-                        HoprChainProcess::OutgoingOnchainActionQueue,
-                        spawn(async move { action_queue.start().await }),
-                    );
-                    pull_tx.send(r).await.unwrap();
-                }
-                Err(e) => {
-                    panic!("Failed to receive the push message from HoprChain object to initiate process spawning: {e}")
-                }
-            }
-        });
-
         // Instantiate Chain Actions
         let chain_actions = ChainActions::new(&me_onchain, db.clone(), action_sender);
 
@@ -247,9 +229,9 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
             indexer_events_tx,
             db,
             chain_actions,
+            action_queue,
             action_state,
             rpc_operations,
-            processes: (push_tx, pull_rx),
         }
     }
 
@@ -257,18 +239,13 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
     ///
     /// This method will spawn the [`HoprChainProcess::Indexer`] and [`HoprChainProcess::OutgoingOnchainActionQueue`]
     /// processes and return join handles to the calling function.
-    ///
-    /// Both processes are not started immediately, but are waiting for a trigger from this piece of code.
-    ///
-    /// This is a hack around the fact that `futures::channel::mpsc::oneshot`
-    pub async fn start(&self) -> errors::Result<std::collections::HashMap<HoprChainProcess, JoinHandle<()>>> {
-        let rx = self.processes.1.clone();
-        self.processes.0.clone().send(()).await.unwrap();
-        let mut processes = rx
-            .recv()
-            .await
-            .map_err(|e| HoprChainError::Api(format!("failed to spawn background chain processes: {e}")))?;
+    pub async fn start(&self) -> errors::Result<HashMap<HoprChainProcess, JoinHandle<()>>> {
+        let mut processes: HashMap<HoprChainProcess, JoinHandle<()>> = HashMap::new();
 
+        processes.insert(
+            HoprChainProcess::OutgoingOnchainActionQueue,
+            spawn(self.action_queue.clone().start()),
+        );
         processes.insert(
             HoprChainProcess::Indexer,
             Indexer::new(

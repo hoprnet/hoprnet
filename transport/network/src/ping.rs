@@ -1,12 +1,15 @@
-use std::pin::Pin;
-use std::{collections::hash_map::Entry, ops::Div};
+use std::{
+    collections::{hash_map::Entry, HashMap},
+    ops::Div,
+};
 
 use async_trait::async_trait;
-use futures::{future::poll_fn, StreamExt};
+use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
+use futures::StreamExt;
 use hopr_primitive_types::traits::SaturatingSub;
 use libp2p_identity::PeerId;
 
-use tracing::{debug, error, trace, warn};
+use tracing::{debug, trace, warn};
 
 use hopr_platform::time::native::current_time;
 
@@ -41,7 +44,7 @@ const MAX_PARALLEL_PINGS: usize = 14;
 /// The unboundedness relies on the fact that a back pressure mechanism exists on a
 /// higher level of the business logic making sure that only a fixed maximum count
 /// of pings ever enter the queues at any given time.
-pub type HeartbeatSendPingTx = futures::channel::mpsc::UnboundedSender<(PeerId, ControlMessage)>;
+pub type HeartbeatSendPingTx = UnboundedSender<(PeerId, ControlMessage)>;
 
 /// Heartbeat get pong RX type
 ///
@@ -51,8 +54,7 @@ pub type HeartbeatSendPingTx = futures::channel::mpsc::UnboundedSender<(PeerId, 
 /// The unboundedness relies on the fact that a back pressure mechanism exists on a
 /// higher level of the business logic making sure that only a fixed maximum count
 /// of pings ever enter the queues at any given time.
-pub type HeartbeatGetPongRx =
-    futures::channel::mpsc::UnboundedReceiver<(PeerId, std::result::Result<(ControlMessage, String), ()>)>;
+pub type HeartbeatGetPongRx = UnboundedReceiver<(PeerId, std::result::Result<(ControlMessage, String), ()>)>;
 
 /// Result of the ping operation.
 pub type PingResult = std::result::Result<u64, ()>;
@@ -118,9 +120,13 @@ impl<T: PingExternalAPI + std::marker::Send> Ping<T> {
 
         self.send_ping
             .clone()
-            .start_send((*peer, ping_challenge.clone()))
+            .unbounded_send((*peer, ping_challenge.clone()))
             .map(move |_| (current_time().as_unix_timestamp().as_millis() as u64, ping_challenge))
             .map_err(|_| ())
+    }
+
+    pub fn config(&self) -> &PingConfig {
+        &self.config
     }
 }
 
@@ -145,12 +151,7 @@ impl<T: PingExternalAPI + std::marker::Send> Pinging for Ping<T> {
             return;
         }
 
-        if let Err(e) = poll_fn(|cx| Pin::new(&self.send_ping).poll_ready(cx)).await {
-            error!("The ping receiver is not listening: {}", e);
-            return;
-        }
-
-        let mut active_pings: std::collections::HashMap<PeerId, PingStartedRecord> = std::collections::HashMap::new();
+        let mut active_pings: HashMap<PeerId, PingStartedRecord> = HashMap::new();
 
         let remainder = peers.split_off(self.config.max_parallel_pings.min(peers.len()));
         for peer in peers.into_iter() {
@@ -266,7 +267,7 @@ mod tests {
     #[async_std::test]
     async fn test_ping_peers_with_happy_path_should_trigger_the_desired_external_api_calls() {
         let (tx, mut rx_ping) = futures::channel::mpsc::unbounded::<(PeerId, ControlMessage)>();
-        let (mut tx_pong, rx) =
+        let (tx_pong, rx) =
             futures::channel::mpsc::unbounded::<(PeerId, std::result::Result<(ControlMessage, String), ()>)>();
 
         let peer = PeerId::random();
@@ -282,7 +283,7 @@ mod tests {
 
         let ideal_single_use_channel = async move {
             if let Some((peer, challenge)) = rx_ping.next().await {
-                let _ = tx_pong.start_send((
+                let _ = tx_pong.unbounded_send((
                     peer,
                     Ok((
                         ControlMessage::generate_pong_response(&challenge).expect("valid challenge"),
@@ -299,7 +300,7 @@ mod tests {
     #[async_std::test]
     async fn test_ping_should_invoke_a_failed_ping_reply_for_an_incorrect_reply() {
         let (tx, mut rx_ping) = futures::channel::mpsc::unbounded::<(PeerId, ControlMessage)>();
-        let (mut tx_pong, rx) =
+        let (tx_pong, rx) =
             futures::channel::mpsc::unbounded::<(PeerId, std::result::Result<(ControlMessage, String), ()>)>();
 
         let peer = PeerId::random();
@@ -315,7 +316,7 @@ mod tests {
 
         let bad_pong_single_use_channel = async move {
             if let Some((peer, challenge)) = rx_ping.next().await {
-                let _ = tx_pong.start_send((peer, Ok((challenge, "version".to_owned()))));
+                let _ = tx_pong.unbounded_send((peer, Ok((challenge, "version".to_owned()))));
             };
         };
 
@@ -326,7 +327,7 @@ mod tests {
     #[async_std::test]
     async fn test_ping_peer_times_out_on_the_pong() {
         let (tx, mut rx_ping) = futures::channel::mpsc::unbounded::<(PeerId, ControlMessage)>();
-        let (mut tx_pong, rx) =
+        let (tx_pong, rx) =
             futures::channel::mpsc::unbounded::<(PeerId, std::result::Result<(ControlMessage, String), ()>)>();
 
         let peer = PeerId::random();
@@ -348,7 +349,7 @@ mod tests {
         // from the channel
         let timeout_single_use_channel = async move {
             if let Some((peer, _challenge)) = rx_ping.next().await {
-                let _ = tx_pong.start_send((peer, Err(())));
+                let _ = tx_pong.unbounded_send((peer, Err(())));
             };
         };
 
@@ -359,7 +360,7 @@ mod tests {
     #[async_std::test]
     async fn test_ping_peers_multiple_peers_are_pinged_in_parallel() {
         let (tx, mut rx_ping) = futures::channel::mpsc::unbounded::<(PeerId, ControlMessage)>();
-        let (mut tx_pong, rx) =
+        let (tx_pong, rx) =
             futures::channel::mpsc::unbounded::<(PeerId, std::result::Result<(ControlMessage, String), ()>)>();
 
         let peers = vec![PeerId::random(), PeerId::random()];
@@ -383,7 +384,7 @@ mod tests {
         let ideal_twice_usable_channel = async move {
             for _ in 0..2 {
                 if let Some((peer, challenge)) = rx_ping.next().await {
-                    let _ = tx_pong.start_send((
+                    let _ = tx_pong.unbounded_send((
                         peer,
                         Ok((
                             ControlMessage::generate_pong_response(&challenge).expect("valid challenge"),
@@ -401,7 +402,7 @@ mod tests {
     #[async_std::test]
     async fn test_ping_peers_should_ping_parallel_only_a_limited_number_of_peers() {
         let (tx, mut rx_ping) = futures::channel::mpsc::unbounded::<(PeerId, ControlMessage)>();
-        let (mut tx_pong, rx) =
+        let (tx_pong, rx) =
             futures::channel::mpsc::unbounded::<(PeerId, std::result::Result<(ControlMessage, String), ()>)>();
 
         let mut config = simple_ping_config();
@@ -431,7 +432,7 @@ mod tests {
             for i in 0..2 {
                 if let Some((peer, challenge)) = rx_ping.next().await {
                     async_std::task::sleep(std::time::Duration::from_millis(ping_delay * i)).await;
-                    let _ = tx_pong.start_send((
+                    let _ = tx_pong.unbounded_send((
                         peer,
                         Ok((
                             ControlMessage::generate_pong_response(&challenge).expect("valid challenge"),

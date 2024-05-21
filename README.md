@@ -29,6 +29,8 @@
 - [Develop](#develop)
   - [Nix environment setup](#nix-environment-setup)
     - [Nix flake outputs](#nix-flake-outputs)
+    - [Code Formatting](#code-formatting)
+    - [Code Linting](#code-linting)
   - [Local node with safe staking service (local network)](#local-node-with-safe-staking-service-local-network)
   - [Local node with safe staking service (dufour network)](#local-node-with-safe-staking-service-dufour-network)
 - [Local cluster](#local-cluster)
@@ -113,6 +115,8 @@ $ sudo cp result/bin/* /usr/local/bin/
 
 ```shell
 $ hoprd --help
+HOPR node executable.
+
 Usage: hoprd [OPTIONS]
 
 Options:
@@ -140,6 +144,8 @@ Options:
           Disables checking of unrealized balance before validating unacknowledged tickets. [env: HOPRD_DISABLE_UNREALIZED_BALANCE_CHECK=]
       --maxBlockRange <MAX_BLOCK_RANGE>
           Maximum number of blocks that can be fetched in a batch request from the RPC provider. [env: HOPRD_MAX_BLOCK_RANGE=]
+      --maxRequestsPerSec <MAX_RPC_REQUESTS_PER_SEC>
+          Maximum number of RPC requestes that can be performed per second. [env: HOPRD_MAX_RPC_REQUESTS_PER_SEC=]
       --provider <PROVIDER>
           A custom RPC provider to be used for the node to connect to blockchain [env: HOPRD_PROVIDER=]
       --init...

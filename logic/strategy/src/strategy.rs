@@ -19,10 +19,13 @@
 //! For details on default parameters see [MultiStrategyConfig].
 use async_trait::async_trait;
 use chain_actions::ChainActions;
-use core_protocol::ticket_aggregation::processor::AwaitingAggregator;
+use core_protocol::ticket_aggregation::processor::TicketAggregatorTrait;
 use hopr_internal_types::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::fmt::{Debug, Display, Formatter};
+use std::{
+    fmt::{Debug, Display, Formatter},
+    sync::Arc,
+};
 use tracing::{error, warn};
 use validator::Validate;
 
@@ -121,16 +124,14 @@ pub struct MultiStrategy {
 impl MultiStrategy {
     /// Constructs new `MultiStrategy`.
     /// The strategy can contain another `MultiStrategy` if `allow_recursive` is set.
-    pub fn new<Db, U, V>(
+    pub fn new<Db>(
         cfg: MultiStrategyConfig,
         db: Db,
         chain_actions: ChainActions<Db>,
-        ticket_aggregator: AwaitingAggregator<U, V, Db>,
+        ticket_aggregator: Arc<dyn TicketAggregatorTrait + Send + Sync + 'static>,
     ) -> Self
     where
         Db: HoprDbAllOperations + Clone + Send + Sync + std::fmt::Debug + 'static,
-        U: Sync + Send + std::fmt::Debug + 'static,
-        V: Sync + Send + std::fmt::Debug + 'static,
     {
         let mut strategies = Vec::<Box<dyn SingularStrategy + Send + Sync>>::new();
 

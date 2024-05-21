@@ -13,6 +13,7 @@ use futures_concurrency::stream::Merge;
 use libp2p_identity::PeerId;
 use serde_json::json;
 use serde_with::{serde_as, DisplayFromStr, DurationMilliSeconds};
+pub use tide::listener::Listener;
 use tide::{
     http::{
         headers::{HeaderName, HeaderValue, AUTHORIZATION},
@@ -267,15 +268,14 @@ enum WebSocketInput {
     WsInput(std::result::Result<tide_websockets::Message, tide_websockets::Error>),
 }
 
-pub async fn run_hopr_api(
-    host: String,
+pub async fn build_hopr_api(
     hoprd_cfg: String,
     cfg: crate::config::Api,
     hopr: Arc<hopr_lib::Hopr>,
     inbox: Arc<RwLock<hoprd_inbox::Inbox>>,
     websocket_rx: async_broadcast::InactiveReceiver<TransportOutput>,
     msg_encoder: Option<MessageEncoder>,
-) {
+) -> tide::Server<State> {
     // Prepare alias part of the state
     let aliases: Arc<RwLock<BiHashMap<String, PeerId>>> = Arc::new(RwLock::new(BiHashMap::new()));
     aliases.write().await.insert("me".to_owned(), hopr.me_peer_id());
@@ -444,9 +444,7 @@ pub async fn run_hopr_api(
         api
     });
 
-    app.listen(host)
-        .await
-        .expect("the REST API server should run successfully")
+    app
 }
 
 #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]

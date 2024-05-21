@@ -42,7 +42,7 @@ hopr-internal-types = { workspace = true }
 hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
-env_logger = { workspace = true }
+tracing-test = { workspace = true }
 more-asserts = "0.3.1"
 parameterized = { workspace = true }
 serial_test = "3.1.1"

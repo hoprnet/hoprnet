@@ -19,7 +19,7 @@ use chain_types::{ContractAddresses, ContractInstances};
 use core_transport::{ChainKeypair, Hash, Keypair, Multiaddr, OffchainKeypair};
 use ethers::providers::Middleware;
 use ethers::utils::AnvilInstance;
-use futures::StreamExt;
+use futures::{pin_mut, StreamExt};
 use hopr_crypto_types::prelude::*;
 use hopr_db_api::prelude::*;
 use hopr_internal_types::prelude::*;
@@ -205,9 +205,12 @@ async fn start_node_chain_logic(
     }));
 
     // Action state tracking
-    let (sce_tx, mut sce_rx) = futures::channel::mpsc::unbounded();
+    let (sce_tx, sce_rx) = async_channel::unbounded();
     node_tasks.push(async_std::task::spawn(async move {
-        while let Some(sce) = sce_rx.next().await {
+        let rx = sce_rx.clone();
+        pin_mut!(rx);
+
+        while let Some(sce) = rx.next().await {
             let _ = action_state.match_and_resolve(&sce).await;
             //debug!("{:?}: expectations resolved {:?}", sce, res);
         }

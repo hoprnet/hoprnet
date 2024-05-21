@@ -6,8 +6,6 @@
 //! ## Help
 //! ```shell
 //! ➜   hoprd-cfg --help
-//! Contains the main entry point of HOPR daemon application
-//!
 //! Usage: hoprd-cfg [OPTIONS]
 //!
 //! Options:
