@@ -94,7 +94,7 @@ jobs:
           WORKLOAD_NAME: ${{ github.event.inputs.workload }}
           SCENARIO_ITERATIONS: ${{ github.event.inputs.rate }}
           TESTID: ${{ github.event.inputs.test_id }}
-          DURATION: ${{ github.event.inputs.duration }}
+          SCENARIO_DURATION: ${{ github.event.inputs.duration }}
           HOPRD_API_TOKEN: ${{ secrets.HOPRD_API_TOKEN }}
 
 
