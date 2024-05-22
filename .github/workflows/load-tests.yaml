@@ -84,6 +84,7 @@ jobs:
         run: |
           npm install
           npm run test:${{ github.event.inputs.network }}:setup
+        working-directory: "./k6"
 
       - name: Run Load test
         run: |
