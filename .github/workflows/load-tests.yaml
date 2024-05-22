@@ -39,6 +39,11 @@ on:
         default: 10m
         required: true
         description: 'Duration of the test'
+      concurrency:
+        type: number
+        default: 1
+        required: true
+        description: 'Concurrent virtual users per hoprd node'
 concurrency:
   group: load-tests
   cancel-in-progress: true
@@ -92,6 +97,7 @@ jobs:
           TESTID: ${{ github.event.inputs.test_id }}
           SCENARIO_DURATION: ${{ github.event.inputs.duration }}
           HOPRD_API_TOKEN: ${{ secrets.HOPRD_API_TOKEN }}
+          HOPRD_NODE_THREADS: ${{ github.event.inputs.concurrency }}
 
       - name: Run Load test
         run: |
