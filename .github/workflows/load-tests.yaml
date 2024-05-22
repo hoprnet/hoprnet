@@ -34,7 +34,11 @@ on:
         default: 1
         required: true
         description: 'Number of messages per seconds'
-
+      duration:
+        type: number
+        default: 10
+        required: true
+        description: 'Duration of the test in minutes'
 concurrency:
   group: load-tests
   cancel-in-progress: true
@@ -82,12 +86,20 @@ jobs:
           npm run test:${{ github.event.inputs.network }}:setup
           kubectl delete -f k6-test-run.yaml 2> /dev/null || true
           kubectl apply -f k6-test-run.yaml
+          sleep 3m # Wait for test to bootstrap
+          sleep ${{ github.event.inputs.duration }}m # wait for the test to finish
         working-directory: "./k6"
         env:
           ENVIRONMENT_NAME: ${{ github.event.inputs.network }}
           WORKLOAD_NAME: ${{ github.event.inputs.workload }}
           SCENARIO_ITERATIONS: ${{ github.event.inputs.rate }}
           TESTID: ${{ github.event.inputs.test_id }}
+          DURATION: ${{ github.event.inputs.duration }}
           HOPRD_API_TOKEN: ${{ secrets.HOPRD_API_TOKEN }}
 
 
+      - name: Parse results
+        run: |
+          kubectl apply -f k6-test-results.yaml
+          sleep 1h # Wait for debugging purposes
+        working-directory: "./k6"
