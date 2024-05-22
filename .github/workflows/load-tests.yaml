@@ -35,10 +35,10 @@ on:
         required: true
         description: 'Number of messages per seconds'
       duration:
-        type: number
-        default: 10
+        type: string
+        default: 10m
         required: true
-        description: 'Duration of the test in minutes'
+        description: 'Duration of the test'
 concurrency:
   group: load-tests
   cancel-in-progress: true
