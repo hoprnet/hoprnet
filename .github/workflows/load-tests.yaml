@@ -107,5 +107,4 @@ jobs:
         run: |
           kubectl delete -f k6-test-results.yaml 2> /dev/null || true
           kubectl apply -f k6-test-results.yaml
-          sleep 1h # Wait for debugging purposes
         working-directory: "./k6"
