@@ -97,7 +97,9 @@ jobs:
         run: |
           kubectl delete -f k6-test-run.yaml 2> /dev/null || true
           kubectl apply -f k6-test-run.yaml
-          sleep 3m # Wait for test to bootstrap
+          echo "Waiting for test to bootstrap..."
+          sleep 2m # Wait for test to bootstrap
+          echo "Waiting for test to finish..."
           sleep ${{ github.event.inputs.duration }}m # wait for the test to finish
         working-directory: "./k6"
 
