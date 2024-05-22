@@ -69,6 +69,12 @@ pub enum TicketAggregationProcessed<T, U> {
     ),
 }
 
+#[async_trait::async_trait]
+pub trait TicketAggregatorTrait {
+    /// Pushes a new collection of tickets into the processing.
+    async fn aggregate_tickets(&self, channel: &Hash, prerequisites: AggregationPrerequisites) -> Result<()>;
+}
+
 #[derive(Debug)]
 pub struct AwaitingAggregator<T, U, Db>
 where
@@ -77,7 +83,6 @@ where
     U: Send,
 {
     db: Db,
-    ck: ChainKeypair,
     writer: TicketAggregationActions<T, U>,
     agg_timeout: std::time::Duration,
 }
@@ -91,7 +96,6 @@ where
     fn clone(&self) -> Self {
         Self {
             db: self.db.clone(),
-            ck: self.ck.clone(),
             writer: self.writer.clone(),
             agg_timeout: self.agg_timeout,
         }
@@ -104,25 +108,24 @@ where
     T: Send,
     U: Send,
 {
-    pub fn new(
-        db: Db,
-        ck: ChainKeypair,
-        writer: TicketAggregationActions<T, U>,
-        agg_timeout: std::time::Duration,
-    ) -> Self {
+    pub fn new(db: Db, writer: TicketAggregationActions<T, U>, agg_timeout: std::time::Duration) -> Self {
         Self {
             db,
-            ck,
             writer,
             agg_timeout,
         }
     }
+}
 
-    pub async fn aggregate_tickets_in_the_channel(
-        &self,
-        channel: &Hash,
-        prerequisites: AggregationPrerequisites,
-    ) -> Result<()> {
+#[async_trait::async_trait]
+impl<T, U, Db> TicketAggregatorTrait for AwaitingAggregator<T, U, Db>
+where
+    Db: HoprDbTicketOperations + Send + Sync + Clone + std::fmt::Debug,
+    T: Send,
+    U: Send,
+{
+    #[tracing::instrument(level = "debug", skip(self))]
+    async fn aggregate_tickets(&self, channel: &Hash, prerequisites: AggregationPrerequisites) -> Result<()> {
         let mut awaiter = self.writer.clone().aggregate_tickets(channel, prerequisites)?;
 
         if let Err(e) = awaiter.consume_and_wait(self.agg_timeout).await {
@@ -524,8 +527,6 @@ mod tests {
 
     #[async_std::test]
     async fn test_ticket_aggregation() {
-        let _ = env_logger::builder().is_test(true).try_init();
-
         let db_alice = HoprDb::new_in_memory(PEERS_CHAIN[0].clone()).await;
         let db_bob = HoprDb::new_in_memory(PEERS_CHAIN[1].clone()).await;
         init_db(db_alice.clone()).await;

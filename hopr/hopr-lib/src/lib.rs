@@ -63,12 +63,9 @@ use chain_api::{
 use chain_types::chain_events::ChainEventType;
 use chain_types::ContractAddresses;
 use core_path::channel_graph::ChannelGraph;
-use core_strategy::{
-    aggregating::AwaitingAggregator,
-    strategy::{MultiStrategy, SingularStrategy},
-};
+use core_strategy::strategy::{MultiStrategy, SingularStrategy};
 use core_transport::libp2p::identity::PeerId;
-use core_transport::{build_network, execute_on_tick};
+use core_transport::{build_network, execute_on_tick, PeerTransportEvent};
 use core_transport::{ChainKeypair, Hash, HoprTransport, OffchainKeypair};
 use core_transport::{IndexerToProcess, Network, PeerEligibility, PeerOrigin};
 use hopr_platform::file::native::{join, read_file, remove_dir_all, write};
@@ -370,6 +367,17 @@ impl HoprSocket {
     }
 }
 
+fn as_host_multiaddress(host_cfg: &crate::HostConfig) -> Multiaddr {
+    match &host_cfg.address {
+        core_transport::config::HostType::IPv4(ip) => {
+            Multiaddr::from_str(format!("/ip4/{}/tcp/{}", ip.as_str(), host_cfg.port).as_str()).unwrap()
+        }
+        core_transport::config::HostType::Domain(domain) => {
+            Multiaddr::from_str(format!("/dns4/{}/tcp/{}", domain.as_str(), host_cfg.port).as_str()).unwrap()
+        }
+    }
+}
+
 /// HOPR main object providing the entire HOPR node functionality
 ///
 /// Instantiating this object creates all processes and objects necessary for
@@ -383,6 +391,8 @@ impl HoprSocket {
 /// As such, the `hopr_lib` serves mainly as an integration point into Rust programs.
 pub struct Hopr {
     me: OffchainKeypair,
+    // onchain keypair is necessary, because the ack interaction needs it to be constructable in runtime
+    me_onchain: ChainKeypair,
     cfg: config::HoprLibConfig,
     state: Arc<AtomicHoprState>,
     transport_api: HoprTransport<HoprDb>,
@@ -399,14 +409,7 @@ pub struct Hopr {
 
 impl Hopr {
     pub fn new(mut cfg: config::HoprLibConfig, me: &OffchainKeypair, me_onchain: &ChainKeypair) -> Self {
-        let multiaddress = match &cfg.host.address {
-            core_transport::config::HostType::IPv4(ip) => {
-                Multiaddr::from_str(format!("/ip4/{}/tcp/{}", ip.as_str(), cfg.host.port).as_str()).unwrap()
-            }
-            core_transport::config::HostType::Domain(domain) => {
-                Multiaddr::from_str(format!("/dns4/{}/tcp/{}", domain.as_str(), cfg.host.port).as_str()).unwrap()
-            }
-        };
+        let multiaddress = as_host_multiaddress(&cfg.host);
 
         let db_path: String = join(&[&cfg.db.data, "db"]).expect("Could not create a db storage path");
         info!("Initiating the DB at: {db_path}");
@@ -468,24 +471,7 @@ impl Hopr {
             db.clone(),
         );
 
-        let (tx_indexer_events, rx_indexer_events) = futures::channel::mpsc::unbounded();
-        let (tx_indexer_significant_events, rx_indexer_significant_events) =
-            async_channel::unbounded::<SignificantChainEvent>();
-
-        // NOTE: architectural deficiency, needs to be refactored, but for now the remapping
-        // to `async_channel::Receiver` is used, because the `async_channel::Receiver`
-        // implements the `Clone`.
-        //
-        // The task is automatically terminated, when the receiver is closed.
-        spawn(async move {
-            let tx = tx_indexer_significant_events.clone();
-            let mut rx = rx_indexer_events;
-            while let Some(event) = rx.next().await {
-                if let Err(e) = tx.send(event).await {
-                    error!("failed to forward indexer event: {e}");
-                }
-            }
-        });
+        let (tx_indexer_events, rx_indexer_events) = async_channel::unbounded::<SignificantChainEvent>();
 
         let channel_graph = Arc::new(RwLock::new(ChannelGraph::new(me_onchain.public().to_address())));
 
@@ -496,10 +482,9 @@ impl Hopr {
             cfg.protocol,
             cfg.heartbeat,
             db.clone(),
-            tbf.raw_filter(),
             network.clone(),
             channel_graph.clone(),
-            my_multiaddresses.clone(),
+            my_multiaddresses,
         );
 
         let hopr_chain_api = chain_api::HoprChain::new(
@@ -529,12 +514,7 @@ impl Hopr {
             cfg.strategy.clone(),
             db.clone(),
             hopr_chain_api.actions_ref().clone(),
-            AwaitingAggregator::new(
-                db.clone(),
-                me_onchain.clone(),
-                hopr_transport_api.ticket_aggregator_writer(),
-                cfg.protocol.ticket_aggregation.timeout,
-            ),
+            hopr_transport_api.ticket_aggregator(),
         ));
         debug!("Initialized strategies: {multi_strategy:?}");
 
@@ -554,6 +534,7 @@ impl Hopr {
 
         Self {
             me: me.clone(),
+            me_onchain: me_onchain.clone(),
             cfg,
             state: Arc::new(AtomicHoprState::new(HoprState::Uninitialized)),
             transport_api: hopr_transport_api,
@@ -564,7 +545,7 @@ impl Hopr {
             channel_graph,
             multistrategy: multi_strategy,
             tbf,
-            rx_indexer_significant_events,
+            rx_indexer_significant_events: rx_indexer_events,
         }
     }
 
@@ -696,6 +677,9 @@ impl Hopr {
 
         self.state.store(HoprState::Indexing, Ordering::Relaxed);
 
+        let (to_process_tx, to_process_rx) =
+            async_channel::bounded::<IndexerToProcess>(core_transport::constants::INDEXER_UPDATE_QUEUE_SIZE);
+
         spawn(chain_event_refresh_process(
             self.me_peer_id(),
             self.me_onchain(),
@@ -703,10 +687,36 @@ impl Hopr {
             self.multistrategy.clone(),
             self.rx_indexer_significant_events.clone(),
             self.channel_graph.clone(),
-            self.transport_api.index_updater(),
+            core_transport::IndexerActions::new(to_process_tx.clone()),
             self.chain_api.action_state(),
             self.network.clone(),
         ));
+
+        let (indexer_update_tx, indexer_update_rx) =
+            async_channel::bounded::<PeerTransportEvent>(core_transport::constants::INDEXER_UPDATE_QUEUE_SIZE);
+
+        let db = self.db.clone();
+        let network = self.network.clone();
+        spawn(async move {
+            let processing_stream = core_transport::add_peer_update_processing(to_process_rx, db, network)
+                .await
+                .filter_map(move |event| {
+                    let emitter = indexer_update_tx.clone();
+                    async move {
+                        match emitter.send(event).await {
+                            Ok(_) => {}
+                            Err(e) => {
+                                error!("Failed to emit an indexer event: {e}");
+                            }
+                        };
+
+                        None::<()>
+                    }
+                });
+
+            pin_mut!(processing_stream);
+            while processing_stream.next().await.is_some() {}
+        });
 
         info!("Start the chain process and sync the indexer");
         for (id, proc) in self.chain_api.start().await?.into_iter() {
@@ -735,7 +745,31 @@ impl Hopr {
         // TODO: wait here for the confirmation that the node is allowed in the registry
 
         info!("Loading initial peers from the storage");
-        self.transport_api.init_from_db().await?;
+        let index_updater = core_transport::IndexerActions::new(to_process_tx.clone());
+
+        for (peer, _address, multiaddresses) in self.transport_api.get_public_nodes().await? {
+            if self.is_allowed_to_access_network(&peer).await? {
+                debug!("Using initial public node '{peer}' with '{:?}'", multiaddresses);
+                index_updater
+                    .emit_indexer_update(IndexerToProcess::EligibilityUpdate(peer, PeerEligibility::Eligible))
+                    .await;
+
+                index_updater
+                    .emit_indexer_update(IndexerToProcess::Announce(peer, multiaddresses.clone()))
+                    .await;
+
+                // Self-reference is not needed in the network storage
+                if &peer != self.transport_api.me() {
+                    if let Err(e) = self
+                        .network
+                        .add(&peer, PeerOrigin::Initialization, multiaddresses)
+                        .await
+                    {
+                        error!("Failed to store the peer observation: {e}");
+                    }
+                }
+            }
+        }
 
         // Possibly register node-safe pair to NodeSafeRegistry. Following that the
         // connector is set to use safe tx variants.
@@ -844,11 +878,14 @@ impl Hopr {
         for (id, proc) in self
             .transport_api
             .run(
+                &self.me,
+                &self.me_onchain,
                 String::from(constants::APP_VERSION),
                 self.network.clone(),
-                self.cfg.protocol,
+                self.tbf.raw_filter(),
                 transport_output_tx,
                 on_ack_tkt_tx,
+                indexer_update_rx,
             )
             .await
             .into_iter()

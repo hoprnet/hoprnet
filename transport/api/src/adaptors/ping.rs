@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use async_lock::RwLock;
 use async_trait::async_trait;
-use futures::channel::mpsc::Sender;
 use tracing::{debug, error};
 
 use core_network::{
@@ -36,7 +35,7 @@ where
     channel_graph: Arc<RwLock<ChannelGraph>>,
     /// Implementation of the network interface allowing emitting events
     /// based on the [core_network::network::Network] events into the p2p swarm.
-    emitter: Sender<NetworkTriggeredEvent>,
+    emitter: futures::channel::mpsc::Sender<NetworkTriggeredEvent>,
 }
 
 impl<T> PingExternalInteractions<T>
@@ -52,7 +51,7 @@ where
         network: Arc<Network<T>>,
         resolver: T,
         channel_graph: Arc<RwLock<ChannelGraph>>,
-        emitter: Sender<NetworkTriggeredEvent>,
+        emitter: futures::channel::mpsc::Sender<NetworkTriggeredEvent>,
     ) -> Self {
         Self {
             network,
@@ -85,7 +84,7 @@ where
                     if let Err(e) = self
                         .emitter
                         .clone()
-                        .start_send(NetworkTriggeredEvent::CloseConnection(peer))
+                        .try_send(NetworkTriggeredEvent::CloseConnection(peer))
                     {
                         error!("Failed to emit a network event 'close connection': {}", e)
                     }

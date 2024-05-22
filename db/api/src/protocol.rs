@@ -208,7 +208,7 @@ impl HoprDbProtocolOperations for HoprDb {
         Ok(result.into())
     }
 
-    #[instrument(level = "trace", skip(self))]
+    #[tracing::instrument(level = "trace", skip(self, data, me, path))]
     async fn to_send(
         &self,
         data: Box<[u8]>,
@@ -283,7 +283,7 @@ impl HoprDbProtocolOperations for HoprDb {
         }
     }
 
-    #[instrument(level = "trace", skip(self))]
+    #[tracing::instrument(level = "trace", skip(self, data, me, pkt_keypair, sender), fields(sender = %sender))]
     async fn from_recv(
         &self,
         data: Box<[u8]>,

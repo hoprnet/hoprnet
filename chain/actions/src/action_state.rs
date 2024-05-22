@@ -86,7 +86,7 @@ type ExpectationTable = HashMap<Hash, (IndexerExpectation, channel::oneshot::Sen
 
 /// Implements [action state](ActionState) tracking using a non-persistent in-memory hash table of
 /// assumed [IndexerExpectations](IndexerExpectation).
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct IndexerActionTracker {
     expectations: Arc<RwLock<ExpectationTable>>,
 }

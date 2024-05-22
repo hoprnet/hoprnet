@@ -1,4 +1,4 @@
-use futures::{channel::mpsc, Stream};
+use futures::Stream;
 use futures_lite::StreamExt;
 use libp2p::identity::PeerId;
 use std::pin::Pin;
@@ -21,14 +21,15 @@ pub struct ManualPingChallenge(pub PeerId, pub ControlMessage);
 /// NOTE: UnboundedSender and UnboundedReceiver are bound only by available memory in
 /// case of faster input than output the memory might run out, but these are protected
 /// by a bounded queue managing the request generation.
-pub type HeartbeaRequestRx = mpsc::UnboundedReceiver<(PeerId, ControlMessage)>;
+pub type HeartbeatRequestRx = futures::channel::mpsc::UnboundedReceiver<(PeerId, ControlMessage)>;
 
 /// Heartbeat response TX type.
 ///
 /// NOTE: UnboundedSender and UnboundedReceiver are bound only by available memory in
 /// case of faster input than output the memory might run out, but these are protected
 /// by a bounded queue managing the request generation.
-pub type HeartbeatResponseTx = mpsc::UnboundedSender<(PeerId, std::result::Result<(ControlMessage, String), ()>)>;
+pub type HeartbeatResponseTx =
+    futures::channel::mpsc::UnboundedSender<(PeerId, std::result::Result<(ControlMessage, String), ()>)>;
 
 /// Heartbeat mechanism API implementations for usage inside the libp2p stack.
 pub struct HeartbeatResponder {
@@ -44,7 +45,7 @@ impl HeartbeatResponder {
     pub fn record_pong(&mut self, pong: (PeerId, std::result::Result<(ControlMessage, String), ()>)) -> Result<()> {
         self.sender
             .unbounded_send(pong)
-            .map_err(|e| P2PError::Notification(format!("Failed to send notification to heartbeat mechanism: {}", e)))
+            .map_err(|e| P2PError::Notification(format!("Failed to send pong response: {}", e)))
     }
 
     /// Generate the response for a given challenge.
@@ -65,11 +66,11 @@ impl HeartbeatResponder {
 
 /// Heartbeat mechanism trigger implementing the `std::future::Stream` trait.
 pub struct HeartbeatRequester {
-    receiver: HeartbeaRequestRx,
+    receiver: HeartbeatRequestRx,
 }
 
 impl HeartbeatRequester {
-    pub fn new(receiver: HeartbeaRequestRx) -> Self {
+    pub fn new(receiver: HeartbeatRequestRx) -> Self {
         Self { receiver }
     }
 }
@@ -99,11 +100,11 @@ impl Stream for HeartbeatRequester {
 
 /// Manual ping mechanism trigger implementing the `std::future::Stream` trait.
 pub struct ManualPingRequester {
-    receiver: HeartbeaRequestRx,
+    receiver: HeartbeatRequestRx,
 }
 
 impl ManualPingRequester {
-    pub fn new(receiver: HeartbeaRequestRx) -> Self {
+    pub fn new(receiver: HeartbeatRequestRx) -> Self {
         Self { receiver }
     }
 }
@@ -135,12 +136,14 @@ impl Stream for ManualPingRequester {
 mod tests {
     use super::*;
     use async_std::future::timeout;
+    use futures::{pin_mut, StreamExt};
 
     #[async_std::test]
     pub async fn test_heartbeat_requestor_should_not_return_a_value_if_no_action_was_requested() {
-        let (_api_tx, hb_rx) = mpsc::unbounded::<(PeerId, ControlMessage)>();
-        let mut stream = HeartbeatRequester::new(hb_rx);
+        let (_api_tx, hb_rx) = futures::channel::mpsc::unbounded::<(PeerId, ControlMessage)>();
+        let stream = HeartbeatRequester::new(hb_rx);
 
+        pin_mut!(stream);
         assert!(timeout(std::time::Duration::from_millis(5), stream.next())
             .await
             .is_err());
@@ -148,16 +151,17 @@ mod tests {
 
     #[async_std::test]
     pub async fn test_heartbeat_requestor_should_return_value_when_ping_is_requested() {
-        let (mut request_ping, hb_rx) = mpsc::unbounded::<(PeerId, ControlMessage)>();
-        let mut stream = HeartbeatRequester::new(hb_rx);
+        let (request_ping, hb_rx) = futures::channel::mpsc::unbounded::<(PeerId, ControlMessage)>();
+        let stream = HeartbeatRequester::new(hb_rx);
 
         let peer = PeerId::random();
         let payload = ControlMessage::generate_ping_request();
 
         request_ping
-            .start_send((peer, payload.clone()))
+            .unbounded_send((peer, payload.clone()))
             .expect("Must be transmitted correctly");
 
+        pin_mut!(stream);
         let next_item = timeout(std::time::Duration::from_millis(5), stream.next())
             .await
             .unwrap();
@@ -172,8 +176,8 @@ mod tests {
 
     #[async_std::test]
     pub async fn test_heartbeat_requestor_should_return_all_events_when_multiple_are_polled() {
-        let (mut request_ping, hb_rx) = mpsc::unbounded::<(PeerId, ControlMessage)>();
-        let mut stream = HeartbeatRequester::new(hb_rx);
+        let (request_ping, hb_rx) = futures::channel::mpsc::unbounded::<(PeerId, ControlMessage)>();
+        let stream = HeartbeatRequester::new(hb_rx);
 
         let peers = vec![PeerId::random(), PeerId::random()];
         let challenges = vec![
@@ -183,10 +187,11 @@ mod tests {
 
         for i in 0..peers.len().min(challenges.len()) {
             request_ping
-                .start_send((peers[i], challenges[i].clone()))
+                .unbounded_send((peers[i], challenges[i].clone()))
                 .expect("Must be transmitted correctly");
         }
 
+        pin_mut!(stream);
         for _ in 0..peers.len().min(challenges.len()) {
             let next_item = timeout(std::time::Duration::from_millis(5), stream.next())
                 .await
@@ -203,8 +208,8 @@ mod tests {
 
     #[async_std::test]
     pub async fn test_heartbeat_responder_should_update_the_pong_if_the_challenge_is_replied_correctly() {
-        let (hb_tx, mut pong_receiver) =
-            mpsc::unbounded::<(PeerId, std::result::Result<(ControlMessage, String), ()>)>();
+        let (hb_tx, pong_receiver) =
+            futures::channel::mpsc::unbounded::<(PeerId, std::result::Result<(ControlMessage, String), ()>)>();
         let mut responder = HeartbeatResponder::new(hb_tx);
 
         let peer = PeerId::random();
@@ -213,6 +218,7 @@ mod tests {
         let result = responder.record_pong((peer, Ok((pong.clone(), "version".to_owned()))));
         assert!(result.is_ok());
 
+        pin_mut!(pong_receiver);
         let notification = pong_receiver.next().await;
         assert!(notification.is_some());
         let (_peer, _response) = notification.unwrap();
@@ -224,7 +230,7 @@ mod tests {
     #[async_std::test]
     pub async fn test_heartbeat_responder_should_fail_if_the_receiver_is_closed() {
         let (hb_tx, mut pong_receiver) =
-            mpsc::unbounded::<(PeerId, std::result::Result<(ControlMessage, String), ()>)>();
+            futures::channel::mpsc::unbounded::<(PeerId, std::result::Result<(ControlMessage, String), ()>)>();
         let mut responder = HeartbeatResponder::new(hb_tx);
 
         let peer = PeerId::random();
@@ -234,6 +240,7 @@ mod tests {
         let result = responder.record_pong((peer, Ok((pong.clone(), "".to_owned()))));
         assert!(result.is_err());
 
+        pin_mut!(pong_receiver);
         let notification = pong_receiver.next().await;
         assert!(notification.is_none());
     }

@@ -7,6 +7,7 @@ use async_signal::{Signal, Signals};
 use async_std::task::{spawn, JoinHandle};
 use chrono::{DateTime, Utc};
 use futures::StreamExt;
+
 use opentelemetry_otlp::WithExportConfig as _;
 use opentelemetry_sdk::trace::{RandomIdGenerator, Sampler};
 use signal_hook::low_level;
@@ -15,7 +16,8 @@ use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 
 use hopr_lib::{ApplicationData, AsUnixTimestamp, HoprLibProcesses, ToHex, TransportOutput};
 use hoprd::cli::CliArgs;
-use hoprd_api::run_hopr_api;
+use hoprd::errors::HoprdError;
+use hoprd_api::{build_hopr_api, Listener};
 use hoprd_keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -108,10 +110,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("This is HOPRd {} ({})", hopr_lib::constants::APP_VERSION, git_hash);
 
     let args = <CliArgs as clap::Parser>::parse();
-
-    // TOOD: add proper signal handling
-    // The signal handling should produce the crossbeam-channel and notify all background loops to terminate gracefully
-    // https://rust-cli.github.io/book/in-depth/signals.html
+    let cfg = hoprd::config::HoprdConfig::from_cli_args(args, false)?;
 
     if std::env::var("DAPPNODE")
         .map(|v| v.to_lowercase() == "true")
@@ -120,11 +119,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         info!("The HOPRd node appears to run on DappNode");
     }
 
-    let cfg = hoprd::config::HoprdConfig::from_cli_args(args, false)?;
     info!("Node configuration: {}", cfg.as_redacted_string()?);
 
     if let hopr_lib::HostType::IPv4(address) = &cfg.hopr.host.address {
-        let ipv4 = std::net::Ipv4Addr::from_str(address)?;
+        let ipv4 = std::net::Ipv4Addr::from_str(address).map_err(|e| HoprdError::ConfigError(e.to_string()))?;
 
         if ipv4.is_loopback() && !cfg.hopr.transport.announce_local_addresses {
             return Err(hopr_lib::errors::HoprLibError::GeneralError(
@@ -162,7 +160,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let hoprlib_cfg: hopr_lib::config::HoprLibConfig = cfg.clone().into();
 
     let node = Arc::new(hopr_lib::Hopr::new(
-        hoprlib_cfg,
+        hoprlib_cfg.clone(),
         &hopr_keys.packet_key,
         &hopr_keys.chain_key,
     ));
@@ -184,36 +182,45 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let node_clone = node.clone();
 
     let mut processes: HashMap<HoprdProcesses, JoinHandle<()>> = HashMap::new();
-    info!(
-        "Node REST API is {}",
-        if cfg.api.enable { "enabled" } else { "disabled" }
-    );
 
     if cfg.api.enable {
         // TODO: remove RLP in 3.0
         let msg_encoder =
             |data: &[u8]| hopr_lib::rlp::encode(data, hopr_platform::time::native::current_time().as_unix_timestamp());
 
-        let host_listen = match &cfg.api.host.address {
+        let node_cfg_str = cfg.as_redacted_string()?;
+        let api_cfg = cfg.api.clone();
+
+        let listen_address = match &cfg.api.host.address {
             hopr_lib::HostType::IPv4(a) | hopr_lib::HostType::Domain(a) => {
                 format!("{a}:{}", cfg.api.host.port)
             }
         };
 
-        let node_cfg_str = cfg.as_redacted_string()?;
-        let api_cfg = cfg.api.clone();
+        let server = build_hopr_api(
+            node_cfg_str,
+            api_cfg,
+            node_clone,
+            inbox,
+            ws_events_rx,
+            Some(msg_encoder),
+        )
+        .await;
+
+        let mut api_listen = server
+            .bind(&listen_address)
+            .await
+            .unwrap_or_else(|e| panic!("REST API bind failed for {listen_address}: {e}"));
+        info!("Node REST API is listening on {api_listen}");
 
         processes.insert(
             HoprdProcesses::RestApi,
-            spawn(run_hopr_api(
-                host_listen,
-                node_cfg_str,
-                api_cfg,
-                node_clone,
-                inbox,
-                ws_events_rx,
-                Some(msg_encoder),
-            )),
+            spawn(async move {
+                api_listen
+                    .accept()
+                    .await
+                    .expect("the REST API server should run successfully")
+            }),
         );
     }
 
@@ -287,7 +294,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     processes.extend(hopr_processes.into_iter().map(|(k, v)| (HoprdProcesses::HoprLib(k), v)));
 
-    let mut signals = Signals::new([Signal::Hup, Signal::Int])?;
+    let mut signals = Signals::new([Signal::Hup, Signal::Int]).map_err(|e| HoprdError::OsError(e.to_string()))?;
     while let Some(Ok(signal)) = signals.next().await {
         match signal {
             Signal::Hup => {
@@ -297,17 +304,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 info!("Received the INT signal... tearing down the node");
                 futures::stream::iter(processes)
                     .for_each_concurrent(None, |(name, handle)| async move {
-                        info!("Stopping process: {:?}", name);
+                        info!("Stopping process: {name:?}");
                         handle.cancel().await;
                     })
                     .await;
+
+                info!("All processes stopped... emulating the default handler...");
                 low_level::emulate_default_handler(signal as i32)?;
+                info!("Shutting down!");
                 break;
             }
-            _ => {}
+            _ => low_level::emulate_default_handler(signal as i32)?,
         }
-
-        low_level::emulate_default_handler(signal as i32)?;
     }
 
     Ok(())

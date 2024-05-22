@@ -1,15 +1,15 @@
-use core_network::{network::Network, PeerId};
-use core_p2p::libp2p::swarm::derive_prelude::Multiaddr;
-use futures::{channel::mpsc::Sender, future::poll_fn, StreamExt};
-use hopr_crypto_types::types::OffchainPublicKey;
-use std::{pin::Pin, sync::Arc};
+use std::sync::Arc;
+
+use futures::{Stream, StreamExt};
 use tracing::{error, warn};
 
+use chain_types::chain_events::NetworkRegistryStatus;
+use core_network::{network::Network, PeerId};
+use core_p2p::libp2p::swarm::derive_prelude::Multiaddr;
+use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_db_api::{
     peers::HoprDbPeersOperations, registry::HoprDbRegistryOperations, resolver::HoprDbResolverOperations,
 };
-
-use chain_types::chain_events::NetworkRegistryStatus;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum PeerEligibility {
@@ -35,136 +35,122 @@ pub enum IndexerToProcess {
 
 #[derive(Debug)]
 /// Processed indexer generated events.
-pub enum IndexerProcessed {
+pub enum PeerTransportEvent {
     Allow(PeerId),
     Ban(PeerId),
     Announce(PeerId, Vec<Multiaddr>),
 }
 
-/// Implementor interface for indexer actions
-#[derive(Debug, Clone)]
-pub struct IndexerActions {
-    internal_emitter: Sender<IndexerToProcess>,
-}
+pub async fn add_peer_update_processing<S, T>(
+    src: S,
+    db: T,
+    network: Arc<Network<T>>,
+) -> impl Stream<Item = PeerTransportEvent> + Send + 'static
+where
+    T: HoprDbPeersOperations
+        + HoprDbResolverOperations
+        + HoprDbRegistryOperations
+        + Send
+        + Sync
+        + 'static
+        + std::fmt::Debug
+        + Clone,
+    S: Stream<Item = IndexerToProcess> + Send + 'static,
+{
+    let out_stream = src
+        .filter_map(move |event| {
+            let network = network.clone();
+            let db = db.clone();
 
-impl IndexerActions {
-    pub fn new<T>(db: T, network: Arc<Network<T>>, emitter: Sender<IndexerProcessed>) -> Self
-    where
-        T: HoprDbPeersOperations
-            + HoprDbResolverOperations
-            + HoprDbRegistryOperations
-            + Send
-            + Sync
-            + 'static
-            + std::fmt::Debug
-            + Clone,
-    {
-        let (to_process_tx, mut to_process_rx) =
-            futures::channel::mpsc::channel::<IndexerToProcess>(crate::constants::INDEXER_UPDATE_QUEUE_SIZE);
-
-        // NOTE: This spawned task does not need to be explicitly canceled, since it will
-        // be automatically dropped when the event sender object is dropped.
-        async_std::task::spawn(async move {
-            let mut emitter = emitter;
-            let db_local = db.clone();
-
-            while let Some(value) = to_process_rx.next().await {
-                let event = match value {
+            async move {
+                match event {
                     IndexerToProcess::EligibilityUpdate(peer, eligibility) => match eligibility {
-                        PeerEligibility::Eligible => IndexerProcessed::Allow(peer),
+                        PeerEligibility::Eligible => Some(vec![PeerTransportEvent::Allow(peer)]),
                         PeerEligibility::Ineligible => {
                             if let Err(e) = network.remove(&peer).await {
                                 error!("failed to remove '{peer}' from the local registry: {e}")
                             }
-                            IndexerProcessed::Ban(peer)
+                            Some(vec![PeerTransportEvent::Ban(peer)])
                         }
                     },
-                    IndexerToProcess::Announce(peer, multiaddress) => IndexerProcessed::Announce(peer, multiaddress),
+                    IndexerToProcess::Announce(peer, multiaddress) => {
+                        Some(vec![PeerTransportEvent::Announce(peer, multiaddress)])
+                    }
                     // TODO: when is this even triggered? network registry missing?
-                    IndexerToProcess::RegisterStatusUpdate => {
-                        let peers = network
-                            .peer_filter(|peer| async move { Some(peer.id.1) })
-                            .await
-                            .unwrap_or(vec![]);
+                    IndexerToProcess::RegisterStatusUpdate => Some(
+                        futures::stream::iter(
+                            network
+                                .peer_filter(|peer| async move { Some(peer.id.1) })
+                                .await
+                                .unwrap_or(vec![]),
+                        )
+                        .filter_map(move |peer| {
+                            let network = network.clone();
+                            let db = db.clone();
 
-                        for peer in peers.into_iter() {
-                            let is_allowed = {
-                                let address = {
-                                    if let Ok(key) = OffchainPublicKey::try_from(peer) {
-                                        match db_local.resolve_chain_key(&key).await.and_then(|maybe_address| {
-                                            maybe_address.ok_or(hopr_db_api::errors::DbError::LogicalError(format!(
-                                                "No address available for peer '{peer}'",
-                                            )))
-                                        }) {
-                                            Ok(v) => v,
-                                            Err(e) => {
-                                                error!("{e}");
-                                                continue;
+                            async move {
+                            if let Ok(key) = OffchainPublicKey::try_from(peer) {
+                                match db.resolve_chain_key(&key).await.and_then(|maybe_address| {
+                                    maybe_address.ok_or(hopr_db_api::errors::DbError::LogicalError(format!(
+                                        "No address available for peer '{peer}'",
+                                    )))
+                                }) {
+                                    Ok(address) => match db.is_allowed_in_network_registry(None, address).await {
+                                        Ok(is_allowed) => {
+                                            if is_allowed {
+                                                Some(PeerTransportEvent::Allow(peer))
+                                            } else {
+                                                if let Err(e) = network.remove(&peer).await {
+                                                    error!("failed to remove '{peer}' from the local registry: {e}");
+                                                }
+                                                Some(PeerTransportEvent::Ban(peer))
                                             }
                                         }
-                                    } else {
-                                        warn!("Could not convert the peer id '{peer}' to an offchain public key");
-                                        continue;
+                                        Err(_) => None,
+                                    },
+                                    Err(e) => {
+                                        error!("{e}");
+                                        None
                                     }
-                                };
-
-                                match db_local.is_allowed_in_network_registry(None, address).await {
-                                    Ok(v) => v,
-                                    Err(_) => continue,
                                 }
-                            };
-
-                            let event = if is_allowed {
-                                IndexerProcessed::Allow(peer)
                             } else {
-                                if let Err(e) = network.remove(&peer).await {
-                                    error!("failed to remove '{peer}' from the local registry: {e}");
-                                }
-                                IndexerProcessed::Ban(peer)
-                            };
-
-                            match poll_fn(|cx| Pin::new(&mut emitter).poll_ready(cx)).await {
-                                Ok(_) => match emitter.start_send(event) {
-                                    Ok(_) => {}
-                                    Err(e) => error!("Failed to emit an indexer event: {}", e),
-                                },
-                                Err(e) => {
-                                    warn!("The receiver for processed indexer events no longer exists: {}", e);
-                                }
-                            };
+                                warn!("Could not convert the peer id '{peer}' to an offchain public key");
+                                None
+                            }
                         }
-                        continue;
-                    }
-                };
-
-                match poll_fn(|cx| Pin::new(&mut emitter).poll_ready(cx)).await {
-                    Ok(_) => match emitter.start_send(event) {
-                        Ok(_) => {}
-                        Err(e) => error!("Failed to emit an indexer event: {}", e),
-                    },
-                    Err(e) => {
-                        warn!("The receiver for processed indexer events no longer exists: {}", e);
-                    }
-                };
+                })
+                        .collect::<Vec<_>>()
+                        .await,
+                    ),
+                }
             }
-        });
+        })
+        .flat_map(futures::stream::iter);
 
+    Box::pin(out_stream)
+}
+
+/// Implementor interface for indexer actions
+#[derive(Debug, Clone)]
+pub struct IndexerActions {
+    pub(crate) internal_emitter: async_channel::Sender<IndexerToProcess>,
+}
+
+impl IndexerActions {
+    pub const INDEXER_UPDATE_QUEUE_SIZE: usize = 4096;
+
+    pub fn new(emitter: async_channel::Sender<IndexerToProcess>) -> Self {
         Self {
-            internal_emitter: to_process_tx,
+            internal_emitter: emitter,
         }
     }
 }
 
 impl IndexerActions {
     pub async fn emit_indexer_update(&self, event: IndexerToProcess) {
-        let mut internal_emitter = self.internal_emitter.clone();
-
-        match poll_fn(|cx| Pin::new(&mut internal_emitter).poll_ready(cx)).await {
-            Ok(_) => match internal_emitter.start_send(event) {
-                Ok(_) => {}
-                Err(e) => error!("Failed to send register update 'eligibility' to the receiver: {}", e),
-            },
-            Err(e) => error!("The receiver for indexer updates was dropped: {}", e),
+        match self.internal_emitter.clone().send(event).await {
+            Ok(_) => {}
+            Err(e) => error!("Failed to send index update event to transport: {e}"),
         }
     }
 }

@@ -1,6 +1,6 @@
 [package]
 name = "chain-actions"
-version = "0.6.0"
+version = "0.7.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "High-level Core-Ethereum functions that translate to on-chain transactions"
@@ -12,6 +12,7 @@ license = "GPL-3.0-only"
 crate-type = ["rlib"]
 
 [dependencies]
+async-channel = { workspace = true }
 async-std = { workspace = true }
 async-trait = { workspace = true }
 async-lock = { workspace = true }

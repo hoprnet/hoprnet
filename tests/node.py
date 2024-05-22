@@ -87,6 +87,7 @@ class Node:
             "HOPRD_HEARTBEAT_VARIANCE": "1000",
             "HOPRD_NETWORK_QUALITY_THRESHOLD": "0.3",
         }
+
         cmd = [
             "hoprd",
             "--announce",

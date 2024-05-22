@@ -1,9 +1,9 @@
 [package]
 name = "hoprd"
-version = "2.1.0"
+version = "2.2.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
-description = "Contains the main entry point of HOPR daemon application"
+description = "HOPR node executable."
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"

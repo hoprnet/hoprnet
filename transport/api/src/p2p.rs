@@ -1,8 +1,6 @@
-use futures::{
-    channel::mpsc::{Receiver, UnboundedSender},
-    select, StreamExt,
-};
+use futures::{channel::mpsc::UnboundedSender, pin_mut, select, StreamExt};
 use futures_concurrency::stream::Merge;
+use hopr_crypto_types::keypairs::OffchainKeypair;
 use hopr_internal_types::prelude::*;
 use libp2p::request_response::OutboundRequestId;
 use std::{
@@ -15,7 +13,8 @@ use tracing::{debug, error, info, trace, warn};
 use core_network::network::{Network, NetworkTriggeredEvent, PeerOrigin};
 pub use core_p2p::api;
 use core_p2p::{
-    libp2p::request_response::ResponseChannel, libp2p::swarm::SwarmEvent, HoprNetworkBehaviorEvent, Ping, Pong,
+    libp2p::{request_response::ResponseChannel, swarm::SwarmEvent},
+    HoprNetworkBehavior, HoprNetworkBehaviorEvent, Ping, Pong,
 };
 use core_protocol::{
     ack::processor::{AckProcessed, AckResult, AcknowledgementInteraction},
@@ -26,7 +25,7 @@ use core_protocol::{
     },
 };
 
-use crate::{processes::indexer::IndexerProcessed, PeerId, TransportOutput};
+use crate::{processes::indexer::PeerTransportEvent, PeerId, TransportOutput};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleGauge;
@@ -50,7 +49,7 @@ pub enum Inputs {
     Message(MsgProcessed),
     TicketAggregation(TicketAggregationProcessed<ResponseChannel<Result<Ticket, String>>, OutboundRequestId>),
     Acknowledgement(AckProcessed),
-    Indexer(IndexerProcessed),
+    Indexer(PeerTransportEvent),
 }
 
 impl From<api::HeartbeatChallenge> for Inputs {
@@ -89,8 +88,8 @@ impl From<TicketAggregationProcessed<ResponseChannel<Result<Ticket, String>>, Ou
     }
 }
 
-impl From<IndexerProcessed> for Inputs {
-    fn from(value: IndexerProcessed) -> Self {
+impl From<PeerTransportEvent> for Inputs {
+    fn from(value: PeerTransportEvent) -> Self {
         Self::Indexer(value)
     }
 }
@@ -154,86 +153,30 @@ fn resolve_dns_if_any(ma: &multiaddr::Multiaddr) -> crate::errors::Result<multia
     Ok(out)
 }
 
-pub struct SwarmEventLoop {
-    me: libp2p::identity::Keypair,
-    my_multiaddresses: Vec<multiaddr::Multiaddr>,
-    network_update_input: Receiver<NetworkTriggeredEvent>,
-    indexer_update_input: Receiver<IndexerProcessed>,
-    ack_interactions: AcknowledgementInteraction,
-    pkt_interactions: PacketInteraction,
-    ticket_aggregation_interactions:
-        TicketAggregationInteraction<ResponseChannel<Result<Ticket, String>>, OutboundRequestId>,
-    heartbeat_requests: api::HeartbeatRequester,
-    heartbeat_responds: api::HeartbeatResponder,
-    manual_ping_requests: api::ManualPingRequester,
-    manual_ping_responds: api::HeartbeatResponder,
+pub type TicketAggregationRequestType = OutboundRequestId;
+pub type TicketAggregationResponseType = ResponseChannel<Result<Ticket, String>>;
+
+pub struct HoprSwarm {
+    pub(crate) swarm: libp2p::Swarm<HoprNetworkBehavior>,
 }
 
-impl std::fmt::Debug for SwarmEventLoop {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("SwarmEventLoop").finish()
-    }
-}
-
-impl SwarmEventLoop {
-    #[allow(clippy::too_many_arguments)] // TODO: refactor this function into a reasonable group of components once fully rearchitected
-    pub fn new(
-        me: libp2p::identity::Keypair,
+impl HoprSwarm {
+    pub async fn new(
+        me: &OffchainKeypair,
         my_multiaddresses: Vec<multiaddr::Multiaddr>,
-        network_update_input: Receiver<NetworkTriggeredEvent>,
-        indexer_update_input: Receiver<IndexerProcessed>,
-        ack_interactions: AcknowledgementInteraction,
-        pkt_interactions: PacketInteraction,
-        ticket_aggregation_interactions: TicketAggregationInteraction<
-            ResponseChannel<Result<Ticket, String>>,
-            OutboundRequestId,
-        >,
-        heartbeat_requests: api::HeartbeatRequester,
-        heartbeat_responds: api::HeartbeatResponder,
-        manual_ping_requests: api::ManualPingRequester,
-        manual_ping_responds: api::HeartbeatResponder,
-    ) -> Self {
-        Self {
-            me,
-            my_multiaddresses,
-            network_update_input,
-            indexer_update_input,
-            ack_interactions,
-            pkt_interactions,
-            ticket_aggregation_interactions,
-            heartbeat_requests,
-            heartbeat_responds,
-            manual_ping_requests,
-            manual_ping_responds,
-        }
-    }
-
-    /// Main p2p loop that instantiates a new libp2p::Swarm instance and sets up listening and reacting pipelines
-    /// running in a neverending loop future.
-    ///
-    /// The function represents the entirety of the business logic of the hopr daemon related to core operations.
-    ///
-    /// This future can only be resolved by an unrecoverable error or a panic.
-    pub async fn run<T>(
-        self,
-        version: String,
-        network: Arc<Network<T>>,
         protocol_cfg: ProtocolConfig,
-        on_transport_output: UnboundedSender<TransportOutput>,
-        on_acknowledged_ticket: UnboundedSender<AcknowledgedTicket>,
-    ) where
-        T: hopr_db_api::peers::HoprDbPeersOperations + Sync + Send + std::fmt::Debug + 'static,
-    {
-        let me_peer_id = self.me.public().to_peer_id();
-        let mut swarm = core_p2p::build_p2p_network(self.me, protocol_cfg)
+    ) -> Self {
+        let identity: libp2p::identity::Keypair = (me).into();
+
+        let mut swarm = core_p2p::build_p2p_network(identity, protocol_cfg)
             .await
             .expect("swarm must be constructible");
 
-        for multiaddress in self.my_multiaddresses.iter() {
+        for multiaddress in my_multiaddresses.iter() {
             match resolve_dns_if_any(multiaddress) {
                 Ok(ma) => {
                     if let Err(e) = swarm.listen_on(ma.clone()) {
-                        error!("Failed to listen_on using the multiaddress '{}': {}", multiaddress, e);
+                        error!("Failed to listen_on using the multiaddress '{multiaddress}': {e}");
 
                         match replace_transport_with_unspecified(&ma) {
                             Ok(ma) => {
@@ -263,6 +206,88 @@ impl SwarmEventLoop {
         //     "The node failed to listen on at least one of the specified interfaces"
         // );
 
+        Self { swarm }
+    }
+
+    pub fn peer_id(&self) -> PeerId {
+        *self.swarm.local_peer_id()
+    }
+}
+
+impl From<HoprSwarm> for libp2p::Swarm<HoprNetworkBehavior> {
+    fn from(value: HoprSwarm) -> Self {
+        value.swarm
+    }
+}
+
+pub struct SwarmEventLoop {
+    network_update_input: futures::channel::mpsc::Receiver<NetworkTriggeredEvent>,
+    indexer_update_input: async_channel::Receiver<PeerTransportEvent>,
+    ack_interactions: AcknowledgementInteraction,
+    pkt_interactions: PacketInteraction,
+    ticket_aggregation_interactions:
+        TicketAggregationInteraction<ResponseChannel<Result<Ticket, String>>, OutboundRequestId>,
+    heartbeat_requests: api::HeartbeatRequester,
+    heartbeat_responds: api::HeartbeatResponder,
+    manual_ping_requests: api::ManualPingRequester,
+    manual_ping_responds: api::HeartbeatResponder,
+}
+
+impl std::fmt::Debug for SwarmEventLoop {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SwarmEventLoop").finish()
+    }
+}
+
+impl SwarmEventLoop {
+    #[allow(clippy::too_many_arguments)] // TODO: refactor this function into a reasonable group of components once fully rearchitected
+    pub fn new(
+        network_update_input: futures::channel::mpsc::Receiver<NetworkTriggeredEvent>,
+        indexer_update_input: async_channel::Receiver<PeerTransportEvent>,
+        ack_interactions: AcknowledgementInteraction,
+        pkt_interactions: PacketInteraction,
+        ticket_aggregation_interactions: TicketAggregationInteraction<
+            TicketAggregationResponseType,
+            TicketAggregationRequestType,
+        >,
+        heartbeat_requests: api::HeartbeatRequester,
+        heartbeat_responds: api::HeartbeatResponder,
+        manual_ping_requests: api::ManualPingRequester,
+        manual_ping_responds: api::HeartbeatResponder,
+    ) -> Self {
+        Self {
+            network_update_input,
+            indexer_update_input,
+            ack_interactions,
+            pkt_interactions,
+            ticket_aggregation_interactions,
+            heartbeat_requests,
+            heartbeat_responds,
+            manual_ping_requests,
+            manual_ping_responds,
+        }
+    }
+
+    /// Main p2p loop that instantiates a new libp2p::Swarm instance and sets up listening and reacting pipelines
+    /// running in a neverending loop future.
+    ///
+    /// The function represents the entirety of the business logic of the hopr daemon related to core operations.
+    ///
+    /// This future can only be resolved by an unrecoverable error or a panic.
+    pub async fn run<T>(
+        self,
+        swarm: HoprSwarm,
+        version: String,
+        network: Arc<Network<T>>,
+        on_transport_output: UnboundedSender<TransportOutput>,
+        on_acknowledged_ticket: UnboundedSender<AcknowledgedTicket>,
+    ) where
+        T: hopr_db_api::peers::HoprDbPeersOperations + Sync + Send + std::fmt::Debug + 'static,
+    {
+        let me_peer_id = swarm.peer_id();
+
+        let mut swarm: libp2p::Swarm<HoprNetworkBehavior> = swarm.into();
+
         let mut heartbeat_responds = self.heartbeat_responds;
         let mut manual_ping_responds = self.manual_ping_responds;
 
@@ -278,7 +303,7 @@ impl SwarmEventLoop {
 
         let mut allowed_peers: HashSet<PeerId> = HashSet::new();
 
-        let mut inputs = (
+        let inputs = (
             self.heartbeat_requests.map(Inputs::Heartbeat),
             self.manual_ping_requests.map(Inputs::ManualPing),
             self.network_update_input.map(Inputs::NetworkUpdate),
@@ -289,6 +314,8 @@ impl SwarmEventLoop {
         )
             .merge()
             .fuse();
+
+        pin_mut!(inputs);
 
         loop {
             select! {
@@ -384,11 +411,11 @@ impl SwarmEventLoop {
                         }
                     },
                     Inputs::Indexer(task) => match task {
-                        IndexerProcessed::Allow(peer) => {
+                        PeerTransportEvent::Allow(peer) => {
                             debug!("transport input - indexer - allowing '{peer}'");
                             let _ = allowed_peers.insert(peer);
                         }
-                        IndexerProcessed::Ban(peer) => {
+                        PeerTransportEvent::Ban(peer) => {
                             debug!("transport input - indexer - banning '{peer}'");
                             allowed_peers.remove(&peer);
 
@@ -399,7 +426,7 @@ impl SwarmEventLoop {
                                 }
                             }
                         },
-                        IndexerProcessed::Announce(peer, multiaddresses) => {
+                        PeerTransportEvent::Announce(peer, multiaddresses) => {
                             if peer != me_peer_id {
                                 trace!("transport input - indexer - processing announcement for '{peer}' with addresses: '{multiaddresses:?}'");
                                 for multiaddress in multiaddresses.iter() {

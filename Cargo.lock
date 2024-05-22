@@ -1206,8 +1206,9 @@ dependencies = [
 
 [[package]]
 name = "chain-actions"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
+ "async-channel 2.1.1",
  "async-lock 3.3.0",
  "async-std",
  "async-trait",
@@ -1238,7 +1239,7 @@ dependencies = [
 
 [[package]]
 name = "chain-api"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "async-channel 2.1.1",
  "async-lock 3.3.0",
@@ -1267,8 +1268,9 @@ dependencies = [
 
 [[package]]
 name = "chain-indexer"
-version = "0.2.2"
+version = "0.3.0"
 dependencies = [
+ "async-channel 2.1.1",
  "async-lock 3.3.0",
  "async-std",
  "async-trait",
@@ -1608,6 +1610,7 @@ checksum = "06ea2b9bc92be3c2baa9334a323ebca2d6f074ff852cd1d7b11064035cd3868f"
 name = "core-network"
 version = "0.5.0"
 dependencies = [
+ "async-channel 2.1.1",
  "async-std",
  "async-trait",
  "chrono",
@@ -1639,6 +1642,7 @@ dependencies = [
 name = "core-p2p"
 version = "0.2.0"
 dependencies = [
+ "async-channel 2.1.1",
  "async-std",
  "core-network",
  "core-protocol",
@@ -1685,7 +1689,6 @@ dependencies = [
  "async-std",
  "async-trait",
  "core-path",
- "env_logger 0.11.3",
  "futures",
  "futures-lite 1.13.0",
  "hex-literal",
@@ -1710,12 +1713,13 @@ dependencies = [
  "smart-default",
  "thiserror",
  "tracing",
+ "tracing-test",
  "validator",
 ]
 
 [[package]]
 name = "core-strategy"
-version = "0.9.1"
+version = "0.10.0"
 dependencies = [
  "async-lock 3.3.0",
  "async-std",
@@ -1774,6 +1778,7 @@ dependencies = [
  "libp2p",
  "multiaddr",
  "proc-macro-regex",
+ "rust-stream-ext-concurrent",
  "serde",
  "smart-default",
  "thiserror",
@@ -3788,7 +3793,7 @@ dependencies = [
 
 [[package]]
 name = "hoprd"
-version = "2.1.0"
+version = "2.2.0"
 dependencies = [
  "anyhow",
  "async-broadcast",

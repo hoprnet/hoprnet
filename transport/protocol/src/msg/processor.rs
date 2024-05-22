@@ -63,8 +63,8 @@ lazy_static::lazy_static! {
 }
 
 // Default sizes of the packet queues
-const PACKET_TX_QUEUE_SIZE: usize = 2048;
-const PACKET_RX_QUEUE_SIZE: usize = 2048;
+pub const PACKET_TX_QUEUE_SIZE: usize = 8192;
+pub const PACKET_RX_QUEUE_SIZE: usize = 8192;
 
 pub enum MsgToProcess {
     ToReceive(Box<[u8]>, PeerId),
@@ -345,7 +345,7 @@ pub struct PacketMetadata {
 ///
 /// The result of packet processing can be extracted as a stream.
 pub struct PacketInteraction {
-    ack_event_queue: (Sender<MsgToProcess>, Receiver<MsgProcessed>),
+    msg_event_queue: (Sender<MsgToProcess>, Receiver<MsgProcessed>),
 }
 
 impl PacketInteraction {
@@ -531,13 +531,13 @@ impl PacketInteraction {
         });
 
         Self {
-            ack_event_queue: (to_process_tx, processed_rx),
+            msg_event_queue: (to_process_tx, processed_rx),
         }
     }
 
     pub fn writer(&self) -> PacketActions {
         PacketActions {
-            queue: self.ack_event_queue.0.clone(),
+            queue: self.msg_event_queue.0.clone(),
         }
     }
 }
@@ -547,7 +547,7 @@ impl Stream for PacketInteraction {
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Option<Self::Item>> {
         use futures_lite::stream::StreamExt;
-        Pin::new(self).ack_event_queue.1.poll_next(cx)
+        Pin::new(self).msg_event_queue.1.poll_next(cx)
     }
 }
 
@@ -1079,15 +1079,15 @@ mod tests {
 
     #[serial]
     #[async_std::test]
+    // #[tracing_test::traced_test]
     async fn test_packet_relayer_workflow_3_peers() {
-        let _ = env_logger::builder().is_test(true).try_init();
         packet_relayer_workflow_n_peers(3, 5).await;
     }
 
     #[serial]
     #[async_std::test]
+    // #[tracing_test::traced_test]
     async fn test_packet_relayer_workflow_5_peers() {
-        let _ = env_logger::builder().is_test(true).try_init();
         packet_relayer_workflow_n_peers(5, 5).await;
     }
 }

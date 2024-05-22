@@ -43,7 +43,7 @@ pub struct RpcEthereumClientConfig {
 }
 
 /// Instantiation of `EthereumClient` using `HoprRpcOperations`.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct RpcEthereumClient<Rpc: HoprRpcOperations> {
     rpc: Rpc,
     cfg: RpcEthereumClientConfig,

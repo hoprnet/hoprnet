@@ -25,6 +25,7 @@
 //! For details on default parameters see [AggregatingStrategyConfig].
 use async_trait::async_trait;
 pub use core_protocol::ticket_aggregation::processor::AwaitingAggregator;
+use core_protocol::ticket_aggregation::processor::TicketAggregatorTrait;
 use hopr_crypto_types::prelude::Hash;
 use hopr_db_api::channels::HoprDbChannelOperations;
 use hopr_db_api::tickets::{AggregationPrerequisites, HoprDbTicketOperations};
@@ -106,62 +107,56 @@ impl From<AggregatingStrategyConfig> for AggregationPrerequisites {
 /// above the given threshold.
 /// Optionally, the strategy can also redeem the aggregated ticket, if the aggregation
 /// was successful.
-pub struct AggregatingStrategy<Db, T, U>
+pub struct AggregatingStrategy<Db>
 where
     Db: HoprDbTicketOperations + Send + Sync + Clone + std::fmt::Debug,
-    T: Send + 'static,
-    U: Send + 'static,
 {
     db: Db,
-    ticket_aggregator: Arc<AwaitingAggregator<T, U, Db>>,
+    ticket_aggregator: Arc<dyn TicketAggregatorTrait + Send + Sync + 'static>,
     cfg: AggregatingStrategyConfig,
     #[allow(clippy::type_complexity)]
     agg_tasks: Arc<RwLock<HashMap<Hash, (bool, JoinHandle<()>)>>>,
 }
 
-impl<Db, T, U> Debug for AggregatingStrategy<Db, T, U>
+impl<Db> Debug for AggregatingStrategy<Db>
 where
     Db: HoprDbTicketOperations + Send + Sync + Clone + std::fmt::Debug,
-    T: Send,
-    U: Send,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", Strategy::Aggregating(self.cfg))
     }
 }
 
-impl<Db, T, U> Display for AggregatingStrategy<Db, T, U>
+impl<Db> Display for AggregatingStrategy<Db>
 where
     Db: HoprDbTicketOperations + Send + Sync + Clone + std::fmt::Debug,
-    T: Send,
-    U: Send,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", Strategy::Aggregating(self.cfg))
     }
 }
 
-impl<Db, T, U> AggregatingStrategy<Db, T, U>
+impl<Db> AggregatingStrategy<Db>
 where
     Db: HoprDbTicketOperations + Send + Sync + Clone + std::fmt::Debug,
-    T: Send,
-    U: Send,
 {
-    pub fn new(cfg: AggregatingStrategyConfig, db: Db, ticket_aggregator: AwaitingAggregator<T, U, Db>) -> Self {
+    pub fn new(
+        cfg: AggregatingStrategyConfig,
+        db: Db,
+        ticket_aggregator: Arc<dyn TicketAggregatorTrait + Send + Sync + 'static>,
+    ) -> Self {
         Self {
             db,
             cfg,
-            ticket_aggregator: Arc::new(ticket_aggregator),
+            ticket_aggregator,
             agg_tasks: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 }
 
-impl<Db, T, U> AggregatingStrategy<Db, T, U>
+impl<Db> AggregatingStrategy<Db>
 where
     Db: HoprDbChannelOperations + HoprDbTicketOperations + Send + Sync + Clone + std::fmt::Debug + 'static,
-    T: Send + 'static,
-    U: Send + 'static,
 {
     async fn try_start_aggregation(
         &self,
@@ -175,10 +170,7 @@ where
             let aggregator_clone = self.ticket_aggregator.clone();
             let (can_remove_tx, can_remove_rx) = futures::channel::oneshot::channel();
             let task = async_std::task::spawn(async move {
-                match aggregator_clone
-                    .aggregate_tickets_in_the_channel(&channel_id, criteria)
-                    .await
-                {
+                match aggregator_clone.aggregate_tickets(&channel_id, criteria).await {
                     Ok(_) => {
                         debug!("tried ticket aggregation in channel {channel_id} without any issues");
 
@@ -231,11 +223,9 @@ where
 }
 
 #[async_trait]
-impl<Db, T, U> SingularStrategy for AggregatingStrategy<Db, T, U>
+impl<Db> SingularStrategy for AggregatingStrategy<Db>
 where
     Db: HoprDbChannelOperations + HoprDbTicketOperations + Clone + Send + Sync + std::fmt::Debug + 'static,
-    T: Send,
-    U: Send,
 {
     async fn on_tick(&self) -> crate::errors::Result<()> {
         let incoming = self
@@ -310,6 +300,7 @@ mod tests {
     use lazy_static::lazy_static;
     use std::ops::Add;
     use std::pin::pin;
+    use std::sync::Arc;
     use std::time::Duration;
     use tracing::{debug, error};
 
@@ -526,7 +517,7 @@ mod tests {
             aggregate_on_channel_close: false,
         };
 
-        let aggregation_strategy = super::AggregatingStrategy::new(cfg, db_bob.clone(), bob_aggregator);
+        let aggregation_strategy = super::AggregatingStrategy::new(cfg, db_bob.clone(), Arc::new(bob_aggregator));
 
         //let threshold_ticket = acked_tickets.last().unwrap();
         aggregation_strategy
@@ -569,7 +560,7 @@ mod tests {
             aggregate_on_channel_close: false,
         };
 
-        let aggregation_strategy = super::AggregatingStrategy::new(cfg, db_bob.clone(), bob_aggregator);
+        let aggregation_strategy = super::AggregatingStrategy::new(cfg, db_bob.clone(), Arc::new(bob_aggregator));
 
         //let threshold_ticket = acked_tickets.last().unwrap();
         aggregation_strategy
@@ -625,7 +616,7 @@ mod tests {
             aggregate_on_channel_close: false,
         };
 
-        let aggregation_strategy = super::AggregatingStrategy::new(cfg, db_bob.clone(), bob_aggregator);
+        let aggregation_strategy = super::AggregatingStrategy::new(cfg, db_bob.clone(), Arc::new(bob_aggregator));
 
         //let threshold_ticket = acked_tickets.last().unwrap();
         aggregation_strategy
@@ -666,7 +657,7 @@ mod tests {
         let (bob_aggregator, awaiter) =
             spawn_aggregation_interaction(db_alice.clone(), db_bob.clone(), &PEERS_CHAIN[0], &PEERS_CHAIN[1]);
 
-        let aggregation_strategy = super::AggregatingStrategy::new(cfg, db_alice.clone(), bob_aggregator);
+        let aggregation_strategy = super::AggregatingStrategy::new(cfg, db_alice.clone(), Arc::new(bob_aggregator));
 
         aggregation_strategy
             .on_own_channel_changed(
@@ -721,7 +712,7 @@ mod tests {
             aggregate_on_channel_close: true,
         };
 
-        let aggregation_strategy = super::AggregatingStrategy::new(cfg, db_bob.clone(), bob_aggregator);
+        let aggregation_strategy = super::AggregatingStrategy::new(cfg, db_bob.clone(), Arc::new(bob_aggregator));
 
         aggregation_strategy
             .on_own_channel_changed(

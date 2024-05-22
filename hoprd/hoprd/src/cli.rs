@@ -58,7 +58,7 @@ pub struct CliArgs {
     )]
     pub network: Option<String>,
 
-    // Identitiy details
+    // Identity details
     #[arg(
         long,
         env = "HOPRD_IDENTITY",

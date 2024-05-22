@@ -1,6 +1,6 @@
 [package]
 name = "chain-indexer"
-version = "0.2.2"
+version = "0.3.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Core-Ethereum-specific interaction with the backend database"
@@ -12,6 +12,7 @@ license = "GPL-3.0"
 crate-type = ["rlib"]
 
 [dependencies]
+async-channel = { workspace = true }
 async-std = { workspace = true }
 async-trait = { workspace = true }
 async-lock = { workspace = true }

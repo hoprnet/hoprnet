@@ -2,10 +2,10 @@
 //!
 //! The [ActionQueue] acts as a MPSC queue of [Actions](chain_types::actions::Action) which are executed one-by-one
 //! as they are being popped up from the queue by a runner task.
+use async_channel::{bounded, Receiver, Sender};
 use async_trait::async_trait;
 use chain_types::actions::Action;
 use chain_types::chain_events::ChainEventType;
-use futures::channel::mpsc::{channel, Receiver, Sender};
 use futures::future::Either;
 use futures::{pin_mut, FutureExt, StreamExt};
 use hopr_crypto_types::types::Hash;
@@ -13,7 +13,7 @@ use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
-use std::future::{poll_fn, Future};
+use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
@@ -106,10 +106,11 @@ impl ActionSender {
     #[tracing::instrument(level = "debug", skip(self))]
     pub async fn send(&self, action: Action) -> Result<PendingAction> {
         let completer = futures::channel::oneshot::channel();
-        let mut sender = self.0.clone();
-        poll_fn(|cx| Pin::new(&mut sender).poll_ready(cx))
+        let sender = self.0.clone();
+
+        sender
+            .send((action, completer.0))
             .await
-            .and_then(move |_| sender.start_send((action, completer.0)))
             .map(|_| {
                 completer
                     .1
@@ -130,6 +131,7 @@ pub struct ActionQueueConfig {
     pub max_action_confirmation_wait: Duration,
 }
 
+#[derive(Debug)]
 struct ExecutionContext<S, TxExec>
 where
     S: ActionState,
@@ -294,6 +296,7 @@ where
 /// This queue awaits new Actions to arrive, translates them into Ethereum
 /// transactions via [TransactionExecutor] to execute them and await their confirmation
 /// by registering their corresponding expectations in [ActionState].
+#[derive(Debug, Clone)]
 pub struct ActionQueue<Db, S, TxExec>
 where
     Db: HoprDbInfoOperations + HoprDbTicketOperations + Send + Sync,
@@ -317,7 +320,7 @@ where
 
     /// Creates a new instance with the given [TransactionExecutor] and [ActionState] implementations.
     pub fn new(db: Db, action_state: S, tx_exec: TxExec, cfg: ActionQueueConfig) -> Self {
-        let (queue_send, queue_recv) = channel(Self::ACTION_QUEUE_SIZE);
+        let (queue_send, queue_recv) = bounded(Self::ACTION_QUEUE_SIZE);
         Self {
             db,
             ctx: ExecutionContext {
@@ -345,8 +348,10 @@ where
     /// The method will panic if Channel Domain Separator is not yet populated in the DB.
     #[allow(clippy::async_yields_async)]
     #[tracing::instrument(level = "debug", skip(self))]
-    pub async fn start(mut self) {
-        while let Some((act, tx_finisher)) = self.queue_recv.next().await {
+    pub async fn start(self) {
+        let queue_recv = self.queue_recv.clone();
+        pin_mut!(queue_recv);
+        while let Some((act, tx_finisher)) = queue_recv.next().await {
             // Some minimum separation to avoid batching txs
             futures_timer::Delay::new(Duration::from_millis(100)).await;
 
