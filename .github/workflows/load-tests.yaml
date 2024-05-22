@@ -80,10 +80,13 @@ jobs:
         with:
           node-version: 18
 
-      - name: Run Load test
+      - name: Setup Load Testing environment
         run: |
           npm install
           npm run test:${{ github.event.inputs.network }}:setup
+
+      - name: Run Load test
+        run: |
           kubectl delete -f k6-test-run.yaml 2> /dev/null || true
           kubectl apply -f k6-test-run.yaml
           sleep 3m # Wait for test to bootstrap
