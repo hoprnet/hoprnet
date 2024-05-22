@@ -100,7 +100,7 @@ jobs:
           echo "Waiting for test to bootstrap..."
           sleep 30 # Wait for test to bootstrap
           echo "Waiting for test to finish..."
-          sleep ${{ github.event.inputs.duration }}m # wait for the test to finish
+          sleep ${{ github.event.inputs.duration }} # wait for the test to finish
         working-directory: "./k6"
 
       - name: Parse results
