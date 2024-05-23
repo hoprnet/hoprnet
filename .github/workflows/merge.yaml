@@ -108,67 +108,65 @@ jobs:
   #           fi
   #         done
 
-  deploy_nodes:
-    name: Deploy nodes
-    runs-on: self-hosted-hoprnet-small
-    # if: needs.tag.result == 'success'
-    # needs:
-    #   - tag
-    steps:
+  # deploy_nodes:
+  #   name: Deploy nodes
+  #   runs-on: self-hosted-hoprnet-small
+  #   if: needs.tag.result == 'success'
+  #   needs:
+  #     - tag
+  #   steps:
 
-      - name: Checkout hoprnet repository
-        uses: actions/checkout@v4
-        # with:
-        #   repository: hoprnet/hoprnet-ci
+  #     - name: Checkout hoprnet repository
+  #       uses: actions/checkout@v4
 
-      - name: Set up Google Cloud Credentials
-        id: auth
-        uses: google-github-actions/auth@v1
-        with:
-          token_format: "access_token"
-          credentials_json: ${{ secrets.GCP_SA_TERRAFORM_JSON }}
+  #     - name: Set up Google Cloud Credentials
+  #       id: auth
+  #       uses: google-github-actions/auth@v1
+  #       with:
+  #         token_format: "access_token"
+  #         credentials_json: ${{ secrets.GCP_SA_TERRAFORM_JSON }}
 
-      - name: Set up Google Cloud SDK
-        uses: google-github-actions/setup-gcloud@v1
-        with:
-          project_id: hopr-staging
-          install_components: beta
+  #     - name: Set up Google Cloud SDK
+  #       uses: google-github-actions/setup-gcloud@v1
+  #       with:
+  #         project_id: hopr-staging
+  #         install_components: beta
 
-      - name: Get credentials
-        uses: google-github-actions/get-gke-credentials@v2
-        with:
-          cluster_name: cluster-staging
-          location: europe-west3
-          project_id: hopr-staging
+  #     - name: Get credentials
+  #       uses: google-github-actions/get-gke-credentials@v2
+  #       with:
+  #         cluster_name: cluster-staging
+  #         location: europe-west3
+  #         project_id: hopr-staging
 
-      - name: "Restart deployments"
-        timeout-minutes: 5
-        id: restart_deployments
-        run: |
-          base_branch="${{ github.event.pull_request.base.ref }}"
-          # Identify parameters depending on branch
-          if [[ "${base_branch}" == "master" ]]; then
-            hoprd_cluster=hoprd-core-rotsee
-            gh variable set LOAD_TESTING_NETWORK --body "rotsee"
-          elif [[ "${base_branch}" =~ ^"release" ]]; then
-            hoprd_cluster=hoprd-core-dufour
-            gh variable set LOAD_TESTING_NETWORK --body "dufour"
-          else
-            echo "Skipping deployment"
-            exit 0
-          fi
-          namespace=core-team
-          echo "[INFO] Restarting deployments on ${namespace} from pr-${{ github.event.pull_request.number }}"
-          kubectl rollout restart deployments -n ${namespace} -l hoprds.hoprnet.org/cluster=${hoprd_cluster};
-          kubectl rollout status  deployments -n ${namespace} -l hoprds.hoprnet.org/cluster=${hoprd_cluster};
-        env:
-          GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
+  #     - name: "Restart deployments"
+  #       timeout-minutes: 5
+  #       id: restart_deployments
+  #       run: |
+  #         base_branch="${{ github.event.pull_request.base.ref }}"
+  #         # Identify parameters depending on branch
+  #         if [[ "${base_branch}" == "master" ]]; then
+  #           hoprd_cluster=hoprd-core-rotsee
+  #           gh variable set LOAD_TESTING_NETWORK --body "rotsee"
+  #         elif [[ "${base_branch}" =~ ^"release" ]]; then
+  #           hoprd_cluster=hoprd-core-dufour
+  #           gh variable set LOAD_TESTING_NETWORK --body "dufour"
+  #         else
+  #           echo "Skipping deployment"
+  #           exit 0
+  #         fi
+  #         namespace=core-team
+  #         echo "[INFO] Restarting deployments on ${namespace} from pr-${{ github.event.pull_request.number }}"
+  #         kubectl rollout restart deployments -n ${namespace} -l hoprds.hoprnet.org/cluster=${hoprd_cluster};
+  #         kubectl rollout status  deployments -n ${namespace} -l hoprds.hoprnet.org/cluster=${hoprd_cluster};
+  #       env:
+  #         GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
 
   load_test:
     name: Load Testing
     if: contains(github.event.pull_request.labels.*.name, 'load_tests')
-    needs:
-      - deploy_nodes
+    # needs:
+    #   - deploy_nodes
     uses: ./.github/workflows/load-tests.yaml
     with:
       test_id: pr-${{ github.event.pull_request.number }}
