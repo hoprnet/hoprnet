@@ -171,7 +171,7 @@ jobs:
     with:
       test_id: pr-${{ github.event.pull_request.number }}
       network: ${{ vars.LOAD_TESTING_NETWORK }}
-      workload: on-hop
+      workload: one-hop
       duration: ${{ vars.LOAD_TESTING_DURATION }}
       rate: "${{ vars.LOAD_TESTING_RATE }}"
 
