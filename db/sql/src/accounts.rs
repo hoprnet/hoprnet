@@ -17,8 +17,8 @@ use hopr_primitive_types::errors::GeneralError;
 use hopr_primitive_types::prelude::{Address, ToHex};
 
 use crate::db::HoprDb;
-use crate::errors::DbError::MissingAccount;
-use crate::errors::{DbError, Result};
+use crate::errors::DbSqlError::MissingAccount;
+use crate::errors::{DbSqlError, Result};
 use crate::{HoprDbGeneralModelOperations, OptTx};
 
 /// A type that can represent both [chain public key](Address) and [packet public key](OffchainPublicKey).
@@ -146,7 +146,7 @@ fn model_to_account_entry(account: account::Model, announcements: Vec<announceme
         match announcement {
             None => AccountType::NotAnnounced,
             Some(a) => AccountType::Announced {
-                multiaddr: a.multiaddress.parse().map_err(|_| DbError::DecodingError)?,
+                multiaddr: a.multiaddress.parse().map_err(|_| DbSqlError::DecodingError)?,
                 updated_block: a.at_block as u32,
             },
         },
@@ -173,7 +173,7 @@ impl HoprDbAccountOperations for HoprDb {
                         .await?
                         .pop();
 
-                    Ok::<_, DbError>(if let Some((account, announcements)) = maybe_model {
+                    Ok::<_, DbSqlError>(if let Some((account, announcements)) = maybe_model {
                         Some(model_to_account_entry(account, announcements)?)
                     } else {
                         None
@@ -186,7 +186,7 @@ impl HoprDbAccountOperations for HoprDb {
     async fn get_self_account<'a>(&'a self, tx: OptTx<'a>) -> Result<AccountEntry> {
         self.get_account(tx, self.me_onchain)
             .await?
-            .ok_or(DbError::MissingAccount)
+            .ok_or(DbSqlError::MissingAccount)
     }
 
     async fn get_accounts<'a>(&'a self, tx: OptTx<'a>, public_only: bool) -> Result<Vec<AccountEntry>> {
@@ -253,7 +253,7 @@ impl HoprDbAccountOperations for HoprDb {
                                     .insert_announcement(Some(tx), account.chain_addr, multiaddr, updated_block)
                                     .await?;
                             }
-                            Ok::<(), DbError>(())
+                            Ok::<(), DbSqlError>(())
                         }
                         Err(e) => Err(e.into()),
                     }
@@ -340,7 +340,7 @@ impl HoprDbAccountOperations for HoprDb {
                             .exec(tx.as_ref())
                             .await?;
 
-                        Ok::<_, DbError>(())
+                        Ok::<_, DbSqlError>(())
                     } else {
                         Err(MissingAccount)
                     }
@@ -373,7 +373,7 @@ impl HoprDbAccountOperations for HoprDb {
                             .offchain_to_chain
                             .invalidate(&account_entry.public_key)
                             .await;
-                        Ok::<_, DbError>(())
+                        Ok::<_, DbSqlError>(())
                     } else {
                         Err(MissingAccount)
                     }
@@ -441,8 +441,8 @@ impl HoprDbAccountOperations for HoprDb {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::errors::DbError;
-    use crate::errors::DbError::DecodingError;
+    use crate::errors::DbSqlError;
+    use crate::errors::DbSqlError::DecodingError;
     use crate::HoprDbGeneralModelOperations;
     use hopr_crypto_types::prelude::{ChainKeypair, Keypair, OffchainKeypair};
     use hopr_internal_types::prelude::AccountType::NotAnnounced;
@@ -730,7 +730,7 @@ mod tests {
                             AccountEntry::new(packet_2, chain_2, AccountType::NotAnnounced),
                         )
                         .await?;
-                    Ok::<(), DbError>(())
+                    Ok::<(), DbSqlError>(())
                 })
             })
             .await
@@ -784,7 +784,7 @@ mod tests {
                             AccountEntry::new(packet_2, chain_2, AccountType::NotAnnounced),
                         )
                         .await?;
-                    Ok::<(), DbError>(())
+                    Ok::<(), DbSqlError>(())
                 })
             })
             .await

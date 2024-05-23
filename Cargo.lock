@@ -3638,6 +3638,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "hopr-db-api"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "futures",
+ "hopr-crypto-types",
+ "hopr-internal-types",
+ "hopr-metrics",
+ "hopr-primitive-types",
+ "lazy_static",
+ "libp2p-identity",
+ "multiaddr",
+ "num_enum",
+ "smart-default",
+ "strum 0.26.2",
+ "thiserror",
+ "tracing",
+ "tracing-test",
+]
+
+[[package]]
 name = "hopr-db-entity"
 version = "0.2.0"
 dependencies = [

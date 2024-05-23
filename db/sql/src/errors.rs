@@ -8,7 +8,7 @@ use std::sync::Arc;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
-pub enum DbError {
+pub enum DbSqlError {
     #[error("account entry for announcement not found")]
     MissingAccount,
 
@@ -55,13 +55,13 @@ pub enum DbError {
     NonSpecificError(#[from] hopr_primitive_types::errors::GeneralError),
 }
 
-impl From<TicketValidationError> for DbError {
+impl From<TicketValidationError> for DbSqlError {
     fn from(value: TicketValidationError) -> Self {
-        DbError::TicketValidationError(Box::new((*value.ticket, value.reason)))
+        DbSqlError::TicketValidationError(Box::new((*value.ticket, value.reason)))
     }
 }
 
-impl<E: std::error::Error + Send + Sync + 'static> From<TransactionError<E>> for DbError {
+impl<E: std::error::Error + Send + Sync + 'static> From<TransactionError<E>> for DbSqlError {
     fn from(value: TransactionError<E>) -> Self {
         match value {
             TransactionError::Connection(e) => Self::BackendError(e),
@@ -70,4 +70,4 @@ impl<E: std::error::Error + Send + Sync + 'static> From<TransactionError<E>> for
     }
 }
 
-pub type Result<T> = std::result::Result<T, DbError>;
+pub type Result<T> = std::result::Result<T, DbSqlError>;

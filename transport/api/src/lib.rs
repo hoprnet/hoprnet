@@ -138,7 +138,7 @@ use core_path::selectors::PathSelector;
 use core_protocol::errors::ProtocolError;
 use futures::future::{select, Either};
 use futures::pin_mut;
-use hopr_db_sql::errors::DbError;
+use hopr_db_sql::errors::DbSqlError;
 use hopr_internal_types::channels::ChannelStatus;
 use hopr_primitive_types::prelude::*;
 
@@ -581,7 +581,7 @@ where
                             .is_allowed_in_network_registry(Some(tx), address.try_into()?)
                             .await
                     } else {
-                        Err(DbError::LogicalError("cannot translate off-chain key".into()))
+                        Err(DbSqlError::LogicalError("cannot translate off-chain key".into()))
                     }
                 })
             })
@@ -659,8 +659,7 @@ where
 
     #[tracing::instrument(level = "debug", skip(self))]
     pub async fn ticket_statistics(&self) -> errors::Result<TicketStatistics> {
-        // TODO: add parameter to specify which channel are we interested in
-        let ticket_stats = self.db.get_ticket_statistics(None, None).await?;
+        let ticket_stats = self.db.get_ticket_statistics(None).await?;
 
         Ok(TicketStatistics {
             winning_count: ticket_stats.winning_tickets,
@@ -675,7 +674,7 @@ where
     pub async fn tickets_in_channel(&self, channel_id: &Hash) -> errors::Result<Option<Vec<AcknowledgedTicket>>> {
         if let Some(channel) = self.db.get_channel_by_id(None, channel_id).await? {
             if channel.destination == self.me_onchain {
-                Ok(Some(self.db.get_tickets(None, (&channel).into()).await?))
+                Ok(Some(self.db.get_tickets((&channel).into()).await?))
             } else {
                 Ok(None)
             }

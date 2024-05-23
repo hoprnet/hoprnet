@@ -5,7 +5,7 @@ use sea_orm::{ColumnTrait, DbErr, EntityTrait, QueryFilter, Set};
 use sea_query::OnConflict;
 
 use crate::db::HoprDb;
-use crate::errors::{DbError, Result};
+use crate::errors::{DbSqlError, Result};
 use crate::{HoprDbGeneralModelOperations, OptTx};
 
 /// Defines DB access API for network registry operations.
@@ -52,7 +52,7 @@ impl HoprDbRegistryOperations for HoprDb {
                             .exec(tx.as_ref())
                             .await
                         {
-                            Ok(_) | Err(DbErr::RecordNotInserted) => Ok::<_, DbError>(()),
+                            Ok(_) | Err(DbErr::RecordNotInserted) => Ok::<_, DbSqlError>(()),
                             Err(e) => Err(e.into()),
                         }
                     } else {
@@ -60,7 +60,7 @@ impl HoprDbRegistryOperations for HoprDb {
                             .filter(network_registry::Column::ChainAddress.eq(address.to_hex()))
                             .exec(tx.as_ref())
                             .await?;
-                        Ok::<_, DbError>(())
+                        Ok::<_, DbSqlError>(())
                     }
                 })
             })
@@ -72,7 +72,7 @@ impl HoprDbRegistryOperations for HoprDb {
             .await?
             .perform(|tx| {
                 Box::pin(async move {
-                    Ok::<_, DbError>(
+                    Ok::<_, DbSqlError>(
                         network_registry::Entity::find()
                             .filter(network_registry::Column::ChainAddress.eq(address.to_hex()))
                             .one(tx.as_ref())
@@ -104,7 +104,7 @@ impl HoprDbRegistryOperations for HoprDb {
                             .exec(tx.as_ref())
                             .await
                         {
-                            Ok(_) | Err(DbErr::RecordNotInserted) => Ok::<_, DbError>(()),
+                            Ok(_) | Err(DbErr::RecordNotInserted) => Ok::<_, DbSqlError>(()),
                             Err(e) => Err(e.into()),
                         }
                     } else {
@@ -112,7 +112,7 @@ impl HoprDbRegistryOperations for HoprDb {
                             .filter(network_eligibility::Column::SafeAddress.eq(address.to_hex()))
                             .exec(tx.as_ref())
                             .await?;
-                        Ok::<_, DbError>(())
+                        Ok::<_, DbSqlError>(())
                     }
                 })
             })
@@ -124,7 +124,7 @@ impl HoprDbRegistryOperations for HoprDb {
             .await?
             .perform(|tx| {
                 Box::pin(async move {
-                    Ok::<_, DbError>(
+                    Ok::<_, DbSqlError>(
                         network_eligibility::Entity::find()
                             .filter(network_eligibility::Column::SafeAddress.eq(address.to_hex()))
                             .one(tx.as_ref())

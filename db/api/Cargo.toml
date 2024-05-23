@@ -1,0 +1,31 @@
+[package]
+name = "hopr-db-api"
+version = "0.1.0"
+edition = "2021"
+description = "API interface specifying the desired implementation details of the HOPR database."
+homepage = "https://hoprnet.org/"
+repository = "https://github.com/hoprnet/hoprnet"
+license = "GPL-3.0-only"
+
+[features]
+default = []
+
+[dependencies]
+async-trait = { workspace = true }
+futures = { workspace = true }
+lazy_static = { workspace = true, optional = true }
+libp2p-identity = { workspace = true }
+multiaddr = { workspace = true }
+num_enum = { workspace = true }
+smart-default = { workspace = true }
+strum = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+hopr-crypto-types = { workspace = true}
+hopr-primitive-types = { workspace = true}
+hopr-internal-types = { workspace = true }
+hopr-metrics = { workspace = true, optional = true }
+
+[dev-dependencies]
+tracing-test = { workspace = true }

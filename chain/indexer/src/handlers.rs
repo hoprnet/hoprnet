@@ -16,7 +16,7 @@ use hopr_crypto_types::prelude::{Hash, Keypair};
 use hopr_crypto_types::types::OffchainSignature;
 use hopr_db_entity::channel;
 use hopr_db_entity::conversions::channels::ChannelStatusUpdate;
-use hopr_db_sql::errors::DbError;
+use hopr_db_sql::errors::DbSqlError;
 use hopr_db_sql::info::DomainSeparator;
 use hopr_db_sql::tickets::TicketSelector;
 use hopr_db_sql::{HoprDbAllOperations, OpenTransaction};
@@ -132,7 +132,7 @@ where
                         address: account.chain_addr,
                         multiaddresses: vec![account.get_multiaddr().expect("not must contain multiaddr")],
                     })),
-                    Err(DbError::MissingAccount) => Err(CoreEthereumIndexerError::AnnounceBeforeKeyBinding),
+                    Err(DbSqlError::MissingAccount) => Err(CoreEthereumIndexerError::AnnounceBeforeKeyBinding),
                     Err(e) => Err(e.into()),
                 };
             }
@@ -161,7 +161,9 @@ where
             HoprAnnouncementsEvents::RevokeAnnouncementFilter(revocation) => {
                 let node_address: Address = revocation.node.into();
                 match self.db.delete_all_announcements(Some(tx), node_address).await {
-                    Err(DbError::MissingAccount) => return Err(CoreEthereumIndexerError::RevocationBeforeKeyBinding),
+                    Err(DbSqlError::MissingAccount) => {
+                        return Err(CoreEthereumIndexerError::RevocationBeforeKeyBinding)
+                    }
                     Err(e) => return Err(e.into()),
                     _ => {}
                 }
@@ -324,7 +326,6 @@ where
                             let mut matching_tickets = self
                                 .db
                                 .get_tickets(
-                                    None,
                                     TicketSelector::from(&channel_entry)
                                         .with_state(AcknowledgedTicketStatus::BeingRedeemed),
                                 )

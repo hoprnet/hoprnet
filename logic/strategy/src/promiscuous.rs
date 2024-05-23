@@ -30,7 +30,7 @@ use async_trait::async_trait;
 use chain_actions::channels::ChannelActions;
 use futures::StreamExt;
 use hopr_crypto_random::OsRng;
-use hopr_db_sql::errors::DbError;
+use hopr_db_sql::errors::DbSqlError;
 use hopr_db_sql::peers::PeerSelector;
 use hopr_db_sql::HoprDbAllOperations;
 use rand::seq::SliceRandom;
@@ -218,7 +218,7 @@ where
                             .db
                             .resolve_chain_key(&status.id.0)
                             .await
-                            .and_then(|addr| addr.ok_or(DbError::MissingAccount))
+                            .and_then(|addr| addr.ok_or(DbSqlError::MissingAccount))
                         {
                             Some((addr, status.get_average_quality()))
                         } else {
@@ -592,7 +592,7 @@ mod tests {
                         )
                         .await?;
                     }
-                    Ok::<_, DbError>(())
+                    Ok::<_, DbSqlError>(())
                 })
             })
             .await

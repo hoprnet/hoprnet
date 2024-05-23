@@ -148,7 +148,7 @@ where
             Ok(v) => Ok(v.into()),
             Err(e) => {
                 #[cfg(all(feature = "prometheus", not(test)))]
-                if let hopr_db_sql::errors::DbError::TicketValidationError(_) = e {
+                if let hopr_db_sql::errors::DbSqlError::TicketValidationError(_) = e {
                     METRIC_REJECTED_TICKETS_COUNT.increment();
                 }
 

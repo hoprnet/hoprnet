@@ -1,5 +1,5 @@
 use chain_actions::errors::ChainActionsError;
-use hopr_db_sql::errors::DbError;
+use hopr_db_sql::errors::DbSqlError;
 use hopr_primitive_types::errors::GeneralError;
 use thiserror::Error;
 
@@ -13,7 +13,7 @@ pub enum StrategyError {
     Other(String),
 
     #[error(transparent)]
-    DbError(#[from] DbError),
+    DbError(#[from] DbSqlError),
 
     #[error(transparent)]
     ProtocolError(#[from] core_protocol::errors::ProtocolError),

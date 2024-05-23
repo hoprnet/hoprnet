@@ -9,7 +9,7 @@ use tracing::{debug, instrument, trace, warn};
 
 use crate::channels::HoprDbChannelOperations;
 use crate::db::HoprDb;
-use crate::errors::DbError;
+use crate::errors::DbSqlError;
 use crate::info::HoprDbInfoOperations;
 use crate::prelude::{HoprDbResolverOperations, HoprDbTicketOperations};
 use crate::{HoprDbGeneralModelOperations, OptTx};
@@ -116,7 +116,7 @@ impl HoprDbProtocolOperations for HoprDb {
                         .remove(&ack.ack_challenge())
                         .await
                         .ok_or_else(|| {
-                            crate::errors::DbError::AcknowledgementValidationError(format!(
+                            crate::errors::DbSqlError::AcknowledgementValidationError(format!(
                                 "received unexpected acknowledgement for half key challenge {} - half key {}",
                                 ack.ack_challenge().to_hex(),
                                 ack.ack_key_share.to_hex()
@@ -140,7 +140,7 @@ impl HoprDbProtocolOperations for HoprDb {
                                     c.channel_epoch.as_u32() != unacknowledged.verified_ticket().channel_epoch
                                 })
                             {
-                                return Err(crate::errors::DbError::LogicalError(format!(
+                                return Err(crate::errors::DbSqlError::LogicalError(format!(
                                     "no channel found for  address '{}'",
                                     unacknowledged.ticket.verified_issuer()
                                 )));
@@ -148,7 +148,7 @@ impl HoprDbProtocolOperations for HoprDb {
 
                             let domain_separator =
                                 myself.get_indexer_data(Some(tx)).await?.channels_dst.ok_or_else(|| {
-                                    crate::errors::DbError::LogicalError("domain separator missing".into())
+                                    crate::errors::DbSqlError::LogicalError("domain separator missing".into())
                                 })?;
 
                             // This explicitly checks whether the acknowledgement matches
@@ -223,14 +223,14 @@ impl HoprDbProtocolOperations for HoprDb {
             .perform(|tx| {
                 Box::pin(async move {
                     let next_peer = myself.resolve_chain_key(&path[0]).await?.ok_or_else(|| {
-                        crate::errors::DbError::LogicalError(format!(
+                        crate::errors::DbSqlError::LogicalError(format!(
                             "failed to find channel key for packet key {} on previous hop",
                             path[0].to_peerid_str()
                         ))
                     })?;
 
                     let domain_separator = myself.get_indexer_data(Some(tx)).await?.channels_dst.ok_or_else(|| {
-                        crate::errors::DbError::LogicalError("failed to fetch the domain separator".into())
+                        crate::errors::DbSqlError::LogicalError("failed to fetch the domain separator".into())
                     })?;
 
                     // Decide whether to create 0-hop or multihop ticket
@@ -244,7 +244,7 @@ impl HoprDbProtocolOperations for HoprDb {
 
                     ChainPacketComponents::into_outgoing(&data, &path, &me, next_ticket, &domain_separator).map_err(
                         |e| {
-                            crate::errors::DbError::LogicalError(format!(
+                            crate::errors::DbSqlError::LogicalError(format!(
                                 "failed to construct chain components for a packet: {e}"
                             ))
                         },
@@ -255,7 +255,7 @@ impl HoprDbProtocolOperations for HoprDb {
 
         match components {
             ChainPacketComponents::Final { .. } | ChainPacketComponents::Forwarded { .. } => Err(
-                crate::errors::DbError::LogicalError("Must contain an outgoing packet type".into()),
+                crate::errors::DbSqlError::LogicalError("Must contain an outgoing packet type".into()),
             ),
             ChainPacketComponents::Outgoing {
                 packet,
@@ -291,9 +291,9 @@ impl HoprDbProtocolOperations for HoprDb {
         pkt_keypair: &OffchainKeypair,
         sender: OffchainPublicKey,
     ) -> crate::errors::Result<TransportPacketWithChainData> {
-        match ChainPacketComponents::from_incoming(&data, pkt_keypair, sender)
-            .map_err(|e| crate::errors::DbError::LogicalError(format!("failed to construct an incoming packet: {e}")))?
-        {
+        match ChainPacketComponents::from_incoming(&data, pkt_keypair, sender).map_err(|e| {
+            crate::errors::DbSqlError::LogicalError(format!("failed to construct an incoming packet: {e}"))
+        })? {
             ChainPacketComponents::Final {
                 packet_tag,
                 ack_key,
@@ -331,23 +331,23 @@ impl HoprDbProtocolOperations for HoprDb {
                         Box::pin(async move {
                             let chain_data = myself.get_indexer_data(Some(tx)).await?;
 
-                            let domain_separator = chain_data
-                                .channels_dst
-                                .ok_or_else(|| DbError::LogicalError("failed to fetch the domain separator".into()))?;
+                            let domain_separator = chain_data.channels_dst.ok_or_else(|| {
+                                DbSqlError::LogicalError("failed to fetch the domain separator".into())
+                            })?;
                             let ticket_price = chain_data
                                 .ticket_price
-                                .ok_or_else(|| DbError::LogicalError("failed to fetch the ticket price".into()))?;
+                                .ok_or_else(|| DbSqlError::LogicalError("failed to fetch the ticket price".into()))?;
 
                             let previous_hop_addr =
                                 myself.resolve_chain_key(&previous_hop).await?.ok_or_else(|| {
-                                    DbError::LogicalError(format!(
+                                    DbSqlError::LogicalError(format!(
                                         "failed to find channel key for packet key {} on previous hop",
                                         previous_hop.to_peerid_str()
                                     ))
                                 })?;
 
                             let next_hop_addr = myself.resolve_chain_key(&next_hop).await?.ok_or_else(|| {
-                                DbError::LogicalError(format!(
+                                DbSqlError::LogicalError(format!(
                                     "failed to find channel key for packet key {} on next hop",
                                     next_hop.to_peerid_str()
                                 ))
@@ -358,7 +358,7 @@ impl HoprDbProtocolOperations for HoprDb {
                                 .get_channel_by_parties(Some(tx), &previous_hop_addr, &myself.me_onchain)
                                 .await?
                                 .ok_or_else(|| {
-                                    DbError::LogicalError(format!(
+                                    DbSqlError::LogicalError(format!(
                                         "no channel found for previous hop address '{previous_hop_addr}'"
                                     ))
                                 })?;
@@ -396,7 +396,7 @@ impl HoprDbProtocolOperations for HoprDb {
                             // Check that the calculated path position from the ticket matches value from the packet header
                             let ticket_path_pos = ticket.get_path_position(ticket_price.amount())?;
                             if !ticket_path_pos.eq(&path_pos) {
-                                return Err(DbError::LogicalError(format!(
+                                return Err(DbSqlError::LogicalError(format!(
                                     "path position mismatch: from ticket {ticket_path_pos}, from packet {path_pos}"
                                 )));
                             }
@@ -419,19 +419,19 @@ impl HoprDbProtocolOperations for HoprDb {
                     .await
                 {
                     Ok(ticket) => Ok(ticket),
-                    Err(DbError::TicketValidationError(boxed_error)) => {
+                    Err(DbSqlError::TicketValidationError(boxed_error)) => {
                         let (rejected_ticket, error) = *boxed_error;
                         let rejected_value = rejected_ticket.amount;
                         warn!("encountered validation error during forwarding for {rejected_ticket} with value: {rejected_value}");
 
                         self.mark_ticket_rejected(&rejected_ticket).await.map_err(|e| {
-                            DbError::TicketValidationError(Box::new((
+                            DbSqlError::TicketValidationError(Box::new((
                                 rejected_ticket.clone(),
                                 format!("during validation error '{error}' update another error occurred: {e}"),
                             )))
                         })?;
 
-                        Err(DbError::TicketValidationError(Box::new((rejected_ticket, error))))
+                        Err(DbSqlError::TicketValidationError(Box::new((rejected_ticket, error))))
                     }
                     Err(e) => Err(e),
                 }?;
@@ -453,7 +453,7 @@ impl HoprDbProtocolOperations for HoprDb {
                 })
             }
             ChainPacketComponents::Outgoing { .. } => {
-                Err(DbError::LogicalError("Cannot receive an outgoing packet".into()))
+                Err(DbSqlError::LogicalError("Cannot receive an outgoing packet".into()))
             }
         }
     }
@@ -473,7 +473,7 @@ impl HoprDb {
             .await?
             .perform(|tx| {
                 Box::pin(async move {
-                    Ok::<_, DbError>(
+                    Ok::<_, DbSqlError>(
                         if let Some(channel) = myself
                             .get_channel_by_parties(Some(tx), &me_onchain, &destination)
                             .await?
@@ -483,7 +483,7 @@ impl HoprDb {
                             Some((
                                 channel,
                                 ticket_price
-                                    .ok_or(DbError::LogicalError("missing ticket price".into()))?
+                                    .ok_or(DbSqlError::LogicalError("missing ticket price".into()))?
                                     .amount(),
                             ))
                         } else {
@@ -493,13 +493,13 @@ impl HoprDb {
                 })
             })
             .await?
-            .ok_or(crate::errors::DbError::LogicalError(format!(
+            .ok_or(crate::errors::DbSqlError::LogicalError(format!(
                 "channel to '{destination}' not found",
             )))?;
 
         let amount = Balance::new(
             ticket_price.div_f64(TICKET_WIN_PROB).map_err(|e| {
-                crate::errors::DbError::LogicalError(format!(
+                crate::errors::DbSqlError::LogicalError(format!(
                     "winning probability outside of the allowed interval (0.0, 1.0]: {e}"
                 ))
             })? * U256::from(path_pos - 1),
@@ -507,7 +507,7 @@ impl HoprDb {
         );
 
         if channel.balance.lt(&amount) {
-            return Err(crate::errors::DbError::LogicalError(format!(
+            return Err(crate::errors::DbSqlError::LogicalError(format!(
                 "out of funds: {} with counterparty {destination} has balance {} < {amount}",
                 channel.get_id(),
                 channel.balance

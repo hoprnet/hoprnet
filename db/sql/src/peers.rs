@@ -179,7 +179,7 @@ impl HoprDbPeersOperations for HoprDb {
         let new_peer = hopr_db_entity::network_peer::ActiveModel {
             packet_key: sea_orm::ActiveValue::Set(Vec::from(
                 OffchainPublicKey::try_from(peer)
-                    .map_err(|_| crate::errors::DbError::DecodingError)?
+                    .map_err(|_| crate::errors::DbSqlError::DecodingError)?
                     .as_ref(),
             )),
             multi_addresses: sea_orm::ActiveValue::Set(
@@ -192,7 +192,7 @@ impl HoprDbPeersOperations for HoprDb {
             backoff: sea_orm::ActiveValue::Set(Some(backoff)),
             quality_sma: sea_orm::ActiveValue::Set(Some(
                 bincode::serialize(&SingleSumSMA::<f64>::new(quality_window as usize))
-                    .map_err(|_| crate::errors::DbError::DecodingError)?,
+                    .map_err(|_| crate::errors::DbSqlError::DecodingError)?,
             )),
             ..Default::default()
         };
@@ -207,7 +207,7 @@ impl HoprDbPeersOperations for HoprDb {
             .filter(
                 hopr_db_entity::network_peer::Column::PacketKey.eq(Vec::from(
                     OffchainPublicKey::try_from(peer)
-                        .map_err(|_| crate::errors::DbError::DecodingError)?
+                        .map_err(|_| crate::errors::DbSqlError::DecodingError)?
                         .as_ref(),
                 )),
             )
@@ -217,7 +217,7 @@ impl HoprDbPeersOperations for HoprDb {
         if res.rows_affected > 0 {
             Ok(())
         } else {
-            Err(crate::errors::DbError::LogicalError(
+            Err(crate::errors::DbSqlError::LogicalError(
                 "peer cannot be removed because it does not exist".into(),
             ))
         }
@@ -250,7 +250,7 @@ impl HoprDbPeersOperations for HoprDb {
             peer_data.quality = sea_orm::ActiveValue::Set(new_status.quality);
             peer_data.quality_sma = sea_orm::ActiveValue::Set(Some(
                 bincode::serialize(&new_status.quality_avg)
-                    .map_err(|e| crate::errors::DbError::LogicalError(format!("cannot serialize sma: {e}")))?,
+                    .map_err(|e| crate::errors::DbSqlError::LogicalError(format!("cannot serialize sma: {e}")))?,
             ));
             peer_data.backoff = sea_orm::ActiveValue::Set(Some(new_status.backoff));
             peer_data.heartbeats_sent = sea_orm::ActiveValue::Set(Some(new_status.heartbeats_sent as i32));
@@ -260,7 +260,7 @@ impl HoprDbPeersOperations for HoprDb {
 
             Ok(())
         } else {
-            Err(crate::errors::DbError::LogicalError(format!(
+            Err(crate::errors::DbSqlError::LogicalError(format!(
                 "cannot update a non-existing peer '{}'",
                 new_status.id.1
             )))
@@ -272,7 +272,7 @@ impl HoprDbPeersOperations for HoprDb {
             .filter(
                 hopr_db_entity::network_peer::Column::PacketKey.eq(Vec::from(
                     OffchainPublicKey::try_from(peer)
-                        .map_err(|_| crate::errors::DbError::DecodingError)?
+                        .map_err(|_| crate::errors::DbSqlError::DecodingError)?
                         .as_ref(),
                 )),
             )
@@ -432,7 +432,7 @@ impl std::fmt::Display for PeerStatus {
 }
 
 impl TryFrom<hopr_db_entity::network_peer::Model> for PeerStatus {
-    type Error = crate::errors::DbError;
+    type Error = crate::errors::DbSqlError;
 
     fn try_from(value: hopr_db_entity::network_peer::Model) -> std::result::Result<Self, Self::Error> {
         let key = OffchainPublicKey::try_from(value.packet_key.as_slice()).map_err(|_| Self::Error::DecodingError)?;

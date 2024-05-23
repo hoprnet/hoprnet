@@ -37,7 +37,7 @@ use tracing::info;
 
 #[cfg(feature = "runtime-async-std")]
 async fn cancel_join_handle<T>(handle: JoinHandle<T>) {
-    handle.cancel().await
+    handle.cancel().await;
 }
 
 #[cfg(feature = "runtime-tokio")]
@@ -622,7 +622,7 @@ async fn integration_test_indexer() {
 
     let bob_ack_tickets = bob_node
         .db
-        .get_tickets(None, channel_alice_bob_seen_by_bob.into())
+        .get_tickets(channel_alice_bob_seen_by_bob.into())
         .await
         .expect("get ack ticket call on Alice's db must not fail");
 
@@ -709,7 +709,7 @@ async fn integration_test_indexer() {
 
     let bob_ack_tickets = alice_node
         .db
-        .get_tickets(None, channel_bob_alice.into())
+        .get_tickets(channel_bob_alice.into())
         .await
         .expect("get ack ticket call on Alice's db must not fail");
 

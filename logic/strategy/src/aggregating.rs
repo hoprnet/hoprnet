@@ -295,7 +295,7 @@ mod tests {
     use hopr_db_sql::accounts::HoprDbAccountOperations;
     use hopr_db_sql::channels::HoprDbChannelOperations;
     use hopr_db_sql::db::HoprDb;
-    use hopr_db_sql::errors::DbError;
+    use hopr_db_sql::errors::DbSqlError;
     use hopr_db_sql::info::{DomainSeparator, HoprDbInfoOperations};
     use hopr_db_sql::tickets::HoprDbTicketOperations;
     use hopr_db_sql::{HoprDbGeneralModelOperations, TargetDb};
@@ -378,7 +378,7 @@ mod tests {
                         acked_tickets.push(acked_ticket);
                     }
 
-                    Ok::<_, DbError>((acked_tickets, total_value))
+                    Ok::<_, DbSqlError>((acked_tickets, total_value))
                 })
             })
             .await
@@ -425,7 +425,7 @@ mod tests {
                             .await
                             .unwrap();
                     }
-                    Ok::<_, DbError>(())
+                    Ok::<_, DbSqlError>(())
                 })
             })
             .await
@@ -534,7 +534,7 @@ mod tests {
         let f2 = pin!(async_std::task::sleep(Duration::from_secs(5)).fuse());
         let _ = futures::future::select(f1, f2).await;
 
-        let tickets = db_bob.get_tickets(None, (&channel).into()).await.unwrap();
+        let tickets = db_bob.get_tickets((&channel).into()).await.unwrap();
         assert_eq!(tickets.len(), 1, "there should be a single aggregated ticket");
     }
 
@@ -577,7 +577,7 @@ mod tests {
         let f2 = pin!(async_std::task::sleep(Duration::from_secs(5)));
         let _ = futures::future::select(f1, f2).await;
 
-        let tickets = db_bob.get_tickets(None, (&channel).into()).await.unwrap();
+        let tickets = db_bob.get_tickets((&channel).into()).await.unwrap();
         assert_eq!(tickets.len(), 1, "there should be a single aggregated ticket");
     }
 
@@ -606,7 +606,7 @@ mod tests {
         debug!("upserting {}", acked_tickets[0]);
         db_bob.upsert_ticket(None, acked_tickets[0].clone()).await.unwrap();
 
-        let tickets = db_bob.get_tickets(None, (&channel).into()).await.unwrap();
+        let tickets = db_bob.get_tickets((&channel).into()).await.unwrap();
         assert_eq!(tickets.len(), NUM_TICKETS, "nothing should be aggregated");
 
         channel.balance = Balance::new(100_u32, BalanceType::HOPR);
@@ -628,7 +628,7 @@ mod tests {
             .await
             .expect("strategy call should succeed");
 
-        let tickets = db_bob.get_tickets(None, (&channel).into()).await.unwrap();
+        let tickets = db_bob.get_tickets((&channel).into()).await.unwrap();
         assert_eq!(tickets.len(), NUM_TICKETS, "nothing should be aggregated");
         std::mem::drop(awaiter);
     }
@@ -682,7 +682,7 @@ mod tests {
             .expect("should not timeout")
             .unwrap();
 
-        let tickets = db_bob.get_tickets(None, (&channel).into()).await.unwrap();
+        let tickets = db_bob.get_tickets((&channel).into()).await.unwrap();
         assert_eq!(tickets.len(), 1, "there should be a single aggregated ticket");
     }
 
@@ -704,7 +704,7 @@ mod tests {
         let (bob_aggregator, awaiter) =
             spawn_aggregation_interaction(db_alice.clone(), db_bob.clone(), &PEERS_CHAIN[0], &PEERS_CHAIN[1]);
 
-        let tickets = db_bob.get_tickets(None, (&channel).into()).await.unwrap();
+        let tickets = db_bob.get_tickets((&channel).into()).await.unwrap();
         assert_eq!(tickets.len(), NUM_TICKETS, "should have a single ticket");
 
         db_alice.upsert_channel(None, channel).await.unwrap();
@@ -735,7 +735,7 @@ mod tests {
             .await
             .expect_err("should timeout");
 
-        let tickets = db_bob.get_tickets(None, (&channel).into()).await.unwrap();
+        let tickets = db_bob.get_tickets((&channel).into()).await.unwrap();
         assert_eq!(tickets.len(), NUM_TICKETS, "nothing should be aggregated");
     }
 }

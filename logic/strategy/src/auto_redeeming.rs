@@ -113,7 +113,7 @@ where
 
             let mut ack_ticket_in_db = self
                 .db
-                .get_tickets(None, channel.into())
+                .get_tickets(channel.into())
                 .await?
                 .into_iter()
                 .filter(|t| {

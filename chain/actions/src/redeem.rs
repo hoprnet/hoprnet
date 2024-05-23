@@ -136,7 +136,7 @@ where
             .with_aggregated_only(only_aggregated)
             .with_state(AcknowledgedTicketStatus::Untouched);
 
-        let (count_redeemable_tickets, _) = self.db.get_tickets_value(None, selector).await?;
+        let (count_redeemable_tickets, _) = self.db.get_tickets_value(selector).await?;
 
         info!(
             "there are {count_redeemable_tickets} acknowledged tickets in channel {channel_id} which can be redeemed"
@@ -233,7 +233,7 @@ mod tests {
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::prelude::*;
     use hopr_db_sql::db::HoprDb;
-    use hopr_db_sql::errors::DbError;
+    use hopr_db_sql::errors::DbSqlError;
     use hopr_db_sql::info::{DomainSeparator, HoprDbInfoOperations};
     use hopr_db_sql::{HoprDbGeneralModelOperations, TargetDb};
 
@@ -296,7 +296,7 @@ mod tests {
                         channel_epoch.into(),
                     );
                     db_clone.upsert_channel(Some(tx), channel).await?;
-                    Ok::<_, DbError>(channel)
+                    Ok::<_, DbSqlError>(channel)
                 })
             })
             .await
@@ -315,7 +315,7 @@ mod tests {
                         db.upsert_ticket(Some(tx), ack_ticket.clone()).await?;
                         input_tickets.push(ack_ticket);
                     }
-                    Ok::<_, DbError>(input_tickets)
+                    Ok::<_, DbSqlError>(input_tickets)
                 })
             })
             .await
@@ -413,9 +413,9 @@ mod tests {
             "tx hashes must be equal"
         );
 
-        let db_acks_bob = db.get_tickets(None, (&channel_from_bob).into()).await.unwrap();
+        let db_acks_bob = db.get_tickets((&channel_from_bob).into()).await.unwrap();
 
-        let db_acks_charlie = db.get_tickets(None, (&channel_from_charlie).into()).await.unwrap();
+        let db_acks_charlie = db.get_tickets((&channel_from_charlie).into()).await.unwrap();
 
         assert!(
             db_acks_bob
@@ -494,9 +494,9 @@ mod tests {
             "tx hashes must be equal"
         );
 
-        let db_acks_bob = db.get_tickets(None, (&channel_from_bob).into()).await.unwrap();
+        let db_acks_bob = db.get_tickets((&channel_from_bob).into()).await.unwrap();
 
-        let db_acks_charlie = db.get_tickets(None, (&channel_from_charlie).into()).await.unwrap();
+        let db_acks_charlie = db.get_tickets((&channel_from_charlie).into()).await.unwrap();
 
         assert!(
             db_acks_bob

@@ -9,8 +9,8 @@ use tracing::debug;
 use crate::db::HoprDb;
 
 use crate::cache::{CachedValue, CachedValueDiscriminants};
-use crate::errors::DbError::MissingFixedTableEntry;
-use crate::errors::{DbError, Result};
+use crate::errors::DbSqlError::MissingFixedTableEntry;
+use crate::errors::{DbSqlError, Result};
 use crate::{HoprDbGeneralModelOperations, OptTx, SINGULAR_TABLE_FIXED_ID};
 
 /// Contains various on-chain information collected by Indexer,
@@ -152,7 +152,7 @@ impl HoprDbInfoOperations for HoprDb {
                     node_info::Entity::find_by_id(SINGULAR_TABLE_FIXED_ID)
                         .one(tx.as_ref())
                         .await?
-                        .ok_or(DbError::MissingFixedTableEntry("node_info".into()))
+                        .ok_or(DbSqlError::MissingFixedTableEntry("node_info".into()))
                         .map(|m| BalanceType::HOPR.balance_bytes(m.safe_balance))
                 })
             })
@@ -164,7 +164,7 @@ impl HoprDbInfoOperations for HoprDb {
             .await?
             .perform(|tx| {
                 Box::pin(async move {
-                    Ok::<_, DbError>(
+                    Ok::<_, DbSqlError>(
                         node_info::ActiveModel {
                             id: Set(SINGULAR_TABLE_FIXED_ID),
                             safe_balance: Set(new_balance.amount().to_be_bytes().into()),
@@ -188,7 +188,7 @@ impl HoprDbInfoOperations for HoprDb {
                     node_info::Entity::find_by_id(SINGULAR_TABLE_FIXED_ID)
                         .one(tx.as_ref())
                         .await?
-                        .ok_or(DbError::MissingFixedTableEntry("node_info".into()))
+                        .ok_or(DbSqlError::MissingFixedTableEntry("node_info".into()))
                         .map(|m| BalanceType::HOPR.balance_bytes(m.safe_allowance))
                 })
             })
@@ -208,7 +208,7 @@ impl HoprDbInfoOperations for HoprDb {
                     .update(tx.as_ref()) // DB is primed in the migration, so only update is needed
                     .await?;
 
-                    Ok::<_, DbError>(())
+                    Ok::<_, DbSqlError>(())
                 })
             })
             .await
@@ -228,8 +228,8 @@ impl HoprDbInfoOperations for HoprDb {
                                 let info = node_info::Entity::find_by_id(SINGULAR_TABLE_FIXED_ID)
                                     .one(tx.as_ref())
                                     .await?
-                                    .ok_or(DbError::MissingFixedTableEntry("node_info".into()))?;
-                                Ok::<_, DbError>(info.safe_address.zip(info.module_address))
+                                    .ok_or(DbSqlError::MissingFixedTableEntry("node_info".into()))?;
+                                Ok::<_, DbSqlError>(info.safe_address.zip(info.module_address))
                             })
                         })
                     })
@@ -263,7 +263,7 @@ impl HoprDbInfoOperations for HoprDb {
                     }
                     .update(tx.as_ref()) // DB is primed in the migration, so only update is needed
                     .await?;
-                    Ok::<_, DbError>(())
+                    Ok::<_, DbSqlError>(())
                 })
             })
             .await?;
@@ -291,7 +291,7 @@ impl HoprDbInfoOperations for HoprDb {
                                 let model = chain_info::Entity::find_by_id(SINGULAR_TABLE_FIXED_ID)
                                     .one(tx.as_ref())
                                     .await?
-                                    .ok_or(DbError::MissingFixedTableEntry("chain_info".into()))?;
+                                    .ok_or(DbSqlError::MissingFixedTableEntry("chain_info".into()))?;
 
                                 let ledger_dst = if let Some(b) = model.ledger_dst {
                                     Some(Hash::try_from(b.as_ref())?)
@@ -311,7 +311,7 @@ impl HoprDbInfoOperations for HoprDb {
                                     None
                                 };
 
-                                Ok::<_, DbError>(CachedValue::IndexerDataCache(IndexerData {
+                                Ok::<_, DbSqlError>(CachedValue::IndexerDataCache(IndexerData {
                                     ledger_dst,
                                     safe_registry_dst,
                                     channels_dst,
@@ -352,7 +352,7 @@ impl HoprDbInfoOperations for HoprDb {
                     // DB is primed in the migration, so only update is needed
                     active_model.update(tx.as_ref()).await?;
 
-                    Ok::<(), DbError>(())
+                    Ok::<(), DbSqlError>(())
                 })
             })
             .await?;
@@ -377,7 +377,7 @@ impl HoprDbInfoOperations for HoprDb {
                     .update(tx.as_ref())
                     .await?;
 
-                    Ok::<(), DbError>(())
+                    Ok::<(), DbSqlError>(())
                 })
             })
             .await?;
@@ -397,7 +397,7 @@ impl HoprDbInfoOperations for HoprDb {
                     chain_info::Entity::find_by_id(SINGULAR_TABLE_FIXED_ID)
                         .one(tx.as_ref())
                         .await?
-                        .ok_or(DbError::MissingFixedTableEntry("chain_info".into()))
+                        .ok_or(DbSqlError::MissingFixedTableEntry("chain_info".into()))
                         .map(|m| {
                             let chain_checksum = if let Some(b) = m.chain_checksum {
                                 Hash::try_from(b.as_slice()).expect("invalid chain checksum in the db")
@@ -443,7 +443,7 @@ impl HoprDbInfoOperations for HoprDb {
                     active_model.last_indexed_block = Set(block_num as i32);
                     active_model.update(tx.as_ref()).await?;
 
-                    Ok::<_, DbError>(())
+                    Ok::<_, DbSqlError>(())
                 })
             })
             .await
@@ -461,7 +461,7 @@ impl HoprDbInfoOperations for HoprDb {
                     }
                     .update(tx.as_ref())
                     .await?;
-                    Ok::<_, DbError>(())
+                    Ok::<_, DbSqlError>(())
                 })
             })
             .await?;
@@ -479,7 +479,7 @@ impl HoprDbInfoOperations for HoprDb {
             .await?
             .perform(|tx| {
                 Box::pin(async move {
-                    Ok::<Option<Box<[u8]>>, DbError>(
+                    Ok::<Option<Box<[u8]>>, DbSqlError>(
                         global_settings::Entity::find()
                             .filter(global_settings::Column::Key.eq(k))
                             .one(tx.as_ref())
@@ -516,7 +516,7 @@ impl HoprDbInfoOperations for HoprDb {
                             .exec(tx.as_ref())
                             .await?;
                     }
-                    Ok::<(), DbError>(())
+                    Ok::<(), DbSqlError>(())
                 })
             })
             .await

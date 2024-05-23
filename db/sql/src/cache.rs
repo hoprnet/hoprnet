@@ -1,4 +1,4 @@
-use crate::errors::DbError;
+use crate::errors::DbSqlError;
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::{Address, Balance};
@@ -22,23 +22,23 @@ pub enum CachedValue {
 }
 
 impl TryFrom<CachedValue> for IndexerData {
-    type Error = DbError;
+    type Error = DbSqlError;
 
     fn try_from(value: CachedValue) -> Result<Self, Self::Error> {
         match value {
             CachedValue::IndexerDataCache(data) => Ok(data),
-            _ => Err(DbError::DecodingError),
+            _ => Err(DbSqlError::DecodingError),
         }
     }
 }
 
 impl TryFrom<CachedValue> for Option<SafeInfo> {
-    type Error = DbError;
+    type Error = DbSqlError;
 
     fn try_from(value: CachedValue) -> Result<Self, Self::Error> {
         match value {
             CachedValue::SafeInfoCache(data) => Ok(data),
-            _ => Err(DbError::DecodingError),
+            _ => Err(DbSqlError::DecodingError),
         }
     }
 }

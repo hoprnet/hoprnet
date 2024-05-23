@@ -21,7 +21,7 @@ pub enum ProtocolError {
     TransportError(String),
 
     #[error("db error {0}")]
-    DatabaseError(#[from] hopr_db_sql::errors::DbError),
+    DatabaseError(#[from] hopr_db_sql::errors::DbSqlError),
 
     #[error("db error {0}")]
     UnifiedDbError(String),

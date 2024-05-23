@@ -10,7 +10,7 @@ use hopr_primitive_types::prelude::ToHex;
 
 use crate::cache::HoprDbCaches;
 use crate::executor::spawn;
-use crate::prelude::DbError;
+use crate::prelude::DbSqlError;
 use crate::{errors::Result, tickets::TicketSelector, OpenTransaction};
 
 /// Functionality related to locking and structural improvements to the underlying SQLite database
@@ -54,7 +54,7 @@ impl TicketManager {
                 match db_clone
                     .begin_with_config(None, None)
                     .await
-                    .map_err(crate::errors::DbError::BackendError)
+                    .map_err(crate::errors::DbSqlError::BackendError)
                 {
                     Ok(transaction) => {
                         let transaction = OpenTransaction(transaction, crate::TargetDb::Tickets);
@@ -90,7 +90,7 @@ impl TicketManager {
                                     }
                                     .save(tx.as_ref())
                                     .await
-                                    .map_err(DbError::from)
+                                    .map_err(DbSqlError::from)
                                 })
                             })
                             .await
@@ -120,7 +120,7 @@ impl TicketManager {
         let unrealized_value = self.unrealized_value(TicketSelector::new(channel, epoch)).await?;
 
         self.incoming_ack_tickets_tx.clone().try_send(ticket).map_err(|e| {
-            crate::errors::DbError::LogicalError(format!(
+            crate::errors::DbSqlError::LogicalError(format!(
                 "failed to enqueue acknowledged ticket processing into the DB: {e}"
             ))
         })?;
@@ -147,7 +147,7 @@ impl TicketManager {
             self.tickets_db
                 .begin_with_config(None, None)
                 .await
-                .map_err(crate::errors::DbError::BackendError)?,
+                .map_err(crate::errors::DbSqlError::BackendError)?,
             crate::TargetDb::Tickets,
         );
 
@@ -162,8 +162,8 @@ impl TicketManager {
                                 .filter(selector)
                                 .stream(tx.as_ref())
                                 .await
-                                .map_err(crate::errors::DbError::from)?
-                                .map_err(crate::errors::DbError::from)
+                                .map_err(crate::errors::DbSqlError::from)?
+                                .map_err(crate::errors::DbSqlError::from)
                                 .try_fold(BalanceType::HOPR.zero(), |value, t| async move {
                                     Ok(value + BalanceType::HOPR.balance_bytes(t.amount))
                                 })
@@ -180,7 +180,7 @@ impl TicketManager {
     where
         F: for<'c> FnOnce(&'c OpenTransaction) -> BoxFuture<'c, std::result::Result<T, E>> + Send,
         T: Send,
-        E: std::error::Error + From<crate::errors::DbError>,
+        E: std::error::Error + From<crate::errors::DbSqlError>,
     {
         let mutex = self.mutex.clone();
         let _guard = mutex.lock().await;
@@ -189,7 +189,7 @@ impl TicketManager {
             self.tickets_db
                 .begin_with_config(None, None)
                 .await
-                .map_err(crate::errors::DbError::BackendError)?,
+                .map_err(crate::errors::DbSqlError::BackendError)?,
             crate::TargetDb::Tickets,
         );
 

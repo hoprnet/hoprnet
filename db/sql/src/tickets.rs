@@ -20,8 +20,8 @@ use hopr_primitive_types::prelude::*;
 
 use crate::channels::HoprDbChannelOperations;
 use crate::db::HoprDb;
-use crate::errors::DbError::LogicalError;
-use crate::errors::{DbError, Result};
+use crate::errors::DbSqlError::LogicalError;
+use crate::errors::{DbSqlError, Result};
 use crate::info::{DomainSeparator, HoprDbInfoOperations};
 use crate::resolver::HoprDbResolverOperations;
 use crate::{HoprDbGeneralModelOperations, OpenTransaction, OptTx, TargetDb};
@@ -274,7 +274,7 @@ pub trait HoprDbTicketOperations {
 
     /// Retrieve acknowledged winning tickets according to the given `selector`.
     /// The optional transaction `tx` must be in the [tickets database](TargetDb::Tickets).
-    async fn get_tickets<'a>(&'a self, tx: OptTx<'a>, selector: TicketSelector) -> Result<Vec<AcknowledgedTicket>>;
+    async fn get_tickets(&self, selector: TicketSelector) -> Result<Vec<AcknowledgedTicket>>;
 
     /// Marks tickets as redeemed (removing them from the DB) and updating the statistics.
     /// Returns the number of tickets that were redeemed.
@@ -304,28 +304,23 @@ pub trait HoprDbTicketOperations {
     ) -> Result<usize>;
 
     /// Retrieves the ticket statistics for the given channel.
-    /// If no channel is given, it retrieves aggregate ticket statistics for all channels.
     ///
-    /// The optional transaction `tx` must be in the [tickets database](TargetDb::Tickets).
-    async fn get_ticket_statistics<'a>(
-        &'a self,
-        tx: OptTx<'a>,
-        channel_id: Option<Hash>,
-    ) -> Result<ChannelTicketStatistics>;
+    /// If no channel is given, it retrieves aggregate ticket statistics for all channels.
+    async fn get_ticket_statistics(&self, channel_id: Option<Hash>) -> Result<ChannelTicketStatistics>;
 
     /// Counts the tickets matching the given `selector` and their total value.
-    ///
-    /// The optional transaction `tx` must be in the [tickets database](TargetDb::Tickets).
-    async fn get_tickets_value<'a>(&'a self, tx: OptTx<'a>, selector: TicketSelector) -> Result<(usize, Balance)>;
+    async fn get_tickets_value(&self, selector: TicketSelector) -> Result<(usize, Balance)>;
 
     /// Sets the stored outgoing ticket index to `index`, only if the currently stored value
     /// is less than `index`. This ensures the stored value can only be growing.
+    ///
     /// Returns the old value.
     ///
     /// If the entry is not yet present for the given ID, it is initialized to 0.
     async fn compare_and_set_outgoing_ticket_index(&self, channel_id: Hash, index: u64) -> Result<u64>;
 
     /// Resets the outgoing ticket index to 0 for the given channel id.
+    ///
     /// Returns the old value before reset.
     ///
     /// If the entry is not yet present for the given ID, it is initialized to 0.
@@ -423,6 +418,29 @@ pub(crate) async fn find_stats_for_channel(
     }
 }
 
+impl HoprDb {
+    async fn get_tickets_value_int<'a>(&'a self, tx: OptTx<'a>, selector: TicketSelector) -> Result<(usize, Balance)> {
+        Ok(self
+            .nest_transaction_in_db(tx, TargetDb::Tickets)
+            .await?
+            .perform(|tx| {
+                Box::pin(async move {
+                    ticket::Entity::find()
+                        .filter(selector)
+                        .stream(tx.as_ref())
+                        .await
+                        .map_err(DbSqlError::from)?
+                        .map_err(DbSqlError::from)
+                        .try_fold((0_usize, BalanceType::HOPR.zero()), |(count, value), t| async move {
+                            Ok((count + 1, value + BalanceType::HOPR.balance_bytes(t.amount)))
+                        })
+                        .await
+                })
+            })
+            .await?)
+    }
+}
+
 #[async_trait]
 impl HoprDbTicketOperations for HoprDb {
     async fn get_all_tickets(&self) -> Result<Vec<AcknowledgedTicket>> {
@@ -436,16 +454,16 @@ impl HoprDbTicketOperations for HoprDb {
                         .into_iter()
                         .map(AcknowledgedTicket::try_from)
                         .collect::<hopr_db_entity::errors::Result<Vec<_>>>()
-                        .map_err(DbError::from)
+                        .map_err(DbSqlError::from)
                 })
             })
             .await
     }
 
-    async fn get_tickets<'a>(&'a self, tx: OptTx<'a>, selector: TicketSelector) -> Result<Vec<AcknowledgedTicket>> {
+    async fn get_tickets(&self, selector: TicketSelector) -> Result<Vec<AcknowledgedTicket>> {
         debug!("fetching tickets via {selector}");
 
-        self.nest_transaction_in_db(tx, TargetDb::Tickets)
+        self.nest_transaction_in_db(None, TargetDb::Tickets)
             .await?
             .perform(|tx| {
                 Box::pin(async move {
@@ -456,7 +474,7 @@ impl HoprDbTicketOperations for HoprDb {
                         .into_iter()
                         .map(AcknowledgedTicket::try_from)
                         .collect::<hopr_db_entity::errors::Result<Vec<_>>>()
-                        .map_err(DbError::from)
+                        .map_err(DbSqlError::from)
                 })
             })
             .await
@@ -468,7 +486,7 @@ impl HoprDbTicketOperations for HoprDb {
             .with_write_locked_db(|tx| {
                 Box::pin(async move {
                     // Obtain the amount of redeemed tickets and their value
-                    let (redeemed_count, redeemed_value) = myself.get_tickets_value(Some(tx), selector).await?;
+                    let (redeemed_count, redeemed_value) = myself.get_tickets_value_int(Some(tx), selector).await?;
 
                     if redeemed_count > 0 {
                         // Delete the redeemed tickets first
@@ -495,7 +513,7 @@ impl HoprDbTicketOperations for HoprDb {
 
                             myself.caches.unrealized_value.invalidate(&selector.channel_id).await;
                         } else {
-                            return Err(DbError::LogicalError(format!(
+                            return Err(DbSqlError::LogicalError(format!(
                                 "could not mark {redeemed_count} ticket as redeemed"
                             )));
                         }
@@ -518,7 +536,8 @@ impl HoprDbTicketOperations for HoprDb {
             .with_write_locked_db(|tx| {
                 Box::pin(async move {
                     // Obtain the amount of neglected tickets and their value
-                    let (neglectable_count, neglectable_value) = myself.get_tickets_value(Some(tx), selector).await?;
+                    let (neglectable_count, neglectable_value) =
+                        myself.get_tickets_value_int(Some(tx), selector).await?;
 
                     if neglectable_count > 0 {
                         // Delete the neglectable tickets first
@@ -547,7 +566,7 @@ impl HoprDbTicketOperations for HoprDb {
                             // invalidating unrealized balance for the channel
                             myself.caches.unrealized_value.invalidate(&selector.channel_id).await;
                         } else {
-                            return Err(DbError::LogicalError(format!(
+                            return Err(DbSqlError::LogicalError(format!(
                                 "could not mark {neglectable_count} ticket as neglected"
                             )));
                         }
@@ -585,7 +604,7 @@ impl HoprDbTicketOperations for HoprDb {
                         );
                     }
 
-                    Ok::<(), DbError>(())
+                    Ok::<(), DbSqlError>(())
                 })
             })
             .await
@@ -646,20 +665,16 @@ impl HoprDbTicketOperations for HoprDb {
                         .col_expr(ticket::Column::State, Expr::value(new_state as u8))
                         .exec(tx.as_ref())
                         .await?;
-                    Ok::<_, DbError>(update.rows_affected as usize)
+                    Ok::<_, DbSqlError>(update.rows_affected as usize)
                 })
             })
             .await
     }
 
-    async fn get_ticket_statistics<'a>(
-        &'a self,
-        tx: OptTx<'a>,
-        channel_id: Option<Hash>,
-    ) -> Result<ChannelTicketStatistics> {
+    async fn get_ticket_statistics(&self, channel_id: Option<Hash>) -> Result<ChannelTicketStatistics> {
         match channel_id {
             None => {
-                self.nest_transaction_in_db(tx, TargetDb::Tickets)
+                self.nest_transaction_in_db(None, TargetDb::Tickets)
                     .await?
                     .perform(|tx| {
                         Box::pin(async move {
@@ -688,7 +703,7 @@ impl HoprDbTicketOperations for HoprDb {
 
                             all_stats.unredeemed_value = BalanceType::HOPR.balance(unredeemed_value);
 
-                            Ok::<_, DbError>(all_stats)
+                            Ok::<_, DbSqlError>(all_stats)
                         })
                     })
                     .await
@@ -697,10 +712,10 @@ impl HoprDbTicketOperations for HoprDb {
                 // We need to make sure the channel exists, to avoid creating
                 // stats entry for a non-existing channel
                 if self.get_channel_by_id(None, &channel).await?.is_none() {
-                    return Err(DbError::ChannelNotFound(channel));
+                    return Err(DbSqlError::ChannelNotFound(channel));
                 }
 
-                self.nest_transaction_in_db(tx, TargetDb::Tickets)
+                self.nest_transaction_in_db(None, TargetDb::Tickets)
                     .await?
                     .perform(|tx| {
                         Box::pin(async move {
@@ -714,7 +729,7 @@ impl HoprDbTicketOperations for HoprDb {
                                 })
                                 .await?;
 
-                            Ok::<_, DbError>(ChannelTicketStatistics {
+                            Ok::<_, DbSqlError>(ChannelTicketStatistics {
                                 winning_tickets: stats.winning_tickets as u128,
                                 neglected_value: BalanceType::HOPR.balance_bytes(stats.neglected_value),
                                 redeemed_value: BalanceType::HOPR.balance_bytes(stats.redeemed_value),
@@ -728,25 +743,8 @@ impl HoprDbTicketOperations for HoprDb {
         }
     }
 
-    async fn get_tickets_value<'a>(&'a self, tx: OptTx<'a>, selector: TicketSelector) -> Result<(usize, Balance)> {
-        Ok(self
-            .nest_transaction_in_db(tx, TargetDb::Tickets)
-            .await?
-            .perform(|tx| {
-                Box::pin(async move {
-                    ticket::Entity::find()
-                        .filter(selector)
-                        .stream(tx.as_ref())
-                        .await
-                        .map_err(DbError::from)?
-                        .map_err(DbError::from)
-                        .try_fold((0_usize, BalanceType::HOPR.zero()), |(count, value), t| async move {
-                            Ok((count + 1, value + BalanceType::HOPR.balance_bytes(t.amount)))
-                        })
-                        .await
-                })
-            })
-            .await?)
+    async fn get_tickets_value(&self, selector: TicketSelector) -> Result<(usize, Balance)> {
+        self.get_tickets_value_int(None, selector).await
     }
 
     async fn compare_and_set_outgoing_ticket_index(&self, channel_id: Hash, index: u64) -> Result<u64> {
@@ -807,7 +805,7 @@ impl HoprDbTicketOperations for HoprDb {
                                     }
                                     .insert(tx.as_ref())
                                     .await?;
-                                    Ok::<_, DbError>(())
+                                    Ok::<_, DbSqlError>(())
                                 })
                             })
                             .await?;
@@ -816,7 +814,7 @@ impl HoprDbTicketOperations for HoprDb {
                 })))
             })
             .await
-            .map_err(|e: Arc<DbError>| LogicalError(format!("failed to retrieve ticket index: {e}")))
+            .map_err(|e: Arc<DbSqlError>| LogicalError(format!("failed to retrieve ticket index: {e}")))
     }
 
     async fn persist_outgoing_ticket_indices(&self) -> Result<usize> {
@@ -840,7 +838,7 @@ impl HoprDbTicketOperations for HoprDb {
                         .with_write_locked_db(|wtx| {
                             Box::pin(async move {
                                 index_active_model.save(wtx.as_ref()).await?;
-                                Ok::<_, DbError>(())
+                                Ok::<_, DbSqlError>(())
                             })
                         })
                         .await?;
@@ -855,7 +853,7 @@ impl HoprDbTicketOperations for HoprDb {
             }
         }
 
-        Ok::<_, DbError>(updated)
+        Ok::<_, DbSqlError>(updated)
     }
 
     async fn prepare_aggregation_in_channel(
@@ -867,39 +865,41 @@ impl HoprDbTicketOperations for HoprDb {
 
         let channel_id = *channel;
 
-        let (channel_entry, peer, domain_separator) =
-            self.nest_transaction_in_db(None, TargetDb::Index)
-                .await?
-                .perform(|tx| {
-                    Box::pin(async move {
-                        let entry = myself
-                            .get_channel_by_id(Some(tx), &channel_id)
-                            .await?
-                            .ok_or(DbError::ChannelNotFound(channel_id))?;
+        let (channel_entry, peer, domain_separator) = self
+            .nest_transaction_in_db(None, TargetDb::Index)
+            .await?
+            .perform(|tx| {
+                Box::pin(async move {
+                    let entry = myself
+                        .get_channel_by_id(Some(tx), &channel_id)
+                        .await?
+                        .ok_or(DbSqlError::ChannelNotFound(channel_id))?;
 
-                        if entry.status == ChannelStatus::Closed {
-                            return Err(DbError::LogicalError(format!("channel '{channel_id}' is closed")));
-                        } else if entry.direction(&myself.me_onchain) != Some(ChannelDirection::Incoming) {
-                            return Err(DbError::LogicalError(format!("channel '{channel_id}' is not incoming")));
-                        }
+                    if entry.status == ChannelStatus::Closed {
+                        return Err(DbSqlError::LogicalError(format!("channel '{channel_id}' is closed")));
+                    } else if entry.direction(&myself.me_onchain) != Some(ChannelDirection::Incoming) {
+                        return Err(DbSqlError::LogicalError(format!(
+                            "channel '{channel_id}' is not incoming"
+                        )));
+                    }
 
-                        let pk = myself
-                            .resolve_packet_key(&entry.source)
-                            .await?
-                            .ok_or(DbError::LogicalError(format!(
-                                "peer '{}' has no offchain key record",
-                                entry.source
-                            )))?;
+                    let pk = myself
+                        .resolve_packet_key(&entry.source)
+                        .await?
+                        .ok_or(DbSqlError::LogicalError(format!(
+                            "peer '{}' has no offchain key record",
+                            entry.source
+                        )))?;
 
-                        let domain_separator =
-                            myself.get_indexer_data(Some(tx)).await?.channels_dst.ok_or_else(|| {
-                                crate::errors::DbError::LogicalError("domain separator missing".into())
-                            })?;
+                    let domain_separator =
+                        myself.get_indexer_data(Some(tx)).await?.channels_dst.ok_or_else(|| {
+                            crate::errors::DbSqlError::LogicalError("domain separator missing".into())
+                        })?;
 
-                        Ok((entry, pk, domain_separator))
-                    })
+                    Ok((entry, pk, domain_separator))
                 })
-                .await?;
+            })
+            .await?;
 
         let myself = self.clone();
         let tickets = self
@@ -915,7 +915,7 @@ impl HoprDbTicketOperations for HoprDb {
                         .await?
                         .is_some()
                     {
-                        return Err(DbError::LogicalError(format!(
+                        return Err(DbSqlError::LogicalError(format!(
                             "'{channel_entry}' is already being aggregated",
                         )));
                     }
@@ -946,10 +946,10 @@ impl HoprDbTicketOperations for HoprDb {
                         .into_iter()
                         .map(|model| {
                             AcknowledgedTicket::try_from(model)
-                                .map_err(DbError::from)
+                                .map_err(DbSqlError::from)
                                 .and_then(|ack| {
                                     ack.into_transferable(&myself.chain_key, &domain_separator)
-                                        .map_err(DbError::from)
+                                        .map_err(DbSqlError::from)
                                 })
                         })
                         .collect::<Result<Vec<_>>>()?;
@@ -970,7 +970,7 @@ impl HoprDbTicketOperations for HoprDb {
                             .await?;
 
                         if marked.rows_affected as usize != to_be_aggregated.len() {
-                            return Err(DbError::LogicalError(format!(
+                            return Err(DbSqlError::LogicalError(format!(
                                 "expected to mark {}, but was able to mark {}",
                                 to_be_aggregated.len(),
                                 marked.rows_affected,
@@ -997,7 +997,7 @@ impl HoprDbTicketOperations for HoprDb {
         let channel_entry = self
             .get_channel_by_id(None, &channel)
             .await?
-            .ok_or(DbError::ChannelNotFound(channel))?;
+            .ok_or(DbSqlError::ChannelNotFound(channel))?;
 
         let selector = TicketSelector::from(channel_entry).with_state(AcknowledgedTicketStatus::BeingAggregated);
 
@@ -1017,7 +1017,7 @@ impl HoprDbTicketOperations for HoprDb {
         chain_keypair: &ChainKeypair,
     ) -> Result<AcknowledgedTicket> {
         if chain_keypair.public().to_address() != self.me_onchain {
-            return Err(DbError::LogicalError(
+            return Err(DbSqlError::LogicalError(
                 "chain key for ticket aggregation does not match the DB public address".into(),
             ));
         }
@@ -1025,44 +1025,46 @@ impl HoprDbTicketOperations for HoprDb {
         let myself = self.clone();
         let channel_id = aggregated_ticket.channel_id;
 
-        let (channel_entry, domain_separator) =
-            self.nest_transaction_in_db(None, TargetDb::Index)
-                .await?
-                .perform(|tx| {
-                    Box::pin(async move {
-                        let entry = myself
-                            .get_channel_by_id(Some(tx), &channel_id)
-                            .await?
-                            .ok_or(DbError::ChannelNotFound(channel_id))?;
+        let (channel_entry, domain_separator) = self
+            .nest_transaction_in_db(None, TargetDb::Index)
+            .await?
+            .perform(|tx| {
+                Box::pin(async move {
+                    let entry = myself
+                        .get_channel_by_id(Some(tx), &channel_id)
+                        .await?
+                        .ok_or(DbSqlError::ChannelNotFound(channel_id))?;
 
-                        if entry.status == ChannelStatus::Closed {
-                            return Err(DbError::LogicalError(format!("channel '{channel_id}' is closed")));
-                        } else if entry.direction(&myself.me_onchain) != Some(ChannelDirection::Incoming) {
-                            return Err(DbError::LogicalError(format!("channel '{channel_id}' is not incoming")));
-                        }
+                    if entry.status == ChannelStatus::Closed {
+                        return Err(DbSqlError::LogicalError(format!("channel '{channel_id}' is closed")));
+                    } else if entry.direction(&myself.me_onchain) != Some(ChannelDirection::Incoming) {
+                        return Err(DbSqlError::LogicalError(format!(
+                            "channel '{channel_id}' is not incoming"
+                        )));
+                    }
 
-                        let domain_separator =
-                            myself.get_indexer_data(Some(tx)).await?.channels_dst.ok_or_else(|| {
-                                crate::errors::DbError::LogicalError("domain separator missing".into())
-                            })?;
+                    let domain_separator =
+                        myself.get_indexer_data(Some(tx)).await?.channels_dst.ok_or_else(|| {
+                            crate::errors::DbSqlError::LogicalError("domain separator missing".into())
+                        })?;
 
-                        Ok((entry, domain_separator))
-                    })
+                    Ok((entry, domain_separator))
                 })
-                .await?;
+            })
+            .await?;
 
         // Verify the ticket first
         let aggregated_ticket = aggregated_ticket
             .verify(&channel_entry.source, &domain_separator)
             .map_err(|e| {
-                DbError::LogicalError(format!(
+                DbSqlError::LogicalError(format!(
                     "failed to verify received aggregated ticket in {channel_id}: {e}"
                 ))
             })?;
 
         // Aggregated tickets always have 100% winning probability
         if aggregated_ticket.win_prob() != 1.0f64 {
-            return Err(DbError::LogicalError(
+            return Err(DbSqlError::LogicalError(
                 "Aggregated tickets must have 100% win probability".into(),
             ));
         }
@@ -1078,14 +1080,14 @@ impl HoprDbTicketOperations for HoprDb {
                         )
                         .all(tx.as_ref())
                         .await
-                        .map_err(DbError::BackendError)
+                        .map_err(DbSqlError::BackendError)
                 })
             })
             .await?;
 
         if acknowledged_tickets.is_empty() {
             debug!("Received unexpected aggregated ticket in channel {channel_id}");
-            return Err(DbError::LogicalError(format!(
+            return Err(DbSqlError::LogicalError(format!(
                 "failed insert aggregated ticket, because no tickets seem to be aggregated for '{channel_id}'",
             )));
         }
@@ -1098,7 +1100,7 @@ impl HoprDbTicketOperations for HoprDb {
         // Value of received ticket can be higher (profit for us) but not lower
         if aggregated_ticket.verified_ticket().amount.lt(&stored_value) {
             error!("Aggregated ticket value in '{channel_id}' is lower than sum of stored tickets",);
-            return Err(DbError::LogicalError(
+            return Err(DbSqlError::LogicalError(
                 "Value of received aggregated ticket is too low".into(),
             ));
         }
@@ -1130,7 +1132,7 @@ impl HoprDbTicketOperations for HoprDb {
                         .await?;
 
                     if deleted.rows_affected as usize != acknowledged_tickets.len() {
-                        return Err(DbError::LogicalError(format!(
+                        return Err(DbSqlError::LogicalError(format!(
                             "The deleted aggregated ticket count ({}) does not correspond to the expected count: {}",
                             deleted.rows_affected,
                             acknowledged_tickets.len(),
@@ -1141,7 +1143,7 @@ impl HoprDbTicketOperations for HoprDb {
                         .exec(tx.as_ref())
                         .await?;
 
-                    Ok::<(), DbError>(())
+                    Ok::<(), DbSqlError>(())
                 })
             })
             .await?;
@@ -1157,7 +1159,7 @@ impl HoprDbTicketOperations for HoprDb {
         me: &ChainKeypair,
     ) -> Result<VerifiedTicket> {
         if me.public().to_address() != self.me_onchain {
-            return Err(DbError::LogicalError(
+            return Err(DbSqlError::LogicalError(
                 "chain key for ticket aggregation does not match the DB public address".into(),
             ));
         }
@@ -1166,10 +1168,10 @@ impl HoprDbTicketOperations for HoprDb {
             .get_indexer_data(None)
             .await?
             .domain_separator(DomainSeparator::Channel)
-            .ok_or_else(|| DbError::LogicalError("domain separator missing".into()))?;
+            .ok_or_else(|| DbSqlError::LogicalError("domain separator missing".into()))?;
 
         if acked_tickets.is_empty() {
-            return Err(DbError::LogicalError(
+            return Err(DbSqlError::LogicalError(
                 "at least one ticket required for aggregation".to_owned(),
             ));
         }
@@ -1202,7 +1204,7 @@ impl HoprDbTicketOperations for HoprDb {
                     let address = myself
                         .resolve_chain_key(&destination)
                         .await?
-                        .ok_or(DbError::LogicalError(format!(
+                        .ok_or(DbSqlError::LogicalError(format!(
                             "peer '{}' has no chain key record",
                             destination.to_peerid_str()
                         )))?;
@@ -1210,12 +1212,14 @@ impl HoprDbTicketOperations for HoprDb {
                     let entry = myself
                         .get_channel_by_parties(Some(tx), &myself.me_onchain, &address)
                         .await?
-                        .ok_or_else(|| DbError::ChannelNotFound(generate_channel_id(&myself.me_onchain, &address)))?;
+                        .ok_or_else(|| {
+                            DbSqlError::ChannelNotFound(generate_channel_id(&myself.me_onchain, &address))
+                        })?;
 
                     if entry.status == ChannelStatus::Closed {
-                        return Err(DbError::LogicalError(format!("{entry} is closed")));
+                        return Err(DbSqlError::LogicalError(format!("{entry} is closed")));
                     } else if entry.direction(&myself.me_onchain) != Some(ChannelDirection::Outgoing) {
-                        return Err(DbError::LogicalError(format!("{entry} is not outgoing")));
+                        return Err(DbSqlError::LogicalError(format!("{entry} is not outgoing")));
                     }
 
                     Ok((entry, address))
@@ -1235,32 +1239,34 @@ impl HoprDbTicketOperations for HoprDb {
             .map(|t| t.into_redeemable(&self.me_onchain, &domain_separator))
             .collect::<hopr_internal_types::errors::Result<Vec<_>>>()
             .map_err(|e| {
-                DbError::LogicalError(format!("trying to aggregate an invalid or a non-winning ticket: {e}"))
+                DbSqlError::LogicalError(format!("trying to aggregate an invalid or a non-winning ticket: {e}"))
             })?;
 
         // Perform additional consistency check on the verified tickets
         for (i, acked_ticket) in verified_tickets.iter().enumerate() {
             if channel_id != acked_ticket.verified_ticket().channel_id {
-                return Err(DbError::LogicalError(format!(
+                return Err(DbSqlError::LogicalError(format!(
                     "ticket for aggregation has an invalid channel id {}",
                     acked_ticket.verified_ticket().channel_id
                 )));
             }
 
             if acked_ticket.verified_ticket().channel_epoch != channel_epoch {
-                return Err(DbError::LogicalError("channel epochs do not match".into()));
+                return Err(DbSqlError::LogicalError("channel epochs do not match".into()));
             }
 
             if i + 1 < verified_tickets.len()
                 && acked_ticket.verified_ticket().index + acked_ticket.verified_ticket().index_offset as u64
                     > verified_tickets[i + 1].verified_ticket().index
             {
-                return Err(DbError::LogicalError("tickets with overlapping index intervals".into()));
+                return Err(DbSqlError::LogicalError(
+                    "tickets with overlapping index intervals".into(),
+                ));
             }
 
             final_value = final_value.add(&acked_ticket.verified_ticket().amount);
             if final_value.gt(&channel_balance) {
-                return Err(DbError::LogicalError(format!("ticket amount to aggregate {final_value} is greater than the balance {channel_balance} of channel {channel_id}")));
+                return Err(DbSqlError::LogicalError(format!("ticket amount to aggregate {final_value} is greater than the balance {channel_balance} of channel {channel_id}")));
             }
         }
 
@@ -1312,7 +1318,7 @@ impl HoprDb {
                         model.id = Set(ticket.id);
                     }
 
-                    Ok::<_, DbError>(model.save(tx.as_ref()).await?)
+                    Ok::<_, DbSqlError>(model.save(tx.as_ref()).await?)
                 })
             })
             .await?;
@@ -1336,7 +1342,7 @@ mod tests {
     use crate::accounts::HoprDbAccountOperations;
     use crate::channels::HoprDbChannelOperations;
     use crate::db::HoprDb;
-    use crate::errors::DbError;
+    use crate::errors::DbSqlError;
     use crate::info::{DomainSeparator, HoprDbInfoOperations};
     use crate::prelude::ChannelTicketStatistics;
     use crate::tickets::{AggregationPrerequisites, HoprDbTicketOperations, TicketSelector};
@@ -1424,7 +1430,7 @@ mod tests {
                     for t in tickets_clone {
                         db_clone.upsert_ticket(Some(tx), t).await?;
                     }
-                    Ok::<(), DbError>(())
+                    Ok::<(), DbSqlError>(())
                 })
             })
             .await
@@ -1455,7 +1461,7 @@ mod tests {
         );
 
         let db_ticket = db
-            .get_tickets(None, (&ack_ticket).into())
+            .get_tickets((&ack_ticket).into())
             .await
             .expect("should get ticket")
             .first()
@@ -1472,7 +1478,7 @@ mod tests {
 
         let (_, tickets) = init_db_with_tickets(&db, COUNT_TICKETS).await;
 
-        let stats = db.get_ticket_statistics(None, None).await.unwrap();
+        let stats = db.get_ticket_statistics(None).await.unwrap();
         assert_eq!(
             BalanceType::HOPR.balance(TICKET_VALUE * COUNT_TICKETS),
             stats.unredeemed_value,
@@ -1486,7 +1492,7 @@ mod tests {
 
         assert_eq!(
             stats,
-            db.get_ticket_statistics(None, Some(*CHANNEL_ID)).await.unwrap(),
+            db.get_ticket_statistics(Some(*CHANNEL_ID)).await.unwrap(),
             "per channel stats must be same"
         );
 
@@ -1501,13 +1507,13 @@ mod tests {
                         let r = db_clone.mark_tickets_redeemed((&tickets[i]).into()).await?;
                         assert_eq!(1, r, "must redeem only a single ticket");
                     }
-                    Ok::<(), DbError>(())
+                    Ok::<(), DbSqlError>(())
                 })
             })
             .await
             .expect("tx must not fail");
 
-        let stats = db.get_ticket_statistics(None, None).await.unwrap();
+        let stats = db.get_ticket_statistics(None).await.unwrap();
         assert_eq!(
             BalanceType::HOPR.balance(TICKET_VALUE * (COUNT_TICKETS - TO_REDEEM)),
             stats.unredeemed_value,
@@ -1521,7 +1527,7 @@ mod tests {
 
         assert_eq!(
             stats,
-            db.get_ticket_statistics(None, Some(*CHANNEL_ID)).await.unwrap(),
+            db.get_ticket_statistics(Some(*CHANNEL_ID)).await.unwrap(),
             "per channel stats must be same"
         );
     }
@@ -1560,7 +1566,7 @@ mod tests {
 
         let (channel, _) = init_db_with_tickets(&db, COUNT_TICKETS).await;
 
-        let stats = db.get_ticket_statistics(None, None).await.unwrap();
+        let stats = db.get_ticket_statistics(None).await.unwrap();
         assert_eq!(
             BalanceType::HOPR.balance(TICKET_VALUE * COUNT_TICKETS),
             stats.unredeemed_value,
@@ -1574,7 +1580,7 @@ mod tests {
 
         assert_eq!(
             stats,
-            db.get_ticket_statistics(None, Some(*CHANNEL_ID)).await.unwrap(),
+            db.get_ticket_statistics(Some(*CHANNEL_ID)).await.unwrap(),
             "per channel stats must be same"
         );
 
@@ -1582,7 +1588,7 @@ mod tests {
             .await
             .expect("should mark as neglected");
 
-        let stats = db.get_ticket_statistics(None, None).await.unwrap();
+        let stats = db.get_ticket_statistics(None).await.unwrap();
         assert_eq!(
             BalanceType::HOPR.zero(),
             stats.unredeemed_value,
@@ -1596,7 +1602,7 @@ mod tests {
 
         assert_eq!(
             stats,
-            db.get_ticket_statistics(None, Some(*CHANNEL_ID)).await.unwrap(),
+            db.get_ticket_statistics(Some(*CHANNEL_ID)).await.unwrap(),
             "per channel stats must be same"
         );
     }
@@ -1608,21 +1614,21 @@ mod tests {
         let (_, mut ticket) = init_db_with_tickets(&db, 1).await;
         let ticket = ticket.pop().unwrap().ticket;
 
-        let stats = db.get_ticket_statistics(None, None).await.unwrap();
+        let stats = db.get_ticket_statistics(None).await.unwrap();
         assert_eq!(BalanceType::HOPR.zero(), stats.rejected_value);
         assert_eq!(
             stats,
-            db.get_ticket_statistics(None, Some(*CHANNEL_ID)).await.unwrap(),
+            db.get_ticket_statistics(Some(*CHANNEL_ID)).await.unwrap(),
             "per channel stats must be same"
         );
 
         db.mark_ticket_rejected(ticket.verified_ticket()).await.unwrap();
 
-        let stats = db.get_ticket_statistics(None, None).await.unwrap();
+        let stats = db.get_ticket_statistics(None).await.unwrap();
         assert_eq!(ticket.verified_ticket().amount, stats.rejected_value);
         assert_eq!(
             stats,
-            db.get_ticket_statistics(None, Some(*CHANNEL_ID)).await.unwrap(),
+            db.get_ticket_statistics(Some(*CHANNEL_ID)).await.unwrap(),
             "per channel stats must be same"
         );
     }
@@ -1719,7 +1725,7 @@ mod tests {
     async fn test_ticket_stats_must_fail_for_non_existing_channel() {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
 
-        db.get_ticket_statistics(None, Some(*CHANNEL_ID))
+        db.get_ticket_statistics(Some(*CHANNEL_ID))
             .await
             .expect_err("must fail for non-existing channel");
     }
@@ -1739,7 +1745,7 @@ mod tests {
 
         db.upsert_channel(None, channel).await.unwrap();
 
-        let stats = db.get_ticket_statistics(None, Some(*CHANNEL_ID)).await.unwrap();
+        let stats = db.get_ticket_statistics(Some(*CHANNEL_ID)).await.unwrap();
 
         assert_eq!(
             ChannelTicketStatistics::default(),
@@ -1749,7 +1755,7 @@ mod tests {
 
         assert_eq!(
             stats,
-            db.get_ticket_statistics(None, None).await.unwrap(),
+            db.get_ticket_statistics(None).await.unwrap(),
             "per-channel stats must be the same as global stats"
         )
     }
@@ -1789,24 +1795,18 @@ mod tests {
         db.upsert_ticket(None, t2).await.unwrap();
 
         let stats_1 = db
-            .get_ticket_statistics(
-                None,
-                Some(generate_channel_id(
-                    &BOB.public().to_address(),
-                    &ALICE.public().to_address(),
-                )),
-            )
+            .get_ticket_statistics(Some(generate_channel_id(
+                &BOB.public().to_address(),
+                &ALICE.public().to_address(),
+            )))
             .await
             .unwrap();
 
         let stats_2 = db
-            .get_ticket_statistics(
-                None,
-                Some(generate_channel_id(
-                    &ALICE.public().to_address(),
-                    &BOB.public().to_address(),
-                )),
-            )
+            .get_ticket_statistics(Some(generate_channel_id(
+                &ALICE.public().to_address(),
+                &BOB.public().to_address(),
+            )))
             .await
             .unwrap();
 
@@ -1821,24 +1821,18 @@ mod tests {
         db.mark_tickets_neglected(channel_1.into()).await.unwrap();
 
         let stats_1 = db
-            .get_ticket_statistics(
-                None,
-                Some(generate_channel_id(
-                    &BOB.public().to_address(),
-                    &ALICE.public().to_address(),
-                )),
-            )
+            .get_ticket_statistics(Some(generate_channel_id(
+                &BOB.public().to_address(),
+                &ALICE.public().to_address(),
+            )))
             .await
             .unwrap();
 
         let stats_2 = db
-            .get_ticket_statistics(
-                None,
-                Some(generate_channel_id(
-                    &ALICE.public().to_address(),
-                    &BOB.public().to_address(),
-                )),
-            )
+            .get_ticket_statistics(Some(generate_channel_id(
+                &ALICE.public().to_address(),
+                &BOB.public().to_address(),
+            )))
             .await
             .unwrap();
 

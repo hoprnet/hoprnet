@@ -91,7 +91,7 @@ where
                             async move {
                             if let Ok(key) = OffchainPublicKey::try_from(peer) {
                                 match db.resolve_chain_key(&key).await.and_then(|maybe_address| {
-                                    maybe_address.ok_or(hopr_db_sql::errors::DbError::LogicalError(format!(
+                                    maybe_address.ok_or(hopr_db_sql::errors::DbSqlError::LogicalError(format!(
                                         "No address available for peer '{peer}'",
                                     )))
                                 }) {

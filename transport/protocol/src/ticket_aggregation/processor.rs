@@ -14,7 +14,7 @@ use std::{pin::Pin, task::Poll};
 use tracing::{error, warn};
 
 use hopr_crypto_types::prelude::*;
-use hopr_db_sql::errors::DbError;
+use hopr_db_sql::errors::DbSqlError;
 use hopr_db_sql::prelude::HoprDbInfoOperations;
 pub use hopr_db_sql::tickets::AggregationPrerequisites;
 use hopr_db_sql::tickets::HoprDbTicketOperations;
@@ -305,7 +305,7 @@ where
                                 Ok(ticket) => {
                                     Some(TicketAggregationProcessed::Reply(destination, Ok(ticket.leak()), response))
                                 }
-                                Err(hopr_db_sql::errors::DbError::TicketAggregationError(e)) => {
+                                Err(hopr_db_sql::errors::DbSqlError::TicketAggregationError(e)) => {
                                     // forward error to counterparty
                                     Some(TicketAggregationProcessed::Reply(destination, Err(e), response))
                                 }
@@ -355,7 +355,7 @@ where
                                 let addr = chain_key.public().to_address();
                                 match db.get_indexer_data(None)
                                     .await
-                                    .and_then(|data| data.channels_dst.ok_or(DbError::LogicalError("missing channels domain separator".into()))) {
+                                    .and_then(|data| data.channels_dst.ok_or(DbSqlError::LogicalError("missing channels domain separator".into()))) {
                                     Ok(dst) => {
                                         let tickets = tickets.into_iter()
                                             .map(|t| hopr_internal_types::legacy::AcknowledgedTicket::new(t, &addr, &dst))
@@ -519,7 +519,7 @@ mod tests {
                             .await?
                     }
 
-                    Ok::<(), hopr_db_sql::errors::DbError>(())
+                    Ok::<(), hopr_db_sql::errors::DbSqlError>(())
                 })
             })
             .await
@@ -612,7 +612,7 @@ mod tests {
             _ => panic!("unexpected action happened while awaiting agg response at Bob"),
         }
 
-        let stored_acked_tickets = db_bob.get_tickets(None, (&channel_alice_bob).into()).await.unwrap();
+        let stored_acked_tickets = db_bob.get_tickets((&channel_alice_bob).into()).await.unwrap();
 
         assert_eq!(
             stored_acked_tickets.len(),

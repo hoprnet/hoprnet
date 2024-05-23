@@ -24,7 +24,7 @@ use futures::future::BoxFuture;
 use sea_orm::TransactionTrait;
 
 use crate::db::HoprDb;
-use crate::errors::{DbError, Result};
+use crate::errors::{DbSqlError, Result};
 use crate::info::HoprDbInfoOperations;
 use crate::peers::HoprDbPeersOperations;
 use crate::protocol::HoprDbProtocolOperations;
@@ -60,7 +60,7 @@ impl OpenTransaction {
     where
         F: for<'c> FnOnce(&'c OpenTransaction) -> BoxFuture<'c, std::result::Result<T, E>> + Send,
         T: Send,
-        E: std::error::Error + From<DbError>,
+        E: std::error::Error + From<DbSqlError>,
     {
         let res = callback(&self).await;
 

@@ -1,4 +1,4 @@
-use hopr_db_sql::errors::DbError;
+use hopr_db_sql::errors::DbSqlError;
 use hopr_primitive_types::errors::GeneralError;
 use thiserror::Error;
 
@@ -24,7 +24,7 @@ pub enum PathError {
     PathNotFound(usize, String, String),
 
     #[error(transparent)]
-    DatabaseError(#[from] DbError),
+    DatabaseError(#[from] DbSqlError),
 
     #[error(transparent)]
     OtherError(#[from] GeneralError),

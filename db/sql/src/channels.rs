@@ -8,7 +8,7 @@ use hopr_primitive_types::prelude::*;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 
 use crate::db::HoprDb;
-use crate::errors::{DbError, Result};
+use crate::errors::{DbSqlError, Result};
 use crate::{HoprDbGeneralModelOperations, OptTx};
 
 /// Defines DB API for accessing information about HOPR payment channels.
@@ -58,7 +58,7 @@ impl HoprDbChannelOperations for HoprDb {
             .await?
             .perform(|tx| {
                 Box::pin(async move {
-                    Ok::<_, DbError>(
+                    Ok::<_, DbSqlError>(
                         if let Some(model) = Channel::find()
                             .filter(channel::Column::ChannelId.eq(id_hex))
                             .one(tx.as_ref())
@@ -86,7 +86,7 @@ impl HoprDbChannelOperations for HoprDb {
             .await?
             .perform(|tx| {
                 Box::pin(async move {
-                    Ok::<_, DbError>(
+                    Ok::<_, DbSqlError>(
                         if let Some(model) = Channel::find()
                             .filter(channel::Column::Source.eq(src_hex))
                             .filter(channel::Column::Destination.eq(dst_hex))
@@ -122,7 +122,7 @@ impl HoprDbChannelOperations for HoprDb {
                         .all(tx.as_ref())
                         .await?
                         .into_iter()
-                        .map(|x| ChannelEntry::try_from(x).map_err(DbError::from))
+                        .map(|x| ChannelEntry::try_from(x).map_err(DbSqlError::from))
                         .collect::<Result<Vec<_>>>()
                 })
             })
@@ -147,7 +147,7 @@ impl HoprDbChannelOperations for HoprDb {
                     Channel::find()
                         .stream(tx.as_ref())
                         .await?
-                        .map_err(DbError::from)
+                        .map_err(DbSqlError::from)
                         .try_filter_map(|m| async move { Ok(Some(ChannelEntry::try_from(m)?)) })
                         .try_collect()
                         .await
@@ -170,7 +170,7 @@ impl HoprDbChannelOperations for HoprDb {
                         model.id = Set(channel.id);
                     }
 
-                    Ok::<_, DbError>(model.save(tx.as_ref()).await?)
+                    Ok::<_, DbSqlError>(model.save(tx.as_ref()).await?)
                 })
             })
             .await?;
