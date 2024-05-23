@@ -9,6 +9,7 @@ use hopr_internal_types::tickets::AcknowledgedTicket;
 use hopr_primitive_types::prelude::ToHex;
 
 use crate::cache::HoprDbCaches;
+use crate::executor::spawn;
 use crate::prelude::DbError;
 use crate::{errors::Result, tickets::TicketSelector, OpenTransaction};
 
@@ -46,7 +47,7 @@ impl TicketManager {
 
         // NOTE: This spawned task does not need to be explicitly canceled, since it will
         // be automatically dropped when the event sender object is dropped.
-        async_std::task::spawn(async move {
+        spawn(async move {
             // TODO: it would be beneficial to check the size hint and extract as much, as possible
             // in this step to avoid relocking for each individual ticket.
             while let Some(acknowledged_ticket) = rx.next().await {

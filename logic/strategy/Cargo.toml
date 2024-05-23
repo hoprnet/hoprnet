@@ -1,6 +1,6 @@
 [package]
-name = "core-strategy"
-version = "0.10.0"
+name = "hopr-strategy"
+version = "0.11.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Contains implementations of different HOPR strategies"
 edition = "2021"
@@ -14,7 +14,7 @@ crate-type = ["rlib"]
 [dependencies]
 async-lock = { workspace = true }
 async-trait = { workspace = true }
-async-std = { workspace = true, features = ["unstable"]}
+async-std = { workspace = true, optional = true }
 futures = { workspace = true }
 rand = "0.8.5"
 serde = { workspace = true, features = ["derive"] }
@@ -24,6 +24,7 @@ semver = { workspace = true }
 smart-default = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }
+tokio = { workspace = true, optional = true }
 validator = { workspace = true }
 
 hopr-crypto-random = { workspace = true }
@@ -51,5 +52,7 @@ futures = { workspace = true }
 
 
 [features]
-default = ["prometheus"]
+default = []
+runtime-async-std = ["async-std", "core-protocol/runtime-async-std"]
+runtime-tokio = ["tokio", "core-protocol/runtime-tokio"]
 prometheus = [ "dep:hopr-metrics", "core-network/prometheus", "core-protocol/prometheus", "chain-actions/prometheus" ]

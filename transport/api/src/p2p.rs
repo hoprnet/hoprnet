@@ -10,6 +10,12 @@ use std::{
 };
 use tracing::{debug, error, info, trace, warn};
 
+#[cfg(feature = "runtime-async-std")]
+use async_std::task::spawn;
+
+#[cfg(feature = "runtime-tokio")]
+use tokio::task::spawn;
+
 use core_network::network::{Network, NetworkTriggeredEvent, PeerOrigin};
 pub use core_p2p::api;
 use core_p2p::{
@@ -629,13 +635,13 @@ impl SwarmEventLoop {
                             let _ = swarm.disconnect_peer_id(peer_id);
                         } else {
                             let network = network.clone();
-                            async_std::task::block_on(async move {
+                            let _ = spawn(async move {
                                 if !network.has(&peer_id).await {
                                     if let Err(e) = network.add(&peer_id, PeerOrigin::IncomingConnection, vec![]).await {
                                         error!("transport - p2p - failed to update the record for '{peer_id}': {e}")
                                     }
                                 }
-                            });
+                            }).await;
                         }
                     },
                     SwarmEvent::ConnectionClosed {

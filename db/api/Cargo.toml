@@ -8,11 +8,25 @@ repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"
 
 [features]
-default = []
+default = ["traits"]
+traits = []
+impls = []
+runtime-async-std = [
+    "async-std",
+    "sea-orm/runtime-async-std",
+    "sea-query-binder/runtime-async-std-rustls",
+    "sqlx/runtime-async-std"
+]
+runtime-tokio = [
+    "tokio",
+    "sea-orm/runtime-tokio",
+    "sea-query-binder/runtime-tokio-rustls",
+    "sqlx/runtime-tokio"
+]
 prometheus = ["dep:lazy_static", "dep:hopr-metrics"]
 
 [dependencies]
-async-std = { workspace = true }
+async-std = { workspace = true, optional = true }
 async-lock = { workspace = true }
 async-stream = { workspace = true }
 async-trait = { workspace = true }
@@ -26,11 +40,12 @@ multiaddr = { workspace = true }
 num_enum = { workspace = true }
 sea-orm = { workspace = true }
 sea-query = { version = "0", default-features = false, features = ["with-chrono", "derive", "backend-sqlite", "attr"]}
-sea-query-binder = { version = "0",  default-features = false, features = ["with-chrono", "sqlx-sqlite", "runtime-async-std-rustls"]}
+sea-query-binder = { version = "0",  default-features = false, features = ["with-chrono", "sqlx-sqlite"]}
 smart-default = { workspace = true }
 sqlx = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }
+tokio = { workspace = true, optional = true }
 tracing = { workspace = true }
 
 hopr-crypto-types = { workspace = true}
@@ -42,7 +57,7 @@ hopr-internal-types = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 
 [dev-dependencies]
-async-std = { workspace = true, features = ["attributes"] }
+async-std = { workspace = true }
 env_logger = { workspace = true }
 rand = "0.8.5"
 lazy_static = { workspace = true }

@@ -10,12 +10,14 @@ license = "GPL-3.0-only"
 crate-type = ["rlib"]
 
 [features]
-default = ["prometheus"]
+default = []
+runtime-async-std = ["async-std", "chain-indexer/runtime-async-std"]
+runtime-tokio = ["tokio", "chain-indexer/runtime-tokio"]
 prometheus = ["chain-rpc/prometheus", "chain-actions/prometheus", "chain-indexer/prometheus"]
 
 [dependencies]
 async-channel = { workspace = true }
-async-std = { workspace = true }
+async-std = { workspace = true, optional = true }
 async-trait = { workspace = true }
 async-lock = { workspace = true }
 futures = { workspace = true }
@@ -26,6 +28,7 @@ serde_with = { workspace = true }
 smart-default = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }
+tokio = { workspace = true, optional = true }
 tracing = { workspace = true }
 validator = { workspace = true }
 
@@ -39,3 +42,5 @@ hopr-internal-types = { workspace = true }
 hopr-primitive-types = { workspace = true }
 hopr-db-api = { workspace = true }
 
+[dev-dependencies]
+async-std = { workspace = true}

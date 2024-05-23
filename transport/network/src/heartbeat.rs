@@ -1,4 +1,3 @@
-use async_std::task::sleep;
 use async_trait::async_trait;
 use futures::{
     future::{
@@ -128,6 +127,9 @@ where
     }
 }
 
+pub type AsyncSleepFn =
+    Box<dyn Fn(std::time::Duration) -> std::pin::Pin<Box<dyn futures::Future<Output = ()> + Send>> + Send>;
+
 /// Heartbeat mechanism providing the regular trigger and processing for the heartbeat protocol.
 ///
 /// This object provides a single public method that can be polled. Once triggered, it will never
@@ -137,6 +139,7 @@ pub struct Heartbeat<T: Pinging, API: HeartbeatExternalApi> {
     config: HeartbeatConfig,
     pinger: T,
     external_api: API,
+    sleep_fn: AsyncSleepFn,
 }
 
 impl<T: Pinging, API: HeartbeatExternalApi> std::fmt::Debug for Heartbeat<T, API> {
@@ -146,11 +149,12 @@ impl<T: Pinging, API: HeartbeatExternalApi> std::fmt::Debug for Heartbeat<T, API
 }
 
 impl<T: Pinging, API: HeartbeatExternalApi> Heartbeat<T, API> {
-    pub fn new(config: HeartbeatConfig, pinger: T, external_api: API) -> Self {
+    pub fn new(config: HeartbeatConfig, pinger: T, external_api: API, sleep_fn: AsyncSleepFn) -> Self {
         Self {
             config,
             pinger,
             external_api,
+            sleep_fn,
         }
     }
 
@@ -175,7 +179,7 @@ impl<T: Pinging, API: HeartbeatExternalApi> Heartbeat<T, API> {
             )
         });
 
-        let timeout = sleep(this_round_planned_duration).fuse();
+        let timeout = (self.sleep_fn)(this_round_planned_duration).fuse();
         let ping = self.pinger.ping(peers).fuse();
 
         pin_mut!(timeout, ping);
@@ -193,7 +197,7 @@ impl<T: Pinging, API: HeartbeatExternalApi> Heartbeat<T, API> {
                     "Heartbeat round finished for all peers"
                 );
 
-                sleep(time_to_wait_for_next_round).await
+                (self.sleep_fn)(time_to_wait_for_next_round).await
             }
         };
 
@@ -218,6 +222,7 @@ impl<T: Pinging, API: HeartbeatExternalApi> Heartbeat<T, API> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use async_std::task::sleep;
 
     fn simple_heartbeat_config() -> HeartbeatConfig {
         HeartbeatConfig {
@@ -250,7 +255,12 @@ mod tests {
             .times(expected_loop_count as usize..)
             .return_const(vec![PeerId::random(), PeerId::random()]);
 
-        let mut heartbeat = Heartbeat::new(config, DelayingPinger { delay: ping_delay }, mock);
+        let mut heartbeat = Heartbeat::new(
+            config,
+            DelayingPinger { delay: ping_delay },
+            mock,
+            Box::new(|dur| Box::pin(sleep(dur))),
+        );
 
         futures_lite::future::race(heartbeat.heartbeat_loop(), sleep(config.interval * expected_loop_count)).await;
     }
@@ -270,7 +280,12 @@ mod tests {
             .times(expected_loop_count..)
             .return_const(vec![PeerId::random(), PeerId::random()]);
 
-        let mut heartbeat = Heartbeat::new(config, DelayingPinger { delay: ping_delay }, mock);
+        let mut heartbeat = Heartbeat::new(
+            config,
+            DelayingPinger { delay: ping_delay },
+            mock,
+            Box::new(|dur| Box::pin(sleep(dur))),
+        );
 
         let tolerance = std::time::Duration::from_millis(2);
         futures_lite::future::race(

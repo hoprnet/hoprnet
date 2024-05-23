@@ -9,14 +9,33 @@ repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"
 build = "build.rs"
 
+[features]
+default = ["runtime-tokio", "prometheus"]
+prometheus = [
+    "dep:hopr-metrics",
+    "dep:lazy_static",
+    "hopr-lib/prometheus",
+    "hoprd-api/prometheus"
+]
+runtime-async-std = [
+    "dep:async-std",
+    "hopr-lib/runtime-async-std",
+    "opentelemetry_sdk?/rt-async-std"
+]
+runtime-tokio = [
+    "dep:tokio",
+    "hopr-lib/runtime-tokio",
+    "opentelemetry_sdk?/rt-tokio"
+]
+telemetry = ["dep:opentelemetry", "dep:opentelemetry-otlp", "dep:opentelemetry_sdk", "dep:tracing-opentelemetry"]
+
 [dependencies]
 async-broadcast = { workspace = true }
 async-lock = { workspace = true }
 async-signal = { workspace = true }
-async-std = { workspace = true, features = ["attributes", "tokio1"] }
+async-std = { workspace = true, features = ["attributes", "tokio1"], optional = true }
 clap = { workspace = true }
 chrono = { workspace = true }
-env_logger = { workspace = true, optional = true }
 futures = { workspace = true }
 hex = { workspace = true }
 home = "0.5"
@@ -30,15 +49,15 @@ serde_json = "1.0"
 signal-hook = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }
-tokio = "1.36.0"
+tokio = { workspace = true, optional = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 validator = { workspace = true }
 
-opentelemetry = { version = "0.22" }
-opentelemetry-otlp = { version = "0.15", default-features = false, features = ["trace", "reqwest-client", "tls-roots", "http-proto", "grpc-tonic"] }
-opentelemetry_sdk = { version = "0.22", features = ["rt-async-std"] }
-tracing-opentelemetry = "0.23"
+opentelemetry = { version = "0.22", optional = true }
+opentelemetry-otlp = { version = "0.15", default-features = false, features = ["trace", "reqwest-client", "tls-roots", "http-proto", "grpc-tonic"], optional = true }
+opentelemetry_sdk = { version = "0.22", optional = true }
+tracing-opentelemetry = { version = "0.23", optional = true }
 
 hopr-lib = { workspace = true }
 hoprd-api = { workspace = true }
@@ -54,12 +73,4 @@ tempfile = { workspace = true }
 vergen-gitcl = { version = "1.0.0-beta.2", features = ["build"] }
 anyhow = "1"
 
-[features]
-default = ["prometheus"]
-prometheus = [
-    "dep:hopr-metrics",
-    "dep:lazy_static",
-    "hopr-lib/prometheus",
-    "hoprd-api/prometheus"
-]
-simple_log = ["dep:env_logger"]
+

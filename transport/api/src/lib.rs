@@ -47,13 +47,22 @@ pub use {
     timer::execute_on_tick,
 };
 
+use async_lock::RwLock;
+use futures::{channel::mpsc::UnboundedSender, FutureExt, SinkExt};
 use std::{
     collections::HashMap,
     sync::{Arc, OnceLock},
 };
 
-use async_lock::RwLock;
-use async_std::task::{spawn, JoinHandle};
+#[cfg(feature = "runtime-async-std")]
+use async_std::task::{sleep, spawn, JoinHandle};
+
+#[cfg(feature = "runtime-tokio")]
+use tokio::{
+    task::{spawn, JoinHandle},
+    time::sleep,
+};
+
 use hopr_db_api::{peers::HoprDbPeersOperations, tickets::HoprDbTicketOperations, HoprDbAllOperations};
 use tracing::{debug, error, info, warn};
 
@@ -66,8 +75,8 @@ use core_protocol::{
         AwaitingAggregator, TicketAggregationActions, TicketAggregationInteraction, TicketAggregatorTrait,
     },
 };
-use futures::{channel::mpsc::UnboundedSender, FutureExt, SinkExt};
 use hopr_internal_types::prelude::*;
+use hopr_platform::time::native::current_time;
 use hopr_primitive_types::primitives::Address;
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -81,8 +90,6 @@ lazy_static::lazy_static! {
         vec![0.0, 1.0, 2.0, 3.0, 4.0]
     ).unwrap();
 }
-
-use {async_std::task::sleep, hopr_platform::time::native::current_time};
 
 /// Build the [Network] object responsible for tracking and holding the
 /// observable state of the physical transport network, peers inside the network
@@ -353,6 +360,7 @@ where
             self.hb_cfg,
             hb_pinger,
             core_network::heartbeat::HeartbeatExternalInteractions::new(network.clone()),
+            Box::new(|dur| Box::pin(sleep(dur))),
         );
 
         let swarm_loop = SwarmEventLoop::new(

@@ -1,7 +1,6 @@
 use std::{pin::Pin, sync::Arc};
 
 use async_lock::RwLock;
-use async_std::task::{sleep, spawn};
 use futures::channel::mpsc::{channel, Receiver, Sender};
 use futures::future::{poll_fn, Either};
 use futures::{pin_mut, stream::Stream, StreamExt};
@@ -20,6 +19,7 @@ use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 
 use super::packet::{PacketConstructing, TransportPacket};
+use crate::executor::{sleep, spawn};
 use crate::msg::mixer::MixerConfig;
 
 #[cfg(all(feature = "prometheus", not(test)))]

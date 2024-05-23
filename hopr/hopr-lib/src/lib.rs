@@ -13,6 +13,9 @@
 //! For most of the practical use cases, the `hoprd` application should be a preferable
 //! choice.
 
+#[cfg(all(feature = "runtime-async-std", feature = "runtime-tokio"))]
+compile_error!("Only one of the runtime features can be specified for the build");
+
 /// Configuration related public types
 pub mod config;
 /// Various public constants.
@@ -25,7 +28,6 @@ pub use {
     chain_api::config::{
         Addresses as NetworkContractAddresses, EnvironmentType, Network as ChainNetwork, ProtocolsConfig,
     },
-    core_strategy::Strategy,
     core_transport::{
         config::{looks_like_domain, HostConfig, HostType},
         errors::{HoprTransportError, ProtocolError},
@@ -34,6 +36,7 @@ pub use {
     hopr_internal_types::prelude::*,
     hopr_primitive_types::prelude::*,
     hopr_primitive_types::rlp,
+    hopr_strategy::Strategy,
 };
 
 use std::{
@@ -44,10 +47,18 @@ use std::{
 };
 
 use async_lock::RwLock;
-use async_std::task::{spawn, JoinHandle};
 use futures::{
     channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender},
     pin_mut, Stream, StreamExt,
+};
+
+#[cfg(feature = "runtime-async-std")]
+use async_std::task::{sleep, spawn, JoinHandle};
+
+#[cfg(feature = "runtime-tokio")]
+use tokio::{
+    task::{spawn, JoinHandle},
+    time::sleep,
 };
 
 use chain_actions::{
@@ -63,12 +74,12 @@ use chain_api::{
 use chain_types::chain_events::ChainEventType;
 use chain_types::ContractAddresses;
 use core_path::channel_graph::ChannelGraph;
-use core_strategy::strategy::{MultiStrategy, SingularStrategy};
 use core_transport::libp2p::identity::PeerId;
 use core_transport::{build_network, execute_on_tick, PeerTransportEvent};
 use core_transport::{ChainKeypair, Hash, HoprTransport, OffchainKeypair};
 use core_transport::{IndexerToProcess, Network, PeerEligibility, PeerOrigin};
 use hopr_platform::file::native::{join, read_file, remove_dir_all, write};
+use hopr_strategy::strategy::{MultiStrategy, SingularStrategy};
 use tracing::{debug, error, info, warn};
 
 use crate::constants::{MIN_NATIVE_BALANCE, ONBOARDING_INFORMATION_INTERVAL, SUGGESTED_NATIVE_BALANCE};
@@ -238,7 +249,7 @@ pub async fn chain_event_refresh_process<Db, S, T>(
                     if let Some(own_channel_direction) = maybe_direction {
                         if let Some(change_set) = change {
                             for channel_change in change_set {
-                                let _ = core_strategy::strategy::SingularStrategy::on_own_channel_changed(
+                                let _ = hopr_strategy::strategy::SingularStrategy::on_own_channel_changed(
                                     &*multi_strategy,
                                     &channel,
                                     own_channel_direction,
@@ -248,7 +259,7 @@ pub async fn chain_event_refresh_process<Db, S, T>(
                             }
                         } else if channel.status == ChannelStatus::Open {
                             // Emit Opening event if the channel did not exist before in the graph
-                            let _ = core_strategy::strategy::SingularStrategy::on_own_channel_changed(
+                            let _ = hopr_strategy::strategy::SingularStrategy::on_own_channel_changed(
                                 &*multi_strategy,
                                 &channel,
                                 own_channel_direction,
@@ -432,7 +443,7 @@ impl Hopr {
             force_create: cfg.db.force_initialize,
             log_slow_queries: std::time::Duration::from_millis(150),
         };
-        let db = async_std::task::block_on(HoprDb::new(db_path.clone(), me_onchain.clone(), db_cfg));
+        let db = futures::executor::block_on(HoprDb::new(db_path.clone(), me_onchain.clone(), db_cfg));
 
         if let Some(provider) = &cfg.chain.provider {
             info!("Creating chain components using the custom provider: {provider}");
@@ -736,7 +747,7 @@ impl Hopr {
             while !self.is_allowed_to_access_network(&my_peer_id).await.unwrap_or(false) {
                 info!("Once you become eligible to join the HOPR network, you can continue your onboarding by using the following URL: https://hub.hoprnet.org/staking/onboarding?HOPRdNodeAddressForOnboarding={my_ethereum_address}, or by manually entering the node address of your node on https://hub.hoprnet.org/.");
 
-                async_std::task::sleep(ONBOARDING_INFORMATION_INTERVAL).await;
+                sleep(ONBOARDING_INFORMATION_INTERVAL).await;
 
                 info!("Node information: peerID => {my_peer_id}, Ethereum address => {my_ethereum_address}, version => {my_version}");
                 info!("Node Ethereum address: {my_ethereum_address} <- put this into staking hub");
@@ -866,7 +877,7 @@ impl Hopr {
             HoprLibProcesses::OnReceivedAcknowledgement,
             spawn(async move {
                 while let Some(ack) = on_ack_tkt_rx.next().await {
-                    let _ = core_strategy::strategy::SingularStrategy::on_acknowledged_winning_ticket(
+                    let _ = hopr_strategy::strategy::SingularStrategy::on_acknowledged_winning_ticket(
                         &*multi_strategy_ack_ticket,
                         &ack,
                     )

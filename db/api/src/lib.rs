@@ -32,6 +32,14 @@ use crate::registry::HoprDbRegistryOperations;
 use crate::resolver::HoprDbResolverOperations;
 use crate::tickets::HoprDbTicketOperations;
 
+pub(crate) mod executor {
+    #[cfg(any(feature = "runtime-async-std", test))]
+    pub(crate) use async_std::task::spawn;
+
+    #[cfg(all(feature = "runtime-tokio", not(test)))]
+    pub(crate) use tokio::task::spawn;
+}
+
 /// Primary key used in tables that contain only a single row.
 pub const SINGULAR_TABLE_FIXED_ID: i32 = 1;
 

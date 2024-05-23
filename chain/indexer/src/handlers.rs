@@ -788,7 +788,6 @@ pub mod tests {
     use std::time::SystemTime;
 
     use super::ContractEventHandlers;
-    use async_std;
     use bindings::{
         hopr_announcements::{AddressAnnouncementFilter, KeyBindingFilter, RevokeAnnouncementFilter},
         hopr_channels::{

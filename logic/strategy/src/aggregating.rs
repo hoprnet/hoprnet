@@ -24,7 +24,6 @@
 //!
 //! For details on default parameters see [AggregatingStrategyConfig].
 use async_trait::async_trait;
-pub use core_protocol::ticket_aggregation::processor::AwaitingAggregator;
 use core_protocol::ticket_aggregation::processor::TicketAggregatorTrait;
 use hopr_crypto_types::prelude::Hash;
 use hopr_db_api::channels::HoprDbChannelOperations;
@@ -32,7 +31,6 @@ use hopr_db_api::tickets::{AggregationPrerequisites, HoprDbTicketOperations};
 use hopr_internal_types::prelude::*;
 
 use async_lock::RwLock;
-use async_std::task::JoinHandle;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use std::collections::HashMap;
@@ -43,6 +41,12 @@ use std::{
 };
 use tracing::{debug, error, info, warn};
 use validator::Validate;
+
+#[cfg(feature = "runtime-async-std")]
+use async_std::task::{spawn, JoinHandle};
+
+#[cfg(feature = "runtime-tokio")]
+use tokio::task::{spawn, JoinHandle};
 
 use crate::{strategy::SingularStrategy, Strategy};
 
@@ -169,7 +173,7 @@ where
             let agg_tasks_clone = self.agg_tasks.clone();
             let aggregator_clone = self.ticket_aggregator.clone();
             let (can_remove_tx, can_remove_rx) = futures::channel::oneshot::channel();
-            let task = async_std::task::spawn(async move {
+            let task = spawn(async move {
                 match aggregator_clone.aggregate_tickets(&channel_id, criteria).await {
                     Ok(_) => {
                         debug!("tried ticket aggregation in channel {channel_id} without any issues");
@@ -205,7 +209,7 @@ where
             if done {
                 if let Some((_, task)) = self.agg_tasks.write().await.remove(&channel_id) {
                     // Task has been completed, remove it and await its join handle
-                    task.await;
+                    let _ = task.await;
                     false
                 } else {
                     // Should not happen, but means there's no more aggregation task for the channel
@@ -486,7 +490,7 @@ mod tests {
         });
 
         (
-            AwaitingAggregator::new(db_bob, key_bob.clone(), bob_aggregator, Duration::from_secs(5)),
+            AwaitingAggregator::new(db_bob, bob_aggregator, Duration::from_secs(5)),
             awaiter,
         )
     }

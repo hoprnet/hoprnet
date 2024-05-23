@@ -1,7 +1,3 @@
-use crate::errors::{
-    ProtocolError::{Retry, TransportError},
-    Result,
-};
 use futures::{
     channel::{
         mpsc::{channel, Receiver, Sender},
@@ -11,19 +7,24 @@ use futures::{
     pin_mut,
 };
 use futures_lite::stream::{Stream, StreamExt};
-use hopr_crypto_types::prelude::*;
-pub use hopr_db_api::tickets::AggregationPrerequisites;
-use hopr_db_api::tickets::HoprDbTicketOperations;
-use hopr_internal_types::prelude::*;
 use libp2p::request_response::{OutboundRequestId, ResponseChannel};
 use libp2p_identity::PeerId;
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use std::{pin::Pin, task::Poll};
 use tracing::{error, warn};
 
-use async_std::task::{sleep, spawn};
+use hopr_crypto_types::prelude::*;
 use hopr_db_api::errors::DbError;
 use hopr_db_api::prelude::HoprDbInfoOperations;
+pub use hopr_db_api::tickets::AggregationPrerequisites;
+use hopr_db_api::tickets::HoprDbTicketOperations;
+use hopr_internal_types::prelude::*;
+
+use crate::errors::{
+    ProtocolError::{Retry, TransportError},
+    Result,
+};
+use crate::executor::{sleep, spawn};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleCounter;

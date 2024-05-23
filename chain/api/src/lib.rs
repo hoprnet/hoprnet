@@ -8,7 +8,15 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
+#[cfg(feature = "runtime-async-std")]
 use async_std::task::{sleep, spawn, JoinHandle};
+
+#[cfg(feature = "runtime-tokio")]
+use tokio::{
+    task::{spawn, JoinHandle},
+    time::sleep,
+};
+
 use tracing::{debug, error, info, warn};
 
 use chain_actions::action_queue::{ActionQueue, ActionQueueConfig};
