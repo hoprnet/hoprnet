@@ -20,7 +20,7 @@ on:
           - rotsee
           - dufour
         required: true
-        description: 'Cluster of nodes'
+        description: 'Cluster of hoprd nodes'
       workload:
         type: choice
         options:
@@ -28,17 +28,17 @@ on:
           - endurance
           - full
         required: true
-        description: 'Type of workload'
+        description: 'Workload type'
+      duration:
+        type: string
+        default: 10m
+        required: true
+        description: 'Test duration'
       rate:
         type: number
         default: 1
         required: true
         description: 'Number of messages per seconds'
-      duration:
-        type: string
-        default: 10m
-        required: true
-        description: 'Duration of the test'
       concurrency:
         type: number
         default: 1
