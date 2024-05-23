@@ -152,6 +152,7 @@ jobs:
             echo "NETWORK=rotsee" >> $GITHUB_ENV
           elif [[ "${base_branch}" =~ ^"release" ]]; then
             hoprd_cluster=hoprd-core-dufour
+            echo "NETWORK=dufour" >> $GITHUB_ENV
           else
             echo "Skipping deployment"
             exit 0
