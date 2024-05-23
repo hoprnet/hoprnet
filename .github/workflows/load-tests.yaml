@@ -19,6 +19,7 @@ on:
         options:
           - rotsee
           - dufour
+          - team
         required: true
         description: 'Cluster of hoprd nodes'
       workload:
