@@ -118,8 +118,8 @@ jobs:
 
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4
-        with:
-          repository: hoprnet/hoprnet-ci
+        # with:
+        #   repository: hoprnet/hoprnet-ci
 
       - name: Set up Google Cloud Credentials
         id: auth
