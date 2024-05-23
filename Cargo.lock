@@ -1239,7 +1239,7 @@ dependencies = [
  "hex-literal",
  "hopr-crypto-random",
  "hopr-crypto-types",
- "hopr-db-api",
+ "hopr-db-sql",
  "hopr-internal-types",
  "hopr-metrics",
  "hopr-platform",
@@ -1269,7 +1269,7 @@ dependencies = [
  "core-path",
  "futures",
  "hopr-crypto-types",
- "hopr-db-api",
+ "hopr-db-sql",
  "hopr-internal-types",
  "hopr-primitive-types",
  "semver 1.0.21",
@@ -1300,8 +1300,8 @@ dependencies = [
  "hex-literal",
  "hopr-crypto-random",
  "hopr-crypto-types",
- "hopr-db-api",
  "hopr-db-entity",
+ "hopr-db-sql",
  "hopr-internal-types",
  "hopr-metrics",
  "hopr-primitive-types",
@@ -1641,8 +1641,8 @@ dependencies = [
  "hopr-crypto-random",
  "hopr-crypto-sphinx",
  "hopr-crypto-types",
- "hopr-db-api",
  "hopr-db-entity",
+ "hopr-db-sql",
  "hopr-metrics",
  "hopr-platform",
  "hopr-primitive-types",
@@ -1690,7 +1690,7 @@ dependencies = [
  "hex-literal",
  "hopr-crypto-random",
  "hopr-crypto-types",
- "hopr-db-api",
+ "hopr-db-sql",
  "hopr-internal-types",
  "hopr-metrics",
  "hopr-primitive-types",
@@ -1718,7 +1718,7 @@ dependencies = [
  "hopr-crypto-random",
  "hopr-crypto-sphinx",
  "hopr-crypto-types",
- "hopr-db-api",
+ "hopr-db-sql",
  "hopr-internal-types",
  "hopr-metrics",
  "hopr-platform",
@@ -1757,7 +1757,7 @@ dependencies = [
  "futures-concurrency",
  "hopr-crypto-packet",
  "hopr-crypto-types",
- "hopr-db-api",
+ "hopr-db-sql",
  "hopr-internal-types",
  "hopr-metrics",
  "hopr-platform",
@@ -3564,7 +3564,7 @@ dependencies = [
  "hopr-crypto-random",
  "hopr-crypto-sphinx",
  "hopr-crypto-types",
- "hopr-db-api",
+ "hopr-db-sql",
  "hopr-internal-types",
  "hopr-primitive-types",
  "lazy_static",
@@ -3638,8 +3638,36 @@ dependencies = [
 ]
 
 [[package]]
-name = "hopr-db-api"
+name = "hopr-db-entity"
 version = "0.2.0"
+dependencies = [
+ "async-std",
+ "chrono",
+ "clap",
+ "futures",
+ "hopr-crypto-types",
+ "hopr-db-migration",
+ "hopr-internal-types",
+ "hopr-primitive-types",
+ "sea-orm",
+ "sea-orm-cli",
+ "sea-orm-migration",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
+name = "hopr-db-migration"
+version = "0.1.0"
+dependencies = [
+ "async-std",
+ "hopr-primitive-types",
+ "sea-orm-migration",
+]
+
+[[package]]
+name = "hopr-db-sql"
+version = "0.3.0"
 dependencies = [
  "async-lock 3.3.0",
  "async-std",
@@ -3674,34 +3702,6 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-test",
-]
-
-[[package]]
-name = "hopr-db-entity"
-version = "0.2.0"
-dependencies = [
- "async-std",
- "chrono",
- "clap",
- "futures",
- "hopr-crypto-types",
- "hopr-db-migration",
- "hopr-internal-types",
- "hopr-primitive-types",
- "sea-orm",
- "sea-orm-cli",
- "sea-orm-migration",
- "thiserror",
- "tokio",
-]
-
-[[package]]
-name = "hopr-db-migration"
-version = "0.1.0"
-dependencies = [
- "async-std",
- "hopr-primitive-types",
- "sea-orm-migration",
 ]
 
 [[package]]
@@ -3751,7 +3751,7 @@ dependencies = [
  "ethers",
  "futures",
  "hopr-crypto-types",
- "hopr-db-api",
+ "hopr-db-sql",
  "hopr-internal-types",
  "hopr-metrics",
  "hopr-platform",
@@ -3822,7 +3822,7 @@ dependencies = [
  "hex-literal",
  "hopr-crypto-random",
  "hopr-crypto-types",
- "hopr-db-api",
+ "hopr-db-sql",
  "hopr-internal-types",
  "hopr-metrics",
  "hopr-platform",

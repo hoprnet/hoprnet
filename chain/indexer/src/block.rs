@@ -6,8 +6,8 @@ use tracing::{debug, error, info, trace};
 use chain_rpc::{HoprIndexerRpcOperations, LogFilter};
 use chain_types::chain_events::SignificantChainEvent;
 use hopr_crypto_types::types::Hash;
-use hopr_db_api::info::HoprDbInfoOperations;
-use hopr_db_api::HoprDbGeneralModelOperations;
+use hopr_db_sql::info::HoprDbInfoOperations;
+use hopr_db_sql::HoprDbGeneralModelOperations;
 
 use crate::{errors::CoreEthereumIndexerError, traits::ChainLogHandler, IndexerConfig};
 
@@ -281,8 +281,8 @@ pub mod tests {
     use hex_literal::hex;
     use hopr_crypto_types::keypairs::{Keypair, OffchainKeypair};
     use hopr_crypto_types::prelude::ChainKeypair;
-    use hopr_db_api::db::HoprDb;
-    use hopr_db_api::info::HoprDbInfoOperations;
+    use hopr_db_sql::db::HoprDb;
+    use hopr_db_sql::info::HoprDbInfoOperations;
     use hopr_primitive_types::prelude::*;
     use mockall::mock;
     use multiaddr::Multiaddr;

@@ -1,4 +1,4 @@
-use hopr_db_api::protocol::TransportPacketWithChainData;
+use hopr_db_sql::protocol::TransportPacketWithChainData;
 use libp2p_identity::PeerId;
 
 use hopr_crypto_packet::errors::Result;

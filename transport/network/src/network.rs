@@ -8,12 +8,12 @@ use libp2p_identity::PeerId;
 use multiaddr::Multiaddr;
 use tracing::debug;
 
-pub use hopr_db_api::peers::{PeerOrigin, PeerStatus, Stats};
+pub use hopr_db_sql::peers::{PeerOrigin, PeerStatus, Stats};
 use hopr_platform::time::native::current_time;
 
 use crate::config::NetworkConfig;
 
-use hopr_db_api::peers::PeerSelector;
+use hopr_db_sql::peers::PeerSelector;
 #[cfg(all(feature = "prometheus", not(test)))]
 use {
     hopr_metrics::metrics::{MultiGauge, SimpleGauge},
@@ -85,7 +85,7 @@ fn health_from_stats(stats: &Stats, is_public: bool) -> Health {
 #[derive(Debug)]
 pub struct Network<T>
 where
-    T: hopr_db_api::peers::HoprDbPeersOperations + Sync + Send + std::fmt::Debug,
+    T: hopr_db_sql::peers::HoprDbPeersOperations + Sync + Send + std::fmt::Debug,
 {
     me: PeerId,
     me_addresses: Vec<Multiaddr>,
@@ -98,7 +98,7 @@ where
 
 impl<T> Network<T>
 where
-    T: hopr_db_api::peers::HoprDbPeersOperations + Sync + Send + std::fmt::Debug,
+    T: hopr_db_sql::peers::HoprDbPeersOperations + Sync + Send + std::fmt::Debug,
 {
     pub fn new(my_peer_id: PeerId, my_multiaddresses: Vec<Multiaddr>, cfg: NetworkConfig, db: T) -> Self {
         if cfg.quality_offline_threshold < cfg.quality_bad_threshold {
@@ -369,14 +369,14 @@ mod tests {
         Ok(assert_eq!(parsed, Health::Orange))
     }
 
-    async fn basic_network(my_id: &PeerId) -> Network<hopr_db_api::db::HoprDb> {
+    async fn basic_network(my_id: &PeerId) -> Network<hopr_db_sql::db::HoprDb> {
         let mut cfg = NetworkConfig::default();
         cfg.quality_offline_threshold = 0.6;
         Network::new(
             *my_id,
             vec![],
             cfg,
-            hopr_db_api::db::HoprDb::new_in_memory(ChainKeypair::random()).await,
+            hopr_db_sql::db::HoprDb::new_in_memory(ChainKeypair::random()).await,
         )
     }
 
@@ -706,7 +706,7 @@ mod tests {
             me,
             vec![],
             cfg,
-            hopr_db_api::db::HoprDb::new_in_memory(ChainKeypair::random()).await,
+            hopr_db_sql::db::HoprDb::new_in_memory(ChainKeypair::random()).await,
         );
 
         peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await.unwrap();
@@ -732,7 +732,7 @@ mod tests {
             me,
             vec![],
             cfg,
-            hopr_db_api::db::HoprDb::new_in_memory(ChainKeypair::random()).await,
+            hopr_db_sql::db::HoprDb::new_in_memory(ChainKeypair::random()).await,
         );
 
         peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await.unwrap();
@@ -764,7 +764,7 @@ mod tests {
             me,
             vec![],
             cfg,
-            hopr_db_api::db::HoprDb::new_in_memory(ChainKeypair::random()).await,
+            hopr_db_sql::db::HoprDb::new_in_memory(ChainKeypair::random()).await,
         );
 
         peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await.unwrap();
@@ -792,7 +792,7 @@ mod tests {
             OffchainKeypair::random().public().into(),
             vec![],
             cfg,
-            hopr_db_api::db::HoprDb::new_in_memory(ChainKeypair::random()).await,
+            hopr_db_sql::db::HoprDb::new_in_memory(ChainKeypair::random()).await,
         );
 
         peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await.unwrap();

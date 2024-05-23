@@ -288,7 +288,7 @@ impl SwarmEventLoop {
         on_transport_output: UnboundedSender<TransportOutput>,
         on_acknowledged_ticket: UnboundedSender<AcknowledgedTicket>,
     ) where
-        T: hopr_db_api::peers::HoprDbPeersOperations + Sync + Send + std::fmt::Debug + 'static,
+        T: hopr_db_sql::peers::HoprDbPeersOperations + Sync + Send + std::fmt::Debug + 'static,
     {
         let me_peer_id = swarm.peer_id();
 

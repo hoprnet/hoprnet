@@ -38,7 +38,7 @@ hopr-platform = { workspace = true }
 hopr-metrics = { workspace = true, optional = true, default-features = false }
 hopr-internal-types = { workspace = true }
 hopr-primitive-types = { workspace = true }
-hopr-db-api = { workspace = true }
+hopr-db-sql = { workspace = true }
 
 [dev-dependencies]
 async-std = { workspace = true }
@@ -47,7 +47,7 @@ env_logger = { workspace = true }
 mockall = { workspace = true }
 hex-literal = { workspace = true }
 hopr-crypto-random = { workspace = true }
-hopr-db-api = { workspace = true }
+hopr-db-sql = { workspace = true }
 futures = { workspace = true }
 
 

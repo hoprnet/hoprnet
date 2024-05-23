@@ -1,5 +1,5 @@
 use chain_actions::errors::ChainActionsError;
-use hopr_db_api::errors::DbError;
+use hopr_db_sql::errors::DbError;
 use hopr_primitive_types::errors::GeneralError;
 use thiserror::Error;
 

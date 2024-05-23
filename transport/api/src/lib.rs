@@ -63,7 +63,7 @@ use tokio::{
     time::sleep,
 };
 
-use hopr_db_api::{peers::HoprDbPeersOperations, tickets::HoprDbTicketOperations, HoprDbAllOperations};
+use hopr_db_sql::{peers::HoprDbPeersOperations, tickets::HoprDbTicketOperations, HoprDbAllOperations};
 use tracing::{debug, error, info, warn};
 
 use core_network::{config::NetworkConfig, heartbeat::Heartbeat, messaging::ControlMessage, ping::Ping};
@@ -138,7 +138,7 @@ use core_path::selectors::PathSelector;
 use core_protocol::errors::ProtocolError;
 use futures::future::{select, Either};
 use futures::pin_mut;
-use hopr_db_api::errors::DbError;
+use hopr_db_sql::errors::DbError;
 use hopr_internal_types::channels::ChannelStatus;
 use hopr_primitive_types::prelude::*;
 
@@ -191,7 +191,7 @@ where
     async fn aggregate_tickets(
         &self,
         channel: &Hash,
-        prerequisites: hopr_db_api::tickets::AggregationPrerequisites,
+        prerequisites: hopr_db_sql::tickets::AggregationPrerequisites,
     ) -> core_protocol::errors::Result<()> {
         if let Some(writer) = self.maybe_writer.clone().get() {
             AwaitingAggregator::new(self.db.clone(), writer.clone(), self.agg_timeout)

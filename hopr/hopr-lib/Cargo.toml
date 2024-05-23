@@ -36,7 +36,7 @@ chain-rpc = { workspace = true }
 chain-types = { workspace = true }
 chain-indexer = { workspace = true }
 hopr-crypto-types = { workspace = true }
-hopr-db-api = { workspace = true }
+hopr-db-sql = { workspace = true }
 hopr-internal-types = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-platform = { workspace = true }
@@ -55,14 +55,14 @@ runtime-async-std = [
     "async-std",
     "chain-api/runtime-async-std",
     "core-transport/runtime-async-std",
-    "hopr-db-api/runtime-async-std",
+    "hopr-db-sql/runtime-async-std",
     "hopr-strategy/runtime-async-std",
 ]
 runtime-tokio = [
     "tokio",
     "chain-api/runtime-tokio",
     "core-transport/runtime-tokio",
-    "hopr-db-api/runtime-tokio",
+    "hopr-db-sql/runtime-tokio",
     "hopr-strategy/runtime-tokio"
 ]
 prometheus = [
@@ -71,5 +71,5 @@ prometheus = [
     "chain-api/prometheus",
     "chain-indexer/prometheus",
     "chain-rpc/prometheus",
-    "hopr-db-api/prometheus"
+    "hopr-db-sql/prometheus"
 ]

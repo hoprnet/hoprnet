@@ -26,8 +26,8 @@
 use async_trait::async_trait;
 use core_protocol::ticket_aggregation::processor::TicketAggregatorTrait;
 use hopr_crypto_types::prelude::Hash;
-use hopr_db_api::channels::HoprDbChannelOperations;
-use hopr_db_api::tickets::{AggregationPrerequisites, HoprDbTicketOperations};
+use hopr_db_sql::channels::HoprDbChannelOperations;
+use hopr_db_sql::tickets::{AggregationPrerequisites, HoprDbTicketOperations};
 use hopr_internal_types::prelude::*;
 
 use async_lock::RwLock;
@@ -292,13 +292,13 @@ mod tests {
     use futures::{FutureExt, StreamExt};
     use hex_literal::hex;
     use hopr_crypto_types::prelude::*;
-    use hopr_db_api::accounts::HoprDbAccountOperations;
-    use hopr_db_api::channels::HoprDbChannelOperations;
-    use hopr_db_api::db::HoprDb;
-    use hopr_db_api::errors::DbError;
-    use hopr_db_api::info::{DomainSeparator, HoprDbInfoOperations};
-    use hopr_db_api::tickets::HoprDbTicketOperations;
-    use hopr_db_api::{HoprDbGeneralModelOperations, TargetDb};
+    use hopr_db_sql::accounts::HoprDbAccountOperations;
+    use hopr_db_sql::channels::HoprDbChannelOperations;
+    use hopr_db_sql::db::HoprDb;
+    use hopr_db_sql::errors::DbError;
+    use hopr_db_sql::info::{DomainSeparator, HoprDbInfoOperations};
+    use hopr_db_sql::tickets::HoprDbTicketOperations;
+    use hopr_db_sql::{HoprDbGeneralModelOperations, TargetDb};
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
     use lazy_static::lazy_static;

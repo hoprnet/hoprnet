@@ -33,7 +33,7 @@ use chain_types::ContractAddresses;
 use config::ChainNetworkConfig;
 use executors::{EthereumTransactionExecutor, RpcEthereumClient, RpcEthereumClientConfig};
 use hopr_crypto_types::prelude::*;
-use hopr_db_api::HoprDbAllOperations;
+use hopr_db_sql::HoprDbAllOperations;
 use hopr_internal_types::account::AccountEntry;
 pub use hopr_internal_types::channels::ChannelEntry;
 use hopr_internal_types::prelude::ChannelDirection;

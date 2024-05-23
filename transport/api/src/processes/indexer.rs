@@ -7,7 +7,7 @@ use chain_types::chain_events::NetworkRegistryStatus;
 use core_network::{network::Network, PeerId};
 use core_p2p::libp2p::swarm::derive_prelude::Multiaddr;
 use hopr_crypto_types::types::OffchainPublicKey;
-use hopr_db_api::{
+use hopr_db_sql::{
     peers::HoprDbPeersOperations, registry::HoprDbRegistryOperations, resolver::HoprDbResolverOperations,
 };
 
@@ -91,7 +91,7 @@ where
                             async move {
                             if let Ok(key) = OffchainPublicKey::try_from(peer) {
                                 match db.resolve_chain_key(&key).await.and_then(|maybe_address| {
-                                    maybe_address.ok_or(hopr_db_api::errors::DbError::LogicalError(format!(
+                                    maybe_address.ok_or(hopr_db_sql::errors::DbError::LogicalError(format!(
                                         "No address available for peer '{peer}'",
                                     )))
                                 }) {

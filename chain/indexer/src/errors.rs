@@ -8,7 +8,7 @@ pub enum CoreEthereumIndexerError {
     ProcessError(String),
 
     #[error(transparent)]
-    DbApiError(#[from] hopr_db_api::errors::DbError),
+    DbApiError(#[from] hopr_db_sql::errors::DbError),
 
     #[error(transparent)]
     DbBackendError(#[from] sea_orm::DbErr),

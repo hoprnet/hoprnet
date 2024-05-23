@@ -23,8 +23,8 @@ use hopr_crypto_types::types::OffchainPublicKey;
 #[derive(Debug, Clone)]
 pub struct PingExternalInteractions<T>
 where
-    T: hopr_db_api::peers::HoprDbPeersOperations
-        + hopr_db_api::resolver::HoprDbResolverOperations
+    T: hopr_db_sql::peers::HoprDbPeersOperations
+        + hopr_db_sql::resolver::HoprDbResolverOperations
         + Sync
         + Send
         + Clone
@@ -40,8 +40,8 @@ where
 
 impl<T> PingExternalInteractions<T>
 where
-    T: hopr_db_api::peers::HoprDbPeersOperations
-        + hopr_db_api::resolver::HoprDbResolverOperations
+    T: hopr_db_sql::peers::HoprDbPeersOperations
+        + hopr_db_sql::resolver::HoprDbResolverOperations
         + Sync
         + Send
         + Clone
@@ -65,8 +65,8 @@ where
 #[async_trait]
 impl<T> PingExternalAPI for PingExternalInteractions<T>
 where
-    T: hopr_db_api::peers::HoprDbPeersOperations
-        + hopr_db_api::resolver::HoprDbResolverOperations
+    T: hopr_db_sql::peers::HoprDbPeersOperations
+        + hopr_db_sql::resolver::HoprDbResolverOperations
         + Sync
         + Send
         + Clone

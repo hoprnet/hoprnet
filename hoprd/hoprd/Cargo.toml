@@ -10,7 +10,7 @@ license = "GPL-3.0-only"
 build = "build.rs"
 
 [features]
-default = ["runtime-tokio", "prometheus"]
+default = ["runtime-async-std", "prometheus"]   # must be async-std due to tide framework
 prometheus = [
     "dep:hopr-metrics",
     "dep:lazy_static",

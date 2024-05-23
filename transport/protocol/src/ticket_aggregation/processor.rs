@@ -14,10 +14,10 @@ use std::{pin::Pin, task::Poll};
 use tracing::{error, warn};
 
 use hopr_crypto_types::prelude::*;
-use hopr_db_api::errors::DbError;
-use hopr_db_api::prelude::HoprDbInfoOperations;
-pub use hopr_db_api::tickets::AggregationPrerequisites;
-use hopr_db_api::tickets::HoprDbTicketOperations;
+use hopr_db_sql::errors::DbError;
+use hopr_db_sql::prelude::HoprDbInfoOperations;
+pub use hopr_db_sql::tickets::AggregationPrerequisites;
+use hopr_db_sql::tickets::HoprDbTicketOperations;
 use hopr_internal_types::prelude::*;
 
 use crate::errors::{
@@ -305,7 +305,7 @@ where
                                 Ok(ticket) => {
                                     Some(TicketAggregationProcessed::Reply(destination, Ok(ticket.leak()), response))
                                 }
-                                Err(hopr_db_api::errors::DbError::TicketAggregationError(e)) => {
+                                Err(hopr_db_sql::errors::DbError::TicketAggregationError(e)) => {
                                     // forward error to counterparty
                                     Some(TicketAggregationProcessed::Reply(destination, Err(e), response))
                                 }
@@ -433,12 +433,12 @@ mod tests {
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         types::{Hash, Response},
     };
-    use hopr_db_api::accounts::HoprDbAccountOperations;
-    use hopr_db_api::channels::HoprDbChannelOperations;
-    use hopr_db_api::db::HoprDb;
-    use hopr_db_api::info::{DomainSeparator, HoprDbInfoOperations};
-    use hopr_db_api::tickets::HoprDbTicketOperations;
-    use hopr_db_api::HoprDbGeneralModelOperations;
+    use hopr_db_sql::accounts::HoprDbAccountOperations;
+    use hopr_db_sql::channels::HoprDbChannelOperations;
+    use hopr_db_sql::db::HoprDb;
+    use hopr_db_sql::info::{DomainSeparator, HoprDbInfoOperations};
+    use hopr_db_sql::tickets::HoprDbTicketOperations;
+    use hopr_db_sql::HoprDbGeneralModelOperations;
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
     use lazy_static::lazy_static;
@@ -519,7 +519,7 @@ mod tests {
                             .await?
                     }
 
-                    Ok::<(), hopr_db_api::errors::DbError>(())
+                    Ok::<(), hopr_db_sql::errors::DbError>(())
                 })
             })
             .await

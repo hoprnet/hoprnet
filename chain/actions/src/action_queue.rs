@@ -23,8 +23,8 @@ use crate::action_state::{ActionState, IndexerExpectation};
 use crate::errors::ChainActionsError::{ChannelAlreadyClosed, InvalidState, Timeout, TransactionSubmissionFailed};
 use crate::errors::{ChainActionsError, Result};
 
-use hopr_db_api::info::HoprDbInfoOperations;
-use hopr_db_api::tickets::HoprDbTicketOperations;
+use hopr_db_sql::info::HoprDbInfoOperations;
+use hopr_db_sql::tickets::HoprDbTicketOperations;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::MultiCounter;

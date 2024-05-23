@@ -29,7 +29,7 @@ use ethers::providers::Middleware;
 use ethers::utils::AnvilInstance;
 use futures::{pin_mut, StreamExt};
 use hopr_crypto_types::prelude::*;
-use hopr_db_api::prelude::*;
+use hopr_db_sql::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use std::time::Duration;

@@ -1,8 +1,8 @@
 [package]
-name = "hopr-db-api"
-version = "0.2.0"
+name = "hopr-db-sql"
+version = "0.3.0"
 edition = "2021"
-description = "Contains general DB functionality to be used by other crates in the code base"
+description = "Contains SQL DB functionality implementing the DB API traits to be used by other crates in the code base"
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"
@@ -10,7 +10,6 @@ license = "GPL-3.0-only"
 [features]
 default = ["traits"]
 traits = []
-impls = []
 runtime-async-std = [
     "async-std",
     "sea-orm/runtime-async-std",

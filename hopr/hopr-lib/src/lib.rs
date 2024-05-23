@@ -85,7 +85,7 @@ use tracing::{debug, error, info, warn};
 use crate::constants::{MIN_NATIVE_BALANCE, ONBOARDING_INFORMATION_INTERVAL, SUGGESTED_NATIVE_BALANCE};
 use crate::{config::SafeModule, errors::HoprLibError};
 
-use hopr_db_api::{
+use hopr_db_sql::{
     accounts::HoprDbAccountOperations,
     db::{HoprDb, HoprDbConfig},
     info::{HoprDbInfoOperations, SafeInfo},
@@ -93,11 +93,11 @@ use hopr_db_api::{
     tickets::HoprDbTicketOperations,
     HoprDbGeneralModelOperations,
 };
-use hopr_db_api::{channels::HoprDbChannelOperations, HoprDbAllOperations};
+use hopr_db_sql::{channels::HoprDbChannelOperations, HoprDbAllOperations};
 
 use hopr_crypto_types::prelude::OffchainPublicKey;
-use hopr_db_api::prelude::ChainOrPacketKey::ChainKey;
-use hopr_db_api::prelude::{DbError, HoprDbPeersOperations};
+use hopr_db_sql::prelude::ChainOrPacketKey::ChainKey;
+use hopr_db_sql::prelude::{DbError, HoprDbPeersOperations};
 #[cfg(all(feature = "prometheus", not(test)))]
 use {
     hopr_metrics::metrics::{MultiGauge, SimpleGauge},

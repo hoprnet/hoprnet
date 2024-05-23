@@ -16,7 +16,7 @@
 use async_trait::async_trait;
 use chain_types::actions::Action;
 use hopr_crypto_types::types::Hash;
-use hopr_db_api::HoprDbAllOperations;
+use hopr_db_sql::HoprDbAllOperations;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use std::time::Duration;
@@ -226,10 +226,10 @@ mod tests {
     use hex_literal::hex;
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::prelude::*;
-    use hopr_db_api::channels::HoprDbChannelOperations;
-    use hopr_db_api::db::HoprDb;
-    use hopr_db_api::info::{DomainSeparator, HoprDbInfoOperations};
-    use hopr_db_api::HoprDbGeneralModelOperations;
+    use hopr_db_sql::channels::HoprDbChannelOperations;
+    use hopr_db_sql::db::HoprDb;
+    use hopr_db_sql::info::{DomainSeparator, HoprDbInfoOperations};
+    use hopr_db_sql::HoprDbGeneralModelOperations;
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
     use lazy_static::lazy_static;
