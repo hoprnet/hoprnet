@@ -161,6 +161,8 @@ jobs:
           echo "[INFO] Restarting deployments on ${namespace} from pr-${{ github.event.pull_request.number }}"
           kubectl rollout restart deployments -n ${namespace} -l hoprds.hoprnet.org/cluster=${hoprd_cluster};
           kubectl rollout status  deployments -n ${namespace} -l hoprds.hoprnet.org/cluster=${hoprd_cluster};
+        env:
+          GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
 
   load_test:
     name: Load Testing
