@@ -518,22 +518,32 @@ pub mod reqwest_client {
     use async_trait::async_trait;
     use http_types::StatusCode;
     use serde::Serialize;
-
-    // TODO: add rate-limiter via Tower crate
+    use std::sync::Arc;
 
     /// HTTP client that uses a Tokio runtime-based HTTP client library, such as `reqwest`.
     #[derive(Clone, Debug, Default)]
-    pub struct ReqwestRequestor(reqwest::Client);
+    pub struct ReqwestRequestor {
+        client: reqwest::Client,
+        limiter: Option<Arc<governor::DefaultDirectRateLimiter>>,
+    }
 
     impl ReqwestRequestor {
         pub fn new(cfg: HttpPostRequestorConfig) -> Self {
-            Self(
-                reqwest::Client::builder()
+            Self {
+                client: reqwest::Client::builder()
                     .timeout(cfg.http_request_timeout)
                     .redirect(reqwest::redirect::Policy::limited(cfg.max_redirects as usize))
                     .build()
                     .expect("could not build reqwest client"),
-            )
+                limiter: cfg
+                    .max_requests_per_sec
+                    .filter(|reqs| *reqs > 0) // Ensures the following unwrapping won't fail
+                    .map(|reqs| {
+                        Arc::new(governor::DefaultDirectRateLimiter::direct(governor::Quota::per_second(
+                            reqs.try_into().unwrap(),
+                        )))
+                    }),
+            }
         }
     }
 
@@ -543,33 +553,42 @@ pub mod reqwest_client {
         where
             T: Serialize + Send + Sync,
         {
-            let resp = self
-                .0
-                .post(url)
-                .header("content-type", "application/json")
-                .body(
-                    serde_json::to_string(&data)
-                        .map_err(|e| HttpRequestError::UnknownError(format!("serialize error: {e}")))?,
-                )
-                .send()
-                .await
-                .map_err(|e| {
-                    if e.is_status() {
-                        HttpRequestError::HttpError(
-                            StatusCode::try_from(e.status().map(|s| s.as_u16()).unwrap_or(500))
-                                .expect("status code must be compatible"), // cannot happen
-                        )
-                    } else if e.is_timeout() {
-                        HttpRequestError::Timeout
-                    } else {
-                        HttpRequestError::UnknownError(e.to_string())
-                    }
-                })?;
+            if self
+                .limiter
+                .clone()
+                .map(|limiter| limiter.check().is_ok())
+                .unwrap_or(true)
+            {
+                let resp = self
+                    .client
+                    .post(url)
+                    .header("content-type", "application/json")
+                    .body(
+                        serde_json::to_string(&data)
+                            .map_err(|e| HttpRequestError::UnknownError(format!("serialize error: {e}")))?,
+                    )
+                    .send()
+                    .await
+                    .map_err(|e| {
+                        if e.is_status() {
+                            HttpRequestError::HttpError(
+                                StatusCode::try_from(e.status().map(|s| s.as_u16()).unwrap_or(500))
+                                    .expect("status code must be compatible"), // cannot happen
+                            )
+                        } else if e.is_timeout() {
+                            HttpRequestError::Timeout
+                        } else {
+                            HttpRequestError::UnknownError(e.to_string())
+                        }
+                    })?;
 
-            resp.bytes()
-                .await
-                .map(|b| Box::from(b.as_ref()))
-                .map_err(|e| HttpRequestError::UnknownError(format!("body: {}", e.to_string())))
+                resp.bytes()
+                    .await
+                    .map(|b| Box::from(b.as_ref()))
+                    .map_err(|e| HttpRequestError::UnknownError(format!("error retrieving body: {e}")))
+            } else {
+                Err(HttpRequestError::HttpError(StatusCode::TooManyRequests))
+            }
         }
     }
 }
@@ -610,26 +629,44 @@ pub mod tests {
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
     use hopr_primitive_types::primitives::Address;
     use serde_json::json;
+    use std::fmt::Debug;
     use std::sync::atomic::Ordering;
     use std::time::Duration;
 
+    use crate::client::reqwest_client::ReqwestRequestor;
     use crate::client::surf_client::SurfRequestor;
     use crate::client::{create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy};
     use crate::errors::JsonRpcProviderClientError;
-    use crate::ZeroRetryPolicy;
+    use crate::{HttpPostRequestor, ZeroRetryPolicy};
 
-    #[async_std::test]
-    async fn test_client_should_deploy_contracts() {
+    async fn deploy_contracts<R: HttpPostRequestor + Debug>(req: R) -> ContractAddresses {
         let anvil = create_anvil(None);
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
 
-        let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &chain_key_0);
+        let client = create_rpc_client_to_anvil(req, &anvil, &chain_key_0);
 
-        let contract_addrs = ContractAddresses::from(
+        ContractAddresses::from(
             &ContractInstances::deploy_for_testing(client.clone(), &chain_key_0)
                 .await
                 .expect("failed to deploy"),
-        );
+        )
+    }
+
+    #[async_std::test]
+    async fn test_client_should_deploy_contracts_via_surf() {
+        let contract_addrs = deploy_contracts(SurfRequestor::default()).await;
+
+        assert_ne!(contract_addrs.token, Address::default());
+        assert_ne!(contract_addrs.channels, Address::default());
+        assert_ne!(contract_addrs.announcements, Address::default());
+        assert_ne!(contract_addrs.network_registry, Address::default());
+        assert_ne!(contract_addrs.safe_registry, Address::default());
+        assert_ne!(contract_addrs.price_oracle, Address::default());
+    }
+
+    #[tokio::test]
+    async fn test_client_should_deploy_contracts_via_reqwest() {
+        let contract_addrs = deploy_contracts(ReqwestRequestor::default()).await;
 
         assert_ne!(contract_addrs.token, Address::default());
         assert_ne!(contract_addrs.channels, Address::default());

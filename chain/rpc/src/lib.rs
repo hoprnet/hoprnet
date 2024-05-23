@@ -188,13 +188,36 @@ impl<E> RetryPolicy<E> for ZeroRetryPolicy<E> {}
 #[async_trait]
 pub trait HttpPostRequestor: Send + Sync {
     /// Performs HTTP POST of JSON data to the given URL
-    /// and obtains the JSON response.
+    /// and gets the JSON response.
     async fn http_post<T>(&self, url: &str, data: T) -> std::result::Result<Box<[u8]>, HttpRequestError>
     where
         T: Serialize + Send + Sync;
 }
 
-/// Short-hand for creating new EIP1559 transaction object.
+/// Common configuration for all native `HttpPostRequestor`s
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, smart_default::SmartDefault)]
+pub struct HttpPostRequestorConfig {
+    /// Timeout for HTTP POST request
+    ///
+    /// Defaults to 5 seconds.
+    #[default(Duration::from_secs(5))]
+    pub http_request_timeout: Duration,
+
+    /// Maximum number of HTTP redirects to follow
+    ///
+    /// Defaults to 3
+    #[default(3)]
+    pub max_redirects: u8,
+
+    /// Maximum number of requests per second.
+    /// If set to Some(0) or `None`, there will be no limit.
+    ///
+    /// Defaults to 10
+    #[default(Some(10))]
+    pub max_requests_per_sec: Option<u32>,
+}
+
+/// Shorthand for creating a new EIP1559 transaction object.
 pub fn create_eip1559_transaction() -> TypedTransaction {
     TypedTransaction::Eip1559(ethers::types::Eip1559TransactionRequest::new())
 }
@@ -343,27 +366,4 @@ pub trait HoprIndexerRpcOperations {
         start_block_number: u64,
         filter: LogFilter,
     ) -> Result<Pin<Box<dyn Stream<Item = BlockWithLogs> + Send + 'a>>>;
-}
-
-/// Common configuration for all native `HttpPostRequestor`s
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, smart_default::SmartDefault)]
-pub struct HttpPostRequestorConfig {
-    /// Timeout for HTTP POST request
-    ///
-    /// Defaults to 5 seconds.
-    #[default(Duration::from_secs(5))]
-    pub http_request_timeout: Duration,
-
-    /// Maximum number of HTTP redirects to follow
-    ///
-    /// Defaults to 3
-    #[default(3)]
-    pub max_redirects: u8,
-
-    /// Maximum number of requests per second.
-    /// If set to Some(0) or `None`, there will be no limit.
-    ///
-    /// Defaults to 10
-    #[default(Some(10))]
-    pub max_requests_per_sec: Option<u32>,
 }

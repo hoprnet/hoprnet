@@ -1316,6 +1316,7 @@ dependencies = [
  "ethers",
  "futures",
  "futures-timer",
+ "governor",
  "hex-literal",
  "hopr-crypto-types",
  "hopr-metrics",
@@ -1332,6 +1333,7 @@ dependencies = [
  "surf",
  "surf-governor",
  "thiserror",
+ "tokio",
  "tracing",
  "validator",
 ]
