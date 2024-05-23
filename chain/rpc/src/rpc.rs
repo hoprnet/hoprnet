@@ -253,7 +253,7 @@ pub mod tests {
     use hopr_primitive_types::prelude::*;
     use std::time::Duration;
 
-    use crate::client::native::SurfRequestor;
+    use crate::client::surf_client::SurfRequestor;
     use crate::client::{create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy};
 
     lazy_static::lazy_static! {

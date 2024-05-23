@@ -448,38 +448,14 @@ where
     }
 }
 
-pub mod native {
+pub mod surf_client {
     use async_std::prelude::FutureExt;
     use async_trait::async_trait;
-    use serde::{Deserialize, Serialize};
-    use std::time::Duration;
+    use serde::Serialize;
     use tracing::info;
 
     use crate::errors::HttpRequestError;
-    use crate::HttpPostRequestor;
-
-    /// Common configuration for all native `HttpPostRequestor`s
-    #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, smart_default::SmartDefault)]
-    pub struct HttpPostRequestorConfig {
-        /// Timeout for HTTP POST request
-        ///
-        /// Defaults to 5 seconds.
-        #[default(Duration::from_secs(5))]
-        pub http_request_timeout: Duration,
-
-        /// Maximum number of HTTP redirects to follow
-        ///
-        /// Defaults to 3
-        #[default(3)]
-        pub max_redirects: u8,
-
-        /// Maximum number of requests per second.
-        /// If set to Some(0) or `None`, there will be no limit.
-        ///
-        /// Defaults to 10.
-        #[default(Some(10))]
-        pub max_requests_per_sec: Option<u32>,
-    }
+    use crate::{HttpPostRequestor, HttpPostRequestorConfig};
 
     /// HTTP client that uses a non-Tokio runtime based HTTP client library, such as `surf`.
     /// `surf` works also for Browsers in WASM environments.
@@ -536,6 +512,68 @@ pub mod native {
     }
 }
 
+pub mod reqwest_client {
+    use crate::errors::HttpRequestError;
+    use crate::{HttpPostRequestor, HttpPostRequestorConfig};
+    use async_trait::async_trait;
+    use http_types::StatusCode;
+    use serde::Serialize;
+
+    // TODO: add rate-limiter via Tower crate
+
+    /// HTTP client that uses a Tokio runtime-based HTTP client library, such as `reqwest`.
+    #[derive(Clone, Debug, Default)]
+    pub struct ReqwestRequestor(reqwest::Client);
+
+    impl ReqwestRequestor {
+        pub fn new(cfg: HttpPostRequestorConfig) -> Self {
+            Self(
+                reqwest::Client::builder()
+                    .timeout(cfg.http_request_timeout)
+                    .redirect(reqwest::redirect::Policy::limited(cfg.max_redirects as usize))
+                    .build()
+                    .expect("could not build reqwest client"),
+            )
+        }
+    }
+
+    #[async_trait]
+    impl HttpPostRequestor for ReqwestRequestor {
+        async fn http_post<T>(&self, url: &str, data: T) -> Result<Box<[u8]>, HttpRequestError>
+        where
+            T: Serialize + Send + Sync,
+        {
+            let resp = self
+                .0
+                .post(url)
+                .header("content-type", "application/json")
+                .body(
+                    serde_json::to_string(&data)
+                        .map_err(|e| HttpRequestError::UnknownError(format!("serialize error: {e}")))?,
+                )
+                .send()
+                .await
+                .map_err(|e| {
+                    if e.is_status() {
+                        HttpRequestError::HttpError(
+                            StatusCode::try_from(e.status().map(|s| s.as_u16()).unwrap_or(500))
+                                .expect("status code must be compatible"), // cannot happen
+                        )
+                    } else if e.is_timeout() {
+                        HttpRequestError::Timeout
+                    } else {
+                        HttpRequestError::UnknownError(e.to_string())
+                    }
+                })?;
+
+            resp.bytes()
+                .await
+                .map(|b| Box::from(b.as_ref()))
+                .map_err(|e| HttpRequestError::UnknownError(format!("body: {}", e.to_string())))
+        }
+    }
+}
+
 type AnvilRpcClient<R> = std::sync::Arc<
     ethers::middleware::SignerMiddleware<
         ethers::providers::Provider<JsonRpcProviderClient<R, SimpleJsonRpcRetryPolicy>>,
@@ -575,7 +613,7 @@ pub mod tests {
     use std::sync::atomic::Ordering;
     use std::time::Duration;
 
-    use crate::client::native::SurfRequestor;
+    use crate::client::surf_client::SurfRequestor;
     use crate::client::{create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy};
     use crate::errors::JsonRpcProviderClientError;
     use crate::ZeroRetryPolicy;

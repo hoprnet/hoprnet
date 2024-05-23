@@ -8,7 +8,7 @@ use chain_actions::redeem::TicketRedeemActions;
 use chain_actions::ChainActions;
 use chain_api::executors::{EthereumTransactionExecutor, RpcEthereumClient, RpcEthereumClientConfig};
 use chain_indexer::{block::Indexer, handlers::ContractEventHandlers, IndexerConfig};
-use chain_rpc::client::native::SurfRequestor;
+use chain_rpc::client::surf_client::SurfRequestor;
 use chain_rpc::client::{create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy};
 use chain_rpc::rpc::{RpcOperations, RpcOperationsConfig};
 use chain_types::chain_events::ChainEventType;

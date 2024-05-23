@@ -28,6 +28,7 @@ use crate::errors::{HttpRequestError, Result};
 use crate::RetryAction::NoRetry;
 
 pub use ethers::types::transaction::eip2718::TypedTransaction;
+use http_types::convert::Deserialize;
 
 pub mod client;
 pub mod errors;
@@ -183,7 +184,7 @@ impl<E> Default for ZeroRetryPolicy<E> {
 
 impl<E> RetryPolicy<E> for ZeroRetryPolicy<E> {}
 
-/// Abstraction for HTTP client that perform HTTP POST with serializable request data.
+/// Abstraction for an HTTP client that performs HTTP POST with serializable request data.
 #[async_trait]
 pub trait HttpPostRequestor: Send + Sync {
     /// Performs HTTP POST of JSON data to the given URL
@@ -199,7 +200,7 @@ pub fn create_eip1559_transaction() -> TypedTransaction {
 }
 
 /// Contains some selected fields of a receipt for a transaction that has been
-/// already included into the blockchain.
+/// already included in the blockchain.
 #[derive(Debug, Clone)]
 pub struct TransactionReceipt {
     /// Hash of the transaction.
@@ -273,7 +274,7 @@ impl<'a> IntoFuture for PendingTransaction<'a> {
     }
 }
 
-/// Trait defining general set of operations an RPC provider
+/// Trait defining a general set of operations an RPC provider
 /// must provide to the HOPR node.
 #[async_trait]
 pub trait HoprRpcOperations {
@@ -342,4 +343,27 @@ pub trait HoprIndexerRpcOperations {
         start_block_number: u64,
         filter: LogFilter,
     ) -> Result<Pin<Box<dyn Stream<Item = BlockWithLogs> + Send + 'a>>>;
+}
+
+/// Common configuration for all native `HttpPostRequestor`s
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, smart_default::SmartDefault)]
+pub struct HttpPostRequestorConfig {
+    /// Timeout for HTTP POST request
+    ///
+    /// Defaults to 5 seconds.
+    #[default(Duration::from_secs(5))]
+    pub http_request_timeout: Duration,
+
+    /// Maximum number of HTTP redirects to follow
+    ///
+    /// Defaults to 3
+    #[default(3)]
+    pub max_redirects: u8,
+
+    /// Maximum number of requests per second.
+    /// If set to Some(0) or `None`, there will be no limit.
+    ///
+    /// Defaults to 10
+    #[default(Some(10))]
+    pub max_requests_per_sec: Option<u32>,
 }

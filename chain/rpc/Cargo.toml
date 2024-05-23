@@ -37,6 +37,7 @@ hopr-primitive-types = { workspace = true }
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 surf = { version = "2.3.2" }
 surf-governor = "0.2.0"
+reqwest = "0.12.4"
 
 [dev-dependencies]
 async-std = { version = "1.12.0", features = ["attributes", "unstable"] }

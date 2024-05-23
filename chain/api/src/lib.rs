@@ -36,7 +36,7 @@ use crate::errors::{HoprChainError, Result};
 /// The default HTTP request engine
 ///
 /// TODO: Should be an internal type, `hopr_lib::chain` must be moved to this package
-pub type DefaultHttpPostRequestor = chain_rpc::client::native::SurfRequestor;
+pub type DefaultHttpPostRequestor = chain_rpc::client::surf_client::SurfRequestor;
 
 /// The default JSON RPC provider client
 ///
@@ -161,7 +161,7 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
         indexer_events_tx: async_channel::Sender<SignificantChainEvent>,
     ) -> Self {
         // TODO: extract this from the global config type
-        let mut rpc_http_config = chain_rpc::client::native::HttpPostRequestorConfig::default();
+        let mut rpc_http_config = chain_rpc::HttpPostRequestorConfig::default();
         if let Some(max_rpc_req) = chain_config.max_requests_per_sec {
             rpc_http_config.max_requests_per_sec = Some(max_rpc_req); // override the default if set
         }
