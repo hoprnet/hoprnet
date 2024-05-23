@@ -143,11 +143,13 @@ jobs:
 
       - name: "Restart deployments"
         timeout-minutes: 5
+        id: restart_deployments
         run: |
           base_branch="${{ github.event.pull_request.base.ref }}"
           # Identify parameters depending on branch
           if [[ "${base_branch}" == "master" ]]; then
             hoprd_cluster=hoprd-core-rotsee
+            echo "NETWORK=rotsee" >> $GITHUB_OUTPUT
           elif [[ "${base_branch}" =~ ^"release" ]]; then
             hoprd_cluster=hoprd-core-dufour
           else
@@ -167,7 +169,7 @@ jobs:
     uses: ./.github/workflows/load-tests.yaml
     with:
       test_id: pr-${{ github.event.pull_request.number }}
-      network: rotsee
+      network: ${{ steps.restart_deployments.outputs.NETWORK }}
       workload: on-hop
       duration: ${{ vars.LOAD_TESTING_DURATION }}
       rate: ${{ vars.LOAD_TESTING_RATE }}
