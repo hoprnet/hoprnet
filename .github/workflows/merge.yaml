@@ -149,7 +149,7 @@ jobs:
           # Identify parameters depending on branch
           if [[ "${base_branch}" == "master" ]]; then
             hoprd_cluster=hoprd-core-rotsee
-            echo "NETWORK=rotsee" >> $GITHUB_OUTPUT
+            echo "NETWORK=rotsee" >> $GITHUB_ENV
           elif [[ "${base_branch}" =~ ^"release" ]]; then
             hoprd_cluster=hoprd-core-dufour
           else
@@ -169,10 +169,10 @@ jobs:
     uses: ./.github/workflows/load-tests.yaml
     with:
       test_id: pr-${{ github.event.pull_request.number }}
-      network: ${{ steps.restart_deployments.outputs.NETWORK }}
+      network: ${{ env.NETWORK }}
       workload: on-hop
       duration: ${{ vars.LOAD_TESTING_DURATION }}
-      rate: ${{ vars.LOAD_TESTING_RATE }}
+      rate: "${{ vars.LOAD_TESTING_RATE }}"
 
     secrets: inherit
 
