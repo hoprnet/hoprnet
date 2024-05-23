@@ -24,26 +24,26 @@ on:
       workload:
         type: choice
         options:
+          - one-hop
           - sanity-check
-          - endurance
-          - full
+          - multiple-hops
         required: true
         description: 'Workload type'
       duration:
         type: string
-        default: 10m
+        default: 30m
         required: true
         description: 'Test duration'
       rate:
         type: number
-        default: 1
+        default: 100
         required: true
         description: 'Number of messages per seconds'
-      concurrency:
-        type: number
-        default: 1
-        required: true
-        description: 'Concurrent virtual users per hoprd node'
+        # concurrency:
+        #   type: number
+        #   default: 1
+        #   required: true
+        #   description: 'Concurrent virtual users per hoprd node'
 concurrency:
   group: load-tests
   cancel-in-progress: true
@@ -97,7 +97,7 @@ jobs:
           TESTID: ${{ github.event.inputs.test_id }}
           SCENARIO_DURATION: ${{ github.event.inputs.duration }}
           HOPRD_API_TOKEN: ${{ secrets.HOPRD_API_TOKEN }}
-          HOPRD_NODE_THREADS: ${{ github.event.inputs.concurrency }}
+          # HOPRD_NODE_THREADS: ${{ github.event.inputs.concurrency }}
 
       - name: Run Load test
         run: |
