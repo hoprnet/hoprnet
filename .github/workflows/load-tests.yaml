@@ -20,7 +20,7 @@ on:
         type: string
         required: true
       rate:
-        type: number
+        type: string
         required: true
   workflow_dispatch:
     inputs:
@@ -50,8 +50,8 @@ on:
         required: true
         description: 'Test duration'
       rate:
-        type: number
-        default: 100
+        type: string
+        default: "100"
         required: true
         description: 'Number of messages per seconds'
 concurrency:
