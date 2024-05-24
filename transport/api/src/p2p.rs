@@ -16,7 +16,10 @@ use async_std::task::spawn;
 #[cfg(feature = "runtime-tokio")]
 use tokio::task::spawn;
 
-use core_network::network::{Network, NetworkTriggeredEvent, PeerOrigin};
+use core_network::{
+    network::{Network, NetworkTriggeredEvent, PeerOrigin},
+    HoprDbPeersOperations,
+};
 pub use core_p2p::api;
 use core_p2p::{
     libp2p::{request_response::ResponseChannel, swarm::SwarmEvent},
@@ -288,7 +291,7 @@ impl SwarmEventLoop {
         on_transport_output: UnboundedSender<TransportOutput>,
         on_acknowledged_ticket: UnboundedSender<AcknowledgedTicket>,
     ) where
-        T: hopr_db_sql::peers::HoprDbPeersOperations + Sync + Send + std::fmt::Debug + 'static,
+        T: HoprDbPeersOperations + Sync + Send + std::fmt::Debug + 'static,
     {
         let me_peer_id = swarm.peer_id();
 

@@ -14,6 +14,8 @@ pub mod resolver;
 mod ticket_manager;
 pub mod tickets;
 
+pub use hopr_db_api as api;
+
 pub use sea_orm::DatabaseConnection;
 pub use sea_orm::DatabaseTransaction;
 
@@ -26,11 +28,11 @@ use sea_orm::TransactionTrait;
 use crate::db::HoprDb;
 use crate::errors::{DbSqlError, Result};
 use crate::info::HoprDbInfoOperations;
-use crate::peers::HoprDbPeersOperations;
-use crate::protocol::HoprDbProtocolOperations;
 use crate::registry::HoprDbRegistryOperations;
-use crate::resolver::HoprDbResolverOperations;
-use crate::tickets::HoprDbTicketOperations;
+use hopr_db_api::peers::HoprDbPeersOperations;
+use hopr_db_api::protocol::HoprDbProtocolOperations;
+use hopr_db_api::resolver::HoprDbResolverOperations;
+use hopr_db_api::tickets::HoprDbTicketOperations;
 
 pub(crate) mod executor {
     #[cfg(any(feature = "runtime-async-std", test))]
@@ -203,9 +205,9 @@ pub mod prelude {
     pub use crate::db::*;
     pub use crate::errors::*;
     pub use crate::info::*;
-    pub use crate::peers::*;
-    pub use crate::protocol::*;
     pub use crate::registry::*;
-    pub use crate::resolver::*;
-    pub use crate::tickets::*;
+    pub use hopr_db_api::peers::*;
+    pub use hopr_db_api::protocol::*;
+    pub use hopr_db_api::resolver::*;
+    pub use hopr_db_api::tickets::*;
 }

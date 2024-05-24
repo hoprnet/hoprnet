@@ -10,7 +10,10 @@ pub enum HoprLibError {
     StatusError(String),
 
     #[error(transparent)]
-    DatabaseError(#[from] hopr_db_sql::errors::DbSqlError),
+    DatabaseBackendError(#[from] hopr_db_sql::errors::DbSqlError),
+
+    #[error(transparent)]
+    DbError(#[from] hopr_db_sql::api::errors::DbError),
 
     #[error(transparent)]
     TransportError(#[from] core_transport::errors::HoprTransportError),

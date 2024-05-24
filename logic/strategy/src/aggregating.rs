@@ -26,8 +26,8 @@
 use async_trait::async_trait;
 use core_protocol::ticket_aggregation::processor::TicketAggregatorTrait;
 use hopr_crypto_types::prelude::Hash;
+use hopr_db_sql::api::tickets::{AggregationPrerequisites, HoprDbTicketOperations};
 use hopr_db_sql::channels::HoprDbChannelOperations;
-use hopr_db_sql::tickets::{AggregationPrerequisites, HoprDbTicketOperations};
 use hopr_internal_types::prelude::*;
 
 use async_lock::RwLock;
@@ -235,7 +235,8 @@ where
         let incoming = self
             .db
             .get_incoming_channels(None)
-            .await?
+            .await
+            .map_err(hopr_db_sql::api::errors::DbError::from)?
             .into_iter()
             .filter(|c| !c.closure_time_passed(current_time()))
             .map(|c| c.get_id());
@@ -293,11 +294,11 @@ mod tests {
     use hex_literal::hex;
     use hopr_crypto_types::prelude::*;
     use hopr_db_sql::accounts::HoprDbAccountOperations;
+    use hopr_db_sql::api::{info::DomainSeparator, tickets::HoprDbTicketOperations};
     use hopr_db_sql::channels::HoprDbChannelOperations;
     use hopr_db_sql::db::HoprDb;
     use hopr_db_sql::errors::DbSqlError;
-    use hopr_db_sql::info::{DomainSeparator, HoprDbInfoOperations};
-    use hopr_db_sql::tickets::HoprDbTicketOperations;
+    use hopr_db_sql::info::HoprDbInfoOperations;
     use hopr_db_sql::{HoprDbGeneralModelOperations, TargetDb};
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
@@ -497,8 +498,6 @@ mod tests {
 
     #[async_std::test]
     async fn test_strategy_aggregation_on_tick() {
-        let _ = env_logger::builder().is_test(true).try_init();
-
         // db_0: Alice (channel source)
         // db_1: Bob (channel destination)
         let db_alice = HoprDb::new_in_memory(PEERS_CHAIN[0].clone()).await;
@@ -540,8 +539,6 @@ mod tests {
 
     #[async_std::test]
     async fn test_strategy_aggregation_on_tick_when_unrealized_balance_exceeded() {
-        let _ = env_logger::builder().is_test(true).try_init();
-
         // db_0: Alice (channel source)
         // db_1: Bob (channel destination)
         let db_alice = HoprDb::new_in_memory(PEERS_CHAIN[0].clone()).await;
@@ -584,8 +581,6 @@ mod tests {
     #[async_std::test]
     async fn test_strategy_aggregation_on_tick_should_not_agg_when_unrealized_balance_exceeded_via_aggregated_tickets()
     {
-        let _ = env_logger::builder().is_test(true).try_init();
-
         // db_0: Alice (channel source)
         // db_1: Bob (channel destination)
         let db_alice = HoprDb::new_in_memory(PEERS_CHAIN[0].clone()).await;
@@ -635,8 +630,6 @@ mod tests {
 
     #[async_std::test]
     async fn test_strategy_aggregation_on_channel_close() {
-        let _ = env_logger::builder().is_test(true).try_init();
-
         // db_0: Alice (channel source)
         // db_1: Bob (channel destination)
         let db_alice = HoprDb::new_in_memory(PEERS_CHAIN[0].clone()).await;
@@ -688,8 +681,6 @@ mod tests {
 
     #[async_std::test]
     async fn test_strategy_aggregation_on_tick_should_not_agg_on_channel_close_if_only_single_ticket() {
-        let _ = env_logger::builder().is_test(true).try_init();
-
         // db_0: Alice (channel source)
         // db_1: Bob (channel destination)
         let db_alice = HoprDb::new_in_memory(PEERS_CHAIN[0].clone()).await;

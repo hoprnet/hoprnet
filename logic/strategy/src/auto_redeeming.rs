@@ -5,7 +5,7 @@
 //! For details on default parameters see [AutoRedeemingStrategyConfig].
 use async_trait::async_trait;
 use chain_actions::redeem::TicketRedeemActions;
-use hopr_db_sql::tickets::HoprDbTicketOperations;
+use hopr_db_sql::api::tickets::HoprDbTicketOperations;
 use hopr_internal_types::prelude::*;
 use hopr_internal_types::tickets::{AcknowledgedTicket, AcknowledgedTicketStatus};
 use hopr_primitive_types::prelude::*;
@@ -161,7 +161,7 @@ mod tests {
     use hopr_crypto_types::prelude::*;
     use hopr_db_sql::channels::HoprDbChannelOperations;
     use hopr_db_sql::db::HoprDb;
-    use hopr_db_sql::info::{DomainSeparator, HoprDbInfoOperations};
+    use hopr_db_sql::{api::info::DomainSeparator, info::HoprDbInfoOperations};
     use hopr_db_sql::{HoprDbGeneralModelOperations, TargetDb};
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;

@@ -8,12 +8,11 @@ use libp2p_identity::PeerId;
 use multiaddr::Multiaddr;
 use tracing::debug;
 
-pub use hopr_db_sql::peers::{PeerOrigin, PeerStatus, Stats};
+pub use hopr_db_api::peers::{HoprDbPeersOperations, PeerOrigin, PeerSelector, PeerStatus, Stats};
 use hopr_platform::time::native::current_time;
 
 use crate::config::NetworkConfig;
 
-use hopr_db_sql::peers::PeerSelector;
 #[cfg(all(feature = "prometheus", not(test)))]
 use {
     hopr_metrics::metrics::{MultiGauge, SimpleGauge},
@@ -85,7 +84,7 @@ fn health_from_stats(stats: &Stats, is_public: bool) -> Health {
 #[derive(Debug)]
 pub struct Network<T>
 where
-    T: hopr_db_sql::peers::HoprDbPeersOperations + Sync + Send + std::fmt::Debug,
+    T: HoprDbPeersOperations + Sync + Send + std::fmt::Debug,
 {
     me: PeerId,
     me_addresses: Vec<Multiaddr>,
@@ -98,7 +97,7 @@ where
 
 impl<T> Network<T>
 where
-    T: hopr_db_sql::peers::HoprDbPeersOperations + Sync + Send + std::fmt::Debug,
+    T: HoprDbPeersOperations + Sync + Send + std::fmt::Debug,
 {
     pub fn new(my_peer_id: PeerId, my_multiaddresses: Vec<Multiaddr>, cfg: NetworkConfig, db: T) -> Self {
         if cfg.quality_offline_threshold < cfg.quality_bad_threshold {

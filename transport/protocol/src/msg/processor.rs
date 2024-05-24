@@ -14,7 +14,7 @@ use hopr_crypto_packet::errors::{
     Result,
 };
 use hopr_crypto_types::prelude::*;
-use hopr_db_sql::prelude::HoprDbProtocolOperations;
+use hopr_db_api::prelude::HoprDbProtocolOperations;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 
@@ -148,7 +148,7 @@ where
             Ok(v) => Ok(v.into()),
             Err(e) => {
                 #[cfg(all(feature = "prometheus", not(test)))]
-                if let hopr_db_sql::errors::DbSqlError::TicketValidationError(_) = e {
+                if let hopr_db_api::errors::DbError::TicketValidationError(_) = e {
                     METRIC_REJECTED_TICKETS_COUNT.increment();
                 }
 
@@ -569,7 +569,7 @@ mod tests {
     use hex_literal::hex;
     use hopr_crypto_random::{random_bytes, random_integer};
     use hopr_crypto_types::prelude::*;
-    use hopr_db_sql::info::DomainSeparator;
+    use hopr_db_api::{info::DomainSeparator, resolver::HoprDbResolverOperations};
     use hopr_db_sql::{
         accounts::HoprDbAccountOperations, channels::HoprDbChannelOperations, db::HoprDb, info::HoprDbInfoOperations,
     };
@@ -985,18 +985,18 @@ mod tests {
         struct TestResolver(Vec<(OffchainPublicKey, Address)>);
 
         #[async_trait]
-        impl hopr_db_sql::resolver::HoprDbResolverOperations for TestResolver {
+        impl HoprDbResolverOperations for TestResolver {
             async fn resolve_packet_key(
                 &self,
                 onchain_key: &Address,
-            ) -> hopr_db_sql::errors::Result<Option<OffchainPublicKey>> {
+            ) -> hopr_db_api::errors::Result<Option<OffchainPublicKey>> {
                 Ok(self.0.iter().find(|(_, addr)| addr.eq(onchain_key)).map(|(pk, _)| *pk))
             }
 
             async fn resolve_chain_key(
                 &self,
                 offchain_key: &OffchainPublicKey,
-            ) -> hopr_db_sql::errors::Result<Option<Address>> {
+            ) -> hopr_db_api::errors::Result<Option<Address>> {
                 Ok(self.0.iter().find(|(pk, _)| pk.eq(offchain_key)).map(|(_, addr)| *addr))
             }
         }

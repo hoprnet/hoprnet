@@ -1,7 +1,4 @@
-use std::{
-    str::FromStr,
-    time::{Duration, SystemTime},
-};
+use std::{str::FromStr, time::Duration};
 
 use async_stream::stream;
 use async_trait::async_trait;
@@ -11,159 +8,48 @@ use multiaddr::Multiaddr;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder};
 use sea_query::{Condition, Expr, IntoCondition, Order};
 use sqlx::types::chrono::{self, DateTime, Utc};
-use tracing::{error, trace, warn};
+use tracing::{error, trace};
 
 use hopr_crypto_types::prelude::OffchainPublicKey;
+use hopr_db_api::{
+    errors::Result,
+    peers::{HoprDbPeersOperations, PeerOrigin, PeerSelector, PeerStatus, Stats},
+};
 use hopr_db_entity::network_peer;
 use hopr_primitive_types::prelude::*;
 
-use crate::{db::HoprDb, errors::Result};
+use crate::{db::HoprDb, prelude::DbSqlError};
 
-/// Actual origin.
-///
-/// First occurence of the peer in the network mechanism.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, strum::Display, num_enum::IntoPrimitive, num_enum::TryFromPrimitive)]
-#[repr(u8)]
-pub enum PeerOrigin {
-    #[strum(to_string = "node initialization")]
-    Initialization = 0,
-    #[strum(to_string = "network registry")]
-    NetworkRegistry = 1,
-    #[strum(to_string = "incoming connection")]
-    IncomingConnection = 2,
-    #[strum(to_string = "outgoing connection attempt")]
-    OutgoingConnection = 3,
-    #[strum(to_string = "strategy monitors existing channel")]
-    StrategyExistingChannel = 4,
-    #[strum(to_string = "strategy considers opening a channel")]
-    StrategyConsideringChannel = 5,
-    #[strum(to_string = "strategy decided to open new channel")]
-    StrategyNewChannel = 6,
-    #[strum(to_string = "manual ping")]
-    ManualPing = 7,
-    #[strum(to_string = "testing")]
-    Testing = 8,
-}
+struct WrappedPeerSelector(PeerSelector);
 
-/// Statistical observation related to peers in the network. statistics on all peer entries stored
-/// in the [crate::network::Network] object.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub struct Stats {
-    /// Number of good quality public nodes.
-    pub good_quality_public: u32,
-    /// Number of bad quality public nodes.
-    pub bad_quality_public: u32,
-    /// Number of good quality nodes non-public nodes.
-    pub good_quality_non_public: u32,
-    /// Number of bad quality nodes non-public nodes.
-    pub bad_quality_non_public: u32,
-}
-
-// #[cfg(all(feature = "prometheus", not(test)))]
-impl Stats {
-    /// Returns count of all peers.
-    pub fn all_count(&self) -> usize {
-        self.good_quality_public as usize
-            + self.bad_quality_public as usize
-            + self.good_quality_non_public as usize
-            + self.bad_quality_non_public as usize
+impl From<PeerSelector> for WrappedPeerSelector {
+    fn from(selector: PeerSelector) -> Self {
+        WrappedPeerSelector(selector)
     }
 }
 
-#[derive(Copy, Clone, Debug, Default, PartialEq)]
-pub struct PeerSelector {
-    /// Lower and upper bounds (both inclusive) on last seen timestamp.
-    pub last_seen: (Option<SystemTime>, Option<SystemTime>),
-    /// Lower and upper bounds (both inclusive) on peer quality.
-    pub quality: (Option<f64>, Option<f64>),
-}
-
-impl PeerSelector {
-    pub fn with_last_seen_gte(mut self, lower_bound: SystemTime) -> Self {
-        self.last_seen.0 = Some(lower_bound);
-        self
-    }
-
-    pub fn with_last_seen_lte(mut self, upper_bound: SystemTime) -> Self {
-        self.last_seen.1 = Some(upper_bound);
-        self
-    }
-
-    pub fn with_quality_gte(mut self, lower_bound: f64) -> Self {
-        self.quality.0 = Some(lower_bound);
-        self
-    }
-
-    pub fn with_quality_lte(mut self, upper_bound: f64) -> Self {
-        self.quality.1 = Some(upper_bound);
-        self
-    }
-}
-
-impl IntoCondition for PeerSelector {
+impl IntoCondition for WrappedPeerSelector {
     fn into_condition(self) -> Condition {
         let mut ret = Expr::value(1);
 
-        if let Some(last_seen_l) = self.last_seen.0 {
+        if let Some(last_seen_l) = self.0.last_seen.0 {
             ret = ret.and(network_peer::Column::LastSeen.gte(chrono::DateTime::<chrono::Utc>::from(last_seen_l)));
         }
 
-        if let Some(last_seen_u) = self.last_seen.1 {
+        if let Some(last_seen_u) = self.0.last_seen.1 {
             ret = ret.and(network_peer::Column::LastSeen.lte(chrono::DateTime::<chrono::Utc>::from(last_seen_u)));
         }
 
-        if let Some(quality_l) = self.quality.0 {
+        if let Some(quality_l) = self.0.quality.0 {
             ret = ret.and(network_peer::Column::Quality.gte(quality_l));
         }
 
-        if let Some(quality_u) = self.quality.1 {
+        if let Some(quality_u) = self.0.quality.1 {
             ret = ret.and(network_peer::Column::Quality.lte(quality_u));
         }
 
         ret.into_condition()
     }
-}
-
-#[async_trait]
-pub trait HoprDbPeersOperations {
-    /// Adds a peer to the backend.
-    ///
-    /// Should fail if the given peer id already exists in the store.
-    async fn add_network_peer(
-        &self,
-        peer: &PeerId,
-        origin: PeerOrigin,
-        mas: Vec<Multiaddr>,
-        backoff: f64,
-        quality_window: u32,
-    ) -> Result<()>;
-
-    /// Removes the peer from the backend.
-    ///
-    /// Should fail if the given peer id does not exist.
-    async fn remove_network_peer(&self, peer: &PeerId) -> Result<()>;
-
-    /// Updates stored information about the peer.
-    /// Should fail if the peer does not exist in the store.
-    async fn update_network_peer(&self, new_status: PeerStatus) -> Result<()>;
-
-    /// Gets stored information about the peer.
-    ///
-    /// Should return `None` if such peer does not exist in the store.
-    async fn get_network_peer(&self, peer: &PeerId) -> Result<Option<PeerStatus>>;
-
-    /// Returns a stream of all stored peers, optionally matching the given [SimpleExpr] filter.
-    ///
-    /// The `sort_last_seen_asc` indicates whether the results should be sorted in ascending
-    /// or descending order of the `last_seen` field.
-    async fn get_network_peers<'a>(
-        &'a self,
-        selector: PeerSelector,
-        sort_last_seen_asc: bool,
-    ) -> Result<BoxStream<'a, PeerStatus>>;
-
-    /// Returns the [statistics](Stats) on the stored peers.
-    async fn network_peer_stats(&self, quality_threshold: f64) -> Result<Stats>;
 }
 
 #[async_trait]
@@ -197,7 +83,7 @@ impl HoprDbPeersOperations for HoprDb {
             ..Default::default()
         };
 
-        let _ = new_peer.insert(&self.peers_db).await?;
+        let _ = new_peer.insert(&self.peers_db).await.map_err(DbSqlError::from)?;
 
         Ok(())
     }
@@ -212,14 +98,16 @@ impl HoprDbPeersOperations for HoprDb {
                 )),
             )
             .exec(&self.peers_db)
-            .await?;
+            .await
+            .map_err(DbSqlError::from)?;
 
         if res.rows_affected > 0 {
             Ok(())
         } else {
-            Err(crate::errors::DbSqlError::LogicalError(
-                "peer cannot be removed because it does not exist".into(),
-            ))
+            Err(
+                crate::errors::DbSqlError::LogicalError("peer cannot be removed because it does not exist".into())
+                    .into(),
+            )
         }
     }
 
@@ -227,7 +115,8 @@ impl HoprDbPeersOperations for HoprDb {
         let row = hopr_db_entity::network_peer::Entity::find()
             .filter(hopr_db_entity::network_peer::Column::PacketKey.eq(Vec::from(new_status.id.0.as_ref())))
             .one(&self.peers_db)
-            .await?;
+            .await
+            .map_err(DbSqlError::from)?;
 
         if let Some(model) = row {
             let mut peer_data: hopr_db_entity::network_peer::ActiveModel = model.into();
@@ -256,14 +145,15 @@ impl HoprDbPeersOperations for HoprDb {
             peer_data.heartbeats_sent = sea_orm::ActiveValue::Set(Some(new_status.heartbeats_sent as i32));
             peer_data.heartbeats_successful = sea_orm::ActiveValue::Set(Some(new_status.heartbeats_succeeded as i32));
 
-            peer_data.update(&self.peers_db).await?;
+            peer_data.update(&self.peers_db).await.map_err(DbSqlError::from)?;
 
             Ok(())
         } else {
             Err(crate::errors::DbSqlError::LogicalError(format!(
                 "cannot update a non-existing peer '{}'",
                 new_status.id.1
-            )))
+            ))
+            .into())
         }
     }
 
@@ -277,10 +167,12 @@ impl HoprDbPeersOperations for HoprDb {
                 )),
             )
             .one(&self.peers_db)
-            .await?;
+            .await
+            .map_err(DbSqlError::from)?;
 
         if let Some(model) = row {
-            Ok(Some(model.try_into()?))
+            let status: WrappedPeerStatus = model.try_into()?;
+            Ok(Some(status.0))
         } else {
             Ok(None)
         }
@@ -291,6 +183,7 @@ impl HoprDbPeersOperations for HoprDb {
         selector: PeerSelector,
         sort_last_seen_asc: bool,
     ) -> Result<BoxStream<'a, PeerStatus>> {
+        let selector: WrappedPeerSelector = selector.into();
         let mut sub_stream = hopr_db_entity::network_peer::Entity::find()
             // .filter(hopr_db_entity::network_peer::Column::Ignored.is_not_null())
             .filter(selector)
@@ -299,15 +192,16 @@ impl HoprDbPeersOperations for HoprDb {
                 if sort_last_seen_asc { Order::Asc } else { Order::Desc },
             )
             .stream(&self.peers_db)
-            .await?;
+            .await
+            .map_err(DbSqlError::from)?;
 
         Ok(Box::pin(stream! {
             loop {
                 match sub_stream.try_next().await {
                     Ok(Some(peer_row)) => {
                         trace!("got db network row: {peer_row:?}");
-                        match PeerStatus::try_from(peer_row) {
-                            Ok(peer_status) => yield peer_status,
+                        match WrappedPeerStatus::try_from(peer_row) {
+                            Ok(peer_status) => yield peer_status.0,
                             Err(e) => error!("cannot map peer from row: {e}"),
                         }
                     },
@@ -334,7 +228,8 @@ impl HoprDbPeersOperations for HoprDb {
                         .add(hopr_db_entity::network_peer::Column::Quality.gt(quality_threshold)),
                 )
                 .count(&self.peers_db)
-                .await? as u32,
+                .await
+                .map_err(DbSqlError::from)? as u32,
             good_quality_non_public: hopr_db_entity::network_peer::Entity::find()
                 .filter(
                     sea_orm::Condition::all()
@@ -343,7 +238,8 @@ impl HoprDbPeersOperations for HoprDb {
                         .add(hopr_db_entity::network_peer::Column::Quality.gt(quality_threshold)),
                 )
                 .count(&self.peers_db)
-                .await? as u32,
+                .await
+                .map_err(DbSqlError::from)? as u32,
             bad_quality_public: hopr_db_entity::network_peer::Entity::find()
                 .filter(
                     sea_orm::Condition::all()
@@ -352,7 +248,8 @@ impl HoprDbPeersOperations for HoprDb {
                         .add(hopr_db_entity::network_peer::Column::Quality.lte(quality_threshold)),
                 )
                 .count(&self.peers_db)
-                .await? as u32,
+                .await
+                .map_err(DbSqlError::from)? as u32,
             bad_quality_non_public: hopr_db_entity::network_peer::Entity::find()
                 .filter(
                     sea_orm::Condition::all()
@@ -361,77 +258,21 @@ impl HoprDbPeersOperations for HoprDb {
                         .add(hopr_db_entity::network_peer::Column::Quality.lte(quality_threshold)),
                 )
                 .count(&self.peers_db)
-                .await? as u32,
+                .await
+                .map_err(DbSqlError::from)? as u32,
         })
     }
 }
 
-/// Status of the peer as recorded by the [Network].
-#[derive(Debug, Clone, PartialEq)]
-pub struct PeerStatus {
-    pub id: (OffchainPublicKey, PeerId),
-    pub origin: PeerOrigin,
-    pub is_public: bool,
-    pub last_seen: SystemTime,
-    pub last_seen_latency: Duration,
-    pub heartbeats_sent: u64,
-    pub heartbeats_succeeded: u64,
-    pub backoff: f64,
-    pub ignored: Option<SystemTime>,
-    pub peer_version: Option<String>,
-    pub multiaddresses: Vec<Multiaddr>,
-    pub(crate) quality: f64,
-    pub(crate) quality_avg: SingleSumSMA<f64>,
-}
+struct WrappedPeerStatus(PeerStatus);
 
-impl PeerStatus {
-    pub fn new(id: PeerId, origin: PeerOrigin, backoff: f64, quality_window: u32) -> PeerStatus {
-        PeerStatus {
-            id: (OffchainPublicKey::try_from(&id).expect("invalid peer id given"), id),
-            origin,
-            is_public: true,
-            heartbeats_sent: 0,
-            heartbeats_succeeded: 0,
-            last_seen: SystemTime::UNIX_EPOCH,
-            last_seen_latency: Duration::default(),
-            ignored: None,
-            backoff,
-            quality: 0.0,
-            peer_version: None,
-            quality_avg: SingleSumSMA::new(quality_window as usize),
-            multiaddresses: vec![],
-        }
-    }
-
-    // Update both the immediate last quality and the average windowed quality
-    pub fn update_quality(&mut self, new_value: f64) {
-        if (0.0f64..=1.0f64).contains(&new_value) {
-            self.quality = new_value;
-            self.quality_avg.push(new_value);
-        } else {
-            warn!("Quality failed to update with value outside the [0,1] range")
-        }
-    }
-
-    /// Gets the average quality of this peer
-    pub fn get_average_quality(&self) -> f64 {
-        self.quality_avg.average().unwrap_or_default()
-    }
-
-    /// Gets the immediate node quality
-    pub fn get_quality(&self) -> f64 {
-        self.quality
+impl From<PeerStatus> for WrappedPeerStatus {
+    fn from(status: PeerStatus) -> Self {
+        WrappedPeerStatus(status)
     }
 }
 
-impl std::fmt::Display for PeerStatus {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "Entry: [id={}, origin={}, last seen on={:?}, quality={}, heartbeats sent={}, heartbeats succeeded={}, backoff={}]",
-            self.id.1, self.origin, self.last_seen, self.quality, self.heartbeats_sent, self.heartbeats_succeeded, self.backoff)
-    }
-}
-
-impl TryFrom<hopr_db_entity::network_peer::Model> for PeerStatus {
+impl TryFrom<hopr_db_entity::network_peer::Model> for WrappedPeerStatus {
     type Error = crate::errors::DbSqlError;
 
     fn try_from(value: hopr_db_entity::network_peer::Model) -> std::result::Result<Self, Self::Error> {
@@ -472,7 +313,8 @@ impl TryFrom<hopr_db_entity::network_peer::Model> for PeerStatus {
                     .as_slice(),
             )
             .map_err(|_| Self::Error::DecodingError)?,
-        })
+        }
+        .into())
     }
 }
 

@@ -30,8 +30,8 @@ use async_trait::async_trait;
 use chain_actions::channels::ChannelActions;
 use futures::StreamExt;
 use hopr_crypto_random::OsRng;
+use hopr_db_sql::api::peers::PeerSelector;
 use hopr_db_sql::errors::DbSqlError;
-use hopr_db_sql::peers::PeerSelector;
 use hopr_db_sql::HoprDbAllOperations;
 use rand::seq::SliceRandom;
 use semver::Version;
@@ -218,7 +218,7 @@ where
                             .db
                             .resolve_chain_key(&status.id.0)
                             .await
-                            .and_then(|addr| addr.ok_or(DbSqlError::MissingAccount))
+                            .and_then(|addr| addr.ok_or(DbSqlError::MissingAccount.into()))
                         {
                             Some((addr, status.get_average_quality()))
                         } else {
@@ -245,7 +245,8 @@ where
         let outgoing_open_channels = self
             .db
             .get_outgoing_channels(None)
-            .await?
+            .await
+            .map_err(hopr_db_sql::api::errors::DbError::from)?
             .into_iter()
             .filter(|channel| channel.status == ChannelStatus::Open)
             .collect::<Vec<_>>();
@@ -347,7 +348,11 @@ where
             new_channel_candidates.truncate(max_auto_channels - occupied);
             debug!("got {} new channel candidates", new_channel_candidates.len());
 
-            let mut remaining_balance = self.db.get_safe_hopr_balance(None).await?;
+            let mut remaining_balance = self
+                .db
+                .get_safe_hopr_balance(None)
+                .await
+                .map_err(hopr_db_sql::api::errors::DbError::from)?;
 
             // Go through the new candidates for opening channels allow them to open based on our available node balance
             for (address, _) in new_channel_candidates {
@@ -464,10 +469,10 @@ mod tests {
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::prelude::*;
     use hopr_db_sql::accounts::HoprDbAccountOperations;
+    use hopr_db_sql::api::peers::HoprDbPeersOperations;
     use hopr_db_sql::channels::HoprDbChannelOperations;
     use hopr_db_sql::db::HoprDb;
     use hopr_db_sql::info::HoprDbInfoOperations;
-    use hopr_db_sql::peers::HoprDbPeersOperations;
     use hopr_db_sql::HoprDbGeneralModelOperations;
     use lazy_static::lazy_static;
     use mockall::mock;
@@ -635,8 +640,6 @@ mod tests {
 
     #[async_std::test]
     async fn test_promiscuous_strategy_tick_decisions() {
-        let _ = env_logger::builder().is_test(true).try_init();
-
         let db = HoprDb::new_in_memory(ALICE.clone()).await;
 
         let qualities_that_alice_sees = vec![0.7, 0.9, 0.8, 0.98, 0.1, 0.3, 0.1, 0.2, 1.0];

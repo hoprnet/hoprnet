@@ -1,4 +1,5 @@
 use futures::{future::BoxFuture, StreamExt, TryStreamExt};
+use hopr_db_api::tickets::TicketSelector;
 use hopr_db_entity::ticket;
 use hopr_primitive_types::primitives::{Balance, BalanceType};
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, TransactionTrait};
@@ -11,7 +12,8 @@ use hopr_primitive_types::prelude::ToHex;
 use crate::cache::HoprDbCaches;
 use crate::executor::spawn;
 use crate::prelude::DbSqlError;
-use crate::{errors::Result, tickets::TicketSelector, OpenTransaction};
+use crate::tickets::WrappedTicketSelector;
+use crate::{errors::Result, OpenTransaction};
 
 /// Functionality related to locking and structural improvements to the underlying SQLite database
 ///
@@ -143,6 +145,9 @@ impl TicketManager {
 
     /// Get unrealized value for a channel
     pub async fn unrealized_value(&self, selector: TicketSelector) -> Result<Balance> {
+        let selector: WrappedTicketSelector = selector.into();
+        let channel_id = selector.0.channel_id;
+
         let transaction = OpenTransaction(
             self.tickets_db
                 .begin_with_config(None, None)
@@ -154,7 +159,7 @@ impl TicketManager {
         Ok(self
             .caches
             .unrealized_value
-            .try_get_with_by_ref(&selector.channel_id, async move {
+            .try_get_with_by_ref(&channel_id, async move {
                 transaction
                     .perform(|tx| {
                         Box::pin(async move {
@@ -201,13 +206,14 @@ impl TicketManager {
 mod tests {
     use hex_literal::hex;
     use hopr_crypto_types::prelude::*;
+    use hopr_db_api::info::DomainSeparator;
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
 
     use crate::accounts::HoprDbAccountOperations;
     use crate::channels::HoprDbChannelOperations;
     use crate::db::HoprDb;
-    use crate::info::{DomainSeparator, HoprDbInfoOperations};
+    use crate::info::HoprDbInfoOperations;
 
     lazy_static::lazy_static! {
         static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).unwrap();

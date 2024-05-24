@@ -53,11 +53,20 @@ pub enum DbSqlError {
 
     #[error(transparent)]
     NonSpecificError(#[from] hopr_primitive_types::errors::GeneralError),
+
+    #[error(transparent)]
+    ApiError(#[from] hopr_db_api::errors::DbError),
 }
 
 impl From<TicketValidationError> for DbSqlError {
     fn from(value: TicketValidationError) -> Self {
         DbSqlError::TicketValidationError(Box::new((*value.ticket, value.reason)))
+    }
+}
+
+impl From<DbSqlError> for hopr_db_api::errors::DbError {
+    fn from(value: DbSqlError) -> Self {
+        hopr_db_api::errors::DbError::General(value.to_string())
     }
 }
 

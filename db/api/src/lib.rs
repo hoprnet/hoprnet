@@ -3,6 +3,7 @@
 //! Functionality defined here is meant to be used mostly by other higher-level crates.
 
 pub mod errors;
+pub mod info;
 pub mod peers;
 pub mod protocol;
 pub mod resolver;
@@ -23,6 +24,7 @@ pub trait HoprDbAllAbstractedOperations:
 pub mod prelude {
     pub use super::*;
     pub use crate::errors::*;
+    pub use crate::info::*;
     pub use crate::peers::*;
     pub use crate::protocol::*;
     pub use crate::resolver::*;

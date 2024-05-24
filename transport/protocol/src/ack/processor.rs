@@ -10,8 +10,8 @@ use tracing::{error, trace, warn};
 use hopr_crypto_packet::errors::PacketError::{Retry, TransportError};
 use hopr_crypto_packet::errors::Result;
 use hopr_crypto_types::prelude::*;
-use hopr_db_sql::prelude::HoprDbProtocolOperations;
-pub use hopr_db_sql::protocol::AckResult;
+pub use hopr_db_api::protocol::AckResult;
+use hopr_db_api::protocol::HoprDbProtocolOperations;
 use hopr_internal_types::prelude::*;
 
 use crate::executor::spawn;
@@ -69,7 +69,7 @@ impl<Db: HoprDbProtocolOperations> AcknowledgementProcessor<Db> {
     pub async fn handle_acknowledgement(
         &self,
         ack: Acknowledgement,
-    ) -> std::result::Result<AckResult, hopr_db_sql::errors::DbSqlError> {
+    ) -> std::result::Result<AckResult, hopr_db_api::errors::DbError> {
         self.db.handle_acknowledgement(ack, &self.chain_key).await
     }
 }

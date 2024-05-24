@@ -7,6 +7,7 @@ use futures::{
     },
     pin_mut,
 };
+use hopr_db_api::peers::HoprDbPeersOperations;
 use hopr_primitive_types::traits::SaturatingSub;
 use libp2p_identity::PeerId;
 use serde::{Deserialize, Serialize};
@@ -94,14 +95,14 @@ pub trait HeartbeatExternalApi {
 #[derive(Debug, Clone)]
 pub struct HeartbeatExternalInteractions<T>
 where
-    T: hopr_db_sql::peers::HoprDbPeersOperations + Sync + Send + std::fmt::Debug,
+    T: HoprDbPeersOperations + Sync + Send + std::fmt::Debug,
 {
     network: Arc<Network<T>>,
 }
 
 impl<T> HeartbeatExternalInteractions<T>
 where
-    T: hopr_db_sql::peers::HoprDbPeersOperations + Sync + Send + std::fmt::Debug,
+    T: HoprDbPeersOperations + Sync + Send + std::fmt::Debug,
 {
     pub fn new(network: Arc<Network<T>>) -> Self {
         Self { network }
@@ -111,7 +112,7 @@ where
 #[async_trait]
 impl<T> HeartbeatExternalApi for HeartbeatExternalInteractions<T>
 where
-    T: hopr_db_sql::peers::HoprDbPeersOperations + Sync + Send + std::fmt::Debug,
+    T: HoprDbPeersOperations + Sync + Send + std::fmt::Debug,
 {
     /// Get all peers considered by the `Network` to be pingable.
     ///

@@ -11,7 +11,7 @@ pub enum HoprTransportError {
     General(#[from] hopr_primitive_types::errors::GeneralError),
 
     #[error("Db error: {0}")]
-    Db(#[from] hopr_db_sql::errors::DbSqlError),
+    Db(#[from] hopr_db_sql::api::errors::DbError),
 
     #[error("Path error: {0}")]
     Path(#[from] core_path::errors::PathError),

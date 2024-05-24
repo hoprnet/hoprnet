@@ -2,6 +2,11 @@ use async_trait::async_trait;
 use hopr_crypto_packet::chain::ChainPacketComponents;
 use hopr_crypto_packet::validation::validate_unacknowledged_ticket;
 use hopr_crypto_types::prelude::*;
+use hopr_db_api::errors::Result;
+use hopr_db_api::protocol::{
+    AckResult, HoprDbProtocolOperations, ResolvedAcknowledgement, TransportPacketWithChainData,
+};
+use hopr_db_api::resolver::HoprDbResolverOperations;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use std::ops::Sub;
@@ -11,97 +16,13 @@ use crate::channels::HoprDbChannelOperations;
 use crate::db::HoprDb;
 use crate::errors::DbSqlError;
 use crate::info::HoprDbInfoOperations;
-use crate::prelude::{HoprDbResolverOperations, HoprDbTicketOperations};
+use crate::prelude::HoprDbTicketOperations;
 use crate::{HoprDbGeneralModelOperations, OptTx};
-
-/// Trait defining all DB functionality needed by packet/acknowledgement processing pipeline.
-#[async_trait]
-pub trait HoprDbProtocolOperations {
-    /// Processes the acknowledgements for the pending tickets
-    ///
-    /// There are three cases:
-    /// 1. There is an unacknowledged ticket and we are awaiting a half key.
-    /// 2. We were the creator of the packet, hence we do not wait for any half key
-    /// 3. The acknowledgement is unexpected and stems from a protocol bug or an attacker
-    async fn handle_acknowledgement(&self, ack: Acknowledgement, me: &ChainKeypair)
-        -> crate::errors::Result<AckResult>;
-
-    /// Process the data into an outgoing packet
-    async fn to_send(
-        &self,
-        data: Box<[u8]>,
-        me: ChainKeypair,
-        path: Vec<OffchainPublicKey>,
-    ) -> crate::errors::Result<TransportPacketWithChainData>;
-
-    /// Process the incoming packet into data
-    #[allow(clippy::wrong_self_convention)]
-    async fn from_recv(
-        &self,
-        data: Box<[u8]>,
-        me: ChainKeypair,
-        pkt_keypair: &OffchainKeypair,
-        sender: OffchainPublicKey,
-    ) -> crate::errors::Result<TransportPacketWithChainData>;
-}
-
-#[allow(clippy::large_enum_variant)] // TODO: Uses too large objects
-#[derive(Debug)]
-pub enum AckResult {
-    Sender(HalfKeyChallenge),
-    RelayerWinning(AcknowledgedTicket),
-    RelayerLosing,
-}
-
-pub enum TransportPacketWithChainData {
-    /// Packet is intended for us
-    Final {
-        packet_tag: PacketTag,
-        previous_hop: OffchainPublicKey,
-        plain_text: Box<[u8]>,
-        ack: Acknowledgement,
-    },
-    /// Packet must be forwarded
-    Forwarded {
-        packet_tag: PacketTag,
-        previous_hop: OffchainPublicKey,
-        next_hop: OffchainPublicKey,
-        data: Box<[u8]>,
-        ack: Acknowledgement,
-    },
-    /// Packet that is being sent out by us
-    Outgoing {
-        next_hop: OffchainPublicKey,
-        ack_challenge: HalfKeyChallenge,
-        data: Box<[u8]>,
-    },
-}
-
-#[allow(clippy::large_enum_variant)] // TODO: Uses too large objects
-enum ResolvedAcknowledgement {
-    Sending(HalfKeyChallenge),
-    RelayingWin(AcknowledgedTicket),
-    RelayingLoss(Hash),
-}
-
-impl From<ResolvedAcknowledgement> for AckResult {
-    fn from(value: ResolvedAcknowledgement) -> Self {
-        match value {
-            ResolvedAcknowledgement::Sending(ack_challenge) => AckResult::Sender(ack_challenge),
-            ResolvedAcknowledgement::RelayingWin(ack_ticket) => AckResult::RelayerWinning(ack_ticket),
-            ResolvedAcknowledgement::RelayingLoss(_) => AckResult::RelayerLosing,
-        }
-    }
-}
 
 #[async_trait]
 impl HoprDbProtocolOperations for HoprDb {
     #[instrument(level = "trace", skip(self))]
-    async fn handle_acknowledgement(
-        &self,
-        ack: Acknowledgement,
-        me: &ChainKeypair,
-    ) -> crate::errors::Result<AckResult> {
+    async fn handle_acknowledgement(&self, ack: Acknowledgement, me: &ChainKeypair) -> Result<AckResult> {
         let myself = self.clone();
         let me_ckp = me.clone();
 
@@ -183,7 +104,7 @@ impl HoprDbProtocolOperations for HoprDb {
                     crate::tickets::METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(
                         &[&channel, "unredeemed"],
                         self.ticket_manager
-                            .unrealized_value(crate::tickets::TicketSelector::new(
+                            .unrealized_value(hopr_db_api::tickets::TicketSelector::new(
                                 verified_ticket.channel_id,
                                 verified_ticket.channel_epoch,
                             ))
@@ -214,21 +135,20 @@ impl HoprDbProtocolOperations for HoprDb {
         data: Box<[u8]>,
         me: ChainKeypair,
         path: Vec<OffchainPublicKey>,
-    ) -> crate::errors::Result<TransportPacketWithChainData> {
+    ) -> Result<TransportPacketWithChainData> {
         let myself = self.clone();
+        let next_peer = myself.resolve_chain_key(&path[0]).await?.ok_or_else(|| {
+            crate::errors::DbSqlError::LogicalError(format!(
+                "failed to find channel key for packet key {} on previous hop",
+                path[0].to_peerid_str()
+            ))
+        })?;
 
         let components = self
             .begin_transaction()
             .await?
             .perform(|tx| {
                 Box::pin(async move {
-                    let next_peer = myself.resolve_chain_key(&path[0]).await?.ok_or_else(|| {
-                        crate::errors::DbSqlError::LogicalError(format!(
-                            "failed to find channel key for packet key {} on previous hop",
-                            path[0].to_peerid_str()
-                        ))
-                    })?;
-
                     let domain_separator = myself.get_indexer_data(Some(tx)).await?.channels_dst.ok_or_else(|| {
                         crate::errors::DbSqlError::LogicalError("failed to fetch the domain separator".into())
                     })?;
@@ -254,9 +174,9 @@ impl HoprDbProtocolOperations for HoprDb {
             .await?;
 
         match components {
-            ChainPacketComponents::Final { .. } | ChainPacketComponents::Forwarded { .. } => Err(
-                crate::errors::DbSqlError::LogicalError("Must contain an outgoing packet type".into()),
-            ),
+            ChainPacketComponents::Final { .. } | ChainPacketComponents::Forwarded { .. } => {
+                Err(crate::errors::DbSqlError::LogicalError("Must contain an outgoing packet type".into()).into())
+            }
             ChainPacketComponents::Outgoing {
                 packet,
                 ticket,
@@ -290,7 +210,7 @@ impl HoprDbProtocolOperations for HoprDb {
         me: ChainKeypair,
         pkt_keypair: &OffchainKeypair,
         sender: OffchainPublicKey,
-    ) -> crate::errors::Result<TransportPacketWithChainData> {
+    ) -> Result<TransportPacketWithChainData> {
         match ChainPacketComponents::from_incoming(&data, pkt_keypair, sender).map_err(|e| {
             crate::errors::DbSqlError::LogicalError(format!("failed to construct an incoming packet: {e}"))
         })? {
@@ -323,6 +243,19 @@ impl HoprDbProtocolOperations for HoprDb {
                 path_pos,
             } => {
                 let myself = self.clone();
+                let previous_hop_addr = myself.resolve_chain_key(&previous_hop).await?.ok_or_else(|| {
+                    DbSqlError::LogicalError(format!(
+                        "failed to find channel key for packet key {} on previous hop",
+                        previous_hop.to_peerid_str()
+                    ))
+                })?;
+
+                let next_hop_addr = myself.resolve_chain_key(&next_hop).await?.ok_or_else(|| {
+                    DbSqlError::LogicalError(format!(
+                        "failed to find channel key for packet key {} on next hop",
+                        next_hop.to_peerid_str()
+                    ))
+                })?;
 
                 let verified_ticket = match self
                     .begin_transaction()
@@ -337,21 +270,6 @@ impl HoprDbProtocolOperations for HoprDb {
                             let ticket_price = chain_data
                                 .ticket_price
                                 .ok_or_else(|| DbSqlError::LogicalError("failed to fetch the ticket price".into()))?;
-
-                            let previous_hop_addr =
-                                myself.resolve_chain_key(&previous_hop).await?.ok_or_else(|| {
-                                    DbSqlError::LogicalError(format!(
-                                        "failed to find channel key for packet key {} on previous hop",
-                                        previous_hop.to_peerid_str()
-                                    ))
-                                })?;
-
-                            let next_hop_addr = myself.resolve_chain_key(&next_hop).await?.ok_or_else(|| {
-                                DbSqlError::LogicalError(format!(
-                                    "failed to find channel key for packet key {} on next hop",
-                                    next_hop.to_peerid_str()
-                                ))
-                            })?;
 
                             // TODO: cache this DB call too, or use the channel graph
                             let channel = myself
@@ -453,7 +371,7 @@ impl HoprDbProtocolOperations for HoprDb {
                 })
             }
             ChainPacketComponents::Outgoing { .. } => {
-                Err(DbSqlError::LogicalError("Cannot receive an outgoing packet".into()))
+                Err(DbSqlError::LogicalError("Cannot receive an outgoing packet".into()).into())
             }
         }
     }

@@ -101,7 +101,7 @@ mod tests {
     use hopr_crypto_types::prelude::*;
     use hopr_db_sql::accounts::HoprDbAccountOperations;
     use hopr_db_sql::db::HoprDb;
-    use hopr_db_sql::info::{DomainSeparator, HoprDbInfoOperations};
+    use hopr_db_sql::{api::info::DomainSeparator, info::HoprDbInfoOperations};
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
     use multiaddr::Multiaddr;
@@ -117,8 +117,6 @@ mod tests {
 
     #[async_std::test]
     async fn test_announce() {
-        let _ = env_logger::builder().is_test(true).try_init();
-
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
         let announce_multiaddr = Multiaddr::from_str("/ip4/1.2.3.4/tcp/9009").unwrap();
 
@@ -181,8 +179,6 @@ mod tests {
 
     #[async_std::test]
     async fn test_announce_should_not_allow_reannouncing_with_same_multiaddress() {
-        let _ = env_logger::builder().is_test(true).try_init();
-
         let announce_multiaddr = Multiaddr::from_str("/ip4/1.2.3.4/tcp/9009").unwrap();
 
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
@@ -223,8 +219,6 @@ mod tests {
 
     #[async_std::test]
     async fn test_withdraw() {
-        let _ = env_logger::builder().is_test(true).try_init();
-
         let stake = Balance::new(10_u32, BalanceType::HOPR);
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
 
@@ -271,8 +265,6 @@ mod tests {
 
     #[async_std::test]
     async fn test_should_not_withdraw_zero_amount() {
-        let _ = env_logger::builder().is_test(true).try_init();
-
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
         db.set_domain_separator(None, DomainSeparator::Channel, Default::default())
             .await

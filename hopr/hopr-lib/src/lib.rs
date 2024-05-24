@@ -87,10 +87,9 @@ use crate::{config::SafeModule, errors::HoprLibError};
 
 use hopr_db_sql::{
     accounts::HoprDbAccountOperations,
+    api::{info::SafeInfo, resolver::HoprDbResolverOperations, tickets::HoprDbTicketOperations},
     db::{HoprDb, HoprDbConfig},
-    info::{HoprDbInfoOperations, SafeInfo},
-    resolver::HoprDbResolverOperations,
-    tickets::HoprDbTicketOperations,
+    info::HoprDbInfoOperations,
     HoprDbGeneralModelOperations,
 };
 use hopr_db_sql::{channels::HoprDbChannelOperations, HoprDbAllOperations};
@@ -857,7 +856,11 @@ impl Hopr {
             })?;
 
             // Sync all the qualities there too
-            let mut peer_stream = self.db.get_network_peers(Default::default(), false).await?;
+            let mut peer_stream = self
+                .db
+                .get_network_peers(Default::default(), false)
+                .await
+                .map_err(hopr_db_sql::api::errors::DbError::from)?;
             while let Some(peer) = peer_stream.next().await {
                 if let Some(ChainKey(key)) = self.db.translate_key(None, peer.id.0).await? {
                     cg.update_channel_quality(self.me_onchain(), key, peer.get_quality());

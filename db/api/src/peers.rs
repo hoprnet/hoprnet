@@ -106,8 +106,10 @@ pub struct PeerStatus {
     pub ignored: Option<SystemTime>,
     pub peer_version: Option<String>,
     pub multiaddresses: Vec<Multiaddr>,
-    pub(crate) quality: f64,
-    pub(crate) quality_avg: SingleSumSMA<f64>,
+    // Should be public(crate) but the separation through traits does not allow direct SQL ORM serde
+    pub quality: f64,
+    // Should be public(crate) but the separation through traits does not allow direct SQL ORM serde
+    pub quality_avg: SingleSumSMA<f64>,
 }
 
 impl PeerStatus {

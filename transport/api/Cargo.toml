@@ -11,11 +11,25 @@ crate-type = ["rlib"]
 
 [features]
 default = []
-runtime-async-std = ["async-std", "core-protocol/runtime-async-std", "core-p2p/runtime-async-std"]
-runtime-tokio = ["tokio", "core-protocol/runtime-tokio", "core-p2p/runtime-tokio"]
+runtime-async-std = [
+    "async-std",
+    "core-protocol/runtime-async-std",
+    "core-p2p/runtime-async-std",
+    "hopr-db-sql/runtime-async-std"
+]
+runtime-tokio = [
+    "tokio",
+    "core-protocol/runtime-tokio",
+    "core-p2p/runtime-tokio",
+    "hopr-db-sql/runtime-tokio"
+]
 prometheus = [
     "dep:lazy_static", "dep:hopr-metrics",
-    "core-network/prometheus", "hopr-crypto-packet/prometheus", "core-path/prometheus", "core-protocol/prometheus"
+    "core-network/prometheus",
+    "hopr-crypto-packet/prometheus",
+    "core-path/prometheus",
+    "core-protocol/prometheus",
+    "hopr-db-sql/prometheus"
 ]
 
 [dependencies]

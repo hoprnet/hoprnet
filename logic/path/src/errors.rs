@@ -1,4 +1,4 @@
-use hopr_db_sql::errors::DbSqlError;
+use hopr_db_sql::{api::errors::DbError, errors::DbSqlError};
 use hopr_primitive_types::errors::GeneralError;
 use thiserror::Error;
 
@@ -25,6 +25,9 @@ pub enum PathError {
 
     #[error(transparent)]
     DatabaseError(#[from] DbSqlError),
+
+    #[error(transparent)]
+    DbError(#[from] DbError),
 
     #[error(transparent)]
     OtherError(#[from] GeneralError),

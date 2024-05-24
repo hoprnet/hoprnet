@@ -228,8 +228,8 @@ mod tests {
     use hopr_crypto_types::prelude::*;
     use hopr_db_sql::channels::HoprDbChannelOperations;
     use hopr_db_sql::db::HoprDb;
-    use hopr_db_sql::info::{DomainSeparator, HoprDbInfoOperations};
     use hopr_db_sql::HoprDbGeneralModelOperations;
+    use hopr_db_sql::{api::info::DomainSeparator, info::HoprDbInfoOperations};
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
     use lazy_static::lazy_static;
@@ -254,8 +254,6 @@ mod tests {
 
     #[async_std::test]
     async fn test_open_channel() {
-        let _ = env_logger::builder().is_test(true).try_init();
-
         let stake = Balance::new(10_u32, BalanceType::HOPR);
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
 
@@ -329,7 +327,6 @@ mod tests {
 
     #[async_std::test]
     async fn test_should_not_open_channel_again() {
-        let _ = env_logger::builder().is_test(true).try_init();
         let stake = Balance::new(10_u32, BalanceType::HOPR);
 
         let channel = ChannelEntry::new(*ALICE, *BOB, stake, U256::zero(), ChannelStatus::Open, U256::zero());
@@ -377,8 +374,6 @@ mod tests {
 
     #[async_std::test]
     async fn test_should_not_open_channel_to_self() {
-        let _ = env_logger::builder().is_test(true).try_init();
-
         let stake = Balance::new(10_u32, BalanceType::HOPR);
 
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
@@ -423,8 +418,6 @@ mod tests {
 
     #[async_std::test]
     async fn test_open_should_not_allow_invalid_balance() {
-        let _ = env_logger::builder().is_test(true).try_init();
-
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
         let db_clone = db.clone();
         db.begin_transaction()
@@ -477,8 +470,6 @@ mod tests {
 
     #[async_std::test]
     async fn test_should_not_open_if_not_enough_allowance() {
-        let _ = env_logger::builder().is_test(true).try_init();
-
         let stake = Balance::new(10_000_u32, BalanceType::HOPR);
 
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
@@ -523,8 +514,6 @@ mod tests {
 
     #[async_std::test]
     async fn test_should_not_open_if_not_enough_token_balance() {
-        let _ = env_logger::builder().is_test(true).try_init();
-
         let stake = Balance::new(10_000_u32, BalanceType::HOPR);
 
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
@@ -569,8 +558,6 @@ mod tests {
 
     #[async_std::test]
     async fn test_fund_channel() {
-        let _ = env_logger::builder().is_test(true).try_init();
-
         let stake = Balance::new(10_u32, BalanceType::HOPR);
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
         let channel = ChannelEntry::new(*ALICE, *BOB, stake, U256::zero(), ChannelStatus::Open, U256::zero());
@@ -645,8 +632,6 @@ mod tests {
 
     #[async_std::test]
     async fn test_should_not_fund_nonexistent_channel() {
-        let _ = env_logger::builder().is_test(true).try_init();
-
         let channel_id = generate_channel_id(&*ALICE, &*BOB);
 
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
@@ -691,8 +676,6 @@ mod tests {
 
     #[async_std::test]
     async fn test_fund_should_not_allow_invalid_balance() {
-        let _ = env_logger::builder().is_test(true).try_init();
-
         let channel_id = generate_channel_id(&*ALICE, &*BOB);
 
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
@@ -746,8 +729,6 @@ mod tests {
 
     #[async_std::test]
     async fn test_should_not_fund_if_not_enough_allowance() {
-        let _ = env_logger::builder().is_test(true).try_init();
-
         let channel_id = generate_channel_id(&*ALICE, &*BOB);
 
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
@@ -792,8 +773,6 @@ mod tests {
 
     #[async_std::test]
     async fn test_should_not_fund_if_not_enough_balance() {
-        let _ = env_logger::builder().is_test(true).try_init();
-
         let channel_id = generate_channel_id(&*ALICE, &*BOB);
 
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
@@ -838,8 +817,6 @@ mod tests {
 
     #[async_std::test]
     async fn test_close_channel_outgoing() {
-        let _ = env_logger::builder().is_test(true).try_init();
-
         let stake = Balance::new(10_u32, BalanceType::HOPR);
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
 
@@ -1094,8 +1071,6 @@ mod tests {
 
     #[async_std::test]
     async fn test_should_not_close_nonexistent_channel() {
-        let _ = env_logger::builder().is_test(true).try_init();
-
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
         let db_clone = db.clone();
         db.begin_transaction()
@@ -1141,8 +1116,6 @@ mod tests {
 
     #[async_std::test]
     async fn test_should_not_close_closed_channel() {
-        let _ = env_logger::builder().is_test(true).try_init();
-
         let stake = Balance::new(10_u32, BalanceType::HOPR);
         let channel = ChannelEntry::new(*ALICE, *BOB, stake, U256::zero(), ChannelStatus::Closed, U256::zero());
 

@@ -11,9 +11,9 @@ crate-type = ["rlib"]
 
 [features]
 default = []
-runtime-async-std = ["async-std", "chain-indexer/runtime-async-std"]
-runtime-tokio = ["tokio", "chain-indexer/runtime-tokio"]
-prometheus = ["chain-rpc/prometheus", "chain-actions/prometheus", "chain-indexer/prometheus"]
+runtime-async-std = ["async-std", "chain-indexer/runtime-async-std", "hopr-db-sql/runtime-async-std", "chain-actions/runtime-async-std"]
+runtime-tokio = ["tokio", "chain-indexer/runtime-tokio", "hopr-db-sql/runtime-tokio", "chain-actions/runtime-tokio"]
+prometheus = ["chain-rpc/prometheus", "chain-actions/prometheus", "chain-indexer/prometheus", "hopr-db-sql/prometheus"]
 
 [dependencies]
 async-channel = { workspace = true }
@@ -43,4 +43,6 @@ hopr-primitive-types = { workspace = true }
 hopr-db-sql = { workspace = true }
 
 [dev-dependencies]
-async-std = { workspace = true}
+async-std = { workspace = true }
+hopr-db-sql = { workspace = true, features = ["runtime-async-std"] }
+

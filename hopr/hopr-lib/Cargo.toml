@@ -11,6 +11,31 @@ license = "GPL-3.0-only"
 [lib]
 crate-type = ["rlib"]
 
+[features]
+default = []
+runtime-async-std = [
+    "async-std",
+    "chain-api/runtime-async-std",
+    "core-transport/runtime-async-std",
+    "hopr-db-sql/runtime-async-std",
+    "hopr-strategy/runtime-async-std",
+]
+runtime-tokio = [
+    "tokio",
+    "chain-api/runtime-tokio",
+    "core-transport/runtime-tokio",
+    "hopr-db-sql/runtime-tokio",
+    "hopr-strategy/runtime-tokio"
+]
+prometheus = [
+    "dep:hopr-metrics",
+    "core-transport/prometheus",
+    "chain-api/prometheus",
+    "chain-indexer/prometheus",
+    "chain-rpc/prometheus",
+    "hopr-db-sql/prometheus"
+]
+
 [dependencies]
 async-channel = { workspace = true }
 async-lock = { workspace = true }
@@ -44,32 +69,9 @@ hopr-primitive-types = { workspace = true }
 hopr-strategy = { workspace = true }
 
 [dev-dependencies]
-env_logger = { workspace = true }
-serde_yaml = { version = "0.9" }
-hopr-crypto-types = { workspace = true }
+async-std = { workspace = true }
 ethers = { workspace = true }
+hopr-crypto-types = { workspace = true }
+hopr-db-sql = { workspace = true, features = ["runtime-async-std"] }
+serde_yaml = { version = "0.9" }
 
-[features]
-default = []
-runtime-async-std = [
-    "async-std",
-    "chain-api/runtime-async-std",
-    "core-transport/runtime-async-std",
-    "hopr-db-sql/runtime-async-std",
-    "hopr-strategy/runtime-async-std",
-]
-runtime-tokio = [
-    "tokio",
-    "chain-api/runtime-tokio",
-    "core-transport/runtime-tokio",
-    "hopr-db-sql/runtime-tokio",
-    "hopr-strategy/runtime-tokio"
-]
-prometheus = [
-    "dep:hopr-metrics",
-    "core-transport/prometheus",
-    "chain-api/prometheus",
-    "chain-indexer/prometheus",
-    "chain-rpc/prometheus",
-    "hopr-db-sql/prometheus"
-]

@@ -8,7 +8,7 @@ use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::info::{IndexerData, SafeInfo};
+use hopr_db_api::info::{IndexerData, SafeInfo};
 
 /// Enumerates all singular data that can be cached and
 /// cannot be represented by a key. These values can be cached for long term.

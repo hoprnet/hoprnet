@@ -63,7 +63,13 @@ use tokio::{
     time::sleep,
 };
 
-use hopr_db_sql::{peers::HoprDbPeersOperations, tickets::HoprDbTicketOperations, HoprDbAllOperations};
+use hopr_db_sql::{
+    api::{
+        peers::HoprDbPeersOperations,
+        tickets::{AggregationPrerequisites, HoprDbTicketOperations},
+    },
+    HoprDbAllOperations,
+};
 use tracing::{debug, error, info, warn};
 
 use core_network::{config::NetworkConfig, heartbeat::Heartbeat, messaging::ControlMessage, ping::Ping};
@@ -138,7 +144,6 @@ use core_path::selectors::PathSelector;
 use core_protocol::errors::ProtocolError;
 use futures::future::{select, Either};
 use futures::pin_mut;
-use hopr_db_sql::errors::DbSqlError;
 use hopr_internal_types::channels::ChannelStatus;
 use hopr_primitive_types::prelude::*;
 
@@ -191,7 +196,7 @@ where
     async fn aggregate_tickets(
         &self,
         channel: &Hash,
-        prerequisites: hopr_db_sql::tickets::AggregationPrerequisites,
+        prerequisites: AggregationPrerequisites,
     ) -> core_protocol::errors::Result<()> {
         if let Some(writer) = self.maybe_writer.clone().get() {
             AwaitingAggregator::new(self.db.clone(), writer.clone(), self.agg_timeout)
@@ -471,7 +476,12 @@ where
 
             let pk = OffchainPublicKey::try_from(destination)?;
 
-            if let Some(chain_key) = self.db.translate_key(None, pk).await? {
+            if let Some(chain_key) = self
+                .db
+                .translate_key(None, pk)
+                .await
+                .map_err(hopr_db_sql::api::errors::DbError::from)?
+            {
                 let selector = LegacyPathSelector::default();
                 let target_chain_key: Address = chain_key.try_into()?;
                 let cp = {
@@ -524,6 +534,7 @@ where
             .db
             .get_channel_by_id(None, channel_id)
             .await
+            .map_err(hopr_db_sql::api::errors::DbError::from)
             .map_err(errors::HoprTransportError::from)
             .and_then(|c| {
                 if let Some(c) = c {
@@ -551,7 +562,8 @@ where
         Ok(self
             .db
             .get_accounts(None, true)
-            .await?
+            .await
+            .map_err(hopr_db_sql::api::errors::DbError::from)?
             .into_iter()
             .map(|entry| {
                 (
@@ -572,7 +584,8 @@ where
         Ok(self
             .db
             .begin_transaction()
-            .await?
+            .await
+            .map_err(hopr_db_sql::api::errors::DbError::from)?
             .perform(|tx| {
                 Box::pin(async move {
                     let pk = OffchainPublicKey::try_from(peer)?;
@@ -581,11 +594,14 @@ where
                             .is_allowed_in_network_registry(Some(tx), address.try_into()?)
                             .await
                     } else {
-                        Err(DbSqlError::LogicalError("cannot translate off-chain key".into()))
+                        Err(hopr_db_sql::errors::DbSqlError::LogicalError(
+                            "cannot translate off-chain key".into(),
+                        ))
                     }
                 })
             })
-            .await?)
+            .await
+            .map_err(hopr_db_sql::api::errors::DbError::from)?)
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
@@ -672,7 +688,12 @@ where
 
     #[tracing::instrument(level = "debug", skip(self))]
     pub async fn tickets_in_channel(&self, channel_id: &Hash) -> errors::Result<Option<Vec<AcknowledgedTicket>>> {
-        if let Some(channel) = self.db.get_channel_by_id(None, channel_id).await? {
+        if let Some(channel) = self
+            .db
+            .get_channel_by_id(None, channel_id)
+            .await
+            .map_err(hopr_db_sql::api::errors::DbError::from)?
+        {
             if channel.destination == self.me_onchain {
                 Ok(Some(self.db.get_tickets((&channel).into()).await?))
             } else {

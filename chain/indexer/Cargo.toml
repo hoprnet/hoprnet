@@ -11,6 +11,21 @@ license = "GPL-3.0"
 [lib]
 crate-type = ["rlib"]
 
+[features]
+default = []
+runtime-async-std = [
+    "async-std",
+    "hopr-db-sql/runtime-async-std",
+    "sea-orm/runtime-async-std",
+]
+runtime-tokio = [
+    "sea-orm/runtime-tokio",
+    "hopr-db-sql/runtime-tokio",
+    "tokio"
+]
+prometheus = ["dep:hopr-metrics", "chain-rpc/prometheus", "hopr-db-sql/prometheus"]
+
+
 [dependencies]
 async-channel = { workspace = true }
 async-std = { workspace = true, optional = true }
@@ -38,19 +53,10 @@ hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
 async-std = { workspace = true }
+hopr-db-sql = { workspace = true, features = ["runtime-async-std"] }
 hex-literal = { workspace = true }
 mockall = { workspace = true }
 primitive-types = { workspace = true }
 hopr-crypto-random = { workspace = true }
 
-[features]
-default = []
-runtime-async-std = [
-    "async-std",
-    "sea-orm/runtime-async-std",
-]
-runtime-tokio = [
-    "sea-orm/runtime-tokio",
-    "tokio"
-]
-prometheus = ["dep:hopr-metrics", "chain-rpc/prometheus" ]
+

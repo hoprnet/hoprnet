@@ -36,8 +36,8 @@ validator = { workspace = true }
 hopr-crypto-random = { workspace = true }
 hopr-crypto-sphinx = { workspace = true }
 hopr-crypto-types = { workspace = true }
-hopr-db-sql = { workspace = true }
 hopr-crypto-packet = { workspace = true }
+hopr-db-api = { workspace = true }
 core-path = { workspace = true }
 hopr-metrics = { optional = true, workspace = true }
 hopr-platform = { workspace = true }
@@ -46,7 +46,8 @@ hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
 async-std = { workspace = true }
-tracing-test = { workspace = true }
+hopr-db-sql = { workspace = true, features = ["runtime-async-std"] }
 more-asserts = "0.3.1"
 parameterized = { workspace = true }
 serial_test = "3.1.1"
+tracing-test = { workspace = true }

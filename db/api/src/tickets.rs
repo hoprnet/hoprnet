@@ -11,18 +11,6 @@ use hopr_primitive_types::prelude::*;
 
 use crate::errors::Result;
 
-#[cfg(all(feature = "prometheus", not(test)))]
-use hopr_metrics::metrics::MultiGauge;
-
-#[cfg(all(feature = "prometheus", not(test)))]
-lazy_static::lazy_static! {
-    pub static ref METRIC_HOPR_TICKETS_INCOMING_STATISTICS: MultiGauge = MultiGauge::new(
-        "hopr_tickets_incoming_statistics",
-        "Ticket statistics for channels with incoming tickets.",
-        &["channel", "statistic"]
-    ).unwrap();
-}
-
 /// Allows to select multiple tickets (if `index` is `None`)
 /// or a single ticket (with given `index`) in the given channel and epoch.
 ///
@@ -245,7 +233,7 @@ pub trait HoprDbTicketOperations {
         &self,
         channel: &Hash,
         prerequisites: AggregationPrerequisites,
-    ) -> Result<Option<(OffchainPublicKey, Vec<TransferableWinningTicket>)>>;
+    ) -> Result<Option<(OffchainPublicKey, Vec<TransferableWinningTicket>, Hash)>>;
 
     /// Perform a ticket aggregation rollback in the channel.
     ///

@@ -14,10 +14,10 @@ use std::{pin::Pin, task::Poll};
 use tracing::{error, warn};
 
 use hopr_crypto_types::prelude::*;
-use hopr_db_sql::errors::DbSqlError;
-use hopr_db_sql::prelude::HoprDbInfoOperations;
-pub use hopr_db_sql::tickets::AggregationPrerequisites;
-use hopr_db_sql::tickets::HoprDbTicketOperations;
+use hopr_db_api::{
+    errors::DbError,
+    tickets::{AggregationPrerequisites, HoprDbTicketOperations},
+};
 use hopr_internal_types::prelude::*;
 
 use crate::errors::{
@@ -279,7 +279,7 @@ where
     /// Creates a new instance given the DB to process the ticket aggregation requests.
     pub fn new<Db>(db: Db, chain_key: &ChainKeypair) -> Self
     where
-        Db: HoprDbTicketOperations + HoprDbInfoOperations + Send + Sync + Clone + std::fmt::Debug + 'static,
+        Db: HoprDbTicketOperations + Send + Sync + Clone + std::fmt::Debug + 'static,
     {
         let (processing_in_tx, processing_in_rx) = channel::<TicketAggregationToProcess<T, U>>(
             TICKET_AGGREGATION_RX_QUEUE_SIZE + TICKET_AGGREGATION_TX_QUEUE_SIZE,
@@ -305,7 +305,7 @@ where
                                 Ok(ticket) => {
                                     Some(TicketAggregationProcessed::Reply(destination, Ok(ticket.leak()), response))
                                 }
-                                Err(hopr_db_sql::errors::DbSqlError::TicketAggregationError(e)) => {
+                                Err(DbError::TicketAggregationError(e)) => {
                                     // forward error to counterparty
                                     Some(TicketAggregationProcessed::Reply(destination, Err(e), response))
                                 }
@@ -344,30 +344,20 @@ where
                     }
                     TicketAggregationToProcess::ToSend(channel, prerequsites, finalizer) => {
                         match db.prepare_aggregation_in_channel(&channel, prerequsites).await {
-                            Ok(Some((source, tickets))) if !tickets.is_empty() => {
+                            Ok(Some((source, tickets, dst))) if !tickets.is_empty() => {
                                 #[cfg(all(feature = "prometheus", not(test)))]
                                 {
                                     METRIC_AGGREGATED_TICKETS.increment_by(tickets.len() as u64);
                                     METRIC_AGGREGATION_COUNT.increment();
                                 }
 
-                                // TODO: remove this transformation in 3.0 once proper aggregation protocol format is introduc
+                                // TODO: remove this transformation in 3.0 once proper aggregation protocol format is introduced
                                 let addr = chain_key.public().to_address();
-                                match db.get_indexer_data(None)
-                                    .await
-                                    .and_then(|data| data.channels_dst.ok_or(DbSqlError::LogicalError("missing channels domain separator".into()))) {
-                                    Ok(dst) => {
-                                        let tickets = tickets.into_iter()
-                                            .map(|t| hopr_internal_types::legacy::AcknowledgedTicket::new(t, &addr, &dst))
-                                            .collect::<Vec<_>>();
-                                        Some(TicketAggregationProcessed::Send(source.into(), tickets, finalizer))
-                                    }
-                                    Err(e) => {
-                                        error!("An error occured when preparing the channel aggregation: {e}");
-                                        None
-                                    }
-                                }
-                            },
+                                let tickets = tickets.into_iter()
+                                    .map(|t| hopr_internal_types::legacy::AcknowledgedTicket::new(t, &addr, &dst))
+                                    .collect::<Vec<_>>();
+                                Some(TicketAggregationProcessed::Send(source.into(), tickets, finalizer))
+                            }
                             Err(e) => {
                                 error!("An error occured when preparing the channel aggregation: {e}");
                                 None
@@ -434,11 +424,11 @@ mod tests {
         types::{Hash, Response},
     };
     use hopr_db_sql::accounts::HoprDbAccountOperations;
+    use hopr_db_sql::api::tickets::HoprDbTicketOperations;
     use hopr_db_sql::channels::HoprDbChannelOperations;
-    use hopr_db_sql::db::HoprDb;
-    use hopr_db_sql::info::{DomainSeparator, HoprDbInfoOperations};
-    use hopr_db_sql::tickets::HoprDbTicketOperations;
+    use hopr_db_sql::info::HoprDbInfoOperations;
     use hopr_db_sql::HoprDbGeneralModelOperations;
+    use hopr_db_sql::{api::info::DomainSeparator, db::HoprDb};
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
     use lazy_static::lazy_static;

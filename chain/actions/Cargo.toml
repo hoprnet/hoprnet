@@ -11,9 +11,15 @@ license = "GPL-3.0-only"
 [lib]
 crate-type = ["rlib"]
 
+[features]
+default = []
+runtime-async-std = ["async-std", "hopr-db-sql/runtime-async-std"]
+runtime-tokio = ["tokio", "hopr-db-sql/runtime-tokio"]
+prometheus = [ "dep:hopr-metrics", "chain-rpc/prometheus", "hopr-db-sql/prometheus"]
+
 [dependencies]
 async-channel = { workspace = true }
-async-std = { workspace = true }
+async-std = { workspace = true, optional = true }
 async-trait = { workspace = true }
 async-lock = { workspace = true }
 ethers = { workspace = true, default-features = false }
@@ -24,6 +30,7 @@ multiaddr = "0.18"
 serde = { workspace = true }
 smart-default = { workspace = true }
 thiserror = { workspace = true }
+tokio = { workspace = true, optional = true }
 
 bindings = { workspace = true }
 hopr-crypto-types = { workspace = true }
@@ -37,14 +44,8 @@ hopr-internal-types = { workspace = true }
 hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
-async-std = { version = "1.12.0", features = ["attributes", "unstable"] }
-env_logger = { workspace = true }
+async-std = { workspace = true }
 mockall = { workspace = true }
 hex-literal = { workspace = true }
 hopr-crypto-random = { workspace = true }
 tracing-test = { workspace = true }
-
-
-[features]
-default = ["prometheus"]
-prometheus = [ "dep:hopr-metrics", "chain-rpc/prometheus"]

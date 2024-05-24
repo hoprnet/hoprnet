@@ -29,7 +29,7 @@ use ethers::providers::Middleware;
 use ethers::utils::AnvilInstance;
 use futures::{pin_mut, StreamExt};
 use hopr_crypto_types::prelude::*;
-use hopr_db_sql::prelude::*;
+use hopr_db_sql::{api::info::DomainSeparator, prelude::*};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use std::time::Duration;
@@ -253,8 +253,6 @@ async fn start_node_chain_logic(
 #[cfg_attr(feature = "runtime-async-std", async_std::test)]
 #[cfg_attr(feature = "runtime-tokio", tokio::test)]
 async fn integration_test_indexer() {
-    let _ = env_logger::builder().is_test(true).try_init();
-
     let block_time = Duration::from_secs(1);
     let anvil = create_anvil(Some(block_time));
     let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();

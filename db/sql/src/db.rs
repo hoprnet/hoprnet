@@ -166,10 +166,10 @@ impl HoprDbAllOperations for HoprDb {}
 #[cfg(test)]
 mod tests {
     use crate::db::HoprDb;
-    use crate::peers::{HoprDbPeersOperations, PeerOrigin};
     use crate::{HoprDbGeneralModelOperations, TargetDb};
     use hopr_crypto_types::keypairs::{ChainKeypair, OffchainKeypair};
     use hopr_crypto_types::prelude::Keypair;
+    use hopr_db_api::peers::{HoprDbPeersOperations, PeerOrigin};
     use libp2p_identity::PeerId;
     use migration::{MigratorIndex, MigratorPeers, MigratorTickets, MigratorTrait};
     use multiaddr::Multiaddr;
