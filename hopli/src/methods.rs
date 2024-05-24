@@ -1251,7 +1251,7 @@ mod tests {
 
     use super::*;
     use bindings::{hopr_announcements::HoprAnnouncements, hopr_channels::HoprChannels};
-    use chain_rpc::client::{create_rpc_client_to_anvil, native::SurfRequestor};
+    use chain_rpc::client::{create_rpc_client_to_anvil, surf_client::SurfRequestor};
     use chain_types::ContractInstances;
     use ethers::abi::AbiDecode;
     use ethers::types::TransactionRequest;

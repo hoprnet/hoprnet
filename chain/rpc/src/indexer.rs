@@ -222,7 +222,7 @@ mod test {
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
     use tracing::debug;
 
-    use crate::client::native::SurfRequestor;
+    use crate::client::surf_client::SurfRequestor;
     use crate::client::{create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy};
     use crate::indexer::split_range;
     use crate::rpc::{RpcOperations, RpcOperationsConfig};
