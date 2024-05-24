@@ -1854,6 +1854,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "crossbeam-deque"
+version = "0.8.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "613f8cc01fe9cf1a3eb3d7f488fd2fa8388403e97039e2f73692932e291a770d"
+dependencies = [
+ "crossbeam-epoch",
+ "crossbeam-utils",
+]
+
+[[package]]
 name = "crossbeam-epoch"
 version = "0.9.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3724,12 +3734,16 @@ name = "hopr-internal-types"
 version = "0.5.0"
 dependencies = [
  "aquamarine",
+ "async-channel 2.1.1",
+ "async-std",
  "async-trait",
  "bincode",
  "bindings",
  "bloomfilter",
  "cbor4ii",
+ "dashmap",
  "ethers",
+ "futures",
  "hex-literal",
  "hopr-crypto-random",
  "hopr-crypto-types",
@@ -3737,6 +3751,8 @@ dependencies = [
  "lazy_static",
  "multiaddr",
  "num_enum",
+ "rand 0.8.5",
+ "rayon",
  "serde",
  "serde_bytes",
  "serde_repr",
@@ -6398,6 +6414,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9d86a7c4638d42c44551f4791a20e687dbb4c3de1f33c43dd71e355cd429def1"
 dependencies = [
  "bitflags 2.4.2",
+]
+
+[[package]]
+name = "rayon"
+version = "1.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b418a60154510ca1a002a752ca9714984e21e4241e804d32555251faf8b78ffa"
+dependencies = [
+ "either",
+ "rayon-core",
+]
+
+[[package]]
+name = "rayon-core"
+version = "1.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1465873a3dfdaa8ae7cb14b4383657caab0b3e8a0aa9ae8e04b044854c8dfce2"
+dependencies = [
+ "crossbeam-deque",
+ "crossbeam-utils",
 ]
 
 [[package]]
