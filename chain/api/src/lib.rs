@@ -44,7 +44,11 @@ use crate::errors::{HoprChainError, Result};
 /// The default HTTP request engine
 ///
 /// TODO: Should be an internal type, `hopr_lib::chain` must be moved to this package
+#[cfg(feature = "runtime-async-std")]
 pub type DefaultHttpPostRequestor = chain_rpc::client::surf_client::SurfRequestor;
+
+#[cfg(feature = "runtime-tokio")]
+pub type DefaultHttpPostRequestor = chain_rpc::client::reqwest_client::ReqwestRequestor;
 
 /// The default JSON RPC provider client
 ///

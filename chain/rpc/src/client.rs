@@ -448,6 +448,7 @@ where
     }
 }
 
+#[cfg(feature = "runtime-async-std")]
 pub mod surf_client {
     use async_std::prelude::FutureExt;
     use async_trait::async_trait;
@@ -512,6 +513,7 @@ pub mod surf_client {
     }
 }
 
+#[cfg(feature = "runtime-tokio")]
 pub mod reqwest_client {
     use crate::errors::HttpRequestError;
     use crate::{HttpPostRequestor, HttpPostRequestorConfig};

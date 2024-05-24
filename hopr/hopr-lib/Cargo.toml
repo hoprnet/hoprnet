@@ -16,6 +16,7 @@ default = []
 runtime-async-std = [
     "async-std",
     "chain-api/runtime-async-std",
+    "chain-rpc/runtime-async-std",
     "core-transport/runtime-async-std",
     "hopr-db-sql/runtime-async-std",
     "hopr-strategy/runtime-async-std",
@@ -23,6 +24,7 @@ runtime-async-std = [
 runtime-tokio = [
     "tokio",
     "chain-api/runtime-tokio",
+    "chain-rpc/runtime-tokio",
     "core-transport/runtime-tokio",
     "hopr-db-sql/runtime-tokio",
     "hopr-strategy/runtime-tokio"
