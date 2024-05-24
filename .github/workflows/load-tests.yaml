@@ -70,24 +70,19 @@ jobs:
         run: |
           if [ -z "${{ github.event.inputs.test_id }}" ]; then 
             echo "The workflow is triggered by other pipeline"
-            echo "ENVIRONMENT_NAME=${{ inputs.network }}" >> $GITHUB_ENV
-            echo "WORKLOAD_NAME=${{ inputs.workload }}" >> $GITHUB_ENV
-            echo "SCENARIO_ITERATIONS=${{ github.event.inputs.rate }}" >> $GITHUB_ENV
-            echo "TESTID=${{ inputs.test_id }}" >> $GITHUB_ENV
-            echo "SCENARIO_DURATION=${{ inputs.duration }}" >> $GITHUB_ENV
+            echo "ENVIRONMENT_NAME=${{ inputs.network }}" >> $GITHUB_OUTPUT
+            echo "WORKLOAD_NAME=${{ inputs.workload }}" >> $GITHUB_OUTPUT
+            echo "SCENARIO_ITERATIONS=${{ github.event.inputs.rate }}" >> $GITHUB_OUTPUT
+            echo "TESTID=${{ inputs.test_id }}" >> $GITHUB_OUTPUT
+            echo "SCENARIO_DURATION=${{ inputs.duration }}" >> $GITHUB_OUTPUT
           else
             echo "The workflow is triggered manually"
-            echo "ENVIRONMENT_NAME=${{ github.event.inputs.network }}" >> $GITHUB_ENV
-            echo "WORKLOAD_NAME=${{ github.event.inputs.workload }}" >> $GITHUB_ENV
-            echo "SCENARIO_ITERATIONS=${{ github.event.github.event.inputs.rate }}" >> $GITHUB_ENV
-            echo "TESTID=${{ github.event.inputs.test_id }}" >> $GITHUB_ENV
-            echo "SCENARIO_DURATION=${{ github.event.inputs.duration }}" >> $GITHUB_ENV
+            echo "ENVIRONMENT_NAME=${{ github.event.inputs.network }}" >> $GITHUB_OUTPUT
+            echo "WORKLOAD_NAME=${{ github.event.inputs.workload }}" >> $GITHUB_OUTPUT
+            echo "SCENARIO_ITERATIONS=${{ github.event.github.event.inputs.rate }}" >> $GITHUB_OUTPUT
+            echo "TESTID=${{ github.event.inputs.test_id }}" >> $GITHUB_OUTPUT
+            echo "SCENARIO_DURATION=${{ github.event.inputs.duration }}" >> $GITHUB_OUTPUT
           fi
-          echo "ENVIRONMENT_NAME=${{ env.ENVIRONMENT_NAME }}"
-          echo "WORKLOAD_NAME=${{ env.WORKLOAD_NAME }}"
-          echo "SCENARIO_ITERATIONS=${{ env.SCENARIO_ITERATIONS }}"
-          echo "TESTID=${{ env.TESTID }}"
-          echo "SCENARIO_DURATION=${{ env.SCENARIO_DURATION }}"
 
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4
@@ -121,16 +116,21 @@ jobs:
 
       - name: Setup Load Testing environment
         run: |
+          echo "ENVIRONMENT_NAME=${{ steps.vars.outputs.ENVIRONMENT_NAME }}"
+          echo "WORKLOAD_NAME=${{ steps.vars.outputs.WORKLOAD_NAME }}"
+          echo "SCENARIO_ITERATIONS=${{ steps.vars.outputs.SCENARIO_ITERATIONS }}"
+          echo "TESTID=${{ steps.vars.outputs.TESTID }}"
+          echo "SCENARIO_DURATION=${{ steps.vars.outputs.SCENARIO_DURATION }}"
           npm install
-          npm run test:${{ env.ENVIRONMENT_NAME }}:setup
+          npm run test:${{ steps.vars.outputs.ENVIRONMENT_NAME }}:setup
         working-directory: "./k6"
         env:
           HOPRD_API_TOKEN: ${{ secrets.HOPRD_API_TOKEN }}
-          ENVIRONMENT_NAME: ${{ env.ENVIRONMENT_NAME }}
-          WORKLOAD_NAME: ${{ env.WORKLOAD_NAME }}
-          SCENARIO_ITERATIONS: ${{ env.SCENARIO_ITERATIONS }}
-          TESTID: ${{ env.SCENARIO_ITERATIONS }}
-          SCENARIO_DURATION: ${{ env.SCENARIO_DURATION }}
+          ENVIRONMENT_NAME: ${{ steps.vars.outputs.ENVIRONMENT_NAME }}
+          WORKLOAD_NAME: ${{ steps.vars.outputs.WORKLOAD_NAME }}
+          SCENARIO_ITERATIONS: ${{ steps.vars.outputs.SCENARIO_ITERATIONS }}
+          TESTID: ${{ steps.vars.outputs.TESTID }}
+          SCENARIO_DURATION: ${{ steps.vars.outputs.SCENARIO_DURATION }}
 
       - name: Run Load test
         run: |
@@ -139,7 +139,7 @@ jobs:
           echo "Waiting for test to bootstrap..."
           sleep 2m # Wait for test to bootstrap
           echo "Waiting for test to finish..."
-          sleep ${{ env.SCENARIO_DURATION }} # wait for the test to finish
+          sleep ${{ steps.vars.outputs.SCENARIO_DURATION }} # wait for the test to finish
         working-directory: "./k6"
 
       - name: Parse results
