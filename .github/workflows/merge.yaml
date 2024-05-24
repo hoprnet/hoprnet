@@ -141,7 +141,6 @@ jobs:
 
       - name: "Restart deployments"
         timeout-minutes: 5
-        id: restart_deployments
         run: |
           base_branch="${{ github.event.pull_request.base.ref }}"
           # Identify parameters depending on branch
