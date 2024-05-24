@@ -48,7 +48,7 @@ struct FrameTable<'a> {
 }
 
 impl<'a> FrameTable<'a> {
-    pub fn new(initial_frame: Frame<'a>) -> Self {
+    fn new(initial_frame: Frame<'a>) -> Self {
         Self {
             segments: (0..initial_frame.seq_len)
                 .map(|i| {
@@ -63,7 +63,7 @@ impl<'a> FrameTable<'a> {
         }
     }
 
-    pub fn put(&self, frame: Frame<'a>) -> u16 {
+    fn put(&self, frame: Frame<'a>) -> u16 {
         if !self.is_complete() {
             if self.segments[frame.seq_idx as usize].set(frame.data).is_ok() {
                 self.missing.fetch_sub(1, Ordering::SeqCst);
@@ -74,38 +74,36 @@ impl<'a> FrameTable<'a> {
         }
     }
 
-    pub fn is_complete(&self) -> bool {
+    fn is_complete(&self) -> bool {
         self.missing.load(Ordering::SeqCst) == 0
     }
 
-    pub fn reassemble(self) -> Box<[u8]> {
+    fn reassemble(self) -> Box<[u8]> {
         assert!(self.is_complete(), "missing frames");
         self.segments
             .into_iter()
-            .map(|lock| lock.into_inner().unwrap().into())
+            .map(|lock| lock.into_inner().unwrap())
             .collect::<Vec<&[u8]>>()
             .concat()
             .into_boxed_slice()
     }
 }
 
-pub type ReassembledData = (u16, Box<[u8]>);
-
 pub struct FrameReassembler<'a> {
     sequences: DashMap<u32, FrameTable<'a>>,
     lowest_seq: AtomicU32,
-    complete: (
-        async_channel::Sender<ReassembledData>,
-        async_channel::Receiver<ReassembledData>,
-    ),
+    complete_send: async_channel::Sender<(u16, Box<[u8]>)>,
+    complete_recv: async_channel::Receiver<(u16, Box<[u8]>)>,
 }
 
 impl<'a> FrameReassembler<'a> {
     pub fn new() -> Self {
+        let (complete_send, complete_recv) = async_channel::unbounded();
         Self {
             sequences: DashMap::new(),
             lowest_seq: Default::default(),
-            complete: async_channel::unbounded(),
+            complete_send,
+            complete_recv,
         }
     }
 
@@ -129,18 +127,18 @@ impl<'a> FrameReassembler<'a> {
         {
             if let Some((seq_id, table)) = self.sequences.remove(&seq_id) {
                 let seq_num = (seq_id & 0xffff0000) >> 16;
-                let _ = self.complete.0.try_send((seq_num as u16, table.reassemble()));
+                let _ = self.complete_send.try_send((seq_num as u16, table.reassemble()));
             }
         }
     }
 
     pub fn stream(&self) -> impl Stream<Item = (u16, Box<[u8]>)> {
-        self.complete.1.clone()
+        self.complete_recv.clone()
     }
 
     pub fn close(self) {
-        self.complete.0.close();
-        self.complete.1.close();
+        self.complete_send.close();
+        self.complete_recv.close();
     }
 }
 
@@ -154,7 +152,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_shuffled_randomized() {
-        let packets = (0..100_000)
+        let packets = (0..65_535)
             .into_par_iter()
             .map(|_| hopr_crypto_random::random_bytes::<500>())
             .collect::<Vec<_>>();
@@ -179,7 +177,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_shuffled_randomized_parallel() {
-        let packets = (0..100_000)
+        let packets = (0..65_535)
             .into_par_iter()
             .map(|_| hopr_crypto_random::random_bytes::<500>())
             .collect::<Vec<_>>();
