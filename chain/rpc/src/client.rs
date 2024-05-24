@@ -524,7 +524,7 @@ pub mod reqwest_client {
     #[derive(Clone, Debug, Default)]
     pub struct ReqwestRequestor {
         client: reqwest::Client,
-        limiter: Option<Arc<governor::DefaultDirectRateLimiter>>,
+        limiter: Option<Arc<governor::DefaultKeyedRateLimiter<String>>>,
     }
 
     impl ReqwestRequestor {
@@ -539,7 +539,7 @@ pub mod reqwest_client {
                     .max_requests_per_sec
                     .filter(|reqs| *reqs > 0) // Ensures the following unwrapping won't fail
                     .map(|reqs| {
-                        Arc::new(governor::DefaultDirectRateLimiter::direct(governor::Quota::per_second(
+                        Arc::new(governor::DefaultKeyedRateLimiter::keyed(governor::Quota::per_second(
                             reqs.try_into().unwrap(),
                         )))
                     }),
@@ -553,10 +553,13 @@ pub mod reqwest_client {
         where
             T: Serialize + Send + Sync,
         {
+            let url = reqwest::Url::parse(url)
+                .map_err(|e| HttpRequestError::UnknownError(format!("url parse error: {e}")))?;
+
             if self
                 .limiter
                 .clone()
-                .map(|limiter| limiter.check().is_ok())
+                .map(|limiter| limiter.check_key(&url.host_str().unwrap_or(".").to_string()).is_ok())
                 .unwrap_or(true)
             {
                 let resp = self
