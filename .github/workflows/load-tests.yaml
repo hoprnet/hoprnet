@@ -79,12 +79,12 @@ jobs:
             echo "The workflow is triggered manually"
             echo "ENVIRONMENT_NAME=${{ github.event.inputs.network }}" >> $GITHUB_OUTPUT
             echo "WORKLOAD_NAME=${{ github.event.inputs.workload }}" >> $GITHUB_OUTPUT
-            echo "SCENARIO_ITERATIONS=${{ github.event.github.event.inputs.rate }}" >> $GITHUB_OUTPUT
+            echo "SCENARIO_ITERATIONS=${{ github.event.inputs.rate }}" >> $GITHUB_OUTPUT
             echo "TESTID=${{ github.event.inputs.test_id }}" >> $GITHUB_OUTPUT
             echo "SCENARIO_DURATION=${{ github.event.inputs.duration }}" >> $GITHUB_OUTPUT
           fi
 
-      - name: Checkout hoprnet repository
+      - name: Checkout hoprd-test repository
         uses: actions/checkout@v4
         with:
           repository: hoprnet/hoprd-test
