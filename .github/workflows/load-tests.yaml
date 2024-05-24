@@ -130,7 +130,7 @@ jobs:
           WORKLOAD_NAME: ${{ env.WORKLOAD_NAME }}
           SCENARIO_ITERATIONS: ${{ env.SCENARIO_ITERATIONS }}
           TESTID: ${{ env.SCENARIO_ITERATIONS }}
-          SCENARIO_DURATION: ${{ env.SCENARIO_ITERATIONS }}
+          SCENARIO_DURATION: ${{ env.SCENARIO_DURATION }}
 
       - name: Run Load test
         run: |
