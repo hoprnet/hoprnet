@@ -201,8 +201,9 @@ impl<'a> Sink<Segment<'a>> for FrameReassembler<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::frame::{Frame, FrameReassembler};
+    use crate::frame::{Frame, FrameReassembler, Segment};
     use futures::StreamExt;
+    use lazy_static::lazy_static;
     use rand::prelude::SliceRandom;
     use rand::thread_rng;
     use rayon::prelude::*;
@@ -211,9 +212,8 @@ mod tests {
     const PACKET_COUNT: u16 = 65_535;
     const PACKET_SIZE: usize = 500;
 
-    #[async_std::test]
-    async fn test_shuffled_randomized() {
-        let packets = (0..PACKET_COUNT)
+    lazy_static! {
+        static ref PACKETS: Vec<Frame> = (0..PACKET_COUNT)
             .into_par_iter()
             .map(|frame_id| Frame {
                 frame_id,
@@ -221,14 +221,25 @@ mod tests {
             })
             .collect::<Vec<_>>();
 
-        let mut segments = packets.par_iter().flat_map(|f| f.segment(MTU)).collect::<Vec<_>>();
+        static ref SEGMENTS: Vec<Segment<'static>> = {
+            let mut segments = PACKETS.par_iter().flat_map(|f| f.segment(MTU)).collect::<Vec<_>>();
+            let mut rng = thread_rng();
+            segments.shuffle(&mut rng);
+            segments
+        };
+    }
 
-        let mut rng = thread_rng();
-        segments.shuffle(&mut rng);
+    #[ctor::ctor]
+    fn init() {
+        lazy_static::initialize(&PACKETS);
+        lazy_static::initialize(&SEGMENTS);
+    }
 
+    #[async_std::test]
+    async fn test_shuffled_randomized() {
         let (fragmented, reassembled) = FrameReassembler::new();
 
-        segments.into_iter().for_each(|b| {
+        SEGMENTS.iter().cloned().for_each(|b| {
             let _ = fragmented.push_segment(b);
         });
         fragmented.close();
@@ -238,27 +249,14 @@ mod tests {
         reassembled_packets
             .into_par_iter()
             .enumerate()
-            .for_each(|(i, frame)| assert_eq!(frame, packets[i]));
+            .for_each(|(i, frame)| assert_eq!(frame, PACKETS[i]));
     }
 
     #[async_std::test]
     async fn test_shuffled_randomized_parallel() {
-        let packets = (0..PACKET_COUNT)
-            .into_par_iter()
-            .map(|frame_id| Frame {
-                frame_id,
-                data: hopr_crypto_random::random_bytes::<PACKET_SIZE>().into(),
-            })
-            .collect::<Vec<_>>();
-
-        let mut segments = packets.par_iter().flat_map(|f| f.segment(MTU)).collect::<Vec<_>>();
-
-        let mut rng = thread_rng();
-        segments.shuffle(&mut rng);
-
         let (fragmented, reassembled) = FrameReassembler::new();
 
-        segments.into_par_iter().for_each(|b| {
+        SEGMENTS.par_iter().cloned().for_each(|b| {
             let _ = fragmented.push_segment(b);
         });
         fragmented.close();
@@ -268,6 +266,6 @@ mod tests {
         reassembled_packets
             .into_par_iter()
             .enumerate()
-            .for_each(|(i, frame)| assert_eq!(frame, packets[i]));
+            .for_each(|(i, frame)| assert_eq!(frame, PACKETS[i]));
     }
 }
