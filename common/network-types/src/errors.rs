@@ -2,6 +2,12 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum NetworkTypeError {
+    #[error("attempt to insert invalid frame id")]
+    InvalidFrameId,
+
+    #[error("cannot reassemble frame because it is not complete")]
+    IncompleteFrame,
+
     #[error("frame reassembler is closed")]
     ReassemblerClosed,
 }

@@ -1,12 +1,13 @@
 use crate::errors::NetworkTypeError;
-use crate::errors::NetworkTypeError::ReassemblerClosed;
-use dashmap::mapref::entry::Entry;
-use dashmap::DashMap;
+use crate::errors::NetworkTypeError::{IncompleteFrame, InvalidFrameId, ReassemblerClosed};
 use futures::{Sink, Stream};
 use std::pin::Pin;
-use std::sync::atomic::{AtomicU16, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicU16, Ordering};
 use std::sync::OnceLock;
 use std::task::{Context, Poll};
+use crossbeam_skiplist::SkipSet;
+use dashmap::DashMap;
+use dashmap::mapref::entry::Entry;
 
 fn segment(data: &[u8], mtu: u16, frame_id: u16) -> Vec<Segment> {
     let chunks = data.chunks(mtu as usize);
@@ -105,14 +106,18 @@ impl<'a> FrameBuilder<'a> {
     }
 
     /// Adds a new segment to the builder.
-    fn put(&self, frame: Segment<'a>) -> u16 {
-        if !self.is_complete() {
-            if self.segments[frame.seq_idx as usize].set(frame.data).is_ok() {
-                self.missing.fetch_sub(1, Ordering::SeqCst);
+    fn put(&self, frame: Segment<'a>) -> crate::errors::Result<u16> {
+        if self.frame_id == frame.frame_id {
+            if !self.is_complete() {
+                if self.segments[frame.seq_idx as usize].set(frame.data).is_ok() {
+                    self.missing.fetch_sub(1, Ordering::SeqCst);
+                }
+                Ok(self.missing.load(Ordering::SeqCst))
+            } else {
+                Ok(0)
             }
-            self.missing.load(Ordering::SeqCst)
         } else {
-            0
+            Err(InvalidFrameId)
         }
     }
 
@@ -122,17 +127,20 @@ impl<'a> FrameBuilder<'a> {
     }
 
     /// Reassembles the [Frame]. Panics if not [complete](FrameBuilder::is_complete).
-    fn reassemble(self) -> Frame {
-        assert!(self.is_complete(), "missing frames");
-        Frame {
-            frame_id: self.frame_id,
-            data: self
-                .segments
-                .into_iter()
-                .map(|lock| lock.into_inner().unwrap())
-                .collect::<Vec<&[u8]>>()
-                .concat()
-                .into_boxed_slice(),
+    fn reassemble(self) -> crate::errors::Result<Frame> {
+        if self.is_complete() {
+            Ok(Frame {
+                frame_id: self.frame_id,
+                data: self
+                    .segments
+                    .into_iter()
+                    .map(|lock| lock.into_inner().unwrap())
+                    .collect::<Vec<&[u8]>>()
+                    .concat()
+                    .into_boxed_slice(),
+            })
+        } else {
+            Err(IncompleteFrame)
         }
     }
 }
@@ -169,8 +177,10 @@ impl<'a> FrameBuilder<'a> {
 /// ````
 #[derive(Debug)]
 pub struct FrameReassembler<'a> {
+    /// Maintains
     sequences: DashMap<u32, FrameBuilder<'a>>,
-    earliest_frame: AtomicU32,
+    /// Maintains a sorted list of sequence IDs
+    sorted_seq_ids: SkipSet<u32>,
     reassembled: async_channel::Sender<Frame>,
 }
 
@@ -182,7 +192,7 @@ impl<'a> FrameReassembler<'a> {
         (
             Self {
                 sequences: DashMap::new(),
-                earliest_frame: AtomicU32::new(u32::MAX),
+                sorted_seq_ids: SkipSet::new(),
                 reassembled,
             },
             reassembled_recv,
@@ -198,22 +208,19 @@ impl<'a> FrameReassembler<'a> {
         let seq_id = segment.seq_id();
         match self.sequences.entry(seq_id) {
             Entry::Occupied(e) => {
-                e.get().put(segment);
-            }
+                e.get().put(segment)?;
+            },
             Entry::Vacant(v) => {
                 v.insert(FrameBuilder::new(segment));
-                self.earliest_frame.fetch_min(seq_id, Ordering::SeqCst);
-            }
+                self.sorted_seq_ids.insert(seq_id);
+            },
         }
 
-        if let Some((seq_id, builder)) = self
-            .sequences
-            .remove_if(&self.earliest_frame.load(Ordering::SeqCst), |_, table| {
-                table.is_complete()
-            })
-        {
-            let _ = self.reassembled.try_send(builder.reassemble());
-            self.earliest_frame.fetch_min(seq_id + (1u32 << 16), Ordering::SeqCst);
+        if let Some(maybe_front) = self.sorted_seq_ids.front() {
+            if let Some((_, builder)) = self.sequences.remove_if(maybe_front.value(), |_, builder| builder.is_complete()) {
+                let _ = self.reassembled.try_send(builder.reassemble()?);
+                maybe_front.remove();
+            }
         }
 
         Ok(())
