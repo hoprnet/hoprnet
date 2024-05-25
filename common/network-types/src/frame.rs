@@ -55,6 +55,21 @@ pub struct Segment<'a> {
     data: &'a [u8],
 }
 
+impl<'a> PartialOrd<Segment<'a>> for Segment<'a> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Segment<'_> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        match self.frame_id.cmp(&other.frame_id) {
+            std::cmp::Ordering::Equal => self.seq_idx.cmp(&other.seq_idx),
+            cmp => cmp,
+        }
+    }
+}
+
 impl<'a> Segment<'a> {
     /// Identifies the entire segment sequence using the frame id and the length
     /// of the sequence.
@@ -72,19 +87,20 @@ struct FrameBuilder<'a> {
 }
 
 impl<'a> FrameBuilder<'a> {
-    fn new(initial_frame: Segment<'a>) -> Self {
+    /// Creates a new builder with the given initial segment.
+    fn new(initial: Segment<'a>) -> Self {
         Self {
-            frame_id: initial_frame.frame_id,
-            segments: (0..initial_frame.seq_len)
+            frame_id: initial.frame_id,
+            segments: (0..initial.seq_len)
                 .map(|i| {
-                    if i == initial_frame.seq_idx {
-                        OnceLock::from(initial_frame.data)
+                    if i == initial.seq_idx {
+                        OnceLock::from(initial.data)
                     } else {
                         OnceLock::new()
                     }
                 })
                 .collect(),
-            missing: AtomicU16::new(initial_frame.seq_len - 1),
+            missing: AtomicU16::new(initial.seq_len - 1),
         }
     }
 
