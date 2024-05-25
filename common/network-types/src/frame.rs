@@ -138,6 +138,7 @@ impl<'a> FrameReassembler<'a> {
         )
     }
 
+    /// Pushes a new [Segment] for reassembly.
     pub fn push_segment(&self, segment: Segment<'a>) -> crate::errors::Result<()> {
         if self.reassembled.is_closed() {
             return Err(ReassemblerClosed);
@@ -171,6 +172,7 @@ impl<'a> FrameReassembler<'a> {
         Ok(())
     }
 
+    /// Closes the reassembler, so it cannot be used to push new [Segments](Segment) anymore.
     pub fn close(self) {
         self.reassembled.close();
     }
