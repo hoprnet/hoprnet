@@ -3808,6 +3808,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "hopr-network-types"
+version = "0.1.0"
+dependencies = [
+ "async-channel 2.1.1",
+ "async-std",
+ "dashmap",
+ "futures",
+ "hopr-crypto-random",
+ "rand 0.8.5",
+ "rayon",
+]
+
+[[package]]
 name = "hopr-platform"
 version = "0.2.1"
 dependencies = [

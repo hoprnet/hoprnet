@@ -8,6 +8,7 @@ resolver = "2"
 
 members = [
     "common/internal-types",
+    "common/network-types",
     "common/primitive-types",
     "crypto/packet",
     "crypto/random",
@@ -35,7 +36,7 @@ members = [
     "transport/network",
     "transport/protocol",
     "transport/p2p",
-    "transport/api", "db/api",
+    "transport/api",
 ]
 
 [workspace.dependencies]
@@ -121,6 +122,7 @@ hopr-lib = { path = "hopr/hopr-lib", default-features = false }
 hopr-metrics = { path = "misc/metrics", default-features = false }
 hopr-platform = { path = "misc/platform" }
 hopr-primitive-types = { path = "common/primitive-types", default-features = false }
+hopr-network-types = { path = "common/network-types", default-features = false }
 hoprd-api = { path = "hoprd/rest-api", default-features = false }
 hoprd-inbox = { path = "hoprd/inbox", default-features = false }
 hoprd-keypair = { path = "hoprd/keypair", default-features = false }

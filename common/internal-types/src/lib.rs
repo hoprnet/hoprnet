@@ -15,7 +15,6 @@ pub mod errors;
 /// Types related to internal HOPR protocol logic.
 pub mod protocol;
 
-mod frame;
 #[doc(hidden)]
 pub mod legacy; // TODO: remove this in 3.0
 
