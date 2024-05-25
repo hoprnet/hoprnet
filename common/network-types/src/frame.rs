@@ -206,12 +206,14 @@ impl<'a> FrameReassembler<'a> {
             }
         }
 
-        let earliest = self.earliest_frame.load(Ordering::SeqCst);
-
-        if self.sequences.get(&earliest).is_some_and(|t| t.is_complete()) {
-            if let Some((_, table)) = self.sequences.remove(&earliest) {
-                let _ = self.reassembled.try_send(table.reassemble());
-            }
+        if let Some((seq_id, builder)) = self
+            .sequences
+            .remove_if(&self.earliest_frame.load(Ordering::SeqCst), |_, table| {
+                table.is_complete()
+            })
+        {
+            let _ = self.reassembled.try_send(builder.reassemble());
+            self.earliest_frame.fetch_min(seq_id + (1u32 << 16), Ordering::SeqCst);
         }
 
         Ok(())
