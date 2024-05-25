@@ -63,15 +63,18 @@ impl<'a> Segment<'a> {
     }
 }
 
+/// Rebuilds the [Frame] from [Segments](Segment).
 #[derive(Debug)]
-struct SegmentBag<'a> {
+struct FrameBuilder<'a> {
+    frame_id: u16,
     segments: Vec<OnceLock<&'a [u8]>>,
     missing: AtomicU16,
 }
 
-impl<'a> SegmentBag<'a> {
+impl<'a> FrameBuilder<'a> {
     fn new(initial_frame: Segment<'a>) -> Self {
         Self {
+            frame_id: initial_frame.frame_id,
             segments: (0..initial_frame.seq_len)
                 .map(|i| {
                     if i == initial_frame.seq_idx {
@@ -85,6 +88,7 @@ impl<'a> SegmentBag<'a> {
         }
     }
 
+    /// Adds a new segment to the builder.
     fn put(&self, frame: Segment<'a>) -> u16 {
         if !self.is_complete() {
             if self.segments[frame.seq_idx as usize].set(frame.data).is_ok() {
@@ -96,18 +100,24 @@ impl<'a> SegmentBag<'a> {
         }
     }
 
+    /// Checks if the builder contains all segments of the frame.
     fn is_complete(&self) -> bool {
         self.missing.load(Ordering::SeqCst) == 0
     }
 
-    fn reassemble(self) -> Box<[u8]> {
+    /// Reassembles the [Frame]. Panics if not [complete](FrameBuilder::is_complete).
+    fn reassemble(self) -> Frame {
         assert!(self.is_complete(), "missing frames");
-        self.segments
-            .into_iter()
-            .map(|lock| lock.into_inner().unwrap())
-            .collect::<Vec<&[u8]>>()
-            .concat()
-            .into_boxed_slice()
+        Frame {
+            frame_id: self.frame_id,
+            data: self
+                .segments
+                .into_iter()
+                .map(|lock| lock.into_inner().unwrap())
+                .collect::<Vec<&[u8]>>()
+                .concat()
+                .into_boxed_slice(),
+        }
     }
 }
 
@@ -118,7 +128,7 @@ impl<'a> SegmentBag<'a> {
 /// [futures::SinkExt::close] is called.
 #[derive(Debug)]
 pub struct FrameReassembler<'a> {
-    sequences: DashMap<u32, SegmentBag<'a>>,
+    sequences: DashMap<u32, FrameBuilder<'a>>,
     earliest_frame: AtomicU32,
     reassembled: async_channel::Sender<Frame>,
 }
@@ -150,7 +160,7 @@ impl<'a> FrameReassembler<'a> {
                 e.get().put(segment);
             }
             Entry::Vacant(v) => {
-                v.insert(SegmentBag::new(segment));
+                v.insert(FrameBuilder::new(segment));
                 self.earliest_frame.fetch_min(seq_id, Ordering::SeqCst);
             }
         }
@@ -160,12 +170,8 @@ impl<'a> FrameReassembler<'a> {
             .get(&self.earliest_frame.load(Ordering::SeqCst))
             .is_some_and(|t| t.is_complete())
         {
-            if let Some((seq_id, table)) = self.sequences.remove(&seq_id) {
-                let frame_id = ((seq_id & 0xffff0000) >> 16) as u16;
-                let _ = self.reassembled.try_send(Frame {
-                    frame_id,
-                    data: table.reassemble(),
-                });
+            if let Some((_, table)) = self.sequences.remove(&seq_id) {
+                let _ = self.reassembled.try_send(table.reassemble());
             }
         }
 
@@ -220,7 +226,6 @@ mod tests {
                 data: hopr_crypto_random::random_bytes::<PACKET_SIZE>().into(),
             })
             .collect::<Vec<_>>();
-
         static ref SEGMENTS: Vec<Segment<'static>> = {
             let mut segments = PACKETS.par_iter().flat_map(|f| f.segment(MTU)).collect::<Vec<_>>();
             let mut rng = thread_rng();
