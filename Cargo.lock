@@ -3818,6 +3818,7 @@ dependencies = [
  "hopr-crypto-random",
  "rand 0.8.5",
  "rayon",
+ "thiserror",
 ]
 
 [[package]]

@@ -12,6 +12,7 @@ license = "GPL-3.0-only"
 async-channel = { workspace = true }
 dashmap = "5.5.3"
 futures = { workspace = true }
+thiserror = { workspace = true }
 
 [dev-dependencies]
 async-std = { workspace = true }
