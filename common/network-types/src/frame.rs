@@ -142,6 +142,31 @@ impl<'a> FrameBuilder<'a> {
 /// Upon creation, also [Stream] for reassembled [Frames](Frame) is created.
 /// The corresponding stream is closed either when [FrameReassembler::close] or
 /// [futures::SinkExt::close] is called.
+///
+/// ````rust
+/// # futures::executor::block_on(async {
+/// use hopr_network_types::frame::{Frame, FrameReassembler};
+/// use futures::{pin_mut, StreamExt};
+///
+/// let bytes = b"deadbeefcafe00112233";
+///
+/// // Build Frame and segment it
+/// let frame = Frame { frame_id: 1, data: bytes.as_ref().into() };
+/// let segments = frame.segment(2);
+/// assert_eq!(bytes.len() / 2, segments.len());
+///
+/// // Create FrameReassembler and feed the segments to it
+/// let (fragmented, reassembled) = FrameReassembler::new();
+/// pin_mut!(reassembled);
+///
+/// for segment in segments {
+///     fragmented.push_segment(segment).unwrap();
+/// }
+/// fragmented.close();
+///
+/// assert_eq!(Some(frame), reassembled.next().await);
+/// # });
+/// ````
 #[derive(Debug)]
 pub struct FrameReassembler<'a> {
     sequences: DashMap<u32, FrameBuilder<'a>>,
@@ -157,7 +182,7 @@ impl<'a> FrameReassembler<'a> {
         (
             Self {
                 sequences: DashMap::new(),
-                earliest_frame: Default::default(),
+                earliest_frame: AtomicU32::new(u32::MAX),
                 reassembled,
             },
             reassembled_recv,
@@ -181,12 +206,10 @@ impl<'a> FrameReassembler<'a> {
             }
         }
 
-        if self
-            .sequences
-            .get(&self.earliest_frame.load(Ordering::SeqCst))
-            .is_some_and(|t| t.is_complete())
-        {
-            if let Some((_, table)) = self.sequences.remove(&seq_id) {
+        let earliest = self.earliest_frame.load(Ordering::SeqCst);
+
+        if self.sequences.get(&earliest).is_some_and(|t| t.is_complete()) {
+            if let Some((_, table)) = self.sequences.remove(&earliest) {
                 let _ = self.reassembled.try_send(table.reassemble());
             }
         }
