@@ -3837,6 +3837,7 @@ dependencies = [
  "ctor",
  "dashmap",
  "futures",
+ "hex-literal",
  "hopr-crypto-random",
  "lazy_static",
  "rand 0.8.5",

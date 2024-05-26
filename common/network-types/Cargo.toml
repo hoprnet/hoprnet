@@ -18,6 +18,7 @@ thiserror = { workspace = true }
 [dev-dependencies]
 async-std = { workspace = true }
 ctor = "0.2.8"
+hex-literal = { workspace = true }
 rand = "0.8.5"
 rayon = "1.10.0"
 lazy_static = { workspace = true }

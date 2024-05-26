@@ -1,13 +1,13 @@
 use crate::errors::NetworkTypeError;
 use crate::errors::NetworkTypeError::{IncompleteFrame, InvalidFrameId, ReassemblerClosed};
+use crossbeam_skiplist::SkipSet;
+use dashmap::mapref::entry::Entry;
+use dashmap::DashMap;
 use futures::{Sink, Stream};
 use std::pin::Pin;
 use std::sync::atomic::{AtomicU16, Ordering};
 use std::sync::OnceLock;
 use std::task::{Context, Poll};
-use crossbeam_skiplist::SkipSet;
-use dashmap::DashMap;
-use dashmap::mapref::entry::Entry;
 
 fn segment(data: &[u8], mtu: u16, frame_id: u16) -> Vec<Segment> {
     let chunks = data.chunks(mtu as usize);
@@ -90,34 +90,25 @@ struct FrameBuilder<'a> {
 impl<'a> FrameBuilder<'a> {
     /// Creates a new builder with the given initial segment.
     fn new(initial: Segment<'a>) -> Self {
-        Self {
-            frame_id: initial.frame_id,
-            segments: (0..initial.seq_len)
-                .map(|i| {
-                    if i == initial.seq_idx {
-                        OnceLock::from(initial.data)
-                    } else {
-                        OnceLock::new()
-                    }
-                })
-                .collect(),
-            missing: AtomicU16::new(initial.seq_len - 1),
-        }
+        let ret = Self::empty(initial.frame_id, initial.seq_len);
+        ret.put(initial).unwrap();
+        ret
     }
 
+    /// Creates a new empty builder.
     fn empty(frame_id: u16, seq_len: u16) -> Self {
         Self {
             frame_id,
             segments: vec![OnceLock::new(); seq_len as usize],
-            missing: AtomicU16::new(seq_len)
+            missing: AtomicU16::new(seq_len),
         }
     }
 
     /// Adds a new segment to the builder.
-    fn put(&self, frame: Segment<'a>) -> crate::errors::Result<u16> {
-        if self.frame_id == frame.frame_id {
+    fn put(&self, segment: Segment<'a>) -> crate::errors::Result<u16> {
+        if self.frame_id == segment.frame_id {
             if !self.is_complete() {
-                if self.segments[frame.seq_idx as usize].set(frame.data).is_ok() {
+                if self.segments[segment.seq_idx as usize].set(segment.data).is_ok() {
                     self.missing.fetch_sub(1, Ordering::SeqCst);
                 }
                 Ok(self.missing.load(Ordering::SeqCst))
@@ -173,21 +164,19 @@ impl<'a> FrameBuilder<'a> {
 ///
 /// // Create FrameReassembler and feed the segments to it
 /// let (fragmented, reassembled) = FrameReassembler::new();
-/// pin_mut!(reassembled);
 ///
 /// for segment in segments {
 ///     fragmented.push_segment(segment).unwrap();
 /// }
-/// fragmented.close();
+/// drop(fragmented);
+/// pin_mut!(reassembled);
 ///
 /// assert_eq!(Some(frame), reassembled.next().await);
 /// # });
 /// ````
 #[derive(Debug)]
 pub struct FrameReassembler<'a> {
-    /// Maintains
     sequences: DashMap<u32, FrameBuilder<'a>>,
-    /// Maintains a sorted list of sequence IDs
     sorted_seq_ids: SkipSet<u32>,
     reassembled: async_channel::Sender<Frame>,
 }
@@ -217,26 +206,24 @@ impl<'a> FrameReassembler<'a> {
         match self.sequences.entry(seq_id) {
             Entry::Occupied(e) => {
                 e.get().put(segment)?;
-            },
+            }
             Entry::Vacant(v) => {
                 v.insert(FrameBuilder::new(segment));
                 self.sorted_seq_ids.insert(seq_id);
-            },
+            }
         }
 
-        if let Some(maybe_front) = self.sorted_seq_ids.front() {
-            if let Some((_, builder)) = self.sequences.remove_if(maybe_front.value(), |_, builder| builder.is_complete()) {
+        if let Some(earliest_seq_id) = self.sorted_seq_ids.front() {
+            if let Some((_, builder)) = self
+                .sequences
+                .remove_if(earliest_seq_id.value(), |_, builder| builder.is_complete())
+            {
                 let _ = self.reassembled.try_send(builder.reassemble()?);
-                maybe_front.remove();
+                earliest_seq_id.remove();
             }
         }
 
         Ok(())
-    }
-
-    /// Closes the reassembler, so it cannot be used to push new [Segments](Segment) anymore.
-    pub fn close(self) {
-        self.reassembled.close();
     }
 }
 
@@ -265,14 +252,15 @@ impl<'a> Sink<Segment<'a>> for FrameReassembler<'a> {
 mod tests {
     use crate::frame::{Frame, FrameReassembler, Segment};
     use futures::StreamExt;
+    use hex_literal::hex;
     use lazy_static::lazy_static;
     use rand::prelude::SliceRandom;
     use rand::thread_rng;
     use rayon::prelude::*;
 
-    const MTU: u16 = 10;
+    const MTU: u16 = 450;
     const PACKET_COUNT: u16 = 65_535;
-    const PACKET_SIZE: usize = 500;
+    const PACKET_SIZE: usize = 2000;
 
     lazy_static! {
         static ref PACKETS: Vec<Frame> = (0..PACKET_COUNT)
@@ -296,6 +284,33 @@ mod tests {
         lazy_static::initialize(&SEGMENTS);
     }
 
+    #[test]
+    fn test_segmentation() {
+        let data = hex!("deadbeefcafebabe");
+        let frame = Frame {
+            frame_id: 0,
+            data: data.as_ref().into(),
+        };
+
+        let segments = frame.segment(3);
+        assert_eq!(3, segments.len());
+
+        assert_eq!(hex!("deadbe"), segments[0].data);
+        assert_eq!(0, segments[0].seq_idx);
+        assert_eq!(3, segments[0].seq_len);
+        assert_eq!(frame.frame_id, segments[0].frame_id);
+
+        assert_eq!(hex!("efcafe"), segments[1].data);
+        assert_eq!(1, segments[1].seq_idx);
+        assert_eq!(3, segments[1].seq_len);
+        assert_eq!(frame.frame_id, segments[1].frame_id);
+
+        assert_eq!(hex!("babe"), segments[2].data);
+        assert_eq!(2, segments[2].seq_idx);
+        assert_eq!(3, segments[2].seq_len);
+        assert_eq!(frame.frame_id, segments[2].frame_id);
+    }
+
     #[async_std::test]
     async fn test_shuffled_randomized() {
         let (fragmented, reassembled) = FrameReassembler::new();
@@ -303,7 +318,7 @@ mod tests {
         SEGMENTS.iter().cloned().for_each(|b| {
             let _ = fragmented.push_segment(b);
         });
-        fragmented.close();
+        drop(fragmented);
 
         let reassembled_packets = reassembled.collect::<Vec<_>>().await;
 
@@ -320,7 +335,7 @@ mod tests {
         SEGMENTS.par_iter().cloned().for_each(|b| {
             let _ = fragmented.push_segment(b);
         });
-        fragmented.close();
+        drop(fragmented);
 
         let reassembled_packets = reassembled.collect::<Vec<_>>().await;
 
