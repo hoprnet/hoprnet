@@ -105,6 +105,14 @@ impl<'a> FrameBuilder<'a> {
         }
     }
 
+    fn empty(frame_id: u16, seq_len: u16) -> Self {
+        Self {
+            frame_id,
+            segments: vec![OnceLock::new(); seq_len as usize],
+            missing: AtomicU16::new(seq_len)
+        }
+    }
+
     /// Adds a new segment to the builder.
     fn put(&self, frame: Segment<'a>) -> crate::errors::Result<u16> {
         if self.frame_id == frame.frame_id {
