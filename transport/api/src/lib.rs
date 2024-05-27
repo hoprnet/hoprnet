@@ -412,6 +412,12 @@ where
     ) -> crate::errors::Result<HalfKeyChallenge> {
         let app_data = ApplicationData::new(application_tag, &msg)?;
 
+        if msg.len() > PAYLOAD_SIZE {
+            return Err(crate::errors::HoprTransportError::Api(format!(
+                "Message exceeds the maximum allowed size of {PAYLOAD_SIZE} bytes"
+            )));
+        }
+
         let path: TransportPath = if let Some(intermediate_path) = intermediate_path {
             let mut full_path = intermediate_path;
             full_path.push(destination);
