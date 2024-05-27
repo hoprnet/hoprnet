@@ -116,11 +116,6 @@ jobs:
 
       - name: Setup Load Testing environment
         run: |
-          echo "ENVIRONMENT_NAME=${{ steps.vars.outputs.ENVIRONMENT_NAME }}"
-          echo "WORKLOAD_NAME=${{ steps.vars.outputs.WORKLOAD_NAME }}"
-          echo "SCENARIO_ITERATIONS=${{ steps.vars.outputs.SCENARIO_ITERATIONS }}"
-          echo "TESTID=${{ steps.vars.outputs.TESTID }}"
-          echo "SCENARIO_DURATION=${{ steps.vars.outputs.SCENARIO_DURATION }}"
           npm install
           npm run test:${{ steps.vars.outputs.ENVIRONMENT_NAME }}:setup
         working-directory: "./k6"
