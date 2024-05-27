@@ -4,13 +4,15 @@ use crossbeam_skiplist::SkipSet;
 use dashmap::mapref::entry::Entry;
 use dashmap::DashMap;
 use futures::{Sink, Stream};
+use hopr_platform::time::native::current_time;
+use hopr_primitive_types::prelude::AsUnixTimestamp;
 use serde::{Deserialize, Serialize};
+use std::ops::Sub;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicU16, AtomicU64, Ordering};
 use std::sync::OnceLock;
 use std::task::{Context, Poll};
-use hopr_platform::time::native::current_time;
-use hopr_primitive_types::prelude::AsUnixTimestamp;
+use std::time::Duration;
 
 fn segment(data: &[u8], mtu: u16, frame_id: u16) -> Vec<Segment> {
     let chunks = data.chunks(mtu as usize);
@@ -146,7 +148,7 @@ impl<'a> FrameBuilder<'a> {
         }
     }
 
-    /// Adds a new segment to the builder.
+    /// Adds a new segment to the builder with a timestamp.
     /// Returns the number of segments missing in this builder.
     fn put(&self, segment: Segment<'a>, ts: u64) -> crate::errors::Result<u16> {
         if self.frame_id == segment.frame_id {
@@ -171,13 +173,13 @@ impl<'a> FrameBuilder<'a> {
     }
 
     /// Checks if the last added segment to this frame happened before `cutoff`.
-    /// In other words, the frame under construction is considered expired, if last
+    /// In other words, the frame under construction is considered expired if the last
     /// segment was added before `cutoff`.
     fn is_expired(&self, cutoff: u64) -> bool {
         self.last_ts.load(Ordering::SeqCst) < cutoff
     }
 
-    /// Reassembles the [Frame]. Panics if not [complete](FrameBuilder::is_complete).
+    /// Reassembles the [Frame]. Returns [`IncompleteFrame`] if not [complete](FrameBuilder::is_complete).
     fn reassemble(self) -> crate::errors::Result<Frame> {
         if self.is_complete() {
             Ok(Frame {
@@ -197,10 +199,21 @@ impl<'a> FrameBuilder<'a> {
 }
 
 /// Represents a frame reassembler.
-/// The [FrameReassembler] behaves as a sink [Sink] for [Segment].
-/// Upon creation, also [Stream] for reassembled [Frames](Frame) is created.
-/// The corresponding stream is closed either when [FrameReassembler::close] or
-/// [futures::SinkExt::close] is called.
+///
+/// The [`FrameReassembler`] behaves as a [`Sink`] for [`Segment`].
+/// Upon creation, also [`Stream`] for reassembled [Frames](Frame) is created.
+/// The corresponding stream is closed either when [`FrameReassembler::close`] or
+/// [`futures::SinkExt::close`] is called.
+///
+/// As new segments are [pushed](FrameReassembler::push_segment) into the reassembler,
+/// the frames get reassembled and once they are completed, they are automatically pushed out into
+/// the outgoing frame stream.
+///
+/// The reassembler can also have a `max_age` of frames that are under construction.
+/// The [`evict`](FrameReassembler::evict) method then can be called to remove
+/// the incomplete frames over `max_age`.
+///
+/// Note that the reassembler is not flushed when dropped.
 ///
 /// ````rust
 /// # futures::executor::block_on(async {
@@ -215,11 +228,12 @@ impl<'a> FrameBuilder<'a> {
 /// assert_eq!(bytes.len() / 2, segments.len());
 ///
 /// // Create FrameReassembler and feed the segments to it
-/// let (fragmented, reassembled) = FrameReassembler::new();
+/// let (fragmented, reassembled) = FrameReassembler::new(None);
 ///
 /// for segment in segments {
 ///     fragmented.push_segment(segment).unwrap();
 /// }
+///
 /// drop(fragmented);
 /// pin_mut!(reassembled);
 ///
@@ -231,18 +245,20 @@ pub struct FrameReassembler<'a> {
     sequences: DashMap<u32, FrameBuilder<'a>>,
     sorted_seq_ids: SkipSet<u32>,
     reassembled: futures::channel::mpsc::UnboundedSender<Frame>,
+    max_age: Option<Duration>,
 }
 
 impl<'a> FrameReassembler<'a> {
     /// Creates a new frame reassembler and a corresponding stream
     /// for reassembled [Frames](Frame).
-    pub fn new() -> (Self, impl Stream<Item = Frame>) {
+    pub fn new(max_age: Option<Duration>) -> (Self, impl Stream<Item = Frame>) {
         let (reassembled, reassembled_recv) = futures::channel::mpsc::unbounded();
         (
             Self {
                 sequences: DashMap::new(),
                 sorted_seq_ids: SkipSet::new(),
                 reassembled,
+                max_age,
             },
             reassembled_recv,
         )
@@ -254,7 +270,7 @@ impl<'a> FrameReassembler<'a> {
             return Err(ReassemblerClosed);
         }
 
-        let ts = current_time().as_unix_timestamp().as_secs();
+        let ts = current_time().as_unix_timestamp().as_millis() as u64;
         let seq_id = segment.seq_id();
 
         match self.sequences.entry(seq_id) {
@@ -278,24 +294,46 @@ impl<'a> FrameReassembler<'a> {
         Ok(())
     }
 
-    /// Prunes the incomplete frames in construction that are expired given `cutoff` value.
-    /// Incomplete frames that for which the last segment was added earlier than `cutoff` will
-    /// be removed.
-    /// Returns the number of pruned entries.
-    pub fn prune_expired(&self, cutoff: u64) -> usize {
-        let mut count = 0;
-        for entry in self.sorted_seq_ids.iter() {
-            if self
-                .sequences
-                .remove_if(entry.value(), |_, builder| !builder.is_complete() && builder.is_expired(cutoff))
-                .is_some()
-            {
-                entry.remove();
-                count += 1;
-            }
+    /// If [max_age](FrameReassembler::new) was set during construction, evicts
+    /// leading incomplete frames that are expired at the time this method was called.
+    /// Returns that total number of frames that were evicted.
+    pub fn evict(&self) -> crate::errors::Result<usize> {
+        if self.sequences.is_empty() {
+            self.sorted_seq_ids.clear();
+            return Ok(0);
         }
 
-        count
+        let mut count = 0;
+        if let Some(cutoff) = self
+            .max_age
+            .map(|max_age| current_time().sub(max_age).as_unix_timestamp().as_millis() as u64)
+        {
+            // Iterate from lowest seq_ids first, since they are more likely to be completed or expired
+            for seq_id in self.sorted_seq_ids.iter() {
+                // Remove each frame that is either completed (or expired if max age was given).
+                if let Some((_, builder)) = self.sequences.remove_if(seq_id.value(), |_, builder| {
+                    builder.is_complete() || builder.is_expired(cutoff)
+                }) {
+                    if builder.is_complete() {
+                        let _ = self.reassembled.unbounded_send(builder.reassemble()?);
+                    }
+
+                    seq_id.remove();
+                    count += 1;
+                } else if !self.sequences.contains_key(seq_id.value()) {
+                    // If removal failed, because the entry is no longer there, just remove its seq_id
+                    seq_id.remove();
+                } else {
+                    // Existing FrameBuilder is not expired nor completed.
+                    // Continuing would output frames out of order.
+                    break;
+                }
+            }
+
+            Ok(count)
+        } else {
+            Ok(0)
+        }
     }
 }
 
@@ -311,7 +349,7 @@ impl<'a> Sink<Segment<'a>> for FrameReassembler<'a> {
     }
 
     fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
+        Poll::Ready(self.evict().map(|_| ()))
     }
 
     fn poll_close(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -323,12 +361,15 @@ impl<'a> Sink<Segment<'a>> for FrameReassembler<'a> {
 #[cfg(test)]
 mod tests {
     use crate::frame::{Frame, FrameReassembler, Segment};
-    use futures::StreamExt;
+    use futures::{pin_mut, StreamExt};
     use hex_literal::hex;
     use lazy_static::lazy_static;
     use rand::prelude::SliceRandom;
     use rand::thread_rng;
     use rayon::prelude::*;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Arc;
+    use std::time::Duration;
 
     const MTU: u16 = 448;
     const PACKET_COUNT: u16 = 65_535;
@@ -402,7 +443,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_shuffled_randomized() {
-        let (fragmented, reassembled) = FrameReassembler::new();
+        let (fragmented, reassembled) = FrameReassembler::new(None);
 
         SEGMENTS.iter().cloned().for_each(|b| {
             let _ = fragmented.push_segment(b);
@@ -419,7 +460,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_shuffled_randomized_parallel() {
-        let (fragmented, reassembled) = FrameReassembler::new();
+        let (fragmented, reassembled) = FrameReassembler::new(None);
 
         SEGMENTS.par_iter().cloned().for_each(|b| {
             let _ = fragmented.push_segment(b);
@@ -432,5 +473,62 @@ mod tests {
             .into_par_iter()
             .enumerate()
             .for_each(|(i, frame)| assert_eq!(frame, PACKETS[i]));
+    }
+
+    #[async_std::test]
+    async fn test_flush() {
+        let frames = vec![
+            Frame {
+                frame_id: 1,
+                data: hex!("deadbeefcafebabe").into(),
+            },
+            Frame {
+                frame_id: 2,
+                data: hex!("feedbeefbaadcafe").into(),
+            },
+            Frame {
+                frame_id: 3,
+                data: hex!("00112233abcd").into(),
+            },
+        ];
+
+        let mut segments = frames.iter().flat_map(|f| f.segment(3)).collect::<Vec<_>>();
+        segments.remove(4); // Remove 2nd segment of Frame 3
+
+        let mut rng = thread_rng();
+        segments.shuffle(&mut rng);
+
+        let (fragmented, reassembled) = FrameReassembler::new(Some(Duration::from_millis(10)));
+
+        segments.into_iter().for_each(|b| {
+            let _ = fragmented.push_segment(b);
+        });
+
+        let flushed = Arc::new(AtomicBool::new(false));
+
+        let flushed_cpy = flushed.clone();
+        let frames_cpy = frames.clone();
+        let jh = async_std::task::spawn(async move {
+            pin_mut!(reassembled);
+
+            // The first frame should yield immediately
+            assert_eq!(Some(frames_cpy[0].clone()), reassembled.next().await);
+
+            assert!(!flushed_cpy.load(Ordering::SeqCst));
+
+            // The next frame is the third one
+            assert_eq!(Some(frames_cpy[2].clone()), reassembled.next().await);
+
+            // and it must've happened only after pruning
+            assert!(flushed_cpy.load(Ordering::SeqCst));
+        });
+
+        async_std::task::sleep(Duration::from_millis(100)).await;
+
+        // Prune the expired entry, which is Frame 2 (that is missing a segment)
+        flushed.store(true, Ordering::SeqCst);
+        assert_eq!(2, fragmented.evict().unwrap()); // One expired, one complete
+
+        jh.await;
     }
 }
