@@ -39,6 +39,7 @@ pub struct Frame {
 
 impl Frame {
     /// Segments this frame into a list of [segments](Segment) each of maximum sizes `mtu`.
+    #[inline]
     pub fn segment(&self, mtu: u16) -> Vec<Segment> {
         segment(self.data.as_ref(), mtu, self.frame_id)
     }
@@ -74,6 +75,7 @@ impl Ord for Segment<'_> {
 impl<'a> Segment<'a> {
     /// Identifies the entire segment sequence using the frame id and the length
     /// of the sequence.
+    #[inline]
     pub fn seq_id(&self) -> u32 {
         (self.frame_id as u32) << 16 | self.seq_len as u32
     }
@@ -105,11 +107,12 @@ impl<'a> FrameBuilder<'a> {
     }
 
     /// Adds a new segment to the builder.
+    /// Returns the number of segments missing in this builder.
     fn put(&self, segment: Segment<'a>) -> crate::errors::Result<u16> {
         if self.frame_id == segment.frame_id {
             if !self.is_complete() {
                 if self.segments[segment.seq_idx as usize].set(segment.data).is_ok() {
-                    self.missing.fetch_sub(1, Ordering::SeqCst);
+                    self.missing.fetch_sub(1, Ordering::Relaxed);
                 }
                 Ok(self.missing.load(Ordering::SeqCst))
             } else {
@@ -123,6 +126,11 @@ impl<'a> FrameBuilder<'a> {
     /// Checks if the builder contains all segments of the frame.
     fn is_complete(&self) -> bool {
         self.missing.load(Ordering::SeqCst) == 0
+    }
+
+    #[allow(dead_code)]
+    fn is_expired(&self) -> bool {
+        todo!()
     }
 
     /// Reassembles the [Frame]. Panics if not [complete](FrameBuilder::is_complete).
@@ -205,21 +213,19 @@ impl<'a> FrameReassembler<'a> {
         let seq_id = segment.seq_id();
         match self.sequences.entry(seq_id) {
             Entry::Occupied(e) => {
-                e.get().put(segment)?;
+                if e.get().put(segment)? == 0 {
+                    // No more segments missing in this frame, check if this is the earliest frame
+                    if let Some(earliest_seq_id) = self.sorted_seq_ids.front() {
+                        if earliest_seq_id.eq(e.key()) {
+                            let _ = self.reassembled.try_send(e.remove().reassemble()?);
+                            earliest_seq_id.remove();
+                        }
+                    }
+                }
             }
             Entry::Vacant(v) => {
                 v.insert(FrameBuilder::new(segment));
                 self.sorted_seq_ids.insert(seq_id);
-            }
-        }
-
-        if let Some(earliest_seq_id) = self.sorted_seq_ids.front() {
-            if let Some((_, builder)) = self
-                .sequences
-                .remove_if(earliest_seq_id.value(), |_, builder| builder.is_complete())
-            {
-                let _ = self.reassembled.try_send(builder.reassemble()?);
-                earliest_seq_id.remove();
             }
         }
 
@@ -258,9 +264,9 @@ mod tests {
     use rand::thread_rng;
     use rayon::prelude::*;
 
-    const MTU: u16 = 450;
+    const MTU: u16 = 448;
     const PACKET_COUNT: u16 = 65_535;
-    const PACKET_SIZE: usize = 2000;
+    const PACKET_SIZE: usize = 2048;
 
     lazy_static! {
         static ref PACKETS: Vec<Frame> = (0..PACKET_COUNT)
