@@ -59,3 +59,11 @@ pub mod heartbeat;
 pub mod msg;
 /// `ticket_aggregation` p2p protocol
 pub mod ticket_aggregation;
+
+pub(crate) mod executor {
+    #[cfg(any(feature = "runtime-async-std", test))]
+    pub(crate) use async_std::task::{sleep, spawn};
+
+    #[cfg(all(feature = "runtime-tokio", not(test)))]
+    pub(crate) use tokio::{task::spawn, time::sleep};
+}

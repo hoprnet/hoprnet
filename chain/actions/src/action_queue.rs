@@ -23,8 +23,14 @@ use crate::action_state::{ActionState, IndexerExpectation};
 use crate::errors::ChainActionsError::{ChannelAlreadyClosed, InvalidState, Timeout, TransactionSubmissionFailed};
 use crate::errors::{ChainActionsError, Result};
 
-use hopr_db_api::info::HoprDbInfoOperations;
-use hopr_db_api::tickets::HoprDbTicketOperations;
+#[cfg(any(feature = "runtime-async-std", test))]
+use async_std::task::spawn;
+
+#[cfg(all(feature = "runtime-tokio", not(test)))]
+use tokio::task::spawn;
+
+use hopr_db_sql::api::tickets::HoprDbTicketOperations;
+use hopr_db_sql::info::HoprDbInfoOperations;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::MultiCounter;
@@ -366,7 +372,7 @@ where
                 .unwrap();
 
             // NOTE: the process is "daemonized" and not awaited, so it will run in the background
-            async_std::task::spawn(async move {
+            spawn(async move {
                 let act_id = act.to_string();
                 let act_name: &'static str = (&act).into();
                 trace!("start executing {act_id} ({act_name})");

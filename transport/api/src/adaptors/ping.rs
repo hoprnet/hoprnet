@@ -2,13 +2,13 @@ use std::sync::Arc;
 
 use async_lock::RwLock;
 use async_trait::async_trait;
+use hopr_db_sql::api::resolver::HoprDbResolverOperations;
 use tracing::{debug, error};
 
 use core_network::{
     network::{Network, NetworkTriggeredEvent},
-    ping::PingExternalAPI,
-    ping::PingResult,
-    PeerId,
+    ping::{PingExternalAPI, PingResult},
+    HoprDbPeersOperations, PeerId,
 };
 use core_path::channel_graph::ChannelGraph;
 use hopr_crypto_types::types::OffchainPublicKey;
@@ -23,12 +23,7 @@ use hopr_crypto_types::types::OffchainPublicKey;
 #[derive(Debug, Clone)]
 pub struct PingExternalInteractions<T>
 where
-    T: hopr_db_api::peers::HoprDbPeersOperations
-        + hopr_db_api::resolver::HoprDbResolverOperations
-        + Sync
-        + Send
-        + Clone
-        + std::fmt::Debug,
+    T: HoprDbPeersOperations + HoprDbResolverOperations + Sync + Send + Clone + std::fmt::Debug,
 {
     network: Arc<Network<T>>,
     resolver: T,
@@ -40,12 +35,7 @@ where
 
 impl<T> PingExternalInteractions<T>
 where
-    T: hopr_db_api::peers::HoprDbPeersOperations
-        + hopr_db_api::resolver::HoprDbResolverOperations
-        + Sync
-        + Send
-        + Clone
-        + std::fmt::Debug,
+    T: HoprDbPeersOperations + HoprDbResolverOperations + Sync + Send + Clone + std::fmt::Debug,
 {
     pub fn new(
         network: Arc<Network<T>>,
@@ -65,12 +55,7 @@ where
 #[async_trait]
 impl<T> PingExternalAPI for PingExternalInteractions<T>
 where
-    T: hopr_db_api::peers::HoprDbPeersOperations
-        + hopr_db_api::resolver::HoprDbResolverOperations
-        + Sync
-        + Send
-        + Clone
-        + std::fmt::Debug,
+    T: HoprDbPeersOperations + HoprDbResolverOperations + Sync + Send + Clone + std::fmt::Debug,
 {
     #[tracing::instrument(level = "info", skip(self))]
     async fn on_finished_ping(&self, peer: &PeerId, result: PingResult, version: String) {

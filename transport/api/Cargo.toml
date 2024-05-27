@@ -10,15 +10,31 @@ license = "GPL-3.0-only"
 crate-type = ["rlib"]
 
 [features]
-default = ["prometheus"]
+default = []
+runtime-async-std = [
+    "async-std",
+    "core-protocol/runtime-async-std",
+    "core-p2p/runtime-async-std",
+    "hopr-db-sql/runtime-async-std"
+]
+runtime-tokio = [
+    "tokio",
+    "core-protocol/runtime-tokio",
+    "core-p2p/runtime-tokio",
+    "hopr-db-sql/runtime-tokio"
+]
 prometheus = [
     "dep:lazy_static", "dep:hopr-metrics",
-    "core-network/prometheus", "hopr-crypto-packet/prometheus", "core-path/prometheus", "core-protocol/prometheus"
+    "core-network/prometheus",
+    "hopr-crypto-packet/prometheus",
+    "core-path/prometheus",
+    "core-protocol/prometheus",
+    "hopr-db-sql/prometheus"
 ]
 
 [dependencies]
 async-channel = { workspace = true }
-async-std = { workspace = true }
+async-std = { workspace = true, optional = true }
 async-trait = { workspace = true }
 async-lock = { workspace = true }
 futures = { workspace = true }
@@ -31,6 +47,7 @@ rust-stream-ext-concurrent = { workspace = true }
 serde = { workspace = true }
 smart-default = { workspace = true }
 thiserror = { workspace = true }
+tokio = { workspace = true, optional = true }
 tracing = { workspace = true }
 uuid = { workspace = true, features = ["v4",  "fast-rng"] }
 validator = { workspace = true }
@@ -42,7 +59,7 @@ core-path = { workspace = true }
 core-p2p = { workspace = true }
 hopr-crypto-packet = { workspace = true }
 core-protocol = { workspace = true }
-hopr-db-api = { workspace = true }
+hopr-db-sql = { workspace = true }
 hopr-platform = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-internal-types = { workspace = true }

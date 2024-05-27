@@ -43,6 +43,7 @@ impl MixerConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use async_std::task::sleep;
     use futures_lite::stream::StreamExt;
     use hopr_crypto_random::Rng;
     use more_asserts::*;
@@ -66,7 +67,7 @@ mod tests {
     #[async_std::test]
     async fn test_then_concurrent_empty_stream_should_not_produce_a_value_if_none_is_ready() {
         let mut stream = futures::stream::iter(random_packets(1)).then_concurrent(|x| async {
-            async_std::task::sleep(TINY_CONSTANT_DELAY * 3).await;
+            sleep(TINY_CONSTANT_DELAY * 3).await;
             x
         });
 
@@ -87,7 +88,7 @@ mod tests {
         let start = std::time::Instant::now();
 
         let stream = futures::stream::iter(expected.clone()).then_concurrent(|x| async move {
-            async_std::task::sleep(constant_delay).await;
+            sleep(constant_delay).await;
             x
         });
 
@@ -106,7 +107,7 @@ mod tests {
         let expected_packets = vec![packet_2, packet_3, packet_1];
 
         let stream = futures::stream::iter(vec![packet_1, packet_2, packet_3]).then_concurrent(|x| async move {
-            async_std::task::sleep(std::time::Duration::from_millis(x)).await;
+            sleep(std::time::Duration::from_millis(x)).await;
             x
         });
         let actual_packets = stream.collect::<Vec<u64>>().await;

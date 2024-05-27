@@ -8,7 +8,7 @@ use futures::TryStreamExt;
 use libp2p_identity::PeerId;
 
 use hopr_crypto_types::types::OffchainPublicKey;
-use hopr_db_api::resolver::HoprDbResolverOperations;
+use hopr_db_sql::api::resolver::HoprDbResolverOperations;
 use hopr_internal_types::channels::ChannelStatus;
 use hopr_primitive_types::{primitives::Address, traits::ToHex};
 
@@ -414,14 +414,14 @@ mod tests {
         async fn resolve_packet_key(
             &self,
             onchain_key: &Address,
-        ) -> hopr_db_api::errors::Result<Option<OffchainPublicKey>> {
+        ) -> hopr_db_sql::api::errors::Result<Option<OffchainPublicKey>> {
             Ok(self.0.iter().find(|(_, addr)| addr.eq(onchain_key)).map(|(pk, _)| *pk))
         }
 
         async fn resolve_chain_key(
             &self,
             offchain_key: &OffchainPublicKey,
-        ) -> hopr_db_api::errors::Result<Option<Address>> {
+        ) -> hopr_db_sql::api::errors::Result<Option<Address>> {
             Ok(self.0.iter().find(|(pk, _)| pk.eq(offchain_key)).map(|(_, addr)| *addr))
         }
     }
