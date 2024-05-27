@@ -48,6 +48,7 @@ pub use {
 };
 
 use async_lock::RwLock;
+use constants::RESERVED_TAG_UPPER_BOUND;
 use futures::{channel::mpsc::UnboundedSender, FutureExt, SinkExt};
 use std::{
     collections::HashMap,
@@ -457,6 +458,14 @@ where
         hops: Option<u16>,
         application_tag: Option<u16>,
     ) -> crate::errors::Result<HalfKeyChallenge> {
+        if let Some(application_tag) = application_tag {
+            if application_tag < RESERVED_TAG_UPPER_BOUND {
+                return Err(crate::errors::HoprTransportError::Api(format!(
+                    "Application tag must not be lower than {RESERVED_TAG_UPPER_BOUND}"
+                )));
+            }
+        }
+
         let app_data = ApplicationData::new(application_tag, &msg)?;
 
         let path: TransportPath = if let Some(intermediate_path) = intermediate_path {
