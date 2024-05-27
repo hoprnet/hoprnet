@@ -8,6 +8,9 @@ pub enum NetworkTypeError {
     #[error("cannot reassemble frame because it is not complete")]
     IncompleteFrame,
 
+    #[error("segment could not be parsed correctly")]
+    InvalidSegment,
+
     #[error("frame reassembler is closed")]
     ReassemblerClosed,
 }

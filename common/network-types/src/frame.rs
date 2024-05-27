@@ -1,5 +1,5 @@
 use crate::errors::NetworkTypeError;
-use crate::errors::NetworkTypeError::{IncompleteFrame, InvalidFrameId, ReassemblerClosed};
+use crate::errors::NetworkTypeError::{IncompleteFrame, InvalidFrameId, InvalidSegment, ReassemblerClosed};
 use crossbeam_skiplist::SkipSet;
 use dashmap::mapref::entry::Entry;
 use dashmap::DashMap;
@@ -8,6 +8,7 @@ use std::pin::Pin;
 use std::sync::atomic::{AtomicU16, Ordering};
 use std::sync::OnceLock;
 use std::task::{Context, Poll};
+use serde::{Deserialize, Serialize};
 
 fn segment(data: &[u8], mtu: u16, frame_id: u16) -> Vec<Segment> {
     let chunks = data.chunks(mtu as usize);
@@ -49,12 +50,17 @@ impl Frame {
 /// Besides the data, a segment carries information about the total number of
 /// segments in the original frame, its index within the frame and
 /// ID of that frame.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Segment<'a> {
-    frame_id: u16,
-    seq_len: u16,
-    seq_idx: u16,
-    data: &'a [u8],
+    /// Id of the [Frame] this segment belongs to.
+    pub frame_id: u16,
+    /// Index of this segment within the segment sequence.
+    pub seq_idx: u16,
+    /// Total number of segments within this segment sequence.
+    pub seq_len: u16,
+    /// Data in this segment.
+    #[serde(with = "serde_bytes")]
+    pub data: &'a [u8],
 }
 
 impl<'a> PartialOrd<Segment<'a>> for Segment<'a> {
@@ -68,6 +74,36 @@ impl Ord for Segment<'_> {
         match self.frame_id.cmp(&other.frame_id) {
             std::cmp::Ordering::Equal => self.seq_idx.cmp(&other.seq_idx),
             cmp => cmp,
+        }
+    }
+}
+
+impl From<Segment<'_>> for Box<[u8]> {
+    fn from(value: Segment<'_>) -> Self {
+        let mut ret = Vec::with_capacity(6 + value.data.len());
+        ret.extend_from_slice(value.frame_id.to_be_bytes().as_ref());
+        ret.extend_from_slice(value.seq_idx.to_be_bytes().as_ref());
+        ret.extend_from_slice(value.seq_len.to_be_bytes().as_ref());
+        ret.extend_from_slice(value.data);
+        ret.into_boxed_slice()
+    }
+}
+
+impl<'a> TryFrom<&'a [u8]> for Segment<'a> {
+    type Error = NetworkTypeError;
+
+    fn try_from(value: &'a [u8]) -> Result<Self, Self::Error> {
+        let (header, data) = value.split_at(6);
+        let segment = Segment {
+            frame_id: u16::from_be_bytes(header[0..2].try_into().map_err(|_| InvalidSegment)?),
+            seq_idx: u16::from_be_bytes(header[2..4].try_into().map_err(|_| InvalidSegment)?),
+            seq_len: u16::from_be_bytes(header[4..6].try_into().map_err(|_| InvalidSegment)?),
+            data,
+        };
+        if segment.seq_idx < segment.seq_len {
+            Ok(segment)
+        } else {
+            Err(InvalidSegment)
         }
     }
 }
@@ -186,14 +222,14 @@ impl<'a> FrameBuilder<'a> {
 pub struct FrameReassembler<'a> {
     sequences: DashMap<u32, FrameBuilder<'a>>,
     sorted_seq_ids: SkipSet<u32>,
-    reassembled: async_channel::Sender<Frame>,
+    reassembled: futures::channel::mpsc::UnboundedSender<Frame>,
 }
 
 impl<'a> FrameReassembler<'a> {
     /// Creates a new frame reassembler and a corresponding stream
     /// for reassembled [Frames](Frame).
     pub fn new() -> (Self, impl Stream<Item = Frame>) {
-        let (reassembled, reassembled_recv) = async_channel::unbounded();
+        let (reassembled, reassembled_recv) = futures::channel::mpsc::unbounded();
         (
             Self {
                 sequences: DashMap::new(),
@@ -217,7 +253,7 @@ impl<'a> FrameReassembler<'a> {
                     // No more segments missing in this frame, check if this is the earliest frame
                     if let Some(earliest_seq_id) = self.sorted_seq_ids.front() {
                         if earliest_seq_id.eq(e.key()) {
-                            let _ = self.reassembled.try_send(e.remove().reassemble()?);
+                            let _ = self.reassembled.unbounded_send(e.remove().reassemble()?);
                             earliest_seq_id.remove();
                         }
                     }
@@ -249,7 +285,7 @@ impl<'a> Sink<Segment<'a>> for FrameReassembler<'a> {
     }
 
     fn poll_close(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.reassembled.close();
+        self.reassembled.close_channel();
         Poll::Ready(Ok(()))
     }
 }
@@ -315,6 +351,23 @@ mod tests {
         assert_eq!(2, segments[2].seq_idx);
         assert_eq!(3, segments[2].seq_len);
         assert_eq!(frame.frame_id, segments[2].frame_id);
+    }
+
+    #[test]
+    fn test_segment_serialization() {
+        let data = hopr_crypto_random::random_bytes::<128>();
+
+        let segment = Segment {
+            frame_id: 1234,
+            seq_len: 123,
+            seq_idx: 12,
+            data: &data,
+        };
+
+        let boxed: Box<[u8]> = segment.clone().into();
+        let recovered: Segment = (&boxed[..]).try_into().unwrap();
+
+        assert_eq!(segment, recovered);
     }
 
     #[async_std::test]

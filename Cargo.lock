@@ -3831,7 +3831,6 @@ dependencies = [
 name = "hopr-network-types"
 version = "0.1.0"
 dependencies = [
- "async-channel 2.1.1",
  "async-std",
  "crossbeam-skiplist",
  "ctor",
@@ -3842,6 +3841,8 @@ dependencies = [
  "lazy_static",
  "rand 0.8.5",
  "rayon",
+ "serde",
+ "serde_bytes",
  "thiserror",
 ]
 
