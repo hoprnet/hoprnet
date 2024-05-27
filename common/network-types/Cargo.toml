@@ -16,6 +16,9 @@ serde = { workspace = true }
 serde_bytes = { workspace = true }
 thiserror = { workspace = true }
 
+hopr-platform = { workspace = true }
+hopr-primitive-types = { workspace = true }
+
 [dev-dependencies]
 async-std = { workspace = true }
 ctor = "0.2.8"

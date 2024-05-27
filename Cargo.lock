@@ -3838,6 +3838,8 @@ dependencies = [
  "futures",
  "hex-literal",
  "hopr-crypto-random",
+ "hopr-platform",
+ "hopr-primitive-types",
  "lazy_static",
  "rand 0.8.5",
  "rayon",

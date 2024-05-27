@@ -4,11 +4,13 @@ use crossbeam_skiplist::SkipSet;
 use dashmap::mapref::entry::Entry;
 use dashmap::DashMap;
 use futures::{Sink, Stream};
+use serde::{Deserialize, Serialize};
 use std::pin::Pin;
-use std::sync::atomic::{AtomicU16, Ordering};
+use std::sync::atomic::{AtomicU16, AtomicU64, Ordering};
 use std::sync::OnceLock;
 use std::task::{Context, Poll};
-use serde::{Deserialize, Serialize};
+use hopr_platform::time::native::current_time;
+use hopr_primitive_types::prelude::AsUnixTimestamp;
 
 fn segment(data: &[u8], mtu: u16, frame_id: u16) -> Vec<Segment> {
     let chunks = data.chunks(mtu as usize);
@@ -123,13 +125,14 @@ struct FrameBuilder<'a> {
     frame_id: u16,
     segments: Vec<OnceLock<&'a [u8]>>,
     missing: AtomicU16,
+    last_ts: AtomicU64,
 }
 
 impl<'a> FrameBuilder<'a> {
     /// Creates a new builder with the given initial segment.
-    fn new(initial: Segment<'a>) -> Self {
+    fn new(initial: Segment<'a>, ts: u64) -> Self {
         let ret = Self::empty(initial.frame_id, initial.seq_len);
-        ret.put(initial).unwrap();
+        ret.put(initial, ts).unwrap();
         ret
     }
 
@@ -139,19 +142,22 @@ impl<'a> FrameBuilder<'a> {
             frame_id,
             segments: vec![OnceLock::new(); seq_len as usize],
             missing: AtomicU16::new(seq_len),
+            last_ts: AtomicU64::new(0),
         }
     }
 
     /// Adds a new segment to the builder.
     /// Returns the number of segments missing in this builder.
-    fn put(&self, segment: Segment<'a>) -> crate::errors::Result<u16> {
+    fn put(&self, segment: Segment<'a>, ts: u64) -> crate::errors::Result<u16> {
         if self.frame_id == segment.frame_id {
             if !self.is_complete() {
                 if self.segments[segment.seq_idx as usize].set(segment.data).is_ok() {
                     self.missing.fetch_sub(1, Ordering::Relaxed);
+                    self.last_ts.fetch_max(ts, Ordering::Relaxed);
                 }
                 Ok(self.missing.load(Ordering::SeqCst))
             } else {
+                // Silently throw away segments of a frame that is already complete
                 Ok(0)
             }
         } else {
@@ -164,9 +170,11 @@ impl<'a> FrameBuilder<'a> {
         self.missing.load(Ordering::SeqCst) == 0
     }
 
-    #[allow(dead_code)]
-    fn is_expired(&self) -> bool {
-        todo!()
+    /// Checks if the last added segment to this frame happened before `cutoff`.
+    /// In other words, the frame under construction is considered expired, if last
+    /// segment was added before `cutoff`.
+    fn is_expired(&self, cutoff: u64) -> bool {
+        self.last_ts.load(Ordering::SeqCst) < cutoff
     }
 
     /// Reassembles the [Frame]. Panics if not [complete](FrameBuilder::is_complete).
@@ -246,10 +254,12 @@ impl<'a> FrameReassembler<'a> {
             return Err(ReassemblerClosed);
         }
 
+        let ts = current_time().as_unix_timestamp().as_secs();
         let seq_id = segment.seq_id();
+
         match self.sequences.entry(seq_id) {
             Entry::Occupied(e) => {
-                if e.get().put(segment)? == 0 {
+                if e.get().put(segment, ts)? == 0 {
                     // No more segments missing in this frame, check if this is the earliest frame
                     if let Some(earliest_seq_id) = self.sorted_seq_ids.front() {
                         if earliest_seq_id.eq(e.key()) {
@@ -260,12 +270,32 @@ impl<'a> FrameReassembler<'a> {
                 }
             }
             Entry::Vacant(v) => {
-                v.insert(FrameBuilder::new(segment));
+                v.insert(FrameBuilder::new(segment, ts));
                 self.sorted_seq_ids.insert(seq_id);
             }
         }
 
         Ok(())
+    }
+
+    /// Prunes the incomplete frames in construction that are expired given `cutoff` value.
+    /// Incomplete frames that for which the last segment was added earlier than `cutoff` will
+    /// be removed.
+    /// Returns the number of pruned entries.
+    pub fn prune_expired(&self, cutoff: u64) -> usize {
+        let mut count = 0;
+        for entry in self.sorted_seq_ids.iter() {
+            if self
+                .sequences
+                .remove_if(entry.value(), |_, builder| !builder.is_complete() && builder.is_expired(cutoff))
+                .is_some()
+            {
+                entry.remove();
+                count += 1;
+            }
+        }
+
+        count
     }
 }
 
