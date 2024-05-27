@@ -9,6 +9,7 @@ import requests
 from .conftest import (
     API_TOKEN,
     OPEN_CHANNEL_FUNDING_VALUE_HOPR,
+    RESERVED_TAG_UPPER_BOUND,
     TICKET_AGGREGATION_THRESHOLD,
     TICKET_PRICE_PER_HOP,
     barebone_nodes,
@@ -765,6 +766,26 @@ async def test_hoprd_check_ticket_price_is_default(peer, swarm7: dict[str, Node]
 
     assert isinstance(price, int)
     assert price > 0
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("tag", [random.randint(0, RESERVED_TAG_UPPER_BOUND) for _ in range(5)])
+async def test_send_message_with_reserved_application_tag_should_fail(tag: int, swarm7: dict[str, Node]):
+    src, dest = random_distinct_pairs_from(barebone_nodes(), count=1)[0]
+
+    await swarm7[src].api.send_message(
+        swarm7[dest].peer_id, "This message should fail due to reserved tag", [], tag
+    ) == None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("tag", [random.randint(0, RESERVED_TAG_UPPER_BOUND) for _ in range(5)])
+async def test_inbox_operations_with_reserved_application_tag_should_fail(tag: int, swarm7: dict[str, Node]):
+    id = random.choice(barebone_nodes())
+
+    await swarm7[id].api.messages_pop(tag) == None
+    await swarm7[id].api.messages_peek(tag) == None
+    await swarm7[id].api.messages_peek(tag) == None
 
 
 @pytest.mark.asyncio
