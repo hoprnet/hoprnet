@@ -43,6 +43,8 @@ lazy_static::lazy_static! {
     ).unwrap();
 }
 
+/// The type is needed solely to allow implementing the [`IntoCondition`] trait for [`TicketSelector`]
+/// from the `hopr_db_api` crate.
 pub(crate) struct WrappedTicketSelector(pub(crate) TicketSelector);
 
 impl From<TicketSelector> for WrappedTicketSelector {
