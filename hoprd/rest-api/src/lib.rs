@@ -464,6 +464,8 @@ pub(crate) struct ApiError {
 #[strum(serialize_all = "SCREAMING_SNAKE_CASE")]
 enum ApiErrorStatus {
     InvalidInput,
+    /// An invalid application tag from the reserved range was provided.
+    InvalidApplicationTag,
     InvalidChannelId,
     InvalidPeerId,
     ChannelNotFound,
@@ -1416,7 +1418,7 @@ mod channels {
 mod messages {
     use std::time::Duration;
 
-    use hopr_lib::{AsUnixTimestamp, HalfKeyChallenge};
+    use hopr_lib::{AsUnixTimestamp, HalfKeyChallenge, RESERVED_TAG_UPPER_LIMIT};
 
     use super::*;
 
@@ -1672,6 +1674,7 @@ mod messages {
         params(TagQueryRequest),
         responses(
             (status = 204, description = "Messages successfully deleted."),
+            (status = 400, description = "Bad request.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
         ),
         tag = "Messages",
@@ -1682,8 +1685,13 @@ mod messages {
     )]
     pub async fn delete_messages(req: Request<InternalState>) -> tide::Result<Response> {
         let tag: TagQueryRequest = req.query()?;
-        let inbox = req.state().inbox.clone();
+        if tag.tag.map_or(false, |tag| tag < RESERVED_TAG_UPPER_LIMIT) {
+            return Ok(Response::builder(400)
+                .body(ApiErrorStatus::InvalidApplicationTag)
+                .build());
+        }
 
+        let inbox = req.state().inbox.clone();
         inbox.write().await.pop_all(tag.tag).await;
         Ok(Response::builder(204).build())
     }
@@ -1695,6 +1703,7 @@ mod messages {
         params(TagQueryRequest),
         responses(
             (status = 200, description = "Returns the message inbox size filtered by the given tag", body = SizeResponse),
+            (status = 400, description = "Bad request.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
         ),
         security(
@@ -1705,8 +1714,13 @@ mod messages {
     )]
     pub async fn size(req: Request<InternalState>) -> tide::Result<Response> {
         let query: TagQueryRequest = req.query()?;
-        let inbox = req.state().inbox.clone();
+        if query.tag.map_or(false, |tag| tag < RESERVED_TAG_UPPER_LIMIT) {
+            return Ok(Response::builder(400)
+                .body(ApiErrorStatus::InvalidApplicationTag)
+                .build());
+        }
 
+        let inbox = req.state().inbox.clone();
         let size = inbox.read().await.size(query.tag).await;
 
         Ok(Response::builder(200).body(json!(SizeResponse { size })).build())
@@ -1756,6 +1770,7 @@ mod messages {
         ),
         responses(
             (status = 200, description = "Message successfully extracted.", body = MessagePopResponse),
+            (status = 400, description = "Bad request.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "The specified resource was not found."),
             (status = 422, description = "Unknown failure", body = ApiError)
@@ -1768,8 +1783,13 @@ mod messages {
     )]
     pub async fn pop(mut req: Request<InternalState>) -> tide::Result<Response> {
         let tag: TagQueryRequest = req.body_json().await?;
-        let inbox = req.state().inbox.clone();
+        if tag.tag.map_or(false, |tag| tag < RESERVED_TAG_UPPER_LIMIT) {
+            return Ok(Response::builder(400)
+                .body(ApiErrorStatus::InvalidApplicationTag)
+                .build());
+        }
 
+        let inbox = req.state().inbox.clone();
         let inbox = inbox.write().await;
         if let Some((data, ts)) = inbox.pop(tag.tag).await {
             match to_api_message(data, ts) {
@@ -1799,6 +1819,7 @@ mod messages {
         ),
         responses(
             (status = 200, description = "All message successfully extracted.", body = MessagePopAllResponse),
+            (status = 400, description = "Bad request.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "The specified resource was not found."),
             (status = 422, description = "Unknown failure", body = ApiError)
@@ -1811,6 +1832,12 @@ mod messages {
     )]
     pub async fn pop_all(mut req: Request<InternalState>) -> tide::Result<Response> {
         let tag: TagQueryRequest = req.body_json().await?;
+        if tag.tag.map_or(false, |tag| tag < RESERVED_TAG_UPPER_LIMIT) {
+            return Ok(Response::builder(400)
+                .body(ApiErrorStatus::InvalidApplicationTag)
+                .build());
+        }
+
         let inbox = req.state().inbox.clone();
 
         let inbox = inbox.write().await;
@@ -1845,6 +1872,7 @@ mod messages {
         ),
         responses(
             (status = 200, description = "Message successfully peeked at.", body = MessagePopResponse),
+            (status = 400, description = "Bad request.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "The specified resource was not found."),
             (status = 422, description = "Unknown failure", body = ApiError)
@@ -1857,6 +1885,12 @@ mod messages {
     )]
     pub async fn peek(mut req: Request<InternalState>) -> tide::Result<Response> {
         let tag: TagQueryRequest = req.body_json().await?;
+        if tag.tag.map_or(false, |tag| tag < RESERVED_TAG_UPPER_LIMIT) {
+            return Ok(Response::builder(400)
+                .body(ApiErrorStatus::InvalidApplicationTag)
+                .build());
+        }
+
         let inbox = req.state().inbox.clone();
 
         let inbox = inbox.write().await;
@@ -1883,6 +1917,7 @@ mod messages {
         ),
         responses(
             (status = 200, description = "All messages successfully peeked at.", body = MessagePopAllResponse),
+            (status = 400, description = "Bad request.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "The specified resource was not found."),
             (status = 422, description = "Unknown failure", body = ApiError)
@@ -1896,6 +1931,12 @@ mod messages {
 
     pub async fn peek_all(mut req: Request<InternalState>) -> tide::Result<Response> {
         let args: GetMessageBodyRequest = req.body_json().await?;
+        if args.tag.map_or(false, |tag| tag < RESERVED_TAG_UPPER_LIMIT) {
+            return Ok(Response::builder(400)
+                .body(ApiErrorStatus::InvalidApplicationTag)
+                .build());
+        }
+
         let inbox = req.state().inbox.clone();
 
         let inbox = inbox.read().await;
