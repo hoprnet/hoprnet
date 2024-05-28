@@ -56,7 +56,7 @@ impl Frame {
 /// ID of that frame.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Segment<'a> {
-    /// Id of the [Frame] this segment belongs to.
+    /// ID of the [Frame] this segment belongs to.
     pub frame_id: u16,
     /// Index of this segment within the segment sequence.
     pub seq_idx: u16,
@@ -279,7 +279,9 @@ impl<'a> FrameReassembler<'a> {
                     // No more segments missing in this frame, check if this is the earliest frame
                     if let Some(earliest_seq_id) = self.sorted_seq_ids.front() {
                         if earliest_seq_id.eq(e.key()) {
-                            let _ = self.reassembled.unbounded_send(e.remove().reassemble()?);
+                            self.reassembled
+                                .unbounded_send(e.remove().reassemble()?)
+                                .map_err(|_| ReassemblerClosed)?;
                             earliest_seq_id.remove();
                         }
                     }
@@ -298,10 +300,14 @@ impl<'a> FrameReassembler<'a> {
     /// leading incomplete frames that are expired at the time this method was called.
     /// Returns that total number of frames that were evicted.
     pub fn evict(&self) -> crate::errors::Result<usize> {
-        if self.sequences.is_empty() {
+        if self.reassembled.is_closed() || self.sequences.is_empty() {
             self.sorted_seq_ids.clear();
             return Ok(0);
         }
+
+        // Start evicting the earliest incomplete expired frames.
+        // This might also uncover queued complete frames that couldn't be pushed out
+        // due to prior incomplete frames.
 
         let mut count = 0;
         if let Some(cutoff) = self
@@ -315,7 +321,9 @@ impl<'a> FrameReassembler<'a> {
                     builder.is_complete() || builder.is_expired(cutoff)
                 }) {
                     if builder.is_complete() {
-                        let _ = self.reassembled.unbounded_send(builder.reassemble()?);
+                        self.reassembled
+                            .unbounded_send(builder.reassemble()?)
+                            .map_err(|_| ReassemblerClosed)?;
                     }
 
                     seq_id.remove();
@@ -324,8 +332,7 @@ impl<'a> FrameReassembler<'a> {
                     // If removal failed, because the entry is no longer there, just remove its seq_id
                     seq_id.remove();
                 } else {
-                    // Existing FrameBuilder is not expired nor completed.
-                    // Continuing would output frames out of order.
+                    // Stop on the first non expired and non completed frame.
                     break;
                 }
             }
@@ -334,6 +341,13 @@ impl<'a> FrameReassembler<'a> {
         } else {
             Ok(0)
         }
+    }
+}
+
+impl Drop for FrameReassembler<'_> {
+    fn drop(&mut self) {
+        let _ = self.evict();
+        self.reassembled.close_channel();
     }
 }
 
@@ -365,26 +379,28 @@ mod tests {
     use hex_literal::hex;
     use lazy_static::lazy_static;
     use rand::prelude::SliceRandom;
-    use rand::thread_rng;
+    use rand::{seq::IteratorRandom, thread_rng, Rng};
     use rayon::prelude::*;
+    use std::collections::HashSet;
+    use std::convert::identity;
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
     use std::time::Duration;
 
     const MTU: u16 = 448;
-    const PACKET_COUNT: u16 = 65_535;
-    const PACKET_SIZE: usize = 2048;
+    const FRAME_COUNT: u16 = 65_535;
+    const FRAME_SIZE: usize = 2048;
 
     lazy_static! {
-        static ref PACKETS: Vec<Frame> = (0..PACKET_COUNT)
+        static ref FRAMES: Vec<Frame> = (0..FRAME_COUNT)
             .into_par_iter()
             .map(|frame_id| Frame {
                 frame_id,
-                data: hopr_crypto_random::random_bytes::<PACKET_SIZE>().into(),
+                data: hopr_crypto_random::random_bytes::<FRAME_SIZE>().into(),
             })
             .collect::<Vec<_>>();
         static ref SEGMENTS: Vec<Segment<'static>> = {
-            let mut segments = PACKETS.par_iter().flat_map(|f| f.segment(MTU)).collect::<Vec<_>>();
+            let mut segments = FRAMES.par_iter().flat_map(|f| f.segment(MTU)).collect::<Vec<_>>();
             let mut rng = thread_rng();
             segments.shuffle(&mut rng);
             segments
@@ -393,7 +409,7 @@ mod tests {
 
     #[ctor::ctor]
     fn init() {
-        lazy_static::initialize(&PACKETS);
+        lazy_static::initialize(&FRAMES);
         lazy_static::initialize(&SEGMENTS);
     }
 
@@ -448,14 +464,16 @@ mod tests {
         SEGMENTS.iter().cloned().for_each(|b| {
             let _ = fragmented.push_segment(b);
         });
+
+        assert_eq!(0, fragmented.evict().unwrap());
         drop(fragmented);
 
-        let reassembled_packets = reassembled.collect::<Vec<_>>().await;
+        let reassembled_frames = reassembled.collect::<Vec<_>>().await;
 
-        reassembled_packets
+        reassembled_frames
             .into_par_iter()
             .enumerate()
-            .for_each(|(i, frame)| assert_eq!(frame, PACKETS[i]));
+            .for_each(|(i, frame)| assert_eq!(frame, FRAMES[i]));
     }
 
     #[async_std::test]
@@ -465,14 +483,16 @@ mod tests {
         SEGMENTS.par_iter().cloned().for_each(|b| {
             let _ = fragmented.push_segment(b);
         });
+
+        assert_eq!(0, fragmented.evict().unwrap());
         drop(fragmented);
 
-        let reassembled_packets = reassembled.collect::<Vec<_>>().await;
+        let reassembled_frames = reassembled.collect::<Vec<_>>().await;
 
-        reassembled_packets
+        reassembled_frames
             .into_par_iter()
             .enumerate()
-            .for_each(|(i, frame)| assert_eq!(frame, PACKETS[i]));
+            .for_each(|(i, frame)| assert_eq!(frame, FRAMES[i]));
     }
 
     #[async_std::test]
@@ -523,7 +543,7 @@ mod tests {
             assert!(flushed_cpy.load(Ordering::SeqCst));
         });
 
-        async_std::task::sleep(Duration::from_millis(100)).await;
+        async_std::task::sleep(Duration::from_millis(50)).await;
 
         // Prune the expired entry, which is Frame 2 (that is missing a segment)
         flushed.store(true, Ordering::SeqCst);
@@ -531,4 +551,197 @@ mod tests {
 
         jh.await;
     }
+
+    #[async_std::test]
+    async fn test_randomized_delayed_parallel() {
+        let frames = FRAMES.iter().take(100).collect::<Vec<_>>();
+
+        let mut segments = frames.iter().flat_map(|frame| frame.segment(MTU)).collect::<Vec<_>>();
+
+        let mut rng = thread_rng();
+        segments.shuffle(&mut rng);
+
+        let (fragmented, reassembled) = FrameReassembler::new(None);
+
+        futures::stream::iter(segments)
+            .map(|segment| {
+                let delay = Duration::from_millis(thread_rng().gen_range(0..10u64));
+                async_std::task::spawn(async move {
+                    async_std::task::sleep(delay).await;
+                    Ok(segment)
+                })
+            })
+            .buffer_unordered(4)
+            .forward(fragmented)
+            .await
+            .unwrap();
+
+        let reassembled_frames = reassembled.collect::<Vec<_>>().await;
+
+        reassembled_frames
+            .into_par_iter()
+            .enumerate()
+            .for_each(|(i, frame)| assert_eq!(&frame, frames[i]));
+    }
+
+    #[async_std::test]
+    async fn test_randomized_delayed_parallel_with_eviction() {
+        let frames = FRAMES.iter().take(100).collect::<Vec<_>>();
+
+        let mut segments = frames.iter().flat_map(|frame| frame.segment(MTU)).collect::<Vec<_>>();
+
+        let mut rng = thread_rng();
+        segments.shuffle(&mut rng);
+
+        let (fragmented, reassembled) = FrameReassembler::new(None);
+
+        let fragmented = Arc::new(fragmented);
+
+        futures::stream::iter(segments)
+            .map(|segment| {
+                let mut rng = thread_rng();
+                let delay = Duration::from_millis(rng.gen_range(0..10u64));
+                let should_evict = rng.gen_bool(0.5);
+                let reassembler = fragmented.clone();
+
+                async_std::task::spawn(async move {
+                    async_std::task::sleep(delay).await;
+
+                    if should_evict {
+                        reassembler.evict().unwrap();
+                    }
+
+                    reassembler.push_segment(segment).unwrap();
+                })
+            })
+            .for_each_concurrent(4, identity)
+            .await;
+
+        drop(fragmented);
+
+        let reassembled_frames = reassembled.collect::<Vec<_>>().await;
+
+        reassembled_frames
+            .into_par_iter()
+            .enumerate()
+            .for_each(|(i, frame)| assert_eq!(&frame, frames[i]));
+    }
+
+    /// Creates `num_frames` out of which `num_corrupted` will have missing segments.
+    fn corrupt_frames(num_frames: u16, corrupted_ratio: f32) -> (Vec<Segment<'static>>, Vec<&'static Frame>) {
+        assert!((0.0..=1.0).contains(&corrupted_ratio));
+
+        #[derive(Copy, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
+        struct SegmentId(u16, u16);
+
+        let excluded_segments = (0..num_frames)
+            .choose_multiple(&mut thread_rng(), ((num_frames as f32) * corrupted_ratio) as usize)
+            .into_par_iter()
+            .map(|frame_id| {
+                SegmentId(
+                    frame_id,
+                    thread_rng().gen_range(0..SEGMENTS.iter().find(|s| s.frame_id == frame_id).unwrap().seq_len),
+                )
+            })
+            .collect::<HashSet<_>>();
+
+        let excluded_frame_ids = excluded_segments.par_iter().map(|s| s.0).collect::<HashSet<_>>();
+
+        let segments = SEGMENTS
+            .par_iter()
+            .filter(|s| s.frame_id < num_frames && !excluded_segments.contains(&SegmentId(s.frame_id, s.seq_idx)))
+            .cloned()
+            .collect::<Vec<_>>();
+
+        let expected_frames = FRAMES
+            .par_iter()
+            .filter(|f| f.frame_id < num_frames && !excluded_frame_ids.contains(&f.frame_id))
+            .collect::<Vec<_>>();
+
+        (segments, expected_frames)
+    }
+
+    #[async_std::test]
+    async fn test_random_corrupted_frames_parallel() {
+        // Corrupt 30% of the frames, by removing a random segment from them
+        let (segments, expected_frames) = corrupt_frames(FRAME_COUNT / 4, 0.3);
+
+        let (fragmented, reassembled) = FrameReassembler::new(Duration::from_millis(100).into());
+
+        segments.into_par_iter().for_each(|s| {
+            fragmented.push_segment(s).unwrap();
+        });
+
+        async_std::task::sleep(Duration::from_millis(100)).await;
+        drop(fragmented);
+
+        let reassembled_frames = reassembled.collect::<Vec<_>>().await;
+
+        reassembled_frames
+            .into_par_iter()
+            .enumerate()
+            .for_each(|(i, frame)| assert_eq!(&frame, expected_frames[i]));
+    }
+
+    #[async_std::test]
+    async fn test_corrupted_frames_should_yield_no_frames() {
+        // Corrupt each frame
+        let (segments, expected_frames) = corrupt_frames(1000, 1.0);
+        assert!(expected_frames.is_empty());
+
+        let (fragmented, reassembled) = FrameReassembler::new(Duration::from_millis(100).into());
+
+        segments.into_par_iter().for_each(|s| {
+            fragmented.push_segment(s).unwrap();
+        });
+        drop(fragmented);
+
+        let reassembled_frames = reassembled.collect::<Vec<_>>().await;
+
+        assert!(reassembled_frames.is_empty());
+    }
+
+    /*#[async_std::test]
+    async fn test_random_corrupted_frames_with_parallel_evictions() {
+        // Corrupt 40% of the frames, by removing a random segment from them
+        let (segments, expected_frames) = corrupt_frames(100, 0.4);
+
+        let (fragmented, reassembled) = FrameReassembler::new(Duration::from_millis(40).into());
+        let fragmented = Arc::new(fragmented);
+
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        let frag_clone = fragmented.clone();
+        let eviction_jh = async_std::task::spawn(async move {
+            while !done_clone.load(Ordering::SeqCst) {
+                frag_clone.evict().unwrap();
+                async_std::task::sleep(Duration::from_millis(500)).await;
+            }
+        });
+
+        futures::stream::iter(segments)
+            .map(|segment| {
+                let delay = Duration::from_millis(thread_rng().gen_range(0..20u64));
+                let frag_clone = fragmented.clone();
+                async_std::task::spawn(async move {
+                    async_std::task::sleep(delay).await;
+                    frag_clone.push_segment(segment).unwrap();
+                })
+            })
+            .for_each_concurrent(2, identity)
+            .await;
+
+        done.store(true, Ordering::SeqCst);
+        eviction_jh.await;
+
+        drop(fragmented);
+
+        let reassembled_frames = reassembled.collect::<Vec<_>>().await;
+
+        reassembled_frames
+            .into_iter()
+            .enumerate()
+            .for_each(|(i, frame)| assert_eq!(&frame, expected_frames[i]));
+
+    }*/
 }
