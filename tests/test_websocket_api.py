@@ -8,12 +8,8 @@ import pytest
 import websocket
 import websockets
 
-from .conftest import API_TOKEN, nodes_with_auth, random_distinct_pairs_from
+from .conftest import API_TOKEN, nodes_with_auth, random_distinct_pairs_from, to_ws_url
 from .node import Node
-
-
-def url(host, port):
-    return f"ws://{host}:{port}/api/v3/messages/websocket"
 
 
 EXTRA_HEADERS = [("X-Auth-Token", API_TOKEN)]
@@ -23,7 +19,7 @@ EXTRA_HEADERS = [("X-Auth-Token", API_TOKEN)]
 def test_hoprd_websocket_api_should_reject_a_connection_without_a_valid_token(peer: str, swarm7: dict[str, Node]):
     ws = websocket.WebSocket()
     try:
-        ws.connect(url(swarm7[peer].host_addr, swarm7[peer].api_port))
+        ws.connect(to_ws_url(swarm7[peer].host_addr, swarm7[peer].api_port))
     except websocket.WebSocketBadStatusException as e:
         assert "401 Unauthorized" in str(e)
     else:
@@ -35,7 +31,7 @@ def test_hoprd_websocket_api_should_reject_a_connection_with_an_invalid_token(pe
     ws = websocket.WebSocket()
     try:
         ws.connect(
-            url(swarm7[peer].host_addr, swarm7[peer].api_port),
+            to_ws_url(swarm7[peer].host_addr, swarm7[peer].api_port),
             header={"X-Auth-Token": "InvAliD_toKeN"},
         )
     except websocket.WebSocketBadStatusException as e:
@@ -52,7 +48,7 @@ def test_hoprd_websocket_api_should_accept_a_connection_with_an_invalid_token_pa
 
     try:
         ws.connect(
-            url(swarm7[peer].host_addr, swarm7[peer].api_port) + "?apiToken=InvAlidShit",
+            to_ws_url(swarm7[peer].host_addr, swarm7[peer].api_port) + "?apiToken=InvAlidShit",
         )
     except websocket.WebSocketBadStatusException as e:
         assert "401 Unauthorized" in str(e)
@@ -67,7 +63,7 @@ def test_hoprd_websocket_api_should_reject_a_connection_with_an_invalid_bearer_t
     ws = websocket.WebSocket()
     try:
         ws.connect(
-            url(swarm7[peer].host_addr, swarm7[peer].api_port),
+            to_ws_url(swarm7[peer].host_addr, swarm7[peer].api_port),
             header={"Authorization": "Bearer InvAliD_toKeN"},
         )
     except websocket.WebSocketBadStatusException as e:
@@ -80,7 +76,7 @@ def test_hoprd_websocket_api_should_reject_a_connection_with_an_invalid_bearer_t
 def test_hoprd_websocket_api_should_accept_a_connection_with_a_valid_token(peer: str, swarm7: dict[str, Node]):
     ws = websocket.WebSocket()
     ws.connect(
-        url(swarm7[peer].host_addr, swarm7[peer].api_port),
+        to_ws_url(swarm7[peer].host_addr, swarm7[peer].api_port),
         header={"X-Auth-Token": API_TOKEN},
     )
 
@@ -93,7 +89,7 @@ def test_hoprd_websocket_api_should_accept_a_connection_with_a_valid_token_passe
 ):
     ws = websocket.WebSocket()
     ws.connect(
-        url(swarm7[peer].host_addr, swarm7[peer].api_port) + f"?apiToken={API_TOKEN}",
+        to_ws_url(swarm7[peer].host_addr, swarm7[peer].api_port) + f"?apiToken={API_TOKEN}",
     )
 
     time.sleep(0.5)
@@ -103,7 +99,7 @@ def test_hoprd_websocket_api_should_accept_a_connection_with_a_valid_token_passe
 def test_hoprd_websocket_api_should_accept_a_connection_with_a_valid_bearer_token(peer: str, swarm7: dict[str, Node]):
     ws = websocket.WebSocket()
     ws.connect(
-        url(swarm7[peer].host_addr, swarm7[peer].api_port),
+        to_ws_url(swarm7[peer].host_addr, swarm7[peer].api_port),
         header={"Authorization": "Bearer " + API_TOKEN},
     )
 
@@ -115,7 +111,7 @@ def test_hoprd_websocket_api_should_reject_connection_on_invalid_path(peer: str,
     ws = websocket.WebSocket()
     try:
         ws.connect(
-            f"{url(swarm7[peer].host_addr, swarm7[peer].api_port)}/defIniteLY_InVAliD_paTh",
+            f"{to_ws_url(swarm7[peer].host_addr, swarm7[peer].api_port)}/defIniteLY_InVAliD_paTh",
             header={"X-Auth-Token": API_TOKEN},
         )
     except websocket.WebSocketBadStatusException as e:
@@ -127,12 +123,14 @@ def test_hoprd_websocket_api_should_reject_connection_on_invalid_path(peer: str,
 @pytest.fixture
 async def ws_connections(swarm7: dict[str, Node]):
     async with websockets.connect(
-        url(swarm7["1"].host_addr, swarm7["1"].api_port), extra_headers=EXTRA_HEADERS
+        to_ws_url(swarm7["1"].host_addr, swarm7["1"].api_port), extra_headers=EXTRA_HEADERS
     ) as ws1, websockets.connect(
-        url(swarm7["2"].host_addr, swarm7["2"].api_port), extra_headers=EXTRA_HEADERS
+        to_ws_url(swarm7["2"].host_addr, swarm7["2"].api_port), extra_headers=EXTRA_HEADERS
     ) as ws2, websockets.connect(
-        url(swarm7["3"].host_addr, swarm7["3"].api_port), extra_headers=EXTRA_HEADERS
-    ) as ws3, websockets.connect(url(swarm7["4"].host_addr, swarm7["4"].api_port), extra_headers=EXTRA_HEADERS) as ws4:
+        to_ws_url(swarm7["3"].host_addr, swarm7["3"].api_port), extra_headers=EXTRA_HEADERS
+    ) as ws3, websockets.connect(
+        to_ws_url(swarm7["4"].host_addr, swarm7["4"].api_port), extra_headers=EXTRA_HEADERS
+    ) as ws4:
         yield {"1": ws1, "2": ws2, "3": ws3, "4": ws4}
 
 
