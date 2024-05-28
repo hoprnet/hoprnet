@@ -775,7 +775,7 @@ async def test_send_message_with_reserved_application_tag_should_fail(tag: int, 
 
     await swarm7[src].api.send_message(
         swarm7[dest].peer_id, "This message should fail due to reserved tag", [], tag
-    ) == None
+    ) is None
 
 
 @pytest.mark.asyncio
@@ -783,9 +783,9 @@ async def test_send_message_with_reserved_application_tag_should_fail(tag: int, 
 async def test_inbox_operations_with_reserved_application_tag_should_fail(tag: int, swarm7: dict[str, Node]):
     id = random.choice(barebone_nodes())
 
-    await swarm7[id].api.messages_pop(tag) == None
-    await swarm7[id].api.messages_peek(tag) == None
-    await swarm7[id].api.messages_peek(tag) == None
+    await swarm7[id].api.messages_pop(tag) is None
+    await swarm7[id].api.messages_peek(tag) is None
+    await swarm7[id].api.messages_peek(tag) is None
 
 
 @pytest.mark.asyncio
