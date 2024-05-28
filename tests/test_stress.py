@@ -1,91 +1,114 @@
 import asyncio
+from contextlib import AsyncExitStack
 import os
 import random
 
 import pytest
 
-from .conftest import TICKET_PRICE_PER_HOP, barebone_nodes
+from .conftest import TICKET_PRICE_PER_HOP, to_ws_url
 from .hopr import HoprdAPI
 from .test_integration import create_channel, send_and_receive_packets_with_pop
 
+import json
+import random
+import re
 
-async def check_connected_peer_count(me, count):
+import websockets
+
+from .conftest import API_TOKEN, nodes_with_auth, random_distinct_pairs_from
+from .node import Node
+
+
+@pytest.fixture
+async def stress_fixture(request: pytest.FixtureRequest):
+    return {
+        "request_count": request.config.getoption("--stress-request-count"),
+        "sources": json.loads(request.config.getoption("--stress-sources")),
+        "target": json.loads(request.config.getoption("--stress-target")),
+    }
+
+
+async def has_peer(me, target):
     while True:
-        if len([x["peer_id"] for x in await me.peers()]) >= count:
+        if target in [x["peer_id"] for x in await me.peers()]:
+            import logging
+
+            logging.error("peer {} not found in {await me.peers()}".format(["peer_id"]))
             break
         else:
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(1)
+            continue
 
 
 @pytest.mark.asyncio
 @pytest.mark.skipif(
     os.getenv("CI", "false") == "true", reason="stress tests fail randomly on CI due to resource constraints"
 )
-@pytest.mark.parametrize("src,dest", [(random.choice(barebone_nodes()), random.choice(barebone_nodes()))])
-async def test_hoprd_stress_1_hop_to_self(src, dest, swarm7, cmd_line_args):
-    STRESS_1_HOP_TO_SELF_MESSAGE_COUNT = cmd_line_args["stress_seq_request_count"]
+async def test_stress_relayed_flood_test_with_sources_performing_1_hop_to_self(stress_fixture, swarm7):
+    STRESS_1_HOP_TO_SELF_MESSAGE_COUNT = stress_fixture["request_count"]
 
-    async with create_channel(
-        swarm7[src],
-        swarm7[dest],
-        funding=STRESS_1_HOP_TO_SELF_MESSAGE_COUNT * TICKET_PRICE_PER_HOP,
-        close_from_dest=False,
-    ) as _channel_id:
-        packets = [
-            f"1 hop stress msg to self: {src} - {dest} - {src} #{i+1:08d}/{STRESS_1_HOP_TO_SELF_MESSAGE_COUNT:08d}"
-            for i in range(STRESS_1_HOP_TO_SELF_MESSAGE_COUNT)
-        ]
+    api_sources = [HoprdAPI(f'http://{d["url"]}', d["token"]) for d in stress_fixture["sources"]]
+    api_target = HoprdAPI(f'http://{stress_fixture["target"]["url"]}', stress_fixture["target"]["token"])
+    target_peer_id = await api_target.addresses("hopr")
 
-        await send_and_receive_packets_with_pop(
-            packets, src=swarm7[src], dest=swarm7[src], path=[swarm7[dest].peer_id], timeout=60.0
+    async with AsyncExitStack() as channels:
+        await asyncio.gather(
+            *[asyncio.wait_for(has_peer(source, target_peer_id), timeout=15.0) for source in api_sources]
         )
 
-
-@pytest.mark.asyncio
-@pytest.mark.skipif(
-    os.getenv("CI", "false") == "true", reason="stress tests fail randomly on CI due to resource constraints"
-)
-async def test_stress_hoprd_send_message_should_send_sequential_messages_without_errors(request, cmd_line_args):
-    if "127.0.0.1" in cmd_line_args["stress_tested_api"] or "localhost" in cmd_line_args["stress_tested_api"]:
-        request.getfixturevalue("swarm7")
-
-    STRESS_SEQUENTIAL_MESSAGE_COUNT = cmd_line_args["stress_seq_request_count"]
-
-    stressor = HoprdAPI(cmd_line_args["stress_tested_api"], cmd_line_args["stress_tested_api_token"])
-    await asyncio.wait_for(check_connected_peer_count(stressor, count=cmd_line_args["stress_minimum_peer_count"]), 20.0)
-
-    connected_peers = [x["peer_id"] for x in await stressor.peers()]
-
-    assert len(connected_peers) >= cmd_line_args["stress_minimum_peer_count"]
-
-    assert all(
-        [
-            (await stressor.send_message(random.choice(connected_peers), f"message #{i}", []))
-            for i in range(STRESS_SEQUENTIAL_MESSAGE_COUNT)
-        ]
-    )
-
-
-@pytest.mark.asyncio
-@pytest.mark.skipif(os.getenv("CI", "false") == "true", reason="stress tests fail randomly on CI due to resources")
-async def test_stress_hoprd_send_message_should_send_parallel_messages_without_errors(request, cmd_line_args):
-    if "127.0.0.1" in cmd_line_args["stress_tested_api"] or "localhost" in cmd_line_args["stress_tested_api"]:
-        request.getfixturevalue("swarm7")
-
-    STRESS_PARALLEL_MESSAGE_COUNT = cmd_line_args["stress_seq_request_count"]
-
-    stressor = HoprdAPI(cmd_line_args["stress_tested_api"], cmd_line_args["stress_tested_api_token"])
-    await asyncio.wait_for(check_connected_peer_count(stressor, count=cmd_line_args["stress_minimum_peer_count"]), 20.0)
-
-    connected_peers = [x["peer_id"] for x in await stressor.peers()]
-
-    assert len(connected_peers) >= cmd_line_args["stress_minimum_peer_count"]
-
-    assert all(
         await asyncio.gather(
             *[
-                stressor.send_message(random.choice(connected_peers), f"message #{i}", [])
-                for i in range(STRESS_PARALLEL_MESSAGE_COUNT)
+                channels.enter_async_context(
+                    create_channel(
+                        source,
+                        api_target,
+                        funding=STRESS_1_HOP_TO_SELF_MESSAGE_COUNT * TICKET_PRICE_PER_HOP,
+                        close_from_dest=False,
+                    )
+                )
+                for source in api_sources
             ]
         )
-    )
+
+        async def send_and_receive_all_messages(host, port, token, target_peer_id):
+            socket = websockets.connect(
+                f"{to_ws_url(host, port)}",
+                header={"X-Auth-Token": token},
+            )
+
+            tag = random.randint(30000, 60000)
+            packets = [
+                f"1 hop stress msg to self ({host}:{port}) through {target_peer_id} #{i+1:08d}/{STRESS_1_HOP_TO_SELF_MESSAGE_COUNT:08d}"
+                for i in range(STRESS_1_HOP_TO_SELF_MESSAGE_COUNT)
+            ]
+
+            recv_packets = []
+
+            for packet in packets:
+                msg = {"cmd": "sendmsg", "args": {"body": packet, "peerId": target_peer_id, "path": [], "tag": tag}}
+                await socket.send(json.dumps(msg))
+
+            # receive all messages, acks and ack-challenges
+            for _ in range(packets.len() * 3):
+                try:
+                    msg = await asyncio.wait_for(socket.recv(), timeout=5)
+                    if re.match(r"^.*\"message\".*$", msg):
+                        recv_packets.append(msg)
+                except Exception:
+                    pytest.fail(f"Timeout when receiving an expected item from socket")
+
+            packets.sort()
+            recv_packets.sort()
+            assert packets == recv_packets
+
+        await asyncio.gather(
+            *[
+                asyncio.wait_for(
+                    send_and_receive_all_messages(
+                        source["url"].split(":")[0], source["url"].split(":")[1], source["token"], target_peer_id
+                    ),
+                    timeout=20.0,
+                )
+                for source in api_sources
+            ]
+        )
