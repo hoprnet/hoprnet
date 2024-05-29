@@ -10,9 +10,11 @@ use tracing::{error, trace, warn};
 use hopr_crypto_packet::errors::PacketError::{Retry, TransportError};
 use hopr_crypto_packet::errors::Result;
 use hopr_crypto_types::prelude::*;
-use hopr_db_api::prelude::HoprDbProtocolOperations;
 pub use hopr_db_api::protocol::AckResult;
+use hopr_db_api::protocol::HoprDbProtocolOperations;
 use hopr_internal_types::prelude::*;
+
+use crate::executor::spawn;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::{MultiCounter, SimpleCounter};
@@ -201,7 +203,7 @@ impl AcknowledgementInteraction {
 
         // NOTE: This spawned task does not need to be explicitly canceled, since it will
         // be automatically dropped when the event sender object is dropped.
-        async_std::task::spawn(async move {
+        spawn(async move {
             processing_stream.map(Ok).forward(futures::sink::drain()).await.unwrap();
         });
 

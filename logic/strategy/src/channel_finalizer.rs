@@ -2,8 +2,8 @@ use async_trait::async_trait;
 use chain_actions::channels::ChannelActions;
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
-use hopr_db_api::accounts::HoprDbAccountOperations;
-use hopr_db_api::channels::HoprDbChannelOperations;
+use hopr_db_sql::accounts::HoprDbAccountOperations;
+use hopr_db_sql::channels::HoprDbChannelOperations;
 use hopr_internal_types::prelude::*;
 use hopr_platform::time::native::current_time;
 use serde::{Deserialize, Serialize};
@@ -84,7 +84,11 @@ where
     async fn on_tick(&self) -> errors::Result<()> {
         let ts_limit = current_time().sub(self.cfg.max_closure_overdue);
 
-        let outgoing_channels = self.db.get_outgoing_channels(None).await?;
+        let outgoing_channels = self
+            .db
+            .get_outgoing_channels(None)
+            .await
+            .map_err(hopr_db_sql::api::errors::DbError::from)?;
 
         let to_close = outgoing_channels
             .iter()
@@ -130,8 +134,8 @@ mod tests {
     use hex_literal::hex;
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::prelude::*;
-    use hopr_db_api::db::HoprDb;
-    use hopr_db_api::HoprDbGeneralModelOperations;
+    use hopr_db_sql::db::HoprDb;
+    use hopr_db_sql::HoprDbGeneralModelOperations;
     use hopr_primitive_types::prelude::*;
     use lazy_static::lazy_static;
     use mockall::mock;

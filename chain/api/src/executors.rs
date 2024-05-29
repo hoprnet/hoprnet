@@ -13,7 +13,11 @@ use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
 use std::time::Duration;
 
+#[cfg(feature = "runtime-async-std")]
 use async_std::task::sleep;
+
+#[cfg(feature = "runtime-tokio")]
+use tokio::time::sleep;
 
 /// Represents an abstract client that is capable of submitting
 /// an Ethereum transaction-like object to the blockchain.

@@ -708,6 +708,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "attohttpc"
+version = "0.24.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8d9a9bf8b79a749ee0b911b91b671cc2b6c670bdbc7e3dfd537576ddc94bb2a2"
+dependencies = [
+ "http 0.2.11",
+ "log",
+ "url",
+]
+
+[[package]]
 name = "atty"
 version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1221,14 +1232,13 @@ dependencies = [
  "bindings",
  "chain-rpc",
  "chain-types",
- "env_logger 0.11.3",
  "ethers",
  "futures",
  "futures-timer",
  "hex-literal",
  "hopr-crypto-random",
  "hopr-crypto-types",
- "hopr-db-api",
+ "hopr-db-sql",
  "hopr-internal-types",
  "hopr-metrics",
  "hopr-platform",
@@ -1239,6 +1249,7 @@ dependencies = [
  "serde",
  "smart-default",
  "thiserror",
+ "tokio",
  "tracing",
  "tracing-test",
 ]
@@ -1258,7 +1269,7 @@ dependencies = [
  "core-path",
  "futures",
  "hopr-crypto-types",
- "hopr-db-api",
+ "hopr-db-sql",
  "hopr-internal-types",
  "hopr-primitive-types",
  "semver 1.0.21",
@@ -1268,6 +1279,7 @@ dependencies = [
  "smart-default",
  "strum 0.26.2",
  "thiserror",
+ "tokio",
  "tracing",
  "validator",
 ]
@@ -1288,8 +1300,8 @@ dependencies = [
  "hex-literal",
  "hopr-crypto-random",
  "hopr-crypto-types",
- "hopr-db-api",
  "hopr-db-entity",
+ "hopr-db-sql",
  "hopr-internal-types",
  "hopr-metrics",
  "hopr-primitive-types",
@@ -1300,6 +1312,7 @@ dependencies = [
  "sea-orm",
  "smart-default",
  "thiserror",
+ "tokio",
  "tracing",
 ]
 
@@ -1630,6 +1643,7 @@ dependencies = [
  "hopr-crypto-types",
  "hopr-db-api",
  "hopr-db-entity",
+ "hopr-db-sql",
  "hopr-metrics",
  "hopr-platform",
  "hopr-primitive-types",
@@ -1677,7 +1691,7 @@ dependencies = [
  "hex-literal",
  "hopr-crypto-random",
  "hopr-crypto-types",
- "hopr-db-api",
+ "hopr-db-sql",
  "hopr-internal-types",
  "hopr-metrics",
  "hopr-primitive-types",
@@ -1706,6 +1720,7 @@ dependencies = [
  "hopr-crypto-sphinx",
  "hopr-crypto-types",
  "hopr-db-api",
+ "hopr-db-sql",
  "hopr-internal-types",
  "hopr-metrics",
  "hopr-platform",
@@ -1721,43 +1736,9 @@ dependencies = [
  "serial_test",
  "smart-default",
  "thiserror",
+ "tokio",
  "tracing",
  "tracing-test",
- "validator",
-]
-
-[[package]]
-name = "core-strategy"
-version = "0.10.0"
-dependencies = [
- "async-lock 3.3.0",
- "async-std",
- "async-trait",
- "chain-actions",
- "chain-types",
- "core-network",
- "core-protocol",
- "core-transport",
- "env_logger 0.11.3",
- "futures",
- "hex-literal",
- "hopr-crypto-random",
- "hopr-crypto-types",
- "hopr-db-api",
- "hopr-internal-types",
- "hopr-metrics",
- "hopr-platform",
- "hopr-primitive-types",
- "lazy_static",
- "mockall",
- "rand 0.8.5",
- "semver 1.0.21",
- "serde",
- "serde_with",
- "smart-default",
- "strum 0.26.2",
- "thiserror",
- "tracing",
  "validator",
 ]
 
@@ -1778,7 +1759,7 @@ dependencies = [
  "futures-concurrency",
  "hopr-crypto-packet",
  "hopr-crypto-types",
- "hopr-db-api",
+ "hopr-db-sql",
  "hopr-internal-types",
  "hopr-metrics",
  "hopr-platform",
@@ -1791,6 +1772,7 @@ dependencies = [
  "serde",
  "smart-default",
  "thiserror",
+ "tokio",
  "tracing",
  "uuid 1.7.0",
  "validator",
@@ -3498,6 +3480,7 @@ dependencies = [
  "socket2 0.5.5",
  "thiserror",
  "tinyvec",
+ "tokio",
  "tracing",
  "url",
 ]
@@ -3519,6 +3502,7 @@ dependencies = [
  "resolv-conf",
  "smallvec",
  "thiserror",
+ "tokio",
  "tracing",
 ]
 
@@ -3687,7 +3671,56 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-api"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "futures",
+ "hopr-crypto-types",
+ "hopr-internal-types",
+ "hopr-metrics",
+ "hopr-primitive-types",
+ "lazy_static",
+ "libp2p-identity",
+ "multiaddr",
+ "num_enum",
+ "smart-default",
+ "strum 0.26.2",
+ "thiserror",
+ "tracing",
+ "tracing-test",
+]
+
+[[package]]
+name = "hopr-db-entity"
 version = "0.2.0"
+dependencies = [
+ "async-std",
+ "chrono",
+ "clap",
+ "futures",
+ "hopr-crypto-types",
+ "hopr-db-migration",
+ "hopr-internal-types",
+ "hopr-primitive-types",
+ "sea-orm",
+ "sea-orm-cli",
+ "sea-orm-migration",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
+name = "hopr-db-migration"
+version = "0.1.0"
+dependencies = [
+ "async-std",
+ "hopr-primitive-types",
+ "sea-orm-migration",
+]
+
+[[package]]
+name = "hopr-db-sql"
+version = "0.3.0"
 dependencies = [
  "async-lock 3.3.0",
  "async-std",
@@ -3695,12 +3728,12 @@ dependencies = [
  "async-trait",
  "bincode",
  "chrono",
- "env_logger 0.11.3",
  "futures",
  "hex-literal",
  "hopr-crypto-packet",
  "hopr-crypto-random",
  "hopr-crypto-types",
+ "hopr-db-api",
  "hopr-db-entity",
  "hopr-db-migration",
  "hopr-internal-types",
@@ -3719,34 +3752,9 @@ dependencies = [
  "sqlx",
  "strum 0.26.2",
  "thiserror",
+ "tokio",
  "tracing",
  "tracing-test",
-]
-
-[[package]]
-name = "hopr-db-entity"
-version = "0.1.0"
-dependencies = [
- "async-std",
- "chrono",
- "clap",
- "hopr-crypto-types",
- "hopr-db-migration",
- "hopr-internal-types",
- "hopr-primitive-types",
- "sea-orm",
- "sea-orm-cli",
- "sea-orm-migration",
- "thiserror",
-]
-
-[[package]]
-name = "hopr-db-migration"
-version = "0.1.0"
-dependencies = [
- "async-std",
- "hopr-primitive-types",
- "sea-orm-migration",
 ]
 
 [[package]]
@@ -3797,17 +3805,16 @@ dependencies = [
  "chain-types",
  "const_format",
  "core-path",
- "core-strategy",
  "core-transport",
- "env_logger 0.11.3",
  "ethers",
  "futures",
  "hopr-crypto-types",
- "hopr-db-api",
+ "hopr-db-sql",
  "hopr-internal-types",
  "hopr-metrics",
  "hopr-platform",
  "hopr-primitive-types",
+ "hopr-strategy",
  "lazy_static",
  "serde",
  "serde_with",
@@ -3815,6 +3822,7 @@ dependencies = [
  "smart-default",
  "strum 0.26.2",
  "thiserror",
+ "tokio",
  "tracing",
  "validator",
 ]
@@ -3879,6 +3887,41 @@ dependencies = [
 ]
 
 [[package]]
+name = "hopr-strategy"
+version = "0.11.0"
+dependencies = [
+ "async-lock 3.3.0",
+ "async-std",
+ "async-trait",
+ "chain-actions",
+ "chain-types",
+ "core-network",
+ "core-protocol",
+ "core-transport",
+ "futures",
+ "hex-literal",
+ "hopr-crypto-random",
+ "hopr-crypto-types",
+ "hopr-db-sql",
+ "hopr-internal-types",
+ "hopr-metrics",
+ "hopr-platform",
+ "hopr-primitive-types",
+ "lazy_static",
+ "mockall",
+ "rand 0.8.5",
+ "semver 1.0.21",
+ "serde",
+ "serde_with",
+ "smart-default",
+ "strum 0.26.2",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "validator",
+]
+
+[[package]]
 name = "hoprd"
 version = "2.2.0"
 dependencies = [
@@ -3889,7 +3932,6 @@ dependencies = [
  "async-std",
  "chrono",
  "clap",
- "env_logger 0.11.3",
  "futures",
  "hex",
  "home",
@@ -4296,7 +4338,27 @@ dependencies = [
  "rtnetlink",
  "smol",
  "system-configuration",
+ "tokio",
  "windows",
+]
+
+[[package]]
+name = "igd-next"
+version = "0.14.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "064d90fec10d541084e7b39ead8875a5a80d9114a2b18791565253bae25f49e4"
+dependencies = [
+ "async-trait",
+ "attohttpc",
+ "bytes 1.5.0",
+ "futures",
+ "http 0.2.11",
+ "hyper 0.14.28",
+ "log",
+ "rand 0.8.5",
+ "tokio",
+ "url",
+ "xmltree",
 ]
 
 [[package]]
@@ -4632,6 +4694,7 @@ dependencies = [
  "libp2p-request-response",
  "libp2p-swarm",
  "libp2p-tcp",
+ "libp2p-upnp",
  "libp2p-yamux",
  "multiaddr",
  "pin-project",
@@ -4745,6 +4808,7 @@ dependencies = [
  "rand 0.8.5",
  "smallvec",
  "socket2 0.5.5",
+ "tokio",
  "tracing",
  "void",
 ]
@@ -4815,6 +4879,7 @@ dependencies = [
  "rustls 0.21.10",
  "socket2 0.5.5",
  "thiserror",
+ "tokio",
  "tracing",
 ]
 
@@ -4859,6 +4924,7 @@ dependencies = [
  "once_cell",
  "rand 0.8.5",
  "smallvec",
+ "tokio",
  "tracing",
  "void",
 ]
@@ -4889,6 +4955,7 @@ dependencies = [
  "libp2p-core",
  "libp2p-identity",
  "socket2 0.5.5",
+ "tokio",
  "tracing",
 ]
 
@@ -4909,6 +4976,22 @@ dependencies = [
  "thiserror",
  "x509-parser",
  "yasna",
+]
+
+[[package]]
+name = "libp2p-upnp"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b49cc89949bf0e06869297cd4fe2c132358c23fe93e76ad43950453df4da3d35"
+dependencies = [
+ "futures",
+ "futures-timer",
+ "igd-next",
+ "libp2p-core",
+ "libp2p-swarm",
+ "tokio",
+ "tracing",
+ "void",
 ]
 
 [[package]]
@@ -5306,6 +5389,7 @@ dependencies = [
  "futures",
  "libc",
  "log",
+ "tokio",
 ]
 
 [[package]]
@@ -5652,6 +5736,8 @@ dependencies = [
  "percent-encoding",
  "rand 0.8.5",
  "thiserror",
+ "tokio",
+ "tokio-stream",
 ]
 
 [[package]]
@@ -6805,6 +6891,7 @@ dependencies = [
  "netlink-proto",
  "nix 0.24.3",
  "thiserror",
+ "tokio",
 ]
 
 [[package]]
@@ -7989,6 +8076,8 @@ dependencies = [
  "sqlformat",
  "thiserror",
  "time 0.3.31",
+ "tokio",
+ "tokio-stream",
  "tracing",
  "url",
  "uuid 1.7.0",
@@ -8032,6 +8121,7 @@ dependencies = [
  "sqlx-sqlite",
  "syn 1.0.109",
  "tempfile",
+ "tokio",
  "url",
 ]
 
@@ -8717,9 +8807,9 @@ checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 
 [[package]]
 name = "tokio"
-version = "1.36.0"
+version = "1.37.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "61285f6515fa018fb2d1e46eb21223fff441ee8db5d0f1435e8ab4f5cdb80931"
+checksum = "1adbebffeca75fcfd058afa480fb6c0b81e165a0323f9c9d39c9697e37c46787"
 dependencies = [
  "backtrace",
  "bytes 1.5.0",
@@ -9960,6 +10050,21 @@ dependencies = [
  "libc",
  "linux-raw-sys 0.4.13",
  "rustix 0.38.30",
+]
+
+[[package]]
+name = "xml-rs"
+version = "0.8.20"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "791978798f0597cfc70478424c2b4fdc2b7a8024aaff78497ef00f24ef674193"
+
+[[package]]
+name = "xmltree"
+version = "0.10.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d7d8a75eaf6557bb84a65ace8609883db44a29951042ada9b393151532e41fcb"
+dependencies = [
+ "xml-rs",
 ]
 
 [[package]]

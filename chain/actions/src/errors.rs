@@ -55,7 +55,10 @@ pub enum ChainActionsError {
     MissingDomainSeparator,
 
     #[error(transparent)]
-    DbError(#[from] hopr_db_api::errors::DbError),
+    DbBackendError(#[from] hopr_db_sql::errors::DbSqlError),
+
+    #[error(transparent)]
+    DbError(#[from] hopr_db_sql::api::errors::DbError),
 
     #[error(transparent)]
     RpcError(#[from] RpcError),

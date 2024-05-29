@@ -10,7 +10,6 @@ crate-type = ["rlib"]
 
 [dependencies]
 async-channel = { workspace = true }
-async-std = { workspace = true }
 async-trait = { workspace = true }
 chrono = { version = "0.4", default-features = false, features = ["clock" ,"std"] }
 futures = { workspace = true }
@@ -26,16 +25,18 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 validator = { workspace = true }
 
+hopr-db-api = { workspace = true }
 hopr-crypto-sphinx = { workspace = true }
 hopr-crypto-random = { workspace = true }
 hopr-crypto-types = { workspace = true }
-hopr-db-api = { workspace = true }
 hopr-db-entity = { workspace = true }
 hopr-platform = { workspace = true }
 hopr-metrics = { workspace = true, optional = true}
 hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
+async-std = { workspace = true }
+hopr-db-sql = { workspace = true, features = ["runtime-async-std"] }
 mockall = { workspace = true }
 more-asserts = "0.3.1"
 

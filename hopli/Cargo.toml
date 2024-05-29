@@ -24,7 +24,7 @@ tracing-subscriber = { workspace = true }
 uuid = { workspace = true }
 chain-rpc = {workspace = true}
 chain-api = {workspace = true}
-hopr-lib = { workspace = true }
+hopr-lib = { workspace = true, features = ["runtime-async-std"] }
 chain-types = { workspace = true }
 async-std = { workspace = true, features = ["attributes"] }
 hex-literal = { workspace = true }

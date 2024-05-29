@@ -6,10 +6,16 @@ use tracing::{debug, error, info, trace};
 use chain_rpc::{HoprIndexerRpcOperations, LogFilter};
 use chain_types::chain_events::SignificantChainEvent;
 use hopr_crypto_types::types::Hash;
-use hopr_db_api::info::HoprDbInfoOperations;
-use hopr_db_api::HoprDbGeneralModelOperations;
+use hopr_db_sql::info::HoprDbInfoOperations;
+use hopr_db_sql::HoprDbGeneralModelOperations;
 
 use crate::{errors::CoreEthereumIndexerError, traits::ChainLogHandler, IndexerConfig};
+
+#[cfg(any(feature = "runtime-async-std", test))]
+use async_std::task::{spawn, JoinHandle};
+
+#[cfg(all(feature = "runtime-tokio", not(test)))]
+use tokio::task::{spawn, JoinHandle};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleGauge;
@@ -82,7 +88,7 @@ where
         }
     }
 
-    pub async fn start(&mut self) -> crate::errors::Result<async_std::task::JoinHandle<()>>
+    pub async fn start(&mut self) -> crate::errors::Result<JoinHandle<()>>
     where
         T: HoprIndexerRpcOperations + 'static,
         U: ChainLogHandler + 'static,
@@ -132,7 +138,7 @@ where
         info!("Building indexer background process");
         let (tx, mut rx) = futures::channel::mpsc::channel::<()>(1);
 
-        let indexing_proc = async_std::task::spawn(async move {
+        let indexing_proc = spawn(async move {
             let is_synced = Arc::new(std::sync::atomic::AtomicBool::new(false));
             let chain_head = Arc::new(std::sync::atomic::AtomicU64::new(0));
 
@@ -275,8 +281,8 @@ pub mod tests {
     use hex_literal::hex;
     use hopr_crypto_types::keypairs::{Keypair, OffchainKeypair};
     use hopr_crypto_types::prelude::ChainKeypair;
-    use hopr_db_api::db::HoprDb;
-    use hopr_db_api::info::HoprDbInfoOperations;
+    use hopr_db_sql::db::HoprDb;
+    use hopr_db_sql::info::HoprDbInfoOperations;
     use hopr_primitive_types::prelude::*;
     use mockall::mock;
     use multiaddr::Multiaddr;
