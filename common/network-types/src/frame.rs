@@ -388,7 +388,7 @@ mod tests {
     use futures::{pin_mut, Stream, StreamExt};
     use hex_literal::hex;
     use lazy_static::lazy_static;
-    use rand::prelude::Distribution;
+    use rand::prelude::{Distribution, SliceRandom};
     use rand::{seq::IteratorRandom, thread_rng, Rng};
     use rand_distr::Normal;
     use rayon::prelude::*;
@@ -498,6 +498,25 @@ mod tests {
             .into_par_iter()
             .enumerate()
             .for_each(|(i, frame)| assert_eq!(frame, FRAMES[i]));
+    }
+
+    #[async_std::test]
+    async fn test_reassemble_single_frame() {
+        let (fragmented, reassembled) = FrameReassembler::new(None);
+
+        let mut rng = thread_rng();
+
+        let frame = FRAMES.iter().choose(&mut rng).unwrap();
+        let mut segments = frame.segment(MTU);
+        segments.shuffle(&mut rng);
+
+        segments.into_iter().for_each(|s| fragmented.push_segment(s).unwrap());
+
+        drop(fragmented);
+        let reassembled_frames = reassembled.collect::<Vec<_>>().await;
+
+        assert_eq!(1, reassembled_frames.len());
+        assert_eq!(frame, &reassembled_frames[0]);
     }
 
     #[async_std::test]
