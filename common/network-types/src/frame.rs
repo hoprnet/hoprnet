@@ -105,11 +105,9 @@ impl<'a> TryFrom<&'a [u8]> for Segment<'a> {
             seq_len: u16::from_be_bytes(header[4..6].try_into().map_err(|_| InvalidSegment)?),
             data,
         };
-        if segment.seq_idx < segment.seq_len {
-            Ok(segment)
-        } else {
-            Err(InvalidSegment)
-        }
+        (segment.seq_idx < segment.seq_len)
+            .then_some(segment)
+            .ok_or(InvalidSegment)
     }
 }
 
