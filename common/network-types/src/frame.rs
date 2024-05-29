@@ -401,6 +401,7 @@ mod tests {
     const MTU: u16 = 448;
     const FRAME_COUNT: u16 = 65_535;
     const FRAME_SIZE: usize = 4096;
+    const MIXING_FACTOR: f64 = 4.0;
 
     lazy_static! {
         static ref FRAMES: Vec<Frame> = (0..FRAME_COUNT)
@@ -412,7 +413,7 @@ mod tests {
             .collect::<Vec<_>>();
         static ref SEGMENTS: Vec<Segment<'static>> = {
             let deque = FRAMES.par_iter().flat_map(|f| f.segment(MTU)).collect::<VecDeque<_>>();
-            custom_shuffle(deque, 4.0)
+            custom_shuffle(deque, MIXING_FACTOR)
         };
     }
 
@@ -576,7 +577,7 @@ mod tests {
 
         let mut segments = frames.iter().flat_map(|f| f.segment(3)).collect::<VecDeque<_>>();
         segments.retain(|s| s.frame_id != 2 || s.seq_idx != 2); // Remove 2nd segment of Frame 2
-        let segments = custom_shuffle(segments, 4.0);
+        let segments = custom_shuffle(segments, MIXING_FACTOR);
 
         let (fragmented, reassembled) = FrameReassembler::new(Some(Duration::from_millis(10)));
 
@@ -603,7 +604,7 @@ mod tests {
             assert!(flushed_cpy.load(Ordering::SeqCst));
         });
 
-        async_std::task::sleep(Duration::from_millis(50)).await;
+        async_std::task::sleep(Duration::from_millis(100)).await;
 
         // Prune the expired entry, which is Frame 2 (that is missing a segment)
         flushed.store(true, Ordering::SeqCst);
@@ -812,12 +813,11 @@ mod tests {
             }
         });
 
-        //let mut pushed = Vec::new();
-
-        let (stream, expected_frames) = create_unreliable_segment_stream(200, Duration::from_millis(10), 4.0, 0.2);
+        // Corrupt 20% of the frames
+        let (stream, expected_frames) =
+            create_unreliable_segment_stream(200, Duration::from_millis(10), MIXING_FACTOR, 0.2);
         stream
             .for_each(|s| {
-                //pushed.push((current_time().as_unix_timestamp().as_millis(), s.frame_id, s.seq_idx));
                 fragmented.push_segment(s).unwrap();
                 futures::future::ready(())
             })
@@ -825,14 +825,9 @@ mod tests {
 
         done.store(true, Ordering::SeqCst);
         eviction_jh.await;
-
         drop(fragmented);
 
         let reassembled_frames = reassembled.collect::<Vec<_>>().await;
-
-        //let pushed = pushed.into_iter().map(|(t, x, y)| format!("{t}: {x},{y}")).collect::<Vec<_>>().join("\n");
-        //std::fs::write("/tmp/test.txt", pushed).unwrap();
-
         reassembled_frames
             .into_iter()
             .enumerate()
