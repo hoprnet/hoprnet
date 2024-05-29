@@ -16,19 +16,27 @@ use tokio::{
 ///
 /// ## Run in server mode:
 ///
-/// $ hopr-socks server --host 127.0.0.1 --port 1337 no-auth
-/// $ hopr-socks server --host 127.0.0.1 --port 1337 password --username admin --password password
+/// $ hopr-socks --host 127.0.0.1 --port 1337 server no-auth
+/// $ hopr-socks --host 127.0.0.1 --port 1337 server password --username admin --password password
 ///
 /// ## Run in client mode:
 ///
-/// $ hopr-socks client --host 127.0.0.1 --port 1337 --target-host example.com no-auth
+/// $ hopr-socks --host 127.0.0.1 --port 1337 client --target-host example.com no-auth
 ///
-/// $ hopr-socks client --host 127.0.0.1 --port 1337 --target-host example.com password --username admin --password password
+/// $ hopr-socks --host 127.0.0.1 --port 1337 client --target-host example.com password --username admin --password password
 ///
 #[derive(Debug, StructOpt)]
 #[structopt(name = "hopr-socks", about = "A simple SOCKS5 server implementation.")]
 
 struct Opt {
+    /// Bind on address address. eg. `127.0.0.1`
+    #[structopt(long)]
+    host: String,
+
+    /// Bind on address address. eg. `1337`
+    #[structopt(long)]
+    port: String,
+
     /// Choose running mode
     #[structopt(subcommand, name = "mode")]
     pub mode: RunModeOpt,
@@ -37,14 +45,6 @@ struct Opt {
 #[derive(StructOpt, Debug)]
 enum RunModeOpt {
     Client {
-        /// Bind on address address. eg. `127.0.0.1`
-        #[structopt(long)]
-        host: String,
-
-        /// Bind on address address. eg. `1337`
-        #[structopt(long)]
-        port: String,
-
         /// Target address server (not the socks server)
         #[structopt(short = "a", long)]
         target_host: String,
@@ -58,14 +58,6 @@ enum RunModeOpt {
         auth: AuthMode,
     },
     Server {
-        /// Bind on address address. eg. `127.0.0.1`
-        #[structopt(long)]
-        host: String,
-
-        /// Bind on address address. eg. `1337`
-        #[structopt(long)]
-        port: String,
-
         /// Request timeout
         #[structopt(short = "t", long, default_value = "10")]
         request_timeout: u64,
@@ -92,33 +84,26 @@ enum AuthMode {
 #[tokio::main]
 async fn main() -> Result<()> {
     let opt: Opt = Opt::from_args();
+    let socks_domain: String = [opt.host, opt.port].join(":");
+
     env_logger::init();
 
     return match opt.mode {
         RunModeOpt::Client {
-            host,
-            port,
             target_host,
             target_port,
             auth,
-        } => spawn_socks_client(host, port, target_host, target_port, auth).await,
-        RunModeOpt::Server {
-            host,
-            port,
-            request_timeout,
-            auth,
-        } => spawn_socks_server(host, port, request_timeout, auth).await,
+        } => spawn_socks_client(&socks_domain, target_host, target_port, auth).await,
+        RunModeOpt::Server { request_timeout, auth } => spawn_socks_server(&socks_domain, request_timeout, auth).await,
     };
 }
 
 async fn spawn_socks_client(
-    host: String,
-    port: String,
+    socks_domain: &String,
     target_host: String,
     target_port: u16,
     auth: AuthMode,
 ) -> Result<()> {
-    let socks_domain: String = [host, port].join(":");
     let remote_domain: String = [target_host.clone(), target_port.to_string()].join(":");
     let config = ClientConfig::default();
 
@@ -143,8 +128,7 @@ async fn spawn_socks_client(
 
     Ok(())
 }
-async fn spawn_socks_server(host: String, port: String, timeout: u64, auth: AuthMode) -> Result<()> {
-    let socks_domain: String = [host, port].join(":");
+async fn spawn_socks_server(socks_domain: &String, timeout: u64, auth: AuthMode) -> Result<()> {
     let mut config = ServerConfig::default();
     config.set_request_timeout(timeout);
 
