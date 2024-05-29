@@ -24,6 +24,7 @@ members = [
     "db/entity",
     "ethereum/bindings",
     "hopli",
+    "hopr-socks",
     "hopr/hopr-lib",
     "hoprd/rest-api",
     "hoprd/hoprd",

@@ -1,0 +1,22 @@
+[package]
+name = "hopr-socks"
+version = "0.1.0"
+authors = ["HOPR Association <tech@hoprnet.org>"]
+edition = "2021"
+description = ""
+homepage = "https://hoprnet.org/"
+repository = "https://github.com/hoprnet/hoprnet"
+license = "GPL-3.0-only"
+
+[dependencies]
+fast-socks5 = "0.9.6"
+env_logger = "0.10.2"
+structopt = "0.3"
+tokio = { version = "1", features = [
+    "io-util",
+    "net",
+    "time",
+    "rt-multi-thread",
+    "macros",
+] }
+log = "0.4.21"
