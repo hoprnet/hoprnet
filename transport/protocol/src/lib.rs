@@ -67,3 +67,12 @@ pub(crate) mod executor {
     #[cfg(all(feature = "runtime-tokio", not(test)))]
     pub(crate) use tokio::{task::spawn, time::sleep};
 }
+
+#[derive(Clone)]
+struct Discv5Executor(task_executor::TaskExecutor);
+
+impl executor for Discv5Executor {
+    fn spawn(&self, future: std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>>) {
+        self.0.spawn(future);
+    }
+}

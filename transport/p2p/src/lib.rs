@@ -74,6 +74,7 @@ pub struct HoprNetworkBehavior {
     pub ack: libp2p::request_response::cbor::Behaviour<Acknowledgement, ()>,
     pub ticket_aggregation:
         libp2p::request_response::cbor::Behaviour<Vec<legacy::AcknowledgedTicket>, std::result::Result<Ticket, String>>,
+    pub discovery: Discovery<TSpec>,
 }
 
 impl Debug for HoprNetworkBehavior {
