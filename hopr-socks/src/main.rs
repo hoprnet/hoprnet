@@ -16,14 +16,14 @@ use tokio::{
 ///
 /// ## Run in server mode:
 ///
-/// $ hopr-socks -- server --host 127.0.0.1 --port 1337 no-auth
-/// $ hopr-socks -- server --host 127.0.0.1 --port 1337 password --username admin --password password
+/// $ hopr-socks server --host 127.0.0.1 --port 1337 no-auth
+/// $ hopr-socks server --host 127.0.0.1 --port 1337 password --username admin --password password
 ///
 /// ## Run in client mode:
 ///
-/// $ hopr-socks -- client --host 127.0.0.1 --port 1337 --target-host example.com no-auth
+/// $ hopr-socks client --host 127.0.0.1 --port 1337 --target-host example.com no-auth
 ///
-/// $ hopr-socks -- client --host 127.0.0.1 --port 1337 --target-host example.com password --username admin --password password
+/// $ hopr-socks client --host 127.0.0.1 --port 1337 --target-host example.com password --username admin --password password
 ///
 #[derive(Debug, StructOpt)]
 #[structopt(name = "hopr-socks", about = "A simple SOCKS5 server implementation.")]
