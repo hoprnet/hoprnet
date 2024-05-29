@@ -1,41 +1,79 @@
-use fast_socks5::server::{Authentication, Config, SimpleUserPassword, Socks5Socket};
+use anyhow::Context;
+use fast_socks5::client::{Config as ClientConfig, Socks5Stream};
+use fast_socks5::server::{Authentication, Config as ServerConfig, SimpleUserPassword, Socks5Socket};
 use fast_socks5::Result;
-use log::{error, info, warn};
+use log::{debug, error, info, warn};
 use std::future::Future;
 use std::sync::Arc;
 use structopt::StructOpt;
-use tokio::task;
 use tokio::{
-    io::{AsyncRead, AsyncWrite},
+    io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
     net::TcpListener,
+    task,
 };
 
 /// # How to use it:
 ///
-/// Listen on a local address, authentication-free:
-///     `$ RUST_LOG=debug cargo run --bin hopr-socks -- --host 127.0.0.1 --port 1337 no-auth`
+/// ## Run in server mode:
 ///
-/// Listen on a local address, with basic username/password requirement:
-///     `$ RUST_LOG=debug cargo run --bin hopr-socks -- --host 127.0.0.1 --port 1337 password --username admin --password password`
+/// $ hopr-socks -- server --host 127.0.0.1 --port 1337 no-auth
+/// $ hopr-socks -- server --host 127.0.0.1 --port 1337 password --username admin --password password
+///
+/// ## Run in client mode:
+///
+/// $ hopr-socks -- client --host 127.0.0.1 --port 1337 --target-host example.com no-auth
+///
+/// $ hopr-socks -- client --host 127.0.0.1 --port 1337 --target-host example.com password --username admin --password password
 ///
 #[derive(Debug, StructOpt)]
 #[structopt(name = "hopr-socks", about = "A simple SOCKS5 server implementation.")]
+
 struct Opt {
-    /// Bind on address address. eg. `127.0.0.1`
-    #[structopt(long)]
-    pub host: String,
+    /// Choose running mode
+    #[structopt(subcommand, name = "mode")]
+    pub mode: RunModeOpt,
+}
 
-    /// Bind on address address. eg. `1337`
-    #[structopt(long)]
-    pub port: String,
+#[derive(StructOpt, Debug)]
+enum RunModeOpt {
+    Client {
+        /// Bind on address address. eg. `127.0.0.1`
+        #[structopt(long)]
+        host: String,
 
-    /// Request timeout
-    #[structopt(short = "t", long, default_value = "10")]
-    pub request_timeout: u64,
+        /// Bind on address address. eg. `1337`
+        #[structopt(long)]
+        port: String,
 
-    /// Choose authentication type
-    #[structopt(subcommand, name = "auth")]
-    pub auth: AuthMode,
+        /// Target address server (not the socks server)
+        #[structopt(short = "a", long)]
+        target_host: String,
+
+        /// Target port server (not the socks server)
+        #[structopt(short = "p", long, default_value = "80")]
+        target_port: u16,
+
+        /// Choose authentication type
+        #[structopt(subcommand, name = "auth")]
+        auth: AuthMode,
+    },
+    Server {
+        /// Bind on address address. eg. `127.0.0.1`
+        #[structopt(long)]
+        host: String,
+
+        /// Bind on address address. eg. `1337`
+        #[structopt(long)]
+        port: String,
+
+        /// Request timeout
+        #[structopt(short = "t", long, default_value = "10")]
+        request_timeout: u64,
+
+        /// Choose authentication type
+        #[structopt(subcommand, name = "auth")]
+        auth: AuthMode,
+    },
 }
 
 /// Choose the authentication type
@@ -53,17 +91,64 @@ enum AuthMode {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    let opt: Opt = Opt::from_args();
     env_logger::init();
 
-    spawn_socks_server().await
+    return match opt.mode {
+        RunModeOpt::Client {
+            host,
+            port,
+            target_host,
+            target_port,
+            auth,
+        } => spawn_socks_client(host, port, target_host, target_port, auth).await,
+        RunModeOpt::Server {
+            host,
+            port,
+            request_timeout,
+            auth,
+        } => spawn_socks_server(host, port, request_timeout, auth).await,
+    };
 }
 
-async fn spawn_socks_server() -> Result<()> {
-    let opt: Opt = Opt::from_args();
-    let mut config = Config::default();
-    config.set_request_timeout(opt.request_timeout);
+async fn spawn_socks_client(
+    host: String,
+    port: String,
+    target_host: String,
+    target_port: u16,
+    auth: AuthMode,
+) -> Result<()> {
+    let socks_domain: String = [host, port].join(":");
+    let remote_domain: String = [target_host.clone(), target_port.to_string()].join(":");
+    let config = ClientConfig::default();
 
-    let config = match opt.auth {
+    // Creating a SOCKS stream to the target address through the socks server
+    let mut socks = match auth {
+        AuthMode::NoAuth => Socks5Stream::connect(socks_domain.clone(), target_host, target_port, config).await?,
+        AuthMode::Password { username, password } => {
+            Socks5Stream::connect_with_password(
+                socks_domain.clone(),
+                target_host,
+                target_port,
+                username,
+                password,
+                config,
+            )
+            .await?
+        }
+    };
+
+    // Once connection is completed, can start to communicate with the server
+    http_request(&mut socks, remote_domain).await?;
+
+    Ok(())
+}
+async fn spawn_socks_server(host: String, port: String, timeout: u64, auth: AuthMode) -> Result<()> {
+    let socks_domain: String = [host, port].join(":");
+    let mut config = ServerConfig::default();
+    config.set_request_timeout(timeout);
+
+    let config = match auth {
         AuthMode::NoAuth => {
             warn!("No authentication has been set!");
             config
@@ -75,12 +160,9 @@ async fn spawn_socks_server() -> Result<()> {
     };
 
     let config = Arc::new(config);
+    let listener = TcpListener::bind(&socks_domain).await?;
 
-    let domain = [opt.host, opt.port].join(":");
-    let listener = TcpListener::bind(&domain).await?;
-    //    listener.set_config(config);
-
-    info!("Listen for socks connections @ {}", &domain);
+    info!("Listen for socks connections @ {}", &socks_domain);
 
     // Standard TCP loop
     loop {
@@ -107,4 +189,31 @@ where
             error!("{:#}", &e);
         }
     })
+}
+
+async fn http_request<T: AsyncRead + AsyncWrite + Unpin>(stream: &mut T, domain: String) -> Result<()> {
+    debug!("Requesting body...");
+
+    // construct our request, with a dynamic domain
+    let mut headers = vec![];
+    headers.extend_from_slice("GET / HTTP/1.1\n".as_bytes());
+    headers.extend_from_slice(format!("Host: {domain}\n").as_bytes());
+    headers.extend_from_slice("User-Agent: hopr-socks/0.1.0\n".as_bytes());
+    headers.extend_from_slice("Accept: */*\n\n".as_bytes());
+
+    // flush headers
+    stream.write_all(&headers).await.context("Can't write HTTP Headers")?;
+
+    debug!("Reading body response...");
+    let mut result = [0u8; 1024];
+    stream.read(&mut result).await.context("Can't read HTTP Response")?;
+
+    info!("Response: {}", String::from_utf8_lossy(&result));
+
+    if result.starts_with(b"HTTP/1.1") {
+        info!("HTTP/1.1 Response detected!");
+    }
+    //assert!(result.ends_with(b"</HTML>\r\n") || result.ends_with(b"</html>"));
+
+    Ok(())
 }

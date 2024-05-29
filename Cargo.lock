@@ -3882,6 +3882,7 @@ dependencies = [
 name = "hopr-socks"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "env_logger 0.10.2",
  "fast-socks5",
  "log",
