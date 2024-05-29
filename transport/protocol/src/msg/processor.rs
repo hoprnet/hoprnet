@@ -1,7 +1,6 @@
 use std::{pin::Pin, sync::Arc};
 
 use async_lock::RwLock;
-use async_std::task::{sleep, spawn};
 use futures::channel::mpsc::{channel, Receiver, Sender};
 use futures::future::{poll_fn, Either};
 use futures::{pin_mut, stream::Stream, StreamExt};
@@ -20,6 +19,7 @@ use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 
 use super::packet::{PacketConstructing, TransportPacket};
+use crate::executor::{sleep, spawn};
 use crate::msg::mixer::MixerConfig;
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -569,8 +569,8 @@ mod tests {
     use hex_literal::hex;
     use hopr_crypto_random::{random_bytes, random_integer};
     use hopr_crypto_types::prelude::*;
-    use hopr_db_api::info::DomainSeparator;
-    use hopr_db_api::{
+    use hopr_db_api::{info::DomainSeparator, resolver::HoprDbResolverOperations};
+    use hopr_db_sql::{
         accounts::HoprDbAccountOperations, channels::HoprDbChannelOperations, db::HoprDb, info::HoprDbInfoOperations,
     };
     use hopr_internal_types::prelude::*;
@@ -985,7 +985,7 @@ mod tests {
         struct TestResolver(Vec<(OffchainPublicKey, Address)>);
 
         #[async_trait]
-        impl hopr_db_api::resolver::HoprDbResolverOperations for TestResolver {
+        impl HoprDbResolverOperations for TestResolver {
             async fn resolve_packet_key(
                 &self,
                 onchain_key: &Address,

@@ -1,4 +1,12 @@
-use async_std::task::JoinHandle;
+#[cfg(feature = "runtime-async-std")]
+use async_std::task::{sleep, spawn, JoinHandle};
+
+#[cfg(feature = "runtime-tokio")]
+use tokio::{
+    task::{spawn, JoinHandle},
+    time::sleep,
+};
+
 use chain_actions::action_queue::{ActionQueue, ActionQueueConfig};
 use chain_actions::action_state::{ActionState, IndexerActionTracker};
 use chain_actions::channels::ChannelActions;
@@ -21,11 +29,21 @@ use ethers::providers::Middleware;
 use ethers::utils::AnvilInstance;
 use futures::{pin_mut, StreamExt};
 use hopr_crypto_types::prelude::*;
-use hopr_db_api::prelude::*;
+use hopr_db_sql::{api::info::DomainSeparator, prelude::*};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use std::time::Duration;
 use tracing::info;
+
+#[cfg(feature = "runtime-async-std")]
+async fn cancel_join_handle<T>(handle: JoinHandle<T>) {
+    handle.cancel().await;
+}
+
+#[cfg(feature = "runtime-tokio")]
+async fn cancel_join_handle<T>(handle: JoinHandle<T>) {
+    handle.abort()
+}
 
 // Helper function to generate the first acked ticket (channel_epoch 1, index 0, offset 0) of win prob 100%
 async fn generate_the_first_ack_ticket<M: Middleware>(
@@ -200,13 +218,13 @@ async fn start_node_chain_logic(
 
     let mut node_tasks = Vec::new();
 
-    node_tasks.push(async_std::task::spawn(async move {
+    node_tasks.push(spawn(async move {
         action_queue.start().await;
     }));
 
     // Action state tracking
     let (sce_tx, sce_rx) = async_channel::unbounded();
-    node_tasks.push(async_std::task::spawn(async move {
+    node_tasks.push(spawn(async move {
         let rx = sce_rx.clone();
         pin_mut!(rx);
 
@@ -232,10 +250,9 @@ async fn start_node_chain_logic(
     }
 }
 
-#[async_std::test]
+#[cfg_attr(feature = "runtime-async-std", async_std::test)]
+#[cfg_attr(feature = "runtime-tokio", tokio::test)]
 async fn integration_test_indexer() {
-    let _ = env_logger::builder().is_test(true).try_init();
-
     let block_time = Duration::from_secs(1);
     let anvil = create_anvil(Some(block_time));
     let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
@@ -258,7 +275,7 @@ async fn integration_test_indexer() {
     let contract_addrs = ContractAddresses::from(&instances);
 
     let finality = 2;
-    async_std::task::sleep((1 + finality) * block_time).await;
+    sleep((1 + finality) * block_time).await;
 
     // ----------------------------------------
 
@@ -406,7 +423,7 @@ async fn integration_test_indexer() {
         bob_chain_key.public().to_address()
     );
 
-    async_std::task::sleep(Duration::from_millis(1000)).await;
+    sleep(Duration::from_millis(1000)).await;
 
     assert_eq!(
         Some(alice_node.chain_key.public().to_address()),
@@ -459,7 +476,7 @@ async fn integration_test_indexer() {
         .expect("should confirm open channel");
 
     // Delay the fetch, so that channel increase can be processed first
-    async_std::task::sleep(Duration::from_millis(100)).await;
+    sleep(Duration::from_millis(100)).await;
 
     let channel_alice_bob = alice_node
         .db
@@ -516,7 +533,7 @@ async fn integration_test_indexer() {
         _ => panic!("invalid confirmation"),
     };
 
-    async_std::task::sleep(Duration::from_millis(1000)).await;
+    sleep(Duration::from_millis(1000)).await;
 
     // After the funding, read channel_alice_bob again and compare its balance
     let channel_alice_bob = alice_node
@@ -581,7 +598,7 @@ async fn integration_test_indexer() {
         _ => panic!("invalid confirmation"),
     };
 
-    async_std::task::sleep(Duration::from_millis(1000)).await;
+    sleep(Duration::from_millis(1000)).await;
 
     let channel_bob_alice = alice_node
         .db
@@ -603,7 +620,7 @@ async fn integration_test_indexer() {
 
     let bob_ack_tickets = bob_node
         .db
-        .get_tickets(None, channel_alice_bob_seen_by_bob.into())
+        .get_tickets(channel_alice_bob_seen_by_bob.into())
         .await
         .expect("get ack ticket call on Alice's db must not fail");
 
@@ -686,11 +703,11 @@ async fn integration_test_indexer() {
         _ => panic!("invalid confirmation"),
     };
 
-    async_std::task::sleep(Duration::from_millis(1000)).await;
+    sleep(Duration::from_millis(1000)).await;
 
     let bob_ack_tickets = alice_node
         .db
-        .get_tickets(None, channel_bob_alice.into())
+        .get_tickets(channel_bob_alice.into())
         .await
         .expect("get ack ticket call on Alice's db must not fail");
 
@@ -794,7 +811,7 @@ async fn integration_test_indexer() {
         _ => panic!("invalid confirmation"),
     }
 
-    async_std::task::sleep(Duration::from_millis(1000)).await;
+    sleep(Duration::from_millis(1000)).await;
 
     let channel_alice_bob = alice_node
         .db
@@ -826,5 +843,5 @@ async fn integration_test_indexer() {
         "alice and bob must be at the same checksum"
     );
 
-    futures::future::join_all(alice_node.node_tasks.into_iter().map(|t| t.cancel())).await;
+    futures::future::join_all(alice_node.node_tasks.into_iter().map(|t| cancel_join_handle(t))).await;
 }

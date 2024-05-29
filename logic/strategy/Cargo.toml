@@ -1,6 +1,6 @@
 [package]
-name = "core-strategy"
-version = "0.10.0"
+name = "hopr-strategy"
+version = "0.11.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Contains implementations of different HOPR strategies"
 edition = "2021"
@@ -11,10 +11,16 @@ license = "GPL-3.0-only"
 [lib]
 crate-type = ["rlib"]
 
+[features]
+default = []
+runtime-async-std = ["async-std", "core-protocol/runtime-async-std", "hopr-db-sql/runtime-async-std"]
+runtime-tokio = ["tokio", "core-protocol/runtime-tokio", "hopr-db-sql/runtime-tokio"]
+prometheus = [ "dep:hopr-metrics", "core-network/prometheus", "core-protocol/prometheus", "chain-actions/prometheus", "hopr-db-sql/prometheus" ]
+
 [dependencies]
 async-lock = { workspace = true }
 async-trait = { workspace = true }
-async-std = { workspace = true, features = ["unstable"]}
+async-std = { workspace = true, optional = true }
 futures = { workspace = true }
 rand = "0.8.5"
 serde = { workspace = true, features = ["derive"] }
@@ -24,6 +30,7 @@ semver = { workspace = true }
 smart-default = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }
+tokio = { workspace = true, optional = true }
 validator = { workspace = true }
 
 hopr-crypto-random = { workspace = true }
@@ -37,19 +44,14 @@ hopr-platform = { workspace = true }
 hopr-metrics = { workspace = true, optional = true, default-features = false }
 hopr-internal-types = { workspace = true }
 hopr-primitive-types = { workspace = true }
-hopr-db-api = { workspace = true }
+hopr-db-sql = { workspace = true }
 
 [dev-dependencies]
 async-std = { workspace = true }
+hopr-db-sql = { workspace = true, features = ["runtime-async-std"] }
 chain-types = { workspace = true }
-env_logger = { workspace = true }
 mockall = { workspace = true }
 hex-literal = { workspace = true }
 hopr-crypto-random = { workspace = true }
-hopr-db-api = { workspace = true }
 futures = { workspace = true }
 
-
-[features]
-default = ["prometheus"]
-prometheus = [ "dep:hopr-metrics", "core-network/prometheus", "core-protocol/prometheus", "chain-actions/prometheus" ]

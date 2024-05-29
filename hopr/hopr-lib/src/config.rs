@@ -2,10 +2,10 @@ use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use validator::{Validate, ValidationError};
 
-pub use core_strategy::StrategyConfig;
 pub use core_transport::config::{
     validate_external_host, HeartbeatConfig, HostConfig, HostType, NetworkConfig, ProtocolConfig, TransportConfig,
 };
+pub use hopr_strategy::StrategyConfig;
 
 use hopr_primitive_types::prelude::*;
 
@@ -121,8 +121,8 @@ pub struct HoprLibConfig {
     /// Strategies represent automatically executable behavior performed by
     /// the node given pre-configured triggers.
     #[validate(nested)]
-    #[serde(default = "core_strategy::hopr_default_strategies")]
-    #[default(core_strategy::hopr_default_strategies())]
+    #[serde(default = "hopr_strategy::hopr_default_strategies")]
+    #[default(hopr_strategy::hopr_default_strategies())]
     pub strategy: StrategyConfig,
     /// Configuration of the protocol heartbeat mechanism
     #[validate(nested)]

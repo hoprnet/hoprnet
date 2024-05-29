@@ -69,7 +69,7 @@ fn main() {
             .as_str(),
     );
 
-    async_std::task::block_on(execute_sea_orm_cli_command([
+    futures::executor::block_on(execute_sea_orm_cli_command([
         "sea-orm-cli",
         "migrate",
         "refresh",
@@ -92,7 +92,7 @@ fn main() {
             .as_str(),
     ]));
 
-    async_std::task::block_on(execute_sea_orm_cli_command([
+    futures::executor::block_on(execute_sea_orm_cli_command([
         "sea-orm-cli",
         "generate",
         "entity",

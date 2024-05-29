@@ -9,12 +9,14 @@ license = "GPL-3.0-only"
 crate-type = ["rlib"]
 
 [features]
-default = ["prometheus"]
+default = []
+runtime-async-std = ["async-std"]
+runtime-tokio = ["tokio"]
 prometheus = ["dep:hopr-metrics", "core-path/prometheus", "hopr-crypto-packet/prometheus"]
 
 [dependencies]
 async-trait = { workspace = true }
-async-std = { workspace = true, features = ["attributes", "unstable"] }
+async-std = { workspace = true, optional = true }
 async-lock = { workspace = true }
 futures = { workspace = true }
 futures-lite = { workspace = true }
@@ -27,14 +29,15 @@ serde = { workspace = true, features = ["derive"]}
 serde_with = { workspace = true }
 smart-default = { workspace = true }
 thiserror = { workspace = true }
+tokio = { workspace = true, optional = true }
 tracing = { workspace = true }
 validator = { workspace = true }
 
 hopr-crypto-random = { workspace = true }
 hopr-crypto-sphinx = { workspace = true }
 hopr-crypto-types = { workspace = true }
-hopr-db-api = { workspace = true }
 hopr-crypto-packet = { workspace = true }
+hopr-db-api = { workspace = true }
 core-path = { workspace = true }
 hopr-metrics = { optional = true, workspace = true }
 hopr-platform = { workspace = true }
@@ -42,7 +45,9 @@ hopr-internal-types = { workspace = true }
 hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
-tracing-test = { workspace = true }
+async-std = { workspace = true }
+hopr-db-sql = { workspace = true, features = ["runtime-async-std"] }
 more-asserts = "0.3.1"
 parameterized = { workspace = true }
 serial_test = "3.1.1"
+tracing-test = { workspace = true }

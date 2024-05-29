@@ -37,7 +37,7 @@ use crate::errors::Result;
 use crate::promiscuous::PromiscuousStrategy;
 use crate::Strategy;
 
-use hopr_db_api::HoprDbAllOperations;
+use hopr_db_sql::HoprDbAllOperations;
 #[cfg(all(feature = "prometheus", not(test)))]
 use {hopr_metrics::metrics::MultiGauge, strum::VariantNames};
 

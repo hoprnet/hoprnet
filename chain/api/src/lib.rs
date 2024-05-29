@@ -8,7 +8,15 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
+#[cfg(feature = "runtime-async-std")]
 use async_std::task::{sleep, spawn, JoinHandle};
+
+#[cfg(feature = "runtime-tokio")]
+use tokio::{
+    task::{spawn, JoinHandle},
+    time::sleep,
+};
+
 use tracing::{debug, error, info, warn};
 
 use chain_actions::action_queue::{ActionQueue, ActionQueueConfig};
@@ -25,7 +33,7 @@ use chain_types::ContractAddresses;
 use config::ChainNetworkConfig;
 use executors::{EthereumTransactionExecutor, RpcEthereumClient, RpcEthereumClientConfig};
 use hopr_crypto_types::prelude::*;
-use hopr_db_api::HoprDbAllOperations;
+use hopr_db_sql::HoprDbAllOperations;
 use hopr_internal_types::account::AccountEntry;
 pub use hopr_internal_types::channels::ChannelEntry;
 use hopr_internal_types::prelude::ChannelDirection;
@@ -36,7 +44,11 @@ use crate::errors::{HoprChainError, Result};
 /// The default HTTP request engine
 ///
 /// TODO: Should be an internal type, `hopr_lib::chain` must be moved to this package
+#[cfg(feature = "runtime-async-std")]
 pub type DefaultHttpPostRequestor = chain_rpc::client::surf_client::SurfRequestor;
+
+#[cfg(feature = "runtime-tokio")]
+pub type DefaultHttpPostRequestor = chain_rpc::client::reqwest_client::ReqwestRequestor;
 
 /// The default JSON RPC provider client
 ///

@@ -18,12 +18,16 @@ async-stream = { workspace = true }
 ethers = { workspace = true }
 futures = { workspace = true }
 futures-timer = { workspace = true }
+governor = { version = "0.6", optional = true }
 http-types = "2.12.0"
 lazy_static = { workspace = true }
 primitive-types = { workspace = true }
+reqwest = { version = "0.12.4", optional = true }
 serde = { workspace = true }
 serde_json = "1"
 smart-default = { workspace = true }
+surf = { version = "2.3.2", optional = true }
+surf-governor = { version = "0.2.0", optional = true }
 thiserror = { workspace = true }
 validator = { workspace = true }
 
@@ -34,16 +38,9 @@ tracing = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-primitive-types = { workspace = true }
 
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-surf = { version = "2.3.2" }
-surf-governor = "0.2.0"
-
-reqwest = "0.12.4"
-governor = "0.6.0"
-
 [dev-dependencies]
-async-std = { version = "1.12.0", features = ["attributes", "unstable"] }
-tokio = "1.36.0"
+async-std = { workspace = true, features = ["attributes", "unstable"] }
+tokio = { workspace = true }
 env_logger = { workspace = true }
 mockall = { workspace = true }
 mockito = "1.2.0"
@@ -53,3 +50,5 @@ hex-literal = { workspace = true }
 [features]
 default = ["prometheus"]
 prometheus = ["dep:hopr-metrics"]
+runtime-async-std = ["dep:surf", "dep:surf-governor"]
+runtime-tokio = ["dep:reqwest", "dep:governor"]

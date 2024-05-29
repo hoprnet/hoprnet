@@ -20,12 +20,37 @@ logging.basicConfig(format="%(asctime)s %(message)s")
 SEED = int.from_bytes(os.urandom(8), byteorder="big")
 random.seed(SEED)
 
+
+def pytest_addoption(parser: pytest.Parser):
+    parser.addoption(
+        "--stress-request-count",
+        action="store",
+        default=500,
+        help="Number of requests performed by each source node towards the stressed target",
+    )
+    parser.addoption(
+        "--stress-sources",
+        action="store",
+        type=str,
+        help="The JSON string containing the list of dicts with 'url' and 'token' keys for each stress test source node",
+    )
+    parser.addoption(
+        "--stress-target",
+        action="store",
+        type=str,
+        help="The JSON string containing the dict with 'url' and 'token' keys for the stressed target node",
+    )
+
+
 # Global variables
 LOCALHOST = "127.0.0.1"
 OPEN_CHANNEL_FUNDING_VALUE_HOPR = 1000
 
 TICKET_AGGREGATION_THRESHOLD = 100
 TICKET_PRICE_PER_HOP = 100
+
+RESERVED_TAG_UPPER_BOUND = 1023
+
 
 FIXTURES_PREFIX = "hopr-smoke-test"
 NODE_NAME_PREFIX = f"{FIXTURES_PREFIX}-node"
@@ -113,46 +138,6 @@ NODES = {
         FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_barebone.cfg.yaml"),
     ),
 }
-
-
-def pytest_addoption(parser: pytest.Parser):
-    parser.addoption(
-        "--stress-seq-request-count",
-        action="store",
-        default=500,
-        help="Number of sequential requests in the stress test",
-    )
-    parser.addoption(
-        "--stress-par-request-count", action="store", default=200, help="Number of parallel requests in the stress test"
-    )
-    parser.addoption(
-        "--stress-tested-api",
-        action="store",
-        default=f"http://{LOCALHOST}:{NODES['1'].api_port}",
-        help="The API towards which the stress test is performed",
-    )
-    parser.addoption(
-        "--stress-tested-api-token",
-        action="store",
-        default=API_TOKEN,
-        help="The token for the stress tested API",
-    )
-    parser.addoption(
-        "--stress-minimum-peer-count", action="store", default=3, help="The minimum peer count to start the stress test"
-    )
-
-
-@pytest.fixture
-def cmd_line_args(request: pytest.FixtureRequest):
-    args = {
-        "stress_seq_request_count": request.config.getoption("--stress-seq-request-count"),
-        "stress_par_request_count": request.config.getoption("--stress-par-request-count"),
-        "stress_tested_api": request.config.getoption("--stress-tested-api"),
-        "stress_tested_api_token": request.config.getoption("--stress-tested-api-token"),
-        "stress_minimum_peer_count": request.config.getoption("--stress-minimum-peer-count"),
-    }
-
-    return args
 
 
 def barebone_nodes():
@@ -387,3 +372,7 @@ async def swarm7(request):
     # POST TEST CLEANUP
     logging.debug(f"Tearing down the {len(nodes)} nodes cluster")
     [node.clean_up() for node in nodes.values()]
+
+
+def to_ws_url(host, port):
+    return f"ws://{host}:{port}/api/v3/messages/websocket"

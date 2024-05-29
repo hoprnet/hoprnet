@@ -5,7 +5,7 @@
 //! For details on default parameters see [AutoRedeemingStrategyConfig].
 use async_trait::async_trait;
 use chain_actions::redeem::TicketRedeemActions;
-use hopr_db_api::tickets::HoprDbTicketOperations;
+use hopr_db_sql::api::tickets::HoprDbTicketOperations;
 use hopr_internal_types::prelude::*;
 use hopr_internal_types::tickets::{AcknowledgedTicket, AcknowledgedTicketStatus};
 use hopr_primitive_types::prelude::*;
@@ -113,7 +113,7 @@ where
 
             let mut ack_ticket_in_db = self
                 .db
-                .get_tickets(None, channel.into())
+                .get_tickets(channel.into())
                 .await?
                 .into_iter()
                 .filter(|t| {
@@ -159,10 +159,10 @@ mod tests {
     use hex_literal::hex;
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::prelude::*;
-    use hopr_db_api::channels::HoprDbChannelOperations;
-    use hopr_db_api::db::HoprDb;
-    use hopr_db_api::info::{DomainSeparator, HoprDbInfoOperations};
-    use hopr_db_api::{HoprDbGeneralModelOperations, TargetDb};
+    use hopr_db_sql::channels::HoprDbChannelOperations;
+    use hopr_db_sql::db::HoprDb;
+    use hopr_db_sql::{api::info::DomainSeparator, info::HoprDbInfoOperations};
+    use hopr_db_sql::{HoprDbGeneralModelOperations, TargetDb};
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
     use mockall::mock;

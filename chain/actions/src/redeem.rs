@@ -25,10 +25,10 @@ use async_trait::async_trait;
 use chain_types::actions::Action;
 use futures::StreamExt;
 use hopr_crypto_types::types::Hash;
-use hopr_db_api::channels::HoprDbChannelOperations;
-use hopr_db_api::info::DomainSeparator;
-use hopr_db_api::prelude::HoprDbInfoOperations;
-use hopr_db_api::tickets::{HoprDbTicketOperations, TicketSelector};
+use hopr_db_sql::api::info::DomainSeparator;
+use hopr_db_sql::api::tickets::{HoprDbTicketOperations, TicketSelector};
+use hopr_db_sql::channels::HoprDbChannelOperations;
+use hopr_db_sql::prelude::HoprDbInfoOperations;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use tracing::{debug, error, info, warn};
@@ -136,7 +136,7 @@ where
             .with_aggregated_only(only_aggregated)
             .with_state(AcknowledgedTicketStatus::Untouched);
 
-        let (count_redeemable_tickets, _) = self.db.get_tickets_value(None, selector).await?;
+        let (count_redeemable_tickets, _) = self.db.get_tickets_value(selector).await?;
 
         info!(
             "there are {count_redeemable_tickets} acknowledged tickets in channel {channel_id} which can be redeemed"
@@ -232,10 +232,11 @@ mod tests {
     use hex_literal::hex;
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::prelude::*;
-    use hopr_db_api::db::HoprDb;
-    use hopr_db_api::errors::DbError;
-    use hopr_db_api::info::{DomainSeparator, HoprDbInfoOperations};
-    use hopr_db_api::{HoprDbGeneralModelOperations, TargetDb};
+    use hopr_db_sql::api::info::DomainSeparator;
+    use hopr_db_sql::db::HoprDb;
+    use hopr_db_sql::errors::DbSqlError;
+    use hopr_db_sql::info::HoprDbInfoOperations;
+    use hopr_db_sql::{HoprDbGeneralModelOperations, TargetDb};
 
     use crate::action_queue::{ActionQueue, MockTransactionExecutor};
     use crate::action_state::MockActionState;
@@ -296,7 +297,7 @@ mod tests {
                         channel_epoch.into(),
                     );
                     db_clone.upsert_channel(Some(tx), channel).await?;
-                    Ok::<_, DbError>(channel)
+                    Ok::<_, DbSqlError>(channel)
                 })
             })
             .await
@@ -315,7 +316,7 @@ mod tests {
                         db.upsert_ticket(Some(tx), ack_ticket.clone()).await?;
                         input_tickets.push(ack_ticket);
                     }
-                    Ok::<_, DbError>(input_tickets)
+                    Ok::<_, DbSqlError>(input_tickets)
                 })
             })
             .await
@@ -326,7 +327,6 @@ mod tests {
 
     #[async_std::test]
     async fn test_ticket_redeem_flow() {
-        let _ = env_logger::builder().is_test(true).try_init();
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
 
         let ticket_count = 5;
@@ -413,9 +413,9 @@ mod tests {
             "tx hashes must be equal"
         );
 
-        let db_acks_bob = db.get_tickets(None, (&channel_from_bob).into()).await.unwrap();
+        let db_acks_bob = db.get_tickets((&channel_from_bob).into()).await.unwrap();
 
-        let db_acks_charlie = db.get_tickets(None, (&channel_from_charlie).into()).await.unwrap();
+        let db_acks_charlie = db.get_tickets((&channel_from_charlie).into()).await.unwrap();
 
         assert!(
             db_acks_bob
@@ -433,7 +433,6 @@ mod tests {
 
     #[async_std::test]
     async fn test_ticket_redeem_in_channel() {
-        let _ = env_logger::builder().is_test(true).try_init();
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
 
         let ticket_count = 5;
@@ -494,9 +493,9 @@ mod tests {
             "tx hashes must be equal"
         );
 
-        let db_acks_bob = db.get_tickets(None, (&channel_from_bob).into()).await.unwrap();
+        let db_acks_bob = db.get_tickets((&channel_from_bob).into()).await.unwrap();
 
-        let db_acks_charlie = db.get_tickets(None, (&channel_from_charlie).into()).await.unwrap();
+        let db_acks_charlie = db.get_tickets((&channel_from_charlie).into()).await.unwrap();
 
         assert!(
             db_acks_bob
@@ -514,7 +513,6 @@ mod tests {
 
     #[async_std::test]
     async fn test_redeem_must_not_work_for_tickets_being_aggregated_and_being_redeemed() {
-        let _ = env_logger::builder().is_test(true).try_init();
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
 
         let ticket_count = 3;
@@ -598,8 +596,6 @@ mod tests {
 
     #[async_std::test]
     async fn test_redeem_must_not_work_for_tickets_of_previous_epoch_being_aggregated_and_being_redeemed() {
-        let _ = env_logger::builder().is_test(true).try_init();
-
         let ticket_count = 3;
         let ticket_from_previous_epoch_count = 1;
         let db = HoprDb::new_in_memory(ALICE.clone()).await;
@@ -668,8 +664,6 @@ mod tests {
 
     #[async_std::test]
     async fn test_redeem_must_not_work_for_tickets_of_next_epoch_being_redeemed() {
-        let _ = env_logger::builder().is_test(true).try_init();
-
         let ticket_count = 4;
         let ticket_from_next_epoch_count = 2;
         let db = HoprDb::new_in_memory(ALICE.clone()).await;

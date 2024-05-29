@@ -1,15 +1,27 @@
+#[cfg(all(feature = "runtime-async-std", feature = "runtime-tokio"))]
+compile_error!("Only one of the runtime features can be specified for the build");
+
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::{sync::Arc, time::SystemTime};
 
 use async_lock::RwLock;
 use async_signal::{Signal, Signals};
-use async_std::task::{spawn, JoinHandle};
 use chrono::{DateTime, Utc};
 use futures::StreamExt;
 
-use opentelemetry_otlp::WithExportConfig as _;
-use opentelemetry_sdk::trace::{RandomIdGenerator, Sampler};
+#[cfg(feature = "runtime-async-std")]
+use async_std::task::{spawn, JoinHandle};
+
+#[cfg(feature = "runtime-tokio")]
+use tokio::task::{spawn, JoinHandle};
+
+#[cfg(feature = "telemetry")]
+use {
+    opentelemetry_otlp::WithExportConfig as _,
+    opentelemetry_sdk::trace::{RandomIdGenerator, Sampler},
+};
+
 use signal_hook::low_level;
 use tracing::{error, info, warn};
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
@@ -34,12 +46,6 @@ lazy_static::lazy_static! {
     ).unwrap();
 }
 
-#[cfg(feature = "simple_log")]
-fn init_logger() {
-    env_logger::init();
-}
-
-#[cfg(not(feature = "simple_log"))]
 fn init_logger() -> Result<(), Box<dyn std::error::Error>> {
     let env_filter = match tracing_subscriber::EnvFilter::try_from_default_env() {
         Ok(filter) => filter,
@@ -57,40 +63,49 @@ fn init_logger() -> Result<(), Box<dyn std::error::Error>> {
         .with_thread_ids(true)
         .with_thread_names(false);
 
-    if let Ok(telemetry_url) = std::env::var("HOPRD_OPENTELEMETRY_COLLECTOR_URL") {
-        let tracer = opentelemetry_otlp::new_pipeline()
-            .tracing()
-            .with_exporter(
-                opentelemetry_otlp::new_exporter()
-                    .http()
-                    .with_endpoint(telemetry_url)
-                    .with_protocol(opentelemetry_otlp::Protocol::HttpBinary)
-                    .with_timeout(std::time::Duration::from_secs(5)),
-            )
-            .with_trace_config(
-                opentelemetry_sdk::trace::config()
-                    .with_sampler(Sampler::AlwaysOn)
-                    .with_id_generator(RandomIdGenerator::default())
-                    .with_max_events_per_span(64)
-                    .with_max_attributes_per_span(16)
-                    .with_resource(opentelemetry_sdk::Resource::new(vec![opentelemetry::KeyValue::new(
-                        "service.name",
-                        env!("CARGO_PKG_NAME"),
-                    )])),
-            )
-            .install_batch(opentelemetry_sdk::runtime::AsyncStd)?;
-
-        tracing::subscriber::set_global_default(
-            tracing_subscriber::Registry::default()
-                .with(env_filter)
-                .with(format)
-                .with(tracing_opentelemetry::layer().with_tracer(tracer)),
-        )
+    #[cfg(not(feature = "telemetry"))]
+    tracing::subscriber::set_global_default(tracing_subscriber::Registry::default().with(env_filter).with(format))
         .expect("Failed to set tracing subscriber");
-    } else {
-        tracing::subscriber::set_global_default(tracing_subscriber::Registry::default().with(env_filter).with(format))
+
+    #[cfg(feature = "telemetry")]
+    {
+        if let Ok(telemetry_url) = std::env::var("HOPRD_OPENTELEMETRY_COLLECTOR_URL") {
+            let tracer = opentelemetry_otlp::new_pipeline()
+                .tracing()
+                .with_exporter(
+                    opentelemetry_otlp::new_exporter()
+                        .http()
+                        .with_endpoint(telemetry_url)
+                        .with_protocol(opentelemetry_otlp::Protocol::HttpBinary)
+                        .with_timeout(std::time::Duration::from_secs(5)),
+                )
+                .with_trace_config(
+                    opentelemetry_sdk::trace::config()
+                        .with_sampler(Sampler::AlwaysOn)
+                        .with_id_generator(RandomIdGenerator::default())
+                        .with_max_events_per_span(64)
+                        .with_max_attributes_per_span(16)
+                        .with_resource(opentelemetry_sdk::Resource::new(vec![opentelemetry::KeyValue::new(
+                            "service.name",
+                            env!("CARGO_PKG_NAME"),
+                        )])),
+                )
+                .install_batch(opentelemetry_sdk::runtime::AsyncStd)?;
+
+            tracing::subscriber::set_global_default(
+                tracing_subscriber::Registry::default()
+                    .with(env_filter)
+                    .with(format)
+                    .with(tracing_opentelemetry::layer().with_tracer(tracer)),
+            )
             .expect("Failed to set tracing subscriber");
-    };
+        } else {
+            tracing::subscriber::set_global_default(
+                tracing_subscriber::Registry::default().with(env_filter).with(format),
+            )
+            .expect("Failed to set tracing subscriber");
+        };
+    }
 
     Ok(())
 }
@@ -102,7 +117,8 @@ enum HoprdProcesses {
     RestApi,
 }
 
-#[async_std::main]
+#[cfg_attr(feature = "runtime-async-std", async_std::main)]
+#[cfg_attr(feature = "runtime-tokio", tokio::main)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let _ = init_logger();
 
@@ -305,7 +321,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 futures::stream::iter(processes)
                     .for_each_concurrent(None, |(name, handle)| async move {
                         info!("Stopping process: {name:?}");
+                        #[cfg(feature = "runtime-async-std")]
                         handle.cancel().await;
+
+                        #[cfg(feature = "runtime-tokio")]
+                        handle.abort();
                     })
                     .await;
 
