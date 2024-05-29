@@ -7,6 +7,7 @@ use futures::{Sink, Stream};
 use hopr_platform::time::native::current_time;
 use hopr_primitive_types::prelude::AsUnixTimestamp;
 use serde::{Deserialize, Serialize};
+use std::mem;
 use std::ops::Sub;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicU16, AtomicU64, Ordering};
@@ -84,7 +85,7 @@ impl Ord for Segment<'_> {
 
 impl From<Segment<'_>> for Box<[u8]> {
     fn from(value: Segment<'_>) -> Self {
-        let mut ret = Vec::with_capacity(6 + value.data.len());
+        let mut ret = Vec::with_capacity(3 * mem::size_of::<u16>() + value.data.len());
         ret.extend_from_slice(value.frame_id.to_be_bytes().as_ref());
         ret.extend_from_slice(value.seq_idx.to_be_bytes().as_ref());
         ret.extend_from_slice(value.seq_len.to_be_bytes().as_ref());
@@ -97,7 +98,7 @@ impl<'a> TryFrom<&'a [u8]> for Segment<'a> {
     type Error = NetworkTypeError;
 
     fn try_from(value: &'a [u8]) -> Result<Self, Self::Error> {
-        let (header, data) = value.split_at(6);
+        let (header, data) = value.split_at(3 * mem::size_of::<u16>());
         let segment = Segment {
             frame_id: u16::from_be_bytes(header[0..2].try_into().map_err(|_| InvalidSegment)?),
             seq_idx: u16::from_be_bytes(header[2..4].try_into().map_err(|_| InvalidSegment)?),
@@ -351,6 +352,14 @@ impl Drop for FrameReassembler<'_> {
     }
 }
 
+impl<'a> Extend<Segment<'a>> for FrameReassembler<'a> {
+    fn extend<T: IntoIterator<Item = Segment<'a>>>(&mut self, iter: T) {
+        iter.into_iter()
+            .try_for_each(|s| self.push_segment(s))
+            .expect("failed to extend")
+    }
+}
+
 impl<'a> Sink<Segment<'a>> for FrameReassembler<'a> {
     type Error = NetworkTypeError;
 
@@ -375,13 +384,15 @@ impl<'a> Sink<Segment<'a>> for FrameReassembler<'a> {
 #[cfg(test)]
 mod tests {
     use crate::frame::{Frame, FrameReassembler, Segment};
-    use futures::{pin_mut, StreamExt};
+    use async_stream::stream;
+    use futures::{pin_mut, Stream, StreamExt};
     use hex_literal::hex;
     use lazy_static::lazy_static;
-    use rand::prelude::SliceRandom;
+    use rand::prelude::{Distribution, SliceRandom};
     use rand::{seq::IteratorRandom, thread_rng, Rng};
+    use rand_distr::Normal;
     use rayon::prelude::*;
-    use std::collections::HashSet;
+    use std::collections::{HashSet, VecDeque};
     use std::convert::identity;
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
@@ -389,7 +400,13 @@ mod tests {
 
     const MTU: u16 = 448;
     const FRAME_COUNT: u16 = 65_535;
-    const FRAME_SIZE: usize = 2048;
+    const FRAME_SIZE: usize = 4096;
+
+    fn shuffle_vec<T>(mut vec: Vec<T>) -> Vec<T> {
+        let mut rng = thread_rng();
+        vec.shuffle(&mut rng);
+        vec
+    }
 
     lazy_static! {
         static ref FRAMES: Vec<Frame> = (0..FRAME_COUNT)
@@ -400,11 +417,25 @@ mod tests {
             })
             .collect::<Vec<_>>();
         static ref SEGMENTS: Vec<Segment<'static>> = {
-            let mut segments = FRAMES.par_iter().flat_map(|f| f.segment(MTU)).collect::<Vec<_>>();
-            let mut rng = thread_rng();
-            segments.shuffle(&mut rng);
-            segments
+            let deque = FRAMES.par_iter().flat_map(|f| f.segment(MTU)).collect::<VecDeque<_>>();
+            custom_shuffle(deque, 4.0)
         };
+    }
+
+    fn sample_index<T: Distribution<f64>, R: Rng>(dist: &mut T, rng: &mut R, len: usize) -> usize {
+        let f: f64 = dist.sample(rng);
+        (f.max(0.0).round() as usize).min(len - 1)
+    }
+
+    fn custom_shuffle<T>(mut vec: VecDeque<T>, factor: f64) -> Vec<T> {
+        let mut rng = thread_rng();
+        let mut dist = Normal::new(0.0, factor).unwrap();
+
+        let mut ret = Vec::new();
+        while !vec.is_empty() {
+            ret.push(vec.remove(sample_index(&mut dist, &mut rng, vec.len())).unwrap());
+        }
+        ret
     }
 
     #[ctor::ctor]
@@ -455,6 +486,24 @@ mod tests {
         let recovered: Segment = (&boxed[..]).try_into().unwrap();
 
         assert_eq!(segment, recovered);
+    }
+
+    #[async_std::test]
+    async fn test_ordered() {
+        let (fragmented, reassembled) = FrameReassembler::new(None);
+
+        FRAMES
+            .iter()
+            .flat_map(|f| f.segment(MTU))
+            .for_each(|s| fragmented.push_segment(s).unwrap());
+
+        drop(fragmented);
+        let reassembled_frames = reassembled.collect::<Vec<_>>().await;
+
+        reassembled_frames
+            .into_par_iter()
+            .enumerate()
+            .for_each(|(i, frame)| assert_eq!(frame, FRAMES[i]));
     }
 
     #[async_std::test]
@@ -512,11 +561,11 @@ mod tests {
             },
         ];
 
-        let mut segments = frames.iter().flat_map(|f| f.segment(3)).collect::<Vec<_>>();
-        segments.remove(4); // Remove 2nd segment of Frame 3
-
-        let mut rng = thread_rng();
-        segments.shuffle(&mut rng);
+        let mut segments = frames
+            .iter()
+            .flat_map(|f| shuffle_vec(f.segment(3)))
+            .collect::<Vec<_>>();
+        segments.retain(|s| s.frame_id != 2 || s.seq_idx != 2); // Remove 2nd segment of Frame 2
 
         let (fragmented, reassembled) = FrameReassembler::new(Some(Duration::from_millis(10)));
 
@@ -556,10 +605,13 @@ mod tests {
     async fn test_randomized_delayed_parallel() {
         let frames = FRAMES.iter().take(100).collect::<Vec<_>>();
 
-        let mut segments = frames.iter().flat_map(|frame| frame.segment(MTU)).collect::<Vec<_>>();
+        let segments = frames
+            .iter()
+            .flat_map(|frame| shuffle_vec(frame.segment(MTU)))
+            .collect::<Vec<_>>();
 
-        let mut rng = thread_rng();
-        segments.shuffle(&mut rng);
+        //let mut rng = thread_rng();
+        //segments.shuffle(&mut rng);
 
         let (fragmented, reassembled) = FrameReassembler::new(None);
 
@@ -588,10 +640,13 @@ mod tests {
     async fn test_randomized_delayed_parallel_with_eviction() {
         let frames = FRAMES.iter().take(100).collect::<Vec<_>>();
 
-        let mut segments = frames.iter().flat_map(|frame| frame.segment(MTU)).collect::<Vec<_>>();
+        let segments = frames
+            .iter()
+            .flat_map(|frame| shuffle_vec(frame.segment(MTU)))
+            .collect::<Vec<_>>();
 
-        let mut rng = thread_rng();
-        segments.shuffle(&mut rng);
+        //let mut rng = thread_rng();
+        //segments.shuffle(&mut rng);
 
         let (fragmented, reassembled) = FrameReassembler::new(None);
 
@@ -627,25 +682,26 @@ mod tests {
             .for_each(|(i, frame)| assert_eq!(&frame, frames[i]));
     }
 
+    #[derive(Copy, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
+    struct SegmentId(u16, u16);
+
     /// Creates `num_frames` out of which `num_corrupted` will have missing segments.
     fn corrupt_frames(num_frames: u16, corrupted_ratio: f32) -> (Vec<Segment<'static>>, Vec<&'static Frame>) {
         assert!((0.0..=1.0).contains(&corrupted_ratio));
 
-        #[derive(Copy, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
-        struct SegmentId(u16, u16);
-
-        let excluded_segments = (0..num_frames)
+        let (excluded_frame_ids, excluded_segments): (HashSet<u16>, HashSet<SegmentId>) = (0..num_frames)
             .choose_multiple(&mut thread_rng(), ((num_frames as f32) * corrupted_ratio) as usize)
             .into_par_iter()
             .map(|frame_id| {
-                SegmentId(
+                (
                     frame_id,
-                    thread_rng().gen_range(0..SEGMENTS.iter().find(|s| s.frame_id == frame_id).unwrap().seq_len),
+                    SegmentId(
+                        frame_id,
+                        thread_rng().gen_range(0..SEGMENTS.iter().find(|s| s.frame_id == frame_id).unwrap().seq_len),
+                    ),
                 )
             })
-            .collect::<HashSet<_>>();
-
-        let excluded_frame_ids = excluded_segments.par_iter().map(|s| s.0).collect::<HashSet<_>>();
+            .unzip();
 
         let segments = SEGMENTS
             .par_iter()
@@ -662,13 +718,13 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn test_random_corrupted_frames_parallel() {
+    async fn test_random_corrupted_frames() {
         // Corrupt 30% of the frames, by removing a random segment from them
         let (segments, expected_frames) = corrupt_frames(FRAME_COUNT / 4, 0.3);
 
         let (fragmented, reassembled) = FrameReassembler::new(Duration::from_millis(100).into());
 
-        segments.into_par_iter().for_each(|s| {
+        segments.into_iter().for_each(|s| {
             fragmented.push_segment(s).unwrap();
         });
 
@@ -701,12 +757,50 @@ mod tests {
         assert!(reassembled_frames.is_empty());
     }
 
-    /*#[async_std::test]
-    async fn test_random_corrupted_frames_with_parallel_evictions() {
-        // Corrupt 40% of the frames, by removing a random segment from them
-        let (segments, expected_frames) = corrupt_frames(100, 0.4);
+    fn create_unreliable_segment_stream(
+        num_frames: usize,
+        max_latency: Duration,
+        mixing_factor: f64,
+        corruption_ratio: f64,
+    ) -> (impl Stream<Item = Segment<'static>>, Vec<&'static Frame>) {
+        let mut segments = FRAMES
+            .par_iter()
+            .take(num_frames)
+            .flat_map(|f| f.segment(MTU))
+            .collect::<VecDeque<_>>();
+        let (corrupted_frames, corrupted_segments): (HashSet<u16>, HashSet<SegmentId>) = segments
+            .iter()
+            .choose_multiple(
+                &mut thread_rng(),
+                (segments.len() as f64 * corruption_ratio).round() as usize,
+            )
+            .into_par_iter()
+            .map(|s| (s.frame_id, SegmentId(s.frame_id, s.seq_idx)))
+            .unzip();
 
-        let (fragmented, reassembled) = FrameReassembler::new(Duration::from_millis(40).into());
+        (
+            stream! {
+                let mut rng = thread_rng();
+                let mut distr = Normal::new(0.0, mixing_factor).unwrap();
+                while !segments.is_empty() {
+                    let segment = segments.remove(sample_index(&mut distr, &mut rng, segments.len())).unwrap();
+
+                    if !corrupted_segments.contains(&SegmentId(segment.frame_id, segment.seq_idx)) {
+                        async_std::task::sleep(max_latency.mul_f64(rng.gen())).await;
+                        yield segment;
+                    }
+                }
+            },
+            FRAMES
+                .par_iter()
+                .filter(|f| !corrupted_frames.contains(&f.frame_id))
+                .collect(),
+        )
+    }
+
+    #[async_std::test]
+    async fn test_unreliable_network_with_parallel_evictions() {
+        let (fragmented, reassembled) = FrameReassembler::new(Duration::from_millis(100).into());
         let fragmented = Arc::new(fragmented);
 
         let done = Arc::new(AtomicBool::new(false));
@@ -714,21 +808,20 @@ mod tests {
         let frag_clone = fragmented.clone();
         let eviction_jh = async_std::task::spawn(async move {
             while !done_clone.load(Ordering::SeqCst) {
+                async_std::task::sleep(Duration::from_millis(100)).await;
                 frag_clone.evict().unwrap();
-                async_std::task::sleep(Duration::from_millis(500)).await;
             }
         });
 
-        futures::stream::iter(segments)
-            .map(|segment| {
-                let delay = Duration::from_millis(thread_rng().gen_range(0..20u64));
-                let frag_clone = fragmented.clone();
-                async_std::task::spawn(async move {
-                    async_std::task::sleep(delay).await;
-                    frag_clone.push_segment(segment).unwrap();
-                })
+        //let mut pushed = Vec::new();
+
+        let (stream, expected_frames) = create_unreliable_segment_stream(200, Duration::from_millis(10), 4.0, 0.2);
+        stream
+            .for_each(|s| {
+                //pushed.push((current_time().as_unix_timestamp().as_millis(), s.frame_id, s.seq_idx));
+                fragmented.push_segment(s).unwrap();
+                futures::future::ready(())
             })
-            .for_each_concurrent(2, identity)
             .await;
 
         done.store(true, Ordering::SeqCst);
@@ -738,10 +831,12 @@ mod tests {
 
         let reassembled_frames = reassembled.collect::<Vec<_>>().await;
 
+        //let pushed = pushed.into_iter().map(|(t, x, y)| format!("{t}: {x},{y}")).collect::<Vec<_>>().join("\n");
+        //std::fs::write("/tmp/test.txt", pushed).unwrap();
+
         reassembled_frames
             .into_iter()
             .enumerate()
             .for_each(|(i, frame)| assert_eq!(&frame, expected_frames[i]));
-
-    }*/
+    }
 }
