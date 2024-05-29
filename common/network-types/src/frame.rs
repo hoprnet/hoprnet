@@ -388,7 +388,7 @@ mod tests {
     use futures::{pin_mut, Stream, StreamExt};
     use hex_literal::hex;
     use lazy_static::lazy_static;
-    use rand::prelude::{Distribution, SliceRandom};
+    use rand::prelude::Distribution;
     use rand::{seq::IteratorRandom, thread_rng, Rng};
     use rand_distr::Normal;
     use rayon::prelude::*;
@@ -401,12 +401,6 @@ mod tests {
     const MTU: u16 = 448;
     const FRAME_COUNT: u16 = 65_535;
     const FRAME_SIZE: usize = 4096;
-
-    fn shuffle_vec<T>(mut vec: Vec<T>) -> Vec<T> {
-        let mut rng = thread_rng();
-        vec.shuffle(&mut rng);
-        vec
-    }
 
     lazy_static! {
         static ref FRAMES: Vec<Frame> = (0..FRAME_COUNT)
@@ -561,11 +555,9 @@ mod tests {
             },
         ];
 
-        let mut segments = frames
-            .iter()
-            .flat_map(|f| shuffle_vec(f.segment(3)))
-            .collect::<Vec<_>>();
+        let mut segments = frames.iter().flat_map(|f| f.segment(3)).collect::<VecDeque<_>>();
         segments.retain(|s| s.frame_id != 2 || s.seq_idx != 2); // Remove 2nd segment of Frame 2
+        let segments = custom_shuffle(segments, 4.0);
 
         let (fragmented, reassembled) = FrameReassembler::new(Some(Duration::from_millis(10)));
 
@@ -605,13 +597,7 @@ mod tests {
     async fn test_randomized_delayed_parallel() {
         let frames = FRAMES.iter().take(100).collect::<Vec<_>>();
 
-        let segments = frames
-            .iter()
-            .flat_map(|frame| shuffle_vec(frame.segment(MTU)))
-            .collect::<Vec<_>>();
-
-        //let mut rng = thread_rng();
-        //segments.shuffle(&mut rng);
+        let segments = frames.iter().flat_map(|frame| frame.segment(MTU)).collect::<Vec<_>>();
 
         let (fragmented, reassembled) = FrameReassembler::new(None);
 
@@ -640,13 +626,7 @@ mod tests {
     async fn test_randomized_delayed_parallel_with_eviction() {
         let frames = FRAMES.iter().take(100).collect::<Vec<_>>();
 
-        let segments = frames
-            .iter()
-            .flat_map(|frame| shuffle_vec(frame.segment(MTU)))
-            .collect::<Vec<_>>();
-
-        //let mut rng = thread_rng();
-        //segments.shuffle(&mut rng);
+        let segments = frames.iter().flat_map(|frame| frame.segment(MTU)).collect::<Vec<_>>();
 
         let (fragmented, reassembled) = FrameReassembler::new(None);
 
