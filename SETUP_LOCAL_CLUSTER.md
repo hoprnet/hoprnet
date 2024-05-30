@@ -31,12 +31,18 @@ cd hoprnet-master
 make -j deps && make -j build
 ```
 
-1. **Run the one-line setup script**: Proceed to run the following script. If you are planning to run [MyneChat](http://app.myne.chat/)
-   alongside, then make sure to pass the `-m` flag with your MyneChat instance URL. Please wait while this script creates
-   the local blockchain network and deploys the project contracts. In average, the process can take between 2-6 minutes,
-   depending on your computer capacity. **Important**, make sure to have both `curl` and `jq` installed in your computer
-   before running the script, as both are used. Please be aware you also need a version of `bash` of `5.x` or superior,
-   which in most macOS devices require an upgrade, the easiest being via `brew bash`.
+2. **Run the one-line setup script**: Proceed to run the following script.
+
+```
+./scripts/setup-local-cluster.sh -i topologies/full_interconnected_cluster.sh --listen-host 0.0.0.0
+```
+
+**Important**, make sure to have both `curl` and `jq` installed in your computer before running the script, as both are used.
+Please be aware you also need a version of `bash` of `5.x` or superior, which in most macOS devices require an upgrade, the easiest being via `brew bash`.
+
+If you are planning to run [MyneChat](http://app.myne.chat/) alongside, then make sure to pass the `-m` flag with your MyneChat instance URL, as shown below.
+Please wait while this script creates the local blockchain network and deploys the project contracts.
+On average, the process can take between 2-6 minutes, depending on your computer capacity.
 
 ```
 ./scripts/setup-local-cluster.sh -m "http://app.myne.chat" -i topologies/full_interconnected_cluster.sh
