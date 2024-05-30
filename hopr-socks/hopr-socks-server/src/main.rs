@@ -19,9 +19,9 @@ async fn main() -> Result<()> {
     tracing::subscriber::set_global_default(subscriber).expect("Failed to set tracing subscriber");
 
     let opt: Opt = Opt::parse();
-    let socks_domain = match opt.socks_url {
+    let socks_domain = match opt.url {
         Some(url) => url,
-        None => [opt.socks_host.clone(), opt.socks_port.clone()].join(":"),
+        None => [opt.host.clone(), opt.port.clone()].join(":"),
     };
 
     spawn_server(&socks_domain, opt.request_timeout, opt.auth.unwrap_or_default()).await
