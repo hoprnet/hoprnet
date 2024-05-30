@@ -17,43 +17,55 @@ use tracing_subscriber::layer::SubscriberExt;
 ///
 /// ## Run in server mode:
 ///
-/// $ hopr-socks --host 127.0.0.1 --port 1337 server no-auth
-/// $ hopr-socks --host 127.0.0.1 --port 1337 server password --username admin --password password
+/// $ hopr-socks server --shost 127.0.0.1 --sport 1337
+/// $ hopr-socks server --surl 127.0.0.1:1337
+/// $ hopr-socks server --surl 127.0.0.1:1337 password --username admin --password password
 ///
 /// ## Run in client mode:
 ///
-/// $ hopr-socks --host 127.0.0.1 --port 1337 client --target-host example.com no-auth
-///
-/// $ hopr-socks --host 127.0.0.1 --port 1337 client --target-host example.com password --username admin --password password
+/// $ hopr-socks client --shost 127.0.0.1 --sport 1337  --host example.com
+/// $ hopr-socks client --surl 127.0.0.1:1337 --host example.com
+/// $ hopr-socks client --surl 127.0.0.1:1337 --host example.com password --username admin --password password
 ///
 #[derive(Debug, Parser)]
 #[clap(name = "hopr-socks", about = "A simple SOCKS5 server implementation.")]
 struct Opt {
-    #[clap(help = "Bind on address host. eg. `127.0.0.1`", long)]
-    host: String,
-
-    #[clap(help = "Bind on address port", long)]
-    port: String,
-
-    /// Choose running mode
+    /// Choose running mode (`server` or `client`)
     #[clap(subcommand)]
     pub mode: RunModeOpt,
+
+    /// Socks server host
+    #[clap(
+        help = "Bind on address host. eg. `127.0.0.1`",
+        long = "shost",
+        default_value = "127.0.0.1",
+        global = true
+    )]
+    socks_host: String,
+
+    /// Socks server port
+    #[clap(help = "Bind on address port", long = "sport", default_value = "1337", global = true)]
+    socks_port: String,
+
+    /// Socks server full address
+    #[clap(help = "Full address to bind on (host + port)", long = "surl", global = true)]
+    socks_url: Option<String>,
 }
 
 #[derive(Debug, Subcommand)]
 enum RunModeOpt {
     Client {
-        /// Target address server (not the socks server)
+        /// Target address server
         #[clap(short = 'a', long)]
-        target_host: String,
+        host: String,
 
-        /// Target port server (not the socks server)
-        #[clap(short = 'p', long, default_value = "80")]
-        target_port: u16,
+        /// Target port server
+        #[clap(long, default_value = "80")]
+        port: u16,
 
         /// Choose authentication type
         #[clap(subcommand)]
-        auth: AuthMode,
+        auth: Option<AuthMode>,
     },
     Server {
         /// Request timeout
@@ -62,7 +74,7 @@ enum RunModeOpt {
 
         /// Choose authentication type
         #[clap(subcommand)]
-        auth: AuthMode,
+        auth: Option<AuthMode>,
     },
 }
 
@@ -77,6 +89,11 @@ enum AuthMode {
         #[clap(short, long)]
         password: String,
     },
+}
+impl Default for AuthMode {
+    fn default() -> Self {
+        Self::NoAuth
+    }
 }
 
 #[tokio::main]
@@ -94,15 +111,18 @@ async fn main() -> Result<()> {
     tracing::subscriber::set_global_default(subscriber).expect("Failed to set tracing subscriber");
 
     let opt: Opt = Opt::parse();
-    let socks_domain: String = [opt.host, opt.port].join(":");
+    let socks_domain = match opt.socks_url {
+        Some(url) => url,
+        None => [opt.socks_host.clone(), opt.socks_port.clone()].join(":"),
+    };
 
     return match opt.mode {
-        RunModeOpt::Client {
-            target_host,
-            target_port,
-            auth,
-        } => spawn_socks_client(&socks_domain, target_host, target_port, auth).await,
-        RunModeOpt::Server { request_timeout, auth } => spawn_socks_server(&socks_domain, request_timeout, auth).await,
+        RunModeOpt::Client { host, port, auth } => {
+            spawn_socks_client(&socks_domain, host, port, auth.unwrap_or_default()).await
+        }
+        RunModeOpt::Server { request_timeout, auth } => {
+            spawn_socks_server(&socks_domain, request_timeout, auth.unwrap_or_default()).await
+        }
     };
 }
 
@@ -116,7 +136,7 @@ async fn spawn_socks_client(
     let config = ClientConfig::default();
 
     // Creating a SOCKS stream to the target address through the socks server
-    let mut socks = match auth {
+    let mut stream = match auth {
         AuthMode::NoAuth => Socks5Stream::connect(socks_domain.clone(), target_host, target_port, config).await?,
         AuthMode::Password { username, password } => {
             Socks5Stream::connect_with_password(
@@ -132,10 +152,11 @@ async fn spawn_socks_client(
     };
 
     // Once connection is completed, can start to communicate with the server
-    http_request(&mut socks, remote_domain).await?;
+    http_request(&mut stream, remote_domain).await?;
 
     Ok(())
 }
+
 async fn spawn_socks_server(socks_domain: &String, timeout: u64, auth: AuthMode) -> Result<()> {
     let mut config = ServerConfig::default();
     config.set_request_timeout(timeout);
