@@ -1,5 +1,5 @@
 [package]
-name = "hopr-socks"
+name = "hopr-socks-server"
 version = "0.1.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
@@ -21,3 +21,6 @@ tokio = { workspace = true, features = [
 ] }
 tracing = { workspace = true}
 tracing-subscriber = { workspace = true }
+hopr-lib = { workspace = true }
+serde = { workspace = true }
+validator = { workspace = true }
