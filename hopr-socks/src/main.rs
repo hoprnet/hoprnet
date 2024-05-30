@@ -1,16 +1,17 @@
 use anyhow::Context;
+use clap::{Parser, Subcommand};
 use fast_socks5::client::{Config as ClientConfig, Socks5Stream};
 use fast_socks5::server::{Authentication, Config as ServerConfig, SimpleUserPassword, Socks5Socket};
 use fast_socks5::Result;
-use log::{debug, error, info, warn};
 use std::future::Future;
 use std::sync::Arc;
-use structopt::StructOpt;
 use tokio::{
     io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
     net::TcpListener,
     task,
 };
+use tracing::{debug, error, info, warn};
+use tracing_subscriber::layer::SubscriberExt;
 
 /// # How to use it:
 ///
@@ -25,68 +26,75 @@ use tokio::{
 ///
 /// $ hopr-socks --host 127.0.0.1 --port 1337 client --target-host example.com password --username admin --password password
 ///
-#[derive(Debug, StructOpt)]
-#[structopt(name = "hopr-socks", about = "A simple SOCKS5 server implementation.")]
-
+#[derive(Debug, Parser)]
+#[clap(name = "hopr-socks", about = "A simple SOCKS5 server implementation.")]
 struct Opt {
-    /// Bind on address address. eg. `127.0.0.1`
-    #[structopt(long)]
+    #[clap(help = "Bind on address host. eg. `127.0.0.1`", long)]
     host: String,
 
-    /// Bind on address address. eg. `1337`
-    #[structopt(long)]
+    #[clap(help = "Bind on address port", long)]
     port: String,
 
     /// Choose running mode
-    #[structopt(subcommand, name = "mode")]
+    #[clap(subcommand)]
     pub mode: RunModeOpt,
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(Debug, Subcommand)]
 enum RunModeOpt {
     Client {
         /// Target address server (not the socks server)
-        #[structopt(short = "a", long)]
+        #[clap(short = 'a', long)]
         target_host: String,
 
         /// Target port server (not the socks server)
-        #[structopt(short = "p", long, default_value = "80")]
+        #[clap(short = 'p', long, default_value = "80")]
         target_port: u16,
 
         /// Choose authentication type
-        #[structopt(subcommand, name = "auth")]
+        #[clap(subcommand)]
         auth: AuthMode,
     },
     Server {
         /// Request timeout
-        #[structopt(short = "t", long, default_value = "10")]
+        #[clap(short = 't', long, default_value = "10")]
         request_timeout: u64,
 
         /// Choose authentication type
-        #[structopt(subcommand, name = "auth")]
+        #[clap(subcommand)]
         auth: AuthMode,
     },
 }
 
 /// Choose the authentication type
-#[derive(StructOpt, Debug)]
+#[derive(Subcommand, Debug)]
 enum AuthMode {
     NoAuth,
     Password {
-        #[structopt(short, long)]
+        #[clap(short, long)]
         username: String,
 
-        #[structopt(short, long)]
+        #[clap(short, long)]
         password: String,
     },
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let opt: Opt = Opt::from_args();
-    let socks_domain: String = [opt.host, opt.port].join(":");
+    let env_filter = tracing_subscriber::EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"));
+    let format = tracing_subscriber::fmt::layer()
+        .with_level(true)
+        .with_target(true)
+        .with_thread_ids(true)
+        .with_thread_names(false);
 
-    env_logger::init();
+    let subscriber = tracing_subscriber::Registry::default().with(env_filter).with(format);
+
+    tracing::subscriber::set_global_default(subscriber).expect("Failed to set tracing subscriber");
+
+    let opt: Opt = Opt::parse();
+    let socks_domain: String = [opt.host, opt.port].join(":");
 
     return match opt.mode {
         RunModeOpt::Client {
@@ -197,7 +205,6 @@ async fn http_request<T: AsyncRead + AsyncWrite + Unpin>(stream: &mut T, domain:
     if result.starts_with(b"HTTP/1.1") {
         info!("HTTP/1.1 Response detected!");
     }
-    //assert!(result.ends_with(b"</HTML>\r\n") || result.ends_with(b"</html>"));
 
     Ok(())
 }

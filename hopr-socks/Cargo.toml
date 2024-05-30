@@ -9,15 +9,15 @@ repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"
 
 [dependencies]
+anyhow = "1"
+clap = { workspace = true }
 fast-socks5 = "0.9.6"
-env_logger = "0.10.2"
-structopt = "0.3"
-tokio = { version = "1", features = [
+tokio = { workspace = true, features = [
     "io-util",
     "net",
     "time",
     "rt-multi-thread",
     "macros",
 ] }
-anyhow = "1"
-log = "0.4.21"
+tracing = { workspace = true}
+tracing-subscriber = { workspace = true }
