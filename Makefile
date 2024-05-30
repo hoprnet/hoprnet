@@ -49,7 +49,7 @@ cargo-download: ## download vendored Cargo dependencies
 
 .PHONY: build
 build: ## build all packages
-	$(cargo) build
+	$(cargo) build --workspace --bin hopli --bin hoprd
 
 .PHONY: build-yellowpaper
 build-yellowpaper: ## build the yellowpaper in docs/yellowpaper
