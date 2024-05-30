@@ -7,6 +7,7 @@ use futures::{Sink, Stream};
 use hopr_platform::time::native::current_time;
 use hopr_primitive_types::prelude::AsUnixTimestamp;
 use serde::{Deserialize, Serialize};
+use std::fmt::Debug;
 use std::mem;
 use std::ops::Sub;
 use std::pin::Pin;
@@ -55,7 +56,7 @@ impl Frame {
 /// Besides the data, a segment carries information about the total number of
 /// segments in the original frame, its index within the frame and
 /// ID of that frame.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Segment<'a> {
     /// ID of the [Frame] this segment belongs to.
     pub frame_id: u16,
@@ -66,6 +67,17 @@ pub struct Segment<'a> {
     /// Data in this segment.
     #[serde(with = "serde_bytes")]
     pub data: &'a [u8],
+}
+
+impl Debug for Segment<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Segment")
+            .field("frame_id", &self.frame_id)
+            .field("seq_id", &self.seq_idx)
+            .field("seq_len", &self.seq_len)
+            .field("data", &hex::encode(self.data))
+            .finish()
+    }
 }
 
 impl<'a> PartialOrd<Segment<'a>> for Segment<'a> {
@@ -125,38 +137,39 @@ impl<'a> Segment<'a> {
 struct FrameBuilder<'a> {
     frame_id: u16,
     segments: Vec<OnceLock<&'a [u8]>>,
-    missing: AtomicU16,
+    remaining: AtomicU16,
     last_ts: AtomicU64,
 }
 
 impl<'a> FrameBuilder<'a> {
-    /// Creates a new builder with the given initial segment.
+    /// Creates a new builder with the given `initial` [Segment] and its timestamp `ts`.
     fn new(initial: Segment<'a>, ts: u64) -> Self {
         let ret = Self::empty(initial.frame_id, initial.seq_len);
         ret.put(initial, ts).unwrap();
         ret
     }
 
-    /// Creates a new empty builder.
+    /// Creates a new empty builder for the given frame.
     fn empty(frame_id: u16, seq_len: u16) -> Self {
         Self {
             frame_id,
             segments: vec![OnceLock::new(); seq_len as usize],
-            missing: AtomicU16::new(seq_len),
+            remaining: AtomicU16::new(seq_len),
             last_ts: AtomicU64::new(0),
         }
     }
 
-    /// Adds a new segment to the builder with a timestamp.
-    /// Returns the number of segments missing in this builder.
+    /// Adds a new [`segment`](Segment) to the builder with a timestamp `ts`.
+    /// Returns the number of segments remaining in this builder.
     fn put(&self, segment: Segment<'a>, ts: u64) -> crate::errors::Result<u16> {
         if self.frame_id == segment.frame_id {
             if !self.is_complete() {
                 if self.segments[segment.seq_idx as usize].set(segment.data).is_ok() {
-                    self.missing.fetch_sub(1, Ordering::Relaxed);
+                    // A new segment has been added, decrease the remaining number and update timestamp
+                    self.remaining.fetch_sub(1, Ordering::Relaxed);
                     self.last_ts.fetch_max(ts, Ordering::Relaxed);
                 }
-                Ok(self.missing.load(Ordering::SeqCst))
+                Ok(self.remaining.load(Ordering::SeqCst))
             } else {
                 // Silently throw away segments of a frame that is already complete
                 Ok(0)
@@ -168,7 +181,7 @@ impl<'a> FrameBuilder<'a> {
 
     /// Checks if the builder contains all segments of the frame.
     fn is_complete(&self) -> bool {
-        self.missing.load(Ordering::SeqCst) == 0
+        self.remaining.load(Ordering::SeqCst) == 0
     }
 
     /// Checks if the last added segment to this frame happened before `cutoff`.
@@ -250,6 +263,8 @@ pub struct FrameReassembler<'a> {
 impl<'a> FrameReassembler<'a> {
     /// Creates a new frame reassembler and a corresponding stream
     /// for reassembled [Frames](Frame).
+    /// An optional `max_age` of segments can be specified,
+    /// which allows the [`evict`](Frame::evict) method to remove stale incomplete segments.
     pub fn new(max_age: Option<Duration>) -> (Self, impl Stream<Item = Frame>) {
         let (reassembled, reassembled_recv) = futures::channel::mpsc::unbounded();
         (
@@ -278,6 +293,7 @@ impl<'a> FrameReassembler<'a> {
                     // No more segments missing in this frame, check if this is the earliest frame
                     if let Some(earliest_seq_id) = self.sorted_seq_ids.front() {
                         if earliest_seq_id.eq(e.key()) {
+                            // If this is currently the earliest frame, push it out as reassembled
                             self.reassembled
                                 .unbounded_send(e.remove().reassemble()?)
                                 .map_err(|_| ReassemblerClosed)?;
@@ -287,6 +303,7 @@ impl<'a> FrameReassembler<'a> {
                 }
             }
             Entry::Vacant(v) => {
+                // Begin building a new frame
                 v.insert(FrameBuilder::new(segment, ts));
                 self.sorted_seq_ids.insert(seq_id);
             }
@@ -319,6 +336,7 @@ impl<'a> FrameReassembler<'a> {
                 if let Some((_, builder)) = self.sequences.remove_if(seq_id.value(), |_, builder| {
                     builder.is_complete() || builder.is_expired(cutoff)
                 }) {
+                    // If the frame is complete, push it out as reassembled
                     if builder.is_complete() {
                         self.reassembled
                             .unbounded_send(builder.reassemble()?)
@@ -411,16 +429,21 @@ mod tests {
             .collect::<Vec<_>>();
         static ref SEGMENTS: Vec<Segment<'static>> = {
             let deque = FRAMES.par_iter().flat_map(|f| f.segment(MTU)).collect::<VecDeque<_>>();
-            custom_shuffle(deque, MIXING_FACTOR)
+            linear_half_normal_shuffle(deque, MIXING_FACTOR)
         };
     }
 
+    /// Sample an index between `0` and `len - 1` using the given distribution and RNG.
     fn sample_index<T: Distribution<f64>, R: Rng>(dist: &mut T, rng: &mut R, len: usize) -> usize {
         let f: f64 = dist.sample(rng);
         (f.max(0.0).round() as usize).min(len - 1)
     }
 
-    fn custom_shuffle<T>(mut vec: VecDeque<T>, factor: f64) -> Vec<T> {
+    /// Shuffles the given `vec` by taking a next element with index `|N(0,factor^2)`|, where
+    /// `N` denotes normal distribution.
+    /// When used on frame segments vector, it will shuffle the segments in a controlled manner;
+    /// such that an entire frame can unlikely swap position with another, if `factor` ~ frame length.
+    fn linear_half_normal_shuffle<T>(mut vec: VecDeque<T>, factor: f64) -> Vec<T> {
         let mut rng = thread_rng();
         let mut dist = Normal::new(0.0, factor).unwrap();
 
@@ -575,7 +598,6 @@ mod tests {
 
         let mut segments = frames.iter().flat_map(|f| f.segment(3)).collect::<VecDeque<_>>();
         segments.retain(|s| s.frame_id != 2 || s.seq_idx != 2); // Remove 2nd segment of Frame 2
-        let segments = custom_shuffle(segments, MIXING_FACTOR);
 
         let (fragmented, reassembled) = FrameReassembler::new(Some(Duration::from_millis(10)));
 
@@ -602,7 +624,7 @@ mod tests {
             assert!(flushed_cpy.load(Ordering::SeqCst));
         });
 
-        async_std::task::sleep(Duration::from_millis(100)).await;
+        async_std::task::sleep(Duration::from_millis(20)).await;
 
         // Prune the expired entry, which is Frame 2 (that is missing a segment)
         flushed.store(true, Ordering::SeqCst);
@@ -766,6 +788,7 @@ mod tests {
             .take(num_frames)
             .flat_map(|f| f.segment(MTU))
             .collect::<VecDeque<_>>();
+
         let (corrupted_frames, corrupted_segments): (HashSet<u16>, HashSet<SegmentId>) = segments
             .iter()
             .choose_multiple(

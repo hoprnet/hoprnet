@@ -3845,6 +3845,7 @@ dependencies = [
  "ctor",
  "dashmap",
  "futures",
+ "hex",
  "hex-literal",
  "hopr-crypto-random",
  "hopr-platform",
