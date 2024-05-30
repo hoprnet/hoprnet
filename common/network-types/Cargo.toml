@@ -1,0 +1,33 @@
+[package]
+name = "hopr-network-types"
+version = "0.1.0"
+authors = ["HOPR Association <tech@hoprnet.org>"]
+description = "Contains types used for networking over HOPR protocol"
+edition = "2021"
+homepage = "https://hoprnet.org/"
+repository = "https://github.com/hoprnet/hoprnet"
+license = "GPL-3.0-only"
+
+[dependencies]
+crossbeam-skiplist = "0.1.3"
+dashmap = "5.5.3"
+futures = { workspace = true }
+hex = { workspace = true }
+serde = { workspace = true }
+serde_bytes = { workspace = true }
+thiserror = { workspace = true }
+
+hopr-platform = { workspace = true }
+hopr-primitive-types = { workspace = true }
+
+[dev-dependencies]
+async-std = { workspace = true }
+async-stream = { workspace = true }
+ctor = "0.2.8"
+hex-literal = { workspace = true }
+rand = "0.8.5"
+rayon = "1.10.0"
+rand_distr = "0.4.3"
+lazy_static = { workspace = true }
+
+hopr-crypto-random = { workspace = true }
