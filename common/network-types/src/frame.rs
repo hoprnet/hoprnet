@@ -14,8 +14,8 @@
 //!
 //! ## Reassembly
 //! This is an inverse operation to segmentation. The reassembler is implemented lock-free.
-//! Reassembly is performed by a [`FrameReassembler`]. The reassembler acts as a [`Sink`](futures::Sink)
-//! for [`Segments`](Segment) and is always paired with a [`Stream`](futures::Stream) that outputs
+//! Reassembly is performed by a [`FrameReassembler`]. The reassembler acts as a [`Sink`]
+//! for [`Segments`](Segment) and is always paired with a [`Stream`] that outputs
 //! the reassembled [`Frames`](Frame).
 //!
 //! The reassembled frames will always have the segments in correct order. However, it can happen
@@ -27,7 +27,7 @@
 //!
 //! The reassembler also implements segment expiration. Upon [construction](FrameReassembler::new), the maximum
 //! incomplete frame age can be specified. If a frame is not completed in the reassembled within
-//! this period, it can be [evicted](Frame::evict) from the reassembler, so that it will be lost
+//! this period, it can be [evicted](FrameReassembler::evict) from the reassembler, so that it will be lost
 //! forever.
 //! The eviction operation is supposed to be run periodically, so that the space could be freed up in the
 //! reassembler.
