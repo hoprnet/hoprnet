@@ -12,7 +12,16 @@ hopr:
     on_fail_continue: true
     allow_recursive: true
     finalize_channel_closure: true
-    strategies: []
+    strategies:
+      - !Aggregating
+        aggregation_threshold: 3
+        unrealized_balance_ratio: 0.95
+        aggregate_on_channel_close: true
+      - !AutoRedeeming
+        redeem_only_aggregated: true
+        on_close_redeem_single_tickets_value_min: "2000000000000000000 HOPR"
+      - !ClosureFinalizer
+        max_closure_overdue: 60
   heartbeat:
     variance: 1
     interval: 20

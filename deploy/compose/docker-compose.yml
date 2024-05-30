@@ -1,0 +1,160 @@
+---
+
+networks:
+  hoprnet:
+    driver: bridge
+
+volumes:
+  prometheus_data: {}
+  grafana_data: {}
+  hoprd_data: {}
+
+services:
+  hoprd:
+    image: "${HOPRD_CONTAINER_IMAGE}"
+    restart: unless-stopped
+    pull_policy: always
+    container_name: hoprd
+    hostname: hoprd
+    stop_signal: SIGINT
+    networks:
+      - hoprnet
+    ports:
+      - "${HOPRD_P2P_PORT}:9091/tcp"
+      - "${HOPRD_P2P_PORT}:9091/udp"
+      - "${HOPRD_API_PORT}:3001"
+    environment:
+      - "RUST_LOG=${HOPRD_LOG_LEVEL}"
+      - RUST_BACKTRACE=full
+      - HOPRD_CONFIGURATION_FILE_PATH=/app/hoprd.cfg.yaml
+      # - OPENTELEMETRY_COLLECTOR_URL=http://server.
+    volumes:
+      - ./hoprd.cfg.yaml:/app/hoprd.cfg.yaml
+      - ./hoprd.id:/app/hoprd.id
+      - hoprd_data:/app/hoprd-db
+      - '/var/run/docker.sock:/var/run/docker.sock'
+    deploy:
+      resources:
+        reservations:
+          memory: "${HOPRD_MEM_REQUEST}"
+        limits:
+          memory: "${HOPRD_MEM_LIMIT}"
+    logging:
+      driver: json-file
+      options:
+        max-size: "${HOPRD_LOG_MAX_SIZE}"
+        max-file: 5
+    profiles:
+      - hoprd
+
+  hopr-admin:
+    image: "${HOPR_ADMIN_CONTAINER_IMAGE}"
+    restart: unless-stopped
+    ports:
+      - "${HOPR_ADMIN_PORT}:80"
+    networks:
+      - hoprnet
+    deploy:
+      resources:
+        limits:
+          memory: "${HOPR_ADMIN_MEM_LIMIT}"
+    profiles:
+      - frontend
+
+  cadvisor:
+    image: "${METRICS_CADVISOR_IMAGE}"
+    container_name: cadvisor
+    hostname: cadvisor
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    privileged: true
+    #expose:
+    #  - "${METRICS_CADVISOR_PORT}"
+    ports:
+      - "${METRICS_CADVISOR_PORT}:8080"
+    networks:
+      - hoprnet
+    devices:
+      - /dev/kmsg:/dev/kmsg
+    profiles:
+      - metrics
+      - metrics-vis
+
+  nodeexporter:
+    image: "${METRICS_NODE_EXPORTER_IMAGE}"
+    container_name: nodeexporter
+    hostname: nodeexporter
+    restart: unless-stopped
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.ignored-mount-points=^/(sys|proc|dev|host|etc)($$|/)'
+    ports:
+      - "${METRICS_NODE_EXPORTER_PORT}:9100"
+    networks:
+      - hoprnet
+    profiles:
+      - metrics
+      - metrics-vis
+
+  metricspusher:
+    image: curlimages/curl:latest
+    command: /bin/sh -c "while true; do curl -s ${METRICS_PUSH_SOURCE} | curl --data-binary @- ${METRICS_PUSH_URL}; sleep 15; done"
+    profiles:
+      - metrics-push
+
+  prometheus:
+    image: "${PROMETHEUS_IMAGE}"
+    restart: always
+    container_name: prometheus
+    hostname: prometheus
+    depends_on:
+      - cadvisor
+      - nodeexporter
+      - hoprd
+    command: |
+      --web.listen-address=0.0.0.0:9090
+      --config.file=/etc/prometheus/prometheus.yml
+      --storage.tsdb.path=/prometheus
+      --web.console.libraries=/usr/share/prometheus/console_libraries
+      --web.console.templates=/usr/share/prometheus/consoles
+    environment:
+      DATA_RETENTION_DAYS: 30
+    ports:
+      - "${PROMETHEUS_PORT}:9090"
+    volumes:
+      - "${PROMETHEUS_CONFIG_FILE}:/etc/prometheus/prometheus.yml"
+      - prometheus_data:/prometheus
+    networks:
+      - hoprnet
+    profiles:
+      - metrics-vis
+
+  grafana:
+    image: "${GRAFANA_IMAGE}"
+    user: '472'
+    restart: always
+    environment:
+      GF_INSTALL_PLUGINS: 'grafana-clock-panel,grafana-simple-json-datasource,yesoreyeram-infinity-datasource'
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning/:/etc/grafana/provisioning/
+    env_file:
+      - ./grafana/config.monitoring
+    ports:
+      - "${GRAFANA_PORT}:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - hoprnet
+    profiles:
+      - metrics-vis
