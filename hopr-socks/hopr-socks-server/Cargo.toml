@@ -9,7 +9,6 @@ repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"
 
 [dependencies]
-anyhow = "1"
 clap = { workspace = true }
 fast-socks5 = "0.9.6"
 tokio = { workspace = true, features = [

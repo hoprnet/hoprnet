@@ -3905,7 +3905,6 @@ dependencies = [
 name = "hopr-socks-server"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "clap",
  "fast-socks5",
  "hopr-lib",
