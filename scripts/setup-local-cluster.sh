@@ -215,10 +215,11 @@ function create_local_safes() {
         --network anvil-localhost \
         --identity-from-path "${id_file}" \
         --hopr-amount 1000 --native-amount 1 \
+        --provider-url "http://localhost:8545" \
         --contracts-root "./ethereum/contracts" > "${id_file%.id}.safe.log"
 
     # store safe arguments in separate file for later use
-    grep -oE "(.*)" "${id_file%.id}.safe.log" > "${id_file%.id}.safe.args"
+    grep -E '^(safe|node_module)' "${id_file%.id}.safe.log" | sed -e 's/^safe/--safeAddress/' -e ':a;N;$!ba;s/\nnode_module/ --moduleAddress/' > "${id_file%.id}.safe.args"
     rm "${id_file%.id}.safe.log"
   done
 }
@@ -243,11 +244,12 @@ function create_local_safe_for_multi_nodes() {
       --identity-directory "${tmp_dir}" \
       --identity-prefix "${node_prefix}" \
       --hopr-amount 1000 --native-amount 1 \
+      --provider-url "http://localhost:8545" \
       --contracts-root "./ethereum/contracts" > "${node_prefix}_all_nodes.safe.log"
 
   # store safe arguments in separate file for later use (as in `create_local_safes` function)
   for id_file in ${id_files[@]}; do
-    grep -oE "(.*)" "${node_prefix}_all_nodes.safe.log" > "${id_file%.id}.safe.args"
+    grep -E '^(safe|node_module)' "${node_prefix}_all_nodes.safe.log" | sed -e 's/^safe/--safeAddress/' -e ':a;N;$!ba;s/\nnode_module/ --moduleAddress/' > "${id_file%.id}.safe.args"
   done
   rm "${node_prefix}_all_nodes.safe.log"
 }
