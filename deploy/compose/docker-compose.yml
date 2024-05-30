@@ -14,15 +14,14 @@ services:
     image: "${HOPRD_CONTAINER_IMAGE}"
     restart: unless-stopped
     pull_policy: always
-    container_name: hoprd
     hostname: hoprd
     stop_signal: SIGINT
     networks:
       - hoprnet
     ports:
-      - "${HOPRD_P2P_PORT}:9091/tcp"
-      - "${HOPRD_P2P_PORT}:9091/udp"
-      - "${HOPRD_API_PORT}:3001"
+      - "${HOPRD_P2P_PORT}:${HOPRD_P2P_PORT}/tcp"
+      - "${HOPRD_P2P_PORT}:${HOPRD_P2P_PORT}/udp"
+      - "${HOPRD_API_PORT}:${HOPRD_API_PORT}"
     environment:
       - "RUST_LOG=${HOPRD_LOG_LEVEL}"
       - RUST_BACKTRACE=full
@@ -63,7 +62,6 @@ services:
 
   cadvisor:
     image: "${METRICS_CADVISOR_IMAGE}"
-    container_name: cadvisor
     hostname: cadvisor
     volumes:
       - /:/rootfs:ro
@@ -86,7 +84,6 @@ services:
 
   nodeexporter:
     image: "${METRICS_NODE_EXPORTER_IMAGE}"
-    container_name: nodeexporter
     hostname: nodeexporter
     restart: unless-stopped
     volumes:
@@ -115,12 +112,10 @@ services:
   prometheus:
     image: "${PROMETHEUS_IMAGE}"
     restart: always
-    container_name: prometheus
     hostname: prometheus
     depends_on:
       - cadvisor
       - nodeexporter
-      - hoprd
     command: |
       --web.listen-address=0.0.0.0:9090
       --config.file=/etc/prometheus/prometheus.yml
