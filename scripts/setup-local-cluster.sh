@@ -254,6 +254,21 @@ function create_local_safe_for_multi_nodes() {
   rm "${node_prefix}_all_nodes.safe.log"
 }
 
+function fund_all_local_identities() {
+  log "Funding nodes"
+
+  env \
+    ETHERSCAN_API_KEY="" \
+    IDENTITY_PASSWORD="${password}" \
+    PRIVATE_KEY="${deployer_private_key}" \
+    hopli faucet \
+      --network anvil-localhost \
+      --identity-directory "${tmp_dir}" \
+      --identity-prefix "${node_prefix}" \
+      --provider-url "http://localhost:8545" \
+      --contracts-root "./ethereum/contracts"
+}
+
 # --- Log setup info {{{
 log "Node files and directories"
 log "\tanvil"
@@ -320,12 +335,8 @@ for node_id in ${!id_files[@]}; do
 done
 # }}}
 
-log "Funding nodes"
-
-#  --- Fund nodes --- {{{
-make -C "${mydir}/../" fund-local-all \
-  id_dir="${tmp_dir}"
-# }}}
+# fund all the local nodes
+fund_all_local_identities
 
 log "Waiting for nodes startup"
 

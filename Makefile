@@ -152,7 +152,8 @@ fund-local-all: ## use faucet script to fund all the local identities
 		--network anvil-localhost \
 		--contracts-root "./ethereum/contracts" \
 		--identity-prefix "${id_prefix}" \
-		--identity-directory "${id_dir}"
+		--identity-directory "${id_dir}" \
+		--provider-url "http://localhost:8545"
 
 .PHONY: create-safe-module-all
 create-safe-module-all: id_dir=/tmp/
