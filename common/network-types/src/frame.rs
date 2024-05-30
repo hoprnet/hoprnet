@@ -1,11 +1,44 @@
-use crate::errors::NetworkTypeError;
-use crate::errors::NetworkTypeError::{IncompleteFrame, InvalidFrameId, InvalidSegment, ReassemblerClosed};
+//! This module implements segmentation of [frames][Frame] into [segments][Segment] and
+//! their reassembly back into [`Frame`].
+//!
+//! ## Frames
+//! Can be of arbitrary length, differently sized frames are supported, and they do not
+//! need all to have the same length. Each frame carries a [`frame_id`](Frame::frame_id) which
+//! should be unique within some higher level session. Frame ID ranges from 0 to 65535.
+//!
+//! ## Segmentation
+//! A [frame](Frame) can be [segmented](Frame::segment) into equally sized [`Segments`](Segment).
+//! This operation runs in linear time with respect to the size of the frame.
+//! There can be up to 65535 segments per frame, the size of a segment can also set between 0 and
+//! 65535.
+//!
+//! ## Reassembly
+//! This is an inverse operation to segmentation. The reassembler is implemented lock-free.
+//! Reassembly is performed by a [`FrameReassembler`]. The reassembler acts as a [`Sink`](futures::Sink)
+//! for [`Segments`](Segment) and is always paired with a [`Stream`](futures::Stream) that outputs
+//! the reassembled [`Frames`](Frame).
+//!
+//! The reassembled frames will always have the segments in correct order. However, it can happen
+//! that the reassembled frames might not be ordered by `frame_id`. This can happen in a situation
+//! when **all** segments of frame ID `n` arrive to the reassembler later than all segments of frame
+//! with ID `n+1`. In this case, the reassembler will first output frame `n+1` and then frame `n`.
+//! To avoid this, the frames should be large enough, so that the chances of this happening are
+//! negligible given the properties of the underlying transport network.
+//!
+//! The reassembler also implements segment expiration. Upon [construction](FrameReassembler::new), the maximum
+//! incomplete frame age can be specified. If a frame is not completed in the reassembled within
+//! this period, it can be [evicted](Frame::evict) from the reassembler, so that it will be lost
+//! forever.
+//! The eviction operation is supposed to be run periodically, so that the space could be freed up in the
+//! reassembler.
+//! Beware that once eviction is performed and an incomplete frame with ID `n` is destroyed;
+//! the caller should make sure that frames with ID < `n` will not arrive into the reassembler,
+//! otherwise the frames will be output out of order.
+
 use crossbeam_skiplist::SkipSet;
 use dashmap::mapref::entry::Entry;
 use dashmap::DashMap;
 use futures::{Sink, Stream};
-use hopr_platform::time::native::current_time;
-use hopr_primitive_types::prelude::AsUnixTimestamp;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use std::mem;
@@ -16,6 +49,14 @@ use std::sync::OnceLock;
 use std::task::{Context, Poll};
 use std::time::Duration;
 
+use hopr_platform::time::native::current_time;
+use hopr_primitive_types::prelude::AsUnixTimestamp;
+
+use crate::errors::NetworkTypeError;
+use crate::errors::NetworkTypeError::{IncompleteFrame, InvalidFrameId, InvalidSegment, ReassemblerClosed};
+
+/// Helper function to segment `data` into segments of given `mtu` length.
+/// All segments are tagged with the same `frame_id`.
 fn segment(data: &[u8], mtu: u16, frame_id: u16) -> Vec<Segment> {
     let chunks = data.chunks(mtu as usize);
     assert!(chunks.len() < u16::MAX as usize, "data too long");
@@ -214,7 +255,7 @@ impl<'a> FrameBuilder<'a> {
 ///
 /// The [`FrameReassembler`] behaves as a [`Sink`] for [`Segment`].
 /// Upon creation, also [`Stream`] for reassembled [Frames](Frame) is created.
-/// The corresponding stream is closed either when [`FrameReassembler::close`] or
+/// The corresponding stream is closed either when the reassembler is dropped or
 /// [`futures::SinkExt::close`] is called.
 ///
 /// As new segments are [pushed](FrameReassembler::push_segment) into the reassembler,
@@ -223,7 +264,7 @@ impl<'a> FrameBuilder<'a> {
 ///
 /// The reassembler can also have a `max_age` of frames that are under construction.
 /// The [`evict`](FrameReassembler::evict) method then can be called to remove
-/// the incomplete frames over `max_age`.
+/// the incomplete frames over `max_age`. The timestamps are measured with millisecond precision.
 ///
 /// Note that the reassembler is not flushed when dropped.
 ///
@@ -264,7 +305,7 @@ impl<'a> FrameReassembler<'a> {
     /// Creates a new frame reassembler and a corresponding stream
     /// for reassembled [Frames](Frame).
     /// An optional `max_age` of segments can be specified,
-    /// which allows the [`evict`](Frame::evict) method to remove stale incomplete segments.
+    /// which allows the [`evict`](FrameReassembler::evict) method to remove stale incomplete segments.
     pub fn new(max_age: Option<Duration>) -> (Self, impl Stream<Item = Frame>) {
         let (reassembled, reassembled_recv) = futures::channel::mpsc::unbounded();
         (
