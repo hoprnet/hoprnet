@@ -12,7 +12,7 @@ volumes:
 services:
   admin:
     # NOTE: latest version from 28.11.2023, not compatible with hoprd v2.1 yet
-    image: europe-west3-docker.pkg.dev/hoprassociation/docker-images/hopr-admin@sha256:b354b698ece88155607fcc0d325e57786ce0e15bb9d40dc180826ac3c1000c13
+    image: europe-west3-docker.pkg.dev/hoprassociation/docker-images/hopr-admin@sha256:005b097473bdab75a0e3006026586e908ab0a67dd868d06553f0c393cb519b07
     restart: unless-stopped
     ports:
       - 3000:80
