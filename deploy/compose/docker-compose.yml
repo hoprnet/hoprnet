@@ -21,7 +21,7 @@ services:
     ports:
       - "${HOPRD_P2P_PORT}:${HOPRD_P2P_PORT}/tcp"
       - "${HOPRD_P2P_PORT}:${HOPRD_P2P_PORT}/udp"
-      - "${HOPRD_API_PORT}:${HOPRD_API_PORT}"
+      - "${HOPRD_API_PORT}:3001"
     environment:
       - "RUST_LOG=${HOPRD_LOG_LEVEL}"
       - RUST_BACKTRACE=full
