@@ -369,7 +369,7 @@ Running one node in test mode, with safe and module attached (in dufour network)
 # build deps and HOPRd code
 make -j deps && make -j build
 
-# Fill out the `ethereum/contract/.env` from the `ethereum/contract/example.env`
+# Fill out the `ethereum/contract/.env` from the `ethereum/contracts/example.env`
 #
 # ensure a private key with enough xDAI is set as PRIVATE_KEY
 # This PRIVATE_KEY is the "admin_key" (i.e. owner of the created safe and node management module)
