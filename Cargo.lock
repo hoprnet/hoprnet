@@ -2885,6 +2885,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "fast-socks5"
+version = "0.9.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f89f36d4ee12370d30d57b16c7e190950a1a916e7dbbb5fd5a412f5ef913fe84"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "log",
+ "thiserror",
+ "tokio",
+ "tokio-stream",
+]
+
+[[package]]
 name = "fastrand"
 version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3885,6 +3899,20 @@ dependencies = [
  "serde",
  "strum 0.26.2",
  "thiserror",
+]
+
+[[package]]
+name = "hopr-socks-server"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "fast-socks5",
+ "hopr-lib",
+ "serde",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "validator",
 ]
 
 [[package]]
