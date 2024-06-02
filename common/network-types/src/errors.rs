@@ -5,11 +5,14 @@ pub enum NetworkTypeError {
     #[error("attempt to insert invalid frame id")]
     InvalidFrameId,
 
-    #[error("cannot reassemble frame because it is not complete")]
-    IncompleteFrame,
+    #[error("cannot reassemble frame {0}, because it is not complete")]
+    IncompleteFrame(u32),
 
     #[error("segment could not be parsed correctly")]
     InvalidSegment,
+
+    #[error("received a segment of a frame {0} that was already completed or evicted")]
+    OldSegment(u32),
 
     #[error("frame reassembler is closed")]
     ReassemblerClosed,

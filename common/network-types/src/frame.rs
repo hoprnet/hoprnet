@@ -2,29 +2,33 @@
 //! their reassembly back into [`Frame`].
 //!
 //! ## Frames
-//! Can be of arbitrary length, differently sized frames are supported, and they do not
+//! Can be of arbitrary length, differently sized frames are supported as they do not
 //! need all to have the same length. Each frame carries a [`frame_id`](Frame::frame_id) which
-//! should be unique within some higher level session. Frame ID ranges from 0 to 65535.
+//! should be unique within some higher level session. Frame ID ranges from 1 to 2^32-1.
+//! Frame ID of 0 is not allowed, and its segments cannot be pushed to the reassembler.
 //!
 //! ## Segmentation
 //! A [frame](Frame) can be [segmented](Frame::segment) into equally sized [`Segments`](Segment).
 //! This operation runs in linear time with respect to the size of the frame.
 //! There can be up to 65535 segments per frame, the size of a segment can also set between 0 and
-//! 65535.
+//! 65535 bytes.
 //!
 //! ## Reassembly
-//! This is an inverse operation to segmentation. The reassembler is implemented lock-free.
-//! Reassembly is performed by a [`FrameReassembler`]. The reassembler acts as a [`Sink`]
-//! for [`Segments`](Segment) and is always paired with a [`Stream`] that outputs
-//! the reassembled [`Frames`](Frame).
+//! This is an inverse operation to segmentation. Reassembly is performed by a [`FrameReassembler`]
+//! and is implemented lock-free. The reassembler acts as a [`Sink`] for [`Segments`](Segment) and
+//! is always paired with a [`Stream`] that outputs the reassembled [`Frames`](Frame).
 //!
-//! The reassembled frames will always have the segments in correct order. However, it can happen
-//! that the reassembled frames might not be ordered by `frame_id`. This can happen in a situation
-//! when **all** segments of frame ID `n` arrive to the reassembler later than all segments of frame
-//! with ID `n+1`. In this case, the reassembler will first output frame `n+1` and then frame `n`.
+//! ### Ordering
+//! The reassembled frames will always have the segments in correct order. The output frames
+//! will be also in the correct ascending order of their `frame_id`, if certain conditions are met:
+//! Frames will be output out of order only in a situation in which **all** segments
+//! of the frame ID `n` arrived to the reassembler later than **all** segments of the frame with ID `n+1`.
+//! In this case, the reassembler will first output frame `n+1` and then will fail to process
+//! more segments of frame ID `n` as they arrive.
 //! To avoid this, the frames should be large enough, so that the chances of this happening are
-//! negligible given the properties of the underlying transport network.
+//! negligible given the non-deterministic properties of the underlying transport network.
 //!
+//! ### Expiration
 //! The reassembler also implements segment expiration. Upon [construction](FrameReassembler::new), the maximum
 //! incomplete frame age can be specified. If a frame is not completed in the reassembled within
 //! this period, it can be [evicted](FrameReassembler::evict) from the reassembler, so that it will be lost
@@ -32,32 +36,35 @@
 //! The eviction operation is supposed to be run periodically, so that the space could be freed up in the
 //! reassembler.
 //! Beware that once eviction is performed and an incomplete frame with ID `n` is destroyed;
-//! the caller should make sure that frames with ID < `n` will not arrive into the reassembler,
-//! otherwise the frames will be output out of order.
+//! the caller should make sure that frames with ID <= `n` will not arrive into the reassembler,
+//! otherwise the [NetworkTypeError::OldSegment] error will be thrown.
 
 use crossbeam_skiplist::SkipSet;
 use dashmap::mapref::entry::Entry;
 use dashmap::DashMap;
 use futures::{Sink, Stream};
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use std::fmt::Debug;
 use std::mem;
-use std::ops::Sub;
+use std::ops::{Add, Sub};
 use std::pin::Pin;
-use std::sync::atomic::{AtomicU16, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU16, AtomicU32, AtomicU64, Ordering};
 use std::sync::OnceLock;
 use std::task::{Context, Poll};
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
 use hopr_platform::time::native::current_time;
 use hopr_primitive_types::prelude::AsUnixTimestamp;
 
 use crate::errors::NetworkTypeError;
-use crate::errors::NetworkTypeError::{IncompleteFrame, InvalidFrameId, InvalidSegment, ReassemblerClosed};
+
+/// ID of a [Frame].
+pub type FrameId = u32;
 
 /// Helper function to segment `data` into segments of given `mtu` length.
 /// All segments are tagged with the same `frame_id`.
-fn segment(data: &[u8], mtu: u16, frame_id: u16) -> Vec<Segment> {
+pub fn segment(data: &[u8], mtu: u16, frame_id: u32) -> Vec<Segment> {
     let chunks = data.chunks(mtu as usize);
     assert!(chunks.len() < u16::MAX as usize, "data too long");
 
@@ -80,7 +87,7 @@ fn segment(data: &[u8], mtu: u16, frame_id: u16) -> Vec<Segment> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Frame {
     /// Identifier of this frame.
-    pub frame_id: u16,
+    pub frame_id: FrameId,
     /// Frame data.
     pub data: Box<[u8]>,
 }
@@ -89,6 +96,7 @@ impl Frame {
     /// Segments this frame into a list of [segments](Segment) each of maximum sizes `mtu`.
     #[inline]
     pub fn segment(&self, mtu: u16) -> Vec<Segment> {
+        assert!(self.frame_id > 0, "frame id 0 is not allowed");
         segment(self.data.as_ref(), mtu, self.frame_id)
     }
 }
@@ -100,7 +108,7 @@ impl Frame {
 #[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Segment<'a> {
     /// ID of the [Frame] this segment belongs to.
-    pub frame_id: u16,
+    pub frame_id: FrameId,
     /// Index of this segment within the segment sequence.
     pub seq_idx: u16,
     /// Total number of segments within this segment sequence.
@@ -108,6 +116,11 @@ pub struct Segment<'a> {
     /// Data in this segment.
     #[serde(with = "serde_bytes")]
     pub data: &'a [u8],
+}
+
+impl Segment<'_> {
+    /// Size of the segment header.
+    const HEADER_SIZE: usize = mem::size_of::<FrameId>() + 2 * mem::size_of::<u16>();
 }
 
 impl Debug for Segment<'_> {
@@ -138,7 +151,7 @@ impl Ord for Segment<'_> {
 
 impl From<Segment<'_>> for Box<[u8]> {
     fn from(value: Segment<'_>) -> Self {
-        let mut ret = Vec::with_capacity(3 * mem::size_of::<u16>() + value.data.len());
+        let mut ret = Vec::with_capacity(Segment::HEADER_SIZE + value.data.len());
         ret.extend_from_slice(value.frame_id.to_be_bytes().as_ref());
         ret.extend_from_slice(value.seq_idx.to_be_bytes().as_ref());
         ret.extend_from_slice(value.seq_len.to_be_bytes().as_ref());
@@ -151,32 +164,23 @@ impl<'a> TryFrom<&'a [u8]> for Segment<'a> {
     type Error = NetworkTypeError;
 
     fn try_from(value: &'a [u8]) -> Result<Self, Self::Error> {
-        let (header, data) = value.split_at(3 * mem::size_of::<u16>());
+        let (header, data) = value.split_at(Self::HEADER_SIZE);
         let segment = Segment {
-            frame_id: u16::from_be_bytes(header[0..2].try_into().map_err(|_| InvalidSegment)?),
-            seq_idx: u16::from_be_bytes(header[2..4].try_into().map_err(|_| InvalidSegment)?),
-            seq_len: u16::from_be_bytes(header[4..6].try_into().map_err(|_| InvalidSegment)?),
+            frame_id: FrameId::from_be_bytes(header[0..4].try_into().map_err(|_| NetworkTypeError::InvalidSegment)?),
+            seq_idx: u16::from_be_bytes(header[4..6].try_into().map_err(|_| NetworkTypeError::InvalidSegment)?),
+            seq_len: u16::from_be_bytes(header[6..8].try_into().map_err(|_| NetworkTypeError::InvalidSegment)?),
             data,
         };
-        (segment.seq_idx < segment.seq_len)
+        (segment.frame_id > 0 && segment.seq_idx < segment.seq_len)
             .then_some(segment)
-            .ok_or(InvalidSegment)
-    }
-}
-
-impl<'a> Segment<'a> {
-    /// Identifies the entire segment sequence using the frame id and the length
-    /// of the sequence.
-    #[inline]
-    pub fn seq_id(&self) -> u32 {
-        (self.frame_id as u32) << 16 | self.seq_len as u32
+            .ok_or(NetworkTypeError::InvalidSegment)
     }
 }
 
 /// Rebuilds the [Frame] from [Segments](Segment).
 #[derive(Debug)]
 struct FrameBuilder<'a> {
-    frame_id: u16,
+    frame_id: FrameId,
     segments: Vec<OnceLock<&'a [u8]>>,
     remaining: AtomicU16,
     last_ts: AtomicU64,
@@ -191,7 +195,7 @@ impl<'a> FrameBuilder<'a> {
     }
 
     /// Creates a new empty builder for the given frame.
-    fn empty(frame_id: u16, seq_len: u16) -> Self {
+    fn empty(frame_id: FrameId, seq_len: u16) -> Self {
         Self {
             frame_id,
             segments: vec![OnceLock::new(); seq_len as usize],
@@ -216,7 +220,7 @@ impl<'a> FrameBuilder<'a> {
                 Ok(0)
             }
         } else {
-            Err(InvalidFrameId)
+            Err(NetworkTypeError::InvalidFrameId)
         }
     }
 
@@ -232,7 +236,22 @@ impl<'a> FrameBuilder<'a> {
         self.last_ts.load(Ordering::SeqCst) < cutoff
     }
 
-    /// Reassembles the [Frame]. Returns [`IncompleteFrame`] if not [complete](FrameBuilder::is_complete).
+    /// Returns information about the frame that is being built by this builder.
+    pub fn info(&self) -> FrameInfo {
+        FrameInfo {
+            frame_id: self.frame_id,
+            missing_segments: self
+                .segments
+                .iter()
+                .enumerate()
+                .filter_map(|(i, s)| s.get().is_none().then_some(i as u16))
+                .collect(),
+            total_segments: self.segments.len() as u16,
+            last_update: SystemTime::UNIX_EPOCH.add(Duration::from_millis(self.last_ts.load(Ordering::SeqCst))),
+        }
+    }
+
+    /// Reassembles the [Frame]. Returns [`NetworkTypeError::IncompleteFrame`] if not [complete](FrameBuilder::is_complete).
     fn reassemble(self) -> crate::errors::Result<Frame> {
         if self.is_complete() {
             Ok(Frame {
@@ -246,9 +265,22 @@ impl<'a> FrameBuilder<'a> {
                     .into_boxed_slice(),
             })
         } else {
-            Err(IncompleteFrame)
+            Err(NetworkTypeError::IncompleteFrame(self.frame_id))
         }
     }
+}
+
+/// Contains information about a frame that being built by the [`FrameBuilder`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FrameInfo {
+    /// ID of the frame.
+    pub frame_id: FrameId,
+    /// Indices of segments that are missing. Empty if the frame is complete.
+    pub missing_segments: Vec<u16>,
+    /// The total number of segments this frame consists from.
+    pub total_segments: u16,
+    /// Time of the last received segment in this frame.
+    pub last_update: SystemTime,
 }
 
 /// Represents a frame reassembler.
@@ -266,7 +298,7 @@ impl<'a> FrameBuilder<'a> {
 /// The [`evict`](FrameReassembler::evict) method then can be called to remove
 /// the incomplete frames over `max_age`. The timestamps are measured with millisecond precision.
 ///
-/// Note that the reassembler is not flushed when dropped.
+/// Note that the reassembler is also evicted when dropped.
 ///
 /// ````rust
 /// # futures::executor::block_on(async {
@@ -295,8 +327,9 @@ impl<'a> FrameBuilder<'a> {
 /// ````
 #[derive(Debug)]
 pub struct FrameReassembler<'a> {
-    sequences: DashMap<u32, FrameBuilder<'a>>,
-    sorted_seq_ids: SkipSet<u32>,
+    sequences: DashMap<FrameId, FrameBuilder<'a>>,
+    sorted_seq_ids: SkipSet<FrameId>,
+    last_emitted_frame: AtomicU32,
     reassembled: futures::channel::mpsc::UnboundedSender<Frame>,
     max_age: Option<Duration>,
 }
@@ -312,6 +345,7 @@ impl<'a> FrameReassembler<'a> {
             Self {
                 sequences: DashMap::new(),
                 sorted_seq_ids: SkipSet::new(),
+                last_emitted_frame: AtomicU32::new(0),
                 reassembled,
                 max_age,
             },
@@ -320,15 +354,23 @@ impl<'a> FrameReassembler<'a> {
     }
 
     /// Pushes a new [Segment] for reassembly.
+    /// This function also pushes out the reassembled frame if this segment completed it.
+    /// Pushing a segment belonging to a frame ID that has been already
+    /// previously completed or [evicted](FrameReassembler::evict) will fail.
     pub fn push_segment(&self, segment: Segment<'a>) -> crate::errors::Result<()> {
         if self.reassembled.is_closed() {
-            return Err(ReassemblerClosed);
+            return Err(NetworkTypeError::ReassemblerClosed);
+        }
+
+        // Check if this frame has not been emitted yet.
+        let frame_id = segment.frame_id;
+        if frame_id <= self.last_emitted_frame.load(Ordering::SeqCst) {
+            return Err(NetworkTypeError::OldSegment(frame_id));
         }
 
         let ts = current_time().as_unix_timestamp().as_millis() as u64;
-        let seq_id = segment.seq_id();
 
-        match self.sequences.entry(seq_id) {
+        match self.sequences.entry(frame_id) {
             Entry::Occupied(e) => {
                 if e.get().put(segment, ts)? == 0 {
                     // No more segments missing in this frame, check if this is the earliest frame
@@ -337,7 +379,8 @@ impl<'a> FrameReassembler<'a> {
                             // If this is currently the earliest frame, push it out as reassembled
                             self.reassembled
                                 .unbounded_send(e.remove().reassemble()?)
-                                .map_err(|_| ReassemblerClosed)?;
+                                .map_err(|_| NetworkTypeError::ReassemblerClosed)?;
+                            self.last_emitted_frame.fetch_max(frame_id, Ordering::Relaxed);
                             earliest_seq_id.remove();
                         }
                     }
@@ -346,11 +389,20 @@ impl<'a> FrameReassembler<'a> {
             Entry::Vacant(v) => {
                 // Begin building a new frame
                 v.insert(FrameBuilder::new(segment, ts));
-                self.sorted_seq_ids.insert(seq_id);
+                self.sorted_seq_ids.insert(frame_id);
             }
         }
 
         Ok(())
+    }
+
+    /// Returns [information](FrameInfo) about the incomplete frames.
+    /// The ordered frame IDs are the keys on the returned map.
+    pub fn incomplete_frames(&self) -> BTreeMap<FrameId, FrameInfo> {
+        self.sequences
+            .iter()
+            .filter_map(|e| (!e.is_complete()).then(|| (e.frame_id, e.info())))
+            .collect()
     }
 
     /// If [max_age](FrameReassembler::new) was set during construction, evicts
@@ -372,23 +424,24 @@ impl<'a> FrameReassembler<'a> {
             .map(|max_age| current_time().sub(max_age).as_unix_timestamp().as_millis() as u64)
         {
             // Iterate from lowest seq_ids first, since they are more likely to be completed or expired
-            for seq_id in self.sorted_seq_ids.iter() {
+            for frame_id in self.sorted_seq_ids.iter() {
                 // Remove each frame that is either completed (or expired if max age was given).
-                if let Some((_, builder)) = self.sequences.remove_if(seq_id.value(), |_, builder| {
+                if let Some((_, builder)) = self.sequences.remove_if(frame_id.value(), |_, builder| {
                     builder.is_complete() || builder.is_expired(cutoff)
                 }) {
                     // If the frame is complete, push it out as reassembled
                     if builder.is_complete() {
                         self.reassembled
                             .unbounded_send(builder.reassemble()?)
-                            .map_err(|_| ReassemblerClosed)?;
+                            .map_err(|_| NetworkTypeError::ReassemblerClosed)?;
                     }
 
-                    seq_id.remove();
+                    frame_id.remove();
+                    self.last_emitted_frame.fetch_max(*frame_id.value(), Ordering::Relaxed);
                     count += 1;
-                } else if !self.sequences.contains_key(seq_id.value()) {
+                } else if !self.sequences.contains_key(frame_id.value()) {
                     // If removal failed, because the entry is no longer there, just remove its seq_id
-                    seq_id.remove();
+                    frame_id.remove();
                 } else {
                     // Stop on the first non expired and non completed frame.
                     break;
@@ -440,7 +493,7 @@ impl<'a> Sink<Segment<'a>> for FrameReassembler<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::frame::{Frame, FrameReassembler, Segment};
+    use crate::frame::{Frame, FrameId, FrameReassembler, Segment};
     use async_stream::stream;
     use futures::{pin_mut, Stream, StreamExt};
     use hex_literal::hex;
@@ -450,13 +503,12 @@ mod tests {
     use rand_distr::Normal;
     use rayon::prelude::*;
     use std::collections::{HashSet, VecDeque};
-    use std::convert::identity;
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
     use std::time::Duration;
 
     const MTU: u16 = 448;
-    const FRAME_COUNT: u16 = 65_535;
+    const FRAME_COUNT: u32 = 65_535;
     const FRAME_SIZE: usize = 4096;
     const MIXING_FACTOR: f64 = 4.0;
 
@@ -464,7 +516,7 @@ mod tests {
         static ref FRAMES: Vec<Frame> = (0..FRAME_COUNT)
             .into_par_iter()
             .map(|frame_id| Frame {
-                frame_id,
+                frame_id: frame_id + 1,
                 data: hopr_crypto_random::random_bytes::<FRAME_SIZE>().into(),
             })
             .collect::<Vec<_>>();
@@ -505,7 +557,7 @@ mod tests {
     fn test_segmentation() {
         let data = hex!("deadbeefcafebabe");
         let frame = Frame {
-            frame_id: 0,
+            frame_id: 1,
             data: data.as_ref().into(),
         };
 
@@ -563,6 +615,53 @@ mod tests {
             .for_each(|(i, frame)| assert_eq!(frame, FRAMES[i]));
     }
 
+    #[test]
+    fn test_should_not_push_frame_id_0() {
+        let frame = Frame {
+            frame_id: 1,
+            data: hex!("deadbeefcafe").into(),
+        };
+
+        let mut segments = frame.segment(2);
+        segments[0].frame_id = 0;
+
+        let (fragmented, _reassembled) = FrameReassembler::new(None);
+        fragmented
+            .push_segment(segments[0].clone())
+            .expect_err("must not push frame id 0");
+    }
+
+    #[test]
+    fn test_pushing_segment_of_completed_frame_should_fail() {
+        let (fragmented, _reassembled) = FrameReassembler::new(None);
+
+        let segments = FRAMES[0].segment(MTU);
+        let segment_1 = segments[0].clone();
+
+        segments.into_iter().for_each(|s| fragmented.push_segment(s).unwrap());
+
+        fragmented
+            .push_segment(segment_1)
+            .expect_err("must fail pushing segment of a completed frame");
+    }
+
+    #[async_std::test]
+    async fn test_pushing_segment_of_evicted_frame_should_fail() {
+        let (fragmented, _reassembled) = FrameReassembler::new(Duration::from_millis(5).into());
+
+        let mut segments = FRAMES[0].segment(MTU);
+        let segment_1 = segments.pop().unwrap(); // Remove the first segment
+
+        segments.into_iter().for_each(|s| fragmented.push_segment(s).unwrap());
+
+        async_std::task::sleep(Duration::from_millis(10)).await;
+        assert_eq!(1, fragmented.evict().unwrap());
+
+        fragmented
+            .push_segment(segment_1)
+            .expect_err("must fail pushing segment of an evicted frame");
+    }
+
     #[async_std::test]
     async fn test_reassemble_single_frame() {
         let (fragmented, reassembled) = FrameReassembler::new(None);
@@ -586,9 +685,10 @@ mod tests {
     async fn test_shuffled_randomized() {
         let (fragmented, reassembled) = FrameReassembler::new(None);
 
-        SEGMENTS.iter().cloned().for_each(|b| {
-            let _ = fragmented.push_segment(b);
-        });
+        SEGMENTS
+            .iter()
+            .cloned()
+            .for_each(|b| fragmented.push_segment(b).unwrap());
 
         assert_eq!(0, fragmented.evict().unwrap());
         drop(fragmented);
@@ -605,9 +705,10 @@ mod tests {
     async fn test_shuffled_randomized_parallel() {
         let (fragmented, reassembled) = FrameReassembler::new(None);
 
-        SEGMENTS.par_iter().cloned().for_each(|b| {
-            let _ = fragmented.push_segment(b);
-        });
+        SEGMENTS
+            .par_iter()
+            .cloned()
+            .for_each(|b| fragmented.push_segment(b).unwrap());
 
         assert_eq!(0, fragmented.evict().unwrap());
         drop(fragmented);
@@ -703,54 +804,17 @@ mod tests {
             .for_each(|(i, frame)| assert_eq!(&frame, frames[i]));
     }
 
-    #[async_std::test]
-    async fn test_randomized_delayed_parallel_with_eviction() {
-        let frames = FRAMES.iter().take(100).collect::<Vec<_>>();
-
-        let segments = frames.iter().flat_map(|frame| frame.segment(MTU)).collect::<Vec<_>>();
-
-        let (fragmented, reassembled) = FrameReassembler::new(None);
-
-        let fragmented = Arc::new(fragmented);
-
-        futures::stream::iter(segments)
-            .map(|segment| {
-                let mut rng = thread_rng();
-                let delay = Duration::from_millis(rng.gen_range(0..10u64));
-                let should_evict = rng.gen_bool(0.5);
-                let reassembler = fragmented.clone();
-
-                async_std::task::spawn(async move {
-                    async_std::task::sleep(delay).await;
-
-                    if should_evict {
-                        reassembler.evict().unwrap();
-                    }
-
-                    reassembler.push_segment(segment).unwrap();
-                })
-            })
-            .for_each_concurrent(4, identity)
-            .await;
-
-        drop(fragmented);
-
-        let reassembled_frames = reassembled.collect::<Vec<_>>().await;
-
-        reassembled_frames
-            .into_par_iter()
-            .enumerate()
-            .for_each(|(i, frame)| assert_eq!(&frame, frames[i]));
-    }
-
-    #[derive(Copy, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
-    struct SegmentId(u16, u16);
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
+    struct SegmentId(FrameId, u16);
 
     /// Creates `num_frames` out of which `num_corrupted` will have missing segments.
-    fn corrupt_frames(num_frames: u16, corrupted_ratio: f32) -> (Vec<Segment<'static>>, Vec<&'static Frame>) {
+    fn corrupt_frames(
+        num_frames: u32,
+        corrupted_ratio: f32,
+    ) -> (Vec<Segment<'static>>, Vec<&'static Frame>, HashSet<SegmentId>) {
         assert!((0.0..=1.0).contains(&corrupted_ratio));
 
-        let (excluded_frame_ids, excluded_segments): (HashSet<u16>, HashSet<SegmentId>) = (0..num_frames)
+        let (excluded_frame_ids, excluded_segments): (HashSet<FrameId>, HashSet<SegmentId>) = (1..num_frames + 1)
             .choose_multiple(&mut thread_rng(), ((num_frames as f32) * corrupted_ratio) as usize)
             .into_par_iter()
             .map(|frame_id| {
@@ -775,19 +839,28 @@ mod tests {
             .filter(|f| f.frame_id < num_frames && !excluded_frame_ids.contains(&f.frame_id))
             .collect::<Vec<_>>();
 
-        (segments, expected_frames)
+        (segments, expected_frames, excluded_segments)
     }
 
     #[async_std::test]
     async fn test_random_corrupted_frames() {
         // Corrupt 30% of the frames, by removing a random segment from them
-        let (segments, expected_frames) = corrupt_frames(FRAME_COUNT / 4, 0.3);
+        let (segments, expected_frames, excluded) = corrupt_frames(FRAME_COUNT / 4, 0.3);
 
         let (fragmented, reassembled) = FrameReassembler::new(Duration::from_millis(100).into());
 
         segments.into_iter().for_each(|s| {
             fragmented.push_segment(s).unwrap();
         });
+
+        let computed_missing = fragmented
+            .incomplete_frames()
+            .into_par_iter()
+            .flat_map_iter(|(_, e)| e.missing_segments.into_iter().map(move |s| SegmentId(e.frame_id, s)))
+            .collect::<HashSet<_>>();
+
+        assert!(computed_missing.par_iter().all(|s| excluded.contains(&s)));
+        assert!(excluded.par_iter().all(|s| computed_missing.contains(&s)));
 
         async_std::task::sleep(Duration::from_millis(100)).await;
         drop(fragmented);
@@ -803,7 +876,7 @@ mod tests {
     #[async_std::test]
     async fn test_corrupted_frames_should_yield_no_frames() {
         // Corrupt each frame
-        let (segments, expected_frames) = corrupt_frames(1000, 1.0);
+        let (segments, expected_frames, _) = corrupt_frames(1000, 1.0);
         assert!(expected_frames.is_empty());
 
         let (fragmented, reassembled) = FrameReassembler::new(Duration::from_millis(100).into());
@@ -830,7 +903,7 @@ mod tests {
             .flat_map(|f| f.segment(MTU))
             .collect::<VecDeque<_>>();
 
-        let (corrupted_frames, corrupted_segments): (HashSet<u16>, HashSet<SegmentId>) = segments
+        let (corrupted_frames, corrupted_segments): (HashSet<FrameId>, HashSet<SegmentId>) = segments
             .iter()
             .choose_multiple(
                 &mut thread_rng(),
