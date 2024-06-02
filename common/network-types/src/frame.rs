@@ -42,6 +42,7 @@
 use crossbeam_skiplist::SkipSet;
 use dashmap::mapref::entry::Entry;
 use dashmap::DashMap;
+use fixedbitset::FixedBitSet;
 use futures::{Sink, Stream};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -120,7 +121,7 @@ pub struct Segment<'a> {
 
 impl Segment<'_> {
     /// Size of the segment header.
-    const HEADER_SIZE: usize = mem::size_of::<FrameId>() + 2 * mem::size_of::<u16>();
+    pub const HEADER_SIZE: usize = mem::size_of::<FrameId>() + 2 * mem::size_of::<u16>();
 }
 
 impl Debug for Segment<'_> {
@@ -149,14 +150,14 @@ impl Ord for Segment<'_> {
     }
 }
 
-impl From<Segment<'_>> for Box<[u8]> {
+impl From<Segment<'_>> for Vec<u8> {
     fn from(value: Segment<'_>) -> Self {
         let mut ret = Vec::with_capacity(Segment::HEADER_SIZE + value.data.len());
         ret.extend_from_slice(value.frame_id.to_be_bytes().as_ref());
         ret.extend_from_slice(value.seq_idx.to_be_bytes().as_ref());
         ret.extend_from_slice(value.seq_len.to_be_bytes().as_ref());
         ret.extend_from_slice(value.data);
-        ret.into_boxed_slice()
+        ret
     }
 }
 
@@ -244,7 +245,7 @@ impl<'a> FrameBuilder<'a> {
                 .segments
                 .iter()
                 .enumerate()
-                .filter_map(|(i, s)| s.get().is_none().then_some(i as u16))
+                .filter_map(|(i, s)| s.get().is_none().then_some(i))
                 .collect(),
             total_segments: self.segments.len() as u16,
             last_update: SystemTime::UNIX_EPOCH.add(Duration::from_millis(self.last_ts.load(Ordering::SeqCst))),
@@ -276,7 +277,7 @@ pub struct FrameInfo {
     /// ID of the frame.
     pub frame_id: FrameId,
     /// Indices of segments that are missing. Empty if the frame is complete.
-    pub missing_segments: Vec<u16>,
+    pub missing_segments: FixedBitSet,
     /// The total number of segments this frame consists from.
     pub total_segments: u16,
     /// Time of the last received segment in this frame.
@@ -423,7 +424,7 @@ impl<'a> FrameReassembler<'a> {
             .max_age
             .map(|max_age| current_time().sub(max_age).as_unix_timestamp().as_millis() as u64)
         {
-            // Iterate from lowest seq_ids first, since they are more likely to be completed or expired
+            // Iterate from the lowest frame ids first, since they are more likely to be completed or expired
             for frame_id in self.sorted_seq_ids.iter() {
                 // Remove each frame that is either completed (or expired if max age was given).
                 if let Some((_, builder)) = self.sequences.remove_if(frame_id.value(), |_, builder| {
@@ -591,7 +592,7 @@ mod tests {
             data: &data,
         };
 
-        let boxed: Box<[u8]> = segment.clone().into();
+        let boxed: Vec<u8> = segment.clone().into();
         let recovered: Segment = (&boxed[..]).try_into().unwrap();
 
         assert_eq!(segment, recovered);
@@ -856,7 +857,11 @@ mod tests {
         let computed_missing = fragmented
             .incomplete_frames()
             .into_par_iter()
-            .flat_map_iter(|(_, e)| e.missing_segments.into_iter().map(move |s| SegmentId(e.frame_id, s)))
+            .flat_map_iter(|(_, e)| {
+                e.missing_segments
+                    .into_ones()
+                    .map(move |s| SegmentId(e.frame_id, s.try_into().unwrap()))
+            })
             .collect::<HashSet<_>>();
 
         assert!(computed_missing.par_iter().all(|s| excluded.contains(&s)));

@@ -13,16 +13,18 @@ pub trait ToHex {
 }
 
 /// Represents a type that can be encoded to/decoded from a fixed sized byte array of size `N`.
-/// This requires processing and memory allocation in order to represent the type in binary encoding.
+/// This requires processing and memory allocation to represent the type in binary encoding.
 ///
-/// Differences between [BytesEncodable] and [BytesRepresentable] :
+/// Differences between [BytesEncodable] and [BytesRepresentable]:
 /// - [BytesRepresentable] is already internally carrying the encoded representation of the type,
 /// so no additional encoding or allocation is required to represent the type as a byte array.
-/// - [BytesEncodable] requires additional transformation and allocation in order to represent the type as a fixed size
+/// - [BytesEncodable] requires additional transformation and allocation to represent the type as a fixed size
 /// byte array.
 /// - [BytesEncodable] is the strict superset of [BytesRepresentable]: meaning the former can be possibly implemented
-/// for a type that already implements the latter, but it is not possible vice-versa.
-pub trait BytesEncodable<const N: usize>: Into<[u8; N]> + for<'a> TryFrom<&'a [u8], Error = GeneralError> {
+/// for a type that already implements the latter, but it is not possible vice versa.
+pub trait BytesEncodable<const N: usize, E = GeneralError>:
+    Into<[u8; N]> + for<'a> TryFrom<&'a [u8], Error = E>
+{
     /// Size of the encoded byte array. Defaults to `N` and should not be overridden.
     const SIZE: usize = N;
 
@@ -44,7 +46,7 @@ pub trait BytesEncodable<const N: usize>: Into<[u8; N]> + for<'a> TryFrom<&'a [u
 /// and therefore requires no memory allocation to represent the type in binary encoding.
 ///
 /// This is a strict subset of [BytesEncodable], see its documentation for details.
-pub trait BytesRepresentable: AsRef<[u8]> + for<'a> TryFrom<&'a [u8], Error = GeneralError> {
+pub trait BytesRepresentable<E = GeneralError>: AsRef<[u8]> + for<'a> TryFrom<&'a [u8], Error = E> {
     /// Size of the encoded byte array.
     const SIZE: usize;
 
