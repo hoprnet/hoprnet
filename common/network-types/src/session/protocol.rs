@@ -71,8 +71,18 @@ impl From<SegmentRequest> for [u8; SESSION_MSG_SIZE] {
     }
 }
 
+const MAX_ACKS_NUM: usize = SESSION_MSG_SIZE / mem::size_of::<FrameId>();
+
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FrameAcknowledgements([FrameId; SESSION_MSG_SIZE / mem::size_of::<FrameId>()]);
+pub struct FrameAcknowledgements([FrameId; MAX_ACKS_NUM]);
+
+impl From<Vec<FrameId>> for FrameAcknowledgements {
+    fn from(value: Vec<FrameId>) -> Self {
+        let mut inner = [FrameId::default(); MAX_ACKS_NUM];
+        inner[..value.len()].copy_from_slice(&value);
+        Self(inner)
+    }
+}
 
 impl IntoIterator for FrameAcknowledgements {
     type Item = FrameId;

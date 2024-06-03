@@ -1,5 +1,5 @@
 use crossbeam_skiplist::SkipMap;
-use crate::frame::{FrameReassembler, SegmentId};
+use crate::frame::{FrameId, FrameInfo, FrameReassembler, SegmentId};
 use crate::prelude::Segment;
 use crate::session::protocol::SessionMessage;
 
@@ -40,17 +40,35 @@ impl SessionState {
         Ok(())
     }
 
-    async fn send_segment_add_lookbehind(&self, segment: &Segment) -> crate::errors::Result<()> {
+    async fn add_and_send_segment(&self, segment: &Segment) -> crate::errors::Result<()> {
         self.lookbehind.insert(segment.into(), segment.clone());
 
+        self.send_segment(segment).await?;
+
+        // TODO: prevent stalling here
         while self.lookbehind.len() > self.cfg.max_buffered_segments {
             self.lookbehind.pop_front();
         }
 
-        self.send_segment(segment).await
+        Ok(())
+    }
+
+    async fn send_segment_request(&self, frame_info: FrameInfo) -> crate::errors::Result<()> {
+        let msg = SessionMessage::Request(frame_info.into());
+        self.send_raw(&Vec::from(msg).into_boxed_slice()).await
     }
 
     async fn send_segment(&self, segment: &Segment) -> crate::errors::Result<()> {
+        let msg = SessionMessage::Segment(segment.clone());
+        self.send_raw(&Vec::from(msg).into_boxed_slice()).await
+    }
+
+    async fn send_acknowledgement(&self, frame_ids: Vec<FrameId>) -> crate::errors::Result<()> {
+        let msg = SessionMessage::Acknowledge(frame_ids.into());
+        self.send_raw(&Vec::from(msg).into_boxed_slice()).await
+    }
+
+    async fn send_raw(&self, data: &[u8]) -> crate::errors::Result<()> {
         todo!()
     }
 }
