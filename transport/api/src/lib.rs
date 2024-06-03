@@ -34,23 +34,23 @@ pub use {
         processes::indexer::{add_peer_update_processing, IndexerActions, IndexerToProcess, PeerEligibility},
     },
     core_network::network::{Health, Network, NetworkTriggeredEvent, PeerOrigin, PeerStatus},
-    core_p2p::{
-        libp2p,
-        multiaddrs::{decapsulate_p2p_protocol, Multiaddr},
-    },
     hopr_crypto_types::{
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         types::{HalfKeyChallenge, Hash, OffchainPublicKey},
     },
     hopr_internal_types::protocol::ApplicationData,
+    hopr_transport_p2p::{
+        libp2p,
+        multiaddrs::{decapsulate_p2p_protocol, Multiaddr},
+    },
     p2p::{api, SwarmEventLoop},
     timer::execute_on_tick,
 };
 
 use async_lock::RwLock;
 use constants::RESERVED_TAG_UPPER_LIMIT;
-use core_p2p::HoprSwarm;
 use futures::{channel::mpsc::UnboundedSender, FutureExt, SinkExt};
+use hopr_transport_p2p::HoprSwarm;
 use std::{
     collections::HashMap,
     sync::{Arc, OnceLock},
@@ -374,10 +374,10 @@ where
             ack_proc,
             packet_proc,
             ticket_agg_proc,
-            core_p2p::api::HeartbeatRequester::new(hb_ping_rx),
-            core_p2p::api::HeartbeatResponder::new(hb_pong_tx),
-            core_p2p::api::ManualPingRequester::new(ping_rx),
-            core_p2p::api::HeartbeatResponder::new(pong_tx),
+            hopr_transport_p2p::api::HeartbeatRequester::new(hb_ping_rx),
+            hopr_transport_p2p::api::HeartbeatResponder::new(hb_pong_tx),
+            hopr_transport_p2p::api::ManualPingRequester::new(ping_rx),
+            hopr_transport_p2p::api::HeartbeatResponder::new(pong_tx),
         );
 
         let mut processes: HashMap<HoprTransportProcess, JoinHandle<()>> = HashMap::new();
@@ -388,13 +388,7 @@ where
         );
         processes.insert(
             HoprTransportProcess::Swarm,
-            spawn(swarm_loop.run(
-                transport_layer,
-                version,
-                network,
-                on_transport_output,
-                on_acknowledged_ticket,
-            )),
+            spawn(swarm_loop.run(transport_layer, version, on_transport_output, on_acknowledged_ticket)),
         );
 
         processes
@@ -631,16 +625,16 @@ where
             .local_multiaddresses()
             .into_iter()
             .filter(|ma| {
-                core_p2p::multiaddrs::is_supported(ma)
-                    && (self.cfg.announce_local_addresses || !core_p2p::multiaddrs::is_private(ma))
+                hopr_transport_p2p::multiaddrs::is_supported(ma)
+                    && (self.cfg.announce_local_addresses || !hopr_transport_p2p::multiaddrs::is_private(ma))
             })
             .map(|ma| decapsulate_p2p_protocol(&ma))
             .filter(|v| !v.is_empty())
             .collect::<Vec<_>>();
 
         mas.sort_by(|l, r| {
-            let is_left_dns = core_p2p::multiaddrs::is_dns(l);
-            let is_right_dns = core_p2p::multiaddrs::is_dns(r);
+            let is_left_dns = hopr_transport_p2p::multiaddrs::is_dns(l);
+            let is_right_dns = hopr_transport_p2p::multiaddrs::is_dns(r);
 
             if !(is_left_dns ^ is_right_dns) {
                 std::cmp::Ordering::Equal

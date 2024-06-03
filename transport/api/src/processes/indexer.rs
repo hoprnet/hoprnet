@@ -5,12 +5,12 @@ use tracing::{error, warn};
 
 use chain_types::chain_events::NetworkRegistryStatus;
 use core_network::{network::Network, PeerId};
-use core_p2p::libp2p::swarm::derive_prelude::Multiaddr;
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_db_sql::{
     api::{errors::DbError, peers::HoprDbPeersOperations, resolver::HoprDbResolverOperations},
     registry::HoprDbRegistryOperations,
 };
+use hopr_transport_p2p::libp2p::swarm::derive_prelude::Multiaddr;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum PeerEligibility {

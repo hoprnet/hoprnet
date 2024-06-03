@@ -2,33 +2,21 @@ use futures::{channel::mpsc::UnboundedSender, pin_mut, select, StreamExt};
 use futures_concurrency::stream::Merge;
 use hopr_internal_types::prelude::*;
 use libp2p::request_response::OutboundRequestId;
-use std::{
-    collections::{HashMap, HashSet},
-    sync::Arc,
-};
+use std::collections::{HashMap, HashSet};
 use tracing::{debug, error, info, trace, warn};
 
-#[cfg(feature = "runtime-async-std")]
-use async_std::task::spawn;
-
-#[cfg(feature = "runtime-tokio")]
-use tokio::task::spawn;
-
-use core_network::{
-    network::{Network, NetworkTriggeredEvent, PeerOrigin},
-    HoprDbPeersOperations,
-};
-pub use core_p2p::api;
-use core_p2p::{
-    libp2p::{request_response::ResponseChannel, swarm::SwarmEvent},
-    HoprNetworkBehavior, HoprNetworkBehaviorEvent, HoprSwarm, Ping, Pong,
-};
+use core_network::network::NetworkTriggeredEvent;
 use core_protocol::{
     ack::processor::{AckProcessed, AckResult, AcknowledgementInteraction},
     msg::processor::{MsgProcessed, PacketInteraction},
     ticket_aggregation::processor::{
         TicketAggregationFinalizer, TicketAggregationInteraction, TicketAggregationProcessed,
     },
+};
+pub use hopr_transport_p2p::api;
+use hopr_transport_p2p::{
+    libp2p::{request_response::ResponseChannel, swarm::SwarmEvent},
+    HoprNetworkBehavior, HoprNetworkBehaviorEvent, HoprSwarm, Ping, Pong,
 };
 
 use crate::{processes::indexer::PeerTransportEvent, PeerId, TransportOutput};
@@ -158,16 +146,13 @@ impl SwarmEventLoop {
     /// The function represents the entirety of the business logic of the hopr daemon related to core operations.
     ///
     /// This future can only be resolved by an unrecoverable error or a panic.
-    pub async fn run<T>(
+    pub async fn run(
         self,
         swarm: HoprSwarm,
         version: String,
-        network: Arc<Network<T>>,
         on_transport_output: UnboundedSender<TransportOutput>,
         on_acknowledged_ticket: UnboundedSender<AcknowledgedTicket>,
-    ) where
-        T: HoprDbPeersOperations + Sync + Send + std::fmt::Debug + 'static,
-    {
+    ) {
         let me_peer_id = swarm.peer_id();
 
         let mut swarm: libp2p::Swarm<HoprNetworkBehavior> = swarm.into();
@@ -511,15 +496,6 @@ impl SwarmEventLoop {
                         if !allowed_peers.contains(&peer_id) {
                             info!("transport - p2p - DISCONNECTING '{peer_id}': not allowed in the network registry)");
                             let _ = swarm.disconnect_peer_id(peer_id);
-                        } else {
-                            let network = network.clone();
-                            let _ = spawn(async move {
-                                if !network.has(&peer_id).await {
-                                    if let Err(e) = network.add(&peer_id, PeerOrigin::IncomingConnection, vec![]).await {
-                                        error!("transport - p2p - failed to update the record for '{peer_id}': {e}")
-                                    }
-                                }
-                            }).await;
                         }
                     },
                     SwarmEvent::ConnectionClosed {
