@@ -3,7 +3,7 @@
 
   inputs.flake-utils.url = github:numtide/flake-utils;
   inputs.flake-parts.url = github:hercules-ci/flake-parts;
-  inputs.nixpkgs.url = github:NixOS/nixpkgs/master;
+  inputs.nixpkgs.url = github:NixOS/nixpkgs/24.05;
   # using bugfix for macos libcurl:
   # https://github.com/oxalica/rust-overlay/pull/149
   inputs.rust-overlay.url = github:oxalica/rust-overlay/647bff9f5e10d7f1756d86eee09831e6b1b06430;
@@ -90,12 +90,39 @@
           buildInputs = with pkgs; [
             pkg-config
             openssl # required to build curl rust bindings
+            # Cross-compilers
+            pkgsCross.aarch64-multiplatform.buildPackages.gcc
+            #pkgsCross.x86_64-multiplatform.buildPackages.gcc
+
+            # Cross-compilers for Darwin
+            #pkgsCross.aarch64-darwin.buildPackages.gcc
+            #pkgsCross.x86_64-darwin.buildPackages.gcc
+
+            # Install rustup and cargo
+            rustup
+            cargo
           ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin (
             with darwin.apple_sdk.frameworks; [
               CoreServices
               SystemConfiguration
             ]
           );
+
+          # Preconfigure rustup toolchains and targets
+          preBuild = ''
+            export RUSTUP_HOME=$PWD/.rustup
+            export CARGO_HOME=$PWD/.cargo
+
+            rustup default stable
+
+            rustup target add aarch64-unknown-linux-gnu
+            #rustup target add x86_64-unknown-linux-gnu
+            #rustup target add aarch64-apple-darwin
+
+            # Optionally, specify a specific toolchain version if needed
+            # rustup install <specific-version>
+            # rustup default <specific-version>
+          '';
           commonArgs = {
             inherit buildInputs nativeBuildInputs;
             CARGO_HOME = ".cargo";
@@ -404,6 +431,11 @@
               sed "s|# solc = .*|solc = \"${solcDefault}/bin/solc\"|g" \
                 ethereum/contracts/foundry.toml.in > \
                 ethereum/contracts/foundry.toml
+            '';
+            shellHook = ''
+              export RUSTUP_HOME=$PWD/.rustup
+              export CARGO_HOME=$PWD/.cargo
+              echo "Development shell is ready for cross-compilation!"
             '';
             postShellHook = ''
               ${pre-commit-check.shellHook}
