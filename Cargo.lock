@@ -1684,6 +1684,7 @@ dependencies = [
  "multiaddr",
  "serde",
  "thiserror",
+ "tokio",
  "tracing",
  "void",
 ]

@@ -10,10 +10,11 @@ crate-type = ["rlib"]
 
 [features]
 default = []
-runtime-async-std = ["libp2p/async-std"]
-runtime-tokio = ["libp2p/tokio"]
+runtime-async-std = ["dep:async-std", "libp2p/async-std"]
+runtime-tokio = ["dep:tokio", "libp2p/tokio"]
 
 [dependencies]
+async-std = { workspace = true, optional = true}
 async-channel = { workspace = true }
 futures = { workspace = true }
 futures-lite = { workspace = true }
@@ -22,6 +23,7 @@ libp2p-mplex = { workspace = true }
 multiaddr = { workspace = true }
 serde = { workspace = true, features = ["derive"]}
 thiserror = { workspace = true }
+tokio = { workspace = true, optional = true}
 tracing = { workspace = true }
 void = "1"          # needed for Behavior implementations from libp2p
 

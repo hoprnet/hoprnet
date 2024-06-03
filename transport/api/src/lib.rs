@@ -43,12 +43,13 @@ pub use {
         types::{HalfKeyChallenge, Hash, OffchainPublicKey},
     },
     hopr_internal_types::protocol::ApplicationData,
-    p2p::{api, HoprSwarm, SwarmEventLoop},
+    p2p::{api, SwarmEventLoop},
     timer::execute_on_tick,
 };
 
 use async_lock::RwLock;
 use constants::RESERVED_TAG_UPPER_LIMIT;
+use core_p2p::HoprSwarm;
 use futures::{channel::mpsc::UnboundedSender, FutureExt, SinkExt};
 use std::{
     collections::HashMap,
@@ -320,7 +321,7 @@ where
             .set(RwLock::new(ping))
             .expect("must set the ping executor only once");
 
-        let transport_layer = HoprSwarm::new(me, self.my_multiaddresses.clone(), self.proto_cfg).await;
+        let transport_layer = HoprSwarm::new(me.into(), self.my_multiaddresses.clone(), self.proto_cfg).await;
 
         let ack_proc = AcknowledgementInteraction::new(self.db.clone(), me_onchain);
 

@@ -28,11 +28,14 @@ pub mod errors;
 /// Utilities for work with multiaddresses
 pub mod multiaddrs;
 
-use std::{fmt::Debug, num::NonZeroU8};
+/// Raw swarm definition for the HOPR network.
+pub mod swarm;
+
+use std::fmt::Debug;
 
 use core_protocol::{
-    ack::config::AckProtocolConfig, config::ProtocolConfig, heartbeat::config::HeartbeatProtocolConfig,
-    msg::config::MsgProtocolConfig, ticket_aggregation::config::TicketAggregationProtocolConfig,
+    ack::config::AckProtocolConfig, heartbeat::config::HeartbeatProtocolConfig, msg::config::MsgProtocolConfig,
+    ticket_aggregation::config::TicketAggregationProtocolConfig,
 };
 
 /// Re-export of the entire libp2p functionality
@@ -51,7 +54,6 @@ use hopr_internal_types::protocol::Acknowledgement;
 
 use crate::constants::{
     HOPR_ACKNOWLEDGE_PROTOCOL_V_0_1_0, HOPR_HEARTBEAT_PROTOCOL_V_0_1_0, HOPR_MESSAGE_PROTOCOL_V_0_1_0,
-    HOPR_SWARM_CONCURRENTLY_DIALED_PEER_COUNT, HOPR_SWARM_CONCURRENTLY_NEGOTIATING_INBOUND_PEER_COUNT,
     HOPR_TICKET_AGGREGATION_PROTOCOL_V_0_1_0,
 };
 
@@ -188,69 +190,4 @@ impl From<libp2p::request_response::Event<Acknowledgement, ()>> for HoprNetworkB
     }
 }
 
-/// Build objects comprising the p2p network.
-///
-/// Returns a built [libp2p::Swarm] object implementing the HoprNetworkBehavior functionality.
-pub async fn build_p2p_network(
-    me: libp2p::identity::Keypair,
-    protocol_cfg: ProtocolConfig,
-) -> crate::errors::Result<libp2p::Swarm<HoprNetworkBehavior>> {
-    let tcp_upgrade = libp2p::core::upgrade::SelectUpgrade::new(
-        libp2p::yamux::Config::default(),
-        libp2p_mplex::MplexConfig::new()
-            .set_max_num_streams(1024)
-            .set_max_buffer_size(32)
-            .set_split_send_size(8 * 1024)
-            .set_max_buffer_behaviour(libp2p_mplex::MaxBufferBehaviour::Block)
-            .clone(),
-    );
-
-    #[cfg(feature = "runtime-async-std")]
-    let swarm = libp2p::SwarmBuilder::with_existing_identity(me)
-        .with_async_std()
-        .with_tcp(Default::default(), libp2p::noise::Config::new, move || tcp_upgrade)
-        .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?
-        .with_quic()
-        .with_dns()
-        .await;
-
-    #[cfg(feature = "runtime-tokio")]
-    let swarm = libp2p::SwarmBuilder::with_existing_identity(me)
-        .with_tokio()
-        .with_tcp(Default::default(), libp2p::noise::Config::new, || tcp_upgrade)
-        .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?
-        .with_quic()
-        .with_dns();
-
-    Ok(swarm
-        .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?
-        .with_behaviour(|_key| {
-            HoprNetworkBehavior::new(
-                protocol_cfg.msg,
-                protocol_cfg.ack,
-                protocol_cfg.heartbeat,
-                protocol_cfg.ticket_aggregation,
-            )
-        })
-        .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?
-        .with_swarm_config(|cfg| {
-            cfg.with_dial_concurrency_factor(
-                NonZeroU8::new(
-                    std::env::var("HOPR_INTERNAL_LIBP2P_MAX_CONCURRENTLY_DIALED_PEER_COUNT")
-                        .map(|v| v.trim().parse::<u8>().unwrap_or(u8::MAX))
-                        .unwrap_or(HOPR_SWARM_CONCURRENTLY_DIALED_PEER_COUNT),
-                )
-                .expect("concurrently dialed peer count must be > 0"),
-            )
-            .with_max_negotiating_inbound_streams(
-                std::env::var("HOPR_INTERNAL_LIBP2P_MAX_NEGOTIATING_INBOUND_STREAM_COUNT")
-                    .map(|v| v.trim().parse::<usize>().unwrap_or(128))
-                    .unwrap_or(HOPR_SWARM_CONCURRENTLY_NEGOTIATING_INBOUND_PEER_COUNT),
-            )
-            .with_idle_connection_timeout(constants::HOPR_SWARM_IDLE_CONNECTION_TIMEOUT)
-        })
-        .build())
-}
-
-/// Swarm defined with the HOPR protocols and network behaviour.
-pub type HoprSwarm = libp2p::Swarm<HoprNetworkBehavior>;
+pub use swarm::HoprSwarm;

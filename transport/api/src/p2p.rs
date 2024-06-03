@@ -1,11 +1,9 @@
 use futures::{channel::mpsc::UnboundedSender, pin_mut, select, StreamExt};
 use futures_concurrency::stream::Merge;
-use hopr_crypto_types::keypairs::OffchainKeypair;
 use hopr_internal_types::prelude::*;
 use libp2p::request_response::OutboundRequestId;
 use std::{
     collections::{HashMap, HashSet},
-    net::Ipv4Addr,
     sync::Arc,
 };
 use tracing::{debug, error, info, trace, warn};
@@ -23,12 +21,10 @@ use core_network::{
 pub use core_p2p::api;
 use core_p2p::{
     libp2p::{request_response::ResponseChannel, swarm::SwarmEvent},
-    multiaddrs::{Multiaddr, Protocol},
-    HoprNetworkBehavior, HoprNetworkBehaviorEvent, Ping, Pong,
+    HoprNetworkBehavior, HoprNetworkBehaviorEvent, HoprSwarm, Ping, Pong,
 };
 use core_protocol::{
     ack::processor::{AckProcessed, AckResult, AcknowledgementInteraction},
-    config::ProtocolConfig,
     msg::processor::{MsgProcessed, PacketInteraction},
     ticket_aggregation::processor::{
         TicketAggregationFinalizer, TicketAggregationInteraction, TicketAggregationProcessed,
@@ -104,126 +100,9 @@ impl From<PeerTransportEvent> for Inputs {
 }
 
 use hopr_internal_types::legacy;
-use std::net::ToSocketAddrs;
-
-/// Replaces the IPv4 and IPv6 from the network layer with a unspecified interface in any multiaddress.
-fn replace_transport_with_unspecified(ma: &Multiaddr) -> crate::errors::Result<Multiaddr> {
-    let mut out = Multiaddr::empty();
-
-    for proto in ma.iter() {
-        match proto {
-            Protocol::Ip4(_) => out.push(std::net::IpAddr::V4(Ipv4Addr::UNSPECIFIED).into()),
-            Protocol::Ip6(_) => out.push(std::net::IpAddr::V6(std::net::Ipv6Addr::UNSPECIFIED).into()),
-            _ => out.push(proto),
-        }
-    }
-
-    Ok(out)
-}
-
-/// Resolves the DNS parts of a multiaddress and replaces it with the resolved IP address.
-fn resolve_dns_if_any(ma: &Multiaddr) -> crate::errors::Result<Multiaddr> {
-    let mut out = Multiaddr::empty();
-
-    for proto in ma.iter() {
-        match proto {
-            Protocol::Dns4(domain) => {
-                let ip = format!("{domain}:443") // dummy port, irrevelant at this point
-                    .to_socket_addrs()
-                    .map_err(|e| crate::errors::HoprTransportError::Api(e.to_string()))?
-                    .filter(|sa| sa.is_ipv4())
-                    .collect::<Vec<_>>()
-                    .first()
-                    .ok_or(crate::errors::HoprTransportError::Api(format!(
-                        "Failed to resolve {domain} to an IPv4 address. Does the DNS entry has an A record?"
-                    )))?
-                    .ip();
-
-                out.push(ip.into())
-            }
-            Protocol::Dns6(domain) => {
-                let ip = format!("{domain}:443") // dummy port, irrevelant at this point
-                    .to_socket_addrs()
-                    .map_err(|e| crate::errors::HoprTransportError::Api(e.to_string()))?
-                    .filter(|sa| sa.is_ipv6())
-                    .collect::<Vec<_>>()
-                    .first()
-                    .ok_or(crate::errors::HoprTransportError::Api(format!(
-                        "Failed to resolve {domain} to an IPv6 address. Does the DNS entry has an AAAA record?"
-                    )))?
-                    .ip();
-
-                out.push(ip.into())
-            }
-            _ => out.push(proto),
-        }
-    }
-
-    Ok(out)
-}
 
 pub type TicketAggregationRequestType = OutboundRequestId;
 pub type TicketAggregationResponseType = ResponseChannel<Result<Ticket, String>>;
-
-pub struct HoprSwarm {
-    pub(crate) swarm: libp2p::Swarm<HoprNetworkBehavior>,
-}
-
-impl HoprSwarm {
-    pub async fn new(me: &OffchainKeypair, my_multiaddresses: Vec<Multiaddr>, protocol_cfg: ProtocolConfig) -> Self {
-        let identity: libp2p::identity::Keypair = (me).into();
-
-        let mut swarm = core_p2p::build_p2p_network(identity, protocol_cfg)
-            .await
-            .expect("swarm must be constructible");
-
-        for multiaddress in my_multiaddresses.iter() {
-            match resolve_dns_if_any(multiaddress) {
-                Ok(ma) => {
-                    if let Err(e) = swarm.listen_on(ma.clone()) {
-                        error!("Failed to listen_on using the multiaddress '{multiaddress}': {e}");
-
-                        match replace_transport_with_unspecified(&ma) {
-                            Ok(ma) => {
-                                if let Err(e) = swarm.listen_on(ma.clone()) {
-                                    error!("Failed to listen_on also using the unspecified multiaddress '{ma}': {e}",);
-                                } else {
-                                    info!("Successfully started listening on {ma} (from {multiaddress})");
-                                    swarm.add_external_address(multiaddress.clone());
-                                }
-                            }
-                            Err(e) => {
-                                error!("Failed to transform the multiaddress '{ma}' to unspecified: {e}")
-                            }
-                        }
-                    } else {
-                        info!("Successfully started listening on {ma} (from {multiaddress})");
-                        swarm.add_external_address(multiaddress.clone());
-                    }
-                }
-                Err(_) => error!("Failed to transform the multiaddress '{multiaddress}' - skipping"),
-            }
-        }
-
-        // NOTE: This would be a valid check but is not immediate
-        // assert!(
-        //     swarm.listeners().count() > 0,
-        //     "The node failed to listen on at least one of the specified interfaces"
-        // );
-
-        Self { swarm }
-    }
-
-    pub fn peer_id(&self) -> PeerId {
-        *self.swarm.local_peer_id()
-    }
-}
-
-impl From<HoprSwarm> for libp2p::Swarm<HoprNetworkBehavior> {
-    fn from(value: HoprSwarm) -> Self {
-        value.swarm
-    }
-}
 
 pub struct SwarmEventLoop {
     network_update_input: futures::channel::mpsc::Receiver<NetworkTriggeredEvent>,
