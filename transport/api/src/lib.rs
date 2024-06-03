@@ -322,8 +322,6 @@ where
 
         let transport_layer = HoprSwarm::new(me, self.my_multiaddresses.clone(), self.proto_cfg).await;
 
-        let mut processes: HashMap<HoprTransportProcess, JoinHandle<()>> = HashMap::new();
-
         let ack_proc = AcknowledgementInteraction::new(self.db.clone(), me_onchain);
 
         let packet_proc = PacketInteraction::new(self.db.clone(), tbf, PacketInteractionConfig::new(me, me_onchain));
@@ -380,6 +378,8 @@ where
             core_p2p::api::ManualPingRequester::new(ping_rx),
             core_p2p::api::HeartbeatResponder::new(pong_tx),
         );
+
+        let mut processes: HashMap<HoprTransportProcess, JoinHandle<()>> = HashMap::new();
 
         processes.insert(
             HoprTransportProcess::Heartbeat,
