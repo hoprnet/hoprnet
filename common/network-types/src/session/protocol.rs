@@ -1,13 +1,15 @@
-use crate::errors::NetworkTypeError;
-use crate::frame::{FrameId, FrameInfo, Segment};
 use fixedbitset::FixedBitSet;
 use hopr_primitive_types::prelude::BytesEncodable;
 use std::mem;
 
+use crate::session::errors::SessionError;
+use crate::frame::{FrameId, FrameInfo, Segment};
+
+// TODO: get this from another crate?
 const PACKET_SIZE: usize = 500;
 
 // TODO: should include pub key?
-const AVAILABLE_FOR_PAYLOAD: usize = PACKET_SIZE - 2 - 32 - Segment::HEADER_SIZE - 2; // 500 - 44 = 456
+const SESSION_MSG_SIZE: usize = PACKET_SIZE - 2 - 32 - Segment::HEADER_SIZE - 2; // 500 - 44 = 456
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SegmentRequest {
@@ -15,7 +17,7 @@ pub struct SegmentRequest {
     pub missing_segments: FixedBitSet,
 }
 
-const BITMAP_SIZE: usize = AVAILABLE_FOR_PAYLOAD - mem::size_of::<FrameId>();
+const BITMAP_SIZE: usize = SESSION_MSG_SIZE - mem::size_of::<FrameId>();
 
 impl From<FrameInfo> for SegmentRequest {
     fn from(value: FrameInfo) -> Self {
@@ -32,13 +34,13 @@ impl From<FrameInfo> for SegmentRequest {
     }
 }
 
-impl BytesEncodable<AVAILABLE_FOR_PAYLOAD, NetworkTypeError> for SegmentRequest {}
+impl BytesEncodable<SESSION_MSG_SIZE, SessionError> for SegmentRequest {}
 
 impl TryFrom<&[u8]> for SegmentRequest {
-    type Error = NetworkTypeError;
+    type Error = SessionError;
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
-        if value.len() == AVAILABLE_FOR_PAYLOAD {
+        if value.len() == SESSION_MSG_SIZE {
             Ok(Self {
                 frame_id: FrameId::from_be_bytes(value[..mem::size_of::<FrameId>()].try_into().unwrap()),
                 missing_segments: FixedBitSet::with_capacity_and_blocks(
@@ -49,14 +51,14 @@ impl TryFrom<&[u8]> for SegmentRequest {
                 ),
             })
         } else {
-            Err(NetworkTypeError::InvalidSessionMessage)
+            Err(SessionError::ParseError)
         }
     }
 }
 
-impl From<SegmentRequest> for [u8; AVAILABLE_FOR_PAYLOAD] {
+impl From<SegmentRequest> for [u8; SESSION_MSG_SIZE] {
     fn from(value: SegmentRequest) -> Self {
-        let mut ret = [0u8; AVAILABLE_FOR_PAYLOAD];
+        let mut ret = [0u8; SESSION_MSG_SIZE];
         ret[0..mem::size_of::<FrameId>()].copy_from_slice(&value.frame_id.to_be_bytes());
         ret[mem::size_of::<FrameId>()..].copy_from_slice(
             &value
@@ -70,30 +72,39 @@ impl From<SegmentRequest> for [u8; AVAILABLE_FOR_PAYLOAD] {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FrameAcknowledgements([FrameId; AVAILABLE_FOR_PAYLOAD / mem::size_of::<FrameId>()]);
+pub struct FrameAcknowledgements([FrameId; SESSION_MSG_SIZE / mem::size_of::<FrameId>()]);
 
-impl BytesEncodable<AVAILABLE_FOR_PAYLOAD, NetworkTypeError> for FrameAcknowledgements {}
+impl IntoIterator for FrameAcknowledgements {
+    type Item = FrameId;
+    type IntoIter = std::array::IntoIter<Self::Item, {SESSION_MSG_SIZE / mem::size_of::<FrameId>()}>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+impl BytesEncodable<SESSION_MSG_SIZE, SessionError> for FrameAcknowledgements {}
 
 impl<'a> TryFrom<&'a [u8]> for FrameAcknowledgements {
-    type Error = NetworkTypeError;
+    type Error = SessionError;
 
     fn try_from(value: &'a [u8]) -> Result<Self, Self::Error> {
-        if value.len() == AVAILABLE_FOR_PAYLOAD {
+        if value.len() == SESSION_MSG_SIZE {
             Ok(Self(
                 value
                     .chunks(mem::size_of::<FrameId>())
                     .map(|v| FrameId::from_be_bytes(v.try_into().unwrap()))
                     .collect::<Vec<_>>()
                     .try_into()
-                    .map_err(|_| NetworkTypeError::InvalidSessionMessage)?,
+                    .map_err(|_| SessionError::ParseError)?,
             ))
         } else {
-            Err(NetworkTypeError::InvalidSessionMessage)
+            Err(SessionError::ParseError)
         }
     }
 }
 
-impl From<FrameAcknowledgements> for [u8; AVAILABLE_FOR_PAYLOAD] {
+impl From<FrameAcknowledgements> for [u8; SESSION_MSG_SIZE] {
     fn from(value: FrameAcknowledgements) -> Self {
         value
             .0
@@ -107,39 +118,39 @@ impl From<FrameAcknowledgements> for [u8; AVAILABLE_FOR_PAYLOAD] {
 
 #[derive(Debug, Clone, PartialEq, Eq, strum::EnumDiscriminants)]
 #[strum_discriminants(derive(strum::FromRepr), repr(u16))]
-pub enum SessionMessage<'a> {
+pub enum SessionMessage {
     /// Represents a message containing a segment.
-    Segment(Segment<'a>),
+    Segment(Segment),
     /// Represents a message containing a request for segments.
     Request(SegmentRequest),
     /// Represents a message containing frame acknowledgements.
     Acknowledge(FrameAcknowledgements),
 }
 
-impl<'a> TryFrom<&'a [u8]> for SessionMessage<'a> {
-    type Error = NetworkTypeError;
+impl TryFrom<&[u8]> for SessionMessage {
+    type Error = SessionError;
 
-    fn try_from(value: &'a [u8]) -> Result<Self, Self::Error> {
-        if value.len() < 2 {
-            return Err(NetworkTypeError::InvalidSessionMessage);
+    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+        if value.len() < SESSION_MSG_SIZE {
+            return Err(SessionError::ParseError);
         }
 
         let disc = u16::from_be_bytes(
             (&value[0..2])
                 .try_into()
-                .map_err(|_| NetworkTypeError::InvalidSessionMessage)?,
+                .map_err(|_| SessionError::ParseError)?,
         );
 
-        match SessionMessageDiscriminants::from_repr(disc).ok_or(NetworkTypeError::InvalidSessionMessage)? {
-            SessionMessageDiscriminants::Segment => Ok(SessionMessage::Segment((&value[1..]).try_into()?)),
-            SessionMessageDiscriminants::Request => Ok(SessionMessage::Request((&value[1..]).try_into()?)),
-            SessionMessageDiscriminants::Acknowledge => Ok(SessionMessage::Acknowledge((&value[1..]).try_into()?)),
+        match SessionMessageDiscriminants::from_repr(disc).ok_or(SessionError::UnknownMessageTag)? {
+            SessionMessageDiscriminants::Segment => Ok(SessionMessage::Segment((&value[2..]).try_into().map_err(|_| SessionError::ParseError)?)),
+            SessionMessageDiscriminants::Request => Ok(SessionMessage::Request((&value[2..]).try_into()?)),
+            SessionMessageDiscriminants::Acknowledge => Ok(SessionMessage::Acknowledge((&value[2..]).try_into()?)),
         }
     }
 }
 
-impl<'a> From<SessionMessage<'a>> for Vec<u8> {
-    fn from(value: SessionMessage<'a>) -> Self {
+impl From<SessionMessage> for Vec<u8> {
+    fn from(value: SessionMessage) -> Self {
         let disc = SessionMessageDiscriminants::from(&value) as u16;
 
         let mut ret = Vec::with_capacity(500);

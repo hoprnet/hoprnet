@@ -17,8 +17,8 @@ pub enum NetworkTypeError {
     #[error("frame reassembler is closed")]
     ReassemblerClosed,
 
-    #[error("cannot parse session protocol message")]
-    InvalidSessionMessage,
+    #[error(transparent)]
+    SessionProtocolError(#[from] crate::session::errors::SessionError)
 }
 
 pub type Result<T> = std::result::Result<T, NetworkTypeError>;

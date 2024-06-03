@@ -63,6 +63,16 @@ use crate::errors::NetworkTypeError;
 /// ID of a [Frame].
 pub type FrameId = u32;
 
+/// Convenience type that identifies a segment within a frame.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
+pub(crate) struct SegmentId(pub FrameId, pub u16);
+
+impl From<&Segment> for SegmentId {
+    fn from(value: &Segment) -> Self {
+        Self(value.frame_id, value.seq_idx)
+    }
+}
+
 /// Helper function to segment `data` into segments of given `mtu` length.
 /// All segments are tagged with the same `frame_id`.
 pub fn segment(data: &[u8], mtu: u16, frame_id: u32) -> Vec<Segment> {
@@ -77,7 +87,7 @@ pub fn segment(data: &[u8], mtu: u16, frame_id: u32) -> Vec<Segment> {
             frame_id,
             seq_len,
             seq_idx: idx as u16,
-            data,
+            data: data.into(),
         })
         .collect()
 }
@@ -107,7 +117,7 @@ impl Frame {
 /// segments in the original frame, its index within the frame and
 /// ID of that frame.
 #[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub struct Segment<'a> {
+pub struct Segment {
     /// ID of the [Frame] this segment belongs to.
     pub frame_id: FrameId,
     /// Index of this segment within the segment sequence.
@@ -116,32 +126,32 @@ pub struct Segment<'a> {
     pub seq_len: u16,
     /// Data in this segment.
     #[serde(with = "serde_bytes")]
-    pub data: &'a [u8],
+    pub data: Box<[u8]>,
 }
 
-impl Segment<'_> {
+impl Segment {
     /// Size of the segment header.
     pub const HEADER_SIZE: usize = mem::size_of::<FrameId>() + 2 * mem::size_of::<u16>();
 }
 
-impl Debug for Segment<'_> {
+impl Debug for Segment {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Segment")
             .field("frame_id", &self.frame_id)
             .field("seq_id", &self.seq_idx)
             .field("seq_len", &self.seq_len)
-            .field("data", &hex::encode(self.data))
+            .field("data", &hex::encode(&self.data))
             .finish()
     }
 }
 
-impl<'a> PartialOrd<Segment<'a>> for Segment<'a> {
+impl<'a> PartialOrd<Segment> for Segment {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl Ord for Segment<'_> {
+impl Ord for Segment {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         match self.frame_id.cmp(&other.frame_id) {
             std::cmp::Ordering::Equal => self.seq_idx.cmp(&other.seq_idx),
@@ -150,27 +160,27 @@ impl Ord for Segment<'_> {
     }
 }
 
-impl From<Segment<'_>> for Vec<u8> {
-    fn from(value: Segment<'_>) -> Self {
+impl From<Segment> for Vec<u8> {
+    fn from(value: Segment) -> Self {
         let mut ret = Vec::with_capacity(Segment::HEADER_SIZE + value.data.len());
         ret.extend_from_slice(value.frame_id.to_be_bytes().as_ref());
         ret.extend_from_slice(value.seq_idx.to_be_bytes().as_ref());
         ret.extend_from_slice(value.seq_len.to_be_bytes().as_ref());
-        ret.extend_from_slice(value.data);
+        ret.extend_from_slice(value.data.as_ref());
         ret
     }
 }
 
-impl<'a> TryFrom<&'a [u8]> for Segment<'a> {
+impl TryFrom<&[u8]> for Segment {
     type Error = NetworkTypeError;
 
-    fn try_from(value: &'a [u8]) -> Result<Self, Self::Error> {
+    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         let (header, data) = value.split_at(Self::HEADER_SIZE);
         let segment = Segment {
             frame_id: FrameId::from_be_bytes(header[0..4].try_into().map_err(|_| NetworkTypeError::InvalidSegment)?),
             seq_idx: u16::from_be_bytes(header[4..6].try_into().map_err(|_| NetworkTypeError::InvalidSegment)?),
             seq_len: u16::from_be_bytes(header[6..8].try_into().map_err(|_| NetworkTypeError::InvalidSegment)?),
-            data,
+            data: data.into(),
         };
         (segment.frame_id > 0 && segment.seq_idx < segment.seq_len)
             .then_some(segment)
@@ -180,16 +190,16 @@ impl<'a> TryFrom<&'a [u8]> for Segment<'a> {
 
 /// Rebuilds the [Frame] from [Segments](Segment).
 #[derive(Debug)]
-struct FrameBuilder<'a> {
+struct FrameBuilder {
     frame_id: FrameId,
-    segments: Vec<OnceLock<&'a [u8]>>,
+    segments: Vec<OnceLock<Box<[u8]>>>,
     remaining: AtomicU16,
     last_ts: AtomicU64,
 }
 
-impl<'a> FrameBuilder<'a> {
+impl FrameBuilder {
     /// Creates a new builder with the given `initial` [Segment] and its timestamp `ts`.
-    fn new(initial: Segment<'a>, ts: u64) -> Self {
+    fn new(initial: Segment, ts: u64) -> Self {
         let ret = Self::empty(initial.frame_id, initial.seq_len);
         ret.put(initial, ts).unwrap();
         ret
@@ -207,7 +217,7 @@ impl<'a> FrameBuilder<'a> {
 
     /// Adds a new [`segment`](Segment) to the builder with a timestamp `ts`.
     /// Returns the number of segments remaining in this builder.
-    fn put(&self, segment: Segment<'a>, ts: u64) -> crate::errors::Result<u16> {
+    fn put(&self, segment: Segment, ts: u64) -> crate::errors::Result<u16> {
         if self.frame_id == segment.frame_id {
             if !self.is_complete() {
                 if self.segments[segment.seq_idx as usize].set(segment.data).is_ok() {
@@ -261,7 +271,7 @@ impl<'a> FrameBuilder<'a> {
                     .segments
                     .into_iter()
                     .map(|lock| lock.into_inner().unwrap())
-                    .collect::<Vec<&[u8]>>()
+                    .collect::<Vec<Box<[u8]>>>()
                     .concat()
                     .into_boxed_slice(),
             })
@@ -327,15 +337,15 @@ pub struct FrameInfo {
 /// # });
 /// ````
 #[derive(Debug)]
-pub struct FrameReassembler<'a> {
-    sequences: DashMap<FrameId, FrameBuilder<'a>>,
+pub struct FrameReassembler {
+    sequences: DashMap<FrameId, FrameBuilder>,
     sorted_seq_ids: SkipSet<FrameId>,
     last_emitted_frame: AtomicU32,
     reassembled: futures::channel::mpsc::UnboundedSender<Frame>,
     max_age: Option<Duration>,
 }
 
-impl<'a> FrameReassembler<'a> {
+impl FrameReassembler {
     /// Creates a new frame reassembler and a corresponding stream
     /// for reassembled [Frames](Frame).
     /// An optional `max_age` of segments can be specified,
@@ -358,7 +368,7 @@ impl<'a> FrameReassembler<'a> {
     /// This function also pushes out the reassembled frame if this segment completed it.
     /// Pushing a segment belonging to a frame ID that has been already
     /// previously completed or [evicted](FrameReassembler::evict) will fail.
-    pub fn push_segment(&self, segment: Segment<'a>) -> crate::errors::Result<()> {
+    pub fn push_segment(&self, segment: Segment) -> crate::errors::Result<()> {
         if self.reassembled.is_closed() {
             return Err(NetworkTypeError::ReassemblerClosed);
         }
@@ -456,29 +466,29 @@ impl<'a> FrameReassembler<'a> {
     }
 }
 
-impl Drop for FrameReassembler<'_> {
+impl Drop for FrameReassembler {
     fn drop(&mut self) {
         let _ = self.evict();
         self.reassembled.close_channel();
     }
 }
 
-impl<'a> Extend<Segment<'a>> for FrameReassembler<'a> {
-    fn extend<T: IntoIterator<Item = Segment<'a>>>(&mut self, iter: T) {
+impl<'a> Extend<Segment> for FrameReassembler {
+    fn extend<T: IntoIterator<Item = Segment>>(&mut self, iter: T) {
         iter.into_iter()
             .try_for_each(|s| self.push_segment(s))
             .expect("failed to extend")
     }
 }
 
-impl<'a> Sink<Segment<'a>> for FrameReassembler<'a> {
+impl Sink<Segment> for FrameReassembler {
     type Error = NetworkTypeError;
 
     fn poll_ready(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
     }
 
-    fn start_send(self: Pin<&mut Self>, item: Segment<'a>) -> Result<(), Self::Error> {
+    fn start_send(self: Pin<&mut Self>, item: Segment) -> Result<(), Self::Error> {
         self.push_segment(item)
     }
 
@@ -494,7 +504,7 @@ impl<'a> Sink<Segment<'a>> for FrameReassembler<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::frame::{Frame, FrameId, FrameReassembler, Segment};
+    use crate::frame::{Frame, FrameId, FrameReassembler, Segment, SegmentId};
     use async_stream::stream;
     use futures::{pin_mut, Stream, StreamExt};
     use hex_literal::hex;
@@ -521,7 +531,7 @@ mod tests {
                 data: hopr_crypto_random::random_bytes::<FRAME_SIZE>().into(),
             })
             .collect::<Vec<_>>();
-        static ref SEGMENTS: Vec<Segment<'static>> = {
+        static ref SEGMENTS: Vec<Segment> = {
             let deque = FRAMES.par_iter().flat_map(|f| f.segment(MTU)).collect::<VecDeque<_>>();
             linear_half_normal_shuffle(deque, MIXING_FACTOR)
         };
@@ -565,17 +575,17 @@ mod tests {
         let segments = frame.segment(3);
         assert_eq!(3, segments.len());
 
-        assert_eq!(hex!("deadbe"), segments[0].data);
+        assert_eq!(hex!("deadbe"), segments[0].data.as_ref());
         assert_eq!(0, segments[0].seq_idx);
         assert_eq!(3, segments[0].seq_len);
         assert_eq!(frame.frame_id, segments[0].frame_id);
 
-        assert_eq!(hex!("efcafe"), segments[1].data);
+        assert_eq!(hex!("efcafe"), segments[1].data.as_ref());
         assert_eq!(1, segments[1].seq_idx);
         assert_eq!(3, segments[1].seq_len);
         assert_eq!(frame.frame_id, segments[1].frame_id);
 
-        assert_eq!(hex!("babe"), segments[2].data);
+        assert_eq!(hex!("babe"), segments[2].data.as_ref());
         assert_eq!(2, segments[2].seq_idx);
         assert_eq!(3, segments[2].seq_len);
         assert_eq!(frame.frame_id, segments[2].frame_id);
@@ -589,7 +599,7 @@ mod tests {
             frame_id: 1234,
             seq_len: 123,
             seq_idx: 12,
-            data: &data,
+            data: data.into(),
         };
 
         let boxed: Vec<u8> = segment.clone().into();
@@ -805,14 +815,11 @@ mod tests {
             .for_each(|(i, frame)| assert_eq!(&frame, frames[i]));
     }
 
-    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
-    struct SegmentId(FrameId, u16);
-
     /// Creates `num_frames` out of which `num_corrupted` will have missing segments.
     fn corrupt_frames(
         num_frames: u32,
         corrupted_ratio: f32,
-    ) -> (Vec<Segment<'static>>, Vec<&'static Frame>, HashSet<SegmentId>) {
+    ) -> (Vec<Segment>, Vec<&'static Frame>, HashSet<SegmentId>) {
         assert!((0.0..=1.0).contains(&corrupted_ratio));
 
         let (excluded_frame_ids, excluded_segments): (HashSet<FrameId>, HashSet<SegmentId>) = (1..num_frames + 1)
@@ -901,7 +908,7 @@ mod tests {
         max_latency: Duration,
         mixing_factor: f64,
         corruption_ratio: f64,
-    ) -> (impl Stream<Item = Segment<'static>>, Vec<&'static Frame>) {
+    ) -> (impl Stream<Item = Segment>, Vec<&'static Frame>) {
         let mut segments = FRAMES
             .par_iter()
             .take(num_frames)

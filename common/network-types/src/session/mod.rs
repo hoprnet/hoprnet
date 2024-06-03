@@ -1,5 +1,6 @@
-mod protocol;
-mod state;
+pub mod protocol;
+pub mod state;
+pub mod errors;
 
 #[cfg(test)]
 mod tests {
