@@ -14,14 +14,14 @@ default = []
 runtime-async-std = [
     "async-std",
     "core-protocol/runtime-async-std",
-    "core-p2p/runtime-async-std",
-    "hopr-db-sql/runtime-async-std"
+    "hopr-db-sql/runtime-async-std",
+    "hopr-transport-p2p/runtime-async-std",
 ]
 runtime-tokio = [
     "tokio",
     "core-protocol/runtime-tokio",
-    "core-p2p/runtime-tokio",
-    "hopr-db-sql/runtime-tokio"
+    "hopr-db-sql/runtime-tokio",
+    "hopr-transport-p2p/runtime-tokio",
 ]
 prometheus = [
     "dep:lazy_static", "dep:hopr-metrics",
@@ -51,14 +51,14 @@ uuid = { workspace = true, features = ["v4",  "fast-rng"] }
 validator = { workspace = true }
 
 core-network = { workspace = true }
-hopr-crypto-types = { workspace = true }
 chain-types = { workspace = true }
 core-path = { workspace = true }
-core-p2p = { workspace = true }
-hopr-crypto-packet = { workspace = true }
 core-protocol = { workspace = true }
+hopr-crypto-packet = { workspace = true }
+hopr-crypto-types = { workspace = true }
 hopr-db-sql = { workspace = true }
-hopr-platform = { workspace = true }
-hopr-metrics = { workspace = true, optional = true }
 hopr-internal-types = { workspace = true }
+hopr-metrics = { workspace = true, optional = true }
+hopr-platform = { workspace = true }
 hopr-primitive-types = { workspace = true }
+hopr-transport-p2p = { workspace = true }

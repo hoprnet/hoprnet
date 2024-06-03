@@ -1669,27 +1669,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "core-p2p"
-version = "0.2.0"
-dependencies = [
- "async-channel 2.1.1",
- "async-std",
- "core-network",
- "core-protocol",
- "futures",
- "futures-lite 1.13.0",
- "hopr-internal-types",
- "libp2p",
- "libp2p-mplex",
- "multiaddr",
- "serde",
- "thiserror",
- "tokio",
- "tracing",
- "void",
-]
-
-[[package]]
 name = "core-path"
 version = "0.3.0"
 dependencies = [
@@ -1761,7 +1740,6 @@ dependencies = [
  "async-trait",
  "chain-types",
  "core-network",
- "core-p2p",
  "core-path",
  "core-protocol",
  "futures",
@@ -1773,6 +1751,7 @@ dependencies = [
  "hopr-metrics",
  "hopr-platform",
  "hopr-primitive-types",
+ "hopr-transport-p2p",
  "lazy_static",
  "libp2p",
  "proc-macro-regex",
@@ -3994,6 +3973,27 @@ dependencies = [
  "tokio",
  "tracing",
  "validator",
+]
+
+[[package]]
+name = "hopr-transport-p2p"
+version = "0.3.0"
+dependencies = [
+ "async-channel 2.1.1",
+ "async-std",
+ "core-network",
+ "core-protocol",
+ "futures",
+ "futures-lite 1.13.0",
+ "hopr-internal-types",
+ "libp2p",
+ "libp2p-mplex",
+ "multiaddr",
+ "serde",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "void",
 ]
 
 [[package]]
