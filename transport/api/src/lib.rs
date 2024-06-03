@@ -17,7 +17,6 @@ pub mod config;
 pub mod constants;
 /// Errors used by the crate.
 pub mod errors;
-mod multiaddrs;
 mod p2p;
 mod processes;
 mod timer;
@@ -31,18 +30,19 @@ pub enum TransportOutput {
 
 pub use {
     crate::{
-        multiaddrs::decapsulate_p2p_protocol,
         processes::indexer::PeerTransportEvent,
         processes::indexer::{add_peer_update_processing, IndexerActions, IndexerToProcess, PeerEligibility},
     },
     core_network::network::{Health, Network, NetworkTriggeredEvent, PeerOrigin, PeerStatus},
-    core_p2p::libp2p,
+    core_p2p::{
+        libp2p,
+        multiaddrs::{decapsulate_p2p_protocol, Multiaddr},
+    },
     hopr_crypto_types::{
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         types::{HalfKeyChallenge, Hash, OffchainPublicKey},
     },
     hopr_internal_types::protocol::ApplicationData,
-    multiaddr::Multiaddr,
     p2p::{api, HoprSwarm, SwarmEventLoop},
     timer::execute_on_tick,
 };
@@ -630,16 +630,16 @@ where
             .local_multiaddresses()
             .into_iter()
             .filter(|ma| {
-                crate::multiaddrs::is_supported(ma)
-                    && (self.cfg.announce_local_addresses || !crate::multiaddrs::is_private(ma))
+                core_p2p::multiaddrs::is_supported(ma)
+                    && (self.cfg.announce_local_addresses || !core_p2p::multiaddrs::is_private(ma))
             })
-            .map(|ma| crate::multiaddrs::decapsulate_p2p_protocol(&ma))
+            .map(|ma| decapsulate_p2p_protocol(&ma))
             .filter(|v| !v.is_empty())
             .collect::<Vec<_>>();
 
         mas.sort_by(|l, r| {
-            let is_left_dns = crate::multiaddrs::is_dns(l);
-            let is_right_dns = crate::multiaddrs::is_dns(r);
+            let is_left_dns = core_p2p::multiaddrs::is_dns(l);
+            let is_right_dns = core_p2p::multiaddrs::is_dns(r);
 
             if !(is_left_dns ^ is_right_dns) {
                 std::cmp::Ordering::Equal

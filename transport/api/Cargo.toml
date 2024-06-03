@@ -40,7 +40,6 @@ futures = { workspace = true }
 futures-concurrency = "7.6.0"
 lazy_static = { workspace = true, optional = true }
 libp2p = { workspace = true, features = ["request-response"] }
-multiaddr = { workspace = true }
 proc-macro-regex = "~1.1.0"
 rust-stream-ext-concurrent = { workspace = true }
 serde = { workspace = true }

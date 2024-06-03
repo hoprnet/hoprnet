@@ -23,6 +23,7 @@ use core_network::{
 pub use core_p2p::api;
 use core_p2p::{
     libp2p::{request_response::ResponseChannel, swarm::SwarmEvent},
+    multiaddrs::{Multiaddr, Protocol},
     HoprNetworkBehavior, HoprNetworkBehaviorEvent, Ping, Pong,
 };
 use core_protocol::{
@@ -106,13 +107,13 @@ use hopr_internal_types::legacy;
 use std::net::ToSocketAddrs;
 
 /// Replaces the IPv4 and IPv6 from the network layer with a unspecified interface in any multiaddress.
-fn replace_transport_with_unspecified(ma: &multiaddr::Multiaddr) -> crate::errors::Result<multiaddr::Multiaddr> {
-    let mut out = multiaddr::Multiaddr::empty();
+fn replace_transport_with_unspecified(ma: &Multiaddr) -> crate::errors::Result<Multiaddr> {
+    let mut out = Multiaddr::empty();
 
     for proto in ma.iter() {
         match proto {
-            multiaddr::Protocol::Ip4(_) => out.push(std::net::IpAddr::V4(Ipv4Addr::UNSPECIFIED).into()),
-            multiaddr::Protocol::Ip6(_) => out.push(std::net::IpAddr::V6(std::net::Ipv6Addr::UNSPECIFIED).into()),
+            Protocol::Ip4(_) => out.push(std::net::IpAddr::V4(Ipv4Addr::UNSPECIFIED).into()),
+            Protocol::Ip6(_) => out.push(std::net::IpAddr::V6(std::net::Ipv6Addr::UNSPECIFIED).into()),
             _ => out.push(proto),
         }
     }
@@ -121,12 +122,12 @@ fn replace_transport_with_unspecified(ma: &multiaddr::Multiaddr) -> crate::error
 }
 
 /// Resolves the DNS parts of a multiaddress and replaces it with the resolved IP address.
-fn resolve_dns_if_any(ma: &multiaddr::Multiaddr) -> crate::errors::Result<multiaddr::Multiaddr> {
-    let mut out = multiaddr::Multiaddr::empty();
+fn resolve_dns_if_any(ma: &Multiaddr) -> crate::errors::Result<Multiaddr> {
+    let mut out = Multiaddr::empty();
 
     for proto in ma.iter() {
         match proto {
-            multiaddr::Protocol::Dns4(domain) => {
+            Protocol::Dns4(domain) => {
                 let ip = format!("{domain}:443") // dummy port, irrevelant at this point
                     .to_socket_addrs()
                     .map_err(|e| crate::errors::HoprTransportError::Api(e.to_string()))?
@@ -140,7 +141,7 @@ fn resolve_dns_if_any(ma: &multiaddr::Multiaddr) -> crate::errors::Result<multia
 
                 out.push(ip.into())
             }
-            multiaddr::Protocol::Dns6(domain) => {
+            Protocol::Dns6(domain) => {
                 let ip = format!("{domain}:443") // dummy port, irrevelant at this point
                     .to_socket_addrs()
                     .map_err(|e| crate::errors::HoprTransportError::Api(e.to_string()))?
@@ -169,11 +170,7 @@ pub struct HoprSwarm {
 }
 
 impl HoprSwarm {
-    pub async fn new(
-        me: &OffchainKeypair,
-        my_multiaddresses: Vec<multiaddr::Multiaddr>,
-        protocol_cfg: ProtocolConfig,
-    ) -> Self {
+    pub async fn new(me: &OffchainKeypair, my_multiaddresses: Vec<Multiaddr>, protocol_cfg: ProtocolConfig) -> Self {
         let identity: libp2p::identity::Keypair = (me).into();
 
         let mut swarm = core_p2p::build_p2p_network(identity, protocol_cfg)

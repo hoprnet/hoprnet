@@ -19,6 +19,7 @@ futures = { workspace = true }
 futures-lite = { workspace = true }
 libp2p = { workspace = true, features = ["noise", "request-response", "cbor", "macros", "tcp", "quic", "dns", "yamux"] }
 libp2p-mplex = { workspace = true }
+multiaddr = { workspace = true }
 serde = { workspace = true, features = ["derive"]}
 thiserror = { workspace = true }
 tracing = { workspace = true }
