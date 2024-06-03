@@ -11,22 +11,35 @@ const PACKET_SIZE: usize = 500;
 // TODO: should include pub key?
 const SESSION_MSG_SIZE: usize = PACKET_SIZE - 2 - 32 - Segment::HEADER_SIZE - 2; // 500 - 44 = 456
 
+/// Holds the Segment Retransmission Request message.
+/// That is an ID of a frame and a bitmap of missing segments in this frame.
+/// The bitmap can cover up a request for up to [`SegmentRequest::MAX_ERROR_SEGMENTS`] segments.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SegmentRequest {
+    /// Frame ID that requires segment retransmission.
     pub frame_id: FrameId,
+    /// Bitmap of segments missing from the frame.
+    /// This can express up to [`SegmentRequest::MAX_ERROR_SEGMENTS`] segment positions.
     pub missing_segments: FixedBitSet,
 }
 
-/// Size of the `missing_segments` bitmap in bytes, rounded to the multiple of its Block.
+/// Size of the block inside the bitmap.
 const BITMAP_BLOCK_SIZE: usize = mem::size_of::<fixedbitset::Block>();
+/// Size of the `missing_segments` bitmap in bytes, rounded to the multiple of its Block.
 const BITMAP_SIZE: usize = ((SESSION_MSG_SIZE - mem::size_of::<FrameId>()) / BITMAP_BLOCK_SIZE) *  BITMAP_BLOCK_SIZE;
+
+impl SegmentRequest {
+    /// Maximum number of segments that can be requested.
+    /// This is calculated so that the request fits within a single segment itself.
+    pub const MAX_ERROR_SEGMENTS: usize = BITMAP_SIZE * 8;
+}
 
 impl From<FrameInfo> for SegmentRequest {
     fn from(value: FrameInfo) -> Self {
         Self {
             frame_id: value.frame_id,
             missing_segments: FixedBitSet::with_capacity_and_blocks(
-                BITMAP_SIZE * 8,
+                Self::MAX_ERROR_SEGMENTS,
                 value
                     .missing_segments
                     .into_ones()
@@ -46,7 +59,7 @@ impl TryFrom<&[u8]> for SegmentRequest {
             Ok(Self {
                 frame_id: FrameId::from_be_bytes(value[..mem::size_of::<FrameId>()].try_into().unwrap()),
                 missing_segments: FixedBitSet::with_capacity_and_blocks(
-                    BITMAP_SIZE * 8,
+                    Self::MAX_ERROR_SEGMENTS,
                     value[mem::size_of::<FrameId>()..]
                         .chunks(BITMAP_BLOCK_SIZE)
                         .map(|c| fixedbitset::Block::from_be_bytes(c.try_into().unwrap())),
@@ -76,23 +89,26 @@ impl From<SegmentRequest> for [u8; SESSION_MSG_SIZE] {
     }
 }
 
-const MAX_ACKS_NUM: usize = SESSION_MSG_SIZE / mem::size_of::<FrameId>();
-
+/// Holds the Frame Acknowledgement message.
+/// This carries up to [`FrameAcknowledgements::MAX_ACK_FRAMES`] [frame IDs](FrameId) that have
+/// been acknowledged by the counterparty.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FrameAcknowledgements([FrameId; MAX_ACKS_NUM]);
+pub struct FrameAcknowledgements(Vec<FrameId>);
+
+impl FrameAcknowledgements {
+    /// Maximum number of [frame IDs](FrameId) that can be accommodated.
+    pub const MAX_ACK_FRAMES: usize = SESSION_MSG_SIZE / mem::size_of::<FrameId>();
+}
 
 impl From<Vec<FrameId>> for FrameAcknowledgements {
-    fn from(mut value: Vec<FrameId>) -> Self {
-        let mut inner = [FrameId::default(); MAX_ACKS_NUM];
-        value.resize(MAX_ACKS_NUM, 0);
-        inner[..value.len()].copy_from_slice(&value);
-        Self(inner)
+    fn from(value: Vec<FrameId>) -> Self {
+        Self(value.into_iter().take(Self::MAX_ACK_FRAMES).filter(|v| *v > 0).collect())
     }
 }
 
 impl IntoIterator for FrameAcknowledgements {
     type Item = FrameId;
-    type IntoIter = std::array::IntoIter<Self::Item, {SESSION_MSG_SIZE / mem::size_of::<FrameId>()}>;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
@@ -110,9 +126,8 @@ impl<'a> TryFrom<&'a [u8]> for FrameAcknowledgements {
                 value
                     .chunks(mem::size_of::<FrameId>())
                     .map(|v| FrameId::from_be_bytes(v.try_into().unwrap()))
-                    .collect::<Vec<_>>()
-                    .try_into()
-                    .map_err(|_| SessionError::ParseError)?,
+                    .filter(|f| *f > 0)
+                    .collect::<Vec<_>>(),
             ))
         } else {
             Err(SessionError::ParseError)
@@ -126,6 +141,8 @@ impl From<FrameAcknowledgements> for [u8; SESSION_MSG_SIZE] {
             .0
             .iter()
             .flat_map(|v| v.to_be_bytes())
+            .chain(std::iter::repeat(0_u8))
+            .take(SESSION_MSG_SIZE)
             .collect::<Vec<_>>()
             .try_into()
             .unwrap()
