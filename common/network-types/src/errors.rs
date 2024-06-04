@@ -18,7 +18,7 @@ pub enum NetworkTypeError {
     ReassemblerClosed,
 
     #[error(transparent)]
-    SessionProtocolError(#[from] crate::session::errors::SessionError)
+    SessionProtocolError(#[from] crate::session::errors::SessionError),
 }
 
 pub type Result<T> = std::result::Result<T, NetworkTypeError>;

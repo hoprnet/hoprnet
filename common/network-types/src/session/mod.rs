@@ -1,6 +1,6 @@
+pub mod errors;
 pub mod protocol;
 pub mod state;
-pub mod errors;
 
 #[cfg(test)]
 mod tests {

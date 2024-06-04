@@ -3864,17 +3864,21 @@ version = "0.1.0"
 dependencies = [
  "async-std",
  "async-stream",
+ "async-trait",
+ "crossbeam-queue",
  "crossbeam-skiplist",
  "ctor",
  "dashmap",
  "fixedbitset 0.5.7",
  "futures",
+ "futures-timer",
  "hex",
  "hex-literal",
  "hopr-crypto-random",
  "hopr-platform",
  "hopr-primitive-types",
  "lazy_static",
+ "pin-project",
  "rand 0.8.5",
  "rand_distr",
  "rayon",
@@ -3882,6 +3886,7 @@ dependencies = [
  "serde_bytes",
  "strum 0.26.2",
  "thiserror",
+ "tokio",
 ]
 
 [[package]]

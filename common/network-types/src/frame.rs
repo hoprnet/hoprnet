@@ -76,6 +76,8 @@ impl From<&Segment> for SegmentId {
 /// Helper function to segment `data` into segments of given `mtu` length.
 /// All segments are tagged with the same `frame_id`.
 pub fn segment(data: &[u8], mtu: u16, frame_id: u32) -> Vec<Segment> {
+    assert!(frame_id > 0, "frame id cannot be 0");
+
     let chunks = data.chunks(mtu as usize);
     assert!(chunks.len() < u16::MAX as usize, "data too long");
 
@@ -109,6 +111,12 @@ impl Frame {
     pub fn segment(&self, mtu: u16) -> Vec<Segment> {
         assert!(self.frame_id > 0, "frame id 0 is not allowed");
         segment(self.data.as_ref(), mtu, self.frame_id)
+    }
+}
+
+impl AsRef<[u8]> for Frame {
+    fn as_ref(&self) -> &[u8] {
+        &self.data
     }
 }
 

@@ -1,9 +1,10 @@
 use fixedbitset::FixedBitSet;
 use hopr_primitive_types::prelude::BytesEncodable;
+use std::collections::BTreeSet;
 use std::mem;
 
-use crate::session::errors::SessionError;
 use crate::frame::{FrameId, FrameInfo, Segment};
+use crate::session::errors::SessionError;
 
 // TODO: get this from another crate?
 const PACKET_SIZE: usize = 500;
@@ -26,7 +27,7 @@ pub struct SegmentRequest {
 /// Size of the block inside the bitmap.
 const BITMAP_BLOCK_SIZE: usize = mem::size_of::<fixedbitset::Block>();
 /// Size of the `missing_segments` bitmap in bytes, rounded to the multiple of its Block.
-const BITMAP_SIZE: usize = ((SESSION_MSG_SIZE - mem::size_of::<FrameId>()) / BITMAP_BLOCK_SIZE) *  BITMAP_BLOCK_SIZE;
+const BITMAP_SIZE: usize = ((SESSION_MSG_SIZE - mem::size_of::<FrameId>()) / BITMAP_BLOCK_SIZE) * BITMAP_BLOCK_SIZE;
 
 impl SegmentRequest {
     /// Maximum number of segments that can be requested.
@@ -40,10 +41,7 @@ impl From<FrameInfo> for SegmentRequest {
             frame_id: value.frame_id,
             missing_segments: FixedBitSet::with_capacity_and_blocks(
                 Self::MAX_ERROR_SEGMENTS,
-                value
-                    .missing_segments
-                    .into_ones()
-                    .take(BITMAP_SIZE / BITMAP_BLOCK_SIZE),
+                value.missing_segments.into_ones().take(BITMAP_SIZE / BITMAP_BLOCK_SIZE),
             ),
         }
     }
@@ -90,25 +88,49 @@ impl From<SegmentRequest> for [u8; SESSION_MSG_SIZE] {
 }
 
 /// Holds the Frame Acknowledgement message.
-/// This carries up to [`FrameAcknowledgements::MAX_ACK_FRAMES`] [frame IDs](FrameId) that have
+/// This carries an ordered set of up to [`FrameAcknowledgements::MAX_ACK_FRAMES`] [frame IDs](FrameId) that have
 /// been acknowledged by the counterparty.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FrameAcknowledgements(Vec<FrameId>);
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct FrameAcknowledgements(BTreeSet<FrameId>);
 
 impl FrameAcknowledgements {
     /// Maximum number of [frame IDs](FrameId) that can be accommodated.
     pub const MAX_ACK_FRAMES: usize = SESSION_MSG_SIZE / mem::size_of::<FrameId>();
+
+    /// Pushes the frame ID.
+    /// Returns true if the value has been pushed or false it the container is full or already
+    /// contains that value.
+    pub fn push(&mut self, frame_id: FrameId) -> bool {
+        if !self.is_full() {
+            self.0.insert(frame_id)
+        } else {
+            false
+        }
+    }
+
+    /// Indicates whether the [maximum number of frame IDs](FrameAcknowledgements::MAX_ACK_FRAMES)
+    /// has been reached.
+    #[inline]
+    pub fn is_full(&self) -> bool {
+        self.0.len() == Self::MAX_ACK_FRAMES
+    }
 }
 
 impl From<Vec<FrameId>> for FrameAcknowledgements {
     fn from(value: Vec<FrameId>) -> Self {
-        Self(value.into_iter().take(Self::MAX_ACK_FRAMES).filter(|v| *v > 0).collect())
+        Self(
+            value
+                .into_iter()
+                .take(Self::MAX_ACK_FRAMES)
+                .filter(|v| *v > 0)
+                .collect(),
+        )
     }
 }
 
 impl IntoIterator for FrameAcknowledgements {
     type Item = FrameId;
-    type IntoIter = std::vec::IntoIter<Self::Item>;
+    type IntoIter = std::collections::btree_set::IntoIter<Self::Item>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
@@ -127,7 +149,7 @@ impl<'a> TryFrom<&'a [u8]> for FrameAcknowledgements {
                     .chunks(mem::size_of::<FrameId>())
                     .map(|v| FrameId::from_be_bytes(v.try_into().unwrap()))
                     .filter(|f| *f > 0)
-                    .collect::<Vec<_>>(),
+                    .collect(),
             ))
         } else {
             Err(SessionError::ParseError)
@@ -149,6 +171,7 @@ impl From<FrameAcknowledgements> for [u8; SESSION_MSG_SIZE] {
     }
 }
 
+/// Contains all messages of the Session sub-protocol.
 #[derive(Debug, Clone, PartialEq, Eq, strum::EnumDiscriminants)]
 #[strum_discriminants(derive(strum::FromRepr), repr(u16))]
 pub enum SessionMessage {
@@ -160,22 +183,27 @@ pub enum SessionMessage {
     Acknowledge(FrameAcknowledgements),
 }
 
+impl SessionMessage {
+    /// Convenience method to encode the session message.
+    pub fn into_encoded(self) -> Box<[u8]> {
+        Vec::from(self).into_boxed_slice()
+    }
+}
+
 impl TryFrom<&[u8]> for SessionMessage {
     type Error = SessionError;
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
-        if value.len() < 2 + Segment::HEADER_SIZE  {
+        if value.len() < 2 + Segment::HEADER_SIZE {
             return Err(SessionError::ParseError);
         }
 
-        let disc = u16::from_be_bytes(
-            (&value[0..2])
-                .try_into()
-                .map_err(|_| SessionError::ParseError)?,
-        );
+        let disc = u16::from_be_bytes((&value[0..2]).try_into().map_err(|_| SessionError::ParseError)?);
 
         match SessionMessageDiscriminants::from_repr(disc).ok_or(SessionError::UnknownMessageTag)? {
-            SessionMessageDiscriminants::Segment => Ok(SessionMessage::Segment((&value[2..]).try_into().map_err(|_| SessionError::ParseError)?)),
+            SessionMessageDiscriminants::Segment => Ok(SessionMessage::Segment(
+                (&value[2..]).try_into().map_err(|_| SessionError::ParseError)?,
+            )),
             SessionMessageDiscriminants::Request => Ok(SessionMessage::Request((&value[2..]).try_into()?)),
             SessionMessageDiscriminants::Acknowledge => Ok(SessionMessage::Acknowledge((&value[2..]).try_into()?)),
         }
@@ -199,23 +227,23 @@ impl From<SessionMessage> for Vec<u8> {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
-    use std::time::SystemTime;
+    use crate::frame::{Frame, FrameInfo};
+    use crate::session::protocol::SessionMessage;
     use fixedbitset::FixedBitSet;
     use hex_literal::hex;
     use rand::prelude::IteratorRandom;
-    use rand::{Rng, thread_rng};
-    use crate::frame::{Frame, FrameInfo};
-    use crate::session::protocol::{SegmentRequest, SessionMessage};
+    use rand::{thread_rng, Rng};
+    use std::time::SystemTime;
 
     #[test]
     fn test_session_message_segment() {
         let mut segments = Frame {
             frame_id: 10,
             data: hex!("deadbeefcafebabe").into(),
-        }.segment(8);
+        }
+        .segment(8);
 
         let msg_1 = SessionMessage::Segment(segments.pop().unwrap());
         let data = Vec::from(msg_1.clone());
@@ -227,7 +255,12 @@ mod tests {
     #[test]
     fn test_session_message_segment_req() {
         let mut missing_segments = FixedBitSet::with_capacity(10_000);
-        (0..10_000_usize).choose_multiple(&mut thread_rng(), 2000).into_iter().for_each(|i| { missing_segments.put(i); });
+        (0..10_000_usize)
+            .choose_multiple(&mut thread_rng(), 2000)
+            .into_iter()
+            .for_each(|i| {
+                missing_segments.put(i);
+            });
 
         let frame_info = FrameInfo {
             frame_id: 10,
