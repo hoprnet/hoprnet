@@ -184,6 +184,10 @@ pub enum SessionMessage {
 }
 
 impl SessionMessage {
+    /// Header size of the session message.
+    /// This is currently just the size of [SessionMessageDiscriminants] representation.
+    pub const HEADER_SIZE: usize = mem::size_of::<SessionMessageDiscriminants>();
+
     /// Convenience method to encode the session message.
     pub fn into_encoded(self) -> Box<[u8]> {
         Vec::from(self).into_boxed_slice()

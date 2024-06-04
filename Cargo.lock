@@ -3884,6 +3884,7 @@ dependencies = [
  "rayon",
  "serde",
  "serde_bytes",
+ "smart-default",
  "strum 0.26.2",
  "thiserror",
  "tokio",

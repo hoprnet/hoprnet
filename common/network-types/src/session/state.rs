@@ -11,6 +11,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::Duration;
+use smart_default::SmartDefault;
 
 use crate::errors::NetworkTypeError;
 use crate::frame::{segment, FrameId, FrameReassembler, SegmentId};
@@ -22,11 +23,22 @@ pub trait NetworkTransport {
     async fn send_to_counterparty(&self, data: &[u8]) -> crate::errors::Result<()>;
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Configuration of session.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, SmartDefault)]
 pub struct SessionConfig {
+    /// Maximum number of buffered segments.
+    #[default = 30000]
     pub max_buffered_segments: usize,
+    /// Size of the buffer for acknowledged frame IDs.
+    /// If set to 0, no frame acknowledgement will be sent.
+    #[default = 0]
     pub acknowledged_frames_buffer: usize,
+    /// Incomplete frames will be discarded after being in the reassembler
+    /// this long.
+    #[default(Duration::from_secs(30))]
     pub frame_expiration_age: Duration,
+    /// Payload size available for the session sub-protocol.
+    #[default = 466]
     pub mtu: u16,
 }
 
@@ -115,7 +127,7 @@ impl<T: NetworkTransport> SessionState<T> {
     pub async fn send_frame_data(&self, data: &[u8]) -> crate::errors::Result<()> {
         for segment in segment(
             data,
-            self.cfg.mtu,
+            self.cfg.mtu - SessionMessage::HEADER_SIZE as u16,
             self.outgoing_frame_id.fetch_add(1, Ordering::SeqCst),
         ) {
             self.lookbehind.insert((&segment).into(), segment.clone());
@@ -156,8 +168,10 @@ pub struct SessionSocket<T: NetworkTransport> {
 impl<T: NetworkTransport> SessionSocket<T> {
     pub fn new(transport: T, cfg: SessionConfig) -> Self {
         let (reassembler, egress) = FrameReassembler::new(cfg.frame_expiration_age.into());
+
         let acknowledged =
             Arc::new((cfg.acknowledged_frames_buffer > 0).then(|| ArrayQueue::new(cfg.acknowledged_frames_buffer)));
+
         let state = SessionState {
             transport: Arc::new(transport),
             lookbehind: Arc::new(SkipMap::new()),
@@ -167,19 +181,18 @@ impl<T: NetworkTransport> SessionSocket<T> {
             cfg,
         };
 
-        let egress = egress
+        let egress = Box::new(egress
             .inspect(move |frame| {
                 if let Some(ack_buf) = acknowledged.deref() {
-                    let _ = ack_buf.push(frame.frame_id);
+                    // Act as a ring buffer, so the buffer is full, any unsent acknowledgements
+                    // will be discarded.
+                    ack_buf.force_push(frame.frame_id);
                 }
             })
             .map(Ok)
-            .into_async_read();
+            .into_async_read());
 
-        Self {
-            state,
-            egress: Box::new(egress),
-        }
+        Self { state, egress }
     }
 }
 
