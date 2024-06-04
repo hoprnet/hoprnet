@@ -136,8 +136,6 @@ impl SwarmEventLoop {
         on_transport_output: UnboundedSender<TransportOutput>,
         on_acknowledged_ticket: UnboundedSender<AcknowledgedTicket>,
     ) {
-        let me_peer_id = swarm.peer_id();
-
         let mut swarm: libp2p::Swarm<HoprNetworkBehavior> = swarm.into();
 
         let mut ack_writer = self.ack_interactions.writer();
@@ -272,7 +270,7 @@ impl SwarmEventLoop {
                             }
                         },
                         PeerTransportEvent::Announce(peer, multiaddresses) => {
-                            if peer != me_peer_id {
+                            if &peer != swarm.local_peer_id() {
                                 trace!("transport input - indexer - processing announcement for '{peer}' with addresses: '{multiaddresses:?}'");
                                 for multiaddress in multiaddresses.iter() {
                                     if !swarm.is_connected(&peer) {

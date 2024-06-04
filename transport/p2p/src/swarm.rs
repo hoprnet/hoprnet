@@ -187,10 +187,6 @@ impl HoprSwarm {
 
         Self { swarm }
     }
-
-    pub fn peer_id(&self) -> libp2p::PeerId {
-        *self.swarm.local_peer_id()
-    }
 }
 
 impl From<HoprSwarm> for libp2p::Swarm<HoprNetworkBehavior> {
