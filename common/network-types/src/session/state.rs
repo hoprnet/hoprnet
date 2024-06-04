@@ -4,6 +4,7 @@ use crossbeam_skiplist::SkipMap;
 use futures::future::BoxFuture;
 use futures::{AsyncRead, AsyncWrite, FutureExt, StreamExt, TryStreamExt};
 use pin_project::pin_project;
+use smart_default::SmartDefault;
 use std::future::Future;
 use std::ops::Deref;
 use std::pin::Pin;
@@ -11,7 +12,6 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::Duration;
-use smart_default::SmartDefault;
 
 use crate::errors::NetworkTypeError;
 use crate::frame::{segment, FrameId, FrameReassembler, SegmentId};
@@ -42,6 +42,13 @@ pub struct SessionConfig {
     pub mtu: u16,
 }
 
+/// Contains the state of the session bound to a [`SessionSocket`].
+///
+/// It implements the entire [`SessionMessage`] state machine and
+/// performs the frame reassembly and sequencing.
+/// The underlying transport operations are bound to [`NetworkTransport`]
+///
+/// The `SessionState` cannot be created directly, it must always be created via [`SessionSocket`].
 #[derive(Debug)]
 pub struct SessionState<T: NetworkTransport> {
     transport: Arc<T>,
@@ -53,7 +60,9 @@ pub struct SessionState<T: NetworkTransport> {
 }
 
 impl<T: NetworkTransport> SessionState<T> {
-    pub async fn received_packet(&self, data: &[u8]) -> crate::errors::Result<()> {
+    /// Should be called by the underlying transport when raw packet data are received.
+    /// The `data` argument must contain a valid [`SessionMessage`], otherwise the method throws an error.
+    pub async fn received_message(&self, data: &[u8]) -> crate::errors::Result<()> {
         match SessionMessage::try_from(data)? {
             SessionMessage::Segment(s) => self.frame_reassembler.push_segment(s)?,
             SessionMessage::Request(r) => {
@@ -83,7 +92,13 @@ impl<T: NetworkTransport> SessionState<T> {
         Ok(())
     }
 
-    pub async fn request_segments(&self, max_requests: Option<usize>) -> crate::errors::Result<()> {
+    /// Sends a requests for missing segments in incomplete frames.
+    /// One [request](SessionMessage::Request) message is sent per incomplete frame. The message contains
+    /// the segment indices missing from that frame. The `max_requests` argument can provide a maximum
+    /// number of request messages sent by this call. If `max_requests` is `None`, request messages
+    /// are set for all incomplete frames.
+    /// Returns the number of sent request messages.
+    pub async fn request_missing_segments(&self, max_requests: Option<usize>) -> crate::errors::Result<usize> {
         self.frame_reassembler.evict()?;
 
         let mut incomplete = self
@@ -95,35 +110,68 @@ impl<T: NetworkTransport> SessionState<T> {
         incomplete.sort_unstable_by(|a, b| a.last_update.cmp(&b.last_update));
         let max = max_requests.unwrap_or(incomplete.len());
 
+        let mut sent = 0;
         for req in incomplete
             .into_iter()
             .take(max)
             .map(|info| SessionMessage::Request(info.into()))
         {
             self.transport.send_to_counterparty(&req.into_encoded()).await?;
+            sent += 1;
         }
 
-        Ok(())
+        Ok(sent)
     }
 
-    pub async fn acknowledge_segments(&self) -> crate::errors::Result<usize> {
-        let mut ack_frames = FrameAcknowledgements::default();
+    /// Sends [acknowledgement](SessionMessage::Acknowledge) messages containing frames IDs
+    /// of all frames that were successfully processed.
+    /// If [`acknowledged_frames_buffer`](SessionConfig) was set to `0` during the construction,
+    /// this method will do nothing and return `0`.
+    /// Otherwise, it returns the number of acknowledged frames.
+    /// If `acknowledged_frames_buffer` is non-zero, the buffer behaves like a ring buffer,
+    /// which means if this method is not called sufficiently often, the oldest acknowledged
+    /// frame IDs will be discarded.
+    /// Single [message](SessionMessage::Acknowledge) can accommodate up to [`FrameAcknowledgements::MAX_ACK_FRAMES`] frame IDs, so
+    /// this method sends as many messages as needed, or at most `max_message` if was given.
+    pub async fn acknowledge_segments(&self, max_messages: Option<usize>) -> crate::errors::Result<usize> {
         if let Some(acked_buffer) = self.acknowledged.deref() {
             let mut len = 0;
-            while !ack_frames.is_full() && !acked_buffer.is_empty() {
-                ack_frames.push(acked_buffer.pop().unwrap());
-                len += 1;
+            let mut msgs = 0;
+            while !acked_buffer.is_empty() {
+                let mut ack_frames = FrameAcknowledgements::default();
+
+                if max_messages.map(|max| msgs < max).unwrap_or(true) {
+                    while !ack_frames.is_full() {
+                        if let Some(ack_id) = acked_buffer.pop() {
+                            ack_frames.push(ack_id);
+                            len += 1;
+                        }
+                    }
+
+                    self.transport
+                        .send_to_counterparty(&SessionMessage::Acknowledge(ack_frames).into_encoded())
+                        .await?;
+                    msgs += 1;
+                } else {
+                    // Break out if we sent max allowed
+                    return Ok(len);
+                }
             }
 
-            self.transport
-                .send_to_counterparty(&SessionMessage::Acknowledge(ack_frames).into_encoded())
-                .await?;
             Ok(len)
         } else {
             Ok(0)
         }
     }
 
+    /// Segments the `data` and sends them as (possibly multiple) [`SessionMessage::Segment`].
+    /// Therefore, this method sends as many messages as needed after the data was segmented.
+    /// Each segment is inserted into the lookbehind ring buffer for possible retransmissions.
+    ///
+    /// The size of the lookbehind ring buffer is given by the [`max_buffered_segments`](SessionConfig)
+    /// given during the construction. It needs to accommodate as many segments as
+    /// is the expected underlying transport bandwidth (segment/sec) to guarantee the retransmission
+    /// can still happen within some time window.
     pub async fn send_frame_data(&self, data: &[u8]) -> crate::errors::Result<()> {
         for segment in segment(
             data,
@@ -158,6 +206,11 @@ impl<T: NetworkTransport> Clone for SessionState<T> {
     }
 }
 
+/// Represents a socket for a session between two nodes bound by the
+/// underlying [`NetworkTransport`].
+///
+/// It also implements [`AsyncRead`] and [`AsyncWrite`] so that it can
+/// be used on top of the usual transport stack.
 #[pin_project]
 pub struct SessionSocket<T: NetworkTransport> {
     state: SessionState<T>,
@@ -166,6 +219,7 @@ pub struct SessionSocket<T: NetworkTransport> {
 }
 
 impl<T: NetworkTransport> SessionSocket<T> {
+    /// Create a new socket over the given `transport` that binds the communicating parties.
     pub fn new(transport: T, cfg: SessionConfig) -> Self {
         let (reassembler, egress) = FrameReassembler::new(cfg.frame_expiration_age.into());
 
@@ -181,18 +235,25 @@ impl<T: NetworkTransport> SessionSocket<T> {
             cfg,
         };
 
-        let egress = Box::new(egress
-            .inspect(move |frame| {
-                if let Some(ack_buf) = acknowledged.deref() {
-                    // Act as a ring buffer, so the buffer is full, any unsent acknowledgements
-                    // will be discarded.
-                    ack_buf.force_push(frame.frame_id);
-                }
-            })
-            .map(Ok)
-            .into_async_read());
+        let egress = Box::new(
+            egress
+                .inspect(move |frame| {
+                    if let Some(ack_buf) = acknowledged.deref() {
+                        // Act as a ring buffer, so the buffer is full, any unsent acknowledgements
+                        // will be discarded.
+                        ack_buf.force_push(frame.frame_id);
+                    }
+                })
+                .map(Ok)
+                .into_async_read(),
+        );
 
         Self { state, egress }
+    }
+
+    /// The [state](SessionState) of this socket.
+    pub fn state(&self) -> &SessionState<T> {
+        &self.state
     }
 }
 
@@ -245,3 +306,6 @@ impl<T: NetworkTransport + Send + Sync> AsyncRead for SessionSocket<T> {
         self.project().egress.poll_read(cx, buf)
     }
 }
+
+#[cfg(test)]
+mod tests {}

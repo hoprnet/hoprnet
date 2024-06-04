@@ -153,7 +153,7 @@ impl Debug for Segment {
     }
 }
 
-impl<'a> PartialOrd<Segment> for Segment {
+impl PartialOrd<Segment> for Segment {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
     }
@@ -207,7 +207,7 @@ struct FrameBuilder {
 
 impl FrameBuilder {
     /// Creates a new builder with the given `initial` [Segment] and its timestamp `ts`.
-    fn new(initial: Segment, ts: u64) -> Self {
+    fn new(initial: Segment, ts: SystemTime) -> Self {
         let ret = Self::empty(initial.frame_id, initial.seq_len);
         ret.put(initial, ts).unwrap();
         ret
@@ -225,13 +225,14 @@ impl FrameBuilder {
 
     /// Adds a new [`segment`](Segment) to the builder with a timestamp `ts`.
     /// Returns the number of segments remaining in this builder.
-    fn put(&self, segment: Segment, ts: u64) -> crate::errors::Result<u16> {
+    fn put(&self, segment: Segment, ts: SystemTime) -> crate::errors::Result<u16> {
         if self.frame_id == segment.frame_id {
             if !self.is_complete() {
                 if self.segments[segment.seq_idx as usize].set(segment.data).is_ok() {
                     // A new segment has been added, decrease the remaining number and update timestamp
                     self.remaining.fetch_sub(1, Ordering::Relaxed);
-                    self.last_ts.fetch_max(ts, Ordering::Relaxed);
+                    self.last_ts
+                        .fetch_max(ts.as_unix_timestamp().as_millis() as u64, Ordering::Relaxed);
                 }
                 Ok(self.remaining.load(Ordering::SeqCst))
             } else {
@@ -387,7 +388,7 @@ impl FrameReassembler {
             return Err(NetworkTypeError::OldSegment(frame_id));
         }
 
-        let ts = current_time().as_unix_timestamp().as_millis() as u64;
+        let ts = current_time();
 
         match self.sequences.entry(frame_id) {
             Entry::Occupied(e) => {
