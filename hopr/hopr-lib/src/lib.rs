@@ -703,7 +703,7 @@ impl Hopr {
             self.network.clone(),
         ));
 
-        let (indexer_update_tx, indexer_update_rx) =
+        let (indexer_peer_update_tx, indexer_peer_update_rx) =
             async_channel::bounded::<PeerTransportEvent>(core_transport::constants::INDEXER_UPDATE_QUEUE_SIZE);
 
         let network = self.network.clone();
@@ -711,7 +711,7 @@ impl Hopr {
             let processing_stream = core_transport::add_peer_update_processing(to_process_rx, network)
                 .await
                 .filter_map(move |event| {
-                    let emitter = indexer_update_tx.clone();
+                    let emitter = indexer_peer_update_tx.clone();
                     async move {
                         match emitter.send(event).await {
                             Ok(_) => {}
@@ -899,7 +899,7 @@ impl Hopr {
                 self.tbf.raw_filter(),
                 transport_output_tx,
                 on_ack_tkt_tx,
-                indexer_update_rx,
+                indexer_peer_update_rx,
             )
             .await
             .into_iter()

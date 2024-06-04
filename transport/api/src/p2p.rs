@@ -5,7 +5,7 @@ use libp2p::request_response::OutboundRequestId;
 use std::collections::{HashMap, HashSet};
 use tracing::{debug, error, info, trace, warn};
 
-use core_network::network::NetworkTriggeredEvent;
+use core_network::{messaging::ControlMessage, network::NetworkTriggeredEvent, ping::PingQueryReplier};
 use core_protocol::{
     ack::processor::{AckProcessed, AckResult, AcknowledgementInteraction},
     msg::processor::{MsgProcessed, PacketInteraction},
@@ -13,7 +13,6 @@ use core_protocol::{
         TicketAggregationFinalizer, TicketAggregationInteraction, TicketAggregationProcessed,
     },
 };
-pub use hopr_transport_p2p::api;
 use hopr_transport_p2p::{
     libp2p::{request_response::ResponseChannel, swarm::SwarmEvent},
     HoprNetworkBehavior, HoprNetworkBehaviorEvent, HoprSwarm, Ping, Pong,
@@ -36,8 +35,7 @@ lazy_static::lazy_static! {
 /// input events passed into the swarm processing logic.
 #[derive(Debug)]
 pub enum Inputs {
-    Heartbeat(api::HeartbeatChallenge),
-    ManualPing(api::ManualPingChallenge),
+    Heartbeat((PeerId, PingQueryReplier)),
     NetworkUpdate(NetworkTriggeredEvent),
     Message(MsgProcessed),
     TicketAggregation(TicketAggregationProcessed<ResponseChannel<Result<Ticket, String>>, OutboundRequestId>),
@@ -45,15 +43,9 @@ pub enum Inputs {
     Indexer(PeerTransportEvent),
 }
 
-impl From<api::HeartbeatChallenge> for Inputs {
-    fn from(value: api::HeartbeatChallenge) -> Self {
+impl From<(PeerId, PingQueryReplier)> for Inputs {
+    fn from(value: (PeerId, PingQueryReplier)) -> Self {
         Self::Heartbeat(value)
-    }
-}
-
-impl From<api::ManualPingChallenge> for Inputs {
-    fn from(value: api::ManualPingChallenge) -> Self {
-        Self::ManualPing(value)
     }
 }
 
@@ -99,10 +91,7 @@ pub struct SwarmEventLoop {
     pkt_interactions: PacketInteraction,
     ticket_aggregation_interactions:
         TicketAggregationInteraction<ResponseChannel<Result<Ticket, String>>, OutboundRequestId>,
-    heartbeat_requests: api::HeartbeatRequester,
-    heartbeat_responds: api::HeartbeatResponder,
-    manual_ping_requests: api::ManualPingRequester,
-    manual_ping_responds: api::HeartbeatResponder,
+    heartbeat_requests: futures::channel::mpsc::UnboundedReceiver<(PeerId, PingQueryReplier)>,
 }
 
 impl std::fmt::Debug for SwarmEventLoop {
@@ -122,10 +111,7 @@ impl SwarmEventLoop {
             TicketAggregationResponseType,
             TicketAggregationRequestType,
         >,
-        heartbeat_requests: api::HeartbeatRequester,
-        heartbeat_responds: api::HeartbeatResponder,
-        manual_ping_requests: api::ManualPingRequester,
-        manual_ping_responds: api::HeartbeatResponder,
+        heartbeat_requests: futures::channel::mpsc::UnboundedReceiver<(PeerId, PingQueryReplier)>,
     ) -> Self {
         Self {
             network_update_input,
@@ -134,9 +120,6 @@ impl SwarmEventLoop {
             pkt_interactions,
             ticket_aggregation_interactions,
             heartbeat_requests,
-            heartbeat_responds,
-            manual_ping_requests,
-            manual_ping_responds,
         }
     }
 
@@ -157,14 +140,12 @@ impl SwarmEventLoop {
 
         let mut swarm: libp2p::Swarm<HoprNetworkBehavior> = swarm.into();
 
-        let mut heartbeat_responds = self.heartbeat_responds;
-        let mut manual_ping_responds = self.manual_ping_responds;
-
         let mut ack_writer = self.ack_interactions.writer();
         let mut pkt_writer = self.pkt_interactions.writer();
         let mut aggregation_writer = self.ticket_aggregation_interactions.writer();
 
-        let mut active_manual_pings: HashSet<libp2p::request_response::OutboundRequestId> = HashSet::new();
+        // TODO: use a forgetting cache for the ping responses
+        let mut active_pings: HashMap<libp2p::request_response::OutboundRequestId, PingQueryReplier> = HashMap::new();
         let mut active_aggregation_requests: HashMap<
             libp2p::request_response::OutboundRequestId,
             TicketAggregationFinalizer,
@@ -174,7 +155,6 @@ impl SwarmEventLoop {
 
         let inputs = (
             self.heartbeat_requests.map(Inputs::Heartbeat),
-            self.manual_ping_requests.map(Inputs::ManualPing),
             self.network_update_input.map(Inputs::NetworkUpdate),
             self.ack_interactions.map(Inputs::Acknowledgement),
             self.pkt_interactions.map(Inputs::Message),
@@ -189,14 +169,10 @@ impl SwarmEventLoop {
         loop {
             select! {
                 input = inputs.select_next_some() => match input {
-                    Inputs::Heartbeat(api::HeartbeatChallenge(peer, challenge)) => {
+                    Inputs::Heartbeat((peer, replier)) => {
                         trace!("transport input - heartbeat - executing ping to peer '{peer}'");
-                        swarm.behaviour_mut().heartbeat.send_request(&peer, Ping(challenge));
-                    },
-                    Inputs::ManualPing(api::ManualPingChallenge(peer, challenge)) => {
-                        trace!("transport input - manual ping - executing ping to peer '{peer}'");
-                        let req_id = swarm.behaviour_mut().heartbeat.send_request(&peer, Ping(challenge));
-                        active_manual_pings.insert(req_id);
+                        let req_id = swarm.behaviour_mut().heartbeat.send_request(&peer, Ping(replier.challenge()));
+                        active_pings.insert(req_id, replier);
                     },
                     Inputs::NetworkUpdate(event) => match event {
                         NetworkTriggeredEvent::CloseConnection(peer) => {
@@ -439,10 +415,12 @@ impl SwarmEventLoop {
                         },
                     })) => {
                         trace!("transport protocol - p2p - heartbeat - received a Ping request from '{peer}' (#{request_id})");
-                        let challenge_response = api::HeartbeatResponder::generate_challenge_response(&request.0);
-                        if swarm.behaviour_mut().heartbeat.send_response(channel, Pong(challenge_response, version.clone())).is_err() {
-                            error!("transport protocol - p2p - heartbeat - failed to reply to ping request");
-                        };
+                        if let Ok(challenge_response) = ControlMessage::generate_pong_response(&request.0)
+                        {
+                            if swarm.behaviour_mut().heartbeat.send_response(channel, Pong(challenge_response, version.clone())).is_err() {
+                                error!("transport protocol - p2p - heartbeat - failed to reply to ping request");
+                            };
+                        }
                     },
                     SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Heartbeat(libp2p::request_response::Event::<Ping,Pong>::Message {
                         peer,
@@ -451,24 +429,18 @@ impl SwarmEventLoop {
                             request_id, response
                         },
                     })) => {
-                        if active_manual_pings.take(&request_id).is_some() {
+                        if let Some(replier) = active_pings.remove(&request_id) {
                             trace!("transport protocol - p2p - heartbeat - processing manual ping response from '{peer}'");
-                            if let Err(e) = manual_ping_responds.record_pong((peer, Ok((response.0, response.1)))) {
-                                error!("transport protocol - p2p - heartbeat - failed to record manual ping response: {e}");
-                            }
+                            replier.notify(response.0, response.1)
                         } else {
-                            trace!("transport protocol - p2p - heartbeat - processing heartbeat ping response from peer '{peer}'");
-                            if let Err(e) = heartbeat_responds.record_pong((peer, Ok((response.0, response.1)))) {
-                                error!("transport protocol - p2p - heartbeat - failed to record heartbeat response: {e}");
-                            }
+                            debug!("transport protocol - p2p - heartbeat - failed to find heartbeat replier for '{peer}'");
                         }
                     },
                     SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Heartbeat(libp2p::request_response::Event::<Ping,Pong>::OutboundFailure {
-                        peer, ..    //request_id, error,
+                        request_id, peer, error,
                     })) => {
-                        if let Err(e) = heartbeat_responds.record_pong((peer, Err(()))) {
-                            error!("transport protocol - p2p - failed to update heartbeat mechanism with response: {e}");
-                        }
+                        trace!("transport protocol - p2p - heartbeat - encountered outbound failure for '{peer}': {error}");
+                        active_pings.remove(&request_id);
                     },
                     SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Heartbeat(libp2p::request_response::Event::<Ping,Pong>::InboundFailure {
                         peer, error, ..     // request_id

@@ -1,15 +1,12 @@
-use std::{
-    collections::{hash_map::Entry, HashMap},
-    ops::Div,
-};
+use std::ops::Div;
 
 use async_trait::async_trait;
-use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
+use futures::channel::mpsc::UnboundedSender;
 use futures::StreamExt;
 use hopr_primitive_types::traits::SaturatingSub;
 use libp2p_identity::PeerId;
 
-use tracing::{debug, trace, warn};
+use tracing::{debug, warn};
 
 use hopr_platform::time::native::current_time;
 
@@ -34,7 +31,31 @@ lazy_static::lazy_static! {
         ).unwrap();
 }
 
+#[cfg(any(feature = "runtime-async-std", test))]
+use async_std::future::timeout as timeout_fut;
+
+#[cfg(all(feature = "runtime-tokio", not(test)))]
+use tokio::time::timeout as timeout_fut;
+
 const MAX_PARALLEL_PINGS: usize = 14;
+
+/// Trait for the ping operation itself.
+#[async_trait]
+pub trait Pinging {
+    async fn ping(&self, peers: Vec<PeerId>);
+}
+
+/// External behavior that will be triggered once a [PingResult] is available.
+#[cfg_attr(test, mockall::automock)]
+#[async_trait]
+pub trait PingExternalAPI {
+    async fn on_finished_ping(
+        &self,
+        peer: &PeerId,
+        result: std::result::Result<std::time::Duration, ()>,
+        version: String,
+    );
+}
 
 /// Heartbeat send ping TX type
 ///
@@ -44,29 +65,9 @@ const MAX_PARALLEL_PINGS: usize = 14;
 /// The unboundedness relies on the fact that a back pressure mechanism exists on a
 /// higher level of the business logic making sure that only a fixed maximum count
 /// of pings ever enter the queues at any given time.
-pub type HeartbeatSendPingTx = UnboundedSender<(PeerId, ControlMessage)>;
+pub type HeartbeatSendPingTx = UnboundedSender<(PeerId, PingQueryReplier)>;
 
-/// Heartbeat get pong RX type
-///
-/// NOTE: UnboundedSender and UnboundedReceiver are bound only by available memory
-/// in case of faster input than output the memory might run out.
-///
-/// The unboundedness relies on the fact that a back pressure mechanism exists on a
-/// higher level of the business logic making sure that only a fixed maximum count
-/// of pings ever enter the queues at any given time.
-pub type HeartbeatGetPongRx = UnboundedReceiver<(PeerId, std::result::Result<(ControlMessage, String), ()>)>;
-
-/// Result of the ping operation.
-pub type PingResult = std::result::Result<u64, ()>;
-
-/// External behavior that will be triggered once a [PingResult] is available.
-#[cfg_attr(test, mockall::automock)]
-#[async_trait]
-pub trait PingExternalAPI {
-    async fn on_finished_ping(&self, peer: &PeerId, result: PingResult, version: String);
-}
-
-/// Configuration for the [Ping] mechanism
+/// Configuration for the [`Pinger`] mechanism
 #[derive(Debug, Clone, PartialEq, Eq, smart_default::SmartDefault)]
 pub struct PingConfig {
     /// The maximum total allowed concurrent heartbeat ping count
@@ -77,52 +78,99 @@ pub struct PingConfig {
     pub timeout: std::time::Duration, // `Duration` -> should be in millis,
 }
 
-/// Trait for the ping operation itself.
-#[async_trait]
-pub trait Pinging {
-    async fn ping(&mut self, peers: Vec<PeerId>);
+pub type PingQueryResult = std::result::Result<(std::time::Duration, String), ()>;
+
+#[derive(Debug)]
+pub struct PingQueryReplier {
+    notifier: futures::channel::oneshot::Sender<PingQueryResult>,
+    challenge: Box<(u64, ControlMessage)>,
+}
+
+impl PingQueryReplier {
+    pub fn new(notifier: futures::channel::oneshot::Sender<PingQueryResult>) -> Self {
+        Self {
+            notifier,
+            challenge: Box::new((
+                current_time().as_unix_timestamp().as_millis() as u64,
+                ControlMessage::generate_ping_request(),
+            )),
+        }
+    }
+
+    pub fn challenge(&self) -> ControlMessage {
+        self.challenge.1.clone()
+    }
+
+    pub fn notify(self, pong: ControlMessage, version: String) {
+        if let Err(_) = self.notifier.send(
+            ControlMessage::validate_pong_response(&self.challenge.1, &pong)
+                .map(|_| {
+                    let unidirectional_latency = current_time()
+                        .as_unix_timestamp()
+                        .saturating_sub(std::time::Duration::from_millis(self.challenge.0))
+                        .div(2u32);
+                    (unidirectional_latency, version)
+                })
+                .map_err(|_| ()),
+        ) {
+            warn!("Failed to notify the ping query result due to timeout");
+        }
+    }
+}
+
+#[tracing::instrument(level = "trace")]
+pub fn to_active_ping(
+    peer: PeerId,
+    sender: HeartbeatSendPingTx,
+    timeout: std::time::Duration,
+) -> impl std::future::Future<Output = (PeerId, std::result::Result<std::time::Duration, ()>, String)> {
+    let (tx, rx) = futures::channel::oneshot::channel::<PingQueryResult>();
+    let replier = PingQueryReplier::new(tx);
+
+    if let Err(e) = sender.unbounded_send((peer, replier)) {
+        warn!("Failed to initiate a ping request to '{peer}': {e}");
+    }
+
+    async move {
+        match timeout_fut(timeout, rx).await {
+            Ok(Ok(Ok((latency, version)))) => {
+                debug!(latency = latency.as_millis(), "Ping to '{peer}' ({version}) succeeded",);
+                (peer, Ok(latency), version)
+            }
+            _ => {
+                debug!("Ping to '{peer}' failed");
+                (peer, Err(()), "unknown".into())
+            }
+        }
+    }
 }
 
 /// Implementation of the ping mechanism
 #[derive(Debug)]
-pub struct Ping<T: PingExternalAPI + std::marker::Send> {
+pub struct Pinger<T>
+where
+    T: PingExternalAPI + Send + Sync,
+{
     config: PingConfig,
     send_ping: HeartbeatSendPingTx,
-    receive_pong: HeartbeatGetPongRx,
-    external_api: T,
+    recorder: T,
 }
 
-type PingStartedRecord = (u64, ControlMessage);
-
-impl<T: PingExternalAPI + std::marker::Send> Ping<T> {
-    pub fn new(
-        config: PingConfig,
-        send_ping: HeartbeatSendPingTx,
-        receive_pong: HeartbeatGetPongRx,
-        external_api: T,
-    ) -> Ping<T> {
+impl<T> Pinger<T>
+where
+    T: PingExternalAPI + Send + Sync,
+{
+    pub fn new(config: PingConfig, send_ping: HeartbeatSendPingTx, recorder: T) -> Self {
         let config = PingConfig {
             max_parallel_pings: config.max_parallel_pings.min(MAX_PARALLEL_PINGS),
             ..config
         };
 
-        Ping {
+        Pinger {
             config,
             send_ping,
-            receive_pong,
-            external_api,
+            recorder,
         }
-    }
-
-    #[tracing::instrument(level = "debug", skip(self))]
-    fn initiate_peer_ping(&self, peer: &PeerId) -> Result<(u64, ControlMessage), ()> {
-        let ping_challenge: ControlMessage = ControlMessage::generate_ping_request();
-
-        self.send_ping
-            .clone()
-            .unbounded_send((*peer, ping_challenge.clone()))
-            .map(move |_| (current_time().as_unix_timestamp().as_millis() as u64, ping_challenge))
-            .map_err(|_| ())
     }
 
     pub fn config(&self) -> &PingConfig {
@@ -131,7 +179,10 @@ impl<T: PingExternalAPI + std::marker::Send> Ping<T> {
 }
 
 #[async_trait]
-impl<T: PingExternalAPI + std::marker::Send> Pinging for Ping<T> {
+impl<T> Pinging for Pinger<T>
+where
+    T: PingExternalAPI + Send + Sync,
+{
     /// Performs multiple concurrent async pings to the specified peers.
     ///
     /// A sliding window mechanism is used to select at most a fixed number of concurrently processed
@@ -142,7 +193,7 @@ impl<T: PingExternalAPI + std::marker::Send> Pinging for Ping<T> {
     ///
     /// * `peers` - A vector of PeerId objects referencing the peers to be pinged
     #[tracing::instrument(level = "info", skip(self))]
-    async fn ping(&mut self, peers: Vec<PeerId>) {
+    async fn ping(&self, peers: Vec<PeerId>) {
         let start_all_peers = current_time();
         let mut peers = peers;
 
@@ -151,55 +202,17 @@ impl<T: PingExternalAPI + std::marker::Send> Pinging for Ping<T> {
             return;
         }
 
-        let mut active_pings: HashMap<PeerId, PingStartedRecord> = HashMap::new();
-
         let remainder = peers.split_off(self.config.max_parallel_pings.min(peers.len()));
-        for peer in peers.into_iter() {
-            if let Entry::Vacant(e) = active_pings.entry(peer) {
-                if let Ok(v) = self.initiate_peer_ping(&peer) {
-                    e.insert(v);
-                }
-            }
-        }
+        let mut active_pings = futures::stream::FuturesUnordered::from_iter(
+            peers
+                .into_iter()
+                .map(|peer| to_active_ping(peer, self.send_ping.clone(), self.config.timeout)),
+        );
 
         let mut waiting = std::collections::VecDeque::from(remainder);
 
-        while let Some((peer, response)) = self.receive_pong.next().await {
-            let record = active_pings.remove(&peer);
-
-            if record.is_none() {
-                trace!("Received a pong for an unregistered ping, likely an aborted run");
-                continue;
-            }
-
-            let (peer, result, version) = match response {
-                Ok((pong, version)) => {
-                    let (start, challenge) = record.expect("Should hold a value at this point");
-                    let duration: std::result::Result<std::time::Duration, ()> = {
-                        if ControlMessage::validate_pong_response(&challenge, &pong).is_ok() {
-                            let unidirectional_latency = current_time()
-                                .as_unix_timestamp()
-                                .saturating_sub(std::time::Duration::from_millis(start))
-                                .div(2u32);
-
-                            debug!(
-                                latency = tracing::field::debug(unidirectional_latency),
-                                "Successfully pinged '{peer}'"
-                            );
-                            Ok(unidirectional_latency)
-                        } else {
-                            warn!("Failed to verify the challenge for ping to '{peer}'");
-                            Err(())
-                        }
-                    };
-
-                    (peer, duration, version)
-                }
-                Err(_) => {
-                    debug!("Ping to '{peer}' timed out");
-                    (peer, Err(()), "unknown".to_owned())
-                }
-            };
+        while let Some((peer, result, version)) = active_pings.next().await {
+            self.recorder.on_finished_ping(&peer, result, version).await;
 
             #[cfg(all(feature = "prometheus", not(test)))]
             match result {
@@ -212,20 +225,9 @@ impl<T: PingExternalAPI + std::marker::Send> Pinging for Ping<T> {
                 }
             }
 
-            self.external_api
-                .on_finished_ping(&peer, result.map(|v| v.as_millis() as u64), version)
-                .await;
-
             if current_time().saturating_sub(start_all_peers) < self.config.timeout {
-                while let Some(peer) = waiting.pop_front() {
-                    if let Entry::Vacant(e) = active_pings.entry(peer) {
-                        match self.initiate_peer_ping(&peer) {
-                            Ok(v) => {
-                                e.insert(v);
-                            }
-                            Err(_) => continue,
-                        };
-                    }
+                if let Some(peer) = waiting.pop_front() {
+                    active_pings.push(to_active_ping(peer, self.send_ping.clone(), self.config.timeout));
                 }
             }
 
@@ -240,7 +242,7 @@ impl<T: PingExternalAPI + std::marker::Send> Pinging for Ping<T> {
 mod tests {
     use super::*;
     use crate::messaging::ControlMessage;
-    use crate::ping::Ping;
+    use crate::ping::Pinger;
     use hopr_primitive_types::traits::SaturatingSub;
     use mockall::*;
     use more_asserts::*;
@@ -253,82 +255,161 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn test_ping_peers_with_no_peers_should_not_do_any_api_calls() {
-        let mock = MockPingExternalAPI::new();
+    async fn ping_query_replier_should_return_ok_result_when_the_pong_is_correct_for_the_challenge() {
+        let (tx, rx) = futures::channel::oneshot::channel::<PingQueryResult>();
 
-        let (tx, _rx_ping) = futures::channel::mpsc::unbounded::<(PeerId, ControlMessage)>();
-        let (_tx_pong, rx) =
-            futures::channel::mpsc::unbounded::<(PeerId, std::result::Result<(ControlMessage, String), ()>)>();
+        let replier = PingQueryReplier::new(tx);
+        let challenge = replier.challenge.clone();
 
-        let mut pinger = Ping::new(simple_ping_config(), tx, rx, mock);
+        replier.notify(
+            ControlMessage::generate_pong_response(&challenge.1).expect("valid challenge reply"),
+            "version".to_owned(),
+        );
+
+        assert!(rx.await.unwrap().is_ok());
+    }
+
+    #[async_std::test]
+    async fn ping_query_replier_should_return_err_result_when_the_pong_is_incorrect_for_the_challenge() {
+        let (tx, rx) = futures::channel::oneshot::channel::<PingQueryResult>();
+
+        let replier = PingQueryReplier::new(tx);
+
+        replier.notify(
+            ControlMessage::generate_pong_response(&ControlMessage::generate_ping_request())
+                .expect("valid challenge reply"),
+            "version".to_owned(),
+        );
+
+        assert!(rx.await.unwrap().is_err());
+    }
+
+    #[async_std::test]
+    async fn ping_query_replier_should_return_the_unidirectional_latency() {
+        let (tx, rx) = futures::channel::oneshot::channel::<PingQueryResult>();
+
+        let replier = PingQueryReplier::new(tx);
+        let challenge = replier.challenge.clone();
+
+        let delay = std::time::Duration::from_millis(10);
+
+        async_std::task::sleep(delay).await;
+        replier.notify(
+            ControlMessage::generate_pong_response(&challenge.1).expect("valid challenge reply"),
+            "version".to_owned(),
+        );
+
+        let actual_latency = rx.await.unwrap().expect("should contain a result value").0;
+        assert!(actual_latency > delay / 2);
+        assert!(actual_latency < delay);
+    }
+
+    #[async_std::test]
+    async fn ping_empty_vector_of_peers_should_not_do_any_api_calls() {
+        let (tx, mut rx) = futures::channel::mpsc::unbounded::<(PeerId, PingQueryReplier)>();
+
+        let ideal_channel = async_std::task::spawn(async move {
+            while let Some((_peer, replier)) = rx.next().await {
+                let challenge = replier.challenge.1.clone();
+
+                replier.notify(
+                    ControlMessage::generate_pong_response(&challenge).expect("valid challenge reply"),
+                    "version".to_owned(),
+                );
+            }
+        });
+
+        let mut mock = MockPingExternalAPI::new();
+        mock.expect_on_finished_ping().times(0);
+
+        let pinger = Pinger::new(simple_ping_config(), tx, mock);
+
         pinger.ping(vec![]).await;
+
+        ideal_channel.cancel().await;
     }
 
     #[async_std::test]
     async fn test_ping_peers_with_happy_path_should_trigger_the_desired_external_api_calls() {
-        let (tx, mut rx_ping) = futures::channel::mpsc::unbounded::<(PeerId, ControlMessage)>();
-        let (tx_pong, rx) =
-            futures::channel::mpsc::unbounded::<(PeerId, std::result::Result<(ControlMessage, String), ()>)>();
+        let (tx, mut rx) = futures::channel::mpsc::unbounded::<(PeerId, PingQueryReplier)>();
+
+        let ideal_channel = async_std::task::spawn(async move {
+            while let Some((_peer, replier)) = rx.next().await {
+                let challenge = replier.challenge.1.clone();
+
+                replier.notify(
+                    ControlMessage::generate_pong_response(&challenge).expect("valid challenge reply"),
+                    "version".to_owned(),
+                );
+            }
+        });
 
         let peer = PeerId::random();
 
         let mut mock = MockPingExternalAPI::new();
         mock.expect_on_finished_ping()
+            .times(1)
             .with(
                 predicate::eq(peer),
-                predicate::function(|x: &PingResult| x.is_ok()),
+                predicate::function(|x: &std::result::Result<std::time::Duration, ()>| x.is_ok()),
                 predicate::eq("version".to_owned()),
             )
             .return_const(());
 
-        let ideal_single_use_channel = async move {
-            if let Some((peer, challenge)) = rx_ping.next().await {
-                let _ = tx_pong.unbounded_send((
-                    peer,
-                    Ok((
-                        ControlMessage::generate_pong_response(&challenge).expect("valid challenge"),
-                        "version".to_owned(),
-                    )),
-                ));
-            };
-        };
+        let pinger = Pinger::new(simple_ping_config(), tx, mock);
+        pinger.ping(vec![peer]).await;
 
-        let mut pinger = Ping::new(simple_ping_config(), tx, rx, mock);
-        futures::join!(pinger.ping(vec![peer]), ideal_single_use_channel);
+        ideal_channel.cancel().await;
     }
 
     #[async_std::test]
     async fn test_ping_should_invoke_a_failed_ping_reply_for_an_incorrect_reply() {
-        let (tx, mut rx_ping) = futures::channel::mpsc::unbounded::<(PeerId, ControlMessage)>();
-        let (tx_pong, rx) =
-            futures::channel::mpsc::unbounded::<(PeerId, std::result::Result<(ControlMessage, String), ()>)>();
+        let (tx, mut rx) = futures::channel::mpsc::unbounded::<(PeerId, PingQueryReplier)>();
+
+        let failing_channel = async_std::task::spawn(async move {
+            while let Some((_peer, replier)) = rx.next().await {
+                replier.notify(
+                    ControlMessage::generate_pong_response(&ControlMessage::generate_ping_request())
+                        .expect("valid challenge reply"),
+                    "version".to_owned(),
+                );
+            }
+        });
 
         let peer = PeerId::random();
 
         let mut mock = MockPingExternalAPI::new();
         mock.expect_on_finished_ping()
+            .times(1)
             .with(
                 predicate::eq(peer),
-                predicate::function(|x: &PingResult| x.is_err()),
-                predicate::eq("version".to_owned()),
+                predicate::function(|x: &std::result::Result<std::time::Duration, ()>| x.is_err()),
+                predicate::eq("unknown".to_owned()),
             )
             .return_const(());
 
-        let bad_pong_single_use_channel = async move {
-            if let Some((peer, challenge)) = rx_ping.next().await {
-                let _ = tx_pong.unbounded_send((peer, Ok((challenge, "version".to_owned()))));
-            };
-        };
+        let pinger = Pinger::new(simple_ping_config(), tx, mock);
+        pinger.ping(vec![peer]).await;
 
-        let mut pinger = Ping::new(simple_ping_config(), tx, rx, mock);
-        futures::join!(pinger.ping(vec![peer]), bad_pong_single_use_channel);
+        failing_channel.cancel().await;
     }
 
     #[async_std::test]
     async fn test_ping_peer_times_out_on_the_pong() {
-        let (tx, mut rx_ping) = futures::channel::mpsc::unbounded::<(PeerId, ControlMessage)>();
-        let (tx_pong, rx) =
-            futures::channel::mpsc::unbounded::<(PeerId, std::result::Result<(ControlMessage, String), ()>)>();
+        let (tx, mut rx) = futures::channel::mpsc::unbounded::<(PeerId, PingQueryReplier)>();
+
+        let delay = std::time::Duration::from_millis(10);
+        let delaying_channel = async_std::task::spawn(async move {
+            while let Some((_peer, replier)) = rx.next().await {
+                let challenge = replier.challenge.1.clone();
+
+                async_std::task::sleep(delay).await;
+                replier.notify(
+                    ControlMessage::generate_pong_response(&challenge).expect("valid challenge reply"),
+                    "version".to_owned(),
+                );
+            }
+        });
 
         let peer = PeerId::random();
         let ping_config = PingConfig {
@@ -338,117 +419,114 @@ mod tests {
 
         let mut mock = MockPingExternalAPI::new();
         mock.expect_on_finished_ping()
+            .times(1)
             .with(
                 predicate::eq(peer),
-                predicate::function(|x: &PingResult| x.is_err()),
+                predicate::function(|x: &std::result::Result<std::time::Duration, ()>| x.is_err()),
                 predicate::eq("unknown".to_owned()),
             )
             .return_const(());
 
-        // NOTE: timeout is ensured by the libp2p protocol handling, only error arrives
-        // from the channel
-        let timeout_single_use_channel = async move {
-            if let Some((peer, _challenge)) = rx_ping.next().await {
-                let _ = tx_pong.unbounded_send((peer, Err(())));
-            };
-        };
+        let pinger = Pinger::new(ping_config, tx, mock);
+        pinger.ping(vec![peer]).await;
 
-        let mut pinger = Ping::new(ping_config, tx, rx, mock);
-        futures::join!(pinger.ping(vec![peer]), timeout_single_use_channel);
+        delaying_channel.cancel().await;
     }
 
     #[async_std::test]
     async fn test_ping_peers_multiple_peers_are_pinged_in_parallel() {
-        let (tx, mut rx_ping) = futures::channel::mpsc::unbounded::<(PeerId, ControlMessage)>();
-        let (tx_pong, rx) =
-            futures::channel::mpsc::unbounded::<(PeerId, std::result::Result<(ControlMessage, String), ()>)>();
+        let (tx, mut rx) = futures::channel::mpsc::unbounded::<(PeerId, PingQueryReplier)>();
+
+        let ideal_channel = async_std::task::spawn(async move {
+            while let Some((_peer, replier)) = rx.next().await {
+                let challenge = replier.challenge.1.clone();
+
+                replier.notify(
+                    ControlMessage::generate_pong_response(&challenge).expect("valid challenge reply"),
+                    "version".to_owned(),
+                );
+            }
+        });
 
         let peers = vec![PeerId::random(), PeerId::random()];
 
         let mut mock = MockPingExternalAPI::new();
         mock.expect_on_finished_ping()
+            .times(1)
             .with(
                 predicate::eq(peers[0]),
-                predicate::function(|x: &PingResult| x.is_ok()),
+                predicate::function(|x: &std::result::Result<std::time::Duration, ()>| x.is_ok()),
                 predicate::eq("version".to_owned()),
             )
             .return_const(());
         mock.expect_on_finished_ping()
+            .times(1)
             .with(
                 predicate::eq(peers[1]),
-                predicate::function(|x: &PingResult| x.is_ok()),
+                predicate::function(|x: &std::result::Result<std::time::Duration, ()>| x.is_ok()),
                 predicate::eq("version".to_owned()),
             )
             .return_const(());
 
-        let ideal_twice_usable_channel = async move {
-            for _ in 0..2 {
-                if let Some((peer, challenge)) = rx_ping.next().await {
-                    let _ = tx_pong.unbounded_send((
-                        peer,
-                        Ok((
-                            ControlMessage::generate_pong_response(&challenge).expect("valid challenge"),
-                            "version".to_owned(),
-                        )),
-                    ));
-                };
-            }
-        };
+        let pinger = Pinger::new(simple_ping_config(), tx, mock);
+        pinger.ping(peers).await;
 
-        let mut pinger = Ping::new(simple_ping_config(), tx, rx, mock);
-        futures::join!(pinger.ping(peers), ideal_twice_usable_channel);
+        ideal_channel.cancel().await;
     }
 
     #[async_std::test]
     async fn test_ping_peers_should_ping_parallel_only_a_limited_number_of_peers() {
-        let (tx, mut rx_ping) = futures::channel::mpsc::unbounded::<(PeerId, ControlMessage)>();
-        let (tx_pong, rx) =
-            futures::channel::mpsc::unbounded::<(PeerId, std::result::Result<(ControlMessage, String), ()>)>();
+        let (tx, mut rx) = futures::channel::mpsc::unbounded::<(PeerId, PingQueryReplier)>();
 
-        let mut config = simple_ping_config();
-        config.max_parallel_pings = 1;
+        let delay = 10u64;
 
-        let ping_delay = 10u64;
+        let ideal_delaying_channel = async_std::task::spawn(async move {
+            while let Some((_peer, replier)) = rx.next().await {
+                let challenge = replier.challenge.1.clone();
+
+                async_std::task::sleep(std::time::Duration::from_millis(delay)).await;
+                replier.notify(
+                    ControlMessage::generate_pong_response(&challenge).expect("valid challenge reply"),
+                    "version".to_owned(),
+                );
+            }
+        });
 
         let peers = vec![PeerId::random(), PeerId::random()];
 
         let mut mock = MockPingExternalAPI::new();
         mock.expect_on_finished_ping()
+            .times(1)
             .with(
                 predicate::eq(peers[0]),
-                predicate::function(|x: &PingResult| x.is_ok()),
+                predicate::function(|x: &std::result::Result<std::time::Duration, ()>| x.is_ok()),
                 predicate::eq("version".to_owned()),
             )
             .return_const(());
         mock.expect_on_finished_ping()
+            .times(1)
             .with(
                 predicate::eq(peers[1]),
-                predicate::function(|x: &PingResult| x.is_ok()),
+                predicate::function(|x: &std::result::Result<std::time::Duration, ()>| x.is_ok()),
                 predicate::eq("version".to_owned()),
             )
             .return_const(());
 
-        let ideal_twice_usable_linearly_delaying_channel = async move {
-            for i in 0..2 {
-                if let Some((peer, challenge)) = rx_ping.next().await {
-                    async_std::task::sleep(std::time::Duration::from_millis(ping_delay * i)).await;
-                    let _ = tx_pong.unbounded_send((
-                        peer,
-                        Ok((
-                            ControlMessage::generate_pong_response(&challenge).expect("valid challenge"),
-                            "version".to_owned(),
-                        )),
-                    ));
-                };
-            }
-        };
-
-        let mut pinger = Ping::new(simple_ping_config(), tx, rx, mock);
+        let pinger = Pinger::new(
+            PingConfig {
+                max_parallel_pings: 1,
+                ..simple_ping_config()
+            },
+            tx,
+            mock,
+        );
 
         let start = current_time();
-        futures::join!(pinger.ping(peers), ideal_twice_usable_linearly_delaying_channel);
+        pinger.ping(peers).await;
         let end = current_time();
 
-        assert_ge!(end.saturating_sub(start), std::time::Duration::from_millis(ping_delay));
+        assert_ge!(end.saturating_sub(start), std::time::Duration::from_millis(delay));
+
+        ideal_delaying_channel.cancel().await;
     }
 }

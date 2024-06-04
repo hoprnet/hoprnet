@@ -10,7 +10,6 @@
 //! 4. algorithms associated with the transport layer operational management
 //! 5. interface specifications to allow modular behavioral extensions
 
-pub mod adaptors;
 /// Configuration of the [HoprTransport].
 pub mod config;
 /// Constants used and exposed by the crate.
@@ -18,6 +17,7 @@ pub mod constants;
 /// Errors used by the crate.
 pub mod errors;
 mod p2p;
+pub mod peer_quality;
 mod processes;
 mod timer;
 
@@ -43,7 +43,7 @@ pub use {
         libp2p,
         multiaddrs::{decapsulate_p2p_protocol, Multiaddr},
     },
-    p2p::{api, SwarmEventLoop},
+    p2p::SwarmEventLoop,
     timer::execute_on_tick,
 };
 
@@ -74,7 +74,11 @@ use hopr_db_sql::{
 };
 use tracing::{debug, error, info, warn};
 
-use core_network::{config::NetworkConfig, heartbeat::Heartbeat, messaging::ControlMessage, ping::Ping};
+use core_network::{
+    config::NetworkConfig,
+    heartbeat::Heartbeat,
+    ping::{PingQueryReplier, Pinger},
+};
 use core_network::{heartbeat::HeartbeatConfig, ping::PingConfig, PeerId};
 use core_protocol::{
     ack::processor::AcknowledgementInteraction,
@@ -225,7 +229,7 @@ where
     hb_cfg: HeartbeatConfig,
     proto_cfg: core_protocol::config::ProtocolConfig,
     db: T,
-    ping: Arc<OnceLock<RwLock<Ping<adaptors::ping::PingExternalInteractions<T>>>>>,
+    ping: Arc<OnceLock<RwLock<Pinger<peer_quality::PingExternalInteractions<T>>>>>,
     network: Arc<Network<T>>,
     channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
     my_multiaddresses: Vec<Multiaddr>,
@@ -295,20 +299,18 @@ where
         );
 
         // manual ping
-        let (ping_tx, ping_rx) = futures::channel::mpsc::unbounded::<(PeerId, ControlMessage)>();
-        let (pong_tx, pong_rx) =
-            futures::channel::mpsc::unbounded::<(PeerId, std::result::Result<(ControlMessage, String), ()>)>();
+        // TODO: does it make sense for this to be unbounded?
+        let (ping_tx, ping_rx) = futures::channel::mpsc::unbounded::<(PeerId, PingQueryReplier)>();
 
         let ping_cfg = PingConfig {
             timeout: self.proto_cfg.heartbeat.timeout,
             ..PingConfig::default()
         };
 
-        let ping: Ping<adaptors::ping::PingExternalInteractions<T>> = Ping::new(
+        let ping: Pinger<peer_quality::PingExternalInteractions<T>> = Pinger::new(
             ping_cfg,
-            ping_tx,
-            pong_rx,
-            adaptors::ping::PingExternalInteractions::new(
+            ping_tx.clone(),
+            peer_quality::PingExternalInteractions::new(
                 network.clone(),
                 self.db.clone(),
                 self.channel_graph.clone(),
@@ -338,13 +340,7 @@ where
             .expect("must set the packet processing writer only once");
 
         // heartbeat
-        let (hb_ping_tx, hb_ping_rx) = futures::channel::mpsc::unbounded::<(PeerId, ControlMessage)>();
-        let (hb_pong_tx, hb_pong_rx) = futures::channel::mpsc::unbounded::<(
-            libp2p::identity::PeerId,
-            std::result::Result<(ControlMessage, String), ()>,
-        )>();
-
-        let hb_pinger = Ping::new(
+        let hb_pinger = Pinger::new(
             self.ping
                 .get()
                 .expect("ping should be initialized at this point")
@@ -352,9 +348,8 @@ where
                 .await
                 .config()
                 .clone(),
-            hb_ping_tx,
-            hb_pong_rx,
-            adaptors::ping::PingExternalInteractions::new(
+            ping_tx,
+            peer_quality::PingExternalInteractions::new(
                 network.clone(),
                 self.db.clone(),
                 self.channel_graph.clone(),
@@ -374,10 +369,7 @@ where
             ack_proc,
             packet_proc,
             ticket_agg_proc,
-            hopr_transport_p2p::api::HeartbeatRequester::new(hb_ping_rx),
-            hopr_transport_p2p::api::HeartbeatResponder::new(hb_pong_tx),
-            hopr_transport_p2p::api::ManualPingRequester::new(ping_rx),
-            hopr_transport_p2p::api::HeartbeatResponder::new(pong_tx),
+            ping_rx,
         );
 
         let mut processes: HashMap<HoprTransportProcess, JoinHandle<()>> = HashMap::new();
@@ -416,7 +408,8 @@ where
             )
         })?;
 
-        let mut pinger = pinger.write().await;
+        // TODO: Write is not necessary
+        let pinger = pinger.write().await;
 
         let timeout = sleep(std::time::Duration::from_secs(30)).fuse();
         let ping = (*pinger).ping(vec![*peer]).fuse();

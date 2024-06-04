@@ -92,7 +92,7 @@ where
     cfg: NetworkConfig,
     db: T,
     #[cfg(all(feature = "prometheus", not(test)))]
-    started_at: std::time::Duration,
+    started_at: Duration,
 }
 
 impl<T> Network<T>
@@ -217,7 +217,7 @@ where
     pub async fn update(
         &self,
         peer: &PeerId,
-        ping_result: crate::ping::PingResult,
+        ping_result: std::result::Result<Duration, ()>,
         version: Option<String>,
     ) -> crate::errors::Result<Option<NetworkTriggeredEvent>> {
         if peer == &self.me {
@@ -234,7 +234,7 @@ where
 
             if let Ok(latency) = ping_result {
                 entry.last_seen = current_time();
-                entry.last_seen_latency = Duration::from_millis(latency);
+                entry.last_seen_latency = latency;
                 entry.heartbeats_succeeded += 1;
                 entry.backoff = self.cfg.backoff_min;
                 entry.update_quality(1.0_f64.min(entry.get_quality() + self.cfg.quality_step));
@@ -460,7 +460,7 @@ mod tests {
         let peers = basic_network(&me).await;
 
         peers
-            .update(&peer, Ok(current_time().as_unix_timestamp().as_millis() as u64), None)
+            .update(&peer, Ok(current_time().as_unix_timestamp()), None)
             .await
             .expect("no error should occur");
 
@@ -487,7 +487,7 @@ mod tests {
         let latency = 123u64;
 
         peers
-            .update(&peer, Ok(latency), None)
+            .update(&peer, Ok(std::time::Duration::from_millis(latency)), None)
             .await
             .expect("no error should occur");
 
@@ -513,11 +513,7 @@ mod tests {
                 .await
                 .expect("should not fail on DB add");
             peers
-                .update(
-                    &peer,
-                    Ok(current_time().as_unix_timestamp().as_millis() as u64),
-                    expected_version.clone(),
-                )
+                .update(&peer, Ok(current_time().as_unix_timestamp()), expected_version.clone())
                 .await
                 .expect("no error should occur");
 
@@ -526,7 +522,7 @@ mod tests {
             assert_eq!(status.peer_version, expected_version);
         }
 
-        let ts = current_time().as_unix_timestamp().as_millis() as u64;
+        let ts = current_time().as_unix_timestamp();
 
         {
             let expected_version = Some("2.0.0".to_string());
@@ -556,11 +552,11 @@ mod tests {
         peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await.unwrap();
 
         peers
-            .update(&peer, Ok(current_time().as_unix_timestamp().as_millis() as u64), None)
+            .update(&peer, Ok(current_time().as_unix_timestamp()), None)
             .await
             .expect("no error should occur");
         peers
-            .update(&peer, Ok(current_time().as_unix_timestamp().as_millis() as u64), None)
+            .update(&peer, Ok(current_time().as_unix_timestamp()), None)
             .await
             .expect("no error should occur");
         peers.update(&peer, Err(()), None).await.expect("no error should occur"); // should drop to ignored
@@ -587,15 +583,15 @@ mod tests {
         // Needs to do 3 pings, so we get over the ignore threshold limit
         // when doing the 4th failed ping
         peers
-            .update(&peer, Ok(123_u64), None)
+            .update(&peer, Ok(std::time::Duration::from_millis(123_u64)), None)
             .await
             .expect("no error should occur");
         peers
-            .update(&peer, Ok(200_u64), None)
+            .update(&peer, Ok(std::time::Duration::from_millis(200_u64)), None)
             .await
             .expect("no error should occur");
         peers
-            .update(&peer, Ok(200_u64), None)
+            .update(&peer, Ok(std::time::Duration::from_millis(200_u64)), None)
             .await
             .expect("no error should occur");
 
@@ -631,11 +627,11 @@ mod tests {
         expected.sort();
 
         peers
-            .update(&first, Ok(latency), None)
+            .update(&first, Ok(std::time::Duration::from_millis(latency)), None)
             .await
             .expect("no error should occur");
         peers
-            .update(&second, Ok(latency), None)
+            .update(&second, Ok(std::time::Duration::from_millis(latency)), None)
             .await
             .expect("no error should occur");
 
@@ -711,7 +707,7 @@ mod tests {
         peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await.unwrap();
 
         peers
-            .update(&peer, Ok(current_time().as_unix_timestamp().as_millis() as u64), None)
+            .update(&peer, Ok(current_time().as_unix_timestamp()), None)
             .await
             .expect("no error should occur");
 
@@ -738,7 +734,7 @@ mod tests {
 
         assert_eq!(
             peers
-                .update(&peer, Ok(13u64), None)
+                .update(&peer, Ok(std::time::Duration::from_millis(13u64)), None)
                 .await
                 .expect("no error should occur"),
             Some(NetworkTriggeredEvent::UpdateQuality(peer.clone(), 0.1))
@@ -770,7 +766,7 @@ mod tests {
 
         for _ in 0..3 {
             peers
-                .update(&peer, Ok(current_time().as_unix_timestamp().as_millis() as u64), None)
+                .update(&peer, Ok(current_time().as_unix_timestamp()), None)
                 .await
                 .expect("no error should occur");
         }
@@ -799,11 +795,11 @@ mod tests {
 
         for _ in 0..3 {
             peers
-                .update(&peer2, Ok(current_time().as_unix_timestamp().as_millis() as u64), None)
+                .update(&peer2, Ok(current_time().as_unix_timestamp()), None)
                 .await
                 .expect("no error should occur");
             peers
-                .update(&peer, Ok(current_time().as_unix_timestamp().as_millis() as u64), None)
+                .update(&peer, Ok(current_time().as_unix_timestamp()), None)
                 .await
                 .expect("no error should occur");
         }
