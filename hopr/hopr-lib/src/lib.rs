@@ -706,10 +706,9 @@ impl Hopr {
         let (indexer_update_tx, indexer_update_rx) =
             async_channel::bounded::<PeerTransportEvent>(core_transport::constants::INDEXER_UPDATE_QUEUE_SIZE);
 
-        let db = self.db.clone();
         let network = self.network.clone();
         spawn(async move {
-            let processing_stream = core_transport::add_peer_update_processing(to_process_rx, db, network)
+            let processing_stream = core_transport::add_peer_update_processing(to_process_rx, network)
                 .await
                 .filter_map(move |event| {
                     let emitter = indexer_update_tx.clone();

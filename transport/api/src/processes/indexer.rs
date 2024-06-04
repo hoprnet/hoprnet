@@ -1,15 +1,12 @@
 use std::sync::Arc;
 
 use futures::{Stream, StreamExt};
-use tracing::{error, warn};
+use tracing::error;
 
 use chain_types::chain_events::NetworkRegistryStatus;
 use core_network::{network::Network, PeerId};
-use hopr_crypto_types::types::OffchainPublicKey;
-use hopr_db_sql::{
-    api::{errors::DbError, peers::HoprDbPeersOperations, resolver::HoprDbResolverOperations},
-    registry::HoprDbRegistryOperations,
-};
+
+use hopr_db_sql::api::peers::HoprDbPeersOperations;
 use hopr_transport_p2p::libp2p::swarm::derive_prelude::Multiaddr;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -30,7 +27,6 @@ impl From<NetworkRegistryStatus> for PeerEligibility {
 /// Indexer events triggered externally from the [crate::HoprTransport] object.
 pub enum IndexerToProcess {
     EligibilityUpdate(PeerId, PeerEligibility),
-    RegisterStatusUpdate,
     Announce(PeerId, Vec<Multiaddr>),
 }
 
@@ -44,24 +40,15 @@ pub enum PeerTransportEvent {
 
 pub async fn add_peer_update_processing<S, T>(
     src: S,
-    db: T,
     network: Arc<Network<T>>,
 ) -> impl Stream<Item = PeerTransportEvent> + Send + 'static
 where
-    T: HoprDbPeersOperations
-        + HoprDbResolverOperations
-        + HoprDbRegistryOperations
-        + Send
-        + Sync
-        + 'static
-        + std::fmt::Debug
-        + Clone,
+    T: HoprDbPeersOperations + Send + Sync + 'static + std::fmt::Debug + Clone,
     S: Stream<Item = IndexerToProcess> + Send + 'static,
 {
-    let out_stream = src
-        .filter_map(move |event| {
+    Box::pin(
+        src.filter_map(move |event| {
             let network = network.clone();
-            let db = db.clone();
 
             async move {
                 match event {
@@ -77,58 +64,11 @@ where
                     IndexerToProcess::Announce(peer, multiaddress) => {
                         Some(vec![PeerTransportEvent::Announce(peer, multiaddress)])
                     }
-                    // TODO: when is this even triggered? network registry missing?
-                    IndexerToProcess::RegisterStatusUpdate => Some(
-                        futures::stream::iter(
-                            network
-                                .peer_filter(|peer| async move { Some(peer.id.1) })
-                                .await
-                                .unwrap_or(vec![]),
-                        )
-                        .filter_map(move |peer| {
-                            let network = network.clone();
-                            let db = db.clone();
-
-                            async move {
-                            if let Ok(key) = OffchainPublicKey::try_from(peer) {
-                                match db.resolve_chain_key(&key).await.and_then(|maybe_address| {
-                                    maybe_address.ok_or(DbError::LogicalError(format!(
-                                        "No address available for peer '{peer}'",
-                                    )))
-                                }) {
-                                    Ok(address) => match db.is_allowed_in_network_registry(None, address).await {
-                                        Ok(is_allowed) => {
-                                            if is_allowed {
-                                                Some(PeerTransportEvent::Allow(peer))
-                                            } else {
-                                                if let Err(e) = network.remove(&peer).await {
-                                                    error!("failed to remove '{peer}' from the local registry: {e}");
-                                                }
-                                                Some(PeerTransportEvent::Ban(peer))
-                                            }
-                                        }
-                                        Err(_) => None,
-                                    },
-                                    Err(e) => {
-                                        error!("{e}");
-                                        None
-                                    }
-                                }
-                            } else {
-                                warn!("Could not convert the peer id '{peer}' to an offchain public key");
-                                None
-                            }
-                        }
-                })
-                        .collect::<Vec<_>>()
-                        .await,
-                    ),
                 }
             }
         })
-        .flat_map(futures::stream::iter);
-
-    Box::pin(out_stream)
+        .flat_map(futures::stream::iter),
+    )
 }
 
 /// Implementor interface for indexer actions
