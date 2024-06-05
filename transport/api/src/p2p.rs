@@ -86,7 +86,7 @@ pub type TicketAggregationResponseType = ResponseChannel<Result<Ticket, String>>
 
 pub struct SwarmEventLoop {
     network_update_input: futures::channel::mpsc::Receiver<NetworkTriggeredEvent>,
-    indexer_update_input: async_channel::Receiver<PeerTransportEvent>,
+    indexer_update_input: futures::channel::mpsc::UnboundedReceiver<PeerTransportEvent>,
     ack_interactions: AcknowledgementInteraction,
     pkt_interactions: PacketInteraction,
     ticket_aggregation_interactions:
@@ -104,7 +104,7 @@ impl SwarmEventLoop {
     #[allow(clippy::too_many_arguments)] // TODO: refactor this function into a reasonable group of components once fully rearchitected
     pub fn new(
         network_update_input: futures::channel::mpsc::Receiver<NetworkTriggeredEvent>,
-        indexer_update_input: async_channel::Receiver<PeerTransportEvent>,
+        indexer_update_input: futures::channel::mpsc::UnboundedReceiver<PeerTransportEvent>,
         ack_interactions: AcknowledgementInteraction,
         pkt_interactions: PacketInteraction,
         ticket_aggregation_interactions: TicketAggregationInteraction<
@@ -202,7 +202,7 @@ impl SwarmEventLoop {
                         },
                         AckProcessed::Send(peer, ack) => {
                             trace!("transport input - ack - sending an acknowledgement to '{peer}'");
-                            let _request_id = swarm.behaviour_mut().ack.send_request(&peer, ack);
+                            let _req_id = swarm.behaviour_mut().ack.send_request(&peer, ack);
                         }
                     }
                     Inputs::Message(task) => match task {
@@ -231,8 +231,8 @@ impl SwarmEventLoop {
                     Inputs::TicketAggregation(task) => match task {
                         TicketAggregationProcessed::Send(peer, acked_tickets, finalizer) => {
                             debug!("transport input - ticket aggregation - send request to '{peer}' to aggregate {} tickets", acked_tickets.len());
-                            let request_id = swarm.behaviour_mut().ticket_aggregation.send_request(&peer, acked_tickets);
-                            active_aggregation_requests.insert(request_id, finalizer);
+                            let req_id = swarm.behaviour_mut().ticket_aggregation.send_request(&peer, acked_tickets);
+                            active_aggregation_requests.insert(req_id, finalizer);
                         },
                         TicketAggregationProcessed::Reply(peer, ticket, response) => {
                             debug!("transport input - ticket aggregation - responding to request by '{peer}'");

@@ -31,7 +31,7 @@ pub enum TransportOutput {
 pub use {
     crate::{
         processes::indexer::PeerTransportEvent,
-        processes::indexer::{add_peer_update_processing, IndexerActions, IndexerToProcess, PeerEligibility},
+        processes::indexer::{IndexerActions, IndexerTransportEvent, PeerEligibility},
     },
     core_network::network::{Health, Network, NetworkTriggeredEvent, PeerOrigin, PeerStatus},
     hopr_crypto_types::{
@@ -49,7 +49,10 @@ pub use {
 
 use async_lock::RwLock;
 use constants::RESERVED_TAG_UPPER_LIMIT;
-use futures::{channel::mpsc::UnboundedSender, FutureExt, SinkExt};
+use futures::{
+    channel::mpsc::{UnboundedReceiver, UnboundedSender},
+    FutureExt, SinkExt,
+};
 use hopr_transport_p2p::HoprSwarm;
 use std::{
     collections::HashMap,
@@ -291,7 +294,7 @@ where
         tbf: Arc<RwLock<TagBloomFilter>>,
         on_transport_output: UnboundedSender<TransportOutput>,
         on_acknowledged_ticket: UnboundedSender<AcknowledgedTicket>,
-        transport_updates: async_channel::Receiver<PeerTransportEvent>,
+        transport_updates: UnboundedReceiver<PeerTransportEvent>,
     ) -> HashMap<HoprTransportProcess, JoinHandle<()>> {
         // network event processing channel
         let (network_events_tx, network_events_rx) = futures::channel::mpsc::channel::<NetworkTriggeredEvent>(
