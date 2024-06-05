@@ -35,12 +35,14 @@ use core_protocol::{
     ticket_aggregation::config::TicketAggregationProtocolConfig,
 };
 
+use hopr_crypto_types::types::HalfKeyChallenge;
 /// Re-export of the entire libp2p functionality
 ///
 /// NOTE: likely can be reduced to [libp2p::PeerId] and [libp2p::multiaddr]
 pub use libp2p;
 
 use libp2p::{swarm::NetworkBehaviour, StreamProtocol};
+use libp2p::{Multiaddr, PeerId};
 
 use serde::{Deserialize, Serialize};
 
@@ -188,3 +190,18 @@ impl From<libp2p::request_response::Event<Acknowledgement, ()>> for HoprNetworkB
 }
 
 pub use swarm::HoprSwarm;
+
+/// Composite output from the transport layer.
+#[derive(Clone)]
+pub enum TransportOutput {
+    Received(ApplicationData),
+    Sent(HalfKeyChallenge),
+}
+
+#[derive(Debug)]
+/// Processed indexer generated events.
+pub enum PeerTransportEvent {
+    Allow(PeerId),
+    Ban(PeerId),
+    Announce(PeerId, Vec<Multiaddr>),
+}

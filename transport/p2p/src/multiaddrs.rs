@@ -1,4 +1,8 @@
+use std::net::{Ipv4Addr, ToSocketAddrs};
+
 pub use multiaddr::{Multiaddr, Protocol};
+
+use crate::errors::Result;
 
 /// Remove the `p2p/<PeerId>` component from a multiaddress
 pub fn decapsulate_p2p_protocol(ma: &Multiaddr) -> Multiaddr {
@@ -40,6 +44,62 @@ pub fn is_supported(ma: &Multiaddr) -> bool {
             )
         })
         .unwrap_or(false)
+}
+
+/// Replaces the IPv4 and IPv6 from the network layer with a unspecified interface in any multiaddress.
+pub(crate) fn replace_transport_with_unspecified(ma: &Multiaddr) -> Result<Multiaddr> {
+    let mut out = Multiaddr::empty();
+
+    for proto in ma.iter() {
+        match proto {
+            Protocol::Ip4(_) => out.push(std::net::IpAddr::V4(Ipv4Addr::UNSPECIFIED).into()),
+            Protocol::Ip6(_) => out.push(std::net::IpAddr::V6(std::net::Ipv6Addr::UNSPECIFIED).into()),
+            _ => out.push(proto),
+        }
+    }
+
+    Ok(out)
+}
+
+/// Resolves the DNS parts of a multiaddress and replaces it with the resolved IP address.
+pub(crate) fn resolve_dns_if_any(ma: &Multiaddr) -> Result<Multiaddr> {
+    let mut out = Multiaddr::empty();
+
+    for proto in ma.iter() {
+        match proto {
+            Protocol::Dns4(domain) => {
+                let ip = format!("{domain}:443") // dummy port, irrevelant at this point
+                    .to_socket_addrs()
+                    .map_err(|e| crate::errors::P2PError::Logic(e.to_string()))?
+                    .filter(|sa| sa.is_ipv4())
+                    .collect::<Vec<_>>()
+                    .first()
+                    .ok_or(crate::errors::P2PError::Logic(format!(
+                        "Failed to resolve {domain} to an IPv4 address. Does the DNS entry has an A record?"
+                    )))?
+                    .ip();
+
+                out.push(ip.into())
+            }
+            Protocol::Dns6(domain) => {
+                let ip = format!("{domain}:443") // dummy port, irrevelant at this point
+                    .to_socket_addrs()
+                    .map_err(|e| crate::errors::P2PError::Logic(e.to_string()))?
+                    .filter(|sa| sa.is_ipv6())
+                    .collect::<Vec<_>>()
+                    .first()
+                    .ok_or(crate::errors::P2PError::Logic(format!(
+                        "Failed to resolve {domain} to an IPv6 address. Does the DNS entry has an AAAA record?"
+                    )))?
+                    .ip();
+
+                out.push(ip.into())
+            }
+            _ => out.push(proto),
+        }
+    }
+
+    Ok(out)
 }
 
 #[cfg(test)]

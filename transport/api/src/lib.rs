@@ -16,8 +16,7 @@ pub mod config;
 pub mod constants;
 /// Errors used by the crate.
 pub mod errors;
-mod p2p;
-pub mod ping_notifier;
+pub mod network_notifier;
 mod processes;
 mod timer;
 
@@ -28,8 +27,10 @@ pub use {
         types::{HalfKeyChallenge, Hash, OffchainPublicKey},
     },
     hopr_internal_types::protocol::ApplicationData,
-    hopr_transport_p2p::{libp2p, libp2p::swarm::derive_prelude::Multiaddr, multiaddrs::decapsulate_p2p_protocol},
-    p2p::SwarmEventLoop,
+    hopr_transport_p2p::{
+        libp2p, libp2p::swarm::derive_prelude::Multiaddr, multiaddrs::decapsulate_p2p_protocol,
+        swarm::HoprSwarmWithProcessors, PeerTransportEvent, TransportOutput,
+    },
     timer::execute_on_tick,
 };
 
@@ -39,7 +40,10 @@ use futures::{
     channel::mpsc::{UnboundedReceiver, UnboundedSender},
     FutureExt, SinkExt,
 };
-use hopr_transport_p2p::HoprSwarm;
+use hopr_transport_p2p::{
+    swarm::{TicketAggregationRequestType, TicketAggregationResponseType},
+    HoprSwarm,
+};
 use std::{
     collections::HashMap,
     sync::{Arc, OnceLock},
@@ -94,13 +98,6 @@ lazy_static::lazy_static! {
 
 use chain_types::chain_events::NetworkRegistryStatus;
 
-/// Composite output from the transport layer.
-#[derive(Clone)]
-pub enum TransportOutput {
-    Received(ApplicationData),
-    Sent(HalfKeyChallenge),
-}
-
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum PeerEligibility {
     Eligible,
@@ -119,14 +116,6 @@ impl From<NetworkRegistryStatus> for PeerEligibility {
 /// Indexer events triggered externally from the [crate::HoprTransport] object.
 pub enum IndexerTransportEvent {
     EligibilityUpdate(PeerId, PeerEligibility),
-    Announce(PeerId, Vec<Multiaddr>),
-}
-
-#[derive(Debug)]
-/// Processed indexer generated events.
-pub enum PeerTransportEvent {
-    Allow(PeerId),
-    Ban(PeerId),
     Announce(PeerId, Vec<Multiaddr>),
 }
 
@@ -192,11 +181,8 @@ where
     Db: HoprDbTicketOperations + Send + Sync + Clone + std::fmt::Debug,
 {
     db: Db,
-    maybe_writer: Arc<
-        std::sync::OnceLock<
-            TicketAggregationActions<p2p::TicketAggregationResponseType, p2p::TicketAggregationRequestType>,
-        >,
-    >,
+    maybe_writer:
+        Arc<std::sync::OnceLock<TicketAggregationActions<TicketAggregationResponseType, TicketAggregationRequestType>>>,
     agg_timeout: std::time::Duration,
 }
 
@@ -207,9 +193,7 @@ where
     pub fn new(
         db: Db,
         maybe_writer: Arc<
-            std::sync::OnceLock<
-                TicketAggregationActions<p2p::TicketAggregationResponseType, p2p::TicketAggregationRequestType>,
-            >,
+            std::sync::OnceLock<TicketAggregationActions<TicketAggregationResponseType, TicketAggregationRequestType>>,
         >,
         agg_timeout: std::time::Duration,
     ) -> Self {
@@ -256,13 +240,13 @@ where
     hb_cfg: HeartbeatConfig,
     proto_cfg: core_protocol::config::ProtocolConfig,
     db: T,
-    ping: Arc<OnceLock<RwLock<Pinger<ping_notifier::PingExternalInteractions<T>>>>>,
+    ping: Arc<OnceLock<RwLock<Pinger<network_notifier::PingExternalInteractions<T>>>>>,
     network: Arc<Network<T>>,
     channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
     my_multiaddresses: Vec<Multiaddr>,
     process_packet_send: Arc<OnceLock<PacketActions>>,
     process_ticket_aggregate:
-        Arc<OnceLock<TicketAggregationActions<p2p::TicketAggregationResponseType, p2p::TicketAggregationRequestType>>>,
+        Arc<OnceLock<TicketAggregationActions<TicketAggregationResponseType, TicketAggregationRequestType>>>,
 }
 
 impl<T> HoprTransport<T>
@@ -334,10 +318,10 @@ where
             ..PingConfig::default()
         };
 
-        let ping: Pinger<ping_notifier::PingExternalInteractions<T>> = Pinger::new(
+        let ping: Pinger<network_notifier::PingExternalInteractions<T>> = Pinger::new(
             ping_cfg,
             ping_tx.clone(),
-            ping_notifier::PingExternalInteractions::new(
+            network_notifier::PingExternalInteractions::new(
                 network.clone(),
                 self.db.clone(),
                 self.channel_graph.clone(),
@@ -376,7 +360,7 @@ where
                 .config()
                 .clone(),
             ping_tx,
-            ping_notifier::PingExternalInteractions::new(
+            network_notifier::PingExternalInteractions::new(
                 network.clone(),
                 self.db.clone(),
                 self.channel_graph.clone(),
@@ -390,7 +374,9 @@ where
             Box::new(|dur| Box::pin(sleep(dur))),
         );
 
-        let swarm_loop = SwarmEventLoop::new(
+        // let swarm_loop = HoprSwarmWithProcessors::new
+
+        let transport_layer = transport_layer.with_processors(
             network_events_rx,
             transport_updates,
             ack_proc,
@@ -407,7 +393,7 @@ where
         );
         processes.insert(
             HoprTransportProcess::Swarm,
-            spawn(swarm_loop.run(transport_layer, version, on_transport_output, on_acknowledged_ticket)),
+            spawn(transport_layer.run(version, on_transport_output, on_acknowledged_ticket)),
         );
 
         processes

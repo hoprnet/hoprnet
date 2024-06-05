@@ -102,17 +102,17 @@ impl PingQueryReplier {
     }
 
     pub fn notify(self, pong: ControlMessage, version: String) {
-        if let Err(_) = self.notifier.send(
-            ControlMessage::validate_pong_response(&self.challenge.1, &pong)
-                .map(|_| {
-                    let unidirectional_latency = current_time()
-                        .as_unix_timestamp()
-                        .saturating_sub(std::time::Duration::from_millis(self.challenge.0))
-                        .div(2u32);
-                    (unidirectional_latency, version)
-                })
-                .map_err(|_| ()),
-        ) {
+        let timed_result = if ControlMessage::validate_pong_response(&self.challenge.1, &pong).is_ok() {
+            let unidirectional_latency = current_time()
+                .as_unix_timestamp()
+                .saturating_sub(std::time::Duration::from_millis(self.challenge.0))
+                .div(2u32);
+            Ok((unidirectional_latency, version))
+        } else {
+            Err(())
+        };
+
+        if self.notifier.send(timed_result).is_err() {
             warn!("Failed to notify the ping query result due to timeout");
         }
     }

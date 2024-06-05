@@ -206,8 +206,6 @@ where
     let network_clone = network.clone();
 
     Box::pin(event_stream.filter_map(move |event| {
-        let me = me;
-        let me_onchain = me_onchain;
         let db = db.clone();
         let multi_strategy = multi_strategy.clone();
         let channel_graph = channel_graph.clone();
