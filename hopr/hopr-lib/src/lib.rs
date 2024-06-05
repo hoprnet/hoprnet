@@ -791,21 +791,25 @@ impl Hopr {
         // TODO: wait here for the confirmation that the node is allowed in the registry
 
         info!("Loading initial peers from the storage");
-        let index_updater = core_transport::IndexerActions::new(to_process_tx.clone());
-
         for (peer, _address, multiaddresses) in self.transport_api.get_public_nodes().await? {
             if self.is_allowed_to_access_network(&peer).await? {
                 debug!("Using initial public node '{peer}' with '{:?}'", multiaddresses);
-                index_updater
-                    .emit_indexer_update(IndexerTransportEvent::EligibilityUpdate(
+                if let Err(e) = to_process_tx
+                    .send(IndexerTransportEvent::EligibilityUpdate(
                         peer,
                         PeerEligibility::Eligible,
                     ))
-                    .await;
+                    .await
+                {
+                    error!("Failed to send index update event to transport: {e}");
+                }
 
-                index_updater
-                    .emit_indexer_update(IndexerTransportEvent::Announce(peer, multiaddresses.clone()))
-                    .await;
+                if let Err(e) = to_process_tx
+                    .send(IndexerTransportEvent::Announce(peer, multiaddresses.clone()))
+                    .await
+                {
+                    error!("Failed to send index update event to transport: {e}");
+                }
 
                 // Self-reference is not needed in the network storage
                 if &peer != self.transport_api.me() {

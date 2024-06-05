@@ -17,32 +17,18 @@ pub mod constants;
 /// Errors used by the crate.
 pub mod errors;
 mod p2p;
-pub mod peer_quality;
+pub mod ping_notifier;
 mod processes;
 mod timer;
 
-/// Composite output from the transport layer.
-#[derive(Clone)]
-pub enum TransportOutput {
-    Received(ApplicationData),
-    Sent(HalfKeyChallenge),
-}
-
 pub use {
-    crate::{
-        processes::indexer::PeerTransportEvent,
-        processes::indexer::{IndexerActions, IndexerTransportEvent, PeerEligibility},
-    },
     core_network::network::{Health, Network, NetworkTriggeredEvent, PeerOrigin, PeerStatus},
     hopr_crypto_types::{
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         types::{HalfKeyChallenge, Hash, OffchainPublicKey},
     },
     hopr_internal_types::protocol::ApplicationData,
-    hopr_transport_p2p::{
-        libp2p,
-        multiaddrs::{decapsulate_p2p_protocol, Multiaddr},
-    },
+    hopr_transport_p2p::{libp2p, libp2p::swarm::derive_prelude::Multiaddr, multiaddrs::decapsulate_p2p_protocol},
     p2p::SwarmEventLoop,
     timer::execute_on_tick,
 };
@@ -104,6 +90,44 @@ lazy_static::lazy_static! {
         "Distribution of number of hops of sent messages",
         vec![0.0, 1.0, 2.0, 3.0, 4.0]
     ).unwrap();
+}
+
+use chain_types::chain_events::NetworkRegistryStatus;
+
+/// Composite output from the transport layer.
+#[derive(Clone)]
+pub enum TransportOutput {
+    Received(ApplicationData),
+    Sent(HalfKeyChallenge),
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum PeerEligibility {
+    Eligible,
+    Ineligible,
+}
+
+impl From<NetworkRegistryStatus> for PeerEligibility {
+    fn from(value: NetworkRegistryStatus) -> Self {
+        match value {
+            NetworkRegistryStatus::Allowed => Self::Eligible,
+            NetworkRegistryStatus::Denied => Self::Ineligible,
+        }
+    }
+}
+
+/// Indexer events triggered externally from the [crate::HoprTransport] object.
+pub enum IndexerTransportEvent {
+    EligibilityUpdate(PeerId, PeerEligibility),
+    Announce(PeerId, Vec<Multiaddr>),
+}
+
+#[derive(Debug)]
+/// Processed indexer generated events.
+pub enum PeerTransportEvent {
+    Allow(PeerId),
+    Ban(PeerId),
+    Announce(PeerId, Vec<Multiaddr>),
 }
 
 /// Build the [Network] object responsible for tracking and holding the
@@ -232,7 +256,7 @@ where
     hb_cfg: HeartbeatConfig,
     proto_cfg: core_protocol::config::ProtocolConfig,
     db: T,
-    ping: Arc<OnceLock<RwLock<Pinger<peer_quality::PingExternalInteractions<T>>>>>,
+    ping: Arc<OnceLock<RwLock<Pinger<ping_notifier::PingExternalInteractions<T>>>>>,
     network: Arc<Network<T>>,
     channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
     my_multiaddresses: Vec<Multiaddr>,
@@ -310,10 +334,10 @@ where
             ..PingConfig::default()
         };
 
-        let ping: Pinger<peer_quality::PingExternalInteractions<T>> = Pinger::new(
+        let ping: Pinger<ping_notifier::PingExternalInteractions<T>> = Pinger::new(
             ping_cfg,
             ping_tx.clone(),
-            peer_quality::PingExternalInteractions::new(
+            ping_notifier::PingExternalInteractions::new(
                 network.clone(),
                 self.db.clone(),
                 self.channel_graph.clone(),
@@ -352,7 +376,7 @@ where
                 .config()
                 .clone(),
             ping_tx,
-            peer_quality::PingExternalInteractions::new(
+            ping_notifier::PingExternalInteractions::new(
                 network.clone(),
                 self.db.clone(),
                 self.channel_graph.clone(),

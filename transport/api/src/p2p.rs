@@ -18,7 +18,7 @@ use hopr_transport_p2p::{
     HoprNetworkBehavior, HoprNetworkBehaviorEvent, HoprSwarm, Ping, Pong,
 };
 
-use crate::{processes::indexer::PeerTransportEvent, PeerId, TransportOutput};
+use crate::{PeerId, PeerTransportEvent, TransportOutput};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleGauge;
@@ -142,7 +142,7 @@ impl SwarmEventLoop {
         let mut pkt_writer = self.pkt_interactions.writer();
         let mut aggregation_writer = self.ticket_aggregation_interactions.writer();
 
-        // TODO: use a forgetting cache for the ping responses
+        // NOTE: an improvement would be a forgetting cache for the active requests
         let mut active_pings: HashMap<libp2p::request_response::OutboundRequestId, PingQueryReplier> = HashMap::new();
         let mut active_aggregation_requests: HashMap<
             libp2p::request_response::OutboundRequestId,
