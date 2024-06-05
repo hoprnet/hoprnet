@@ -401,6 +401,12 @@ where
             )));
         }
 
+        if peer == &self.me {
+            return Err(errors::HoprTransportError::Api(format!(
+                "ping to self does not make sense"
+            )));
+        }
+
         let pinger = self.ping.get().ok_or_else(|| {
             crate::errors::HoprTransportError::Api(
                 "ping: failed to send a ping, because ping processing is not yet initialized".into(),
