@@ -1,0 +1,137 @@
+---
+#################################################################################
+# Child pipeline to build hoprnet docker images
+#################################################################################
+name: Build Docker
+
+on:
+  workflow_call:
+    inputs:
+      base_branch:
+        required: true
+        type: string
+      package:
+        required: true
+        type: string
+concurrency:
+  group: ${{ github.head_ref }}-build-docker-${{ inputs.package }}
+  cancel-in-progress: true
+jobs:
+  build-docker:
+    runs-on: self-hosted-hoprnet-big
+    timeout-minutes: 60
+    steps:
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.base_branch }}
+
+      - name: Set up Google Cloud Credentials
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          token_format: "access_token"
+          credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+
+      - name: Login Google Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: europe-west3-docker.pkg.dev
+          username: oauth2accesstoken
+          password: ${{ steps.auth.outputs.access_token }}
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: cachix/cachix-action@v14
+        with:
+          name: hoprnet
+          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
+        env:
+          USER: runner
+
+      - name: Get PR labels
+        id: pr-labels
+        uses: joerick/pr-labels-action@v1.0.9
+
+      - name: Determine build options
+        id: options
+        run: |
+          if ${{ contains(steps.pr-labels.outputs.labels, ' release ') }}; then
+            docker_tag=$(./scripts/get-current-version.sh docker)
+            echo "DOCKER_TAG=${docker_tag}" >> $GITHUB_OUTPUT
+            echo "DOCKER_TAG_PR=${docker_tag}-pr.${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
+          else
+            next_version=$(./scripts/get-next-version.sh Build)
+            ./scripts/bump-version.sh ${next_version}
+            docker_tag_pr=$(echo "${next_version}" | sed 's/+.*/-pr.'${{ github.event.pull_request.number }}'/')
+            docker_tag=$(echo "${next_version}" | sed 's/+/-/')
+            echo "DOCKER_TAG=${docker_tag}" >> $GITHUB_OUTPUT
+            echo "DOCKER_TAG_PR=${docker_tag_pr}" >> $GITHUB_OUTPUT
+          fi
+          echo "DOCKER_TAG=${docker_tag}"
+          echo "DOCKER_TAG_PR=${docker_tag_pr}"
+        env:
+          COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
+
+      - name: Build and push ${{ inputs.package }} docker image - Default
+        run: nix run .#${{ inputs.package }}-docker-build-and-upload
+        env:
+          GOOGLE_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+          IMAGE_TARGET: europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/${{ inputs.package }}:${{ steps.options.outputs.DOCKER_TAG }}
+
+      - name: Build and push ${{ inputs.package }} docker image - PR
+        run: nix run .#${{ inputs.package }}-docker-build-and-upload
+        if: github.event_name == 'pull_request'
+        env:
+          GOOGLE_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+          IMAGE_TARGET: europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/${{ inputs.package }}:${{ steps.options.outputs.DOCKER_TAG_PR }}
+
+  deploy:
+    runs-on: self-hosted-hoprnet-small
+    needs: build-docker
+    if: contains(github.event.pull_request.labels.*.name, 'deploy_nodes') && contains(inputs.package,'hoprd')
+    steps:
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@v4
+
+      - name: Set up Google Cloud Credentials
+        uses: google-github-actions/auth@v1
+        with:
+          token_format: "access_token"
+          credentials_json: ${{ secrets.GCP_SA_TERRAFORM_JSON }}
+
+      - name: Set up Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v1
+        with:
+          project_id: hopr-staging
+          install_components: beta
+
+      - name: Get credentials
+        uses: google-github-actions/get-gke-credentials@v2
+        with:
+          cluster_name: cluster-staging
+          location: europe-west3
+          project_id: hopr-staging
+
+      - name: "Restart PR deployment"
+        run: |
+          base_branch="${{ github.event.pull_request.base.ref }}"
+          # Identify parameters depending on branch
+          if [[ "${base_branch}" =~ ^"release" ]]; then
+            identity_pool=hoprd-core-dufour
+          else
+            identity_pool=hoprd-core-rotsee
+          fi
+          namespace=core-team
+          cluster_name=pr-${{ github.event.pull_request.number }}
+          echo "[INFO] Restarting deployments on ${namespace} from pr-${{ github.event.pull_request.number }}"
+          # Get list of deployments to restart
+          export deployments=($(kubectl get deployments -n core-team -o json | jq -r --arg cluster_name $cluster_name '.items[] | select(.metadata.name | test($cluster_name)).metadata.name'))
+          for deployment in "${deployments[@]}"; do
+            echo "[INFO] Restarting hoprd node ${namespace}/${deployments}"
+            kubectl rollout restart deployments -n ${namespace} $deployment;
+          done
+

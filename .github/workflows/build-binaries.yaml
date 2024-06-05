@@ -1,0 +1,59 @@
+---
+#################################################################################
+# Child pipeline to build hoprnet binaries
+#################################################################################
+name: Build binaries
+
+on:
+  workflow_call:
+    inputs:
+      base_branch:
+        required: true
+        type: string
+      system:
+        required: true
+        type: string
+concurrency:
+  group: ${{ github.head_ref }}-build-binary-${{ inputs.system }}
+  cancel-in-progress: true
+jobs:
+  build-binary:
+    runs-on: self-hosted-hoprnet-big
+    timeout-minutes: 60
+    steps:
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.base_branch }}
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: cachix/cachix-action@v14
+        with:
+          name: hoprnet
+          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
+        env:
+          USER: runner
+
+      - name: Determine build options
+        id: options
+        run: |
+          if ${{ contains(github.event.pull_request.labels.*.name, 'release') }}; then
+            echo "NIX_PACKAGE_HOPRD=hoprd" >> $GITHUB_OUTPUT
+            echo "NIX_PACKAGE_HOPLI=hopli" >> $GITHUB_OUTPUT
+          else
+            echo "NIX_PACKAGE_HOPRD=hoprd-debug" >> $GITHUB_OUTPUT
+            echo "NIX_PACKAGE_HOPLI=hopli-debug" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build ${{ steps.options.outputs.NIX_PACKAGE_HOPRD }} binary for ${{ inputs.system }}
+        run: |
+          nix run .#${{ steps.options.outputs.NIX_PACKAGE_HOPRD }} --crossSystem ${{ inputs.system }}
+
+      - name: Build ${{ steps.options.outputs.NIX_PACKAGE_HOPLI }} binary for ${{ inputs.system }}
+        if: contains(github.event.pull_request.labels.*.name, 'component:hopli')
+        run: |
+          nix run .#${{ steps.options.outputs.NIX_PACKAGE_HOPLI }} --crossSystem ${{ inputs.system }}
