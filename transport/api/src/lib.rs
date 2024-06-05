@@ -402,9 +402,9 @@ where
         }
 
         if peer == &self.me {
-            return Err(errors::HoprTransportError::Api(format!(
-                "ping to self does not make sense"
-            )));
+            return Err(errors::HoprTransportError::Api(
+                "ping to self does not make sense".into(),
+            ));
         }
 
         let pinger = self.ping.get().ok_or_else(|| {
