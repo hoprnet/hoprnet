@@ -240,7 +240,7 @@ where
     hb_cfg: HeartbeatConfig,
     proto_cfg: core_protocol::config::ProtocolConfig,
     db: T,
-    ping: Arc<OnceLock<RwLock<Pinger<network_notifier::PingExternalInteractions<T>>>>>,
+    ping: Arc<OnceLock<Pinger<network_notifier::PingExternalInteractions<T>>>>,
     network: Arc<Network<T>>,
     channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
     my_multiaddresses: Vec<Multiaddr>,
@@ -310,7 +310,6 @@ where
         );
 
         // manual ping
-        // TODO: does it make sense for this to be unbounded?
         let (ping_tx, ping_rx) = futures::channel::mpsc::unbounded::<(PeerId, PingQueryReplier)>();
 
         let ping_cfg = PingConfig {
@@ -331,7 +330,7 @@ where
 
         self.ping
             .clone()
-            .set(RwLock::new(ping))
+            .set(ping)
             .expect("must set the ping executor only once");
 
         let transport_layer = HoprSwarm::new(me.into(), self.my_multiaddresses.clone(), self.proto_cfg).await;
@@ -351,25 +350,12 @@ where
             .expect("must set the packet processing writer only once");
 
         // heartbeat
-        let hb_pinger = Pinger::new(
-            self.ping
-                .get()
-                .expect("ping should be initialized at this point")
-                .read()
-                .await
-                .config()
-                .clone(),
-            ping_tx,
-            network_notifier::PingExternalInteractions::new(
-                network.clone(),
-                self.db.clone(),
-                self.channel_graph.clone(),
-                network_events_tx.clone(),
-            ),
-        );
         let mut heartbeat = Heartbeat::new(
             self.hb_cfg,
-            hb_pinger,
+            self.ping
+                .get()
+                .expect("Ping should be initialized at this point")
+                .clone(),
             core_network::heartbeat::HeartbeatExternalInteractions::new(network.clone()),
             Box::new(|dur| Box::pin(sleep(dur))),
         );
@@ -420,9 +406,6 @@ where
                 "ping: failed to send a ping, because ping processing is not yet initialized".into(),
             )
         })?;
-
-        // TODO: Write is not necessary
-        let pinger = pinger.write().await;
 
         let timeout = sleep(std::time::Duration::from_secs(30)).fuse();
         let ping = (*pinger).ping(vec![*peer]).fuse();
@@ -616,7 +599,6 @@ where
 
     #[tracing::instrument(level = "debug", skip(self))]
     pub async fn listening_multiaddresses(&self) -> Vec<Multiaddr> {
-        // TODO: can fail with the Result?
         self.network
             .get(&self.me)
             .await

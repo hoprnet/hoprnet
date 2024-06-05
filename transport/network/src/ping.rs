@@ -146,7 +146,7 @@ pub fn to_active_ping(
 }
 
 /// Implementation of the ping mechanism
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Pinger<T>
 where
     T: PingExternalAPI + Send + Sync,
