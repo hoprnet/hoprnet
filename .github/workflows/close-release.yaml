@@ -71,23 +71,23 @@ jobs:
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v5
         with:
-            token: ${{ secrets.GH_RUNNER_TOKEN }}
-            commit-message: "Close release ${{ steps.template.outputs.current_version }}"
-            title: "Close release ${{ steps.template.outputs.current_version }}"
-            body-path: .github/files/${{ steps.template.outputs.pr_template }}
-            branch: bot/close-${{ steps.template.outputs.current_version }}
-            delete-branch: true
-            labels: release
-            draft: true
-            assignees: ${{ github.actor }}
-            team-reviewers: "@hoprnet/hopr-development"
+          token: ${{ secrets.GH_RUNNER_TOKEN }}
+          commit-message: "Close release ${{ steps.template.outputs.current_version }}"
+          title: "Close release ${{ steps.template.outputs.current_version }}"
+          body-path: .github/files/${{ steps.template.outputs.pr_template }}
+          branch: bot/close-${{ steps.template.outputs.current_version }}
+          delete-branch: true
+          labels: release,load_tests,component:hopli,binary:x86_64-linux,binary:aarch64-linux,binary:aarch64-darwin,binary:x86_64-darwin
+          draft: true
+          assignees: ${{ github.actor }}
+          team-reviewers: "@hoprnet/hopr-development"
 
       - name: Enable Auto Merge
         run: |
-            git fetch
-            git checkout bot/close-${{ steps.template.outputs.current_version }}
-            gh pr ready
-            gh pr merge --auto --delete-branch --squash
+          git fetch
+          git checkout bot/close-${{ steps.template.outputs.current_version }}
+          gh pr ready
+          gh pr merge --auto --delete-branch --squash
         env:
           GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
 
