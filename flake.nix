@@ -120,6 +120,7 @@
           );
           buildInputsCross = buildInputs ++ [
             pkgsCross.rustCrossHook
+            # pkgsCross.gcc_multi
           ];
           commonArgs = {
             inherit nativeBuildInputs;
