@@ -42,7 +42,7 @@ jobs:
     secrets: inherit
 
   build-binary-aarch64-linux:
-    name: x86_64-linux
+    name: aarch64-linux
     if: contains(github.event.pull_request.labels.*.name, 'binary:aarch64-linux')
     uses: ./.github/workflows/build-binaries.yaml
     with:
@@ -51,7 +51,7 @@ jobs:
     secrets: inherit
 
   build-binary-aarch64-darwin:
-    name: x86_64-linux
+    name: aarch64-darwin
     if: contains(github.event.pull_request.labels.*.name, 'binary:aarch64-darwin')
     uses: ./.github/workflows/build-binaries.yaml
     with:
@@ -60,7 +60,7 @@ jobs:
     secrets: inherit
 
   build-binary-x86_64-darwin:
-    name: x86_64-linux
+    name: x86_64-darwin
     if: contains(github.event.pull_request.labels.*.name, 'binary:x86_64-darwin')
     uses: ./.github/workflows/build-binaries.yaml
     with:
