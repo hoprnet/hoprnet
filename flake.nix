@@ -1,35 +1,40 @@
 {
   description = "hoprnet monorepo";
 
-  inputs.flake-utils.url = github:numtide/flake-utils;
-  inputs.flake-parts.url = github:hercules-ci/flake-parts;
-  inputs.nixpkgs.url = github:NixOS/nixpkgs/master;
-  inputs.nixpkgs-cross-overlay.url = "github:alekseysidorov/nixpkgs-cross-overlay";
-  # using bugfix for macos libcurl:
-  # https://github.com/oxalica/rust-overlay/pull/149
-  inputs.rust-overlay.url = github:oxalica/rust-overlay/647bff9f5e10d7f1756d86eee09831e6b1b06430;
-  # using a fork with an added source filter
-  inputs.crane.url = github:hoprnet/crane/tb/20240117-find-filter;
-  inputs.foundry.url = github:shazow/foundry.nix/monthly;
-  # use change to add solc 0.8.24
-  inputs.solc.url = github:hoprnet/solc.nix/tb/20240129-solc-0.8.24;
-  inputs.pre-commit.url = github:cachix/pre-commit-hooks.nix;
-  inputs.treefmt-nix.url = github:numtide/treefmt-nix;
-  inputs.flake-root.url = github:srid/flake-root;
+  inputs = {
+    flake-utils.url = github:numtide/flake-utils;
+    flake-parts.url = github:hercules-ci/flake-parts;
+    nixpkgs.url = github:NixOS/nixpkgs/release-24.05;
+    nixpkgs-cross-overlay.url = "github:alekseysidorov/nixpkgs-cross-overlay";
+    # using bugfix for macos libcurl:
+    # https://github.com/oxalica/rust-overlay/pull/149
+    rust-overlay.url = github:oxalica/rust-overlay/647bff9f5e10d7f1756d86eee09831e6b1b06430;
+    # using a fork with an added source filter
+    crane.url = github:hoprnet/crane/tb/20240117-find-filter;
+    foundry.url = github:shazow/foundry.nix/monthly;
+    # use change to add solc 0.8.24
+    solc.url = github:hoprnet/solc.nix/tb/20240129-solc-0.8.24;
+    pre-commit.url = github:cachix/pre-commit-hooks.nix;
+    treefmt-nix.url = github:numtide/treefmt-nix;
+    flake-root.url = github:srid/flake-root;
 
-  inputs.rust-overlay.inputs.nixpkgs.follows = "nixpkgs";
-  inputs.rust-overlay.inputs.flake-utils.follows = "flake-utils";
-  inputs.crane.inputs.nixpkgs.follows = "nixpkgs";
-  inputs.foundry.inputs.nixpkgs.follows = "nixpkgs";
-  inputs.foundry.inputs.flake-utils.follows = "flake-utils";
-  inputs.solc.inputs.nixpkgs.follows = "nixpkgs";
-  inputs.solc.inputs.flake-utils.follows = "flake-utils";
-  inputs.treefmt-nix.inputs.nixpkgs.follows = "nixpkgs";
-  inputs.pre-commit.inputs.nixpkgs.follows = "nixpkgs";
-  inputs.pre-commit.inputs.nixpkgs-stable.follows = "nixpkgs";
-  inputs.pre-commit.inputs.flake-utils.follows = "flake-utils";
+    crane.inputs.nixpkgs.follows = "nixpkgs";
+    foundry.inputs.flake-utils.follows = "flake-utils";
+    foundry.inputs.nixpkgs.follows = "nixpkgs";
+    nixpkgs-cross-overlay.inputs.flake-utils.follows = "flake-utils";
+    nixpkgs-cross-overlay.inputs.nixpkgs.follows = "nixpkgs";
+    nixpkgs-cross-overlay.inputs.rust-overlay.follows = "rust-overlay";
+    nixpkgs-cross-overlay.inputs.treefmt-nix.follows = "treefmt-nix";
+    pre-commit.inputs.nixpkgs-stable.follows = "nixpkgs";
+    pre-commit.inputs.nixpkgs.follows = "nixpkgs";
+    rust-overlay.inputs.flake-utils.follows = "flake-utils";
+    rust-overlay.inputs.nixpkgs.follows = "nixpkgs";
+    solc.inputs.flake-utils.follows = "flake-utils";
+    solc.inputs.nixpkgs.follows = "nixpkgs";
+    treefmt-nix.inputs.nixpkgs.follows = "nixpkgs";
+  };
 
-  outputs = { self, nixpkgs, flake-utils, flake-parts, flake-root, rust-overlay, crane, foundry, solc, pre-commit, treefmt-nix, ... }@inputs:
+  outputs = { self, nixpkgs, flake-utils, flake-parts, flake-root, rust-overlay, crane, foundry, solc, pre-commit, treefmt-nix, nixpkgs-cross-overlay, ... }@inputs:
     flake-parts.lib.mkFlake { inherit inputs; } {
       imports = [
         inputs.treefmt-nix.flakeModule
@@ -38,20 +43,31 @@
       perSystem = { config, lib, self', inputs', system, ... }:
         let
           fs = lib.fileset;
-          overlays = [ (import rust-overlay) foundry.overlay solc.overlay ];
+          overlays = [ nixpkgs-cross-overlay.overlays.default (import rust-overlay) foundry.overlay solc.overlay ];
+          localSystem = system;
+          crossSystem = {
+            config = "aarch64-unknown-linux-gnu";
+            useLLVM = true;
+          };
           pkgs = import nixpkgs {
             inherit system overlays;
           };
+          pkgsCross = pkgs.mkCrossPkgs {
+            src = nixpkgs;
+            inherit localSystem crossSystem overlays;
+          };
+
+
           solcDefault = with pkgs; (solc.mkDefault pkgs solc_0_8_19);
           rustToolchain = pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
+          rustToolchainCross = pkgsCross.pkgsBuildHost.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
+
           rustNightly = pkgs.rust-bin.selectLatestNightlyWith (toolchain: toolchain.default);
+
           craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchain;
+          craneLibCross = (crane.mkLib pkgs).overrideToolchain rustToolchainCross;
+
           craneLibNightly = (crane.mkLib pkgs).overrideToolchain rustNightly;
-          localSystem = system;
-          crossSystem = {
-            config = "x86_64-unknown-linux-musl";
-            useLLVM = true;
-          };
           hoprdCrateInfoOriginal = craneLib.crateNameFromCargoToml {
             cargoToml = ./hopr/hopr-lib/Cargo.toml;
           };
@@ -102,8 +118,11 @@
               SystemConfiguration
             ]
           );
+          buildInputsCross = buildInputs ++ [
+            pkgsCross.rustCrossHook
+          ];
           commonArgs = {
-            inherit buildInputs nativeBuildInputs;
+            inherit nativeBuildInputs;
             CARGO_HOME = ".cargo";
             cargoVendorDir = "vendor/cargo";
             # disable running tests automatically for now
@@ -124,8 +143,8 @@
           hopliCrateInfo = craneLib.crateNameFromCargoToml {
             cargoToml = ./hopli/Cargo.toml;
           };
-          rustPackageDeps = { pname, version, builder ? craneLib.buildDepsOnly, CARGO_PROFILE ? "release" }: builder (commonArgs // {
-            inherit pname version CARGO_PROFILE;
+          rustPackageDeps = { pname, version, builder ? craneLib.buildDepsOnly, buildInputs ? buildInputs, CARGO_PROFILE ? "release" }: builder (commonArgs // {
+            inherit pname version CARGO_PROFILE buildInputs;
             src = depsSrc;
             cargoExtraArgs = "--offline -p ${pname}";
             extraDummyScript = ''
@@ -135,8 +154,13 @@
             '';
           });
           rustPackage = { pname, version, cargoArtifacts, CARGO_PROFILE ? "release", postInstall ? null }: craneLib.buildPackage (commonArgs // commonPhases // {
+            inherit pname version cargoArtifacts src postInstall buildInputs CARGO_PROFILE;
+            cargoExtraArgs = "--offline -p ${pname}";
+          });
+          rustPackageCross = { pname, version, cargoArtifacts, CARGO_PROFILE ? "release", postInstall ? null }: craneLibCross.buildPackage (commonArgs // commonPhases // {
             inherit pname version cargoArtifacts src postInstall CARGO_PROFILE;
             cargoExtraArgs = "--offline -p ${pname}";
+            buildInputs = buildInputsCross;
           });
           rustPackageTest = { pname, version, cargoArtifacts }: craneLib.cargoTest (commonArgs // commonPhases // {
             inherit pname version cargoArtifacts src;
@@ -150,6 +174,8 @@
             cargoClippyExtraArgs = "-- -Dwarnings";
           });
           hoprd = rustPackage (hoprdCrateInfo // { cargoArtifacts = rustPackageDeps hoprdCrateInfo; });
+          cross-input = hoprdCrateInfo // { builder = craneLibCross.buildDepsOnly; buildInputs = buildInputsCross; };
+          hoprd-cross = rustPackageCross (hoprdCrateInfo // { cargoArtifacts = rustPackageDeps cross-input; });
           hoprd-debug = rustPackage (hoprdCrateInfo // {
             cargoArtifacts = rustPackageDeps (hoprdCrateInfo // {
               CARGO_PROFILE = "dev";
@@ -464,9 +490,9 @@
             programs.nixpkgs-fmt.enable = true;
             settings.formatter.nixpkgs-fmt.excludes = [ "./vendor/*" ];
 
-            programs.ruff.enable = true;
-            programs.ruff.format = true;
-            settings.formatter.ruff.excludes = [ "./vendor/*" ];
+            #programs.ruff.check = true;
+            #programs.ruff.format = true;
+            #settings.formatter.ruff.excludes = [ "./vendor/*" ];
 
             settings.formatter.solc = {
               command = "sh";
@@ -509,17 +535,18 @@
             inherit anvil-docker;
             inherit smoke-tests docs;
             inherit pre-commit-check;
+            inherit hoprd-cross;
             default = hoprd;
           };
 
-          devShells = {
-            default = import ./shell.nix { inherit localSystem; };
-            cross = import ./shell.nix {
-              inherit localSystem crossSystem;
-            };
-          };
+          #devShells = {
+          #  default = import ./shell.nix { inherit localSystem; };
+          #  cross = import ./shell.nix {
+          #    inherit localSystem crossSystem;
+          #  };
+          #};
 
-          #devShells.default = defaultDevShell;
+          devShells.default = defaultDevShell;
           #devShells.smoke-tests = smoketestsDevShell;
 
           formatter = config.treefmt.build.wrapper;
