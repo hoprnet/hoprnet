@@ -1318,7 +1318,7 @@ dependencies = [
 
 [[package]]
 name = "chain-rpc"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "async-std",
  "async-stream",
@@ -3631,7 +3631,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-crypto-packet"
-version = "0.7.0"
+version = "0.7.1"
 dependencies = [
  "async-lock 3.3.0",
  "async-std",
@@ -3767,7 +3767,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-sql"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "async-lock 3.3.0",
  "async-std",

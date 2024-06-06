@@ -10,7 +10,7 @@
 //! ## What if blocking is needed
 //! Sometimes it is necessary to block a thread, e.g. when performing a CPU intensive task or waiting for a
 //! synchronous IO operation. Because these blocking operations would prevent the async executor to jump to a
-//! different task, effectively blocking it, one of the 3 possible strategies must be used to offload the 
+//! different task, effectively blocking it, one of the 3 possible strategies must be used to offload the
 //! blocking task from the executor's thread:
 //! 1. use executor native `spawn_blocking` to spawn the blocking task to a dedicated pool of blocking tasks running alongside the executor threads
 //!    - this solution allows to offload tasks onto typically hundreds of threads
