@@ -26,10 +26,11 @@ services:
       - "RUST_LOG=${HOPRD_LOG_LEVEL}"
       - RUST_BACKTRACE=full
       - HOPRD_CONFIGURATION_FILE_PATH=/app/hoprd.cfg.yaml
+      - HOPRD_API_PORT=3001
       # - OPENTELEMETRY_COLLECTOR_URL=http://server.
     volumes:
       - ./hoprd.cfg.yaml:/app/hoprd.cfg.yaml
-      - ./hoprd.id:/app/hoprd.id
+      - ./hopr.id:/app/hopr.id
       - hoprd_data:/app/hoprd-db
       - '/var/run/docker.sock:/var/run/docker.sock'
     deploy:
@@ -58,7 +59,7 @@ services:
         limits:
           memory: "${HOPR_ADMIN_MEM_LIMIT}"
     profiles:
-      - frontend
+      - admin-ui
 
   cadvisor:
     image: "${METRICS_CADVISOR_IMAGE}"

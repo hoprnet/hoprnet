@@ -20,8 +20,8 @@ The supported profiles are:
 
 - `hoprd`: runs a single hoprd node with configuration taken from config file
   - requires the `./hoprd.cfg.yaml` to be edited with relevant information
-  - requires the `./hoprd.id` file to be supplied inside the directory
-- `frontend`: runs a `hopr-admin` frontend
+  - requires the `./hopr.id` file to be supplied inside the directory
+- `admin-ui`: runs a `hopr-admin` frontend
 - `metrics`: utilites exporting system, docker and node metrics
 - `metrics-push`: a utility cronjob to publish metrics to an external prometheus push gateway
 - `metrics-vis`: visualization tools for the metrics (containing the prometheus and grafana setup with default dashboards)
@@ -41,13 +41,13 @@ COMPOSE_PROFILES=hoprd docker compose up -d
 2. run the `hopr-admin` and a hopr node
 
 ```shell
-COMPOSE_PROFILES=hoprd,frontend docker compose up -d
+COMPOSE_PROFILES=hoprd,admin-ui docker compose up -d
 ```
 
 3. run everything
 
 ```shell
-COMPOSE_PROFILES=hoprd,frontend,metrics,metrics-vis docker compose up -d
+COMPOSE_PROFILES=hoprd,admin-ui,metrics,metrics-vis docker compose up -d
 ```
 
 The same list of `COMPOSE_PROFILES` should be supplied for the `docker compose down` command.
