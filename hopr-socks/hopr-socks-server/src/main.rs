@@ -1,7 +1,7 @@
 use clap::Parser;
 use fast_socks5::Result;
 use hopr_socks_server::cli::Opt;
-use hopr_socks_server::spawn_server;
+use hopr_socks_server::SocksServer;
 use tracing_subscriber::layer::SubscriberExt;
 
 #[tokio::main]
@@ -24,5 +24,7 @@ async fn main() -> Result<()> {
         None => [opt.host.clone(), opt.port.clone()].join(":"),
     };
 
-    spawn_server(&socks_domain, opt.request_timeout, opt.auth.unwrap_or_default()).await
+    let server = SocksServer::new(socks_domain, opt.request_timeout, opt.auth.unwrap_or_default()).await?;
+
+    server.run().await
 }
