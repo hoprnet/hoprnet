@@ -28,7 +28,7 @@ pub use {
     },
     hopr_internal_types::protocol::ApplicationData,
     hopr_transport_p2p::{
-        libp2p, libp2p::swarm::derive_prelude::Multiaddr, multiaddrs::decapsulate_p2p_protocol,
+        libp2p, libp2p::swarm::derive_prelude::Multiaddr, multiaddrs::strip_p2p_protocol,
         swarm::HoprSwarmWithProcessors, PeerTransportEvent, TransportOutput,
     },
     timer::execute_on_tick,
@@ -49,14 +49,16 @@ use std::{
     sync::{Arc, OnceLock},
 };
 
-#[cfg(feature = "runtime-async-std")]
-use async_std::task::{sleep, spawn, JoinHandle};
+pub(crate) mod executor {
+    #[cfg(any(feature = "runtime-async-std", test))]
+    pub use async_std::task::{sleep, spawn, JoinHandle};
 
-#[cfg(feature = "runtime-tokio")]
-use tokio::{
-    task::{spawn, JoinHandle},
-    time::sleep,
-};
+    #[cfg(all(feature = "runtime-tokio", not(test)))]
+    pub use tokio::{
+        task::{spawn, JoinHandle},
+        time::sleep,
+    };
+}
 
 use hopr_db_sql::{
     api::{
@@ -303,7 +305,7 @@ where
         on_transport_output: UnboundedSender<TransportOutput>,
         on_acknowledged_ticket: UnboundedSender<AcknowledgedTicket>,
         transport_updates: UnboundedReceiver<PeerTransportEvent>,
-    ) -> HashMap<HoprTransportProcess, JoinHandle<()>> {
+    ) -> HashMap<HoprTransportProcess, executor::JoinHandle<()>> {
         // network event processing channel
         let (network_events_tx, network_events_rx) = futures::channel::mpsc::channel::<NetworkTriggeredEvent>(
             constants::MAXIMUM_NETWORK_UPDATE_EVENT_QUEUE_SIZE,
@@ -357,7 +359,7 @@ where
                 .expect("Ping should be initialized at this point")
                 .clone(),
             core_network::heartbeat::HeartbeatExternalInteractions::new(network.clone()),
-            Box::new(|dur| Box::pin(sleep(dur))),
+            Box::new(|dur| Box::pin(executor::sleep(dur))),
         );
 
         // let swarm_loop = HoprSwarmWithProcessors::new
@@ -371,15 +373,15 @@ where
             ping_rx,
         );
 
-        let mut processes: HashMap<HoprTransportProcess, JoinHandle<()>> = HashMap::new();
+        let mut processes: HashMap<HoprTransportProcess, executor::JoinHandle<()>> = HashMap::new();
 
         processes.insert(
             HoprTransportProcess::Heartbeat,
-            spawn(async move { heartbeat.heartbeat_loop().await }),
+            executor::spawn(async move { heartbeat.heartbeat_loop().await }),
         );
         processes.insert(
             HoprTransportProcess::Swarm,
-            spawn(transport_layer.run(version, on_transport_output, on_acknowledged_ticket)),
+            executor::spawn(transport_layer.run(version, on_transport_output, on_acknowledged_ticket)),
         );
 
         processes
@@ -413,7 +415,7 @@ where
             )
         })?;
 
-        let timeout = sleep(std::time::Duration::from_secs(30)).fuse();
+        let timeout = executor::sleep(std::time::Duration::from_secs(30)).fuse();
         let ping = (*pinger).ping(vec![*peer]).fuse();
 
         pin_mut!(timeout, ping);
@@ -622,7 +624,7 @@ where
                 hopr_transport_p2p::multiaddrs::is_supported(ma)
                     && (self.cfg.announce_local_addresses || !hopr_transport_p2p::multiaddrs::is_private(ma))
             })
-            .map(|ma| decapsulate_p2p_protocol(&ma))
+            .map(|ma| strip_p2p_protocol(&ma))
             .filter(|v| !v.is_empty())
             .collect::<Vec<_>>();
 

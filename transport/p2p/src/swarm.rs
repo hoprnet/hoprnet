@@ -7,12 +7,6 @@ use std::{
 };
 use tracing::{debug, error, info, trace, warn};
 
-// #[cfg(any(feature = "runtime-async-std", test))]
-// use async_std::task::spawn;
-
-// #[cfg(all(feature = "runtime-tokio", not(test)))]
-// use tokio::task::spawn;
-
 use core_network::{messaging::ControlMessage, network::NetworkTriggeredEvent, ping::PingQueryReplier};
 use core_protocol::{
     ack::processor::{AckProcessed, AckResult, AcknowledgementInteraction},

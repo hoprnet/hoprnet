@@ -223,7 +223,7 @@ where
                         // decapsulate the `p2p/<peer_id>` to remove duplicities
                         let mas = multiaddresses
                             .into_iter()
-                            .map(|ma| core_transport::decapsulate_p2p_protocol(&ma))
+                            .map(|ma| core_transport::strip_p2p_protocol(&ma))
                             .filter(|v| !v.is_empty())
                             .collect::<Vec<_>>();
 
@@ -735,8 +735,7 @@ impl Hopr {
 
         self.state.store(HoprState::Indexing, Ordering::Relaxed);
 
-        let (to_process_tx, to_process_rx) =
-            async_channel::bounded::<IndexerTransportEvent>(core_transport::constants::INDEXER_UPDATE_QUEUE_SIZE);
+        let (to_process_tx, to_process_rx) = async_channel::unbounded::<IndexerTransportEvent>();
 
         let (indexer_peer_update_tx, indexer_peer_update_rx) =
             futures::channel::mpsc::unbounded::<PeerTransportEvent>();

@@ -37,7 +37,8 @@ use async_std::future::timeout as timeout_fut;
 #[cfg(all(feature = "runtime-tokio", not(test)))]
 use tokio::time::timeout as timeout_fut;
 
-const MAX_PARALLEL_PINGS: usize = 14;
+/// The maximum number of pings that are allowed to run in parallel per `ping` call.
+pub const MAX_PARALLEL_PINGS: usize = 14;
 
 /// Trait for the ping operation itself.
 #[async_trait]
@@ -45,7 +46,8 @@ pub trait Pinging {
     async fn ping(&self, peers: Vec<PeerId>);
 }
 
-/// External behavior that will be triggered once a [PingResult] is available.
+/// External behavior that will be triggered once a ping operation result is available
+/// per each pinged peer.
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait PingExternalAPI {
@@ -78,8 +80,12 @@ pub struct PingConfig {
     pub timeout: std::time::Duration, // `Duration` -> should be in millis,
 }
 
+/// Ping query result type holding data about the ping duration and the string
+/// containg an optional version information of the pinged peer, if provided.
 pub type PingQueryResult = std::result::Result<(std::time::Duration, String), ()>;
 
+/// Helper object allowing to send a ping query as a wrapped channel combination
+/// that can be filled up on the transport part and awaited locally by the `Pinger`.
 #[derive(Debug)]
 pub struct PingQueryReplier {
     notifier: futures::channel::oneshot::Sender<PingQueryResult>,
@@ -97,10 +103,15 @@ impl PingQueryReplier {
         }
     }
 
+    /// Return a copy of the challenge for which the reply is expected
     pub fn challenge(&self) -> ControlMessage {
         self.challenge.1.clone()
     }
 
+    /// Mechanism to finalize the ping operation by providing a [`ControlMessage`] received by the
+    /// transport layer.
+    ///
+    /// The resulting timing information about the RTT is halved to provide a unidirectional latency.
     pub fn notify(self, pong: ControlMessage, version: String) {
         let timed_result = if ControlMessage::validate_pong_response(&self.challenge.1, &pong).is_ok() {
             let unidirectional_latency = current_time()
@@ -118,6 +129,7 @@ impl PingQueryReplier {
     }
 }
 
+/// Timeout-based future that will resolve to the result of the ping operation.
 #[tracing::instrument(level = "trace")]
 pub fn to_active_ping(
     peer: PeerId,
@@ -203,11 +215,10 @@ where
         }
 
         let remainder = peers.split_off(self.config.max_parallel_pings.min(peers.len()));
-        let mut active_pings = futures::stream::FuturesUnordered::from_iter(
-            peers
-                .into_iter()
-                .map(|peer| to_active_ping(peer, self.send_ping.clone(), self.config.timeout)),
-        );
+        let mut active_pings = peers
+            .into_iter()
+            .map(|peer| to_active_ping(peer, self.send_ping.clone(), self.config.timeout))
+            .collect::<futures::stream::FuturesUnordered<_>>();
 
         let mut waiting = std::collections::VecDeque::from(remainder);
 

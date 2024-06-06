@@ -5,7 +5,7 @@ pub use multiaddr::{Multiaddr, Protocol};
 use crate::errors::Result;
 
 /// Remove the `p2p/<PeerId>` component from a multiaddress
-pub fn decapsulate_p2p_protocol(ma: &Multiaddr) -> Multiaddr {
+pub fn strip_p2p_protocol(ma: &Multiaddr) -> Multiaddr {
     Multiaddr::from_iter(ma.iter().filter(|v| !matches!(v, multiaddr::Protocol::P2p(_))))
 }
 
@@ -122,5 +122,23 @@ mod tests {
     #[test]
     fn test_domain_dns4_multiaddresses_should_be_supported() {
         assert!(is_supported(&Multiaddr::from_str("/dns4/localhost/tcp/5543").unwrap()));
+    }
+
+    #[test]
+    fn multiaddrs_modification_specific_ipv4_transport_should_be_replacable_with_unspecified() {
+        assert_eq!(
+            replace_transport_with_unspecified(&Multiaddr::from_str("/ip4/33.42.112.22/udp/9090/quic").unwrap()),
+            Ok(Multiaddr::from_str("/ip4/0.0.0.0/udp/9090/quic").unwrap())
+        );
+    }
+
+    #[test]
+    fn multiaddrs_modification_specific_ipv6_transport_should_be_replacable_with_unspecified() {
+        assert_eq!(
+            replace_transport_with_unspecified(
+                &Multiaddr::from_str("/ip6/82b0:a523:d8c0:1cba:365f:85f6:af3b:e369/udp/9090/quic").unwrap()
+            ),
+            Ok(Multiaddr::from_str("/ip6/0:0:0:0:0:0:0:0/udp/9090/quic").unwrap())
+        );
     }
 }
