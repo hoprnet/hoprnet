@@ -30,7 +30,7 @@ services:
       # - OPENTELEMETRY_COLLECTOR_URL=http://server.
     volumes:
       - ./hoprd.cfg.yaml:/app/hoprd.cfg.yaml
-      - ./hoprd.id:/app/hoprd.id
+      - ./hopr.id:/app/hopr.id
       - hoprd_data:/app/hoprd-db
       - '/var/run/docker.sock:/var/run/docker.sock'
     deploy:

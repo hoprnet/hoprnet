@@ -56,7 +56,7 @@ hopr:
     announce_local_addresses: false
     prefer_local_addresses: false
 identity:
-  file: "/app/hoprd.id"
+  file: "/app/hopr.id"
   password: "REPLACE_THIS_STRING_mySAFEpl4ce"
 api:
   enable: true

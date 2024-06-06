@@ -20,7 +20,7 @@ The supported profiles are:
 
 - `hoprd`: runs a single hoprd node with configuration taken from config file
   - requires the `./hoprd.cfg.yaml` to be edited with relevant information
-  - requires the `./hoprd.id` file to be supplied inside the directory
+  - requires the `./hopr.id` file to be supplied inside the directory
 - `admin-ui`: runs a `hopr-admin` frontend
 - `metrics`: utilites exporting system, docker and node metrics
 - `metrics-push`: a utility cronjob to publish metrics to an external prometheus push gateway
