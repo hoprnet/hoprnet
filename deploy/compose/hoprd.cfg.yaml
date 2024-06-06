@@ -45,7 +45,7 @@ hopr:
     ticket_aggregation:
       timeout: 15
   chain:
-    network: # NOTE: fill in value
+    network: doufur # NOTE: fill in value
     provider: # NOTE: fill in value
     announce: true
     check_unrealized_balance: true
