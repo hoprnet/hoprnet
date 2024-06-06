@@ -247,8 +247,8 @@ jobs:
       - name: Upload release assets
         run: |
           for binary in ./binaries/*; do
-            echo "Uploading $binary"
-            gh release upload ${{ steps.create_release.outputs.id }} "$binary" --clobber
+            echo "Uploading $binary to release v${{ steps.setup.outputs.current_version }}"
+            gh release upload v${{ steps.setup.outputs.current_version }} "$binary" --clobber
           done
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
