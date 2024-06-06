@@ -58,7 +58,7 @@ services:
         limits:
           memory: "${HOPR_ADMIN_MEM_LIMIT}"
     profiles:
-      - frontend
+      - admin-ui
 
   cadvisor:
     image: "${METRICS_CADVISOR_IMAGE}"

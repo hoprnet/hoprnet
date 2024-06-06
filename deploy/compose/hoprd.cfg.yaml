@@ -3,6 +3,7 @@ hopr:
   host:
     # NOTE: adapt this to reflect your public IP
     address: !IPv4 127.0.0.1
+    # NOTE: adapt this to reflect your public port
     port: 9091
   db:
     data: /app/hoprd/
@@ -62,13 +63,12 @@ hopr:
     prefer_local_addresses: false
 identity:
   file: "/app/hoprd.id"
-  password: "mySAFEpl4ce"
+  password: "REPLACE_THIS_STRING_mySAFEpl4ce"
 api:
   enable: true
   auth: !Token ^Pr1vacyasafirstCLASSpr0ductfe4turemadeEASY^
   host:
     address: !IPv4 0.0.0.0
-    port: 3001
 inbox:
   capacity: 512
   max_age: 900
