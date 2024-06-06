@@ -247,6 +247,7 @@ jobs:
             set -x
             echo "Tagging ${image}:${{ steps.tag.outputs.release_name }}"
             gcloud artifacts docker tags add ${gcp_docker_registry}/${image}:${{ steps.setup.outputs.current_version }} ${gcp_docker_registry}/${image}:${{ steps.tag.outputs.release_name }}
+            docker pull ${gcp_docker_registry}/${image}:${{ steps.setup.outputs.current_version }}
             docker tag ${gcp_docker_registry}/${image}:${{ steps.setup.outputs.current_version }} ${{ vars.DOCKER_HUB_ORGANIZATION_NAME }}/${image}:${{ steps.setup.outputs.current_version }}
             docker tag ${gcp_docker_registry}/${image}:${{ steps.tag.outputs.release_name }} ${{ vars.DOCKER_HUB_ORGANIZATION_NAME }}/${image}:${{ steps.tag.outputs.release_name }}
             echo "Pushing images into Docker Hub"
