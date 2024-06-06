@@ -189,6 +189,11 @@ jobs:
         with:
           driver: kubernetes
 
+      - name: Create Buildx builder
+        run: |
+          docker buildx create --name docker_hub --driver kubernetes --use
+          docker buildx inspect docker_hub --bootstrap
+
       - name: Log in to Docker Hub
         uses: docker/login-action@v2
         with:
