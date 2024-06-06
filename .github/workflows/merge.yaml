@@ -237,7 +237,6 @@ jobs:
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
-        id: create_release
         with:
           body_path: docs/changelog/changelog.md
           prerelease: ${{ steps.setup.outputs.prerelease }}
