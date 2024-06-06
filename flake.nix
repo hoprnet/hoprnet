@@ -11,7 +11,8 @@
     rust-overlay.url = github:oxalica/rust-overlay/647bff9f5e10d7f1756d86eee09831e6b1b06430;
     # using a fork with an added source filter
     crane.url = github:hoprnet/crane/tb/20240117-find-filter;
-    foundry.url = github:shazow/foundry.nix/monthly;
+    # pin it to a version which we are compatible with
+    foundry.url = github:shazow/foundry.nix/ece7c960a440c6725a7a5576d1f49a5fabde3747;
     # use change to add solc 0.8.24
     solc.url = github:hoprnet/solc.nix/tb/20240129-solc-0.8.24;
     pre-commit.url = github:cachix/pre-commit-hooks.nix;
