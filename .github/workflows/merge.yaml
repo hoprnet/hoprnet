@@ -206,7 +206,7 @@ jobs:
         run: |
           # Tag semver
           git tag v${{ steps.setup.outputs.current_version }}
-          git push origin v${{ steps.setup.outputs.current_version }}
+          # git push origin v${{ steps.setup.outputs.current_version }}
 
           declare base_branch=${{ github.event.pull_request.base.ref }}
           # Tag release name
@@ -216,7 +216,7 @@ jobs:
             release_name=${{ vars.BRANCH_RELEASE_RELEASE_NAME }}
           fi
           git tag --force ${release_name}
-          git push --force origin ${release_name}
+          # git push --force origin ${release_name}
           echo "release_name=${release_name}" >> $GITHUB_OUTPUT
 
       # - name: Generate Changelog
