@@ -10,6 +10,7 @@ members = [
     "common/internal-types",
     "common/network-types",
     "common/primitive-types",
+    "common/parallelize",
     "crypto/packet",
     "crypto/random",
     "crypto/sphinx",
@@ -78,6 +79,7 @@ multiaddr = "0.18.0"
 num_enum = "0.7"
 parameterized = "2.0.0"
 primitive-types = { version = "0.12.2", features = ["serde"] }
+rayon = "1"
 regex = "1"
 rust-stream-ext-concurrent = "1"
 semver = "1"
@@ -129,6 +131,7 @@ hopr-platform = { path = "misc/platform" }
 hopr-primitive-types = { path = "common/primitive-types", default-features = false }
 hopr-network-types = { path = "common/network-types", default-features = false }
 hopr-strategy = { path = "logic/strategy", default-features = false }
+hopr-parallelize = { path = "common/parallelize" }
 hoprd-api = { path = "hoprd/rest-api", default-features = false }
 hoprd-inbox = { path = "hoprd/inbox", default-features = false }
 hoprd-keypair = { path = "hoprd/keypair", default-features = false }

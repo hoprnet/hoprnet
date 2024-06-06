@@ -19,11 +19,7 @@ use crate::info::HoprDbInfoOperations;
 use crate::prelude::HoprDbTicketOperations;
 use crate::{HoprDbGeneralModelOperations, OptTx};
 
-#[cfg(any(feature = "runtime-async-std", test))]
-use async_std::task::spawn_blocking;
-
-#[cfg(all(feature = "runtime-tokio", not(test)))]
-use tokio::task::spawn_blocking;
+use hopr_parallelize::cpu::spawn_fifo_blocking;
 
 #[async_trait]
 impl HoprDbProtocolOperations for HoprDb {
@@ -168,7 +164,7 @@ impl HoprDbProtocolOperations for HoprDb {
                             .await?
                     };
 
-                    spawn_blocking(move || {
+                    spawn_fifo_blocking(move || {
                         ChainPacketComponents::into_outgoing(&data, &path, &me, next_ticket, &domain_separator).map_err(
                             |e| {
                                 crate::errors::DbSqlError::LogicalError(format!(
@@ -222,7 +218,7 @@ impl HoprDbProtocolOperations for HoprDb {
     ) -> Result<TransportPacketWithChainData> {
         let offchain_keypair = pkt_keypair.clone();
 
-        let packet = spawn_blocking(move || {
+        let packet = spawn_fifo_blocking(move || {
             ChainPacketComponents::from_incoming(&data, &offchain_keypair, sender).map_err(|e| {
                 crate::errors::DbSqlError::LogicalError(format!("failed to construct an incoming packet: {e}"))
             })
@@ -305,7 +301,7 @@ impl HoprDbProtocolOperations for HoprDb {
                             // so afterward we are sure the source of the `channel`
                             // (which is equal to `previous_hop_addr`) has issued this
                             // ticket.
-                            let ticket = spawn_blocking(move || {
+                            let ticket = spawn_fifo_blocking(move || {
                                 validate_unacknowledged_ticket(
                                     ticket,
                                     &channel,
@@ -347,7 +343,7 @@ impl HoprDbProtocolOperations for HoprDb {
                                     .await?
                             };
 
-                            let ticket = spawn_blocking(move || {
+                            let ticket = spawn_fifo_blocking(move || {
                                 ticket_builder
                                     .challenge(next_challenge.to_ethereum_challenge())
                                     .build_signed(&me, &domain_separator)

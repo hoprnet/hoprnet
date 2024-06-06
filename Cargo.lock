@@ -3785,6 +3785,7 @@ dependencies = [
  "hopr-db-migration",
  "hopr-internal-types",
  "hopr-metrics",
+ "hopr-parallelize",
  "hopr-primitive-types",
  "lazy_static",
  "libp2p-identity",
@@ -3792,6 +3793,7 @@ dependencies = [
  "multiaddr",
  "num_enum",
  "rand 0.8.5",
+ "rayon",
  "sea-orm",
  "sea-query",
  "sea-query-binder",
@@ -3904,6 +3906,16 @@ dependencies = [
  "serde",
  "serde_bytes",
  "thiserror",
+]
+
+[[package]]
+name = "hopr-parallelize"
+version = "0.1.0"
+dependencies = [
+ "async-std",
+ "futures",
+ "rayon",
+ "tokio",
 ]
 
 [[package]]
