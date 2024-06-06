@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # exit on errors, undefined variables, ensure errors in pipes are not hidden
-set -Eeo pipefail
+set -Eeuo pipefail
 
 usage() {
   echo ""
