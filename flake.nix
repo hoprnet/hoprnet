@@ -44,10 +44,16 @@
         let
           fs = lib.fileset;
           overlays = [ nixpkgs-cross-overlay.overlays.default (import rust-overlay) foundry.overlay solc.overlay ];
+          rustNixTargetsMap = {
+            "x86_64-linux" = "x86_64-unknown-linux-gnu";
+            "aarch64-linux" = "aarch64-unknown-linux-gnu";
+            "aarch64-darwin" = "aarch64-apple-darwin";
+            "x86_64-darwin" = "x86_64-apple-darwin";
+          };
           localSystem = system;
           crossSystem = {
             config = "aarch64-unknown-linux-gnu";
-            useLLVM = true;
+            useLLVM = false;
           };
           pkgs = import nixpkgs {
             inherit system overlays;
@@ -57,11 +63,13 @@
             inherit localSystem crossSystem overlays;
           };
 
-
           solcDefault = with pkgs; (solc.mkDefault pkgs solc_0_8_19);
-          rustToolchain = pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
-          rustToolchainCross = pkgsCross.pkgsBuildHost.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
-
+          rustToolchain = (pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml).override {
+            targets = [ rustNixTargetsMap."${localSystem}" ];
+          };
+          rustToolchainCross = (pkgsCross.pkgsBuildHost.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml).override {
+            targets = [ crossSystem.config ];
+          };
           rustNightly = pkgs.rust-bin.selectLatestNightlyWith (toolchain: toolchain.default);
 
           craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchain;
@@ -118,7 +126,16 @@
               SystemConfiguration
             ]
           );
-          buildInputsCross = buildInputs ++ [
+          nativeBuildInputsCross = with pkgsCross.pkgsBuildHost; [
+            foundry-bin
+            solcDefault
+            pkg-config
+            stdenv.cc.cc.lib
+            rustBuildHostDependencies
+          ];
+
+          buildInputsCross = [
+            pkgsCross.openssl # required to build curl rust bindings
             pkgsCross.rustCrossHook
             # pkgsCross.gcc_multi
           ];
@@ -144,9 +161,10 @@
           hopliCrateInfo = craneLib.crateNameFromCargoToml {
             cargoToml = ./hopli/Cargo.toml;
           };
-          rustPackageDeps = { pname, version, builder ? craneLib.buildDepsOnly, buildInputs ? buildInputs, CARGO_PROFILE ? "release" }: builder (commonArgs // {
-            inherit pname version CARGO_PROFILE buildInputs;
+          rustPackageDeps = { pname, version, builder ? craneLib.buildDepsOnly, pkgBuildInputs ? buildInputs, nativeBuildInputs ? nativeBuildInputs, CARGO_PROFILE ? "release" }: builder (commonArgs // {
+            inherit pname version CARGO_PROFILE;
             src = depsSrc;
+            buildInputs = pkgBuildInputs;
             cargoExtraArgs = "--offline -p ${pname}";
             extraDummyScript = ''
               mkdir -p $out/vendor/cargo
@@ -162,6 +180,11 @@
             inherit pname version cargoArtifacts src postInstall CARGO_PROFILE;
             cargoExtraArgs = "--offline -p ${pname}";
             buildInputs = buildInputsCross;
+            nativeBuildInputs = nativeBuildInputsCross;
+            LD_LIBRARY_PATH = lib.makeLibraryPath [ pkgsCross.stdenv.cc.cc.lib ];
+            preConfigure = ''
+              export LD_LIBRARY_PATH="${lib.makeLibraryPath [ pkgsCross.stdenv.cc.cc.lib ]}"
+            '';
           });
           rustPackageTest = { pname, version, cargoArtifacts }: craneLib.cargoTest (commonArgs // commonPhases // {
             inherit pname version cargoArtifacts src;
@@ -175,7 +198,7 @@
             cargoClippyExtraArgs = "-- -Dwarnings";
           });
           hoprd = rustPackage (hoprdCrateInfo // { cargoArtifacts = rustPackageDeps hoprdCrateInfo; });
-          cross-input = hoprdCrateInfo // { builder = craneLibCross.buildDepsOnly; buildInputs = buildInputsCross; };
+          cross-input = hoprdCrateInfo // { builder = craneLibCross.buildDepsOnly; pkgBuildInputs = buildInputsCross; nativeBuildInputs = nativeBuildInputsCross; };
           hoprd-cross = rustPackageCross (hoprdCrateInfo // { cargoArtifacts = rustPackageDeps cross-input; });
           hoprd-debug = rustPackage (hoprdCrateInfo // {
             cargoArtifacts = rustPackageDeps (hoprdCrateInfo // {

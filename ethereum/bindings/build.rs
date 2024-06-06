@@ -36,6 +36,7 @@ fn main() {
             "--bindings-path",
             bindings_codegen_path.to_str().unwrap(),
             "--module",
+            "--ethers",
             "--overwrite",
             "--select",
             "^Hopr.*?(Boost|[^t])$"

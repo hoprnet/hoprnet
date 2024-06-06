@@ -3,10 +3,10 @@
 //! This used in unit and integration tests.
 use crate::{create_eip1559_transaction, ContractAddresses, ContractInstances, TypedTransaction};
 use bindings::{
-    hopr_channels::HoprChannels,
+    hopr_channels::hopr_channels as HoprChannels,
     hopr_node_management_module::{IncludeNodeCall, ScopeTargetTokenCall},
     hopr_node_stake_factory::NewHoprNodeStakeModuleFilter,
-    hopr_token::{ApproveCall, HoprToken},
+    hopr_token::{hopr_token as HoprToken, ApproveCall},
 };
 use ethers::abi::{encode_packed, AbiEncode, RawLog, Token};
 use ethers::core::k256::ecdsa::SigningKey;
