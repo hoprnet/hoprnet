@@ -26,6 +26,7 @@ services:
       - "RUST_LOG=${HOPRD_LOG_LEVEL}"
       - RUST_BACKTRACE=full
       - HOPRD_CONFIGURATION_FILE_PATH=/app/hoprd.cfg.yaml
+      - HOPRD_API_PORT=3001
       # - OPENTELEMETRY_COLLECTOR_URL=http://server.
     volumes:
       - ./hoprd.cfg.yaml:/app/hoprd.cfg.yaml
