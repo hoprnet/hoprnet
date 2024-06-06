@@ -1,10 +1,8 @@
 ---
 hopr:
   host:
-    # NOTE: adapt this to reflect your public IP
-    address: !IPv4 127.0.0.1
-    # NOTE: adapt this to reflect your public port
-    port: 9091
+    address: !IPv4 127.0.0.1 # NOTE: adapt this to reflect your public IP
+    port: 9091 # NOTE: adapt this to reflect your public port
   db:
     data: /app/hoprd/
     initialize: true
@@ -12,15 +10,14 @@ hopr:
   strategy:
     on_fail_continue: true
     allow_recursive: true
-    finalize_channel_closure: true
     strategies:
       - !Aggregating
-        aggregation_threshold: 3
+        aggregation_threshold: 100
         unrealized_balance_ratio: 0.95
         aggregate_on_channel_close: true
       - !AutoRedeeming
         redeem_only_aggregated: true
-        on_close_redeem_single_tickets_value_min: "2000000000000000000 HOPR"
+        on_close_redeem_single_tickets_value_min: "90000000000000000 HOPR"
       - !ClosureFinalizer
         max_closure_overdue: 60
   heartbeat:
@@ -48,15 +45,12 @@ hopr:
     ticket_aggregation:
       timeout: 15
   chain:
-    # NOTE: fill in value
-    network:
+    network: # NOTE: fill in value
     announce: true
     check_unrealized_balance: true
   safe_module:
-    # NOTE: fill in value
-    safe_address:
-    # NOTE: fill in value
-    module_address:
+    safe_address: # NOTE: fill in value
+    module_address: # NOTE: fill in value
     safe_transaction_service_provider: https://safe-transaction.prod.hoprtech.net/
   transport:
     announce_local_addresses: false
