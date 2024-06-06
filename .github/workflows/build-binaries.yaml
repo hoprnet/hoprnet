@@ -51,9 +51,24 @@ jobs:
 
       - name: Build ${{ steps.options.outputs.NIX_PACKAGE_HOPRD }} binary for ${{ inputs.system }}
         run: |
-          nix run .#${{ steps.options.outputs.NIX_PACKAGE_HOPRD }} --crossSystem ${{ inputs.system }}
+          echo nix run .#${{ steps.options.outputs.NIX_PACKAGE_HOPRD }} --crossSystem ${{ inputs.system }}
+          mkdir -p result/bin/ && echo "This is hoprd binary for ${{ inputs.system }}" > result/bin/hoprd
+
+      - name: Upload ${{ steps.options.outputs.NIX_PACKAGE_HOPRD }} binary
+        uses: actions/upload-artifact@v2
+        with:
+          name: ${{ steps.options.outputs.NIX_PACKAGE_HOPRD }}-${{ inputs.system }}
+          path: ${{ github.workspace }}/result/bin/hoprd
 
       - name: Build ${{ steps.options.outputs.NIX_PACKAGE_HOPLI }} binary for ${{ inputs.system }}
         if: contains(github.event.pull_request.labels.*.name, 'component:hopli')
         run: |
-          nix run .#${{ steps.options.outputs.NIX_PACKAGE_HOPLI }} --crossSystem ${{ inputs.system }}
+          echo nix run .#${{ steps.options.outputs.NIX_PACKAGE_HOPLI }} --crossSystem ${{ inputs.system }}
+          mkdir -p result/bin/ && echo "This is hopli binary for ${{ inputs.system }}" > result/bin/hopli
+
+      - name: Upload ${{ steps.options.outputs.NIX_PACKAGE_HOPLI }} binary
+        if: contains(github.event.pull_request.labels.*.name, 'component:hopli')
+        uses: actions/upload-artifact@v2
+        with:
+          name: ${{ steps.options.outputs.NIX_PACKAGE_HOPLI }}-${{ inputs.system }}
+          path: ${{ github.workspace }}/result/bin/hopli
