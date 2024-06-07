@@ -26,7 +26,6 @@ runtime-tokio = [
 prometheus = [
     "dep:lazy_static", "dep:hopr-metrics",
     "core-network/prometheus",
-    "hopr-crypto-packet/prometheus",
     "core-path/prometheus",
     "core-protocol/prometheus",
     "hopr-db-sql/prometheus"
