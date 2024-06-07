@@ -164,6 +164,7 @@ impl HoprDbProtocolOperations for HoprDb {
                             .await?
                     };
 
+                    // TODO: benchmark this to confirm, offload a CPU intensive task off the async executor onto a parallelized thread pool
                     spawn_fifo_blocking(move || {
                         ChainPacketComponents::into_outgoing(&data, &path, &me, next_ticket, &domain_separator).map_err(
                             |e| {
@@ -218,6 +219,7 @@ impl HoprDbProtocolOperations for HoprDb {
     ) -> Result<TransportPacketWithChainData> {
         let offchain_keypair = pkt_keypair.clone();
 
+        // TODO: benchmark this to confirm, offload a CPU intensive task off the async executor onto a parallelized thread pool
         let packet = spawn_fifo_blocking(move || {
             ChainPacketComponents::from_incoming(&data, &offchain_keypair, sender).map_err(|e| {
                 crate::errors::DbSqlError::LogicalError(format!("failed to construct an incoming packet: {e}"))
@@ -301,6 +303,8 @@ impl HoprDbProtocolOperations for HoprDb {
                             // so afterward we are sure the source of the `channel`
                             // (which is equal to `previous_hop_addr`) has issued this
                             // ticket.
+                            //
+                            // TODO: benchmark this to confirm, offload a CPU intensive task off the async executor onto a parallelized thread pool
                             let ticket = spawn_fifo_blocking(move || {
                                 validate_unacknowledged_ticket(
                                     ticket,
@@ -343,6 +347,7 @@ impl HoprDbProtocolOperations for HoprDb {
                                     .await?
                             };
 
+                            // TODO: benchmark this to confirm, offload a CPU intensive task off the async executor onto a parallelized thread pool
                             let ticket = spawn_fifo_blocking(move || {
                                 ticket_builder
                                     .challenge(next_challenge.to_ethereum_challenge())
