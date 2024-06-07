@@ -1318,7 +1318,7 @@ dependencies = [
 
 [[package]]
 name = "chain-rpc"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "async-std",
  "async-stream",
@@ -1424,6 +1424,7 @@ dependencies = [
  "anstyle",
  "clap_lex",
  "strsim",
+ "terminal_size",
 ]
 
 [[package]]
@@ -1530,6 +1531,12 @@ checksum = "d16048cd947b08fa32c24458a22f5dc5e835264f689f4f5653210c69fd107363"
 dependencies = [
  "crossbeam-utils",
 ]
+
+[[package]]
+name = "condtype"
+version = "1.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "baf0a07a401f374238ab8e2f11a104d2851bf9ce711ec69804834de8af45c7af"
 
 [[package]]
 name = "console"
@@ -2334,6 +2341,31 @@ name = "displaydoc"
 version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "487585f4d0c6655fe74905e2504d8ad6908e4db67f744eb140876906c2f3175d"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.63",
+]
+
+[[package]]
+name = "divan"
+version = "0.1.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a0d567df2c9c2870a43f3f2bd65aaeb18dbce1c18f217c3e564b4fbaeb3ee56c"
+dependencies = [
+ "cfg-if",
+ "clap",
+ "condtype",
+ "divan-macros",
+ "libc",
+ "regex-lite",
+]
+
+[[package]]
+name = "divan-macros"
+version = "0.1.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "27540baf49be0d484d8f0130d7d8da3011c32a44d4fc873368154f1510e574a2"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3599,12 +3631,13 @@ dependencies = [
 
 [[package]]
 name = "hopr-crypto-packet"
-version = "0.7.0"
+version = "0.7.1"
 dependencies = [
  "async-lock 3.3.0",
  "async-std",
  "async-trait",
  "core-path",
+ "divan",
  "hex",
  "hex-literal",
  "hopr-crypto-random",
@@ -3734,7 +3767,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-sql"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "async-lock 3.3.0",
  "async-std",
@@ -3752,6 +3785,7 @@ dependencies = [
  "hopr-db-migration",
  "hopr-internal-types",
  "hopr-metrics",
+ "hopr-parallelize",
  "hopr-primitive-types",
  "lazy_static",
  "libp2p-identity",
@@ -3759,6 +3793,7 @@ dependencies = [
  "multiaddr",
  "num_enum",
  "rand 0.8.5",
+ "rayon",
  "sea-orm",
  "sea-query",
  "sea-query-binder",
@@ -3871,6 +3906,16 @@ dependencies = [
  "serde",
  "serde_bytes",
  "thiserror",
+]
+
+[[package]]
+name = "hopr-parallelize"
+version = "0.1.0"
+dependencies = [
+ "async-std",
+ "futures",
+ "rayon",
+ "tokio",
 ]
 
 [[package]]
@@ -6669,6 +6714,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "regex-lite"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "30b661b2f27137bdbc16f00eda72866a92bb28af1753ffbd56744fb6e2e9cd8e"
+
+[[package]]
 name = "regex-syntax"
 version = "0.6.29"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8651,6 +8702,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "06794f8f6c5c898b3275aebefa6b8a1cb24cd2c6c79397ab15774837a0bc5755"
 dependencies = [
  "winapi-util",
+]
+
+[[package]]
+name = "terminal_size"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "21bebf2b7c9e0a515f6e0f8c51dc0f8e4696391e6f1ff30379559f8365fb0df7"
+dependencies = [
+ "rustix 0.38.30",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]
