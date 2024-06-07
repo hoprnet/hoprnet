@@ -86,7 +86,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
   grafana:
-    image: grafana/grafana:11.0.0@sha256:eaa2c06d93f77a77e2c8676b71192b9f2bbd7ea62bbaeeb709825934e92c0173
+    image: grafana/grafana:11.0.0@sha256:99ed02202d5166b6d25b821fa34ed184fab9ed0c18996ab0b6ce0fd35a3b67fd
     user: "472"
     restart: always
     environment:
