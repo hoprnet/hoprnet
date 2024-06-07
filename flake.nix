@@ -5,7 +5,6 @@
     flake-utils.url = github:numtide/flake-utils;
     flake-parts.url = github:hercules-ci/flake-parts;
     nixpkgs.url = github:NixOS/nixpkgs/release-24.05;
-    nixpkgs-cross-overlay.url = "github:alekseysidorov/nixpkgs-cross-overlay";
     # using bugfix for macos libcurl:
     # https://github.com/oxalica/rust-overlay/pull/149
     rust-overlay.url = github:oxalica/rust-overlay/647bff9f5e10d7f1756d86eee09831e6b1b06430;
@@ -22,10 +21,6 @@
     crane.inputs.nixpkgs.follows = "nixpkgs";
     foundry.inputs.flake-utils.follows = "flake-utils";
     foundry.inputs.nixpkgs.follows = "nixpkgs";
-    nixpkgs-cross-overlay.inputs.flake-utils.follows = "flake-utils";
-    nixpkgs-cross-overlay.inputs.nixpkgs.follows = "nixpkgs";
-    nixpkgs-cross-overlay.inputs.rust-overlay.follows = "rust-overlay";
-    nixpkgs-cross-overlay.inputs.treefmt-nix.follows = "treefmt-nix";
     pre-commit.inputs.nixpkgs-stable.follows = "nixpkgs";
     pre-commit.inputs.nixpkgs.follows = "nixpkgs";
     rust-overlay.inputs.flake-utils.follows = "flake-utils";
@@ -35,7 +30,7 @@
     treefmt-nix.inputs.nixpkgs.follows = "nixpkgs";
   };
 
-  outputs = { self, nixpkgs, flake-utils, flake-parts, flake-root, rust-overlay, crane, foundry, solc, pre-commit, treefmt-nix, nixpkgs-cross-overlay, ... }@inputs:
+  outputs = { self, nixpkgs, flake-utils, flake-parts, flake-root, rust-overlay, crane, foundry, solc, pre-commit, treefmt-nix, ... }@inputs:
     flake-parts.lib.mkFlake { inherit inputs; } {
       imports = [
         inputs.treefmt-nix.flakeModule
@@ -44,33 +39,21 @@
       perSystem = { config, lib, self', inputs', system, ... }:
         let
           fs = lib.fileset;
-          overlays = [ nixpkgs-cross-overlay.overlays.default (import rust-overlay) foundry.overlay solc.overlay ];
+          overlays = [ (import rust-overlay) foundry.overlay solc.overlay ];
           rustNixTargetsMap = {
             "x86_64-linux" = "x86_64-unknown-linux-gnu";
             "aarch64-linux" = "aarch64-unknown-linux-gnu";
             "aarch64-darwin" = "aarch64-apple-darwin";
             "x86_64-darwin" = "x86_64-apple-darwin";
           };
-          localSystem = system;
-          crossSystem = {
-            config = "aarch64-unknown-linux-gnu";
-            useLLVM = false;
-            isStatic = false;
-          };
-          pkgsBase = import nixpkgs {
-            inherit system;
-            overlays = [ (import nixpkgs-cross-overlay) ];
-          };
           pkgs = import nixpkgs {
-            inherit system;
-            overlays = [ (import rust-overlay) foundry.overlay solc.overlay ];
+            inherit system overlays;
           };
-          pkgsCross = pkgsBase.mkCrossPkgs {
-            inherit localSystem crossSystem;
-            src = nixpkgs;
-            overlays = [ (import nixpkgs-cross-overlay) (import rust-overlay) foundry.overlay solc.overlay ];
+          localSystem = system;
+          crossSystem = pkgs.lib.systems.examples.aarch64-multiplatform;
+          pkgsCross = import nixpkgs {
+            inherit localSystem crossSystem overlays;
           };
-
           solcDefault = with pkgs; (solc.mkDefault pkgs solc_0_8_19);
           solcDefaultCross = with pkgsCross.pkgsBuildHost; (solc.mkDefault pkgsCross.pkgsBuildHost solc_0_8_19);
           rustToolchain = (pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml).override {
@@ -141,12 +124,10 @@
             nativeBuildInputs = with pkgsCross; [
               pkgsBuildHost.foundry-bin
               solcDefaultCross
-              rustBuildHostDependencies
               pkg-config
-              openssl.dev
             ];
             buildInputs = with pkgsCross; [
-              rustCrossHook
+              openssl
             ];
           };
           commonArgs = {
@@ -204,7 +185,11 @@
           });
           hoprd = rustPackage (hoprdCrateInfo // { cargoArtifacts = rustPackageDeps hoprdCrateInfo // { custom-build-inputs = build-inputs; }; });
           cross-input = hoprdCrateInfo // { builder = craneLibCross.buildDepsOnly; custom-build-inputs = build-inputs-cross; };
-          hoprd-cross = rustPackageCross (hoprdCrateInfo // { cargoArtifacts = rustPackageDeps cross-input; });
+          buildRustPackage = import ./nix/build-rust-package.nix;
+          hoprd-cross = pkgsCross.callPackage buildRustPackage (hoprdCrateInfo // {
+            inherit src depsSrc;
+            craneLib = craneLibCross;
+          });
           hoprd-debug = rustPackage (hoprdCrateInfo // {
             cargoArtifacts = rustPackageDeps (hoprdCrateInfo // {
               CARGO_PROFILE = "dev";

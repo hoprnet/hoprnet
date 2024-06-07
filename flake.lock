@@ -135,46 +135,17 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1717670578,
-        "narHash": "sha256-ociV7fc+CzIUtrh5vQzEp4XgNcsgsnO+HBXEywgQVIo=",
+        "lastModified": 1717751420,
+        "narHash": "sha256-rDuJ17aX+L6BiWI6srfE8aEFJfwTt1Sk8JUCUEVcskk=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "59cc8a5cf8b66b71401a7bfc83a34506a7aa3552",
+        "rev": "cb58bde20042f732c4822f10c719fa7c8d5c1ed8",
         "type": "github"
       },
       "original": {
         "owner": "NixOS",
         "ref": "release-24.05",
         "repo": "nixpkgs",
-        "type": "github"
-      }
-    },
-    "nixpkgs-cross-overlay": {
-      "inputs": {
-        "flake-utils": [
-          "flake-utils"
-        ],
-        "nixpkgs": [
-          "nixpkgs"
-        ],
-        "rust-overlay": [
-          "rust-overlay"
-        ],
-        "treefmt-nix": [
-          "treefmt-nix"
-        ]
-      },
-      "locked": {
-        "lastModified": 1717456270,
-        "narHash": "sha256-w0LJVwRiJTWenyNozWfnKAxHYOryaTjlYVC+J9FGKN0=",
-        "owner": "alekseysidorov",
-        "repo": "nixpkgs-cross-overlay",
-        "rev": "403833d6c96b997a913469d75ae0c629e86ec786",
-        "type": "github"
-      },
-      "original": {
-        "owner": "alekseysidorov",
-        "repo": "nixpkgs-cross-overlay",
         "type": "github"
       }
     },
@@ -223,7 +194,6 @@
         "flake-utils": "flake-utils",
         "foundry": "foundry",
         "nixpkgs": "nixpkgs",
-        "nixpkgs-cross-overlay": "nixpkgs-cross-overlay",
         "pre-commit": "pre-commit",
         "rust-overlay": "rust-overlay",
         "solc": "solc",
