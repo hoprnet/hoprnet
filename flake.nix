@@ -49,11 +49,14 @@
           pkgs = import nixpkgs {
             inherit system overlays;
           };
+
           localSystem = system;
           crossSystem = pkgs.lib.systems.examples.aarch64-multiplatform;
+
           pkgsCross = import nixpkgs {
             inherit localSystem crossSystem overlays;
           };
+
           solcDefault = with pkgs; (solc.mkDefault pkgs solc_0_8_19);
           solcDefaultCross = with pkgsCross.pkgsBuildHost; (solc.mkDefault pkgsCross.pkgsBuildHost solc_0_8_19);
           rustToolchain = (pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml).override {
@@ -185,11 +188,15 @@
           });
           hoprd = rustPackage (hoprdCrateInfo // { cargoArtifacts = rustPackageDeps hoprdCrateInfo // { custom-build-inputs = build-inputs; }; });
           cross-input = hoprdCrateInfo // { builder = craneLibCross.buildDepsOnly; custom-build-inputs = build-inputs-cross; };
-          buildRustPackage = import ./nix/build-rust-package.nix;
-          hoprd-cross = pkgsCross.callPackage buildRustPackage (hoprdCrateInfo // {
-            inherit src depsSrc;
-            craneLib = craneLibCross;
+          rust-builder-aarch64-linux = (import ./nix/rust-builder.nix {
+            inherit nixpkgs rust-overlay crane foundry solc localSystem;
+            crossSystem = pkgs.lib.systems.examples.aarch64-multiplatform;
           });
+
+          hoprd-cross = rust-builder-aarch64-linux.callPackage ./nix/build-package.nix (hoprdCrateInfo // {
+            inherit src depsSrc;
+          });
+
           hoprd-debug = rustPackage (hoprdCrateInfo // {
             cargoArtifacts = rustPackageDeps (hoprdCrateInfo // {
               CARGO_PROFILE = "dev";
