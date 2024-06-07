@@ -25,7 +25,7 @@ def pytest_addoption(parser: pytest.Parser):
     parser.addoption(
         "--stress-request-count",
         action="store",
-        default=500,
+        default=1000,
         help="Number of requests performed by each source node towards the stressed target",
     )
     parser.addoption(
