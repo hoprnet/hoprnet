@@ -18,6 +18,7 @@ use crate::frame::{segment, FrameId, FrameReassembler, SegmentId};
 use crate::prelude::Segment;
 use crate::session::protocol::{FrameAcknowledgements, SessionMessage};
 
+#[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait NetworkTransport {
     async fn send_to_counterparty(&self, data: &[u8]) -> crate::errors::Result<()>;
@@ -42,13 +43,14 @@ pub struct SessionConfig {
     pub mtu: u16,
 }
 
-/// Contains the state of the session bound to a [`SessionSocket`].
+/// Contains the cloneable state of the session bound to a [`SessionSocket`].
 ///
 /// It implements the entire [`SessionMessage`] state machine and
 /// performs the frame reassembly and sequencing.
 /// The underlying transport operations are bound to [`NetworkTransport`]
 ///
-/// The `SessionState` cannot be created directly, it must always be created via [`SessionSocket`].
+/// The `SessionState` cannot be created directly, it must always be created via [`SessionSocket`] and
+/// then retrieved via [`SessionSocket::state`].
 #[derive(Debug)]
 pub struct SessionState<T: NetworkTransport> {
     transport: Arc<T>,
@@ -173,11 +175,12 @@ impl<T: NetworkTransport> SessionState<T> {
     /// is the expected underlying transport bandwidth (segment/sec) to guarantee the retransmission
     /// can still happen within some time window.
     pub async fn send_frame_data(&self, data: &[u8]) -> crate::errors::Result<()> {
-        for segment in segment(
+        let segments = segment(
             data,
             self.cfg.mtu - SessionMessage::HEADER_SIZE as u16,
-            self.outgoing_frame_id.fetch_add(1, Ordering::SeqCst),
-        ) {
+            self.outgoing_frame_id.fetch_add(1, Ordering::SeqCst));
+
+        for segment in segments {
             self.lookbehind.insert((&segment).into(), segment.clone());
 
             let msg = SessionMessage::Segment(segment.clone());
@@ -220,14 +223,14 @@ pub struct SessionSocket<T: NetworkTransport> {
 
 impl<T: NetworkTransport> SessionSocket<T> {
     /// Create a new socket over the given `transport` that binds the communicating parties.
-    pub fn new(transport: T, cfg: SessionConfig) -> Self {
+    pub fn new(transport: Arc<T>, cfg: SessionConfig) -> Self {
         let (reassembler, egress) = FrameReassembler::new(cfg.frame_expiration_age.into());
 
         let acknowledged =
             Arc::new((cfg.acknowledged_frames_buffer > 0).then(|| ArrayQueue::new(cfg.acknowledged_frames_buffer)));
 
         let state = SessionState {
-            transport: Arc::new(transport),
+            transport,
             lookbehind: Arc::new(SkipMap::new()),
             acknowledged: acknowledged.clone(),
             outgoing_frame_id: Arc::new(AtomicU32::new(1)),
@@ -239,7 +242,7 @@ impl<T: NetworkTransport> SessionSocket<T> {
             egress
                 .inspect(move |frame| {
                     if let Some(ack_buf) = acknowledged.deref() {
-                        // Act as a ring buffer, so the buffer is full, any unsent acknowledgements
+                        // Acts as a ring buffer, so if the buffer is full, any unsent acknowledgements
                         // will be discarded.
                         ack_buf.force_push(frame.frame_id);
                     }
@@ -308,4 +311,52 @@ impl<T: NetworkTransport + Send + Sync> AsyncRead for SessionSocket<T> {
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use std::sync::OnceLock;
+    use futures::io::{AsyncReadExt, AsyncWriteExt};
+    use super::*;
+
+    #[derive(Debug, Default)]
+    pub struct FakeNetwork(OnceLock<SessionState<FakeNetwork>>);
+
+    #[async_trait]
+    impl NetworkTransport for FakeNetwork {
+        async fn send_to_counterparty(&self, data: &[u8]) -> crate::errors::Result<()> {
+            self.0.get().unwrap().received_message(data).await
+        }
+    }
+
+    fn setup_alice_bob() -> (SessionSocket<FakeNetwork>, SessionSocket<FakeNetwork>) {
+        let cfg = SessionConfig::default();
+
+        let alice_to_bob_transport = Arc::new(FakeNetwork::default());
+        let bob_to_alice_transport = Arc::new(FakeNetwork::default());
+
+        let alice_to_bob = SessionSocket::new(alice_to_bob_transport.clone(), cfg.clone());
+        let bob_to_alice = SessionSocket::new(bob_to_alice_transport.clone(), cfg.clone());
+
+        alice_to_bob_transport.0.set(bob_to_alice.state().clone()).unwrap();
+        bob_to_alice_transport.0.set(alice_to_bob.state().clone()).unwrap();
+
+        (alice_to_bob, bob_to_alice)
+    }
+
+    #[async_std::test]
+    async fn test_basic_send_recv() {
+        let (mut alice_to_bob, mut bob_to_alice) = setup_alice_bob();
+
+        const LEN: usize = 10*1024*1024;
+
+        let data = vec![1u8; LEN];
+        alice_to_bob.write(&data).await.unwrap();
+
+        let mut buf = vec![0u8; LEN];
+        bob_to_alice.read_exact(&mut buf).await.unwrap();
+        assert_eq!(buf, data);
+
+        bob_to_alice.write(&data).await.unwrap();
+        let mut buf = vec![0; LEN];
+        alice_to_bob.read_exact(&mut buf).await.unwrap();
+        assert_eq!(buf, data);
+    }
+}

@@ -389,6 +389,7 @@ impl FrameReassembler {
         }
 
         let ts = current_time();
+        let mut cascade = false;
 
         match self.sequences.entry(frame_id) {
             Entry::Occupied(e) => {
@@ -402,14 +403,37 @@ impl FrameReassembler {
                                 .map_err(|_| NetworkTypeError::ReassemblerClosed)?;
                             self.last_emitted_frame.fetch_max(frame_id, Ordering::Relaxed);
                             earliest_seq_id.remove();
+                            cascade = true;
                         }
                     }
                 }
             }
             Entry::Vacant(v) => {
                 // Begin building a new frame
-                v.insert(FrameBuilder::new(segment, ts));
+                let builder = FrameBuilder::new(segment, ts);
+                cascade = builder.is_complete();
+                v.insert(builder);
                 self.sorted_seq_ids.insert(frame_id);
+            }
+        }
+
+        if cascade {
+            // Iterate from the lowest frame ids first, since they are more likely to be completed
+            for frame_id in self.sorted_seq_ids.iter() {
+                if let Some((_, builder)) = self.sequences.remove_if(frame_id.value(), |_,b| b.is_complete()) {
+                    // If the frame is complete, push it out as reassembled
+                    self.reassembled
+                        .unbounded_send(builder.reassemble()?)
+                        .map_err(|_| NetworkTypeError::ReassemblerClosed)?;
+                    frame_id.remove();
+                    self.last_emitted_frame.fetch_max(*frame_id.value(), Ordering::Relaxed);
+                }
+                else if !self.sequences.contains_key(frame_id.value()) {
+                    // If removal failed, because the entry is no longer there, just remove its seq_id
+                    frame_id.remove();
+                } else {
+                    break;
+                }
             }
         }
 
@@ -633,6 +657,30 @@ mod tests {
             .into_par_iter()
             .enumerate()
             .for_each(|(i, frame)| assert_eq!(frame, FRAMES[i]));
+    }
+
+    #[async_std::test]
+    async fn test_one_segment_frame() {
+        let (fragmented, reassembled) = FrameReassembler::new(None);
+
+        let data = hex!("cafe");
+
+        let segment = Segment {
+            frame_id: 1,
+            seq_idx: 0,
+            seq_len: 1,
+            data: hex!("cafe").clone().into(),
+        };
+
+        fragmented.push_segment(segment).unwrap();
+        drop(fragmented);
+        let mut reassembled_frames = reassembled.collect::<Vec<_>>().await;
+
+        assert_eq!(1, reassembled_frames.len());
+        let frame = reassembled_frames.pop().unwrap();
+
+        assert_eq!(1, frame.frame_id);
+        assert_eq!(&data, frame.data.as_ref());
     }
 
     #[test]
