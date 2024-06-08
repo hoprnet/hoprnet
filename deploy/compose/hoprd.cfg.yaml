@@ -1,8 +1,8 @@
 ---
 hopr:
   host:
-    address: !IPv4 127.0.0.1 # NOTE: adapt this to reflect your public IP
-    port: 9091 # NOTE: adapt this to reflect your public port
+    address: !IPv4 0.0.0.0 # MAKE EDITS: replace with your public IP.
+    port: 9091 # NOTE: adapt port to reflect your public port.
   db:
     data: /app/hoprd/
     initialize: true
@@ -13,7 +13,7 @@ hopr:
     strategies:
       - !Aggregating
         aggregation_threshold: 100
-        unrealized_balance_ratio: 0.95
+        unrealized_balance_ratio: 0.9
         aggregate_on_channel_close: true
       - !AutoRedeeming
         redeem_only_aggregated: true
@@ -45,23 +45,23 @@ hopr:
     ticket_aggregation:
       timeout: 15
   chain:
-    network: dufour # NOTE: fill in value
-    provider: # NOTE: fill in value
+    provider: # MAKE EDITS: add your own RPC provider.
+    network: dufour
     announce: true
     check_unrealized_balance: true
   safe_module:
-    safe_address: # NOTE: fill in value
-    module_address: # NOTE: fill in value
+    safe_address: # MAKE EDITS: add your HOPR Safe address.
+    module_address: # MAKE EDITS: add your HOPR Safe module address.
     safe_transaction_service_provider: https://safe-transaction.prod.hoprtech.net/
   transport:
     announce_local_addresses: false
     prefer_local_addresses: false
 identity:
   file: "/app/hopr.id"
-  password: "REPLACE_THIS_STRING_mySAFEpl4ce"
+  password: "change_me" # MAKE EDITS: replace with your own database password.
 api:
   enable: true
-  auth: !Token ^Pr1vacyasafirstCLASSpr0ductfe4turemadeEASY^
+  auth: !Token ^Pr1vacyasafirstCLASSpr0ductfe4turemadeEASY^ # MAKE EDITS: replace with your own Access token.
   host:
     address: !IPv4 0.0.0.0
     port: 3001
