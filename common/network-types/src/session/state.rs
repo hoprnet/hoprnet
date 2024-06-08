@@ -178,7 +178,8 @@ impl<T: NetworkTransport> SessionState<T> {
         let segments = segment(
             data,
             self.cfg.mtu - SessionMessage::HEADER_SIZE as u16,
-            self.outgoing_frame_id.fetch_add(1, Ordering::SeqCst));
+            self.outgoing_frame_id.fetch_add(1, Ordering::SeqCst),
+        );
 
         for segment in segments {
             self.lookbehind.insert((&segment).into(), segment.clone());
@@ -312,9 +313,9 @@ impl<T: NetworkTransport + Send + Sync> AsyncRead for SessionSocket<T> {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::OnceLock;
-    use futures::io::{AsyncReadExt, AsyncWriteExt};
     use super::*;
+    use futures::io::{AsyncReadExt, AsyncWriteExt};
+    use std::sync::OnceLock;
 
     #[derive(Debug, Default)]
     pub struct FakeNetwork(OnceLock<SessionState<FakeNetwork>>);
@@ -345,7 +346,7 @@ mod tests {
     async fn test_basic_send_recv() {
         let (mut alice_to_bob, mut bob_to_alice) = setup_alice_bob();
 
-        const LEN: usize = 10*1024*1024;
+        const LEN: usize = 10 * 1024 * 1024;
 
         let data = vec![1u8; LEN];
         alice_to_bob.write(&data).await.unwrap();

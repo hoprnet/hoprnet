@@ -41,6 +41,7 @@ divan = { workspace = true }
 hex-literal = { workspace = true }
 rand = "0.8.5"
 rand_distr = "0.4.3"
+rand_chacha = "0.3"
 rayon = { workspace = true }
 lazy_static = { workspace = true }
 mockall = { workspace = true }

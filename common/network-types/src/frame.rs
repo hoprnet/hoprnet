@@ -39,7 +39,6 @@
 //! the caller should make sure that frames with ID <= `n` will not arrive into the reassembler,
 //! otherwise the [NetworkTypeError::OldSegment] error will be thrown.
 
-use crossbeam_skiplist::SkipSet;
 use dashmap::mapref::entry::Entry;
 use dashmap::DashMap;
 use fixedbitset::FixedBitSet;
@@ -321,7 +320,8 @@ pub struct FrameInfo {
 /// Note that the reassembler is also evicted when dropped.
 ///
 /// ````rust
-/// # futures::executor::block_on(async {
+/// # use std::time::Duration;
+/// futures::executor::block_on(async {
 /// use hopr_network_types::frame::{Frame, FrameReassembler};
 /// use futures::{pin_mut, StreamExt};
 ///
@@ -333,7 +333,7 @@ pub struct FrameInfo {
 /// assert_eq!(bytes.len() / 2, segments.len());
 ///
 /// // Create FrameReassembler and feed the segments to it
-/// let (fragmented, reassembled) = FrameReassembler::new(None);
+/// let (fragmented, reassembled) = FrameReassembler::new(Duration::from_secs(10));
 ///
 /// for segment in segments {
 ///     fragmented.push_segment(segment).unwrap();
@@ -348,10 +348,10 @@ pub struct FrameInfo {
 #[derive(Debug)]
 pub struct FrameReassembler {
     sequences: DashMap<FrameId, FrameBuilder>,
-    sorted_seq_ids: SkipSet<FrameId>,
-    last_emitted_frame: AtomicU32,
+    next_emitted_frame: AtomicU32,
+    last_emission: AtomicU64,
     reassembled: futures::channel::mpsc::UnboundedSender<Frame>,
-    max_age: Option<Duration>,
+    max_age: Duration,
 }
 
 impl FrameReassembler {
@@ -359,18 +359,31 @@ impl FrameReassembler {
     /// for reassembled [Frames](Frame).
     /// An optional `max_age` of segments can be specified,
     /// which allows the [`evict`](FrameReassembler::evict) method to remove stale incomplete segments.
-    pub fn new(max_age: Option<Duration>) -> (Self, impl Stream<Item = Frame>) {
+    pub fn new(max_age: Duration) -> (Self, impl Stream<Item = Frame>) {
         let (reassembled, reassembled_recv) = futures::channel::mpsc::unbounded();
         (
             Self {
                 sequences: DashMap::new(),
-                sorted_seq_ids: SkipSet::new(),
-                last_emitted_frame: AtomicU32::new(0),
+                next_emitted_frame: AtomicU32::new(1),
+                last_emission: AtomicU64::new(u64::MAX),
                 reassembled,
                 max_age,
             },
             reassembled_recv,
         )
+    }
+
+    /// Emits the frame if it is the next in sequence and complete.
+    /// If it is not next in the sequence or incomplete, it is discarded forever.
+    fn emit_if_complete_discard_otherwise(&self, builder: FrameBuilder) -> crate::errors::Result<()> {
+        if self.next_emitted_frame.fetch_add(1, Ordering::SeqCst) == builder.frame_id && builder.is_complete() {
+            self.reassembled
+                .unbounded_send(builder.reassemble()?)
+                .map_err(|_| NetworkTypeError::ReassemblerClosed)?;
+        }
+        self.last_emission
+            .store(current_time().as_unix_timestamp().as_millis() as u64, Ordering::Relaxed);
+        Ok(())
     }
 
     /// Pushes a new [Segment] for reassembly.
@@ -384,7 +397,7 @@ impl FrameReassembler {
 
         // Check if this frame has not been emitted yet.
         let frame_id = segment.frame_id;
-        if frame_id <= self.last_emitted_frame.load(Ordering::SeqCst) {
+        if frame_id < self.next_emitted_frame.load(Ordering::SeqCst) {
             return Err(NetworkTypeError::OldSegment(frame_id));
         }
 
@@ -393,47 +406,53 @@ impl FrameReassembler {
 
         match self.sequences.entry(frame_id) {
             Entry::Occupied(e) => {
-                if e.get().put(segment, ts)? == 0 {
-                    // No more segments missing in this frame, check if this is the earliest frame
-                    if let Some(earliest_seq_id) = self.sorted_seq_ids.front() {
-                        if earliest_seq_id.eq(e.key()) {
-                            // If this is currently the earliest frame, push it out as reassembled
-                            self.reassembled
-                                .unbounded_send(e.remove().reassemble()?)
-                                .map_err(|_| NetworkTypeError::ReassemblerClosed)?;
-                            self.last_emitted_frame.fetch_max(frame_id, Ordering::Relaxed);
-                            earliest_seq_id.remove();
-                            cascade = true;
-                        }
-                    }
+                // No more segments missing in this frame, check if it is the next on to emit
+                if e.get().put(segment, ts)? == 0
+                    && self
+                        .next_emitted_frame
+                        .compare_exchange(frame_id, frame_id + 1, Ordering::SeqCst, Ordering::Relaxed)
+                        .is_ok()
+                {
+                    // Emit this complete frame
+                    self.reassembled
+                        .unbounded_send(e.remove().reassemble()?)
+                        .map_err(|_| NetworkTypeError::ReassemblerClosed)?;
+                    self.last_emission
+                        .store(current_time().as_unix_timestamp().as_millis() as u64, Ordering::Relaxed);
+                    cascade = true; // Try to emit next frames in sequence
                 }
             }
             Entry::Vacant(v) => {
-                // Begin building a new frame
                 let builder = FrameBuilder::new(segment, ts);
-                cascade = builder.is_complete();
-                v.insert(builder);
-                self.sorted_seq_ids.insert(frame_id);
-            }
-        }
-
-        if cascade {
-            // Iterate from the lowest frame ids first, since they are more likely to be completed
-            for frame_id in self.sorted_seq_ids.iter() {
-                if let Some((_, builder)) = self.sequences.remove_if(frame_id.value(), |_,b| b.is_complete()) {
-                    // If the frame is complete, push it out as reassembled
+                // If this frame is already complete, check if it is the next one to emit
+                if builder.is_complete()
+                    && self
+                        .next_emitted_frame
+                        .compare_exchange(frame_id, frame_id + 1, Ordering::SeqCst, Ordering::Relaxed)
+                        .is_ok()
+                {
+                    // Emit this frame if already complete
                     self.reassembled
                         .unbounded_send(builder.reassemble()?)
                         .map_err(|_| NetworkTypeError::ReassemblerClosed)?;
-                    frame_id.remove();
-                    self.last_emitted_frame.fetch_max(*frame_id.value(), Ordering::Relaxed);
-                }
-                else if !self.sequences.contains_key(frame_id.value()) {
-                    // If removal failed, because the entry is no longer there, just remove its seq_id
-                    frame_id.remove();
+                    self.last_emission
+                        .store(current_time().as_unix_timestamp().as_millis() as u64, Ordering::Relaxed);
+                    cascade = true; // Try to emit next frames in sequence
                 } else {
-                    break;
+                    // If not complete or not the next one to be emitted, just start building it
+                    v.insert(builder);
                 }
+            }
+        }
+
+        // As long as there are more in-sequence frames completed, emit them
+        if cascade {
+            while let Some((_, builder)) = self
+                .sequences
+                .remove_if(&self.next_emitted_frame.load(Ordering::SeqCst), |_, b| b.is_complete())
+            {
+                // If the frame is complete, push it out as reassembled
+                self.emit_if_complete_discard_otherwise(builder)?;
             }
         }
 
@@ -449,53 +468,38 @@ impl FrameReassembler {
             .collect()
     }
 
-    /// If [max_age](FrameReassembler::new) was set during construction, evicts
+    /// According to the [max_age](FrameReassembler::new) set during construction, evicts
     /// leading incomplete frames that are expired at the time this method was called.
     /// Returns that total number of frames that were evicted.
     pub fn evict(&self) -> crate::errors::Result<usize> {
         if self.reassembled.is_closed() || self.sequences.is_empty() {
-            self.sorted_seq_ids.clear();
             return Ok(0);
         }
 
-        // Start evicting the earliest incomplete expired frames.
-        // This might also uncover queued complete frames that couldn't be pushed out
-        // due to prior incomplete frames.
-
+        let cutoff = current_time().sub(self.max_age).as_unix_timestamp().as_millis() as u64;
         let mut count = 0;
-        if let Some(cutoff) = self
-            .max_age
-            .map(|max_age| current_time().sub(max_age).as_unix_timestamp().as_millis() as u64)
-        {
-            // Iterate from the lowest frame ids first, since they are more likely to be completed or expired
-            for frame_id in self.sorted_seq_ids.iter() {
-                // Remove each frame that is either completed (or expired if max age was given).
-                if let Some((_, builder)) = self.sequences.remove_if(frame_id.value(), |_, builder| {
-                    builder.is_complete() || builder.is_expired(cutoff)
-                }) {
-                    // If the frame is complete, push it out as reassembled
-                    if builder.is_complete() {
-                        self.reassembled
-                            .unbounded_send(builder.reassemble()?)
-                            .map_err(|_| NetworkTypeError::ReassemblerClosed)?;
-                    }
-
-                    frame_id.remove();
-                    self.last_emitted_frame.fetch_max(*frame_id.value(), Ordering::Relaxed);
-                    count += 1;
-                } else if !self.sequences.contains_key(frame_id.value()) {
-                    // If removal failed, because the entry is no longer there, just remove its seq_id
-                    frame_id.remove();
-                } else {
-                    // Stop on the first non expired and non completed frame.
-                    break;
-                }
+        loop {
+            let next = self.next_emitted_frame.load(Ordering::SeqCst);
+            if let Some((_, builder)) = self
+                .sequences
+                .remove_if(&next, |_, b| b.is_complete() || b.is_expired(cutoff))
+            {
+                // If the frame is complete, push it out as reassembled or discard it as expired
+                self.emit_if_complete_discard_otherwise(builder)?;
+                count += 1;
+            } else if !self.sequences.contains_key(&next) && self.last_emission.load(Ordering::SeqCst) < cutoff {
+                // Do not stall the sequencer too long if we haven't seen this frame at all
+                self.next_emitted_frame.fetch_add(1, Ordering::Relaxed);
+                self.last_emission
+                    .store(current_time().as_unix_timestamp().as_millis() as u64, Ordering::Relaxed);
+                count += 1;
+            } else {
+                // Break on first incomplete and non-expired frame
+                break;
             }
-
-            Ok(count)
-        } else {
-            Ok(0)
         }
+
+        Ok(count)
     }
 }
 
@@ -543,13 +547,14 @@ mod tests {
     use hex_literal::hex;
     use lazy_static::lazy_static;
     use rand::prelude::{Distribution, SliceRandom};
-    use rand::{seq::IteratorRandom, thread_rng, Rng};
+    use rand::{seq::IteratorRandom, thread_rng, Rng, SeedableRng};
     use rand_distr::Normal;
     use rayon::prelude::*;
     use std::collections::{HashSet, VecDeque};
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
     use std::time::Duration;
+    use rand_chacha::ChaCha20Rng;
 
     const MTU: u16 = 448;
     const FRAME_COUNT: u32 = 65_535;
@@ -557,6 +562,7 @@ mod tests {
     const MIXING_FACTOR: f64 = 4.0;
 
     lazy_static! {
+        static ref RAND_SEED: [u8; 32] = hopr_crypto_random::random_bytes();
         static ref FRAMES: Vec<Frame> = (0..FRAME_COUNT)
             .into_par_iter()
             .map(|frame_id| Frame {
@@ -581,7 +587,8 @@ mod tests {
     /// When used on frame segments vector, it will shuffle the segments in a controlled manner;
     /// such that an entire frame can unlikely swap position with another, if `factor` ~ frame length.
     fn linear_half_normal_shuffle<T>(mut vec: VecDeque<T>, factor: f64) -> Vec<T> {
-        let mut rng = thread_rng();
+
+        let mut rng = rand_chacha::ChaCha20Rng::from_seed(RAND_SEED.clone());
         let mut dist = Normal::new(0.0, factor).unwrap();
 
         let mut ret = Vec::new();
@@ -643,7 +650,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_ordered() {
-        let (fragmented, reassembled) = FrameReassembler::new(None);
+        let (fragmented, reassembled) = FrameReassembler::new(Duration::from_secs(30));
 
         FRAMES
             .iter()
@@ -661,7 +668,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_one_segment_frame() {
-        let (fragmented, reassembled) = FrameReassembler::new(None);
+        let (fragmented, reassembled) = FrameReassembler::new(Duration::from_secs(10));
 
         let data = hex!("cafe");
 
@@ -693,7 +700,7 @@ mod tests {
         let mut segments = frame.segment(2);
         segments[0].frame_id = 0;
 
-        let (fragmented, _reassembled) = FrameReassembler::new(None);
+        let (fragmented, _reassembled) = FrameReassembler::new(Duration::from_secs(30));
         fragmented
             .push_segment(segments[0].clone())
             .expect_err("must not push frame id 0");
@@ -701,7 +708,7 @@ mod tests {
 
     #[test]
     fn test_pushing_segment_of_completed_frame_should_fail() {
-        let (fragmented, _reassembled) = FrameReassembler::new(None);
+        let (fragmented, _reassembled) = FrameReassembler::new(Duration::from_secs(30));
 
         let segments = FRAMES[0].segment(MTU);
         let segment_1 = segments[0].clone();
@@ -732,11 +739,11 @@ mod tests {
 
     #[async_std::test]
     async fn test_reassemble_single_frame() {
-        let (fragmented, reassembled) = FrameReassembler::new(None);
+        let (fragmented, reassembled) = FrameReassembler::new(Duration::from_secs(30));
 
         let mut rng = thread_rng();
 
-        let frame = FRAMES.iter().choose(&mut rng).unwrap();
+        let frame = FRAMES[0].clone();
         let mut segments = frame.segment(MTU);
         segments.shuffle(&mut rng);
 
@@ -746,12 +753,12 @@ mod tests {
         let reassembled_frames = reassembled.collect::<Vec<_>>().await;
 
         assert_eq!(1, reassembled_frames.len());
-        assert_eq!(frame, &reassembled_frames[0]);
+        assert_eq!(frame, reassembled_frames[0]);
     }
 
     #[async_std::test]
     async fn test_shuffled_randomized() {
-        let (fragmented, reassembled) = FrameReassembler::new(None);
+        let (fragmented, reassembled) = FrameReassembler::new(Duration::from_secs(30));
 
         SEGMENTS
             .iter()
@@ -771,7 +778,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_shuffled_randomized_parallel() {
-        let (fragmented, reassembled) = FrameReassembler::new(None);
+        let (fragmented, reassembled) = FrameReassembler::new(Duration::from_secs(30));
 
         SEGMENTS
             .par_iter()
@@ -790,7 +797,7 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn test_flush() {
+    async fn test_should_evict_expired_incomplete_frames() {
         let frames = vec![
             Frame {
                 frame_id: 1,
@@ -809,11 +816,9 @@ mod tests {
         let mut segments = frames.iter().flat_map(|f| f.segment(3)).collect::<VecDeque<_>>();
         segments.retain(|s| s.frame_id != 2 || s.seq_idx != 2); // Remove 2nd segment of Frame 2
 
-        let (fragmented, reassembled) = FrameReassembler::new(Some(Duration::from_millis(10)));
+        let (fragmented, reassembled) = FrameReassembler::new(Duration::from_millis(10));
 
-        segments.into_iter().for_each(|b| {
-            let _ = fragmented.push_segment(b);
-        });
+        segments.into_iter().for_each(|b| fragmented.push_segment(b).unwrap());
 
         let flushed = Arc::new(AtomicBool::new(false));
 
@@ -844,12 +849,59 @@ mod tests {
     }
 
     #[async_std::test]
+    async fn test_should_evict_frame_that_never_arrived() {
+        let frames = vec![
+            Frame {
+                frame_id: 1,
+                data: hex!("deadbeefcafebabe").into(),
+            },
+            Frame {
+                frame_id: 3,
+                data: hex!("00112233abcd").into(),
+            },
+        ];
+
+        let segments = frames.iter().flat_map(|f| f.segment(3)).collect::<VecDeque<_>>();
+
+        let (fragmented, reassembled) = FrameReassembler::new(Duration::from_millis(10));
+
+        segments.into_iter().for_each(|b| fragmented.push_segment(b).unwrap());
+
+        let flushed = Arc::new(AtomicBool::new(false));
+
+        let flushed_cpy = flushed.clone();
+        let frames_cpy = frames.clone();
+        let jh = async_std::task::spawn(async move {
+            pin_mut!(reassembled);
+
+            // The first frame should yield immediately
+            assert_eq!(Some(frames_cpy[0].clone()), reassembled.next().await);
+
+            assert!(!flushed_cpy.load(Ordering::SeqCst));
+
+            // The next frame is the third one
+            assert_eq!(Some(frames_cpy[1].clone()), reassembled.next().await);
+
+            // and it must've happened only after pruning
+            assert!(flushed_cpy.load(Ordering::SeqCst));
+        });
+
+        async_std::task::sleep(Duration::from_millis(20)).await;
+
+        // Prune the expired entry, which is Frame 2 (that is missing a segment)
+        flushed.store(true, Ordering::SeqCst);
+        assert_eq!(2, fragmented.evict().unwrap()); // One expired, one complete
+
+        jh.await;
+    }
+
+    #[async_std::test]
     async fn test_randomized_delayed_parallel() {
         let frames = FRAMES.iter().take(100).collect::<Vec<_>>();
 
         let segments = frames.iter().flat_map(|frame| frame.segment(MTU)).collect::<Vec<_>>();
 
-        let (fragmented, reassembled) = FrameReassembler::new(None);
+        let (fragmented, reassembled) = FrameReassembler::new(Duration::from_secs(30));
 
         futures::stream::iter(segments)
             .map(|segment| {
@@ -879,15 +931,17 @@ mod tests {
     ) -> (Vec<Segment>, Vec<&'static Frame>, HashSet<SegmentId>) {
         assert!((0.0..=1.0).contains(&corrupted_ratio));
 
+        let mut rng = ChaCha20Rng::from_seed(RAND_SEED.clone());
+
         let (excluded_frame_ids, excluded_segments): (HashSet<FrameId>, HashSet<SegmentId>) = (1..num_frames + 1)
-            .choose_multiple(&mut thread_rng(), ((num_frames as f32) * corrupted_ratio) as usize)
-            .into_par_iter()
+            .choose_multiple(&mut rng, ((num_frames as f32) * corrupted_ratio) as usize)
+            .into_iter()// Must be sequentially generated due RNG determinism
             .map(|frame_id| {
                 (
                     frame_id,
                     SegmentId(
                         frame_id,
-                        thread_rng().gen_range(0..SEGMENTS.iter().find(|s| s.frame_id == frame_id).unwrap().seq_len),
+                        rng.gen_range(0..SEGMENTS.iter().find(|s| s.frame_id == frame_id).unwrap().seq_len),
                     ),
                 )
             })
