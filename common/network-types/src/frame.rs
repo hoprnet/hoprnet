@@ -561,7 +561,7 @@ impl Sink<Segment> for FrameReassembler {
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use crate::frame::{Frame, FrameId, FrameReassembler, Segment, SegmentId};
     use async_stream::stream;
     use futures::{pin_mut, Stream, StreamExt};
@@ -592,8 +592,9 @@ mod tests {
             })
             .collect::<Vec<_>>();
         static ref SEGMENTS: Vec<Segment> = {
-            let deque = FRAMES.par_iter().flat_map(|f| f.segment(MTU)).collect::<VecDeque<_>>();
-            linear_half_normal_shuffle(deque, MIXING_FACTOR)
+            let vec = FRAMES.par_iter().flat_map(|f| f.segment(MTU)).collect::<VecDeque<_>>();
+            let mut rng = ChaCha20Rng::from_seed(RAND_SEED.clone());
+            linear_half_normal_shuffle(&mut rng, vec, MIXING_FACTOR)
         };
     }
 
@@ -607,13 +608,15 @@ mod tests {
     /// `N` denotes normal distribution.
     /// When used on frame segments vector, it will shuffle the segments in a controlled manner;
     /// such that an entire frame can unlikely swap position with another, if `factor` ~ frame length.
-    fn linear_half_normal_shuffle<T>(mut vec: VecDeque<T>, factor: f64) -> Vec<T> {
-        let mut rng = ChaCha20Rng::from_seed(RAND_SEED.clone());
-        let mut dist = Normal::new(0.0, factor).unwrap();
+    pub fn linear_half_normal_shuffle<T, R: Rng>(rng: &mut R, mut vec: VecDeque<T>, factor: f64) -> Vec<T> {
+        if factor == 0.0 || vec.is_empty() {
+            return vec.into(); // no mixing
+        }
 
+        let mut dist = Normal::new(0.0, factor).unwrap();
         let mut ret = Vec::new();
         while !vec.is_empty() {
-            ret.push(vec.remove(sample_index(&mut dist, &mut rng, vec.len())).unwrap());
+            ret.push(vec.remove(sample_index(&mut dist, rng, vec.len())).unwrap());
         }
         ret
     }

@@ -339,61 +339,115 @@ impl<T: NetworkTransport + Send + Sync> AsyncRead for SessionSocket<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::frame::tests::linear_half_normal_shuffle;
+    use async_stream::stream;
     use futures::channel::mpsc::UnboundedSender;
     use futures::future::Either;
     use futures::io::{AsyncReadExt, AsyncWriteExt};
     use futures::lock::Mutex;
-    use futures::pin_mut;
+    use futures::{join, pin_mut, Stream};
     use hex_literal::hex;
     use lazy_static::lazy_static;
-    use rand::SeedableRng;
+    use rand::{thread_rng, Rng, SeedableRng};
     use rand_distr::Distribution;
+    use std::collections::VecDeque;
+    use std::fmt::{Debug, Formatter};
     use std::ops::DerefMut;
     use std::sync::OnceLock;
     use test_log::test;
-    use tracing::warn;
+    use tracing::{info, warn};
 
     lazy_static! {
         //static ref RNG_SEED: [u8; 32] = hopr_crypto_random::random_bytes();
         static ref RNG_SEED: [u8; 32] = hex!("4042a10ca2b3f9f9e34ae3c8d5fa6298dfbacf6009a16c04754a7d7c626ec1dc");
     }
 
-    trait FakeNetwork: NetworkTransport {
-        fn set_counterparty(&self, c: SessionState<Self>)
-        where
-            Self: Sized;
+    fn randomized_stream<S, R>(mut input_stream: S, mut rng: R, mixing_factor: f64) -> impl Stream<Item = S::Item>
+    where
+        S: Stream + Unpin + 'static,
+        S::Item: Clone + Unpin + 'static,
+        R: Rng + Unpin + 'static,
+    {
+        const BUFFER_SIZE: usize = 10;
+
+        stream! {
+            let mut buffer = VecDeque::with_capacity(BUFFER_SIZE);
+
+            while let Some(item) = input_stream.next().await {
+                buffer.push_front(item);
+                if buffer.len() >= BUFFER_SIZE {
+                    let mut out_buffer = linear_half_normal_shuffle(&mut rng, buffer.clone(), mixing_factor);
+                    while let Some(shuffled_item) = out_buffer.pop() {
+                        yield shuffled_item;
+                    }
+                    buffer.clear();
+                }
+            }
+
+            // Output remaining elements
+            let out_buffer = linear_half_normal_shuffle(&mut rng, buffer.clone(), mixing_factor);
+            for item in out_buffer {
+                yield item;
+            }
+        }
     }
 
-    fn setup_alice_bob<N: FakeNetwork>(
-        cfg: SessionConfig,
-        ctor: impl Fn() -> N,
-    ) -> (SessionSocket<N>, SessionSocket<N>) {
-        let alice_to_bob_transport = Arc::new(ctor());
-        let bob_to_alice_transport = Arc::new(ctor());
-
-        let alice_to_bob = SessionSocket::new(alice_to_bob_transport.clone(), cfg.clone());
-        let bob_to_alice = SessionSocket::new(bob_to_alice_transport.clone(), cfg.clone());
-
-        alice_to_bob_transport.set_counterparty(bob_to_alice.state().clone());
-        bob_to_alice_transport.set_counterparty(alice_to_bob.state().clone());
-
-        (alice_to_bob, bob_to_alice)
+    #[derive(Debug, Clone, Default)]
+    pub struct FaultyNetworkConfig {
+        pub fault_probability: f64,
+        pub mixing_factor: f64,
     }
 
-    #[derive(Debug)]
     pub struct FaultyNetwork {
         rng: Mutex<(rand_distr::Bernoulli, rand_chacha::ChaCha20Rng)>,
         sender: UnboundedSender<Box<[u8]>>,
         counterparty: Arc<OnceLock<SessionState<FaultyNetwork>>>,
     }
 
-    impl FaultyNetwork {
-        pub fn new(fault_prob: f64) -> Self {
-            let counterparty = Arc::new(OnceLock::<SessionState<FaultyNetwork>>::new());
-            let (sender, mut recv) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
+    impl Debug for FaultyNetwork {
+        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+            write!(f, "network with {:?}", &self.counterparty)
+        }
+    }
 
+    fn setup_alice_bob(
+        cfg: SessionConfig,
+        network_cfg: FaultyNetworkConfig,
+    ) -> (
+        Arc<Mutex<SessionSocket<FaultyNetwork>>>,
+        Arc<Mutex<SessionSocket<FaultyNetwork>>>,
+    ) {
+        let alice_to_bob_transport = Arc::new(FaultyNetwork::new(network_cfg.clone()));
+        let bob_to_alice_transport = Arc::new(FaultyNetwork::new(network_cfg.clone()));
+
+        let alice_to_bob = SessionSocket::new(alice_to_bob_transport.clone(), cfg.clone());
+        let bob_to_alice = SessionSocket::new(bob_to_alice_transport.clone(), cfg.clone());
+
+        alice_to_bob_transport
+            .counterparty
+            .set(bob_to_alice.state().clone())
+            .unwrap();
+        bob_to_alice_transport
+            .counterparty
+            .set(alice_to_bob.state().clone())
+            .unwrap();
+
+        (Arc::new(Mutex::new(alice_to_bob)), Arc::new(Mutex::new(bob_to_alice)))
+    }
+
+    impl FaultyNetwork {
+        pub fn new(cfg: FaultyNetworkConfig) -> Self {
+            info!("network RNG seed: {}", hex::encode(RNG_SEED.as_slice()));
+
+            let rng = rand_chacha::ChaCha20Rng::from_seed(RNG_SEED.clone());
+            let counterparty = Arc::new(OnceLock::<SessionState<FaultyNetwork>>::new());
+
+            let (sender, recv) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
+            let recv = randomized_stream(recv, rng.clone(), cfg.mixing_factor);
             let counterparty_clone = counterparty.clone();
+
             async_std::task::spawn(async move {
+                pin_mut!(recv);
                 while let Some(data) = recv.next().await {
                     if let Some(counterparty) = counterparty_clone.get() {
                         counterparty.received_message(&data).await.unwrap();
@@ -402,10 +456,7 @@ mod tests {
             });
 
             Self {
-                rng: Mutex::new((
-                    rand_distr::Bernoulli::new(1.0 - fault_prob).unwrap(),
-                    rand_chacha::ChaCha20Rng::from_seed(RNG_SEED.clone()),
-                )),
+                rng: Mutex::new((rand_distr::Bernoulli::new(1.0 - cfg.fault_probability).unwrap(), rng)),
                 sender,
                 counterparty,
             }
@@ -426,34 +477,25 @@ mod tests {
         }
     }
 
-    impl FakeNetwork for FaultyNetwork {
-        fn set_counterparty(&self, c: SessionState<Self>)
-        where
-            Self: Sized,
-        {
-            self.counterparty.set(c).unwrap()
-        }
-    }
-
-    async fn send_and_recv(
+    async fn send_and_recv<R: AsyncRead + Unpin, W: AsyncWrite + Unpin>(
         num_frames: usize,
         frame_size: usize,
-        sender: &mut (impl AsyncWrite + Unpin),
-        recv: &mut (impl AsyncRead + Unpin),
+        sender: Arc<Mutex<W>>,
+        recv: Arc<Mutex<R>>,
         timeout: Duration,
     ) {
         let mut sent = Vec::new();
         for _ in 0..num_frames {
             let mut data = vec![0u8; frame_size];
             hopr_crypto_random::random_fill(&mut data);
-            sender.write(&data).await.unwrap();
+            sender.lock().await.write(&data).await.unwrap();
             sent.push(data);
         }
 
         let fut1 = async move {
             for i in 0..sent.len() {
                 let mut read = vec![0u8; frame_size];
-                recv.read_exact(&mut read).await.unwrap();
+                recv.lock().await.read_exact(&mut read).await.unwrap();
                 assert_eq!(sent[i], read);
             }
         };
@@ -468,26 +510,49 @@ mod tests {
         );
     }
 
+    #[async_std::test]
+    async fn test_randomized_stream_without_mixing_outputs_in_order() {
+        const SIZE: usize = 1000;
+        let stream = futures::stream::iter(0..SIZE);
+        let randomized = randomized_stream(stream, thread_rng(), 0.0);
+
+        let out = randomized.collect::<Vec<_>>().await;
+        assert_eq!(out, (0..SIZE).into_iter().collect::<Vec<_>>());
+    }
+
+    #[async_std::test]
+    async fn test_randomized_stream_without_mixing_outputs_out_of_order() {
+        const SIZE: usize = 1000;
+        let stream = futures::stream::iter(0..SIZE);
+        let randomized = randomized_stream(stream, thread_rng(), 5.0);
+
+        let mut out = randomized.collect::<Vec<_>>().await;
+        assert_ne!(out, (0..SIZE).into_iter().collect::<Vec<_>>());
+
+        out.sort();
+        assert_eq!(out, (0..SIZE).into_iter().collect::<Vec<_>>());
+    }
+
     #[test(async_std::test)]
     async fn test_reliable_send_recv() {
-        let (mut alice_to_bob, mut bob_to_alice) = setup_alice_bob(Default::default(), || FaultyNetwork::new(0.0));
+        let (alice_to_bob, bob_to_alice) = setup_alice_bob(Default::default(), Default::default());
 
-        send_and_recv(
-            1000,
-            1500,
-            &mut alice_to_bob,
-            &mut bob_to_alice,
-            Duration::from_secs(10),
-        )
-        .await;
-        send_and_recv(
-            1000,
-            1500,
-            &mut bob_to_alice,
-            &mut alice_to_bob,
-            Duration::from_secs(10),
-        )
-        .await;
+        join!(
+            send_and_recv(
+                1000,
+                1500,
+                alice_to_bob.clone(),
+                bob_to_alice.clone(),
+                Duration::from_secs(10),
+            ),
+            send_and_recv(
+                1000,
+                1500,
+                bob_to_alice.clone(),
+                alice_to_bob.clone(),
+                Duration::from_secs(10),
+            )
+        );
     }
 
     #[test(async_std::test)]
@@ -497,12 +562,15 @@ mod tests {
             ..Default::default()
         };
 
-        warn!("seed: {}", hex::encode(RNG_SEED.as_slice()));
+        let net_cfg = FaultyNetworkConfig {
+            fault_probability: 0.33,
+            ..Default::default()
+        };
 
-        let (mut alice_to_bob, mut bob_to_alice) = setup_alice_bob(cfg, || FaultyNetwork::new(0.33));
+        let (alice_to_bob, bob_to_alice) = setup_alice_bob(cfg, net_cfg);
 
-        let alice_bob_state = alice_to_bob.state().clone();
-        let bob_alice_state = bob_to_alice.state().clone();
+        let alice_bob_state = alice_to_bob.lock().await.state().clone();
+        let bob_alice_state = bob_to_alice.lock().await.state().clone();
         async_std::task::spawn(async move {
             loop {
                 async_std::task::sleep(Duration::from_millis(300)).await;
@@ -515,23 +583,70 @@ mod tests {
             }
         });
 
-        send_and_recv(
-            1000,
-            1500,
-            &mut alice_to_bob,
-            &mut bob_to_alice,
-            Duration::from_secs(30),
-        )
-        .await;
+        join!(
+            send_and_recv(
+                1000,
+                1500,
+                alice_to_bob.clone(),
+                bob_to_alice.clone(),
+                Duration::from_secs(30),
+            ),
+            send_and_recv(
+                1000,
+                1500,
+                bob_to_alice.clone(),
+                alice_to_bob.clone(),
+                Duration::from_secs(30),
+            )
+        );
 
-        send_and_recv(
-            1000,
-            1500,
-            &mut bob_to_alice,
-            &mut alice_to_bob,
-            Duration::from_secs(30),
-        )
-        .await;
+        async_std::task::sleep(Duration::from_millis(500)).await;
+    }
+
+    #[test(async_std::test)]
+    async fn test_unreliable_mixed_send_recv() {
+        let cfg = SessionConfig {
+            acknowledged_frames_buffer: 1024,
+            ..Default::default()
+        };
+
+        let net_cfg = FaultyNetworkConfig {
+            fault_probability: 0.33,
+            mixing_factor: 4.0,
+        };
+
+        let (alice_to_bob, bob_to_alice) = setup_alice_bob(cfg, net_cfg);
+
+        let alice_bob_state = alice_to_bob.lock().await.state().clone();
+        let bob_alice_state = bob_to_alice.lock().await.state().clone();
+        async_std::task::spawn(async move {
+            loop {
+                async_std::task::sleep(Duration::from_millis(300)).await;
+
+                alice_bob_state.acknowledge_segments(None).await.unwrap();
+                alice_bob_state.request_missing_segments(None).await.unwrap();
+
+                bob_alice_state.acknowledge_segments(None).await.unwrap();
+                bob_alice_state.request_missing_segments(None).await.unwrap();
+            }
+        });
+
+        join!(
+            send_and_recv(
+                1000,
+                1500,
+                alice_to_bob.clone(),
+                bob_to_alice.clone(),
+                Duration::from_secs(30),
+            ),
+            send_and_recv(
+                1000,
+                1500,
+                bob_to_alice.clone(),
+                alice_to_bob.clone(),
+                Duration::from_secs(30),
+            )
+        );
 
         async_std::task::sleep(Duration::from_millis(500)).await;
     }
