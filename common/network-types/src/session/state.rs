@@ -339,7 +339,7 @@ impl<T: NetworkTransport + Send + Sync> AsyncRead for SessionSocket<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::frame::tests::linear_half_normal_shuffle;
+    use crate::frame::tests::sample_index;
     use async_stream::stream;
     use futures::channel::mpsc::UnboundedSender;
     use futures::future::Either;
@@ -349,7 +349,7 @@ mod tests {
     use hex_literal::hex;
     use lazy_static::lazy_static;
     use rand::{thread_rng, Rng, SeedableRng};
-    use rand_distr::Distribution;
+    use rand_distr::{Distribution, Normal};
     use std::collections::VecDeque;
     use std::fmt::{Debug, Formatter};
     use std::ops::DerefMut;
@@ -372,22 +372,28 @@ mod tests {
 
         stream! {
             let mut buffer = VecDeque::with_capacity(BUFFER_SIZE);
+            let mut dist = Normal::new(0.0, mixing_factor).unwrap();
 
             while let Some(item) = input_stream.next().await {
-                buffer.push_front(item);
+                buffer.push_back(item);
                 if buffer.len() >= BUFFER_SIZE {
-                    let mut out_buffer = linear_half_normal_shuffle(&mut rng, buffer.clone(), mixing_factor);
-                    while let Some(shuffled_item) = out_buffer.pop() {
-                        yield shuffled_item;
+                    while !buffer.is_empty() {
+                        if mixing_factor == 0.0 {
+                            yield buffer.pop_front().unwrap();
+                        } else {
+                            yield buffer.remove(sample_index(&mut dist, &mut rng, buffer.len())).unwrap();
+                        }
                     }
-                    buffer.clear();
                 }
             }
 
             // Output remaining elements
-            let out_buffer = linear_half_normal_shuffle(&mut rng, buffer.clone(), mixing_factor);
-            for item in out_buffer {
-                yield item;
+            while !buffer.is_empty() {
+                if mixing_factor == 0.0 {
+                    yield buffer.pop_front().unwrap();
+                } else {
+                    yield buffer.remove(sample_index(&mut dist, &mut rng, buffer.len())).unwrap();
+                }
             }
         }
     }
@@ -521,10 +527,10 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn test_randomized_stream_without_mixing_outputs_out_of_order() {
+    async fn test_randomized_stream_with_mixing_outputs_out_of_order() {
         const SIZE: usize = 1000;
         let stream = futures::stream::iter(0..SIZE);
-        let randomized = randomized_stream(stream, thread_rng(), 5.0);
+        let randomized = randomized_stream(stream, thread_rng(), 10.0);
 
         let mut out = randomized.collect::<Vec<_>>().await;
         assert_ne!(out, (0..SIZE).into_iter().collect::<Vec<_>>());
