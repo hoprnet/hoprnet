@@ -45,7 +45,7 @@ use fixedbitset::FixedBitSet;
 use futures::{Sink, Stream};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
-use std::fmt::Debug;
+use std::fmt::{Debug, Display, Formatter};
 use std::mem;
 use std::ops::{Add, Sub};
 use std::pin::Pin;
@@ -64,11 +64,17 @@ pub type FrameId = u32;
 
 /// Convenience type that identifies a segment within a frame.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
-pub(crate) struct SegmentId(pub FrameId, pub u16);
+pub struct SegmentId(pub FrameId, pub u16);
 
 impl From<&Segment> for SegmentId {
     fn from(value: &Segment) -> Self {
         Self(value.frame_id, value.seq_idx)
+    }
+}
+
+impl Display for SegmentId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "seg({},{})", self.0, self.1)
     }
 }
 
@@ -348,6 +354,7 @@ pub struct FrameInfo {
 #[derive(Debug)]
 pub struct FrameReassembler {
     sequences: DashMap<FrameId, FrameBuilder>,
+    highest_buffered_frame: AtomicU32,
     next_emitted_frame: AtomicU32,
     last_emission: AtomicU64,
     reassembled: futures::channel::mpsc::UnboundedSender<Frame>,
@@ -364,6 +371,7 @@ impl FrameReassembler {
         (
             Self {
                 sequences: DashMap::new(),
+                highest_buffered_frame: AtomicU32::new(0),
                 next_emitted_frame: AtomicU32::new(1),
                 last_emission: AtomicU64::new(u64::MAX),
                 reassembled,
@@ -441,6 +449,7 @@ impl FrameReassembler {
                 } else {
                     // If not complete or not the next one to be emitted, just start building it
                     v.insert(builder);
+                    self.highest_buffered_frame.fetch_max(frame_id, Ordering::Relaxed);
                 }
             }
         }
@@ -462,9 +471,21 @@ impl FrameReassembler {
     /// Returns [information](FrameInfo) about the incomplete frames.
     /// The ordered frame IDs are the keys on the returned map.
     pub fn incomplete_frames(&self) -> BTreeMap<FrameId, FrameInfo> {
-        self.sequences
-            .iter()
-            .filter_map(|e| (!e.is_complete()).then(|| (e.frame_id, e.info())))
+        (self.next_emitted_frame.load(Ordering::SeqCst)..=self.highest_buffered_frame.load(Ordering::SeqCst))
+            .into_iter()
+            .filter_map(|frame_id| match self.sequences.get(&frame_id) {
+                Some(e) => (!e.is_complete()).then(|| (frame_id, e.info())),
+                None => Some((frame_id, {
+                    let mut missing_segments = FixedBitSet::with_capacity(1);
+                    missing_segments.insert(0);
+                    FrameInfo {
+                        frame_id,
+                        missing_segments,
+                        total_segments: 1,
+                        last_update: SystemTime::UNIX_EPOCH,
+                    }
+                })),
+            })
             .collect()
     }
 
@@ -548,13 +569,13 @@ mod tests {
     use lazy_static::lazy_static;
     use rand::prelude::{Distribution, SliceRandom};
     use rand::{seq::IteratorRandom, thread_rng, Rng, SeedableRng};
+    use rand_chacha::ChaCha20Rng;
     use rand_distr::Normal;
     use rayon::prelude::*;
     use std::collections::{HashSet, VecDeque};
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
     use std::time::Duration;
-    use rand_chacha::ChaCha20Rng;
 
     const MTU: u16 = 448;
     const FRAME_COUNT: u32 = 65_535;
@@ -587,8 +608,7 @@ mod tests {
     /// When used on frame segments vector, it will shuffle the segments in a controlled manner;
     /// such that an entire frame can unlikely swap position with another, if `factor` ~ frame length.
     fn linear_half_normal_shuffle<T>(mut vec: VecDeque<T>, factor: f64) -> Vec<T> {
-
-        let mut rng = rand_chacha::ChaCha20Rng::from_seed(RAND_SEED.clone());
+        let mut rng = ChaCha20Rng::from_seed(RAND_SEED.clone());
         let mut dist = Normal::new(0.0, factor).unwrap();
 
         let mut ret = Vec::new();
@@ -935,7 +955,7 @@ mod tests {
 
         let (excluded_frame_ids, excluded_segments): (HashSet<FrameId>, HashSet<SegmentId>) = (1..num_frames + 1)
             .choose_multiple(&mut rng, ((num_frames as f32) * corrupted_ratio) as usize)
-            .into_iter()// Must be sequentially generated due RNG determinism
+            .into_iter() // Must be sequentially generated due RNG determinism
             .map(|frame_id| {
                 (
                     frame_id,

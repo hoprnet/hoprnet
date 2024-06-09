@@ -28,6 +28,7 @@ serde_bytes = { workspace = true }
 smart-default = { workspace = true }
 strum = { workspace = true }
 tokio = { workspace = true, optional = true}
+tracing = { workspace = true }
 thiserror = { workspace = true }
 
 hopr-platform = { workspace = true }
@@ -39,11 +40,12 @@ async-stream = { workspace = true }
 ctor = "0.2.8"
 divan = { workspace = true }
 hex-literal = { workspace = true }
+lazy_static = { workspace = true }
+mockall = { workspace = true }
 rand = "0.8.5"
 rand_distr = "0.4.3"
 rand_chacha = "0.3"
 rayon = { workspace = true }
-lazy_static = { workspace = true }
-mockall = { workspace = true }
+test-log = { version = "0.2.16", features = ["trace"] }
 
 hopr-crypto-random = { workspace = true }

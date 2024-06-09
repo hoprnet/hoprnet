@@ -3,7 +3,7 @@ use hopr_primitive_types::prelude::BytesEncodable;
 use std::collections::BTreeSet;
 use std::mem;
 
-use crate::frame::{FrameId, FrameInfo, Segment};
+use crate::frame::{FrameId, FrameInfo, Segment, SegmentId};
 use crate::session::errors::SessionError;
 
 // TODO: get this from another crate?
@@ -33,6 +33,36 @@ impl SegmentRequest {
     /// Maximum number of segments that can be requested.
     /// This is calculated so that the request fits within a single segment itself.
     pub const MAX_ERROR_SEGMENTS: usize = BITMAP_SIZE * 8;
+
+    /// Returns the number of missing segments.
+    pub fn len(&self) -> usize {
+        self.missing_segments.count_ones(..)
+    }
+}
+
+pub struct SegmentIdIter(Vec<SegmentId>);
+
+impl Iterator for SegmentIdIter {
+    type Item = SegmentId;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.pop()
+    }
+}
+
+impl IntoIterator for SegmentRequest {
+    type Item = SegmentId;
+    type IntoIter = SegmentIdIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        SegmentIdIter(
+            self.missing_segments
+                .into_ones()
+                .map(|b| SegmentId(self.frame_id, b as u16))
+                .rev()
+                .collect(),
+        )
+    }
 }
 
 impl From<FrameInfo> for SegmentRequest {
@@ -41,7 +71,7 @@ impl From<FrameInfo> for SegmentRequest {
             frame_id: value.frame_id,
             missing_segments: FixedBitSet::with_capacity_and_blocks(
                 Self::MAX_ERROR_SEGMENTS,
-                value.missing_segments.into_ones().take(BITMAP_SIZE / BITMAP_BLOCK_SIZE),
+                value.missing_segments.as_slice().iter().copied(),
             ),
         }
     }
@@ -108,6 +138,12 @@ impl FrameAcknowledgements {
         }
     }
 
+    /// Number of acknowledged frame IDs in this instance.
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
     /// Indicates whether the [maximum number of frame IDs](FrameAcknowledgements::MAX_ACK_FRAMES)
     /// has been reached.
     #[inline]
@@ -172,7 +208,7 @@ impl From<FrameAcknowledgements> for [u8; SESSION_MSG_SIZE] {
 }
 
 /// Contains all messages of the Session sub-protocol.
-#[derive(Debug, Clone, PartialEq, Eq, strum::EnumDiscriminants)]
+#[derive(Debug, Clone, PartialEq, Eq, strum::EnumDiscriminants, strum::EnumTryAs)]
 #[strum_discriminants(derive(strum::FromRepr), repr(u16))]
 pub enum SessionMessage {
     /// Represents a message containing a segment.
@@ -233,10 +269,11 @@ impl From<SessionMessage> for Vec<u8> {
 
 #[cfg(test)]
 mod tests {
-    use crate::frame::{Frame, FrameInfo};
-    use crate::session::protocol::SessionMessage;
+    use crate::frame::{Frame, FrameInfo, SegmentId};
+    use crate::session::protocol::{SegmentRequest, SessionMessage};
     use fixedbitset::FixedBitSet;
     use hex_literal::hex;
+    use hopr_platform::time::native::current_time;
     use rand::prelude::IteratorRandom;
     use rand::{thread_rng, Rng};
     use std::time::SystemTime;
@@ -292,5 +329,35 @@ mod tests {
         let msg_2 = SessionMessage::try_from(&data[..]).unwrap();
 
         assert_eq!(msg_1, msg_2);
+    }
+
+    #[test]
+    fn session_message_segment_request_bitset_test() {
+        let mut seg_req = SegmentRequest {
+            frame_id: 10,
+            missing_segments: FixedBitSet::with_capacity(1024),
+        };
+
+        seg_req.missing_segments.insert(2);
+        seg_req.missing_segments.insert(5);
+
+        let mut iter = seg_req.into_iter();
+        assert_eq!(iter.next(), Some(SegmentId(10, 2)));
+        assert_eq!(iter.next(), Some(SegmentId(10, 5)));
+        assert_eq!(iter.next(), None);
+
+        let mut frame_info = FrameInfo {
+            frame_id: 10,
+            missing_segments: FixedBitSet::with_capacity(1024),
+            total_segments: 10,
+            last_update: current_time(),
+        };
+        frame_info.missing_segments.insert(2);
+        frame_info.missing_segments.insert(5);
+
+        let mut iter = SegmentRequest::from(frame_info).into_iter();
+        assert_eq!(iter.next(), Some(SegmentId(10, 2)));
+        assert_eq!(iter.next(), Some(SegmentId(10, 5)));
+        assert_eq!(iter.next(), None);
     }
 }
