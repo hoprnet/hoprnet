@@ -1,39 +1,16 @@
-# A simplest nix shell file with the project dependencies and 
-# a cross-compilation support.
-{ localSystem ? builtins.currentSystem
-, crossSystem ? null
-}:
+{ config, pkgs, crane, pre-commit-check, solcDefault, extraPackages ? [ ] }:
 let
-  pkgs = import ./nix {
-    inherit localSystem crossSystem;
-  };
-
+  cargoTarget = pkgs.stdenv.buildPlatform.config;
+  rustToolchain = (pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml).override { targets = [ cargoTarget ]; };
+  craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchain;
 in
-pkgs.mkShell {
-  # Native project dependencies like build utilities and additional routines 
-  # like container building, linters, etc.
-  nativeBuildInputs = with pkgs.pkgsBuildHost; [
-    # Rust
-    (rust-bin.fromRustupToolchainFile ./rust-toolchain.toml)
-    sccache
-    # Will add some dependencies like libiconv
-    rustBuildHostDependencies
-
-  ];
-  # Libraries essential to build the service binaries
-  buildInputs = with pkgs; [
-    # Enable Rust cross-compilation support
-    rustCrossHook
-    #gcc_multi
-  ];
-
-  GCCMULTI_VERSION = "9";
-  # You can specify a default GCC version to use
-
-  # For cross-compilation, specify target systems
-  GCCMULTI_TARGETS = [ "x86_64-unknown-linux-gnu" "aarch64-unknown-linux-gnu" ];
-
+craneLib.devShell {
   packages = with pkgs; [
+    openssl
+    pkg-config
+    foundry-bin
+    solcDefault
+
     # testing utilities
     jq
     yq-go
@@ -42,20 +19,6 @@ pkgs.mkShell {
     gnumake
     which
 
-    #rust-bin.stable.latest.default
-    #cmake
-    #clang
-    #libiconv
-    #zlib
-    #protobuf
-    #git
-    #gnupg
-    #nixfmt
-    #solc
-    #foundry
-    #gcc
-    #binutils
-
     # github integration
     gh
 
@@ -63,25 +26,39 @@ pkgs.mkShell {
     act
 
     # documentation utilities
-    #pandoc
-    #swagger-codegen3
+    pandoc
+    swagger-codegen3
 
     # docker image inspection and handling
-    #dive
-    #skopeo
+    dive
+    skopeo
 
     # test coverage generation
-    #lcov
+    lcov
 
     ## python is required by integration tests
-    #python39
-    #python39Packages.venvShellHook
+    python39
+    python39Packages.venvShellHook
 
-  ];
-  TREE_SITTER_STATIC_BUILD = 1;
-  # Prettify shell prompt
-  shellHook = "${pkgs.crossBashPrompt}";
-  # Use sscache to improve rebuilding performance
-  env.RUSTC_WRAPPER = "sccache";
-
+    ## formatting
+    config.treefmt.build.wrapper
+  ] ++
+  (lib.attrValues config.treefmt.build.programs) ++
+  lib.optionals stdenv.isLinux [ autoPatchelfHook ] ++ extraPackages;
+  venvDir = "./.venv";
+  postVenvCreation = ''
+    unset SOURCE_DATE_EPOCH
+    pip install -U pip setuptools wheel
+    pip install -r tests/requirements.txt
+  '' + pkgs.lib.optionalString pkgs.stdenv.isLinux ''
+    autoPatchelf ./.venv
+  '';
+  preShellHook = ''
+    sed "s|# solc = .*|solc = \"${solcDefault}/bin/solc\"|g" \
+      ethereum/contracts/foundry.toml.in > \
+      ethereum/contracts/foundry.toml
+  '';
+  postShellHook = ''
+    ${pre-commit-check.shellHook}
+  '';
 }

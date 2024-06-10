@@ -35,4 +35,3 @@ tempfile = { workspace = true }
 [features]
 default = []
 hopli = []
-js = ["hopr-platform/js"]

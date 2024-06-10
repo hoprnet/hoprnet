@@ -1,21 +1,38 @@
-{ craneLib
+{ buildDocs ? false
 , CARGO_PROFILE ? "release"
+, cargoToml
+, craneLib
+, darwin
 , depsSrc
-, foundry-bin
+, foundryBin
+, git
+, lib
 , openssl
 , pkg-config
-, pname
 , postInstall ? null
 , solcDefault
 , src
-, version
+, stdenv
+, runClippy ? false
+, runTests ? false
 }:
 let
-  sharedArgs = {
+  crateInfo = craneLib.crateNameFromCargoToml { inherit cargoToml; };
+  pname = crateInfo.pname;
+  version = lib.strings.concatStringsSep "." (lib.lists.take 3 (builtins.splitVersion crateInfo.version));
+
+  sharedArgsBase = {
     inherit pname version CARGO_PROFILE;
 
-    nativeBuildInputs = [ solcDefault foundry-bin pkg-config ];
-    buildInputs = [ openssl ];
+    # FIXME: some dev dependencies depend on OpenSSL, would be nice to remove
+    # this dependency
+    nativeBuildInputs = [ solcDefault foundryBin pkg-config openssl git ];
+    buildInputs = [ openssl ] ++ lib.optionals stdenv.isDarwin (
+      with darwin.apple_sdk.frameworks; [
+        CoreServices
+        SystemConfiguration
+      ]
+    );
 
     CARGO_HOME = ".cargo";
     cargoExtraArgs = "--offline -p ${pname} ";
@@ -25,8 +42,19 @@ let
     # prevent nix from changing config.sub files under vendor/cargo
     dontUpdateAutotoolsGnuConfigScripts = true;
   };
+
+  sharedArgs =
+    if runTests then sharedArgsBase // { doCheck = true; }
+    else if runClippy then sharedArgsBase // { cargoClippyExtraArgs = "-- -Dwarnings"; }
+    else sharedArgsBase;
+
+  builder =
+    if runTests then craneLib.cargoTest
+    else if runClippy then craneLib.cargoClippy
+    else if buildDocs then craneLib.cargoDoc
+    else craneLib.buildPackage;
 in
-craneLib.buildPackage (sharedArgs // {
+builder (sharedArgs // {
   inherit src postInstall;
 
   cargoArtifacts = craneLib.buildDepsOnly (sharedArgs // {
