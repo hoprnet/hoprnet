@@ -39,6 +39,7 @@ jobs:
     with:
       base_branch: ${{ github.event.pull_request.base.ref }}
       system: x86_64-linux
+      runner: self-hosted-hoprnet-big
     secrets: inherit
 
   build-binary-aarch64-linux:
@@ -48,6 +49,7 @@ jobs:
     with:
       base_branch: ${{ github.event.pull_request.base.ref }}
       system: aarch64-linux
+      runner: macos-latest
     secrets: inherit
 
   build-binary-aarch64-darwin:
@@ -57,6 +59,7 @@ jobs:
     with:
       base_branch: ${{ github.event.pull_request.base.ref }}
       system: aarch64-darwin
+      runner: macos-latest
     secrets: inherit
 
   build-binary-x86_64-darwin:
@@ -66,6 +69,17 @@ jobs:
     with:
       base_branch: ${{ github.event.pull_request.base.ref }}
       system: x86_64-darwin
+      runner: self-hosted-hoprnet-big
+    secrets: inherit
+
+  build-binary-armv7l-linux:
+    name: armv7l-linux
+    if: contains(github.event.pull_request.labels.*.name, 'binary:armv7l-linux')
+    uses: ./.github/workflows/build-binaries.yaml
+    with:
+      base_branch: ${{ github.event.pull_request.base.ref }}
+      system: armv7l-linux
+      runner: self-hosted-hoprnet-big
     secrets: inherit
 
   docs:

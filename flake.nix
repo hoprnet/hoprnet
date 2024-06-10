@@ -94,6 +94,11 @@
             useRustNightly = true;
           };
 
+          rust-builder-x86_64-linux = import ./nix/rust-builder.nix {
+            inherit nixpkgs rust-overlay crane foundry solc localSystem;
+            crossSystem = pkgs.lib.systems.examples.x86_64-linux;
+          };
+
           rust-builder-x86_64-darwin = import ./nix/rust-builder.nix {
             inherit nixpkgs rust-overlay crane foundry solc localSystem;
             crossSystem = pkgs.lib.systems.examples.x86_64-darwin;
@@ -120,6 +125,7 @@
           };
 
           hoprd = rust-builder-local.callPackage ./nix/rust-package.nix hoprdBuildArgs;
+          hoprd-x86_64-linux = rust-builder-x86_64-linux.callPackage ./nix/rust-package.nix hoprdBuildArgs;
           hoprd-aarch64-linux = rust-builder-aarch64-linux.callPackage ./nix/rust-package.nix hoprdBuildArgs;
           hoprd-armv7l-linux = rust-builder-armv7l-linux.callPackage ./nix/rust-package.nix hoprdBuildArgs;
           # CAVEAT: must be built from a darwin system
@@ -128,6 +134,23 @@
           hoprd-aarch64-darwin = rust-builder-aarch64-darwin.callPackage ./nix/rust-package.nix hoprdBuildArgs;
 
           hoprd-debug = rust-builder-local.callPackage ./nix/rust-package.nix (hoprdBuildArgs // {
+            CARGO_PROFILE = "dev";
+          });
+          hoprd-debug-x86_64-linux = rust-builder-x86_64-linux.callPackage ./nix/rust-package.nix (hoprdBuildArgs // {
+            CARGO_PROFILE = "dev";
+          });
+          hoprd-debug-aarch64-linux = rust-builder-aarch64-linux.callPackage ./nix/rust-package.nix (hoprdBuildArgs // {
+            CARGO_PROFILE = "dev";
+          });
+          hoprd-debug-armv7l-linux = rust-builder-armv7l-linux.callPackage ./nix/rust-package.nix (hoprdBuildArgs // {
+            CARGO_PROFILE = "dev";
+          });
+          # CAVEAT: must be built from a darwin system
+          hoprd-debug-x86_64-darwin = rust-builder-x86_64-darwin.callPackage ./nix/rust-package.nix (hoprdBuildArgs // {
+            CARGO_PROFILE = "dev";
+          });
+          # CAVEAT: must be built from a darwin system
+          hoprd-debug-aarch64-darwin = rust-builder-aarch64-darwin.callPackage ./nix/rust-package.nix (hoprdBuildArgs // {
             CARGO_PROFILE = "dev";
           });
 
