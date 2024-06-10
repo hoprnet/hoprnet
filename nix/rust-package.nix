@@ -8,6 +8,7 @@
 , git
 , html-tidy
 , lib
+, libiconv
 , openssl
 , pandoc
 , pkg-config
@@ -28,7 +29,7 @@ let
 
     # FIXME: some dev dependencies depend on OpenSSL, would be nice to remove
     # this dependency
-    nativeBuildInputs = [ solcDefault foundryBin pkg-config openssl git ];
+    nativeBuildInputs = [ solcDefault foundryBin pkg-config openssl git libiconv ];
     buildInputs = [ openssl ] ++ lib.optionals stdenv.isDarwin (
       with darwin.apple_sdk.frameworks; [
         CoreServices
