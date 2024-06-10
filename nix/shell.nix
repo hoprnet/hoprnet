@@ -1,7 +1,7 @@
 { config, pkgs, crane, pre-commit-check, solcDefault, extraPackages ? [ ] }:
 let
   cargoTarget = pkgs.stdenv.buildPlatform.config;
-  rustToolchain = (pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml).override { targets = [ cargoTarget ]; };
+  rustToolchain = (pkgs.rust-bin.fromRustupToolchainFile ./../rust-toolchain.toml).override { targets = [ cargoTarget ]; };
   craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchain;
 in
 craneLib.devShell {
