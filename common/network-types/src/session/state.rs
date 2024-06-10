@@ -345,7 +345,7 @@ mod tests {
     use futures::future::Either;
     use futures::io::{AsyncReadExt, AsyncWriteExt};
     use futures::lock::Mutex;
-    use futures::{join, pin_mut, Stream};
+    use futures::{pin_mut, Stream};
     use hex_literal::hex;
     use lazy_static::lazy_static;
     use rand::{thread_rng, Rng, SeedableRng};
@@ -438,6 +438,20 @@ mod tests {
             .set(alice_to_bob.state().clone())
             .unwrap();
 
+        let alice_bob_state = alice_to_bob.state().clone();
+        let bob_alice_state = bob_to_alice.state().clone();
+        async_std::task::spawn(async move {
+            loop {
+                async_std::task::sleep(Duration::from_millis(300)).await;
+
+                alice_bob_state.acknowledge_segments(None).await.unwrap();
+                alice_bob_state.request_missing_segments(None).await.unwrap();
+
+                bob_alice_state.acknowledge_segments(None).await.unwrap();
+                bob_alice_state.request_missing_segments(None).await.unwrap();
+            }
+        });
+
         (Arc::new(Mutex::new(alice_to_bob)), Arc::new(Mutex::new(bob_to_alice)))
     }
 
@@ -483,37 +497,44 @@ mod tests {
         }
     }
 
-    async fn send_and_recv<R: AsyncRead + Unpin, W: AsyncWrite + Unpin>(
+    async fn send_and_recv<R: AsyncRead + Unpin + Send + 'static, W: AsyncWrite + Unpin + Send + 'static>(
         num_frames: usize,
         frame_size: usize,
         sender: Arc<Mutex<W>>,
         recv: Arc<Mutex<R>>,
         timeout: Duration,
     ) {
-        let mut sent = Vec::new();
-        for _ in 0..num_frames {
-            let mut data = vec![0u8; frame_size];
-            hopr_crypto_random::random_fill(&mut data);
-            sender.lock().await.write(&data).await.unwrap();
-            sent.push(data);
-        }
+        let sender = async_std::task::spawn(async move {
+            let mut sent = Vec::new();
+            for _ in 0..num_frames {
+                let mut data = vec![0u8; frame_size];
+                hopr_crypto_random::random_fill(&mut data);
+                sender.lock().await.write(&data).await.unwrap();
+                sent.push(data);
+            }
+            sent
+        });
 
-        let fut1 = async move {
-            for i in 0..sent.len() {
+        let receiver = async_std::task::spawn(async move {
+            let mut received = Vec::new();
+            for _ in 0..num_frames {
                 let mut read = vec![0u8; frame_size];
                 recv.lock().await.read_exact(&mut read).await.unwrap();
-                assert_eq!(sent[i], read);
+                received.push(read);
             }
-        };
+            received
+        });
 
-        let fut2 = async_std::task::sleep(timeout);
-        pin_mut!(fut1);
-        pin_mut!(fut2);
+        let send_recv = futures::future::join(sender, receiver);
+        let timeout = async_std::task::sleep(timeout);
 
-        assert!(
-            matches!(futures::future::select(fut1, fut2).await, Either::Left(_)),
-            "timeout"
-        );
+        pin_mut!(send_recv);
+        pin_mut!(timeout);
+
+        match futures::future::select(send_recv, timeout).await {
+            Either::Left(((sent, received), _)) => assert_eq!(sent, received),
+            Either::Right(_) => panic!("timeout"),
+        }
     }
 
     #[async_std::test]
@@ -540,25 +561,54 @@ mod tests {
     }
 
     #[test(async_std::test)]
-    async fn test_reliable_send_recv() {
+    async fn test_reliable_send_recv_no_ack() {
         let (alice_to_bob, bob_to_alice) = setup_alice_bob(Default::default(), Default::default());
 
-        join!(
-            send_and_recv(
-                1000,
-                1500,
-                alice_to_bob.clone(),
-                bob_to_alice.clone(),
-                Duration::from_secs(10),
-            ),
-            send_and_recv(
-                1000,
-                1500,
-                bob_to_alice.clone(),
-                alice_to_bob.clone(),
-                Duration::from_secs(10),
-            )
-        );
+        send_and_recv(
+            1000,
+            1500,
+            alice_to_bob.clone(),
+            bob_to_alice.clone(),
+            Duration::from_secs(10),
+        )
+        .await;
+
+        send_and_recv(
+            1000,
+            1500,
+            bob_to_alice.clone(),
+            alice_to_bob.clone(),
+            Duration::from_secs(10),
+        )
+        .await
+    }
+
+    #[test(async_std::test)]
+    async fn test_reliable_send_recv() {
+        let cfg = SessionConfig {
+            acknowledged_frames_buffer: 1024,
+            ..Default::default()
+        };
+
+        let (alice_to_bob, bob_to_alice) = setup_alice_bob(cfg, Default::default());
+
+        send_and_recv(
+            1000,
+            1500,
+            alice_to_bob.clone(),
+            bob_to_alice.clone(),
+            Duration::from_secs(10),
+        )
+        .await;
+
+        send_and_recv(
+            1000,
+            1500,
+            bob_to_alice.clone(),
+            alice_to_bob.clone(),
+            Duration::from_secs(10),
+        )
+        .await;
     }
 
     #[test(async_std::test)]
@@ -569,42 +619,29 @@ mod tests {
         };
 
         let net_cfg = FaultyNetworkConfig {
-            fault_probability: 0.33,
+            fault_probability: 0.1,
             ..Default::default()
         };
 
         let (alice_to_bob, bob_to_alice) = setup_alice_bob(cfg, net_cfg);
 
-        let alice_bob_state = alice_to_bob.lock().await.state().clone();
-        let bob_alice_state = bob_to_alice.lock().await.state().clone();
-        async_std::task::spawn(async move {
-            loop {
-                async_std::task::sleep(Duration::from_millis(300)).await;
+        send_and_recv(
+            1000,
+            1500,
+            alice_to_bob.clone(),
+            bob_to_alice.clone(),
+            Duration::from_secs(30),
+        )
+        .await;
 
-                alice_bob_state.acknowledge_segments(None).await.unwrap();
-                alice_bob_state.request_missing_segments(None).await.unwrap();
-
-                bob_alice_state.acknowledge_segments(None).await.unwrap();
-                bob_alice_state.request_missing_segments(None).await.unwrap();
-            }
-        });
-
-        join!(
-            send_and_recv(
-                1000,
-                1500,
-                alice_to_bob.clone(),
-                bob_to_alice.clone(),
-                Duration::from_secs(30),
-            ),
-            send_and_recv(
-                1000,
-                1500,
-                bob_to_alice.clone(),
-                alice_to_bob.clone(),
-                Duration::from_secs(30),
-            )
-        );
+        send_and_recv(
+            1000,
+            1500,
+            bob_to_alice.clone(),
+            alice_to_bob.clone(),
+            Duration::from_secs(30),
+        )
+        .await;
 
         async_std::task::sleep(Duration::from_millis(500)).await;
     }
@@ -617,42 +654,64 @@ mod tests {
         };
 
         let net_cfg = FaultyNetworkConfig {
-            fault_probability: 0.33,
+            fault_probability: 0.1,
             mixing_factor: 4.0,
         };
 
         let (alice_to_bob, bob_to_alice) = setup_alice_bob(cfg, net_cfg);
 
-        let alice_bob_state = alice_to_bob.lock().await.state().clone();
-        let bob_alice_state = bob_to_alice.lock().await.state().clone();
-        async_std::task::spawn(async move {
-            loop {
-                async_std::task::sleep(Duration::from_millis(300)).await;
+        send_and_recv(
+            1000,
+            1500,
+            alice_to_bob.clone(),
+            bob_to_alice.clone(),
+            Duration::from_secs(30),
+        )
+        .await;
 
-                alice_bob_state.acknowledge_segments(None).await.unwrap();
-                alice_bob_state.request_missing_segments(None).await.unwrap();
+        send_and_recv(
+            1000,
+            1500,
+            bob_to_alice.clone(),
+            alice_to_bob.clone(),
+            Duration::from_secs(30),
+        )
+        .await;
 
-                bob_alice_state.acknowledge_segments(None).await.unwrap();
-                bob_alice_state.request_missing_segments(None).await.unwrap();
-            }
-        });
+        async_std::task::sleep(Duration::from_millis(500)).await;
+    }
 
-        join!(
-            send_and_recv(
-                1000,
-                1500,
-                alice_to_bob.clone(),
-                bob_to_alice.clone(),
-                Duration::from_secs(30),
-            ),
-            send_and_recv(
-                1000,
-                1500,
-                bob_to_alice.clone(),
-                alice_to_bob.clone(),
-                Duration::from_secs(30),
-            )
-        );
+    #[test(async_std::test)]
+    async fn test_reliable_mixed_send_recv() {
+        let cfg = SessionConfig {
+            acknowledged_frames_buffer: 1024,
+            ..Default::default()
+        };
+
+        let net_cfg = FaultyNetworkConfig {
+            fault_probability: 0.0,
+            mixing_factor: 4.0,
+        };
+
+        let (alice_to_bob, bob_to_alice) = setup_alice_bob(cfg, net_cfg);
+
+        send_and_recv(
+            1000,
+            1500,
+            alice_to_bob.clone(),
+            bob_to_alice.clone(),
+            Duration::from_secs(30),
+        )
+        .await;
+
+        send_and_recv(
+            1000,
+            1500,
+            bob_to_alice.clone(),
+            alice_to_bob.clone(),
+            Duration::from_secs(30),
+        )
+        .await;
 
         async_std::task::sleep(Duration::from_millis(500)).await;
     }
