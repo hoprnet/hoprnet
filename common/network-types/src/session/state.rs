@@ -12,7 +12,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::Duration;
-use tracing::{debug, error};
+use tracing::{debug, error, warn};
 
 use crate::errors::NetworkTypeError;
 use crate::frame::{segment, FrameId, FrameReassembler, SegmentId};
@@ -29,7 +29,7 @@ pub trait NetworkTransport {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, SmartDefault)]
 pub struct SessionConfig {
     /// Maximum number of buffered segments.
-    #[default = 5120]
+    #[default = 10_000]
     pub max_buffered_segments: usize,
     /// Size of the buffer for acknowledged frame IDs.
     /// If set to 0, no frame acknowledgement will be sent.
@@ -70,27 +70,28 @@ impl<T: NetworkTransport> SessionState<T> {
             SessionMessage::Segment(s) => {
                 let id = SegmentId::from(&s);
                 if let Err(e) = self.frame_reassembler.push_segment(s) {
-                    error!("segment {id:?} not pushed: {e}")
+                    warn!("segment {id:?} not pushed: {e}")
                 } else {
-                    debug!("received segment {id:?}");
+                    debug!("RECEIVED: segment {id:?}");
                 }
             }
             SessionMessage::Request(r) => {
-                debug!("received request for {} segments in {}", r.len(), r.frame_id);
+                debug!("RECEIVED: request for {} segments in {}", r.len(), r.frame_id);
                 let mut count = 0;
                 for segment_id in r {
                     if let Some(segment) = self.lookbehind.get(&segment_id) {
                         let msg = SessionMessage::Segment(segment.value().clone());
+                        debug!("SENDING: retransmitted segment: {:?}", SegmentId::from(segment.value()));
                         self.transport.send_to_counterparty(&msg.into_encoded()).await?;
                         count += 1;
                     } else {
                         error!("segment {segment_id:?} not in lookbehind buffer anymore");
                     }
                 }
-                debug!("re-sent {count} requested segments");
+                debug!("retransmitted {count} requested segments");
             }
             SessionMessage::Acknowledge(f) => {
-                debug!("received acknowledgement of {} frames", f.len());
+                debug!("RECEIVED: acknowledgement of {} frames", f.len());
                 for frame_id in f {
                     for seg in self.lookbehind.iter().filter(|s| frame_id == s.key().0) {
                         seg.remove();
@@ -135,7 +136,7 @@ impl<T: NetworkTransport> SessionState<T> {
         {
             let r = req.try_as_request_ref().unwrap();
             debug!(
-                "sending retransmission request for segments {:?} in frame {}",
+                "SENDING: retransmission request for segments {:?} in frame {}",
                 r.clone().into_iter().collect::<Vec<_>>(),
                 r.frame_id
             );
@@ -172,6 +173,7 @@ impl<T: NetworkTransport> SessionState<T> {
                         }
                     }
 
+                    debug!("SENDING: acknowledgement of {} frames", ack_frames.len());
                     self.transport
                         .send_to_counterparty(&SessionMessage::Acknowledge(ack_frames).into_encoded())
                         .await?;
@@ -208,7 +210,7 @@ impl<T: NetworkTransport> SessionState<T> {
             self.lookbehind.insert((&segment).into(), segment.clone());
 
             let msg = SessionMessage::Segment(segment.clone());
-            debug!("sending segment {:?}", SegmentId::from(&segment));
+            debug!("SENDING: segment {:?}", SegmentId::from(&segment));
             self.transport.send_to_counterparty(&msg.into_encoded()).await?;
 
             // TODO: prevent stalling here
@@ -346,20 +348,21 @@ mod tests {
     use futures::io::{AsyncReadExt, AsyncWriteExt};
     use futures::lock::Mutex;
     use futures::{pin_mut, Stream};
-    use hex_literal::hex;
     use lazy_static::lazy_static;
     use rand::{thread_rng, Rng, SeedableRng};
     use rand_distr::{Distribution, Normal};
     use std::collections::VecDeque;
     use std::fmt::{Debug, Formatter};
+    use std::iter::Extend;
     use std::ops::DerefMut;
     use std::sync::OnceLock;
     use test_log::test;
     use tracing::{info, warn};
 
     lazy_static! {
-        //static ref RNG_SEED: [u8; 32] = hopr_crypto_random::random_bytes();
-        static ref RNG_SEED: [u8; 32] = hex!("4042a10ca2b3f9f9e34ae3c8d5fa6298dfbacf6009a16c04754a7d7c626ec1dc");
+        static ref RNG_SEED: [u8; 32] = hopr_crypto_random::random_bytes();
+        //static ref RNG_SEED: [u8; 32] = hex_literal::hex!("4042a10ca2b3f9f9e34ae3c8d5fa6298dfbacf6009a16c04754a7d7c626ec1dc");
+        //static ref RNG_SEED: [u8; 32] = hex_literal::hex!("c95a054074502df4d8108c0bf04d81976892db51e1cf972f37c00c8251d3d928");
     }
 
     fn randomized_stream<S, R>(mut input_stream: S, mut rng: R, mixing_factor: f64) -> impl Stream<Item = S::Item>
@@ -442,7 +445,7 @@ mod tests {
         let bob_alice_state = bob_to_alice.state().clone();
         async_std::task::spawn(async move {
             loop {
-                async_std::task::sleep(Duration::from_millis(300)).await;
+                async_std::task::sleep(Duration::from_millis(50)).await;
 
                 alice_bob_state.acknowledge_segments(None).await.unwrap();
                 alice_bob_state.request_missing_segments(None).await.unwrap();
@@ -497,67 +500,87 @@ mod tests {
         }
     }
 
-    async fn send_and_recv<R: AsyncRead + Unpin + Send + 'static, W: AsyncWrite + Unpin + Send + 'static>(
+    async fn send_and_recv<S>(
         num_frames: usize,
         frame_size: usize,
-        sender: Arc<Mutex<W>>,
-        recv: Arc<Mutex<R>>,
+        alice: Arc<Mutex<S>>,
+        bob: Arc<Mutex<S>>,
         timeout: Duration,
-    ) {
-        let sender = async_std::task::spawn(async move {
-            let mut sent = Vec::new();
-            for _ in 0..num_frames {
-                let mut data = vec![0u8; frame_size];
-                hopr_crypto_random::random_fill(&mut data);
-                sender.lock().await.write(&data).await.unwrap();
-                sent.push(data);
-            }
-            sent
-        });
+    ) where
+        S: AsyncRead + AsyncWrite + Unpin + Send + 'static,
+    {
+        let socket_worker = |socket: Arc<Mutex<S>>| async move {
+            let mut received = Vec::with_capacity(num_frames * frame_size);
+            let mut sent = Vec::with_capacity(num_frames * frame_size);
 
-        let receiver = async_std::task::spawn(async move {
-            let mut received = Vec::new();
+            let mut socket = socket.lock().await;
+
+            for _ in 0..num_frames {
+                let mut write = vec![0u8; frame_size];
+                hopr_crypto_random::random_fill(&mut write);
+                socket.write(&write).await.unwrap();
+                sent.extend(write);
+            }
+
             for _ in 0..num_frames {
                 let mut read = vec![0u8; frame_size];
-                recv.lock().await.read_exact(&mut read).await.unwrap();
-                received.push(read);
+                socket.read_exact(&mut read).await.unwrap();
+                received.extend(read);
             }
-            received
-        });
 
-        let send_recv = futures::future::join(sender, receiver);
+            (sent, received)
+        };
+
+        let alice_worker = async_std::task::spawn(socket_worker(alice));
+        let bob_worker = async_std::task::spawn(socket_worker(bob)); //futures::future::ready::<(Vec<u8>, Vec<u8>)>((vec![], vec![]));
+
+        let send_recv = futures::future::join(bob_worker, alice_worker);
         let timeout = async_std::task::sleep(timeout);
 
         pin_mut!(send_recv);
         pin_mut!(timeout);
 
         match futures::future::select(send_recv, timeout).await {
-            Either::Left(((sent, received), _)) => assert_eq!(sent, received),
-            Either::Right(_) => panic!("timeout"),
+            Either::Left((((alice_sent, alice_recv), (bob_sent, bob_recv)), _)) => {
+                assert_eq!(
+                    alice_sent,
+                    bob_recv,
+                    "alice sent must be equal to bob received {}",
+                    hex::encode(RNG_SEED.clone())
+                );
+                assert_eq!(
+                    bob_sent,
+                    alice_recv,
+                    "bob sent must be equal to alice received {}",
+                    hex::encode(RNG_SEED.clone())
+                );
+            }
+            Either::Right(_) => panic!("timeout {}", hex::encode(RNG_SEED.clone())),
         }
     }
 
+    const NUM_FRAMES: usize = 1000;
+    const FRAME_SIZE: usize = 1500;
+
     #[async_std::test]
     async fn test_randomized_stream_without_mixing_outputs_in_order() {
-        const SIZE: usize = 1000;
-        let stream = futures::stream::iter(0..SIZE);
+        let stream = futures::stream::iter(0..NUM_FRAMES);
         let randomized = randomized_stream(stream, thread_rng(), 0.0);
 
         let out = randomized.collect::<Vec<_>>().await;
-        assert_eq!(out, (0..SIZE).into_iter().collect::<Vec<_>>());
+        assert_eq!(out, (0..NUM_FRAMES).into_iter().collect::<Vec<_>>());
     }
 
     #[async_std::test]
     async fn test_randomized_stream_with_mixing_outputs_out_of_order() {
-        const SIZE: usize = 1000;
-        let stream = futures::stream::iter(0..SIZE);
+        let stream = futures::stream::iter(0..NUM_FRAMES);
         let randomized = randomized_stream(stream, thread_rng(), 10.0);
 
         let mut out = randomized.collect::<Vec<_>>().await;
-        assert_ne!(out, (0..SIZE).into_iter().collect::<Vec<_>>());
+        assert_ne!(out, (0..NUM_FRAMES).into_iter().collect::<Vec<_>>());
 
         out.sort();
-        assert_eq!(out, (0..SIZE).into_iter().collect::<Vec<_>>());
+        assert_eq!(out, (0..NUM_FRAMES).into_iter().collect::<Vec<_>>());
     }
 
     #[test(async_std::test)]
@@ -565,22 +588,13 @@ mod tests {
         let (alice_to_bob, bob_to_alice) = setup_alice_bob(Default::default(), Default::default());
 
         send_and_recv(
-            1000,
-            1500,
+            NUM_FRAMES,
+            FRAME_SIZE,
             alice_to_bob.clone(),
             bob_to_alice.clone(),
             Duration::from_secs(10),
         )
         .await;
-
-        send_and_recv(
-            1000,
-            1500,
-            bob_to_alice.clone(),
-            alice_to_bob.clone(),
-            Duration::from_secs(10),
-        )
-        .await
     }
 
     #[test(async_std::test)]
@@ -593,19 +607,10 @@ mod tests {
         let (alice_to_bob, bob_to_alice) = setup_alice_bob(cfg, Default::default());
 
         send_and_recv(
-            1000,
-            1500,
+            NUM_FRAMES,
+            FRAME_SIZE,
             alice_to_bob.clone(),
             bob_to_alice.clone(),
-            Duration::from_secs(10),
-        )
-        .await;
-
-        send_and_recv(
-            1000,
-            1500,
-            bob_to_alice.clone(),
-            alice_to_bob.clone(),
             Duration::from_secs(10),
         )
         .await;
@@ -619,26 +624,17 @@ mod tests {
         };
 
         let net_cfg = FaultyNetworkConfig {
-            fault_probability: 0.1,
+            fault_probability: 0.33,
             ..Default::default()
         };
 
         let (alice_to_bob, bob_to_alice) = setup_alice_bob(cfg, net_cfg);
 
         send_and_recv(
-            1000,
-            1500,
+            NUM_FRAMES,
+            FRAME_SIZE,
             alice_to_bob.clone(),
             bob_to_alice.clone(),
-            Duration::from_secs(30),
-        )
-        .await;
-
-        send_and_recv(
-            1000,
-            1500,
-            bob_to_alice.clone(),
-            alice_to_bob.clone(),
             Duration::from_secs(30),
         )
         .await;
@@ -654,26 +650,43 @@ mod tests {
         };
 
         let net_cfg = FaultyNetworkConfig {
-            fault_probability: 0.1,
+            fault_probability: 0.33,
             mixing_factor: 4.0,
         };
 
         let (alice_to_bob, bob_to_alice) = setup_alice_bob(cfg, net_cfg);
 
         send_and_recv(
-            1000,
-            1500,
+            NUM_FRAMES,
+            FRAME_SIZE,
             alice_to_bob.clone(),
             bob_to_alice.clone(),
             Duration::from_secs(30),
         )
         .await;
 
+        async_std::task::sleep(Duration::from_millis(500)).await;
+    }
+
+    #[test(async_std::test)]
+    async fn test_almost_reliable_mixed_send_recv() {
+        let cfg = SessionConfig {
+            acknowledged_frames_buffer: 1024,
+            ..Default::default()
+        };
+
+        let net_cfg = FaultyNetworkConfig {
+            fault_probability: 0.01,
+            mixing_factor: 4.0,
+        };
+
+        let (alice_to_bob, bob_to_alice) = setup_alice_bob(cfg, net_cfg);
+
         send_and_recv(
-            1000,
-            1500,
-            bob_to_alice.clone(),
+            NUM_FRAMES,
+            FRAME_SIZE,
             alice_to_bob.clone(),
+            bob_to_alice.clone(),
             Duration::from_secs(30),
         )
         .await;
@@ -696,19 +709,10 @@ mod tests {
         let (alice_to_bob, bob_to_alice) = setup_alice_bob(cfg, net_cfg);
 
         send_and_recv(
-            1000,
-            1500,
+            NUM_FRAMES,
+            FRAME_SIZE,
             alice_to_bob.clone(),
             bob_to_alice.clone(),
-            Duration::from_secs(30),
-        )
-        .await;
-
-        send_and_recv(
-            1000,
-            1500,
-            bob_to_alice.clone(),
-            alice_to_bob.clone(),
             Duration::from_secs(30),
         )
         .await;
