@@ -33,6 +33,7 @@ let
     buildInputs = [ openssl ] ++ lib.optionals stdenv.isDarwin (
       with darwin.apple_sdk.frameworks; [
         CoreServices
+        CoreFoundation
         SystemConfiguration
       ]
     );
