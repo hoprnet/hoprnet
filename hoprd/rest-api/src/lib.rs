@@ -12,7 +12,7 @@ use futures::StreamExt;
 use futures_concurrency::stream::Merge;
 use libp2p_identity::PeerId;
 use serde_json::json;
-use serde_with::{serde_as, DisplayFromStr, DurationMilliSeconds};
+use serde_with::{serde_as, Bytes, DisplayFromStr, DurationMilliSeconds};
 use tide::{
     http::{
         headers::{HeaderName, HeaderValue, AUTHORIZATION},
@@ -403,8 +403,8 @@ pub async fn run_hopr_api(
                                             .state()
                                             .msg_encoder
                                             .as_ref()
-                                            .map(|enc| enc(data.args.body.as_bytes()))
-                                            .unwrap_or_else(|| Box::from(data.args.body.as_bytes()));
+                                            .map(|enc| enc(&data.args.body))
+                                            .unwrap_or_else(|| data.args.body.into_boxed_slice());
 
                                         let hkc = hopr
                                             .send_message(
@@ -1440,7 +1440,7 @@ mod messages {
     }
 
     #[serde_as]
-    #[derive(Debug, Clone, serde::Deserialize, validator::Validate, utoipa::ToSchema)]
+    #[derive(Debug, Clone, PartialEq, serde::Deserialize, validator::Validate, utoipa::ToSchema)]
     #[serde(rename_all = "camelCase")]
     #[schema(example = json!({
         "body": "Test message",
@@ -1455,7 +1455,8 @@ mod messages {
         /// The message tag used to filter messages based on application
         pub tag: u16,
         /// Message to be transmitted over the network
-        pub body: String,
+        #[serde_as(as = "Bytes")]
+        pub body: Vec<u8>,
         /// The recipient HOPR PeerId
         #[serde_as(as = "DisplayFromStr")]
         #[schema(value_type = String)]
@@ -1528,8 +1529,8 @@ mod messages {
             .state()
             .msg_encoder
             .as_ref()
-            .map(|enc| enc(args.body.as_bytes()))
-            .unwrap_or_else(|| Box::from(args.body.as_bytes()));
+            .map(|enc| enc(&args.body))
+            .unwrap_or_else(|| args.body.into_boxed_slice());
 
         if let Some(path) = &args.path {
             if path.len() > 3 {
@@ -2674,5 +2675,58 @@ mod checks {
             hopr_lib::HoprState::Running => Ok(Response::builder(200).build()),
             _ => Ok(Response::builder(412).build()),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::messages::SendMessageBodyRequest;
+
+    #[test]
+    fn send_message_accepts_bytes_in_body() {
+        let peer = libp2p_identity::PeerId::random();
+        let test_sequence = b"wow, this actually works";
+
+        let json_value = serde_json::json!({
+            "tag": 5,
+            "body": test_sequence.to_vec(),
+            "peerId": peer.to_string()
+        });
+
+        let expected = SendMessageBodyRequest {
+            tag: 5,
+            body: test_sequence.to_vec(),
+            peer_id: peer,
+            path: None,
+            hops: None,
+        };
+
+        let actual: SendMessageBodyRequest = serde_json::from_value(json_value).unwrap();
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn send_message_accepts_utf8_string_in_body() {
+        let peer = libp2p_identity::PeerId::random();
+        let test_sequence = b"wow, this actually works";
+
+        let json_value = serde_json::json!({
+            "tag": 5,
+            "body": String::from_utf8(test_sequence.to_vec()).expect("should be a utf-8 string"),
+            "peerId": peer.to_string()
+        });
+
+        let expected = SendMessageBodyRequest {
+            tag: 5,
+            body: test_sequence.to_vec(),
+            peer_id: peer,
+            path: None,
+            hops: None,
+        };
+
+        let actual: SendMessageBodyRequest = serde_json::from_value(json_value).unwrap();
+
+        assert_eq!(actual, expected);
     }
 }
