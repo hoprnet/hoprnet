@@ -443,7 +443,8 @@
             inherit anvil-docker;
             inherit smoke-tests docs;
             inherit pre-commit-check;
-            inherit hoprd-aarch64-linux hoprd-armv7l-linux hoprd-aarch64-darwin hoprd-x86_64-darwin;
+            inherit hoprd-aarch64-linux hoprd-armv7l-linux hoprd-aarch64-darwin hoprd-x86_64-darwin hoprd-x86_64-linux;
+            inherit hoprd-debug-aarch64-linux hoprd-debug-armv7l-linux hoprd-debug-aarch64-darwin hoprd-debug-x86_64-darwin hoprd-debug-x86_64-linux;
             default = hoprd;
           };
 
