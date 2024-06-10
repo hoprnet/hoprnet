@@ -85,34 +85,34 @@
             ];
           };
 
-          rust-builder-local = (import ./nix/rust-builder.nix {
+          rust-builder-local = import ./nix/rust-builder.nix {
             inherit nixpkgs rust-overlay crane foundry solc localSystem;
-          });
+          };
 
-          rust-builder-local-nightly = (import ./nix/rust-builder.nix {
+          rust-builder-local-nightly = import ./nix/rust-builder.nix {
             inherit nixpkgs rust-overlay crane foundry solc localSystem;
             useRustNightly = true;
-          });
+          };
 
-          rust-builder-x86_64-darwin = (import ./nix/rust-builder.nix {
+          rust-builder-x86_64-darwin = import ./nix/rust-builder.nix {
             inherit nixpkgs rust-overlay crane foundry solc localSystem;
             crossSystem = pkgs.lib.systems.examples.x86_64-darwin;
-          });
+          };
 
-          rust-builder-aarch64-linux = (import ./nix/rust-builder.nix {
+          rust-builder-aarch64-linux = import ./nix/rust-builder.nix {
             inherit nixpkgs rust-overlay crane foundry solc localSystem;
             crossSystem = pkgs.lib.systems.examples.aarch64-multiplatform;
-          });
+          };
 
-          rust-builder-aarch64-darwin = (import ./nix/rust-builder.nix {
+          rust-builder-aarch64-darwin = import ./nix/rust-builder.nix {
             inherit nixpkgs rust-overlay crane foundry solc localSystem;
             crossSystem = pkgs.lib.systems.examples.aarch64-darwin;
-          });
+          };
 
-          rust-builder-armv7l-linux = (import ./nix/rust-builder.nix {
+          rust-builder-armv7l-linux = import ./nix/rust-builder.nix {
             inherit nixpkgs rust-overlay crane foundry solc localSystem;
             crossSystem = pkgs.lib.systems.examples.armv7l-hf-multiplatform;
-          });
+          };
 
           hoprdBuildArgs = {
             inherit src depsSrc;
@@ -282,17 +282,8 @@
           hopli-docker-build-and-upload = flake-utils.lib.mkApp {
             drv = dockerImageUploadScript hopli-docker;
           };
-          docs = rust-builder-local-nightly ./nix/rust-package.nix (hoprdBuildArgs // {
+          docs = rust-builder-local-nightly.callPackage ./nix/rust-package.nix (hoprdBuildArgs // {
             buildDocs = true;
-            cargoArtifacts = null;
-            buildPhaseCargoCommand = "cargo doc --offline --no-deps";
-            RUSTDOCFLAGS = "--enable-index-page -Z unstable-options";
-            postBuild = ''
-              ${pkgs.pandoc}/bin/pandoc -f markdown+hard_line_breaks -t html README.md > readme.html
-              ${pkgs.html-tidy}/bin/tidy -q -i target/doc/index.html > index.html || :
-              sed '/<section id="main-content" class="content">/ r readme.html' index.html > target/doc/index.html
-              rm readme.html index.html
-            '';
           });
           smoke-tests = pkgs.stdenv.mkDerivation {
             pname = "hoprd-smoke-tests";
@@ -335,8 +326,8 @@
             };
             tools = pkgs;
           };
-          defaultDevShell = import ./shell.nix { inherit pkgs config crane pre-commit-check solcDefault; };
-          smoketestsDevShell = import ./shell.nix { inherit pkgs config crane pre-commit-check solcDefault; extraPackages = [ hoprd hopli ]; };
+          defaultDevShell = import ./nix/shell.nix { inherit pkgs config crane pre-commit-check solcDefault; };
+          smoketestsDevShell = import ./nix/shell.nix { inherit pkgs config crane pre-commit-check solcDefault; extraPackages = [ hoprd hopli ]; };
           run-check = flake-utils.lib.mkApp {
             drv = pkgs.writeShellScriptBin "run-check" ''
               set -e

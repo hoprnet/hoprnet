@@ -6,8 +6,10 @@
 , depsSrc
 , foundryBin
 , git
+, html-tidy
 , lib
 , openssl
+, pandoc
 , pkg-config
 , postInstall ? null
 , solcDefault
@@ -48,23 +50,39 @@ let
     else if runClippy then sharedArgsBase // { cargoClippyExtraArgs = "-- -Dwarnings"; }
     else sharedArgsBase;
 
+  docsArgs = {
+    cargoArtifacts = null;
+    buildPhaseCargoCommand = "cargo doc --offline --no-deps";
+    RUSTDOCFLAGS = "--enable-index-page -Z unstable-options";
+    postBuild = ''
+      ${pandoc}/bin/pandoc -f markdown+hard_line_breaks -t html README.md > readme.html
+      ${html-tidy}/bin/tidy -q -i target/doc/index.html > index.html || :
+      sed '/<section id="main-content" class="content">/ r readme.html' index.html > target/doc/index.html
+      rm readme.html index.html
+    '';
+  };
+
+  defaultArgs = {
+    cargoArtifacts = craneLib.buildDepsOnly (sharedArgs // {
+      src = depsSrc;
+      extraDummyScript = ''
+        mkdir -p $out/vendor/cargo
+        cp -r --no-preserve=mode,ownership ${depsSrc}/vendor/cargo $out/vendor/
+        echo "# placeholder" > $out/vendor/cargo/config.toml
+      '';
+    });
+  };
+
+  args = if buildDocs then sharedArgs // docsArgs else sharedArgs // defaultArgs;
+
   builder =
     if runTests then craneLib.cargoTest
     else if runClippy then craneLib.cargoClippy
     else if buildDocs then craneLib.cargoDoc
     else craneLib.buildPackage;
 in
-builder (sharedArgs // {
+builder (args // {
   inherit src postInstall;
-
-  cargoArtifacts = craneLib.buildDepsOnly (sharedArgs // {
-    src = depsSrc;
-    extraDummyScript = ''
-      mkdir -p $out/vendor/cargo
-      cp -r --no-preserve=mode,ownership ${depsSrc}/vendor/cargo $out/vendor/
-      echo "# placeholder" > $out/vendor/cargo/config.toml
-    '';
-  });
 
   preConfigure = ''
     # respect the amount of available cores for building
