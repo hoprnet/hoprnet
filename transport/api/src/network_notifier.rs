@@ -7,7 +7,7 @@ use tracing::{debug, error};
 
 use core_network::{
     network::{Network, NetworkTriggeredEvent},
-    ping::{PingExternalAPI, PingResult},
+    ping::PingExternalAPI,
     HoprDbPeersOperations, PeerId,
 };
 use core_path::channel_graph::ChannelGraph;
@@ -58,7 +58,12 @@ where
     T: HoprDbPeersOperations + HoprDbResolverOperations + Sync + Send + Clone + std::fmt::Debug,
 {
     #[tracing::instrument(level = "info", skip(self))]
-    async fn on_finished_ping(&self, peer: &PeerId, result: PingResult, version: String) {
+    async fn on_finished_ping(
+        &self,
+        peer: &PeerId,
+        result: std::result::Result<std::time::Duration, ()>,
+        version: String,
+    ) {
         match self
             .network
             .update(peer, result, result.is_ok().then_some(version))

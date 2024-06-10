@@ -45,6 +45,7 @@ async-std = { workspace = true, optional = true }
 atomic_enum = { workspace = true }
 const_format = "0.2.32"
 futures = { workspace = true }
+futures-concurrency = { workspace = true }
 lazy_static = { workspace = true }
 tracing = { workspace = true }
 tokio = { workspace = true, optional = true }

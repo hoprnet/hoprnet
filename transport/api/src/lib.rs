@@ -10,59 +10,55 @@
 //! 4. algorithms associated with the transport layer operational management
 //! 5. interface specifications to allow modular behavioral extensions
 
-pub mod adaptors;
 /// Configuration of the [HoprTransport].
 pub mod config;
 /// Constants used and exposed by the crate.
 pub mod constants;
 /// Errors used by the crate.
 pub mod errors;
-mod multiaddrs;
-mod p2p;
+pub mod network_notifier;
 mod processes;
 mod timer;
 
-/// Composite output from the transport layer.
-#[derive(Clone)]
-pub enum TransportOutput {
-    Received(ApplicationData),
-    Sent(HalfKeyChallenge),
-}
-
 pub use {
-    crate::{
-        multiaddrs::decapsulate_p2p_protocol,
-        processes::indexer::PeerTransportEvent,
-        processes::indexer::{add_peer_update_processing, IndexerActions, IndexerToProcess, PeerEligibility},
-    },
     core_network::network::{Health, Network, NetworkTriggeredEvent, PeerOrigin, PeerStatus},
-    core_p2p::libp2p,
     hopr_crypto_types::{
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         types::{HalfKeyChallenge, Hash, OffchainPublicKey},
     },
     hopr_internal_types::protocol::ApplicationData,
-    multiaddr::Multiaddr,
-    p2p::{api, HoprSwarm, SwarmEventLoop},
+    hopr_transport_p2p::{
+        libp2p, libp2p::swarm::derive_prelude::Multiaddr, multiaddrs::strip_p2p_protocol,
+        swarm::HoprSwarmWithProcessors, PeerTransportEvent, TransportOutput,
+    },
     timer::execute_on_tick,
 };
 
 use async_lock::RwLock;
 use constants::RESERVED_TAG_UPPER_LIMIT;
-use futures::{channel::mpsc::UnboundedSender, FutureExt, SinkExt};
+use futures::{
+    channel::mpsc::{UnboundedReceiver, UnboundedSender},
+    FutureExt, SinkExt,
+};
+use hopr_transport_p2p::{
+    swarm::{TicketAggregationRequestType, TicketAggregationResponseType},
+    HoprSwarm,
+};
 use std::{
     collections::HashMap,
     sync::{Arc, OnceLock},
 };
 
-#[cfg(feature = "runtime-async-std")]
-use async_std::task::{sleep, spawn, JoinHandle};
+pub(crate) mod executor {
+    #[cfg(any(feature = "runtime-async-std", test))]
+    pub use async_std::task::{sleep, spawn, JoinHandle};
 
-#[cfg(feature = "runtime-tokio")]
-use tokio::{
-    task::{spawn, JoinHandle},
-    time::sleep,
-};
+    #[cfg(all(feature = "runtime-tokio", not(test)))]
+    pub use tokio::{
+        task::{spawn, JoinHandle},
+        time::sleep,
+    };
+}
 
 use hopr_db_sql::{
     api::{
@@ -73,7 +69,11 @@ use hopr_db_sql::{
 };
 use tracing::{debug, error, info, warn};
 
-use core_network::{config::NetworkConfig, heartbeat::Heartbeat, messaging::ControlMessage, ping::Ping};
+use core_network::{
+    config::NetworkConfig,
+    heartbeat::Heartbeat,
+    ping::{PingQueryReplier, Pinger},
+};
 use core_network::{heartbeat::HeartbeatConfig, ping::PingConfig, PeerId};
 use core_protocol::{
     ack::processor::AcknowledgementInteraction,
@@ -96,6 +96,29 @@ lazy_static::lazy_static! {
         "Distribution of number of hops of sent messages",
         vec![0.0, 1.0, 2.0, 3.0, 4.0]
     ).unwrap();
+}
+
+use chain_types::chain_events::NetworkRegistryStatus;
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum PeerEligibility {
+    Eligible,
+    Ineligible,
+}
+
+impl From<NetworkRegistryStatus> for PeerEligibility {
+    fn from(value: NetworkRegistryStatus) -> Self {
+        match value {
+            NetworkRegistryStatus::Allowed => Self::Eligible,
+            NetworkRegistryStatus::Denied => Self::Ineligible,
+        }
+    }
+}
+
+/// Indexer events triggered externally from the [crate::HoprTransport] object.
+pub enum IndexerTransportEvent {
+    EligibilityUpdate(PeerId, PeerEligibility),
+    Announce(PeerId, Vec<Multiaddr>),
 }
 
 /// Build the [Network] object responsible for tracking and holding the
@@ -160,11 +183,8 @@ where
     Db: HoprDbTicketOperations + Send + Sync + Clone + std::fmt::Debug,
 {
     db: Db,
-    maybe_writer: Arc<
-        std::sync::OnceLock<
-            TicketAggregationActions<p2p::TicketAggregationResponseType, p2p::TicketAggregationRequestType>,
-        >,
-    >,
+    maybe_writer:
+        Arc<std::sync::OnceLock<TicketAggregationActions<TicketAggregationResponseType, TicketAggregationRequestType>>>,
     agg_timeout: std::time::Duration,
 }
 
@@ -175,9 +195,7 @@ where
     pub fn new(
         db: Db,
         maybe_writer: Arc<
-            std::sync::OnceLock<
-                TicketAggregationActions<p2p::TicketAggregationResponseType, p2p::TicketAggregationRequestType>,
-            >,
+            std::sync::OnceLock<TicketAggregationActions<TicketAggregationResponseType, TicketAggregationRequestType>>,
         >,
         agg_timeout: std::time::Duration,
     ) -> Self {
@@ -224,13 +242,13 @@ where
     hb_cfg: HeartbeatConfig,
     proto_cfg: core_protocol::config::ProtocolConfig,
     db: T,
-    ping: Arc<OnceLock<RwLock<Ping<adaptors::ping::PingExternalInteractions<T>>>>>,
+    ping: Arc<OnceLock<Pinger<network_notifier::PingExternalInteractions<T>>>>,
     network: Arc<Network<T>>,
     channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
     my_multiaddresses: Vec<Multiaddr>,
     process_packet_send: Arc<OnceLock<PacketActions>>,
     process_ticket_aggregate:
-        Arc<OnceLock<TicketAggregationActions<p2p::TicketAggregationResponseType, p2p::TicketAggregationRequestType>>>,
+        Arc<OnceLock<TicketAggregationActions<TicketAggregationResponseType, TicketAggregationRequestType>>>,
 }
 
 impl<T> HoprTransport<T>
@@ -286,28 +304,25 @@ where
         tbf: Arc<RwLock<TagBloomFilter>>,
         on_transport_output: UnboundedSender<TransportOutput>,
         on_acknowledged_ticket: UnboundedSender<AcknowledgedTicket>,
-        transport_updates: async_channel::Receiver<PeerTransportEvent>,
-    ) -> HashMap<HoprTransportProcess, JoinHandle<()>> {
+        transport_updates: UnboundedReceiver<PeerTransportEvent>,
+    ) -> HashMap<HoprTransportProcess, executor::JoinHandle<()>> {
         // network event processing channel
         let (network_events_tx, network_events_rx) = futures::channel::mpsc::channel::<NetworkTriggeredEvent>(
             constants::MAXIMUM_NETWORK_UPDATE_EVENT_QUEUE_SIZE,
         );
 
         // manual ping
-        let (ping_tx, ping_rx) = futures::channel::mpsc::unbounded::<(PeerId, ControlMessage)>();
-        let (pong_tx, pong_rx) =
-            futures::channel::mpsc::unbounded::<(PeerId, std::result::Result<(ControlMessage, String), ()>)>();
+        let (ping_tx, ping_rx) = futures::channel::mpsc::unbounded::<(PeerId, PingQueryReplier)>();
 
         let ping_cfg = PingConfig {
             timeout: self.proto_cfg.heartbeat.timeout,
             ..PingConfig::default()
         };
 
-        let ping: Ping<adaptors::ping::PingExternalInteractions<T>> = Ping::new(
+        let ping: Pinger<network_notifier::PingExternalInteractions<T>> = Pinger::new(
             ping_cfg,
-            ping_tx,
-            pong_rx,
-            adaptors::ping::PingExternalInteractions::new(
+            ping_tx.clone(),
+            network_notifier::PingExternalInteractions::new(
                 network.clone(),
                 self.db.clone(),
                 self.channel_graph.clone(),
@@ -317,12 +332,10 @@ where
 
         self.ping
             .clone()
-            .set(RwLock::new(ping))
+            .set(ping)
             .expect("must set the ping executor only once");
 
-        let transport_layer = HoprSwarm::new(me, self.my_multiaddresses.clone(), self.proto_cfg).await;
-
-        let mut processes: HashMap<HoprTransportProcess, JoinHandle<()>> = HashMap::new();
+        let transport_layer = HoprSwarm::new(me.into(), self.my_multiaddresses.clone(), self.proto_cfg).await;
 
         let ack_proc = AcknowledgementInteraction::new(self.db.clone(), me_onchain);
 
@@ -339,61 +352,36 @@ where
             .expect("must set the packet processing writer only once");
 
         // heartbeat
-        let (hb_ping_tx, hb_ping_rx) = futures::channel::mpsc::unbounded::<(PeerId, ControlMessage)>();
-        let (hb_pong_tx, hb_pong_rx) = futures::channel::mpsc::unbounded::<(
-            libp2p::identity::PeerId,
-            std::result::Result<(ControlMessage, String), ()>,
-        )>();
-
-        let hb_pinger = Ping::new(
-            self.ping
-                .get()
-                .expect("ping should be initialized at this point")
-                .read()
-                .await
-                .config()
-                .clone(),
-            hb_ping_tx,
-            hb_pong_rx,
-            adaptors::ping::PingExternalInteractions::new(
-                network.clone(),
-                self.db.clone(),
-                self.channel_graph.clone(),
-                network_events_tx.clone(),
-            ),
-        );
         let mut heartbeat = Heartbeat::new(
             self.hb_cfg,
-            hb_pinger,
+            self.ping
+                .get()
+                .expect("Ping should be initialized at this point")
+                .clone(),
             core_network::heartbeat::HeartbeatExternalInteractions::new(network.clone()),
-            Box::new(|dur| Box::pin(sleep(dur))),
+            Box::new(|dur| Box::pin(executor::sleep(dur))),
         );
 
-        let swarm_loop = SwarmEventLoop::new(
+        // let swarm_loop = HoprSwarmWithProcessors::new
+
+        let transport_layer = transport_layer.with_processors(
             network_events_rx,
             transport_updates,
             ack_proc,
             packet_proc,
             ticket_agg_proc,
-            core_p2p::api::HeartbeatRequester::new(hb_ping_rx),
-            core_p2p::api::HeartbeatResponder::new(hb_pong_tx),
-            core_p2p::api::ManualPingRequester::new(ping_rx),
-            core_p2p::api::HeartbeatResponder::new(pong_tx),
+            ping_rx,
         );
+
+        let mut processes: HashMap<HoprTransportProcess, executor::JoinHandle<()>> = HashMap::new();
 
         processes.insert(
             HoprTransportProcess::Heartbeat,
-            spawn(async move { heartbeat.heartbeat_loop().await }),
+            executor::spawn(async move { heartbeat.heartbeat_loop().await }),
         );
         processes.insert(
             HoprTransportProcess::Swarm,
-            spawn(swarm_loop.run(
-                transport_layer,
-                version,
-                network,
-                on_transport_output,
-                on_acknowledged_ticket,
-            )),
+            executor::spawn(transport_layer.run(version, on_transport_output, on_acknowledged_ticket)),
         );
 
         processes
@@ -415,15 +403,19 @@ where
             )));
         }
 
+        if peer == &self.me {
+            return Err(errors::HoprTransportError::Api(
+                "ping to self does not make sense".into(),
+            ));
+        }
+
         let pinger = self.ping.get().ok_or_else(|| {
             crate::errors::HoprTransportError::Api(
                 "ping: failed to send a ping, because ping processing is not yet initialized".into(),
             )
         })?;
 
-        let mut pinger = pinger.write().await;
-
-        let timeout = sleep(std::time::Duration::from_secs(30)).fuse();
+        let timeout = executor::sleep(std::time::Duration::from_secs(30)).fuse();
         let ping = (*pinger).ping(vec![*peer]).fuse();
 
         pin_mut!(timeout, ping);
@@ -615,7 +607,6 @@ where
 
     #[tracing::instrument(level = "debug", skip(self))]
     pub async fn listening_multiaddresses(&self) -> Vec<Multiaddr> {
-        // TODO: can fail with the Result?
         self.network
             .get(&self.me)
             .await
@@ -630,16 +621,16 @@ where
             .local_multiaddresses()
             .into_iter()
             .filter(|ma| {
-                crate::multiaddrs::is_supported(ma)
-                    && (self.cfg.announce_local_addresses || !crate::multiaddrs::is_private(ma))
+                hopr_transport_p2p::multiaddrs::is_supported(ma)
+                    && (self.cfg.announce_local_addresses || !hopr_transport_p2p::multiaddrs::is_private(ma))
             })
-            .map(|ma| crate::multiaddrs::decapsulate_p2p_protocol(&ma))
+            .map(|ma| strip_p2p_protocol(&ma))
             .filter(|v| !v.is_empty())
             .collect::<Vec<_>>();
 
         mas.sort_by(|l, r| {
-            let is_left_dns = crate::multiaddrs::is_dns(l);
-            let is_right_dns = crate::multiaddrs::is_dns(r);
+            let is_left_dns = hopr_transport_p2p::multiaddrs::is_dns(l);
+            let is_right_dns = hopr_transport_p2p::multiaddrs::is_dns(r);
 
             if !(is_left_dns ^ is_right_dns) {
                 std::cmp::Ordering::Equal

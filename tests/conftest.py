@@ -155,6 +155,11 @@ def default_nodes():
     return ["5"]
 
 
+def nodes_with_different_network():
+    """Nodes with different network"""
+    return ["6", "7"]
+
+
 def random_distinct_pairs_from(values: list, count: int):
     return random.sample([(left, right) for left, right in itertools.product(values, repeat=2) if left != right], count)
 
