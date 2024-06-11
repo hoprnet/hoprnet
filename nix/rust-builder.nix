@@ -6,31 +6,40 @@
 , rust-overlay
 , solc
 , useRustNightly ? false
-}:
+} @ args:
 let
-  pkgs = import nixpkgs {
-    inherit crossSystem localSystem;
-    overlays = [ rust-overlay.overlays.default solc.overlay ];
-  };
-
-  solcDefault = solc.mkDefault pkgs pkgs.pkgsBuildHost.solc_0_8_19;
-
+  crossSystem0 = crossSystem;
+in
+let
   # the foundry overlay uses the hostPlatform, so we need to use a
   # localSystem-only pkgs to get the correct architecture
   pkgsLocal = import nixpkgs {
-    system = localSystem;
-    overlays = [ foundry.overlay ];
+    localSystem = args.localSystem;
+    overlays = [ foundry.overlay rust-overlay.overlays.default solc.overlay ];
   };
+
+  localSystem = pkgsLocal.lib.systems.elaborate args.localSystem;
+  crossSystem =
+    let system = pkgsLocal.lib.systems.elaborate crossSystem0; in
+    if crossSystem0 == null || pkgsLocal.lib.systems.equals system localSystem
+    then localSystem
+    else system;
+
+  pkgs = import nixpkgs {
+    inherit localSystem crossSystem;
+    overlays = [ rust-overlay.overlays.default solc.overlay ];
+  };
+
   foundryBin = pkgsLocal.foundry-bin;
 
-  lib = pkgs.pkgsBuildHost.lib;
-
-  envCase = triple: lib.strings.toUpper (builtins.replaceStrings [ "-" ] [ "_" ] triple);
+  envCase = triple: pkgsLocal.lib.strings.toUpper (builtins.replaceStrings [ "-" ] [ "_" ] triple);
 
   # `hostPlatform` is the cross-compilation output platform;
   # `buildPlatform` is the platform we are compiling on
   buildPlatform = pkgs.stdenv.buildPlatform;
   hostPlatform = pkgs.stdenv.hostPlatform;
+
+  solcDefault = solc.mkDefault pkgs pkgs.pkgsBuildHost.solc_0_8_19;
 
   cargoTarget =
     if hostPlatform.config == "armv7l-unknown-linux-gnueabihf" then
