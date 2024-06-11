@@ -96,7 +96,7 @@
 
           rust-builder-x86_64-linux = import ./nix/rust-builder.nix {
             inherit nixpkgs rust-overlay crane foundry solc localSystem;
-            crossSystem = pkgs.lib.systems.examples.x86_64-linux;
+            crossSystem = pkgs.lib.systems.examples.gnu64;
           };
 
           rust-builder-x86_64-darwin = import ./nix/rust-builder.nix {
@@ -136,24 +136,6 @@
           hoprd-debug = rust-builder-local.callPackage ./nix/rust-package.nix (hoprdBuildArgs // {
             CARGO_PROFILE = "dev";
           });
-          hoprd-debug-x86_64-linux = rust-builder-x86_64-linux.callPackage ./nix/rust-package.nix (hoprdBuildArgs // {
-            CARGO_PROFILE = "dev";
-          });
-          hoprd-debug-aarch64-linux = rust-builder-aarch64-linux.callPackage ./nix/rust-package.nix (hoprdBuildArgs // {
-            CARGO_PROFILE = "dev";
-          });
-          hoprd-debug-armv7l-linux = rust-builder-armv7l-linux.callPackage ./nix/rust-package.nix (hoprdBuildArgs // {
-            CARGO_PROFILE = "dev";
-          });
-          # CAVEAT: must be built from a darwin system
-          hoprd-debug-x86_64-darwin = rust-builder-x86_64-darwin.callPackage ./nix/rust-package.nix (hoprdBuildArgs // {
-            CARGO_PROFILE = "dev";
-          });
-          # CAVEAT: must be built from a darwin system
-          hoprd-debug-aarch64-darwin = rust-builder-aarch64-darwin.callPackage ./nix/rust-package.nix (hoprdBuildArgs // {
-            CARGO_PROFILE = "dev";
-          });
-
           hoprd-test = rust-builder-local.callPackage ./nix/rust-package.nix (hoprdBuildArgs // { runTests = true; });
           hoprd-clippy = rust-builder-local.callPackage ./nix/rust-package.nix (hoprdBuildArgs // { runClippy = true; });
           hopliBuildArgs = {
@@ -443,8 +425,10 @@
             inherit anvil-docker;
             inherit smoke-tests docs;
             inherit pre-commit-check;
-            inherit hoprd-aarch64-linux hoprd-armv7l-linux hoprd-aarch64-darwin hoprd-x86_64-darwin hoprd-x86_64-linux;
-            inherit hoprd-debug-aarch64-linux hoprd-debug-armv7l-linux hoprd-debug-aarch64-darwin hoprd-debug-x86_64-darwin hoprd-debug-x86_64-linux;
+            inherit hoprd-aarch64-linux hoprd-armv7l-linux hoprd-x86_64-linux;
+            # FIXME: Darwin cross-builds are currently broken.
+            # Follow https://github.com/nixos/nixpkgs/pull/256590
+            inherit hoprd-aarch64-darwin hoprd-x86_64-darwin;
             default = hoprd;
           };
 
