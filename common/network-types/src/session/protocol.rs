@@ -22,7 +22,11 @@ impl SegmentRequest {
     pub const MAX_ENTRIES: usize = SESSION_MSG_SIZE / Self::ENTRY_SIZE;
 
     pub fn len(&self) -> usize {
-        self.0.iter().map(|(_, e)| e.count_ones() as usize).sum()
+        self.0.values().map(|e| e.count_ones() as usize).sum()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
     }
 }
 
@@ -64,7 +68,8 @@ impl FromIterator<FrameInfo> for SegmentRequest {
             let missing = frame
                 .missing_segments
                 .into_ones()
-                .filter_map(|idx| (idx < seq_size).then(|| (1 << idx) as SeqNum))
+                .filter(|idx| *idx < seq_size)
+                .map(|idx| (1 << idx) as SeqNum)
                 .fold(SeqNum::default(), |acc, n| acc | n);
             ret.0.insert(frame.frame_id, missing);
         }
@@ -142,6 +147,11 @@ impl FrameAcknowledgements {
     #[inline]
     pub fn len(&self) -> usize {
         self.0.len()
+    }
+
+    /// Returns true if there are no frame IDs in this instance.
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
     }
 
     /// Indicates whether the [maximum number of frame IDs](FrameAcknowledgements::MAX_ACK_FRAMES)

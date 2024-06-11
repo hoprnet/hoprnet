@@ -73,7 +73,7 @@ impl<T: AsyncWrite + Unpin> SessionState<T> {
                     if let Some(segment) = self.lookbehind.get(&segment_id) {
                         let msg = SessionMessage::Segment(segment.value().clone());
                         debug!("SENDING: retransmitted segment: {:?}", SegmentId::from(segment.value()));
-                        self.transport.write(&msg.into_encoded()).await?;
+                        self.transport.write_all(&msg.into_encoded()).await?;
                         count += 1;
                     } else {
                         error!("segment {segment_id:?} not in lookbehind buffer anymore");
@@ -124,14 +124,14 @@ impl<T: AsyncWrite + Unpin> SessionState<T> {
         for req in incomplete
             .chunks(SegmentRequest::MAX_ENTRIES)
             .take(max)
-            .map(|chunk| SessionMessage::Request(chunk.into_iter().cloned().collect()))
+            .map(|chunk| SessionMessage::Request(chunk.iter().cloned().collect()))
         {
             let r = req.try_as_request_ref().unwrap();
             debug!(
                 "SENDING: retransmission request for segments {:?}",
                 r.clone().into_iter().collect::<Vec<_>>(),
             );
-            self.transport.write(&req.into_encoded()).await?;
+            self.transport.write_all(&req.into_encoded()).await?;
             sent += 1;
         }
         self.transport.flush().await?;
@@ -167,7 +167,7 @@ impl<T: AsyncWrite + Unpin> SessionState<T> {
 
                     debug!("SENDING: acknowledgement of {} frames", ack_frames.len());
                     self.transport
-                        .write(&SessionMessage::Acknowledge(ack_frames).into_encoded())
+                        .write_all(&SessionMessage::Acknowledge(ack_frames).into_encoded())
                         .await?;
                     msgs += 1;
                 } else {
@@ -204,7 +204,7 @@ impl<T: AsyncWrite + Unpin> SessionState<T> {
 
             let msg = SessionMessage::Segment(segment.clone());
             debug!("SENDING: segment {:?}", SegmentId::from(&segment));
-            self.transport.write(&msg.into_encoded()).await?;
+            self.transport.write_all(&msg.into_encoded()).await?;
 
             // TODO: prevent stalling here
             while self.lookbehind.len() > self.cfg.max_buffered_segments {
@@ -225,7 +225,7 @@ impl<T: AsyncWrite + Unpin + Clone> Clone for SessionState<T> {
             acknowledged: self.acknowledged.clone(),
             outgoing_frame_id: self.outgoing_frame_id.clone(),
             frame_reassembler: self.frame_reassembler.clone(),
-            cfg: self.cfg.clone(),
+            cfg: self.cfg,
         }
     }
 }
@@ -245,7 +245,7 @@ pub struct SessionSocket<T> {
 impl<T: AsyncWrite + Send + Unpin> SessionSocket<T> {
     /// Create a new socket over the given `transport` that binds the communicating parties.
     pub fn new(transport: T, cfg: SessionConfig) -> Self {
-        let (reassembler, egress) = FrameReassembler::new(cfg.frame_expiration_age.into());
+        let (reassembler, egress) = FrameReassembler::new(cfg.frame_expiration_age);
 
         let acknowledged =
             Arc::new((cfg.acknowledged_frames_buffer > 0).then(|| ArrayQueue::new(cfg.acknowledged_frames_buffer)));

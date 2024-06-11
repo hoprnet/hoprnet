@@ -473,7 +473,6 @@ impl FrameReassembler {
     /// The ordered frame IDs are the keys on the returned map.
     pub fn incomplete_frames(&self) -> BTreeMap<FrameId, FrameInfo> {
         (self.next_emitted_frame.load(Ordering::SeqCst)..=self.highest_buffered_frame.load(Ordering::SeqCst))
-            .into_iter()
             .filter_map(|frame_id| match self.sequences.get(&frame_id) {
                 Some(e) => (!e.is_complete()).then(|| (frame_id, e.info())),
                 None => Some((frame_id, {
@@ -538,7 +537,7 @@ impl Drop for FrameReassembler {
     }
 }
 
-impl<'a> Extend<Segment> for FrameReassembler {
+impl Extend<Segment> for FrameReassembler {
     fn extend<T: IntoIterator<Item = Segment>>(&mut self, iter: T) {
         iter.into_iter()
             .try_for_each(|s| self.push_segment(s))
