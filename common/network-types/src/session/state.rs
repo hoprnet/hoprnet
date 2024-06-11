@@ -342,24 +342,20 @@ mod tests {
 
     lazy_static! {
         static ref RNG_SEED: [u8; 32] = hopr_crypto_random::random_bytes();
-        //static ref RNG_SEED: [u8; 32] = hex_literal::hex!("4042a10ca2b3f9f9e34ae3c8d5fa6298dfbacf6009a16c04754a7d7c626ec1dc");
-        //static ref RNG_SEED: [u8; 32] = hex_literal::hex!("c95a054074502df4d8108c0bf04d81976892db51e1cf972f37c00c8251d3d928");
-        //static ref RNG_SEED: [u8; 32] = hex_literal::hex!("39e76519f9e28b83536368ff63f0529957a16a5e83cbd4247136db900a131e66");
-        //static ref RNG_SEED: [u8; 32] = hex_literal::hex!("4ac823f7eba2acb1c6c64f5561da5296c664e9ca513fcc3594d8784f32d62f90");
-        //static ref RNG_SEED: [u8; 32] = hex_literal::hex!("9e0c2c39117592d9b0dcecd7db2ac0389313f75746cb4a6859532b9be9e441ff");
+        //static ref RNG_SEED: [u8; 32] = hex_literal::hex!("b5da488125eccf36276b6d9c7f04fb0014feebdd050dc882536102bce7af5f4b");
     }
 
     #[derive(Debug, Clone, Default)]
     pub struct FaultyNetworkConfig {
-        pub fault_probability: f64,
-        pub mixing_factor: f64,
+        pub fault_mod: usize,
+        pub mixing_factor: usize,
     }
 
     pub struct FaultyNetwork {
-        rng: rand_chacha::ChaCha20Rng,
         sender: UnboundedSender<Box<[u8]>>,
         counterparty: Arc<OnceLock<SessionState<Self>>>,
         cfg: FaultyNetworkConfig,
+        msg_counter: u128,
     }
 
     impl Debug for FaultyNetwork {
@@ -371,10 +367,10 @@ mod tests {
     impl Clone for FaultyNetwork {
         fn clone(&self) -> Self {
             Self {
-                rng: self.rng.clone(),
                 sender: self.sender.clone(),
                 counterparty: self.counterparty.clone(),
                 cfg: self.cfg.clone(),
+                msg_counter: self.msg_counter,
             }
         }
     }
@@ -443,13 +439,12 @@ mod tests {
 
             let (sender, recv) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
             let mut rng_clone = rng.clone();
-            let mixing = cfg.mixing_factor != 0.0;
-            let recv = if mixing {
+            let recv = if cfg.mixing_factor > 0 {
                 recv.map(move |x| {
                     async_std::task::sleep(Duration::from_micros(rng_clone.gen_range(10..1000)))
                         .then(|_| futures::future::ready(x))
                 })
-                .buffer_unordered(5)
+                .buffer_unordered(cfg.mixing_factor)
                 .boxed()
             } else {
                 recv.boxed()
@@ -466,20 +461,20 @@ mod tests {
             });
 
             Self {
-                rng,
                 sender,
                 counterparty,
                 cfg,
+                msg_counter: 0,
             }
         }
 
         fn send_to_counterparty(&mut self, data: &[u8]) -> crate::errors::Result<()> {
-            let num = self.rng.gen_range(0.0..100.0);
-            if num > self.cfg.fault_probability * 100.0 {
-                self.sender.unbounded_send(data.into()).unwrap();
-            } else {
+            if self.cfg.fault_mod > 0 && self.msg_counter > 0 && self.msg_counter % self.cfg.fault_mod as u128 == 0 {
                 warn!("msg discarded");
+            } else {
+                self.sender.unbounded_send(data.into()).unwrap();
             }
+            self.msg_counter += 1;
             Ok(())
         }
     }
@@ -559,8 +554,8 @@ mod tests {
     #[async_std::test]
     async fn test_faulty_network_mixing() {
         let mut net = FaultyNetwork::new(FaultyNetworkConfig {
-            fault_probability: 0.0,
-            mixing_factor: 1.0,
+            fault_mod: 0,
+            mixing_factor: 4,
         });
 
         let data = (0..200_u8).map(|x| vec![x].into_boxed_slice()).collect::<Vec<_>>();
@@ -612,7 +607,7 @@ mod tests {
         };
 
         let net_cfg = FaultyNetworkConfig {
-            fault_probability: 0.33,
+            fault_mod: 3,
             ..Default::default()
         };
 
@@ -639,8 +634,8 @@ mod tests {
         };
 
         let net_cfg = FaultyNetworkConfig {
-            fault_probability: 0.33,
-            mixing_factor: 4.0,
+            fault_mod: 3,
+            mixing_factor: 4,
         };
 
         let (alice_to_bob, bob_to_alice) = setup_alice_bob(cfg, net_cfg);
@@ -666,8 +661,8 @@ mod tests {
         };
 
         let net_cfg = FaultyNetworkConfig {
-            fault_probability: 0.01,
-            mixing_factor: 4.0,
+            fault_mod: 10,
+            mixing_factor: 4,
         };
 
         let (alice_to_bob, bob_to_alice) = setup_alice_bob(cfg, net_cfg);
@@ -693,8 +688,8 @@ mod tests {
         };
 
         let net_cfg = FaultyNetworkConfig {
-            fault_probability: 0.0,
-            mixing_factor: 4.0,
+            fault_mod: 0,
+            mixing_factor: 4,
         };
 
         let (alice_to_bob, bob_to_alice) = setup_alice_bob(cfg, net_cfg);
