@@ -1,42 +1,28 @@
-use fixedbitset::FixedBitSet;
 use hopr_primitive_types::prelude::BytesEncodable;
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 use std::mem;
 
-use crate::frame::{FrameId, FrameInfo, Segment, SegmentId};
+use crate::frame::{FrameId, FrameInfo, Segment, SegmentId, SeqNum};
 use crate::session::errors::SessionError;
 
 // TODO: get this from another crate?
 const PACKET_SIZE: usize = 500;
 
-// TODO: should include pub key?
-const SESSION_MSG_SIZE: usize = PACKET_SIZE - 2 - 32 - Segment::HEADER_SIZE - 2; // 500 - 44 = 456
+const SESSION_MSG_SIZE: usize = PACKET_SIZE - 2 /* tag */ - 32 /* pubkey*/ - SessionMessage::HEADER_SIZE; // 500 - 36 = 464
 
 /// Holds the Segment Retransmission Request message.
-/// That is an ID of a frame and a bitmap of missing segments in this frame.
+/// That is a map of frame IDs and a bitmap of missing segments in each frame.
 /// The bitmap can cover up a request for up to [`SegmentRequest::MAX_ERROR_SEGMENTS`] segments.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SegmentRequest {
-    /// Frame ID that requires segment retransmission.
-    pub frame_id: FrameId,
-    /// Bitmap of segments missing from the frame.
-    /// This can express up to [`SegmentRequest::MAX_ERROR_SEGMENTS`] segment positions.
-    pub missing_segments: FixedBitSet,
-}
-
-/// Size of the block inside the bitmap.
-const BITMAP_BLOCK_SIZE: usize = mem::size_of::<fixedbitset::Block>();
-/// Size of the `missing_segments` bitmap in bytes, rounded to the multiple of its Block.
-const BITMAP_SIZE: usize = ((SESSION_MSG_SIZE - mem::size_of::<FrameId>()) / BITMAP_BLOCK_SIZE) * BITMAP_BLOCK_SIZE;
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct SegmentRequest(HashMap<FrameId, SeqNum>);
 
 impl SegmentRequest {
-    /// Maximum number of segments that can be requested.
-    /// This is calculated so that the request fits within a single segment itself.
-    pub const MAX_ERROR_SEGMENTS: usize = BITMAP_SIZE * 8;
+    pub const ENTRY_SIZE: usize = mem::size_of::<FrameId>() + mem::size_of::<SeqNum>();
 
-    /// Returns the number of missing segments.
+    pub const MAX_ENTRIES: usize = SESSION_MSG_SIZE / Self::ENTRY_SIZE;
+
     pub fn len(&self) -> usize {
-        self.missing_segments.count_ones(..)
+        self.0.iter().map(|(_, e)| e.count_ones() as usize).sum()
     }
 }
 
@@ -55,25 +41,34 @@ impl IntoIterator for SegmentRequest {
     type IntoIter = SegmentIdIter;
 
     fn into_iter(self) -> Self::IntoIter {
-        SegmentIdIter(
-            self.missing_segments
-                .into_ones()
-                .map(|b| SegmentId(self.frame_id, b as u16))
-                .rev()
-                .collect(),
-        )
+        let seq_size = mem::size_of::<SeqNum>() * 8;
+        let mut ret = SegmentIdIter(Vec::with_capacity(seq_size * 8 * self.0.len()));
+        for (frame_id, missing) in self.0 {
+            for i in (0..seq_size).rev() {
+                let mask = (1 << i) as SeqNum;
+                if (mask & missing) != 0 {
+                    ret.0.push(SegmentId(frame_id, i as SeqNum));
+                }
+            }
+        }
+        ret.0.shrink_to_fit();
+        ret
     }
 }
 
-impl From<FrameInfo> for SegmentRequest {
-    fn from(value: FrameInfo) -> Self {
-        Self {
-            frame_id: value.frame_id,
-            missing_segments: FixedBitSet::with_capacity_and_blocks(
-                Self::MAX_ERROR_SEGMENTS,
-                value.missing_segments.as_slice().iter().copied(),
-            ),
+impl FromIterator<FrameInfo> for SegmentRequest {
+    fn from_iter<T: IntoIterator<Item = FrameInfo>>(iter: T) -> Self {
+        let seq_size = mem::size_of::<SeqNum>() * 8;
+        let mut ret = Self::default();
+        for frame in iter {
+            let missing = frame
+                .missing_segments
+                .into_ones()
+                .filter_map(|idx| (idx < seq_size).then(|| (1 << idx) as SeqNum))
+                .fold(SeqNum::default(), |acc, n| acc | n);
+            ret.0.insert(frame.frame_id, missing);
         }
+        ret
     }
 }
 
@@ -84,15 +79,20 @@ impl TryFrom<&[u8]> for SegmentRequest {
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         if value.len() == SESSION_MSG_SIZE {
-            Ok(Self {
-                frame_id: FrameId::from_be_bytes(value[..mem::size_of::<FrameId>()].try_into().unwrap()),
-                missing_segments: FixedBitSet::with_capacity_and_blocks(
-                    Self::MAX_ERROR_SEGMENTS,
-                    value[mem::size_of::<FrameId>()..]
-                        .chunks(BITMAP_BLOCK_SIZE)
-                        .map(|c| fixedbitset::Block::from_be_bytes(c.try_into().unwrap())),
-                ),
-            })
+            let mut ret = Self::default();
+            for (frame_id, missing) in value
+                .chunks_exact(Self::ENTRY_SIZE)
+                .map(|c| c.split_at(mem::size_of::<FrameId>()))
+            {
+                let frame_id = FrameId::from_be_bytes(frame_id.try_into().map_err(|_| SessionError::ParseError)?);
+                if frame_id > 0 {
+                    ret.0.insert(
+                        frame_id,
+                        SeqNum::from_be_bytes(missing.try_into().map_err(|_| SessionError::ParseError)?),
+                    );
+                }
+            }
+            Ok(ret)
         } else {
             Err(SessionError::ParseError)
         }
@@ -102,17 +102,17 @@ impl TryFrom<&[u8]> for SegmentRequest {
 impl From<SegmentRequest> for [u8; SESSION_MSG_SIZE] {
     fn from(value: SegmentRequest) -> Self {
         let mut ret = [0u8; SESSION_MSG_SIZE];
-        ret[0..mem::size_of::<FrameId>()].copy_from_slice(&value.frame_id.to_be_bytes());
-        ret[mem::size_of::<FrameId>()..].copy_from_slice(
-            &value
-                .missing_segments
-                .as_slice()
-                .into_iter()
-                .flat_map(|b| b.to_be_bytes())
-                .chain(std::iter::repeat(0_u8))
-                .take(SESSION_MSG_SIZE - mem::size_of::<FrameId>())
-                .collect::<Vec<_>>(),
-        );
+        let mut offset = 0;
+        for (frame_id, seq_num) in value.0 {
+            if offset + mem::size_of::<FrameId>() + mem::size_of::<SeqNum>() < SESSION_MSG_SIZE {
+                ret[offset..offset + mem::size_of::<FrameId>()].copy_from_slice(&frame_id.to_be_bytes());
+                offset += mem::size_of::<FrameId>();
+                ret[offset..offset + mem::size_of::<SeqNum>()].copy_from_slice(&seq_num.to_be_bytes());
+                offset += mem::size_of::<SeqNum>();
+            } else {
+                break;
+            }
+        }
         ret
     }
 }
@@ -269,12 +269,11 @@ impl From<SessionMessage> for Vec<u8> {
 
 #[cfg(test)]
 mod tests {
-    use crate::frame::{Frame, FrameInfo, SegmentId};
+    use crate::frame::{Frame, FrameInfo, SegmentId, SeqNum};
     use crate::session::protocol::{SegmentRequest, SessionMessage};
     use fixedbitset::FixedBitSet;
     use hex_literal::hex;
     use hopr_platform::time::native::current_time;
-    use rand::prelude::IteratorRandom;
     use rand::{thread_rng, Rng};
     use std::time::SystemTime;
 
@@ -295,28 +294,30 @@ mod tests {
 
     #[test]
     fn test_session_message_segment_req() {
-        let mut missing_segments = FixedBitSet::with_capacity(10_000);
-        (0..10_000_usize)
-            .choose_multiple(&mut thread_rng(), 2000)
-            .into_iter()
-            .for_each(|i| {
-                missing_segments.put(i);
-            });
+        let mut missing_segments = FixedBitSet::with_capacity(10);
+        missing_segments.set_range(.., true);
 
         let frame_info = FrameInfo {
             frame_id: 10,
-            total_segments: missing_segments.len() as u16,
+            total_segments: missing_segments.len() as SeqNum,
             missing_segments,
             last_update: SystemTime::now(),
         };
 
-        let msg_1 = SessionMessage::Request(frame_info.into());
+        let msg_1 = SessionMessage::Request(SegmentRequest::from_iter(vec![frame_info]));
         let data = Vec::from(msg_1.clone());
         let msg_2 = SessionMessage::try_from(&data[..]).unwrap();
 
         assert_eq!(msg_1, msg_2);
 
-        assert!(matches!(msg_1, SessionMessage::Request(r) if  r.missing_segments.len() < 10_000));
+        match msg_1 {
+            SessionMessage::Request(r) => {
+                let missing_segments = r.into_iter().collect::<Vec<_>>();
+                let expected = (0..=7).map(|s| SegmentId(10, s)).collect::<Vec<_>>();
+                assert_eq!(expected, missing_segments);
+            }
+            _ => panic!("invalid type"),
+        }
     }
 
     #[test]
@@ -333,13 +334,7 @@ mod tests {
 
     #[test]
     fn session_message_segment_request_bitset_test() {
-        let mut seg_req = SegmentRequest {
-            frame_id: 10,
-            missing_segments: FixedBitSet::with_capacity(1024),
-        };
-
-        seg_req.missing_segments.insert(2);
-        seg_req.missing_segments.insert(5);
+        let seg_req = SegmentRequest([(10, 0b00100100)].into());
 
         let mut iter = seg_req.into_iter();
         assert_eq!(iter.next(), Some(SegmentId(10, 2)));
@@ -355,7 +350,7 @@ mod tests {
         frame_info.missing_segments.insert(2);
         frame_info.missing_segments.insert(5);
 
-        let mut iter = SegmentRequest::from(frame_info).into_iter();
+        let mut iter = SegmentRequest::from_iter(vec![frame_info]).into_iter();
         assert_eq!(iter.next(), Some(SegmentId(10, 2)));
         assert_eq!(iter.next(), Some(SegmentId(10, 5)));
         assert_eq!(iter.next(), None);

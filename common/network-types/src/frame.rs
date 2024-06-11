@@ -49,7 +49,7 @@ use std::fmt::{Debug, Display, Formatter};
 use std::mem;
 use std::ops::{Add, Sub};
 use std::pin::Pin;
-use std::sync::atomic::{AtomicU16, AtomicU32, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU32, AtomicU64, AtomicU8, Ordering};
 use std::sync::OnceLock;
 use std::task::{Context, Poll};
 use std::time::{Duration, SystemTime};
@@ -61,10 +61,11 @@ use crate::errors::NetworkTypeError;
 
 /// ID of a [Frame].
 pub type FrameId = u32;
+pub type SeqNum = u8;
 
 /// Convenience type that identifies a segment within a frame.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
-pub struct SegmentId(pub FrameId, pub u16);
+pub struct SegmentId(pub FrameId, pub SeqNum);
 
 impl From<&Segment> for SegmentId {
     fn from(value: &Segment) -> Self {
@@ -80,20 +81,20 @@ impl Display for SegmentId {
 
 /// Helper function to segment `data` into segments of given `mtu` length.
 /// All segments are tagged with the same `frame_id`.
-pub fn segment(data: &[u8], mtu: u16, frame_id: u32) -> Vec<Segment> {
+pub fn segment(data: &[u8], mtu: usize, frame_id: u32) -> Vec<Segment> {
     assert!(frame_id > 0, "frame id cannot be 0");
 
-    let chunks = data.chunks(mtu as usize);
-    assert!(chunks.len() < u16::MAX as usize, "data too long");
+    let chunks = data.chunks(mtu);
+    assert!(chunks.len() < SeqNum::MAX as usize, "data too long");
 
-    let seq_len = chunks.len() as u16;
+    let seq_len = chunks.len() as SeqNum;
 
     chunks
         .enumerate()
         .map(|(idx, data)| Segment {
             frame_id,
             seq_len,
-            seq_idx: idx as u16,
+            seq_idx: idx as u8,
             data: data.into(),
         })
         .collect()
@@ -113,7 +114,7 @@ pub struct Frame {
 impl Frame {
     /// Segments this frame into a list of [segments](Segment) each of maximum sizes `mtu`.
     #[inline]
-    pub fn segment(&self, mtu: u16) -> Vec<Segment> {
+    pub fn segment(&self, mtu: usize) -> Vec<Segment> {
         assert!(self.frame_id > 0, "frame id 0 is not allowed");
         segment(self.data.as_ref(), mtu, self.frame_id)
     }
@@ -134,9 +135,9 @@ pub struct Segment {
     /// ID of the [Frame] this segment belongs to.
     pub frame_id: FrameId,
     /// Index of this segment within the segment sequence.
-    pub seq_idx: u16,
+    pub seq_idx: SeqNum,
     /// Total number of segments within this segment sequence.
-    pub seq_len: u16,
+    pub seq_len: SeqNum,
     /// Data in this segment.
     #[serde(with = "serde_bytes")]
     pub data: Box<[u8]>,
@@ -144,7 +145,7 @@ pub struct Segment {
 
 impl Segment {
     /// Size of the segment header.
-    pub const HEADER_SIZE: usize = mem::size_of::<FrameId>() + 2 * mem::size_of::<u16>();
+    pub const HEADER_SIZE: usize = mem::size_of::<FrameId>() + 2 * mem::size_of::<SeqNum>();
 }
 
 impl Debug for Segment {
@@ -191,8 +192,8 @@ impl TryFrom<&[u8]> for Segment {
         let (header, data) = value.split_at(Self::HEADER_SIZE);
         let segment = Segment {
             frame_id: FrameId::from_be_bytes(header[0..4].try_into().map_err(|_| NetworkTypeError::InvalidSegment)?),
-            seq_idx: u16::from_be_bytes(header[4..6].try_into().map_err(|_| NetworkTypeError::InvalidSegment)?),
-            seq_len: u16::from_be_bytes(header[6..8].try_into().map_err(|_| NetworkTypeError::InvalidSegment)?),
+            seq_idx: SeqNum::from_be_bytes(header[4..5].try_into().map_err(|_| NetworkTypeError::InvalidSegment)?),
+            seq_len: SeqNum::from_be_bytes(header[5..6].try_into().map_err(|_| NetworkTypeError::InvalidSegment)?),
             data: data.into(),
         };
         (segment.frame_id > 0 && segment.seq_idx < segment.seq_len)
@@ -206,7 +207,7 @@ impl TryFrom<&[u8]> for Segment {
 struct FrameBuilder {
     frame_id: FrameId,
     segments: Vec<OnceLock<Box<[u8]>>>,
-    remaining: AtomicU16,
+    remaining: AtomicU8,
     last_ts: AtomicU64,
 }
 
@@ -219,18 +220,18 @@ impl FrameBuilder {
     }
 
     /// Creates a new empty builder for the given frame.
-    fn empty(frame_id: FrameId, seq_len: u16) -> Self {
+    fn empty(frame_id: FrameId, seq_len: SeqNum) -> Self {
         Self {
             frame_id,
             segments: vec![OnceLock::new(); seq_len as usize],
-            remaining: AtomicU16::new(seq_len),
+            remaining: AtomicU8::new(seq_len),
             last_ts: AtomicU64::new(0),
         }
     }
 
     /// Adds a new [`segment`](Segment) to the builder with a timestamp `ts`.
     /// Returns the number of segments remaining in this builder.
-    fn put(&self, segment: Segment, ts: SystemTime) -> crate::errors::Result<u16> {
+    fn put(&self, segment: Segment, ts: SystemTime) -> crate::errors::Result<SeqNum> {
         if self.frame_id == segment.frame_id {
             if !self.is_complete() {
                 if self.segments[segment.seq_idx as usize].set(segment.data).is_ok() {
@@ -271,7 +272,7 @@ impl FrameBuilder {
                 .enumerate()
                 .filter_map(|(i, s)| s.get().is_none().then_some(i))
                 .collect(),
-            total_segments: self.segments.len() as u16,
+            total_segments: self.segments.len() as SeqNum,
             last_update: SystemTime::UNIX_EPOCH.add(Duration::from_millis(self.last_ts.load(Ordering::SeqCst))),
         }
     }
@@ -303,7 +304,7 @@ pub struct FrameInfo {
     /// Indices of segments that are missing. Empty if the frame is complete.
     pub missing_segments: FixedBitSet,
     /// The total number of segments this frame consists from.
-    pub total_segments: u16,
+    pub total_segments: SeqNum,
     /// Time of the last received segment in this frame.
     pub last_update: SystemTime,
 }
@@ -577,7 +578,7 @@ pub(crate) mod tests {
     use std::sync::Arc;
     use std::time::Duration;
 
-    const MTU: u16 = 448;
+    const MTU: usize = 448;
     const FRAME_COUNT: u32 = 65_535;
     const FRAME_SIZE: usize = 4096;
     const MIXING_FACTOR: f64 = 4.0;

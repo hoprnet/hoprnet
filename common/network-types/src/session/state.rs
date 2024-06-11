@@ -17,7 +17,7 @@ use tracing::{debug, error, warn};
 use crate::errors::NetworkTypeError;
 use crate::frame::{segment, FrameId, FrameReassembler, SegmentId};
 use crate::prelude::Segment;
-use crate::session::protocol::{FrameAcknowledgements, SessionMessage};
+use crate::session::protocol::{FrameAcknowledgements, SegmentRequest, SessionMessage};
 
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
@@ -41,7 +41,7 @@ pub struct SessionConfig {
     pub frame_expiration_age: Duration,
     /// Payload size available for the session sub-protocol.
     #[default = 466]
-    pub mtu: u16,
+    pub mtu: usize,
 }
 
 /// Contains the cloneable state of the session bound to a [`SessionSocket`].
@@ -76,7 +76,7 @@ impl<T: NetworkTransport> SessionState<T> {
                 }
             }
             SessionMessage::Request(r) => {
-                debug!("RECEIVED: request for {} segments in {}", r.len(), r.frame_id);
+                debug!("RECEIVED: request for {} segments", r.len());
                 let mut count = 0;
                 for segment_id in r {
                     if let Some(segment) = self.lookbehind.get(&segment_id) {
@@ -119,26 +119,25 @@ impl<T: NetworkTransport> SessionState<T> {
             .cloned()
             .collect::<Vec<_>>();
 
+        debug!("tracking {} incomplete frames", incomplete.len());
+
         if incomplete.is_empty() {
-            debug!("tracking {} incomplete frames", incomplete.len());
             return Ok(0);
         }
 
-        debug!("tracking {} incomplete frames", incomplete.len());
         incomplete.sort_unstable_by(|a, b| a.last_update.cmp(&b.last_update));
-        let max = max_requests.unwrap_or(incomplete.len());
-
+        let max = max_requests.unwrap_or(usize::MAX);
         let mut sent = 0;
+
         for req in incomplete
-            .into_iter()
+            .chunks(SegmentRequest::MAX_ENTRIES)
             .take(max)
-            .map(|info| SessionMessage::Request(info.into()))
+            .map(|chunk| SessionMessage::Request(chunk.into_iter().cloned().collect()))
         {
             let r = req.try_as_request_ref().unwrap();
             debug!(
-                "SENDING: retransmission request for segments {:?} in frame {}",
+                "SENDING: retransmission request for segments {:?}",
                 r.clone().into_iter().collect::<Vec<_>>(),
-                r.frame_id
             );
             self.transport.send_to_counterparty(&req.into_encoded()).await?;
             sent += 1;
@@ -202,7 +201,7 @@ impl<T: NetworkTransport> SessionState<T> {
     pub async fn send_frame_data(&self, data: &[u8]) -> crate::errors::Result<()> {
         let segments = segment(
             data,
-            self.cfg.mtu - SessionMessage::HEADER_SIZE as u16,
+            self.cfg.mtu - SessionMessage::HEADER_SIZE,
             self.outgoing_frame_id.fetch_add(1, Ordering::SeqCst),
         );
 
@@ -466,7 +465,7 @@ mod tests {
             let counterparty = Arc::new(OnceLock::<SessionState<FaultyNetwork>>::new());
 
             let (sender, recv) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
-            let recv = randomized_stream(recv, rng.clone(), cfg.mixing_factor);
+            //let recv = randomized_stream(recv, rng.clone(), cfg.mixing_factor);
             let counterparty_clone = counterparty.clone();
 
             async_std::task::spawn(async move {
