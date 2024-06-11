@@ -42,7 +42,7 @@
           localSystem = system;
           overlays = [ (import rust-overlay) foundry.overlay solc.overlay ];
           pkgs = import nixpkgs {
-            inherit system overlays;
+            inherit localSystem overlays;
           };
           solcDefault = solc.mkDefault pkgs pkgs.solc_0_8_19;
           rustNightly = pkgs.rust-bin.selectLatestNightlyWith (toolchain: toolchain.default);
@@ -447,13 +447,6 @@
             inherit hoprd-debug-aarch64-linux hoprd-debug-armv7l-linux hoprd-debug-aarch64-darwin hoprd-debug-x86_64-darwin hoprd-debug-x86_64-linux;
             default = hoprd;
           };
-
-          #devShells = {
-          #  default = import ./shell.nix { inherit localSystem; };
-          #  cross = import ./shell.nix {
-          #    inherit localSystem crossSystem;
-          #  };
-          #};
 
           devShells.default = defaultDevShell;
           #devShells.smoke-tests = smoketestsDevShell;

@@ -2,7 +2,6 @@
 , CARGO_PROFILE ? "release"
 , cargoToml
 , craneLib
-, darwin
 , depsSrc
 , foundryBin
 , git
@@ -12,12 +11,13 @@
 , openssl
 , pandoc
 , pkg-config
+, pkgs
 , postInstall ? null
+, runClippy ? false
+, runTests ? false
 , solcDefault
 , src
 , stdenv
-, runClippy ? false
-, runTests ? false
 }:
 let
   crateInfo = craneLib.crateNameFromCargoToml { inherit cargoToml; };
@@ -29,9 +29,9 @@ let
 
     # FIXME: some dev dependencies depend on OpenSSL, would be nice to remove
     # this dependency
-    nativeBuildInputs = [ solcDefault foundryBin pkg-config openssl git libiconv ];
-    buildInputs = [ openssl ] ++ lib.optionals stdenv.isDarwin (
-      with darwin.apple_sdk.frameworks; [
+    nativeBuildInputs = [ solcDefault foundryBin pkg-config pkgs.pkgsBuildHost.openssl libiconv ];
+    buildInputs = [ ] ++ lib.optionals stdenv.isDarwin (
+      with pkgs.darwin.apple_sdk.frameworks; [
         CoreServices
         CoreFoundation
         SystemConfiguration
