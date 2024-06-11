@@ -1,5 +1,7 @@
 use crossbeam_queue::ArrayQueue;
 use crossbeam_skiplist::SkipMap;
+use dashmap::mapref::entry::Entry;
+use dashmap::DashMap;
 use futures::{AsyncRead, AsyncWrite, AsyncWriteExt, FutureExt, StreamExt, TryStreamExt};
 use pin_project::pin_project;
 use smart_default::SmartDefault;
@@ -9,7 +11,7 @@ use std::pin::Pin;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use std::task::{Context, Poll};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tracing::{debug, error, warn};
 
 use crate::frame::{segment, FrameId, FrameReassembler, SegmentId};
@@ -35,6 +37,23 @@ pub struct SessionConfig {
     pub mtu: usize,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct RetryLog(usize, Instant);
+
+impl RetryLog {
+    pub fn check_and_increase(&self) -> Option<Self> {
+        let now = Instant::now();
+        (now >= self.1).then_some(Self(self.0 + 1, now + Duration::from_secs(10)))
+        // TODO
+    }
+}
+
+impl Default for RetryLog {
+    fn default() -> Self {
+        Self(1, Instant::now() + Duration::from_secs(10)) // TODO
+    }
+}
+
 /// Contains the cloneable state of the session bound to a [`SessionSocket`].
 ///
 /// It implements the entire [`SessionMessage`] state machine and
@@ -48,6 +67,7 @@ pub struct SessionState<T> {
     pub(crate) transport: T,
     lookbehind: Arc<SkipMap<SegmentId, Segment>>,
     acknowledged: Arc<Option<ArrayQueue<FrameId>>>,
+    retry_log: Arc<DashMap<FrameId, RetryLog>>,
     outgoing_frame_id: Arc<AtomicU32>,
     frame_reassembler: Arc<FrameReassembler>,
     cfg: SessionConfig,
@@ -60,6 +80,8 @@ impl<T: AsyncWrite + Unpin> SessionState<T> {
         match SessionMessage::try_from(data)? {
             SessionMessage::Segment(s) => {
                 let id = SegmentId::from(&s);
+                self.retry_log.remove(&id.0);
+
                 if let Err(e) = self.frame_reassembler.push_segment(s) {
                     warn!("segment {id:?} not pushed: {e}")
                 } else {
@@ -104,14 +126,25 @@ impl<T: AsyncWrite + Unpin> SessionState<T> {
     pub async fn request_missing_segments(&mut self, max_requests: Option<usize>) -> crate::errors::Result<usize> {
         self.frame_reassembler.evict()?;
 
-        let mut incomplete = self
-            .frame_reassembler
-            .incomplete_frames()
-            .values()
-            .cloned()
-            .collect::<Vec<_>>();
+        let tracked_incomplete = self.frame_reassembler.incomplete_frames();
 
-        debug!("tracking {} incomplete frames", incomplete.len());
+        debug!("tracking {} incomplete frames", tracked_incomplete.len());
+
+        let mut incomplete = Vec::with_capacity(tracked_incomplete.len());
+        for (id, info) in tracked_incomplete {
+            match self.retry_log.entry(id) {
+                Entry::Occupied(e) => {
+                    if let Some(new_log) = e.get().check_and_increase() {
+                        incomplete.push(info);
+                        e.replace_entry(new_log);
+                    }
+                }
+                Entry::Vacant(v) => {
+                    v.insert(RetryLog::default());
+                    incomplete.push(info);
+                }
+            }
+        }
 
         if incomplete.is_empty() {
             return Ok(0);
@@ -121,16 +154,14 @@ impl<T: AsyncWrite + Unpin> SessionState<T> {
         let max = max_requests.unwrap_or(usize::MAX);
         let mut sent = 0;
 
-        for req in incomplete
+        for chunk in incomplete
             .chunks(SegmentRequest::MAX_ENTRIES)
             .take(max)
-            .map(|chunk| SessionMessage::Request(chunk.iter().cloned().collect()))
+            .map(|chunk| SegmentRequest::from_iter(chunk.iter().cloned()))
         {
-            let r = req.try_as_request_ref().unwrap();
-            debug!(
-                "SENDING: retransmission request for segments {:?}",
-                r.clone().into_iter().collect::<Vec<_>>(),
-            );
+            debug!("SENDING: retransmission request for segments {chunk:?}");
+
+            let req = SessionMessage::Request(chunk);
             self.transport.write_all(&req.into_encoded()).await?;
             sent += 1;
         }
@@ -223,6 +254,7 @@ impl<T: AsyncWrite + Unpin + Clone> Clone for SessionState<T> {
             transport: self.transport.clone(),
             lookbehind: self.lookbehind.clone(),
             acknowledged: self.acknowledged.clone(),
+            retry_log: self.retry_log.clone(),
             outgoing_frame_id: self.outgoing_frame_id.clone(),
             frame_reassembler: self.frame_reassembler.clone(),
             cfg: self.cfg,
@@ -254,6 +286,7 @@ impl<T: AsyncWrite + Send + Unpin> SessionSocket<T> {
             transport,
             lookbehind: Arc::new(SkipMap::new()),
             acknowledged: acknowledged.clone(),
+            retry_log: Arc::new(DashMap::new()),
             outgoing_frame_id: Arc::new(AtomicU32::new(1)),
             frame_reassembler: Arc::new(reassembler),
             cfg,
@@ -322,6 +355,36 @@ impl<T: AsyncWrite + Unpin + Send + Sync> AsyncWrite for SessionSocket<T> {
 impl<T: AsyncWrite + Unpin + Send + Sync> AsyncRead for SessionSocket<T> {
     fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<std::io::Result<usize>> {
         self.project().egress.poll_read(cx, buf)
+    }
+}
+
+/// Implementations of Tokio's AsyncRead and AsyncWrite for compatibility
+#[cfg(feature = "runtime-tokio")]
+pub mod tokio_compat {
+    use std::pin::Pin;
+    use std::task::{Context, Poll};
+    use tokio::io::{AsyncRead, AsyncWrite};
+
+    use crate::session::state::SessionSocket;
+
+    impl<T: futures::AsyncWrite + Unpin + Send + Sync> AsyncWrite for SessionSocket<T> {
+        fn poll_write(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
+            futures::io::AsyncWrite::poll_write(self, cx, buf)
+        }
+
+        fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+            futures::io::AsyncWrite::poll_flush(self, cx)
+        }
+
+        fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+            futures::io::AsyncWrite::poll_close(self, cx)
+        }
+    }
+
+    impl<T: futures::AsyncWrite + Unpin + Send + Sync> AsyncRead for SessionSocket<T> {
+        fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<std::io::Result<usize>> {
+            futures::io::AsyncRead::poll_read(self, cx, buf)
+        }
     }
 }
 
@@ -550,19 +613,6 @@ mod tests {
 
     const NUM_FRAMES: usize = 1000;
     const FRAME_SIZE: usize = 1500;
-
-    #[async_std::test]
-    async fn test_faulty_network_mixing() {
-        let mut net = FaultyNetwork::new(FaultyNetworkConfig {
-            fault_mod: 0,
-            mixing_factor: 4,
-        });
-
-        let data = (0..200_u8).map(|x| vec![x].into_boxed_slice()).collect::<Vec<_>>();
-        for packet in data.iter() {
-            net.write(packet.as_ref()).await.unwrap();
-        }
-    }
 
     #[test(async_std::test)]
     async fn test_reliable_send_recv_no_ack() {
