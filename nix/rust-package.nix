@@ -31,10 +31,12 @@ let
     # FIXME: some dev dependencies depend on OpenSSL, would be nice to remove
     # this dependency
     nativeBuildInputs = [ solcDefault foundryBin pkg-config pkgs.pkgsBuildHost.openssl libiconv ];
-    buildInputs = [ ] ++ lib.optionals stdenv.isDarwin (
+    buildInputs = [ ] ++ lib.optionals stdenv.hostPlatform.isDarwin (
       with darwin.apple_sdk.frameworks; [
-        CoreServices
         CoreFoundation
+        CoreServices
+        IOKit
+        Security
         SystemConfiguration
       ]
     );

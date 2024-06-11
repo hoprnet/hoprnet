@@ -80,7 +80,8 @@ jobs:
     uses: ./.github/workflows/build-binaries.yaml
     with:
       base_branch: ${{ github.event.pull_request.base.ref }}
-      system: armv7l-linux
+      binary_name: hoprd-armv7l-linux
+      package: hoprd-armv7l-linux
       runner: self-hosted-hoprnet-big
     secrets: inherit
 
