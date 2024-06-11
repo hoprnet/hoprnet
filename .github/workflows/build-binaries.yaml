@@ -10,14 +10,18 @@ on:
       base_branch:
         required: true
         type: string
-      system:
-        required: true
-        type: string
       runner:
         required: true
         type: string
+      package:
+        required: false
+        type: string
+        default: hoprd
+      binary_name:
+        required: false
+        type: string
 concurrency:
-  group: ${{ github.head_ref }}-build-binary-${{ inputs.system }}
+  group: ${{ github.head_ref }}-build-binary-${{ inputs.binary_name }}
   cancel-in-progress: true
 jobs:
   build-binary:
@@ -43,12 +47,14 @@ jobs:
 
       - name: Build hoprd binary
         run: |
-          nix build .#hoprd-${{ inputs.system }}
+          nix build .#${{ inputs.package }}
+        env:
+          PKG: ${{ inputs.package }}
 
       - name: Upload hoprd binary
         uses: actions/upload-artifact@v4
         with:
-          name: hoprd-${{ inputs.system }}
+          name: ${{ inputs.binary_name }}
           path: ${{ github.workspace }}/result/bin/hoprd
 
     # - name: Build hopli binary

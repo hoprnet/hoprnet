@@ -2,6 +2,7 @@
 , CARGO_PROFILE ? "release"
 , cargoToml
 , craneLib
+, darwin
 , depsSrc
 , foundryBin
 , git
@@ -31,7 +32,7 @@ let
     # this dependency
     nativeBuildInputs = [ solcDefault foundryBin pkg-config pkgs.pkgsBuildHost.openssl libiconv ];
     buildInputs = [ ] ++ lib.optionals stdenv.isDarwin (
-      with pkgs.darwin.apple_sdk.frameworks; [
+      with darwin.apple_sdk.frameworks; [
         CoreServices
         CoreFoundation
         SystemConfiguration

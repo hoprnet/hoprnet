@@ -38,7 +38,8 @@ jobs:
     uses: ./.github/workflows/build-binaries.yaml
     with:
       base_branch: ${{ github.event.pull_request.base.ref }}
-      system: x86_64-linux
+      binary_name: hoprd-x86_64-linux
+      package: hoprd-x86_64-linux
       runner: self-hosted-hoprnet-big
     secrets: inherit
 
@@ -48,8 +49,9 @@ jobs:
     uses: ./.github/workflows/build-binaries.yaml
     with:
       base_branch: ${{ github.event.pull_request.base.ref }}
-      system: aarch64-linux
-      runner: macos-latest
+      binary_name: hoprd-aarch64-linux
+      package: hoprd-aarch64-linux
+      runner: self-hosted-hoprnet-big
     secrets: inherit
 
   build-binary-aarch64-darwin:
@@ -58,8 +60,8 @@ jobs:
     uses: ./.github/workflows/build-binaries.yaml
     with:
       base_branch: ${{ github.event.pull_request.base.ref }}
-      system: aarch64-darwin
-      runner: macos-latest
+      binary_name: hoprd-aarch64-darwin
+      runner: macos-14 # M1 machine
     secrets: inherit
 
   build-binary-x86_64-darwin:
@@ -68,8 +70,8 @@ jobs:
     uses: ./.github/workflows/build-binaries.yaml
     with:
       base_branch: ${{ github.event.pull_request.base.ref }}
-      system: x86_64-darwin
-      runner: self-hosted-hoprnet-big
+      binary_name: hoprd-x86_64-darwin
+      runner: macos-13 # Intel machine
     secrets: inherit
 
   build-binary-armv7l-linux:
