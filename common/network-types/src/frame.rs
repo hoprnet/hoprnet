@@ -523,6 +523,12 @@ impl FrameReassembler {
 
         Ok(count)
     }
+
+    /// Closes the reassembler.
+    /// Any subsequent calls to [`FrameReassembler::push_segment`] will fail.
+    pub fn close(&self) {
+        self.reassembled.close_channel();
+    }
 }
 
 impl Drop for FrameReassembler {
