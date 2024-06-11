@@ -19,7 +19,7 @@ jobs:
     name: Hoprd
     uses: ./.github/workflows/build-docker.yaml
     with:
-      base_branch: ${{ github.event.pull_request.base.ref }}
+      branch: ${{ github.event.pull_request.head.ref }}
       package: hoprd
     secrets: inherit
 
@@ -28,7 +28,7 @@ jobs:
     if: contains(github.event.pull_request.labels.*.name, 'component:hopli')
     uses: ./.github/workflows/build-docker.yaml
     with:
-      base_branch: ${{ github.event.pull_request.base.ref }}
+      branch: ${{ github.event.pull_request.head.ref }}
       package: hopli
     secrets: inherit
 
@@ -37,7 +37,7 @@ jobs:
     if: contains(github.event.pull_request.labels.*.name, 'binary:x86_64-linux')
     uses: ./.github/workflows/build-binaries.yaml
     with:
-      base_branch: ${{ github.event.pull_request.base.ref }}
+      branch: ${{ github.event.pull_request.head.ref }}
       system: x86_64-linux
       runner: self-hosted-hoprnet-big
     secrets: inherit
@@ -47,7 +47,7 @@ jobs:
     if: contains(github.event.pull_request.labels.*.name, 'binary:aarch64-linux')
     uses: ./.github/workflows/build-binaries.yaml
     with:
-      base_branch: ${{ github.event.pull_request.base.ref }}
+      base_branch: ${{ github.event.pull_request.head.ref }}
       system: aarch64-linux
       runner: macos-latest
     secrets: inherit
@@ -57,7 +57,7 @@ jobs:
     if: contains(github.event.pull_request.labels.*.name, 'binary:aarch64-darwin')
     uses: ./.github/workflows/build-binaries.yaml
     with:
-      base_branch: ${{ github.event.pull_request.base.ref }}
+      branch: ${{ github.event.pull_request.head.ref }}
       system: aarch64-darwin
       runner: macos-latest
     secrets: inherit
@@ -67,7 +67,7 @@ jobs:
     if: contains(github.event.pull_request.labels.*.name, 'binary:x86_64-darwin')
     uses: ./.github/workflows/build-binaries.yaml
     with:
-      base_branch: ${{ github.event.pull_request.base.ref }}
+      branch: ${{ github.event.pull_request.head.ref }}
       system: x86_64-darwin
       runner: self-hosted-hoprnet-big
     secrets: inherit
@@ -77,7 +77,7 @@ jobs:
     if: contains(github.event.pull_request.labels.*.name, 'binary:armv7l-linux')
     uses: ./.github/workflows/build-binaries.yaml
     with:
-      base_branch: ${{ github.event.pull_request.base.ref }}
+      branch: ${{ github.event.pull_request.head.ref }}
       system: armv7l-linux
       runner: self-hosted-hoprnet-big
     secrets: inherit

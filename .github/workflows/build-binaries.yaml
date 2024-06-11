@@ -7,7 +7,7 @@ name: Build binaries
 on:
   workflow_call:
     inputs:
-      base_branch:
+      branch:
         required: true
         type: string
       system:
@@ -27,7 +27,7 @@ jobs:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.base_branch }}
+          ref: ${{ inputs.branch }}
 
       - name: Install Nix
         uses: cachix/install-nix-action@v27

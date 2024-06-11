@@ -7,7 +7,7 @@ name: Build Docker
 on:
   workflow_call:
     inputs:
-      base_branch:
+      branch:
         required: true
         type: string
       package:
@@ -24,7 +24,7 @@ jobs:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.base_branch }}
+          ref: ${{ inputs.branch }}
 
       - name: Set up Google Cloud Credentials
         id: auth
