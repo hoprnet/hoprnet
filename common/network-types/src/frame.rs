@@ -569,8 +569,10 @@ impl Sink<Segment> for FrameReassembler {
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use crate::frame::{Frame, FrameId, FrameReassembler, Segment, SegmentId};
+    use crate::frame::{Frame, FrameId, FrameInfo, FrameReassembler, Segment, SegmentId, SeqNum};
+    use crate::session::protocol::SegmentRequest;
     use async_stream::stream;
+    use fixedbitset::FixedBitSet;
     use futures::{pin_mut, Stream, StreamExt};
     use hex_literal::hex;
     use lazy_static::lazy_static;
@@ -582,7 +584,7 @@ pub(crate) mod tests {
     use std::collections::{HashSet, VecDeque};
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
-    use std::time::Duration;
+    use std::time::{Duration, SystemTime};
 
     const MTU: usize = 448;
     const FRAME_COUNT: u32 = 65_535;
@@ -632,6 +634,39 @@ pub(crate) mod tests {
     fn init() {
         lazy_static::initialize(&FRAMES);
         lazy_static::initialize(&SEGMENTS);
+    }
+
+    #[test]
+    fn test_frame_info() {
+        let frames = (1..20)
+            .map(|i| {
+                let mut missing_segments = FixedBitSet::with_capacity(10);
+                missing_segments.extend((0..7).choose_multiple(&mut thread_rng(), 4));
+                FrameInfo {
+                    frame_id: i,
+                    missing_segments,
+                    total_segments: 8,
+                    last_update: SystemTime::UNIX_EPOCH,
+                }
+            })
+            .collect::<Vec<_>>();
+
+        let mut req = SegmentRequest::from_iter(frames.clone())
+            .into_iter()
+            .collect::<Vec<_>>();
+        req.sort();
+
+        assert_eq!(frames.len() * 4, req.len());
+        assert_eq!(
+            req,
+            frames
+                .into_iter()
+                .flat_map(|f| f
+                    .missing_segments
+                    .into_ones()
+                    .map(move |idx| SegmentId(f.frame_id, idx as SeqNum)))
+                .collect::<Vec<_>>()
+        );
     }
 
     #[test]
