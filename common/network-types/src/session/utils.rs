@@ -1,32 +1,40 @@
 use std::time::{Duration, Instant};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct RetryLog(usize, Instant);
+pub struct RetryLog {
+    num_retry: usize,
+    started_at: Instant
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RetryResult {
     Wait,
-    Next(RetryLog),
+    RetryNow(RetryLog),
     Expired,
 }
 
 impl RetryLog {
-    pub fn new(now: Instant, base: Duration) -> Self {
-        Self(0, now + base)
+    pub fn new(now: Instant) -> Self {
+        Self {
+            num_retry: 0,
+            started_at: now
+        }
+    }
+
+    pub fn retry_at(&self, base: Duration, max_duration: Duration) -> Option<Instant> {
+        let base_ms = base.as_millis() as u64;
+        let duration = Duration::from_millis(base_ms.pow(self.num_retry as u32));
+        (duration < max_duration).then_some(self.started_at + duration)
     }
 
     pub fn check(&self, now: Instant, base: Duration, max: Duration) -> RetryResult {
-        if now >= self.1 {
-            let base_ms = base.as_millis() as u64;
-            let retry_no = self.0 + 1;
-            let next = Duration::from_millis(base_ms.pow(retry_no as u32));
-            if next < max {
-                RetryResult::Next(Self(retry_no, now + next))
-            } else {
-                RetryResult::Expired
-            }
-        } else {
-            RetryResult::Wait
+        match self.retry_at(base, max) {
+            None => RetryResult::Expired,
+            Some(retry_at) if retry_at >= now => RetryResult::Wait,
+            _ => RetryResult::RetryNow(Self {
+                num_retry: self.num_retry + 1,
+                started_at: self.started_at
+            })
         }
     }
 }

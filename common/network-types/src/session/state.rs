@@ -55,21 +55,27 @@ pub struct SessionState<T> {
     pub(crate) transport: T,
     lookbehind: Arc<SkipMap<SegmentId, Segment>>,
     acknowledged: Arc<ArrayQueue<FrameId>>,
-    retry_log: Arc<DashMap<FrameId, RetryLog>>,
+    incoming_frame_retries: Arc<DashMap<FrameId, RetryLog>>,
     outgoing_frame_id: Arc<AtomicU32>,
     frame_reassembler: Arc<FrameReassembler>,
     cfg: SessionConfig,
 }
 
 impl<T: AsyncWrite + Unpin> SessionState<T> {
-    async fn consume_segment(&self, segment: Segment) {
+    async fn consume_segment(&mut self, segment: Segment) {
         let id = segment.id();
-        self.retry_log.remove(&id.0);
-
-        if let Err(e) = self.frame_reassembler.push_segment(segment) {
-            warn!("segment {id:?} not pushed: {e}")
-        } else {
-            debug!("RECEIVED: segment {id:?}");
+        match self.frame_reassembler.push_segment(segment) {
+            Ok(_) => {
+                debug!("RECEIVED: segment {id:?}");
+                // Create a retry record for this segment
+                match self.incoming_frame_retries.entry(id.0) {
+                    Entry::Vacant(v) => {
+                        v.insert(RetryLog::new(Instant::now()));
+                    },
+                    _ => {}
+                }
+            }
+            Err(e) => warn!("segment {id:?} not pushed: {e}")
         }
     }
 
@@ -91,7 +97,7 @@ impl<T: AsyncWrite + Unpin> SessionState<T> {
         Ok(())
     }
 
-    async fn acknowledge_frames(&self, acked: FrameAcknowledgements) {
+    async fn acknowledged_frames(&mut self, acked: FrameAcknowledgements) {
         debug!("RECEIVED: acknowledgement of {} frames", acked.len());
         for frame_id in acked {
             for seg in self.lookbehind.iter().filter(|s| frame_id == s.key().0) {
@@ -106,7 +112,7 @@ impl<T: AsyncWrite + Unpin> SessionState<T> {
         match SessionMessage::try_from(data)? {
             SessionMessage::Segment(s) => self.consume_segment(s).await,
             SessionMessage::Request(r) => self.retransmit_segments(r).await?,
-            SessionMessage::Acknowledge(f) => self.acknowledge_frames(f).await,
+            SessionMessage::Acknowledge(f) => self.acknowledged_frames(f).await,
         }
         Ok(())
     }
@@ -131,12 +137,12 @@ impl<T: AsyncWrite + Unpin> SessionState<T> {
         let mut to_retry = Vec::with_capacity(tracked_incomplete.len());
         let now = Instant::now();
         for info in tracked_incomplete {
-            match self.retry_log.entry(info.frame_id) {
+            match self.incoming_frame_retries.entry(info.frame_id) {
                 Entry::Occupied(e) => {
                     // Check if we can retry this frame now
                     let rto_check = e.get().check(now, self.cfg.rto_base, self.cfg.frame_expiration_age);
                     match rto_check {
-                        RetryResult::Next(next_rto) => {
+                        RetryResult::RetryNow(next_rto) => {
                             // Retry this frame and plan ahead the time of the next retry
                             e.replace_entry(next_rto);
                             to_retry.push(info);
@@ -149,8 +155,8 @@ impl<T: AsyncWrite + Unpin> SessionState<T> {
                     }
                 }
                 Entry::Vacant(v) => {
-                    // This is the first retry of this frame, so retry it
-                    v.insert(RetryLog::new(now, self.cfg.rto_base));
+                    // Shouldn't happen, but retry the frame anyway
+                    v.insert(RetryLog::new(now));
                     to_retry.push(info);
                 }
             }
@@ -242,6 +248,7 @@ impl<T: AsyncWrite + Unpin> SessionState<T> {
         }
 
         self.transport.flush().await?;
+
         Ok(())
     }
 }
@@ -252,7 +259,7 @@ impl<T: AsyncWrite + Unpin + Clone> Clone for SessionState<T> {
             transport: self.transport.clone(),
             lookbehind: self.lookbehind.clone(),
             acknowledged: self.acknowledged.clone(),
-            retry_log: self.retry_log.clone(),
+            incoming_frame_retries: self.incoming_frame_retries.clone(),
             outgoing_frame_id: self.outgoing_frame_id.clone(),
             frame_reassembler: self.frame_reassembler.clone(),
             cfg: self.cfg,
@@ -279,21 +286,15 @@ impl<T: AsyncWrite + Send + Unpin> SessionSocket<T> {
 
         let acknowledged = Arc::new(ArrayQueue::new(cfg.acknowledged_frames_buffer.max(1)));
         let is_acknowledging = (cfg.acknowledged_frames_buffer > 0).then_some(acknowledged.clone());
+        let incoming_frame_retries = Arc::new(DashMap::new());
 
-        let state = SessionState {
-            transport,
-            acknowledged,
-            cfg,
-            lookbehind: Arc::new(SkipMap::new()),
-            retry_log: Arc::new(DashMap::new()),
-            outgoing_frame_id: Arc::new(AtomicU32::new(1)),
-            frame_reassembler: Arc::new(reassembler),
-        };
-
+        let incoming_frame_retries_clone = incoming_frame_retries.clone();
         let egress = Box::new(
             egress
                 .inspect(move |frame| {
                     debug!("emit frame {}", frame.frame_id);
+                    // The frame has been completed, so remove its retry record
+                    incoming_frame_retries_clone.remove(&frame.frame_id);
                     if let Some(ack_buffer) = &is_acknowledging {
                         // Acts as a ring buffer, so if the buffer is full, any unsent acknowledgements
                         // will be discarded.
@@ -303,6 +304,16 @@ impl<T: AsyncWrite + Send + Unpin> SessionSocket<T> {
                 .map(Ok)
                 .into_async_read(),
         );
+
+        let state = SessionState {
+            transport,
+            acknowledged,
+            cfg,
+            incoming_frame_retries,
+            lookbehind: Arc::new(SkipMap::new()),
+            outgoing_frame_id: Arc::new(AtomicU32::new(1)),
+            frame_reassembler: Arc::new(reassembler),
+        };
 
         Self { state, egress }
     }
