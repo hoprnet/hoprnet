@@ -44,7 +44,7 @@ use dashmap::DashMap;
 use fixedbitset::FixedBitSet;
 use futures::{Sink, Stream};
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::collections::BinaryHeap;
 use std::fmt::{Debug, Display, Formatter};
 use std::mem;
 use std::ops::{Add, Sub};
@@ -61,6 +61,7 @@ use crate::errors::NetworkTypeError;
 
 /// ID of a [Frame].
 pub type FrameId = u32;
+/// Type representing the sequence numbers in a [Frame].
 pub type SeqNum = u8;
 
 /// Convenience type that identifies a segment within a frame.
@@ -69,7 +70,7 @@ pub struct SegmentId(pub FrameId, pub SeqNum);
 
 impl From<&Segment> for SegmentId {
     fn from(value: &Segment) -> Self {
-        Self(value.frame_id, value.seq_idx)
+        value.id()
     }
 }
 
@@ -146,6 +147,11 @@ pub struct Segment {
 impl Segment {
     /// Size of the segment header.
     pub const HEADER_SIZE: usize = mem::size_of::<FrameId>() + 2 * mem::size_of::<SeqNum>();
+
+    /// Returns the [SegmentId] for this segment.
+    pub fn id(&self) -> SegmentId {
+        SegmentId(self.frame_id, self.seq_idx)
+    }
 }
 
 impl Debug for Segment {
@@ -297,6 +303,7 @@ impl FrameBuilder {
 }
 
 /// Contains information about a frame that being built by the [`FrameBuilder`].
+/// The instances are totally ordered as most recently used first.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FrameInfo {
     /// ID of the frame.
@@ -307,6 +314,22 @@ pub struct FrameInfo {
     pub total_segments: SeqNum,
     /// Time of the last received segment in this frame.
     pub last_update: SystemTime,
+}
+
+impl PartialOrd for FrameInfo {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for FrameInfo {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        match self.last_update.cmp(&other.last_update) {
+            std::cmp::Ordering::Equal => self.frame_id.cmp(&self.frame_id),
+            cmp => cmp,
+        }
+        .reverse()
+    }
 }
 
 /// Represents a frame reassembler.
@@ -471,11 +494,12 @@ impl FrameReassembler {
 
     /// Returns [information](FrameInfo) about the incomplete frames.
     /// The ordered frame IDs are the keys on the returned map.
-    pub fn incomplete_frames(&self) -> BTreeMap<FrameId, FrameInfo> {
+    pub fn incomplete_frames(&self) -> BinaryHeap<FrameInfo> {
         (self.next_emitted_frame.load(Ordering::SeqCst)..=self.highest_buffered_frame.load(Ordering::SeqCst))
+            .into_iter()
             .filter_map(|frame_id| match self.sequences.get(&frame_id) {
-                Some(e) => (!e.is_complete()).then(|| (frame_id, e.info())),
-                None => Some((frame_id, {
+                Some(e) => (!e.is_complete()).then(|| e.info()),
+                None => Some({
                     let mut missing_segments = FixedBitSet::with_capacity(1);
                     missing_segments.insert(0);
                     FrameInfo {
@@ -484,7 +508,7 @@ impl FrameReassembler {
                         total_segments: 1,
                         last_update: SystemTime::UNIX_EPOCH,
                     }
-                })),
+                }),
             })
             .collect()
     }
@@ -1039,7 +1063,7 @@ pub(crate) mod tests {
         let computed_missing = fragmented
             .incomplete_frames()
             .into_par_iter()
-            .flat_map_iter(|(_, e)| {
+            .flat_map_iter(|e| {
                 e.missing_segments
                     .into_ones()
                     .map(move |s| SegmentId(e.frame_id, s.try_into().unwrap()))
