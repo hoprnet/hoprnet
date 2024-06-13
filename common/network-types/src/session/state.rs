@@ -16,30 +16,48 @@ use tracing::{debug, error, warn};
 use crate::frame::{segment, FrameId, FrameReassembler, SegmentId};
 use crate::prelude::Segment;
 use crate::session::protocol::{FrameAcknowledgements, SegmentRequest, SessionMessage};
-use crate::session::utils::{RetryLog, RetryResult};
+use crate::session::utils::{RetryResult, RetryToken};
 
 /// Configuration of session.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, SmartDefault)]
 pub struct SessionConfig {
     /// Maximum number of buffered segments.
+    /// This value should be large enough to accommodate segments for an at least
+    /// `frame_expiration_age` period, given the expected maximum bandwidth.
     #[default = 50_000]
     pub max_buffered_segments: usize,
+
     /// Size of the buffer for acknowledged frame IDs.
+    /// This value should be large enough, so that the buffer can accommodate segments
+    /// for an at least `frame_expiration_age` period, given the expected maximum bandwidth.
     /// If set to 0, no frame acknowledgement will be sent.
     #[default = 1024]
     pub acknowledged_frames_buffer: usize,
-    /// Incomplete frames will be discarded after being in the reassembler
-    /// this long.
+
+    /// Specifies the maximum period a frame should be kept by the sender and
+    /// asked for retransmission by the recipient.
     #[default(Duration::from_secs(30))]
     pub frame_expiration_age: Duration,
+
     /// Payload size available for the session sub-protocol.
     #[default = 466]
     pub mtu: usize,
-    /// If a frame is incomplete (on the receiver) or unacknowledged (on the sender),
-    /// retries will be made with exponential backoff starting at this initial retry timeout (RTO).
-    /// Retries will be made until `frame_expiration_age` is reached.
-    #[default(Duration::from_secs(1))]
-    pub rto_base: Duration,
+
+    /// If a frame is incomplete (on the receiver), retransmission requests will be made
+    /// with exponential backoff starting at this initial retry timeout (RTO).
+    /// Requests will be sent until `frame_expiration_age` is reached.
+    /// NOTE that this value should be offset from `rto_base_sender`, so that the receiver's
+    /// retransmission requests are interleaved with sender's retransmissions.
+    #[default(Duration::from_millis(1000))]
+    pub rto_base_receiver: Duration,
+
+    /// If a frame is unacknowledged (on the sender), entire frame retransmissions will be made
+    /// with exponential backoff starting at this initial retry timeout (RTO).
+    /// Frames will be retransmitted until `frame_expiration_age` is reached.
+    /// NOTE that this value should be offset from `rto_base_receiver`, so that the receiver's
+    /// retransmission requests are interleaved with sender's retransmissions.
+    #[default(Duration::from_millis(1500))]
+    pub rto_base_sender: Duration,
 }
 
 /// Contains the cloneable state of the session bound to a [`SessionSocket`].
@@ -55,8 +73,8 @@ pub struct SessionState<T> {
     pub(crate) transport: T,
     lookbehind: Arc<SkipMap<SegmentId, Segment>>,
     to_acknowledge: Arc<ArrayQueue<FrameId>>,
-    incoming_frame_retries: Arc<DashMap<FrameId, RetryLog>>,
-    outgoing_frame_resends: Arc<DashMap<FrameId, RetryLog>>,
+    incoming_frame_retries: Arc<DashMap<FrameId, RetryToken>>,
+    outgoing_frame_resends: Arc<DashMap<FrameId, RetryToken>>,
     outgoing_frame_id: Arc<AtomicU32>,
     frame_reassembler: Arc<FrameReassembler>,
     cfg: SessionConfig,
@@ -69,11 +87,8 @@ impl<T: AsyncWrite + Unpin> SessionState<T> {
             Ok(_) => {
                 debug!("RECEIVED: segment {id:?}");
                 // Create a retry record for this frame
-                match self.incoming_frame_retries.entry(id.0) {
-                    Entry::Vacant(v) => {
-                        v.insert(RetryLog::new(Instant::now()));
-                    }
-                    _ => {}
+                if let Entry::Vacant(v) = self.incoming_frame_retries.entry(id.0) {
+                    v.insert(RetryToken::new(Instant::now()));
                 }
             }
             Err(e) => warn!("segment {id:?} not pushed: {e}"),
@@ -146,7 +161,9 @@ impl<T: AsyncWrite + Unpin> SessionState<T> {
             match self.incoming_frame_retries.entry(info.frame_id) {
                 Entry::Occupied(e) => {
                     // Check if we can retry this frame now
-                    let rto_check = e.get().check(now, self.cfg.rto_base, self.cfg.frame_expiration_age);
+                    let rto_check = e
+                        .get()
+                        .check(now, self.cfg.rto_base_receiver, self.cfg.frame_expiration_age);
                     match rto_check {
                         RetryResult::RetryNow(next_rto) => {
                             // Retry this frame and plan ahead the time of the next retry
@@ -171,7 +188,7 @@ impl<T: AsyncWrite + Unpin> SessionState<T> {
                 Entry::Vacant(v) => {
                     // Happens when no segment of this frame has been received yet
                     warn!("frame {} not in retry log", info.frame_id);
-                    v.insert(RetryLog::new(now));
+                    v.insert(RetryToken::new(now));
                     to_retry.push(info);
                 }
             }
@@ -234,6 +251,55 @@ impl<T: AsyncWrite + Unpin> SessionState<T> {
         Ok(len)
     }
 
+    pub async fn retransmit_unacknowledged_frames(
+        &mut self,
+        max_messages: Option<usize>,
+    ) -> crate::errors::Result<usize> {
+        if max_messages == Some(0) {
+            return Ok(0);
+        }
+
+        let now = Instant::now();
+        let max = max_messages.unwrap_or(usize::MAX);
+
+        let mut frames_to_resend = Vec::new();
+        self.outgoing_frame_resends.retain(|frame_id, retry_log| {
+            let check_res = retry_log.check(now, self.cfg.rto_base_sender, self.cfg.frame_expiration_age);
+            match check_res {
+                RetryResult::Wait(_) => true,
+                RetryResult::RetryNow(next_retry) => {
+                    // Single segment frame scenario
+                    if frames_to_resend.len() < max {
+                        frames_to_resend.push(*frame_id);
+                        *retry_log = next_retry;
+                    }
+                    true
+                }
+                RetryResult::Expired => false,
+            }
+        });
+
+        debug!("{} frames will be self-resent", frames_to_resend.len());
+
+        // Find all segments of the frames to resend in the lookbehind buffer
+        let mut count = 0;
+        for segment in frames_to_resend
+            .into_iter()
+            .flat_map(|f| self.lookbehind.iter().filter(move |e| e.key().0 == f))
+            .take(max)
+        {
+            let msg = SessionMessage::Segment(segment.value().clone());
+            debug!("SENDING: self-retransmitted segment: {:?}", segment.key());
+            self.transport.write_all(&msg.into_encoded()).await?;
+            count += 1;
+        }
+
+        self.transport.flush().await?;
+        debug!("SELF-RETRANSMIT BATCH COMPLETE: re-sent {count} segments");
+
+        Ok(count)
+    }
+
     /// Segments the `data` and sends them as (possibly multiple) [`SessionMessage::Segment`].
     /// Therefore, this method sends as many messages as needed after the data was segmented.
     /// Each segment is inserted into the lookbehind ring buffer for possible retransmissions.
@@ -261,7 +327,7 @@ impl<T: AsyncWrite + Unpin> SessionState<T> {
 
         self.transport.flush().await?;
         self.outgoing_frame_resends
-            .insert(frame_id, RetryLog::new(Instant::now()));
+            .insert(frame_id, RetryToken::new(Instant::now()));
 
         Ok(())
     }
@@ -688,7 +754,8 @@ mod tests {
     #[test(async_std::test)]
     async fn test_unreliable_send_recv() {
         let cfg = SessionConfig {
-            rto_base: Duration::from_millis(2),
+            rto_base_sender: Duration::from_millis(1),
+            rto_base_receiver: Duration::from_millis(1),
             acknowledged_frames_buffer: 1024,
             ..Default::default()
         };
@@ -716,7 +783,8 @@ mod tests {
     #[test(async_std::test)]
     async fn test_unreliable_mixed_send_recv() {
         let cfg = SessionConfig {
-            rto_base: Duration::from_millis(2),
+            rto_base_sender: Duration::from_millis(1),
+            rto_base_receiver: Duration::from_millis(1),
             acknowledged_frames_buffer: 1024,
             ..Default::default()
         };
@@ -745,7 +813,8 @@ mod tests {
     #[test(async_std::test)]
     async fn test_almost_reliable_mixed_send_recv() {
         let cfg = SessionConfig {
-            rto_base: Duration::from_millis(2),
+            rto_base_sender: Duration::from_millis(1),
+            rto_base_receiver: Duration::from_millis(1),
             acknowledged_frames_buffer: 1024,
             ..Default::default()
         };
@@ -774,7 +843,8 @@ mod tests {
     #[test(async_std::test)]
     async fn test_reliable_mixed_send_recv() {
         let cfg = SessionConfig {
-            rto_base: Duration::from_millis(2),
+            rto_base_sender: Duration::from_millis(1),
+            rto_base_receiver: Duration::from_millis(1),
             acknowledged_frames_buffer: 1024,
             ..Default::default()
         };
@@ -803,7 +873,8 @@ mod tests {
     #[test(async_std::test)]
     async fn test_disconnected_network_should_timeout() {
         let cfg = SessionConfig {
-            rto_base: Duration::from_millis(2),
+            rto_base_sender: Duration::from_millis(2),
+            rto_base_receiver: Duration::from_millis(2),
             frame_expiration_age: Duration::from_secs(10),
             acknowledged_frames_buffer: 1024,
             ..Default::default()

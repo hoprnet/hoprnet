@@ -1,7 +1,7 @@
 use std::time::{Duration, Instant};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct RetryLog {
+pub struct RetryToken {
     pub num_retry: usize,
     pub started_at: Instant,
 }
@@ -9,11 +9,11 @@ pub struct RetryLog {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RetryResult {
     Wait(Duration),
-    RetryNow(RetryLog),
+    RetryNow(RetryToken),
     Expired,
 }
 
-impl RetryLog {
+impl RetryToken {
     pub fn new(now: Instant) -> Self {
         Self {
             num_retry: 0,
@@ -22,8 +22,7 @@ impl RetryLog {
     }
 
     pub fn retry_at(&self, base: Duration, max_duration: Duration) -> Option<Instant> {
-        let base_ms = base.as_millis() as u64;
-        let duration = Duration::from_millis(base_ms.pow(self.num_retry as u32));
+        let duration = base * 2_u32.pow(self.num_retry as u32);
         (duration < max_duration).then_some(self.started_at + duration)
     }
 

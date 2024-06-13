@@ -496,7 +496,6 @@ impl FrameReassembler {
     /// The ordered frame IDs are the keys on the returned map.
     pub fn incomplete_frames(&self) -> BinaryHeap<FrameInfo> {
         (self.next_emitted_frame.load(Ordering::SeqCst)..=self.highest_buffered_frame.load(Ordering::SeqCst))
-            .into_iter()
             .filter_map(|frame_id| match self.sequences.get(&frame_id) {
                 Some(e) => (!e.is_complete()).then(|| e.info()),
                 None => Some({
