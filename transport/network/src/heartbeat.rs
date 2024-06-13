@@ -239,7 +239,7 @@ mod tests {
 
     #[async_trait]
     impl Pinging for DelayingPinger {
-        async fn ping(&mut self, _peers: Vec<PeerId>) {
+        async fn ping(&self, _peers: Vec<PeerId>) {
             sleep(self.delay).await;
         }
     }

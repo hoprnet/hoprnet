@@ -25,7 +25,7 @@ def pytest_addoption(parser: pytest.Parser):
     parser.addoption(
         "--stress-request-count",
         action="store",
-        default=500,
+        default=1000,
         help="Number of requests performed by each source node towards the stressed target",
     )
     parser.addoption(
@@ -153,6 +153,11 @@ def nodes_with_auth():
 def default_nodes():
     """A node that uses the default strategies"""
     return ["5"]
+
+
+def nodes_with_different_network():
+    """Nodes with different network"""
+    return ["6", "7"]
 
 
 def random_distinct_pairs_from(values: list, count: int):

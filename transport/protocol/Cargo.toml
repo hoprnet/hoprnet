@@ -1,6 +1,6 @@
 [package]
 name = "core-protocol"
-version = "0.2.3"
+version = "0.2.4"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 license = "GPL-3.0-only"
@@ -12,7 +12,7 @@ crate-type = ["rlib"]
 default = []
 runtime-async-std = ["async-std"]
 runtime-tokio = ["tokio"]
-prometheus = ["dep:hopr-metrics", "core-path/prometheus", "hopr-crypto-packet/prometheus"]
+prometheus = ["dep:hopr-metrics", "core-path/prometheus"]
 
 [dependencies]
 async-trait = { workspace = true }

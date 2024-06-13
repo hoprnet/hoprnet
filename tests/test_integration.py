@@ -294,10 +294,10 @@ async def test_hoprd_ping_should_work_between_nodes_in_the_same_network(src: str
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
-async def test_hoprd_ping_should_timeout_on_pinging_self(peer: str, swarm7: dict[str, Node]):
+async def test_hoprd_ping_to_self_should_fail(peer: str, swarm7: dict[str, Node]):
     response = await swarm7[peer].api.ping(swarm7[peer].peer_id)
 
-    assert response is None, f"Pinging self should produce timeout, not '{response}'"
+    assert response is None, f"Pinging self should fail"
 
 
 @pytest.mark.asyncio

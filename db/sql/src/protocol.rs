@@ -19,6 +19,8 @@ use crate::info::HoprDbInfoOperations;
 use crate::prelude::HoprDbTicketOperations;
 use crate::{HoprDbGeneralModelOperations, OptTx};
 
+use hopr_parallelize::cpu::spawn_fifo_blocking;
+
 #[async_trait]
 impl HoprDbProtocolOperations for HoprDb {
     #[instrument(level = "trace", skip(self))]
@@ -162,13 +164,17 @@ impl HoprDbProtocolOperations for HoprDb {
                             .await?
                     };
 
-                    ChainPacketComponents::into_outgoing(&data, &path, &me, next_ticket, &domain_separator).map_err(
-                        |e| {
-                            crate::errors::DbSqlError::LogicalError(format!(
-                                "failed to construct chain components for a packet: {e}"
-                            ))
-                        },
-                    )
+                    // TODO: benchmark this to confirm, offload a CPU intensive task off the async executor onto a parallelized thread pool
+                    spawn_fifo_blocking(move || {
+                        ChainPacketComponents::into_outgoing(&data, &path, &me, next_ticket, &domain_separator).map_err(
+                            |e| {
+                                crate::errors::DbSqlError::LogicalError(format!(
+                                    "failed to construct chain components for a packet: {e}"
+                                ))
+                            },
+                        )
+                    })
+                    .await
                 })
             })
             .await?;
@@ -211,9 +217,17 @@ impl HoprDbProtocolOperations for HoprDb {
         pkt_keypair: &OffchainKeypair,
         sender: OffchainPublicKey,
     ) -> Result<TransportPacketWithChainData> {
-        match ChainPacketComponents::from_incoming(&data, pkt_keypair, sender).map_err(|e| {
-            crate::errors::DbSqlError::LogicalError(format!("failed to construct an incoming packet: {e}"))
-        })? {
+        let offchain_keypair = pkt_keypair.clone();
+
+        // TODO: benchmark this to confirm, offload a CPU intensive task off the async executor onto a parallelized thread pool
+        let packet = spawn_fifo_blocking(move || {
+            ChainPacketComponents::from_incoming(&data, &offchain_keypair, sender).map_err(|e| {
+                crate::errors::DbSqlError::LogicalError(format!("failed to construct an incoming packet: {e}"))
+            })
+        })
+        .await?;
+
+        match packet {
             ChainPacketComponents::Final {
                 packet_tag,
                 ack_key,
@@ -289,14 +303,19 @@ impl HoprDbProtocolOperations for HoprDb {
                             // so afterward we are sure the source of the `channel`
                             // (which is equal to `previous_hop_addr`) has issued this
                             // ticket.
-                            let ticket = validate_unacknowledged_ticket(
-                                ticket,
-                                &channel,
-                                ticket_price,
-                                TICKET_WIN_PROB,
-                                remaining_balance,
-                                &domain_separator,
-                            )?;
+                            //
+                            // TODO: benchmark this to confirm, offload a CPU intensive task off the async executor onto a parallelized thread pool
+                            let ticket = spawn_fifo_blocking(move || {
+                                validate_unacknowledged_ticket(
+                                    ticket,
+                                    &channel,
+                                    ticket_price,
+                                    TICKET_WIN_PROB,
+                                    remaining_balance,
+                                    &domain_separator,
+                                )
+                            })
+                            .await?;
 
                             myself.increment_outgoing_ticket_index(channel.get_id()).await?;
 
@@ -320,15 +339,21 @@ impl HoprDbProtocolOperations for HoprDb {
                             }
 
                             // Create next ticket for the packet
-                            let ticket = if ticket_path_pos == 1 {
+                            let ticket_builder = if ticket_path_pos == 1 {
                                 TicketBuilder::zero_hop().direction(&myself.me_onchain, &next_hop_addr)
                             } else {
                                 myself
                                     .create_multihop_ticket(Some(tx), myself.me_onchain, next_hop_addr, ticket_path_pos)
                                     .await?
-                            }
-                            .challenge(next_challenge.to_ethereum_challenge())
-                            .build_signed(&me, &domain_separator)?;
+                            };
+
+                            // TODO: benchmark this to confirm, offload a CPU intensive task off the async executor onto a parallelized thread pool
+                            let ticket = spawn_fifo_blocking(move || {
+                                ticket_builder
+                                    .challenge(next_challenge.to_ethereum_challenge())
+                                    .build_signed(&me, &domain_separator)
+                            })
+                            .await?;
 
                             // forward packet
                             Ok(ticket)
@@ -432,7 +457,7 @@ impl HoprDb {
             )));
         }
 
-        let ticket = TicketBuilder::default()
+        let ticket_builder = TicketBuilder::default()
             .direction(&me_onchain, &destination)
             .balance(amount)
             .index(self.increment_outgoing_ticket_index(channel.get_id()).await?)
@@ -440,7 +465,7 @@ impl HoprDb {
             .win_prob(TICKET_WIN_PROB)
             .channel_epoch(channel.channel_epoch.as_u32());
 
-        Ok(ticket)
+        Ok(ticket_builder)
     }
 }
 
