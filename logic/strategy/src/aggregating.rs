@@ -65,9 +65,9 @@ pub struct AggregatingStrategyConfig {
     ///
     /// This condition is independent of `unrealized_balance_ratio`.
     ///
-    /// Default is 100.
+    /// Default is 1000.
     #[validate(range(min = 2))]
-    #[default(Some(100))]
+    #[default(Some(1000))]
     pub aggregation_threshold: Option<u32>,
 
     /// Percentage of unrealized balance in unaggregated tickets in a channel
