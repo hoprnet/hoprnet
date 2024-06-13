@@ -35,8 +35,8 @@ pub struct SessionConfig {
     /// Payload size available for the session sub-protocol.
     #[default = 466]
     pub mtu: usize,
-    /// If a frame is incomplete, retries will be made with exponential
-    /// backoff starting at this initial retry timeout (RTO).
+    /// If a frame is incomplete (on the receiver) or unacknowledged (on the sender),
+    /// retries will be made with exponential backoff starting at this initial retry timeout (RTO).
     /// Retries will be made until `frame_expiration_age` is reached.
     #[default(Duration::from_secs(1))]
     pub rto_base: Duration,
@@ -54,9 +54,9 @@ pub struct SessionConfig {
 pub struct SessionState<T> {
     pub(crate) transport: T,
     lookbehind: Arc<SkipMap<SegmentId, Segment>>,
-    acknowledged: Arc<ArrayQueue<FrameId>>,
+    to_acknowledge: Arc<ArrayQueue<FrameId>>,
     incoming_frame_retries: Arc<DashMap<FrameId, RetryLog>>,
-    outgoing_frame_ts: Arc<DashMap<FrameId, Instant>>,
+    outgoing_frame_resends: Arc<DashMap<FrameId, RetryLog>>,
     outgoing_frame_id: Arc<AtomicU32>,
     frame_reassembler: Arc<FrameReassembler>,
     cfg: SessionConfig,
@@ -68,15 +68,15 @@ impl<T: AsyncWrite + Unpin> SessionState<T> {
         match self.frame_reassembler.push_segment(segment) {
             Ok(_) => {
                 debug!("RECEIVED: segment {id:?}");
-                // Create a retry record for this segment
+                // Create a retry record for this frame
                 match self.incoming_frame_retries.entry(id.0) {
                     Entry::Vacant(v) => {
                         v.insert(RetryLog::new(Instant::now()));
-                    },
+                    }
                     _ => {}
                 }
             }
-            Err(e) => warn!("segment {id:?} not pushed: {e}")
+            Err(e) => warn!("segment {id:?} not pushed: {e}"),
         }
     }
 
@@ -84,6 +84,9 @@ impl<T: AsyncWrite + Unpin> SessionState<T> {
         debug!("RECEIVED: request for {} segments", request.len());
         let mut count = 0;
         for segment_id in request {
+            // No need to retry this frame ourselves, since the other side will request on its own
+            self.outgoing_frame_resends.remove(&segment_id.0);
+
             if let Some(segment) = self.lookbehind.get(&segment_id) {
                 let msg = SessionMessage::Segment(segment.value().clone());
                 debug!("SENDING: retransmitted segment: {:?}", SegmentId::from(segment.value()));
@@ -101,6 +104,8 @@ impl<T: AsyncWrite + Unpin> SessionState<T> {
     async fn acknowledged_frames(&mut self, acked: FrameAcknowledgements) {
         debug!("RECEIVED: acknowledgement of {} frames", acked.len());
         for frame_id in acked {
+            // Frame acknowledged, we won't need to resend it
+            self.outgoing_frame_resends.remove(&frame_id);
             for seg in self.lookbehind.iter().filter(|s| frame_id == s.key().0) {
                 seg.remove();
             }
@@ -145,7 +150,10 @@ impl<T: AsyncWrite + Unpin> SessionState<T> {
                     match rto_check {
                         RetryResult::RetryNow(next_rto) => {
                             // Retry this frame and plan ahead the time of the next retry
-                            debug!("going to perform frame {} retransmission req. #{}", info.frame_id, next_rto.retry_num());
+                            debug!(
+                                "going to perform frame {} retransmission req. #{}",
+                                info.frame_id, next_rto.num_retry
+                            );
                             e.replace_entry(next_rto);
                             to_retry.push(info);
                         }
@@ -153,7 +161,11 @@ impl<T: AsyncWrite + Unpin> SessionState<T> {
                             warn!("frame {} is already expired and will be evicted", info.frame_id);
                             e.remove();
                         }
-                        RetryResult::Wait(d) => debug!("frame {} needs to wait {}ms for next retransmission request", info.frame_id, d.as_millis())
+                        RetryResult::Wait(d) => debug!(
+                            "frame {} needs to wait {}ms for next retransmission request",
+                            info.frame_id,
+                            d.as_millis()
+                        ),
                     }
                 }
                 Entry::Vacant(v) => {
@@ -196,12 +208,12 @@ impl<T: AsyncWrite + Unpin> SessionState<T> {
     pub async fn acknowledge_segments(&mut self, max_messages: Option<usize>) -> crate::errors::Result<usize> {
         let mut len = 0;
         let mut msgs = 0;
-        while !self.acknowledged.is_empty() {
+        while !self.to_acknowledge.is_empty() {
             let mut ack_frames = FrameAcknowledgements::default();
 
             if max_messages.map(|max| msgs < max).unwrap_or(true) {
-                while !ack_frames.is_full() && !self.acknowledged.is_empty() {
-                    if let Some(ack_id) = self.acknowledged.pop() {
+                while !ack_frames.is_full() && !self.to_acknowledge.is_empty() {
+                    if let Some(ack_id) = self.to_acknowledge.pop() {
                         ack_frames.push(ack_id);
                         len += 1;
                     }
@@ -232,11 +244,7 @@ impl<T: AsyncWrite + Unpin> SessionState<T> {
     /// can still happen within some time window.
     pub async fn send_frame_data(&mut self, data: &[u8]) -> crate::errors::Result<()> {
         let frame_id = self.outgoing_frame_id.fetch_add(1, Ordering::SeqCst);
-        let segments = segment(
-            data,
-            self.cfg.mtu - SessionMessage::HEADER_SIZE,
-            frame_id,
-        );
+        let segments = segment(data, self.cfg.mtu - SessionMessage::HEADER_SIZE, frame_id);
 
         for segment in segments {
             self.lookbehind.insert((&segment).into(), segment.clone());
@@ -252,7 +260,8 @@ impl<T: AsyncWrite + Unpin> SessionState<T> {
         }
 
         self.transport.flush().await?;
-        self.outgoing_frame_ts.insert(frame_id, Instant::now());
+        self.outgoing_frame_resends
+            .insert(frame_id, RetryLog::new(Instant::now()));
 
         Ok(())
     }
@@ -263,9 +272,9 @@ impl<T: AsyncWrite + Unpin + Clone> Clone for SessionState<T> {
         Self {
             transport: self.transport.clone(),
             lookbehind: self.lookbehind.clone(),
-            acknowledged: self.acknowledged.clone(),
+            to_acknowledge: self.to_acknowledge.clone(),
             incoming_frame_retries: self.incoming_frame_retries.clone(),
-            outgoing_frame_ts: self.outgoing_frame_ts.clone(),
+            outgoing_frame_resends: self.outgoing_frame_resends.clone(),
             outgoing_frame_id: self.outgoing_frame_id.clone(),
             frame_reassembler: self.frame_reassembler.clone(),
             cfg: self.cfg,
@@ -313,13 +322,13 @@ impl<T: AsyncWrite + Send + Unpin> SessionSocket<T> {
 
         let state = SessionState {
             transport,
-            acknowledged,
+            to_acknowledge: acknowledged,
             cfg,
             incoming_frame_retries,
             lookbehind: Arc::new(SkipMap::new()),
             outgoing_frame_id: Arc::new(AtomicU32::new(1)),
             frame_reassembler: Arc::new(reassembler),
-            outgoing_frame_ts: Arc::new(DashMap::new()),
+            outgoing_frame_resends: Arc::new(DashMap::new()),
         };
 
         Self { state, egress }

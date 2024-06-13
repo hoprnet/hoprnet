@@ -2,8 +2,8 @@ use std::time::{Duration, Instant};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RetryLog {
-    num_retry: usize,
-    started_at: Instant
+    pub num_retry: usize,
+    pub started_at: Instant,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -17,12 +17,8 @@ impl RetryLog {
     pub fn new(now: Instant) -> Self {
         Self {
             num_retry: 0,
-            started_at: now
+            started_at: now,
         }
-    }
-
-    pub fn retry_num(&self) -> usize {
-        self.num_retry
     }
 
     pub fn retry_at(&self, base: Duration, max_duration: Duration) -> Option<Instant> {
@@ -37,8 +33,8 @@ impl RetryLog {
             Some(retry_at) if retry_at >= now => RetryResult::Wait(retry_at - now),
             _ => RetryResult::RetryNow(Self {
                 num_retry: self.num_retry + 1,
-                started_at: self.started_at
-            })
+                started_at: self.started_at,
+            }),
         }
     }
 }
