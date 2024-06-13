@@ -56,6 +56,7 @@ pub struct SessionState<T> {
     lookbehind: Arc<SkipMap<SegmentId, Segment>>,
     acknowledged: Arc<ArrayQueue<FrameId>>,
     incoming_frame_retries: Arc<DashMap<FrameId, RetryLog>>,
+    outgoing_frame_ts: Arc<DashMap<FrameId, Instant>>,
     outgoing_frame_id: Arc<AtomicU32>,
     frame_reassembler: Arc<FrameReassembler>,
     cfg: SessionConfig,
@@ -144,6 +145,7 @@ impl<T: AsyncWrite + Unpin> SessionState<T> {
                     match rto_check {
                         RetryResult::RetryNow(next_rto) => {
                             // Retry this frame and plan ahead the time of the next retry
+                            debug!("going to perform frame {} retransmission req. #{}", info.frame_id, next_rto.retry_num());
                             e.replace_entry(next_rto);
                             to_retry.push(info);
                         }
@@ -151,11 +153,12 @@ impl<T: AsyncWrite + Unpin> SessionState<T> {
                             warn!("frame {} is already expired and will be evicted", info.frame_id);
                             e.remove();
                         }
-                        _ => {}
+                        RetryResult::Wait(d) => debug!("frame {} needs to wait {}ms for next retransmission request", info.frame_id, d.as_millis())
                     }
                 }
                 Entry::Vacant(v) => {
-                    // Shouldn't happen, but retry the frame anyway
+                    // Happens when no segment of this frame has been received yet
+                    warn!("frame {} not in retry log", info.frame_id);
                     v.insert(RetryLog::new(now));
                     to_retry.push(info);
                 }
@@ -228,10 +231,11 @@ impl<T: AsyncWrite + Unpin> SessionState<T> {
     /// is the expected underlying transport bandwidth (segment/sec) to guarantee the retransmission
     /// can still happen within some time window.
     pub async fn send_frame_data(&mut self, data: &[u8]) -> crate::errors::Result<()> {
+        let frame_id = self.outgoing_frame_id.fetch_add(1, Ordering::SeqCst);
         let segments = segment(
             data,
             self.cfg.mtu - SessionMessage::HEADER_SIZE,
-            self.outgoing_frame_id.fetch_add(1, Ordering::SeqCst),
+            frame_id,
         );
 
         for segment in segments {
@@ -248,6 +252,7 @@ impl<T: AsyncWrite + Unpin> SessionState<T> {
         }
 
         self.transport.flush().await?;
+        self.outgoing_frame_ts.insert(frame_id, Instant::now());
 
         Ok(())
     }
@@ -260,6 +265,7 @@ impl<T: AsyncWrite + Unpin + Clone> Clone for SessionState<T> {
             lookbehind: self.lookbehind.clone(),
             acknowledged: self.acknowledged.clone(),
             incoming_frame_retries: self.incoming_frame_retries.clone(),
+            outgoing_frame_ts: self.outgoing_frame_ts.clone(),
             outgoing_frame_id: self.outgoing_frame_id.clone(),
             frame_reassembler: self.frame_reassembler.clone(),
             cfg: self.cfg,
@@ -313,6 +319,7 @@ impl<T: AsyncWrite + Send + Unpin> SessionSocket<T> {
             lookbehind: Arc::new(SkipMap::new()),
             outgoing_frame_id: Arc::new(AtomicU32::new(1)),
             frame_reassembler: Arc::new(reassembler),
+            outgoing_frame_ts: Arc::new(DashMap::new()),
         };
 
         Self { state, egress }
@@ -417,10 +424,21 @@ mod tests {
         //static ref RNG_SEED: [u8; 32] = hex_literal::hex!("b5da488125eccf36276b6d9c7f04fb0014feebdd050dc882536102bce7af5f4b");
     }
 
-    #[derive(Debug, Clone, Default)]
+    #[derive(Debug, Clone)]
     pub struct FaultyNetworkConfig {
         pub fault_mod: usize,
         pub mixing_factor: usize,
+        pub step_interval: Duration,
+    }
+
+    impl Default for FaultyNetworkConfig {
+        fn default() -> Self {
+            Self {
+                fault_mod: 0,
+                mixing_factor: 0,
+                step_interval: Duration::from_millis(50),
+            }
+        }
     }
 
     pub struct FaultyNetwork {
@@ -495,7 +513,7 @@ mod tests {
                 bob_alice_state.acknowledge_segments(None).await.unwrap();
                 bob_alice_state.request_missing_segments(None).await.unwrap();
 
-                async_std::task::sleep(Duration::from_millis(50)).await;
+                async_std::task::sleep(network_cfg.step_interval).await;
             }
         });
 
@@ -536,12 +554,12 @@ mod tests {
                 sender,
                 counterparty,
                 cfg,
-                msg_counter: 0,
+                msg_counter: 1,
             }
         }
 
         fn send_to_counterparty(&mut self, data: &[u8]) -> crate::errors::Result<()> {
-            if self.cfg.fault_mod > 0 && self.msg_counter > 0 && self.msg_counter % self.cfg.fault_mod as u128 == 0 {
+            if self.cfg.fault_mod > 0 && self.msg_counter % self.cfg.fault_mod as u128 == 0 {
                 warn!("msg discarded");
             } else {
                 self.sender.unbounded_send(data.into()).unwrap();
@@ -661,6 +679,7 @@ mod tests {
     #[test(async_std::test)]
     async fn test_unreliable_send_recv() {
         let cfg = SessionConfig {
+            rto_base: Duration::from_millis(2),
             acknowledged_frames_buffer: 1024,
             ..Default::default()
         };
@@ -688,6 +707,7 @@ mod tests {
     #[test(async_std::test)]
     async fn test_unreliable_mixed_send_recv() {
         let cfg = SessionConfig {
+            rto_base: Duration::from_millis(2),
             acknowledged_frames_buffer: 1024,
             ..Default::default()
         };
@@ -695,6 +715,7 @@ mod tests {
         let net_cfg = FaultyNetworkConfig {
             fault_mod: 3,
             mixing_factor: 4,
+            ..Default::default()
         };
 
         let (alice_to_bob, bob_to_alice) = setup_alice_bob(cfg, net_cfg);
@@ -715,6 +736,7 @@ mod tests {
     #[test(async_std::test)]
     async fn test_almost_reliable_mixed_send_recv() {
         let cfg = SessionConfig {
+            rto_base: Duration::from_millis(2),
             acknowledged_frames_buffer: 1024,
             ..Default::default()
         };
@@ -722,6 +744,7 @@ mod tests {
         let net_cfg = FaultyNetworkConfig {
             fault_mod: 10,
             mixing_factor: 4,
+            ..Default::default()
         };
 
         let (alice_to_bob, bob_to_alice) = setup_alice_bob(cfg, net_cfg);
@@ -742,6 +765,7 @@ mod tests {
     #[test(async_std::test)]
     async fn test_reliable_mixed_send_recv() {
         let cfg = SessionConfig {
+            rto_base: Duration::from_millis(2),
             acknowledged_frames_buffer: 1024,
             ..Default::default()
         };
@@ -749,6 +773,7 @@ mod tests {
         let net_cfg = FaultyNetworkConfig {
             fault_mod: 0,
             mixing_factor: 4,
+            ..Default::default()
         };
 
         let (alice_to_bob, bob_to_alice) = setup_alice_bob(cfg, net_cfg);
@@ -764,5 +789,37 @@ mod tests {
         .await;
 
         async_std::task::sleep(Duration::from_millis(100)).await;
+    }
+
+    #[test(async_std::test)]
+    async fn test_disconnected_network_should_timeout() {
+        let cfg = SessionConfig {
+            rto_base: Duration::from_millis(2),
+            frame_expiration_age: Duration::from_secs(10),
+            acknowledged_frames_buffer: 1024,
+            ..Default::default()
+        };
+
+        let net_cfg = FaultyNetworkConfig {
+            fault_mod: 1, // throws away 100% of packets
+            mixing_factor: 0,
+            step_interval: Duration::from_millis(200),
+        };
+
+        let (mut alice_to_bob, mut bob_to_alice) = setup_alice_bob(cfg, net_cfg);
+        let data = b"will not be delivered!";
+
+        alice_to_bob.write(data.as_ref()).await.unwrap();
+
+        let mut out = vec![0u8; data.len()];
+        let f1 = bob_to_alice.read_exact(&mut out);
+        let f2 = async_std::task::sleep(Duration::from_secs(3));
+        pin_mut!(f1);
+        pin_mut!(f2);
+
+        match futures::future::select(f1, f2).await {
+            Either::Left(_) => panic!("should timeout: {:?}", out),
+            Either::Right(_) => {}
+        }
     }
 }
