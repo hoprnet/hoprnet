@@ -70,9 +70,9 @@ pub struct AggregatingStrategyConfig {
     ///
     /// This condition is independent of `unrealized_balance_ratio`.
     ///
-    /// Default is 100.
+    /// Default is 1000.
     #[validate(range(min = 2))]
-    #[default(Some(100))]
+    #[default(Some(1000))]
     pub aggregation_threshold: Option<u32>,
 
     /// Percentage of unrealized balance in unaggregated tickets in a channel
@@ -641,7 +641,7 @@ mod tests {
         let (_, mut channel) = populate_db_with_ack_tickets(db_bob.clone(), 5).await;
 
         let cfg = super::AggregatingStrategyConfig {
-            aggregation_threshold: Some(100),
+            aggregation_threshold: Some(1000),
             unrealized_balance_ratio: None,
             aggregate_on_channel_close: true,
         };
@@ -702,7 +702,7 @@ mod tests {
         db_bob.upsert_channel(None, channel).await.unwrap();
 
         let cfg = super::AggregatingStrategyConfig {
-            aggregation_threshold: Some(100),
+            aggregation_threshold: Some(1000),
             unrealized_balance_ratio: Some(0.75),
             aggregate_on_channel_close: true,
         };
