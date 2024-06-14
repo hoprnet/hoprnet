@@ -41,10 +41,6 @@ pub struct SessionConfig {
     #[default(Duration::from_secs(30))]
     pub frame_expiration_age: Duration,
 
-    /// Payload size available for the session sub-protocol.
-    #[default = 466]
-    pub mtu: usize,
-
     /// If a frame is incomplete (on the receiver), retransmission requests will be made
     /// with exponential backoff starting at this initial retry timeout (RTO).
     /// Requests will be sent until `frame_expiration_age` is reached.
@@ -70,12 +66,12 @@ pub struct SessionConfig {
 ///
 /// It implements the entire [`SessionMessage`] state machine and
 /// performs the frame reassembly and sequencing.
-/// The underlying transport operations are bound to `T`
+/// The underlying transport operations are bound to `T`, the MTU is `C`.
 ///
 /// The `SessionState` cannot be created directly, it must always be created via [`SessionSocket`] and
 /// then retrieved via [`SessionSocket::state`].
 #[derive(Debug)]
-pub struct SessionState<T> {
+pub struct SessionState<const C: usize, T> {
     pub(crate) transport: T,
     lookbehind: Arc<SkipMap<SegmentId, Segment>>,
     to_acknowledge: Arc<ArrayQueue<FrameId>>,
@@ -86,7 +82,7 @@ pub struct SessionState<T> {
     cfg: SessionConfig,
 }
 
-impl<T: AsyncWrite + Debug + Unpin> SessionState<T> {
+impl<const C: usize, T: AsyncWrite + Debug + Unpin> SessionState<C, T> {
     async fn consume_segment(&mut self, segment: Segment) {
         let conn_id = &self.transport;
         let id = segment.id();
@@ -109,7 +105,7 @@ impl<T: AsyncWrite + Debug + Unpin> SessionState<T> {
         }
     }
 
-    async fn retransmit_segments(&mut self, request: SegmentRequest) -> crate::errors::Result<()> {
+    async fn retransmit_segments(&mut self, request: SegmentRequest<C>) -> crate::errors::Result<()> {
         debug!("{:?} RECEIVED: request for {} segments", self.transport, request.len());
 
         let mut count = 0;
@@ -118,7 +114,7 @@ impl<T: AsyncWrite + Debug + Unpin> SessionState<T> {
             self.outgoing_frame_resends.remove(&segment_id.0);
 
             if let Some(segment) = self.lookbehind.get(&segment_id) {
-                let msg = SessionMessage::Segment(segment.value().clone());
+                let msg = SessionMessage::<C>::Segment(segment.value().clone());
                 debug!(
                     "{:?} SENDING: retransmitted segment: {:?}",
                     self.transport,
@@ -138,9 +134,12 @@ impl<T: AsyncWrite + Debug + Unpin> SessionState<T> {
         Ok(())
     }
 
-    async fn acknowledged_frames(&mut self, acked: FrameAcknowledgements) {
-        let conn_id = &self.transport;
-        debug!("{conn_id:?} RECEIVED: acknowledgement of {} frames", acked.len());
+    async fn acknowledged_frames(&mut self, acked: FrameAcknowledgements<C>) {
+        debug!(
+            "{:?} RECEIVED: acknowledgement of {} frames",
+            self.transport,
+            acked.len()
+        );
 
         for frame_id in acked {
             // Frame acknowledged, we won't need to resend it
@@ -234,7 +233,7 @@ impl<T: AsyncWrite + Debug + Unpin> SessionState<T> {
 
         let mut sent = 0;
         for chunk in to_retry
-            .chunks(SegmentRequest::MAX_ENTRIES)
+            .chunks(SegmentRequest::<C>::MAX_ENTRIES)
             .take(max_requests.unwrap_or(usize::MAX))
             .map(|chunk| SegmentRequest::from_iter(chunk.iter().cloned()))
         {
@@ -243,7 +242,7 @@ impl<T: AsyncWrite + Debug + Unpin> SessionState<T> {
                 self.transport
             );
 
-            let req = SessionMessage::Request(chunk);
+            let req = SessionMessage::<C>::Request(chunk);
             self.transport.write_all(&req.into_encoded()).await?;
             sent += 1;
         }
@@ -271,7 +270,7 @@ impl<T: AsyncWrite + Debug + Unpin> SessionState<T> {
         let mut msgs = 0;
 
         while !self.to_acknowledge.is_empty() {
-            let mut ack_frames = FrameAcknowledgements::default();
+            let mut ack_frames = FrameAcknowledgements::<C>::default();
 
             if max_messages.map(|max| msgs < max).unwrap_or(true) {
                 while !ack_frames.is_full() && !self.to_acknowledge.is_empty() {
@@ -357,7 +356,7 @@ impl<T: AsyncWrite + Debug + Unpin> SessionState<T> {
             .flat_map(|f| self.lookbehind.iter().filter(move |e| e.key().0 == f))
             .take(max)
         {
-            let msg = SessionMessage::Segment(segment.value().clone());
+            let msg = SessionMessage::<C>::Segment(segment.value().clone());
             debug!(
                 "{:?}: SENDING: auto-retransmitted segment: {:?}",
                 self.transport,
@@ -386,12 +385,12 @@ impl<T: AsyncWrite + Debug + Unpin> SessionState<T> {
     /// can still happen within some time window.
     pub async fn send_frame_data(&mut self, data: &[u8]) -> crate::errors::Result<()> {
         let frame_id = self.outgoing_frame_id.fetch_add(1, Ordering::SeqCst);
-        let segments = segment(data, self.cfg.mtu - SessionMessage::HEADER_SIZE, frame_id);
+        let segments = segment(data, C - SessionMessage::<C>::HEADER_SIZE, frame_id);
 
         for segment in segments {
             self.lookbehind.insert((&segment).into(), segment.clone());
 
-            let msg = SessionMessage::Segment(segment.clone());
+            let msg = SessionMessage::<C>::Segment(segment.clone());
             debug!("{:?}: SENDING: segment {:?}", self.transport, segment.id());
             self.transport.write_all(&msg.into_encoded()).await?;
 
@@ -409,7 +408,7 @@ impl<T: AsyncWrite + Debug + Unpin> SessionState<T> {
     }
 }
 
-impl<T: AsyncWrite + Unpin + Clone> Clone for SessionState<T> {
+impl<const C: usize, T: AsyncWrite + Unpin + Clone> Clone for SessionState<C, T> {
     fn clone(&self) -> Self {
         Self {
             transport: self.transport.clone(),
@@ -425,20 +424,25 @@ impl<T: AsyncWrite + Unpin + Clone> Clone for SessionState<T> {
 }
 
 /// Represents a socket for a session between two nodes bound by the
-/// underlying [`NetworkTransport`].
+/// underlying [network transport `T`](AsyncWrite) and the maximum transmission unit (MTU) of `C`.
 ///
 /// It also implements [`AsyncRead`] and [`AsyncWrite`] so that it can
 /// be used on top of the usual transport stack.
 #[pin_project]
-pub struct SessionSocket<T> {
-    state: SessionState<T>,
+pub struct SessionSocket<const C: usize, T> {
+    state: SessionState<C, T>,
     #[pin]
     egress: Box<dyn AsyncRead + Send + Unpin>,
 }
 
-impl<T: AsyncWrite + Debug + Send + Unpin> SessionSocket<T> {
+impl<const C: usize, T: AsyncWrite + Debug + Send + Unpin> SessionSocket<C, T> {
     /// Create a new socket over the given `transport` that binds the communicating parties.
     pub fn new(transport: T, cfg: SessionConfig) -> Self {
+        assert!(
+            C >= SessionMessage::<C>::minimum_message_size(),
+            "given MTU is too small"
+        );
+
         let (reassembler, egress) = FrameReassembler::new(cfg.frame_expiration_age);
 
         let acknowledged = Arc::new(ArrayQueue::new(cfg.acknowledged_frames_buffer.max(1)));
@@ -479,17 +483,20 @@ impl<T: AsyncWrite + Debug + Send + Unpin> SessionSocket<T> {
     }
 
     /// Gets the [state](SessionState) of this socket.
-    pub fn state(&self) -> &SessionState<T> {
+    pub fn state(&self) -> &SessionState<C, T> {
         &self.state
     }
 
     /// Gets the mutable [state](SessionState) of this socket.
-    pub fn state_mut(&mut self) -> &mut SessionState<T> {
+    pub fn state_mut(&mut self) -> &mut SessionState<C, T> {
         &mut self.state
     }
 }
 
-impl<T: AsyncWrite + Debug + Unpin + Send + Sync> AsyncWrite for SessionSocket<T> {
+impl<const C: usize, T> AsyncWrite for SessionSocket<C, T>
+where
+    T: AsyncWrite + Debug + Unpin + Send + Sync,
+{
     fn poll_write(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
         let mut socket_future = self.state.send_frame_data(buf).boxed();
         match Pin::new(&mut socket_future).poll(cx) {
@@ -521,7 +528,7 @@ impl<T: AsyncWrite + Debug + Unpin + Send + Sync> AsyncWrite for SessionSocket<T
     }
 }
 
-impl<T: AsyncWrite + Unpin + Send + Sync> AsyncRead for SessionSocket<T> {
+impl<const C: usize, T: AsyncWrite + Unpin + Send + Sync> AsyncRead for SessionSocket<C, T> {
     fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<std::io::Result<usize>> {
         self.project().egress.poll_read(cx, buf)
     }
@@ -536,7 +543,10 @@ pub mod tokio_compat {
 
     use crate::session::state::SessionSocket;
 
-    impl<T: futures::AsyncWrite + Unpin + Send + Sync> AsyncWrite for SessionSocket<T> {
+    impl<const C: usize, T> AsyncWrite for SessionSocket<C, T>
+    where
+        T: futures::AsyncWrite + Unpin + Send + Sync,
+    {
         fn poll_write(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
             futures::io::AsyncWrite::poll_write(self, cx, buf)
         }
@@ -550,7 +560,10 @@ pub mod tokio_compat {
         }
     }
 
-    impl<T: futures::AsyncWrite + Unpin + Send + Sync> AsyncRead for SessionSocket<T> {
+    impl<const C: usize, T> AsyncRead for SessionSocket<C, T>
+    where
+        T: futures::AsyncWrite + Unpin + Send + Sync,
+    {
         fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<std::io::Result<usize>> {
             futures::io::AsyncRead::poll_read(self, cx, buf)
         }
@@ -571,6 +584,8 @@ mod tests {
     use std::sync::OnceLock;
     use test_log::test;
     use tracing::warn;
+
+    const MTU: usize = 466; // MTU used by HOPR
 
     #[derive(Debug, Clone)]
     pub struct FaultyNetworkConfig {
@@ -593,7 +608,7 @@ mod tests {
     pub struct FaultyNetwork {
         name: String,
         sender: UnboundedSender<Box<[u8]>>,
-        counterparty: Arc<OnceLock<SessionState<Self>>>,
+        counterparty: Arc<OnceLock<SessionState<MTU, Self>>>,
         cfg: FaultyNetworkConfig,
     }
 
@@ -621,7 +636,7 @@ mod tests {
     fn setup_alice_bob(
         cfg: SessionConfig,
         network_cfg: FaultyNetworkConfig,
-    ) -> (SessionSocket<FaultyNetwork>, SessionSocket<FaultyNetwork>) {
+    ) -> (SessionSocket<MTU, FaultyNetwork>, SessionSocket<MTU, FaultyNetwork>) {
         let alice_to_bob_transport = FaultyNetwork::new("alice", network_cfg.clone());
         let bob_to_alice_transport = FaultyNetwork::new("bob", network_cfg.clone());
 
@@ -669,7 +684,7 @@ mod tests {
     impl FaultyNetwork {
         pub fn new(name: &str, cfg: FaultyNetworkConfig) -> Self {
             let rng = rand::rngs::StdRng::from_rng(thread_rng()).unwrap();
-            let counterparty = Arc::new(OnceLock::<SessionState<FaultyNetwork>>::new());
+            let counterparty = Arc::new(OnceLock::<SessionState<MTU, FaultyNetwork>>::new());
 
             let (sender, recv) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
             let mut rng_clone = rng.clone();

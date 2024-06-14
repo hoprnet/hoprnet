@@ -87,7 +87,7 @@ pub fn segment(data: &[u8], mtu: usize, frame_id: u32) -> Vec<Segment> {
     assert!(frame_id > 0, "frame id cannot be 0");
 
     let chunks = data.chunks(mtu);
-    assert!(chunks.len() < SeqNum::MAX as usize, "data too long");
+    assert!(chunks.len() <= SeqNum::MAX as usize, "data too long");
 
     let seq_len = chunks.len() as SeqNum;
 
@@ -305,7 +305,7 @@ impl FrameBuilder {
     }
 }
 
-/// Contains information about a frame that being built by the [`FrameBuilder`].
+/// Contains information about a frame that being built.
 /// The instances are totally ordered as most recently used first.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FrameInfo {
@@ -698,7 +698,7 @@ pub(crate) mod tests {
             })
             .collect::<Vec<_>>();
 
-        let mut req = SegmentRequest::from_iter(frames.clone())
+        let mut req = SegmentRequest::<466>::from_iter(frames.clone())
             .into_iter()
             .collect::<Vec<_>>();
         req.sort();
