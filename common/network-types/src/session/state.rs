@@ -564,18 +564,13 @@ mod tests {
     use futures::future::Either;
     use futures::io::{AsyncReadExt, AsyncWriteExt};
     use futures::pin_mut;
-    use lazy_static::lazy_static;
+    use parameterized::parameterized;
     use rand::{thread_rng, Rng, SeedableRng};
     use std::fmt::{Debug, Formatter};
     use std::iter::Extend;
     use std::sync::OnceLock;
     use test_log::test;
-    use tracing::{info, warn};
-
-    lazy_static! {
-        static ref RNG_SEED: [u8; 32] = hopr_crypto_random::random_bytes();
-        //static ref RNG_SEED: [u8; 32] = hex_literal::hex!("b5da488125eccf36276b6d9c7f04fb0014feebdd050dc882536102bce7af5f4b");
-    }
+    use tracing::warn;
 
     #[derive(Debug, Clone)]
     pub struct FaultyNetworkConfig {
@@ -600,7 +595,6 @@ mod tests {
         sender: UnboundedSender<Box<[u8]>>,
         counterparty: Arc<OnceLock<SessionState<Self>>>,
         cfg: FaultyNetworkConfig,
-        msg_counter: u128,
     }
 
     impl Debug for FaultyNetwork {
@@ -674,9 +668,7 @@ mod tests {
 
     impl FaultyNetwork {
         pub fn new(name: &str, cfg: FaultyNetworkConfig) -> Self {
-            info!("network RNG seed: {}", hex::encode(RNG_SEED.as_slice()));
-
-            let rng = rand::rngs::StdRng::from_seed(RNG_SEED.clone());
+            let rng = rand::rngs::StdRng::from_rng(thread_rng()).unwrap();
             let counterparty = Arc::new(OnceLock::<SessionState<FaultyNetwork>>::new());
 
             let (sender, recv) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
@@ -706,7 +698,6 @@ mod tests {
                 name: name.to_string(),
                 sender,
                 counterparty,
-                msg_counter: 1,
                 cfg,
             }
         }
@@ -717,7 +708,6 @@ mod tests {
             } else {
                 self.sender.unbounded_send(data.into()).unwrap();
             }
-            self.msg_counter += 1;
             Ok(())
         }
     }
@@ -774,28 +764,16 @@ mod tests {
 
         match futures::future::select(send_recv, timeout).await {
             Either::Left((((alice_sent, alice_recv), (bob_sent, bob_recv)), _)) => {
-                assert_eq!(
-                    alice_sent,
-                    bob_recv,
-                    "alice sent must be equal to bob received {}",
-                    hex::encode(RNG_SEED.clone())
-                );
-                assert_eq!(
-                    bob_sent,
-                    alice_recv,
-                    "bob sent must be equal to alice received {}",
-                    hex::encode(RNG_SEED.clone())
-                );
+                assert_eq!(alice_sent, bob_recv, "alice sent must be equal to bob received");
+                assert_eq!(bob_sent, alice_recv, "bob sent must be equal to alice received",);
             }
-            Either::Right(_) => panic!("timeout {}", hex::encode(RNG_SEED.clone())),
+            Either::Right(_) => panic!("timeout"),
         }
     }
 
-    const NUM_FRAMES: usize = 1000;
-    const FRAME_SIZE: usize = 1500;
-
-    #[test(async_std::test)]
-    async fn test_reliable_send_recv_no_ack() {
+    #[parameterized(num_frames = {10, 100, 1000}, frame_size = {1500, 1500, 1500})]
+    #[parameterized_macro(async_std::test)]
+    async fn test_reliable_send_recv_no_ack(num_frames: usize, frame_size: usize) {
         let cfg = SessionConfig {
             acknowledged_frames_buffer: 0,
             ..Default::default()
@@ -804,8 +782,8 @@ mod tests {
         let (alice_to_bob, bob_to_alice) = setup_alice_bob(cfg, Default::default());
 
         send_and_recv(
-            NUM_FRAMES,
-            FRAME_SIZE,
+            num_frames,
+            frame_size,
             alice_to_bob,
             bob_to_alice,
             Duration::from_secs(10),
@@ -814,13 +792,14 @@ mod tests {
         .await;
     }
 
-    #[test(async_std::test)]
-    async fn test_reliable_send_recv() {
+    #[parameterized(num_frames = {10, 100, 1000}, frame_size = {1500, 1500, 1500})]
+    #[parameterized_macro(async_std::test)]
+    async fn test_reliable_send_recv(num_frames: usize, frame_size: usize) {
         let (alice_to_bob, bob_to_alice) = setup_alice_bob(Default::default(), Default::default());
 
         send_and_recv(
-            NUM_FRAMES,
-            FRAME_SIZE,
+            num_frames,
+            frame_size,
             alice_to_bob,
             bob_to_alice,
             Duration::from_secs(10),
@@ -829,8 +808,9 @@ mod tests {
         .await;
     }
 
-    #[test(async_std::test)]
-    async fn test_unreliable_send_recv() {
+    #[parameterized(num_frames = {10, 100, 1000}, frame_size = {1500, 1500, 1500})]
+    #[parameterized_macro(async_std::test)]
+    async fn test_unreliable_send_recv(num_frames: usize, frame_size: usize) {
         let cfg = SessionConfig {
             rto_base_sender: Duration::from_millis(500),
             rto_base_receiver: Duration::from_millis(10),
@@ -847,8 +827,8 @@ mod tests {
         let (alice_to_bob, bob_to_alice) = setup_alice_bob(cfg, net_cfg);
 
         send_and_recv(
-            NUM_FRAMES,
-            FRAME_SIZE,
+            num_frames,
+            frame_size,
             alice_to_bob,
             bob_to_alice,
             Duration::from_secs(30),
@@ -859,8 +839,9 @@ mod tests {
         async_std::task::sleep(Duration::from_millis(100)).await;
     }
 
-    #[test(async_std::test)]
-    async fn test_unreliable_mixed_send_recv() {
+    #[parameterized(num_frames = {10, 100, 1000}, frame_size = {1500, 1500, 1500})]
+    #[parameterized_macro(async_std::test)]
+    async fn test_unreliable_mixed_send_recv(num_frames: usize, frame_size: usize) {
         let cfg = SessionConfig {
             rto_base_sender: Duration::from_millis(500),
             rto_base_receiver: Duration::from_millis(10),
@@ -878,8 +859,8 @@ mod tests {
         let (alice_to_bob, bob_to_alice) = setup_alice_bob(cfg, net_cfg);
 
         send_and_recv(
-            NUM_FRAMES,
-            FRAME_SIZE,
+            num_frames,
+            frame_size,
             alice_to_bob,
             bob_to_alice,
             Duration::from_secs(30),
@@ -890,8 +871,9 @@ mod tests {
         async_std::task::sleep(Duration::from_millis(500)).await;
     }
 
-    #[test(async_std::test)]
-    async fn test_almost_reliable_mixed_send_recv() {
+    #[parameterized(num_frames = {10, 100, 1000}, frame_size = {1500, 1500, 1500})]
+    #[parameterized_macro(async_std::test)]
+    async fn test_almost_reliable_mixed_send_recv(num_frames: usize, frame_size: usize) {
         let cfg = SessionConfig {
             rto_base_sender: Duration::from_millis(500),
             rto_base_receiver: Duration::from_millis(10),
@@ -909,8 +891,8 @@ mod tests {
         let (alice_to_bob, bob_to_alice) = setup_alice_bob(cfg, net_cfg);
 
         send_and_recv(
-            NUM_FRAMES,
-            FRAME_SIZE,
+            num_frames,
+            frame_size,
             alice_to_bob,
             bob_to_alice,
             Duration::from_secs(30),
@@ -921,8 +903,9 @@ mod tests {
         async_std::task::sleep(Duration::from_millis(100)).await;
     }
 
-    #[test(async_std::test)]
-    async fn test_reliable_mixed_send_recv() {
+    #[parameterized(num_frames = {10, 100, 1000}, frame_size = {1500, 1500, 1500})]
+    #[parameterized_macro(async_std::test)]
+    async fn test_reliable_mixed_send_recv(num_frames: usize, frame_size: usize) {
         let cfg = SessionConfig {
             rto_base_sender: Duration::from_millis(500),
             rto_base_receiver: Duration::from_millis(10),
@@ -939,8 +922,8 @@ mod tests {
         let (alice_to_bob, bob_to_alice) = setup_alice_bob(cfg, net_cfg);
 
         send_and_recv(
-            NUM_FRAMES,
-            FRAME_SIZE,
+            num_frames,
+            frame_size,
             alice_to_bob,
             bob_to_alice,
             Duration::from_secs(30),
