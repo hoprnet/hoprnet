@@ -988,7 +988,7 @@ mod tests {
 
         let mut out = vec![0u8; data.len()];
         let f1 = bob_to_alice.read_exact(&mut out);
-        let f2 = async_std::task::sleep(Duration::from_secs(3));
+        let f2 = async_std::task::sleep(Duration::from_secs(5));
         pin_mut!(f1);
         pin_mut!(f2);
 

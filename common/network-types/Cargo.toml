@@ -15,10 +15,10 @@ runtime-tokio = ["dep:tokio"]
 [dependencies]
 async-std = { workspace = true, optional = true}
 async-trait = { workspace = true }
+bitvec = "1"
 crossbeam-queue = "0.3.11"
 crossbeam-skiplist = "0.1.3"
 dashmap = "5.5.3"
-fixedbitset = { version = "0.5.7", features = ["serde"] }
 futures = { workspace = true }
 futures-timer = { workspace = true }
 hex = { workspace = true }

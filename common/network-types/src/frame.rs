@@ -39,9 +39,10 @@
 //! the caller should make sure that frames with ID <= `n` will not arrive into the reassembler,
 //! otherwise the [NetworkTypeError::OldSegment] error will be thrown.
 
+use bitvec::array::BitArray;
+use bitvec::{bitarr, BitArr};
 use dashmap::mapref::entry::Entry;
 use dashmap::DashMap;
-use fixedbitset::FixedBitSet;
 use futures::{Sink, Stream};
 use serde::{Deserialize, Serialize};
 use std::collections::BinaryHeap;
@@ -270,14 +271,16 @@ impl FrameBuilder {
 
     /// Returns information about the frame that is being built by this builder.
     pub fn info(&self) -> FrameInfo {
+        let mut missing_segments = bitarr![0; 256];
+        self.segments
+            .iter()
+            .enumerate()
+            .filter_map(|(i, s)| s.get().is_none().then_some(i))
+            .for_each(|i| missing_segments.set(i, true));
+
         FrameInfo {
             frame_id: self.frame_id,
-            missing_segments: self
-                .segments
-                .iter()
-                .enumerate()
-                .filter_map(|(i, s)| s.get().is_none().then_some(i))
-                .collect(),
+            missing_segments,
             total_segments: self.segments.len() as SeqNum,
             last_update: SystemTime::UNIX_EPOCH.add(Duration::from_millis(self.last_ts.load(Ordering::SeqCst))),
         }
@@ -309,11 +312,31 @@ pub struct FrameInfo {
     /// ID of the frame.
     pub frame_id: FrameId,
     /// Indices of segments that are missing. Empty if the frame is complete.
-    pub missing_segments: FixedBitSet,
+    pub missing_segments: BitArr!(for 256),
     /// The total number of segments this frame consists from.
     pub total_segments: SeqNum,
     /// Time of the last received segment in this frame.
     pub last_update: SystemTime,
+}
+
+impl FrameInfo {
+    /// Transform self into iterator of missing segment numbers.
+    pub fn iter_missing_sequence_indices(&self) -> impl Iterator<Item = SeqNum> + '_ {
+        self.missing_segments
+            .iter()
+            .by_vals()
+            .enumerate()
+            .filter(|(i, s)| *s && *i <= SeqNum::MAX as usize)
+            .map(|(s, _)| s as SeqNum)
+    }
+
+    pub fn into_missing_segments(self) -> impl Iterator<Item = SegmentId> {
+        self.missing_segments
+            .into_iter()
+            .enumerate()
+            .filter(|(i, s)| *s && *i <= SeqNum::MAX as usize)
+            .map(move |(i, _)| SegmentId(self.frame_id, i as SeqNum))
+    }
 }
 
 impl PartialOrd for FrameInfo {
@@ -499,8 +522,8 @@ impl FrameReassembler {
             .filter_map(|frame_id| match self.sequences.get(&frame_id) {
                 Some(e) => (!e.is_complete()).then(|| e.info()),
                 None => Some({
-                    let mut missing_segments = FixedBitSet::with_capacity(1);
-                    missing_segments.insert(0);
+                    let mut missing_segments = BitArray::ZERO;
+                    missing_segments.set(0, true);
                     FrameInfo {
                         frame_id,
                         missing_segments,
@@ -591,10 +614,10 @@ impl Sink<Segment> for FrameReassembler {
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use crate::frame::{Frame, FrameId, FrameInfo, FrameReassembler, Segment, SegmentId, SeqNum};
+    use crate::frame::{Frame, FrameId, FrameInfo, FrameReassembler, Segment, SegmentId};
     use crate::session::protocol::SegmentRequest;
     use async_stream::stream;
-    use fixedbitset::FixedBitSet;
+    use bitvec::array::BitArray;
     use futures::{pin_mut, Stream, StreamExt};
     use hex_literal::hex;
     use lazy_static::lazy_static;
@@ -661,8 +684,11 @@ pub(crate) mod tests {
     fn test_frame_info() {
         let frames = (1..20)
             .map(|i| {
-                let mut missing_segments = FixedBitSet::with_capacity(10);
-                missing_segments.extend((0..7).choose_multiple(&mut thread_rng(), 4));
+                let mut missing_segments = BitArray::ZERO;
+                (0..7_usize)
+                    .choose_multiple(&mut thread_rng(), 4)
+                    .into_iter()
+                    .for_each(|i| missing_segments.set(i, true));
                 FrameInfo {
                     frame_id: i,
                     missing_segments,
@@ -682,10 +708,7 @@ pub(crate) mod tests {
             req,
             frames
                 .into_iter()
-                .flat_map(|f| f
-                    .missing_segments
-                    .into_ones()
-                    .map(move |idx| SegmentId(f.frame_id, idx as SeqNum)))
+                .flat_map(|f| f.into_missing_segments())
                 .collect::<Vec<_>>()
         );
     }
@@ -1061,11 +1084,7 @@ pub(crate) mod tests {
         let computed_missing = fragmented
             .incomplete_frames()
             .into_par_iter()
-            .flat_map_iter(|e| {
-                e.missing_segments
-                    .into_ones()
-                    .map(move |s| SegmentId(e.frame_id, s.try_into().unwrap()))
-            })
+            .flat_map_iter(|e| e.into_missing_segments())
             .collect::<HashSet<_>>();
 
         assert!(computed_missing.par_iter().all(|s| excluded.contains(&s)));

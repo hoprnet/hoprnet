@@ -19,6 +19,8 @@ pub struct SegmentRequest(HashMap<FrameId, SeqNum>);
 impl SegmentRequest {
     pub const ENTRY_SIZE: usize = mem::size_of::<FrameId>() + mem::size_of::<SeqNum>();
 
+    pub const MAX_MISSING_SEGMENTS_PER_FRAME: usize = mem::size_of::<SeqNum>() * 8;
+
     pub const MAX_ENTRIES: usize = SESSION_MSG_SIZE / Self::ENTRY_SIZE;
 
     pub fn len(&self) -> usize {
@@ -62,16 +64,15 @@ impl IntoIterator for SegmentRequest {
 
 impl FromIterator<FrameInfo> for SegmentRequest {
     fn from_iter<T: IntoIterator<Item = FrameInfo>>(iter: T) -> Self {
-        let seq_size = mem::size_of::<SeqNum>() * 8;
         let mut ret = Self::default();
         for frame in iter {
+            let frame_id = frame.frame_id;
             let missing = frame
-                .missing_segments
-                .into_ones()
-                .filter(|idx| *idx < seq_size)
-                .map(|idx| (1 << idx) as SeqNum)
+                .iter_missing_sequence_indices()
+                .filter(|s| *s < Self::MAX_MISSING_SEGMENTS_PER_FRAME as SeqNum)
+                .map(|idx| 1 << idx)
                 .fold(SeqNum::default(), |acc, n| acc | n);
-            ret.0.insert(frame.frame_id, missing);
+            ret.0.insert(frame_id, missing);
         }
         ret
     }
@@ -279,9 +280,9 @@ impl From<SessionMessage> for Vec<u8> {
 
 #[cfg(test)]
 mod tests {
-    use crate::frame::{Frame, FrameInfo, SegmentId, SeqNum};
+    use crate::frame::{Frame, FrameInfo, SegmentId};
     use crate::session::protocol::{SegmentRequest, SessionMessage};
-    use fixedbitset::FixedBitSet;
+    use bitvec::bitarr;
     use hex_literal::hex;
     use hopr_platform::time::native::current_time;
     use rand::{thread_rng, Rng};
@@ -304,13 +305,10 @@ mod tests {
 
     #[test]
     fn test_session_message_segment_req() {
-        let mut missing_segments = FixedBitSet::with_capacity(10);
-        missing_segments.set_range(.., true);
-
         let frame_info = FrameInfo {
             frame_id: 10,
-            total_segments: missing_segments.len() as SeqNum,
-            missing_segments,
+            total_segments: 255,
+            missing_segments: bitarr![1; 256],
             last_update: SystemTime::now(),
         };
 
@@ -353,12 +351,12 @@ mod tests {
 
         let mut frame_info = FrameInfo {
             frame_id: 10,
-            missing_segments: FixedBitSet::with_capacity(1024),
+            missing_segments: bitarr![0; 256],
             total_segments: 10,
             last_update: current_time(),
         };
-        frame_info.missing_segments.insert(2);
-        frame_info.missing_segments.insert(5);
+        frame_info.missing_segments.set(2, true);
+        frame_info.missing_segments.set(5, true);
 
         let mut iter = SegmentRequest::from_iter(vec![frame_info]).into_iter();
         assert_eq!(iter.next(), Some(SegmentId(10, 2)));
