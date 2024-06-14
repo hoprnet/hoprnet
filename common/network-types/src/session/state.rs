@@ -82,7 +82,7 @@ pub struct SessionConfig {
 #[pin_project]
 #[derive(Debug)]
 pub struct SessionState<const C: usize> {
-    transport_id: String,
+    session_id: String,
     lookbehind: Arc<SkipMap<SegmentId, Segment>>,
     to_acknowledge: Arc<ArrayQueue<FrameId>>,
     incoming_frame_retries: Arc<DashMap<FrameId, RetryToken>>,
@@ -100,7 +100,7 @@ impl<const C: usize> SessionState<C> {
 
         match self.frame_reassembler.push_segment(segment) {
             Ok(_) => {
-                debug!("{:?}: RECEIVED: segment {id:?}", self.transport_id);
+                debug!("{:?}: RECEIVED: segment {id:?}", self.session_id);
                 match self.incoming_frame_retries.entry(id.0) {
                     Entry::Occupied(e) => {
                         // Restart the retry token for this frame
@@ -112,16 +112,12 @@ impl<const C: usize> SessionState<C> {
                     }
                 }
             }
-            Err(e) => warn!("{:?}: segment {id:?} not pushed: {e}", self.transport_id),
+            Err(e) => warn!("{:?}: segment {id:?} not pushed: {e}", self.session_id),
         }
     }
 
     async fn retransmit_segments(&mut self, request: SegmentRequest<C>) -> crate::errors::Result<()> {
-        debug!(
-            "{:?} RECEIVED: request for {} segments",
-            self.transport_id,
-            request.len()
-        );
+        debug!("{:?} RECEIVED: request for {} segments", self.session_id, request.len());
 
         let mut count = 0;
         for segment_id in request {
@@ -132,7 +128,7 @@ impl<const C: usize> SessionState<C> {
                 let msg = SessionMessage::<C>::Segment(segment.value().clone());
                 debug!(
                     "{:?} SENDING: retransmitted segment: {:?}",
-                    self.transport_id,
+                    self.session_id,
                     segment.value().id()
                 );
                 self.segment_egress
@@ -143,7 +139,7 @@ impl<const C: usize> SessionState<C> {
             } else {
                 warn!(
                     "{:?}: segment {segment_id:?} not in lookbehind buffer anymore",
-                    self.transport_id
+                    self.session_id
                 );
             }
         }
@@ -151,14 +147,14 @@ impl<const C: usize> SessionState<C> {
             .flush()
             .await
             .map_err(|e| SessionError::ProcessingError(e.to_string()))?;
-        debug!("{:?}: retransmitted {count} requested segments", self.transport_id);
+        debug!("{:?}: retransmitted {count} requested segments", self.session_id);
         Ok(())
     }
 
     fn acknowledged_frames(&mut self, acked: FrameAcknowledgements<C>) {
         debug!(
             "{:?} RECEIVED: acknowledgement of {} frames",
-            self.transport_id,
+            self.session_id,
             acked.len()
         );
 
@@ -191,7 +187,7 @@ impl<const C: usize> SessionState<C> {
     /// Returns the number of sent request messages.
     pub async fn request_missing_segments(&mut self, max_requests: Option<usize>) -> crate::errors::Result<usize> {
         let num_evicted = self.frame_reassembler.evict()?;
-        debug!("{:?}: evicted {} frames", self.transport_id, num_evicted);
+        debug!("{:?}: evicted {} frames", self.session_id, num_evicted);
 
         if max_requests == Some(0) {
             return Ok(0); // don't even bother
@@ -200,7 +196,7 @@ impl<const C: usize> SessionState<C> {
         let tracked_incomplete = self.frame_reassembler.incomplete_frames();
         debug!(
             "{:?}: tracking {} incomplete frames",
-            self.transport_id,
+            self.session_id,
             tracked_incomplete.len()
         );
 
@@ -219,7 +215,7 @@ impl<const C: usize> SessionState<C> {
                             // Retry this frame and plan ahead the time of the next retry
                             debug!(
                                 "{:?}: going to perform frame {} retransmission req. #{}",
-                                self.transport_id, info.frame_id, next_rto.num_retry
+                                self.session_id, info.frame_id, next_rto.num_retry
                             );
                             e.replace_entry(next_rto);
                             to_retry.push(info);
@@ -228,13 +224,13 @@ impl<const C: usize> SessionState<C> {
                             // Frame is expired, so no more retries
                             debug!(
                                 "{:?}: frame {} is already expired and will be evicted",
-                                self.transport_id, info.frame_id
+                                self.session_id, info.frame_id
                             );
                             e.remove();
                         }
                         RetryResult::Wait(d) => debug!(
                             "{:?}: frame {} needs to wait {d:?} for next retransmission request (#{})",
-                            self.transport_id,
+                            self.session_id,
                             info.frame_id,
                             e.get().num_retry
                         ),
@@ -244,7 +240,7 @@ impl<const C: usize> SessionState<C> {
                     // Happens when no segment of this frame has been received yet
                     debug!(
                         "{:?}: frame {} does not have a retry token",
-                        self.transport_id, info.frame_id
+                        self.session_id, info.frame_id
                     );
                     v.insert(RetryToken::new(now, self.cfg.backoff_base));
                     to_retry.push(info);
@@ -260,7 +256,7 @@ impl<const C: usize> SessionState<C> {
         {
             debug!(
                 "{:?}: SENDING: retransmission request for segments {chunk:?}",
-                self.transport_id
+                self.session_id
             );
 
             let req = SessionMessage::<C>::Request(chunk);
@@ -277,7 +273,7 @@ impl<const C: usize> SessionState<C> {
 
         debug!(
             "{:?}: RETRANSMISSION BATCH COMPLETE: sent {sent} re-send requests",
-            self.transport_id
+            self.session_id
         );
         Ok(sent)
     }
@@ -307,7 +303,7 @@ impl<const C: usize> SessionState<C> {
                     }
                 }
 
-                debug!("{:?}: SENDING: acks of {} frames", self.transport_id, ack_frames.len());
+                debug!("{:?}: SENDING: acks of {} frames", self.session_id, ack_frames.len());
                 self.segment_egress
                     .feed(SessionMessage::Acknowledge(ack_frames))
                     .await
@@ -324,7 +320,7 @@ impl<const C: usize> SessionState<C> {
 
         debug!(
             "{:?}: ACK BATCH COMPLETE: sent {len} acks in {msgs} messages",
-            self.transport_id
+            self.session_id
         );
         Ok(len)
     }
@@ -351,7 +347,7 @@ impl<const C: usize> SessionState<C> {
             let check_res = retry_log.check(now, self.cfg.rto_base_sender, self.cfg.frame_expiration_age);
             match check_res {
                 RetryResult::Wait(d) => {
-                    debug!("{:?}: frame {frame_id} will retransmit in {d:?}", self.transport_id);
+                    debug!("{:?}: frame {frame_id} will retransmit in {d:?}", self.session_id);
                     true
                 }
                 RetryResult::RetryNow(next_retry) => {
@@ -361,14 +357,14 @@ impl<const C: usize> SessionState<C> {
                         *retry_log = next_retry;
                         debug!(
                             "{:?}: frame {frame_id} will self-resend now, next retry in {:?}",
-                            self.transport_id,
+                            self.session_id,
                             next_retry.retry_in(self.cfg.rto_base_sender, self.cfg.frame_expiration_age)
                         )
                     }
                     true
                 }
                 RetryResult::Expired => {
-                    debug!("{:?}: frame {frame_id} expired", self.transport_id);
+                    debug!("{:?}: frame {frame_id} expired", self.session_id);
                     false
                 }
             }
@@ -376,7 +372,7 @@ impl<const C: usize> SessionState<C> {
 
         debug!(
             "{:?}: {} frames will auto-resend",
-            self.transport_id,
+            self.session_id,
             frames_to_resend.len()
         );
 
@@ -390,7 +386,7 @@ impl<const C: usize> SessionState<C> {
             let msg = SessionMessage::<C>::Segment(segment.value().clone());
             debug!(
                 "{:?}: SENDING: auto-retransmitted segment: {:?}",
-                self.transport_id,
+                self.session_id,
                 segment.key()
             );
             self.segment_egress
@@ -406,7 +402,7 @@ impl<const C: usize> SessionState<C> {
 
         debug!(
             "{:?}: AUTO-RETRANSMIT BATCH COMPLETE: re-sent {count} segments",
-            self.transport_id
+            self.session_id
         );
 
         Ok(count)
@@ -428,7 +424,7 @@ impl<const C: usize> SessionState<C> {
             self.lookbehind.insert((&segment).into(), segment.clone());
 
             let msg = SessionMessage::<C>::Segment(segment.clone());
-            debug!("{:?}: SENDING: segment {:?}", self.transport_id, segment.id());
+            debug!("{:?}: SENDING: segment {:?}", self.session_id, segment.id());
             self.segment_egress
                 .feed(msg)
                 .await
@@ -449,12 +445,17 @@ impl<const C: usize> SessionState<C> {
 
         Ok(())
     }
+
+    /// Returns the ID of this session.
+    pub fn session_id(&self) -> &str {
+        &self.session_id
+    }
 }
 
 impl<const C: usize> Clone for SessionState<C> {
     fn clone(&self) -> Self {
         Self {
-            transport_id: self.transport_id.clone(),
+            session_id: self.session_id.clone(),
             segment_egress: self.segment_egress.clone(),
             lookbehind: self.lookbehind.clone(),
             to_acknowledge: self.to_acknowledge.clone(),
@@ -513,7 +514,7 @@ pub struct SessionSocket<const C: usize> {
 
 impl<const C: usize> SessionSocket<C> {
     /// Create a new socket over the given `transport` that binds the communicating parties.
-    pub fn new<T, I>(transport_id: I, transport: T, cfg: SessionConfig) -> Self
+    pub fn new<T, I>(id: I, transport: T, cfg: SessionConfig) -> Self
     where
         T: AsyncWrite + Send + 'static,
         I: Display,
@@ -530,12 +531,12 @@ impl<const C: usize> SessionSocket<C> {
         let incoming_frame_retries = Arc::new(DashMap::new());
 
         let incoming_frame_retries_clone = incoming_frame_retries.clone();
-        let transport_id_clone = transport_id.to_string().clone();
+        let id_clone = id.to_string().clone();
 
         let frame_egress = Box::new(
             egress
                 .inspect(move |frame| {
-                    debug!("{transport_id_clone:?}: emit frame {}", frame.frame_id);
+                    debug!("{id_clone:?}: emit frame {}", frame.frame_id);
                     // The frame has been completed, so remove its retry record
                     incoming_frame_retries_clone.remove(&frame.frame_id);
                     if let Some(ack_buffer) = &is_acknowledging {
@@ -555,7 +556,7 @@ impl<const C: usize> SessionSocket<C> {
             outgoing_frame_id: Arc::new(AtomicU32::new(1)),
             frame_reassembler: Arc::new(reassembler),
             outgoing_frame_resends: Arc::new(DashMap::new()),
-            transport_id: transport_id.to_string(),
+            session_id: id.to_string(),
             to_acknowledge,
             incoming_frame_retries,
             segment_egress,
