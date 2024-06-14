@@ -850,8 +850,6 @@ mod tests {
             false,
         )
         .await;
-
-        async_std::task::sleep(Duration::from_millis(100)).await;
     }
 
     #[parameterized(num_frames = {10, 100, 1000}, frame_size = {1500, 1500, 1500})]
@@ -882,8 +880,6 @@ mod tests {
             false,
         )
         .await;
-
-        async_std::task::sleep(Duration::from_millis(500)).await;
     }
 
     #[parameterized(num_frames = {10, 100, 1000}, frame_size = {1500, 1500, 1500})]
@@ -914,8 +910,6 @@ mod tests {
             false,
         )
         .await;
-
-        async_std::task::sleep(Duration::from_millis(100)).await;
     }
 
     #[parameterized(num_frames = {10, 100, 1000}, frame_size = {1500, 1500, 1500})]
@@ -945,8 +939,6 @@ mod tests {
             false,
         )
         .await;
-
-        async_std::task::sleep(Duration::from_millis(100)).await;
     }
 
     #[test(async_std::test)]
@@ -1011,7 +1003,5 @@ mod tests {
             Either::Left(_) => {}
             Either::Right(_) => panic!("timeout"),
         }
-
-        async_std::task::sleep(Duration::from_millis(800)).await;
     }
 }
