@@ -2,11 +2,12 @@ use crossbeam_queue::ArrayQueue;
 use crossbeam_skiplist::SkipMap;
 use dashmap::mapref::entry::Entry;
 use dashmap::DashMap;
-use futures::{AsyncRead, AsyncWrite, AsyncWriteExt, FutureExt, StreamExt, TryStreamExt};
+use futures::channel::mpsc::UnboundedSender;
+use futures::{AsyncRead, AsyncWrite, AsyncWriteExt, FutureExt, Sink, SinkExt, StreamExt, TryStreamExt};
 use pin_project::pin_project;
 use smart_default::SmartDefault;
 use std::collections::BTreeSet;
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -15,10 +16,18 @@ use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
 use tracing::{debug, warn};
 
+use crate::errors::NetworkTypeError;
 use crate::frame::{segment, FrameId, FrameReassembler, SegmentId};
 use crate::prelude::Segment;
+use crate::session::errors::SessionError;
 use crate::session::protocol::{FrameAcknowledgements, SegmentRequest, SessionMessage};
 use crate::session::utils::{RetryResult, RetryToken};
+
+#[cfg(feature = "runtime-async-std")]
+use async_std::task::spawn;
+
+#[cfg(feature = "runtime-tokio")]
+use tokio::task::spawn;
 
 /// Configuration of session.
 #[derive(Debug, Clone, Copy, PartialEq, SmartDefault)]
@@ -70,9 +79,10 @@ pub struct SessionConfig {
 ///
 /// The `SessionState` cannot be created directly, it must always be created via [`SessionSocket`] and
 /// then retrieved via [`SessionSocket::state`].
+#[pin_project]
 #[derive(Debug)]
-pub struct SessionState<const C: usize, T> {
-    pub(crate) transport: T,
+pub struct SessionState<const C: usize> {
+    transport_id: String,
     lookbehind: Arc<SkipMap<SegmentId, Segment>>,
     to_acknowledge: Arc<ArrayQueue<FrameId>>,
     incoming_frame_retries: Arc<DashMap<FrameId, RetryToken>>,
@@ -80,16 +90,17 @@ pub struct SessionState<const C: usize, T> {
     outgoing_frame_id: Arc<AtomicU32>,
     frame_reassembler: Arc<FrameReassembler>,
     cfg: SessionConfig,
+    #[pin]
+    segment_egress: UnboundedSender<SessionMessage<C>>,
 }
 
-impl<const C: usize, T: AsyncWrite + Debug + Unpin> SessionState<C, T> {
-    async fn consume_segment(&mut self, segment: Segment) {
-        let conn_id = &self.transport;
+impl<const C: usize> SessionState<C> {
+    fn consume_segment(&mut self, segment: Segment) {
         let id = segment.id();
 
         match self.frame_reassembler.push_segment(segment) {
             Ok(_) => {
-                debug!("{conn_id:?}: RECEIVED: segment {id:?}");
+                debug!("{:?}: RECEIVED: segment {id:?}", self.transport_id);
                 match self.incoming_frame_retries.entry(id.0) {
                     Entry::Occupied(e) => {
                         // Restart the retry token for this frame
@@ -101,12 +112,16 @@ impl<const C: usize, T: AsyncWrite + Debug + Unpin> SessionState<C, T> {
                     }
                 }
             }
-            Err(e) => warn!("{conn_id:?}: segment {id:?} not pushed: {e}"),
+            Err(e) => warn!("{:?}: segment {id:?} not pushed: {e}", self.transport_id),
         }
     }
 
     async fn retransmit_segments(&mut self, request: SegmentRequest<C>) -> crate::errors::Result<()> {
-        debug!("{:?} RECEIVED: request for {} segments", self.transport, request.len());
+        debug!(
+            "{:?} RECEIVED: request for {} segments",
+            self.transport_id,
+            request.len()
+        );
 
         let mut count = 0;
         for segment_id in request {
@@ -117,27 +132,33 @@ impl<const C: usize, T: AsyncWrite + Debug + Unpin> SessionState<C, T> {
                 let msg = SessionMessage::<C>::Segment(segment.value().clone());
                 debug!(
                     "{:?} SENDING: retransmitted segment: {:?}",
-                    self.transport,
+                    self.transport_id,
                     segment.value().id()
                 );
-                self.transport.write_all(&msg.into_encoded()).await?;
+                self.segment_egress
+                    .feed(msg)
+                    .await
+                    .map_err(|e| SessionError::ProcessingError(e.to_string()))?;
                 count += 1;
             } else {
                 warn!(
                     "{:?}: segment {segment_id:?} not in lookbehind buffer anymore",
-                    self.transport
+                    self.transport_id
                 );
             }
         }
-        self.transport.flush().await?;
-        debug!("{:?}: retransmitted {count} requested segments", self.transport);
+        self.segment_egress
+            .flush()
+            .await
+            .map_err(|e| SessionError::ProcessingError(e.to_string()))?;
+        debug!("{:?}: retransmitted {count} requested segments", self.transport_id);
         Ok(())
     }
 
-    async fn acknowledged_frames(&mut self, acked: FrameAcknowledgements<C>) {
+    fn acknowledged_frames(&mut self, acked: FrameAcknowledgements<C>) {
         debug!(
             "{:?} RECEIVED: acknowledgement of {} frames",
-            self.transport,
+            self.transport_id,
             acked.len()
         );
 
@@ -154,9 +175,9 @@ impl<const C: usize, T: AsyncWrite + Debug + Unpin> SessionState<C, T> {
     /// The `data` argument must contain a valid [`SessionMessage`], otherwise the method throws an error.
     pub async fn received_message(&mut self, data: &[u8]) -> crate::errors::Result<()> {
         match SessionMessage::try_from(data)? {
-            SessionMessage::Segment(s) => self.consume_segment(s).await,
+            SessionMessage::Segment(s) => self.consume_segment(s),
             SessionMessage::Request(r) => self.retransmit_segments(r).await?,
-            SessionMessage::Acknowledge(f) => self.acknowledged_frames(f).await,
+            SessionMessage::Acknowledge(f) => self.acknowledged_frames(f),
         }
         Ok(())
     }
@@ -170,7 +191,7 @@ impl<const C: usize, T: AsyncWrite + Debug + Unpin> SessionState<C, T> {
     /// Returns the number of sent request messages.
     pub async fn request_missing_segments(&mut self, max_requests: Option<usize>) -> crate::errors::Result<usize> {
         let num_evicted = self.frame_reassembler.evict()?;
-        debug!("{:?}: evicted {} frames", self.transport, num_evicted);
+        debug!("{:?}: evicted {} frames", self.transport_id, num_evicted);
 
         if max_requests == Some(0) {
             return Ok(0); // don't even bother
@@ -179,7 +200,7 @@ impl<const C: usize, T: AsyncWrite + Debug + Unpin> SessionState<C, T> {
         let tracked_incomplete = self.frame_reassembler.incomplete_frames();
         debug!(
             "{:?}: tracking {} incomplete frames",
-            self.transport,
+            self.transport_id,
             tracked_incomplete.len()
         );
 
@@ -198,7 +219,7 @@ impl<const C: usize, T: AsyncWrite + Debug + Unpin> SessionState<C, T> {
                             // Retry this frame and plan ahead the time of the next retry
                             debug!(
                                 "{:?}: going to perform frame {} retransmission req. #{}",
-                                self.transport, info.frame_id, next_rto.num_retry
+                                self.transport_id, info.frame_id, next_rto.num_retry
                             );
                             e.replace_entry(next_rto);
                             to_retry.push(info);
@@ -207,13 +228,13 @@ impl<const C: usize, T: AsyncWrite + Debug + Unpin> SessionState<C, T> {
                             // Frame is expired, so no more retries
                             debug!(
                                 "{:?}: frame {} is already expired and will be evicted",
-                                self.transport, info.frame_id
+                                self.transport_id, info.frame_id
                             );
                             e.remove();
                         }
                         RetryResult::Wait(d) => debug!(
                             "{:?}: frame {} needs to wait {d:?} for next retransmission request (#{})",
-                            self.transport,
+                            self.transport_id,
                             info.frame_id,
                             e.get().num_retry
                         ),
@@ -223,7 +244,7 @@ impl<const C: usize, T: AsyncWrite + Debug + Unpin> SessionState<C, T> {
                     // Happens when no segment of this frame has been received yet
                     debug!(
                         "{:?}: frame {} does not have a retry token",
-                        self.transport, info.frame_id
+                        self.transport_id, info.frame_id
                     );
                     v.insert(RetryToken::new(now, self.cfg.backoff_base));
                     to_retry.push(info);
@@ -239,18 +260,24 @@ impl<const C: usize, T: AsyncWrite + Debug + Unpin> SessionState<C, T> {
         {
             debug!(
                 "{:?}: SENDING: retransmission request for segments {chunk:?}",
-                self.transport
+                self.transport_id
             );
 
             let req = SessionMessage::<C>::Request(chunk);
-            self.transport.write_all(&req.into_encoded()).await?;
+            self.segment_egress
+                .feed(req)
+                .await
+                .map_err(|e| SessionError::ProcessingError(e.to_string()))?;
             sent += 1;
         }
-        self.transport.flush().await?;
+        self.segment_egress
+            .flush()
+            .await
+            .map_err(|e| SessionError::ProcessingError(e.to_string()))?;
 
         debug!(
             "{:?}: RETRANSMISSION BATCH COMPLETE: sent {sent} re-send requests",
-            self.transport
+            self.transport_id
         );
         Ok(sent)
     }
@@ -280,20 +307,24 @@ impl<const C: usize, T: AsyncWrite + Debug + Unpin> SessionState<C, T> {
                     }
                 }
 
-                debug!("{:?}: SENDING: acks of {} frames", self.transport, ack_frames.len());
-                self.transport
-                    .write_all(&SessionMessage::Acknowledge(ack_frames).into_encoded())
-                    .await?;
+                debug!("{:?}: SENDING: acks of {} frames", self.transport_id, ack_frames.len());
+                self.segment_egress
+                    .feed(SessionMessage::Acknowledge(ack_frames))
+                    .await
+                    .map_err(|e| SessionError::ProcessingError(e.to_string()))?;
                 msgs += 1;
             } else {
                 break; // break out if we sent max allowed
             }
         }
-        self.transport.flush().await?;
+        self.segment_egress
+            .flush()
+            .await
+            .map_err(|e| SessionError::ProcessingError(e.to_string()))?;
 
         debug!(
             "{:?}: ACK BATCH COMPLETE: sent {len} acks in {msgs} messages",
-            self.transport
+            self.transport_id
         );
         Ok(len)
     }
@@ -320,7 +351,7 @@ impl<const C: usize, T: AsyncWrite + Debug + Unpin> SessionState<C, T> {
             let check_res = retry_log.check(now, self.cfg.rto_base_sender, self.cfg.frame_expiration_age);
             match check_res {
                 RetryResult::Wait(d) => {
-                    debug!("{:?}: frame {frame_id} will retransmit in {d:?}", self.transport);
+                    debug!("{:?}: frame {frame_id} will retransmit in {d:?}", self.transport_id);
                     true
                 }
                 RetryResult::RetryNow(next_retry) => {
@@ -330,14 +361,14 @@ impl<const C: usize, T: AsyncWrite + Debug + Unpin> SessionState<C, T> {
                         *retry_log = next_retry;
                         debug!(
                             "{:?}: frame {frame_id} will self-resend now, next retry in {:?}",
-                            self.transport,
+                            self.transport_id,
                             next_retry.retry_in(self.cfg.rto_base_sender, self.cfg.frame_expiration_age)
                         )
                     }
                     true
                 }
                 RetryResult::Expired => {
-                    debug!("{:?}: frame {frame_id} expired", self.transport);
+                    debug!("{:?}: frame {frame_id} expired", self.transport_id);
                     false
                 }
             }
@@ -345,7 +376,7 @@ impl<const C: usize, T: AsyncWrite + Debug + Unpin> SessionState<C, T> {
 
         debug!(
             "{:?}: {} frames will auto-resend",
-            self.transport,
+            self.transport_id,
             frames_to_resend.len()
         );
 
@@ -359,17 +390,23 @@ impl<const C: usize, T: AsyncWrite + Debug + Unpin> SessionState<C, T> {
             let msg = SessionMessage::<C>::Segment(segment.value().clone());
             debug!(
                 "{:?}: SENDING: auto-retransmitted segment: {:?}",
-                self.transport,
+                self.transport_id,
                 segment.key()
             );
-            self.transport.write_all(&msg.into_encoded()).await?;
+            self.segment_egress
+                .feed(msg)
+                .await
+                .map_err(|e| SessionError::ProcessingError(e.to_string()))?;
             count += 1;
         }
+        self.segment_egress
+            .flush()
+            .await
+            .map_err(|e| SessionError::ProcessingError(e.to_string()))?;
 
-        self.transport.flush().await?;
         debug!(
             "{:?}: AUTO-RETRANSMIT BATCH COMPLETE: re-sent {count} segments",
-            self.transport
+            self.transport_id
         );
 
         Ok(count)
@@ -391,8 +428,11 @@ impl<const C: usize, T: AsyncWrite + Debug + Unpin> SessionState<C, T> {
             self.lookbehind.insert((&segment).into(), segment.clone());
 
             let msg = SessionMessage::<C>::Segment(segment.clone());
-            debug!("{:?}: SENDING: segment {:?}", self.transport, segment.id());
-            self.transport.write_all(&msg.into_encoded()).await?;
+            debug!("{:?}: SENDING: segment {:?}", self.transport_id, segment.id());
+            self.segment_egress
+                .feed(msg)
+                .await
+                .map_err(|e| SessionError::ProcessingError(e.to_string()))?;
 
             // TODO: prevent stalling here
             while self.lookbehind.len() > self.cfg.max_buffered_segments {
@@ -400,7 +440,10 @@ impl<const C: usize, T: AsyncWrite + Debug + Unpin> SessionState<C, T> {
             }
         }
 
-        self.transport.flush().await?;
+        self.segment_egress
+            .flush()
+            .await
+            .map_err(|e| SessionError::ProcessingError(e.to_string()))?;
         self.outgoing_frame_resends
             .insert(frame_id, RetryToken::new(Instant::now(), self.cfg.backoff_base));
 
@@ -408,10 +451,11 @@ impl<const C: usize, T: AsyncWrite + Debug + Unpin> SessionState<C, T> {
     }
 }
 
-impl<const C: usize, T: AsyncWrite + Unpin + Clone> Clone for SessionState<C, T> {
+impl<const C: usize> Clone for SessionState<C> {
     fn clone(&self) -> Self {
         Self {
-            transport: self.transport.clone(),
+            transport_id: self.transport_id.clone(),
+            segment_egress: self.segment_egress.clone(),
             lookbehind: self.lookbehind.clone(),
             to_acknowledge: self.to_acknowledge.clone(),
             incoming_frame_retries: self.incoming_frame_retries.clone(),
@@ -423,21 +467,57 @@ impl<const C: usize, T: AsyncWrite + Unpin + Clone> Clone for SessionState<C, T>
     }
 }
 
+impl<const C: usize, T: AsRef<[u8]>> Sink<T> for SessionState<C> {
+    type Error = NetworkTypeError;
+
+    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.project()
+            .segment_egress
+            .poll_ready(cx)
+            .map_err(|e| SessionError::ProcessingError(e.to_string()).into())
+    }
+
+    fn start_send(self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
+        self.project()
+            .segment_egress
+            .start_send(item.as_ref().try_into()?)
+            .map_err(|e| SessionError::ProcessingError(e.to_string()).into())
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.project()
+            .segment_egress
+            .poll_flush(cx)
+            .map_err(|e| SessionError::ProcessingError(e.to_string()).into())
+    }
+
+    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.project()
+            .segment_egress
+            .poll_close(cx)
+            .map_err(|e| SessionError::ProcessingError(e.to_string()).into())
+    }
+}
+
 /// Represents a socket for a session between two nodes bound by the
 /// underlying [network transport `T`](AsyncWrite) and the maximum transmission unit (MTU) of `C`.
 ///
 /// It also implements [`AsyncRead`] and [`AsyncWrite`] so that it can
 /// be used on top of the usual transport stack.
 #[pin_project]
-pub struct SessionSocket<const C: usize, T> {
-    state: SessionState<C, T>,
+pub struct SessionSocket<const C: usize> {
+    state: SessionState<C>,
     #[pin]
-    egress: Box<dyn AsyncRead + Send + Unpin>,
+    frame_egress: Box<dyn AsyncRead + Send + Unpin>,
 }
 
-impl<const C: usize, T: AsyncWrite + Debug + Send + Unpin> SessionSocket<C, T> {
+impl<const C: usize> SessionSocket<C> {
     /// Create a new socket over the given `transport` that binds the communicating parties.
-    pub fn new(transport: T, cfg: SessionConfig) -> Self {
+    pub fn new<T, I>(transport_id: I, transport: T, cfg: SessionConfig) -> Self
+    where
+        T: AsyncWrite + Send + 'static,
+        I: Display,
+    {
         assert!(
             C >= SessionMessage::<C>::minimum_message_size(),
             "given MTU is too small"
@@ -445,17 +525,17 @@ impl<const C: usize, T: AsyncWrite + Debug + Send + Unpin> SessionSocket<C, T> {
 
         let (reassembler, egress) = FrameReassembler::new(cfg.frame_expiration_age);
 
-        let acknowledged = Arc::new(ArrayQueue::new(cfg.acknowledged_frames_buffer.max(1)));
-        let is_acknowledging = (cfg.acknowledged_frames_buffer > 0).then_some(acknowledged.clone());
+        let to_acknowledge = Arc::new(ArrayQueue::new(cfg.acknowledged_frames_buffer.max(1)));
+        let is_acknowledging = (cfg.acknowledged_frames_buffer > 0).then_some(to_acknowledge.clone());
         let incoming_frame_retries = Arc::new(DashMap::new());
 
         let incoming_frame_retries_clone = incoming_frame_retries.clone();
-        let conn_id = format!("{transport:?}");
+        let transport_id_clone = transport_id.to_string().clone();
 
-        let egress = Box::new(
+        let frame_egress = Box::new(
             egress
                 .inspect(move |frame| {
-                    debug!("{conn_id:?}: emit frame {}", frame.frame_id);
+                    debug!("{transport_id_clone:?}: emit frame {}", frame.frame_id);
                     // The frame has been completed, so remove its retry record
                     incoming_frame_retries_clone.remove(&frame.frame_id);
                     if let Some(ack_buffer) = &is_acknowledging {
@@ -468,35 +548,41 @@ impl<const C: usize, T: AsyncWrite + Debug + Send + Unpin> SessionSocket<C, T> {
                 .into_async_read(),
         );
 
+        let (segment_egress, segment_ingress) = futures::channel::mpsc::unbounded();
+
         let state = SessionState {
-            transport,
-            to_acknowledge: acknowledged,
-            cfg,
-            incoming_frame_retries,
             lookbehind: Arc::new(SkipMap::new()),
             outgoing_frame_id: Arc::new(AtomicU32::new(1)),
             frame_reassembler: Arc::new(reassembler),
             outgoing_frame_resends: Arc::new(DashMap::new()),
+            transport_id: transport_id.to_string(),
+            to_acknowledge,
+            incoming_frame_retries,
+            segment_egress,
+            cfg,
         };
 
-        Self { state, egress }
+        spawn(
+            segment_ingress
+                .map(|m| Ok(m.into_encoded()))
+                .forward(transport.into_sink()),
+        );
+
+        Self { state, frame_egress }
     }
 
     /// Gets the [state](SessionState) of this socket.
-    pub fn state(&self) -> &SessionState<C, T> {
+    pub fn state(&self) -> &SessionState<C> {
         &self.state
     }
 
     /// Gets the mutable [state](SessionState) of this socket.
-    pub fn state_mut(&mut self) -> &mut SessionState<C, T> {
+    pub fn state_mut(&mut self) -> &mut SessionState<C> {
         &mut self.state
     }
 }
 
-impl<const C: usize, T> AsyncWrite for SessionSocket<C, T>
-where
-    T: AsyncWrite + Debug + Unpin + Send + Sync,
-{
+impl<const C: usize> AsyncWrite for SessionSocket<C> {
     fn poll_write(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
         let mut socket_future = self.state.send_frame_data(buf).boxed();
         match Pin::new(&mut socket_future).poll(cx) {
@@ -508,7 +594,7 @@ where
 
     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
         // Only flush the underlying transport
-        let mut flush_future = self.state.transport.flush().boxed();
+        let mut flush_future = self.state.segment_egress.flush();
         match Pin::new(&mut flush_future).poll(cx) {
             Poll::Ready(Ok(())) => Poll::Ready(Ok(())),
             Poll::Ready(Err(e)) => Poll::Ready(Err(std::io::Error::new(std::io::ErrorKind::Other, e))),
@@ -519,7 +605,7 @@ where
     fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
         // Close the reassembler and the underlying transport
         self.state.frame_reassembler.close();
-        let mut close_future = self.state.transport.close().boxed();
+        let mut close_future = self.state.segment_egress.close().boxed();
         match Pin::new(&mut close_future).poll(cx) {
             Poll::Ready(Ok(())) => Poll::Ready(Ok(())),
             Poll::Ready(Err(e)) => Poll::Ready(Err(std::io::Error::new(std::io::ErrorKind::Other, e))),
@@ -528,9 +614,9 @@ where
     }
 }
 
-impl<const C: usize, T: AsyncWrite + Unpin + Send + Sync> AsyncRead for SessionSocket<C, T> {
+impl<const C: usize> AsyncRead for SessionSocket<C> {
     fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<std::io::Result<usize>> {
-        self.project().egress.poll_read(cx, buf)
+        self.project().frame_egress.poll_read(cx, buf)
     }
 }
 
@@ -539,33 +625,31 @@ impl<const C: usize, T: AsyncWrite + Unpin + Send + Sync> AsyncRead for SessionS
 pub mod tokio_compat {
     use std::pin::Pin;
     use std::task::{Context, Poll};
-    use tokio::io::{AsyncRead, AsyncWrite};
 
     use crate::session::state::SessionSocket;
 
-    impl<const C: usize, T> AsyncWrite for SessionSocket<C, T>
-    where
-        T: futures::AsyncWrite + Unpin + Send + Sync,
-    {
-        fn poll_write(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
+    impl<const C: usize> tokio::io::AsyncWrite for SessionSocket<C> {
+        fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
             futures::io::AsyncWrite::poll_write(self, cx, buf)
         }
 
-        fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+        fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
             futures::io::AsyncWrite::poll_flush(self, cx)
         }
 
-        fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+        fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
             futures::io::AsyncWrite::poll_close(self, cx)
         }
     }
 
-    impl<const C: usize, T> AsyncRead for SessionSocket<C, T>
-    where
-        T: futures::AsyncWrite + Unpin + Send + Sync,
-    {
-        fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<std::io::Result<usize>> {
-            futures::io::AsyncRead::poll_read(self, cx, buf)
+    impl<const C: usize> tokio::io::AsyncRead for SessionSocket<C> {
+        fn poll_read(
+            self: Pin<&mut Self>,
+            cx: &mut Context<'_>,
+            buf: &mut tokio::io::ReadBuf<'_>,
+        ) -> Poll<std::io::Result<()>> {
+            // TODO: check correctness
+            futures::io::AsyncRead::poll_read(self, cx, buf.filled_mut()).map(|_| Ok(()))
         }
     }
 }
@@ -579,7 +663,7 @@ mod tests {
     use futures::pin_mut;
     use parameterized::parameterized;
     use rand::{thread_rng, Rng, SeedableRng};
-    use std::fmt::{Debug, Formatter};
+    use std::fmt::Debug;
     use std::iter::Extend;
     use std::sync::OnceLock;
     use test_log::test;
@@ -606,16 +690,9 @@ mod tests {
 
     #[derive(Clone)]
     pub struct FaultyNetwork {
-        name: String,
         sender: UnboundedSender<Box<[u8]>>,
-        counterparty: Arc<OnceLock<SessionState<MTU, Self>>>,
+        counterparty: Arc<OnceLock<SessionState<MTU>>>,
         cfg: FaultyNetworkConfig,
-    }
-
-    impl Debug for FaultyNetwork {
-        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-            write!(f, "{}", self.name)
-        }
     }
 
     impl AsyncWrite for FaultyNetwork {
@@ -636,25 +713,18 @@ mod tests {
     fn setup_alice_bob(
         cfg: SessionConfig,
         network_cfg: FaultyNetworkConfig,
-    ) -> (SessionSocket<MTU, FaultyNetwork>, SessionSocket<MTU, FaultyNetwork>) {
-        let alice_to_bob_transport = FaultyNetwork::new("alice", network_cfg.clone());
-        let bob_to_alice_transport = FaultyNetwork::new("bob", network_cfg.clone());
+    ) -> (SessionSocket<MTU>, SessionSocket<MTU>) {
+        let alice_to_bob_transport = FaultyNetwork::new(network_cfg.clone());
+        let bob_to_alice_transport = FaultyNetwork::new(network_cfg.clone());
 
-        let mut alice_to_bob = SessionSocket::new(alice_to_bob_transport, cfg.clone());
-        let mut bob_to_alice = SessionSocket::new(bob_to_alice_transport, cfg.clone());
+        let alice_to_bob_ctp = alice_to_bob_transport.counterparty.clone();
+        let bob_to_alice_ctp = bob_to_alice_transport.counterparty.clone();
 
-        alice_to_bob
-            .state_mut()
-            .transport
-            .counterparty
-            .set(bob_to_alice.state().clone())
-            .unwrap();
-        bob_to_alice
-            .state_mut()
-            .transport
-            .counterparty
-            .set(alice_to_bob.state().clone())
-            .unwrap();
+        let alice_to_bob = SessionSocket::new("alice", alice_to_bob_transport, cfg.clone());
+        let bob_to_alice = SessionSocket::new("bob", bob_to_alice_transport, cfg.clone());
+
+        alice_to_bob_ctp.set(bob_to_alice.state().clone()).unwrap();
+        bob_to_alice_ctp.set(alice_to_bob.state().clone()).unwrap();
 
         let mut alice_bob_state = alice_to_bob.state().clone();
         let mut bob_alice_state = bob_to_alice.state().clone();
@@ -682,9 +752,9 @@ mod tests {
     }
 
     impl FaultyNetwork {
-        pub fn new(name: &str, cfg: FaultyNetworkConfig) -> Self {
+        pub fn new(cfg: FaultyNetworkConfig) -> Self {
             let rng = rand::rngs::StdRng::from_rng(thread_rng()).unwrap();
-            let counterparty = Arc::new(OnceLock::<SessionState<MTU, FaultyNetwork>>::new());
+            let counterparty = Arc::new(OnceLock::<SessionState<MTU>>::new());
 
             let (sender, recv) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
             let mut rng_clone = rng.clone();
@@ -710,7 +780,6 @@ mod tests {
             });
 
             Self {
-                name: name.to_string(),
                 sender,
                 counterparty,
                 cfg,
