@@ -35,7 +35,7 @@ hopr-platform = { workspace = true }
 hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
-async-std = { workspace = true }
+async-std = { workspace = true , features = ["attributes", "unstable"]}
 async-stream = { workspace = true }
 ctor = "0.2.8"
 divan = { workspace = true }
@@ -44,7 +44,6 @@ lazy_static = { workspace = true }
 mockall = { workspace = true }
 rand = "0.8.5"
 rand_distr = "0.4.3"
-rand_chacha = "0.3"
 rayon = { workspace = true }
 test-log = { version = "0.2.16", features = ["trace"] }
 

@@ -5,13 +5,15 @@ use dashmap::DashMap;
 use futures::{AsyncRead, AsyncWrite, AsyncWriteExt, FutureExt, StreamExt, TryStreamExt};
 use pin_project::pin_project;
 use smart_default::SmartDefault;
+use std::collections::BTreeSet;
+use std::fmt::Debug;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
-use tracing::{debug, error, warn};
+use tracing::{debug, warn};
 
 use crate::frame::{segment, FrameId, FrameReassembler, SegmentId};
 use crate::prelude::Segment;
@@ -19,7 +21,7 @@ use crate::session::protocol::{FrameAcknowledgements, SegmentRequest, SessionMes
 use crate::session::utils::{RetryResult, RetryToken};
 
 /// Configuration of session.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, SmartDefault)]
+#[derive(Debug, Clone, Copy, PartialEq, SmartDefault)]
 pub struct SessionConfig {
     /// Maximum number of buffered segments.
     /// This value should be large enough to accommodate segments for an at least
@@ -58,6 +60,10 @@ pub struct SessionConfig {
     /// retransmission requests are interleaved with sender's retransmissions.
     #[default(Duration::from_millis(1500))]
     pub rto_base_sender: Duration,
+
+    /// Base for the exponential backoff on retries.
+    #[default(2.0)]
+    pub backoff_base: f64,
 }
 
 /// Contains the cloneable state of the session bound to a [`SessionSocket`].
@@ -80,23 +86,32 @@ pub struct SessionState<T> {
     cfg: SessionConfig,
 }
 
-impl<T: AsyncWrite + Unpin> SessionState<T> {
+impl<T: AsyncWrite + Debug + Unpin> SessionState<T> {
     async fn consume_segment(&mut self, segment: Segment) {
+        let conn_id = &self.transport;
         let id = segment.id();
+
         match self.frame_reassembler.push_segment(segment) {
             Ok(_) => {
-                debug!("RECEIVED: segment {id:?}");
-                // Create a retry record for this frame
-                if let Entry::Vacant(v) = self.incoming_frame_retries.entry(id.0) {
-                    v.insert(RetryToken::new(Instant::now()));
+                debug!("{conn_id:?}: RECEIVED: segment {id:?}");
+                match self.incoming_frame_retries.entry(id.0) {
+                    Entry::Occupied(e) => {
+                        // Restart the retry token for this frame
+                        e.replace_entry(RetryToken::new(Instant::now(), self.cfg.backoff_base));
+                    }
+                    Entry::Vacant(v) => {
+                        // Create the retry token for this frame
+                        v.insert(RetryToken::new(Instant::now(), self.cfg.backoff_base));
+                    }
                 }
             }
-            Err(e) => warn!("segment {id:?} not pushed: {e}"),
+            Err(e) => warn!("{conn_id:?}: segment {id:?} not pushed: {e}"),
         }
     }
 
     async fn retransmit_segments(&mut self, request: SegmentRequest) -> crate::errors::Result<()> {
-        debug!("RECEIVED: request for {} segments", request.len());
+        debug!("{:?} RECEIVED: request for {} segments", self.transport, request.len());
+
         let mut count = 0;
         for segment_id in request {
             // No need to retry this frame ourselves, since the other side will request on its own
@@ -104,20 +119,29 @@ impl<T: AsyncWrite + Unpin> SessionState<T> {
 
             if let Some(segment) = self.lookbehind.get(&segment_id) {
                 let msg = SessionMessage::Segment(segment.value().clone());
-                debug!("SENDING: retransmitted segment: {:?}", SegmentId::from(segment.value()));
+                debug!(
+                    "{:?} SENDING: retransmitted segment: {:?}",
+                    self.transport,
+                    segment.value().id()
+                );
                 self.transport.write_all(&msg.into_encoded()).await?;
                 count += 1;
             } else {
-                error!("segment {segment_id:?} not in lookbehind buffer anymore");
+                warn!(
+                    "{:?}: segment {segment_id:?} not in lookbehind buffer anymore",
+                    self.transport
+                );
             }
         }
         self.transport.flush().await?;
-        debug!("retransmitted {count} requested segments");
+        debug!("{:?}: retransmitted {count} requested segments", self.transport);
         Ok(())
     }
 
     async fn acknowledged_frames(&mut self, acked: FrameAcknowledgements) {
-        debug!("RECEIVED: acknowledgement of {} frames", acked.len());
+        let conn_id = &self.transport;
+        debug!("{conn_id:?} RECEIVED: acknowledgement of {} frames", acked.len());
+
         for frame_id in acked {
             // Frame acknowledged, we won't need to resend it
             self.outgoing_frame_resends.remove(&frame_id);
@@ -143,16 +167,22 @@ impl<T: AsyncWrite + Unpin> SessionState<T> {
     /// the segment indices missing from that frame. The `max_requests` argument can provide a maximum
     /// number of request messages sent by this call. If `max_requests` is `None`, request messages
     /// are set for all incomplete frames.
+    /// Recurring requests have a [`rto_base_receiver`](SessionConfig) timeout with backoff.
     /// Returns the number of sent request messages.
     pub async fn request_missing_segments(&mut self, max_requests: Option<usize>) -> crate::errors::Result<usize> {
-        self.frame_reassembler.evict()?;
+        let num_evicted = self.frame_reassembler.evict()?;
+        debug!("{:?}: evicted {} frames", self.transport, num_evicted);
 
         if max_requests == Some(0) {
             return Ok(0); // don't even bother
         }
 
         let tracked_incomplete = self.frame_reassembler.incomplete_frames();
-        debug!("tracking {} incomplete frames", tracked_incomplete.len());
+        debug!(
+            "{:?}: tracking {} incomplete frames",
+            self.transport,
+            tracked_incomplete.len()
+        );
 
         // Filter the frames which we are allowed to retry now
         let mut to_retry = Vec::with_capacity(tracked_incomplete.len());
@@ -168,27 +198,35 @@ impl<T: AsyncWrite + Unpin> SessionState<T> {
                         RetryResult::RetryNow(next_rto) => {
                             // Retry this frame and plan ahead the time of the next retry
                             debug!(
-                                "going to perform frame {} retransmission req. #{}",
-                                info.frame_id, next_rto.num_retry
+                                "{:?}: going to perform frame {} retransmission req. #{}",
+                                self.transport, info.frame_id, next_rto.num_retry
                             );
                             e.replace_entry(next_rto);
                             to_retry.push(info);
                         }
                         RetryResult::Expired => {
-                            warn!("frame {} is already expired and will be evicted", info.frame_id);
+                            // Frame is expired, so no more retries
+                            debug!(
+                                "{:?}: frame {} is already expired and will be evicted",
+                                self.transport, info.frame_id
+                            );
                             e.remove();
                         }
                         RetryResult::Wait(d) => debug!(
-                            "frame {} needs to wait {}ms for next retransmission request",
+                            "{:?}: frame {} needs to wait {d:?} for next retransmission request (#{})",
+                            self.transport,
                             info.frame_id,
-                            d.as_millis()
+                            e.get().num_retry
                         ),
                     }
                 }
                 Entry::Vacant(v) => {
                     // Happens when no segment of this frame has been received yet
-                    warn!("frame {} not in retry log", info.frame_id);
-                    v.insert(RetryToken::new(now));
+                    debug!(
+                        "{:?}: frame {} does not have a retry token",
+                        self.transport, info.frame_id
+                    );
+                    v.insert(RetryToken::new(now, self.cfg.backoff_base));
                     to_retry.push(info);
                 }
             }
@@ -200,7 +238,10 @@ impl<T: AsyncWrite + Unpin> SessionState<T> {
             .take(max_requests.unwrap_or(usize::MAX))
             .map(|chunk| SegmentRequest::from_iter(chunk.iter().cloned()))
         {
-            debug!("SENDING: retransmission request for segments {chunk:?}");
+            debug!(
+                "{:?}: SENDING: retransmission request for segments {chunk:?}",
+                self.transport
+            );
 
             let req = SessionMessage::Request(chunk);
             self.transport.write_all(&req.into_encoded()).await?;
@@ -208,7 +249,10 @@ impl<T: AsyncWrite + Unpin> SessionState<T> {
         }
         self.transport.flush().await?;
 
-        debug!("RETRANSMISSION BATCH COMPLETE: sent {sent} re-send requests");
+        debug!(
+            "{:?}: RETRANSMISSION BATCH COMPLETE: sent {sent} re-send requests",
+            self.transport
+        );
         Ok(sent)
     }
 
@@ -225,6 +269,7 @@ impl<T: AsyncWrite + Unpin> SessionState<T> {
     pub async fn acknowledge_segments(&mut self, max_messages: Option<usize>) -> crate::errors::Result<usize> {
         let mut len = 0;
         let mut msgs = 0;
+
         while !self.to_acknowledge.is_empty() {
             let mut ack_frames = FrameAcknowledgements::default();
 
@@ -236,7 +281,7 @@ impl<T: AsyncWrite + Unpin> SessionState<T> {
                     }
                 }
 
-                debug!("SENDING: acknowledgement of {} frames", ack_frames.len());
+                debug!("{:?}: SENDING: acks of {} frames", self.transport, ack_frames.len());
                 self.transport
                     .write_all(&SessionMessage::Acknowledge(ack_frames).into_encoded())
                     .await?;
@@ -247,39 +292,63 @@ impl<T: AsyncWrite + Unpin> SessionState<T> {
         }
         self.transport.flush().await?;
 
-        debug!("ACKNOWLEDGEMENT BATCH COMPLETE: sent {len} acknowledgements in {msgs} messages");
+        debug!(
+            "{:?}: ACK BATCH COMPLETE: sent {len} acks in {msgs} messages",
+            self.transport
+        );
         Ok(len)
     }
 
+    /// Performs retransmission of entire unacknowledged frames as sender.
+    /// If [`acknowledged_frames_buffer`](SessionConfig) was set to `0` during the construction,
+    /// this method will do nothing and return `0`.
+    /// Otherwise, it returns the number of retransmitted frames.
+    /// Recurring retransmissions have a [`rto_base_sender`](SessionConfig) timeout with backoff.
+    /// At most `max_messages` frames are resent if the argument was specified.
     pub async fn retransmit_unacknowledged_frames(
         &mut self,
         max_messages: Option<usize>,
     ) -> crate::errors::Result<usize> {
-        if max_messages == Some(0) {
+        if max_messages == Some(0) || self.cfg.acknowledged_frames_buffer == 0 {
             return Ok(0);
         }
 
         let now = Instant::now();
         let max = max_messages.unwrap_or(usize::MAX);
 
-        let mut frames_to_resend = Vec::new();
+        let mut frames_to_resend = BTreeSet::new();
         self.outgoing_frame_resends.retain(|frame_id, retry_log| {
             let check_res = retry_log.check(now, self.cfg.rto_base_sender, self.cfg.frame_expiration_age);
             match check_res {
-                RetryResult::Wait(_) => true,
+                RetryResult::Wait(d) => {
+                    debug!("{:?}: frame {frame_id} will retransmit in {d:?}", self.transport);
+                    true
+                }
                 RetryResult::RetryNow(next_retry) => {
                     // Single segment frame scenario
                     if frames_to_resend.len() < max {
-                        frames_to_resend.push(*frame_id);
+                        frames_to_resend.insert(*frame_id);
                         *retry_log = next_retry;
+                        debug!(
+                            "{:?}: frame {frame_id} will self-resend now, next retry in {:?}",
+                            self.transport,
+                            next_retry.retry_in(self.cfg.rto_base_sender, self.cfg.frame_expiration_age)
+                        )
                     }
                     true
                 }
-                RetryResult::Expired => false,
+                RetryResult::Expired => {
+                    debug!("{:?}: frame {frame_id} expired", self.transport);
+                    false
+                }
             }
         });
 
-        debug!("{} frames will be self-resent", frames_to_resend.len());
+        debug!(
+            "{:?}: {} frames will auto-resend",
+            self.transport,
+            frames_to_resend.len()
+        );
 
         // Find all segments of the frames to resend in the lookbehind buffer
         let mut count = 0;
@@ -289,13 +358,20 @@ impl<T: AsyncWrite + Unpin> SessionState<T> {
             .take(max)
         {
             let msg = SessionMessage::Segment(segment.value().clone());
-            debug!("SENDING: self-retransmitted segment: {:?}", segment.key());
+            debug!(
+                "{:?}: SENDING: auto-retransmitted segment: {:?}",
+                self.transport,
+                segment.key()
+            );
             self.transport.write_all(&msg.into_encoded()).await?;
             count += 1;
         }
 
         self.transport.flush().await?;
-        debug!("SELF-RETRANSMIT BATCH COMPLETE: re-sent {count} segments");
+        debug!(
+            "{:?}: AUTO-RETRANSMIT BATCH COMPLETE: re-sent {count} segments",
+            self.transport
+        );
 
         Ok(count)
     }
@@ -316,7 +392,7 @@ impl<T: AsyncWrite + Unpin> SessionState<T> {
             self.lookbehind.insert((&segment).into(), segment.clone());
 
             let msg = SessionMessage::Segment(segment.clone());
-            debug!("SENDING: segment {:?}", SegmentId::from(&segment));
+            debug!("{:?}: SENDING: segment {:?}", self.transport, segment.id());
             self.transport.write_all(&msg.into_encoded()).await?;
 
             // TODO: prevent stalling here
@@ -327,7 +403,7 @@ impl<T: AsyncWrite + Unpin> SessionState<T> {
 
         self.transport.flush().await?;
         self.outgoing_frame_resends
-            .insert(frame_id, RetryToken::new(Instant::now()));
+            .insert(frame_id, RetryToken::new(Instant::now(), self.cfg.backoff_base));
 
         Ok(())
     }
@@ -360,7 +436,7 @@ pub struct SessionSocket<T> {
     egress: Box<dyn AsyncRead + Send + Unpin>,
 }
 
-impl<T: AsyncWrite + Send + Unpin> SessionSocket<T> {
+impl<T: AsyncWrite + Debug + Send + Unpin> SessionSocket<T> {
     /// Create a new socket over the given `transport` that binds the communicating parties.
     pub fn new(transport: T, cfg: SessionConfig) -> Self {
         let (reassembler, egress) = FrameReassembler::new(cfg.frame_expiration_age);
@@ -370,10 +446,12 @@ impl<T: AsyncWrite + Send + Unpin> SessionSocket<T> {
         let incoming_frame_retries = Arc::new(DashMap::new());
 
         let incoming_frame_retries_clone = incoming_frame_retries.clone();
+        let conn_id = format!("{transport:?}");
+
         let egress = Box::new(
             egress
                 .inspect(move |frame| {
-                    debug!("emit frame {}", frame.frame_id);
+                    debug!("{conn_id:?}: emit frame {}", frame.frame_id);
                     // The frame has been completed, so remove its retry record
                     incoming_frame_retries_clone.remove(&frame.frame_id);
                     if let Some(ack_buffer) = &is_acknowledging {
@@ -411,7 +489,7 @@ impl<T: AsyncWrite + Send + Unpin> SessionSocket<T> {
     }
 }
 
-impl<T: AsyncWrite + Unpin + Send + Sync> AsyncWrite for SessionSocket<T> {
+impl<T: AsyncWrite + Debug + Unpin + Send + Sync> AsyncWrite for SessionSocket<T> {
     fn poll_write(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
         let mut socket_future = self.state.send_frame_data(buf).boxed();
         match Pin::new(&mut socket_future).poll(cx) {
@@ -487,7 +565,7 @@ mod tests {
     use futures::io::{AsyncReadExt, AsyncWriteExt};
     use futures::pin_mut;
     use lazy_static::lazy_static;
-    use rand::{Rng, SeedableRng};
+    use rand::{thread_rng, Rng, SeedableRng};
     use std::fmt::{Debug, Formatter};
     use std::iter::Extend;
     use std::sync::OnceLock;
@@ -501,7 +579,7 @@ mod tests {
 
     #[derive(Debug, Clone)]
     pub struct FaultyNetworkConfig {
-        pub fault_mod: usize,
+        pub fault_prob: f64,
         pub mixing_factor: usize,
         pub step_interval: Duration,
     }
@@ -509,14 +587,16 @@ mod tests {
     impl Default for FaultyNetworkConfig {
         fn default() -> Self {
             Self {
-                fault_mod: 0,
+                fault_prob: 0.0,
                 mixing_factor: 0,
                 step_interval: Duration::from_millis(50),
             }
         }
     }
 
+    #[derive(Clone)]
     pub struct FaultyNetwork {
+        name: String,
         sender: UnboundedSender<Box<[u8]>>,
         counterparty: Arc<OnceLock<SessionState<Self>>>,
         cfg: FaultyNetworkConfig,
@@ -525,18 +605,7 @@ mod tests {
 
     impl Debug for FaultyNetwork {
         fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-            write!(f, "network with {:?}", &self.counterparty)
-        }
-    }
-
-    impl Clone for FaultyNetwork {
-        fn clone(&self) -> Self {
-            Self {
-                sender: self.sender.clone(),
-                counterparty: self.counterparty.clone(),
-                cfg: self.cfg.clone(),
-                msg_counter: self.msg_counter,
-            }
+            write!(f, "{}", self.name)
         }
     }
 
@@ -559,8 +628,8 @@ mod tests {
         cfg: SessionConfig,
         network_cfg: FaultyNetworkConfig,
     ) -> (SessionSocket<FaultyNetwork>, SessionSocket<FaultyNetwork>) {
-        let alice_to_bob_transport = FaultyNetwork::new(network_cfg.clone());
-        let bob_to_alice_transport = FaultyNetwork::new(network_cfg.clone());
+        let alice_to_bob_transport = FaultyNetwork::new("alice", network_cfg.clone());
+        let bob_to_alice_transport = FaultyNetwork::new("bob", network_cfg.clone());
 
         let mut alice_to_bob = SessionSocket::new(alice_to_bob_transport, cfg.clone());
         let mut bob_to_alice = SessionSocket::new(bob_to_alice_transport, cfg.clone());
@@ -580,13 +649,21 @@ mod tests {
 
         let mut alice_bob_state = alice_to_bob.state().clone();
         let mut bob_alice_state = bob_to_alice.state().clone();
-        async_std::task::spawn(async move {
+        async_std::task::spawn_local(async move {
             loop {
                 alice_bob_state.acknowledge_segments(None).await.unwrap();
                 alice_bob_state.request_missing_segments(None).await.unwrap();
+                alice_bob_state.retransmit_unacknowledged_frames(None).await.unwrap();
 
+                async_std::task::sleep(network_cfg.step_interval).await;
+            }
+        });
+
+        async_std::task::spawn_local(async move {
+            loop {
                 bob_alice_state.acknowledge_segments(None).await.unwrap();
                 bob_alice_state.request_missing_segments(None).await.unwrap();
+                bob_alice_state.retransmit_unacknowledged_frames(None).await.unwrap();
 
                 async_std::task::sleep(network_cfg.step_interval).await;
             }
@@ -596,10 +673,10 @@ mod tests {
     }
 
     impl FaultyNetwork {
-        pub fn new(cfg: FaultyNetworkConfig) -> Self {
+        pub fn new(name: &str, cfg: FaultyNetworkConfig) -> Self {
             info!("network RNG seed: {}", hex::encode(RNG_SEED.as_slice()));
 
-            let rng = rand_chacha::ChaCha20Rng::from_seed(RNG_SEED.clone());
+            let rng = rand::rngs::StdRng::from_seed(RNG_SEED.clone());
             let counterparty = Arc::new(OnceLock::<SessionState<FaultyNetwork>>::new());
 
             let (sender, recv) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
@@ -626,15 +703,16 @@ mod tests {
             });
 
             Self {
+                name: name.to_string(),
                 sender,
                 counterparty,
-                cfg,
                 msg_counter: 1,
+                cfg,
             }
         }
 
         fn send_to_counterparty(&mut self, data: &[u8]) -> crate::errors::Result<()> {
-            if self.cfg.fault_mod > 0 && self.msg_counter % self.cfg.fault_mod as u128 == 0 {
+            if thread_rng().gen_bool(self.cfg.fault_prob) {
                 warn!("msg discarded");
             } else {
                 self.sender.unbounded_send(data.into()).unwrap();
@@ -718,23 +796,8 @@ mod tests {
 
     #[test(async_std::test)]
     async fn test_reliable_send_recv_no_ack() {
-        let (alice_to_bob, bob_to_alice) = setup_alice_bob(Default::default(), Default::default());
-
-        send_and_recv(
-            NUM_FRAMES,
-            FRAME_SIZE,
-            alice_to_bob,
-            bob_to_alice,
-            Duration::from_secs(10),
-            false,
-        )
-        .await;
-    }
-
-    #[test(async_std::test)]
-    async fn test_reliable_send_recv() {
         let cfg = SessionConfig {
-            acknowledged_frames_buffer: 1024,
+            acknowledged_frames_buffer: 0,
             ..Default::default()
         };
 
@@ -752,16 +815,32 @@ mod tests {
     }
 
     #[test(async_std::test)]
+    async fn test_reliable_send_recv() {
+        let (alice_to_bob, bob_to_alice) = setup_alice_bob(Default::default(), Default::default());
+
+        send_and_recv(
+            NUM_FRAMES,
+            FRAME_SIZE,
+            alice_to_bob,
+            bob_to_alice,
+            Duration::from_secs(10),
+            false,
+        )
+        .await;
+    }
+
+    #[test(async_std::test)]
     async fn test_unreliable_send_recv() {
         let cfg = SessionConfig {
-            rto_base_sender: Duration::from_millis(1),
-            rto_base_receiver: Duration::from_millis(1),
-            acknowledged_frames_buffer: 1024,
+            rto_base_sender: Duration::from_millis(500),
+            rto_base_receiver: Duration::from_millis(10),
+            frame_expiration_age: Duration::from_secs(30),
+            backoff_base: 1.001,
             ..Default::default()
         };
 
         let net_cfg = FaultyNetworkConfig {
-            fault_mod: 3,
+            fault_prob: 0.33,
             ..Default::default()
         };
 
@@ -783,14 +862,15 @@ mod tests {
     #[test(async_std::test)]
     async fn test_unreliable_mixed_send_recv() {
         let cfg = SessionConfig {
-            rto_base_sender: Duration::from_millis(1),
-            rto_base_receiver: Duration::from_millis(1),
-            acknowledged_frames_buffer: 1024,
+            rto_base_sender: Duration::from_millis(500),
+            rto_base_receiver: Duration::from_millis(10),
+            frame_expiration_age: Duration::from_secs(30),
+            backoff_base: 1.001,
             ..Default::default()
         };
 
         let net_cfg = FaultyNetworkConfig {
-            fault_mod: 3,
+            fault_prob: 0.33,
             mixing_factor: 4,
             ..Default::default()
         };
@@ -813,14 +893,15 @@ mod tests {
     #[test(async_std::test)]
     async fn test_almost_reliable_mixed_send_recv() {
         let cfg = SessionConfig {
-            rto_base_sender: Duration::from_millis(1),
-            rto_base_receiver: Duration::from_millis(1),
-            acknowledged_frames_buffer: 1024,
+            rto_base_sender: Duration::from_millis(500),
+            rto_base_receiver: Duration::from_millis(10),
+            frame_expiration_age: Duration::from_secs(30),
+            backoff_base: 1.001,
             ..Default::default()
         };
 
         let net_cfg = FaultyNetworkConfig {
-            fault_mod: 10,
+            fault_prob: 0.1,
             mixing_factor: 4,
             ..Default::default()
         };
@@ -843,14 +924,14 @@ mod tests {
     #[test(async_std::test)]
     async fn test_reliable_mixed_send_recv() {
         let cfg = SessionConfig {
-            rto_base_sender: Duration::from_millis(1),
-            rto_base_receiver: Duration::from_millis(1),
-            acknowledged_frames_buffer: 1024,
+            rto_base_sender: Duration::from_millis(500),
+            rto_base_receiver: Duration::from_millis(10),
+            frame_expiration_age: Duration::from_secs(30),
+            backoff_base: 1.001,
             ..Default::default()
         };
 
         let net_cfg = FaultyNetworkConfig {
-            fault_mod: 0,
             mixing_factor: 4,
             ..Default::default()
         };
@@ -873,15 +954,14 @@ mod tests {
     #[test(async_std::test)]
     async fn test_disconnected_network_should_timeout() {
         let cfg = SessionConfig {
-            rto_base_sender: Duration::from_millis(2),
-            rto_base_receiver: Duration::from_millis(2),
-            frame_expiration_age: Duration::from_secs(10),
-            acknowledged_frames_buffer: 1024,
+            rto_base_sender: Duration::from_millis(250),
+            rto_base_receiver: Duration::from_millis(300),
+            frame_expiration_age: Duration::from_secs(2),
             ..Default::default()
         };
 
         let net_cfg = FaultyNetworkConfig {
-            fault_mod: 1, // throws away 100% of packets
+            fault_prob: 1.0, // throws away 100% of packets
             mixing_factor: 0,
             step_interval: Duration::from_millis(200),
         };
@@ -901,5 +981,39 @@ mod tests {
             Either::Left(_) => panic!("should timeout: {:?}", out),
             Either::Right(_) => {}
         }
+    }
+
+    #[test(async_std::test)]
+    async fn test_single_frame_resend() {
+        let cfg = SessionConfig {
+            rto_base_sender: Duration::from_millis(250),
+            rto_base_receiver: Duration::from_millis(300),
+            frame_expiration_age: Duration::from_secs(2),
+            ..Default::default()
+        };
+
+        let net_cfg = FaultyNetworkConfig {
+            fault_prob: 0.5, // throws away 50% of packets
+            mixing_factor: 0,
+            step_interval: Duration::from_millis(200),
+        };
+
+        let (mut alice_to_bob, mut bob_to_alice) = setup_alice_bob(cfg, net_cfg);
+        let data = b"will be re-delivered!";
+
+        alice_to_bob.write(data.as_ref()).await.unwrap();
+
+        let mut out = vec![0u8; data.len()];
+        let f1 = bob_to_alice.read_exact(&mut out);
+        let f2 = async_std::task::sleep(Duration::from_secs(3));
+        pin_mut!(f1);
+        pin_mut!(f2);
+
+        match futures::future::select(f1, f2).await {
+            Either::Left(_) => {}
+            Either::Right(_) => panic!("timeout"),
+        }
+
+        async_std::task::sleep(Duration::from_millis(800)).await;
     }
 }

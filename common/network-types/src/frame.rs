@@ -600,7 +600,6 @@ pub(crate) mod tests {
     use lazy_static::lazy_static;
     use rand::prelude::{Distribution, SliceRandom};
     use rand::{seq::IteratorRandom, thread_rng, Rng, SeedableRng};
-    use rand_chacha::ChaCha20Rng;
     use rand_distr::Normal;
     use rayon::prelude::*;
     use std::collections::{HashSet, VecDeque};
@@ -624,7 +623,7 @@ pub(crate) mod tests {
             .collect::<Vec<_>>();
         static ref SEGMENTS: Vec<Segment> = {
             let vec = FRAMES.par_iter().flat_map(|f| f.segment(MTU)).collect::<VecDeque<_>>();
-            let mut rng = ChaCha20Rng::from_seed(RAND_SEED.clone());
+            let mut rng = rand::rngs::StdRng::from_seed(RAND_SEED.clone());
             linear_half_normal_shuffle(&mut rng, vec, MIXING_FACTOR)
         };
     }
@@ -1018,7 +1017,7 @@ pub(crate) mod tests {
     ) -> (Vec<Segment>, Vec<&'static Frame>, HashSet<SegmentId>) {
         assert!((0.0..=1.0).contains(&corrupted_ratio));
 
-        let mut rng = ChaCha20Rng::from_seed(RAND_SEED.clone());
+        let mut rng = rand::rngs::StdRng::from_seed(RAND_SEED.clone());
 
         let (excluded_frame_ids, excluded_segments): (HashSet<FrameId>, HashSet<SegmentId>) = (1..num_frames + 1)
             .choose_multiple(&mut rng, ((num_frames as f32) * corrupted_ratio) as usize)
