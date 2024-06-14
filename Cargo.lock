@@ -1637,7 +1637,7 @@ checksum = "06ea2b9bc92be3c2baa9334a323ebca2d6f074ff852cd1d7b11064035cd3868f"
 
 [[package]]
 name = "core-network"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "async-channel 2.1.1",
  "async-std",
@@ -1664,27 +1664,9 @@ dependencies = [
  "smart-default",
  "strum 0.26.2",
  "thiserror",
+ "tokio",
  "tracing",
  "validator",
-]
-
-[[package]]
-name = "core-p2p"
-version = "0.2.0"
-dependencies = [
- "async-channel 2.1.1",
- "async-std",
- "core-network",
- "core-protocol",
- "futures",
- "futures-lite 1.13.0",
- "hopr-internal-types",
- "libp2p",
- "libp2p-mplex",
- "serde",
- "thiserror",
- "tracing",
- "void",
 ]
 
 [[package]]
@@ -1713,7 +1695,7 @@ dependencies = [
 
 [[package]]
 name = "core-protocol"
-version = "0.2.3"
+version = "0.2.4"
 dependencies = [
  "async-lock 3.3.0",
  "async-std",
@@ -1751,7 +1733,7 @@ dependencies = [
 
 [[package]]
 name = "core-transport"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "async-channel 2.1.1",
  "async-lock 3.3.0",
@@ -1759,11 +1741,9 @@ dependencies = [
  "async-trait",
  "chain-types",
  "core-network",
- "core-p2p",
  "core-path",
  "core-protocol",
  "futures",
- "futures-concurrency",
  "hopr-crypto-packet",
  "hopr-crypto-types",
  "hopr-db-sql",
@@ -1771,9 +1751,9 @@ dependencies = [
  "hopr-metrics",
  "hopr-platform",
  "hopr-primitive-types",
+ "hopr-transport-p2p",
  "lazy_static",
  "libp2p",
- "multiaddr",
  "proc-macro-regex",
  "rust-stream-ext-concurrent",
  "serde",
@@ -3857,6 +3837,7 @@ dependencies = [
  "core-transport",
  "ethers",
  "futures",
+ "futures-concurrency",
  "hopr-crypto-types",
  "hopr-db-sql",
  "hopr-internal-types",
@@ -4004,6 +3985,29 @@ dependencies = [
  "tokio",
  "tracing",
  "validator",
+]
+
+[[package]]
+name = "hopr-transport-p2p"
+version = "0.4.0"
+dependencies = [
+ "async-channel 2.1.1",
+ "async-std",
+ "core-network",
+ "core-protocol",
+ "futures",
+ "futures-concurrency",
+ "futures-lite 1.13.0",
+ "hopr-crypto-types",
+ "hopr-internal-types",
+ "libp2p",
+ "libp2p-mplex",
+ "multiaddr",
+ "serde",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "void",
 ]
 
 [[package]]

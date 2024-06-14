@@ -1,6 +1,6 @@
 [package]
 name = "core-network"
-version = "0.5.0"
+version = "0.6.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 license = "GPL-3.0-only"
@@ -10,6 +10,7 @@ crate-type = ["rlib"]
 
 [dependencies]
 async-channel = { workspace = true }
+async-std = { workspace = true, optional = true }
 async-trait = { workspace = true }
 chrono = { version = "0.4", default-features = false, features = ["clock" ,"std"] }
 futures = { workspace = true }
@@ -22,6 +23,7 @@ serde_with = { workspace = true }
 smart-default = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }
+tokio = { workspace = true, optional = true }
 tracing = { workspace = true }
 validator = { workspace = true }
 
@@ -31,7 +33,7 @@ hopr-crypto-random = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-db-entity = { workspace = true }
 hopr-platform = { workspace = true }
-hopr-metrics = { workspace = true, optional = true}
+hopr-metrics = { workspace = true, optional = true }
 hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
@@ -44,3 +46,9 @@ more-asserts = "0.3.1"
 default = ["prometheus", "compat-ping"]
 compat-ping = []
 prometheus = ["dep:hopr-metrics"]
+runtime-async-std = [
+    "async-std",
+]
+runtime-tokio = [
+    "tokio",
+]
