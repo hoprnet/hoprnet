@@ -30,14 +30,26 @@ let
     overlays = [ rust-overlay.overlays.default solc.overlay ];
   };
 
-  foundryBin = pkgsLocal.foundry-bin;
-
-  envCase = triple: pkgsLocal.lib.strings.toUpper (builtins.replaceStrings [ "-" ] [ "_" ] triple);
+  isCrossBuild = ! pkgsLocal.lib.systems.equals localSystem crossSystem;
+  isCIBuild = builtins.getEnv "CI" == "true";
 
   # `hostPlatform` is the cross-compilation output platform;
   # `buildPlatform` is the platform we are compiling on
   buildPlatform = pkgs.stdenv.buildPlatform;
   hostPlatform = pkgs.stdenv.hostPlatform;
+
+  # We assume any CI-build and cross-build artifact is meant to run on a non-Nix Linux for now.
+  postFixup =
+    if (!hostPlatform.isDarwin) && (isCrossBuild || isCIBuild)
+    then ''
+      patchelf --set-interpreter /lib64/ld-linux-x86-64.so.2 $out/bin/hoprd
+    ''
+    else null;
+
+
+  foundryBin = pkgsLocal.foundry-bin;
+
+  envCase = triple: pkgsLocal.lib.strings.toUpper (builtins.replaceStrings [ "-" ] [ "_" ] triple);
 
   solcDefault = solc.mkDefault pkgs pkgs.pkgsBuildHost.solc_0_8_19;
 
@@ -64,7 +76,7 @@ in
   inherit rustToolchain;
 
   callPackage = (package: args:
-    let crate = pkgs.callPackage package (args // { inherit foundryBin solcDefault craneLib; });
+    let crate = pkgs.callPackage package (args // { inherit foundryBin solcDefault craneLib postFixup; });
     in
     # Override the derivation to add cross-compilation environment variables.
     crate.overrideAttrs (previous: buildEnv // {

@@ -2,7 +2,6 @@
 , CARGO_PROFILE ? "release"
 , cargoToml
 , craneLib
-, darwin
 , depsSrc
 , foundryBin
 , git
@@ -13,6 +12,7 @@
 , pandoc
 , pkg-config
 , pkgs
+, postFixup ? null
 , postInstall ? null
 , runClippy ? false
 , runTests ? false
@@ -30,16 +30,20 @@ let
 
     # FIXME: some dev dependencies depend on OpenSSL, would be nice to remove
     # this dependency
-    nativeBuildInputs = [ solcDefault foundryBin pkg-config pkgs.pkgsBuildHost.openssl libiconv ];
-    buildInputs = [ openssl ] ++ lib.optionals stdenv.hostPlatform.isDarwin (
-      with darwin.apple_sdk.frameworks; [
+    nativeBuildInputs = stdenv.extraNativeBuildInputs ++ [ solcDefault foundryBin pkg-config pkgs.pkgsBuildHost.openssl libiconv ]
+      ++ lib.optionals stdenv.buildPlatform.isDarwin (
+      with pkgs.pkgsBuildHost.darwin.apple_sdk.frameworks; [
         CoreFoundation
         CoreServices
-        IOKit
         Security
         SystemConfiguration
       ]
     );
+    buildInputs = [ openssl ] ++ stdenv.extraBuildInputs;
+    #++ lib.optionals stdenv.hostPlatform.isDarwin ([
+    #     CoreFoundation
+    #   ]
+    # );
 
     CARGO_HOME = ".cargo";
     cargoExtraArgs = "--offline -p ${pname} ";
@@ -87,7 +91,7 @@ let
     else craneLib.buildPackage;
 in
 builder (args // {
-  inherit src postInstall;
+  inherit src postInstall postFixup;
 
   preConfigure = ''
     # respect the amount of available cores for building
