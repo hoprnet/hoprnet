@@ -8,6 +8,9 @@ pub enum SessionError {
     #[error("failed to parse session message")]
     ParseError,
 
+    #[error("invalid protocol version")]
+    WrongVersion,
+
     #[error("the message has an incorrect tag")]
     UnknownMessageTag,
 }

@@ -73,6 +73,8 @@ pub struct SessionConfig {
     pub backoff_base: f64,
 
     /// Optional rate limiting of egress messages per second.
+    /// This will force the [SessionSocket] not to pass more than this quota of messages
+    /// to the underlying transport.
     #[default(None)]
     pub max_msg_per_sec: Option<usize>,
 }
@@ -81,12 +83,12 @@ pub struct SessionConfig {
 ///
 /// It implements the entire [`SessionMessage`] state machine and
 /// performs the frame reassembly and sequencing.
-/// The underlying transport operations are bound to `T`, the MTU is `C`.
+/// The MTU size is specified by `C`.
 ///
 /// The `SessionState` cannot be created directly, it must always be created via [`SessionSocket`] and
 /// then retrieved via [`SessionSocket::state`].
 #[pin_project]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SessionState<const C: usize> {
     session_id: String,
     lookbehind: Arc<SkipMap<SegmentId, Segment>>,
@@ -458,22 +460,6 @@ impl<const C: usize> SessionState<C> {
     }
 }
 
-impl<const C: usize> Clone for SessionState<C> {
-    fn clone(&self) -> Self {
-        Self {
-            session_id: self.session_id.clone(),
-            segment_ingress: self.segment_ingress.clone(),
-            lookbehind: self.lookbehind.clone(),
-            to_acknowledge: self.to_acknowledge.clone(),
-            incoming_frame_retries: self.incoming_frame_retries.clone(),
-            outgoing_frame_resends: self.outgoing_frame_resends.clone(),
-            outgoing_frame_id: self.outgoing_frame_id.clone(),
-            frame_reassembler: self.frame_reassembler.clone(),
-            cfg: self.cfg,
-        }
-    }
-}
-
 impl<const C: usize, T: AsRef<[u8]>> Sink<T> for SessionState<C> {
     type Error = NetworkTypeError;
 
@@ -507,7 +493,7 @@ impl<const C: usize, T: AsRef<[u8]>> Sink<T> for SessionState<C> {
 }
 
 /// Represents a socket for a session between two nodes bound by the
-/// underlying [network transport `T`](AsyncWrite) and the maximum transmission unit (MTU) of `C`.
+/// underlying [network transport](AsyncWrite) and the maximum transmission unit (MTU) of `C`.
 ///
 /// It also implements [`AsyncRead`] and [`AsyncWrite`] so that it can
 /// be used on top of the usual transport stack.
@@ -519,7 +505,8 @@ pub struct SessionSocket<const C: usize> {
 }
 
 impl<const C: usize> SessionSocket<C> {
-    /// Create a new socket over the given `transport` that binds the communicating parties.
+    /// Create a new socket over the given underlying `transport` that binds the communicating parties.
+    /// A human-readable session `id` also must be supplied.
     pub fn new<T, I>(id: I, transport: T, cfg: SessionConfig) -> Self
     where
         T: AsyncWrite + Send + 'static,
@@ -554,7 +541,7 @@ impl<const C: usize> SessionSocket<C> {
                             }
                         }
                         Err(NetworkTypeError::FrameDiscarded(id)) | Err(NetworkTypeError::IncompleteFrame(id)) => {
-                            // Remove from retries since the frame has been discarded
+                            // Remove retry token, because the frame has been discarded
                             incoming_frame_retries_clone.remove(id);
                         }
                         _ => {}
@@ -573,8 +560,8 @@ impl<const C: usize> SessionSocket<C> {
 
             spawn(async move {
                 segment_egress
-                    .ratelimit_stream_with_jitter(&rate_limiter, jitter)
                     .map(|m: SessionMessage<C>| Ok(m.into_encoded()))
+                    .ratelimit_stream_with_jitter(&rate_limiter, jitter)
                     .forward(transport.into_sink())
                     .await
             });

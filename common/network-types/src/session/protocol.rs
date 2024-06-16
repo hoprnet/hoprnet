@@ -226,20 +226,23 @@ impl<const C: usize> From<FrameAcknowledgements<C>> for [u8; C] {
 
 /// Contains all messages of the Session sub-protocol.
 #[derive(Debug, Clone, PartialEq, Eq, strum::EnumDiscriminants, strum::EnumTryAs)]
-#[strum_discriminants(derive(strum::FromRepr), repr(u16))]
+#[strum_discriminants(derive(strum::FromRepr), repr(u8))]
 pub enum SessionMessage<const C: usize> {
     /// Represents a message containing a segment.
     Segment(Segment),
-    /// Represents a message containing a request for segments.
+    /// Represents a message containing a [request](SegmentRequest) for segments.
     Request(SegmentRequest<C>),
-    /// Represents a message containing frame acknowledgements.
+    /// Represents a message containing [frame acknowledgements](FrameAcknowledgements).
     Acknowledge(FrameAcknowledgements<C>),
 }
 
 impl<const C: usize> SessionMessage<C> {
     /// Header size of the session message.
-    /// This is currently just the size of [SessionMessageDiscriminants] representation.
-    pub const HEADER_SIZE: usize = mem::size_of::<SessionMessageDiscriminants>();
+    /// This is currently the version byte and the size of [SessionMessageDiscriminants] representation.
+    pub const HEADER_SIZE: usize = 1 + mem::size_of::<SessionMessageDiscriminants>();
+
+    /// Current version of the protocol.
+    pub const VERSION: u8 = 0;
 
     /// Returns the minimum size of a [SessionMessage].
     pub fn minimum_message_size() -> usize {
@@ -263,9 +266,12 @@ impl<const C: usize> TryFrom<&[u8]> for SessionMessage<C> {
             return Err(SessionError::ParseError);
         }
 
-        let disc = u16::from_be_bytes((&value[0..2]).try_into().map_err(|_| SessionError::ParseError)?);
+        let version = value[0];
+        if version != Self::VERSION {
+            return Err(SessionError::WrongVersion);
+        }
 
-        match SessionMessageDiscriminants::from_repr(disc).ok_or(SessionError::UnknownMessageTag)? {
+        match SessionMessageDiscriminants::from_repr(value[1]).ok_or(SessionError::UnknownMessageTag)? {
             SessionMessageDiscriminants::Segment => Ok(SessionMessage::Segment(
                 (&value[2..]).try_into().map_err(|_| SessionError::ParseError)?,
             )),
@@ -277,10 +283,9 @@ impl<const C: usize> TryFrom<&[u8]> for SessionMessage<C> {
 
 impl<const C: usize> From<SessionMessage<C>> for Vec<u8> {
     fn from(value: SessionMessage<C>) -> Self {
-        let disc = SessionMessageDiscriminants::from(&value) as u16;
-
-        let mut ret = Vec::with_capacity(500);
-        ret.extend(disc.to_be_bytes());
+        let mut ret = Vec::with_capacity(C);
+        ret.push(SessionMessage::<C>::VERSION);
+        ret.push(SessionMessageDiscriminants::from(&value) as u8);
 
         match value {
             SessionMessage::Segment(s) => ret.extend(Vec::from(s)),
@@ -288,6 +293,7 @@ impl<const C: usize> From<SessionMessage<C>> for Vec<u8> {
             SessionMessage::Acknowledge(f) => ret.extend(f.into_encoded()),
         };
 
+        ret.shrink_to_fit();
         ret
     }
 }

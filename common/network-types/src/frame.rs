@@ -1,17 +1,18 @@
 //! This module implements segmentation of [frames][Frame] into [segments][Segment] and
-//! their reassembly back into [`Frame`].
+//! their [reassembly](FrameReassembler) back into [`Frames`](Frame) and their sequencing.
 //!
 //! ## Frames
-//! Can be of arbitrary length, differently sized frames are supported as they do not
-//! need all to have the same length. Each frame carries a [`frame_id`](Frame::frame_id) which
+//! Contain data of arbitrary length up to 65536 bytes, differently sized frames are supported.
+//! Each frame carries a [`frame_id`](FrameId) which
 //! should be unique within some higher level session. Frame ID ranges from 1 to 2^32-1.
 //! Frame ID of 0 is not allowed, and its segments cannot be pushed to the reassembler.
 //!
 //! ## Segmentation
-//! A [frame](Frame) can be [segmented](Frame::segment) into equally sized [`Segments`](Segment).
+//! A [frame](Frame) can be [segmented](Frame::segment) into equally sized [`Segments`](Segment),
+//! each of them carrying its [sequence number](SeqNum).
 //! This operation runs in linear time with respect to the size of the frame.
-//! There can be up to 65535 segments per frame, the size of a segment can also set between 0 and
-//! 65535 bytes.
+//! There can be up to 256 segments per frame.
+//! Frame segments are uniquely identified via [`SegmentId`].
 //!
 //! ## Reassembly
 //! This is an inverse operation to segmentation. Reassembly is performed by a [`FrameReassembler`]
@@ -19,22 +20,20 @@
 //! is always paired with a [`Stream`] that outputs the reassembled [`Frames`](Frame).
 //!
 //! ### Ordering
-//! The reassembled frames will always have the segments in correct order. The output frames
-//! will be also in the correct ascending order of their `frame_id`, if certain conditions are met:
-//! Frames will be output out of order only in a situation in which **all** segments
-//! of the frame ID `n` arrived to the reassembler later than **all** segments of the frame with ID `n+1`.
-//! In this case, the reassembler will first output frame `n+1` and then will fail to process
-//! more segments of frame ID `n` as they arrive.
-//! To avoid this, the frames should be large enough, so that the chances of this happening are
-//! negligible given the non-deterministic properties of the underlying transport network.
+//! The reassembled frames will always have the segments in correct order, and complete frames emitted
+//! from the reassembler will also be ordered correctly according to their frame IDs.
+//! If the next frame in sequence cannot be completed within the `max_age` period given
+//! upon [construction](FrameReassembler::new) of the reassembler, [`NetworkTypeError::FrameDiscarded`]
+//! error will be emitted by the reassembler (see the next section).
 //!
 //! ### Expiration
 //! The reassembler also implements segment expiration. Upon [construction](FrameReassembler::new), the maximum
-//! incomplete frame age can be specified. If a frame is not completed in the reassembled within
+//! incomplete frame age can be specified. If a frame is not completed in the reassembler within
 //! this period, it can be [evicted](FrameReassembler::evict) from the reassembler, so that it will be lost
 //! forever.
 //! The eviction operation is supposed to be run periodically, so that the space could be freed up in the
-//! reassembler.
+//! reassembler, and the reassembler does not wait indefinitely for the next frame in sequence.
+//!
 //! Beware that once eviction is performed and an incomplete frame with ID `n` is destroyed;
 //! the caller should make sure that frames with ID <= `n` will not arrive into the reassembler,
 //! otherwise the [NetworkTypeError::OldSegment] error will be thrown.
