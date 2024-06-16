@@ -4,6 +4,8 @@ use dashmap::mapref::entry::Entry;
 use dashmap::DashMap;
 use futures::channel::mpsc::UnboundedSender;
 use futures::{AsyncRead, AsyncWrite, AsyncWriteExt, FutureExt, Sink, SinkExt, StreamExt, TryStreamExt};
+use governor::prelude::StreamRateLimitExt;
+use governor::{Jitter, Quota, RateLimiter};
 use pin_project::pin_project;
 use smart_default::SmartDefault;
 use std::collections::BTreeSet;
@@ -69,6 +71,10 @@ pub struct SessionConfig {
     /// Base for the exponential backoff on retries.
     #[default(2.0)]
     pub backoff_base: f64,
+
+    /// Optional rate limiting of egress messages per second.
+    #[default(None)]
+    pub max_msg_per_sec: Option<usize>
 }
 
 /// Contains the cloneable state of the session bound to a [`SessionSocket`].
@@ -91,7 +97,7 @@ pub struct SessionState<const C: usize> {
     frame_reassembler: Arc<FrameReassembler>,
     cfg: SessionConfig,
     #[pin]
-    segment_egress: UnboundedSender<SessionMessage<C>>,
+    segment_ingress: UnboundedSender<SessionMessage<C>>,
 }
 
 impl<const C: usize> SessionState<C> {
@@ -131,7 +137,7 @@ impl<const C: usize> SessionState<C> {
                     self.session_id,
                     segment.value().id()
                 );
-                self.segment_egress
+                self.segment_ingress
                     .feed(msg)
                     .await
                     .map_err(|e| SessionError::ProcessingError(e.to_string()))?;
@@ -143,7 +149,7 @@ impl<const C: usize> SessionState<C> {
                 );
             }
         }
-        self.segment_egress
+        self.segment_ingress
             .flush()
             .await
             .map_err(|e| SessionError::ProcessingError(e.to_string()))?;
@@ -260,13 +266,13 @@ impl<const C: usize> SessionState<C> {
             );
 
             let req = SessionMessage::<C>::Request(chunk);
-            self.segment_egress
+            self.segment_ingress
                 .feed(req)
                 .await
                 .map_err(|e| SessionError::ProcessingError(e.to_string()))?;
             sent += 1;
         }
-        self.segment_egress
+        self.segment_ingress
             .flush()
             .await
             .map_err(|e| SessionError::ProcessingError(e.to_string()))?;
@@ -304,7 +310,7 @@ impl<const C: usize> SessionState<C> {
                 }
 
                 debug!("{:?}: SENDING: acks of {} frames", self.session_id, ack_frames.len());
-                self.segment_egress
+                self.segment_ingress
                     .feed(SessionMessage::Acknowledge(ack_frames))
                     .await
                     .map_err(|e| SessionError::ProcessingError(e.to_string()))?;
@@ -313,7 +319,7 @@ impl<const C: usize> SessionState<C> {
                 break; // break out if we sent max allowed
             }
         }
-        self.segment_egress
+        self.segment_ingress
             .flush()
             .await
             .map_err(|e| SessionError::ProcessingError(e.to_string()))?;
@@ -389,13 +395,13 @@ impl<const C: usize> SessionState<C> {
                 self.session_id,
                 segment.key()
             );
-            self.segment_egress
+            self.segment_ingress
                 .feed(msg)
                 .await
                 .map_err(|e| SessionError::ProcessingError(e.to_string()))?;
             count += 1;
         }
-        self.segment_egress
+        self.segment_ingress
             .flush()
             .await
             .map_err(|e| SessionError::ProcessingError(e.to_string()))?;
@@ -425,7 +431,7 @@ impl<const C: usize> SessionState<C> {
 
             let msg = SessionMessage::<C>::Segment(segment.clone());
             debug!("{:?}: SENDING: segment {:?}", self.session_id, segment.id());
-            self.segment_egress
+            self.segment_ingress
                 .feed(msg)
                 .await
                 .map_err(|e| SessionError::ProcessingError(e.to_string()))?;
@@ -436,7 +442,7 @@ impl<const C: usize> SessionState<C> {
             }
         }
 
-        self.segment_egress
+        self.segment_ingress
             .flush()
             .await
             .map_err(|e| SessionError::ProcessingError(e.to_string()))?;
@@ -456,7 +462,7 @@ impl<const C: usize> Clone for SessionState<C> {
     fn clone(&self) -> Self {
         Self {
             session_id: self.session_id.clone(),
-            segment_egress: self.segment_egress.clone(),
+            segment_ingress: self.segment_ingress.clone(),
             lookbehind: self.lookbehind.clone(),
             to_acknowledge: self.to_acknowledge.clone(),
             incoming_frame_retries: self.incoming_frame_retries.clone(),
@@ -473,28 +479,28 @@ impl<const C: usize, T: AsRef<[u8]>> Sink<T> for SessionState<C> {
 
     fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.project()
-            .segment_egress
+            .segment_ingress
             .poll_ready(cx)
             .map_err(|e| SessionError::ProcessingError(e.to_string()).into())
     }
 
     fn start_send(self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
         self.project()
-            .segment_egress
+            .segment_ingress
             .start_send(item.as_ref().try_into()?)
             .map_err(|e| SessionError::ProcessingError(e.to_string()).into())
     }
 
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.project()
-            .segment_egress
+            .segment_ingress
             .poll_flush(cx)
             .map_err(|e| SessionError::ProcessingError(e.to_string()).into())
     }
 
     fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.project()
-            .segment_egress
+            .segment_ingress
             .poll_close(cx)
             .map_err(|e| SessionError::ProcessingError(e.to_string()).into())
     }
@@ -549,7 +555,25 @@ impl<const C: usize> SessionSocket<C> {
                 .into_async_read(),
         );
 
-        let (segment_egress, segment_ingress) = futures::channel::mpsc::unbounded();
+        let (segment_ingress, segment_egress) = futures::channel::mpsc::unbounded();
+
+        // Apply rate-limiting for egress segments if configured
+        if let Some(rate_limit) = cfg.max_msg_per_sec.filter(|r| *r > 0).map(|r| r as u32) {
+            let rate_limiter = RateLimiter::direct(Quota::per_second(rate_limit.try_into().unwrap()));
+            let jitter = Jitter::up_to(Duration::from_millis(5));
+
+            spawn(async move {
+                segment_egress
+                    .ratelimit_stream_with_jitter(&rate_limiter, jitter)
+                    .map(|m: SessionMessage<C>| Ok(m.into_encoded()))
+                    .forward(transport.into_sink())
+                    .await
+            });
+        } else {
+            spawn(segment_egress
+                      .map(|m| Ok(m.into_encoded()))
+                      .forward(transport.into_sink()));
+        }
 
         let state = SessionState {
             lookbehind: Arc::new(SkipMap::new()),
@@ -559,15 +583,9 @@ impl<const C: usize> SessionSocket<C> {
             session_id: id.to_string(),
             to_acknowledge,
             incoming_frame_retries,
-            segment_egress,
+            segment_ingress,
             cfg,
         };
-
-        spawn(
-            segment_ingress
-                .map(|m| Ok(m.into_encoded()))
-                .forward(transport.into_sink()),
-        );
 
         Self { state, frame_egress }
     }
@@ -595,7 +613,7 @@ impl<const C: usize> AsyncWrite for SessionSocket<C> {
 
     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
         // Only flush the underlying transport
-        let mut flush_future = self.state.segment_egress.flush();
+        let mut flush_future = self.state.segment_ingress.flush();
         match Pin::new(&mut flush_future).poll(cx) {
             Poll::Ready(Ok(())) => Poll::Ready(Ok(())),
             Poll::Ready(Err(e)) => Poll::Ready(Err(std::io::Error::new(std::io::ErrorKind::Other, e))),
@@ -606,7 +624,7 @@ impl<const C: usize> AsyncWrite for SessionSocket<C> {
     fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
         // Close the reassembler and the underlying transport
         self.state.frame_reassembler.close();
-        let mut close_future = self.state.segment_egress.close().boxed();
+        let mut close_future = self.state.segment_ingress.close().boxed();
         match Pin::new(&mut close_future).poll(cx) {
             Poll::Ready(Ok(())) => Poll::Ready(Ok(())),
             Poll::Ready(Err(e)) => Poll::Ready(Err(std::io::Error::new(std::io::ErrorKind::Other, e))),
