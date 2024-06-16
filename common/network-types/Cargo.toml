@@ -37,6 +37,7 @@ hopr-platform = { workspace = true }
 hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
+anyhow = "1.0"
 async-std = { workspace = true , features = ["attributes", "unstable"]}
 async-stream = { workspace = true }
 ctor = "0.2.8"

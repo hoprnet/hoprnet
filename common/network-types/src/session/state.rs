@@ -74,7 +74,7 @@ pub struct SessionConfig {
 
     /// Optional rate limiting of egress messages per second.
     #[default(None)]
-    pub max_msg_per_sec: Option<usize>
+    pub max_msg_per_sec: Option<usize>,
 }
 
 /// Contains the cloneable state of the session bound to a [`SessionSocket`].
@@ -541,17 +541,26 @@ impl<const C: usize> SessionSocket<C> {
 
         let frame_egress = Box::new(
             egress
-                .inspect(move |frame| {
-                    debug!("{id_clone:?}: emit frame {}", frame.frame_id);
-                    // The frame has been completed, so remove its retry record
-                    incoming_frame_retries_clone.remove(&frame.frame_id);
-                    if let Some(ack_buffer) = &is_acknowledging {
-                        // Acts as a ring buffer, so if the buffer is full, any unsent acknowledgements
-                        // will be discarded.
-                        ack_buffer.force_push(frame.frame_id);
+                .inspect(move |maybe_frame| {
+                    match maybe_frame {
+                        Ok(frame) => {
+                            debug!("{id_clone:?}: emit frame {}", frame.frame_id);
+                            // The frame has been completed, so remove its retry record
+                            incoming_frame_retries_clone.remove(&frame.frame_id);
+                            if let Some(ack_buffer) = &is_acknowledging {
+                                // Acts as a ring buffer, so if the buffer is full, any unsent acknowledgements
+                                // will be discarded.
+                                ack_buffer.force_push(frame.frame_id);
+                            }
+                        }
+                        Err(NetworkTypeError::FrameDiscarded(id)) | Err(NetworkTypeError::IncompleteFrame(id)) => {
+                            // Remove from retries since the frame has been discarded
+                            incoming_frame_retries_clone.remove(id);
+                        }
+                        _ => {}
                     }
                 })
-                .map(Ok)
+                .filter_map(|r| futures::future::ready(r.ok().map(Ok))) // Skip discarded frames
                 .into_async_read(),
         );
 
@@ -570,9 +579,11 @@ impl<const C: usize> SessionSocket<C> {
                     .await
             });
         } else {
-            spawn(segment_egress
-                      .map(|m| Ok(m.into_encoded()))
-                      .forward(transport.into_sink()));
+            spawn(
+                segment_egress
+                    .map(|m| Ok(m.into_encoded()))
+                    .forward(transport.into_sink()),
+            );
         }
 
         let state = SessionState {

@@ -1,3 +1,4 @@
+use crate::frame::FrameId;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -6,13 +7,16 @@ pub enum NetworkTypeError {
     InvalidFrameId,
 
     #[error("cannot reassemble frame {0}, because it is not complete")]
-    IncompleteFrame(u32),
+    IncompleteFrame(FrameId),
 
     #[error("segment could not be parsed correctly")]
     InvalidSegment,
 
     #[error("received a segment of a frame {0} that was already completed or evicted")]
-    OldSegment(u32),
+    OldSegment(FrameId),
+
+    #[error("frame {0} has expired and has been evicted")]
+    FrameDiscarded(FrameId),
 
     #[error("frame reassembler is closed")]
     ReassemblerClosed,
