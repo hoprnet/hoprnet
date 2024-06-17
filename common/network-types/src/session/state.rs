@@ -425,12 +425,14 @@ impl<const C: usize> SessionState<C> {
     /// is the expected underlying transport bandwidth (segment/sec) to guarantee the retransmission
     /// can still happen within some time window.
     pub async fn send_frame_data(&mut self, data: &[u8]) -> crate::errors::Result<()> {
-        if data.is_empty() || data.len() > SessionMessage::<C>::MAX_SEGMENTS_PER_FRAME * C {
+        // Real space for payload is MTU minus sizes of the headers
+        let real_payload_len = C - SessionMessage::<C>::HEADER_SIZE - Segment::HEADER_SIZE;
+        if data.is_empty() || data.len() > SessionMessage::<C>::MAX_SEGMENTS_PER_FRAME * real_payload_len {
             return Err(SessionError::IncorrectMessageLength.into());
         }
 
         let frame_id = self.outgoing_frame_id.fetch_add(1, Ordering::SeqCst);
-        let segments = segment(data, C - SessionMessage::<C>::HEADER_SIZE, frame_id);
+        let segments = segment(data, real_payload_len, frame_id);
 
         for segment in segments {
             self.lookbehind.insert((&segment).into(), segment.clone());

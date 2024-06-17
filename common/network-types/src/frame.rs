@@ -83,11 +83,10 @@ impl Display for SegmentId {
 
 /// Helper function to segment `data` into segments of given `mtu` length.
 /// All segments are tagged with the same `frame_id`.
-pub fn segment(data: &[u8], mtu: usize, frame_id: u32) -> Vec<Segment> {
+pub fn segment(data: &[u8], max_segment_size: usize, frame_id: u32) -> Vec<Segment> {
     assert!(frame_id > 0, "frame id cannot be 0");
-    assert!(mtu > Segment::HEADER_SIZE, "MTU is too small");
 
-    let chunks = data.chunks(mtu - Segment::HEADER_SIZE);
+    let chunks = data.chunks(max_segment_size);
     assert!(chunks.len() <= SeqNum::MAX as usize, "data too long");
 
     let seq_len = chunks.len() as SeqNum;
@@ -117,9 +116,8 @@ pub struct Frame {
 impl Frame {
     /// Segments this frame into a list of [segments](Segment) each of maximum sizes `mtu`.
     #[inline]
-    pub fn segment(&self, mtu: usize) -> Vec<Segment> {
-        assert!(self.frame_id > 0, "frame id 0 is not allowed");
-        segment(self.data.as_ref(), mtu, self.frame_id)
+    pub fn segment(&self, max_segment_size: usize) -> Vec<Segment> {
+        segment(self.data.as_ref(), max_segment_size, self.frame_id)
     }
 }
 
