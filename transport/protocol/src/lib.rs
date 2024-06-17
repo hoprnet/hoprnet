@@ -45,8 +45,6 @@
 
 /// Configuration of the protocol components.
 pub mod config;
-/// Constants exported by the crate.
-pub mod constants;
 /// Errors produced by the crate.
 pub mod errors;
 

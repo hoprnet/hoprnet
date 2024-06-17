@@ -12,13 +12,12 @@ on:
         required: true
         description: 'New release name'
         options:
-          - saint-louis
           - singapore
           - kaunas
       tag_name:
         type: string
         required: true
-        description: 'Git tag name which the release will be branched (v2.1.0)'
+        description: 'Git tag from which the release branch fork (v2.2.0)'
 
 concurrency:
   group: promote-release
@@ -36,6 +35,7 @@ jobs:
           ref: master
 
       - name: Promote release
+        id: promote_release
         run: |
           git fetch --all
           # Checkout to tag revision
@@ -47,10 +47,11 @@ jobs:
 
           # Create new branch or reuse an existing branch
           release_name="${{ vars.BRANCH_MASTER_RELEASE_NAME }}"
+          echo "release_name=${release_name}"  >> $GITHUB_OUTPUT
           if git branch -al release/${release_name} | grep ${release_name};
           then
-            echo "Branch release/${release_name} already exists"
-            exit 1
+            echo "Branch release/${release_name} already exists. Skipping promotion..."
+            exit 0
           else
             git checkout ${{ github.event.inputs.tag_name }}
             git checkout -b release/${release_name}
@@ -60,6 +61,29 @@ jobs:
           gh variable set BRANCH_MASTER_RELEASE_NAME --body "${{ github.event.inputs.new_release_name }}"
         env:
           GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
+
+      - name: Checkout hoprd-sdk-python repository
+        uses: actions/checkout@v4
+        with:
+          repository: hoprnet/hoprd-sdk-python
+          path: ./hoprd-sdk-python
+          ref: master
+
+      - name: Promote release hoprd-sdk-python
+        run: |
+          git fetch --all
+          # Create new branch or reuse an existing branch
+          release_name="${{ steps.promote_release.outputs.release_name }}"
+          if git branch -al release/${release_name} | grep ${release_name};
+          then
+            echo "Branch release/${release_name} already exists. Skipping promotion..."
+            exit 0
+          else
+            git checkout -b release/${release_name}
+            git push --set-upstream origin release/${release_name}
+          fi
+        working-directory: ./hoprd-sdk-python
+
   new_release:
     name: Open new release
     needs:
