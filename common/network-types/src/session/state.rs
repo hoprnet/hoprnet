@@ -461,15 +461,15 @@ impl<const C: usize> SessionState<C> {
     }
 
     /// Convenience method to advance the state by calling all three methods in order:
-    /// - [`SessionState::request_missing_segments`]
     /// - [`SessionState::acknowledge_segments`]
+    /// - [`SessionState::request_missing_segments`]
     /// - [`SessionState::retransmit_unacknowledged_frames`]
     ///
     /// The given optional limit is per each method call and is not shared, meaning
     /// each method gets the same limit.
     pub async fn advance(&mut self, max_messages: Option<usize>) -> crate::errors::Result<()> {
-        self.request_missing_segments(max_messages).await?;
         self.acknowledge_segments(max_messages).await?;
+        self.request_missing_segments(max_messages).await?;
         self.retransmit_unacknowledged_frames(max_messages).await?;
         Ok(())
     }
@@ -505,6 +505,7 @@ impl<const C: usize, T: AsRef<[u8]>> Sink<T> for SessionState<C> {
     }
 
     fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.frame_reassembler.close();
         self.project()
             .segment_ingress
             .poll_close(cx)

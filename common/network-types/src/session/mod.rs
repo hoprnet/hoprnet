@@ -155,8 +155,8 @@
 //! This, however, takes care only of the basic payload transmission function.
 //! If the user wishes to use the retransmission and acknowledgement features of the protocol,
 //! it must periodically call (in order) the corresponding methods of [`SessionState`](state::SessionState):
-//! 1) [`request_missing_segments`](state::SessionState::request_missing_segments)
-//! 2) [`acknowledge_segments`](state::SessionState::acknowledge_segments)
+//! 1) [`acknowledge_segments`](state::SessionState::acknowledge_segments)
+//! 2) [`request_missing_segments`](state::SessionState::request_missing_segments)
 //! 3) [`retransmit_unacknowledged_frames`](state::SessionState::retransmit_unacknowledged_frames)
 //!
 //! These should be called multiple times within the `frame_expiration_age` period, in order
