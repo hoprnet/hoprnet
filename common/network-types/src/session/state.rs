@@ -425,6 +425,10 @@ impl<const C: usize> SessionState<C> {
     /// is the expected underlying transport bandwidth (segment/sec) to guarantee the retransmission
     /// can still happen within some time window.
     pub async fn send_frame_data(&mut self, data: &[u8]) -> crate::errors::Result<()> {
+        if data.is_empty() || data.len() > SessionMessage::<C>::MAX_SEGMENTS_PER_FRAME * C {
+            return Err(SessionError::IncorrectMessageLength.into());
+        }
+
         let frame_id = self.outgoing_frame_id.fetch_add(1, Ordering::SeqCst);
         let segments = segment(data, C - SessionMessage::<C>::HEADER_SIZE, frame_id);
 
@@ -451,6 +455,20 @@ impl<const C: usize> SessionState<C> {
         self.outgoing_frame_resends
             .insert(frame_id, RetryToken::new(Instant::now(), self.cfg.backoff_base));
 
+        Ok(())
+    }
+
+    /// Convenience method to advance the state by calling all three methods in order:
+    /// - [`SessionState::request_missing_segments`]
+    /// - [`SessionState::acknowledge_segments`]
+    /// - [`SessionState::retransmit_unacknowledged_frames`]
+    ///
+    /// The given optional limit is per each method call and is not shared, meaning
+    /// each method gets the same limit.
+    pub async fn advance(&mut self, max_messages: Option<usize>) -> crate::errors::Result<()> {
+        self.request_missing_segments(max_messages).await?;
+        self.acknowledge_segments(max_messages).await?;
+        self.retransmit_unacknowledged_frames(max_messages).await?;
         Ok(())
     }
 
@@ -543,6 +561,7 @@ impl<const C: usize> SessionSocket<C> {
                         Err(NetworkTypeError::FrameDiscarded(id)) | Err(NetworkTypeError::IncompleteFrame(id)) => {
                             // Remove retry token, because the frame has been discarded
                             incoming_frame_retries_clone.remove(id);
+                            debug!("{id_clone:?}: frame {id} skipped");
                         }
                         _ => {}
                     }
@@ -622,6 +641,7 @@ impl<const C: usize> AsyncWrite for SessionSocket<C> {
     fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
         // Close the reassembler and the underlying transport
         self.state.frame_reassembler.close();
+        self.state.segment_ingress.close_channel();
         let mut close_future = self.state.segment_ingress.close().boxed();
         match Pin::new(&mut close_future).poll(cx) {
             Poll::Ready(Ok(())) => Poll::Ready(Ok(())),
@@ -747,20 +767,14 @@ mod tests {
         let mut bob_alice_state = bob_to_alice.state().clone();
         async_std::task::spawn_local(async move {
             loop {
-                alice_bob_state.acknowledge_segments(None).await.unwrap();
-                alice_bob_state.request_missing_segments(None).await.unwrap();
-                alice_bob_state.retransmit_unacknowledged_frames(None).await.unwrap();
-
+                alice_bob_state.advance(None).await.unwrap();
                 async_std::task::sleep(network_cfg.step_interval).await;
             }
         });
 
         async_std::task::spawn_local(async move {
             loop {
-                bob_alice_state.acknowledge_segments(None).await.unwrap();
-                bob_alice_state.request_missing_segments(None).await.unwrap();
-                bob_alice_state.retransmit_unacknowledged_frames(None).await.unwrap();
-
+                bob_alice_state.advance(None).await.unwrap();
                 async_std::task::sleep(network_cfg.step_interval).await;
             }
         });

@@ -136,7 +136,7 @@ pub struct FrameAcknowledgements<const C: usize>(BTreeSet<FrameId>);
 
 impl<const C: usize> FrameAcknowledgements<C> {
     /// Maximum number of [frame IDs](FrameId) that can be accommodated.
-    pub const MAX_ACK_FRAMES: usize = C / mem::size_of::<FrameId>();
+    pub const MAX_ACK_FRAMES: usize = (C - SessionMessage::<C>::HEADER_SIZE) / mem::size_of::<FrameId>();
 
     /// Pushes the frame ID.
     /// Returns true if the value has been pushed or false it the container is full or already
@@ -244,6 +244,9 @@ impl<const C: usize> SessionMessage<C> {
     /// Current version of the protocol.
     pub const VERSION: u8 = 0;
 
+    /// Maximum number of segments per frame.
+    pub const MAX_SEGMENTS_PER_FRAME: usize = SegmentRequest::<C>::MAX_MISSING_SEGMENTS_PER_FRAME;
+
     /// Returns the minimum size of a [SessionMessage].
     pub fn minimum_message_size() -> usize {
         // Make this a "const fn" once "min" is const fn too
@@ -262,8 +265,10 @@ impl<const C: usize> TryFrom<&[u8]> for SessionMessage<C> {
     type Error = SessionError;
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
-        if value.len() < Self::HEADER_SIZE + Segment::HEADER_SIZE {
-            return Err(SessionError::ParseError);
+        if value.len() < Self::minimum_message_size()
+        /*|| value.len() > C*/
+        {
+            return Err(SessionError::IncorrectMessageLength);
         }
 
         let version = value[0];

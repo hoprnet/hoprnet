@@ -11,6 +11,9 @@ pub enum SessionError {
     #[error("invalid protocol version")]
     WrongVersion,
 
+    #[error("message has an incorrect length")]
+    IncorrectMessageLength,
+
     #[error("the message has an incorrect tag")]
     UnknownMessageTag,
 }

@@ -85,8 +85,9 @@ impl Display for SegmentId {
 /// All segments are tagged with the same `frame_id`.
 pub fn segment(data: &[u8], mtu: usize, frame_id: u32) -> Vec<Segment> {
     assert!(frame_id > 0, "frame id cannot be 0");
+    assert!(mtu > Segment::HEADER_SIZE, "MTU is too small");
 
-    let chunks = data.chunks(mtu);
+    let chunks = data.chunks(mtu - Segment::HEADER_SIZE);
     assert!(chunks.len() <= SeqNum::MAX as usize, "data too long");
 
     let seq_len = chunks.len() as SeqNum;
