@@ -24,6 +24,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   build-binary:
+    if: contains(github.event.pull_request.labels.*.name, format('binary:{0}', inputs.target))
     runs-on: ${{ inputs.runner }}
     timeout-minutes: 60
     steps:
