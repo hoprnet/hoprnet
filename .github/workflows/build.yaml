@@ -53,7 +53,7 @@ jobs:
           - name: armv7l-linux
             package: hoprd-armv7l-linux
             runner: self-hosted-hoprnet-big
-    name: ${{ martrix.target.name }}
+    name: ${{ matrix.target.name }}
     if: contains(github.event.pull_request.labels.*.name, format('binary:{0}', matrix.target.name))
     uses: ./.github/workflows/build-binaries.yaml
     with:
