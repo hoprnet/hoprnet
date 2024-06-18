@@ -31,7 +31,7 @@ let
   };
 
   isCrossBuild = ! pkgsLocal.lib.systems.equals localSystem crossSystem;
-  isCIBuild = builtins.getEnv "CI" == "true";
+  isCIBuild = (builtins.getEnv "CI") == "true";
 
   # `hostPlatform` is the cross-compilation output platform;
   # `buildPlatform` is the platform we are compiling on
@@ -42,7 +42,7 @@ let
   postFixup =
     if (!hostPlatform.isDarwin) && (isCrossBuild || isCIBuild)
     then ''
-      patchelf --set-interpreter /lib64/ld-linux-x86-64.so.2 $out/bin/hoprd
+      ${pkgs.pkgsBuildHost.patchelf}/bin/patchelf --set-interpreter /lib64/ld-linux-x86-64.so.2 $out/bin/hoprd
     ''
     else null;
 

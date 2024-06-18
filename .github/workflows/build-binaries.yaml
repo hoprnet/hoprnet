@@ -47,7 +47,7 @@ jobs:
 
       - name: Build hoprd binary
         run: |
-          nix build .#${{ inputs.package }}
+          nix build .#${{ inputs.package }} -L
         env:
           PKG: ${{ inputs.package }}
 

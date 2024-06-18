@@ -8,6 +8,7 @@
 , html-tidy
 , lib
 , libiconv
+, makeSetupHook
 , openssl
 , pandoc
 , pkg-config
@@ -21,29 +22,44 @@
 , stdenv
 }:
 let
+  # The hook is used when building on darwin for non-darwin, where the flags
+  # need to be cleaned up.
+  darwinSuffixSalt = builtins.replaceStrings [ "-" "." ] [ "_" "_" ] stdenv.buildPlatform.config;
+  targetSuffixSalt = builtins.replaceStrings [ "-" "." ] [ "_" "_" ] stdenv.hostPlatform.config;
+  setupHookDarwin = makeSetupHook
+    {
+      name = "darwin-hopr-gcc-hook";
+      substitutions = {
+        inherit darwinSuffixSalt targetSuffixSalt;
+      };
+    } ./setup-hook-darwin.sh;
+
   crateInfo = craneLib.crateNameFromCargoToml { inherit cargoToml; };
   pname = crateInfo.pname;
   version = lib.strings.concatStringsSep "." (lib.lists.take 3 (builtins.splitVersion crateInfo.version));
+
+  isDarwinForDarwin = stdenv.buildPlatform.isDarwin && stdenv.hostPlatform.isDarwin;
+  isDarwinForNonDarwin = stdenv.buildPlatform.isDarwin && !stdenv.hostPlatform.isDarwin;
+
+  darwinBuildInputs =
+    if isDarwinForDarwin || isDarwinForNonDarwin then
+      with pkgs.pkgsBuildHost.darwin.apple_sdk.frameworks; [
+        CoreFoundation
+        CoreServices
+        Security
+        SystemConfiguration
+      ] else [ ];
+  darwinNativeBuildInputs =
+    if !isDarwinForDarwin && isDarwinForNonDarwin then
+      [ setupHookDarwin ] else [ ];
 
   sharedArgsBase = {
     inherit pname version CARGO_PROFILE;
 
     # FIXME: some dev dependencies depend on OpenSSL, would be nice to remove
     # this dependency
-    nativeBuildInputs = stdenv.extraNativeBuildInputs ++ [ solcDefault foundryBin pkg-config pkgs.pkgsBuildHost.openssl libiconv ]
-      ++ lib.optionals stdenv.buildPlatform.isDarwin (
-      with pkgs.pkgsBuildHost.darwin.apple_sdk.frameworks; [
-        CoreFoundation
-        CoreServices
-        Security
-        SystemConfiguration
-      ]
-    );
-    buildInputs = [ openssl ] ++ stdenv.extraBuildInputs;
-    #++ lib.optionals stdenv.hostPlatform.isDarwin ([
-    #     CoreFoundation
-    #   ]
-    # );
+    nativeBuildInputs = [ solcDefault foundryBin pkg-config pkgs.pkgsBuildHost.openssl libiconv ] ++ stdenv.extraNativeBuildInputs ++ darwinNativeBuildInputs;
+    buildInputs = [ openssl ] ++ stdenv.extraBuildInputs ++ darwinBuildInputs;
 
     CARGO_HOME = ".cargo";
     cargoExtraArgs = "--offline -p ${pname} ";
