@@ -77,7 +77,7 @@ impl Validate for NetworkConfig {
         }
 
         // #[validate(range(min = 0.0, max = 1.0))]
-        if !(0.0..1.0).contains(&self.quality_bad_threshold) {
+        if !(0.0..=1.0).contains(&self.quality_bad_threshold) {
             errors.add(
                 "quality_bad_threshold",
                 validator::ValidationError::new("quality_bad_threshold must be between 0 and 1"),
@@ -85,7 +85,7 @@ impl Validate for NetworkConfig {
         }
 
         // #[validate(range(min = 0.0, max = 1.0))]
-        if !(0.0..1.0).contains(&self.quality_offline_threshold) {
+        if !(0.0..=1.0).contains(&self.quality_offline_threshold) {
             errors.add(
                 "quality_offline_threshold",
                 validator::ValidationError::new("quality_offline_threshold must be between 0 and 1"),
@@ -100,7 +100,7 @@ impl Validate for NetworkConfig {
         // }
 
         // #[validate(range(min = 0.0, max = 1.0))]
-        if !(0.0..1.0).contains(&self.quality_step) {
+        if !(0.0..=1.0).contains(&self.quality_step) {
             errors.add(
                 "quality_step",
                 validator::ValidationError::new("quality_step must be between 0 and 1"),
