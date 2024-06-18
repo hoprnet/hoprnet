@@ -80,11 +80,15 @@ impl Display for SegmentId {
     }
 }
 
-/// Helper function to segment `data` into segments of given `mtu` length.
+/// Helper function to segment `data` into segments of given `max_segment_size` length.
 /// All segments are tagged with the same `frame_id`.
 pub fn segment(data: &[u8], max_segment_size: usize, frame_id: u32) -> crate::errors::Result<Vec<Segment>> {
     if frame_id == 0 {
         return Err(NetworkTypeError::InvalidFrameId);
+    }
+
+    if max_segment_size == 0 {
+        return Err(NetworkTypeError::InvalidSegmentSize);
     }
 
     let chunks = data.chunks(max_segment_size);

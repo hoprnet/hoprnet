@@ -24,6 +24,9 @@ pub enum NetworkTypeError {
     #[error("frame reassembler is closed")]
     ReassemblerClosed,
 
+    #[error("invalid size of a segment was specified")]
+    InvalidSegmentSize,
+
     #[error(transparent)]
     SessionProtocolError(#[from] crate::session::errors::SessionError),
 

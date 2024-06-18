@@ -3842,6 +3842,7 @@ dependencies = [
  "hopr-db-sql",
  "hopr-internal-types",
  "hopr-metrics",
+ "hopr-network-types",
  "hopr-platform",
  "hopr-primitive-types",
  "hopr-strategy",

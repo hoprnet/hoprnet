@@ -9,9 +9,9 @@ repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"
 
 [features]
-default = ["runtime-async-std"]
-runtime-async-std = ["dep:async-std"]
-runtime-tokio = ["dep:tokio"]
+default = []
+runtime-async-std = ["async-std"]
+runtime-tokio = ["tokio"]
 
 [dependencies]
 async-std = { workspace = true, optional = true}

@@ -1,3 +1,111 @@
+//! # `Session` protocol state machine
+//!
+//! The protocol always forms a middle layer between a *lower layer* transport (such as an unreliable
+//! UDP-like network) and any upstream protocol.
+//! The communication with the *lower layer* is done via [`SessionState`];
+//! the *upper layer* is using the [`SessionSocket`] to pass data with the
+//! `Session` protocol.
+//!
+//! ## Instantiation
+//! The instantiation of the protocol state machine is done by creating the [`SessionSocket`]
+//! object, by [providing it](SessionSocket::new) an underlying transport writer and its MTU `C`.
+//! The protocol can be instantiated over any transport that implements [`futures::io::AsyncWrite`]
+//! for sending raw data packets.
+//!
+//! ## Passing data between the protocol and the upper layer
+//! The [`SessionSocket`] exposes as [`AsyncRead`] +
+//! [`AsyncWrite`] and can be used to read and write arbitrary data
+//! to the protocol. If the writer is [closed](AsyncWrite::poll_close), the session is closed
+//! as well.
+//!
+//! ## Passing of data from the protocol *to* the lower layer
+//!
+//! Writes to the underlying transport happen automatically as needed. The amount of data written
+//! per each [`write`](AsyncWrite::poll_write) does not exceed the size of the set MTU.
+//!
+//! ## Passing of data to the protocol *from* the lower layer
+//!
+//! The user is responsible for polling the underlying transport for any incoming data,
+//! and updating the [state of the socket](SessionSocket::state).
+//! This is done by passing the data to the [`SessionState`], which implements
+//! [`futures::io::Sink`] for any `AsRef<[u8]>`. The size of each [`send`](Sink::start_send)
+//! to the `Sink` also must not exceed the size of the MTU.
+//!
+//! ## Protocol features
+//!
+//! ### Data segmentation
+//! Once data is written to the [`SessionSocket`], it is segmented and written
+//! automatically to the underlying transport. Every write to the `SessionSocket` corresponds to
+//! a [`Frame`](crate::session::frame::Frame).
+//!
+//! ## Frame reassembly
+//! The receiving side performs frame reassembly and sequencing of the frames.
+//! Frames are never emitted to the upper layer transport out of order, but frames
+//! can be skipped if they exceed the [`frame_expiration_age`](SessionConfig).
+//!
+//! ## Frame acknowledgement
+//!
+//! The recipient can acknowledge frames to the sender, once all its segments have been received.
+//! This is done with a [`FrameAcknowledgements`] message sent back
+//! to the sender.
+//!
+//! ## Segment retransmission
+//!
+//! There are two means of segment retransmission:
+//!
+//! ### Recipient requested retransmission
+//! This is useful in situations when the recipient has received only some segments of a frame.
+//! At this point, the recipient knows which segments are missing in a frame and can initiate
+//! [`SegmentRequest`] sent back to the sender.
+//! This method is more targeted, as it requests only those segments of a frame that are needed.
+//! Once the sender receives the segment request, it will retransmit the segments in question
+//! over to the receiver.
+//! The recipient can make repeating requests on retransmission, based on the network reliability.
+//! However, retransmission requests decay with an exponential backoff given by `backoff_base`
+//! and `rto_base_receiver` timeout in [`SessionConfig`] up
+//! until the `frame_expiration_age`.
+//!
+//!
+//! ### Sender initiated retransmission
+//! The frame sender can also automatically retransmit entire frames (= all their segments)
+//! to the recipient. This happens if the sender (within a time period) did not receive the
+//! frame acknowledgement *and* the recipient also did not request retransmission of any segment in
+//! that frame.
+//! This is useful in situations when the recipient did not receive any segment of a frame. Once
+//! the recipient receives at least one segment of a frame, the recipient requested retransmission
+//! is the preferred way.
+//!
+//! The sender can make repeating frame retransmissions, based on the network reliability.
+//! However, retransmissions decay with an exponential backoff given by `backoff_base`
+//! and `rto_base_sender` timeout in [`SessionConfig`] up until
+//! the `frame_expiration_age`.
+//! The retransmissions of a frame by the sender stop, if the frame has been acknowledged by the
+//! recipient *or* the recipient started requesting segment retransmission.
+//!
+//! ### Retransmission timing
+//! Both retransmission methods will work up until `frame_expiration_age`. Since the
+//! recipient request based method is more targeted, at least one should be allowed to happen
+//! before the sender initiated retransmission kicks in. Therefore, it is recommended to set
+//! the `rto_base_sender` at least twice the `rto_base_receiver`.
+//!
+//! ## State stepping
+//!
+//! As mentioned in the above text, the only responsibility of the user so far is to
+//! pass the data received by the transport to the `SessionState` of the socket.
+//!
+//! This, however, takes care only of the basic payload transmission function.
+//! If the user wishes to use the retransmission and acknowledgement features of the protocol,
+//! it must periodically call (in order) the corresponding methods of [`SessionState`]:
+//! 1) [`acknowledge_segments`](SessionState::acknowledge_segments)
+//! 2) [`request_missing_segments`](SessionState::request_missing_segments)
+//! 3) [`retransmit_unacknowledged_frames`](SessionState::retransmit_unacknowledged_frames)
+//!
+//! These should be called multiple times within the `frame_expiration_age` period, in order
+//! for the session state to advance.
+//!
+//! For convenience, the [`SessionState::advance`](SessionState::advance) method
+//! combines all three above methods in a single call
+//!
 use crossbeam_queue::ArrayQueue;
 use crossbeam_skiplist::SkipMap;
 use dashmap::mapref::entry::Entry;
@@ -24,18 +132,21 @@ use crate::session::frame::{segment, FrameId, FrameReassembler, Segment, Segment
 use crate::session::protocol::{FrameAcknowledgements, SegmentRequest, SessionMessage};
 use crate::session::utils::{RetryResult, RetryToken};
 
-#[cfg(feature = "runtime-async-std")]
+#[cfg(any(feature = "runtime-async-std", test))]
 use async_std::task::spawn;
 
-#[cfg(feature = "runtime-tokio")]
+#[cfg(all(feature = "runtime-tokio", not(test)))]
 use tokio::task::spawn;
+
+#[cfg(all(feature = "runtime-async-std", feature = "runtime-tokio"))]
+compile_error!("Only one of the runtime features can be specified for the build");
 
 /// Configuration of session.
 #[derive(Debug, Clone, Copy, PartialEq, SmartDefault)]
 pub struct SessionConfig {
     /// Maximum number of buffered segments.
     /// This value should be large enough to accommodate segments for an at least
-    /// `frame_expiration_age` period, given the expected maximum bandwidth.
+    /// `frame_expiration_age` period, considering the expected maximum bandwidth.
     #[default = 50_000]
     pub max_buffered_segments: usize,
 
