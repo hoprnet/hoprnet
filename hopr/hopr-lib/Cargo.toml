@@ -77,4 +77,3 @@ ethers = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-db-sql = { workspace = true, features = ["runtime-async-std"] }
 serde_yaml = { version = "0.9" }
-
