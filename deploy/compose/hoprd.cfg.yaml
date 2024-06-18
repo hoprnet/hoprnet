@@ -1,7 +1,7 @@
 ---
 hopr:
   host:
-    address: !IPv4 127.0.0.1   # MAKE EDITS: replace with your public IP.
+    address: !IPv4 127.0.0.1 # MAKE EDITS: replace with your public IP.
     port: 9091 # NOTE: adapt port to reflect your public port.
   db:
     data: /app/hoprd/
