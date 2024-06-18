@@ -11,9 +11,11 @@ on:
     types:
       - synchronize
       - ready_for_review
+
 concurrency:
   group: ${{ github.head_ref }}-build
   cancel-in-progress: true
+
 jobs:
   build-docker-hoprd:
     name: Hoprd
@@ -32,57 +34,33 @@ jobs:
       package: hopli
     secrets: inherit
 
-  build-binary-x86_64-linux:
-    name: x86_64-linux
-    if: contains(github.event.pull_request.labels.*.name, 'binary:x86_64-linux')
+  build-binary:
+    strategy:
+      matrix:
+        target:
+          - target: x86_64-linux
+            package: hoprd-x86_64-linux
+            runner: self-hosted-hoprnet-big
+          - target: aarch64-linux
+            package: hoprd-aarch64-linux
+            runner: self-hosted-hoprnet-big
+          - target: aarch64-darwin
+            package: hoprd
+            runner: macos-14 # M1 machine
+          - target: x86_64-darwin
+            package: hoprd
+            runner: macos-13 # Intel machine
+          - target: armv7l-linux
+            package: hoprd-armv7l-linux
+            runner: self-hosted-hoprnet-big
+    name: ${{ martrix.target.target }}
+    if: contains(github.event.pull_request.labels.*.name, 'binary:${{ matrix.target.target }}')
     uses: ./.github/workflows/build-binaries.yaml
     with:
       branch: ${{ github.event.pull_request.head.ref }}
-      binary_name: hoprd-x86_64-linux
-      package: hoprd-x86_64-linux
-      runner: self-hosted-hoprnet-big
-    secrets: inherit
-
-  build-binary-aarch64-linux:
-    name: aarch64-linux
-    if: contains(github.event.pull_request.labels.*.name, 'binary:aarch64-linux')
-    uses: ./.github/workflows/build-binaries.yaml
-    with:
-      branch: ${{ github.event.pull_request.head.ref }}
-      binary_name: hoprd-aarch64-linux
-      package: hoprd-aarch64-linux
-      runner: self-hosted-hoprnet-big
-    secrets: inherit
-
-  build-binary-aarch64-darwin:
-    name: aarch64-darwin
-    if: contains(github.event.pull_request.labels.*.name, 'binary:aarch64-darwin')
-    uses: ./.github/workflows/build-binaries.yaml
-    with:
-      branch: ${{ github.event.pull_request.head.ref }}
-      binary_name: hoprd-aarch64-darwin
-      runner: macos-14 # M1 machine
-    secrets: inherit
-
-  build-binary-x86_64-darwin:
-    name: x86_64-darwin
-    if: contains(github.event.pull_request.labels.*.name, 'binary:x86_64-darwin')
-    uses: ./.github/workflows/build-binaries.yaml
-    with:
-      branch: ${{ github.event.pull_request.head.ref }}
-      binary_name: hoprd-x86_64-darwin
-      runner: macos-13 # Intel machine
-    secrets: inherit
-
-  build-binary-armv7l-linux:
-    name: armv7l-linux
-    if: contains(github.event.pull_request.labels.*.name, 'binary:armv7l-linux')
-    uses: ./.github/workflows/build-binaries.yaml
-    with:
-      branch: ${{ github.event.pull_request.head.ref }}
-      binary_name: hoprd-armv7l-linux
-      package: hoprd-armv7l-linux
-      runner: self-hosted-hoprnet-big
+      target: ${{ matrix.target.target }}
+      package: ${{ matrix.target.package }}
+      runner: ${{ matrix.target.runner }}
     secrets: inherit
 
   docs:
