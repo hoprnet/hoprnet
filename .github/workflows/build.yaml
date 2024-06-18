@@ -38,27 +38,27 @@ jobs:
     strategy:
       matrix:
         target:
-          - target: x86_64-linux
+          - name: x86_64-linux
             package: hoprd-x86_64-linux
             runner: self-hosted-hoprnet-big
-          - target: aarch64-linux
+          - name: aarch64-linux
             package: hoprd-aarch64-linux
             runner: self-hosted-hoprnet-big
-          - target: aarch64-darwin
+          - name: aarch64-darwin
             package: hoprd
             runner: macos-14 # M1 machine
-          - target: x86_64-darwin
+          - name: x86_64-darwin
             package: hoprd
             runner: macos-13 # Intel machine
-          - target: armv7l-linux
+          - name: armv7l-linux
             package: hoprd-armv7l-linux
             runner: self-hosted-hoprnet-big
-    name: ${{ martrix.target.target }}
-    if: contains(github.event.pull_request.labels.*.name, 'binary:${{ matrix.target.target }}')
+    name: ${{ martrix.target.name }}
+    if: contains(github.event.pull_request.labels.*.name, format('binary:{0}', matrix.target.name))
     uses: ./.github/workflows/build-binaries.yaml
     with:
       branch: ${{ github.event.pull_request.head.ref }}
-      target: ${{ matrix.target.target }}
+      target: ${{ matrix.target.name }}
       package: ${{ matrix.target.package }}
       runner: ${{ matrix.target.runner }}
     secrets: inherit
