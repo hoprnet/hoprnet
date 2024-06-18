@@ -320,14 +320,14 @@ mod tests {
     use std::time::SystemTime;
 
     #[test]
-    fn test_session_message_segment() {
+    fn test_session_message_segment() -> anyhow::Result<()> {
         const SEG_SIZE: usize = 8;
 
         let mut segments = Frame {
             frame_id: 10,
             data: hex!("deadbeefcafebabe").into(),
         }
-        .segment(SEG_SIZE);
+        .segment(SEG_SIZE)?;
 
         const MTU: usize = SEG_SIZE + Segment::HEADER_SIZE + 2;
 
@@ -336,6 +336,8 @@ mod tests {
         let msg_2 = SessionMessage::try_from(&data[..]).unwrap();
 
         assert_eq!(msg_1, msg_2);
+
+        Ok(())
     }
 
     #[test]

@@ -6,6 +6,9 @@ pub enum NetworkTypeError {
     #[error("attempt to insert invalid frame id")]
     InvalidFrameId,
 
+    #[error("frame cannot be segmented because it is too long")]
+    DataTooLong,
+
     #[error("cannot reassemble frame {0}, because it is not complete")]
     IncompleteFrame(FrameId),
 

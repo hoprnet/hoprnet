@@ -415,7 +415,7 @@ impl<const C: usize> SessionState<C> {
         }
 
         let frame_id = self.outgoing_frame_id.fetch_add(1, Ordering::SeqCst);
-        let segments = segment(data, real_payload_len, frame_id);
+        let segments = segment(data, real_payload_len, frame_id)?;
 
         for segment in segments {
             self.lookbehind.insert((&segment).into(), segment.clone());

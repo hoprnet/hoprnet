@@ -58,7 +58,6 @@ use hopr_platform::time::native::current_time;
 use hopr_primitive_types::prelude::AsUnixTimestamp;
 
 use crate::errors::NetworkTypeError;
-use crate::errors::NetworkTypeError::FrameDiscarded;
 
 /// ID of a [Frame].
 pub type FrameId = u32;
@@ -83,15 +82,18 @@ impl Display for SegmentId {
 
 /// Helper function to segment `data` into segments of given `mtu` length.
 /// All segments are tagged with the same `frame_id`.
-pub fn segment(data: &[u8], max_segment_size: usize, frame_id: u32) -> Vec<Segment> {
-    assert!(frame_id > 0, "frame id cannot be 0");
+pub fn segment(data: &[u8], max_segment_size: usize, frame_id: u32) -> crate::errors::Result<Vec<Segment>> {
+    if frame_id == 0 {
+        return Err(NetworkTypeError::InvalidFrameId);
+    }
 
     let chunks = data.chunks(max_segment_size);
-    assert!(chunks.len() <= SeqNum::MAX as usize, "data too long");
+    if chunks.len() > SeqNum::MAX as usize {
+        return Err(NetworkTypeError::DataTooLong);
+    }
 
     let seq_len = chunks.len() as SeqNum;
-
-    chunks
+    Ok(chunks
         .enumerate()
         .map(|(idx, data)| Segment {
             frame_id,
@@ -99,7 +101,7 @@ pub fn segment(data: &[u8], max_segment_size: usize, frame_id: u32) -> Vec<Segme
             seq_idx: idx as u8,
             data: data.into(),
         })
-        .collect()
+        .collect())
 }
 
 /// Data frame of arbitrary length.
@@ -116,7 +118,7 @@ pub struct Frame {
 impl Frame {
     /// Segments this frame into a list of [segments](Segment) each of maximum sizes `mtu`.
     #[inline]
-    pub fn segment(&self, max_segment_size: usize) -> Vec<Segment> {
+    pub fn segment(&self, max_segment_size: usize) -> crate::errors::Result<Vec<Segment>> {
         segment(self.data.as_ref(), max_segment_size, self.frame_id)
     }
 }
@@ -381,7 +383,7 @@ impl Ord for FrameInfo {
 ///
 /// // Build Frame and segment it
 /// let frame = Frame { frame_id: 1, data: bytes.as_ref().into() };
-/// let segments = frame.segment(2);
+/// let segments = frame.segment(2).unwrap();
 /// assert_eq!(bytes.len() / 2, segments.len());
 ///
 /// // Create FrameReassembler and feed the segments to it
@@ -436,7 +438,7 @@ impl FrameReassembler {
                 .map_err(|_| NetworkTypeError::ReassemblerClosed)?;
         } else {
             self.reassembled
-                .unbounded_send(Err(FrameDiscarded(builder.frame_id)))
+                .unbounded_send(Err(NetworkTypeError::FrameDiscarded(builder.frame_id)))
                 .map_err(|_| NetworkTypeError::ReassemblerClosed)?;
         }
         self.last_emission
@@ -542,7 +544,11 @@ impl FrameReassembler {
     /// leading incomplete frames that are expired at the time this method was called.
     /// Returns that total number of frames that were evicted.
     pub fn evict(&self) -> crate::errors::Result<usize> {
-        if self.reassembled.is_closed() || self.sequences.is_empty() {
+        if self.reassembled.is_closed() {
+            return Err(NetworkTypeError::ReassemblerClosed);
+        }
+
+        if self.sequences.is_empty() {
             return Ok(0);
         }
 
@@ -650,7 +656,7 @@ pub(crate) mod tests {
             })
             .collect::<Vec<_>>();
         static ref SEGMENTS: Vec<Segment> = {
-            let vec = FRAMES.par_iter().flat_map(|f| f.segment(MTU)).collect::<VecDeque<_>>();
+            let vec = FRAMES.par_iter().flat_map(|f| f.segment(MTU).unwrap()).collect::<VecDeque<_>>();
             let mut rng = rand::rngs::StdRng::from_seed(RAND_SEED.clone());
             linear_half_normal_shuffle(&mut rng, vec, MIXING_FACTOR)
         };
@@ -719,14 +725,14 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn test_segmentation() {
+    fn test_segmentation() -> anyhow::Result<()> {
         let data = hex!("deadbeefcafebabe");
         let frame = Frame {
             frame_id: 1,
             data: data.as_ref().into(),
         };
 
-        let segments = frame.segment(3);
+        let segments = frame.segment(3)?;
         assert_eq!(3, segments.len());
 
         assert_eq!(hex!("deadbe"), segments[0].data.as_ref());
@@ -743,6 +749,8 @@ pub(crate) mod tests {
         assert_eq!(2, segments[2].seq_idx);
         assert_eq!(3, segments[2].seq_len);
         assert_eq!(frame.frame_id, segments[2].frame_id);
+
+        Ok(())
     }
 
     #[test]
@@ -763,21 +771,23 @@ pub(crate) mod tests {
     }
 
     #[async_std::test]
-    async fn test_ordered() {
+    async fn test_ordered() -> anyhow::Result<()> {
         let (fragmented, reassembled) = FrameReassembler::new(Duration::from_secs(30));
 
         FRAMES
             .iter()
-            .flat_map(|f| f.segment(MTU))
-            .for_each(|s| fragmented.push_segment(s).unwrap());
+            .flat_map(|f| f.segment(MTU).unwrap())
+            .try_for_each(|s| fragmented.push_segment(s))?;
 
         drop(fragmented);
-        let reassembled_frames = reassembled.try_collect::<Vec<_>>().await.unwrap();
+        let reassembled_frames = reassembled.try_collect::<Vec<_>>().await?;
 
         reassembled_frames
             .into_par_iter()
             .enumerate()
             .for_each(|(i, frame)| assert_eq!(frame, FRAMES[i]));
+
+        Ok(())
     }
 
     #[async_std::test]
@@ -807,26 +817,28 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn test_should_not_push_frame_id_0() {
+    fn test_should_not_push_frame_id_0() -> anyhow::Result<()> {
         let frame = Frame {
             frame_id: 1,
             data: hex!("deadbeefcafe").into(),
         };
 
-        let mut segments = frame.segment(2);
+        let mut segments = frame.segment(2)?;
         segments[0].frame_id = 0;
 
         let (fragmented, _reassembled) = FrameReassembler::new(Duration::from_secs(30));
         fragmented
             .push_segment(segments[0].clone())
             .expect_err("must not push frame id 0");
+
+        Ok(())
     }
 
     #[test]
     fn test_pushing_segment_of_completed_frame_should_fail() -> anyhow::Result<()> {
         let (fragmented, _reassembled) = FrameReassembler::new(Duration::from_secs(30));
 
-        let segments = FRAMES[0].segment(MTU);
+        let segments = FRAMES[0].segment(MTU)?;
         let segment_1 = segments[0].clone();
 
         segments.into_iter().try_for_each(|s| fragmented.push_segment(s))?;
@@ -842,7 +854,7 @@ pub(crate) mod tests {
     async fn test_pushing_segment_of_evicted_frame_should_fail() -> anyhow::Result<()> {
         let (fragmented, _reassembled) = FrameReassembler::new(Duration::from_millis(5).into());
 
-        let mut segments = FRAMES[0].segment(MTU);
+        let mut segments = FRAMES[0].segment(MTU)?;
         let segment_1 = segments.pop().unwrap(); // Remove the first segment
 
         segments.into_iter().try_for_each(|s| fragmented.push_segment(s))?;
@@ -864,7 +876,7 @@ pub(crate) mod tests {
         let mut rng = thread_rng();
 
         let frame = FRAMES[0].clone();
-        let mut segments = frame.segment(MTU);
+        let mut segments = frame.segment(MTU)?;
         segments.shuffle(&mut rng);
 
         segments.into_iter().try_for_each(|s| fragmented.push_segment(s))?;
@@ -936,7 +948,10 @@ pub(crate) mod tests {
             },
         ];
 
-        let mut segments = frames.iter().flat_map(|f| f.segment(3)).collect::<VecDeque<_>>();
+        let mut segments = frames
+            .iter()
+            .flat_map(|f| f.segment(3).unwrap())
+            .collect::<VecDeque<_>>();
         segments.retain(|s| s.frame_id != 2 || s.seq_idx != 2); // Remove 2nd segment of Frame 2
 
         let (fragmented, reassembled) = FrameReassembler::new(Duration::from_millis(10));
@@ -982,7 +997,10 @@ pub(crate) mod tests {
             },
         ];
 
-        let segments = frames.iter().flat_map(|f| f.segment(3)).collect::<VecDeque<_>>();
+        let segments = frames
+            .iter()
+            .flat_map(|f| f.segment(3).unwrap())
+            .collect::<VecDeque<_>>();
 
         let (fragmented, reassembled) = FrameReassembler::new(Duration::from_millis(10));
 
@@ -1022,7 +1040,10 @@ pub(crate) mod tests {
     async fn test_randomized_delayed_parallel() -> anyhow::Result<()> {
         let frames = FRAMES.iter().take(100).collect::<Vec<_>>();
 
-        let segments = frames.iter().flat_map(|frame| frame.segment(MTU)).collect::<Vec<_>>();
+        let segments = frames
+            .iter()
+            .flat_map(|frame| frame.segment(MTU).unwrap())
+            .collect::<Vec<_>>();
 
         let (fragmented, reassembled) = FrameReassembler::new(Duration::from_secs(30));
 
@@ -1172,7 +1193,7 @@ pub(crate) mod tests {
         let mut segments = FRAMES
             .par_iter()
             .take(num_frames)
-            .flat_map(|f| f.segment(MTU))
+            .flat_map(|f| f.segment(MTU).unwrap())
             .collect::<VecDeque<_>>();
 
         let (corrupted_frames, corrupted_segments): (HashSet<FrameId>, HashSet<SegmentId>) = segments

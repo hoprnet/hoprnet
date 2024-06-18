@@ -14,7 +14,7 @@ pub enum SessionError {
     #[error("message has an incorrect length")]
     IncorrectMessageLength,
 
-    #[error("the message has an incorrect tag")]
+    #[error("the message has an unknown tag")]
     UnknownMessageTag,
 }
 
