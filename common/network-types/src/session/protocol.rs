@@ -1,8 +1,9 @@
 use std::collections::{BTreeMap, BTreeSet};
+use std::fmt::{Display, Formatter};
 use std::mem;
 
-use crate::frame::{FrameId, FrameInfo, Segment, SegmentId, SeqNum};
 use crate::session::errors::SessionError;
+use crate::session::frame::{FrameId, FrameInfo, Segment, SegmentId, SeqNum};
 
 /// Holds the Segment Retransmission Request message.
 /// That is an ordered map of frame IDs and a bitmap of missing segments in each frame.
@@ -233,6 +234,16 @@ pub enum SessionMessage<const C: usize> {
     Acknowledge(FrameAcknowledgements<C>),
 }
 
+impl<const C: usize> Display for SessionMessage<C> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match &self {
+            SessionMessage::Segment(s) => write!(f, "segment {}", s.id()),
+            SessionMessage::Request(r) => write!(f, "retransmission request of {:?}", r.0),
+            SessionMessage::Acknowledge(a) => write!(f, "acknowledgement of {:?}", a.0),
+        }
+    }
+}
+
 impl<const C: usize> SessionMessage<C> {
     /// Header size of the session message.
     /// This is currently the version byte and the size of [SessionMessageDiscriminants] representation.
@@ -300,8 +311,8 @@ impl<const C: usize> From<SessionMessage<C>> for Vec<u8> {
 
 #[cfg(test)]
 mod tests {
-    use crate::frame::{Frame, FrameInfo, Segment, SegmentId};
-    use crate::session::protocol::{SegmentRequest, SessionMessage};
+    use super::*;
+    use crate::session::Frame;
     use bitvec::bitarr;
     use hex_literal::hex;
     use hopr_platform::time::native::current_time;

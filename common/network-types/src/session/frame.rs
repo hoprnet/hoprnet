@@ -374,7 +374,7 @@ impl Ord for FrameInfo {
 /// ````rust
 /// # use std::time::Duration;
 /// futures::executor::block_on(async {
-/// use hopr_network_types::frame::{Frame, FrameReassembler};
+/// use hopr_network_types::session::{Frame, FrameReassembler};
 /// use futures::{pin_mut, StreamExt, TryStreamExt};
 ///
 /// let bytes = b"deadbeefcafe00112233";
@@ -617,8 +617,7 @@ impl Sink<Segment> for FrameReassembler {
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use crate::errors::NetworkTypeError;
-    use crate::frame::{Frame, FrameId, FrameInfo, FrameReassembler, Segment, SegmentId};
+    use super::*;
     use crate::session::protocol::SegmentRequest;
     use async_stream::stream;
     use bitvec::array::BitArray;

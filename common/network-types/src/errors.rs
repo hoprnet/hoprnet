@@ -1,4 +1,4 @@
-use crate::frame::FrameId;
+use crate::session::FrameId;
 use thiserror::Error;
 
 #[derive(Error, Debug)]

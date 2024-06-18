@@ -11,8 +11,8 @@
 //! capabilities of individual segments.
 //!
 //! # `Session` protocol messages
-//! The protocol components are built via low-level types of the [`frame`](crate::frame) module, such as
-//! [`Segment`](crate::frame::Segment) and [`Frame`](crate::frame::Frame).
+//! The protocol components are built via low-level types of the [`frame`](frame) module, such as
+//! [`Segment`](frame::Segment) and [`Frame`](frame::Frame).
 //! Most importantly, the `Session` protocol fixes the maximum number of segments per frame
 //! to 8 (see [`MAX_SEGMENTS_PER_FRAME`](protocol::SessionMessage::MAX_SEGMENTS_PER_FRAME)).
 //! Since each segment must fit within a maximum transmission unit (MTU),
@@ -20,7 +20,7 @@
 //!
 //! The [current version](protocol::SessionMessage::VERSION) of the protocol consists of three
 //! messages that are sent and received via the underlying transport:
-//! - [`Segment message`](crate::frame::Segment)
+//! - [`Segment message`](frame::Segment)
 //! - [`Retransmission request`](protocol::SegmentRequest)
 //! - [`Frame acknowledgement`](protocol::FrameAcknowledgements)
 //!
@@ -41,7 +41,7 @@
 //! the segment recipient to the sender, once it realizes some of the received frames are incomplete
 //! (after a certain period of time).
 //!
-//! The encoding of this message consists of pairs of [frame ID](crate::frame::FrameId) and
+//! The encoding of this message consists of pairs of [frame ID](frame::FrameId) and
 //! a single byte bitmap of requested segments in this frame.
 //! Each pair is therefore [`ENTRY_SIZE`](protocol::SegmentRequest::ENTRY_SIZE) bytes long.
 //! There can be at most [`MAX_ENTRIES`](protocol::SegmentRequest::MAX_ENTRIES)
@@ -53,7 +53,7 @@
 //! This message is sent from the segment recipient to the segment sender, to acknowledge that
 //! all segments of certain frames have been completely and correctly received by the recipient.
 //!
-//! The message consists simply of a list of [frame IDs](crate::frame::FrameId) of the completely received
+//! The message consists simply of a list of [frame IDs](frame::FrameId) of the completely received
 //! frames. There can be at most [`MAX_ACK_FRAMES`](protocol::FrameAcknowledgements::MAX_ACK_FRAMES)
 //! per message. If more frames need to be acknowledged, more messages need to be sent.
 //! If the message contains fewer entries, it is padded with zeros (0 is not a valid frame ID).
@@ -161,8 +161,14 @@
 //!
 //! These should be called multiple times within the `frame_expiration_age` period, in order
 //! for the session state to advance.
+//!
+//! For convenience, the [`SessionState::advance`](state::SessionState::advance) method
+//! combines all three above methods in a single call.
 
 pub mod errors;
+mod frame;
 pub mod protocol;
 pub mod state;
 mod utils;
+
+pub use frame::{Frame, FrameId, FrameReassembler, Segment, SegmentId};

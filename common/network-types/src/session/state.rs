@@ -19,9 +19,8 @@ use std::time::{Duration, Instant};
 use tracing::{debug, warn};
 
 use crate::errors::NetworkTypeError;
-use crate::frame::{segment, FrameId, FrameReassembler, SegmentId};
-use crate::prelude::Segment;
 use crate::session::errors::SessionError;
+use crate::session::frame::{segment, FrameId, FrameReassembler, Segment, SegmentId};
 use crate::session::protocol::{FrameAcknowledgements, SegmentRequest, SessionMessage};
 use crate::session::utils::{RetryResult, RetryToken};
 
@@ -128,21 +127,15 @@ impl<const C: usize> SessionState<C> {
         debug!("{:?} RECEIVED: request for {} segments", self.session_id, request.len());
 
         let mut count = 0;
-        for segment_id in request {
+        let request = request.into_iter().filter_map(|segment_id| {
             // No need to retry this frame ourselves, since the other side will request on its own
             self.outgoing_frame_resends.remove(&segment_id.0);
-
-            if let Some(segment) = self.lookbehind.get(&segment_id) {
-                let msg = SessionMessage::<C>::Segment(segment.value().clone());
-                debug!(
-                    "{:?} SENDING: retransmitted segment: {:?}",
-                    self.session_id,
-                    segment.value().id()
-                );
-                self.segment_ingress
-                    .feed(msg)
-                    .await
-                    .map_err(|e| SessionError::ProcessingError(e.to_string()))?;
+            let ret = self
+                .lookbehind
+                .get(&segment_id)
+                .map(|e| Ok(SessionMessage::<C>::Segment(e.value().clone())));
+            if ret.is_some() {
+                debug!("{:?} SENDING: retransmitted segment: {segment_id:?}", self.session_id);
                 count += 1;
             } else {
                 warn!(
@@ -150,11 +143,14 @@ impl<const C: usize> SessionState<C> {
                     self.session_id
                 );
             }
-        }
+            ret
+        });
+
         self.segment_ingress
-            .flush()
+            .send_all(&mut futures::stream::iter(request))
             .await
             .map_err(|e| SessionError::ProcessingError(e.to_string()))?;
+
         debug!("{:?}: retransmitted {count} requested segments", self.session_id);
         Ok(())
     }
@@ -257,25 +253,17 @@ impl<const C: usize> SessionState<C> {
         }
 
         let mut sent = 0;
-        for chunk in to_retry
+        let to_retry = to_retry
             .chunks(SegmentRequest::<C>::MAX_ENTRIES)
             .take(max_requests.unwrap_or(usize::MAX))
-            .map(|chunk| SegmentRequest::from_iter(chunk.iter().cloned()))
-        {
-            debug!(
-                "{:?}: SENDING: retransmission request for segments {chunk:?}",
-                self.session_id
-            );
+            .map(|chunk| Ok(SessionMessage::<C>::Request(chunk.iter().cloned().collect())))
+            .inspect(|r| {
+                debug!("{:?}: SENDING: {:?}", self.session_id, r);
+                sent += 1;
+            });
 
-            let req = SessionMessage::<C>::Request(chunk);
-            self.segment_ingress
-                .feed(req)
-                .await
-                .map_err(|e| SessionError::ProcessingError(e.to_string()))?;
-            sent += 1;
-        }
         self.segment_ingress
-            .flush()
+            .send_all(&mut futures::stream::iter(to_retry))
             .await
             .map_err(|e| SessionError::ProcessingError(e.to_string()))?;
 
@@ -350,6 +338,7 @@ impl<const C: usize> SessionState<C> {
         let now = Instant::now();
         let max = max_messages.unwrap_or(usize::MAX);
 
+        // Retain only non-expired frames, collect all which are due for re-send
         let mut frames_to_resend = BTreeSet::new();
         self.outgoing_frame_resends.retain(|frame_id, retry_log| {
             let check_res = retry_log.check(now, self.cfg.rto_base_sender, self.cfg.frame_expiration_age);
@@ -384,27 +373,21 @@ impl<const C: usize> SessionState<C> {
             frames_to_resend.len()
         );
 
-        // Find all segments of the frames to resend in the lookbehind buffer
+        // Find all segments of the frames to resend in the lookbehind buffer,
+        // skip those that are not in the lookbehind buffer anymore
         let mut count = 0;
-        for segment in frames_to_resend
+        let frames_to_resend = frames_to_resend
             .into_iter()
             .flat_map(|f| self.lookbehind.iter().filter(move |e| e.key().0 == f))
             .take(max)
-        {
-            let msg = SessionMessage::<C>::Segment(segment.value().clone());
-            debug!(
-                "{:?}: SENDING: auto-retransmitted segment: {:?}",
-                self.session_id,
-                segment.key()
-            );
-            self.segment_ingress
-                .feed(msg)
-                .await
-                .map_err(|e| SessionError::ProcessingError(e.to_string()))?;
-            count += 1;
-        }
+            .inspect(|e| {
+                debug!("{:?}: SENDING: auto-retransmitted {}", self.session_id, e.key());
+                count += 1
+            })
+            .map(|e| Ok(SessionMessage::<C>::Segment(e.value().clone())));
+
         self.segment_ingress
-            .flush()
+            .send_all(&mut futures::stream::iter(frames_to_resend))
             .await
             .map_err(|e| SessionError::ProcessingError(e.to_string()))?;
 
