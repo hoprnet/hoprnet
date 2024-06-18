@@ -30,7 +30,6 @@ if [ "$(jq '.["'${release_name}'"]' "${mydir}/../releases.json")" = "null" ]; th
   exit 1
 fi
 
-exit 1
 if [ -z "$(git status --porcelain)" ]; then
   git checkout "release/${release_name}"
   git pull
