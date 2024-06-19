@@ -19,6 +19,7 @@ runtime-async-std = [
     "chain-rpc/runtime-async-std",
     "core-transport/runtime-async-std",
     "hopr-db-sql/runtime-async-std",
+    "hopr-network-types/runtime-async-std",
     "hopr-strategy/runtime-async-std",
 ]
 runtime-tokio = [
@@ -27,6 +28,7 @@ runtime-tokio = [
     "chain-rpc/runtime-tokio",
     "core-transport/runtime-tokio",
     "hopr-db-sql/runtime-tokio",
+    "hopr-network-types/runtime-tokio",
     "hopr-strategy/runtime-tokio"
 ]
 prometheus = [
@@ -70,6 +72,7 @@ hopr-metrics = { workspace = true, optional = true }
 hopr-platform = { workspace = true }
 hopr-primitive-types = { workspace = true }
 hopr-strategy = { workspace = true }
+hopr-network-types = { workspace = true }
 
 [dev-dependencies]
 async-std = { workspace = true }
