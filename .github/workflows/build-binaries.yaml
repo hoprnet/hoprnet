@@ -56,7 +56,7 @@ jobs:
 
       - name: Patch hoprd binary
         if: ${{ inputs.interpreter != '' }}
-        run: nix shell -p patchelf --command "patchelf --set-interpreter ${{ inputs.interpreter }}"
+        run: nix shell -p patchelf --command "patchelf --set-interpreter ${{ inputs.interpreter }} ./result/bin/hoprd"
 
       - name: Upload hoprd binary
         uses: actions/upload-artifact@v4
