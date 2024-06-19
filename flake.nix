@@ -390,9 +390,7 @@
             settings.formatter.nixpkgs-fmt.excludes = [ "./vendor/*" ];
 
             programs.ruff.check = true;
-            programs.ruff.format = true;
             settings.formatter.ruff.check.excludes = [ "./vendor/*" ];
-            settings.formatter.ruff.format.excludes = [ "./vendor/*" ];
 
             settings.formatter.solc = {
               command = "sh";

@@ -57,7 +57,7 @@ jobs:
             package_suffix: -armv7l-linux
             runner: self-hosted-hoprnet-big
             interpreter: /lib/ld-linux-armhf.so.3
-    name: hoprd-${{ matrix.target.name }}
+    name: ${{ matrix.binary }}-${{ matrix.target.name }}
     uses: ./.github/workflows/build-binaries.yaml
     with:
       branch: ${{ github.event.pull_request.head.ref }}

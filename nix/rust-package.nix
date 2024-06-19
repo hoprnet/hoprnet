@@ -83,8 +83,10 @@ let
     cargoArtifacts = null;
     buildPhaseCargoCommand = "cargo doc --offline --no-deps";
     RUSTDOCFLAGS = "--enable-index-page -Z unstable-options";
+    CARGO_TARGET_DIR = "target/";
     postBuild = ''
       ${pandoc}/bin/pandoc -f markdown+hard_line_breaks -t html README.md > readme.html
+      mv target/''${CARGO_BUILD_TARGET}/doc target/
       ${html-tidy}/bin/tidy -q -i target/doc/index.html > index.html || :
       sed '/<section id="main-content" class="content">/ r readme.html' index.html > target/doc/index.html
       rm readme.html index.html
