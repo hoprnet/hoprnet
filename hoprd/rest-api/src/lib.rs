@@ -1552,6 +1552,7 @@ mod messages {
 
     #[derive(Debug, Default, Clone, serde::Deserialize, utoipa::ToSchema)]
     #[schema(value_type = String)] //, format = Binary)]
+    #[allow(dead_code)] // not dead code, just for codegen
     pub struct Text(String);
 
     #[derive(Debug, Clone, serde::Deserialize)]

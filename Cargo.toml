@@ -62,7 +62,7 @@ divan = "0.1"
 ethers = { version = "2.0.10", default-features = false }
 env_logger = "0.11.3"
 futures = "0.3.28"
-futures-lite = "1.12.0"
+futures-lite = "2.3"
 futures-concurrency = "7.3.0"
 futures-timer = "3.0.2"
 generic-array = { version = "0.14.7", features = ["zeroize"] }
@@ -111,14 +111,14 @@ chain-api = { path = "chain/api", default-features = false }
 chain-rpc = { path = "chain/rpc", default-features = false }
 chain-types = { path = "chain/types", default-features = false }
 chain-indexer = { path = "chain/indexer", default-features = false }
-hopr-crypto-random = { path = "crypto/random", default-features = false }
-hopr-crypto-packet = { path = "crypto/packet", default-features = false }
-hopr-crypto-sphinx = { path = "crypto/sphinx", default-features = false, features = ["x25519"] }
-hopr-crypto-types = { path = "crypto/types", default-features = false }
 core-network = { path = "transport/network", default-features = false }
 core-path = { path = "logic/path", default-features = false }
 core-protocol = { path = "transport/protocol", default-features = false }
 core-transport = { path = "transport/api", default-features = false }
+hopr-crypto-random = { path = "crypto/random", default-features = false }
+hopr-crypto-packet = { path = "crypto/packet", default-features = false }
+hopr-crypto-sphinx = { path = "crypto/sphinx", default-features = false, features = ["x25519"] }
+hopr-crypto-types = { path = "crypto/types", default-features = false }
 hopr-db-api = { path = "db/api" }
 hopr-db-sql = { path = "db/sql" }
 hopr-db-entity = { path = "db/entity" }
