@@ -19,6 +19,10 @@ on:
       target:
         required: true
         type: string
+      interpreter:
+        required: false
+        type: string
+        default: ''
 concurrency:
   group: ${{ github.head_ref }}-build-binary-${{ inputs.target }}
   cancel-in-progress: true
@@ -46,11 +50,13 @@ jobs:
           USER: runner
 
       - name: Build hoprd binary
-        run: |
-          nix build .#${{ inputs.package }} -L
+        run: nix build .#${{ inputs.package }} -L
         env:
           PKG: ${{ inputs.package }}
-          CI: "true"
+
+      - name: Patch hoprd binary
+        if: ${{ inputs.interpreter != '' }}
+        run: nix shell -p patchelf --command "patchelf --set-interpreter ${{ inputs.interpreter }}"
 
       - name: Upload hoprd binary
         uses: actions/upload-artifact@v4

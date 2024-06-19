@@ -41,9 +41,11 @@ jobs:
           - name: x86_64-linux
             package: hoprd-x86_64-linux
             runner: self-hosted-hoprnet-big
+            interpreter: /lib64/ld-linux-x86-64.so.2
           - name: aarch64-linux
             package: hoprd-aarch64-linux
             runner: self-hosted-hoprnet-big
+            interpreter: /lib64/ld-linux-aarch64.so.1
           - name: aarch64-darwin
             package: hoprd
             runner: macos-14 # M1 machine
@@ -53,7 +55,8 @@ jobs:
           - name: armv7l-linux
             package: hoprd-armv7l-linux
             runner: self-hosted-hoprnet-big
-    name: ${{ matrix.target.name }}
+            interpreter: /lib/ld-linux-armhf.so.3
+    name: hoprd-${{ matrix.target.name }}
     uses: ./.github/workflows/build-binaries.yaml
     with:
       branch: ${{ github.event.pull_request.head.ref }}

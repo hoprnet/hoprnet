@@ -13,7 +13,6 @@
 , pandoc
 , pkg-config
 , pkgs
-, postFixup ? null
 , postInstall ? null
 , runClippy ? false
 , runTests ? false
@@ -22,10 +21,15 @@
 , stdenv
 }:
 let
+  # `hostPlatform` is the cross-compilation output platform;
+  # `buildPlatform` is the platform we are compiling on
+  buildPlatform = stdenv.buildPlatform;
+  hostPlatform = stdenv.hostPlatform;
+
   # The hook is used when building on darwin for non-darwin, where the flags
   # need to be cleaned up.
-  darwinSuffixSalt = builtins.replaceStrings [ "-" "." ] [ "_" "_" ] stdenv.buildPlatform.config;
-  targetSuffixSalt = builtins.replaceStrings [ "-" "." ] [ "_" "_" ] stdenv.hostPlatform.config;
+  darwinSuffixSalt = builtins.replaceStrings [ "-" "." ] [ "_" "_" ] buildPlatform.config;
+  targetSuffixSalt = builtins.replaceStrings [ "-" "." ] [ "_" "_" ] hostPlatform.config;
   setupHookDarwin = makeSetupHook
     {
       name = "darwin-hopr-gcc-hook";
@@ -38,8 +42,8 @@ let
   pname = crateInfo.pname;
   version = lib.strings.concatStringsSep "." (lib.lists.take 3 (builtins.splitVersion crateInfo.version));
 
-  isDarwinForDarwin = stdenv.buildPlatform.isDarwin && stdenv.hostPlatform.isDarwin;
-  isDarwinForNonDarwin = stdenv.buildPlatform.isDarwin && !stdenv.hostPlatform.isDarwin;
+  isDarwinForDarwin = buildPlatform.isDarwin && hostPlatform.isDarwin;
+  isDarwinForNonDarwin = buildPlatform.isDarwin && !hostPlatform.isDarwin;
 
   darwinBuildInputs =
     if isDarwinForDarwin || isDarwinForNonDarwin then
@@ -107,7 +111,7 @@ let
     else craneLib.buildPackage;
 in
 builder (args // {
-  inherit src postInstall postFixup;
+  inherit src postInstall;
 
   preConfigure = ''
     # respect the amount of available cores for building
