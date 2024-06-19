@@ -46,10 +46,19 @@ async fn get_client(
     Ok(stream)
 }
 
-async fn http_request<T: AsyncRead + AsyncWrite + Unpin>(stream: &mut T, domain: String) -> Result<[u8; 1024]> {
+async fn get_request<T: AsyncRead + AsyncWrite + Unpin>(stream: &mut T, domain: String) -> Result<[u8; 1024]> {
     // construct our request, with a dynamic domain
+
+    // get http version from domain. If domain starts with https, use HTTP/2, else use HTTP/1.1, using map_or_else
+    let http_version = domain.split(':').next().map_or_else(
+        || "HTTP/1.1",
+        |protocol| if protocol == "https" { "HTTP/2" } else { "HTTP/1.1" },
+    );
+
+    eprintln!("HTTP Version: {}", http_version);
+
     let mut headers = vec![];
-    headers.extend_from_slice("GET / HTTP/1.1\n".as_bytes());
+    headers.extend_from_slice(format!("GET / {http_version}\n").as_bytes());
     headers.extend_from_slice(format!("Host: {domain}\n").as_bytes());
     headers.extend_from_slice("User-Agent: hopr-socks/0.1.0\n".as_bytes());
     headers.extend_from_slice("Accept: */*\n\n".as_bytes());
@@ -64,9 +73,8 @@ async fn http_request<T: AsyncRead + AsyncWrite + Unpin>(stream: &mut T, domain:
 }
 
 #[tokio::test]
-async fn test_connect_client() {
+async fn test_connect_client_incorrect_bind_address() {
     let bind_address = "127.0.0.1:1331";
-    let host_address = "hoprnet.org";
 
     let server_proc = tokio::spawn(async move {
         SocksServer::new(String::from(bind_address), 10, AuthMode::NoAuth)
@@ -89,6 +97,26 @@ async fn test_connect_client() {
     .await;
     assert!(result.is_err());
 
+    server_proc.abort();
+    sleep(Duration::from_millis(200)).await;
+}
+
+#[tokio::test]
+async fn test_connect_client_correct_bind_address() {
+    let bind_address = "127.0.0.1:1332";
+    let host_address = "http://www.example.com";
+
+    let server_proc = tokio::spawn(async move {
+        SocksServer::new(String::from(bind_address), 10, AuthMode::NoAuth)
+            .await
+            .expect("Failed to create a SOCKS5 server")
+            .run()
+            .await
+            .expect("SOCKS5 server could not be run");
+    });
+
+    sleep(Duration::from_millis(200)).await;
+
     // Open TCP connection through proxy (correct bind address)
     get_client(
         String::from(bind_address),
@@ -105,8 +133,8 @@ async fn test_connect_client() {
 
 #[tokio::test]
 async fn test_http_request_through_socks_proxy() {
-    let bind_address = "127.0.0.1:1332";
-    let host_address = "hoprnet.org";
+    let bind_address = "127.0.0.1:1333";
+    let host_address = "http://www.example.com";
 
     let server_proc = tokio::spawn(async move {
         SocksServer::new(String::from(bind_address), 10, AuthMode::NoAuth)
@@ -129,7 +157,7 @@ async fn test_http_request_through_socks_proxy() {
     .await
     .expect("Failed to create a SOCKS5 client");
 
-    let results = http_request(&mut client, String::from(host_address))
+    let results = get_request(&mut client, String::from(host_address))
         .await
         .expect("Failed to send HTTP request");
 
@@ -141,8 +169,8 @@ async fn test_http_request_through_socks_proxy() {
 
 #[tokio::test]
 async fn test_multiple_clients() {
-    let bind_address = "127.0.0.1:1333";
-    let host_address = "hoprnet.org";
+    let bind_address = "127.0.0.1:1334";
+    let host_address = "http://www.example.com";
 
     let server_proc = tokio::spawn(async move {
         SocksServer::new(String::from(bind_address), 10, AuthMode::NoAuth)
@@ -172,7 +200,7 @@ async fn test_multiple_clients() {
 
     // Send HTTP request to each client
     for mut client in clients {
-        let results = http_request(&mut client, String::from(host_address))
+        let results = get_request(&mut client, String::from(host_address))
             .await
             .expect("Failed to send HTTP request");
 
@@ -184,9 +212,9 @@ async fn test_multiple_clients() {
 }
 
 #[tokio::test]
-async fn test_connect_client_with_auth() {
-    let bind_address = "127.0.0.1:1334";
-    let host_address = "hoprnet.org";
+async fn test_connect_unauthenticated_client_with_auth() {
+    let bind_address = "127.0.0.1:1335";
+    let host_address = "http://www.example.com";
     let auth_username = "admin";
     let auth_password = "opensesame";
 
@@ -218,6 +246,35 @@ async fn test_connect_client_with_auth() {
     .await;
     assert!(client.is_err());
 
+    server_proc.abort();
+    sleep(Duration::from_millis(200)).await;
+}
+
+#[tokio::test]
+async fn test_connect_authenticated_client_with_auth() {
+    let bind_address = "127.0.0.1:1336";
+    let host_address = "http://www.example.com";
+    let auth_username = "admin";
+    let auth_password = "opensesame";
+
+    let server_proc = tokio::spawn(async move {
+        SocksServer::new(
+            String::from(bind_address),
+            10,
+            AuthMode::Password {
+                username: String::from(auth_username),
+                password: String::from(auth_password),
+            },
+        )
+        .await
+        .expect("Failed to create a SOCKS5 server")
+        .run()
+        .await
+        .expect("SOCKS5 server could not be run");
+    });
+
+    sleep(Duration::from_millis(200)).await;
+
     let _client = get_client(
         String::from(bind_address),
         String::from(host_address),
@@ -229,6 +286,42 @@ async fn test_connect_client_with_auth() {
     )
     .await
     .expect("Failed to create a SOCKS5 client");
+
+    server_proc.abort();
+    sleep(Duration::from_millis(200)).await;
+}
+
+#[tokio::test]
+async fn test_https_request_through_socks_proxy() {
+    let bind_address = "127.0.0.1:1337";
+    let host_address = "https://www.hoprnet.org";
+
+    let server_proc = tokio::spawn(async move {
+        SocksServer::new(String::from(bind_address), 10, AuthMode::NoAuth)
+            .await
+            .expect("Failed to create a SOCKS5 server")
+            .run()
+            .await
+            .expect("SOCKS5 server could not be run");
+    });
+
+    sleep(Duration::from_millis(200)).await;
+
+    // Open TCP connection to existing endpoint
+    let mut client = get_client(
+        String::from(bind_address),
+        String::from(host_address),
+        80,
+        AuthMode::NoAuth,
+    )
+    .await
+    .expect("Failed to create a SOCKS5 client");
+
+    let results = get_request(&mut client, String::from(host_address))
+        .await
+        .expect("Failed to send HTTP request");
+
+    assert!(results.starts_with(b"HTTP/2"));
 
     server_proc.abort();
     sleep(Duration::from_millis(200)).await;
