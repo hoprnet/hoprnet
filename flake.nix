@@ -133,11 +133,12 @@
           # CAVEAT: must be built from a darwin system
           hoprd-aarch64-darwin = rust-builder-aarch64-darwin.callPackage ./nix/rust-package.nix hoprdBuildArgs;
 
+          hoprd-test = rust-builder-local.callPackage ./nix/rust-package.nix (hoprdBuildArgs // { runTests = true; });
+          hoprd-clippy = rust-builder-local.callPackage ./nix/rust-package.nix (hoprdBuildArgs // { runClippy = true; });
           hoprd-debug = rust-builder-local.callPackage ./nix/rust-package.nix (hoprdBuildArgs // {
             CARGO_PROFILE = "dev";
           });
-          hoprd-test = rust-builder-local.callPackage ./nix/rust-package.nix (hoprdBuildArgs // { runTests = true; });
-          hoprd-clippy = rust-builder-local.callPackage ./nix/rust-package.nix (hoprdBuildArgs // { runClippy = true; });
+
           hopliBuildArgs = {
             inherit src depsSrc;
             cargoToml = ./hopli/Cargo.toml;
@@ -148,6 +149,14 @@
           };
 
           hopli = rust-builder-local.callPackage ./nix/rust-package.nix hopliBuildArgs;
+          hopli-x86_64-linux = rust-builder-x86_64-linux.callPackage ./nix/rust-package.nix hopliBuildArgs;
+          hopli-aarch64-linux = rust-builder-aarch64-linux.callPackage ./nix/rust-package.nix hopliBuildArgs;
+          hopli-armv7l-linux = rust-builder-armv7l-linux.callPackage ./nix/rust-package.nix hopliBuildArgs;
+          # CAVEAT: must be built from a darwin system
+          hopli-x86_64-darwin = rust-builder-x86_64-darwin.callPackage ./nix/rust-package.nix hopliBuildArgs;
+          # CAVEAT: must be built from a darwin system
+          hopli-aarch64-darwin = rust-builder-aarch64-darwin.callPackage ./nix/rust-package.nix hopliBuildArgs;
+
           hopli-test = rust-builder-local.callPackage ./nix/rust-package.nix (hopliBuildArgs // { runTests = true; });
           hopli-clippy = rust-builder-local.callPackage ./nix/rust-package.nix (hopliBuildArgs // { runClippy = true; });
           hopli-debug = rust-builder-local.callPackage ./nix/rust-package.nix (hopliBuildArgs // {
@@ -380,9 +389,10 @@
             programs.nixpkgs-fmt.enable = true;
             settings.formatter.nixpkgs-fmt.excludes = [ "./vendor/*" ];
 
-            #programs.ruff.check = true;
-            #programs.ruff.format = true;
-            #settings.formatter.ruff.excludes = [ "./vendor/*" ];
+            programs.ruff.check = true;
+            programs.ruff.format = true;
+            settings.formatter.ruff.check.excludes = [ "./vendor/*" ];
+            settings.formatter.ruff.format.excludes = [ "./vendor/*" ];
 
             settings.formatter.solc = {
               command = "sh";
@@ -426,14 +436,16 @@
             inherit smoke-tests docs;
             inherit pre-commit-check;
             inherit hoprd-aarch64-linux hoprd-armv7l-linux hoprd-x86_64-linux;
+            inherit hopli-aarch64-linux hopli-armv7l-linux hopli-x86_64-linux;
             # FIXME: Darwin cross-builds are currently broken.
             # Follow https://github.com/nixos/nixpkgs/pull/256590
             inherit hoprd-aarch64-darwin hoprd-x86_64-darwin;
+            inherit hopli-aarch64-darwin hopli-x86_64-darwin;
             default = hoprd;
           };
 
           devShells.default = defaultDevShell;
-          #devShells.smoke-tests = smoketestsDevShell;
+          devShells.smoke-tests = smoketestsDevShell;
 
           formatter = config.treefmt.build.wrapper;
         };
