@@ -985,7 +985,7 @@ mod tests {
 
     #[parameterized(num_frames = {10, 100, 1000}, frame_size = {1500, 1500, 1500})]
     #[parameterized_macro(async_std::test)]
-    async fn test_reliable_send_recv_no_ack(num_frames: usize, frame_size: usize) {
+    async fn reliable_send_recv_with_no_acks(num_frames: usize, frame_size: usize) {
         let cfg = SessionConfig {
             acknowledged_frames_buffer: 0,
             ..Default::default()
@@ -1006,7 +1006,7 @@ mod tests {
 
     #[parameterized(num_frames = {10, 100, 1000}, frame_size = {1500, 1500, 1500})]
     #[parameterized_macro(async_std::test)]
-    async fn test_reliable_send_recv(num_frames: usize, frame_size: usize) {
+    async fn reliable_send_recv_with_with_acks(num_frames: usize, frame_size: usize) {
         let (alice_to_bob, bob_to_alice) = setup_alice_bob(Default::default(), Default::default());
 
         send_and_recv(
@@ -1022,7 +1022,7 @@ mod tests {
 
     #[parameterized(num_frames = {10, 100, 1000}, frame_size = {1500, 1500, 1500})]
     #[parameterized_macro(async_std::test)]
-    async fn test_unreliable_send_recv(num_frames: usize, frame_size: usize) {
+    async fn unreliable_send_recv(num_frames: usize, frame_size: usize) {
         let cfg = SessionConfig {
             rto_base_sender: Duration::from_millis(500),
             rto_base_receiver: Duration::from_millis(10),
@@ -1051,7 +1051,7 @@ mod tests {
 
     #[parameterized(num_frames = {10, 100, 1000}, frame_size = {1500, 1500, 1500})]
     #[parameterized_macro(async_std::test)]
-    async fn test_unreliable_mixed_send_recv(num_frames: usize, frame_size: usize) {
+    async fn unreliable_send_recv_with_mixing(num_frames: usize, frame_size: usize) {
         let cfg = SessionConfig {
             rto_base_sender: Duration::from_millis(500),
             rto_base_receiver: Duration::from_millis(10),
@@ -1081,7 +1081,7 @@ mod tests {
 
     #[parameterized(num_frames = {10, 100, 1000}, frame_size = {1500, 1500, 1500})]
     #[parameterized_macro(async_std::test)]
-    async fn test_almost_reliable_mixed_send_recv(num_frames: usize, frame_size: usize) {
+    async fn almost_reliable_send_recv_with_mixing(num_frames: usize, frame_size: usize) {
         let cfg = SessionConfig {
             rto_base_sender: Duration::from_millis(500),
             rto_base_receiver: Duration::from_millis(10),
@@ -1111,7 +1111,7 @@ mod tests {
 
     #[parameterized(num_frames = {10, 100, 1000}, frame_size = {1500, 1500, 1500})]
     #[parameterized_macro(async_std::test)]
-    async fn test_reliable_mixed_send_recv(num_frames: usize, frame_size: usize) {
+    async fn reliable_send_recv_with_mixing(num_frames: usize, frame_size: usize) {
         let cfg = SessionConfig {
             rto_base_sender: Duration::from_millis(500),
             rto_base_receiver: Duration::from_millis(10),
@@ -1139,7 +1139,7 @@ mod tests {
     }
 
     #[test(async_std::test)]
-    async fn test_disconnected_network_should_timeout() {
+    async fn receving_on_disconnected_network_should_timeout() {
         let cfg = SessionConfig {
             rto_base_sender: Duration::from_millis(250),
             rto_base_receiver: Duration::from_millis(300),
@@ -1171,7 +1171,7 @@ mod tests {
     }
 
     #[test(async_std::test)]
-    async fn test_single_frame_resend() {
+    async fn single_frame_resend_should_be_resent_on_unreliable_network() {
         let cfg = SessionConfig {
             rto_base_sender: Duration::from_millis(250),
             rto_base_receiver: Duration::from_millis(300),

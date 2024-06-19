@@ -359,14 +359,49 @@ impl<const C: usize> From<SessionMessage<C>> for Vec<u8> {
 mod tests {
     use super::*;
     use crate::session::Frame;
+    use bitvec::array::BitArray;
     use bitvec::bitarr;
     use hex_literal::hex;
     use hopr_platform::time::native::current_time;
+    use rand::prelude::IteratorRandom;
     use rand::{thread_rng, Rng};
     use std::time::SystemTime;
 
     #[test]
-    fn test_session_message_segment() -> anyhow::Result<()> {
+    fn segment_request_should_be_constructible_from_frame_info() {
+        let frames = (1..20)
+            .map(|i| {
+                let mut missing_segments = BitArray::ZERO;
+                (0..7_usize)
+                    .choose_multiple(&mut thread_rng(), 4)
+                    .into_iter()
+                    .for_each(|i| missing_segments.set(i, true));
+                FrameInfo {
+                    frame_id: i,
+                    missing_segments,
+                    total_segments: 8,
+                    last_update: SystemTime::UNIX_EPOCH,
+                }
+            })
+            .collect::<Vec<_>>();
+
+        let mut req = SegmentRequest::<466>::from_iter(frames.clone())
+            .into_iter()
+            .collect::<Vec<_>>();
+        req.sort();
+
+        assert_eq!(frames.len() * 4, req.len());
+        assert_eq!(
+            req,
+            frames
+                .into_iter()
+                .flat_map(|f| f.into_missing_segments())
+                .collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn session_message_segment_should_serialize_and_deserialize() -> anyhow::Result<()> {
         const SEG_SIZE: usize = 8;
 
         let mut segments = Frame {
@@ -387,7 +422,7 @@ mod tests {
     }
 
     #[test]
-    fn test_session_message_segment_req() {
+    fn session_message_segment_request_should_serialize_and_deserialize() {
         let frame_info = FrameInfo {
             frame_id: 10,
             total_segments: 255,
@@ -412,7 +447,7 @@ mod tests {
     }
 
     #[test]
-    fn test_session_message_frame_ack() {
+    fn session_message_ack_should_serialize_and_deserialize() {
         let mut rng = thread_rng();
         let frame_ids: Vec<u32> = (0..500).map(|_| rng.gen()).collect();
 
@@ -424,7 +459,7 @@ mod tests {
     }
 
     #[test]
-    fn session_message_segment_request_bitset_test() {
+    fn session_message_segment_request_should_yield_correct_bitset_values() {
         let seg_req = SegmentRequest::<466>([(10, 0b00100100)].into());
 
         let mut iter = seg_req.into_iter();
