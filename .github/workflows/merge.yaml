@@ -118,8 +118,6 @@ jobs:
 
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4
-        with:
-          repository: hoprnet/hoprnet-ci
 
       - name: Set up Google Cloud Credentials
         id: auth
@@ -142,25 +140,41 @@ jobs:
           project_id: hopr-staging
 
       - name: "Restart deployments"
+        timeout-minutes: 5
         run: |
           base_branch="${{ github.event.pull_request.base.ref }}"
           # Identify parameters depending on branch
           if [[ "${base_branch}" == "master" ]]; then
-            identity_pool=hoprd-core-rotsee
+            hoprd_cluster=hoprd-core-rotsee
+            gh variable set LOAD_TESTING_NETWORK --body "rotsee"
           elif [[ "${base_branch}" =~ ^"release" ]]; then
-            identity_pool=hoprd-core-dufour
+            hoprd_cluster=hoprd-core-dufour
+            gh variable set LOAD_TESTING_NETWORK --body "dufour"
           else
             echo "Skipping deployment"
             exit 0
           fi
           namespace=core-team
           echo "[INFO] Restarting deployments on ${namespace} from pr-${{ github.event.pull_request.number }}"
-          # Get list of deployments to restart
-          export deployments=($(kubectl get deployments -n ${namespace} -l app.kubernetes.io/name=hoprd-operator,hoprds.hoprnet.org/identitypool=${identity_pool} -o jsonpath="{.items[*].metadata.name}"))
-          for deployment in "${deployments[@]}"; do
-            echo "[INFO] Restarting hoprd node ${namespace}/${deployments}"
-            kubectl rollout restart deployments -n ${namespace} $deployment;
-          done
+          kubectl rollout restart deployments -n ${namespace} -l hoprds.hoprnet.org/cluster=${hoprd_cluster};
+          kubectl rollout status  deployments -n ${namespace} -l hoprds.hoprnet.org/cluster=${hoprd_cluster};
+        env:
+          GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
+
+  load_test:
+    name: Load Testing
+    if: contains(github.event.pull_request.labels.*.name, 'load_tests')
+    needs:
+      - deploy_nodes
+    uses: ./.github/workflows/load-tests.yaml
+    with:
+      test_id: pr-${{ github.event.pull_request.number }}
+      network: ${{ vars.LOAD_TESTING_NETWORK }}
+      workload: one-hop
+      duration: ${{ vars.LOAD_TESTING_DURATION }}
+      rate: "${{ vars.LOAD_TESTING_RATE }}"
+
+    secrets: inherit
 
   create-release:
     name: Create Release

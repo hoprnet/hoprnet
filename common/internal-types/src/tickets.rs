@@ -950,7 +950,7 @@ impl TransferableWinningTicket {
             Ok(RedeemableTicket {
                 ticket: verified_ticket,
                 response: self.response,
-                vrf_params: Default::default(),
+                vrf_params: self.vrf_params,
                 channel_dst: *domain_separator,
             })
         } else {
@@ -1266,5 +1266,39 @@ pub mod test {
     }
 
     #[test]
-    fn test_ticket_entire_ticket_transfer_flow() {}
+    fn test_ticket_entire_ticket_transfer_flow() {
+        let hk1 = HalfKey::random();
+        let hk2 = HalfKey::random();
+        let resp = Response::from_half_keys(&hk1, &hk2).unwrap();
+
+        let verified = TicketBuilder::default()
+            .direction(&ALICE.public().to_address(), &BOB.public().to_address())
+            .balance(BalanceType::HOPR.one())
+            .index(0)
+            .index_offset(1)
+            .win_prob(1.0)
+            .channel_epoch(1)
+            .challenge(resp.to_challenge().to_ethereum_challenge())
+            .build_signed(&ALICE, &Default::default())
+            .expect("should build ticket");
+
+        let unack = verified.into_unacknowledged(hk1);
+        let acknowledged = unack.acknowledge(&hk2).expect("should acknowledge");
+
+        let redeemable_1 = acknowledged
+            .clone()
+            .into_redeemable(&BOB, &Hash::default())
+            .expect("should convert to redeemable");
+
+        let transferable = acknowledged
+            .into_transferable(&BOB, &Hash::default())
+            .expect("should convert to transferable");
+
+        let redeemable_2 = transferable
+            .into_redeemable(&ALICE.public().to_address(), &Hash::default())
+            .expect("should convert to redeemable from transferable");
+
+        assert_eq!(redeemable_1, redeemable_2);
+        assert_eq!(redeemable_1.vrf_params.v, redeemable_2.vrf_params.v);
+    }
 }
