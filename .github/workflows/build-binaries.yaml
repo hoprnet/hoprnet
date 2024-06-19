@@ -59,10 +59,10 @@ jobs:
 
       - name: Patch ${{ inputs.binary }} binary
         if: ${{ inputs.interpreter != '' }}
-        run: nix-shell -p patchelf --command "patchelf --set-interpreter ${{ inputs.interpreter }} ./result/bin/${{ inputs.binary }}"
+        run: nix-shell -p patchelf --command "patchelf --set-interpreter ${{ inputs.interpreter }} ${{ github.workspace }}/result/bin/${{ inputs.binary }}"
 
       - name: Upload ${{ inputs.binary }} binary
         uses: actions/upload-artifact@v4
         with:
-          name: hoprd-${{ inputs.target }}
+          name: ${{ inputs.binary }}-${{ inputs.target }}
           path: ${{ github.workspace }}/result/bin/${{ inputs.binary }}
