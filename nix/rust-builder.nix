@@ -69,8 +69,9 @@ in
     # Override the derivation to add cross-compilation environment variables.
     crate.overrideAttrs (previous: buildEnv // {
       # We also have to override the `cargoArtifacts` derivation with the same changes.
-      cargoArtifacts = if previous.cargoArtifacts != null 
-      then previous.cargoArtifacts.overrideAttrs (previous: buildEnv) 
-      else null;
+      cargoArtifacts =
+        if previous.cargoArtifacts != null
+        then previous.cargoArtifacts.overrideAttrs (previous: buildEnv)
+        else null;
     }));
 }

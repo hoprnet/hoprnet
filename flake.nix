@@ -389,8 +389,9 @@
             programs.nixpkgs-fmt.enable = true;
             settings.formatter.nixpkgs-fmt.excludes = [ "./vendor/*" ];
 
-            programs.ruff.check = true;
-            settings.formatter.ruff.check.excludes = [ "./vendor/*" ];
+            # FIXME: currently broken in treefmt
+            # programs.ruff.check = true;
+            # settings.formatter.ruff.check.excludes = [ "./vendor/*" ];
 
             settings.formatter.solc = {
               command = "sh";
