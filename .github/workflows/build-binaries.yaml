@@ -10,12 +10,16 @@ on:
       branch:
         required: true
         type: string
+      binary:
+        required: true
+        type: string
       runner:
         required: true
         type: string
-      package:
-        required: true
+      package_suffix:
+        required: false
         type: string
+        default: ''
       target:
         required: true
         type: string
@@ -49,29 +53,15 @@ jobs:
         env:
           USER: runner
 
-      - name: Build hoprd binary
-        run: nix build .#${{ inputs.package }} -L
-        env:
-          PKG: ${{ inputs.package }}
+      - name: Build ${{ inputs.binary }} binary
+        run: nix build .#${{inputs.binary}}${{ inputs.package_suffix }} -L
 
-      - name: Patch hoprd binary
+      - name: Patch ${{ inputs.binary }} binary
         if: ${{ inputs.interpreter != '' }}
-        run: nix shell -p patchelf --command "patchelf --set-interpreter ${{ inputs.interpreter }} ./result/bin/hoprd"
+        run: nix-shell -p patchelf --command "patchelf --set-interpreter ${{ inputs.interpreter }} ./result/bin/${{ inputs.binary }}"
 
-      - name: Upload hoprd binary
+      - name: Upload ${{ inputs.binary }} binary
         uses: actions/upload-artifact@v4
         with:
           name: hoprd-${{ inputs.target }}
-          path: ${{ github.workspace }}/result/bin/hoprd
-
-    # - name: Build hopli binary
-    #   if: contains(github.event.pull_request.labels.*.name, 'component:hopli')
-    #   run: |
-    #     nix build .#hopli-${{ inputs.system }}
-
-    # - name: Upload hopli binary
-    #   if: contains(github.event.pull_request.labels.*.name, 'component:hopli')
-    #   uses: actions/upload-artifact@v4
-    #   with:
-    #     name: hopli-${{ inputs.system }}
-    #     path: ${{ github.workspace }}/result/bin/hopli
+          path: ${{ github.workspace }}/result/bin/${{ inputs.binary }}

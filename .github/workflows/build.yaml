@@ -34,34 +34,36 @@ jobs:
       package: hopli
     secrets: inherit
 
-  build-binary:
+  build-binaries:
     strategy:
       matrix:
+        binary:
+          - hopli
+          - hoprd
         target:
           - name: x86_64-linux
-            package: hoprd-x86_64-linux
+            package_suffix: -x86_64-linux
             runner: self-hosted-hoprnet-big
             interpreter: /lib64/ld-linux-x86-64.so.2
           - name: aarch64-linux
-            package: hoprd-aarch64-linux
+            package_suffix: -aarch64-linux
             runner: self-hosted-hoprnet-big
             interpreter: /lib64/ld-linux-aarch64.so.1
           - name: aarch64-darwin
-            package: hoprd
             runner: macos-14 # M1 machine
           - name: x86_64-darwin
-            package: hoprd
             runner: macos-13 # Intel machine
           - name: armv7l-linux
-            package: hoprd-armv7l-linux
+            package_suffix: -armv7l-linux
             runner: self-hosted-hoprnet-big
             interpreter: /lib/ld-linux-armhf.so.3
     name: hoprd-${{ matrix.target.name }}
     uses: ./.github/workflows/build-binaries.yaml
     with:
       branch: ${{ github.event.pull_request.head.ref }}
+      binary: ${{ matrix.binary }}
       target: ${{ matrix.target.name }}
-      package: ${{ matrix.target.package }}
+      package_suffix: ${{ matrix.target.package_suffix }}
       runner: ${{ matrix.target.runner }}
       interpreter: ${{ matrix.target.interpreter }}
     secrets: inherit
