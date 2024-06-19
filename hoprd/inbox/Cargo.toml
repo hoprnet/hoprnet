@@ -14,7 +14,7 @@ crate-type = ["rlib"]
 [dependencies]
 async-lock = { workspace = true }
 async-trait = { workspace = true }
-ringbuffer = "0.15.0"
+ringbuffer = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_with = { workspace = true }
 smart-default = { workspace = true }

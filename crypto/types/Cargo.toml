@@ -14,7 +14,6 @@ generic-array = { workspace = true }
 hex = { workspace = true }
 k256 = { version = "0.13.0", features = ["arithmetic", "ecdh", "hash2curve", "serde"] }
 libp2p-identity = { workspace = true }
-tracing = { workspace = true }
 primitive-types = { workspace = true }
 serde = { workspace = true }
 serde_bytes = { workspace = true }
@@ -22,6 +21,7 @@ sha2 = "0.10"
 sha3 = "0.10"
 subtle = "2"
 thiserror = { workspace = true }
+tracing = { workspace = true }
 typenum = { workspace = true }
 zeroize = { version = "1.7", features = ["zeroize_derive"] }
 

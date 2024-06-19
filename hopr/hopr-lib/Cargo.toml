@@ -45,7 +45,7 @@ async-channel = { workspace = true }
 async-lock = { workspace = true }
 async-std = { workspace = true, optional = true }
 atomic_enum = { workspace = true }
-const_format = "0.2.32"
+const_format ={ workspace = true }
 futures = { workspace = true }
 futures-concurrency = { workspace = true }
 lazy_static = { workspace = true }
@@ -79,4 +79,4 @@ async-std = { workspace = true }
 ethers = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-db-sql = { workspace = true, features = ["runtime-async-std"] }
-serde_yaml = { version = "0.9" }
+serde_yaml = { workspace = true }

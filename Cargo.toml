@@ -43,66 +43,79 @@ members = [
 ]
 
 [workspace.dependencies]
-async-broadcast = "0.7.0"
-async-channel = "2.1"
-async-lock = "3.3"
-async-signal = "0.2"
+anyhow = "1.0.86"
+async-broadcast = "0.7.1"
+async-channel = "2.3.1"
+async-lock = "3.4.0"
+async-signal = "0.2.8"
 async-std = { version = "1.12.0", features = ["attributes"] }
 async-stream = "0.3.5"
-async-trait = "0.1"
+async-trait = "0.1.80"
 aquamarine = "0.5.0"
 atomic_enum = "0.3.0"
 base64 = "0.22.1"
+bimap = "0.6.3"
 bincode = "1.3.3"
-chrono = { version = "0.4" }
-clap = { version = "4.4", features = ["derive", "env", "string"] }
-criterion = { version = "0.5", features = ["async", "html_reports"] }
-daemonize = "0.5"
-divan = "0.1"
+bloomfilter = { version = "1.0.13", features = ["serde"] }
+chrono = { version = "0.4.38" }
+clap = { version = "4.5.7", features = ["derive", "env", "string"] }
+const_format = "0.2.32"
+criterion = { version = "0.5.1", features = ["async", "html_reports"] }
+crossbeam-skiplist = "0.1.3"
+dashmap = "6.0.0"
+divan = "0.1.14"
 ethers = { version = "2.0.10", default-features = false }
 env_logger = "0.11.3"
-futures = "0.3.28"
-futures-lite = "2.3"
-futures-concurrency = "7.3.0"
-futures-timer = "3.0.2"
+futures = "0.3.30"
+futures-lite = "2.3.0"
+futures-concurrency = "7.6.1"
+futures-timer = "3.0.3"
 generic-array = { version = "0.14.7", features = ["zeroize"] }
-getrandom = "0.2.10"
+getrandom = "0.2.15"
 hex = "0.4.3"
 hex-literal = "0.4.1"
 lazy_static = "1.4.0"
-libp2p-identity = { version = "0.2.5", features = ["peerid", "ed25519", "rand"] }
+libp2p-identity = { version = "0.2.9", features = ["peerid", "ed25519", "rand"] }
 libp2p-mplex = "0.41.0"
 libp2p = { version = "0.53.2" }
-moka = { version = "0.12", features = ["future"] }
+moka = { version = "0.12.7", features = ["future"] }
 mockall = "0.12.1"
-multiaddr = "0.18.0"
-num_enum = "0.7"
+mockito = "1.4.0"
+more-asserts = "0.3.1"
+multiaddr = "0.18.1"
+num_enum = "0.7.2"
 parameterized = "2.0.0"
 primitive-types = { version = "0.12.2", features = ["serde"] }
-rayon = "1"
-regex = "1"
-rust-stream-ext-concurrent = "1"
-semver = "1"
-serde = { version = "1.0", features = ["derive"] }
-serde_bytes = "0.11"
-serde_json = "1.0"
-serde_with = { version = "3.3" }
+rand = "0.8.5"
+rayon = "1.10.0"
+regex = "1.10.5"
+reqwest = { version = "0.12.5" }
+ringbuffer = "0.15.0"
+rust-stream-ext-concurrent = "1.0.0"
+semver = "1.0.23"
+serde = { version = "1.0.203", features = ["derive"] }
+serde_bytes = "0.11.14"
+serde_json = "1.0.117"
+serde_repr = "0.1.19"
+serde_yaml = { version = "0.9.33" }
+serde_with = { version = "3.8.1" }
+serial_test = "3.1.1"
 sea-orm = { version = "0.12.15", features = ["sqlx-sqlite", "with-chrono", "debug-print"] }
 sea-orm-cli = { version = "0.12.15", features = ["codegen"] }
 sea-orm-migration = { version = "0.12.15", features = ["sqlx-sqlite", "with-chrono"]}
-signal-hook = "0.3"
-smart-default = "0.7"
-sqlx = { version = "0.7.3", default-features = false, features = ["sqlite", "macros", "migrate"] }
+signal-hook = "0.3.17"
+smart-default = "0.7.1"
+sqlx = { version = "0.7.4", default-features = false, features = ["sqlite", "macros", "migrate"] }
 strum = { version = "0.26.2", features = ["derive"] }
-tempfile = "3"
-thiserror = "1.0"
-tokio = { version = "1.37.0", features = ["rt-multi-thread", "macros"] }
-tracing = { version = "0.1" }
-tracing-futures = { version = "0.2" }
-tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "registry", "std"]}
-tracing-test = { version = "0.2.4", features = ["no-env-filter"] }
+tempfile = "3.10.1"
+thiserror = "1.0.61"
+tokio = { version = "1.38.0", features = ["rt-multi-thread", "macros"] }
+tracing = { version = "0.1.40" }
+tracing-futures = { version = "0.2.5" }
+tracing-subscriber = { version = "0.3.18", features = ["env-filter", "fmt", "registry", "std"]}
+tracing-test = { version = "0.2.5", features = ["no-env-filter"] }
 typenum = "1.17.0"
-uuid = { version = "1.7.0" }
+uuid = { version = "1.8.0" }
 validator = { version = "0.18.1", features = ["derive"] }
 
 bindings = { path = "ethereum/bindings", default-features = false }

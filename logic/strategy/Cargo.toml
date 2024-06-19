@@ -22,7 +22,7 @@ async-lock = { workspace = true }
 async-trait = { workspace = true }
 async-std = { workspace = true, optional = true }
 futures = { workspace = true }
-rand = "0.8.5"
+rand = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_with = { workspace = true }
 lazy_static = { workspace = true }
