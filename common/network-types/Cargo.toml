@@ -14,17 +14,12 @@ runtime-async-std = ["async-std"]
 runtime-tokio = ["tokio"]
 
 [dependencies]
-<<<<<<< HEAD
 async-std = { workspace = true, optional = true}
 async-trait = { workspace = true }
 bitvec = "1"
 crossbeam-queue = "0.3.11"
-crossbeam-skiplist = "0.1.3"
-dashmap = "5.5.3"
-=======
 crossbeam-skiplist = { workspace = true }
 dashmap = { workspace = true }
->>>>>>> db2ff45f01 (Update and unify most generic dependencies)
 futures = { workspace = true }
 governor = "0.6.3"
 hex = { workspace = true }
