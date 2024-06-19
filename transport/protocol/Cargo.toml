@@ -47,7 +47,7 @@ hopr-primitive-types = { workspace = true }
 [dev-dependencies]
 async-std = { workspace = true }
 hopr-db-sql = { workspace = true, features = ["runtime-async-std"] }
-more-asserts = "0.3.1"
+more-asserts = { workspace = true }
 parameterized = { workspace = true }
-serial_test = "3.1.1"
+serial_test = { workspace = true }
 tracing-test = { workspace = true }

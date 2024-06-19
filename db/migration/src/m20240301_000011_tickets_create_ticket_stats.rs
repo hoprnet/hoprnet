@@ -2,6 +2,7 @@ use crate::BackendType;
 use sea_orm_migration::prelude::*;
 
 #[derive(DeriveMigrationName)]
+#[allow(dead_code)] // backend type not supported yet but added for future compatibility
 pub struct Migration(pub BackendType);
 
 #[async_trait::async_trait]

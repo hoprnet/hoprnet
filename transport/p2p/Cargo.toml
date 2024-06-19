@@ -26,7 +26,7 @@ serde = { workspace = true, features = ["derive"]}
 thiserror = { workspace = true }
 tokio = { workspace = true, optional = true}
 tracing = { workspace = true }
-void = "1"          # needed for Behavior implementations from libp2p
+void = "1.0.2"          # needed for Behavior implementations from libp2p
 
 core-network = { workspace = true }
 core-protocol = { workspace = true }
