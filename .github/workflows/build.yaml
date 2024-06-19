@@ -63,6 +63,7 @@ jobs:
       target: ${{ matrix.target.name }}
       package: ${{ matrix.target.package }}
       runner: ${{ matrix.target.runner }}
+      interpreter: ${{ matrix.target.interpreter }}
     secrets: inherit
 
   docs:
