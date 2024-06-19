@@ -7,7 +7,7 @@
     nixpkgs.url = github:NixOS/nixpkgs/release-24.05;
     # using bugfix for macos libcurl:
     # https://github.com/oxalica/rust-overlay/pull/149
-    rust-overlay.url = github:oxalica/rust-overlay/69fcfaebbe564d162a85cadeaadd4dec646be4a2;
+    rust-overlay.url = github:oxalica/rust-overlay/cfc8776011bd83508324115d353222475e1601c0;
     # using a fork with an added source filter
     crane.url = github:hoprnet/crane/tb/20240117-find-filter;
     # pin it to a version which we are compatible with

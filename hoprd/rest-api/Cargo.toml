@@ -36,7 +36,7 @@ tide-tracing = "0.1.1"
 tracing = { workspace = true }
 urlencoding = "2.1.3"
 utoipa = { version = "4.2.3" }
-utoipa-swagger-ui = { version = "7.1.0" }
+utoipa-swagger-ui = { version = "6.0.0" }
 validator = { workspace = true }
 
 hopr-lib = { workspace = true }
