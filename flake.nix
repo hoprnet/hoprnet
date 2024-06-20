@@ -19,6 +19,7 @@
     flake-root.url = github:srid/flake-root;
 
     crane.inputs.nixpkgs.follows = "nixpkgs";
+    flake-parts.inputs.nixpkgs-lib.follows = "nixpkgs";
     foundry.inputs.flake-utils.follows = "flake-utils";
     foundry.inputs.nixpkgs.follows = "nixpkgs";
     pre-commit.inputs.nixpkgs-stable.follows = "nixpkgs";
