@@ -34,7 +34,6 @@ tracing = { workspace = true }
 validator = { workspace = true }
 
 hopr-crypto-random = { workspace = true }
-hopr-crypto-sphinx = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-crypto-packet = { workspace = true }
 hopr-db-api = { workspace = true }

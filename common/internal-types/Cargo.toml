@@ -13,13 +13,9 @@ crate-type = ["rlib"]
 
 [dependencies]
 aquamarine = { workspace = true }
-async-trait = { workspace = true }
-async-channel = { workspace = true }
 bloomfilter = { workspace = true }
 bincode = { workspace = true }
-dashmap = { workspace = true }
 ethers = { workspace = true, default-features = false }
-futures = { workspace = true }
 hex-literal = { workspace = true }
 num_enum = { workspace = true }
 multiaddr = { workspace = true }

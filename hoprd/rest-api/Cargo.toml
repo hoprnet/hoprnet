@@ -17,7 +17,6 @@ prometheus = ["hopr-lib/prometheus", "dep:hopr-metrics", "dep:lazy_static"]
 
 [dependencies]
 async-broadcast = { workspace = true }
-async-std = { workspace = true, features = ["attributes"] }
 async-lock = { workspace = true }
 bimap = { workspace = true }
 const_format = { workspace = true }

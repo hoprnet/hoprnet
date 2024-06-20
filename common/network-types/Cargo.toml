@@ -15,8 +15,7 @@ runtime-tokio = ["tokio"]
 
 [dependencies]
 async-std = { workspace = true, optional = true}
-async-trait = { workspace = true }
-bitvec = "1"
+bitvec = "1.0.1"
 crossbeam-queue = "0.3.11"
 crossbeam-skiplist = { workspace = true }
 dashmap = { workspace = true }

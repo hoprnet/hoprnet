@@ -1164,14 +1164,12 @@ name = "chain-api"
 version = "0.3.0"
 dependencies = [
  "async-channel 2.3.1",
- "async-lock 3.4.0",
  "async-std",
  "async-trait",
  "chain-actions",
  "chain-indexer",
  "chain-rpc",
  "chain-types",
- "core-path",
  "futures",
  "hopr-crypto-types",
  "hopr-db-sql",
@@ -1194,7 +1192,6 @@ name = "chain-indexer"
 version = "0.3.0"
 dependencies = [
  "async-channel 2.3.1",
- "async-lock 3.4.0",
  "async-std",
  "async-trait",
  "bindings",
@@ -1513,17 +1510,13 @@ checksum = "06ea2b9bc92be3c2baa9334a323ebca2d6f074ff852cd1d7b11064035cd3868f"
 name = "core-network"
 version = "0.6.0"
 dependencies = [
- "async-channel 2.3.1",
  "async-std",
  "async-trait",
- "chrono",
  "futures",
- "futures-lite 2.3.0",
  "hopr-crypto-random",
  "hopr-crypto-sphinx",
  "hopr-crypto-types",
  "hopr-db-api",
- "hopr-db-entity",
  "hopr-db-sql",
  "hopr-metrics",
  "hopr-platform",
@@ -1547,7 +1540,6 @@ dependencies = [
 name = "core-path"
 version = "0.3.0"
 dependencies = [
- "async-lock 3.4.0",
  "async-std",
  "async-trait",
  "futures",
@@ -1580,7 +1572,6 @@ dependencies = [
  "hex-literal",
  "hopr-crypto-packet",
  "hopr-crypto-random",
- "hopr-crypto-sphinx",
  "hopr-crypto-types",
  "hopr-db-api",
  "hopr-db-sql",
@@ -1609,7 +1600,6 @@ dependencies = [
 name = "core-transport"
 version = "0.6.0"
 dependencies = [
- "async-channel 2.3.1",
  "async-lock 3.4.0",
  "async-std",
  "async-trait",
@@ -1629,9 +1619,7 @@ dependencies = [
  "lazy_static",
  "libp2p",
  "proc-macro-regex",
- "rust-stream-ext-concurrent",
  "serde",
- "smart-default",
  "thiserror",
  "tokio",
  "tracing",
@@ -3326,7 +3314,6 @@ dependencies = [
  "hex-literal",
  "hopr-crypto-random",
  "hopr-crypto-types",
- "hopr-internal-types",
  "hopr-lib",
  "hopr-primitive-types",
  "hoprd-keypair",
@@ -3344,7 +3331,6 @@ dependencies = [
 name = "hopr-crypto-packet"
 version = "0.7.1"
 dependencies = [
- "async-lock 3.4.0",
  "async-std",
  "async-trait",
  "core-path",
@@ -3417,7 +3403,6 @@ dependencies = [
  "libp2p-identity",
  "primitive-types",
  "serde",
- "serde_bytes",
  "sha2 0.10.8",
  "sha3",
  "subtle",
@@ -3435,13 +3420,10 @@ dependencies = [
  "futures",
  "hopr-crypto-types",
  "hopr-internal-types",
- "hopr-metrics",
  "hopr-primitive-types",
- "lazy_static",
  "libp2p-identity",
  "multiaddr",
  "num_enum",
- "smart-default",
  "strum 0.26.2",
  "thiserror",
  "tracing",
@@ -3502,9 +3484,7 @@ dependencies = [
  "libp2p-identity",
  "moka",
  "multiaddr",
- "num_enum",
  "rand 0.8.5",
- "rayon",
  "sea-orm",
  "sea-query",
  "sea-query-binder",
@@ -3522,16 +3502,12 @@ name = "hopr-internal-types"
 version = "0.5.0"
 dependencies = [
  "aquamarine",
- "async-channel 2.3.1",
  "async-std",
- "async-trait",
  "bincode",
  "bindings",
  "bloomfilter",
  "cbor4ii",
- "dashmap 6.0.0",
  "ethers",
- "futures",
  "hex-literal",
  "hopr-crypto-random",
  "hopr-crypto-types",
@@ -3594,7 +3570,6 @@ name = "hopr-metrics"
 version = "1.2.0"
 dependencies = [
  "prometheus",
- "regex",
 ]
 
 [[package]]
@@ -3604,7 +3579,6 @@ dependencies = [
  "anyhow",
  "async-std",
  "async-stream",
- "async-trait",
  "bitvec",
  "crossbeam-queue",
  "crossbeam-skiplist",
@@ -3654,7 +3628,6 @@ dependencies = [
 name = "hopr-primitive-types"
 version = "0.3.3"
 dependencies = [
- "bincode",
  "hex",
  "hex-literal",
  "hopr-crypto-random",
@@ -3692,7 +3665,6 @@ dependencies = [
  "chain-types",
  "core-network",
  "core-protocol",
- "core-transport",
  "futures",
  "hex-literal",
  "hopr-crypto-random",
@@ -3720,13 +3692,11 @@ dependencies = [
 name = "hopr-transport-p2p"
 version = "0.4.0"
 dependencies = [
- "async-channel 2.3.1",
  "async-std",
  "core-network",
  "core-protocol",
  "futures",
  "futures-concurrency",
- "futures-lite 2.3.0",
  "hopr-crypto-types",
  "hopr-internal-types",
  "libp2p",
@@ -3734,7 +3704,6 @@ dependencies = [
  "multiaddr",
  "serde",
  "thiserror",
- "tokio",
  "tracing",
  "void",
 ]
@@ -3751,7 +3720,6 @@ dependencies = [
  "chrono",
  "clap",
  "futures",
- "hex",
  "home",
  "hopr-lib",
  "hopr-metrics",
@@ -3759,13 +3727,11 @@ dependencies = [
  "hoprd-api",
  "hoprd-inbox",
  "hoprd-keypair",
- "humantime",
  "lazy_static",
  "opentelemetry 0.23.0",
  "opentelemetry-otlp",
  "opentelemetry_sdk 0.23.0",
  "proc-macro-regex",
- "prost",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -3787,7 +3753,6 @@ version = "3.1.0"
 dependencies = [
  "async-broadcast",
  "async-lock 3.4.0",
- "async-std",
  "bimap",
  "const_format",
  "futures",
