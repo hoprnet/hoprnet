@@ -1,0 +1,76 @@
+---
+#################################################################################
+# Child pipeline to build hoprnet binaries
+#################################################################################
+name: Build binaries
+
+on:
+  workflow_call:
+    inputs:
+      branch:
+        required: true
+        type: string
+      binary:
+        required: true
+        type: string
+      runner:
+        required: true
+        type: string
+      package_suffix:
+        required: false
+        type: string
+        default: ''
+      target:
+        required: true
+        type: string
+      interpreter:
+        required: false
+        type: string
+        default: ''
+concurrency:
+  group: ${{ github.head_ref }}-build-binary-${{ inputs.binary }}-${{ inputs.target }}
+  cancel-in-progress: true
+jobs:
+  build-binary:
+    if: contains(github.event.pull_request.labels.*.name, format('binary:{0}', inputs.target))
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 60
+    steps:
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch }}
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+          nix_path: nixpkgs=channel:nixos-24.05
+
+      - uses: cachix/cachix-action@v14
+        with:
+          name: hoprnet
+          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
+        env:
+          USER: runner
+
+      - name: Build ${{ inputs.binary }} binary
+        run: nix build .#${{inputs.binary}}${{ inputs.package_suffix }} -L
+
+      - name: Patch ${{ inputs.binary }} binary
+        if: ${{ inputs.interpreter != '' }}
+        run: nix-shell -p patchelf --command "patchelf --set-interpreter ${{ inputs.interpreter }} --output ${{ inputs.binary }}-patched ./result/bin/${{ inputs.binary }}"
+
+      - name: Upload ${{ inputs.binary }} binary
+        uses: actions/upload-artifact@v4
+        if: ${{ inputs.interpreter == '' }}
+        with:
+          name: ${{ inputs.binary }}-${{ inputs.target }}
+          path: ${{ github.workspace }}/result/bin/${{ inputs.binary }}
+
+      - name: Upload ${{ inputs.binary }} patched binary
+        uses: actions/upload-artifact@v4
+        if: ${{ inputs.interpreter != '' }}
+        with:
+          name: ${{ inputs.binary }}-${{ inputs.target }}
+          path: ${{ github.workspace }}/${{ inputs.binary }}-patched

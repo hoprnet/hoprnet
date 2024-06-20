@@ -50,7 +50,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  tag:
+  tag-images:
     name: Tag images
     runs-on: self-hosted-hoprnet-small
     if: github.event.pull_request.merged == true && (github.event.pull_request.base.ref == 'master' || contains(github.event.pull_request.base.ref,'release/'))
@@ -108,12 +108,12 @@ jobs:
             fi
           done
 
-  deploy_nodes:
+  deploy-nodes:
     name: Deploy nodes
     runs-on: self-hosted-hoprnet-small
-    if: needs.tag.result == 'success'
+    if: needs.tag-images.result == 'success'
     needs:
-      - tag
+      - tag-images
     steps:
 
       - name: Checkout hoprnet repository
@@ -176,12 +176,12 @@ jobs:
 
     secrets: inherit
 
-  create_release:
+  create-release:
     name: Create Release
     runs-on: ubuntu-latest-4-cores # Cannot use a self-hosted runner because of the docker daemon not running
     if: contains(github.event.pull_request.labels.*.name, 'release')
     needs:
-      - tag
+      - tag-images
     steps:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4
@@ -193,7 +193,7 @@ jobs:
           credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
 
       - name: Set up Google Cloud SDK
-        uses: google-github-actions/setup-gcloud@v1
+        uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
           install_components: beta
@@ -204,7 +204,7 @@ jobs:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_TOKEN }}
 
-      - name: Setup variables
+      - name: Setup workspace
         id: setup
         run: |
           current_version=$(./scripts/get-current-version.sh semver)
@@ -214,6 +214,9 @@ jobs:
           else
             echo "prerelease=false" >> $GITHUB_OUTPUT
           fi
+          ./scripts/download-workflow-binaries.sh ${{ github.event.pull_request.number }}
+        env:
+          GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
 
       - name: Tag repository
         id: tag
@@ -266,6 +269,15 @@ jobs:
           name: HOPR - v${{ steps.setup.outputs.current_version }}
           tag_name: v${{ steps.setup.outputs.current_version }}
 
+      - name: Upload release assets
+        run: |
+          for binary in ./binaries/*; do
+            echo "Uploading $binary to release v${{ steps.setup.outputs.current_version }}"
+            gh release upload v${{ steps.setup.outputs.current_version }} "$binary" --clobber
+          done
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Close Milestone
         run: |
           gh api --method PATCH -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" /repos/${{ github.repository }}/milestones/${{ steps.changelog.outputs.milestone_number }} -f state='closed'
@@ -276,7 +288,7 @@ jobs:
     name: Open new release
     if: contains(github.event.pull_request.labels.*.name, 'release')
     needs:
-      - create_release
+      - create-release
     uses: ./.github/workflows/open-release.yaml
     with:
       release_type: ${{ vars.NEXT_RELEASE_TYPE }}
@@ -287,7 +299,7 @@ jobs:
     name: Build dappNode
     if: contains(github.event.pull_request.labels.*.name, 'release')
     needs:
-      - create_release
+      - create-release
     uses: ./.github/workflows/build-dappnode.yaml
     with:
       base_branch: ${{ github.event.pull_request.base.ref }}
@@ -297,7 +309,7 @@ jobs:
     name: Generate SDK
     if: contains(github.event.pull_request.labels.*.name, 'release')
     needs:
-      - create_release
+      - create-release
     uses: ./.github/workflows/generate-sdk.yaml
     with:
       base_branch: ${{ github.event.pull_request.base.ref }}

@@ -14,13 +14,13 @@ runtime-async-std = [
     "async-std",
     "sea-orm/runtime-async-std",
     "sea-query-binder/runtime-async-std-rustls",
-    "sqlx/runtime-async-std"
+    "sqlx/runtime-async-std-rustls"
 ]
 runtime-tokio = [
     "tokio",
     "sea-orm/runtime-tokio",
     "sea-query-binder/runtime-tokio-rustls",
-    "sqlx/runtime-tokio"
+    "sqlx/runtime-tokio-rustls"
 ]
 prometheus = ["dep:lazy_static", "dep:hopr-metrics"]
 
@@ -61,9 +61,9 @@ hopr-metrics = { workspace = true, optional = true }
 [dev-dependencies]
 async-std = { workspace = true }
 rand = "0.8.5"
-sea-orm = { workspace = true, features = ["runtime-async-std"] }
+sea-orm = { workspace = true, features = ["runtime-async-std-rustls"] }
 sea-query-binder = { version = "0",  default-features = false, features = ["with-chrono", "sqlx-sqlite", "runtime-async-std-rustls"] }
-sqlx = { workspace = true, features = ["runtime-async-std"] }
+sqlx = { workspace = true, features = ["runtime-async-std-rustls"] }
 lazy_static = { workspace = true }
 hopr-crypto-random = { workspace = true }
 hex-literal = { workspace = true }
