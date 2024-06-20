@@ -115,7 +115,7 @@ impl<Db> ChainActions<Db>
 where
     Db: Clone + std::fmt::Debug,
 {
-    ///! Creates new instance.
+    /// Creates new instance.
     pub fn new(me: &ChainKeypair, db: Db, tx_sender: ActionSender) -> Self {
         Self {
             me: me.public().to_address(),
@@ -125,7 +125,7 @@ where
         }
     }
 
-    ///! On-chain address of this node
+    /// On-chain address of this node
     pub fn self_address(&self) -> Address {
         self.me
     }

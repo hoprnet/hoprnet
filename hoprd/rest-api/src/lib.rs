@@ -194,7 +194,7 @@ impl Middleware<InternalState> for TokenBasedAuthenticationMiddleware {
                 // Use "Authorization Bearer <token>" and "X-Auth-Token <token>" headers and "Sec-Websocket-Protocol"
                 (!auth_headers.is_empty()
                     && (auth_headers.contains(&(&AUTHORIZATION, &format!("Bearer {}", expected_token)))
-                        || auth_headers.contains(&(&x_auth_header, &expected_token)))
+                        || auth_headers.contains(&(&x_auth_header, expected_token)))
                 )
 
                 // TODO: Replace with proper JS compliant solution

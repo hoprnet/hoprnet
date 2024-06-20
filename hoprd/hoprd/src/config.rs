@@ -341,7 +341,7 @@ impl HoprdConfig {
         if redacted_cfg.identity.private_key.is_some() {
             redacted_cfg.identity.private_key = Some("<REDACTED>".to_owned());
         }
-        redacted_cfg.identity.password = "<REDACTED>".to_owned();
+        "<REDACTED>".clone_into(&mut redacted_cfg.identity.password);
 
         serde_json::to_string(&redacted_cfg).map_err(|e| crate::errors::HoprdError::SerializationError(e.to_string()))
     }

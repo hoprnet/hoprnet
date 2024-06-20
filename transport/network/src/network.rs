@@ -184,7 +184,7 @@ where
         if peer == &self.me {
             Ok(Some({
                 let mut ps = PeerStatus::new(*peer, PeerOrigin::Initialization, 0.0f64, 2u32);
-                ps.multiaddresses = self.me_addresses.clone();
+                ps.multiaddresses.clone_from(&self.me_addresses);
                 ps
             }))
         } else {
