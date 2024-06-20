@@ -1,59 +1,60 @@
-use cli::AuthMode;
-use fast_socks5::server::{Authentication, Config as ServerConfig, SimpleUserPassword, Socks5Socket};
-use fast_socks5::Result;
-use std::{future::Future, sync::Arc};
-use tokio::{
-    io::{AsyncRead, AsyncWrite},
-    net::TcpListener,
-    task,
-};
-use tracing::{error, info, warn};
-
 pub mod cli;
 
-pub async fn spawn_server(socks_domain: &String, timeout: u64, auth: AuthMode) -> Result<()> {
-    let mut config = ServerConfig::default();
-    config.set_request_timeout(timeout);
+use cli::AuthMode;
+use fast_socks5::server::{Config as ServerConfig, SimpleUserPassword, Socks5Socket};
+use fast_socks5::{Result, SocksError};
+use std::sync::Arc;
 
-    let config = match auth {
-        AuthMode::NoAuth => {
-            warn!("No authentication has been set!");
-            config
-        }
-        AuthMode::Password { username, password } => {
-            info!("Simple auth system has been set.");
-            config.with_authentication(SimpleUserPassword { username, password })
-        }
-    };
+use tokio::{net::TcpListener, task};
+use tracing::{error, info, warn};
 
-    let config = Arc::new(config);
-    let listener = TcpListener::bind(&socks_domain).await?;
-
-    info!("Listen for socks connections @ {}", &socks_domain);
-
-    // Standard TCP loop
-    loop {
-        match listener.accept().await {
-            Ok((socket, _addr)) => {
-                info!("Connection from {}", socket.peer_addr()?);
-                let socket = Socks5Socket::new(socket, config.clone());
-
-                spawn_and_log_error(socket.upgrade_to_socks5());
-            }
-            Err(err) => error!("accept error = {:?}", err),
-        }
-    }
+pub struct SocksServer {
+    config: Arc<ServerConfig<SimpleUserPassword>>,
+    bind_address: String,
 }
 
-fn spawn_and_log_error<F, T, A>(fut: F) -> task::JoinHandle<()>
-where
-    F: Future<Output = Result<Socks5Socket<T, A>>> + Send + 'static,
-    T: AsyncRead + AsyncWrite + Unpin,
-    A: Authentication,
-{
-    task::spawn(async move {
-        if let Err(e) = fut.await {
-            error!("{:#}", &e);
+impl SocksServer {
+    pub async fn new(bind_address: String, timeout: u64, auth: AuthMode) -> Result<Self, SocksError> {
+        let mut config = ServerConfig::default();
+        config.set_request_timeout(timeout);
+        config = match auth {
+            AuthMode::NoAuth => {
+                warn!("No authentication has been set!");
+                config
+            }
+            AuthMode::Password { username, password } => {
+                info!("Simple auth system has been set.");
+                config.with_authentication(SimpleUserPassword { username, password })
+            }
+        };
+
+        Ok(SocksServer {
+            config: Arc::new(config),
+            bind_address,
+        })
+    }
+
+    pub async fn run(self) -> Result<(), SocksError> {
+        let listener = TcpListener::bind(&self.bind_address).await?;
+        info!("Listen for socks connections @ {}", &self.bind_address);
+
+        loop {
+            match listener.accept().await {
+                Ok((socket, _addr)) => {
+                    info!("Connection from {}", socket.peer_addr()?);
+                    let socket = Socks5Socket::new(socket, self.config.clone());
+
+                    // TODO: we don't care about individual processing
+                    task::spawn(async move {
+                        if let Err(e) = socket.upgrade_to_socks5().await {
+                            error!("{:#}", &e);
+                        }
+                    });
+                }
+                // TODO: consider use cases when there's a limit for incoming connections
+                // and this can fail
+                Err(err) => error!("accept error = {err:?}"),
+            }
         }
-    })
+    }
 }
