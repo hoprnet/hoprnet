@@ -1568,7 +1568,6 @@ dependencies = [
  "async-trait",
  "core-path",
  "futures",
- "futures-lite 2.3.0",
  "hex-literal",
  "hopr-crypto-packet",
  "hopr-crypto-random",

@@ -216,7 +216,7 @@ impl Stream for AcknowledgementInteraction {
     type Item = AckProcessed;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Option<Self::Item>> {
-        use futures_lite::stream::StreamExt;
-        Pin::new(self).ack_event_queue.1.poll_next(cx)
+        use futures::stream::StreamExt;
+        Pin::new(self).ack_event_queue.1.poll_next_unpin(cx)
     }
 }

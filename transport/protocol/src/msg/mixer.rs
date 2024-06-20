@@ -44,7 +44,7 @@ impl MixerConfig {
 mod tests {
     use super::*;
     use async_std::task::sleep;
-    use futures_lite::stream::StreamExt;
+    use futures::stream::StreamExt;
     use hopr_crypto_random::Rng;
     use more_asserts::*;
     use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
