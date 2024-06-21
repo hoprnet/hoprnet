@@ -47,7 +47,6 @@ async fn test_connect_client_incorrect_bind_address() {
         .is_err());
 
     server_proc.abort();
-    sleep(SERVER_DELAY).await;
 }
 
 #[tokio::test]
@@ -74,7 +73,6 @@ async fn test_connect_client_correct_bind_address() {
         .expect("Failed to send HTTP request");
 
     server_proc.abort();
-    sleep(SERVER_DELAY).await;
 }
 
 #[tokio::test]
@@ -102,7 +100,6 @@ async fn test_http_request_through_socks_proxy() {
         .expect("Failed to send HTTP request");
 
     server_proc.abort();
-    sleep(SERVER_DELAY).await;
 }
 
 #[tokio::test]
@@ -138,7 +135,6 @@ async fn test_multiple_clients() {
     }
 
     server_proc.abort();
-    sleep(SERVER_DELAY).await;
 }
 
 #[tokio::test]
@@ -180,7 +176,6 @@ async fn test_connect_unauthenticated_client_with_auth() {
         .is_err());
 
     server_proc.abort();
-    sleep(SERVER_DELAY).await;
 }
 
 #[tokio::test]
@@ -222,7 +217,6 @@ async fn test_connect_authenticated_client_with_auth() {
         .expect("Failed to send HTTP request");
 
     server_proc.abort();
-    sleep(SERVER_DELAY).await;
 }
 
 #[tokio::test]
@@ -249,5 +243,4 @@ async fn test_https_request_through_socks_proxy() {
         .expect("Failed to send HTTP request");
 
     server_proc.abort();
-    sleep(SERVER_DELAY).await;
 }
