@@ -17,5 +17,4 @@ tracing-subscriber = { workspace = true }
 hopr-lib = { workspace = true }
 serde = { workspace = true }
 validator = { workspace = true }
-anyhow = "1.0"
-reqwest = { version = "0.12.5", features = ["socks"] }
+reqwest = { workspace = true, features = ["socks"] }
