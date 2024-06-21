@@ -22,7 +22,7 @@ async-lock = { workspace = true }
 async-trait = { workspace = true }
 async-std = { workspace = true, optional = true }
 futures = { workspace = true }
-rand = "0.8.5"
+rand = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_with = { workspace = true }
 lazy_static = { workspace = true }
@@ -37,7 +37,6 @@ hopr-crypto-random = { workspace = true }
 hopr-crypto-types = { workspace = true }
 core-network = { workspace = true }
 core-protocol = { workspace = true }
-core-transport = { workspace = true }
 chain-actions = { workspace = true }
 tracing = { workspace = true }
 hopr-platform = { workspace = true }

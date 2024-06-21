@@ -84,6 +84,7 @@ let
     buildPhaseCargoCommand = "cargo doc --offline --no-deps";
     RUSTDOCFLAGS = "--enable-index-page -Z unstable-options";
     CARGO_TARGET_DIR = "target/";
+    LD_LIBRARY_PATH = lib.makeLibraryPath [ pkgs.pkgsBuildHost.openssl ];
     postBuild = ''
       ${pandoc}/bin/pandoc -f markdown+hard_line_breaks -t html README.md > readme.html
       mv target/''${CARGO_BUILD_TARGET}/doc target/

@@ -17,21 +17,17 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-docker-hoprd:
-    name: Hoprd
+  build-docker:
+    strategy:
+      matrix:
+        package:
+          - hopli
+          - hoprd
+    name: ${{ matrix.package }}
     uses: ./.github/workflows/build-docker.yaml
     with:
       branch: ${{ github.event.pull_request.head.ref }}
-      package: hoprd
-    secrets: inherit
-
-  build-docker-hopli:
-    name: Hopli
-    if: contains(github.event.pull_request.labels.*.name, 'component:hopli')
-    uses: ./.github/workflows/build-docker.yaml
-    with:
-      branch: ${{ github.event.pull_request.head.ref }}
-      package: hopli
+      package: ${{ matrix.package }}
     secrets: inherit
 
   build-binaries:
