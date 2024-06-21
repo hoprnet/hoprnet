@@ -30,7 +30,6 @@ prometheus = ["dep:hopr-metrics", "chain-rpc/prometheus", "hopr-db-sql/prometheu
 async-channel = { workspace = true }
 async-std = { workspace = true, optional = true }
 async-trait = { workspace = true }
-async-lock = { workspace = true }
 ethers = { workspace = true, default-features = false, features = ["abigen"] }
 futures = { workspace = true }
 lazy_static = { workspace = true }

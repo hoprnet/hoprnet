@@ -15,7 +15,6 @@ crate-type = ["rlib"]
 default = []
 
 [dependencies]
-async-lock = { workspace = true }
 hex = { workspace = true }
 lazy_static = { workspace = true }
 thiserror = { workspace = true }

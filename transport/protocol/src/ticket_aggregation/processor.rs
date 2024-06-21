@@ -1,3 +1,4 @@
+use futures::stream::{Stream, StreamExt};
 use futures::{
     channel::{
         mpsc::{channel, Receiver, Sender},
@@ -6,7 +7,6 @@ use futures::{
     future::{poll_fn, Either},
     pin_mut,
 };
-use futures_lite::stream::{Stream, StreamExt};
 use libp2p::request_response::{OutboundRequestId, ResponseChannel};
 use libp2p_identity::PeerId;
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
@@ -410,14 +410,14 @@ where
     type Item = TicketAggregationProcessed<T, U>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Option<Self::Item>> {
-        Pin::new(self).ack_event_queue.1.poll_next(cx)
+        Pin::new(self).ack_event_queue.1.poll_next_unpin(cx)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use async_std::prelude::FutureExt;
-    use futures_lite::StreamExt;
+    use futures::stream::StreamExt;
     use hex_literal::hex;
     use hopr_crypto_types::{
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},

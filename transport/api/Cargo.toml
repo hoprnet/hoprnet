@@ -34,7 +34,6 @@ prometheus = [
 ]
 
 [dependencies]
-async-channel = { workspace = true }
 async-std = { workspace = true, optional = true }
 async-trait = { workspace = true }
 async-lock = { workspace = true }
@@ -42,9 +41,7 @@ futures = { workspace = true }
 lazy_static = { workspace = true, optional = true }
 libp2p = { workspace = true, features = ["request-response"] }
 proc-macro-regex = "~1.1.0"
-rust-stream-ext-concurrent = { workspace = true }
 serde = { workspace = true }
-smart-default = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, optional = true }
 tracing = { workspace = true }

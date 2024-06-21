@@ -118,7 +118,7 @@ impl VrfParameters {
 
         let h_check = Secp256k1::hash_to_scalar::<ExpandMsgXmd<sha3::Keccak256>>(
             &[
-                &creator.as_ref(),
+                creator.as_ref(),
                 &self.v.as_uncompressed().as_bytes()[1..],
                 &r_v.to_affine().to_encoded_point(false).as_bytes()[1..],
                 msg,
@@ -170,7 +170,7 @@ impl VrfParameters {
         msg: &[u8; T],
         dst: &[u8],
     ) -> crate::errors::Result<k256::ProjectivePoint> {
-        Secp256k1::hash_from_bytes::<ExpandMsgXmd<sha3::Keccak256>>(&[&creator.as_ref(), msg], &[dst])
+        Secp256k1::hash_from_bytes::<ExpandMsgXmd<sha3::Keccak256>>(&[creator.as_ref(), msg], &[dst])
             .or(Err(CalculationError))
     }
 }
@@ -184,7 +184,7 @@ pub fn derive_vrf_parameters<T: AsRef<[u8]>>(
     dst: &[u8],
 ) -> crate::errors::Result<VrfParameters> {
     let chain_addr = chain_keypair.public().to_address();
-    let b = Secp256k1::hash_from_bytes::<ExpandMsgXmd<sha3::Keccak256>>(&[&chain_addr.as_ref(), msg.as_ref()], &[dst])?;
+    let b = Secp256k1::hash_from_bytes::<ExpandMsgXmd<sha3::Keccak256>>(&[chain_addr.as_ref(), msg.as_ref()], &[dst])?;
 
     let a: Scalar = chain_keypair.into();
 
@@ -207,7 +207,7 @@ pub fn derive_vrf_parameters<T: AsRef<[u8]>>(
 
     let h = Secp256k1::hash_to_scalar::<ExpandMsgXmd<sha3::Keccak256>>(
         &[
-            &chain_addr.as_ref(),
+            chain_addr.as_ref(),
             &v.to_affine().to_encoded_point(false).as_bytes()[1..],
             &r_v.to_affine().to_encoded_point(false).as_bytes()[1..],
             msg.as_ref(),

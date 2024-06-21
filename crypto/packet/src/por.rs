@@ -61,7 +61,7 @@ impl ProofOfRelayString {
 
     /// Generates Proof of Relay challenges from the shared secrets of the
     /// outgoing packet.
-    pub fn from_shared_secrets(secrets: &Vec<SharedSecret>) -> Vec<[u8; ProofOfRelayString::SIZE]> {
+    pub fn from_shared_secrets(secrets: &[SharedSecret]) -> Vec<[u8; ProofOfRelayString::SIZE]> {
         (1..secrets.len())
             .map(|i| ProofOfRelayString::new(&secrets[i], secrets.get(i + 1)).into())
             .collect::<Vec<_>>()

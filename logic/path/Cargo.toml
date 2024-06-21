@@ -18,7 +18,6 @@ runtime-tokio = ["hopr-db-sql/runtime-tokio"]
 prometheus = [ "dep:hopr-metrics", "hopr-db-sql/prometheus"]
 
 [dependencies]
-async-lock = { workspace = true }
 async-trait = { workspace = true }
 futures = { workspace = true }
 lazy_static = { workspace = true }
