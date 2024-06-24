@@ -20,6 +20,8 @@ pub mod network_notifier;
 mod processes;
 mod timer;
 
+use crate::errors::HoprTransportError;
+
 pub use {
     core_network::network::{Health, Network, NetworkTriggeredEvent, PeerOrigin, PeerStatus},
     hopr_crypto_types::{
@@ -115,7 +117,7 @@ impl From<NetworkRegistryStatus> for PeerEligibility {
     }
 }
 
-/// Indexer events triggered externally from the [crate::HoprTransport] object.
+/// Indexer events triggered externally from the [`HoprTransport`] object.
 pub enum IndexerTransportEvent {
     EligibilityUpdate(PeerId, PeerEligibility),
     Announce(PeerId, Vec<Multiaddr>),
@@ -227,6 +229,12 @@ where
             ))
         }
     }
+}
+
+#[derive(Debug, Clone)]
+pub enum SendOptions {
+    IntermediatePath(Vec<PeerId>),
+    Hops(u16),
 }
 
 /// Interface into the physical transport mechanism allowing all HOPR related tasks on
@@ -349,7 +357,7 @@ where
         self.process_ticket_aggregate
             .clone()
             .set(ticket_agg_proc.writer())
-            .expect("must set the packet processing writer only once");
+            .expect("must set the ticket aggregation writer only once");
 
         // heartbeat
         let mut heartbeat = Heartbeat::new(
@@ -361,8 +369,6 @@ where
             core_network::heartbeat::HeartbeatExternalInteractions::new(network.clone()),
             Box::new(|dur| Box::pin(executor::sleep(dur))),
         );
-
-        // let swarm_loop = HoprSwarmWithProcessors::new
 
         let transport_layer = transport_layer.with_processors(
             network_events_rx,
@@ -398,22 +404,19 @@ where
     #[tracing::instrument(level = "debug", skip(self))]
     pub async fn ping(&self, peer: &PeerId) -> errors::Result<Option<std::time::Duration>> {
         if !self.is_allowed_to_access_network(peer).await? {
-            return Err(errors::HoprTransportError::Api(format!(
-                "ping to {peer} not allowed due to network registry"
+            return Err(HoprTransportError::Api(format!(
+                "ping to '{peer}' not allowed due to network registry"
             )));
         }
 
         if peer == &self.me {
-            return Err(errors::HoprTransportError::Api(
-                "ping to self does not make sense".into(),
-            ));
+            return Err(HoprTransportError::Api("ping to self does not make sense".into()));
         }
 
-        let pinger = self.ping.get().ok_or_else(|| {
-            crate::errors::HoprTransportError::Api(
-                "ping: failed to send a ping, because ping processing is not yet initialized".into(),
-            )
-        })?;
+        let pinger = self
+            .ping
+            .get()
+            .ok_or_else(|| HoprTransportError::Api("ping processing is not yet initialized".into()))?;
 
         let timeout = executor::sleep(std::time::Duration::from_secs(30)).fuse();
         let ping = (*pinger).ping(vec![*peer]).fuse();
@@ -446,13 +449,12 @@ where
         &self,
         msg: Box<[u8]>,
         destination: PeerId,
-        intermediate_path: Option<Vec<PeerId>>,
-        hops: Option<u16>,
+        options: SendOptions,
         application_tag: Option<u16>,
-    ) -> crate::errors::Result<HalfKeyChallenge> {
+    ) -> errors::Result<HalfKeyChallenge> {
         if let Some(application_tag) = application_tag {
             if application_tag < RESERVED_TAG_UPPER_LIMIT {
-                return Err(crate::errors::HoprTransportError::Api(format!(
+                return Err(HoprTransportError::Api(format!(
                     "Application tag must not be lower than {RESERVED_TAG_UPPER_LIMIT}"
                 )));
             }
@@ -461,51 +463,49 @@ where
         let app_data = ApplicationData::new(application_tag, &msg)?;
 
         if msg.len() > PAYLOAD_SIZE {
-            return Err(crate::errors::HoprTransportError::Api(format!(
+            return Err(HoprTransportError::Api(format!(
                 "Message exceeds the maximum allowed size of {PAYLOAD_SIZE} bytes"
             )));
         }
 
-        let path: TransportPath = if let Some(intermediate_path) = intermediate_path {
-            let mut full_path = intermediate_path;
-            full_path.push(destination);
+        let path = match options {
+            SendOptions::IntermediatePath(mut path) => {
+                path.push(destination);
 
-            debug!(
-                full_path = format!("{full_path:?}"),
-                "Sending a message using full path"
-            );
+                debug!(
+                    full_path = format!("{path:?}"),
+                    "Sending a message using a specific path"
+                );
 
-            let cg = self.channel_graph.read().await;
+                let cg = self.channel_graph.read().await;
 
-            TransportPath::resolve(full_path, &self.db, &cg).await.map(|(p, _)| p)?
-        } else if let Some(hops) = hops {
-            debug!(hops, "Sending a message using hops");
-
-            let pk = OffchainPublicKey::try_from(destination)?;
-
-            if let Some(chain_key) = self
-                .db
-                .translate_key(None, pk)
-                .await
-                .map_err(hopr_db_sql::api::errors::DbError::from)?
-            {
-                let selector = LegacyPathSelector::default();
-                let target_chain_key: Address = chain_key.try_into()?;
-                let cp = {
-                    let cg = self.channel_graph.read().await;
-                    selector.select_path(&cg, cg.my_address(), target_chain_key, hops as usize, hops as usize)?
-                };
-
-                cp.into_path(&self.db, target_chain_key).await?
-            } else {
-                return Err(crate::errors::HoprTransportError::Api(
-                    "send msg: unknown destination peer id encountered".to_owned(),
-                ));
+                TransportPath::resolve(path, &self.db, &cg).await.map(|(p, _)| p)?
             }
-        } else {
-            return Err(crate::errors::HoprTransportError::Api(
-                "send msg: one of either hops or intermediate path must be specified".to_owned(),
-            ));
+            SendOptions::Hops(hops) => {
+                debug!(hops, "Sending a message using a random path");
+
+                let pk = OffchainPublicKey::try_from(destination)?;
+
+                if let Some(chain_key) = self
+                    .db
+                    .translate_key(None, pk)
+                    .await
+                    .map_err(hopr_db_sql::api::errors::DbError::from)?
+                {
+                    let selector = LegacyPathSelector::default();
+                    let target_chain_key: Address = chain_key.try_into()?;
+                    let cp = {
+                        let cg = self.channel_graph.read().await;
+                        selector.select_path(&cg, cg.my_address(), target_chain_key, hops as usize, hops as usize)?
+                    };
+
+                    cp.into_path(&self.db, target_chain_key).await?
+                } else {
+                    return Err(HoprTransportError::Api(
+                        "send msg: unknown destination peer id encountered".to_owned(),
+                    ));
+                }
+            }
         };
 
         #[cfg(all(feature = "prometheus", not(test)))]
@@ -515,7 +515,7 @@ where
             .process_packet_send
             .get()
             .ok_or_else(|| {
-                crate::errors::HoprTransportError::Api(
+                HoprTransportError::Api(
                     "send msg: failed to send a message, because message processing is not yet initialized".into(),
                 )
             })?
@@ -528,7 +528,7 @@ where
                     .consume_and_wait(crate::constants::PACKET_QUEUE_TIMEOUT_MILLISECONDS)
                     .await?)
             }
-            Err(e) => Err(crate::errors::HoprTransportError::Api(format!(
+            Err(e) => Err(HoprTransportError::Api(format!(
                 "send msg: failed to enqueue msg send: {}",
                 e
             ))),
@@ -542,7 +542,7 @@ where
             .get_channel_by_id(None, channel_id)
             .await
             .map_err(hopr_db_sql::api::errors::DbError::from)
-            .map_err(errors::HoprTransportError::from)
+            .map_err(HoprTransportError::from)
             .and_then(|c| {
                 if let Some(c) = c {
                     Ok(c)

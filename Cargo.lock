@@ -3712,6 +3712,7 @@ name = "hopr-transport-session"
 version = "0.1.0"
 dependencies = [
  "async-std",
+ "libp2p-identity",
  "thiserror",
 ]
 

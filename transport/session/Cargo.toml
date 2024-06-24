@@ -15,6 +15,7 @@ crate-type = ["rlib"]
 default = []
 
 [dependencies]
+libp2p-identity = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]

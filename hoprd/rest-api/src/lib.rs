@@ -10,6 +10,7 @@ use bimap::BiHashMap;
 // use base64::{engine::general_purpose::STANDARD_NO_PAD, Engine as _};
 use futures::StreamExt;
 use futures_concurrency::stream::Merge;
+use hopr_lib::SendOptions;
 use libp2p_identity::PeerId;
 use serde_json::json;
 use serde_with::{serde_as, Bytes, DisplayFromStr, DurationMilliSeconds};
@@ -400,22 +401,34 @@ pub async fn build_hopr_api(
                                             .as_ref()
                                             .map(|enc| enc(&data.args.body))
                                             .unwrap_or_else(|| data.args.body.into_boxed_slice());
+                                        // let msg_body =  data.args.body.into_bytes().into_boxed_slice();
 
-                                        let hkc = hopr
-                                            .send_message(
-                                                // data.args.body.into_bytes().into_boxed_slice(),
-                                                msg_body,
-                                                data.args.peer_id,
-                                                data.args.path,
-                                                data.args.hops,
-                                                Some(data.args.tag),
-                                            )
-                                            .await?;
+                                        let options = if let Some(intermediate_path) = data.args.path {
+                                            SendOptions::IntermediatePath(intermediate_path)
+                                        } else if let Some(hops) = data.args.hops {
+                                            SendOptions::Hops(hops)
+                                        } else {
+                                            error!("one of hops or intermediate path must be provided");
+                                            continue;
+                                        };
 
-                                        debug!("websocket notifying client with sent ack {hkc}");
-                                        ws_con
-                                            .send_json(&json!(messages::WebSocketReadAck::from_ack_challenge(hkc)))
-                                            .await?;
+                                        match hopr
+                                            .send_message(msg_body, data.args.peer_id, options, Some(data.args.tag))
+                                            .await
+                                        {
+                                            Ok(hkc) => {
+                                                debug!("websocket notifying client with sent ack {hkc}");
+                                                if let Err(e) = ws_con
+                                                    .send_json(&json!(messages::WebSocketReadAck::from_ack_challenge(
+                                                        hkc
+                                                    )))
+                                                    .await
+                                                {
+                                                    error!("failed to send ack to client: {e}");
+                                                }
+                                            }
+                                            Err(_) => todo!(),
+                                        }
                                     } else {
                                         warn!("skipping an unsupported websocket command '{}'", data.cmd);
                                     }
@@ -1527,22 +1540,29 @@ mod messages {
             .map(|enc| enc(&args.body))
             .unwrap_or_else(|| args.body.into_boxed_slice());
 
-        if let Some(path) = &args.path {
-            if path.len() > 3 {
+        let options = if let Some(intermediate_path) = args.path {
+            if intermediate_path.len() > 3 {
                 return Ok(Response::builder(422)
                     .body(ApiErrorStatus::UnknownFailure(
                         "The path components must contain at most 3 elements".into(),
                     ))
                     .build());
             }
-        }
+
+            SendOptions::IntermediatePath(intermediate_path)
+        } else if let Some(hops) = args.hops {
+            SendOptions::Hops(hops)
+        } else {
+            return Ok(Response::builder(422)
+                .body(ApiErrorStatus::UnknownFailure(
+                    "One of either hops or intermediate path must be specified".to_owned(),
+                ))
+                .build());
+        };
 
         let timestamp = std::time::SystemTime::now().as_unix_timestamp();
 
-        match hopr
-            .send_message(msg_body, args.peer_id, args.path, args.hops, Some(args.tag))
-            .await
-        {
+        match hopr.send_message(msg_body, args.peer_id, options, Some(args.tag)).await {
             Ok(challenge) => Ok(Response::builder(202)
                 .body(json!(SendMessageResponse { challenge, timestamp }))
                 .build()),
