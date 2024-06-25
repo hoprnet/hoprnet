@@ -44,16 +44,26 @@ impl SessionId {
     }
 }
 
-#[derive(Debug)]
 pub struct Session {
     id: SessionId,
     options: SendOptions,
     rx: UnboundedReceiver<ApplicationData>,
+    sender: Box<dyn traits::SendMsg>,
 }
 
 impl Session {
-    pub fn new(id: SessionId, options: SendOptions, rx: UnboundedReceiver<ApplicationData>) -> Self {
-        Self { id, options, rx }
+    pub fn new(
+        id: SessionId,
+        options: SendOptions,
+        rx: UnboundedReceiver<ApplicationData>,
+        sender: Box<dyn traits::SendMsg>,
+    ) -> Self {
+        Self {
+            id,
+            options,
+            rx,
+            sender,
+        }
     }
 
     pub fn id(&self) -> &SessionId {

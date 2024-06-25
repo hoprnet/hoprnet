@@ -47,7 +47,10 @@ use hopr_transport_p2p::{
     swarm::{TicketAggregationRequestType, TicketAggregationResponseType},
     HoprSwarm,
 };
-use hopr_transport_session::{Session, SessionId};
+use hopr_transport_session::{
+    traits::{SendMsg, SessionError},
+    Session, SessionId,
+};
 use std::{
     collections::HashMap,
     sync::{Arc, OnceLock},
@@ -295,6 +298,73 @@ where
         SimpleHistogram::observe(&METRIC_PATH_LENGTH, (path.hops().len() - 1) as f64);
 
         Ok(path)
+    }
+}
+
+pub struct MessageSender<T>
+where
+    T: HoprDbAllOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
+{
+    process_packet_send: Arc<OnceLock<PacketActions>>,
+    resolver: Arc<RwLock<PathPlanner<T>>>,
+}
+
+impl<T> MessageSender<T>
+where
+    T: HoprDbAllOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
+{
+    pub fn new(process_packet_send: Arc<OnceLock<PacketActions>>, resolver: Arc<RwLock<PathPlanner<T>>>) -> Self {
+        Self {
+            process_packet_send,
+            resolver,
+        }
+    }
+}
+
+#[async_trait::async_trait]
+impl<T> SendMsg for MessageSender<T>
+where
+    T: HoprDbAllOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
+{
+    async fn send_message(
+        &self,
+        data: ApplicationData,
+        destination: PeerId,
+        options: SendOptions,
+    ) -> std::result::Result<(), SessionError> {
+        if let Some(application_tag) = data.application_tag {
+            if application_tag < RESERVED_TAG_UPPER_LIMIT {
+                return Err(SessionError::Tag);
+            }
+        } else {
+            error!("Application tag must be set for an outgoing message inside a session");
+            return Err(SessionError::Tag);
+        }
+
+        let path = self
+            .resolver
+            .write()
+            .await
+            .resolve_path(destination, options)
+            .await
+            .map_err(|_| SessionError::Path)?;
+
+        let mut sender = self
+            .process_packet_send
+            .get()
+            .ok_or_else(|| SessionError::Closed)?
+            .clone();
+
+        match sender.send_packet(data, path) {
+            Ok(mut awaiter) => {
+                awaiter
+                    .consume_and_wait(crate::constants::PACKET_QUEUE_TIMEOUT_MILLISECONDS)
+                    .await
+                    .map_err(|_e| SessionError::Timeout)?;
+                Ok(())
+            }
+            Err(_e) => Err(SessionError::Closed),
+        }
     }
 }
 
@@ -556,7 +626,18 @@ where
 
         self.sessions.insert(session_id, tx).await;
 
-        Ok(Session::new(session_id, options, rx))
+        Ok(Session::new(
+            session_id,
+            options,
+            rx,
+            Box::new(MessageSender::new(
+                self.process_packet_send.clone(),
+                Arc::new(RwLock::new(PathPlanner::new(
+                    self.db.clone(),
+                    self.channel_graph.clone(),
+                ))),
+            )),
+        ))
     }
 
     #[tracing::instrument(level = "info", skip(self, msg), fields(uuid = uuid::Uuid::new_v4().to_string()))]
@@ -605,8 +686,7 @@ where
                     .await?)
             }
             Err(e) => Err(HoprTransportError::Api(format!(
-                "send msg: failed to enqueue msg send: {}",
-                e
+                "send msg: failed to enqueue msg send: {e}"
             ))),
         }
     }
