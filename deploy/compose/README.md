@@ -7,7 +7,7 @@
 
 ## Setup
 
-The `docker compose` deployment is multi-faceted allowing different combinations of tooling and extensions and different types of usage for the deployment.
+The `docker compose` deployment is multi-faceted, allowing different combinations of tooling and extensions and different types of usage for the deployment.
 
 - Clone this repository
 - Follow the guide to run a [Hopr node](https://docs.hoprnet.org/node/start-here)
