@@ -618,7 +618,7 @@ impl Cmd for SafeModuleSubcommands {
     }
 
     async fn async_run(self) -> Result<(), HelperErrors> {
-        return match self {
+        match self {
             SafeModuleSubcommands::Create {
                 network_provider,
                 local_identity,
@@ -689,6 +689,6 @@ impl Cmd for SafeModuleSubcommands {
                 )
                 .await
             }
-        };
+        }
     }
 }
