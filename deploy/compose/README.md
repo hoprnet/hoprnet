@@ -19,6 +19,7 @@ The `docker compose` deployment is multi-faceted allowing different combinations
   - Set your safe address created in the onboarding process at `hopr.safe_module.safe_address`
   - Set your module address created in the onboarding process at `hopr.safe_module.module_address`
 - The Hoprd identity file should be located at `./hopr.id`
+- Modfiy the prometheus config file at `./prometheus/prometheus.yml` to set the correct values for credentials and labels
 
 ### Profiles
 
@@ -62,8 +63,9 @@ COMPOSE_PROFILES=hoprd,metrics-vis docker compose up -d
 ```
 
 To acess Prometheus go to: http://localhost:9090 being PROMETHEUS_PORT=9090
-To access Grafana go to: http://localhost:3030/dashboards being GRAFANA_PORT=3030.
+To access Grafana go to: http://localhost:3030 being GRAFANA_PORT=3030.
 Grafana credentials are stored in ./grafana/config.monitoring
+Navigate to the Dashboards page and open the desired dashboard
 
 4. Run hopr node with an external monitoring system using Prometheus pushgateway
 
