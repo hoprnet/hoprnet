@@ -253,7 +253,7 @@ where
         Self { db, channel_graph }
     }
 
-    pub async fn resolve_path(&mut self, destination: PeerId, options: SendOptions) -> errors::Result<TransportPath> {
+    pub async fn resolve_path(&self, destination: PeerId, options: SendOptions) -> errors::Result<TransportPath> {
         let path = match options {
             SendOptions::IntermediatePath(mut path) => {
                 path.push(destination);
@@ -306,14 +306,14 @@ where
     T: HoprDbAllOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
 {
     process_packet_send: Arc<OnceLock<PacketActions>>,
-    resolver: Arc<RwLock<PathPlanner<T>>>,
+    resolver: PathPlanner<T>,
 }
 
 impl<T> MessageSender<T>
 where
     T: HoprDbAllOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
 {
-    pub fn new(process_packet_send: Arc<OnceLock<PacketActions>>, resolver: Arc<RwLock<PathPlanner<T>>>) -> Self {
+    pub fn new(process_packet_send: Arc<OnceLock<PacketActions>>, resolver: PathPlanner<T>) -> Self {
         Self {
             process_packet_send,
             resolver,
@@ -343,8 +343,6 @@ where
 
         let path = self
             .resolver
-            .write()
-            .await
             .resolve_path(destination, options)
             .await
             .map_err(|_| SessionError::Path)?;
@@ -632,10 +630,7 @@ where
             rx,
             Box::new(MessageSender::new(
                 self.process_packet_send.clone(),
-                Arc::new(RwLock::new(PathPlanner::new(
-                    self.db.clone(),
-                    self.channel_graph.clone(),
-                ))),
+                PathPlanner::new(self.db.clone(), self.channel_graph.clone()),
             )),
         ))
     }
