@@ -152,6 +152,8 @@ pub struct CloseChannelResult {
 pub enum HoprLibProcesses {
     #[strum(to_string = "libp2p component responsible for the handling of the p2p communication")]
     Swarm,
+    #[strum(to_string = "session unwrapper pairing the session data")]
+    SessionUnwrapper,
     #[strum(to_string = "heartbeat component responsible for maintaining the network quality measurements")]
     Heartbeat,
     #[strum(to_string = "tick wake up the strategies to perform an action")]
@@ -947,6 +949,7 @@ impl Hopr {
             let nid = match id {
                 core_transport::HoprTransportProcess::Swarm => HoprLibProcesses::Swarm,
                 core_transport::HoprTransportProcess::Heartbeat => HoprLibProcesses::Heartbeat,
+                core_transport::HoprTransportProcess::SessionUnwrapper => HoprLibProcesses::SessionUnwrapper,
             };
             processes.insert(nid, proc);
         }

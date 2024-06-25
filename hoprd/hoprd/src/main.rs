@@ -249,7 +249,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         spawn(async move {
             while let Some(output) = ingress.next().await {
                 match output {
-                    TransportOutput::Received(data) => {
+                    TransportOutput::Received((peer, data)) => {
                         let recv_at = SystemTime::now();
 
                         // TODO: remove RLP in 3.0
@@ -268,12 +268,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 METRIC_MESSAGE_LATENCY.observe(latency.as_secs_f64());
 
                                 if cfg.api.enable && ws_events_tx.receiver_count() > 0 {
-                                    if let Err(e) =
-                                        ws_events_tx.try_broadcast(TransportOutput::Received(ApplicationData {
+                                    if let Err(e) = ws_events_tx.try_broadcast(TransportOutput::Received((
+                                        peer,
+                                        ApplicationData {
                                             application_tag: data.application_tag,
                                             plain_text: msg.clone(),
-                                        }))
-                                    {
+                                        },
+                                    ))) {
                                         error!("failed to notify websockets about a new message: {e}");
                                     }
                                 }
@@ -303,6 +304,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             }
                         }
                     }
+                    TransportOutput::ConnectionClosed(_) => {}
                 }
             }
         }),

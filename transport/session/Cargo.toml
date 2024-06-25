@@ -15,8 +15,13 @@ crate-type = ["rlib"]
 default = []
 
 [dependencies]
+async-trait = { workspace = true }
+futures = { workspace = true }
 libp2p-identity = { workspace = true }
 thiserror = { workspace = true }
+
+core-path = { workspace = true }
+hopr-internal-types = { workspace = true }
 
 [dev-dependencies]
 async-std = { workspace = true }

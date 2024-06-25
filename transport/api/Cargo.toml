@@ -40,6 +40,7 @@ async-lock = { workspace = true }
 futures = { workspace = true }
 lazy_static = { workspace = true, optional = true }
 libp2p = { workspace = true, features = ["request-response"] }
+moka = { workspace = true }
 proc-macro-regex = "~1.1.0"
 serde = { workspace = true }
 thiserror = { workspace = true }
@@ -60,6 +61,7 @@ hopr-metrics = { workspace = true, optional = true }
 hopr-platform = { workspace = true }
 hopr-primitive-types = { workspace = true }
 hopr-transport-p2p = { workspace = true }
+hopr-transport-session = { workspace = true }
 
 [dev-dependencies]
 async-std = { workspace = true }
@@ -67,4 +69,3 @@ hopr-db-sql = { workspace = true, features = ["runtime-async-std"] }
 core-network = { workspace = true, features = ["runtime-async-std"] }
 core-protocol = { workspace = true, features = ["runtime-async-std"] }
 hopr-transport-p2p = { workspace = true, features = ["runtime-async-std"] }
-

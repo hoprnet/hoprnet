@@ -194,8 +194,9 @@ pub use swarm::HoprSwarm;
 /// Composite output from the transport layer.
 #[derive(Clone)]
 pub enum TransportOutput {
-    Received(ApplicationData),
+    Received((PeerId, ApplicationData)),
     Sent(HalfKeyChallenge),
+    ConnectionClosed(PeerId),
 }
 
 #[derive(Debug)]

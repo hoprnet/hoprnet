@@ -1615,8 +1615,10 @@ dependencies = [
  "hopr-platform",
  "hopr-primitive-types",
  "hopr-transport-p2p",
+ "hopr-transport-session",
  "lazy_static",
  "libp2p",
+ "moka",
  "proc-macro-regex",
  "serde",
  "thiserror",
@@ -3712,6 +3714,10 @@ name = "hopr-transport-session"
 version = "0.1.0"
 dependencies = [
  "async-std",
+ "async-trait",
+ "core-path",
+ "futures",
+ "hopr-internal-types",
  "libp2p-identity",
  "thiserror",
 ]

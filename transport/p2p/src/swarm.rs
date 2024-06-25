@@ -339,7 +339,7 @@ impl HoprSwarmWithProcessors {
                     Inputs::Message(task) => match task {
                         MsgProcessed::Receive(peer, data, ack) => {
                             debug!("transport input - msg - received packet from '{peer}'");
-                            if let Err(e) = on_transport_output.unbounded_send(TransportOutput::Received(data)) {
+                            if let Err(e) = on_transport_output.unbounded_send(TransportOutput::Received((peer, data))) {
                                 error!("transport input - msg - failed to store a received message in the inbox: {}", e);
                             }
 
@@ -612,6 +612,10 @@ impl HoprSwarmWithProcessors {
                         #[cfg(all(feature = "prometheus", not(test)))]
                         {
                             METRIC_TRANSPORT_P2P_OPEN_CONNECTION_COUNT.decrement(1.0);
+                        }
+
+                        if let Err(e) = on_transport_output.unbounded_send(TransportOutput::ConnectionClosed(peer_id)) {
+                            error!("transport - p2p - failed to emit close connection for '{peer_id}': {e}");
                         }
                     },
                     SwarmEvent::IncomingConnection {
