@@ -453,26 +453,38 @@ impl SafeModuleSubcommands {
 
         if !node_eth_addresses.is_empty() {
             // first deregister nodes from their old safe
-            deregister_nodes_from_node_safe_registry_and_remove_from_module(
+            match deregister_nodes_from_node_safe_registry_and_remove_from_module(
                 hopr_node_safe_registry.clone(),
                 node_eth_addresses.clone(),
                 old_module_addr,
                 signer_private_key.clone(),
             )
             .await
-            .unwrap();
+            {
+                Ok(_) => {
+                    info!("Nodes are deregistered from old safes");
+                }
+                Err(e) => {
+                    return Err(e);
+                }
+            };
 
-            info!("Nodes are deregistered from old modules");
             // then include nodes to module
-            include_nodes_to_module(
+            match include_nodes_to_module(
                 safe.clone(),
                 node_eth_addresses.clone(),
                 module_addr,
                 signer_private_key,
             )
             .await
-            .unwrap();
-            info!("Nodes are included to the new module");
+            {
+                Ok(_) => {
+                    info!("Nodes are included to the new module");
+                }
+                Err(e) => {
+                    return Err(e);
+                }
+            };
         };
 
         // action around network registry
@@ -606,7 +618,7 @@ impl Cmd for SafeModuleSubcommands {
     }
 
     async fn async_run(self) -> Result<(), HelperErrors> {
-        match self {
+        return match self {
             SafeModuleSubcommands::Create {
                 network_provider,
                 local_identity,
@@ -632,7 +644,6 @@ impl Cmd for SafeModuleSubcommands {
                     manager_private_key,
                 )
                 .await
-                .unwrap();
             }
             SafeModuleSubcommands::Move {
                 network_provider,
@@ -655,7 +666,6 @@ impl Cmd for SafeModuleSubcommands {
                     manager_private_key,
                 )
                 .await
-                .unwrap();
             }
             SafeModuleSubcommands::Migrate {
                 network_provider,
@@ -678,9 +688,7 @@ impl Cmd for SafeModuleSubcommands {
                     manager_private_key,
                 )
                 .await
-                .unwrap();
             }
-        }
-        Ok(())
+        };
     }
 }
