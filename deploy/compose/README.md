@@ -11,7 +11,7 @@ The `docker compose` deployment is multi-faceted allowing different combinations
 
 - Clone this repository
 - Follow the guide to run a [Hopr node](https://docs.hoprnet.org/node/start-here)
-- Copy the `.env.sample` file into `.env` and override with your custome values.
+- Copy the `.env.sample` file into `.env` and override with your custom values.
 - Copy the `.env-secrets.sample` file into `.env-secrets` and override all parameters with your custom values.
 - Edit the file hoprd.cfg.yaml and override with the data taken from the onboarding process at https://hub.hoprnet.org
   - Set your public IP at `hopr.host.address`
