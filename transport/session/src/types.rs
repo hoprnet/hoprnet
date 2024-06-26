@@ -177,7 +177,7 @@ pub fn unwrap_offchain_key(payload: Box<[u8]>) -> crate::errors::Result<(PeerId,
 
 #[cfg(test)]
 mod tests {
-    use futures::AsyncReadExt;
+    use futures::{AsyncReadExt, AsyncWriteExt};
     use hopr_crypto_types::keypairs::{Keypair, OffchainKeypair};
 
     use super::*;
@@ -327,5 +327,31 @@ mod tests {
 
         assert_eq!(bytes_read, PAYLOAD_SIZE - BUFFER_SIZE);
         assert_eq!(&buffer[..bytes_read], &random_data[BUFFER_SIZE..]);
+    }
+
+    #[async_std::test]
+    async fn session_should_write_data() {
+        let id = SessionId::new(1, PeerId::random());
+        let (_tx, rx) = futures::channel::mpsc::unbounded();
+        let mut mock = MockSendMsg::new();
+
+        let data = b"Hello, world!".to_vec().into_boxed_slice();
+
+        mock.expect_send_message()
+            .times(1)
+            .withf(move |data, peer, options| {
+                let (peer_id, data) = unwrap_offchain_key(data.plain_text.clone()).expect("Unwrapping should work");
+                assert_eq!(peer_id, *peer);
+                assert_eq!(data, b"Hello, world!".to_vec().into_boxed_slice());
+                assert_eq!(options, &SendOptions::Hops(1));
+                true
+            })
+            .returning(|_, _, _| Ok(()));
+
+        let mut session = Session::new(id, PeerId::random(), SendOptions::Hops(1), Box::new(mock), rx);
+
+        let bytes_written = session.write(&data).await.expect("Read should work #1");
+
+        assert_eq!(bytes_written, data.len());
     }
 }
