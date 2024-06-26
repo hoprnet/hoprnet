@@ -376,7 +376,7 @@ pub async fn build_hopr_api(
                     while let Some(v) = queue.next().await {
                         match v {
                             WebSocketInput::Network(net_in) => match net_in {
-                                TransportOutput::Received((_peer, data)) => {
+                                TransportOutput::Received(data) => {
                                     debug!("websocket notifying client with received msg {data}");
                                     ws_con.send_json(&json!(messages::WebSocketReadMsg::from(data))).await?;
                                 }

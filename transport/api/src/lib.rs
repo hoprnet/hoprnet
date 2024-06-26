@@ -523,7 +523,7 @@ where
 
                 while let Some(output) = rx.next().await {
                     match output {
-                        TransportOutput::Received((peer, data)) => {
+                        TransportOutput::Received(data) => {
                             if let Some(app_tag) = data.application_tag {
                                 match hopr_transport_session::types::unwrap_offchain_key(data.plain_text.clone()) {
                                     Ok((peer, data)) => {
@@ -539,7 +539,7 @@ where
                             }
 
                             let _ = on_transport_output
-                                .send(TransportOutput::Received((peer, data)))
+                                .send(TransportOutput::Received(data))
                                 .await
                                 .map_err(|e| error!("Failed to send transport output: {e}"));
                         }

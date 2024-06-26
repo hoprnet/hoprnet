@@ -339,7 +339,7 @@ impl HoprSwarmWithProcessors {
                     Inputs::Message(task) => match task {
                         MsgProcessed::Receive(peer, data, ack) => {
                             debug!("transport input - msg - received packet from '{peer}'");
-                            if let Err(e) = on_transport_output.unbounded_send(TransportOutput::Received((peer, data))) {
+                            if let Err(e) = on_transport_output.unbounded_send(TransportOutput::Received(data)) {
                                 error!("transport input - msg - failed to store a received message in the inbox: {}", e);
                             }
 
