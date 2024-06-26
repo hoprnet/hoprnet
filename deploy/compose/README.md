@@ -11,13 +11,10 @@ The `docker compose` deployment is multi-faceted, allowing different combination
 
 - Clone this repository
 - Follow the guide to run a [Hopr node](https://docs.hoprnet.org/node/start-here)
-- Copy the `.env.sample` file into `.env` and override with your custom values.
-- Copy the `.env-secrets.sample` file into `.env-secrets` and override all parameters with your custom values.
-- Edit the file hoprd.cfg.yaml and override with the data taken from the onboarding process at https://hub.hoprnet.org
-+ Copy the `.env.sample` file to `.env`, replacing placeholder values with your specific configurations.
-+ Similarly, copy `.env-secrets.sample` to `.env-secrets` and ensure all sensitive configurations are securely set.
-+ Update `hoprd.cfg.yaml` with your network settings and node configurations as guided by the onboarding process at https://hub.hoprnet.org
-- Modfiy the prometheus config file at `./prometheus/prometheus.yml` to set the correct values for credentials and labels
+- Copy the `.env.sample` file to `.env`, replacing placeholder values with your specific configurations.
+- Similarly, copy `.env-secrets.sample` to `.env-secrets` and ensure all sensitive configurations are securely set.
+- Update `hoprd.cfg.yaml` with your node configuration as guided by the onboarding process at https://hub.hoprnet.
+- Modify the prometheus config file at `./prometheus/prometheus.yml` to set the correct values for credentials and labels
 
 ### Profiles
 
