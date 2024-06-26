@@ -629,6 +629,7 @@ where
 
         Ok(Session::new(
             session_id,
+            self.me,
             options,
             Box::new(MessageSender::new(
                 self.process_packet_send.clone(),

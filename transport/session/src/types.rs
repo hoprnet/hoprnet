@@ -3,11 +3,11 @@ use std::{
     task::Poll,
 };
 
-use futures::{channel::mpsc::UnboundedReceiver, StreamExt};
+use futures::{channel::mpsc::UnboundedReceiver, FutureExt, StreamExt};
 use libp2p_identity::PeerId;
 
 use hopr_crypto_types::types::OffchainPublicKey;
-use hopr_internal_types::protocol::PAYLOAD_SIZE;
+use hopr_internal_types::protocol::{ApplicationData, PAYLOAD_SIZE};
 
 use crate::{errors::TransportSessionError, traits::SendMsg, SendOptions};
 
@@ -36,6 +36,7 @@ impl SessionId {
 
 pub struct Session {
     id: SessionId,
+    me: PeerId,
     options: SendOptions,
     rx: UnboundedReceiver<Box<[u8]>>,
     tx: Box<dyn SendMsg>,
@@ -44,9 +45,16 @@ pub struct Session {
 }
 
 impl Session {
-    pub fn new(id: SessionId, options: SendOptions, tx: Box<dyn SendMsg>, rx: UnboundedReceiver<Box<[u8]>>) -> Self {
+    pub fn new(
+        id: SessionId,
+        me: PeerId,
+        options: SendOptions,
+        tx: Box<dyn SendMsg>,
+        rx: UnboundedReceiver<Box<[u8]>>,
+    ) -> Self {
         Self {
             id,
+            me,
             options,
             rx,
             tx,
@@ -57,6 +65,38 @@ impl Session {
 
     pub fn id(&self) -> &SessionId {
         &self.id
+    }
+}
+
+impl futures::AsyncWrite for Session {
+    fn poll_write(
+        self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+        buf: &[u8],
+    ) -> Poll<std::io::Result<usize>> {
+        let payload = wrap_with_offchain_key(&self.me, buf.to_vec().into_boxed_slice())
+            .map_err(|e| Error::new(ErrorKind::InvalidData, e))?;
+
+        let payload = ApplicationData::new_from_owned(Some(self.id.tag()), payload.into_boxed_slice())
+            .map_err(|e| Error::new(ErrorKind::InvalidData, e))?;
+
+        match self
+            .tx
+            .send_message(payload, *self.id.peer(), self.options.clone())
+            .poll_unpin(cx)
+        {
+            Poll::Ready(Ok(_)) => Poll::Ready(Ok(buf.len())),
+            Poll::Ready(Err(_)) => Poll::Ready(Err(Error::from(ErrorKind::BrokenPipe))),
+            Poll::Pending => Poll::Pending,
+        }
+    }
+
+    fn poll_flush(self: std::pin::Pin<&mut Self>, _cx: &mut std::task::Context<'_>) -> Poll<std::io::Result<()>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn poll_close(self: std::pin::Pin<&mut Self>, _cx: &mut std::task::Context<'_>) -> Poll<std::io::Result<()>> {
+        Poll::Ready(Ok(()))
     }
 }
 
@@ -232,7 +272,7 @@ mod tests {
         let (_tx, rx) = futures::channel::mpsc::unbounded();
         let mock = MockSendMsg::new();
 
-        let session = Session::new(id, SendOptions::Hops(1), Box::new(mock), rx);
+        let session = Session::new(id, PeerId::random(), SendOptions::Hops(1), Box::new(mock), rx);
 
         assert_eq!(session.id(), &id);
     }
@@ -243,7 +283,7 @@ mod tests {
         let (tx, rx) = futures::channel::mpsc::unbounded();
         let mock = MockSendMsg::new();
 
-        let mut session = Session::new(id, SendOptions::Hops(1), Box::new(mock), rx);
+        let mut session = Session::new(id, PeerId::random(), SendOptions::Hops(1), Box::new(mock), rx);
 
         let random_data = hopr_crypto_random::random_bytes::<PAYLOAD_SIZE>()
             .as_ref()
@@ -266,7 +306,7 @@ mod tests {
         let (tx, rx) = futures::channel::mpsc::unbounded();
         let mock = MockSendMsg::new();
 
-        let mut session = Session::new(id, SendOptions::Hops(1), Box::new(mock), rx);
+        let mut session = Session::new(id, PeerId::random(), SendOptions::Hops(1), Box::new(mock), rx);
 
         let random_data = hopr_crypto_random::random_bytes::<PAYLOAD_SIZE>()
             .as_ref()
