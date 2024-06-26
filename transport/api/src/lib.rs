@@ -47,10 +47,7 @@ use hopr_transport_p2p::{
     swarm::{TicketAggregationRequestType, TicketAggregationResponseType},
     HoprSwarm,
 };
-use hopr_transport_session::{
-    traits::{SendMsg, SessionError},
-    Session, SessionId,
-};
+use hopr_transport_session::{errors::TransportSessionError, traits::SendMsg, Session, SessionId};
 use std::{
     collections::HashMap,
     sync::{Arc, OnceLock},
@@ -331,26 +328,26 @@ where
         data: ApplicationData,
         destination: PeerId,
         options: SendOptions,
-    ) -> std::result::Result<(), SessionError> {
+    ) -> std::result::Result<(), TransportSessionError> {
         if let Some(application_tag) = data.application_tag {
             if application_tag < RESERVED_TAG_UPPER_LIMIT {
-                return Err(SessionError::Tag);
+                return Err(TransportSessionError::Tag);
             }
         } else {
             error!("Application tag must be set for an outgoing message inside a session");
-            return Err(SessionError::Tag);
+            return Err(TransportSessionError::Tag);
         }
 
         let path = self
             .resolver
             .resolve_path(destination, options)
             .await
-            .map_err(|_| SessionError::Path)?;
+            .map_err(|_| TransportSessionError::Path)?;
 
         let mut sender = self
             .process_packet_send
             .get()
-            .ok_or_else(|| SessionError::Closed)?
+            .ok_or_else(|| TransportSessionError::Closed)?
             .clone();
 
         match sender.send_packet(data, path) {
@@ -358,10 +355,10 @@ where
                 awaiter
                     .consume_and_wait(crate::constants::PACKET_QUEUE_TIMEOUT_MILLISECONDS)
                     .await
-                    .map_err(|_e| SessionError::Timeout)?;
+                    .map_err(|_e| TransportSessionError::Timeout)?;
                 Ok(())
             }
-            Err(_e) => Err(SessionError::Closed),
+            Err(_e) => Err(TransportSessionError::Closed),
         }
     }
 }
@@ -385,7 +382,7 @@ where
     process_packet_send: Arc<OnceLock<PacketActions>>,
     process_ticket_aggregate:
         Arc<OnceLock<TicketAggregationActions<TicketAggregationResponseType, TicketAggregationRequestType>>>,
-    sessions: moka::future::Cache<SessionId, UnboundedSender<ApplicationData>>,
+    sessions: moka::future::Cache<SessionId, UnboundedSender<Box<[u8]>>>,
 }
 
 impl<T> HoprTransport<T>
@@ -419,7 +416,7 @@ where
             my_multiaddresses,
             process_packet_send: Arc::new(OnceLock::new()),
             process_ticket_aggregate: Arc::new(OnceLock::new()),
-            sessions: moka::future::Cache::new(RESERVED_TAG_UPPER_LIMIT as u64),
+            sessions: moka::future::Cache::new(u16::MAX as u64),
         }
     }
 
@@ -528,10 +525,16 @@ where
                     match output {
                         TransportOutput::Received((peer, data)) => {
                             if let Some(app_tag) = data.application_tag {
-                                if let Some(sender) = sessions.get(&SessionId::new(app_tag, peer)).await {
-                                    // if the data does not get into the session, it can recover
-                                    let _ = sender.unbounded_send(data);
-                                    continue;
+                                match hopr_transport_session::types::unwrap_offchain_key(data.plain_text.clone()) {
+                                    Ok((peer, data)) => {
+                                        // TODO: 2.2 Add the ability to open and process new sessions based on the other side initiating
+                                        if let Some(sender) = sessions.get(&SessionId::new(app_tag, peer)).await {
+                                            // if the data does not get into the session, it can recover
+                                            let _ = sender.unbounded_send(data);
+                                            continue;
+                                        }
+                                    }
+                                    _ => {}
                                 }
                             }
 
@@ -620,7 +623,7 @@ where
     pub async fn new_session(&self, destination: PeerId, options: SendOptions) -> errors::Result<Session> {
         let session_id = SessionId::new(0u16, destination);
 
-        let (tx, rx) = futures::channel::mpsc::unbounded::<ApplicationData>();
+        let (tx, rx) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
 
         self.sessions.insert(session_id, tx).await;
 

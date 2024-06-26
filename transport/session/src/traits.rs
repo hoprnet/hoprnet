@@ -1,20 +1,7 @@
 use hopr_internal_types::protocol::ApplicationData;
 use libp2p_identity::PeerId;
-use thiserror::Error;
 
-use crate::SendOptions;
-
-#[derive(Debug, Error)]
-pub enum SessionError {
-    #[error("Connection timed out")]
-    Timeout,
-    #[error("Application tag from unallowed range")]
-    Tag,
-    #[error("Impossible transport path")]
-    Path,
-    #[error("Session is closed")]
-    Closed,
-}
+use crate::{errors::TransportSessionError, SendOptions};
 
 #[cfg_attr(test, mockall::automock)]
 #[async_trait::async_trait]
@@ -24,5 +11,5 @@ pub trait SendMsg {
         data: ApplicationData,
         destination: PeerId,
         options: SendOptions,
-    ) -> std::result::Result<(), SessionError>;
+    ) -> std::result::Result<(), TransportSessionError>;
 }
