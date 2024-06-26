@@ -3,7 +3,7 @@
 ## Requirements
 
 - A VPS or cloud provider VM with docker and docker compose installed
-- Open at least the P2P port (usually 9091) from your router( or internet gateway) to your VPS
+- Ensure the P2P port (default 9091) is opened from your router or internet gateway to your VPS to allow network communications.
 
 ## Setup
 
@@ -14,11 +14,9 @@ The `docker compose` deployment is multi-faceted, allowing different combination
 - Copy the `.env.sample` file into `.env` and override with your custom values.
 - Copy the `.env-secrets.sample` file into `.env-secrets` and override all parameters with your custom values.
 - Edit the file hoprd.cfg.yaml and override with the data taken from the onboarding process at https://hub.hoprnet.org
-  - Set your public IP at `hopr.host.address`
-  - Set your custom RPC provider at `hopr.chain.provider`
-  - Set your safe address created in the onboarding process at `hopr.safe_module.safe_address`
-  - Set your module address created in the onboarding process at `hopr.safe_module.module_address`
-- The Hoprd identity file should be located at `./hopr.id`
++ Copy the `.env.sample` file to `.env`, replacing placeholder values with your specific configurations.
++ Similarly, copy `.env-secrets.sample` to `.env-secrets` and ensure all sensitive configurations are securely set.
++ Update `hoprd.cfg.yaml` with your network settings and node configurations as guided by the onboarding process at https://hub.hoprnet.org
 - Modfiy the prometheus config file at `./prometheus/prometheus.yml` to set the correct values for credentials and labels
 
 ### Profiles
