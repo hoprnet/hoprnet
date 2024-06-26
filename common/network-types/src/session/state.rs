@@ -788,10 +788,12 @@ mod tests {
     use futures::io::{AsyncReadExt, AsyncWriteExt};
     use futures::pin_mut;
     use parameterized::parameterized;
+    use rand::prelude::SliceRandom;
     use rand::{thread_rng, Rng};
     use std::collections::VecDeque;
     use std::fmt::Debug;
     use std::iter::Extend;
+    use std::task::Waker;
     use test_log::test;
     use tracing::warn;
 
@@ -816,6 +818,7 @@ mod tests {
 
     pub struct FaultyNetwork {
         data: VecDeque<Box<[u8]>>,
+        waker: Option<Waker>,
         cfg: FaultyNetworkConfig,
     }
 
@@ -826,6 +829,10 @@ mod tests {
             } else {
                 self.data.push_front(buf.into());
                 debug!("written {} bytes: {}", buf.len(), hex::encode(buf));
+
+                if let Some(waker) = self.waker.take() {
+                    waker.wake();
+                }
             }
             Poll::Ready(Ok(buf.len()))
         }
@@ -841,13 +848,14 @@ mod tests {
 
     impl AsyncRead for FaultyNetwork {
         fn poll_read(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<std::io::Result<usize>> {
+            // TODO: add shuffling here
             if let Some(data) = self.data.pop_back() {
                 let len = buf.len().min(data.len());
                 buf[0..len].copy_from_slice(data[0..len].as_ref());
                 debug!("read {len} bytes: {}", hex::encode(&buf[0..len]));
                 Poll::Ready(Ok(len))
             } else {
-                cx.waker().wake_by_ref();
+                self.waker = Some(cx.waker().clone());
                 Poll::Pending
             }
         }
@@ -860,25 +868,17 @@ mod tests {
         let (alice_reader, alice_writer) = FaultyNetwork::new(network_cfg.clone()).split();
         let (bob_reader, bob_writer) = FaultyNetwork::new(network_cfg.clone()).split();
 
-        let alice_to_bob_transport = DuplexIO(alice_reader, bob_writer);
-        let bob_to_alice_transport = DuplexIO(bob_reader, alice_writer);
+        let alice_to_bob = SessionSocket::new("alice", DuplexIO(alice_reader, bob_writer), cfg.clone());
+        let bob_to_alice = SessionSocket::new("bob", DuplexIO(bob_reader, alice_writer), cfg.clone());
 
-        let alice_to_bob = SessionSocket::new("alice", alice_to_bob_transport, cfg.clone());
-        let bob_to_alice = SessionSocket::new("bob", bob_to_alice_transport, cfg.clone());
-
-        let mut alice_bob_state = alice_to_bob.state().clone();
-        let mut bob_alice_state = bob_to_alice.state().clone();
-        async_std::task::spawn_local(async move {
-            while let Ok(_) = alice_bob_state.advance(None).await {
+        let state_proc = |mut s: SessionState<MTU>| async move {
+            while let Ok(_) = s.advance(None).await {
                 async_std::task::sleep(network_cfg.step_interval).await;
             }
-        });
+        };
 
-        async_std::task::spawn_local(async move {
-            while let Ok(_) = bob_alice_state.advance(None).await {
-                async_std::task::sleep(network_cfg.step_interval).await;
-            }
-        });
+        async_std::task::spawn_local(state_proc(alice_to_bob.state.clone()));
+        async_std::task::spawn_local(state_proc(bob_to_alice.state.clone()));
 
         (alice_to_bob, bob_to_alice)
     }
@@ -888,6 +888,7 @@ mod tests {
             Self {
                 data: VecDeque::with_capacity(1024),
                 cfg,
+                waker: None,
             }
         }
     }
