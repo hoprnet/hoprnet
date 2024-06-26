@@ -627,11 +627,11 @@ where
         Ok(Session::new(
             session_id,
             options,
-            rx,
             Box::new(MessageSender::new(
                 self.process_packet_send.clone(),
                 PathPlanner::new(self.db.clone(), self.channel_graph.clone()),
             )),
+            rx,
         ))
     }
 

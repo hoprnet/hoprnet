@@ -16,6 +16,7 @@ pub enum SessionError {
     Closed,
 }
 
+#[cfg_attr(test, mockall::automock)]
 #[async_trait::async_trait]
 pub trait SendMsg {
     async fn send_message(

@@ -3715,10 +3715,10 @@ version = "0.1.0"
 dependencies = [
  "async-std",
  "async-trait",
- "core-path",
  "futures",
  "hopr-internal-types",
  "libp2p-identity",
+ "mockall",
  "thiserror",
 ]
 

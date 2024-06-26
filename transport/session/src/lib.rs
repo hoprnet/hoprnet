@@ -5,11 +5,10 @@
 
 pub mod errors;
 pub mod traits;
+pub mod types;
 
-use futures::channel::mpsc::UnboundedReceiver;
 use libp2p_identity::PeerId;
-
-use hopr_internal_types::protocol::ApplicationData;
+pub use types::{Session, SessionId};
 
 /// Send options for the session.
 ///
@@ -19,68 +18,4 @@ use hopr_internal_types::protocol::ApplicationData;
 pub enum SendOptions {
     IntermediatePath(Vec<PeerId>),
     Hops(u16),
-}
-
-/// ID tracking the session uniquely.
-///
-/// Simple wrapper around the maximum range of the port like session unique identifier.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct SessionId {
-    tag: u16,
-    peer: PeerId,
-}
-
-impl SessionId {
-    pub fn new(tag: u16, peer: PeerId) -> Self {
-        Self { tag, peer }
-    }
-
-    pub fn tag(&self) -> u16 {
-        self.tag
-    }
-
-    pub fn peer(&self) -> &PeerId {
-        &self.peer
-    }
-}
-
-pub struct Session {
-    id: SessionId,
-    options: SendOptions,
-    rx: UnboundedReceiver<ApplicationData>,
-    sender: Box<dyn traits::SendMsg>,
-}
-
-impl Session {
-    pub fn new(
-        id: SessionId,
-        options: SendOptions,
-        rx: UnboundedReceiver<ApplicationData>,
-        sender: Box<dyn traits::SendMsg>,
-    ) -> Self {
-        Self {
-            id,
-            options,
-            rx,
-            sender,
-        }
-    }
-
-    pub fn id(&self) -> &SessionId {
-        &self.id
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    // #[test]
-    // fn session_id_can_be_constructed_from_any_type_that_converts_to_u64() {
-    //     let u8_value = 42u8;
-
-    //     let id: SessionId = u8_value.into();
-
-    //     assert_eq!(id.0, u8_value as u16);
-    // }
 }
