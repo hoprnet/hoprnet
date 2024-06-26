@@ -53,8 +53,8 @@ COMPOSE_PROFILES=hoprd docker compose up -d
 COMPOSE_PROFILES=hoprd,admin-ui docker compose up -d
 ```
 
-Access the website: http://localhost:8080 being HOPR_ADMIN_PORT=8080
-The default hoprd endpoint will be http://localhost:3001 being HOPRD_API_PORT=3001
+Access the website at http://localhost:8080, where `HOPR_ADMIN_PORT=8080` is the configured port.
+The default hoprd endpoint is available at http://localhost:3001, with `HOPRD_API_PORT=3001` as the configured port.
 
 3. Run hopr node with a full internal monitoring system (Prometheus and Grafana)
 
@@ -62,8 +62,8 @@ The default hoprd endpoint will be http://localhost:3001 being HOPRD_API_PORT=30
 COMPOSE_PROFILES=hoprd,metrics-vis docker compose up -d
 ```
 
-To acess Prometheus go to: http://localhost:9090 being PROMETHEUS_PORT=9090
-To access Grafana go to: http://localhost:3030 being GRAFANA_PORT=3030.
+To access Prometheus, navigate to http://localhost:9090, where `PROMETHEUS_PORT=9090` is the configured port.
+To access Grafana, navigate to http://localhost:3030, where `GRAFANA_PORT=3030` is the configured port.
 Grafana credentials are stored in ./grafana/config.monitoring
 Navigate to the Dashboards page and open the desired dashboard
 
