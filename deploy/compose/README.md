@@ -3,7 +3,7 @@
 ## Requirements
 
 - A VPS or cloud provider VM with docker and docker compose installed
-- Open at least the P2P port (usually 9091) from your router( or internet gateway) to your VPS
+- Ensure the P2P port (default 9091) is opened from your router or internet gateway to your VPS to allow network communications.
 
 ## Setup
 
