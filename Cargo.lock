@@ -1546,6 +1546,7 @@ dependencies = [
  "hex-literal",
  "hopr-crypto-random",
  "hopr-crypto-types",
+ "hopr-db-api",
  "hopr-db-sql",
  "hopr-internal-types",
  "hopr-metrics",
