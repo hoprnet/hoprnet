@@ -12,21 +12,15 @@ use futures::StreamExt;
 use futures_concurrency::stream::Merge;
 use libp2p_identity::PeerId;
 use serde_json::json;
+use tower::{Service, Layer};
+use axum::{Json, http::StatusCode, Router, routing::{get, post}, extract::State};
+use http::Method;
 use serde_with::{serde_as, Bytes, DisplayFromStr, DurationMilliSeconds};
-pub use tide::listener::Listener;
-use tide::{
-    http::{
-        headers::{HeaderName, HeaderValue, AUTHORIZATION},
-        mime, Mime,
-    },
-    security::{CorsMiddleware, Origin},
-    utils::async_trait,
-    Middleware, Next, Request, Response, StatusCode,
-};
-use tide_tracing::TraceMiddleware;
-use tide_websockets::{Message, WebSocket};
 use tracing::{debug, error, warn};
 use utoipa::openapi::security::{ApiKey, ApiKeyValue, HttpAuthScheme, HttpBuilder, SecurityScheme};
+use tower_http::compression::CompressionLayer;
+use tower_http::cors::{CorsLayer, any};
+use tower::ServiceBuilder;
 use utoipa::{Modify, OpenApi};
 use utoipa_swagger_ui::Config;
 
@@ -36,6 +30,8 @@ use hopr_lib::{
 };
 
 use crate::config::Auth;
+use crate::token_authentication::TokenAuthenticationLayer;
+use crate::prometheus::PrometheusMetricsLayer;
 
 pub const BASE_PATH: &str = "/api/v3";
 pub const API_VERSION: &str = "3.0.0";
@@ -61,7 +57,7 @@ lazy_static::lazy_static! {
 }
 
 #[derive(Clone)]
-pub struct State {
+pub struct AppState {
     pub hopr: Arc<Hopr>, // checks
 }
 
@@ -169,99 +165,6 @@ impl Modify for SecurityAddon {
         );
     }
 }
-/// Token-based authentication middleware
-struct TokenBasedAuthenticationMiddleware;
-
-/// Implementation of the middleware
-#[async_trait]
-impl Middleware<InternalState> for TokenBasedAuthenticationMiddleware {
-    async fn handle(&self, request: Request<InternalState>, next: Next<'_, InternalState>) -> tide::Result {
-        let auth = request.state().auth.clone();
-
-        let x_auth_header = HeaderName::from_str("x-auth-token")?;
-        let websocket_proto_header = HeaderName::from_str("Sec-Websocket-Protocol")?;
-
-        let is_authorized = match auth.as_ref() {
-            Auth::Token(expected_token) => {
-                let auth_headers = request
-                    .iter()
-                    .filter_map(|(n, v)| {
-                        (AUTHORIZATION.eq(n) || x_auth_header.eq(n) || websocket_proto_header.eq(n))
-                            .then_some((n, v.as_str()))
-                    })
-                    .collect::<Vec<_>>();
-
-                // Use "Authorization Bearer <token>" and "X-Auth-Token <token>" headers and "Sec-Websocket-Protocol"
-                (!auth_headers.is_empty()
-                    && (auth_headers.contains(&(&AUTHORIZATION, &format!("Bearer {}", expected_token)))
-                        || auth_headers.contains(&(&x_auth_header, expected_token)))
-                )
-
-                // TODO: Replace with proper JS compliant solution
-                // The following line would never be needed, if the JavaScript browser was able to properly
-                // pass the x-auth-token or Bearer headers.
-                || request.url().as_str().contains(format!("messages/websocket?apiToken={expected_token}").as_str())
-            }
-            Auth::None => true,
-        };
-
-        if !is_authorized {
-            let reject_response = Response::builder(StatusCode::Unauthorized)
-                .content_type(mime::JSON)
-                .body(ApiErrorStatus::Unauthorized)
-                .build();
-
-            return Ok(reject_response);
-        }
-
-        // Go forward to the next middleware or request handler
-        Ok(next.run(request).await)
-    }
-}
-
-/// Custom prometheus recording middleware
-#[cfg(all(feature = "prometheus", not(test)))]
-struct PrometheusMetricsMiddleware;
-
-#[cfg(all(feature = "prometheus", not(test)))]
-#[async_trait]
-impl<T: Clone + Send + Sync + 'static> Middleware<T> for PrometheusMetricsMiddleware {
-    async fn handle(&self, req: Request<T>, next: Next<'_, T>) -> tide::Result {
-        let path = req.url().path().to_owned();
-        let method = req.method().to_string();
-
-        let start = std::time::Instant::now();
-        let response = next.run(req).await;
-        let response_duration = start.elapsed();
-
-        let status = response.status();
-
-        // We're not interested on metrics for non-functional
-        if path.starts_with("/api/v3/") && !path.contains("node/metrics") {
-            METRIC_COUNT_API_CALLS.increment(&[&path, &method, &status.to_string()]);
-            METRIC_COUNT_API_CALLS_TIMING.observe(&[&path, &method], response_duration.as_secs_f64());
-        }
-
-        return Ok(response);
-    }
-}
-
-async fn serve_swagger(request: tide::Request<State>) -> tide::Result<Response> {
-    let path = request.url().path().to_string();
-    let tail = path.strip_prefix("/swagger-ui/").unwrap();
-
-    match utoipa_swagger_ui::serve(tail, Arc::new(Config::from("/api-docs/openapi.json"))) {
-        Ok(swagger_file) => swagger_file
-            .map(|file| {
-                Ok(Response::builder(200)
-                    .body(file.bytes.to_vec())
-                    .content_type(file.content_type.parse::<Mime>()?)
-                    .build())
-            })
-            .unwrap_or_else(|| Ok(Response::builder(404).build())),
-        Err(error) => Ok(Response::builder(500).body(error.to_string()).build()),
-    }
-}
 
 enum WebSocketInput {
     Network(TransportOutput),
@@ -281,29 +184,7 @@ pub async fn build_hopr_api(
     aliases.write().await.insert("me".to_owned(), hopr.me_peer_id());
 
     let state = State { hopr };
-
-    let mut app = tide::with_state(state.clone());
-
-    app.with(TraceMiddleware::new());
-    app.with(
-        CorsMiddleware::new()
-            .allow_methods("GET, POST, OPTIONS, DELETE".parse::<HeaderValue>().unwrap())
-            .allow_origin(Origin::from("*")),
-    );
-    #[cfg(all(feature = "prometheus", not(test)))]
-    app.with(PrometheusMetricsMiddleware);
-
-    app.at("/api-docs/openapi.json")
-        .get(|_| async move { Ok(Response::builder(200).body(json!(ApiDoc::openapi()))) });
-
-    app.at("/swagger-ui/*").get(serve_swagger);
-
-    app.at("/startedz").get(checks::startedz);
-    app.at("/readyz").get(checks::readyz);
-    app.at("/healthyz").get(checks::healthyz);
-
-    app.at(BASE_PATH).nest({
-        let mut api = tide::with_state(InternalState {
+    let inner_state = InternalState {
             auth: Arc::new(cfg.auth.clone()),
             hoprd_cfg,
             hopr: state.hopr.clone(),
@@ -311,138 +192,74 @@ pub async fn build_hopr_api(
             inbox,
             websocket_rx,
             aliases,
-        });
+        };
 
-        api.with(TokenBasedAuthenticationMiddleware);
-
-        api.at("/aliases").get(alias::aliases).post(alias::set_alias);
-
-        api.at("/aliases/:alias")
-            .get(alias::get_alias)
-            .delete(alias::delete_alias);
-
-        api.at("/account/addresses").get(account::addresses);
-        api.at("/account/balances").get(account::balances);
-        api.at("/account/withdraw").get(account::withdraw);
-
-        api.at("/peers/:peerId")
-            .get(peers::show_peer_info)
-            .at("/ping")
-            .post(peers::ping_peer);
-
-        api.at("/channels")
-            .get(channels::list_channels)
-            .post(channels::open_channel);
-
-        api.at("/channels/:channelId")
-            .get(channels::show_channel)
-            .delete(channels::close_channel);
-
-        api.at("/channels/:channelId/fund").post(channels::fund_channel);
-
-        api.at("/channels/:channelId/tickets")
-            .get(tickets::show_channel_tickets);
-
-        api.at("/channels/:channelId/tickets/redeem")
-            .post(tickets::redeem_tickets_in_channel);
-
-        api.at("/channels/:channelId/tickets/aggregate")
-            .post(tickets::aggregate_tickets_in_channel);
-
-        api.at("/tickets").get(tickets::show_all_tickets);
-        api.at("/tickets/statistics").get(tickets::show_ticket_statistics);
-        api.at("/tickets/redeem").post(tickets::redeem_all_tickets);
-
-        api.at("/messages")
-            .post(messages::send_message)
-            .delete(messages::delete_messages);
-        api.at("/messages/pop").post(messages::pop);
-        api.at("/messages/pop-all").post(messages::pop_all);
-        api.at("/messages/peek").post(messages::peek);
-        api.at("/messages/peek-all").post(messages::peek_all);
-        api.at("/messages/size").get(messages::size);
-        api.at("/messages/websocket")
-            .get(WebSocket::new(|request: Request<InternalState>, ws_con| {
-                let ws_rx = request.state().websocket_rx.activate_cloned();
-
-                async move {
-                    let mut queue = (
-                        ws_con.clone().map(WebSocketInput::WsInput),
-                        ws_rx.map(WebSocketInput::Network),
-                    )
-                        .merge();
-
-                    while let Some(v) = queue.next().await {
-                        match v {
-                            WebSocketInput::Network(net_in) => match net_in {
-                                TransportOutput::Received(data) => {
-                                    debug!("websocket notifying client with received msg {data}");
-                                    ws_con.send_json(&json!(messages::WebSocketReadMsg::from(data))).await?;
-                                }
-                                TransportOutput::Sent(hkc) => {
-                                    debug!("websocket notifying client with received ack {hkc}");
-                                    ws_con
-                                        .send_json(&json!(messages::WebSocketReadAck::from_ack(hkc)))
-                                        .await?;
-                                }
-                            },
-                            WebSocketInput::WsInput(ws_in) => match ws_in {
-                                Ok(Message::Text(input)) => {
-                                    let data: messages::WebSocketSendMsg = serde_json::from_str(&input)?;
-                                    if data.cmd == "sendmsg" {
-                                        let hopr = request.state().hopr.clone();
-
-                                        // Use the message encoder, if any
-                                        // TODO: remove RLP in 3.0
-                                        let msg_body = request
-                                            .state()
-                                            .msg_encoder
-                                            .as_ref()
-                                            .map(|enc| enc(&data.args.body))
-                                            .unwrap_or_else(|| data.args.body.into_boxed_slice());
-
-                                        let hkc = hopr
-                                            .send_message(
-                                                // data.args.body.into_bytes().into_boxed_slice(),
-                                                msg_body,
-                                                data.args.peer_id,
-                                                data.args.path,
-                                                data.args.hops,
-                                                Some(data.args.tag),
-                                            )
-                                            .await?;
-
-                                        debug!("websocket notifying client with sent ack {hkc}");
-                                        ws_con
-                                            .send_json(&json!(messages::WebSocketReadAck::from_ack_challenge(hkc)))
-                                            .await?;
-                                    } else {
-                                        warn!("skipping an unsupported websocket command '{}'", data.cmd);
-                                    }
-                                }
-                                Ok(_) => {
-                                    warn!("encountered an unsupported websocket input type");
-                                }
-                                Err(e) => error!("failed to get a valid websocket message: {e}"),
-                            },
-                        }
-                    }
-
-                    Ok(())
-                }
-            }));
-
-        api.at("/network/price").get(network::price);
-
-        api.at("/node/version").get(node::version);
-        api.at("/node/configuration").get(node::configuration);
-        api.at("/node/info").get(node::info);
-        api.at("/node/peers").get(node::peers);
-        api.at("/node/entryNodes").get(node::entry_nodes);
-        api.at("/node/metrics").get(node::metrics);
-
-        api
-    });
+    let app = Router::new()
+        .nest(
+            BASE_PATH,
+            Router::new()
+            .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
+            .merge(Redoc::with_url("/redoc", ApiDoc::openapi()))
+            .merge(RapiDoc::new("/api-docs/openapi.json").path("/rapidoc"))
+            .merge(Scalar::with_url("/scalar", ApiDoc::openapi()))
+            .route("/startedz", get(checks::startedz))
+            .route("/readyz", get(checks::readyz))
+            .route("/healthyz", get(checks::healthyz))
+        .route("/messages/websocket", get(messages::websocket))
+            .with_state(state)
+        )
+        .nest(
+            BASE_PATH,
+            axum::Router::new()
+            .route("/aliases", get(alias::aliases))
+            .route("/aliases", post(alias::set_alias))
+            .route("/aliases/:alias", get(alias::get_alias))
+            .route("/aliases/:alias", delete(alias::delete_alias))
+            .route("/account/addresses", get(account::addresses))
+            .route("/account/balances", get(account::balances))
+            .route("/account/withdraw", get(account::withdraw))
+            .route("/peers/:peerId", get(peers::show_peer_info))
+            .route("/peers/:peerId/ping", post(peers::ping_peer))
+            .route("/channels", get(channels::list_channels))
+            .route("/channels", post(channels::open_channel))
+            .route("/channels/:channelId", get(channels::show_channel))
+            .route("/channels/:channelId", delete(channels::close_channel))
+            .route("/channels/:channelId/fund", post(channels::fund_channel))
+            .route("/channels/:channelId/tickets", get(tickets::show_channel_tickets))
+            .route("/channels/:channelId/tickets/redeem", post(tickets::redeem_tickets_in_channel))
+            .route("/channels/:channelId/tickets/aggregate", post(tickets::aggregate_tickets_in_channel))
+            .route("/tickets", get(tickets::show_all_tickets))
+            .route("/tickets/statistics", get(tickets::show_ticket_statistics))
+            .route("/tickets/redeem", post(tickets::redeem_all_tickets))
+            .route("/messages", post(messages::send_message))
+            .route("/messages", delete(messages::delete_messages))
+            .route("/messages/pop", post(messages::pop))
+            .route("/messages/pop-all",post(messages::pop_all))
+            .route("/messages/peek"),post(messages::peek))
+            .route("/messages/peek-all", post(messages::peek_all))
+            .route("/messages/size", get(messages::size))
+            .route("/network/price", get(network::price))
+            .route("/node/version",get(node::version))
+            .route("/node/configuration",.get(node::configuration))
+            .route("/node/info",get(node::info))
+            .route("/node/peers",get(node::peers))
+            .route("/node/entryNodes",get(node::entry_nodes))
+            .route("/node/metrics",get(node::metrics))
+            .with_state(inner_state)
+            .with_layer(TokenAuthenticationLayer)
+        )
+        .layer(
+            ServiceBuilder::new()
+            .layer(TraceLayer::new_for_http())
+            .layer(CorsLayer::new()
+                .allow_methods([Method::GET, Method::POST, Method::OPTIONS, Method::DELETE])
+                .allow_origin(any)
+            )
+            .layer(PrometheusMetricsLayer::new())
+            .layer(CompressionLayer::new())
+            .layer(ValidateRequestHeaderLayer::accept("application/json"))
+            .layer(SetSensitiveRequestHeadersLayer::new(once(AUTHORIZATION)))
+        );
 
     app
 }
@@ -1661,11 +1478,84 @@ mod messages {
         ),
         tag = "Messages",
     )]
-    pub async fn websocket(_req: Request<InternalState>) -> tide::Result<Response> {
-        // Dummy implementation for utoipa, the websocket is created in-place inside the tide server
-        Ok(Response::builder(422)
-            .body(ApiErrorStatus::UnknownFailure("unimplemented".into()))
-            .build())
+    async fn websocket(
+                ws: WebSocketUpgrade,
+                    State(state): State<Arc<AppState>>,
+        ) -> impl IntoResponse {
+            ws.on_upgrade(|socket| handle_websocket(socket, state))
+        }
+
+        async fn websocket_connection(stream: WebSocket, state: Arc<AppState>) {}
+        
+           let (mut sender, mut receiver) = stream.split();
+
+let ws_rx = request.state().websocket_rx.activate_cloned();
+
+                async move {
+                    let mut queue = (
+                        ws_con.clone().map(WebSocketInput::WsInput),
+                        ws_rx.map(WebSocketInput::Network),
+                    )
+                        .merge();
+
+                    while let Some(v) = queue.next().await {
+                        match v {
+                            WebSocketInput::Network(net_in) => match net_in {
+                                TransportOutput::Received(data) => {
+                                    debug!("websocket notifying client with received msg {data}");
+                                    ws_con.send_json(&json!(messages::WebSocketReadMsg::from(data))).await?;
+                                }
+                                TransportOutput::Sent(hkc) => {
+                                    debug!("websocket notifying client with received ack {hkc}");
+                                    ws_con
+                                        .send_json(&json!(messages::WebSocketReadAck::from_ack(hkc)))
+                                        .await?;
+                                }
+                            },
+                            WebSocketInput::WsInput(ws_in) => match ws_in {
+                                Ok(Message::Text(input)) => {
+                                    let data: messages::WebSocketSendMsg = serde_json::from_str(&input)?;
+                                    if data.cmd == "sendmsg" {
+                                        let hopr = request.state().hopr.clone();
+
+                                        // Use the message encoder, if any
+                                        // TODO: remove RLP in 3.0
+                                        let msg_body = request
+                                            .state()
+                                            .msg_encoder
+                                            .as_ref()
+                                            .map(|enc| enc(&data.args.body))
+                                            .unwrap_or_else(|| data.args.body.into_boxed_slice());
+
+                                        let hkc = hopr
+                                            .send_message(
+                                                // data.args.body.into_bytes().into_boxed_slice(),
+                                                msg_body,
+                                                data.args.peer_id,
+                                                data.args.path,
+                                                data.args.hops,
+                                                Some(data.args.tag),
+                                            )
+                                            .await?;
+
+                                        debug!("websocket notifying client with sent ack {hkc}");
+                                        ws_con
+                                            .send_json(&json!(messages::WebSocketReadAck::from_ack_challenge(hkc)))
+                                            .await?;
+                                    } else {
+                                        warn!("skipping an unsupported websocket command '{}'", data.cmd);
+                                    }
+                                }
+                                Ok(_) => {
+                                    warn!("encountered an unsupported websocket input type");
+                                }
+                                Err(e) => error!("failed to get a valid websocket message: {e}"),
+                            },
+                        }
+                    }
+
+                    Ok(())
+
     }
 
     /// Delete messages from nodes message inbox.
