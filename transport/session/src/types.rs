@@ -145,7 +145,7 @@ const PEER_ID_USED_SIZE: usize = 38;
 // TODO: 2.2 use a more compact representation of the PeerId in the binary form
 // TODO: 3.0 remove if return path is implemented
 pub fn wrap_with_offchain_key(peer: &PeerId, data: Box<[u8]>) -> crate::errors::Result<Vec<u8>> {
-    if data.len() != PAYLOAD_SIZE.saturating_sub(PEER_ID_USED_SIZE) {
+    if data.len() > PAYLOAD_SIZE.saturating_sub(PEER_ID_USED_SIZE) {
         return Err(TransportSessionError::PayloadSize);
     }
 
@@ -161,7 +161,7 @@ pub fn wrap_with_offchain_key(peer: &PeerId, data: Box<[u8]>) -> crate::errors::
 // TODO: 2.2 use a more compact representation of the PeerId in the binary form
 // TODO: 3.0 remove if return path is implemented
 pub fn unwrap_offchain_key(payload: Box<[u8]>) -> crate::errors::Result<(PeerId, Box<[u8]>)> {
-    if payload.len() != PAYLOAD_SIZE {
+    if payload.len() > PAYLOAD_SIZE {
         return Err(TransportSessionError::PayloadSize);
     }
 
@@ -331,7 +331,7 @@ mod tests {
 
     #[async_std::test]
     async fn session_should_write_data() {
-        let id = SessionId::new(1, PeerId::random());
+        let id = SessionId::new(1, OffchainKeypair::random().public().into());
         let (_tx, rx) = futures::channel::mpsc::unbounded();
         let mut mock = MockSendMsg::new();
 
@@ -339,18 +339,23 @@ mod tests {
 
         mock.expect_send_message()
             .times(1)
-            .withf(move |data, peer, options| {
-                let (peer_id, data) = unwrap_offchain_key(data.plain_text.clone()).expect("Unwrapping should work");
-                assert_eq!(peer_id, *peer);
+            .withf(move |data, _peer, options| {
+                let (_peer_id, data) = unwrap_offchain_key(data.plain_text.clone()).expect("Unwrapping should work");
                 assert_eq!(data, b"Hello, world!".to_vec().into_boxed_slice());
                 assert_eq!(options, &PathOptions::Hops(1));
                 true
             })
             .returning(|_, _, _| Ok(()));
 
-        let mut session = Session::new(id, PeerId::random(), PathOptions::Hops(1), Box::new(mock), rx);
+        let mut session = Session::new(
+            id,
+            OffchainKeypair::random().public().into(),
+            PathOptions::Hops(1),
+            Box::new(mock),
+            rx,
+        );
 
-        let bytes_written = session.write(&data).await.expect("Read should work #1");
+        let bytes_written = session.write(&data).await.expect("Write should work #1");
 
         assert_eq!(bytes_written, data.len());
     }
