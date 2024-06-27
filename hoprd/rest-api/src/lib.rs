@@ -386,7 +386,6 @@ pub async fn build_hopr_api(
                                         .send_json(&json!(messages::WebSocketReadAck::from_ack(hkc)))
                                         .await?;
                                 }
-                                TransportOutput::ConnectionClosed(_) => {}
                             },
                             WebSocketInput::WsInput(ws_in) => match ws_in {
                                 Ok(Message::Text(input)) => {

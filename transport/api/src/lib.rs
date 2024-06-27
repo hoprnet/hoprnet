@@ -179,7 +179,7 @@ use hopr_primitive_types::prelude::*;
 pub enum HoprTransportProcess {
     Heartbeat,
     Swarm,
-    SessionUnwrapper,
+    Sessions,
 }
 
 #[derive(Debug, Clone)]
@@ -517,44 +517,30 @@ where
         let sessions = self.sessions.clone();
 
         processes.insert(
-            HoprTransportProcess::SessionUnwrapper,
+            HoprTransportProcess::Sessions,
             executor::spawn(async move {
                 let mut on_transport_output = on_transport_output;
 
                 while let Some(output) = rx.next().await {
-                    match output {
-                        TransportOutput::Received(data) => {
-                            if let Some(app_tag) = data.application_tag {
-                                match hopr_transport_session::types::unwrap_offchain_key(data.plain_text.clone()) {
-                                    Ok((peer, data)) => {
-                                        // TODO: 2.2 Add the ability to open and process new sessions based on the other side initiating
-                                        if let Some(sender) = sessions.get(&SessionId::new(app_tag, peer)).await {
-                                            // if the data does not get into the session, it can recover
-                                            let _ = sender.unbounded_send(data);
-                                            continue;
-                                        }
+                    if let TransportOutput::Received(data) = output {
+                        if let Some(app_tag) = data.application_tag {
+                            match hopr_transport_session::types::unwrap_offchain_key(data.plain_text.clone()) {
+                                Ok((peer, data)) => {
+                                    // TODO: 2.2 Add the ability to open and process new sessions based on the other side initiating
+                                    if let Some(sender) = sessions.get(&SessionId::new(app_tag, peer)).await {
+                                        // if the data does not get into the session, it can recover
+                                        let _ = sender.unbounded_send(data);
+                                        continue;
                                     }
-                                    _ => {}
                                 }
+                                _ => {}
                             }
-
-                            let _ = on_transport_output
-                                .send(TransportOutput::Received(data))
-                                .await
-                                .map_err(|e| error!("Failed to send transport output: {e}"));
                         }
-                        TransportOutput::ConnectionClosed(peer) => {
-                            if let Err(e) = sessions.invalidate_entries_if(move |k, _v| k.peer() == &peer) {
-                                error!("Failed to invalidate session entries: {e}")
-                            };
-                            continue;
-                        }
-                        _ => {
-                            let _ = on_transport_output
-                                .send(output)
-                                .await
-                                .map_err(|e| error!("Failed to send transport output: {e}"));
-                        }
+                    } else {
+                        let _ = on_transport_output
+                            .send(output)
+                            .await
+                            .map_err(|e| error!("Failed to send transport output: {e}"));
                     }
                 }
             }),

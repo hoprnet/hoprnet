@@ -196,7 +196,6 @@ pub use swarm::HoprSwarm;
 pub enum TransportOutput {
     Received(ApplicationData),
     Sent(HalfKeyChallenge),
-    ConnectionClosed(PeerId),
 }
 
 #[derive(Debug)]

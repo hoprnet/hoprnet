@@ -613,10 +613,6 @@ impl HoprSwarmWithProcessors {
                         {
                             METRIC_TRANSPORT_P2P_OPEN_CONNECTION_COUNT.decrement(1.0);
                         }
-
-                        if let Err(e) = on_transport_output.unbounded_send(TransportOutput::ConnectionClosed(peer_id)) {
-                            error!("transport - p2p - failed to emit close connection for '{peer_id}': {e}");
-                        }
                     },
                     SwarmEvent::IncomingConnection {
                         connection_id,
