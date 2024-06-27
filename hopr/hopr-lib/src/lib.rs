@@ -76,8 +76,8 @@ use chain_api::{
 use chain_types::chain_events::ChainEventType;
 use chain_types::ContractAddresses;
 use core_path::channel_graph::ChannelGraph;
-use core_transport::libp2p::identity::PeerId;
 use core_transport::{build_network, execute_on_tick, PeerTransportEvent};
+use core_transport::{libp2p::identity::PeerId, Session};
 use core_transport::{ChainKeypair, Hash, HoprTransport, OffchainKeypair};
 use core_transport::{IndexerTransportEvent, Network, PeerEligibility, PeerOrigin};
 use hopr_platform::file::native::{join, read_file, remove_dir_all, write};
@@ -931,6 +931,8 @@ impl Hopr {
             }),
         );
 
+        // TODO: 2.2: add support for transport session handling
+        let (session_tx, _session_rx) = unbounded::<Session>();
         for (id, proc) in self
             .transport_api
             .run(
@@ -942,6 +944,7 @@ impl Hopr {
                 transport_output_tx,
                 on_ack_tkt_tx,
                 indexer_peer_update_rx,
+                session_tx,
             )
             .await
             .into_iter()

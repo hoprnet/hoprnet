@@ -47,7 +47,7 @@ use hopr_transport_p2p::{
     swarm::{TicketAggregationRequestType, TicketAggregationResponseType},
     HoprSwarm,
 };
-use hopr_transport_session::{errors::TransportSessionError, traits::SendMsg, Session, SessionId};
+pub use hopr_transport_session::{errors::TransportSessionError, traits::SendMsg, Session, SessionId};
 use std::{
     collections::HashMap,
     sync::{Arc, OnceLock},
@@ -234,6 +234,7 @@ where
     }
 }
 
+#[derive(Clone)]
 pub struct PathPlanner<T>
 where
     T: HoprDbAllOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
@@ -298,6 +299,7 @@ where
     }
 }
 
+#[derive(Clone)]
 pub struct MessageSender<T>
 where
     T: HoprDbAllOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
@@ -440,6 +442,7 @@ where
         on_transport_output: UnboundedSender<TransportOutput>,
         on_acknowledged_ticket: UnboundedSender<AcknowledgedTicket>,
         transport_updates: UnboundedReceiver<PeerTransportEvent>,
+        incoming_session_queue: UnboundedSender<Session>,
     ) -> HashMap<HoprTransportProcess, executor::JoinHandle<()>> {
         // network event processing channel
         let (network_events_tx, network_events_rx) = futures::channel::mpsc::channel::<NetworkTriggeredEvent>(
@@ -515,6 +518,11 @@ where
 
         let (tx, mut rx) = futures::channel::mpsc::unbounded::<TransportOutput>();
         let sessions = self.sessions.clone();
+        let me = self.me;
+        let message_sender = Box::new(MessageSender::new(
+            self.process_packet_send.clone(),
+            PathPlanner::new(self.db.clone(), self.channel_graph.clone()),
+        ));
 
         processes.insert(
             HoprTransportProcess::Sessions,
@@ -526,11 +534,29 @@ where
                         if let Some(app_tag) = data.application_tag {
                             match hopr_transport_session::types::unwrap_offchain_key(data.plain_text.clone()) {
                                 Ok((peer, data)) => {
-                                    // TODO: 2.2 Add the ability to open and process new sessions based on the other side initiating
+                                    // data belongs to an existing session
                                     if let Some(sender) = sessions.get(&SessionId::new(app_tag, peer)).await {
                                         // if the data does not get into the session, it can recover
                                         let _ = sender.unbounded_send(data);
                                         continue;
+                                    }
+                                    // data belongs to a new session
+                                    else {
+                                        let session_id = SessionId::new(app_tag, peer);
+
+                                        let (tx, rx) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
+
+                                        if let Ok(_) = incoming_session_queue.unbounded_send(Session::new(
+                                            session_id,
+                                            me,
+                                            PathOptions::Hops(1),
+                                            message_sender.clone(),
+                                            rx,
+                                        )) {
+                                            sessions.insert(session_id, tx).await;
+                                        } else {
+                                            warn!("Failed to send session to incoming session queue")
+                                        }
                                     }
                                 }
                                 _ => {}
@@ -607,6 +633,7 @@ where
 
     // #[cfg(feature = "session")]
     pub async fn new_session(&self, destination: PeerId, options: PathOptions) -> errors::Result<Session> {
+        // TODO: generate this in a more secure way.
         let session_id = SessionId::new(0u16, destination);
 
         let (tx, rx) = futures::channel::mpsc::unbounded::<Box<[u8]>>();

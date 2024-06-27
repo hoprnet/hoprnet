@@ -39,7 +39,7 @@ pub struct Session {
     me: PeerId,
     options: PathOptions,
     rx: UnboundedReceiver<Box<[u8]>>,
-    tx: Box<dyn SendMsg>,
+    tx: Box<dyn SendMsg + Send>,
     rx_buffer: [u8; PAYLOAD_SIZE],
     rx_buffer_range: (usize, usize),
 }
@@ -49,7 +49,7 @@ impl Session {
         id: SessionId,
         me: PeerId,
         options: PathOptions,
-        tx: Box<dyn SendMsg>,
+        tx: Box<dyn SendMsg + Send>,
         rx: UnboundedReceiver<Box<[u8]>>,
     ) -> Self {
         Self {
