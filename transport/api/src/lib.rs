@@ -516,7 +516,7 @@ where
             executor::spawn(async move { heartbeat.heartbeat_loop().await }),
         );
 
-        let (tx, mut rx) = futures::channel::mpsc::unbounded::<TransportOutput>();
+        let (tx, rx) = futures::channel::mpsc::unbounded::<TransportOutput>();
         let sessions = self.sessions.clone();
         let me = self.me;
         let message_sender = Box::new(MessageSender::new(
@@ -527,48 +527,62 @@ where
         processes.insert(
             HoprTransportProcess::Sessions,
             executor::spawn(async move {
-                let mut on_transport_output = on_transport_output;
+                let _the_process_should_not_end = StreamExt::filter_map(rx, move |output| {
+                    let sessions = sessions.clone();
+                    let me = me;
+                    let message_sender = message_sender.clone();
+                    let incoming_session_queue = incoming_session_queue.clone();
 
-                while let Some(output) = rx.next().await {
-                    if let TransportOutput::Received(data) = output {
-                        if let Some(app_tag) = data.application_tag {
-                            match hopr_transport_session::types::unwrap_offchain_key(data.plain_text.clone()) {
-                                Ok((peer, data)) => {
-                                    // data belongs to an existing session
-                                    if let Some(sender) = sessions.get(&SessionId::new(app_tag, peer)).await {
-                                        // if the data does not get into the session, it can recover
-                                        let _ = sender.unbounded_send(data);
-                                        continue;
-                                    }
-                                    // data belongs to a new session
-                                    else {
-                                        let session_id = SessionId::new(app_tag, peer);
+                    async move {
+                        match output {
+                            TransportOutput::Received(data) => {
+                                if let Some(app_tag) = data.application_tag {
+                                    if app_tag < RESERVED_TAG_UPPER_LIMIT {
+                                        if let Ok((peer, data)) =
+                                            hopr_transport_session::types::unwrap_offchain_key(data.plain_text.clone())
+                                        {
+                                            // data belongs to an existing session
+                                            if let Some(sender) = sessions.get(&SessionId::new(app_tag, peer)).await {
+                                                // if the data does not get into the session, it can recover
+                                                let _ = sender.unbounded_send(data);
+                                            }
+                                            // data belongs to a new session
+                                            else {
+                                                let session_id = SessionId::new(app_tag, peer);
 
-                                        let (tx, rx) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
+                                                let (tx, rx) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
 
-                                        if let Ok(_) = incoming_session_queue.unbounded_send(Session::new(
-                                            session_id,
-                                            me,
-                                            PathOptions::Hops(1),
-                                            message_sender.clone(),
-                                            rx,
-                                        )) {
-                                            sessions.insert(session_id, tx).await;
-                                        } else {
-                                            warn!("Failed to send session to incoming session queue")
+                                                if incoming_session_queue
+                                                    .unbounded_send(Session::new(
+                                                        session_id,
+                                                        me,
+                                                        PathOptions::Hops(1),
+                                                        message_sender.clone(),
+                                                        rx,
+                                                    ))
+                                                    .is_ok()
+                                                {
+                                                    sessions.insert(session_id, tx).await;
+                                                } else {
+                                                    warn!("Failed to send session to incoming session queue");
+                                                }
+                                            }
                                         }
+                                        None
+                                    } else {
+                                        Some(TransportOutput::Received(data))
                                     }
+                                } else {
+                                    Some(TransportOutput::Received(data))
                                 }
-                                _ => {}
                             }
+                            TransportOutput::Sent(hkc) => Some(TransportOutput::Sent(hkc)),
                         }
-                    } else {
-                        let _ = on_transport_output
-                            .send(output)
-                            .await
-                            .map_err(|e| error!("Failed to send transport output: {e}"));
                     }
-                }
+                })
+                .map(Ok)
+                .forward(on_transport_output)
+                .await;
             }),
         );
 
