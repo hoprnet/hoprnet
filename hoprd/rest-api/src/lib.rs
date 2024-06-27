@@ -377,11 +377,11 @@ pub async fn build_hopr_api(
                         match v {
                             WebSocketInput::Network(net_in) => match net_in {
                                 TransportOutput::Received(data) => {
-                                    debug!("websocket notifying client with received msg {data}");
+                                    debug!("websocket notifying client: received msg");
                                     ws_con.send_json(&json!(messages::WebSocketReadMsg::from(data))).await?;
                                 }
                                 TransportOutput::Sent(hkc) => {
-                                    debug!("websocket notifying client with received ack {hkc}");
+                                    debug!("websocket notifying client: received next hop receive confirmation");
                                     ws_con
                                         .send_json(&json!(messages::WebSocketReadAck::from_ack(hkc)))
                                         .await?;
@@ -412,23 +412,13 @@ pub async fn build_hopr_api(
                                             continue;
                                         };
 
-                                        match hopr
+                                        let hkc = hopr
                                             .send_message(msg_body, data.args.peer_id, options, Some(data.args.tag))
-                                            .await
-                                        {
-                                            Ok(hkc) => {
-                                                debug!("websocket notifying client with sent ack {hkc}");
-                                                if let Err(e) = ws_con
-                                                    .send_json(&json!(messages::WebSocketReadAck::from_ack_challenge(
-                                                        hkc
-                                                    )))
-                                                    .await
-                                                {
-                                                    error!("websocket: failed to send ack to client: {e}");
-                                                }
-                                            }
-                                            Err(e) => error!("websocket: failed to send msg: {e}"),
-                                        }
+                                            .await?;
+
+                                        ws_con
+                                            .send_json(&json!(messages::WebSocketReadAck::from_ack_challenge(hkc)))
+                                            .await?;
                                     } else {
                                         warn!("skipping an unsupported websocket command '{}'", data.cmd);
                                     }
@@ -1431,6 +1421,7 @@ mod messages {
     use std::time::Duration;
 
     use hopr_lib::{AsUnixTimestamp, HalfKeyChallenge, RESERVED_TAG_UPPER_LIMIT};
+    use validator::Validate;
 
     use super::*;
 
@@ -1470,10 +1461,10 @@ mod messages {
         #[schema(value_type = String)]
         pub peer_id: PeerId,
         #[serde_as(as = "Option<Vec<DisplayFromStr>>")]
-        // #[validate(length(min=0, max=3))]        // NOTE: issue in serde_as with validator -> no order is correct
+        #[validate(length(min = 0, max = 3))]
         #[schema(value_type = Option<Vec<String>>)]
         pub path: Option<Vec<PeerId>>,
-        #[validate(range(min = 1, max = 3))]
+        #[validate(range(min = 0, max = 3))]
         pub hops: Option<u16>,
     }
 
@@ -1532,6 +1523,12 @@ mod messages {
         let args: SendMessageBodyRequest = req.body_json().await?;
         let hopr = req.state().hopr.clone();
 
+        if let Err(e) = args.validate() {
+            return Ok(Response::builder(422)
+                .body(ApiErrorStatus::UnknownFailure(e.to_string()))
+                .build());
+        }
+
         // Use the message encoder, if any
         let msg_body = req
             .state()
@@ -1541,14 +1538,6 @@ mod messages {
             .unwrap_or_else(|| args.body.into_boxed_slice());
 
         let options = if let Some(intermediate_path) = args.path {
-            if intermediate_path.len() > 3 {
-                return Ok(Response::builder(422)
-                    .body(ApiErrorStatus::UnknownFailure(
-                        "The path components must contain at most 3 elements".into(),
-                    ))
-                    .build());
-            }
-
             PathOptions::IntermediatePath(intermediate_path)
         } else if let Some(hops) = args.hops {
             PathOptions::Hops(hops)

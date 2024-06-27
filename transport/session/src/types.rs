@@ -74,11 +74,13 @@ impl futures::AsyncWrite for Session {
         cx: &mut std::task::Context<'_>,
         buf: &[u8],
     ) -> Poll<std::io::Result<usize>> {
+        let tag = self.id.tag();
         let payload = wrap_with_offchain_key(&self.me, buf.to_vec().into_boxed_slice())
-            .map_err(|e| Error::new(ErrorKind::InvalidData, e))?;
-
-        let payload = ApplicationData::new_from_owned(Some(self.id.tag()), payload.into_boxed_slice())
-            .map_err(|e| Error::new(ErrorKind::InvalidData, e))?;
+            .map_err(|e| Error::new(ErrorKind::InvalidData, e))
+            .and_then(move |payload| {
+                ApplicationData::new_from_owned(Some(tag), payload.into_boxed_slice())
+                    .map_err(|e| Error::new(ErrorKind::InvalidData, e))
+            })?;
 
         match self
             .tx

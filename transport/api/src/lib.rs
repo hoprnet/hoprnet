@@ -331,14 +331,10 @@ where
         destination: PeerId,
         options: PathOptions,
     ) -> std::result::Result<(), TransportSessionError> {
-        if let Some(application_tag) = data.application_tag {
-            if application_tag < RESERVED_TAG_UPPER_LIMIT {
-                return Err(TransportSessionError::Tag);
-            }
-        } else {
-            error!("Application tag must be set for an outgoing message inside a session");
-            return Err(TransportSessionError::Tag);
-        }
+        data.application_tag
+            .is_some_and(|application_tag| application_tag < RESERVED_TAG_UPPER_LIMIT)
+            .then_some(())
+            .ok_or(TransportSessionError::Tag)?;
 
         let path = self
             .resolver
@@ -346,22 +342,17 @@ where
             .await
             .map_err(|_| TransportSessionError::Path)?;
 
-        let mut sender = self
-            .process_packet_send
+        self.process_packet_send
             .get()
             .ok_or_else(|| TransportSessionError::Closed)?
-            .clone();
+            .clone()
+            .send_packet(data, path)
+            .map_err(|_| TransportSessionError::Closed)?
+            .consume_and_wait(crate::constants::PACKET_QUEUE_TIMEOUT_MILLISECONDS)
+            .await
+            .map_err(|_e| TransportSessionError::Timeout)?;
 
-        match sender.send_packet(data, path) {
-            Ok(mut awaiter) => {
-                awaiter
-                    .consume_and_wait(crate::constants::PACKET_QUEUE_TIMEOUT_MILLISECONDS)
-                    .await
-                    .map_err(|_e| TransportSessionError::Timeout)?;
-                Ok(())
-            }
-            Err(_e) => Err(TransportSessionError::Closed),
-        }
+        Ok(())
     }
 }
 
