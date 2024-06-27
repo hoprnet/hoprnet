@@ -15,7 +15,7 @@ pub use types::{Session, SessionId};
 /// The send options specify how the path for the sent messages
 /// should be generated during the session duration.
 #[derive(Debug, Clone, PartialEq)]
-pub enum SendOptions {
+pub enum PathOptions {
     IntermediatePath(Vec<PeerId>),
     Hops(u16),
 }

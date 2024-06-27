@@ -33,7 +33,7 @@ pub use {
         libp2p, libp2p::swarm::derive_prelude::Multiaddr, multiaddrs::strip_p2p_protocol,
         swarm::HoprSwarmWithProcessors, PeerTransportEvent, TransportOutput,
     },
-    hopr_transport_session::SendOptions,
+    hopr_transport_session::PathOptions,
     timer::execute_on_tick,
 };
 
@@ -250,9 +250,9 @@ where
         Self { db, channel_graph }
     }
 
-    pub async fn resolve_path(&self, destination: PeerId, options: SendOptions) -> errors::Result<TransportPath> {
+    pub async fn resolve_path(&self, destination: PeerId, options: PathOptions) -> errors::Result<TransportPath> {
         let path = match options {
-            SendOptions::IntermediatePath(mut path) => {
+            PathOptions::IntermediatePath(mut path) => {
                 path.push(destination);
 
                 debug!(
@@ -264,7 +264,7 @@ where
 
                 TransportPath::resolve(path, &self.db, &cg).await.map(|(p, _)| p)?
             }
-            SendOptions::Hops(hops) => {
+            PathOptions::Hops(hops) => {
                 debug!(hops, "Sending a message using a random path");
 
                 let pk = OffchainPublicKey::try_from(destination)?;
@@ -327,7 +327,7 @@ where
         &self,
         data: ApplicationData,
         destination: PeerId,
-        options: SendOptions,
+        options: PathOptions,
     ) -> std::result::Result<(), TransportSessionError> {
         if let Some(application_tag) = data.application_tag {
             if application_tag < RESERVED_TAG_UPPER_LIMIT {
@@ -606,7 +606,7 @@ where
     }
 
     // #[cfg(feature = "session")]
-    pub async fn new_session(&self, destination: PeerId, options: SendOptions) -> errors::Result<Session> {
+    pub async fn new_session(&self, destination: PeerId, options: PathOptions) -> errors::Result<Session> {
         let session_id = SessionId::new(0u16, destination);
 
         let (tx, rx) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
@@ -630,7 +630,7 @@ where
         &self,
         msg: Box<[u8]>,
         destination: PeerId,
-        options: SendOptions,
+        options: PathOptions,
         application_tag: Option<u16>,
     ) -> errors::Result<HalfKeyChallenge> {
         if let Some(application_tag) = application_tag {

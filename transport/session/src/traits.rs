@@ -1,7 +1,7 @@
 use hopr_internal_types::protocol::ApplicationData;
 use libp2p_identity::PeerId;
 
-use crate::{errors::TransportSessionError, SendOptions};
+use crate::{errors::TransportSessionError, PathOptions};
 
 #[cfg_attr(test, mockall::automock)]
 #[async_trait::async_trait]
@@ -10,6 +10,6 @@ pub trait SendMsg {
         &self,
         data: ApplicationData,
         destination: PeerId,
-        options: SendOptions,
+        options: PathOptions,
     ) -> std::result::Result<(), TransportSessionError>;
 }

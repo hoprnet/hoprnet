@@ -32,7 +32,7 @@ pub use {
         config::{looks_like_domain, HostConfig, HostType},
         constants::RESERVED_TAG_UPPER_LIMIT,
         errors::{HoprTransportError, ProtocolError},
-        ApplicationData, HalfKeyChallenge, Health, Keypair, Multiaddr, SendOptions, TicketStatistics, TransportOutput,
+        ApplicationData, HalfKeyChallenge, Health, Keypair, Multiaddr, PathOptions, TicketStatistics, TransportOutput,
     },
     hopr_internal_types::prelude::*,
     hopr_primitive_types::prelude::*,
@@ -1054,7 +1054,7 @@ impl Hopr {
         &self,
         msg: Box<[u8]>,
         destination: PeerId,
-        options: SendOptions,
+        options: PathOptions,
         application_tag: Option<u16>,
     ) -> errors::Result<HalfKeyChallenge> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;

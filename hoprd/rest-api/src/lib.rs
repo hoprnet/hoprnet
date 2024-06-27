@@ -10,7 +10,7 @@ use bimap::BiHashMap;
 // use base64::{engine::general_purpose::STANDARD_NO_PAD, Engine as _};
 use futures::StreamExt;
 use futures_concurrency::stream::Merge;
-use hopr_lib::SendOptions;
+use hopr_lib::PathOptions;
 use libp2p_identity::PeerId;
 use serde_json::json;
 use serde_with::{serde_as, Bytes, DisplayFromStr, DurationMilliSeconds};
@@ -404,9 +404,9 @@ pub async fn build_hopr_api(
                                         // let msg_body =  data.args.body.into_bytes().into_boxed_slice();
 
                                         let options = if let Some(intermediate_path) = data.args.path {
-                                            SendOptions::IntermediatePath(intermediate_path)
+                                            PathOptions::IntermediatePath(intermediate_path)
                                         } else if let Some(hops) = data.args.hops {
-                                            SendOptions::Hops(hops)
+                                            PathOptions::Hops(hops)
                                         } else {
                                             error!("one of hops or intermediate path must be provided");
                                             continue;
@@ -424,10 +424,10 @@ pub async fn build_hopr_api(
                                                     )))
                                                     .await
                                                 {
-                                                    error!("failed to send ack to client: {e}");
+                                                    error!("websocket: failed to send ack to client: {e}");
                                                 }
                                             }
-                                            Err(_) => todo!(),
+                                            Err(e) => error!("websocket: failed to send msg: {e}"),
                                         }
                                     } else {
                                         warn!("skipping an unsupported websocket command '{}'", data.cmd);
@@ -1549,9 +1549,9 @@ mod messages {
                     .build());
             }
 
-            SendOptions::IntermediatePath(intermediate_path)
+            PathOptions::IntermediatePath(intermediate_path)
         } else if let Some(hops) = args.hops {
-            SendOptions::Hops(hops)
+            PathOptions::Hops(hops)
         } else {
             return Ok(Response::builder(422)
                 .body(ApiErrorStatus::UnknownFailure(

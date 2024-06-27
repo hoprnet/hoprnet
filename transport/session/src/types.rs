@@ -9,7 +9,7 @@ use libp2p_identity::PeerId;
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_internal_types::protocol::{ApplicationData, PAYLOAD_SIZE};
 
-use crate::{errors::TransportSessionError, traits::SendMsg, SendOptions};
+use crate::{errors::TransportSessionError, traits::SendMsg, PathOptions};
 
 /// ID tracking the session uniquely.
 ///
@@ -37,7 +37,7 @@ impl SessionId {
 pub struct Session {
     id: SessionId,
     me: PeerId,
-    options: SendOptions,
+    options: PathOptions,
     rx: UnboundedReceiver<Box<[u8]>>,
     tx: Box<dyn SendMsg>,
     rx_buffer: [u8; PAYLOAD_SIZE],
@@ -48,7 +48,7 @@ impl Session {
     pub fn new(
         id: SessionId,
         me: PeerId,
-        options: SendOptions,
+        options: PathOptions,
         tx: Box<dyn SendMsg>,
         rx: UnboundedReceiver<Box<[u8]>>,
     ) -> Self {
@@ -272,7 +272,7 @@ mod tests {
         let (_tx, rx) = futures::channel::mpsc::unbounded();
         let mock = MockSendMsg::new();
 
-        let session = Session::new(id, PeerId::random(), SendOptions::Hops(1), Box::new(mock), rx);
+        let session = Session::new(id, PeerId::random(), PathOptions::Hops(1), Box::new(mock), rx);
 
         assert_eq!(session.id(), &id);
     }
@@ -283,7 +283,7 @@ mod tests {
         let (tx, rx) = futures::channel::mpsc::unbounded();
         let mock = MockSendMsg::new();
 
-        let mut session = Session::new(id, PeerId::random(), SendOptions::Hops(1), Box::new(mock), rx);
+        let mut session = Session::new(id, PeerId::random(), PathOptions::Hops(1), Box::new(mock), rx);
 
         let random_data = hopr_crypto_random::random_bytes::<PAYLOAD_SIZE>()
             .as_ref()
@@ -306,7 +306,7 @@ mod tests {
         let (tx, rx) = futures::channel::mpsc::unbounded();
         let mock = MockSendMsg::new();
 
-        let mut session = Session::new(id, PeerId::random(), SendOptions::Hops(1), Box::new(mock), rx);
+        let mut session = Session::new(id, PeerId::random(), PathOptions::Hops(1), Box::new(mock), rx);
 
         let random_data = hopr_crypto_random::random_bytes::<PAYLOAD_SIZE>()
             .as_ref()
@@ -343,12 +343,12 @@ mod tests {
                 let (peer_id, data) = unwrap_offchain_key(data.plain_text.clone()).expect("Unwrapping should work");
                 assert_eq!(peer_id, *peer);
                 assert_eq!(data, b"Hello, world!".to_vec().into_boxed_slice());
-                assert_eq!(options, &SendOptions::Hops(1));
+                assert_eq!(options, &PathOptions::Hops(1));
                 true
             })
             .returning(|_, _, _| Ok(()));
 
-        let mut session = Session::new(id, PeerId::random(), SendOptions::Hops(1), Box::new(mock), rx);
+        let mut session = Session::new(id, PeerId::random(), PathOptions::Hops(1), Box::new(mock), rx);
 
         let bytes_written = session.write(&data).await.expect("Read should work #1");
 
