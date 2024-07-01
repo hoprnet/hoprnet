@@ -114,13 +114,19 @@ jobs:
         with:
           node-version: 18
 
+      - name: Get Hoprd Api token
+        id: token
+        run: |
+          hoprdApiToken=$(kubectl get secret -n k6-operator-system -o json hoprd-api-tokens | jq -r '.data.${{ steps.vars.outputs.ENVIRONMENT_NAME }}' | base64 -d)
+          echo "HOPRD_API_TOKEN=${hoprdApiToken}" >> $GITHUB_OUTPUT
+
       - name: Setup Load Testing environment
         run: |
           npm install
           npm run test:${{ steps.vars.outputs.ENVIRONMENT_NAME }}:setup
         working-directory: "./k6"
         env:
-          HOPRD_API_TOKEN: ${{ secrets.HOPRD_API_TOKEN }}
+          HOPRD_API_TOKEN: ${{ steps.token.outputs.HOPRD_API_TOKEN }}
           ENVIRONMENT_NAME: ${{ steps.vars.outputs.ENVIRONMENT_NAME }}
           WORKLOAD_NAME: ${{ steps.vars.outputs.WORKLOAD_NAME }}
           SCENARIO_ITERATIONS: ${{ steps.vars.outputs.SCENARIO_ITERATIONS }}
