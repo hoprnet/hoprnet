@@ -1,4 +1,4 @@
-use hopr_db_sql::{api::errors::DbError, errors::DbSqlError};
+use hopr_db_api::errors::DbError;
 use hopr_primitive_types::errors::GeneralError;
 use thiserror::Error;
 
@@ -23,9 +23,8 @@ pub enum PathError {
     #[error("cannot find {0} hop path {0} -> {1} in the channel graph")]
     PathNotFound(usize, String, String),
 
-    #[error(transparent)]
-    DatabaseError(#[from] DbSqlError),
-
+    // #[error(transparent)]
+    // DatabaseError(#[from] DbSqlError),
     #[error(transparent)]
     DbError(#[from] DbError),
 

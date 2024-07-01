@@ -13,6 +13,8 @@ crate-type = ["rlib"]
 
 [features]
 default = []
+session = []            # session based message sending used for SOCKS5
+sessionless = []        # session-less message sending used for async sending
 runtime-async-std = [
     "async-std",
     "chain-api/runtime-async-std",
