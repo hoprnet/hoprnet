@@ -117,7 +117,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
-use tracing::{debug, error, warn};
+use tracing::{debug, warn};
 
 use crate::errors::NetworkTypeError;
 use crate::session::errors::SessionError;
@@ -206,7 +206,7 @@ pub struct SessionState<const C: usize> {
 }
 
 impl<const C: usize> SessionState<C> {
-    fn consume_segment(&mut self, segment: Segment) {
+    fn consume_segment(&mut self, segment: Segment) -> crate::errors::Result<()> {
         let id = segment.id();
 
         match self.frame_reassembler.push_segment(segment) {
@@ -223,15 +223,18 @@ impl<const C: usize> SessionState<C> {
                     }
                 }
             }
+            // The error here is intentionally not propagated
             Err(e) => warn!("{:?}: segment {id:?} not pushed: {e}", self.session_id),
         }
+
+        Ok(())
     }
 
-    fn retransmit_segments(&mut self, request: SegmentRequest<C>) {
+    fn retransmit_segments(&mut self, request: SegmentRequest<C>) -> crate::errors::Result<()> {
         debug!("{:?} RECEIVED: request for {} segments", self.session_id, request.len());
 
         let mut count = 0;
-        if let Err(e) = request
+        request
             .into_iter()
             .filter_map(|segment_id| {
                 // No need to retry this frame ourselves, since the other side will request on its own
@@ -252,15 +255,14 @@ impl<const C: usize> SessionState<C> {
                 ret
             })
             .try_for_each(|msg| self.segment_egress_send.unbounded_send(msg))
-            .map_err(|e| SessionError::ProcessingError(e.to_string()))
-        {
-            error!("{:?}: failed to retransmit segment: {e}", self.session_id);
-        } else {
-            debug!("{:?}: retransmitted {count} requested segments", self.session_id);
-        }
+            .map_err(|e| SessionError::ProcessingError(e.to_string()))?;
+
+        debug!("{:?}: retransmitted {count} requested segments", self.session_id);
+
+        Ok(())
     }
 
-    fn acknowledged_frames(&mut self, acked: FrameAcknowledgements<C>) {
+    fn acknowledged_frames(&mut self, acked: FrameAcknowledgements<C>) -> crate::errors::Result<()> {
         debug!(
             "{:?} RECEIVED: acknowledgement of {} frames",
             self.session_id,
@@ -274,14 +276,16 @@ impl<const C: usize> SessionState<C> {
                 seg.remove();
             }
         }
+
+        Ok(())
     }
 
-    /// Sends a requests for missing segments in incomplete frames.
+    /// Sends a request for missing segments in incomplete frames.
     /// One [request](SessionMessage::Request) message is sent per incomplete frame. The message contains
     /// the segment indices missing from that frame. The `max_requests` argument can provide a maximum
     /// number of request messages sent by this call. If `max_requests` is `None`, request messages
     /// are set for all incomplete frames.
-    /// Recurring requests have a [`rto_base_receiver`](SessionConfig) timeout with backoff.
+    /// Recurring requests have an [`rto_base_receiver`](SessionConfig) timeout with backoff.
     /// Returns the number of sent request messages.
     pub async fn request_missing_segments(&mut self, max_requests: Option<usize>) -> crate::errors::Result<usize> {
         let num_evicted = self.frame_reassembler.evict()?;
@@ -570,7 +574,6 @@ impl<const C: usize, T: AsRef<[u8]>> Sink<T> for SessionState<C> {
             SessionMessage::Request(r) => self.retransmit_segments(r),
             SessionMessage::Acknowledge(f) => self.acknowledged_frames(f),
         }
-        Ok(())
     }
 
     fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -721,9 +724,7 @@ impl<const C: usize> AsyncWrite for SessionSocket<C> {
     }
 
     fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
-        // Close the reassembler and the underlying transport
-        self.state.frame_reassembler.close();
-        self.state.segment_egress_send.close_channel();
+        // Close the underlying transport
         let mut close_future = self.state.segment_egress_send.close().boxed();
         match Pin::new(&mut close_future).poll(cx) {
             Poll::Ready(Ok(())) => Poll::Ready(Ok(())),
@@ -871,6 +872,7 @@ mod tests {
                     socket.write(&write).await.unwrap();
                     sent.extend(write);
                 }
+                socket.close().await.unwrap();
             }
 
             if d == Direction::Recv || d == Direction::Both {
@@ -916,32 +918,32 @@ mod tests {
         }
     }
 
-    #[async_std::test]
-    async fn faulty_network_mixing() {
-        const MIX_FACTOR: usize = 2;
-        const COUNT: usize = 20;
-
-        let (mut recv, mut send) = FaultyNetwork::new(FaultyNetworkConfig {
-            fault_prob: 0.0,
-            mixing_factor: MIX_FACTOR,
-            step_interval: Default::default(),
-        })
-        .split();
-
+    fn spawn_single_byte_read_write<R, W>(
+        mut recv: R,
+        mut send: W,
+        data: Vec<u8>,
+    ) -> (impl Future<Output = Vec<u8>>, impl Future<Output = Vec<u8>>)
+    where
+        R: AsyncRead + Unpin + Send + 'static,
+        W: AsyncWrite + Unpin + Send + 'static,
+    {
+        let len = data.len();
         let read = async_std::task::spawn(async move {
-            let mut out = Vec::with_capacity(COUNT);
-            for _ in 0..COUNT {
+            let mut out = Vec::with_capacity(len);
+            for _ in 0..len {
                 let mut bytes = [0u8; 1];
-                recv.read_exact(&mut bytes).await.unwrap();
-                out.push(bytes[0]);
+                if recv.read(&mut bytes).await.unwrap() > 0 {
+                    out.push(bytes[0]);
+                } else {
+                    break;
+                }
             }
             out
         });
 
         let written = async_std::task::spawn(async move {
-            let mut out = Vec::with_capacity(COUNT);
-            for i in 0..COUNT {
-                let byte = i as u8;
+            let mut out = Vec::with_capacity(len);
+            for byte in data {
                 send.write(&[byte]).await.unwrap();
                 out.push(byte);
             }
@@ -949,6 +951,21 @@ mod tests {
             out
         });
 
+        (read, written)
+    }
+
+    #[async_std::test]
+    async fn faulty_network_mixing() {
+        const MIX_FACTOR: usize = 2;
+        const COUNT: usize = 20;
+
+        let (recv, send) = FaultyNetwork::new(FaultyNetworkConfig {
+            mixing_factor: MIX_FACTOR,
+            ..Default::default()
+        })
+        .split();
+
+        let (read, written) = spawn_single_byte_read_write(recv, send, (0..COUNT as u8).collect());
         let (read, _) = futures::future::join(read, written).await;
 
         for (pos, value) in read.into_iter().enumerate() {
@@ -964,41 +981,29 @@ mod tests {
         const DROP: f64 = 0.3333;
         const COUNT: usize = 20;
 
-        let (mut recv, mut send) = FaultyNetwork::new(FaultyNetworkConfig {
+        let (recv, send) = FaultyNetwork::new(FaultyNetworkConfig {
             fault_prob: DROP,
-            mixing_factor: 0,
-            step_interval: Default::default(),
+            ..Default::default()
         })
         .split();
 
-        let read = async_std::task::spawn(async move {
-            let mut out = Vec::with_capacity(COUNT);
-            for _ in 0..COUNT {
-                let mut bytes = [0u8; 1];
-                if recv.read(&mut bytes).await.unwrap() > 0 {
-                    out.push(bytes[0]);
-                } else {
-                    break;
-                }
-            }
-            out
-        });
-
-        let written = async_std::task::spawn(async move {
-            let mut out = Vec::with_capacity(COUNT);
-            for i in 0..COUNT {
-                let byte = i as u8;
-                send.write(&[byte]).await.unwrap();
-                out.push(byte);
-            }
-            send.close().await.unwrap();
-            out
-        });
-
+        let (read, written) = spawn_single_byte_read_write(recv, send, (0..COUNT as u8).collect());
         let (read, written) = futures::future::join(read, written).await;
 
         let max_drop = (written.len() as f64 * (1.0 - DROP) - 2.0).floor() as usize;
         assert!(read.len() >= max_drop, "dropped more than {max_drop}: {}", read.len());
+    }
+
+    #[async_std::test]
+    async fn faulty_network_reliable() {
+        const COUNT: usize = 20;
+
+        let (recv, send) = FaultyNetwork::new(Default::default()).split();
+
+        let (read, written) = spawn_single_byte_read_write(recv, send, (0..COUNT as u8).collect());
+        let (read, written) = futures::future::join(read, written).await;
+
+        assert_eq!(read, written);
     }
 
     #[parameterized(num_frames = {10, 100, 1000}, frame_size = {1500, 1500, 1500})]
