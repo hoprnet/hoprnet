@@ -9,8 +9,8 @@
 //! ## Instantiation
 //! The instantiation of the protocol state machine is done by creating the [`SessionSocket`]
 //! object, by [providing it](SessionSocket::new) an underlying transport writer and its MTU `C`.
-//! The protocol can be instantiated over any transport that implements [`futures::io::AsyncWrite`]
-//! for sending raw data packets.
+//! The protocol can be instantiated over any transport that implements [`AsyncWrite`] + [`AsyncRead`]
+//! for sending and receiving raw data packets.
 //!
 //! ## Passing data between the protocol and the upper layer
 //! The [`SessionSocket`] exposes as [`AsyncRead`] +
@@ -18,18 +18,11 @@
 //! to the protocol. If the writer is [closed](AsyncWrite::poll_close), the session is closed
 //! as well.
 //!
-//! ## Passing of data from the protocol *to* the lower layer
+//! ## Passing of data between the protocol and the lower layer
 //!
-//! Writes to the underlying transport happen automatically as needed. The amount of data written
-//! per each [`write`](AsyncWrite::poll_write) does not exceed the size of the set MTU.
-//!
-//! ## Passing of data to the protocol *from* the lower layer
-//!
-//! The user is responsible for polling the underlying transport for any incoming data,
-//! and updating the [state of the socket](SessionSocket::state).
-//! This is done by passing the data to the [`SessionState`], which implements
-//! [`futures::io::Sink`] for any `AsRef<[u8]>`. The size of each [`send`](Sink::start_send)
-//! to the `Sink` also must not exceed the size of the MTU.
+//! As long as the underlying transport implements [`AsyncRead`] + [`AsyncWrite`],
+//! the [`SessionSocket`] automatically polls data from the underlying transport,
+//! and sends the data to the underlying transport as needed.
 //!
 //! ## Protocol features
 //!
@@ -746,56 +739,20 @@ impl<const C: usize> AsyncRead for SessionSocket<C> {
     }
 }
 
-/// Implementations of Tokio's AsyncRead and AsyncWrite for compatibility
-#[cfg(feature = "runtime-tokio")]
-pub mod tokio_compat {
-    use std::pin::Pin;
-    use std::task::{Context, Poll};
-
-    use crate::session::state::SessionSocket;
-
-    impl<const C: usize> tokio::io::AsyncWrite for SessionSocket<C> {
-        fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
-            futures::io::AsyncWrite::poll_write(self, cx, buf)
-        }
-
-        fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
-            futures::io::AsyncWrite::poll_flush(self, cx)
-        }
-
-        fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
-            futures::io::AsyncWrite::poll_close(self, cx)
-        }
-    }
-
-    impl<const C: usize> tokio::io::AsyncRead for SessionSocket<C> {
-        fn poll_read(
-            self: Pin<&mut Self>,
-            cx: &mut Context<'_>,
-            buf: &mut tokio::io::ReadBuf<'_>,
-        ) -> Poll<std::io::Result<()>> {
-            // TODO: check correctness
-            futures::io::AsyncRead::poll_read(self, cx, buf.filled_mut()).map(|_| Ok(()))
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::session::utils::DuplexIO;
+    use async_std::prelude::FutureExt;
     use futures::future::Either;
     use futures::io::{AsyncReadExt, AsyncWriteExt};
     use futures::pin_mut;
+    use futures::stream::BoxStream;
     use parameterized::parameterized;
-    use rand::prelude::SliceRandom;
     use rand::{thread_rng, Rng};
-    use std::collections::VecDeque;
     use std::fmt::Debug;
     use std::iter::Extend;
-    use std::task::Waker;
     use test_log::test;
-    use tracing::warn;
 
     const MTU: usize = 466; // MTU used by HOPR
 
@@ -816,24 +773,14 @@ mod tests {
         }
     }
 
-    pub struct FaultyNetwork {
-        data: VecDeque<Box<[u8]>>,
-        waker: Option<Waker>,
-        cfg: FaultyNetworkConfig,
+    pub struct FaultyNetwork<'a> {
+        ingress: UnboundedSender<Box<[u8]>>,
+        egress: BoxStream<'a, Box<[u8]>>,
     }
 
-    impl AsyncWrite for FaultyNetwork {
-        fn poll_write(mut self: Pin<&mut Self>, _: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
-            if thread_rng().gen_bool(self.cfg.fault_prob) {
-                warn!("msg discarded");
-            } else {
-                self.data.push_front(buf.into());
-                debug!("written {} bytes: {}", buf.len(), hex::encode(buf));
-
-                if let Some(waker) = self.waker.take() {
-                    waker.wake();
-                }
-            }
+    impl AsyncWrite for FaultyNetwork<'_> {
+        fn poll_write(self: Pin<&mut Self>, _cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
+            self.ingress.unbounded_send(buf.into()).unwrap();
             Poll::Ready(Ok(buf.len()))
         }
 
@@ -842,21 +789,21 @@ mod tests {
         }
 
         fn poll_close(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+            self.ingress.close_channel();
             Poll::Ready(Ok(()))
         }
     }
 
-    impl AsyncRead for FaultyNetwork {
+    impl AsyncRead for FaultyNetwork<'_> {
         fn poll_read(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<std::io::Result<usize>> {
-            // TODO: add shuffling here
-            if let Some(data) = self.data.pop_back() {
-                let len = buf.len().min(data.len());
-                buf[0..len].copy_from_slice(data[0..len].as_ref());
-                debug!("read {len} bytes: {}", hex::encode(&buf[0..len]));
-                Poll::Ready(Ok(len))
-            } else {
-                self.waker = Some(cx.waker().clone());
-                Poll::Pending
+            match self.egress.poll_next_unpin(cx) {
+                Poll::Ready(Some(item)) => {
+                    let len = buf.len().min(item.len());
+                    buf[..len].copy_from_slice(&item.as_ref()[..len]);
+                    Poll::Ready(Ok(item.len()))
+                }
+                Poll::Ready(None) => Poll::Ready(Ok(0)),
+                Poll::Pending => Poll::Pending,
             }
         }
     }
@@ -883,13 +830,22 @@ mod tests {
         (alice_to_bob, bob_to_alice)
     }
 
-    impl FaultyNetwork {
+    impl FaultyNetwork<'_> {
         pub fn new(cfg: FaultyNetworkConfig) -> Self {
-            Self {
-                data: VecDeque::with_capacity(1024),
-                cfg,
-                waker: None,
-            }
+            let (ingress, egress) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
+
+            let egress = egress.filter(move |_| futures::future::ready(thread_rng().gen_bool(1.0 - cfg.fault_prob)));
+
+            let egress = if cfg.mixing_factor > 0 {
+                egress
+                    .map(|e| futures::future::ready(e).delay(Duration::from_micros(thread_rng().gen_range(0..20))))
+                    .buffer_unordered(cfg.mixing_factor)
+                    .boxed()
+            } else {
+                egress.boxed()
+            };
+
+            Self { ingress, egress }
         }
     }
 
@@ -958,6 +914,91 @@ mod tests {
             }
             Either::Right(_) => panic!("timeout"),
         }
+    }
+
+    #[async_std::test]
+    async fn faulty_network_mixing() {
+        const MIX_FACTOR: usize = 2;
+        const COUNT: usize = 20;
+
+        let (mut recv, mut send) = FaultyNetwork::new(FaultyNetworkConfig {
+            fault_prob: 0.0,
+            mixing_factor: MIX_FACTOR,
+            step_interval: Default::default(),
+        })
+        .split();
+
+        let read = async_std::task::spawn(async move {
+            let mut out = Vec::with_capacity(COUNT);
+            for _ in 0..COUNT {
+                let mut bytes = [0u8; 1];
+                recv.read_exact(&mut bytes).await.unwrap();
+                out.push(bytes[0]);
+            }
+            out
+        });
+
+        let written = async_std::task::spawn(async move {
+            let mut out = Vec::with_capacity(COUNT);
+            for i in 0..COUNT {
+                let byte = i as u8;
+                send.write(&[byte]).await.unwrap();
+                out.push(byte);
+            }
+            send.close().await.unwrap();
+            out
+        });
+
+        let (read, _) = futures::future::join(read, written).await;
+
+        for (pos, value) in read.into_iter().enumerate() {
+            assert!(
+                pos.abs_diff(value as usize) <= MIX_FACTOR,
+                "packet must not be off from its position by more than then mixing factor"
+            );
+        }
+    }
+
+    #[async_std::test]
+    async fn faulty_network_packet_drop() {
+        const DROP: f64 = 0.3333;
+        const COUNT: usize = 20;
+
+        let (mut recv, mut send) = FaultyNetwork::new(FaultyNetworkConfig {
+            fault_prob: DROP,
+            mixing_factor: 0,
+            step_interval: Default::default(),
+        })
+        .split();
+
+        let read = async_std::task::spawn(async move {
+            let mut out = Vec::with_capacity(COUNT);
+            for _ in 0..COUNT {
+                let mut bytes = [0u8; 1];
+                if recv.read(&mut bytes).await.unwrap() > 0 {
+                    out.push(bytes[0]);
+                } else {
+                    break;
+                }
+            }
+            out
+        });
+
+        let written = async_std::task::spawn(async move {
+            let mut out = Vec::with_capacity(COUNT);
+            for i in 0..COUNT {
+                let byte = i as u8;
+                send.write(&[byte]).await.unwrap();
+                out.push(byte);
+            }
+            send.close().await.unwrap();
+            out
+        });
+
+        let (read, written) = futures::future::join(read, written).await;
+
+        let max_drop = (written.len() as f64 * (1.0 - DROP) - 2.0).floor() as usize;
+        assert!(read.len() >= max_drop, "dropped more than {max_drop}: {}", read.len());
     }
 
     #[parameterized(num_frames = {10, 100, 1000}, frame_size = {1500, 1500, 1500})]
@@ -1039,7 +1080,7 @@ mod tests {
 
         let net_cfg = FaultyNetworkConfig {
             fault_prob: 0.33,
-            mixing_factor: 4,
+            mixing_factor: 2,
             ..Default::default()
         };
 
@@ -1069,7 +1110,7 @@ mod tests {
 
         let net_cfg = FaultyNetworkConfig {
             fault_prob: 0.1,
-            mixing_factor: 4,
+            mixing_factor: 2,
             ..Default::default()
         };
 
@@ -1098,7 +1139,7 @@ mod tests {
         };
 
         let net_cfg = FaultyNetworkConfig {
-            mixing_factor: 4,
+            mixing_factor: 2,
             ..Default::default()
         };
 
@@ -1152,7 +1193,7 @@ mod tests {
         let cfg = SessionConfig {
             rto_base_sender: Duration::from_millis(250),
             rto_base_receiver: Duration::from_millis(300),
-            frame_expiration_age: Duration::from_secs(2),
+            frame_expiration_age: Duration::from_secs(10),
             ..Default::default()
         };
 
