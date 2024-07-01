@@ -8,7 +8,7 @@ use futures::TryStreamExt;
 use libp2p_identity::PeerId;
 
 use hopr_crypto_types::types::OffchainPublicKey;
-use hopr_db_sql::api::resolver::HoprDbResolverOperations;
+use hopr_db_api::resolver::HoprDbResolverOperations;
 use hopr_internal_types::channels::ChannelStatus;
 use hopr_primitive_types::{primitives::Address, traits::ToHex};
 

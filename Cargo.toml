@@ -36,10 +36,11 @@ members = [
     "logic/strategy",
     "misc/metrics",
     "misc/platform",
-    "transport/network",
-    "transport/protocol",
-    "transport/p2p",
     "transport/api",
+    "transport/network",
+    "transport/p2p",
+    "transport/protocol",
+    "transport/session"
 ]
 
 [workspace.dependencies]
@@ -144,6 +145,7 @@ hopr-platform = { path = "misc/platform" }
 hopr-strategy = { path = "logic/strategy", default-features = false }
 hopr-parallelize = { path = "common/parallelize" }
 hopr-transport-p2p = { path = "transport/p2p", default-features = false }
+hopr-transport-session = { path = "transport/session" }
 hoprd-api = { path = "hoprd/rest-api", default-features = false }
 hoprd-inbox = { path = "hoprd/inbox", default-features = false }
 hoprd-keypair = { path = "hoprd/keypair", default-features = false }
