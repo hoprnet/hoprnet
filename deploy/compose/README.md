@@ -1,16 +1,20 @@
 ## `docker compose` based deployment
 
-The `docker compose` deployment is multi-faceted allowing different combinations of tooling and extensions and different types of usage for the deployment.
+## Requirements
 
-Copy this directory to where the setup should run and rename the directory appropriately.
+- A VPS or cloud provider VM with docker and docker compose installed
+- Ensure the P2P port (default 9091) is opened from your router or internet gateway to your VPS to allow network communications.
 
-Once in the directory, copy and setup the `.env` file:
+## Setup
 
-```shell
-cp .env{.example,}
-```
+The `docker compose` deployment is multi-faceted, allowing different combinations of tooling and extensions and different types of usage for the deployment.
 
-Now edit the `.env` file if any override is necessary.
+- Clone this repository
+- Follow the guide to run a [Hopr node](https://docs.hoprnet.org/node/start-here)
+- Copy the `.env.sample` file to `.env`, replacing placeholder values with your specific configurations.
+- Similarly, copy `.env-secrets.sample` to `.env-secrets` and ensure all sensitive configurations are securely set.
+- Update `hoprd.cfg.yaml` with your node configuration as guided by the onboarding process at https://hub.hoprnet.
+- Modify the prometheus config file at `./prometheus/prometheus.yml` to set the correct values for credentials and labels
 
 ### Profiles
 
@@ -32,34 +36,44 @@ Profiles should be specified as a list of `,` separated values in the `COMPOSE_P
 
 Inside the copied compose directory:
 
-1. run only the hopr node
+1. Run only the hopr node
 
 ```shell
 COMPOSE_PROFILES=hoprd docker compose up -d
 ```
 
-2. run the `hopr-admin` and a hopr node
+2. Run the `hopr-admin` and a hopr node
 
 ```shell
 COMPOSE_PROFILES=hoprd,admin-ui docker compose up -d
 ```
 
-3. run everything
+Access the website at http://localhost:8080, where `HOPR_ADMIN_PORT=8080` is the configured port.
+The default hoprd endpoint is available at http://localhost:3001, with `HOPRD_API_PORT=3001` as the configured port.
+
+3. Run hopr node with a full internal monitoring system (Prometheus and Grafana)
+
+```shell
+COMPOSE_PROFILES=hoprd,metrics-vis docker compose up -d
+```
+
+To access Prometheus, navigate to http://localhost:9090, where `PROMETHEUS_PORT=9090` is the configured port.
+To access Grafana, navigate to http://localhost:3030, where `GRAFANA_PORT=3030` is the configured port.
+Grafana credentials are stored in ./grafana/config.monitoring
+Navigate to the Dashboards page and open the desired dashboard
+
+4. Run hopr node with an external monitoring system using Prometheus pushgateway
+
+Before running this profile, make sure that you modify the variable `METRICS_PUSH_URL` to point to your prometheus pushgateway instance and that you name your hoprd node accordingly among other nodes.
+
+```shell
+COMPOSE_PROFILES=hoprd,metrics-push docker compose up -d
+```
+
+5. Run everything
 
 ```shell
 COMPOSE_PROFILES=hoprd,admin-ui,metrics,metrics-vis docker compose up -d
 ```
 
 The same list of `COMPOSE_PROFILES` should be supplied for the `docker compose down` command.
-
-### Types of usage
-
-#### `docker compose` based HOPR node
-
-Uses the setup as is.
-
-#### Externally run HOPR node
-
-Omit the `hoprd` profile and run only components deemed necessary for the externally running node.
-
-- in `.env` set all variables so that `prometheus` looks at the proper node

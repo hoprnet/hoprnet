@@ -10,6 +10,7 @@ use bimap::BiHashMap;
 // use base64::{engine::general_purpose::STANDARD_NO_PAD, Engine as _};
 use futures::StreamExt;
 use futures_concurrency::stream::Merge;
+use hopr_lib::PathOptions;
 use libp2p_identity::PeerId;
 use serde_json::json;
 use serde_with::{serde_as, Bytes, DisplayFromStr, DurationMilliSeconds};
@@ -376,11 +377,11 @@ pub async fn build_hopr_api(
                         match v {
                             WebSocketInput::Network(net_in) => match net_in {
                                 TransportOutput::Received(data) => {
-                                    debug!("websocket notifying client with received msg {data}");
+                                    debug!("websocket notifying client: received msg");
                                     ws_con.send_json(&json!(messages::WebSocketReadMsg::from(data))).await?;
                                 }
                                 TransportOutput::Sent(hkc) => {
-                                    debug!("websocket notifying client with received ack {hkc}");
+                                    debug!("websocket notifying client: received next hop receive confirmation");
                                     ws_con
                                         .send_json(&json!(messages::WebSocketReadAck::from_ack(hkc)))
                                         .await?;
@@ -400,19 +401,21 @@ pub async fn build_hopr_api(
                                             .as_ref()
                                             .map(|enc| enc(&data.args.body))
                                             .unwrap_or_else(|| data.args.body.into_boxed_slice());
+                                        // let msg_body =  data.args.body.into_bytes().into_boxed_slice();
+
+                                        let options = if let Some(intermediate_path) = data.args.path {
+                                            PathOptions::IntermediatePath(intermediate_path)
+                                        } else if let Some(hops) = data.args.hops {
+                                            PathOptions::Hops(hops)
+                                        } else {
+                                            error!("one of hops or intermediate path must be provided");
+                                            continue;
+                                        };
 
                                         let hkc = hopr
-                                            .send_message(
-                                                // data.args.body.into_bytes().into_boxed_slice(),
-                                                msg_body,
-                                                data.args.peer_id,
-                                                data.args.path,
-                                                data.args.hops,
-                                                Some(data.args.tag),
-                                            )
+                                            .send_message(msg_body, data.args.peer_id, options, Some(data.args.tag))
                                             .await?;
 
-                                        debug!("websocket notifying client with sent ack {hkc}");
                                         ws_con
                                             .send_json(&json!(messages::WebSocketReadAck::from_ack_challenge(hkc)))
                                             .await?;
@@ -1418,6 +1421,7 @@ mod messages {
     use std::time::Duration;
 
     use hopr_lib::{AsUnixTimestamp, HalfKeyChallenge, RESERVED_TAG_UPPER_LIMIT};
+    use validator::Validate;
 
     use super::*;
 
@@ -1457,10 +1461,10 @@ mod messages {
         #[schema(value_type = String)]
         pub peer_id: PeerId,
         #[serde_as(as = "Option<Vec<DisplayFromStr>>")]
-        // #[validate(length(min=0, max=3))]        // NOTE: issue in serde_as with validator -> no order is correct
+        #[validate(length(min = 0, max = 3))]
         #[schema(value_type = Option<Vec<String>>)]
         pub path: Option<Vec<PeerId>>,
-        #[validate(range(min = 1, max = 3))]
+        #[validate(range(min = 0, max = 3))]
         pub hops: Option<u16>,
     }
 
@@ -1519,6 +1523,12 @@ mod messages {
         let args: SendMessageBodyRequest = req.body_json().await?;
         let hopr = req.state().hopr.clone();
 
+        if let Err(e) = args.validate() {
+            return Ok(Response::builder(422)
+                .body(ApiErrorStatus::UnknownFailure(e.to_string()))
+                .build());
+        }
+
         // Use the message encoder, if any
         let msg_body = req
             .state()
@@ -1527,22 +1537,21 @@ mod messages {
             .map(|enc| enc(&args.body))
             .unwrap_or_else(|| args.body.into_boxed_slice());
 
-        if let Some(path) = &args.path {
-            if path.len() > 3 {
-                return Ok(Response::builder(422)
-                    .body(ApiErrorStatus::UnknownFailure(
-                        "The path components must contain at most 3 elements".into(),
-                    ))
-                    .build());
-            }
-        }
+        let options = if let Some(intermediate_path) = args.path {
+            PathOptions::IntermediatePath(intermediate_path)
+        } else if let Some(hops) = args.hops {
+            PathOptions::Hops(hops)
+        } else {
+            return Ok(Response::builder(422)
+                .body(ApiErrorStatus::UnknownFailure(
+                    "One of either hops or intermediate path must be specified".to_owned(),
+                ))
+                .build());
+        };
 
         let timestamp = std::time::SystemTime::now().as_unix_timestamp();
 
-        match hopr
-            .send_message(msg_body, args.peer_id, args.path, args.hops, Some(args.tag))
-            .await
-        {
+        match hopr.send_message(msg_body, args.peer_id, options, Some(args.tag)).await {
             Ok(challenge) => Ok(Response::builder(202)
                 .body(json!(SendMessageResponse { challenge, timestamp }))
                 .build()),
