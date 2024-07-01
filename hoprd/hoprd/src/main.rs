@@ -185,15 +185,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             let latency = recv_at.as_unix_timestamp().saturating_sub(sent);
 
                             info!(
-                                r#"
-                            #### NODE RECEIVED MESSAGE [{}] ####
-                            Message: {}
-                            App tag: {}
-                            Latency: {}ms"#,
+                                app_tag = data.application_tag.unwrap_or(0),
+                                latency_in_ms = latency.as_millis(),
+                                "## NODE RECEIVED MESSAGE [@{}] ##",
                                 DateTime::<Utc>::from(recv_at).to_rfc3339(),
-                                String::from_utf8_lossy(&msg),
-                                data.application_tag.unwrap_or(0),
-                                latency.as_millis()
                             );
 
                             #[cfg(all(feature = "prometheus", not(test)))]
