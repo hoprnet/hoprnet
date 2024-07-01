@@ -13,12 +13,15 @@ crate-type = ["rlib"]
 
 [features]
 default = []
+session = []            # session based message sending used for SOCKS5
+sessionless = []        # session-less message sending used for async sending
 runtime-async-std = [
     "async-std",
     "chain-api/runtime-async-std",
     "chain-rpc/runtime-async-std",
     "core-transport/runtime-async-std",
     "hopr-db-sql/runtime-async-std",
+    "hopr-network-types/runtime-async-std",
     "hopr-strategy/runtime-async-std",
 ]
 runtime-tokio = [
@@ -27,6 +30,7 @@ runtime-tokio = [
     "chain-rpc/runtime-tokio",
     "core-transport/runtime-tokio",
     "hopr-db-sql/runtime-tokio",
+    "hopr-network-types/runtime-tokio",
     "hopr-strategy/runtime-tokio"
 ]
 prometheus = [
@@ -43,8 +47,9 @@ async-channel = { workspace = true }
 async-lock = { workspace = true }
 async-std = { workspace = true, optional = true }
 atomic_enum = { workspace = true }
-const_format = "0.2.32"
+const_format ={ workspace = true }
 futures = { workspace = true }
+futures-concurrency = { workspace = true }
 lazy_static = { workspace = true }
 tracing = { workspace = true }
 tokio = { workspace = true, optional = true }
@@ -69,11 +74,11 @@ hopr-metrics = { workspace = true, optional = true }
 hopr-platform = { workspace = true }
 hopr-primitive-types = { workspace = true }
 hopr-strategy = { workspace = true }
+hopr-network-types = { workspace = true }
 
 [dev-dependencies]
 async-std = { workspace = true }
 ethers = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-db-sql = { workspace = true, features = ["runtime-async-std"] }
-serde_yaml = { version = "0.9" }
-
+serde_yaml = { workspace = true }

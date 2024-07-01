@@ -140,37 +140,30 @@ impl AcknowledgementInteraction {
                             if ack.validate(&remote_pk) {
                                 match processor.handle_acknowledgement(ack).await {
                                     Ok(reply) => {
+                                        #[cfg(all(feature = "prometheus", not(test)))]
                                         match &reply {
                                             AckResult::Sender(_) => {
-                                                #[cfg(all(feature = "prometheus", not(test)))]
                                                 METRIC_RECEIVED_ACKS.increment(&["true"]);
                                             }
                                             AckResult::RelayerWinning(_) => {
-                                                #[cfg(all(feature = "prometheus", not(test)))]
-                                                {
-                                                    METRIC_RECEIVED_ACKS.increment(&["true"]);
-                                                    METRIC_TICKETS_COUNT.increment(&["winning"]);
-                                                }
+                                                METRIC_RECEIVED_ACKS.increment(&["true"]);
+                                                METRIC_TICKETS_COUNT.increment(&["winning"]);
                                             }
                                             AckResult::RelayerLosing => {
-                                                #[cfg(all(feature = "prometheus", not(test)))]
-                                                {
-                                                    METRIC_RECEIVED_ACKS.increment(&["true"]);
-                                                    METRIC_TICKETS_COUNT.increment(&["losing"]);
-                                                }
+                                                METRIC_RECEIVED_ACKS.increment(&["true"]);
+                                                METRIC_TICKETS_COUNT.increment(&["losing"]);
                                             }
                                         }
 
                                         Some(AckProcessed::Receive(peer, Ok(reply)))
                                     }
                                     Err(e) => {
-                                        error!(
-                                            "Encountered error while handling acknowledgement from peer '{}': {}",
-                                            &peer, e
-                                        );
-
                                         #[cfg(all(feature = "prometheus", not(test)))]
                                         METRIC_RECEIVED_ACKS.increment(&["false"]);
+
+                                        error!(
+                                            "Encountered error while handling acknowledgement from peer '{peer}': {e}",
+                                        );
 
                                         None
                                     }
@@ -223,7 +216,7 @@ impl Stream for AcknowledgementInteraction {
     type Item = AckProcessed;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Option<Self::Item>> {
-        use futures_lite::stream::StreamExt;
-        Pin::new(self).ack_event_queue.1.poll_next(cx)
+        use futures::stream::StreamExt;
+        Pin::new(self).ack_event_queue.1.poll_next_unpin(cx)
     }
 }

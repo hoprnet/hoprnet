@@ -1,6 +1,6 @@
 [package]
 name = "core-protocol"
-version = "0.2.3"
+version = "0.2.4"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 license = "GPL-3.0-only"
@@ -12,14 +12,13 @@ crate-type = ["rlib"]
 default = []
 runtime-async-std = ["async-std"]
 runtime-tokio = ["tokio"]
-prometheus = ["dep:hopr-metrics", "core-path/prometheus", "hopr-crypto-packet/prometheus"]
+prometheus = ["dep:hopr-metrics", "core-path/prometheus"]
 
 [dependencies]
 async-trait = { workspace = true }
 async-std = { workspace = true, optional = true }
 async-lock = { workspace = true }
 futures = { workspace = true }
-futures-lite = { workspace = true }
 hex-literal = { workspace = true }
 lazy_static = { workspace = true }
 libp2p-identity = { workspace = true }
@@ -34,7 +33,6 @@ tracing = { workspace = true }
 validator = { workspace = true }
 
 hopr-crypto-random = { workspace = true }
-hopr-crypto-sphinx = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-crypto-packet = { workspace = true }
 hopr-db-api = { workspace = true }
@@ -47,7 +45,7 @@ hopr-primitive-types = { workspace = true }
 [dev-dependencies]
 async-std = { workspace = true }
 hopr-db-sql = { workspace = true, features = ["runtime-async-std"] }
-more-asserts = "0.3.1"
+more-asserts = { workspace = true }
 parameterized = { workspace = true }
-serial_test = "3.1.1"
+serial_test = { workspace = true }
 tracing-test = { workspace = true }

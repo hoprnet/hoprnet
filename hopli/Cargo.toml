@@ -16,7 +16,6 @@ serde_with = { workspace = true }
 hex = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hoprd-keypair = { features = ["hopli"], workspace = true }
-hopr-internal-types = { workspace = true }
 hopr-primitive-types = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }

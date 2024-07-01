@@ -1,32 +1,33 @@
 {
   description = "hoprnet monorepo";
 
-  inputs.flake-utils.url = github:numtide/flake-utils;
-  inputs.flake-parts.url = github:hercules-ci/flake-parts;
-  inputs.nixpkgs.url = github:NixOS/nixpkgs/master;
-  # using bugfix for macos libcurl:
-  # https://github.com/oxalica/rust-overlay/pull/149
-  inputs.rust-overlay.url = github:oxalica/rust-overlay/647bff9f5e10d7f1756d86eee09831e6b1b06430;
-  # using a fork with an added source filter
-  inputs.crane.url = github:hoprnet/crane/tb/20240117-find-filter;
-  inputs.foundry.url = github:shazow/foundry.nix/monthly;
-  # use change to add solc 0.8.24
-  inputs.solc.url = github:hoprnet/solc.nix/tb/20240129-solc-0.8.24;
-  inputs.pre-commit.url = github:cachix/pre-commit-hooks.nix;
-  inputs.treefmt-nix.url = github:numtide/treefmt-nix;
-  inputs.flake-root.url = github:srid/flake-root;
+  inputs = {
+    flake-utils.url = github:numtide/flake-utils;
+    flake-parts.url = github:hercules-ci/flake-parts;
+    nixpkgs.url = github:NixOS/nixpkgs/release-24.05;
+    rust-overlay.url = github:oxalica/rust-overlay/cfc8776011bd83508324115d353222475e1601c0;
+    # using a fork with an added source filter
+    crane.url = github:hoprnet/crane/tb/20240117-find-filter;
+    # pin it to a version which we are compatible with
+    foundry.url = github:shazow/foundry.nix/ece7c960a440c6725a7a5576d1f49a5fabde3747;
+    # use change to add solc 0.8.24
+    solc.url = github:hoprnet/solc.nix/tb/20240129-solc-0.8.24;
+    pre-commit.url = github:cachix/pre-commit-hooks.nix;
+    treefmt-nix.url = github:numtide/treefmt-nix;
+    flake-root.url = github:srid/flake-root;
 
-  inputs.rust-overlay.inputs.nixpkgs.follows = "nixpkgs";
-  inputs.rust-overlay.inputs.flake-utils.follows = "flake-utils";
-  inputs.crane.inputs.nixpkgs.follows = "nixpkgs";
-  inputs.foundry.inputs.nixpkgs.follows = "nixpkgs";
-  inputs.foundry.inputs.flake-utils.follows = "flake-utils";
-  inputs.solc.inputs.nixpkgs.follows = "nixpkgs";
-  inputs.solc.inputs.flake-utils.follows = "flake-utils";
-  inputs.treefmt-nix.inputs.nixpkgs.follows = "nixpkgs";
-  inputs.pre-commit.inputs.nixpkgs.follows = "nixpkgs";
-  inputs.pre-commit.inputs.nixpkgs-stable.follows = "nixpkgs";
-  inputs.pre-commit.inputs.flake-utils.follows = "flake-utils";
+    crane.inputs.nixpkgs.follows = "nixpkgs";
+    flake-parts.inputs.nixpkgs-lib.follows = "nixpkgs";
+    foundry.inputs.flake-utils.follows = "flake-utils";
+    foundry.inputs.nixpkgs.follows = "nixpkgs";
+    pre-commit.inputs.nixpkgs-stable.follows = "nixpkgs";
+    pre-commit.inputs.nixpkgs.follows = "nixpkgs";
+    rust-overlay.inputs.flake-utils.follows = "flake-utils";
+    rust-overlay.inputs.nixpkgs.follows = "nixpkgs";
+    solc.inputs.flake-utils.follows = "flake-utils";
+    solc.inputs.nixpkgs.follows = "nixpkgs";
+    treefmt-nix.inputs.nixpkgs.follows = "nixpkgs";
+  };
 
   outputs = { self, nixpkgs, flake-utils, flake-parts, flake-root, rust-overlay, crane, foundry, solc, pre-commit, treefmt-nix, ... }@inputs:
     flake-parts.lib.mkFlake { inherit inputs; } {
@@ -37,16 +38,15 @@
       perSystem = { config, lib, self', inputs', system, ... }:
         let
           fs = lib.fileset;
+          localSystem = system;
           overlays = [ (import rust-overlay) foundry.overlay solc.overlay ];
           pkgs = import nixpkgs {
-            inherit system overlays;
+            inherit localSystem overlays;
           };
-          solcDefault = with pkgs; (solc.mkDefault pkgs solc_0_8_19);
-          rustToolchain = pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
+          solcDefault = solc.mkDefault pkgs pkgs.solc_0_8_19;
           rustNightly = pkgs.rust-bin.selectLatestNightlyWith (toolchain: toolchain.default);
-          craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchain;
           craneLibNightly = (crane.mkLib pkgs).overrideToolchain rustNightly;
-          hoprdCrateInfoOriginal = craneLib.crateNameFromCargoToml {
+          hoprdCrateInfoOriginal = craneLibNightly.crateNameFromCargoToml {
             cargoToml = ./hopr/hopr-lib/Cargo.toml;
           };
           hoprdCrateInfo = {
@@ -83,91 +83,85 @@
               (fs.fileFilter (file: file.hasExt "sol") ./ethereum/contracts/src)
             ];
           };
-          nativeBuildInputs = with pkgs; [
-            foundry-bin
-            solcDefault
-          ];
-          buildInputs = with pkgs; [
-            pkg-config
-            openssl # required to build curl rust bindings
-          ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin (
-            with darwin.apple_sdk.frameworks; [
-              CoreServices
-              SystemConfiguration
-            ]
-          );
-          commonArgs = {
-            inherit buildInputs nativeBuildInputs;
-            CARGO_HOME = ".cargo";
-            cargoVendorDir = "vendor/cargo";
-            # disable running tests automatically for now
-            doCheck = false;
-            # prevent nix from changing config.sub files under vendor/cargo
-            dontUpdateAutotoolsGnuConfigScripts = true;
+
+          rust-builder-local = import ./nix/rust-builder.nix {
+            inherit nixpkgs rust-overlay crane foundry solc localSystem;
           };
-          commonPhases = {
-            preConfigure = ''
-              # respect the amount of available cores for building
-              export CARGO_BUILD_JOBS=$NIX_BUILD_CORES
-              echo "# placeholder" > vendor/cargo/config.toml
-              sed "s|# solc = .*|solc = \"${solcDefault}/bin/solc\"|g" \
-                ethereum/contracts/foundry.toml.in > \
-                ethereum/contracts/foundry.toml
-            '';
+
+          rust-builder-local-nightly = import ./nix/rust-builder.nix {
+            inherit nixpkgs rust-overlay crane foundry solc localSystem;
+            useRustNightly = true;
           };
-          hopliCrateInfo = craneLib.crateNameFromCargoToml {
-            cargoToml = ./hopli/Cargo.toml;
+
+          rust-builder-x86_64-linux = import ./nix/rust-builder.nix {
+            inherit nixpkgs rust-overlay crane foundry solc localSystem;
+            crossSystem = pkgs.lib.systems.examples.gnu64;
           };
-          rustPackageDeps = { pname, version, builder ? craneLib.buildDepsOnly, CARGO_PROFILE ? "release" }: builder (commonArgs // {
-            inherit pname version CARGO_PROFILE;
-            src = depsSrc;
-            cargoExtraArgs = "--offline -p ${pname}";
-            extraDummyScript = ''
-              mkdir -p $out/vendor/cargo
-              cp -r --no-preserve=mode,ownership ${depsSrc}/vendor/cargo $out/vendor/
-              echo "# placeholder" > $out/vendor/cargo/config.toml
-            '';
-          });
-          rustPackage = { pname, version, cargoArtifacts, CARGO_PROFILE ? "release", postInstall ? null }: craneLib.buildPackage (commonArgs // commonPhases // {
-            inherit pname version cargoArtifacts src postInstall CARGO_PROFILE;
-            cargoExtraArgs = "--offline -p ${pname}";
-          });
-          rustPackageTest = { pname, version, cargoArtifacts }: craneLib.cargoTest (commonArgs // commonPhases // {
-            inherit pname version cargoArtifacts src;
-            cargoExtraArgs = "--offline -p ${pname}";
-            # this ensures the tests are run as part of the build process
-            doCheck = true;
-          });
-          rustPackageClippy = { pname, version, cargoArtifacts }: craneLib.cargoClippy (commonArgs // commonPhases // {
-            inherit pname version cargoArtifacts src;
-            cargoExtraArgs = "--offline -p ${pname}";
-            cargoClippyExtraArgs = "-- -Dwarnings";
-          });
-          hoprd = rustPackage (hoprdCrateInfo // { cargoArtifacts = rustPackageDeps hoprdCrateInfo; });
-          hoprd-debug = rustPackage (hoprdCrateInfo // {
-            cargoArtifacts = rustPackageDeps (hoprdCrateInfo // {
-              CARGO_PROFILE = "dev";
-            });
+
+          rust-builder-x86_64-darwin = import ./nix/rust-builder.nix {
+            inherit nixpkgs rust-overlay crane foundry solc localSystem;
+            crossSystem = pkgs.lib.systems.examples.x86_64-darwin;
+          };
+
+          rust-builder-aarch64-linux = import ./nix/rust-builder.nix {
+            inherit nixpkgs rust-overlay crane foundry solc localSystem;
+            crossSystem = pkgs.lib.systems.examples.aarch64-multiplatform;
+          };
+
+          rust-builder-aarch64-darwin = import ./nix/rust-builder.nix {
+            inherit nixpkgs rust-overlay crane foundry solc localSystem;
+            crossSystem = pkgs.lib.systems.examples.aarch64-darwin;
+          };
+
+          rust-builder-armv7l-linux = import ./nix/rust-builder.nix {
+            inherit nixpkgs rust-overlay crane foundry solc localSystem;
+            crossSystem = pkgs.lib.systems.examples.armv7l-hf-multiplatform;
+          };
+
+          hoprdBuildArgs = {
+            inherit src depsSrc;
+            cargoToml = ./hoprd/hoprd/Cargo.toml;
+          };
+
+          hoprd = rust-builder-local.callPackage ./nix/rust-package.nix hoprdBuildArgs;
+          hoprd-x86_64-linux = rust-builder-x86_64-linux.callPackage ./nix/rust-package.nix hoprdBuildArgs;
+          hoprd-aarch64-linux = rust-builder-aarch64-linux.callPackage ./nix/rust-package.nix hoprdBuildArgs;
+          hoprd-armv7l-linux = rust-builder-armv7l-linux.callPackage ./nix/rust-package.nix hoprdBuildArgs;
+          # CAVEAT: must be built from a darwin system
+          hoprd-x86_64-darwin = rust-builder-x86_64-darwin.callPackage ./nix/rust-package.nix hoprdBuildArgs;
+          # CAVEAT: must be built from a darwin system
+          hoprd-aarch64-darwin = rust-builder-aarch64-darwin.callPackage ./nix/rust-package.nix hoprdBuildArgs;
+
+          hoprd-test = rust-builder-local.callPackage ./nix/rust-package.nix (hoprdBuildArgs // { runTests = true; });
+          hoprd-clippy = rust-builder-local.callPackage ./nix/rust-package.nix (hoprdBuildArgs // { runClippy = true; });
+          hoprd-debug = rust-builder-local.callPackage ./nix/rust-package.nix (hoprdBuildArgs // {
             CARGO_PROFILE = "dev";
           });
-          hoprd-test = rustPackageTest (hoprdCrateInfo // { cargoArtifacts = rustPackageDeps hoprdCrateInfo; });
-          hoprd-clippy = rustPackageClippy (hoprdCrateInfo // { cargoArtifacts = rustPackageDeps hoprdCrateInfo; });
-          hopliPackageConfig = {
-            cargoArtifacts = rustPackageDeps hopliCrateInfo;
+
+          hopliBuildArgs = {
+            inherit src depsSrc;
+            cargoToml = ./hopli/Cargo.toml;
             postInstall = ''
               mkdir -p $out/ethereum/contracts
               cp ethereum/contracts/contracts-addresses.json $out/ethereum/contracts/
             '';
           };
-          hopli = rustPackage (hopliCrateInfo // hopliPackageConfig);
-          hopli-debug = rustPackage (hopliCrateInfo // {
-            cargoArtifacts = rustPackageDeps (hopliCrateInfo // {
-              CARGO_PROFILE = "dev";
-            });
+
+          hopli = rust-builder-local.callPackage ./nix/rust-package.nix hopliBuildArgs;
+          hopli-x86_64-linux = rust-builder-x86_64-linux.callPackage ./nix/rust-package.nix hopliBuildArgs;
+          hopli-aarch64-linux = rust-builder-aarch64-linux.callPackage ./nix/rust-package.nix hopliBuildArgs;
+          hopli-armv7l-linux = rust-builder-armv7l-linux.callPackage ./nix/rust-package.nix hopliBuildArgs;
+          # CAVEAT: must be built from a darwin system
+          hopli-x86_64-darwin = rust-builder-x86_64-darwin.callPackage ./nix/rust-package.nix hopliBuildArgs;
+          # CAVEAT: must be built from a darwin system
+          hopli-aarch64-darwin = rust-builder-aarch64-darwin.callPackage ./nix/rust-package.nix hopliBuildArgs;
+
+          hopli-test = rust-builder-local.callPackage ./nix/rust-package.nix (hopliBuildArgs // { runTests = true; });
+          hopli-clippy = rust-builder-local.callPackage ./nix/rust-package.nix (hopliBuildArgs // { runClippy = true; });
+          hopli-debug = rust-builder-local.callPackage ./nix/rust-package.nix (hopliBuildArgs // {
             CARGO_PROFILE = "dev";
           });
-          hopli-test = rustPackageTest (hopliCrateInfo // { cargoArtifacts = rustPackageDeps hopliCrateInfo; });
-          hopli-clippy = rustPackageClippy (hopliCrateInfo // { cargoArtifacts = rustPackageDeps hopliCrateInfo; });
+
           # FIXME: the docker image built is not working on macOS arm platforms
           # and will simply lead to a non-working image. Likely, some form of
           # cross-compilation or distributed build is required.
@@ -301,19 +295,8 @@
           hopli-docker-build-and-upload = flake-utils.lib.mkApp {
             drv = dockerImageUploadScript hopli-docker;
           };
-          docs = craneLibNightly.cargoDoc (commonArgs // commonPhases // {
-            inherit src;
-            pname = "hopr";
-            version = hoprdCrateInfo.version;
-            cargoArtifacts = null;
-            buildPhaseCargoCommand = "cargo doc --offline --no-deps";
-            RUSTDOCFLAGS = "--enable-index-page -Z unstable-options";
-            postBuild = ''
-              ${pkgs.pandoc}/bin/pandoc -f markdown+hard_line_breaks -t html README.md > readme.html
-              ${pkgs.html-tidy}/bin/tidy -q -i target/doc/index.html > index.html || :
-              sed '/<section id="main-content" class="content">/ r readme.html' index.html > target/doc/index.html
-              rm readme.html index.html
-            '';
+          docs = rust-builder-local-nightly.callPackage ./nix/rust-package.nix (hoprdBuildArgs // {
+            buildDocs = true;
           });
           smoke-tests = pkgs.stdenv.mkDerivation {
             pname = "hoprd-smoke-tests";
@@ -356,61 +339,8 @@
             };
             tools = pkgs;
           };
-          buildDevShell = extraPackages: craneLib.devShell {
-            packages = with pkgs; [
-              # testing utilities
-              jq
-              yq-go
-              curl
-              bash
-              gnumake
-              which
-
-              # github integration
-              gh
-
-              # test Github automation
-              act
-
-              # documentation utilities
-              pandoc
-              swagger-codegen3
-
-              # docker image inspection and handling
-              dive
-              skopeo
-
-              # test coverage generation
-              lcov
-
-              ## python is required by integration tests
-              python39
-              python39Packages.venvShellHook
-
-              ## formatting
-              config.treefmt.build.wrapper
-            ] ++ buildInputs ++ nativeBuildInputs ++
-            (lib.attrValues config.treefmt.build.programs) ++
-            lib.optionals stdenv.isLinux [ autoPatchelfHook ] ++ extraPackages;
-            venvDir = "./.venv";
-            postVenvCreation = ''
-              unset SOURCE_DATE_EPOCH
-              pip install -U pip setuptools wheel
-              pip install -r tests/requirements.txt
-            '' + pkgs.lib.optionalString pkgs.stdenv.isLinux ''
-              autoPatchelf ./.venv
-            '';
-            preShellHook = ''
-              sed "s|# solc = .*|solc = \"${solcDefault}/bin/solc\"|g" \
-                ethereum/contracts/foundry.toml.in > \
-                ethereum/contracts/foundry.toml
-            '';
-            postShellHook = ''
-              ${pre-commit-check.shellHook}
-            '';
-          };
-          defaultDevShell = buildDevShell [ ];
-          smoketestsDevShell = buildDevShell [ hoprd hopli ];
+          defaultDevShell = import ./nix/shell.nix { inherit pkgs config crane pre-commit-check solcDefault; };
+          smoketestsDevShell = import ./nix/shell.nix { inherit pkgs config crane pre-commit-check solcDefault; extraPackages = [ hoprd hopli ]; };
           run-check = flake-utils.lib.mkApp {
             drv = pkgs.writeShellScriptBin "run-check" ''
               set -e
@@ -458,9 +388,9 @@
             programs.nixpkgs-fmt.enable = true;
             settings.formatter.nixpkgs-fmt.excludes = [ "./vendor/*" ];
 
-            programs.ruff.enable = true;
-            programs.ruff.format = true;
-            settings.formatter.ruff.excludes = [ "./vendor/*" ];
+            # FIXME: currently broken in treefmt
+            # programs.ruff.check = true;
+            # settings.formatter.ruff.check.excludes = [ "./vendor/*" ];
 
             settings.formatter.solc = {
               command = "sh";
@@ -503,6 +433,12 @@
             inherit anvil-docker;
             inherit smoke-tests docs;
             inherit pre-commit-check;
+            inherit hoprd-aarch64-linux hoprd-armv7l-linux hoprd-x86_64-linux;
+            inherit hopli-aarch64-linux hopli-armv7l-linux hopli-x86_64-linux;
+            # FIXME: Darwin cross-builds are currently broken.
+            # Follow https://github.com/nixos/nixpkgs/pull/256590
+            inherit hoprd-aarch64-darwin hoprd-x86_64-darwin;
+            inherit hopli-aarch64-darwin hopli-x86_64-darwin;
             default = hoprd;
           };
 
@@ -511,6 +447,7 @@
 
           formatter = config.treefmt.build.wrapper;
         };
+      # platforms which are supported as build environments
       systems = [ "x86_64-linux" "aarch64-linux" "aarch64-darwin" "x86_64-darwin" ];
     };
 }

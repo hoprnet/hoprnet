@@ -1,6 +1,7 @@
 import asyncio
 import random
 import re
+import string
 from contextlib import AsyncExitStack, asynccontextmanager
 
 import pytest
@@ -294,10 +295,10 @@ async def test_hoprd_ping_should_work_between_nodes_in_the_same_network(src: str
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
-async def test_hoprd_ping_should_timeout_on_pinging_self(peer: str, swarm7: dict[str, Node]):
+async def test_hoprd_ping_to_self_should_fail(peer: str, swarm7: dict[str, Node]):
     response = await swarm7[peer].api.ping(swarm7[peer].peer_id)
 
-    assert response is None, f"Pinging self should produce timeout, not '{response}'"
+    assert response is None, f"Pinging self should fail"
 
 
 @pytest.mark.asyncio
@@ -349,6 +350,18 @@ async def test_hoprd_should_be_able_to_send_0_hop_messages_without_open_channels
 
     packets = [f"0 hop message #{i:08d}" for i in range(message_count)]
     await send_and_receive_packets_with_pop(packets, src=swarm7[src], dest=swarm7[dest], path=[])
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("src, dest", random_distinct_pairs_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
+async def test_hoprd_should_fail_sending_a_message_that_is_too_large(src: Node, dest: Node, swarm7: dict[str, Node]):
+    MAXIMUM_PAYLOAD_SIZE = 500
+    random_tag = random.randint(10, 65530)
+
+    packet = "0 hop message too large: " + "".join(
+        random.choices(string.ascii_uppercase + string.digits, k=MAXIMUM_PAYLOAD_SIZE)
+    )
+    assert await swarm7[src].api.send_message(swarm7[dest].peer_id, packet, [], random_tag) == None
 
 
 @pytest.mark.asyncio

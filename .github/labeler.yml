@@ -115,3 +115,6 @@ crate:hoprd-keypair:
 crate:hoprd-api:
   - changed-files:
       - any-glob-to-any-file: hoprd/rest-api/**
+crate:hopr-socks:
+  - changed-files:
+      - any-glob-to-any-file: hopr-socks/**

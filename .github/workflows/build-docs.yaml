@@ -35,7 +35,7 @@ jobs:
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: cachix/cachix-action@v14
+      - uses: cachix/cachix-action@v15
         if: env.needs_nix_setup == true
         with:
           name: hoprnet
@@ -44,7 +44,7 @@ jobs:
           USER: runner
 
       - name: Build docs
-        run: nix build .#docs
+        run: nix build .#docs -L
 
       - name: Increase git buffer size
         if: github.ref == 'refs/heads/master'

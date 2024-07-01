@@ -1,0 +1,36 @@
+---
+hopr:
+  host:
+    address: !IPv4 127.0.0.1 # NOTE: adapt this to reflect your public IP
+    port: 9091 # NOTE: adapt this to reflect your public p2p port
+  db:
+    data: /app/hoprd/
+  strategy:
+    on_fail_continue: true
+    allow_recursive: true
+    strategies:
+      - !Aggregating
+        aggregation_threshold: 330
+        unrealized_balance_ratio: 0.95
+        aggregate_on_channel_close: true
+      - !AutoRedeeming
+        redeem_only_aggregated: true
+        on_close_redeem_single_tickets_value_min: "2000000000000000000 HOPR"
+      - !ClosureFinalizer
+        max_closure_overdue: 60
+  chain:
+    network: dufour # NOTE: fill in value
+    provider: # NOTE: fill in value
+    announce: true
+    check_unrealized_balance: true
+  safe_module:
+    safe_address: # NOTE: fill in value
+    module_address: # NOTE: fill in value
+    safe_transaction_service_provider: https://safe-transaction.prod.hoprnet.link/
+identity:
+  file: "/app/hopr.id"
+api:
+  enable: true
+  host:
+    address: !IPv4 0.0.0.0
+    port: 3001

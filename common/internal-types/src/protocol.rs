@@ -145,6 +145,7 @@ impl Default for TagBloomFilter {
 /// Represents the received decrypted packet carrying the application-layer data.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ApplicationData {
+    // TODO: 3.0: Remove the Option and replace with the Tag.
     pub application_tag: Option<Tag>,
     #[serde(with = "serde_bytes")]
     pub plain_text: Box<[u8]>,
@@ -156,6 +157,17 @@ impl ApplicationData {
             Ok(Self {
                 application_tag,
                 plain_text: plain_text.into(),
+            })
+        } else {
+            Err(PayloadSizeExceeded)
+        }
+    }
+
+    pub fn new_from_owned(application_tag: Option<Tag>, plain_text: Box<[u8]>) -> Result<Self> {
+        if plain_text.len() <= PAYLOAD_SIZE - Self::SIZE {
+            Ok(Self {
+                application_tag,
+                plain_text,
             })
         } else {
             Err(PayloadSizeExceeded)

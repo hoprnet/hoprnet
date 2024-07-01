@@ -36,6 +36,7 @@ impl<'a, T> Request<'a, T> {
 
 /// A JSON-RPC response
 #[derive(Debug)]
+#[allow(dead_code)] // not dead code, conforming to the trait
 pub enum Response<'a> {
     Success { id: u64, result: &'a RawValue },
     Error { id: u64, error: JsonRpcError },
@@ -44,6 +45,7 @@ pub enum Response<'a> {
 
 /// JSON-RPC request parameters.
 #[derive(Deserialize, Debug)]
+#[allow(dead_code)] // not dead code, conforming to the trait
 pub struct Params<'a> {
     pub subscription: ethers::types::U256,
     #[serde(borrow)]
@@ -57,6 +59,7 @@ impl<'de: 'a, 'a> Deserialize<'de> for Response<'a> {
     where
         D: serde::Deserializer<'de>,
     {
+        #[allow(dead_code)] // not dead code, conforming to the trait
         struct ResponseVisitor<'a>(&'a ());
         impl<'de: 'a, 'a> Visitor<'de> for ResponseVisitor<'a> {
             type Value = Response<'a>;

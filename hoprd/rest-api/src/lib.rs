@@ -10,9 +10,10 @@ use bimap::BiHashMap;
 // use base64::{engine::general_purpose::STANDARD_NO_PAD, Engine as _};
 use futures::StreamExt;
 use futures_concurrency::stream::Merge;
+use hopr_lib::PathOptions;
 use libp2p_identity::PeerId;
 use serde_json::json;
-use serde_with::{serde_as, DisplayFromStr, DurationMilliSeconds};
+use serde_with::{serde_as, Bytes, DisplayFromStr, DurationMilliSeconds};
 pub use tide::listener::Listener;
 use tide::{
     http::{
@@ -194,7 +195,7 @@ impl Middleware<InternalState> for TokenBasedAuthenticationMiddleware {
                 // Use "Authorization Bearer <token>" and "X-Auth-Token <token>" headers and "Sec-Websocket-Protocol"
                 (!auth_headers.is_empty()
                     && (auth_headers.contains(&(&AUTHORIZATION, &format!("Bearer {}", expected_token)))
-                        || auth_headers.contains(&(&x_auth_header, &expected_token)))
+                        || auth_headers.contains(&(&x_auth_header, expected_token)))
                 )
 
                 // TODO: Replace with proper JS compliant solution
@@ -376,11 +377,11 @@ pub async fn build_hopr_api(
                         match v {
                             WebSocketInput::Network(net_in) => match net_in {
                                 TransportOutput::Received(data) => {
-                                    debug!("websocket notifying client with received msg {data}");
+                                    debug!("websocket notifying client: received msg");
                                     ws_con.send_json(&json!(messages::WebSocketReadMsg::from(data))).await?;
                                 }
                                 TransportOutput::Sent(hkc) => {
-                                    debug!("websocket notifying client with received ack {hkc}");
+                                    debug!("websocket notifying client: received next hop receive confirmation");
                                     ws_con
                                         .send_json(&json!(messages::WebSocketReadAck::from_ack(hkc)))
                                         .await?;
@@ -398,21 +399,23 @@ pub async fn build_hopr_api(
                                             .state()
                                             .msg_encoder
                                             .as_ref()
-                                            .map(|enc| enc(data.args.body.as_bytes()))
-                                            .unwrap_or_else(|| Box::from(data.args.body.as_bytes()));
+                                            .map(|enc| enc(&data.args.body))
+                                            .unwrap_or_else(|| data.args.body.into_boxed_slice());
+                                        // let msg_body =  data.args.body.into_bytes().into_boxed_slice();
+
+                                        let options = if let Some(intermediate_path) = data.args.path {
+                                            PathOptions::IntermediatePath(intermediate_path)
+                                        } else if let Some(hops) = data.args.hops {
+                                            PathOptions::Hops(hops)
+                                        } else {
+                                            error!("one of hops or intermediate path must be provided");
+                                            continue;
+                                        };
 
                                         let hkc = hopr
-                                            .send_message(
-                                                // data.args.body.into_bytes().into_boxed_slice(),
-                                                msg_body,
-                                                data.args.peer_id,
-                                                data.args.path,
-                                                data.args.hops,
-                                                Some(data.args.tag),
-                                            )
+                                            .send_message(msg_body, data.args.peer_id, options, Some(data.args.tag))
                                             .await?;
 
-                                        debug!("websocket notifying client with sent ack {hkc}");
                                         ws_con
                                             .send_json(&json!(messages::WebSocketReadAck::from_ack_challenge(hkc)))
                                             .await?;
@@ -478,7 +481,6 @@ enum ApiErrorStatus {
     Timeout,
     Unauthorized,
     InvalidQuality,
-    InvalidAddress,
     AliasAlreadyExists,
     #[strum(serialize = "UNKNOWN_FAILURE")]
     UnknownFailure(String),
@@ -1207,8 +1209,8 @@ mod channels {
             description = "Open channel request specification: on-chain address of the counterparty and the initial HOPR token stake.",
             content_type = "application/json"),
         responses(
-            (status = 201, description = "Channel successfully opened", body = OpenChannelResponse),
-            (status = 400, description = "Invalid counterparty address", body = ApiError),
+            (status = 201, description = "Channel successfully opened.", body = OpenChannelResponse),
+            (status = 400, description = "Invalid counterparty address or stake amount.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 403, description = "Failed to open the channel because of insufficient HOPR balance or allowance.", body = ApiError),
             (status = 409, description = "Failed to open the channel because the channel between this nodes already exists.", body = ApiError),
@@ -1225,7 +1227,7 @@ mod channels {
 
         let open_req: OpenChannelBodyRequest = match req.body_json().await {
             Ok(r) => r,
-            Err(_) => return Ok(Response::builder(400).body(ApiErrorStatus::InvalidAddress).build()),
+            Err(_) => return Ok(Response::builder(400).body(ApiErrorStatus::InvalidInput).build()),
         };
 
         match hopr
@@ -1419,6 +1421,7 @@ mod messages {
     use std::time::Duration;
 
     use hopr_lib::{AsUnixTimestamp, HalfKeyChallenge, RESERVED_TAG_UPPER_LIMIT};
+    use validator::Validate;
 
     use super::*;
 
@@ -1436,7 +1439,7 @@ mod messages {
     }
 
     #[serde_as]
-    #[derive(Debug, Clone, serde::Deserialize, validator::Validate, utoipa::ToSchema)]
+    #[derive(Debug, Clone, PartialEq, serde::Deserialize, validator::Validate, utoipa::ToSchema)]
     #[serde(rename_all = "camelCase")]
     #[schema(example = json!({
         "body": "Test message",
@@ -1451,16 +1454,17 @@ mod messages {
         /// The message tag used to filter messages based on application
         pub tag: u16,
         /// Message to be transmitted over the network
-        pub body: String,
+        #[serde_as(as = "Bytes")]
+        pub body: Vec<u8>,
         /// The recipient HOPR PeerId
         #[serde_as(as = "DisplayFromStr")]
         #[schema(value_type = String)]
         pub peer_id: PeerId,
         #[serde_as(as = "Option<Vec<DisplayFromStr>>")]
-        // #[validate(length(min=0, max=3))]        // NOTE: issue in serde_as with validator -> no order is correct
+        #[validate(length(min = 0, max = 3))]
         #[schema(value_type = Option<Vec<String>>)]
         pub path: Option<Vec<PeerId>>,
-        #[validate(range(min = 1, max = 3))]
+        #[validate(range(min = 0, max = 3))]
         pub hops: Option<u16>,
     }
 
@@ -1519,30 +1523,35 @@ mod messages {
         let args: SendMessageBodyRequest = req.body_json().await?;
         let hopr = req.state().hopr.clone();
 
+        if let Err(e) = args.validate() {
+            return Ok(Response::builder(422)
+                .body(ApiErrorStatus::UnknownFailure(e.to_string()))
+                .build());
+        }
+
         // Use the message encoder, if any
         let msg_body = req
             .state()
             .msg_encoder
             .as_ref()
-            .map(|enc| enc(args.body.as_bytes()))
-            .unwrap_or_else(|| Box::from(args.body.as_bytes()));
+            .map(|enc| enc(&args.body))
+            .unwrap_or_else(|| args.body.into_boxed_slice());
 
-        if let Some(path) = &args.path {
-            if path.len() > 3 {
-                return Ok(Response::builder(422)
-                    .body(ApiErrorStatus::UnknownFailure(
-                        "The path components must contain at most 3 elements".into(),
-                    ))
-                    .build());
-            }
-        }
+        let options = if let Some(intermediate_path) = args.path {
+            PathOptions::IntermediatePath(intermediate_path)
+        } else if let Some(hops) = args.hops {
+            PathOptions::Hops(hops)
+        } else {
+            return Ok(Response::builder(422)
+                .body(ApiErrorStatus::UnknownFailure(
+                    "One of either hops or intermediate path must be specified".to_owned(),
+                ))
+                .build());
+        };
 
         let timestamp = std::time::SystemTime::now().as_unix_timestamp();
 
-        match hopr
-            .send_message(msg_body, args.peer_id, args.path, args.hops, Some(args.tag))
-            .await
-        {
+        match hopr.send_message(msg_body, args.peer_id, options, Some(args.tag)).await {
             Ok(challenge) => Ok(Response::builder(202)
                 .body(json!(SendMessageResponse { challenge, timestamp }))
                 .build()),
@@ -1552,6 +1561,7 @@ mod messages {
 
     #[derive(Debug, Default, Clone, serde::Deserialize, utoipa::ToSchema)]
     #[schema(value_type = String)] //, format = Binary)]
+    #[allow(dead_code)] // not dead code, just for codegen
     pub struct Text(String);
 
     #[derive(Debug, Clone, serde::Deserialize)]
@@ -2709,5 +2719,58 @@ mod checks {
             hopr_lib::HoprState::Running => Ok(Response::builder(200).build()),
             _ => Ok(Response::builder(412).build()),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::messages::SendMessageBodyRequest;
+
+    #[test]
+    fn send_message_accepts_bytes_in_body() {
+        let peer = libp2p_identity::PeerId::random();
+        let test_sequence = b"wow, this actually works";
+
+        let json_value = serde_json::json!({
+            "tag": 5,
+            "body": test_sequence.to_vec(),
+            "peerId": peer.to_string()
+        });
+
+        let expected = SendMessageBodyRequest {
+            tag: 5,
+            body: test_sequence.to_vec(),
+            peer_id: peer,
+            path: None,
+            hops: None,
+        };
+
+        let actual: SendMessageBodyRequest = serde_json::from_value(json_value).unwrap();
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn send_message_accepts_utf8_string_in_body() {
+        let peer = libp2p_identity::PeerId::random();
+        let test_sequence = b"wow, this actually works";
+
+        let json_value = serde_json::json!({
+            "tag": 5,
+            "body": String::from_utf8(test_sequence.to_vec()).expect("should be a utf-8 string"),
+            "peerId": peer.to_string()
+        });
+
+        let expected = SendMessageBodyRequest {
+            tag: 5,
+            body: test_sequence.to_vec(),
+            peer_id: peer,
+            path: None,
+            hops: None,
+        };
+
+        let actual: SendMessageBodyRequest = serde_json::from_value(json_value).unwrap();
+
+        assert_eq!(actual, expected);
     }
 }

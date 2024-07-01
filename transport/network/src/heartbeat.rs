@@ -239,7 +239,7 @@ mod tests {
 
     #[async_trait]
     impl Pinging for DelayingPinger {
-        async fn ping(&mut self, _peers: Vec<PeerId>) {
+        async fn ping(&self, _peers: Vec<PeerId>) {
             sleep(self.delay).await;
         }
     }
@@ -263,7 +263,10 @@ mod tests {
             Box::new(|dur| Box::pin(sleep(dur))),
         );
 
-        futures_lite::future::race(heartbeat.heartbeat_loop(), sleep(config.interval * expected_loop_count)).await;
+        futures::select!(
+            _ = heartbeat.heartbeat_loop().fuse() => {},
+            _ = sleep(config.interval * expected_loop_count).fuse() => {},
+        );
     }
 
     #[async_std::test]
@@ -289,10 +292,9 @@ mod tests {
         );
 
         let tolerance = std::time::Duration::from_millis(2);
-        futures_lite::future::race(
-            heartbeat.heartbeat_loop(),
-            sleep(config.interval * (expected_loop_count as u32) + tolerance),
-        )
-        .await;
+        futures::select!(
+            _ = heartbeat.heartbeat_loop().fuse() => {},
+            _ = sleep(config.interval * (expected_loop_count as u32) + tolerance).fuse() => {},
+        );
     }
 }
