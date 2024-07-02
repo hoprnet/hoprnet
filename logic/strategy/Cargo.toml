@@ -13,9 +13,23 @@ crate-type = ["rlib"]
 
 [features]
 default = []
-runtime-async-std = ["async-std", "core-protocol/runtime-async-std", "hopr-db-sql/runtime-async-std"]
-runtime-tokio = ["tokio", "core-protocol/runtime-tokio", "hopr-db-sql/runtime-tokio"]
-prometheus = [ "dep:hopr-metrics", "core-network/prometheus", "core-protocol/prometheus", "chain-actions/prometheus", "hopr-db-sql/prometheus" ]
+runtime-async-std = [
+  "async-std",
+  "core-protocol/runtime-async-std",
+  "hopr-db-sql/runtime-async-std",
+]
+runtime-tokio = [
+  "tokio",
+  "core-protocol/runtime-tokio",
+  "hopr-db-sql/runtime-tokio",
+]
+prometheus = [
+  "dep:hopr-metrics",
+  "core-network/prometheus",
+  "core-protocol/prometheus",
+  "chain-actions/prometheus",
+  "hopr-db-sql/prometheus",
+]
 
 [dependencies]
 async-lock = { workspace = true }
@@ -53,4 +67,3 @@ mockall = { workspace = true }
 hex-literal = { workspace = true }
 hopr-crypto-random = { workspace = true }
 futures = { workspace = true }
-

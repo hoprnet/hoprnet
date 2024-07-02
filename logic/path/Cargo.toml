@@ -15,7 +15,7 @@ crate-type = ["rlib"]
 default = []
 runtime-async-std = ["hopr-db-sql/runtime-async-std"]
 runtime-tokio = ["hopr-db-sql/runtime-tokio"]
-prometheus = [ "dep:hopr-metrics", "hopr-db-sql/prometheus"]
+prometheus = ["dep:hopr-metrics", "hopr-db-sql/prometheus"]
 
 [dependencies]
 async-trait = { workspace = true }
@@ -39,4 +39,3 @@ async-std = { workspace = true }
 hopr-db-sql = { workspace = true, features = ["runtime-async-std"] }
 regex = { workspace = true }
 hex-literal = { workspace = true }
-

@@ -14,30 +14,30 @@ crate-type = ["rlib"]
 [features]
 default = []
 runtime-async-std = [
-    "async-std",
-    "chain-api/runtime-async-std",
-    "chain-rpc/runtime-async-std",
-    "core-transport/runtime-async-std",
-    "hopr-db-sql/runtime-async-std",
-    "hopr-network-types/runtime-async-std",
-    "hopr-strategy/runtime-async-std",
+  "async-std",
+  "chain-api/runtime-async-std",
+  "chain-rpc/runtime-async-std",
+  "core-transport/runtime-async-std",
+  "hopr-db-sql/runtime-async-std",
+  "hopr-network-types/runtime-async-std",
+  "hopr-strategy/runtime-async-std",
 ]
 runtime-tokio = [
-    "tokio",
-    "chain-api/runtime-tokio",
-    "chain-rpc/runtime-tokio",
-    "core-transport/runtime-tokio",
-    "hopr-db-sql/runtime-tokio",
-    "hopr-network-types/runtime-tokio",
-    "hopr-strategy/runtime-tokio"
+  "tokio",
+  "chain-api/runtime-tokio",
+  "chain-rpc/runtime-tokio",
+  "core-transport/runtime-tokio",
+  "hopr-db-sql/runtime-tokio",
+  "hopr-network-types/runtime-tokio",
+  "hopr-strategy/runtime-tokio",
 ]
 prometheus = [
-    "dep:hopr-metrics",
-    "core-transport/prometheus",
-    "chain-api/prometheus",
-    "chain-indexer/prometheus",
-    "chain-rpc/prometheus",
-    "hopr-db-sql/prometheus"
+  "dep:hopr-metrics",
+  "core-transport/prometheus",
+  "chain-api/prometheus",
+  "chain-indexer/prometheus",
+  "chain-rpc/prometheus",
+  "hopr-db-sql/prometheus",
 ]
 
 [dependencies]
@@ -45,7 +45,7 @@ async-channel = { workspace = true }
 async-lock = { workspace = true }
 async-std = { workspace = true, optional = true }
 atomic_enum = { workspace = true }
-const_format ={ workspace = true }
+const_format = { workspace = true }
 futures = { workspace = true }
 futures-concurrency = { workspace = true }
 lazy_static = { workspace = true }

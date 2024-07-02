@@ -15,7 +15,11 @@ crate-type = ["rlib"]
 default = []
 runtime-async-std = ["async-std", "hopr-db-sql/runtime-async-std"]
 runtime-tokio = ["tokio", "hopr-db-sql/runtime-tokio"]
-prometheus = [ "dep:hopr-metrics", "chain-rpc/prometheus", "hopr-db-sql/prometheus"]
+prometheus = [
+  "dep:hopr-metrics",
+  "chain-rpc/prometheus",
+  "hopr-db-sql/prometheus",
+]
 
 [dependencies]
 async-channel = { workspace = true }

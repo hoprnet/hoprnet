@@ -13,7 +13,7 @@ use futures_concurrency::stream::Merge;
 use libp2p_identity::PeerId;
 use serde_json::json;
 use tower::{Service, Layer};
-use axum::{Json, http::StatusCode, Router, routing::{get, post}, extract::State};
+use axum::{serve::Serve, Json, http::StatusCode, Router, routing::{get, post}, extract::State};
 use http::Method;
 use serde_with::{serde_as, Bytes, DisplayFromStr, DurationMilliSeconds};
 use tracing::{debug, error, warn};
@@ -171,14 +171,18 @@ enum WebSocketInput {
     WsInput(std::result::Result<tide_websockets::Message, tide_websockets::Error>),
 }
 
-pub async fn build_hopr_api(
+pub async fn serve_api(router: Router, listener: tokio::net::Listener) -> Serve {
+    axum::server(listener, router).await?
+}
+
+pub async fn build_api(
     hoprd_cfg: String,
     cfg: crate::config::Api,
     hopr: Arc<hopr_lib::Hopr>,
     inbox: Arc<RwLock<hoprd_inbox::Inbox>>,
     websocket_rx: async_broadcast::InactiveReceiver<TransportOutput>,
     msg_encoder: Option<MessageEncoder>,
-) -> tide::Server<State> {
+) -> Router {
     // Prepare alias part of the state
     let aliases: Arc<RwLock<BiHashMap<String, PeerId>>> = Arc::new(RwLock::new(BiHashMap::new()));
     aliases.write().await.insert("me".to_owned(), hopr.me_peer_id());
@@ -194,7 +198,7 @@ pub async fn build_hopr_api(
             aliases,
         };
 
-    let app = Router::new()
+    Router::new()
         .nest(
             BASE_PATH,
             Router::new()
@@ -259,9 +263,7 @@ pub async fn build_hopr_api(
             .layer(CompressionLayer::new())
             .layer(ValidateRequestHeaderLayer::accept("application/json"))
             .layer(SetSensitiveRequestHeadersLayer::new(once(AUTHORIZATION)))
-        );
-
-    app
+        )
 }
 
 #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
@@ -313,7 +315,7 @@ impl From<ApiErrorStatus> for ApiError {
     }
 }
 
-impl From<ApiErrorStatus> for tide::Body {
+impl From<ApiErrorStatus> for axum::body::Body {
     fn from(value: ApiErrorStatus) -> Self {
         json!(ApiError::from(value)).into()
     }
@@ -372,7 +374,7 @@ mod alias {
         ),
         tag = "Alias",
     )]
-    pub async fn aliases(req: Request<InternalState>) -> tide::Result<Response> {
+    pub async fn aliases(req: Request<InternalState>) -> impl IntoResponse {
         let aliases = req.state().aliases.clone();
 
         let aliases = aliases
@@ -406,7 +408,7 @@ mod alias {
         ),
         tag = "Alias",
     )]
-    pub async fn set_alias(mut req: Request<InternalState>) -> tide::Result<Response> {
+    pub async fn set_alias(mut req: Request<InternalState>) -> impl IntoResponse {
         let args: AliasPeerIdBodyRequest = req.body_json().await?;
         let aliases = req.state().aliases.clone();
 
@@ -437,7 +439,7 @@ mod alias {
         ),
         tag = "Alias",
     )]
-    pub async fn get_alias(req: Request<InternalState>) -> tide::Result<Response> {
+    pub async fn get_alias(req: Request<InternalState>) -> impl IntoResponse {
         let alias = req.param("alias")?.parse::<String>()?;
         let alias = urlencoding::decode(&alias)?.into_owned();
         let aliases = req.state().aliases.clone();
@@ -470,7 +472,7 @@ mod alias {
         ),
         tag = "Alias",
     )]
-    pub async fn delete_alias(req: Request<InternalState>) -> tide::Result<Response> {
+    pub async fn delete_alias(req: Request<InternalState>) -> impl IntoResponse {
         let alias = req.param("alias")?.parse::<String>()?;
         let alias = urlencoding::decode(&alias)?.into_owned();
         let aliases = req.state().aliases.clone();
@@ -514,7 +516,7 @@ mod account {
         ),
         tag = "Account",
     )]
-    pub(super) async fn addresses(req: Request<InternalState>) -> tide::Result<Response> {
+    pub(super) async fn addresses(req: Request<InternalState>) -> impl IntoResponse {
         let addresses = AccountAddressesResponse {
             native: req.state().hopr.me_onchain().to_string(),
             hopr: req.state().hopr.me_peer_id().to_string(),
@@ -560,7 +562,7 @@ mod account {
         ),
         tag = "Account",
     )]
-    pub(super) async fn balances(req: Request<InternalState>) -> tide::Result<Response> {
+    pub(super) async fn balances(req: Request<InternalState>) -> impl IntoResponse {
         let hopr = req.state().hopr.clone();
 
         let mut account_balances = AccountBalancesResponse::default();
@@ -633,7 +635,7 @@ mod account {
         ),
         tag = "Account",
     )]
-    pub(super) async fn withdraw(mut req: Request<InternalState>) -> tide::Result<Response> {
+    pub(super) async fn withdraw(mut req: Request<InternalState>) -> impl IntoResponse {
         let withdraw_req_data: WithdrawBodyRequest = req.body_json().await?;
 
         match req
@@ -699,7 +701,7 @@ mod peers {
         ),
         tag = "Peers",
     )]
-    pub(super) async fn show_peer_info(req: Request<InternalState>) -> tide::Result<Response> {
+    pub(super) async fn show_peer_info(req: Request<InternalState>) -> impl IntoResponse {
         let hopr = req.state().hopr.clone();
         match PeerId::from_str(req.param("peerId")?) {
             Ok(peer) => Ok(Response::builder(200)
@@ -745,7 +747,7 @@ mod peers {
         ),
         tag = "Peers",
     )]
-    pub(super) async fn ping_peer(req: Request<InternalState>) -> tide::Result<Response> {
+    pub(super) async fn ping_peer(req: Request<InternalState>) -> impl IntoResponse {
         let hopr = req.state().hopr.clone();
         match PeerId::from_str(req.param("peerId")?) {
             Ok(peer) => match hopr.ping(&peer).await {
@@ -914,7 +916,7 @@ mod channels {
         ),
         tag = "Channels",
     )]
-    pub(super) async fn list_channels(req: Request<InternalState>) -> tide::Result<Response> {
+    pub(super) async fn list_channels(req: Request<InternalState>) -> impl IntoResponse {
         let hopr = req.state().hopr.clone();
         let query: ChannelsQueryRequest = req.query()?;
 
@@ -1036,7 +1038,7 @@ mod channels {
         ),
         tag = "Channels",
     )]
-    pub(super) async fn open_channel(mut req: Request<InternalState>) -> tide::Result<Response> {
+    pub(super) async fn open_channel(mut req: Request<InternalState>) -> impl IntoResponse {
         let hopr = req.state().hopr.clone();
 
         let open_req: OpenChannelBodyRequest = match req.body_json().await {
@@ -1090,7 +1092,7 @@ mod channels {
         ),
         tag = "Channels",
     )]
-    pub(super) async fn show_channel(req: Request<InternalState>) -> tide::Result<Response> {
+    pub(super) async fn show_channel(req: Request<InternalState>) -> impl IntoResponse {
         let hopr = req.state().hopr.clone();
 
         match Hash::from_hex(req.param("channelId")?) {
@@ -1147,7 +1149,7 @@ mod channels {
         ),
         tag = "Channels",
     )]
-    pub(super) async fn close_channel(req: Request<InternalState>) -> tide::Result<Response> {
+    pub(super) async fn close_channel(req: Request<InternalState>) -> impl IntoResponse {
         let hopr = req.state().hopr.clone();
 
         match Hash::from_hex(req.param("channelId")?) {
@@ -1206,7 +1208,7 @@ mod channels {
         ),
         tag = "Channels",
     )]
-    pub(super) async fn fund_channel(mut req: Request<InternalState>) -> tide::Result<Response> {
+    pub(super) async fn fund_channel(mut req: Request<InternalState>) -> impl IntoResponse {
         let hopr = req.state().hopr.clone();
 
         let fund_req: FundBodyRequest = req.body_json().await?;
@@ -1332,7 +1334,7 @@ mod messages {
         ),
         tag = "Messages",
     )]
-    pub async fn send_message(mut req: Request<InternalState>) -> tide::Result<Response> {
+    pub async fn send_message(mut req: Request<InternalState>) -> impl IntoResponse {
         let args: SendMessageBodyRequest = req.body_json().await?;
         let hopr = req.state().hopr.clone();
 
@@ -1486,7 +1488,6 @@ mod messages {
         }
 
         async fn websocket_connection(stream: WebSocket, state: Arc<AppState>) {}
-        
            let (mut sender, mut receiver) = stream.split();
 
 let ws_rx = request.state().websocket_rx.activate_cloned();
@@ -1574,7 +1575,7 @@ let ws_rx = request.state().websocket_rx.activate_cloned();
             ("bearer_token" = [])
         )
     )]
-    pub async fn delete_messages(req: Request<InternalState>) -> tide::Result<Response> {
+    pub async fn delete_messages(req: Request<InternalState>) -> impl IntoResponse {
         let tag: TagQueryRequest = req.query()?;
         if tag.tag.map_or(false, |tag| tag < RESERVED_TAG_UPPER_LIMIT) {
             return Ok(Response::builder(400)
@@ -1603,7 +1604,7 @@ let ws_rx = request.state().websocket_rx.activate_cloned();
         ),
         tag = "Messages"
     )]
-    pub async fn size(req: Request<InternalState>) -> tide::Result<Response> {
+    pub async fn size(req: Request<InternalState>) -> impl IntoResponse {
         let query: TagQueryRequest = req.query()?;
         if query.tag.map_or(false, |tag| tag < RESERVED_TAG_UPPER_LIMIT) {
             return Ok(Response::builder(400)
@@ -1672,7 +1673,7 @@ let ws_rx = request.state().websocket_rx.activate_cloned();
         ),
         tag = "Messages"
     )]
-    pub async fn pop(mut req: Request<InternalState>) -> tide::Result<Response> {
+    pub async fn pop(mut req: Request<InternalState>) -> impl IntoResponse {
         let tag: TagQueryRequest = req.body_json().await?;
         if tag.tag.map_or(false, |tag| tag < RESERVED_TAG_UPPER_LIMIT) {
             return Ok(Response::builder(400)
@@ -1721,7 +1722,7 @@ let ws_rx = request.state().websocket_rx.activate_cloned();
         ),
         tag = "Messages"
     )]
-    pub async fn pop_all(mut req: Request<InternalState>) -> tide::Result<Response> {
+    pub async fn pop_all(mut req: Request<InternalState>) -> impl IntoResponse {
         let tag: TagQueryRequest = req.body_json().await?;
         if tag.tag.map_or(false, |tag| tag < RESERVED_TAG_UPPER_LIMIT) {
             return Ok(Response::builder(400)
@@ -1774,7 +1775,7 @@ let ws_rx = request.state().websocket_rx.activate_cloned();
         ),
         tag = "Messages"
     )]
-    pub async fn peek(mut req: Request<InternalState>) -> tide::Result<Response> {
+    pub async fn peek(mut req: Request<InternalState>) -> impl IntoResponse {
         let tag: TagQueryRequest = req.body_json().await?;
         if tag.tag.map_or(false, |tag| tag < RESERVED_TAG_UPPER_LIMIT) {
             return Ok(Response::builder(400)
@@ -1820,7 +1821,7 @@ let ws_rx = request.state().websocket_rx.activate_cloned();
         tag = "Messages"
     )]
 
-    pub async fn peek_all(mut req: Request<InternalState>) -> tide::Result<Response> {
+    pub async fn peek_all(mut req: Request<InternalState>) -> impl IntoResponse {
         let args: GetMessageBodyRequest = req.body_json().await?;
         if args.tag.map_or(false, |tag| tag < RESERVED_TAG_UPPER_LIMIT) {
             return Ok(Response::builder(400)
@@ -1875,7 +1876,7 @@ mod network {
         ),
         tag = "Network"
     )]
-    pub(super) async fn price(req: Request<InternalState>) -> tide::Result<Response> {
+    pub(super) async fn price(req: Request<InternalState>) -> impl IntoResponse {
         let hopr = req.state().hopr.clone();
 
         match hopr.get_ticket_price().await {
@@ -1956,7 +1957,7 @@ mod tickets {
         ),
         tag = "Channels"
     )]
-    pub(super) async fn show_channel_tickets(req: Request<InternalState>) -> tide::Result<Response> {
+    pub(super) async fn show_channel_tickets(req: Request<InternalState>) -> impl IntoResponse {
         let hopr = req.state().hopr.clone();
 
         match Hash::from_hex(req.param("channelId")?) {
@@ -1987,7 +1988,7 @@ mod tickets {
         ),
         tag = "Tickets"
     )]
-    pub(super) async fn show_all_tickets(_req: Request<InternalState>) -> tide::Result<Response> {
+    pub(super) async fn show_all_tickets(_req: Request<InternalState>) -> impl IntoResponse {
         let tickets: Vec<ChannelTicket> = vec![];
         Ok(Response::builder(200).body(json!(tickets)).build())
     }
@@ -2036,7 +2037,7 @@ mod tickets {
         ),
         tag = "Tickets"
     )]
-    pub(super) async fn show_ticket_statistics(req: Request<InternalState>) -> tide::Result<Response> {
+    pub(super) async fn show_ticket_statistics(req: Request<InternalState>) -> impl IntoResponse {
         let hopr = req.state().hopr.clone();
         match hopr.ticket_statistics().await.map(NodeTicketStatisticsResponse::from) {
             Ok(stats) => Ok(Response::builder(200).body(json!(stats)).build()),
@@ -2062,7 +2063,7 @@ mod tickets {
         ),
         tag = "Tickets"
     )]
-    pub(super) async fn redeem_all_tickets(req: Request<InternalState>) -> tide::Result<Response> {
+    pub(super) async fn redeem_all_tickets(req: Request<InternalState>) -> impl IntoResponse {
         let hopr = req.state().hopr.clone();
         match hopr.redeem_all_tickets(false).await {
             Ok(()) => Ok(Response::builder(204).build()),
@@ -2093,7 +2094,7 @@ mod tickets {
         ),
         tag = "Channels"
     )]
-    pub(super) async fn redeem_tickets_in_channel(req: Request<InternalState>) -> tide::Result<Response> {
+    pub(super) async fn redeem_tickets_in_channel(req: Request<InternalState>) -> impl IntoResponse {
         let hopr = req.state().hopr.clone();
 
         match Hash::from_hex(req.param("channelId")?) {
@@ -2126,7 +2127,7 @@ mod tickets {
         ),
         tag = "Channels"
     )]
-    pub(super) async fn aggregate_tickets_in_channel(req: Request<InternalState>) -> tide::Result<Response> {
+    pub(super) async fn aggregate_tickets_in_channel(req: Request<InternalState>) -> impl IntoResponse {
         let hopr = req.state().hopr.clone();
 
         match Hash::from_hex(req.param("channelId")?) {
@@ -2150,8 +2151,7 @@ mod node {
     use futures::stream::FuturesUnordered;
     use futures::StreamExt;
     use hopr_lib::{AsUnixTimestamp, Health, Multiaddr};
-
-    use {std::str::FromStr, tide::Body};
+    use std::str::FromStr;
 
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
     #[schema(example = json!({
@@ -2175,7 +2175,7 @@ mod node {
         ),
         tag = "Node"
     )]
-    pub(super) async fn version(req: Request<InternalState>) -> tide::Result<Response> {
+    pub(super) async fn version(req: Request<InternalState>) -> impl IntoResponse {
         let version = req.state().hopr.version();
 
         Ok(Response::builder(200)
@@ -2197,7 +2197,7 @@ mod node {
         ),
         tag = "Configuration"
     )]
-    pub(super) async fn configuration(req: Request<InternalState>) -> tide::Result<Response> {
+    pub(super) async fn configuration(req: Request<InternalState>) -> impl IntoResponse {
         Ok(Response::builder(200).body(req.state().hoprd_cfg.clone()).build())
     }
 
@@ -2281,7 +2281,7 @@ mod node {
         ),
         tag = "Node"
     )]
-    pub(super) async fn peers(req: Request<InternalState>) -> tide::Result<Response> {
+    pub(super) async fn peers(req: Request<InternalState>) -> impl IntoResponse {
         let query_params: NodePeersQueryRequest = req.query()?;
 
         if let Some(quality) = query_params.quality {
@@ -2385,7 +2385,7 @@ mod node {
         ),
         tag = "Node"
     )]
-    pub(crate) async fn metrics(_req: Request<InternalState>) -> tide::Result<Response> {
+    pub(crate) async fn metrics(_req: Request<InternalState>) -> impl IntoResponse {
         match collect_hopr_metrics() {
             Ok(metrics) => Ok(Response::builder(200)
                 .body(Body::from_string(metrics))
@@ -2466,7 +2466,7 @@ mod node {
         ),
         tag = "Node"
     )]
-    pub(super) async fn info(req: Request<InternalState>) -> tide::Result<Response> {
+    pub(super) async fn info(req: Request<InternalState>) -> impl IntoResponse {
         let hopr = req.state().hopr.clone();
 
         let chain_config = hopr.chain_config();
@@ -2527,7 +2527,7 @@ mod node {
         ),
         tag = "Node"
     )]
-    pub(super) async fn entry_nodes(req: Request<InternalState>) -> tide::Result<Response> {
+    pub(super) async fn entry_nodes(req: Request<InternalState>) -> impl IntoResponse {
         let hopr = req.state().hopr.clone();
 
         match hopr.get_public_nodes().await {
@@ -2563,7 +2563,7 @@ mod checks {
         ),
         tag = "Checks"
     )]
-    pub(super) async fn startedz(req: Request<State>) -> tide::Result<Response> {
+    pub(super) async fn startedz(req: Request<State>) -> impl IntoResponse {
         is_running(req).await
     }
 
@@ -2577,7 +2577,7 @@ mod checks {
         ),
         tag = "Checks"
     )]
-    pub(super) async fn readyz(req: Request<State>) -> tide::Result<Response> {
+    pub(super) async fn readyz(req: Request<State>) -> impl IntoResponse {
         is_running(req).await
     }
 
@@ -2591,11 +2591,11 @@ mod checks {
         ),
         tag = "Checks"
     )]
-    pub(super) async fn healthyz(req: Request<State>) -> tide::Result<Response> {
+    pub(super) async fn healthyz(req: Request<State>) -> impl IntoResponse {
         is_running(req).await
     }
 
-    async fn is_running(req: Request<State>) -> tide::Result<Response> {
+    async fn is_running(req: Request<State>) -> impl IntoResponse {
         match req.state().hopr.status() {
             hopr_lib::HoprState::Running => Ok(Response::builder(200).build()),
             _ => Ok(Response::builder(412).build()),

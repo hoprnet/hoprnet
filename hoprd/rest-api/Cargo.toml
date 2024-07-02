@@ -23,7 +23,11 @@ const_format = { workspace = true }
 futures = { workspace = true }
 futures-concurrency = { workspace = true }
 lazy_static = { workspace = true, optional = true }
-libp2p-identity = { workspace = true, features = ["peerid", "ed25519", "serde"] }
+libp2p-identity = { workspace = true, features = [
+  "peerid",
+  "ed25519",
+  "serde",
+] }
 serde = { workspace = true }
 serde_with = { workspace = true }
 serde_json = { workspace = true }
