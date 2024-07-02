@@ -51,7 +51,7 @@ on:
         description: 'Test duration'
       rate:
         type: string
-        default: "100"
+        default: "300"
         required: true
         description: 'Number of messages per seconds'
 concurrency:
