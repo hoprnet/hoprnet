@@ -39,7 +39,7 @@ use core_network::{
     heartbeat::Heartbeat,
     ping::{PingQueryReplier, Pinger, Pinging},
 };
-use core_network::{heartbeat::HeartbeatConfig, ping::PingConfig, PeerId};
+use core_network::{ping::PingConfig, PeerId};
 use core_protocol::{
     ack::processor::AcknowledgementInteraction,
     errors::ProtocolError,
@@ -155,6 +155,13 @@ where
     }
 }
 
+pub struct HoprTransportConfig {
+    pub transport: config::TransportConfig,
+    pub network: core_network::config::NetworkConfig,
+    pub protocol: core_protocol::config::ProtocolConfig,
+    pub heartbeat: core_network::heartbeat::HeartbeatConfig,
+}
+
 /// Interface into the physical transport mechanism allowing all HOPR related tasks on
 /// the transport mechanism, as well as off-chain ticket manipulation.
 pub struct HoprTransport<T>
@@ -163,9 +170,7 @@ where
 {
     me: PeerId,
     me_onchain: Address,
-    cfg: config::TransportConfig,
-    hb_cfg: HeartbeatConfig,
-    proto_cfg: core_protocol::config::ProtocolConfig,
+    cfg: HoprTransportConfig,
     db: T,
     ping: Arc<OnceLock<Pinger<network_notifier::PingExternalInteractions<T>>>>,
     network: Arc<Network<T>>,
@@ -185,10 +190,7 @@ where
     pub fn new(
         me: &OffchainKeypair,
         me_onchain: &ChainKeypair,
-        cfg: config::TransportConfig,
-        cfg_network: core_network::config::NetworkConfig,
-        cfg_proto: core_protocol::config::ProtocolConfig,
-        cfg_hb: HeartbeatConfig,
+        cfg: HoprTransportConfig,
         db: T,
         channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
         my_multiaddresses: Vec<Multiaddr>,
@@ -198,17 +200,15 @@ where
         Self {
             me: identity.public().to_peer_id(),
             me_onchain: me_onchain.public().to_address(),
-            cfg,
-            hb_cfg: cfg_hb,
-            proto_cfg: cfg_proto,
             db: db.clone(),
             ping: Arc::new(OnceLock::new()),
             network: Arc::new(Network::new(
                 me.public().into(),
                 my_multiaddresses.clone(),
-                cfg_network,
+                cfg.network.clone(),
                 db.clone(),
             )),
+            cfg,
             path_planner: helpers::PathPlanner::new(db, channel_graph),
             my_multiaddresses,
             process_packet_send: Arc::new(OnceLock::new()),
@@ -252,7 +252,7 @@ where
         let (ping_tx, ping_rx) = futures::channel::mpsc::unbounded::<(PeerId, PingQueryReplier)>();
 
         let ping_cfg = PingConfig {
-            timeout: self.proto_cfg.heartbeat.timeout,
+            timeout: self.cfg.protocol.heartbeat.timeout,
             ..PingConfig::default()
         };
 
@@ -272,7 +272,7 @@ where
             .set(ping)
             .expect("must set the ping executor only once");
 
-        let transport_layer = HoprSwarm::new(me.into(), self.my_multiaddresses.clone(), self.proto_cfg).await;
+        let transport_layer = HoprSwarm::new(me.into(), self.my_multiaddresses.clone(), self.cfg.protocol).await;
 
         let ack_proc = AcknowledgementInteraction::new(self.db.clone(), me_onchain);
 
@@ -290,7 +290,7 @@ where
 
         // heartbeat
         let mut heartbeat = Heartbeat::new(
-            self.hb_cfg,
+            self.cfg.heartbeat,
             self.ping
                 .get()
                 .expect("Ping should be initialized at this point")
@@ -397,7 +397,7 @@ where
         Arc::new(AggregatorProxy::new(
             self.db.clone(),
             self.process_ticket_aggregate.clone(),
-            self.proto_cfg.ticket_aggregation.timeout,
+            self.cfg.protocol.ticket_aggregation.timeout,
         ))
     }
 
@@ -536,7 +536,7 @@ where
         Ok(Arc::new(AggregatorProxy::new(
             self.db.clone(),
             self.process_ticket_aggregate.clone(),
-            self.proto_cfg.ticket_aggregation.timeout,
+            self.cfg.protocol.ticket_aggregation.timeout,
         ))
         .aggregate_tickets(&entry.get_id(), Default::default())
         .await?)
@@ -606,7 +606,7 @@ where
             .into_iter()
             .filter(|ma| {
                 hopr_transport_p2p::multiaddrs::is_supported(ma)
-                    && (self.cfg.announce_local_addresses || !hopr_transport_p2p::multiaddrs::is_private(ma))
+                    && (self.cfg.transport.announce_local_addresses || !hopr_transport_p2p::multiaddrs::is_private(ma))
             })
             .map(|ma| strip_p2p_protocol(&ma))
             .filter(|v| !v.is_empty())

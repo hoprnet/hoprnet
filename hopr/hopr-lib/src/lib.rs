@@ -63,7 +63,7 @@ use chain_api::{
 use chain_types::chain_events::ChainEventType;
 use chain_types::ContractAddresses;
 use core_path::channel_graph::ChannelGraph;
-use core_transport::{execute_on_tick, PeerTransportEvent};
+use core_transport::{execute_on_tick, HoprTransportConfig, PeerTransportEvent};
 use core_transport::{ChainKeypair, Hash, HoprTransport, OffchainKeypair};
 use core_transport::{IndexerTransportEvent, Network, PeerEligibility, PeerOrigin};
 use hopr_crypto_types::prelude::OffchainPublicKey;
@@ -500,10 +500,12 @@ impl Hopr {
         let hopr_transport_api = HoprTransport::new(
             me,
             me_onchain,
-            cfg.transport.clone(),
-            cfg.network_options.clone(),
-            cfg.protocol,
-            cfg.heartbeat,
+            HoprTransportConfig {
+                transport: cfg.transport.clone(),
+                network: cfg.network_options.clone(),
+                protocol: cfg.protocol,
+                heartbeat: cfg.heartbeat,
+            },
             db.clone(),
             channel_graph.clone(),
             my_multiaddresses,
