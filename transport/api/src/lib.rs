@@ -26,7 +26,7 @@ use std::{
 };
 
 use async_lock::RwLock;
-use constants::RESERVED_TAG_UPPER_LIMIT;
+use constants::{RESERVED_SESSION_TAG_UPPER_LIMIT, RESERVED_SUBPROTOCOL_TAG_UPPER_LIMIT};
 use futures::future::{select, Either};
 use futures::pin_mut;
 use futures::{
@@ -186,7 +186,6 @@ impl<T> HoprTransport<T>
 where
     T: HoprDbAllOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
 {
-    #[allow(clippy::too_many_arguments)] // TODO: Needs refactoring and cleanup once rearchitected
     pub fn new(
         me: &OffchainKeypair,
         me_onchain: &ChainKeypair,
@@ -336,7 +335,9 @@ where
                         match output {
                             TransportOutput::Received(data) => {
                                 if let Some(app_tag) = data.application_tag {
-                                    if app_tag < RESERVED_TAG_UPPER_LIMIT {
+                                    if app_tag < RESERVED_SUBPROTOCOL_TAG_UPPER_LIMIT {
+                                        None
+                                    } else if app_tag < RESERVED_SESSION_TAG_UPPER_LIMIT {
                                         if let Ok((peer, data)) =
                                             hopr_transport_session::types::unwrap_offchain_key(data.plain_text.clone())
                                         {
@@ -473,9 +474,9 @@ where
         application_tag: Option<u16>,
     ) -> errors::Result<HalfKeyChallenge> {
         if let Some(application_tag) = application_tag {
-            if application_tag < RESERVED_TAG_UPPER_LIMIT {
+            if application_tag < RESERVED_SESSION_TAG_UPPER_LIMIT {
                 return Err(HoprTransportError::Api(format!(
-                    "Application tag must not be lower than {RESERVED_TAG_UPPER_LIMIT}"
+                    "Application tag must not be lower than {RESERVED_SESSION_TAG_UPPER_LIMIT}"
                 )));
             }
         }

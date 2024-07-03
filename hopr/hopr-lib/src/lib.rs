@@ -85,7 +85,7 @@ pub use {
     },
     core_transport::{
         config::{looks_like_domain, HostConfig, HostType},
-        constants::RESERVED_TAG_UPPER_LIMIT,
+        constants::RESERVED_SESSION_TAG_UPPER_LIMIT,
         errors::{HoprTransportError, ProtocolError},
         libp2p::identity::PeerId,
         ApplicationData, HalfKeyChallenge, Health, Keypair, Multiaddr, PathOptions, Session as HoprSession,

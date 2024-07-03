@@ -27,7 +27,7 @@ lazy_static::lazy_static! {
     ).unwrap();
 }
 
-use crate::{constants::RESERVED_TAG_UPPER_LIMIT, errors::HoprTransportError};
+use crate::{constants::RESERVED_SESSION_TAG_UPPER_LIMIT, errors::HoprTransportError};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum PeerEligibility {
@@ -166,7 +166,7 @@ where
         options: PathOptions,
     ) -> std::result::Result<(), TransportSessionError> {
         data.application_tag
-            .is_some_and(|application_tag| application_tag < RESERVED_TAG_UPPER_LIMIT)
+            .is_some_and(|application_tag| application_tag < RESERVED_SESSION_TAG_UPPER_LIMIT)
             .then_some(())
             .ok_or(TransportSessionError::Tag)?;
 

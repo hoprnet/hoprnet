@@ -1420,7 +1420,7 @@ mod channels {
 mod messages {
     use std::time::Duration;
 
-    use hopr_lib::{AsUnixTimestamp, HalfKeyChallenge, RESERVED_TAG_UPPER_LIMIT};
+    use hopr_lib::{AsUnixTimestamp, HalfKeyChallenge, RESERVED_SESSION_TAG_UPPER_LIMIT};
     use validator::Validate;
 
     use super::*;
@@ -1695,7 +1695,7 @@ mod messages {
     )]
     pub async fn delete_messages(req: Request<InternalState>) -> tide::Result<Response> {
         let tag: TagQueryRequest = req.query()?;
-        if tag.tag.map_or(false, |tag| tag < RESERVED_TAG_UPPER_LIMIT) {
+        if tag.tag.map_or(false, |tag| tag < RESERVED_SESSION_TAG_UPPER_LIMIT) {
             return Ok(Response::builder(400)
                 .body(ApiErrorStatus::InvalidApplicationTag)
                 .build());
@@ -1724,7 +1724,7 @@ mod messages {
     )]
     pub async fn size(req: Request<InternalState>) -> tide::Result<Response> {
         let query: TagQueryRequest = req.query()?;
-        if query.tag.map_or(false, |tag| tag < RESERVED_TAG_UPPER_LIMIT) {
+        if query.tag.map_or(false, |tag| tag < RESERVED_SESSION_TAG_UPPER_LIMIT) {
             return Ok(Response::builder(400)
                 .body(ApiErrorStatus::InvalidApplicationTag)
                 .build());
@@ -1793,7 +1793,7 @@ mod messages {
     )]
     pub async fn pop(mut req: Request<InternalState>) -> tide::Result<Response> {
         let tag: TagQueryRequest = req.body_json().await?;
-        if tag.tag.map_or(false, |tag| tag < RESERVED_TAG_UPPER_LIMIT) {
+        if tag.tag.map_or(false, |tag| tag < RESERVED_SESSION_TAG_UPPER_LIMIT) {
             return Ok(Response::builder(400)
                 .body(ApiErrorStatus::InvalidApplicationTag)
                 .build());
@@ -1842,7 +1842,7 @@ mod messages {
     )]
     pub async fn pop_all(mut req: Request<InternalState>) -> tide::Result<Response> {
         let tag: TagQueryRequest = req.body_json().await?;
-        if tag.tag.map_or(false, |tag| tag < RESERVED_TAG_UPPER_LIMIT) {
+        if tag.tag.map_or(false, |tag| tag < RESERVED_SESSION_TAG_UPPER_LIMIT) {
             return Ok(Response::builder(400)
                 .body(ApiErrorStatus::InvalidApplicationTag)
                 .build());
@@ -1895,7 +1895,7 @@ mod messages {
     )]
     pub async fn peek(mut req: Request<InternalState>) -> tide::Result<Response> {
         let tag: TagQueryRequest = req.body_json().await?;
-        if tag.tag.map_or(false, |tag| tag < RESERVED_TAG_UPPER_LIMIT) {
+        if tag.tag.map_or(false, |tag| tag < RESERVED_SESSION_TAG_UPPER_LIMIT) {
             return Ok(Response::builder(400)
                 .body(ApiErrorStatus::InvalidApplicationTag)
                 .build());
@@ -1941,7 +1941,7 @@ mod messages {
 
     pub async fn peek_all(mut req: Request<InternalState>) -> tide::Result<Response> {
         let args: GetMessageBodyRequest = req.body_json().await?;
-        if args.tag.map_or(false, |tag| tag < RESERVED_TAG_UPPER_LIMIT) {
+        if args.tag.map_or(false, |tag| tag < RESERVED_SESSION_TAG_UPPER_LIMIT) {
             return Ok(Response::builder(400)
                 .body(ApiErrorStatus::InvalidApplicationTag)
                 .build());
