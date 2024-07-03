@@ -916,7 +916,6 @@ impl Hopr {
             );
         }
 
-        // TODO: 2.2: add support for transport session handling
         for (id, proc) in self
             .transport_api
             .run(
@@ -974,9 +973,11 @@ impl Hopr {
 
         self.state.store(HoprState::Running, Ordering::Relaxed);
 
-        info!("# STARTED NODE");
-        info!("ID {}", self.transport_api.me());
-        info!("Protocol version {}", constants::APP_VERSION);
+        info!(
+            id = self.transport_api.me(),
+            version = constants::APP_VERSION,
+            "NODE STARTED AND RUNNING"
+        );
 
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_HOPR_NODE_INFO.set(
