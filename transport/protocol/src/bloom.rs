@@ -6,14 +6,14 @@ use hopr_platform::file::native::{read_file, write};
 use tracing::{debug, error, info};
 
 #[derive(Debug, Clone)]
-pub(crate) struct WrappedTagBloomFilter {
+pub struct WrappedTagBloomFilter {
     path: String,
     tbf: Arc<RwLock<TagBloomFilter>>,
 }
 
 impl WrappedTagBloomFilter {
     pub fn new(path: String) -> Self {
-        info!("Creating the Bloom filter storage at: {}", path);
+        info!("Creating the Bloom filter storage at: {path}");
         let tbf = read_file(&path)
             .and_then(|data| {
                 TagBloomFilter::from_bytes(&data)
@@ -30,8 +30,9 @@ impl WrappedTagBloomFilter {
         }
     }
 
-    pub fn raw_filter(&self) -> Arc<RwLock<TagBloomFilter>> {
-        self.tbf.clone()
+    pub async fn with_write_lock<T>(&self, f: impl FnOnce(&mut TagBloomFilter) -> T) -> T {
+        let mut tbf = self.tbf.write().await;
+        f(&mut tbf)
     }
 
     pub async fn save(&self) {

@@ -23,8 +23,6 @@ pub mod constants;
 /// Enumerates all errors thrown from this library.
 pub mod errors;
 
-mod helpers;
-
 use std::{
     collections::HashMap,
     str::FromStr,
@@ -38,7 +36,6 @@ use futures::{
     Stream, StreamExt,
 };
 use futures_concurrency::stream::StreamExt as _;
-use helpers::WrappedTagBloomFilter;
 use tracing::{debug, error, info, warn};
 
 #[cfg(feature = "runtime-async-std")]
@@ -63,7 +60,7 @@ use chain_api::{
 use chain_types::chain_events::ChainEventType;
 use chain_types::ContractAddresses;
 use core_path::channel_graph::ChannelGraph;
-use core_transport::{execute_on_tick, HoprTransportConfig, PeerTransportEvent};
+use core_transport::{execute_on_tick, HoprTransportConfig, HoprTransportProcess, PeerTransportEvent};
 use core_transport::{ChainKeypair, Hash, HoprTransport, OffchainKeypair};
 use core_transport::{IndexerTransportEvent, Network, PeerEligibility, PeerOrigin};
 use hopr_crypto_types::prelude::OffchainPublicKey;
@@ -190,6 +187,17 @@ impl HoprLibProcesses {
     /// run indefinitely.
     pub fn can_finish(&self) -> bool {
         matches!(self, HoprLibProcesses::Indexing)
+    }
+}
+
+impl From<HoprTransportProcess> for HoprLibProcesses {
+    fn from(value: HoprTransportProcess) -> Self {
+        match value {
+            core_transport::HoprTransportProcess::Swarm => HoprLibProcesses::Swarm,
+            core_transport::HoprTransportProcess::Heartbeat => HoprLibProcesses::Heartbeat,
+            core_transport::HoprTransportProcess::SessionsRouter => HoprLibProcesses::SessionsRouter,
+            core_transport::HoprTransportProcess::BloomFilterSave => HoprLibProcesses::BloomFilterSave,
+        }
     }
 }
 
@@ -435,7 +443,6 @@ pub struct Hopr {
     chain_cfg: ChainNetworkConfig,
     channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
     multistrategy: Arc<MultiStrategy>,
-    tbf: WrappedTagBloomFilter,
     rx_indexer_significant_events: async_channel::Receiver<SignificantChainEvent>,
 }
 
@@ -487,9 +494,6 @@ impl Hopr {
 
         // let mut packetCfg = PacketInteractionConfig::new(packetKeypair, chainKeypair)
         // packetCfg.check_unrealized_balance = cfg.chain.check_unrealized_balance
-
-        let tbf =
-            WrappedTagBloomFilter::new(join(&[&cfg.db.data, "tbf"]).expect("Could not create a tbf storage path"));
 
         let my_multiaddresses = vec![multiaddress];
 
@@ -567,7 +571,6 @@ impl Hopr {
             chain_cfg: resolved_environment,
             channel_graph,
             multistrategy: multi_strategy,
-            tbf,
             rx_indexer_significant_events: rx_indexer_events,
         }
     }
@@ -921,7 +924,9 @@ impl Hopr {
                 &self.me_onchain,
                 String::from(constants::APP_VERSION),
                 self.transport_api.network(),
-                self.tbf.raw_filter(),
+                join(&[&self.cfg.db.data, "tbf"]).map_err(|e| {
+                    errors::HoprLibError::GeneralError(format!("Failed to construct the bloom filter: {e}"))
+                })?,
                 transport_output_tx,
                 on_ack_tkt_tx,
                 indexer_peer_update_rx,
@@ -930,23 +935,8 @@ impl Hopr {
             .await
             .into_iter()
         {
-            let nid = match id {
-                core_transport::HoprTransportProcess::Swarm => HoprLibProcesses::Swarm,
-                core_transport::HoprTransportProcess::Heartbeat => HoprLibProcesses::Heartbeat,
-                core_transport::HoprTransportProcess::SessionsRouter => HoprLibProcesses::SessionsRouter,
-            };
-            processes.insert(nid, proc);
+            processes.insert(id.into(), proc);
         }
-
-        let tbf_clone = self.tbf.clone();
-        processes.insert(
-            HoprLibProcesses::BloomFilterSave,
-            spawn(Box::pin(execute_on_tick(Duration::from_secs(90), move || {
-                let tbf_clone = tbf_clone.clone();
-
-                async move { tbf_clone.save().await }
-            }))),
-        );
 
         let db_clone = self.db.clone();
         processes.insert(

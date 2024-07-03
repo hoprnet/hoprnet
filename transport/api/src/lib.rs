@@ -42,6 +42,7 @@ use core_network::{
 use core_network::{ping::PingConfig, PeerId};
 use core_protocol::{
     ack::processor::AcknowledgementInteraction,
+    bloom::WrappedTagBloomFilter,
     errors::ProtocolError,
     msg::processor::{PacketActions, PacketInteraction, PacketInteractionConfig},
     ticket_aggregation::processor::{
@@ -96,6 +97,7 @@ pub enum HoprTransportProcess {
     Heartbeat,
     Swarm,
     SessionsRouter,
+    BloomFilterSave,
 }
 
 pub enum SessionComponents {
@@ -236,7 +238,7 @@ where
         me_onchain: &ChainKeypair,
         version: String,
         network: Arc<Network<T>>,
-        tbf: Arc<RwLock<TagBloomFilter>>,
+        tbf_path: String,
         on_transport_output: UnboundedSender<TransportOutput>,
         on_acknowledged_ticket: UnboundedSender<AcknowledgedTicket>,
         transport_updates: UnboundedReceiver<PeerTransportEvent>,
@@ -275,6 +277,23 @@ where
 
         let ack_proc = AcknowledgementInteraction::new(self.db.clone(), me_onchain);
 
+        let tbf = WrappedTagBloomFilter::new(tbf_path);
+
+        let tbf_clone = tbf.clone();
+
+        let mut processes: HashMap<HoprTransportProcess, executor::JoinHandle<()>> = HashMap::new();
+        processes.insert(
+            HoprTransportProcess::BloomFilterSave,
+            executor::spawn(Box::pin(execute_on_tick(
+                std::time::Duration::from_secs(90),
+                move || {
+                    let tbf_clone = tbf_clone.clone();
+
+                    async move { tbf_clone.save().await }
+                },
+            ))),
+        );
+
         let packet_proc = PacketInteraction::new(self.db.clone(), tbf, PacketInteractionConfig::new(me, me_onchain));
         self.process_packet_send
             .clone()
@@ -306,8 +325,6 @@ where
             ticket_agg_proc,
             ping_rx,
         );
-
-        let mut processes: HashMap<HoprTransportProcess, executor::JoinHandle<()>> = HashMap::new();
 
         processes.insert(
             HoprTransportProcess::Heartbeat,
