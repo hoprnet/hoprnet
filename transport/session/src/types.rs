@@ -42,8 +42,10 @@ impl Display for SessionId {
     }
 }
 
+const PEER_ID_BINARY_SIZE: usize = 32;
 // Inner MTU size of what the HOPR payload can take (payload - peer_id - application_tag)
-pub const INNER_MTU_SIZE: usize = PAYLOAD_SIZE - 32 - 2;
+const INNER_MTU_SIZE: usize =
+    PAYLOAD_SIZE - PEER_ID_BINARY_SIZE - std::mem::size_of::<hopr_internal_types::protocol::Tag>();
 
 pub struct Session {
     id: SessionId,
