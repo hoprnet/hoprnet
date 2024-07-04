@@ -974,7 +974,7 @@ impl Hopr {
         self.state.store(HoprState::Running, Ordering::Relaxed);
 
         info!(
-            id = self.transport_api.me(),
+            id = self.transport_api.me().to_string(),
             version = constants::APP_VERSION,
             "NODE STARTED AND RUNNING"
         );

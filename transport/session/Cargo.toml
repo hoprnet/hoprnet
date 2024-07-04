@@ -21,6 +21,7 @@ libp2p-identity = { workspace = true }
 ringbuffer = { workspace = true }
 thiserror = { workspace = true }
 
+hopr-network-types = { workspace = true }
 hopr-crypto-random = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-internal-types = { workspace = true }
