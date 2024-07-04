@@ -1609,6 +1609,7 @@ dependencies = [
  "core-protocol",
  "futures",
  "hopr-crypto-packet",
+ "hopr-crypto-random",
  "hopr-crypto-types",
  "hopr-db-sql",
  "hopr-internal-types",

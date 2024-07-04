@@ -463,8 +463,21 @@ where
     }
 
     pub async fn new_session(&self, destination: PeerId, options: PathOptions) -> errors::Result<Session> {
-        // TODO: generate this in a more secure way.
-        let session_id = SessionId::new(0u16, destination);
+        // TODO: 2.2 session initiation protocol is necessary to establish an application tag instead of this random approach
+        let mut session_id: Option<SessionId> = None;
+        for _ in 0..100 {
+            let hopr_ra = hopr_crypto_random::random_integer(
+                RESERVED_SUBPROTOCOL_TAG_UPPER_LIMIT as u64,
+                Some(RESERVED_SESSION_TAG_UPPER_LIMIT as u64),
+            ) as u16;
+            let id = SessionId::new(hopr_ra, destination);
+            if !self.sessions.contains_key(&id) {
+                session_id = Some(id);
+            }
+        }
+
+        let session_id = session_id
+            .ok_or_else(|| errors::HoprTransportError::Api("Failed to generate a non-occupied session ID".into()))?;
 
         let (tx, rx) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
 
