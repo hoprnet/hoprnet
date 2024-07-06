@@ -3328,7 +3328,6 @@ dependencies = [
  "hex-literal",
  "hopr-crypto-random",
  "hopr-crypto-types",
- "hopr-lib",
  "hopr-primitive-types",
  "hoprd-keypair",
  "serde",
@@ -3763,7 +3762,7 @@ dependencies = [
 
 [[package]]
 name = "hoprd-api"
-version = "3.1.0"
+version = "3.2.0"
 dependencies = [
  "async-broadcast",
  "async-lock 3.4.0",

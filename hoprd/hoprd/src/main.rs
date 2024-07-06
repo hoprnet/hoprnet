@@ -213,16 +213,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         };
 
-        let api = build_api(
-            node_cfg_str,
-            api_cfg,
-            node_clone,
-            inbox,
-            ws_events_rx,
-            Some(msg_encoder),
-        )
-        .await;
-
         let api_listener = tokio::net::TcpListener::bind(&listen_address)
             .await
             .unwrap_or_else(|e| panic!("REST API bind failed for {listen_address}: {e}"));
@@ -232,9 +222,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         processes.insert(
             HoprdProcesses::RestApi,
             spawn(async move {
-                serve_api(api, api_listener)
-                    .await
-                    .expect("the REST API server should run successfully")
+                serve_api(
+                    api_listener,
+                    node_cfg_str,
+                    api_cfg,
+                    node_clone,
+                    inbox,
+                    ws_events_rx,
+                    Some(msg_encoder),
+                )
+                .expect("the REST API server should start successfully")
             }),
         );
     }

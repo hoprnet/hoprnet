@@ -1,0 +1,639 @@
+use axum::{
+    extract::{
+        ws::{Message, WebSocket, WebSocketUpgrade},
+        Json, Query, State,
+    },
+    response::IntoResponse,
+    Error,
+};
+use futures_util::stream::SplitSink;
+use http::status::StatusCode::{ACCEPTED, BAD_REQUEST, NOT_FOUND, NO_CONTENT, OK, UNPROCESSABLE_ENTITY};
+use libp2p_identity::PeerId;
+use std::{sync::Arc, time::Duration};
+
+use hopr_lib::{AsUnixTimestamp, HalfKeyChallenge, TransportOutput, RESERVED_TAG_UPPER_LIMIT};
+
+use crate::{ApiErrorStatus, InternalState, BASE_PATH};
+
+#[derive(Debug, Default, Clone, serde::Deserialize, utoipa::ToSchema, utoipa::IntoParams)]
+#[into_params(parameter_in = Query)]
+pub(crate) struct TagQueryRequest {
+    #[schema(required = false)]
+    tag: Option<u16>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
+pub(crate) struct SizeResponse {
+    size: usize,
+}
+
+#[serde_as]
+#[derive(Debug, Clone, PartialEq, serde::Deserialize, validator::Validate, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
+#[schema(example = json!({
+        "body": "Test message",
+        "hops": 1,
+        "path": [
+            "12D3KooWR4uwjKCDCAY1xsEFB4esuWLF9Q5ijYvCjz5PNkTbnu33"
+        ],
+        "peerId": "12D3KooWEDc1vGJevww48trVDDf6pr1f6N3F86sGJfQrKCyc8kJ1",
+        "tag": 20
+    }))]
+pub(crate) struct SendMessageBodyRequest {
+    /// The message tag used to filter messages based on application
+    tag: u16,
+    /// Message to be transmitted over the network
+    #[serde_as(as = "Bytes")]
+    body: Vec<u8>,
+    /// The recipient HOPR PeerId
+    #[serde_as(as = "DisplayFromStr")]
+    #[schema(value_type = String)]
+    peer_id: PeerId,
+    #[serde_as(as = "Option<Vec<DisplayFromStr>>")]
+    // #[validate(length(min=0, max=3))]        // NOTE: issue in serde_as with validator -> no order is correct
+    #[schema(value_type = Option<Vec<String>>)]
+    path: Option<Vec<PeerId>>,
+    #[validate(range(min = 1, max = 3))]
+    hops: Option<u16>,
+}
+
+#[serde_as]
+#[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
+#[schema(example = json!({
+        "challenge": "031916ee5bfc0493f40c353a670fc586a3a28f9fce9cd065ff9d1cbef19b46eeba"
+    }))]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct SendMessageResponse {
+    #[serde_as(as = "DisplayFromStr")]
+    #[schema(value_type = String)]
+    challenge: HalfKeyChallenge,
+    #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
+    #[schema(value_type = u64)]
+    timestamp: std::time::Duration,
+}
+
+#[serde_as]
+#[derive(Debug, Default, Clone, serde::Deserialize, utoipa::ToSchema)]
+pub(crate) struct GetMessageBodyRequest {
+    /// The message tag used to filter messages based on application
+    #[schema(required = false)]
+    tag: Option<u16>,
+    /// Timestamp to filter messages received after this timestamp
+    #[serde_as(as = "Option<DurationMilliSeconds<u64>>")]
+    #[schema(required = false, value_type = u64)]
+    timestamp: Option<std::time::Duration>,
+}
+
+/// Send a message to another peer using the given path.
+///
+/// The message can be sent either over a specified path or using a specified
+/// number of HOPS, if no path is given.
+#[utoipa::path(
+        post,
+        path = const_format::formatcp!("{BASE_PATH}/messages"),
+        request_body(
+            content = SendMessageBodyRequest,
+            description = "Body of a message to send",
+            content_type = "application/json"),
+        responses(
+            (status = 202, description = "The message was sent successfully, DOES NOT imply successful delivery.", body = SendMessageResponse),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
+            (status = 422, description = "Unknown failure", body = ApiError)
+        ),
+        security(
+            ("api_token" = []),
+            ("bearer_token" = [])
+        ),
+        tag = "Messages",
+    )]
+pub(super) async fn send_message(
+    State(state): State<Arc<InternalState>>,
+    Json(args): Json<SendMessageBodyRequest>,
+) -> impl IntoResponse {
+    let hopr = state.hopr.clone();
+
+    // Use the message encoder, if any
+    let msg_body = state
+        .msg_encoder
+        .as_ref()
+        .map(|enc| enc(&args.body))
+        .unwrap_or_else(|| args.body.into_boxed_slice());
+
+    if let Some(path) = &args.path {
+        if path.len() > 3 {
+            return (
+                UNPROCESSABLE_ENTITY,
+                ApiErrorStatus::UnknownFailure("The path components must contain at most 3 elements".into()),
+            )
+                .into_response();
+        }
+    }
+
+    let timestamp = std::time::SystemTime::now().as_unix_timestamp();
+
+    match hopr
+        .send_message(msg_body, args.peer_id, args.path, args.hops, Some(args.tag))
+        .await
+    {
+        Ok(challenge) => (ACCEPTED, Json(SendMessageResponse { challenge, timestamp })).into_response(),
+        Err(e) => (UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
+    }
+}
+
+#[derive(Debug, Default, Clone, serde::Deserialize, utoipa::ToSchema)]
+#[schema(value_type = String)] //, format = Binary)]
+#[allow(dead_code)] // not dead code, just for codegen
+struct Text(String);
+
+#[derive(Debug, Clone, serde::Deserialize)]
+struct WebSocketSendMsg {
+    cmd: String,
+    args: SendMessageBodyRequest,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+struct WebSocketReadMsg {
+    #[serde(rename = "type")]
+    type_: String,
+    tag: u16,
+    body: String,
+}
+
+impl From<hopr_lib::ApplicationData> for WebSocketReadMsg {
+    fn from(value: hopr_lib::ApplicationData) -> Self {
+        Self {
+            type_: "message".into(),
+            tag: value.application_tag.unwrap_or(0),
+            // TODO: Byte order structures should be used instead of the String object
+            body: String::from_utf8_lossy(value.plain_text.as_ref()).to_string(),
+        }
+    }
+}
+
+#[serde_as]
+#[derive(Debug, Clone, serde::Serialize)]
+struct WebSocketReadAck {
+    #[serde(rename = "type")]
+    type_: String,
+    #[serde_as(as = "DisplayFromStr")]
+    id: HalfKeyChallenge,
+}
+
+impl WebSocketReadAck {
+    pub fn from_ack(value: HalfKeyChallenge) -> Self {
+        Self {
+            type_: "message-ack".into(),
+            id: value,
+        }
+    }
+
+    pub fn from_ack_challenge(value: HalfKeyChallenge) -> Self {
+        Self {
+            type_: "message-ack-challenge".into(),
+            id: value,
+        }
+    }
+}
+
+/// Websocket endpoint exposing a subset of message functions.
+///
+/// Incoming messages from other nodes are sent to the websocket client.
+///
+/// The following message can be set to the server by the client:
+/// ```json
+/// {
+///     cmd: "sendmsg",
+///     args: {
+///         peerId: "SOME_PEER_ID",
+///         path: [],
+///         hops: 1,
+///         body: "asdasd",
+///         tag: 2
+///     }
+/// }
+/// ```
+///
+/// The command arguments follow the same semantics as in the dedicated API endpoint for sending messages.
+///
+/// The following messages may be sent by the server over the Websocket connection:
+/// ````json
+/// {
+///   type: "message",
+///   tag: 12,
+///   body: "my example message"
+/// }
+///
+/// {
+///   type: "message-ack",
+///   id: "some challenge id"
+/// }
+///
+/// {
+///   type: "message-ack-challenge",
+///   id: "some challenge id"
+/// }
+///
+/// Authentication (if enabled) is done by cookie `X-Auth-Token`.
+///
+/// Connect to the endpoint by using a WS client. No preview available. Example: `ws://127.0.0.1:3001/api/v3/messages/websocket
+#[allow(dead_code)] // not dead code, just for documentation
+#[utoipa::path(
+        get,
+        path = const_format::formatcp!("{BASE_PATH}/messages/websocket"),
+        responses(
+            (status = 206, description = "Incoming data", body = Text, content_type = "application/text"),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
+            (status = 422, description = "Unknown failure", body = ApiError)
+        ),
+        security(
+            ("api_token" = []),
+            ("bearer_token" = [])
+        ),
+        tag = "Messages",
+    )]
+pub(crate) async fn websocket(ws: WebSocketUpgrade, State(state): State<Arc<InternalState>>) -> impl IntoResponse {
+    ws.on_upgrade(move |socket| websocket_connection(socket, state))
+}
+
+enum WebSocketInput {
+    Network(TransportOutput),
+    WsInput(core::option::Option<core::result::Result<Message, Error>>),
+}
+
+async fn websocket_connection(mut socket: WebSocket, state: Arc<InternalState>) {
+    let (mut sender, mut receiver) = stream.split();
+
+    let ws_rx = state.websocket_rx.activate_cloned();
+
+    let mut queue = (
+        receiver.map(WebSocketInput::WsInput),
+        ws_rx.map(WebSocketInput::Network),
+    )
+        .merge();
+
+    while let Some(v) = queue.next().await {
+        match v {
+            WebSocketInput::Network(net_in) => match net_in {
+                TransportOutput::Received(data) => {
+                    debug!("websocket notifying client with received msg {data}");
+                    match sender.send_json(&json!(WebSocketReadMsg::from(data))).await {
+                        Ok(_) => {}
+                        Err(e) => error!("failed to send websocket message: {e}"),
+                    };
+                }
+                TransportOutput::Sent(hkc) => {
+                    debug!("websocket notifying client with received ack {hkc}");
+                    match sender.send_json(&json!(WebSocketReadAck::from_ack(hkc))).await {
+                        Ok(_) => {}
+                        Err(e) => error!("failed to send websocket message: {e}"),
+                    };
+                }
+            },
+            WebSocketInput::WsInput(ws_in) => match ws_in {
+                None => {
+                    warn!("websocket connection closed");
+                }
+                Some(Ok(Message::Text(input))) => match handle_send_message(&input, state, sender).await {
+                    Ok(_) => {}
+                    Err(e) => error!("failed to send message: {e}"),
+                },
+                Some(Err(e)) => error!("failed to get a valid websocket message: {e}"),
+                Some(_) => warn!("encountered an unsupported websocket input type"),
+            },
+        }
+    }
+}
+
+async fn handle_send_message(
+    input: &str,
+    state: InternalState,
+    sender: SplitSink<WebSocket, Message>,
+) -> Result<(), serde_json::Error> {
+    let data: WebSocketSendMsg = serde_json::from_str(&input)?;
+    if data.cmd == "sendmsg" {
+        let hopr = state.hopr.clone();
+
+        // Use the message encoder, if any
+        // TODO: remove RLP in 3.0
+        let msg_body = state
+            .msg_encoder
+            .as_ref()
+            .map(|enc| enc(&data.args.body))
+            .unwrap_or_else(|| data.args.body.into_boxed_slice());
+
+        let hkc = hopr
+            .send_message(
+                // data.args.body.into_bytes().into_boxed_slice(),
+                msg_body,
+                data.args.peer_id,
+                data.args.path,
+                data.args.hops,
+                Some(data.args.tag),
+            )
+            .await?;
+        debug!("websocket notifying client with sent ack {hkc}");
+        sender
+            .send_json(&json!(WebSocketReadAck::from_ack_challenge(hkc)))
+            .await?;
+    } else {
+        warn!("skipping an unsupported websocket command '{}'", data.cmd);
+    }
+
+    Ok(())
+}
+
+/// Delete messages from nodes message inbox.
+#[utoipa::path(
+        delete,
+        path = const_format::formatcp!("{BASE_PATH}/messages"),
+        params(TagQueryRequest),
+        responses(
+            (status = 204, description = "Messages successfully deleted."),
+            (status = 400, description = "Bad request.", body = ApiError),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
+        ),
+        tag = "Messages",
+        security(
+            ("api_token" = []),
+            ("bearer_token" = [])
+        )
+    )]
+pub(super) async fn delete_messages(
+    Query(TagQueryRequest { tag }): Query<TagQueryRequest>,
+    State(state): State<Arc<InternalState>>,
+) -> impl IntoResponse {
+    if let Some(tag) = tag {
+        if tag < RESERVED_TAG_UPPER_LIMIT {
+            return (BAD_REQUEST, ApiErrorStatus::InvalidApplicationTag).into_response();
+        }
+    }
+
+    let inbox = state.inbox.clone();
+    inbox.write().await.pop_all(tag).await;
+    (NO_CONTENT, ()).into_response()
+}
+
+/// Get size of filtered message inbox for a specific tag
+#[utoipa::path(
+        get,
+        path = const_format::formatcp!("{BASE_PATH}/messages/size"),
+        params(TagQueryRequest),
+        responses(
+            (status = 200, description = "Returns the message inbox size filtered by the given tag", body = SizeResponse),
+            (status = 400, description = "Bad request.", body = ApiError),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
+        ),
+        security(
+            ("api_token" = []),
+            ("bearer_token" = [])
+        ),
+        tag = "Messages"
+    )]
+pub(super) async fn size(
+    Query(TagQueryRequest { tag }): Query<TagQueryRequest>,
+    State(state): State<Arc<InternalState>>,
+) -> impl IntoResponse {
+    if let Some(tag) = tag {
+        if tag < RESERVED_TAG_UPPER_LIMIT {
+            return (BAD_REQUEST, ApiErrorStatus::InvalidApplicationTag).into_response();
+        }
+    }
+
+    let inbox = state.inbox.clone();
+    let size = inbox.read().await.size(tag).await;
+
+    (OK, Json(SizeResponse { size })).into_response()
+}
+
+#[serde_as]
+#[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
+#[schema(example = json!({
+        "body": "Test message 1",
+        "receivedAt": 1704453953073i64,
+        "tag": 20
+    }))]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct MessagePopResponse {
+    tag: u16,
+    body: String,
+    #[serde_as(as = "DurationMilliSeconds<u64>")]
+    #[schema(value_type = u64)]
+    received_at: std::time::Duration,
+}
+
+fn to_api_message(data: hopr_lib::ApplicationData, received_at: Duration) -> Result<MessagePopResponse, String> {
+    if let Some(tag) = data.application_tag {
+        match std::str::from_utf8(&data.plain_text) {
+            Ok(data_str) => Ok(MessagePopResponse {
+                tag,
+                body: data_str.into(),
+                received_at,
+            }),
+            Err(error) => Err(format!("Failed to deserialize data into string: {error}")),
+        }
+    } else {
+        Err("No application tag was present despite picking from a tagged inbox".into())
+    }
+}
+
+/// Get the oldest message currently present in the nodes message inbox.
+///
+/// The message is removed from the inbox.
+#[utoipa::path(
+        post,
+        path = const_format::formatcp!("{BASE_PATH}/messages/pop"),
+        request_body(
+            content = TagQueryRequest,
+            description = "Tag of message queue to pop from",
+            content_type = "application/json"
+        ),
+        responses(
+            (status = 200, description = "Message successfully extracted.", body = MessagePopResponse),
+            (status = 400, description = "Bad request.", body = ApiError),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
+            (status = 404, description = "The specified resource was not found."),
+            (status = 422, description = "Unknown failure", body = ApiError)
+        ),
+        security(
+            ("api_token" = []),
+            ("bearer_token" = [])
+        ),
+        tag = "Messages"
+    )]
+pub(super) async fn pop(
+    Query(TagQueryRequest { tag }): Query<TagQueryRequest>,
+    State(state): State<Arc<InternalState>>,
+) -> impl IntoResponse {
+    if let Some(tag) = tag {
+        if tag < RESERVED_TAG_UPPER_LIMIT {
+            return (BAD_REQUEST, ApiErrorStatus::InvalidApplicationTag).into_response();
+        }
+    }
+
+    let inbox = state.inbox.clone();
+    let inbox = inbox.write().await;
+    if let Some((data, ts)) = inbox.pop(tag).await {
+        match to_api_message(data, ts) {
+            Ok(message) => (OK, Json(message)).into_response(),
+            Err(e) => (UNPROCESSABLE_ENTITY, ApiErrorStatus::UnknownFailure(e)).into_response(),
+        }
+    } else {
+        (NOT_FOUND, ()).into_response()
+    }
+}
+
+#[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
+pub(crate) struct MessagePopAllResponse {
+    messages: Vec<MessagePopResponse>,
+}
+
+/// Get the list of messages currently present in the nodes message inbox.
+///
+/// The messages are removed from the inbox.
+#[utoipa::path(
+        post,
+        path = const_format::formatcp!("{BASE_PATH}/messages/pop-all"),
+        request_body(
+            content = TagQueryRequest,
+            description = "Tag of message queue to pop from. When an empty object or an object with a `tag: 0` is provided, it lists and removes all the messages.",
+            content_type = "application/json"
+        ),
+        responses(
+            (status = 200, description = "All message successfully extracted.", body = MessagePopAllResponse),
+            (status = 400, description = "Bad request.", body = ApiError),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
+            (status = 404, description = "The specified resource was not found."),
+            (status = 422, description = "Unknown failure", body = ApiError)
+        ),
+        security(
+            ("api_token" = []),
+            ("bearer_token" = [])
+        ),
+        tag = "Messages"
+    )]
+pub(super) async fn pop_all(
+    Query(TagQueryRequest { tag }): Query<TagQueryRequest>,
+    State(state): State<Arc<InternalState>>,
+) -> impl IntoResponse {
+    if let Some(tag) = tag {
+        if tag < RESERVED_TAG_UPPER_LIMIT {
+            return (BAD_REQUEST, ApiErrorStatus::InvalidApplicationTag).into_response();
+        }
+    }
+
+    let inbox = state.inbox.clone();
+    let inbox = inbox.write().await;
+    let messages: Vec<MessagePopResponse> = inbox
+        .pop_all(tag)
+        .await
+        .into_iter()
+        .filter_map(|(data, ts)| match to_api_message(data, ts) {
+            Ok(msg) => Some(msg),
+            Err(e) => {
+                error!("failed to pop message: {e}");
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+
+    (OK, Json(MessagePopAllResponse { messages })).into_response()
+}
+
+/// Peek the oldest message currently present in the nodes message inbox.
+///
+/// The message is not removed from the inbox.
+#[utoipa::path(
+        post,
+        path = const_format::formatcp!("{BASE_PATH}/messages/peek"),
+        request_body(
+            content = TagQueryRequest,
+            description = "Tag of message queue to peek from",
+            content_type = "application/json"
+        ),
+        responses(
+            (status = 200, description = "Message successfully peeked at.", body = MessagePopResponse),
+            (status = 400, description = "Bad request.", body = ApiError),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
+            (status = 404, description = "The specified resource was not found."),
+            (status = 422, description = "Unknown failure", body = ApiError)
+        ),
+        security(
+            ("api_token" = []),
+            ("bearer_token" = [])
+        ),
+        tag = "Messages"
+    )]
+pub(super) async fn peek(
+    Query(TagQueryRequest { tag }): Query<TagQueryRequest>,
+    State(state): State<Arc<InternalState>>,
+) -> impl IntoResponse {
+    if let Some(tag) = tag {
+        if tag < RESERVED_TAG_UPPER_LIMIT {
+            return (BAD_REQUEST, ApiErrorStatus::InvalidApplicationTag).into_response();
+        }
+    }
+
+    let inbox = state.inbox.clone();
+    let inbox = inbox.write().await;
+    if let Some((data, ts)) = inbox.peek(tag).await {
+        match to_api_message(data, ts) {
+            Ok(message) => (OK, Json(message)).into_response(),
+            Err(e) => (UNPROCESSABLE_ENTITY, ApiErrorStatus::UnknownFailure(e)).into_response(),
+        }
+    } else {
+        (NOT_FOUND, ()).into_response()
+    }
+}
+
+/// Peek the list of messages currently present in the nodes message inbox, filtered by tag,
+/// and optionally by timestamp (epoch in milliseconds).
+/// The messages are not removed from the inbox.
+#[utoipa::path(
+        post,
+        path = const_format::formatcp!("{BASE_PATH}/messages/peek-all"),
+        request_body(
+            content = GetMessageBodyRequest,
+            description = "Tag of message queue and optionally a timestamp since from to start peeking. When an empty object or an object with a `tag: 0` is provided, it fetches all the messages.",
+            content_type = "application/json"
+        ),
+        responses(
+            (status = 200, description = "All messages successfully peeked at.", body = MessagePopAllResponse),
+            (status = 400, description = "Bad request.", body = ApiError),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
+            (status = 404, description = "The specified resource was not found."),
+            (status = 422, description = "Unknown failure", body = ApiError)
+        ),
+        security(
+            ("api_token" = []),
+            ("bearer_token" = [])
+        ),
+        tag = "Messages"
+    )]
+
+pub(super) async fn peek_all(
+    State(state): State<Arc<InternalState>>,
+    Json(GetMessageBodyRequest { tag, timestamp }): Json<GetMessageBodyRequest>,
+) -> impl IntoResponse {
+    if let Some(tag) = tag {
+        if tag < RESERVED_TAG_UPPER_LIMIT {
+            return (BAD_REQUEST, ApiErrorStatus::InvalidApplicationTag).into_response();
+        }
+    }
+
+    let inbox = state.inbox.clone();
+    let inbox = inbox.read().await;
+    let messages = inbox
+        .peek_all(tag, timestamp)
+        .await
+        .into_iter()
+        .filter_map(|(data, ts)| match to_api_message(data, ts) {
+            Ok(msg) => Some(msg),
+            Err(e) => {
+                error!("failed to peek message: {e}");
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+
+    (OK, Json(MessagePopAllResponse { messages })).into_response()
+}

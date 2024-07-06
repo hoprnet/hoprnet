@@ -1,59 +1,52 @@
-use futures::FutureExt;
-use std::future::Future;
-use tower_layer::Layer;
-use tower_service::Service;
+use axum::{
+    extract::{OriginalUri, Request},
+    http::Method,
+    middleware::Next,
+    response::Response,
+};
+use std::time::Instant;
+
+#[cfg(all(feature = "prometheus", not(test)))]
+use hopr_metrics::metrics::{MultiCounter, MultiHistogram};
+
+#[cfg(all(feature = "prometheus", not(test)))]
+lazy_static::lazy_static! {
+    static ref METRIC_COUNT_API_CALLS: MultiCounter = MultiCounter::new(
+        "hopr_http_api_call_count",
+        "Number of different REST API calls and their statuses",
+        &["endpoint", "method", "status"]
+    )
+    .unwrap();
+    static ref METRIC_COUNT_API_CALLS_TIMING: MultiHistogram = MultiHistogram::new(
+        "hopr_http_api_call_timing_sec",
+        "Timing of different REST API calls in seconds",
+        vec![0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0],
+        &["endpoint", "method"]
+    )
+    .unwrap();
+}
 
 /// Custom prometheus recording middleware
 #[cfg(all(feature = "prometheus", not(test)))]
-struct PrometheusMetricsLayer;
+pub(crate) async fn record(uri: OriginalUri, method: Method, request: Request, next: Next) -> Response {
+    let path = uri.path().to_owned();
 
-#[cfg(all(feature = "prometheus", not(test)))]
-#[async_trait]
-impl<S> Layer<S> for PrometheusMetricsLayer {
-    type Service = PrometheusMetricsLayer<S>;
+    let start = Instant::now();
+    let response: Response = next.run(request).await;
+    let response_duration = start.elapsed();
 
-    fn layer(&self, inner: S) -> Self::Service {
-        PrometheusMetricsLayer { inner }
+    let status = response.status();
+
+    // We're not interested on metrics for non-functional
+    if path.starts_with("/api/v3/") && !path.contains("node/metrics") {
+        METRIC_COUNT_API_CALLS.increment(&[&path, method.as_str(), &status.to_string()]);
+        METRIC_COUNT_API_CALLS_TIMING.observe(&[&path, method.as_str()], response_duration.as_secs_f64());
     }
+
+    response
 }
 
-struct PrometheusMetricsMiddleware<S> {
-    inner: S,
-}
-
-impl<S> Service<Request> for PrometheusMetricsMiddleware<S>
-where
-    S: Service<Request, Response = Response> + Send + 'static,
-    S::Future: Send + 'static,
-{
-    type Response = S::Response;
-    type Error = S::Error;
-
-    type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
-
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.inner.poll_ready(cx)
-    }
-
-    fn call(&mut self, request: Request) -> Self::Future {
-        let future = self.inner.call(request);
-        Box::pin(async move {
-            let path = req.url().path().to_owned();
-            let method = req.method().to_string();
-
-            let start = std::time::Instant::now();
-            let response: Response = future.await?;
-            let response_duration = start.elapsed();
-
-            let status = response.status();
-
-            // We're not interested on metrics for non-functional
-            if path.starts_with("/api/v3/") && !path.contains("node/metrics") {
-                METRIC_COUNT_API_CALLS.increment(&[&path, &method, &status.to_string()]);
-                METRIC_COUNT_API_CALLS_TIMING.observe(&[&path, &method], response_duration.as_secs_f64());
-            }
-
-            return Ok(response);
-        })
-    }
+#[cfg(any(not(feature = "prometheus"), test))]
+pub(crate) async fn record(uri: OriginalUri, request: Request, next: Next) -> Response {
+    next.run(request).await
 }
