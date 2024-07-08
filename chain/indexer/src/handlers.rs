@@ -761,7 +761,7 @@ where
 
                     // Update the hash only if any logs were processed in this block
                     let block_hash = if !log_tx_hashes.is_empty() {
-                        debug!("block {block_id} has hashes {:?}", log_tx_hashes);
+                        debug!("{block_id} has hashes {:?}", log_tx_hashes);
                         let h = Hash::create(
                             log_tx_hashes
                                 .iter()

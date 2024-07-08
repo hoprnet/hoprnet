@@ -76,7 +76,7 @@ use core_transport::{
 use core_transport::{ChainKeypair, Hash, HoprTransport, OffchainKeypair};
 use core_transport::{IndexerToProcess, Network, PeerEligibility, PeerOrigin};
 use hopr_platform::file::native::{join, read_file, remove_dir_all, write};
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info};
 
 use crate::chain::ChainNetworkConfig;
 use crate::config::HoprLibConfig;
@@ -88,13 +88,12 @@ use hopr_db_api::{
     db::{HoprDb, HoprDbConfig},
     info::{HoprDbInfoOperations, SafeInfo},
     resolver::HoprDbResolverOperations,
-    HoprDbGeneralModelOperations,
 };
 use hopr_db_api::{channels::HoprDbChannelOperations, HoprDbAllOperations};
 
 use hopr_crypto_types::prelude::OffchainPublicKey;
 use hopr_db_api::prelude::ChainOrPacketKey::ChainKey;
-use hopr_db_api::prelude::{DbError, HoprDbPeersOperations};
+use hopr_db_api::prelude::HoprDbPeersOperations;
 #[cfg(all(feature = "prometheus", not(test)))]
 use {
     hopr_metrics::metrics::{MultiGauge, SimpleGauge},
@@ -742,26 +741,6 @@ impl Hopr {
             .chain_api
             .get_safe_balance(self.safe_module_cfg.safe_address, balance_type)
             .await?;
-
-        if balance_type == BalanceType::HOPR {
-            let my_db = self.db.clone();
-            self.db
-                .begin_transaction()
-                .await?
-                .perform(|tx| {
-                    Box::pin(async move {
-                        let db_safe_balance = my_db.get_safe_hopr_balance(Some(tx)).await?;
-                        if safe_balance != db_safe_balance {
-                            warn!(
-                                "Safe balance in the DB {db_safe_balance} mismatches on chain balance: {safe_balance}"
-                            );
-                            my_db.set_safe_hopr_balance(Some(tx), safe_balance).await?;
-                        }
-                        Ok::<_, DbError>(())
-                    })
-                })
-                .await?;
-        }
         Ok(safe_balance)
     }
 
