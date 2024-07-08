@@ -1,13 +1,17 @@
 use axum::{
     extract::{Json, Path, State},
+    http::status::StatusCode,
     response::IntoResponse,
 };
-use http::status::StatusCode::{CONFLICT, CREATED, NOT_FOUND, NO_CONTENT, OK};
+use libp2p_identity::PeerId;
+use serde::{Deserialize, Serialize};
+use serde_with::{serde_as, DisplayFromStr};
+use std::{collections::HashMap, sync::Arc};
 
 use crate::{ApiErrorStatus, InternalState, BASE_PATH};
 
 #[serde_as]
-#[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[schema(example = json!({
         "peerId": "12D3KooWRWeTozREYHzWTbuCYskdYhED1MXpDwTrmccwzFrd2mEA"
     }))]
@@ -19,7 +23,7 @@ pub(crate) struct PeerIdResponse {
 }
 
 #[serde_as]
-#[derive(Debug, Clone, serde::Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 #[schema(example = json!({
         "alias": "Alice",
         "peerId": "12D3KooWRWeTozREYHzWTbuCYskdYhED1MXpDwTrmccwzFrd2mEA"
@@ -59,7 +63,7 @@ pub(super) async fn aliases(State(state): State<Arc<InternalState>>) -> impl Int
         .map(|(key, value)| (key.clone(), value.to_string()))
         .collect::<HashMap<String, String>>();
 
-    (OK, Json(aliases)).into_response()
+    (StatusCode::OK, Json(aliases)).into_response()
 }
 
 /// Set alias for a peer with a specific PeerId.
@@ -91,13 +95,13 @@ pub(super) async fn set_alias(
 
     let inserted = aliases.write().await.insert_no_overwrite(args.alias, args.peer_id);
     match inserted {
-        Ok(_) => (CREATED, Json(PeerIdResponse { peer_id: args.peer_id })).into_response(),
-        Err(_) => (CONFLICT, ApiErrorStatus::AliasAlreadyExists).into_response(),
+        Ok(_) => (StatusCode::CREATED, Json(PeerIdResponse { peer_id: args.peer_id })).into_response(),
+        Err(_) => (StatusCode::CONFLICT, ApiErrorStatus::AliasAlreadyExists).into_response(),
     }
 }
 
 #[derive(Deserialize)]
-struct GetAliasParams {
+pub(crate) struct GetAliasParams {
     alias: String,
 }
 
@@ -127,14 +131,14 @@ pub(super) async fn get_alias(
 
     let aliases = aliases.read().await;
     if let Some(peer_id) = aliases.get_by_left(&alias) {
-        (OK, Json(PeerIdResponse { peer_id: *peer_id })).into_response()
+        (StatusCode::OK, Json(PeerIdResponse { peer_id: *peer_id })).into_response()
     } else {
-        (NOT_FOUND, ApiErrorStatus::InvalidInput).into_response()
+        (StatusCode::NOT_FOUND, ApiErrorStatus::InvalidInput).into_response()
     }
 }
 
 #[derive(Deserialize)]
-struct DeleteAliasParams {
+pub(crate) struct DeleteAliasParams {
     alias: String,
 }
 
@@ -164,5 +168,5 @@ pub(super) async fn delete_alias(
 
     let _ = aliases.write().await.remove_by_left(&alias);
 
-    (NO_CONTENT, "").into_response()
+    (StatusCode::NO_CONTENT, "").into_response()
 }

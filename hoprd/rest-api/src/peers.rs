@@ -1,16 +1,17 @@
 use axum::{
     extract::{Json, Path, State},
+    http::status::StatusCode,
     response::IntoResponse,
 };
 use hopr_lib::{HoprTransportError, Multiaddr};
-use http::status::StatusCode::{BAD_REQUEST, OK, UNPROCESSABLE_ENTITY};
 use libp2p_identity::PeerId;
-use serde_with::DurationMilliSeconds;
+use serde::Deserialize;
+use serde_with::{serde_as, DisplayFromStr, DurationMilliSeconds};
 use std::{str::FromStr, sync::Arc, time::Duration};
 
 use hopr_lib::errors::HoprLibError;
 
-use crate::{ApiErrorStatus, InternalState, BASE_PATH};
+use crate::{ApiError, ApiErrorStatus, InternalState, BASE_PATH};
 
 #[serde_as]
 #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
@@ -33,7 +34,7 @@ pub(crate) struct NodePeerInfoResponse {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct PeerIdParams {
+pub(crate) struct PeerIdParams {
     peer_id: String,
 }
 
@@ -66,14 +67,14 @@ pub(super) async fn show_peer_info(
     let hopr = state.hopr.clone();
     match PeerId::from_str(peer_id.as_str()) {
         Ok(peer) => (
-            OK,
+            StatusCode::OK,
             Json(NodePeerInfoResponse {
                 announced: hopr.multiaddresses_announced_on_chain(&peer).await,
                 observed: hopr.network_observed_multiaddresses(&peer).await,
             }),
         )
             .into_response(),
-        Err(_) => (BAD_REQUEST, ApiErrorStatus::InvalidPeerId).into_response(),
+        Err(_) => (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidPeerId).into_response(),
     }
 }
 
@@ -113,27 +114,23 @@ pub(crate) struct PingResponse {
 pub(super) async fn ping_peer(
     Path(PeerIdParams { peer_id }): Path<PeerIdParams>,
     State(state): State<Arc<InternalState>>,
-) -> impl IntoResponse {
+) -> Result<impl IntoResponse, ApiError> {
     let hopr = state.hopr.clone();
     match PeerId::from_str(peer_id.as_str()) {
         Ok(peer) => match hopr.ping(&peer).await {
-            Ok(latency) => (
-                OK,
-                Json(PingResponse {
+            Ok(latency) => {
+                let info = hopr.network_peer_info(&peer).await?;
+                let resp = Json(PingResponse {
                     latency: latency.unwrap_or(Duration::ZERO), // TODO: what should be the correct default ?
-                    reported_version: hopr
-                        .network_peer_info(&peer)
-                        .await?
-                        .and_then(|p| p.peer_version)
-                        .unwrap_or("unknown".into()),
-                }),
-            )
-                .into_response(),
-            Err(HoprLibError::TransportError(HoprTransportError::Protocol(hopr_lib::ProtocolError::Timeout))) => {
-                (UNPROCESSABLE_ENTITY, ApiErrorStatus::Timeout).into_response()
+                    reported_version: info.and_then(|p| p.peer_version).unwrap_or("unknown".into()),
+                });
+                Ok((StatusCode::OK, resp).into_response())
             }
-            Err(e) => (UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
+            Err(HoprLibError::TransportError(HoprTransportError::Protocol(hopr_lib::ProtocolError::Timeout))) => {
+                Ok((StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::Timeout).into_response())
+            }
+            Err(e) => Ok((StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response()),
         },
-        Err(_) => (BAD_REQUEST, ApiErrorStatus::InvalidPeerId).into_response(),
+        Err(_) => Ok((StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidPeerId).into_response()),
     }
 }

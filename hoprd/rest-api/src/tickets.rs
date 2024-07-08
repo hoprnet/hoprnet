@@ -1,9 +1,12 @@
-use axum::extract::{Json, Path};
-use axum::response::IntoResponse;
-use axum::state::State;
+use axum::{
+    extract::{Json, Path, State},
+    http::status::StatusCode,
+    response::IntoResponse,
+};
 use hopr_crypto_types::types::Hash;
 use hopr_lib::{errors::HoprLibError, HoprTransportError, ProtocolError, Ticket, TicketStatistics, ToHex};
-use hyper::StatusCode::{BAD_REQUEST, NOT_FOUND, NO_CONTENT, OK, UNPROCESSABLE_ENTITY};
+use serde::Deserialize;
+use serde_with::{serde_as, DisplayFromStr};
 use std::sync::Arc;
 
 use crate::{ApiErrorStatus, InternalState, BASE_PATH};
@@ -48,7 +51,7 @@ impl From<Ticket> for ChannelTicket {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct ChannelIdParams {
+pub(crate) struct ChannelIdParams {
     channel_id: String,
 }
 
@@ -82,12 +85,12 @@ pub(super) async fn show_channel_tickets(
         Ok(channel_id) => match hopr.tickets_in_channel(&channel_id).await {
             Ok(Some(_tickets)) => {
                 let tickets: Vec<ChannelTicket> = vec![];
-                (OK, Json(tickets)).into_response()
+                (StatusCode::OK, Json(tickets)).into_response()
             }
-            Ok(None) => (NOT_FOUND, ApiErrorStatus::ChannelNotFound).into_response(),
-            Err(e) => (UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
+            Ok(None) => (StatusCode::NOT_FOUND, ApiErrorStatus::TicketsNotFound).into_response(),
+            Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
         },
-        Err(_) => (BAD_REQUEST, ApiErrorStatus::InvalidChannelId).into_response(),
+        Err(_) => (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidChannelId).into_response(),
     }
 }
 
@@ -108,7 +111,7 @@ pub(super) async fn show_channel_tickets(
     )]
 pub(super) async fn show_all_tickets() -> impl IntoResponse {
     let tickets: Vec<ChannelTicket> = vec![];
-    (OK, Json(tickets)).into_response()
+    (StatusCode::OK, Json(tickets)).into_response()
 }
 
 #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
@@ -158,8 +161,8 @@ impl From<TicketStatistics> for NodeTicketStatisticsResponse {
 pub(super) async fn show_ticket_statistics(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
     let hopr = state.hopr.clone();
     match hopr.ticket_statistics().await.map(NodeTicketStatisticsResponse::from) {
-        Ok(stats) => (OK, Json(stats)).into_response(),
-        Err(e) => (UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
+        Ok(stats) => (StatusCode::OK, Json(stats)).into_response(),
+        Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
     }
 }
 
@@ -184,8 +187,8 @@ pub(super) async fn show_ticket_statistics(State(state): State<Arc<InternalState
 pub(super) async fn redeem_all_tickets(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
     let hopr = state.hopr.clone();
     match hopr.redeem_all_tickets(false).await {
-        Ok(()) => (NO_CONTENT, "").into_response(),
-        Err(e) => (UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
+        Ok(()) => (StatusCode::NO_CONTENT, "").into_response(),
+        Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
     }
 }
 
@@ -220,11 +223,11 @@ pub(super) async fn redeem_tickets_in_channel(
 
     match Hash::from_hex(channel_id.as_str()) {
         Ok(channel_id) => match hopr.redeem_tickets_in_channel(&channel_id, false).await {
-            Ok(count) if count > 0 => (NO_CONTENT, "").into_response(),
-            Ok(_) => (NOT_FOUND, ApiErrorStatus::ChannelNotFound).into_response(),
-            Err(e) => (UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
+            Ok(count) if count > 0 => (StatusCode::NO_CONTENT, "").into_response(),
+            Ok(_) => (StatusCode::NOT_FOUND, ApiErrorStatus::ChannelNotFound).into_response(),
+            Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
         },
-        Err(_) => (BAD_REQUEST, ApiErrorStatus::InvalidChannelId).into_response(),
+        Err(_) => (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidChannelId).into_response(),
     }
 }
 
@@ -256,15 +259,15 @@ pub(super) async fn aggregate_tickets_in_channel(
 
     match Hash::from_hex(channel_id.as_str()) {
         Ok(channel_id) => match hopr.aggregate_tickets(&channel_id).await {
-            Ok(_) => (NO_CONTENT, "").into_response(),
+            Ok(_) => (StatusCode::NO_CONTENT, "").into_response(),
             Err(HoprLibError::TransportError(HoprTransportError::Protocol(ProtocolError::ChannelNotFound))) => {
-                (NOT_FOUND, ApiErrorStatus::ChannelNotFound).into_response()
+                (StatusCode::NOT_FOUND, ApiErrorStatus::ChannelNotFound).into_response()
             }
             Err(HoprLibError::TransportError(HoprTransportError::Protocol(ProtocolError::ChannelClosed))) => {
-                (UNPROCESSABLE_ENTITY, ApiErrorStatus::ChannelNotOpen).into_response()
+                (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::ChannelNotOpen).into_response()
             }
-            Err(e) => (UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
+            Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
         },
-        Err(_) => (BAD_REQUEST, ApiErrorStatus::InvalidChannelId).into_response(),
+        Err(_) => (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidChannelId).into_response(),
     }
 }

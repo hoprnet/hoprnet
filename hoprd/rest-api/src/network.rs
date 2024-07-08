@@ -1,8 +1,8 @@
 use axum::{
     extract::{Json, State},
+    http::status::StatusCode,
     response::IntoResponse,
 };
-use http::status::StatusCode::{OK, UNPROCESSABLE_ENTITY};
 use std::sync::Arc;
 
 use crate::{ApiErrorStatus, InternalState, BASE_PATH};
@@ -34,17 +34,17 @@ pub(super) async fn price(State(state): State<Arc<InternalState>>) -> impl IntoR
 
     match hopr.get_ticket_price().await {
         Ok(Some(price)) => (
-            OK,
+            StatusCode::OK,
             Json(TicketPriceResponse {
                 price: price.to_string(),
             }),
         )
             .into_response(),
         Ok(None) => (
-            UNPROCESSABLE_ENTITY,
+            StatusCode::UNPROCESSABLE_ENTITY,
             ApiErrorStatus::UnknownFailure("The ticket price is not available".into()),
         )
             .into_response(),
-        Err(e) => (UNPROCESSABLE_ENTITY, ApiErrorStatus::from_error(e)).into_response(),
+        Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
     }
 }

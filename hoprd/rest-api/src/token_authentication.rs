@@ -1,13 +1,13 @@
 use axum::{
     extract::{OriginalUri, Request, State},
-    http::HeaderMap,
+    http::{
+        header::{HeaderName, AUTHORIZATION},
+        status::StatusCode,
+        HeaderMap,
+    },
     middleware::Next,
-    response::Response,
+    response::IntoResponse,
 };
-use hyper::extract::Json;
-use hyper::header::{HeaderName, AUTHORIZATION};
-use hyper::StatusCode::UNAUTHORIZED;
-use mime::JSON;
 use std::str::FromStr;
 
 use crate::{ApiErrorStatus, Auth, InternalState};
@@ -18,7 +18,7 @@ pub(crate) async fn authenticate(
     headers: HeaderMap,
     request: Request,
     next: Next,
-) -> Response {
+) -> impl IntoResponse {
     let auth = state.auth.clone();
 
     let x_auth_header = HeaderName::from_str("x-auth-token").unwrap();
@@ -53,10 +53,9 @@ pub(crate) async fn authenticate(
     };
 
     if !is_authorized {
-        let reject_response = (UNAUTHORIZED, Json(ApiErrorStatus::Unauthorized)).into_response();
-        return Ok(reject_response);
+        return (StatusCode::UNAUTHORIZED, ApiErrorStatus::Unauthorized).into_response();
     }
 
     // Go forward to the next middleware or request handler
-    return Ok(next.run(request).await);
+    return next.run(request).await;
 }

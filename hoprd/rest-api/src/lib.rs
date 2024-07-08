@@ -15,32 +15,37 @@ mod token_authentication;
 
 use async_lock::RwLock;
 use axum::{
+    extract::Json,
+    http::{status::StatusCode, Method},
     middleware,
+    response::{IntoResponse, Response},
     routing::{delete, get, post},
-    Json, Router,
+    Router,
 };
 use bimap::BiHashMap;
-use http::Method;
 use hyper::header::AUTHORIZATION;
 use libp2p_identity::PeerId;
+use serde::Serialize;
 use std::error::Error;
 use std::iter::once;
 use std::sync::Arc;
+use tokio::net::TcpListener;
 use tower::ServiceBuilder;
-use tower::{Layer, Service};
-use tower_http::compression::CompressionLayer;
-use tower_http::cors::{any, CorsLayer};
-use tower_http::sensor::SetSensitiveRequestHeadersLayer;
-use tower_http::trace::TraceLayer;
-use tower_http::validate::ValidateRequestHeaderLayer;
+use tower_http::{
+    compression::CompressionLayer,
+    cors::{Any, CorsLayer},
+    sensitive_headers::SetSensitiveRequestHeadersLayer,
+    trace::TraceLayer,
+    validate_request::ValidateRequestHeaderLayer,
+};
 use utoipa::openapi::security::{ApiKey, ApiKeyValue, HttpAuthScheme, HttpBuilder, SecurityScheme};
 use utoipa::{Modify, OpenApi};
+use utoipa_rapidoc::RapiDoc;
+use utoipa_redoc::{Redoc, Servable};
+use utoipa_scalar::{Scalar, Servable as ScalarServable};
 use utoipa_swagger_ui::SwaggerUi;
-use Rapidoc::RapiDoc;
-use Redoc::Redoc;
-use Scalar::Scalar;
 
-use hopr_lib::{Hopr, TransportOutput};
+use hopr_lib::{errors::HoprLibError, Hopr, TransportOutput};
 
 use crate::config::Auth;
 
@@ -158,7 +163,7 @@ impl Modify for SecurityAddon {
 }
 
 pub async fn serve_api(
-    listener: tokio::net::Listener,
+    listener: TcpListener,
     hoprd_cfg: String,
     cfg: crate::config::Api,
     hopr: Arc<hopr_lib::Hopr>,
@@ -204,7 +209,7 @@ async fn build_api(
                 .route("/startedz", get(checks::startedz))
                 .route("/readyz", get(checks::readyz))
                 .route("/healthyz", get(checks::healthyz))
-                .with_state(state),
+                .with_state(state.into()),
         )
         .nest(
             BASE_PATH,
@@ -250,8 +255,11 @@ async fn build_api(
                 .route("/node/peers", get(node::peers))
                 .route("/node/entryNodes", get(node::entry_nodes))
                 .route("/node/metrics", get(node::metrics))
-                .with_state(inner_state)
-                .layer(middleware::from_fn(token_authentication::authenticate)),
+                .with_state(inner_state.clone().into())
+                .layer(middleware::from_fn_with_state(
+                    inner_state.into(),
+                    token_authentication::authenticate,
+                )),
         )
         .layer(
             ServiceBuilder::new()
@@ -259,7 +267,7 @@ async fn build_api(
                 .layer(
                     CorsLayer::new()
                         .allow_methods([Method::GET, Method::POST, Method::OPTIONS, Method::DELETE])
-                        .allow_origin(any),
+                        .allow_origin(Any),
                 )
                 .layer(middleware::from_fn(prometheus::record))
                 .layer(CompressionLayer::new())
@@ -268,7 +276,7 @@ async fn build_api(
         )
 }
 
-#[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[schema(example = json!({
     "status": "INVALID_INPUT",
     "error": "Invalid value passed in parameter 'XYZ'"
@@ -317,9 +325,15 @@ impl From<ApiErrorStatus> for ApiError {
     }
 }
 
-impl From<ApiErrorStatus> for axum::body::Body {
-    fn from(value: ApiErrorStatus) -> Self {
-        Json(ApiError::from(value))
+impl IntoResponse for ApiErrorStatus {
+    fn into_response(self) -> Response {
+        Json(ApiError::from(self)).into_response()
+    }
+}
+
+impl IntoResponse for ApiError {
+    fn into_response(self) -> Response {
+        (StatusCode::INTERNAL_SERVER_ERROR, Json(ApiError::from(self))).into_response()
     }
 }
 
@@ -330,55 +344,15 @@ impl<T: Error> From<T> for ApiErrorStatus {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::messages::SendMessageBodyRequest;
-
-    #[test]
-    fn send_message_accepts_bytes_in_body() {
-        let peer = libp2p_identity::PeerId::random();
-        let test_sequence = b"wow, this actually works";
-
-        let json_value = serde_json::json!({
-            "tag": 5,
-            "body": test_sequence.to_vec(),
-            "peerId": peer.to_string()
-        });
-
-        let expected = SendMessageBodyRequest {
-            tag: 5,
-            body: test_sequence.to_vec(),
-            peer_id: peer,
-            path: None,
-            hops: None,
-        };
-
-        let actual: SendMessageBodyRequest = serde_json::from_value(json_value).unwrap();
-
-        assert_eq!(actual, expected);
-    }
-
-    #[test]
-    fn send_message_accepts_utf8_string_in_body() {
-        let peer = libp2p_identity::PeerId::random();
-        let test_sequence = b"wow, this actually works";
-
-        let json_value = serde_json::json!({
-            "tag": 5,
-            "body": String::from_utf8(test_sequence.to_vec()).expect("should be a utf-8 string"),
-            "peerId": peer.to_string()
-        });
-
-        let expected = SendMessageBodyRequest {
-            tag: 5,
-            body: test_sequence.to_vec(),
-            peer_id: peer,
-            path: None,
-            hops: None,
-        };
-
-        let actual: SendMessageBodyRequest = serde_json::from_value(json_value).unwrap();
-
-        assert_eq!(actual, expected);
+// Errors lead to `UnknownFailure` per default
+impl<T> From<T> for ApiError
+where
+    T: Error + Into<HoprLibError>,
+{
+    fn from(value: T) -> Self {
+        Self {
+            status: ApiErrorStatus::UnknownFailure("unknown error".to_string()).to_string(),
+            error: Some(value.to_string()),
+        }
     }
 }

@@ -3,32 +3,40 @@ use axum::{
         ws::{Message, WebSocket, WebSocketUpgrade},
         Json, Query, State,
     },
+    http::status::StatusCode,
     response::IntoResponse,
     Error,
 };
-use futures_util::stream::SplitSink;
-use http::status::StatusCode::{ACCEPTED, BAD_REQUEST, NOT_FOUND, NO_CONTENT, OK, UNPROCESSABLE_ENTITY};
+use futures::{
+    sink::SinkExt,
+    stream::{SplitSink, StreamExt},
+};
+use futures_concurrency::stream::Merge;
 use libp2p_identity::PeerId;
+use serde::Deserialize;
+use serde_json::json;
+use serde_with::{serde_as, Bytes, DisplayFromStr, DurationMilliSeconds};
 use std::{sync::Arc, time::Duration};
+use tracing::{debug, error, warn};
 
 use hopr_lib::{AsUnixTimestamp, HalfKeyChallenge, TransportOutput, RESERVED_TAG_UPPER_LIMIT};
 
 use crate::{ApiErrorStatus, InternalState, BASE_PATH};
 
-#[derive(Debug, Default, Clone, serde::Deserialize, utoipa::ToSchema, utoipa::IntoParams)]
+#[derive(Debug, Default, Clone, Deserialize, utoipa::ToSchema, utoipa::IntoParams)]
 #[into_params(parameter_in = Query)]
 pub(crate) struct TagQueryRequest {
     #[schema(required = false)]
     tag: Option<u16>,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, serde::Serialize, Deserialize, utoipa::ToSchema)]
 pub(crate) struct SizeResponse {
     size: usize,
 }
 
 #[serde_as]
-#[derive(Debug, Clone, PartialEq, serde::Deserialize, validator::Validate, utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Deserialize, validator::Validate, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 #[schema(example = json!({
         "body": "Test message",
@@ -67,13 +75,13 @@ pub(crate) struct SendMessageResponse {
     #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String)]
     challenge: HalfKeyChallenge,
-    #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
+    #[serde_as(as = "DurationMilliSeconds<u64>")]
     #[schema(value_type = u64)]
     timestamp: std::time::Duration,
 }
 
 #[serde_as]
-#[derive(Debug, Default, Clone, serde::Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Default, Clone, Deserialize, utoipa::ToSchema)]
 pub(crate) struct GetMessageBodyRequest {
     /// The message tag used to filter messages based on application
     #[schema(required = false)]
@@ -122,7 +130,7 @@ pub(super) async fn send_message(
     if let Some(path) = &args.path {
         if path.len() > 3 {
             return (
-                UNPROCESSABLE_ENTITY,
+                StatusCode::UNPROCESSABLE_ENTITY,
                 ApiErrorStatus::UnknownFailure("The path components must contain at most 3 elements".into()),
             )
                 .into_response();
@@ -135,17 +143,17 @@ pub(super) async fn send_message(
         .send_message(msg_body, args.peer_id, args.path, args.hops, Some(args.tag))
         .await
     {
-        Ok(challenge) => (ACCEPTED, Json(SendMessageResponse { challenge, timestamp })).into_response(),
-        Err(e) => (UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
+        Ok(challenge) => (StatusCode::ACCEPTED, Json(SendMessageResponse { challenge, timestamp })).into_response(),
+        Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
     }
 }
 
-#[derive(Debug, Default, Clone, serde::Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Default, Clone, Deserialize, utoipa::ToSchema)]
 #[schema(value_type = String)] //, format = Binary)]
 #[allow(dead_code)] // not dead code, just for codegen
 struct Text(String);
 
-#[derive(Debug, Clone, serde::Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 struct WebSocketSendMsg {
     cmd: String,
     args: SendMessageBodyRequest,
@@ -257,11 +265,11 @@ pub(crate) async fn websocket(ws: WebSocketUpgrade, State(state): State<Arc<Inte
 
 enum WebSocketInput {
     Network(TransportOutput),
-    WsInput(core::option::Option<core::result::Result<Message, Error>>),
+    WsInput(core::result::Result<Message, Error>),
 }
 
-async fn websocket_connection(mut socket: WebSocket, state: Arc<InternalState>) {
-    let (mut sender, mut receiver) = stream.split();
+async fn websocket_connection(socket: WebSocket, state: Arc<InternalState>) {
+    let (mut sender, receiver) = socket.split();
 
     let ws_rx = state.websocket_rx.activate_cloned();
 
@@ -276,29 +284,32 @@ async fn websocket_connection(mut socket: WebSocket, state: Arc<InternalState>) 
             WebSocketInput::Network(net_in) => match net_in {
                 TransportOutput::Received(data) => {
                     debug!("websocket notifying client with received msg {data}");
-                    match sender.send_json(&json!(WebSocketReadMsg::from(data))).await {
+                    match sender
+                        .send(Message::Text(json!(WebSocketReadMsg::from(data)).to_string()))
+                        .await
+                    {
                         Ok(_) => {}
                         Err(e) => error!("failed to send websocket message: {e}"),
                     };
                 }
                 TransportOutput::Sent(hkc) => {
                     debug!("websocket notifying client with received ack {hkc}");
-                    match sender.send_json(&json!(WebSocketReadAck::from_ack(hkc))).await {
+                    match sender
+                        .send(Message::Text(json!(WebSocketReadAck::from_ack(hkc)).to_string()))
+                        .await
+                    {
                         Ok(_) => {}
                         Err(e) => error!("failed to send websocket message: {e}"),
                     };
                 }
             },
             WebSocketInput::WsInput(ws_in) => match ws_in {
-                None => {
-                    warn!("websocket connection closed");
-                }
-                Some(Ok(Message::Text(input))) => match handle_send_message(&input, state, sender).await {
+                Ok(Message::Text(input)) => match handle_send_message(&input, state.clone(), &mut sender).await {
                     Ok(_) => {}
                     Err(e) => error!("failed to send message: {e}"),
                 },
-                Some(Err(e)) => error!("failed to get a valid websocket message: {e}"),
-                Some(_) => warn!("encountered an unsupported websocket input type"),
+                Err(e) => error!("failed to get a valid websocket message: {e}"),
+                Ok(_) => warn!("skipping an unsupported websocket message"),
             },
         }
     }
@@ -306,11 +317,21 @@ async fn websocket_connection(mut socket: WebSocket, state: Arc<InternalState>) 
 
 async fn handle_send_message(
     input: &str,
-    state: InternalState,
-    sender: SplitSink<WebSocket, Message>,
-) -> Result<(), serde_json::Error> {
-    let data: WebSocketSendMsg = serde_json::from_str(&input)?;
-    if data.cmd == "sendmsg" {
+    state: Arc<InternalState>,
+    sender: &mut SplitSink<WebSocket, Message>,
+) -> Result<(), String> {
+    match serde_json::from_str(&input) {
+        Ok(data) => handle_send_message_data(data, state, sender).await,
+        Err(e) => Err(format!("failed to parse websocket message: {e}")),
+    }
+}
+
+async fn handle_send_message_data(
+    msg: WebSocketSendMsg,
+    state: Arc<InternalState>,
+    sender: &mut SplitSink<WebSocket, Message>,
+) -> Result<(), String> {
+    if msg.cmd == "sendmsg" {
         let hopr = state.hopr.clone();
 
         // Use the message encoder, if any
@@ -318,25 +339,36 @@ async fn handle_send_message(
         let msg_body = state
             .msg_encoder
             .as_ref()
-            .map(|enc| enc(&data.args.body))
-            .unwrap_or_else(|| data.args.body.into_boxed_slice());
+            .map(|enc| enc(&msg.args.body))
+            .unwrap_or_else(|| msg.args.body.into_boxed_slice());
 
         let hkc = hopr
             .send_message(
-                // data.args.body.into_bytes().into_boxed_slice(),
                 msg_body,
-                data.args.peer_id,
-                data.args.path,
-                data.args.hops,
-                Some(data.args.tag),
+                msg.args.peer_id,
+                msg.args.path,
+                msg.args.hops,
+                Some(msg.args.tag),
             )
-            .await?;
-        debug!("websocket notifying client with sent ack {hkc}");
-        sender
-            .send_json(&json!(WebSocketReadAck::from_ack_challenge(hkc)))
-            .await?;
+            .await;
+        match hkc {
+            Ok(challenge) => {
+                debug!("websocket notifying client with sent msg {challenge}");
+                if let Err(e) = sender
+                    .send(Message::Text(
+                        json!(WebSocketReadAck::from_ack_challenge(challenge)).to_string(),
+                    ))
+                    .await
+                {
+                    return Err(format!("failed to send websocket message: {e}"));
+                }
+            }
+            Err(e) => {
+                return Err(e.to_string());
+            }
+        }
     } else {
-        warn!("skipping an unsupported websocket command '{}'", data.cmd);
+        warn!("skipping an unsupported websocket command '{}'", msg.cmd);
     }
 
     Ok(())
@@ -364,13 +396,13 @@ pub(super) async fn delete_messages(
 ) -> impl IntoResponse {
     if let Some(tag) = tag {
         if tag < RESERVED_TAG_UPPER_LIMIT {
-            return (BAD_REQUEST, ApiErrorStatus::InvalidApplicationTag).into_response();
+            return (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidApplicationTag).into_response();
         }
     }
 
     let inbox = state.inbox.clone();
     inbox.write().await.pop_all(tag).await;
-    (NO_CONTENT, ()).into_response()
+    (StatusCode::NO_CONTENT, ()).into_response()
 }
 
 /// Get size of filtered message inbox for a specific tag
@@ -395,14 +427,14 @@ pub(super) async fn size(
 ) -> impl IntoResponse {
     if let Some(tag) = tag {
         if tag < RESERVED_TAG_UPPER_LIMIT {
-            return (BAD_REQUEST, ApiErrorStatus::InvalidApplicationTag).into_response();
+            return (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidApplicationTag).into_response();
         }
     }
 
     let inbox = state.inbox.clone();
     let size = inbox.read().await.size(tag).await;
 
-    (OK, Json(SizeResponse { size })).into_response()
+    (StatusCode::OK, Json(SizeResponse { size })).into_response()
 }
 
 #[serde_as]
@@ -466,7 +498,7 @@ pub(super) async fn pop(
 ) -> impl IntoResponse {
     if let Some(tag) = tag {
         if tag < RESERVED_TAG_UPPER_LIMIT {
-            return (BAD_REQUEST, ApiErrorStatus::InvalidApplicationTag).into_response();
+            return (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidApplicationTag).into_response();
         }
     }
 
@@ -474,11 +506,11 @@ pub(super) async fn pop(
     let inbox = inbox.write().await;
     if let Some((data, ts)) = inbox.pop(tag).await {
         match to_api_message(data, ts) {
-            Ok(message) => (OK, Json(message)).into_response(),
-            Err(e) => (UNPROCESSABLE_ENTITY, ApiErrorStatus::UnknownFailure(e)).into_response(),
+            Ok(message) => (StatusCode::OK, Json(message)).into_response(),
+            Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::UnknownFailure(e)).into_response(),
         }
     } else {
-        (NOT_FOUND, ()).into_response()
+        (StatusCode::NOT_FOUND, ()).into_response()
     }
 }
 
@@ -517,7 +549,7 @@ pub(super) async fn pop_all(
 ) -> impl IntoResponse {
     if let Some(tag) = tag {
         if tag < RESERVED_TAG_UPPER_LIMIT {
-            return (BAD_REQUEST, ApiErrorStatus::InvalidApplicationTag).into_response();
+            return (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidApplicationTag).into_response();
         }
     }
 
@@ -536,7 +568,7 @@ pub(super) async fn pop_all(
         })
         .collect::<Vec<_>>();
 
-    (OK, Json(MessagePopAllResponse { messages })).into_response()
+    (StatusCode::OK, Json(MessagePopAllResponse { messages })).into_response()
 }
 
 /// Peek the oldest message currently present in the nodes message inbox.
@@ -569,7 +601,7 @@ pub(super) async fn peek(
 ) -> impl IntoResponse {
     if let Some(tag) = tag {
         if tag < RESERVED_TAG_UPPER_LIMIT {
-            return (BAD_REQUEST, ApiErrorStatus::InvalidApplicationTag).into_response();
+            return (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidApplicationTag).into_response();
         }
     }
 
@@ -577,11 +609,11 @@ pub(super) async fn peek(
     let inbox = inbox.write().await;
     if let Some((data, ts)) = inbox.peek(tag).await {
         match to_api_message(data, ts) {
-            Ok(message) => (OK, Json(message)).into_response(),
-            Err(e) => (UNPROCESSABLE_ENTITY, ApiErrorStatus::UnknownFailure(e)).into_response(),
+            Ok(message) => (StatusCode::OK, Json(message)).into_response(),
+            Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::UnknownFailure(e)).into_response(),
         }
     } else {
-        (NOT_FOUND, ()).into_response()
+        (StatusCode::NOT_FOUND, ()).into_response()
     }
 }
 
@@ -616,7 +648,7 @@ pub(super) async fn peek_all(
 ) -> impl IntoResponse {
     if let Some(tag) = tag {
         if tag < RESERVED_TAG_UPPER_LIMIT {
-            return (BAD_REQUEST, ApiErrorStatus::InvalidApplicationTag).into_response();
+            return (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidApplicationTag).into_response();
         }
     }
 
@@ -635,5 +667,60 @@ pub(super) async fn peek_all(
         })
         .collect::<Vec<_>>();
 
-    (OK, Json(MessagePopAllResponse { messages })).into_response()
+    (StatusCode::OK, Json(MessagePopAllResponse { messages })).into_response()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::messages::SendMessageBodyRequest;
+
+    use serde_json::from_value;
+
+    #[test]
+    fn send_message_accepts_bytes_in_body() {
+        let peer = PeerId::random();
+        let test_sequence = b"wow, this actually works";
+
+        let json_value = json!({
+            "tag": 5,
+            "body": test_sequence.to_vec(),
+            "peerId": peer.to_string()
+        });
+
+        let expected = SendMessageBodyRequest {
+            tag: 5,
+            body: test_sequence.to_vec(),
+            peer_id: peer,
+            path: None,
+            hops: None,
+        };
+
+        let actual: SendMessageBodyRequest = from_value(json_value).unwrap();
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn send_message_accepts_utf8_string_in_body() {
+        let peer = PeerId::random();
+        let test_sequence = b"wow, this actually works";
+
+        let json_value = json!({
+            "tag": 5,
+            "body": String::from_utf8(test_sequence.to_vec()).expect("should be a utf-8 string"),
+            "peerId": peer.to_string()
+        });
+
+        let expected = SendMessageBodyRequest {
+            tag: 5,
+            body: test_sequence.to_vec(),
+            peer_id: peer,
+            path: None,
+            hops: None,
+        };
+
+        let actual: SendMessageBodyRequest = from_value(json_value).unwrap();
+
+        assert_eq!(actual, expected);
+    }
 }

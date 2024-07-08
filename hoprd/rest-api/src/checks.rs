@@ -1,5 +1,4 @@
-use axum::{extract::State, response::IntoResponse};
-use http::status::StatusCode::{OK, PRECONDITION_FAILED};
+use axum::{extract::State, http::status::StatusCode, response::IntoResponse};
 use std::sync::Arc;
 
 use hopr_lib::HoprState;
@@ -50,7 +49,7 @@ pub(super) async fn healthyz(State(state): State<Arc<AppState>>) -> impl IntoRes
 
 async fn is_running(state: Arc<AppState>) -> impl IntoResponse {
     match state.hopr.status() {
-        HoprState::Running => (OK, "").into_response(),
-        _ => (PRECONDITION_FAILED, "").into_response(),
+        HoprState::Running => (StatusCode::OK, "").into_response(),
+        _ => (StatusCode::PRECONDITION_FAILED, "").into_response(),
     }
 }

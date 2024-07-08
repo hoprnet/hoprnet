@@ -29,7 +29,7 @@ use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 use hopr_lib::{ApplicationData, AsUnixTimestamp, HoprLibProcesses, ToHex, TransportOutput};
 use hoprd::cli::CliArgs;
 use hoprd::errors::HoprdError;
-use hoprd_api::{build_api, Listener};
+use hoprd_api::serve_api;
 use hoprd_keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -217,7 +217,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .await
             .unwrap_or_else(|e| panic!("REST API bind failed for {listen_address}: {e}"));
 
-        info!("Node REST API is listening on {api_listen}");
+        info!("Node REST API is listening on {listen_address}");
 
         processes.insert(
             HoprdProcesses::RestApi,
@@ -231,6 +231,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     ws_events_rx,
                     Some(msg_encoder),
                 )
+                .await
                 .expect("the REST API server should start successfully")
             }),
         );

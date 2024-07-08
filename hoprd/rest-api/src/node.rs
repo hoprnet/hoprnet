@@ -1,19 +1,21 @@
 use axum::{
     extract::{Json, Query, State},
+    http::status::StatusCode,
     response::IntoResponse,
 };
 use futures::stream::FuturesUnordered;
+use futures::StreamExt;
 use hopr_lib::{AsUnixTimestamp, Health, Multiaddr};
-use http::status::StatusCode::{BAD_REQUEST, OK, UNPROCESSABLE_ENTITY};
 use libp2p_identity::PeerId;
-use mime::Mime;
+use serde::{Deserialize, Serialize};
+use serde_with::{serde_as, DisplayFromStr};
 use std::{collections::HashMap, sync::Arc};
 
 use hopr_lib::Address;
 
-use crate::{ApiErrorStatus, InternalState, BASE_PATH};
+use crate::{ApiError, ApiErrorStatus, InternalState, BASE_PATH};
 
-#[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[schema(example = json!({
         "version": "2.1.0"
     }))]
@@ -38,7 +40,7 @@ pub(crate) struct NodeVersionResponse {
 pub(super) async fn version(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
     let version = state.hopr.version();
 
-    (OK, Json(NodeVersionResponse { version })).into_response()
+    (StatusCode::OK, Json(NodeVersionResponse { version })).into_response()
 }
 
 /// Get the configuration of the running node.
@@ -56,10 +58,10 @@ pub(super) async fn version(State(state): State<Arc<InternalState>>) -> impl Int
         tag = "Configuration"
     )]
 pub(super) async fn configuration(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
-    (OK, state.hoprd_cfg.clone()).into_response()
+    (StatusCode::OK, state.hoprd_cfg.clone()).into_response()
 }
 
-#[derive(Debug, Clone, serde::Deserialize, utoipa::ToSchema, utoipa::IntoParams)]
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema, utoipa::IntoParams)]
 #[into_params(parameter_in = Query)]
 pub(crate) struct NodePeersQueryRequest {
     #[schema(required = false)]
@@ -67,7 +69,7 @@ pub(crate) struct NodePeersQueryRequest {
     quality: f64,
 }
 
-#[derive(Debug, Default, Clone, serde::Serialize, utoipa::ToSchema)]
+#[derive(Debug, Default, Clone, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct HeartbeatInfo {
     sent: u64,
@@ -75,7 +77,7 @@ pub(crate) struct HeartbeatInfo {
 }
 
 #[serde_as]
-#[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct PeerInfo {
     #[serde_as(as = "DisplayFromStr")]
@@ -97,7 +99,7 @@ pub(crate) struct PeerInfo {
 }
 
 #[serde_as]
-#[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct AnnouncedPeer {
     #[serde_as(as = "DisplayFromStr")]
@@ -111,7 +113,7 @@ pub(crate) struct AnnouncedPeer {
     multiaddr: Option<Multiaddr>,
 }
 
-#[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct NodePeersResponse {
     connected: Vec<PeerInfo>,
@@ -143,9 +145,9 @@ pub(crate) struct NodePeersResponse {
 pub(super) async fn peers(
     Query(NodePeersQueryRequest { quality }): Query<NodePeersQueryRequest>,
     State(state): State<Arc<InternalState>>,
-) -> impl IntoResponse {
+) -> Result<impl IntoResponse, ApiError> {
     if !(0.0f64..=1.0f64).contains(&quality) {
-        return (BAD_REQUEST, ApiErrorStatus::InvalidQuality).into_response();
+        return Ok((StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidQuality).into_response());
     }
 
     let hopr = state.hopr.clone();
@@ -216,7 +218,7 @@ pub(super) async fn peers(
         announced: announced_peers,
     };
 
-    (OK, Json(body)).into_response()
+    Ok((StatusCode::OK, Json(body)).into_response())
 }
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -244,13 +246,13 @@ fn collect_hopr_metrics() -> Result<String, ApiErrorStatus> {
     )]
 pub(super) async fn metrics() -> impl IntoResponse {
     match collect_hopr_metrics() {
-        Ok(metrics) => (OK, metrics).into_response(),
-        Err(error) => (UNPROCESSABLE_ENTITY, ApiErrorStatus::from(error)).into_response(),
+        Ok(metrics) => (StatusCode::OK, metrics).into_response(),
+        Err(error) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(error)).into_response(),
     }
 }
 
 #[serde_as]
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 #[schema(example = json!({
         "announcedAddress": [
             "/ip4/10.0.2.100/tcp/19092"
@@ -320,7 +322,7 @@ pub(crate) struct NodeInfoResponse {
         ),
         tag = "Node"
     )]
-pub(super) async fn info(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
+pub(super) async fn info(State(state): State<Arc<InternalState>>) -> Result<impl IntoResponse, ApiError> {
     let hopr = state.hopr.clone();
 
     let chain_config = hopr.chain_config();
@@ -345,14 +347,14 @@ pub(super) async fn info(State(state): State<Arc<InternalState>>) -> impl IntoRe
                 channel_closure_period: channel_closure_notice_period.as_secs(),
             };
 
-            (OK, Json(body)).into_response()
+            Ok((StatusCode::OK, Json(body)).into_response())
         }
-        Err(error) => (UNPROCESSABLE_ENTITY, ApiErrorStatus::from(error)).into_response(),
+        Err(error) => Ok((StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(error)).into_response()),
     }
 }
 
 #[serde_as]
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct EntryNode {
     #[serde_as(as = "Vec<DisplayFromStr>")]
@@ -381,7 +383,7 @@ pub(crate) struct EntryNode {
         ),
         tag = "Node"
     )]
-pub(super) async fn entry_nodes(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
+pub(super) async fn entry_nodes(State(state): State<Arc<InternalState>>) -> Result<impl IntoResponse, ApiError> {
     let hopr = state.hopr.clone();
 
     match hopr.get_public_nodes().await {
@@ -397,8 +399,8 @@ pub(super) async fn entry_nodes(State(state): State<Arc<InternalState>>) -> impl
                 );
             }
 
-            (OK, Json(body)).into_response()
+            Ok((StatusCode::OK, Json(body)).into_response())
         }
-        Err(error) => (UNPROCESSABLE_ENTITY, ApiErrorStatus::from(error)).into_response(),
+        Err(error) => Ok((StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(error)).into_response()),
     }
 }

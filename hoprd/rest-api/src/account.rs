@@ -1,14 +1,17 @@
 use axum::{
-    extract::{Json, Path, State},
+    extract::{Json, State},
+    http::status::StatusCode,
     response::IntoResponse,
 };
-use http::status::StatusCode::{OK, UNPROCESSABLE_ENTITY};
+use serde::{Deserialize, Serialize};
+use serde_with::{serde_as, DisplayFromStr};
+use std::sync::Arc;
 
-use hopr_lib::U256;
+use hopr_lib::{Address, Balance, BalanceType, U256};
 
 use crate::{ApiErrorStatus, InternalState, BASE_PATH};
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 #[schema(example = json!({
         "hopr": "12D3KooWJmLm8FnBfvYQ5BAZ5qcYBxQFFBzAAEYUBUNJNE8cRsYS",
         "native": "0x07eaf07d6624f741e04f4092a755a9027aaab7f6"
@@ -42,10 +45,10 @@ pub(super) async fn addresses(State(state): State<Arc<InternalState>>) -> impl I
         hopr: state.hopr.me_peer_id().to_string(),
     };
 
-    (OK, Json(addresses)).into_response()
+    (StatusCode::OK, Json(addresses)).into_response()
 }
 
-#[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 #[schema(example = json!({
         "hopr": "2000000000000000000000",
         "native": "9999563581204904000",
@@ -89,34 +92,34 @@ pub(super) async fn balances(State(state): State<Arc<InternalState>>) -> impl In
 
     match hopr.get_balance(BalanceType::Native).await {
         Ok(v) => account_balances.native = v.to_value_string(),
-        Err(e) => return (UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
+        Err(e) => return (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
     }
 
     match hopr.get_balance(BalanceType::HOPR).await {
         Ok(v) => account_balances.hopr = v.to_value_string(),
-        Err(e) => return (UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
+        Err(e) => return (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
     }
 
     match hopr.get_safe_balance(BalanceType::Native).await {
         Ok(v) => account_balances.safe_native = v.to_value_string(),
-        Err(e) => return (UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
+        Err(e) => return (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
     }
 
     match hopr.get_safe_balance(BalanceType::HOPR).await {
         Ok(v) => account_balances.safe_hopr = v.to_value_string(),
-        Err(e) => return (UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
+        Err(e) => return (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
     }
 
     match hopr.safe_allowance().await {
         Ok(v) => account_balances.safe_hopr_allowance = v.to_value_string(),
-        Err(e) => return (UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
+        Err(e) => return (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
     }
 
-    (OK, Json(account_balances)).into_response()
+    (StatusCode::OK, Json(account_balances)).into_response()
 }
 
 #[serde_as]
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 #[schema(example = json!({
         "address": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
         "amount": 20000,
@@ -135,7 +138,7 @@ pub(crate) struct WithdrawBodyRequest {
     address: Address,
 }
 
-#[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 #[schema(example = json!({
         "receipt": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
     }))]
@@ -173,7 +176,13 @@ pub(super) async fn withdraw(
         .withdraw(req_data.address, Balance::new(req_data.amount, req_data.currency))
         .await
     {
-        Ok(receipt) => (OK, Json(WithdrawResponse { receipt })).into_response(),
-        Err(e) => (UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
+        Ok(receipt) => (
+            StatusCode::OK,
+            Json(WithdrawResponse {
+                receipt: receipt.to_string(),
+            }),
+        )
+            .into_response(),
+        Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
     }
 }

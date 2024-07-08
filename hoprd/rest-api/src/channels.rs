@@ -1,17 +1,25 @@
 use axum::{
     extract::{Json, Path, Query, State},
+    http::status::StatusCode,
     response::IntoResponse,
 };
-use http::status::StatusCode::{BAD_REQUEST, CONFLICT, CREATED, FORBIDDEN, NOT_FOUND, OK, UNPROCESSABLE_ENTITY};
-use std::arc::Arc;
+use futures::TryFutureExt;
+use libp2p_identity::PeerId;
+use serde::{Deserialize, Serialize};
+use serde_with::{serde_as, DisplayFromStr};
+use std::sync::Arc;
+use tracing::warn;
 
 use hopr_crypto_types::types::Hash;
-use hopr_lib::{errors::HoprLibError, AsUnixTimestamp, ChainActionsError, ChannelEntry, ChannelStatus, ToHex};
+use hopr_lib::{
+    errors::HoprLibError, Address, AsUnixTimestamp, Balance, BalanceType, ChainActionsError, ChannelEntry,
+    ChannelStatus, Hopr, ToHex,
+};
 
 use crate::{ApiErrorStatus, InternalState, BASE_PATH};
 
 #[serde_as]
-#[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct NodeChannel {
     #[serde_as(as = "DisplayFromStr")]
@@ -27,7 +35,7 @@ pub(crate) struct NodeChannel {
 }
 
 #[serde_as]
-#[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[schema(example = json!({
         "balance": "10000000000000000000",
         "channelEpoch": 1,
@@ -63,7 +71,7 @@ pub(crate) struct ChannelInfoResponse {
 }
 
 /// Listing of channels.
-#[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[schema(example = json!({
         "all": [],
         "incoming": [],
@@ -118,7 +126,7 @@ async fn query_topology_info(channel: &ChannelEntry, node: &Hopr) -> Result<Chan
 }
 
 /// Parameters for enumerating channels.
-#[derive(Debug, Default, Copy, Clone, serde::Deserialize, utoipa::IntoParams, utoipa::ToSchema)]
+#[derive(Debug, Default, Copy, Clone, Deserialize, utoipa::IntoParams, utoipa::ToSchema)]
 #[into_params(parameter_in = Query)]
 #[serde(default, rename_all = "camelCase")]
 pub(crate) struct ChannelsQueryRequest {
@@ -167,7 +175,7 @@ pub(super) async fn list_channels(
 
         match topology {
             Ok(all) => (
-                OK,
+                StatusCode::OK,
                 Json(NodeChannelsResponse {
                     incoming: vec![],
                     outgoing: vec![],
@@ -175,7 +183,7 @@ pub(super) async fn list_channels(
                 }),
             )
                 .into_response(),
-            Err(e) => (UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
+            Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
         }
     } else {
         let channels = hopr
@@ -212,15 +220,15 @@ pub(super) async fn list_channels(
                     all: vec![],
                 };
 
-                (OK, Json(channel_info)).into_response()
+                (StatusCode::OK, Json(channel_info)).into_response()
             }
-            Err(e) => (UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
+            Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
         }
     }
 }
 
 #[serde_as]
-#[derive(Debug, Clone, serde::Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 #[schema(example = json!({
         "amount": "10",
@@ -236,7 +244,7 @@ pub(crate) struct OpenChannelBodyRequest {
 }
 
 #[serde_as]
-#[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[schema(example = json!({
         "channelId": "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f",
         "transactionReceipt": "0x5181ac24759b8e01b3c932e4636c3852f386d17517a8dfc640a5ba6f2258f29c"
@@ -289,7 +297,7 @@ pub(super) async fn open_channel(
         .await
     {
         Ok(channel_details) => (
-            CREATED,
+            StatusCode::CREATED,
             Json(OpenChannelResponse {
                 channel_id: channel_details.channel_id,
                 transaction_receipt: channel_details.tx_hash,
@@ -297,21 +305,21 @@ pub(super) async fn open_channel(
         )
             .into_response(),
         Err(HoprLibError::ChainError(ChainActionsError::BalanceTooLow)) => {
-            (FORBIDDEN, ApiErrorStatus::NotEnoughBalance).into_response()
+            (StatusCode::FORBIDDEN, ApiErrorStatus::NotEnoughBalance).into_response()
         }
         Err(HoprLibError::ChainError(ChainActionsError::NotEnoughAllowance)) => {
-            (FORBIDDEN, ApiErrorStatus::NotEnoughAllowance).into_response()
+            (StatusCode::FORBIDDEN, ApiErrorStatus::NotEnoughAllowance).into_response()
         }
         Err(HoprLibError::ChainError(ChainActionsError::ChannelAlreadyExists)) => {
-            (CONFLICT, ApiErrorStatus::ChannelAlreadyOpen).into_response()
+            (StatusCode::CONFLICT, ApiErrorStatus::ChannelAlreadyOpen).into_response()
         }
-        Err(e) => (UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
+        Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
     }
 }
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct ChannelIdParams {
+pub(crate) struct ChannelIdParams {
     channel_id: String,
 }
 
@@ -341,18 +349,24 @@ pub(super) async fn show_channel(
 ) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
-    match Hash::from_hex(channel_id?.as_str()) {
+    match Hash::from_hex(channel_id.as_str()) {
         Ok(channel_id) => match hopr.channel_from_hash(&channel_id).await {
-            Ok(Some(channel)) => (OK, Json(query_topology_info(&channel, hopr.as_ref()).await?)).into_response(),
-            Ok(None) => (NOT_FOUND, ApiErrorStatus::ChannelNotFound).into_response(),
-            Err(e) => (UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
+            Ok(Some(channel)) => {
+                let info = query_topology_info(&channel, hopr.as_ref()).await;
+                match info {
+                    Ok(info) => (StatusCode::OK, Json(info)).into_response(),
+                    Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
+                }
+            }
+            Ok(None) => (StatusCode::NOT_FOUND, ApiErrorStatus::ChannelNotFound).into_response(),
+            Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
         },
-        Err(_) => (BAD_REQUEST, ApiErrorStatus::InvalidChannelId).into_response(),
+        Err(_) => (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidChannelId).into_response(),
     }
 }
 
 #[serde_as]
-#[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[schema(example = json!({
         "channelStatus": "PendingToClose",
         "receipt": "0xd77da7c1821249e663dead1464d185c03223d9663a06bc1d46ed0ad449a07118"
@@ -399,10 +413,10 @@ pub(super) async fn close_channel(
 ) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
-    match Hash::from_hex(channel_id?.as_str()) {
+    match Hash::from_hex(channel_id.as_str()) {
         Ok(channel_id) => match hopr.close_channel_by_id(channel_id, false).await {
             Ok(receipt) => (
-                OK,
+                StatusCode::OK,
                 Json(CloseChannelResponse {
                     channel_status: receipt.status,
                     receipt: receipt.tx_hash,
@@ -410,19 +424,19 @@ pub(super) async fn close_channel(
             )
                 .into_response(),
             Err(HoprLibError::ChainError(ChainActionsError::ChannelDoesNotExist)) => {
-                (NOT_FOUND, ApiErrorStatus::ChannelNotFound).into_response()
+                (StatusCode::NOT_FOUND, ApiErrorStatus::ChannelNotFound).into_response()
             }
             Err(HoprLibError::ChainError(ChainActionsError::InvalidArguments(_))) => {
-                (UNPROCESSABLE_ENTITY, ApiErrorStatus::UnsupportedFeature).into_response()
+                (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::UnsupportedFeature).into_response()
             }
-            Err(e) => (UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
+            Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
         },
-        Err(_) => (BAD_REQUEST, ApiErrorStatus::InvalidChannelId).into_response(),
+        Err(_) => (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidChannelId).into_response(),
     }
 }
 
 /// Specifies the amount of HOPR tokens to fund a channel with.
-#[derive(Debug, Clone, serde::Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 #[schema(example = json!({
         "amount": "1000"
     }))]
@@ -460,26 +474,26 @@ pub(crate) struct FundBodyRequest {
 pub(super) async fn fund_channel(
     Path(ChannelIdParams { channel_id }): Path<ChannelIdParams>,
     State(state): State<Arc<InternalState>>,
+    Json(fund_req): Json<FundBodyRequest>,
 ) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
-    let fund_req: FundBodyRequest = req.body_json().await?;
     let amount = Balance::new_from_str(&fund_req.amount, BalanceType::HOPR);
 
-    match Hash::from_hex(channel_id?.as_str()) {
+    match Hash::from_hex(channel_id.as_str()) {
         Ok(channel_id) => match hopr.fund_channel(&channel_id, &amount).await {
-            Ok(hash) => (OK, Json(hash.to_hex())).into_response(),
+            Ok(hash) => (StatusCode::OK, Json(hash.to_hex())).into_response(),
             Err(HoprLibError::ChainError(ChainActionsError::ChannelDoesNotExist)) => {
-                (NOT_FOUND, ApiErrorStatus::ChannelNotFound).into_response()
+                (StatusCode::NOT_FOUND, ApiErrorStatus::ChannelNotFound).into_response()
             }
             Err(HoprLibError::ChainError(ChainActionsError::NotEnoughAllowance)) => {
-                (FORBIDDEN, ApiErrorStatus::NotEnoughAllowance).into_response()
+                (StatusCode::FORBIDDEN, ApiErrorStatus::NotEnoughAllowance).into_response()
             }
             Err(HoprLibError::ChainError(ChainActionsError::BalanceTooLow)) => {
-                (FORBIDDEN, ApiErrorStatus::NotEnoughBalance).into_response()
+                (StatusCode::FORBIDDEN, ApiErrorStatus::NotEnoughBalance).into_response()
             }
-            Err(e) => (UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
+            Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
         },
-        Err(_) => (BAD_REQUEST, ApiErrorStatus::InvalidChannelId).into_response(),
+        Err(_) => (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidChannelId).into_response(),
     }
 }
