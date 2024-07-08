@@ -63,6 +63,21 @@ These are the keypoints of this testing phase:
 - Depending on the results of the session, a decission is taken to release the code as it is or not.
 - In case some blocking bugs are found, the Core team should adapt the sprint plan and include them. A new pre-release testing session must be needed once they are fixed
 
+### Load Testing
+
+Load testing can be initiated manually by any team member to gather results based on specific parameters of the application or initiated as part of gathering the performance results of a new release, which is initiated when the `Close Release` pull request is merged. Below is described the procedure to execute load testing as part of **Closing the release**
+
+- Check that when the `Close release` PR is merged, a new workflow action is launched in the [K6 load tests](https://github.com/hoprnet/hoprnet/actions/workflows/load-tests.yaml)
+- Check in [Grafana](https://grafana.staging.hoprnet.link/d/load-tests-results/k6-load-tests-results?orgId=1) the progress of the load testing execution
+- The acceptance criteria to considering the test execution as valid are:
+  - The nodes were warm-up and there were no high response times during the first minutes of execution
+  - The expected throughput has been achieved during the workload. The throughtput in manual execution is set in the parameter `Number of messages per seconds`. And in the automatic execution is determined by the [LOAD_TESTING_RATE](https://github.com/hoprnet/hoprnet/settings/variables/actions) repository variable which currently is 300 messages per second per node. The achieved throughtput can be shown in this [grafana panel](https://grafana.staging.hoprnet.link/d/load-tests-results/k6-load-tests-results?orgId=1&viewPanel=126)
+- Once the execution is finished check that results are stored in the [K6 bucket](https://console.cloud.google.com/storage/browser/hoprnet-k6-staging/core-team;tab=objects?hl=en&project=hopr-staging&prefix=&forceOnObjectsSortingFiltering=false)
+- Update the [Load testing](https://docs.google.com/spreadsheets/d/1ose_1SN-7HlkkaQ1_wQjwq4vvphMz5vAAYOsm_cDTb4/edit?usp=sharing) sheet with the new results
+  - Create a new tab by cloning an existing tab with results.
+  - Rename the tag with a scenario name
+  - Update the summary tab with a new entry for the new execution. Update the column A only with the name of the new tab name created before.
+
 ### Release testing
 
 These are the keypoints of this testing phase:
