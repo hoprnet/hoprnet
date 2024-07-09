@@ -13,8 +13,8 @@ crate-type = ["rlib"]
 
 [features]
 default = []
-session = []            # session based message sending used for SOCKS5
-sessionless = []        # session-less message sending used for async sending
+session-client = []
+session-server = []
 runtime-async-std = [
     "async-std",
     "chain-api/runtime-async-std",
@@ -46,6 +46,7 @@ prometheus = [
 async-channel = { workspace = true }
 async-lock = { workspace = true }
 async-std = { workspace = true, optional = true }
+async-trait = { workspace = true }
 atomic_enum = { workspace = true }
 const_format ={ workspace = true }
 futures = { workspace = true }

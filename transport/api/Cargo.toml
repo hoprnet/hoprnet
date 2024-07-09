@@ -17,6 +17,7 @@ runtime-async-std = [
     "core-protocol/runtime-async-std",
     "hopr-db-sql/runtime-async-std",
     "hopr-transport-p2p/runtime-async-std",
+    "hopr-transport-session/runtime-async-std",
 ]
 runtime-tokio = [
     "tokio",
@@ -24,6 +25,7 @@ runtime-tokio = [
     "core-protocol/runtime-tokio",
     "hopr-db-sql/runtime-tokio",
     "hopr-transport-p2p/runtime-tokio",
+    "hopr-transport-session/runtime-tokio",
 ]
 prometheus = [
     "dep:lazy_static", "dep:hopr-metrics",
@@ -55,6 +57,7 @@ core-path = { workspace = true }
 core-protocol = { workspace = true }
 hopr-crypto-packet = { workspace = true }
 hopr-crypto-types = { workspace = true }
+hopr-crypto-random = { workspace = true }
 hopr-db-sql = { workspace = true }
 hopr-internal-types = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }

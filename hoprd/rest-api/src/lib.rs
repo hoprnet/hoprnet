@@ -1418,9 +1418,8 @@ mod channels {
 }
 
 mod messages {
-    use std::time::Duration;
-
     use hopr_lib::{AsUnixTimestamp, HalfKeyChallenge, RESERVED_TAG_UPPER_LIMIT};
+    use std::time::Duration;
     use validator::Validate;
 
     use super::*;

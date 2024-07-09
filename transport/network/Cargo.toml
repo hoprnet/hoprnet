@@ -8,6 +8,17 @@ license = "GPL-3.0-only"
 [lib]
 crate-type = ["rlib"]
 
+[features]
+default = ["prometheus", "compat-ping"]
+compat-ping = []
+prometheus = ["dep:hopr-metrics"]
+runtime-async-std = [
+    "async-std",
+]
+runtime-tokio = [
+    "tokio",
+]
+
 [dependencies]
 async-std = { workspace = true, optional = true }
 async-trait = { workspace = true }
@@ -37,14 +48,3 @@ async-std = { workspace = true }
 hopr-db-sql = { workspace = true, features = ["runtime-async-std"] }
 mockall = { workspace = true }
 more-asserts = { workspace = true }
-
-[features]
-default = ["prometheus", "compat-ping"]
-compat-ping = []
-prometheus = ["dep:hopr-metrics"]
-runtime-async-std = [
-    "async-std",
-]
-runtime-tokio = [
-    "tokio",
-]
