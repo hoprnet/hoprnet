@@ -8,7 +8,12 @@ pub mod traits;
 pub mod types;
 
 use libp2p_identity::PeerId;
-use serde::{Deserialize, Serialize};
+#[cfg(feature = "serde")]
+use {
+    serde::{Deserialize, Serialize},
+    serde_with::{As, DisplayFromStr},
+};
+
 pub use types::{Session, SessionId};
 
 /// Send options for the session.
@@ -18,6 +23,7 @@ pub use types::{Session, SessionId};
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum PathOptions {
+    #[cfg_attr(feature = "serde", serde(with = "As::<Vec<DisplayFromStr>>"))]
     IntermediatePath(Vec<PeerId>),
     Hops(u16),
 }
@@ -35,7 +41,9 @@ pub enum Capability {
 /// a reactive component with regards to the session concept.
 #[derive(Debug, PartialEq, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct SessionConfig {
+pub struct ClientSessionConfig {
+    #[cfg_attr(feature = "serde", serde(with = "As::<DisplayFromStr>"))]
+    pub peer: PeerId,
     pub path_options: PathOptions,
     pub capabilities: Vec<Capability>,
 }

@@ -1,6 +1,7 @@
 use std::{
     fmt::Display,
     io::{Error, ErrorKind},
+    pin::Pin,
     task::Poll,
 };
 
@@ -11,7 +12,7 @@ use libp2p_identity::PeerId;
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_internal_types::protocol::{ApplicationData, PAYLOAD_SIZE};
 
-use crate::{errors::TransportSessionError, traits::SendMsg, PathOptions};
+use crate::{errors::TransportSessionError, traits::SendMsg, Capability, PathOptions};
 
 /// ID tracking the session uniquely.
 ///
@@ -47,9 +48,14 @@ const PEER_ID_BINARY_SIZE: usize = 32;
 const INNER_MTU_SIZE: usize =
     PAYLOAD_SIZE - PEER_ID_BINARY_SIZE - std::mem::size_of::<hopr_internal_types::protocol::Tag>();
 
+/// Helper trait to allow Box aliasing
+trait AsyncReadWrite: futures::AsyncWrite + futures::AsyncRead + Send {}
+impl<T: futures::AsyncWrite + futures::AsyncRead + Send> AsyncReadWrite for T {}
+
 pub struct Session {
     id: SessionId,
-    inner: SessionSocket<INNER_MTU_SIZE>,
+    // inner: SessionSocket<INNER_MTU_SIZE>,
+    inner: Pin<Box<dyn AsyncReadWrite>>,
 }
 
 impl Session {
@@ -57,14 +63,31 @@ impl Session {
         id: SessionId,
         me: PeerId,
         options: PathOptions,
+        capabilities: Vec<Capability>,
         tx: Box<dyn SendMsg + Send>,
         rx: UnboundedReceiver<Box<[u8]>>,
     ) -> Self {
         Self {
             id,
-            inner: SessionSocket::new(
-                id,
-                InnerSession {
+            inner: if capabilities.contains(&Capability::Retransmission)
+                || capabilities.contains(&Capability::Segmentation)
+            {
+                // TODO: 2.2 implement retransmission and segmentation loading and unloading based on configuration
+                Box::pin(SessionSocket::<INNER_MTU_SIZE>::new(
+                    id,
+                    InnerSession {
+                        id,
+                        me,
+                        options,
+                        rx,
+                        tx,
+                        rx_buffer: [0; PAYLOAD_SIZE],
+                        rx_buffer_range: (0, 0),
+                    },
+                    SessionConfig::default(),
+                ))
+            } else {
+                Box::pin(InnerSession {
                     id,
                     me,
                     options,
@@ -72,9 +95,8 @@ impl Session {
                     tx,
                     rx_buffer: [0; PAYLOAD_SIZE],
                     rx_buffer_range: (0, 0),
-                },
-                SessionConfig::default(),
-            ),
+                })
+            },
         }
     }
 
@@ -89,7 +111,7 @@ impl futures::AsyncRead for Session {
         cx: &mut std::task::Context<'_>,
         buf: &mut [u8],
     ) -> Poll<std::io::Result<usize>> {
-        let inner = &mut self.inner;
+        let inner = self.inner.as_mut();
         pin_mut!(inner);
         inner.poll_read(cx, buf)
     }

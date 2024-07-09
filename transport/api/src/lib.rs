@@ -33,6 +33,7 @@ use futures::{
     channel::mpsc::{UnboundedReceiver, UnboundedSender},
     FutureExt, StreamExt,
 };
+use hopr_transport_session::{Capability, ClientSessionConfig};
 use tracing::{error, info, warn};
 
 use core_network::{
@@ -374,6 +375,7 @@ where
                                                         session_id,
                                                         me,
                                                         PathOptions::Hops(1),
+                                                        vec![Capability::Segmentation, Capability::Retransmission],
                                                         message_sender.clone(),
                                                         rx,
                                                     ))
@@ -462,7 +464,7 @@ where
             .map(|status| status.last_seen.as_unix_timestamp().saturating_sub(start)))
     }
 
-    pub async fn new_session(&self, destination: PeerId, options: PathOptions) -> errors::Result<Session> {
+    pub async fn new_session(&self, cfg: ClientSessionConfig) -> errors::Result<Session> {
         // TODO: 2.2 session initiation protocol is necessary to establish an application tag instead of this random approach
         let mut session_id: Option<SessionId> = None;
         for _ in 0..100 {
@@ -470,7 +472,7 @@ where
                 RESERVED_SUBPROTOCOL_TAG_UPPER_LIMIT as u64,
                 Some(RESERVED_SESSION_TAG_UPPER_LIMIT as u64),
             ) as u16;
-            let id = SessionId::new(hopr_ra, destination);
+            let id = SessionId::new(hopr_ra, cfg.peer);
             if !self.sessions.contains_key(&id) {
                 session_id = Some(id);
             }
@@ -486,7 +488,8 @@ where
         Ok(Session::new(
             session_id,
             self.me,
-            options,
+            cfg.path_options,
+            cfg.capabilities,
             Box::new(helpers::MessageSender::new(
                 self.process_packet_send.clone(),
                 self.path_planner.clone(),
