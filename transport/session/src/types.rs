@@ -1,15 +1,18 @@
 use std::{
+    fmt::Display,
     io::{Error, ErrorKind},
+    pin::Pin,
     task::Poll,
 };
 
-use futures::{channel::mpsc::UnboundedReceiver, FutureExt, StreamExt};
+use futures::{channel::mpsc::UnboundedReceiver, pin_mut, FutureExt, StreamExt};
+use hopr_network_types::session::state::{SessionConfig, SessionSocket};
 use libp2p_identity::PeerId;
 
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_internal_types::protocol::{ApplicationData, PAYLOAD_SIZE};
 
-use crate::{errors::TransportSessionError, traits::SendMsg, PathOptions};
+use crate::{errors::TransportSessionError, traits::SendMsg, Capability, PathOptions};
 
 /// ID tracking the session uniquely.
 ///
@@ -34,7 +37,111 @@ impl SessionId {
     }
 }
 
+impl Display for SessionId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}:{}", self.peer, self.tag)
+    }
+}
+
+const PEER_ID_BINARY_SIZE: usize = 32;
+// Inner MTU size of what the HOPR payload can take (payload - peer_id - application_tag)
+const INNER_MTU_SIZE: usize =
+    PAYLOAD_SIZE - PEER_ID_BINARY_SIZE - std::mem::size_of::<hopr_internal_types::protocol::Tag>();
+
+/// Helper trait to allow Box aliasing
+trait AsyncReadWrite: futures::AsyncWrite + futures::AsyncRead + Send {}
+impl<T: futures::AsyncWrite + futures::AsyncRead + Send> AsyncReadWrite for T {}
+
 pub struct Session {
+    id: SessionId,
+    // inner: SessionSocket<INNER_MTU_SIZE>,
+    inner: Pin<Box<dyn AsyncReadWrite>>,
+}
+
+impl Session {
+    pub fn new(
+        id: SessionId,
+        me: PeerId,
+        options: PathOptions,
+        capabilities: Vec<Capability>,
+        tx: Box<dyn SendMsg + Send>,
+        rx: UnboundedReceiver<Box<[u8]>>,
+    ) -> Self {
+        Self {
+            id,
+            inner: if capabilities.contains(&Capability::Retransmission)
+                || capabilities.contains(&Capability::Segmentation)
+            {
+                // TODO: 2.2 implement retransmission and segmentation loading and unloading based on configuration
+                Box::pin(SessionSocket::<INNER_MTU_SIZE>::new(
+                    id,
+                    InnerSession {
+                        id,
+                        me,
+                        options,
+                        rx,
+                        tx,
+                        rx_buffer: [0; PAYLOAD_SIZE],
+                        rx_buffer_range: (0, 0),
+                    },
+                    SessionConfig::default(),
+                ))
+            } else {
+                Box::pin(InnerSession {
+                    id,
+                    me,
+                    options,
+                    rx,
+                    tx,
+                    rx_buffer: [0; PAYLOAD_SIZE],
+                    rx_buffer_range: (0, 0),
+                })
+            },
+        }
+    }
+
+    pub fn id(&self) -> &SessionId {
+        &self.id
+    }
+}
+
+impl futures::AsyncRead for Session {
+    fn poll_read(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+        buf: &mut [u8],
+    ) -> Poll<std::io::Result<usize>> {
+        let inner = self.inner.as_mut();
+        pin_mut!(inner);
+        inner.poll_read(cx, buf)
+    }
+}
+
+impl futures::AsyncWrite for Session {
+    fn poll_write(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+        buf: &[u8],
+    ) -> Poll<std::io::Result<usize>> {
+        let inner = &mut self.inner;
+        pin_mut!(inner);
+        inner.poll_write(cx, buf)
+    }
+
+    fn poll_flush(mut self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<std::io::Result<()>> {
+        let inner = &mut self.inner;
+        pin_mut!(inner);
+        inner.poll_flush(cx)
+    }
+
+    fn poll_close(mut self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<std::io::Result<()>> {
+        let inner = &mut self.inner;
+        pin_mut!(inner);
+        inner.poll_flush(cx)
+    }
+}
+
+pub struct InnerSession {
     id: SessionId,
     me: PeerId,
     options: PathOptions,
@@ -44,7 +151,7 @@ pub struct Session {
     rx_buffer_range: (usize, usize),
 }
 
-impl Session {
+impl InnerSession {
     pub fn new(
         id: SessionId,
         me: PeerId,
@@ -68,7 +175,7 @@ impl Session {
     }
 }
 
-impl futures::AsyncWrite for Session {
+impl futures::AsyncWrite for InnerSession {
     fn poll_write(
         self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
@@ -102,7 +209,7 @@ impl futures::AsyncWrite for Session {
     }
 }
 
-impl futures::AsyncRead for Session {
+impl futures::AsyncRead for InnerSession {
     fn poll_read(
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
@@ -274,7 +381,7 @@ mod tests {
         let (_tx, rx) = futures::channel::mpsc::unbounded();
         let mock = MockSendMsg::new();
 
-        let session = Session::new(id, PeerId::random(), PathOptions::Hops(1), Box::new(mock), rx);
+        let session = InnerSession::new(id, PeerId::random(), PathOptions::Hops(1), Box::new(mock), rx);
 
         assert_eq!(session.id(), &id);
     }
@@ -285,7 +392,7 @@ mod tests {
         let (tx, rx) = futures::channel::mpsc::unbounded();
         let mock = MockSendMsg::new();
 
-        let mut session = Session::new(id, PeerId::random(), PathOptions::Hops(1), Box::new(mock), rx);
+        let mut session = InnerSession::new(id, PeerId::random(), PathOptions::Hops(1), Box::new(mock), rx);
 
         let random_data = hopr_crypto_random::random_bytes::<PAYLOAD_SIZE>()
             .as_ref()
@@ -308,7 +415,7 @@ mod tests {
         let (tx, rx) = futures::channel::mpsc::unbounded();
         let mock = MockSendMsg::new();
 
-        let mut session = Session::new(id, PeerId::random(), PathOptions::Hops(1), Box::new(mock), rx);
+        let mut session = InnerSession::new(id, PeerId::random(), PathOptions::Hops(1), Box::new(mock), rx);
 
         let random_data = hopr_crypto_random::random_bytes::<PAYLOAD_SIZE>()
             .as_ref()
@@ -349,7 +456,7 @@ mod tests {
             })
             .returning(|_, _, _| Ok(()));
 
-        let mut session = Session::new(
+        let mut session = InnerSession::new(
             id,
             OffchainKeypair::random().public().into(),
             PathOptions::Hops(1),

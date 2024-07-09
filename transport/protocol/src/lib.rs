@@ -48,6 +48,8 @@ pub mod config;
 /// Errors produced by the crate.
 pub mod errors;
 
+/// Bloom filter for the transport layer.
+pub mod bloom;
 // protocols
 /// `ack` p2p protocol
 pub mod ack;
