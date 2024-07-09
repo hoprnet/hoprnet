@@ -12,27 +12,28 @@ crate-type = ["rlib"]
 [features]
 default = []
 runtime-async-std = [
-    "async-std",
-    "core-network/runtime-async-std",
-    "core-protocol/runtime-async-std",
-    "hopr-db-sql/runtime-async-std",
-    "hopr-transport-p2p/runtime-async-std",
-    "hopr-transport-session/runtime-async-std",
+  "async-std",
+  "core-network/runtime-async-std",
+  "core-protocol/runtime-async-std",
+  "hopr-db-sql/runtime-async-std",
+  "hopr-transport-p2p/runtime-async-std",
+  "hopr-transport-session/runtime-async-std",
 ]
 runtime-tokio = [
-    "tokio",
-    "core-network/runtime-tokio",
-    "core-protocol/runtime-tokio",
-    "hopr-db-sql/runtime-tokio",
-    "hopr-transport-p2p/runtime-tokio",
-    "hopr-transport-session/runtime-tokio",
+  "tokio",
+  "core-network/runtime-tokio",
+  "core-protocol/runtime-tokio",
+  "hopr-db-sql/runtime-tokio",
+  "hopr-transport-p2p/runtime-tokio",
+  "hopr-transport-session/runtime-tokio",
 ]
 prometheus = [
-    "dep:lazy_static", "dep:hopr-metrics",
-    "core-network/prometheus",
-    "core-path/prometheus",
-    "core-protocol/prometheus",
-    "hopr-db-sql/prometheus"
+  "dep:lazy_static",
+  "dep:hopr-metrics",
+  "core-network/prometheus",
+  "core-path/prometheus",
+  "core-protocol/prometheus",
+  "hopr-db-sql/prometheus",
 ]
 
 [dependencies]
@@ -48,7 +49,7 @@ serde = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, optional = true }
 tracing = { workspace = true }
-uuid = { workspace = true, features = ["v4",  "fast-rng"] }
+uuid = { workspace = true, features = ["v4", "fast-rng"] }
 validator = { workspace = true }
 
 core-network = { workspace = true }
@@ -65,6 +66,7 @@ hopr-platform = { workspace = true }
 hopr-primitive-types = { workspace = true }
 hopr-transport-p2p = { workspace = true }
 hopr-transport-session = { workspace = true }
+hopr-executor = { workspace = true }
 
 [dev-dependencies]
 async-std = { workspace = true }

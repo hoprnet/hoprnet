@@ -28,6 +28,7 @@ use core_protocol::ticket_aggregation::processor::TicketAggregatorTrait;
 use hopr_crypto_types::prelude::Hash;
 use hopr_db_sql::api::tickets::{AggregationPrerequisites, HoprDbTicketOperations};
 use hopr_db_sql::channels::HoprDbChannelOperations;
+use hopr_executor::api::{spawn, JoinHandle};
 use hopr_internal_types::prelude::*;
 
 use async_lock::RwLock;
@@ -41,12 +42,6 @@ use std::{
 };
 use tracing::{debug, error, info, warn};
 use validator::Validate;
-
-#[cfg(feature = "runtime-async-std")]
-use async_std::task::{spawn, JoinHandle};
-
-#[cfg(feature = "runtime-tokio")]
-use tokio::task::{spawn, JoinHandle};
 
 use crate::{strategy::SingularStrategy, Strategy};
 

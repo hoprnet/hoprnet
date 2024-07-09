@@ -11,8 +11,14 @@ license = "GPL-3.0-only"
 [dependencies]
 clap = { workspace = true }
 fast-socks5 = "0.9.6"
-tokio = { workspace = true, features = ["rt-multi-thread", "macros","io-util", "net", "time"] }
-tracing = { workspace = true}
+tokio = { workspace = true, features = [
+  "rt-multi-thread",
+  "macros",
+  "io-util",
+  "net",
+  "time",
+] }
+tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 hopr-lib = { workspace = true }
 serde = { workspace = true }

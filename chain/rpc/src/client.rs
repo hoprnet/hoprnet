@@ -21,6 +21,8 @@ use std::time::Duration;
 use tracing::{debug, trace, warn};
 use validator::Validate;
 
+use hopr_executor::api::sleep;
+
 use crate::client::RetryAction::{NoRetry, RetryAfter};
 use crate::errors::{HttpRequestError, JsonRpcProviderClientError};
 use crate::helper::{Request, Response};
@@ -441,14 +443,14 @@ where
                 }
                 RetryAfter(backoff) => {
                     warn!("RPC call {method} will retry in {}ms", backoff.as_millis());
-                    async_std::task::sleep(backoff).await
+                    sleep(backoff).await
                 }
             }
         }
     }
 }
 
-#[cfg(any(feature = "runtime-async-std", test))]
+#[cfg(any(test, feature = "runtime-async-std"))]
 pub mod surf_client {
     use async_std::prelude::FutureExt;
     use async_trait::async_trait;
@@ -513,7 +515,9 @@ pub mod surf_client {
     }
 }
 
-#[cfg(any(feature = "runtime-tokio", test))]
+// Both features could be enabled during testing, therefore we only use tokio when its
+// exclusively enabled.
+#[cfg(all(not(test), feature = "runtime-tokio", not(feature = "runtime-async-std")))]
 pub mod reqwest_client {
     use crate::errors::HttpRequestError;
     use crate::{HttpPostRequestor, HttpPostRequestorConfig};
@@ -695,7 +699,7 @@ pub mod tests {
         let mut last_number = 0;
 
         for _ in 0..3 {
-            async_std::task::sleep(block_time).await;
+            sleep(block_time).await;
 
             let number: ethers::types::U64 = client
                 .request("eth_blockNumber", ())

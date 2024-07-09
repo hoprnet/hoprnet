@@ -8,6 +8,7 @@ use libp2p_identity::PeerId;
 
 use tracing::{debug, warn};
 
+use hopr_executor::api::timeout_fut;
 use hopr_platform::time::native::current_time;
 
 use crate::messaging::ControlMessage;
@@ -30,12 +31,6 @@ lazy_static::lazy_static! {
             &["success"]
         ).unwrap();
 }
-
-#[cfg(any(feature = "runtime-async-std", test))]
-use async_std::future::timeout as timeout_fut;
-
-#[cfg(all(feature = "runtime-tokio", not(test)))]
-use tokio::time::timeout as timeout_fut;
 
 /// The maximum number of pings that are allowed to run in parallel per `ping` call.
 pub const MAX_PARALLEL_PINGS: usize = 14;

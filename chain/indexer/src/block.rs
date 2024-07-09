@@ -8,14 +8,9 @@ use chain_types::chain_events::SignificantChainEvent;
 use hopr_crypto_types::types::Hash;
 use hopr_db_sql::info::HoprDbInfoOperations;
 use hopr_db_sql::HoprDbGeneralModelOperations;
+use hopr_executor::api::{spawn, JoinHandle};
 
 use crate::{errors::CoreEthereumIndexerError, traits::ChainLogHandler, IndexerConfig};
-
-#[cfg(any(feature = "runtime-async-std", test))]
-use async_std::task::{spawn, JoinHandle};
-
-#[cfg(all(feature = "runtime-tokio", not(test)))]
-use tokio::task::{spawn, JoinHandle};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleGauge;

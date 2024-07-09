@@ -13,9 +13,6 @@
 //! For most of the practical use cases, the `hoprd` application should be a preferable
 //! choice.
 
-#[cfg(all(feature = "runtime-async-std", feature = "runtime-tokio"))]
-compile_error!("Only one of the runtime features can be specified for the build");
-
 /// Configuration related public types
 pub mod config;
 /// Various public constants.
@@ -37,15 +34,6 @@ use futures::{
 };
 use futures_concurrency::stream::StreamExt as _;
 use tracing::{debug, error, info, warn};
-
-#[cfg(feature = "runtime-async-std")]
-use async_std::task::{sleep, spawn, JoinHandle};
-
-#[cfg(feature = "runtime-tokio")]
-use tokio::{
-    task::{spawn, JoinHandle},
-    time::sleep,
-};
 
 use chain_actions::{
     action_state::{ActionState, IndexerActionTracker},
@@ -73,6 +61,7 @@ use hopr_db_sql::{
     prelude::{ChainOrPacketKey::ChainKey, DbSqlError, HoprDbPeersOperations},
     HoprDbAllOperations, HoprDbGeneralModelOperations,
 };
+use hopr_executor::api::{sleep, spawn, JoinHandle};
 use hopr_platform::file::native::{join, remove_dir_all};
 use hopr_strategy::strategy::{MultiStrategy, SingularStrategy};
 pub use {

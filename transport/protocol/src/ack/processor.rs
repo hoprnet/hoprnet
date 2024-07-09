@@ -12,9 +12,8 @@ use hopr_crypto_packet::errors::Result;
 use hopr_crypto_types::prelude::*;
 pub use hopr_db_api::protocol::AckResult;
 use hopr_db_api::protocol::HoprDbProtocolOperations;
+use hopr_executor::api::spawn;
 use hopr_internal_types::prelude::*;
-
-use crate::executor::spawn;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::{MultiCounter, SimpleCounter};

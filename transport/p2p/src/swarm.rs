@@ -63,7 +63,9 @@ async fn build_p2p_network(
         .with_dns()
         .await;
 
-    #[cfg(feature = "runtime-tokio")]
+    // Both features could be enabled during testing, therefore we only use tokio when its
+    // exclusively enabled.
+    #[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
     let swarm = libp2p::SwarmBuilder::with_existing_identity(me)
         .with_tokio()
         .with_tcp(Default::default(), libp2p::noise::Config::new, || tcp_upgrade)

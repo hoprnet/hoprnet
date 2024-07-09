@@ -58,12 +58,3 @@ pub mod cpu {
             .unwrap_or_else(|caught_panic| std::panic::resume_unwind(caught_panic))
     }
 }
-
-/// Module for executor based parallelization of blocking IO heavy workloads.
-pub mod sync_io {
-    #[cfg(feature = "runtime-async-std")]
-    pub use async_std::task::spawn_blocking;
-
-    #[cfg(feature = "runtime-tokio")]
-    pub use tokio::task::spawn_blocking;
-}

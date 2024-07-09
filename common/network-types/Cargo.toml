@@ -10,11 +10,10 @@ license = "GPL-3.0-only"
 
 [features]
 default = []
-runtime-async-std = ["async-std"]
-runtime-tokio = ["tokio"]
+runtime-async-std = ["hopr-executor/runtime-async-std"]
+runtime-tokio = ["hopr-executor/runtime-tokio"]
 
 [dependencies]
-async-std = { workspace = true, optional = true}
 bitvec = "1.0.1"
 crossbeam-queue = "0.3.11"
 crossbeam-skiplist = { workspace = true }
@@ -27,16 +26,16 @@ serde = { workspace = true }
 serde_bytes = { workspace = true }
 smart-default = { workspace = true }
 strum = { workspace = true }
-tokio = { workspace = true, optional = true}
 tracing = { workspace = true }
 thiserror = { workspace = true }
 
 hopr-platform = { workspace = true }
 hopr-primitive-types = { workspace = true }
+hopr-executor = { workspace = true }
 
 [dev-dependencies]
 anyhow = "1.0"
-async-std = { workspace = true , features = ["attributes", "unstable"]}
+async-std = { workspace = true, features = ["attributes", "unstable"] }
 async-stream = { workspace = true }
 ctor = "0.2.8"
 hex-literal = { workspace = true }

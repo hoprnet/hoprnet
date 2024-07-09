@@ -18,13 +18,13 @@ use hopr_db_api::{
     errors::DbError,
     tickets::{AggregationPrerequisites, HoprDbTicketOperations},
 };
+use hopr_executor::api::{sleep, spawn};
 use hopr_internal_types::prelude::*;
 
 use crate::errors::{
     ProtocolError::{Retry, TransportError},
     Result,
 };
-use crate::executor::{sleep, spawn};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleCounter;

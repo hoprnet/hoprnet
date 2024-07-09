@@ -1,11 +1,8 @@
-#[cfg(feature = "runtime-async-std")]
-use async_std::task::{sleep, spawn, JoinHandle};
-
-#[cfg(feature = "runtime-tokio")]
-use tokio::{
-    task::{spawn, JoinHandle},
-    time::sleep,
-};
+use ethers::providers::Middleware;
+use ethers::utils::AnvilInstance;
+use futures::{pin_mut, StreamExt};
+use std::time::Duration;
+use tracing::info;
 
 use chain_actions::action_queue::{ActionQueue, ActionQueueConfig};
 use chain_actions::action_state::{ActionState, IndexerActionTracker};
@@ -25,25 +22,11 @@ use chain_types::utils::{
 };
 use chain_types::{ContractAddresses, ContractInstances};
 use core_transport::{ChainKeypair, Hash, Keypair, Multiaddr, OffchainKeypair};
-use ethers::providers::Middleware;
-use ethers::utils::AnvilInstance;
-use futures::{pin_mut, StreamExt};
 use hopr_crypto_types::prelude::*;
 use hopr_db_sql::{api::info::DomainSeparator, prelude::*};
+use hopr_executor::api::{cancel_join_handle, sleep, spawn, JoinHandle};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use std::time::Duration;
-use tracing::info;
-
-#[cfg(feature = "runtime-async-std")]
-async fn cancel_join_handle<T>(handle: JoinHandle<T>) {
-    handle.cancel().await;
-}
-
-#[cfg(feature = "runtime-tokio")]
-async fn cancel_join_handle<T>(handle: JoinHandle<T>) {
-    handle.abort()
-}
 
 // Helper function to generate the first acked ticket (channel_epoch 1, index 0, offset 0) of win prob 100%
 async fn generate_the_first_ack_ticket<M: Middleware>(

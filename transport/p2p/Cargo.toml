@@ -16,13 +16,22 @@ runtime-tokio = ["libp2p/tokio"]
 [dependencies]
 futures = { workspace = true }
 futures-concurrency = { workspace = true }
-libp2p = { workspace = true, features = ["noise", "request-response", "cbor", "macros", "tcp", "quic", "dns", "yamux"] }
+libp2p = { workspace = true, features = [
+  "noise",
+  "request-response",
+  "cbor",
+  "macros",
+  "tcp",
+  "quic",
+  "dns",
+  "yamux",
+] }
 libp2p-mplex = { workspace = true }
 multiaddr = { workspace = true }
-serde = { workspace = true, features = ["derive"]}
+serde = { workspace = true, features = ["derive"] }
 thiserror = { workspace = true }
 tracing = { workspace = true }
-void = "1.0.2"          # needed for Behavior implementations from libp2p
+void = "1.0.2" # needed for Behavior implementations from libp2p
 
 core-network = { workspace = true }
 core-protocol = { workspace = true }

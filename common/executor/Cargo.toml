@@ -1,0 +1,21 @@
+[package]
+name = "hopr-executor"
+version = "0.1.0"
+authors = ["HOPR Association <tech@hoprnet.org>"]
+edition = "2021"
+description = "Feature-selected executor for HOPR"
+homepage = "https://hoprnet.org/"
+repository = "https://github.com/hoprnet/hoprnet"
+license = "GPL-3.0-only"
+
+[lib]
+crate-type = ["rlib"]
+
+[features]
+default = []
+runtime-async-std = ["dep:async-std"]
+runtime-tokio = ["dep:tokio"]
+
+[dependencies]
+async-std = { workspace = true, optional = true }
+tokio = { workspace = true, optional = true }

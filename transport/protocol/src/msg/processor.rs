@@ -14,12 +14,12 @@ use hopr_crypto_packet::errors::{
 };
 use hopr_crypto_types::prelude::*;
 use hopr_db_api::prelude::HoprDbProtocolOperations;
+use hopr_executor::api::{sleep, spawn};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 
 use super::packet::{PacketConstructing, TransportPacket};
 use crate::bloom;
-use crate::executor::{sleep, spawn};
 use crate::msg::mixer::MixerConfig;
 
 #[cfg(all(feature = "prometheus", not(test)))]
