@@ -135,9 +135,9 @@ pub trait HoprDbAccountOperations {
         T: Into<ChainOrPacketKey> + Send + Sync;
 }
 
-// NOTE: this currently function assumes `announcements` are sorted from latest to earliest
+// NOTE: this current function assumes `announcements` are sorted from latest to earliest
 fn model_to_account_entry(account: account::Model, announcements: Vec<announcement::Model>) -> Result<AccountEntry> {
-    // Currently we always take only the most recent announcement
+    // Currently, we always take only the most recent announcement
     let announcement = announcements.first();
 
     Ok(AccountEntry::new(

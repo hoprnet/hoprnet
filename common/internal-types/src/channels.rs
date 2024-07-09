@@ -8,12 +8,12 @@ use std::time::{Duration, SystemTime};
 #[derive(Copy, Clone, Debug, smart_default::SmartDefault, Serialize, Deserialize, strum::Display)]
 #[strum(serialize_all = "PascalCase")]
 pub enum ChannelStatus {
-    /// Channel is closed.
+    /// The channel is closed.
     #[default]
     Closed,
-    /// Channel is opened.
+    /// The channel is opened.
     Open,
-    /// Channel is pending to be closed.
+    /// The channel is pending to be closed.
     /// The timestamp marks the *earliest* possible time when the channel can transition into the `Closed` state.
     #[strum(serialize = "PendingToClose")]
     PendingToClose(SystemTime),
@@ -81,6 +81,7 @@ impl ChannelEntry {
         channel_epoch: U256,
     ) -> Self {
         assert_eq!(BalanceType::HOPR, balance.balance_type(), "invalid balance currency");
+        assert!(channel_epoch.ge(&1_u32.into()), "channel epoch must be greater than 0");
         ChannelEntry {
             source,
             destination,

@@ -546,7 +546,6 @@ impl Stream for PacketInteraction {
     type Item = MsgProcessed;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Option<Self::Item>> {
-        use futures::stream::StreamExt;
         Pin::new(self).msg_event_queue.1.poll_next_unpin(cx)
     }
 }

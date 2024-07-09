@@ -1,15 +1,48 @@
+use crate::db::HoprDb;
+use crate::errors::{DbSqlError, Result};
+use crate::{HoprDbGeneralModelOperations, OptTx};
 use async_trait::async_trait;
 use futures::TryStreamExt;
 use hopr_crypto_types::prelude::*;
 use hopr_db_entity::channel;
+use hopr_db_entity::conversions::channels::ChannelStatusUpdate;
 use hopr_db_entity::prelude::Channel;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
+use sea_orm::ActiveValue::Set;
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter};
 
-use crate::db::HoprDb;
-use crate::errors::{DbSqlError, Result};
-use crate::{HoprDbGeneralModelOperations, OptTx};
+pub struct ChannelEditor {
+    orig: ChannelEntry,
+    model: channel::ActiveModel,
+}
+
+impl ChannelEditor {
+    pub fn entry(&self) -> &ChannelEntry {
+        &self.orig
+    }
+
+    pub fn change_balance(mut self, balance: Balance) -> Self {
+        assert_eq!(BalanceType::HOPR, balance.balance_type());
+        self.model.balance = Set(balance.amount().to_be_bytes().to_vec());
+        self
+    }
+
+    pub fn change_status(mut self, status: ChannelStatus) -> Self {
+        self.model.set_status(status);
+        self
+    }
+
+    pub fn change_ticket_index(mut self, index: impl Into<U256>) -> Self {
+        self.model.ticket_index = Set(index.into().to_be_bytes().to_vec());
+        self
+    }
+
+    pub fn change_epoch(mut self, epoch: impl Into<U256>) -> Self {
+        self.model.ticket_index = Set(epoch.into().to_be_bytes().to_vec());
+        self
+    }
+}
 
 /// Defines DB API for accessing information about HOPR payment channels.
 #[async_trait]
@@ -18,6 +51,10 @@ pub trait HoprDbChannelOperations {
     ///
     /// See [generate_channel_id] on how to generate a channel ID hash from source and destination [Addresses](Address).
     async fn get_channel_by_id<'a>(&'a self, tx: OptTx<'a>, id: &Hash) -> Result<Option<ChannelEntry>>;
+
+    async fn get_channel_editor_by_id<'a>(&'a self, tx: OptTx<'a>, id: &Hash) -> Result<Option<ChannelEditor>>;
+
+    async fn edit_channel<'a>(&'a self, tx: OptTx<'a>, editor: ChannelEditor) -> Result<ChannelEntry>;
 
     /// Retrieves the channel by source and destination.
     async fn get_channel_by_parties<'a>(
@@ -69,6 +106,43 @@ impl HoprDbChannelOperations for HoprDb {
                             None
                         },
                     )
+                })
+            })
+            .await
+    }
+
+    async fn get_channel_editor_by_id<'a>(&'a self, tx: OptTx<'a>, id: &Hash) -> Result<Option<ChannelEditor>> {
+        let id_hex = id.to_hex();
+        self.nest_transaction(tx)
+            .await?
+            .perform(|tx| {
+                Box::pin(async move {
+                    Ok::<_, DbSqlError>(
+                        if let Some(model) = Channel::find()
+                            .filter(channel::Column::ChannelId.eq(id_hex))
+                            .one(tx.as_ref())
+                            .await?
+                        {
+                            Some(ChannelEditor {
+                                orig: model.clone().try_into()?,
+                                model: model.into_active_model(),
+                            })
+                        } else {
+                            None
+                        },
+                    )
+                })
+            })
+            .await
+    }
+
+    async fn edit_channel<'a>(&'a self, tx: OptTx<'a>, editor: ChannelEditor) -> Result<ChannelEntry> {
+        self.nest_transaction(tx)
+            .await?
+            .perform(|tx| {
+                Box::pin(async move {
+                    let model = editor.model.update(tx.as_ref()).await?;
+                    Ok::<_, DbSqlError>(model.try_into()?)
                 })
             })
             .await
