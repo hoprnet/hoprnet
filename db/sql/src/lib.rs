@@ -35,10 +35,10 @@ use hopr_db_api::resolver::HoprDbResolverOperations;
 use hopr_db_api::tickets::HoprDbTicketOperations;
 
 pub(crate) mod executor {
-    #[cfg(any(feature = "runtime-async-std", test))]
+    #[cfg(any(test, feature = "runtime-async-std"))]
     pub(crate) use async_std::task::spawn;
 
-    #[cfg(all(feature = "runtime-tokio", not(test)))]
+    #[cfg(all(not(test), feature = "runtime-tokio", not(feature = "runtime-async-std")))]
     pub(crate) use tokio::task::spawn;
 }
 

@@ -63,7 +63,7 @@ async fn build_p2p_network(
         .with_dns()
         .await;
 
-    #[cfg(feature = "runtime-tokio")]
+    #[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
     let swarm = libp2p::SwarmBuilder::with_existing_identity(me)
         .with_tokio()
         .with_tcp(Default::default(), libp2p::noise::Config::new, || tcp_upgrade)

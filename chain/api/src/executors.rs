@@ -16,7 +16,7 @@ use std::time::Duration;
 #[cfg(feature = "runtime-async-std")]
 use async_std::task::sleep;
 
-#[cfg(feature = "runtime-tokio")]
+#[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
 use tokio::time::sleep;
 
 /// Represents an abstract client that is capable of submitting

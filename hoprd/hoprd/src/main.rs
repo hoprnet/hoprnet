@@ -1,6 +1,3 @@
-#[cfg(all(feature = "runtime-async-std", feature = "runtime-tokio"))]
-compile_error!("Only one of the runtime features can be specified for the build");
-
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::{sync::Arc, time::SystemTime};
@@ -13,7 +10,7 @@ use futures::StreamExt;
 #[cfg(feature = "runtime-async-std")]
 use async_std::task::{spawn, JoinHandle};
 
-#[cfg(feature = "runtime-tokio")]
+#[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
 use tokio::task::{spawn, JoinHandle};
 
 #[cfg(feature = "telemetry")]
@@ -118,7 +115,7 @@ enum HoprdProcesses {
 }
 
 #[cfg_attr(feature = "runtime-async-std", async_std::main)]
-#[cfg_attr(feature = "runtime-tokio", tokio::main)]
+#[cfg_attr(all(feature = "runtime-tokio", not(feature = "runtime-async-std")), tokio::main)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let _ = init_logger();
 
@@ -321,7 +318,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         #[cfg(feature = "runtime-async-std")]
                         handle.cancel().await;
 
-                        #[cfg(feature = "runtime-tokio")]
+                        #[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
                         handle.abort();
                     })
                     .await;

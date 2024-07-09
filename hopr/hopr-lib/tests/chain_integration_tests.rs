@@ -1,7 +1,7 @@
 #[cfg(feature = "runtime-async-std")]
 use async_std::task::{sleep, spawn, JoinHandle};
 
-#[cfg(feature = "runtime-tokio")]
+#[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
 use tokio::{
     task::{spawn, JoinHandle},
     time::sleep,
@@ -40,7 +40,7 @@ async fn cancel_join_handle<T>(handle: JoinHandle<T>) {
     handle.cancel().await;
 }
 
-#[cfg(feature = "runtime-tokio")]
+#[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
 async fn cancel_join_handle<T>(handle: JoinHandle<T>) {
     handle.abort()
 }
@@ -251,7 +251,7 @@ async fn start_node_chain_logic(
 }
 
 #[cfg_attr(feature = "runtime-async-std", async_std::test)]
-#[cfg_attr(feature = "runtime-tokio", tokio::test)]
+#[cfg_attr(all(feature = "runtime-tokio", not(feature = "runtime-async-std")), tokio::test)]
 async fn integration_test_indexer() {
     let block_time = Duration::from_secs(1);
     let anvil = create_anvil(Some(block_time));

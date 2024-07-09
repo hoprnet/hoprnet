@@ -31,10 +31,10 @@ lazy_static::lazy_static! {
         ).unwrap();
 }
 
-#[cfg(any(feature = "runtime-async-std", test))]
+#[cfg(any(test, feature = "runtime-async-std"))]
 use async_std::future::timeout as timeout_fut;
 
-#[cfg(all(feature = "runtime-tokio", not(test)))]
+#[cfg(all(not(test), feature = "runtime-tokio", not(feature = "runtime-async-std")))]
 use tokio::time::timeout as timeout_fut;
 
 /// The maximum number of pings that are allowed to run in parallel per `ping` call.

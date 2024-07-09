@@ -50,7 +50,6 @@ use hopr_lib::{errors::HoprLibError, Hopr, TransportOutput};
 use crate::config::Auth;
 
 pub(crate) const BASE_PATH: &str = "/api/v3";
-pub(crate) const API_VERSION: &str = "3.1.0";
 
 #[derive(Clone)]
 pub(crate) struct AppState {
@@ -114,7 +113,7 @@ pub(crate) struct InternalState {
     components(
         schemas(
             ApiError,
-            account::AccountAddressesResponse, account::AccountBalancesResponse, account::WithdrawBodyRequest,
+            account::AccountAddressesResponse, account::AccountBalancesResponse, account::WithdrawBodyRequest, account::WithdrawResponse,
             alias::PeerIdResponse, alias::AliasPeerIdBodyRequest,
             channels::ChannelsQueryRequest,channels::CloseChannelResponse, channels::OpenChannelBodyRequest, channels::OpenChannelResponse,
             channels::NodeChannel, channels::NodeChannelsResponse, channels::ChannelInfoResponse, channels::FundBodyRequest,
@@ -162,6 +161,10 @@ impl Modify for SecurityAddon {
     }
 }
 
+async fn serve_openapi_spec() -> impl IntoResponse {
+    (StatusCode::OK, Json(ApiDoc::openapi())).into_response()
+}
+
 pub async fn serve_api(
     listener: TcpListener,
     hoprd_cfg: String,
@@ -199,13 +202,19 @@ async fn build_api(
     };
 
     Router::new()
+        // FIXME: Remove API UIs which are not going to be used.
         .nest(
-            BASE_PATH,
+            "/",
             Router::new()
-                .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
+                .merge(SwaggerUi::new("/swagger-ui").url("/api-docs2/openapi.json", ApiDoc::openapi()))
                 .merge(Redoc::with_url("/redoc", ApiDoc::openapi()))
                 .merge(RapiDoc::new("/api-docs/openapi.json").path("/rapidoc"))
                 .merge(Scalar::with_url("/scalar", ApiDoc::openapi()))
+                .route("/api-docs/openapi.json", get(serve_openapi_spec)),
+        )
+        .nest(
+            BASE_PATH,
+            Router::new()
                 .route("/startedz", get(checks::startedz))
                 .route("/readyz", get(checks::readyz))
                 .route("/healthyz", get(checks::healthyz))

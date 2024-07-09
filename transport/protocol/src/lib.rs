@@ -59,9 +59,9 @@ pub mod msg;
 pub mod ticket_aggregation;
 
 pub(crate) mod executor {
-    #[cfg(any(feature = "runtime-async-std", test))]
+    #[cfg(any(test, feature = "runtime-async-std"))]
     pub(crate) use async_std::task::{sleep, spawn};
 
-    #[cfg(all(feature = "runtime-tokio", not(test)))]
+    #[cfg(all(not(test), feature = "runtime-tokio", not(feature = "runtime-async-std")))]
     pub(crate) use tokio::{task::spawn, time::sleep};
 }

@@ -11,10 +11,10 @@ use hopr_db_sql::HoprDbGeneralModelOperations;
 
 use crate::{errors::CoreEthereumIndexerError, traits::ChainLogHandler, IndexerConfig};
 
-#[cfg(any(feature = "runtime-async-std", test))]
+#[cfg(any(test, feature = "runtime-async-std"))]
 use async_std::task::{spawn, JoinHandle};
 
-#[cfg(all(feature = "runtime-tokio", not(test)))]
+#[cfg(all(not(test), feature = "runtime-tokio", not(feature = "runtime-async-std")))]
 use tokio::task::{spawn, JoinHandle};
 
 #[cfg(all(feature = "prometheus", not(test)))]

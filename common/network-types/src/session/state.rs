@@ -132,14 +132,11 @@ use crate::session::frame::{segment, FrameId, FrameReassembler, Segment, Segment
 use crate::session::protocol::{FrameAcknowledgements, SegmentRequest, SessionMessage};
 use crate::session::utils::{RetryResult, RetryToken};
 
-#[cfg(any(feature = "runtime-async-std", test))]
+#[cfg(any(test, feature = "runtime-async-std"))]
 use async_std::task::spawn;
 
-#[cfg(all(feature = "runtime-tokio", not(test)))]
+#[cfg(all(not(test), feature = "runtime-tokio", not(feature = "runtime-async-std")))]
 use tokio::task::spawn;
-
-#[cfg(all(feature = "runtime-async-std", feature = "runtime-tokio"))]
-compile_error!("Only one of the runtime features can be specified for the build");
 
 /// Configuration of session.
 #[derive(Debug, Clone, Copy, PartialEq, SmartDefault)]
@@ -755,7 +752,7 @@ impl<const C: usize> AsyncRead for SessionSocket<C> {
 }
 
 /// Implementations of Tokio's AsyncRead and AsyncWrite for compatibility
-#[cfg(feature = "runtime-tokio")]
+#[cfg(all(not(test), feature = "runtime-tokio"))]
 pub mod tokio_compat {
     use std::pin::Pin;
     use std::task::{Context, Poll};

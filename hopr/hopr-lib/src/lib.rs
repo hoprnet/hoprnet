@@ -13,9 +13,6 @@
 //! For most of the practical use cases, the `hoprd` application should be a preferable
 //! choice.
 
-#[cfg(all(feature = "runtime-async-std", feature = "runtime-tokio"))]
-compile_error!("Only one of the runtime features can be specified for the build");
-
 /// Configuration related public types
 pub mod config;
 /// Various public constants.
@@ -57,7 +54,7 @@ use futures_concurrency::stream::StreamExt as _;
 #[cfg(feature = "runtime-async-std")]
 use async_std::task::{sleep, spawn, JoinHandle};
 
-#[cfg(feature = "runtime-tokio")]
+#[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
 use tokio::{
     task::{spawn, JoinHandle},
     time::sleep,

@@ -45,7 +45,7 @@ use validator::Validate;
 #[cfg(feature = "runtime-async-std")]
 use async_std::task::{spawn, JoinHandle};
 
-#[cfg(feature = "runtime-tokio")]
+#[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
 use tokio::task::{spawn, JoinHandle};
 
 use crate::{strategy::SingularStrategy, Strategy};

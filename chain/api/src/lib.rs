@@ -11,7 +11,7 @@ use std::time::Duration;
 #[cfg(feature = "runtime-async-std")]
 use async_std::task::{sleep, spawn, JoinHandle};
 
-#[cfg(feature = "runtime-tokio")]
+#[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
 use tokio::{
     task::{spawn, JoinHandle},
     time::sleep,
@@ -47,7 +47,7 @@ use crate::errors::{HoprChainError, Result};
 #[cfg(feature = "runtime-async-std")]
 pub type DefaultHttpPostRequestor = chain_rpc::client::surf_client::SurfRequestor;
 
-#[cfg(feature = "runtime-tokio")]
+#[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
 pub type DefaultHttpPostRequestor = chain_rpc::client::reqwest_client::ReqwestRequestor;
 
 /// The default JSON RPC provider client

@@ -50,10 +50,10 @@ use std::{
 };
 
 pub(crate) mod executor {
-    #[cfg(any(feature = "runtime-async-std", test))]
+    #[cfg(any(test, feature = "runtime-async-std"))]
     pub use async_std::task::{sleep, spawn, JoinHandle};
 
-    #[cfg(all(feature = "runtime-tokio", not(test)))]
+    #[cfg(all(not(test), feature = "runtime-tokio", not(feature = "runtime-async-std")))]
     pub use tokio::{
         task::{spawn, JoinHandle},
         time::sleep,
