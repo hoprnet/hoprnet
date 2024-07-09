@@ -10,6 +10,7 @@ mod network;
 mod node;
 mod peers;
 mod prometheus;
+mod session;
 mod tickets;
 mod token_authentication;
 

@@ -41,9 +41,27 @@ pub enum Capability {
 /// a reactive component with regards to the session concept.
 #[derive(Debug, PartialEq, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct ClientSessionConfig {
+pub struct SessionClientConfig {
     #[cfg_attr(feature = "serde", serde(with = "As::<DisplayFromStr>"))]
     pub peer: PeerId,
     pub path_options: PathOptions,
     pub capabilities: Vec<Capability>,
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::Capability;
+
+    #[test]
+    fn test_x() {
+        assert_eq!(
+            "",
+            &serde_json::to_string(&super::SessionClientConfig {
+                peer: libp2p_identity::PeerId::random(),
+                path_options: super::PathOptions::Hops(1),
+                capabilities: vec![Capability::Segmentation, Capability::Retransmission]
+            })
+            .unwrap()
+        );
+    }
 }

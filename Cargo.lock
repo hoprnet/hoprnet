@@ -3784,6 +3784,7 @@ dependencies = [
  "mockall",
  "ringbuffer",
  "serde",
+ "serde_json",
  "serde_with",
  "thiserror",
 ]
