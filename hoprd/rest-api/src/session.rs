@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use axum::{
-    extract::{Json, Path, Query, State},
+    extract::{Json, State},
     http::status::StatusCode,
     response::IntoResponse,
 };
@@ -9,6 +9,9 @@ use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 
 use hopr_lib::{PathOptions, PeerId, SessionCapability, SessionClientConfig};
+use tokio::{io::copy_bidirectional_with_sizes, net::TcpListener};
+use tokio_util::compat::FuturesAsyncReadCompatExt;
+use tracing::{error, info};
 
 use crate::{ApiErrorStatus, InternalState, BASE_PATH};
 
@@ -17,7 +20,7 @@ use crate::{ApiErrorStatus, InternalState, BASE_PATH};
 #[schema(example = json!({
         "destination": "12D3KooWR4uwjKCDCAY1xsEFB4esuWLF9Q5ijYvCjz5PNkTbnu33",
         "path": {
-            "Hops":1
+            "Hops": 1
         },
         "capabilities": ["Segmentation", "Retransmission"]
     }))]
@@ -40,20 +43,30 @@ impl From<SessionClientRequest> for SessionClientConfig {
     }
 }
 
+#[serde_as]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+#[schema(example = json!({
+        "port": 5542,
+    }))]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct SessionClientResponse {
+    pub port: u16,
+}
+
 /// Creates a new client session returing a dedicated session listening port.
 #[utoipa::path(
         get,
-        path = const_format::formatcp!("{BASE_PATH}/messages/session"),
+        path = const_format::formatcp!("{BASE_PATH}/session/client"),
         request_body(
             content = SessionClientRequest,
-            description = "Configuration of the ",
+            description = "Configuration of the client session to be created",
             content_type = "application/json"),
         responses(
-            (status = 200, description = "Message successfully peeked at.", body = MessagePopResponse),
+            (status = 200, description = "Successfully created a new client session", body = SessionClientResponse),
             (status = 400, description = "Bad request.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
-            (status = 404, description = "The specified resource was not found."),
-            (status = 422, description = "Unknown failure", body = ApiError)
+            (status = 422, description = "Unknown failure", body = ApiError),
+            (status = 500, description = "Internal server error", body = ApiError)
         ),
         security(
             ("api_token" = []),
@@ -61,26 +74,48 @@ impl From<SessionClientRequest> for SessionClientConfig {
         ),
         tag = "Messages"
     )]
-pub async fn session(
+pub(crate) async fn create_client(
     State(state): State<Arc<InternalState>>,
     Json(args): Json<SessionClientRequest>,
-) -> impl IntoResponse {
-    let port = args.port;
+) -> Result<impl IntoResponse, impl IntoResponse> {
+    let port = args.port.unwrap_or(0);
     let data: SessionClientConfig = args.into();
+    let is_tcp_like = data.capabilities.contains(&SessionCapability::Retransmission)
+        || data.capabilities.contains(&SessionCapability::Segmentation);
 
-    let inbox = state.inbox.clone();
+    if is_tcp_like {
+        let session = state.hopr.clone().connect_to(data.into()).await.map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                ApiErrorStatus::UnknownFailure(e.to_string()),
+            )
+        })?;
 
-    // let inbox = inbox.write().await;
-    // if let Some((data, ts)) = inbox.peek(tag.tag).await {
-    //     match to_api_message(data, ts) {
-    //         Ok(message) => Ok(Response::builder(200).body(json!(message)).build()),
-    //         Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::UnknownFailure(e)).build()),
-    //     }
-    // } else {
-    (
-        StatusCode::UNPROCESSABLE_ENTITY,
-        ApiErrorStatus::UnknownFailure("REPLACE THIS".to_owned()),
-    )
-        .into_response()
-    // }
+        let tcp_listener = TcpListener::bind("0.0.0.0:{port}").await.map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                ApiErrorStatus::UnknownFailure(format!("Failed to bind on 0.0.0.0:{port}: {e}")),
+            )
+        })?;
+
+        tokio::task::spawn(async move {
+            match tcp_listener
+            .accept()
+            .await {
+                Ok((mut tcp_stream, _sock_addr)) => match copy_bidirectional_with_sizes(&mut session.compat(), &mut tcp_stream, 1024, 1024).await {
+                    Ok(bound_stream_finished) => info!("Client session through TCP port {port} ended with {bound_stream_finished:?} bytes transferred in both directions."),
+                    Err(e) => error!("Failed to bind the TCP stream (port {port}) to the session: {e:?}")
+                },
+                Err(e) => error!("Failed to accept connection: {e:?}")
+            }
+        });
+    } else {
+        // let s = UdpSocket::bind("0.0.0.0:{port}").await?.connect().await;
+        return Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            ApiErrorStatus::UnknownFailure("No UDP socket support yet".to_string()),
+        ));
+    };
+
+    Ok((StatusCode::OK, Json(SessionClientResponse { port })).into_response())
 }

@@ -101,6 +101,7 @@ pub(crate) struct InternalState {
         node::version,
         peers::ping_peer,
         peers::show_peer_info,
+        session::create_client,
         tickets::aggregate_tickets_in_channel,
         tickets::redeem_all_tickets,
         tickets::redeem_tickets_in_channel,
@@ -121,6 +122,7 @@ pub(crate) struct InternalState {
             node::EntryNode, node::NodeInfoResponse, node::NodePeersQueryRequest,
             node::HeartbeatInfo, node::PeerInfo, node::AnnouncedPeer, node::NodePeersResponse, node::NodeVersionResponse,
             peers::NodePeerInfoResponse, peers::PingResponse,
+            session::SessionClientRequest, session::SessionClientResponse,
             tickets::NodeTicketStatisticsResponse, tickets::ChannelTicket,
         )
     ),
@@ -250,6 +252,7 @@ async fn build_api(
                 .route("/node/peers", get(node::peers))
                 .route("/node/entryNodes", get(node::entry_nodes))
                 .route("/node/metrics", get(node::metrics))
+                .route("/session/client", get(session::create_client))
                 .with_state(inner_state.clone().into())
                 .layer(middleware::from_fn_with_state(
                     inner_state,

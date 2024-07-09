@@ -39,6 +39,7 @@ serde_with = { workspace = true }
 smart-default = { workspace = true }
 strum = { workspace = true }
 tokio = { workspace = true }
+tokio-util = { workspace = true, features=["compat"] }
 tower = "0.4.13"
 tower-http = { version = "0.5.2", features = [
   "validate-request",
@@ -53,7 +54,7 @@ utoipa = { version = "4.2.3" }
 utoipa-scalar = { version = "0.1.0", features = ["axum"] }
 validator = { workspace = true }
 
-hopr-crypto-types = { workspace = true }
-hopr-lib = { workspace = true, features = ["runtime-tokio"] }
-hopr-metrics = { workspace = true, optional = true }
+hopr-lib = { workspace = true, features = ["runtime-tokio", "session-client"] }
 hoprd-inbox = { workspace = true }
+hopr-crypto-types = { workspace = true }
+hopr-metrics = { workspace = true, optional = true }
