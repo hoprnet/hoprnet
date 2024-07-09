@@ -12,13 +12,15 @@ license = "GPL-3.0-only"
 crate-type = ["rlib"]
 
 [features]
-default = []
+default = ["serde"]
+serde = []
 
 [dependencies]
 async-trait = { workspace = true }
 futures = { workspace = true }
 libp2p-identity = { workspace = true }
 ringbuffer = { workspace = true }
+serde = { workspace = true }
 thiserror = { workspace = true }
 
 hopr-network-types = { workspace = true }

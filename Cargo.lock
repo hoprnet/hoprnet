@@ -3726,6 +3726,7 @@ dependencies = [
  "libp2p-identity",
  "mockall",
  "ringbuffer",
+ "serde",
  "thiserror",
 ]
 
