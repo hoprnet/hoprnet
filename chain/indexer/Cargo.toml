@@ -1,6 +1,6 @@
 [package]
 name = "chain-indexer"
-version = "0.3.0"
+version = "0.3.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Core-Ethereum-specific interaction with the backend database"
@@ -16,10 +16,8 @@ default = []
 runtime-async-std = [
     "async-std",
     "hopr-db-sql/runtime-async-std",
-    "sea-orm/runtime-async-std",
 ]
 runtime-tokio = [
-    "sea-orm/runtime-tokio",
     "hopr-db-sql/runtime-tokio",
     "tokio"
 ]
