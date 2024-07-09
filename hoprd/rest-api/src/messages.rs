@@ -672,7 +672,7 @@ pub(super) async fn peek_all(
 
 #[cfg(test)]
 mod tests {
-    use super::messages::SendMessageBodyRequest;
+    use super::*;
 
     use serde_json::from_value;
 

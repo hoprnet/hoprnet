@@ -14,6 +14,8 @@ crate-type = ["rlib"]
 [features]
 default = ["prometheus"]
 prometheus = ["hopr-lib/prometheus", "dep:hopr-metrics", "dep:lazy_static"]
+# placeholder feature so we can enable it globally during tests
+runtime-async-std = []
 
 [dependencies]
 async-broadcast = { workspace = true }

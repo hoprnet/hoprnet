@@ -33,13 +33,14 @@ hopr-metrics = { workspace = true, optional = true }
 hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
-async-std = { workspace = true }
-hopr-db-sql = { workspace = true, features = ["runtime-async-std"] }
+async-std = { workspace = true, optional = false }
 mockall = { workspace = true }
 more-asserts = { workspace = true }
 
+hopr-db-sql = { workspace = true, features = ["runtime-async-std"] }
+
 [features]
-default = ["prometheus", "compat-ping"]
+default = ["compat-ping"]
 compat-ping = []
 prometheus = ["dep:hopr-metrics"]
 runtime-async-std = ["async-std"]

@@ -1,10 +1,4 @@
-use axum::{
-    extract::{OriginalUri, Request},
-    http::Method,
-    middleware::Next,
-    response::Response,
-};
-use std::time::Instant;
+use axum::{extract::Request, middleware::Next, response::Response};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::{MultiCounter, MultiHistogram};
@@ -28,10 +22,15 @@ lazy_static::lazy_static! {
 
 /// Custom prometheus recording middleware
 #[cfg(all(feature = "prometheus", not(test)))]
-pub(crate) async fn record(uri: OriginalUri, method: Method, request: Request, next: Next) -> Response {
+pub(crate) async fn record(
+    uri: axum::extract::OriginalUri,
+    method: axum::http::Method,
+    request: Request,
+    next: Next,
+) -> Response {
     let path = uri.path().to_owned();
 
-    let start = Instant::now();
+    let start = std::time::Instant::now();
     let response: Response = next.run(request).await;
     let response_duration = start.elapsed();
 
@@ -47,6 +46,6 @@ pub(crate) async fn record(uri: OriginalUri, method: Method, request: Request, n
 }
 
 #[cfg(any(not(feature = "prometheus"), test))]
-pub(crate) async fn record(uri: OriginalUri, request: Request, next: Next) -> Response {
+pub(crate) async fn record(request: Request, next: Next) -> Response {
     next.run(request).await
 }
