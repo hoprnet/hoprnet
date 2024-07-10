@@ -1,3 +1,4 @@
+use crate::cache::ChannelParties;
 use crate::db::HoprDb;
 use crate::errors::{DbSqlError, Result};
 use crate::{HoprDbGeneralModelOperations, OptTx};
@@ -12,34 +13,40 @@ use hopr_primitive_types::prelude::*;
 use sea_orm::ActiveValue::Set;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter};
 
+/// API for editing [ChannelEntry] in the DB.
 pub struct ChannelEditor {
     orig: ChannelEntry,
     model: channel::ActiveModel,
 }
 
 impl ChannelEditor {
+    /// Original channel entry **before** the edits.
     pub fn entry(&self) -> &ChannelEntry {
         &self.orig
     }
 
+    /// Change the HOPR balance of the channel.
     pub fn change_balance(mut self, balance: Balance) -> Self {
         assert_eq!(BalanceType::HOPR, balance.balance_type());
         self.model.balance = Set(balance.amount().to_be_bytes().to_vec());
         self
     }
 
+    /// Change the channel status.
     pub fn change_status(mut self, status: ChannelStatus) -> Self {
         self.model.set_status(status);
         self
     }
 
+    /// Change the ticket index.
     pub fn change_ticket_index(mut self, index: impl Into<U256>) -> Self {
         self.model.ticket_index = Set(index.into().to_be_bytes().to_vec());
         self
     }
 
+    /// Change the channel epoch.
     pub fn change_epoch(mut self, epoch: impl Into<U256>) -> Self {
-        self.model.ticket_index = Set(epoch.into().to_be_bytes().to_vec());
+        self.model.epoch = Set(epoch.into().to_be_bytes().to_vec());
         self
     }
 }
@@ -52,12 +59,18 @@ pub trait HoprDbChannelOperations {
     /// See [generate_channel_id] on how to generate a channel ID hash from source and destination [Addresses](Address).
     async fn get_channel_by_id<'a>(&'a self, tx: OptTx<'a>, id: &Hash) -> Result<Option<ChannelEntry>>;
 
-    async fn get_channel_editor_by_id<'a>(&'a self, tx: OptTx<'a>, id: &Hash) -> Result<Option<ChannelEditor>>;
+    /// Start changes to channel entry.
+    /// If the channel with the given ID exists, the [ChannelEditor] is returned.
+    /// Use [`HoprDbChannelOperations::finish_channel_update`] to commit edits to the DB when done.
+    async fn begin_channel_update<'a>(&'a self, tx: OptTx<'a>, id: &Hash) -> Result<Option<ChannelEditor>>;
 
-    async fn edit_channel<'a>(&'a self, tx: OptTx<'a>, editor: ChannelEditor) -> Result<ChannelEntry>;
+    /// Commits changes of the channel to the database.
+    async fn finish_channel_update<'a>(&'a self, tx: OptTx<'a>, editor: ChannelEditor) -> Result<ChannelEntry>;
 
     /// Retrieves the channel by source and destination.
-    async fn get_channel_by_parties<'a>(
+    /// This operation should primarily use a cache since it is called in performance-sensitive
+    /// places.
+    async fn get_channel_via_cache<'a>(
         &'a self,
         tx: OptTx<'a>,
         src: &Address,
@@ -111,7 +124,7 @@ impl HoprDbChannelOperations for HoprDb {
             .await
     }
 
-    async fn get_channel_editor_by_id<'a>(&'a self, tx: OptTx<'a>, id: &Hash) -> Result<Option<ChannelEditor>> {
+    async fn begin_channel_update<'a>(&'a self, tx: OptTx<'a>, id: &Hash) -> Result<Option<ChannelEditor>> {
         let id_hex = id.to_hex();
         self.nest_transaction(tx)
             .await?
@@ -136,8 +149,10 @@ impl HoprDbChannelOperations for HoprDb {
             .await
     }
 
-    async fn edit_channel<'a>(&'a self, tx: OptTx<'a>, editor: ChannelEditor) -> Result<ChannelEntry> {
-        self.nest_transaction(tx)
+    async fn finish_channel_update<'a>(&'a self, tx: OptTx<'a>, editor: ChannelEditor) -> Result<ChannelEntry> {
+        let parties = ChannelParties(editor.orig.source, editor.orig.destination);
+        let ret = self
+            .nest_transaction(tx)
             .await?
             .perform(|tx| {
                 Box::pin(async move {
@@ -145,36 +160,44 @@ impl HoprDbChannelOperations for HoprDb {
                     Ok::<_, DbSqlError>(model.try_into()?)
                 })
             })
-            .await
+            .await?;
+        self.caches.src_dst_to_channel.invalidate(&parties).await;
+        Ok(ret)
     }
 
-    async fn get_channel_by_parties<'a>(
+    async fn get_channel_via_cache<'a>(
         &'a self,
         tx: OptTx<'a>,
         src: &Address,
         dst: &Address,
     ) -> Result<Option<ChannelEntry>> {
-        let src_hex = src.to_hex();
-        let dst_hex = dst.to_hex();
-        self.nest_transaction(tx)
-            .await?
-            .perform(|tx| {
-                Box::pin(async move {
-                    Ok::<_, DbSqlError>(
-                        if let Some(model) = Channel::find()
-                            .filter(channel::Column::Source.eq(src_hex))
-                            .filter(channel::Column::Destination.eq(dst_hex))
-                            .one(tx.as_ref())
-                            .await?
-                        {
-                            Some(model.try_into()?)
-                        } else {
-                            None
-                        },
-                    )
-                })
+        Ok(self
+            .caches
+            .src_dst_to_channel
+            .try_get_with(ChannelParties(*src, *dst), async move {
+                let src_hex = src.to_hex();
+                let dst_hex = dst.to_hex();
+                self.nest_transaction(tx)
+                    .await?
+                    .perform(|tx| {
+                        Box::pin(async move {
+                            Ok::<_, DbSqlError>(
+                                if let Some(model) = Channel::find()
+                                    .filter(channel::Column::Source.eq(src_hex))
+                                    .filter(channel::Column::Destination.eq(dst_hex))
+                                    .one(tx.as_ref())
+                                    .await?
+                                {
+                                    Some(model.try_into()?)
+                                } else {
+                                    None
+                                },
+                            )
+                        })
+                    })
+                    .await
             })
-            .await
+            .await?)
     }
 
     async fn get_channels_via<'a>(
@@ -231,6 +254,7 @@ impl HoprDbChannelOperations for HoprDb {
     }
 
     async fn upsert_channel<'a>(&'a self, tx: OptTx<'a>, channel_entry: ChannelEntry) -> Result<()> {
+        let parties = ChannelParties(channel_entry.source, channel_entry.destination);
         self.nest_transaction(tx)
             .await?
             .perform(|tx| {
@@ -248,6 +272,8 @@ impl HoprDbChannelOperations for HoprDb {
                 })
             })
             .await?;
+
+        self.caches.src_dst_to_channel.invalidate(&parties).await;
         Ok(())
     }
 }
@@ -305,7 +331,7 @@ mod tests {
 
         db.upsert_channel(None, ce).await.expect("must insert channel");
         let from_db = db
-            .get_channel_by_parties(None, &a, &b)
+            .get_channel_via_cache(None, &a, &b)
             .await
             .expect("must get channel")
             .expect("channel must be present");

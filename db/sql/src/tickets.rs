@@ -136,7 +136,7 @@ pub(crate) fn filter_satisfying_ticket_models(
     if let Some(unrealized_threshold) = prerequisites.min_unaggregated_ratio {
         let diminished_balance = channel_entry.balance.mul_f64(unrealized_threshold)?;
 
-        // Trigger aggregation if unrealized balance greater or equal to X percent of the current balance
+        // Trigger aggregation if unrealized balance greater or equal to X percentage of the current balance
         // and there are at least two tickets
         if unaggregated_balance.ge(&diminished_balance) {
             if to_be_agg_count > 1 {
@@ -986,7 +986,7 @@ impl HoprDbTicketOperations for HoprDb {
             .perform(|tx| {
                 Box::pin(async move {
                     let entry = myself
-                        .get_channel_by_parties(Some(tx), &myself.me_onchain, &address)
+                        .get_channel_via_cache(Some(tx), &myself.me_onchain, &address)
                         .await?
                         .ok_or_else(|| {
                             DbSqlError::ChannelNotFound(generate_channel_id(&myself.me_onchain, &address))

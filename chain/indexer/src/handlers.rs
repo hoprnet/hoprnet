@@ -175,7 +175,7 @@ where
             HoprChannelsEvents::ChannelBalanceDecreasedFilter(balance_decreased) => {
                 let maybe_channel = self
                     .db
-                    .get_channel_editor_by_id(tx.into(), &balance_decreased.channel_id.into())
+                    .begin_channel_update(tx.into(), &balance_decreased.channel_id.into())
                     .await?;
 
                 if let Some(channel_edits) = maybe_channel {
@@ -184,7 +184,7 @@ where
 
                     let updated_channel = self
                         .db
-                        .edit_channel(tx.into(), channel_edits.change_balance(new_balance))
+                        .finish_channel_update(tx.into(), channel_edits.change_balance(new_balance))
                         .await?;
 
                     Ok(Some(ChainEventType::ChannelBalanceDecreased(updated_channel, diff)))
@@ -195,16 +195,16 @@ where
             HoprChannelsEvents::ChannelBalanceIncreasedFilter(balance_increased) => {
                 let maybe_channel = self
                     .db
-                    .get_channel_editor_by_id(tx.into(), &balance_increased.channel_id.into())
+                    .begin_channel_update(tx.into(), &balance_increased.channel_id.into())
                     .await?;
 
                 if let Some(channel_edits) = maybe_channel {
                     let new_balance = Balance::new(balance_increased.new_balance, BalanceType::HOPR);
-                    let diff = channel_edits.entry().balance.sub(&new_balance);
+                    let diff = new_balance.sub(&channel_edits.entry().balance);
 
                     let updated_channel = self
                         .db
-                        .edit_channel(tx.into(), channel_edits.change_balance(new_balance))
+                        .finish_channel_update(tx.into(), channel_edits.change_balance(new_balance))
                         .await?;
 
                     Ok(Some(ChainEventType::ChannelBalanceIncreased(updated_channel, diff)))
@@ -215,7 +215,7 @@ where
             HoprChannelsEvents::ChannelClosedFilter(channel_closed) => {
                 let maybe_channel = self
                     .db
-                    .get_channel_editor_by_id(tx.into(), &channel_closed.channel_id.into())
+                    .begin_channel_update(tx.into(), &channel_closed.channel_id.into())
                     .await?;
 
                 trace!(
@@ -236,7 +236,7 @@ where
                         .change_balance(BalanceType::HOPR.zero())
                         .change_ticket_index(0);
 
-                    let updated_channel = self.db.edit_channel(tx.into(), channel).await?;
+                    let updated_channel = self.db.finish_channel_update(tx.into(), channel).await?;
 
                     if updated_channel.source == self.chain_key.public().to_address()
                         || updated_channel.destination == self.chain_key.public().to_address()
@@ -257,7 +257,7 @@ where
                 let destination: Address = channel_opened.destination.into();
                 let channel_id = generate_channel_id(&source, &destination);
 
-                let maybe_channel = self.db.get_channel_editor_by_id(tx.into(), &channel_id).await?;
+                let maybe_channel = self.db.begin_channel_update(tx.into(), &channel_id).await?;
 
                 let channel = if let Some(channel_edits) = maybe_channel {
                     // Check that we're not receiving the Open event without the channel being Close prior
@@ -287,7 +287,7 @@ where
 
                     // set all channel fields like we do on-chain on close
                     self.db
-                        .edit_channel(
+                        .finish_channel_update(
                             tx.into(),
                             channel_edits
                                 .change_ticket_index(0_u32)
@@ -318,7 +318,7 @@ where
             HoprChannelsEvents::TicketRedeemedFilter(ticket_redeemed) => {
                 let maybe_channel = self
                     .db
-                    .get_channel_editor_by_id(tx.into(), &ticket_redeemed.channel_id.into())
+                    .begin_channel_update(tx.into(), &ticket_redeemed.channel_id.into())
                     .await?;
 
                 if let Some(channel_edits) = maybe_channel {
@@ -404,7 +404,7 @@ where
                     // Update the ticket index on the Channel entry and get the updated model
                     let channel = self
                         .db
-                        .edit_channel(
+                        .finish_channel_update(
                             tx.into(),
                             channel_edits.change_ticket_index(ticket_redeemed.new_ticket_index),
                         )
@@ -419,7 +419,7 @@ where
             HoprChannelsEvents::OutgoingChannelClosureInitiatedFilter(closure_initiated) => {
                 let maybe_channel = self
                     .db
-                    .get_channel_editor_by_id(tx.into(), &closure_initiated.channel_id.into())
+                    .begin_channel_update(tx.into(), &closure_initiated.channel_id.into())
                     .await?;
 
                 if let Some(channel_edits) = maybe_channel {
@@ -429,7 +429,7 @@ where
 
                     let channel = self
                         .db
-                        .edit_channel(tx.into(), channel_edits.change_status(new_status))
+                        .finish_channel_update(tx.into(), channel_edits.change_status(new_status))
                         .await?;
                     Ok(Some(ChainEventType::ChannelClosureInitiated(channel)))
                 } else {

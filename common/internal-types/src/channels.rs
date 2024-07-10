@@ -81,7 +81,6 @@ impl ChannelEntry {
         channel_epoch: U256,
     ) -> Self {
         assert_eq!(BalanceType::HOPR, balance.balance_type(), "invalid balance currency");
-        assert!(channel_epoch.ge(&1_u32.into()), "channel epoch must be greater than 0");
         ChannelEntry {
             source,
             destination,
