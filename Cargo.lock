@@ -3505,7 +3505,6 @@ dependencies = [
  "sqlx",
  "strum 0.26.2",
  "thiserror",
- "tokio",
  "tracing",
  "tracing-test",
 ]
