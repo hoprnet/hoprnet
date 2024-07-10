@@ -1,6 +1,3 @@
-#[cfg(all(feature = "runtime-async-std", feature = "runtime-tokio"))]
-compile_error!("Only one of the runtime features can be specified for the build");
-
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::{sync::Arc, time::SystemTime};
@@ -9,12 +6,6 @@ use async_lock::RwLock;
 use async_signal::{Signal, Signals};
 use chrono::{DateTime, Utc};
 use futures::StreamExt;
-
-#[cfg(feature = "runtime-async-std")]
-use async_std::task::{spawn, JoinHandle};
-
-#[cfg(feature = "runtime-tokio")]
-use tokio::task::{spawn, JoinHandle};
 
 #[cfg(feature = "telemetry")]
 use {
@@ -26,6 +17,7 @@ use signal_hook::low_level;
 use tracing::{error, info, warn};
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 
+use hopr_async_runtime::prelude::{cancel_join_handle, spawn, JoinHandle};
 use hopr_lib::{ApplicationData, AsUnixTimestamp, HoprLibProcesses, ToHex, TransportOutput};
 use hoprd::cli::CliArgs;
 use hoprd::errors::HoprdError;
@@ -321,11 +313,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 futures::stream::iter(processes)
                     .for_each_concurrent(None, |(name, handle)| async move {
                         info!("Stopping process: {name:?}");
-                        #[cfg(feature = "runtime-async-std")]
-                        handle.cancel().await;
-
-                        #[cfg(feature = "runtime-tokio")]
-                        handle.abort();
+                        cancel_join_handle(handle).await
                     })
                     .await;
 

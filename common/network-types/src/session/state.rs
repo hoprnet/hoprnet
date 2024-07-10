@@ -103,20 +103,13 @@ use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
 use tracing::{debug, warn};
 
+use hopr_async_runtime::prelude::{sleep, spawn, spawn_local};
+
 use crate::errors::NetworkTypeError;
 use crate::session::errors::SessionError;
 use crate::session::frame::{segment, FrameId, FrameReassembler, Segment, SegmentId};
 use crate::session::protocol::{FrameAcknowledgements, SegmentRequest, SessionMessage};
 use crate::session::utils::{AsyncReadStreamer, RetryResult, RetryToken};
-
-#[cfg(any(feature = "runtime-async-std", test))]
-use async_std::task::{sleep, spawn, spawn_local};
-
-#[cfg(all(feature = "runtime-tokio", not(test)))]
-use tokio::task::{sleep, spawn, spawn_local};
-
-#[cfg(all(feature = "runtime-async-std", feature = "runtime-tokio"))]
-compile_error!("Only one of the runtime features can be specified for the build");
 
 /// Represents individual Session protocol features that can be enabled.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

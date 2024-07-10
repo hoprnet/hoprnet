@@ -388,6 +388,9 @@
             programs.nixpkgs-fmt.enable = true;
             settings.formatter.nixpkgs-fmt.excludes = [ "./vendor/*" ];
 
+            programs.taplo.enable = true;
+            settings.formatter.taplo.excludes = [ "./vendor/*" ];
+
             # FIXME: currently broken in treefmt
             # programs.ruff.check = true;
             # settings.formatter.ruff.check.excludes = [ "./vendor/*" ];
