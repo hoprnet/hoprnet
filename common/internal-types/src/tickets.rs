@@ -202,7 +202,7 @@ impl TicketBuilder {
     }
 
     /// Verifies all inputs and builds the [Ticket].
-    /// This does not perform signature verification, if a [signature](TicketBuilder::signature)
+    /// This **does not** perform signature verification if a [signature](TicketBuilder::signature)
     /// was set.
     pub fn build(self) -> errors::Result<Ticket> {
         let amount = match (self.amount, self.balance) {

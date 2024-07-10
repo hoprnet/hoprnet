@@ -287,7 +287,7 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
 
     pub async fn channel(&self, src: &Address, dest: &Address) -> errors::Result<ChannelEntry> {
         self.db
-            .get_channel_by_parties(None, src, dest)
+            .get_channel_by_parties(None, src, dest, false)
             .await
             .map_err(HoprChainError::from)
             .and_then(|v| {

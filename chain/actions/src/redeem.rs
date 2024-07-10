@@ -114,7 +114,7 @@ where
     ) -> Result<Vec<PendingAction>> {
         let maybe_channel = self
             .db
-            .get_channel_by_parties(None, counterparty, &self.self_address())
+            .get_channel_by_parties(None, counterparty, &self.self_address(), false)
             .await?;
         if let Some(channel) = maybe_channel {
             self.redeem_tickets_in_channel(&channel, only_aggregated).await

@@ -14,15 +14,12 @@ use ethers::types::TxHash;
 use hopr_crypto_types::keypairs::ChainKeypair;
 use hopr_crypto_types::prelude::{Hash, Keypair};
 use hopr_crypto_types::types::OffchainSignature;
-use hopr_db_entity::channel;
-use hopr_db_entity::conversions::channels::ChannelStatusUpdate;
 use hopr_db_sql::api::info::DomainSeparator;
 use hopr_db_sql::api::tickets::TicketSelector;
 use hopr_db_sql::errors::DbSqlError;
 use hopr_db_sql::{HoprDbAllOperations, OpenTransaction};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set};
 use std::cmp::Ordering;
 use std::fmt::Formatter;
 use std::ops::{Add, Sub};
@@ -69,13 +66,6 @@ impl<Db: Clone> std::fmt::Debug for ContractEventHandlers<Db> {
             .field("chain_key", &self.chain_key)
             .finish_non_exhaustive()
     }
-}
-
-async fn channel_model_from_id(tx: &OpenTransaction, channel_id: Hash) -> Result<Option<channel::Model>> {
-    Ok(channel::Entity::find()
-        .filter(channel::Column::ChannelId.eq(channel_id.to_hex()))
-        .one(tx.as_ref())
-        .await?)
 }
 
 impl<Db> ContractEventHandlers<Db>
@@ -183,41 +173,50 @@ where
 
         match event {
             HoprChannelsEvents::ChannelBalanceDecreasedFilter(balance_decreased) => {
-                let maybe_channel = channel_model_from_id(tx, balance_decreased.channel_id.into()).await?;
+                let maybe_channel = self
+                    .db
+                    .begin_channel_update(tx.into(), &balance_decreased.channel_id.into())
+                    .await?;
 
-                if let Some(channel) = maybe_channel {
-                    let channel_entry: ChannelEntry = (&channel).try_into()?;
+                if let Some(channel_edits) = maybe_channel {
                     let new_balance = Balance::new(balance_decreased.new_balance, BalanceType::HOPR);
-                    let diff = channel_entry.balance.sub(&new_balance);
+                    let diff = channel_edits.entry().balance.sub(&new_balance);
 
-                    let mut updated = channel.into_active_model();
-                    updated.balance = Set(new_balance.amount().to_be_bytes().to_vec());
-                    let channel = updated.update(tx.as_ref()).await?;
+                    let updated_channel = self
+                        .db
+                        .finish_channel_update(tx.into(), channel_edits.change_balance(new_balance))
+                        .await?;
 
-                    Ok(Some(ChainEventType::ChannelBalanceDecreased(channel.try_into()?, diff)))
+                    Ok(Some(ChainEventType::ChannelBalanceDecreased(updated_channel, diff)))
                 } else {
                     Err(CoreEthereumIndexerError::ChannelDoesNotExist)
                 }
             }
             HoprChannelsEvents::ChannelBalanceIncreasedFilter(balance_increased) => {
-                let maybe_channel = channel_model_from_id(tx, balance_increased.channel_id.into()).await?;
+                let maybe_channel = self
+                    .db
+                    .begin_channel_update(tx.into(), &balance_increased.channel_id.into())
+                    .await?;
 
-                if let Some(channel) = maybe_channel {
-                    let channel_entry: ChannelEntry = (&channel).try_into()?;
+                if let Some(channel_edits) = maybe_channel {
                     let new_balance = Balance::new(balance_increased.new_balance, BalanceType::HOPR);
-                    let diff = new_balance.sub(&channel_entry.balance);
+                    let diff = new_balance.sub(&channel_edits.entry().balance);
 
-                    let mut updated = channel.into_active_model();
-                    updated.balance = Set(new_balance.amount().to_be_bytes().to_vec());
-                    let channel = updated.update(tx.as_ref()).await?;
+                    let updated_channel = self
+                        .db
+                        .finish_channel_update(tx.into(), channel_edits.change_balance(new_balance))
+                        .await?;
 
-                    Ok(Some(ChainEventType::ChannelBalanceIncreased(channel.try_into()?, diff)))
+                    Ok(Some(ChainEventType::ChannelBalanceIncreased(updated_channel, diff)))
                 } else {
                     Err(CoreEthereumIndexerError::ChannelDoesNotExist)
                 }
             }
             HoprChannelsEvents::ChannelClosedFilter(channel_closed) => {
-                let maybe_channel = channel_model_from_id(tx, channel_closed.channel_id.into()).await?;
+                let maybe_channel = self
+                    .db
+                    .begin_channel_update(tx.into(), &channel_closed.channel_id.into())
+                    .await?;
 
                 trace!(
                     "on_channel_closed_event - channel_id: {:?} - channel known: {:?}",
@@ -225,23 +224,22 @@ where
                     maybe_channel.is_some()
                 );
 
-                if let Some(channel) = maybe_channel {
-                    let channel_entry: ChannelEntry = (&channel).try_into()?;
-
+                if let Some(channel_edits) = maybe_channel {
                     // Incoming channel, so once closed. All unredeemed tickets just became invalid
-                    if channel_entry.destination == self.chain_key.public().to_address() {
-                        self.db.mark_tickets_neglected((&channel_entry).into()).await?;
+                    if channel_edits.entry().destination == self.chain_key.public().to_address() {
+                        self.db.mark_tickets_neglected(channel_edits.entry().into()).await?;
                     }
 
                     // set all channel fields like we do on-chain on close
-                    let mut active_channel = channel.into_active_model();
-                    active_channel.balance = Set(BalanceType::HOPR.zero().amount().to_be_bytes().to_vec());
-                    active_channel.ticket_index = Set(U256::zero().to_be_bytes().to_vec());
-                    active_channel.set_status(ChannelStatus::Closed);
-                    let channel = active_channel.update(tx.as_ref()).await?;
+                    let channel = channel_edits
+                        .change_status(ChannelStatus::Closed)
+                        .change_balance(BalanceType::HOPR.zero())
+                        .change_ticket_index(0);
 
-                    if channel_entry.source == self.chain_key.public().to_address()
-                        || channel_entry.destination == self.chain_key.public().to_address()
+                    let updated_channel = self.db.finish_channel_update(tx.into(), channel).await?;
+
+                    if updated_channel.source == self.chain_key.public().to_address()
+                        || updated_channel.destination == self.chain_key.public().to_address()
                     {
                         // Reset the current_ticket_index to zero
                         self.db
@@ -249,7 +247,7 @@ where
                             .await?;
                     }
 
-                    Ok(Some(ChainEventType::ChannelClosed(channel.try_into()?)))
+                    Ok(Some(ChainEventType::ChannelClosed(updated_channel)))
                 } else {
                     Err(CoreEthereumIndexerError::ChannelDoesNotExist)
                 }
@@ -259,13 +257,14 @@ where
                 let destination: Address = channel_opened.destination.into();
                 let channel_id = generate_channel_id(&source, &destination);
 
-                let maybe_channel = channel_model_from_id(tx, channel_id).await?;
-                let new_model = if let Some(channel) = maybe_channel {
+                let maybe_channel = self.db.begin_channel_update(tx.into(), &channel_id).await?;
+
+                let channel = if let Some(channel_edits) = maybe_channel {
                     // Check that we're not receiving the Open event without the channel being Close prior
-                    if channel.status != u8::from(ChannelStatus::Closed) as i32 {
+                    if channel_edits.entry().status != ChannelStatus::Closed {
                         return Err(CoreEthereumIndexerError::ProcessError(format!(
                             "trying to re-open channel {} which is not closed",
-                            channel.channel_id
+                            channel_edits.entry().get_id()
                         )));
                     }
 
@@ -273,7 +272,7 @@ where
                         "on_channel_reopened_event - source: {source} - destination: {destination} - channel_id: {channel_id}"
                     );
 
-                    let current_epoch = U256::from_big_endian(&channel.epoch);
+                    let current_epoch = channel_edits.entry().channel_epoch;
 
                     // cleanup tickets from previous epochs on channel re-opening
                     if source == self.chain_key.public().to_address()
@@ -287,38 +286,43 @@ where
                     }
 
                     // set all channel fields like we do on-chain on close
-                    let mut existing_channel = channel.into_active_model();
-                    existing_channel.ticket_index = Set(U256::zero().to_be_bytes().into());
-                    existing_channel.epoch = Set(current_epoch.add(1).to_be_bytes().into());
-                    existing_channel.set_status(ChannelStatus::Open);
-                    existing_channel.update(tx.as_ref()).await?
+                    self.db
+                        .finish_channel_update(
+                            tx.into(),
+                            channel_edits
+                                .change_ticket_index(0_u32)
+                                .change_epoch(current_epoch.add(1))
+                                .change_status(ChannelStatus::Open),
+                        )
+                        .await?
                 } else {
                     trace!(
                         "on_channel_opened_event - source: {source} - destination: {destination} - channel_id: {channel_id}"
                     );
 
-                    channel::ActiveModel {
-                        channel_id: Set(channel_id.to_hex()),
-                        source: Set(source.to_hex()),
-                        destination: Set(destination.to_hex()),
-                        balance: Set(U256::zero().to_be_bytes().into()),
-                        status: Set(u8::from(ChannelStatus::Open) as i32),
-                        epoch: Set(U256::one().to_be_bytes().into()),
-                        ticket_index: Set(U256::zero().to_be_bytes().into()),
-                        ..Default::default()
-                    }
-                    .insert(tx.as_ref())
-                    .await?
+                    let new_channel = ChannelEntry::new(
+                        source,
+                        destination,
+                        BalanceType::HOPR.zero(),
+                        0_u32.into(),
+                        ChannelStatus::Open,
+                        1_u32.into(),
+                    );
+
+                    self.db.upsert_channel(tx.into(), new_channel).await?;
+                    new_channel
                 };
 
-                Ok(Some(ChainEventType::ChannelOpened(new_model.try_into()?)))
+                Ok(Some(ChainEventType::ChannelOpened(channel)))
             }
             HoprChannelsEvents::TicketRedeemedFilter(ticket_redeemed) => {
-                let maybe_channel = channel_model_from_id(tx, ticket_redeemed.channel_id.into()).await?;
+                let maybe_channel = self
+                    .db
+                    .begin_channel_update(tx.into(), &ticket_redeemed.channel_id.into())
+                    .await?;
 
-                if let Some(channel) = maybe_channel {
-                    let channel_entry: ChannelEntry = (&channel).try_into()?;
-                    let ack_ticket = match channel_entry.direction(&self.chain_key.public().to_address()) {
+                if let Some(channel_edits) = maybe_channel {
+                    let ack_ticket = match channel_edits.entry().direction(&self.chain_key.public().to_address()) {
                         // For channels where destination is us, it means that our ticket
                         // has been redeemed, so mark it in the DB as redeemed
                         Some(ChannelDirection::Incoming) => {
@@ -326,7 +330,7 @@ where
                             let mut matching_tickets = self
                                 .db
                                 .get_tickets(
-                                    TicketSelector::from(&channel_entry)
+                                    TicketSelector::from(channel_edits.entry())
                                         .with_state(AcknowledgedTicketStatus::BeingRedeemed),
                                 )
                                 .await?
@@ -351,8 +355,9 @@ where
                                 }
                                 Ordering::Less => {
                                     error!(
-                                        "could not find acknowledged 'BeingRedeemed' ticket with idx {} in {channel_entry}",
-                                        ticket_redeemed.new_ticket_index - 1
+                                        "could not find acknowledged 'BeingRedeemed' ticket with idx {} in {}",
+                                        ticket_redeemed.new_ticket_index - 1,
+                                        channel_edits.entry()
                                     );
                                     // This is not an error, because the ticket might've become neglected before
                                     // the ticket redemption could finish
@@ -360,26 +365,29 @@ where
                                 }
                                 Ordering::Greater => {
                                     error!(
-                                        "found {} tickets matching 'BeingRedeemed' index {} in {channel_entry}",
+                                        "found {} tickets matching 'BeingRedeemed' index {} in {}",
                                         matching_tickets.len(),
-                                        ticket_redeemed.new_ticket_index - 1
+                                        ticket_redeemed.new_ticket_index - 1,
+                                        channel_edits.entry()
                                     );
                                     return Err(CoreEthereumIndexerError::ProcessError(format!(
-                                        "multiple tickets matching idx {} found in {channel_entry}",
-                                        ticket_redeemed.new_ticket_index - 1
+                                        "multiple tickets matching idx {} found in {}",
+                                        ticket_redeemed.new_ticket_index - 1,
+                                        channel_edits.entry()
                                     )));
                                 }
                             }
                         }
-                        // For channel where the source is us, it means a ticket that we
-                        // issue has been redeemed, so we just need to be sure our outgoing ticket
+                        // For the channel where the source is us, it means a ticket that we
+                        // issue has been redeemed.
+                        // So we just need to be sure our outgoing ticket
                         // index value in the cache is at least the index of the redeemed ticket
                         Some(ChannelDirection::Outgoing) => {
                             // We need to ensure the outgoing ticket index is at least this new value
-                            debug!("observed redeem event on an outgoing {channel_entry}");
+                            debug!("observed redeem event on an outgoing {}", channel_edits.entry());
                             self.db
                                 .compare_and_set_outgoing_ticket_index(
-                                    channel_entry.get_id(),
+                                    channel_edits.entry().get_id(),
                                     ticket_redeemed.new_ticket_index,
                                 )
                                 .await?;
@@ -388,36 +396,42 @@ where
                         // For channel where neither source nor destination is us, we don't care
                         None => {
                             // Not our redeem event
-                            debug!("observed redeem event on a foreign {channel_entry}");
+                            debug!("observed redeem event on a foreign {}", channel_edits.entry());
                             None
                         }
                     };
 
-                    // Update ticket index on the Channel entry and get the updated model
-                    let mut active_channel = channel.into_active_model();
-                    active_channel.ticket_index = Set(ticket_redeemed.new_ticket_index.to_be_bytes().into());
-                    let channel = active_channel.update(tx.as_ref()).await?;
+                    // Update the ticket index on the Channel entry and get the updated model
+                    let channel = self
+                        .db
+                        .finish_channel_update(
+                            tx.into(),
+                            channel_edits.change_ticket_index(ticket_redeemed.new_ticket_index),
+                        )
+                        .await?;
 
-                    Ok(Some(ChainEventType::TicketRedeemed(channel.try_into()?, ack_ticket)))
+                    Ok(Some(ChainEventType::TicketRedeemed(channel, ack_ticket)))
                 } else {
                     error!("observed ticket redeem on a channel that we don't have in the DB");
                     Err(CoreEthereumIndexerError::ChannelDoesNotExist)
                 }
             }
             HoprChannelsEvents::OutgoingChannelClosureInitiatedFilter(closure_initiated) => {
-                let maybe_channel = channel_model_from_id(tx, closure_initiated.channel_id.into()).await?;
+                let maybe_channel = self
+                    .db
+                    .begin_channel_update(tx.into(), &closure_initiated.channel_id.into())
+                    .await?;
 
-                if let Some(channel) = maybe_channel {
-                    let mut channel_entry: ChannelEntry = (&channel).try_into()?;
-                    channel_entry.status = ChannelStatus::PendingToClose(
+                if let Some(channel_edits) = maybe_channel {
+                    let new_status = ChannelStatus::PendingToClose(
                         SystemTime::UNIX_EPOCH.add(Duration::from_secs(closure_initiated.closure_time as u64)),
                     );
 
-                    let mut active_channel = channel.into_active_model();
-                    active_channel.set_status(channel_entry.status);
-                    let channel = active_channel.update(tx.as_ref()).await?;
-
-                    Ok(Some(ChainEventType::ChannelClosureInitiated(channel.try_into()?)))
+                    let channel = self
+                        .db
+                        .finish_channel_update(tx.into(), channel_edits.change_status(new_status))
+                        .await?;
+                    Ok(Some(ChainEventType::ChannelClosureInitiated(channel)))
                 } else {
                     Err(CoreEthereumIndexerError::ChannelDoesNotExist)
                 }
