@@ -7,12 +7,12 @@ use libp2p_identity::PeerId;
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use tracing::{error, trace, warn};
 
+use hopr_async_runtime::prelude::spawn;
 use hopr_crypto_packet::errors::PacketError::{Retry, TransportError};
 use hopr_crypto_packet::errors::Result;
 use hopr_crypto_types::prelude::*;
 pub use hopr_db_api::protocol::AckResult;
 use hopr_db_api::protocol::HoprDbProtocolOperations;
-use hopr_executor::api::spawn;
 use hopr_internal_types::prelude::*;
 
 #[cfg(all(feature = "prometheus", not(test)))]

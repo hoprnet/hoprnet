@@ -13,12 +13,12 @@ use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use std::{pin::Pin, task::Poll};
 use tracing::{error, warn};
 
+use hopr_async_runtime::prelude::{sleep, spawn};
 use hopr_crypto_types::prelude::*;
 use hopr_db_api::{
     errors::DbError,
     tickets::{AggregationPrerequisites, HoprDbTicketOperations},
 };
-use hopr_executor::api::{sleep, spawn};
 use hopr_internal_types::prelude::*;
 
 use crate::errors::{

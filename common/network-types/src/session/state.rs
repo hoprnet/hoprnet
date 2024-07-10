@@ -103,7 +103,7 @@ use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
 use tracing::{debug, warn};
 
-use hopr_executor::api::{sleep, spawn, spawn_local};
+use hopr_async_runtime::prelude::{sleep, spawn, spawn_local};
 
 use crate::errors::NetworkTypeError;
 use crate::session::errors::SessionError;

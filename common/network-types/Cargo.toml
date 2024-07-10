@@ -10,8 +10,8 @@ license = "GPL-3.0-only"
 
 [features]
 default = []
-runtime-async-std = ["hopr-executor/runtime-async-std"]
-runtime-tokio = ["hopr-executor/runtime-tokio"]
+runtime-async-std = ["hopr-async-runtime/runtime-async-std"]
+runtime-tokio = ["hopr-async-runtime/runtime-tokio"]
 
 [dependencies]
 bitvec = "1.0.1"
@@ -31,7 +31,7 @@ thiserror = { workspace = true }
 
 hopr-platform = { workspace = true }
 hopr-primitive-types = { workspace = true }
-hopr-executor = { workspace = true }
+hopr-async-runtime = { workspace = true }
 
 [dev-dependencies]
 anyhow = "1.0"

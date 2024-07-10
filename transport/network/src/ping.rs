@@ -8,7 +8,7 @@ use libp2p_identity::PeerId;
 
 use tracing::{debug, warn};
 
-use hopr_executor::api::timeout_fut;
+use hopr_async_runtime::prelude::timeout_fut;
 use hopr_platform::time::native::current_time;
 
 use crate::messaging::ControlMessage;

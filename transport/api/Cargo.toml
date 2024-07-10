@@ -12,17 +12,17 @@ crate-type = ["rlib"]
 [features]
 default = []
 runtime-async-std = [
-  "async-std",
   "core-network/runtime-async-std",
   "core-protocol/runtime-async-std",
+  "hopr-async-runtime/runtime-async-std",
   "hopr-db-sql/runtime-async-std",
   "hopr-transport-p2p/runtime-async-std",
   "hopr-transport-session/runtime-async-std",
 ]
 runtime-tokio = [
-  "tokio",
   "core-network/runtime-tokio",
   "core-protocol/runtime-tokio",
+  "hopr-async-runtime/runtime-tokio",
   "hopr-db-sql/runtime-tokio",
   "hopr-transport-p2p/runtime-tokio",
   "hopr-transport-session/runtime-tokio",
@@ -37,7 +37,6 @@ prometheus = [
 ]
 
 [dependencies]
-async-std = { workspace = true, optional = true }
 async-trait = { workspace = true }
 async-lock = { workspace = true }
 futures = { workspace = true }
@@ -47,7 +46,6 @@ moka = { workspace = true }
 proc-macro-regex = "~1.1.0"
 serde = { workspace = true }
 thiserror = { workspace = true }
-tokio = { workspace = true, optional = true }
 tracing = { workspace = true }
 uuid = { workspace = true, features = ["v4", "fast-rng"] }
 validator = { workspace = true }
@@ -66,7 +64,7 @@ hopr-platform = { workspace = true }
 hopr-primitive-types = { workspace = true }
 hopr-transport-p2p = { workspace = true }
 hopr-transport-session = { workspace = true }
-hopr-executor = { workspace = true }
+hopr-async-runtime = { workspace = true }
 
 [dev-dependencies]
 async-std = { workspace = true }

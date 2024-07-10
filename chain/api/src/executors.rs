@@ -10,8 +10,8 @@ use chain_actions::payload::PayloadGenerator;
 use chain_rpc::errors::RpcError;
 use chain_rpc::{HoprRpcOperations, PendingTransaction};
 use chain_types::TypedTransaction;
+use hopr_async_runtime::prelude::sleep;
 use hopr_crypto_types::types::Hash;
-use hopr_executor::api::sleep;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 

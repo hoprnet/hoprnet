@@ -12,15 +12,10 @@ crate-type = ["rlib"]
 default = ["compat-ping"]
 compat-ping = []
 prometheus = ["dep:hopr-metrics"]
-runtime-async-std = [
-    "async-std",
-]
-runtime-tokio = [
-    "tokio",
-]
+runtime-async-std = ["hopr-async-runtime/runtime-async-std"]
+runtime-tokio = ["hopr-async-runtime/runtime-tokio"]
 
 [dependencies]
-async-std = { workspace = true, optional = true }
 async-trait = { workspace = true }
 futures = { workspace = true }
 lazy_static = { workspace = true }
@@ -31,7 +26,6 @@ serde_with = { workspace = true }
 smart-default = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }
-tokio = { workspace = true, optional = true }
 tracing = { workspace = true }
 validator = { workspace = true }
 
@@ -42,7 +36,7 @@ hopr-crypto-types = { workspace = true }
 hopr-platform = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-primitive-types = { workspace = true }
-hopr-executor = { workspace = true }
+hopr-async-runtime = { workspace = true }
 
 [dev-dependencies]
 async-std = { workspace = true }

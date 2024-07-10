@@ -6,7 +6,7 @@ resolver = "2"
 
 members = [
   "common/internal-types",
-  "common/executor",
+  "common/async-runtime",
   "common/network-types",
   "common/primitive-types",
   "common/parallelize",
@@ -157,7 +157,7 @@ hopr-db-api = { path = "db/api" }
 hopr-db-sql = { path = "db/sql" }
 hopr-db-entity = { path = "db/entity" }
 hopr-db-migration = { path = "db/migration" }
-hopr-executor = { path = "common/executor" }
+hopr-async-runtime = { path = "common/async-runtime" }
 hopr-internal-types = { path = "common/internal-types", default-features = false }
 hopr-lib = { path = "hopr/hopr-lib" }
 hopr-metrics = { path = "misc/metrics", default-features = false }

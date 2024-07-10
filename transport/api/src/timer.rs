@@ -4,7 +4,7 @@ use futures::FutureExt;
 use std::time::Duration;
 use tracing::{trace, warn};
 
-use hopr_executor::api::sleep;
+use hopr_async_runtime::prelude::sleep;
 use hopr_platform::time::native::current_time;
 use hopr_primitive_types::prelude::AsUnixTimestamp;
 

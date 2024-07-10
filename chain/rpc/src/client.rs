@@ -21,7 +21,7 @@ use std::time::Duration;
 use tracing::{debug, trace, warn};
 use validator::Validate;
 
-use hopr_executor::api::sleep;
+use hopr_async_runtime::prelude::sleep;
 
 use crate::client::RetryAction::{NoRetry, RetryAfter};
 use crate::errors::{HttpRequestError, JsonRpcProviderClientError};
@@ -515,9 +515,7 @@ pub mod surf_client {
     }
 }
 
-// Both features could be enabled during testing, therefore we only use tokio when its
-// exclusively enabled.
-#[cfg(all(not(test), feature = "runtime-tokio", not(feature = "runtime-async-std")))]
+#[cfg(any(test, feature = "runtime-tokio"))]
 pub mod reqwest_client {
     use crate::errors::HttpRequestError;
     use crate::{HttpPostRequestor, HttpPostRequestorConfig};
@@ -632,15 +630,17 @@ pub fn create_rpc_client_to_anvil<R: HttpPostRequestor + Debug>(
 
 #[cfg(test)]
 pub mod tests {
-    use chain_types::utils::create_anvil;
-    use chain_types::{ContractAddresses, ContractInstances};
     use ethers::providers::JsonRpcClient;
-    use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
-    use hopr_primitive_types::primitives::Address;
     use serde_json::json;
     use std::fmt::Debug;
     use std::sync::atomic::Ordering;
     use std::time::Duration;
+
+    use chain_types::utils::create_anvil;
+    use chain_types::{ContractAddresses, ContractInstances};
+    use hopr_async_runtime::prelude::sleep;
+    use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
+    use hopr_primitive_types::primitives::Address;
 
     use crate::client::reqwest_client::ReqwestRequestor;
     use crate::client::surf_client::SurfRequestor;

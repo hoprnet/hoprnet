@@ -219,8 +219,8 @@ mod test {
     use bindings::hopr_channels::*;
     use bindings::hopr_token::{ApprovalFilter, TransferFilter};
     use chain_types::{ContractAddresses, ContractInstances};
+    use hopr_async_runtime::prelude::{sleep, spawn};
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
-    use hopr_executor::api::{sleep, spawn};
     use tracing::debug;
 
     use crate::client::surf_client::SurfRequestor;

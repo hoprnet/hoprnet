@@ -22,9 +22,9 @@ use chain_types::utils::{
 };
 use chain_types::{ContractAddresses, ContractInstances};
 use core_transport::{ChainKeypair, Hash, Keypair, Multiaddr, OffchainKeypair};
+use hopr_async_runtime::prelude::{cancel_join_handle, sleep, spawn, JoinHandle};
 use hopr_crypto_types::prelude::*;
 use hopr_db_sql::{api::info::DomainSeparator, prelude::*};
-use hopr_executor::api::{cancel_join_handle, sleep, spawn, JoinHandle};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 

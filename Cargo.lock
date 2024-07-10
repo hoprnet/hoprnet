@@ -1141,10 +1141,10 @@ dependencies = [
  "futures",
  "futures-timer",
  "hex-literal",
+ "hopr-async-runtime",
  "hopr-crypto-random",
  "hopr-crypto-types",
  "hopr-db-sql",
- "hopr-executor",
  "hopr-internal-types",
  "hopr-metrics",
  "hopr-platform",
@@ -1171,9 +1171,9 @@ dependencies = [
  "chain-rpc",
  "chain-types",
  "futures",
+ "hopr-async-runtime",
  "hopr-crypto-types",
  "hopr-db-sql",
- "hopr-executor",
  "hopr-internal-types",
  "hopr-primitive-types",
  "semver 1.0.23",
@@ -1200,11 +1200,11 @@ dependencies = [
  "ethers",
  "futures",
  "hex-literal",
+ "hopr-async-runtime",
  "hopr-crypto-random",
  "hopr-crypto-types",
  "hopr-db-entity",
  "hopr-db-sql",
- "hopr-executor",
  "hopr-internal-types",
  "hopr-metrics",
  "hopr-primitive-types",
@@ -1233,8 +1233,8 @@ dependencies = [
  "futures-timer",
  "governor",
  "hex-literal",
+ "hopr-async-runtime",
  "hopr-crypto-types",
- "hopr-executor",
  "hopr-metrics",
  "hopr-primitive-types",
  "http-types",
@@ -1514,12 +1514,12 @@ dependencies = [
  "async-std",
  "async-trait",
  "futures",
+ "hopr-async-runtime",
  "hopr-crypto-random",
  "hopr-crypto-sphinx",
  "hopr-crypto-types",
  "hopr-db-api",
  "hopr-db-sql",
- "hopr-executor",
  "hopr-metrics",
  "hopr-platform",
  "hopr-primitive-types",
@@ -1533,7 +1533,6 @@ dependencies = [
  "smart-default",
  "strum 0.26.2",
  "thiserror",
- "tokio",
  "tracing",
  "validator",
 ]
@@ -1572,12 +1571,12 @@ dependencies = [
  "core-path",
  "futures",
  "hex-literal",
+ "hopr-async-runtime",
  "hopr-crypto-packet",
  "hopr-crypto-random",
  "hopr-crypto-types",
  "hopr-db-api",
  "hopr-db-sql",
- "hopr-executor",
  "hopr-internal-types",
  "hopr-metrics",
  "hopr-platform",
@@ -1593,7 +1592,6 @@ dependencies = [
  "serial_test",
  "smart-default",
  "thiserror",
- "tokio",
  "tracing",
  "tracing-test",
  "validator",
@@ -1611,11 +1609,11 @@ dependencies = [
  "core-path",
  "core-protocol",
  "futures",
+ "hopr-async-runtime",
  "hopr-crypto-packet",
  "hopr-crypto-random",
  "hopr-crypto-types",
  "hopr-db-sql",
- "hopr-executor",
  "hopr-internal-types",
  "hopr-metrics",
  "hopr-platform",
@@ -1628,7 +1626,6 @@ dependencies = [
  "proc-macro-regex",
  "serde",
  "thiserror",
- "tokio",
  "tracing",
  "uuid 1.8.0",
  "validator",
@@ -3335,6 +3332,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "hopr-async-runtime"
+version = "0.1.0"
+dependencies = [
+ "async-std",
+ "tokio",
+]
+
+[[package]]
 name = "hopr-crypto-packet"
 version = "0.7.1"
 dependencies = [
@@ -3477,13 +3482,13 @@ dependencies = [
  "chrono",
  "futures",
  "hex-literal",
+ "hopr-async-runtime",
  "hopr-crypto-packet",
  "hopr-crypto-random",
  "hopr-crypto-types",
  "hopr-db-api",
  "hopr-db-entity",
  "hopr-db-migration",
- "hopr-executor",
  "hopr-internal-types",
  "hopr-metrics",
  "hopr-parallelize",
@@ -3503,14 +3508,6 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-test",
-]
-
-[[package]]
-name = "hopr-executor"
-version = "0.1.0"
-dependencies = [
- "async-std",
- "tokio",
 ]
 
 [[package]]
@@ -3562,9 +3559,9 @@ dependencies = [
  "ethers",
  "futures",
  "futures-concurrency",
+ "hopr-async-runtime",
  "hopr-crypto-types",
  "hopr-db-sql",
- "hopr-executor",
  "hopr-internal-types",
  "hopr-metrics",
  "hopr-network-types",
@@ -3605,8 +3602,8 @@ dependencies = [
  "governor",
  "hex",
  "hex-literal",
+ "hopr-async-runtime",
  "hopr-crypto-random",
- "hopr-executor",
  "hopr-platform",
  "hopr-primitive-types",
  "lazy_static",
@@ -3684,10 +3681,10 @@ dependencies = [
  "core-protocol",
  "futures",
  "hex-literal",
+ "hopr-async-runtime",
  "hopr-crypto-random",
  "hopr-crypto-types",
  "hopr-db-sql",
- "hopr-executor",
  "hopr-internal-types",
  "hopr-metrics",
  "hopr-platform",
@@ -3701,7 +3698,6 @@ dependencies = [
  "smart-default",
  "strum 0.26.2",
  "thiserror",
- "tokio",
  "tracing",
  "validator",
 ]
@@ -3758,7 +3754,7 @@ dependencies = [
  "clap",
  "futures",
  "home",
- "hopr-executor",
+ "hopr-async-runtime",
  "hopr-lib",
  "hopr-metrics",
  "hopr-platform",

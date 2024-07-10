@@ -17,7 +17,7 @@ use signal_hook::low_level;
 use tracing::{error, info, warn};
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 
-use hopr_executor::api::{cancel_join_handle, spawn, JoinHandle};
+use hopr_async_runtime::prelude::{cancel_join_handle, spawn, JoinHandle};
 use hopr_lib::{ApplicationData, AsUnixTimestamp, HoprLibProcesses, ToHex, TransportOutput};
 use hoprd::cli::CliArgs;
 use hoprd::errors::HoprdError;

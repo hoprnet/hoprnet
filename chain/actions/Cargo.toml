@@ -15,9 +15,12 @@ crate-type = ["rlib"]
 default = []
 runtime-async-std = [
   "hopr-db-sql/runtime-async-std",
-  "hopr-executor/runtime-async-std",
+  "hopr-async-runtime/runtime-async-std",
 ]
-runtime-tokio = ["hopr-db-sql/runtime-tokio", "hopr-executor/runtime-tokio"]
+runtime-tokio = [
+  "hopr-db-sql/runtime-tokio",
+  "hopr-async-runtime/runtime-tokio",
+]
 prometheus = [
   "dep:hopr-metrics",
   "chain-rpc/prometheus",
@@ -44,7 +47,7 @@ chain-rpc = { workspace = true }
 chain-types = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-platform = { workspace = true }
-hopr-executor = { workspace = true }
+hopr-async-runtime = { workspace = true }
 tracing = { workspace = true }
 hopr-internal-types = { workspace = true }
 hopr-primitive-types = { workspace = true }

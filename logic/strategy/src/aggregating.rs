@@ -25,10 +25,10 @@
 //! For details on default parameters see [AggregatingStrategyConfig].
 use async_trait::async_trait;
 use core_protocol::ticket_aggregation::processor::TicketAggregatorTrait;
+use hopr_async_runtime::prelude::{spawn, JoinHandle};
 use hopr_crypto_types::prelude::Hash;
 use hopr_db_sql::api::tickets::{AggregationPrerequisites, HoprDbTicketOperations};
 use hopr_db_sql::channels::HoprDbChannelOperations;
-use hopr_executor::api::{spawn, JoinHandle};
 use hopr_internal_types::prelude::*;
 
 use async_lock::RwLock;

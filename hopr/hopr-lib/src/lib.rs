@@ -51,6 +51,7 @@ use core_path::channel_graph::ChannelGraph;
 use core_transport::{execute_on_tick, HoprTransportConfig, HoprTransportProcess, PeerTransportEvent};
 use core_transport::{ChainKeypair, Hash, HoprTransport, OffchainKeypair};
 use core_transport::{IndexerTransportEvent, Network, PeerEligibility, PeerOrigin};
+use hopr_async_runtime::prelude::{sleep, spawn, JoinHandle};
 use hopr_crypto_types::prelude::OffchainPublicKey;
 use hopr_db_sql::{
     accounts::HoprDbAccountOperations,
@@ -61,7 +62,6 @@ use hopr_db_sql::{
     prelude::{ChainOrPacketKey::ChainKey, DbSqlError, HoprDbPeersOperations},
     HoprDbAllOperations, HoprDbGeneralModelOperations,
 };
-use hopr_executor::api::{sleep, spawn, JoinHandle};
 use hopr_platform::file::native::{join, remove_dir_all};
 use hopr_strategy::strategy::{MultiStrategy, SingularStrategy};
 pub use {

@@ -5,10 +5,10 @@ use tracing::{debug, error, info, trace};
 
 use chain_rpc::{HoprIndexerRpcOperations, LogFilter};
 use chain_types::chain_events::SignificantChainEvent;
+use hopr_async_runtime::prelude::{spawn, JoinHandle};
 use hopr_crypto_types::types::Hash;
 use hopr_db_sql::info::HoprDbInfoOperations;
 use hopr_db_sql::HoprDbGeneralModelOperations;
-use hopr_executor::api::{spawn, JoinHandle};
 
 use crate::{errors::CoreEthereumIndexerError, traits::ChainLogHandler, IndexerConfig};
 

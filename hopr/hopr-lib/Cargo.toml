@@ -29,7 +29,7 @@ runtime-tokio = [
   "chain-rpc/runtime-tokio",
   "core-transport/runtime-tokio",
   "hopr-db-sql/runtime-tokio",
-  "hopr-executor/runtime-tokio",
+  "hopr-async-runtime/runtime-tokio",
   "hopr-network-types/runtime-tokio",
   "hopr-strategy/runtime-tokio",
 ]
@@ -74,7 +74,7 @@ hopr-platform = { workspace = true }
 hopr-primitive-types = { workspace = true }
 hopr-strategy = { workspace = true }
 hopr-network-types = { workspace = true }
-hopr-executor = { workspace = true }
+hopr-async-runtime = { workspace = true }
 
 [dev-dependencies]
 async-std = { workspace = true }

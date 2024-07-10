@@ -15,12 +15,12 @@ crate-type = ["rlib"]
 default = []
 runtime-async-std = [
   "hopr-db-sql/runtime-async-std",
-  "hopr-executor/runtime-async-std",
+  "hopr-async-runtime/runtime-async-std",
   "sea-orm/runtime-async-std",
 ]
 runtime-tokio = [
   "hopr-db-sql/runtime-tokio",
-  "hopr-executor/runtime-tokio",
+  "hopr-async-runtime/runtime-tokio",
   "sea-orm/runtime-tokio",
 ]
 prometheus = [
@@ -50,7 +50,7 @@ chain-types = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-internal-types = { workspace = true }
 hopr-primitive-types = { workspace = true }
-hopr-executor = { workspace = true }
+hopr-async-runtime = { workspace = true }
 
 [dev-dependencies]
 async-std = { workspace = true }

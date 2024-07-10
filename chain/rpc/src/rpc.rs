@@ -250,8 +250,8 @@ pub mod tests {
     use hex_literal::hex;
     use std::time::Duration;
 
+    use hopr_async_runtime::prelude::sleep;
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
-    use hopr_executor::api::sleep;
     use hopr_primitive_types::prelude::*;
 
     use crate::client::surf_client::SurfRequestor;

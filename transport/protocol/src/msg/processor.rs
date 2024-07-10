@@ -8,13 +8,13 @@ use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use tracing::{debug, error, warn};
 
 use core_path::path::{Path, TransportPath};
+use hopr_async_runtime::prelude::{sleep, spawn};
 use hopr_crypto_packet::errors::{
     PacketError::{Retry, TagReplay, TransportError},
     Result,
 };
 use hopr_crypto_types::prelude::*;
 use hopr_db_api::prelude::HoprDbProtocolOperations;
-use hopr_executor::api::{sleep, spawn};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 

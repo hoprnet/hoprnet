@@ -6,7 +6,7 @@ use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, Query
 use std::sync::Arc;
 use tracing::error;
 
-use hopr_executor::api::spawn;
+use hopr_async_runtime::prelude::spawn;
 use hopr_internal_types::tickets::AcknowledgedTicket;
 use hopr_primitive_types::prelude::ToHex;
 

@@ -23,9 +23,9 @@ use crate::action_state::{ActionState, IndexerExpectation};
 use crate::errors::ChainActionsError::{ChannelAlreadyClosed, InvalidState, Timeout, TransactionSubmissionFailed};
 use crate::errors::{ChainActionsError, Result};
 
+use hopr_async_runtime::prelude::spawn;
 use hopr_db_sql::api::tickets::HoprDbTicketOperations;
 use hopr_db_sql::info::HoprDbInfoOperations;
-use hopr_executor::api::spawn;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::MultiCounter;

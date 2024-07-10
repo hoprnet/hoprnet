@@ -55,7 +55,7 @@ hopr-crypto-types = { workspace = true }
 hopr-db-api = { workspace = true }
 hopr-db-entity = { workspace = true }
 hopr-db-migration = { workspace = true }
-hopr-executor = { workspace = true }
+hopr-async-runtime = { workspace = true }
 hopr-internal-types = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-parallelize = { workspace = true, features = ["rayon"] }
