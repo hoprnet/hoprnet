@@ -63,7 +63,7 @@ pub trait HoprDbInfoOperations {
     async fn set_domain_separator<'a>(&'a self, tx: OptTx<'a>, dst_type: DomainSeparator, value: Hash) -> Result<()>;
 
     /// Updates the ticket price.
-    /// To retrieve stored ticket price, use [`HoprDbInfoOperations::get_indexer_data`],
+    /// To retrieve the stored ticket price, use [`HoprDbInfoOperations::get_indexer_data`],
     /// note that this setter should invalidate the cache.
     async fn update_ticket_price<'a>(&'a self, tx: OptTx<'a>, price: Balance) -> Result<()>;
 
@@ -80,7 +80,7 @@ pub trait HoprDbInfoOperations {
     ) -> Result<()>;
 
     /// Updates the network registry state.
-    /// To retrieve stored network registry state, use [`HoprDbInfoOperations::get_indexer_data`],
+    /// To retrieve the stored network registry state, use [`HoprDbInfoOperations::get_indexer_data`],
     /// note that this setter should invalidate the cache.
     async fn set_network_registry_enabled<'a>(&'a self, tx: OptTx<'a>, enabled: bool) -> Result<()>;
 
@@ -89,9 +89,8 @@ pub trait HoprDbInfoOperations {
 
     /// Sets the global setting value with the given key.
     ///
-    /// If setting with the given `key` does not exist, it is created.
-    /// /// If setting with the given `key` exists, it is created.
-    /// If `value` is `None` and setting with the given `key` exists it is removed.
+    /// If the setting with the given `key` does not exist, it is created.
+    /// If `value` is `None` and a setting with the given `key` exists, it is removed.
     async fn set_global_setting<'a>(&'a self, tx: OptTx<'a>, key: &str, value: Option<&[u8]>) -> Result<()>;
 }
 
