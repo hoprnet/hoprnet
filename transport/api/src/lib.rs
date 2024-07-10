@@ -50,6 +50,7 @@ use core_protocol::{
         AwaitingAggregator, TicketAggregationActions, TicketAggregationInteraction, TicketAggregatorTrait,
     },
 };
+use hopr_async_runtime::prelude::{sleep, spawn, JoinHandle};
 use hopr_db_sql::{
     api::tickets::{AggregationPrerequisites, HoprDbTicketOperations},
     HoprDbAllOperations,
@@ -81,17 +82,6 @@ pub use crate::{
     helpers::{IndexerTransportEvent, PeerEligibility, TicketStatistics},
     timer::execute_on_tick,
 };
-
-pub(crate) mod executor {
-    #[cfg(any(feature = "runtime-async-std", test))]
-    pub use async_std::task::{sleep, spawn, JoinHandle};
-
-    #[cfg(all(feature = "runtime-tokio", not(test)))]
-    pub use tokio::{
-        task::{spawn, JoinHandle},
-        time::sleep,
-    };
-}
 
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
 pub enum HoprTransportProcess {
@@ -244,7 +234,7 @@ where
         on_acknowledged_ticket: UnboundedSender<AcknowledgedTicket>,
         transport_updates: UnboundedReceiver<PeerTransportEvent>,
         incoming_session_queue: UnboundedSender<Session>,
-    ) -> HashMap<HoprTransportProcess, executor::JoinHandle<()>> {
+    ) -> HashMap<HoprTransportProcess, JoinHandle<()>> {
         // network event processing channel
         let (network_events_tx, network_events_rx) = futures::channel::mpsc::channel::<NetworkTriggeredEvent>(
             constants::MAXIMUM_NETWORK_UPDATE_EVENT_QUEUE_SIZE,
@@ -282,10 +272,10 @@ where
 
         let tbf_clone = tbf.clone();
 
-        let mut processes: HashMap<HoprTransportProcess, executor::JoinHandle<()>> = HashMap::new();
+        let mut processes: HashMap<HoprTransportProcess, JoinHandle<()>> = HashMap::new();
         processes.insert(
             HoprTransportProcess::BloomFilterSave,
-            executor::spawn(Box::pin(execute_on_tick(
+            spawn(Box::pin(execute_on_tick(
                 std::time::Duration::from_secs(90),
                 move || {
                     let tbf_clone = tbf_clone.clone();
@@ -315,7 +305,7 @@ where
                 .expect("Ping should be initialized at this point")
                 .clone(),
             core_network::heartbeat::HeartbeatExternalInteractions::new(network.clone()),
-            Box::new(|dur| Box::pin(executor::sleep(dur))),
+            Box::new(|dur| Box::pin(sleep(dur))),
         );
 
         let transport_layer = transport_layer.with_processors(
@@ -329,7 +319,7 @@ where
 
         processes.insert(
             HoprTransportProcess::Heartbeat,
-            executor::spawn(async move { heartbeat.heartbeat_loop().await }),
+            spawn(async move { heartbeat.heartbeat_loop().await }),
         );
 
         let (tx, rx) = futures::channel::mpsc::unbounded::<TransportOutput>();
@@ -342,7 +332,7 @@ where
 
         processes.insert(
             HoprTransportProcess::SessionsRouter,
-            executor::spawn(async move {
+            spawn(async move {
                 let _the_process_should_not_end = StreamExt::filter_map(rx, move |output| {
                     let sessions = sessions.clone();
                     let me = me;
@@ -407,7 +397,7 @@ where
 
         processes.insert(
             HoprTransportProcess::Swarm,
-            executor::spawn(transport_layer.run(version, tx, on_acknowledged_ticket)),
+            spawn(transport_layer.run(version, tx, on_acknowledged_ticket)),
         );
 
         processes
@@ -438,7 +428,7 @@ where
             .get()
             .ok_or_else(|| HoprTransportError::Api("ping processing is not yet initialized".into()))?;
 
-        let timeout = executor::sleep(std::time::Duration::from_secs(30)).fuse();
+        let timeout = sleep(std::time::Duration::from_secs(30)).fuse();
         let ping = (*pinger).ping(vec![*peer]).fuse();
 
         pin_mut!(timeout, ping);

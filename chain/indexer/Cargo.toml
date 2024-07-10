@@ -14,19 +14,21 @@ crate-type = ["rlib"]
 [features]
 default = []
 runtime-async-std = [
-    "async-std",
-    "hopr-db-sql/runtime-async-std",
+  "hopr-db-sql/runtime-async-std",
+  "hopr-async-runtime/runtime-async-std",
 ]
 runtime-tokio = [
-    "hopr-db-sql/runtime-tokio",
-    "tokio"
+  "hopr-db-sql/runtime-tokio",
+  "hopr-async-runtime/runtime-tokio",
 ]
-prometheus = ["dep:hopr-metrics", "chain-rpc/prometheus", "hopr-db-sql/prometheus"]
-
+prometheus = [
+  "dep:hopr-metrics",
+  "chain-rpc/prometheus",
+  "hopr-db-sql/prometheus",
+]
 
 [dependencies]
 async-channel = { workspace = true }
-async-std = { workspace = true, optional = true }
 async-trait = { workspace = true }
 ethers = { workspace = true, default-features = false, features = ["abigen"] }
 futures = { workspace = true }
@@ -34,7 +36,6 @@ lazy_static = { workspace = true }
 multiaddr = { workspace = true }
 smart-default = { workspace = true }
 sea-orm = { workspace = true }
-tokio = { workspace = true, optional = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 
@@ -43,10 +44,11 @@ hopr-crypto-types = { workspace = true }
 hopr-db-entity = { workspace = true }
 hopr-db-sql = { workspace = true }
 chain-rpc = { workspace = true }
-chain-types = { workspace = true}
+chain-types = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-internal-types = { workspace = true }
 hopr-primitive-types = { workspace = true }
+hopr-async-runtime = { workspace = true }
 
 [dev-dependencies]
 async-std = { workspace = true }
@@ -55,5 +57,3 @@ hex-literal = { workspace = true }
 mockall = { workspace = true }
 primitive-types = { workspace = true }
 hopr-crypto-random = { workspace = true }
-
-

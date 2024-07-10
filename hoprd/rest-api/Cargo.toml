@@ -23,13 +23,19 @@ const_format = { workspace = true }
 futures = { workspace = true }
 futures-concurrency = { workspace = true }
 lazy_static = { workspace = true, optional = true }
-libp2p-identity = { workspace = true, features = ["peerid", "ed25519", "serde"] }
+libp2p-identity = { workspace = true, features = [
+  "peerid",
+  "ed25519",
+  "serde",
+] }
 serde = { workspace = true }
 serde_with = { workspace = true }
 serde_json = { workspace = true }
 smart-default = { workspace = true }
 strum = { workspace = true }
-tide = { version = "0.16.0", default-features = false, features = ["h1-server"] }
+tide = { version = "0.16.0", default-features = false, features = [
+  "h1-server",
+] }
 tide-websockets = "0.4"
 tide-tracing = "0.1.1"
 tracing = { workspace = true }

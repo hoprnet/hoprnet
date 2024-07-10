@@ -8,6 +8,7 @@ use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use tracing::{debug, error, warn};
 
 use core_path::path::{Path, TransportPath};
+use hopr_async_runtime::prelude::{sleep, spawn};
 use hopr_crypto_packet::errors::{
     PacketError::{Retry, TagReplay, TransportError},
     Result,
@@ -19,7 +20,6 @@ use hopr_primitive_types::prelude::*;
 
 use super::packet::{PacketConstructing, TransportPacket};
 use crate::bloom;
-use crate::executor::{sleep, spawn};
 use crate::msg::mixer::MixerConfig;
 
 #[cfg(all(feature = "prometheus", not(test)))]
