@@ -95,7 +95,7 @@ where
                     }
 
                     let maybe_channel = db_clone
-                        .get_channel_via_cache(Some(tx), &self_addr, &destination)
+                        .get_channel_by_parties(Some(tx), &self_addr, &destination, false)
                         .await?;
                     if let Some(channel) = maybe_channel {
                         debug!("already found existing {channel}");
@@ -166,12 +166,12 @@ where
         let maybe_channel = match direction {
             ChannelDirection::Incoming => {
                 self.db
-                    .get_channel_via_cache(None, &counterparty, &self.self_address())
+                    .get_channel_by_parties(None, &counterparty, &self.self_address(), false)
                     .await?
             }
             ChannelDirection::Outgoing => {
                 self.db
-                    .get_channel_via_cache(None, &self.self_address(), &counterparty)
+                    .get_channel_by_parties(None, &self.self_address(), &counterparty, false)
                     .await?
             }
         };

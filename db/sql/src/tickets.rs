@@ -986,7 +986,7 @@ impl HoprDbTicketOperations for HoprDb {
             .perform(|tx| {
                 Box::pin(async move {
                     let entry = myself
-                        .get_channel_via_cache(Some(tx), &myself.me_onchain, &address)
+                        .get_channel_by_parties(Some(tx), &myself.me_onchain, &address, false)
                         .await?
                         .ok_or_else(|| {
                             DbSqlError::ChannelNotFound(generate_channel_id(&myself.me_onchain, &address))

@@ -53,10 +53,11 @@ impl HoprDbProtocolOperations for HoprDb {
 
                         PendingAcknowledgement::WaitingAsRelayer(unacknowledged) => {
                             if myself
-                                .get_channel_via_cache(
+                                .get_channel_by_parties(
                                     Some(tx),
                                     unacknowledged.ticket.verified_issuer(),
                                     &myself.me_onchain,
+                                    true,
                                 )
                                 .await?
                                 .is_some_and(|c| {
@@ -286,7 +287,7 @@ impl HoprDbProtocolOperations for HoprDb {
                                 .ok_or_else(|| DbSqlError::LogicalError("failed to fetch the ticket price".into()))?;
 
                             let channel = myself
-                                .get_channel_via_cache(Some(tx), &previous_hop_addr, &myself.me_onchain)
+                                .get_channel_by_parties(Some(tx), &previous_hop_addr, &myself.me_onchain, true)
                                 .await?
                                 .ok_or_else(|| {
                                     DbSqlError::LogicalError(format!(
@@ -417,7 +418,7 @@ impl HoprDb {
                 Box::pin(async move {
                     Ok::<_, DbSqlError>(
                         if let Some(channel) = myself
-                            .get_channel_via_cache(Some(tx), &me_onchain, &destination)
+                            .get_channel_by_parties(Some(tx), &me_onchain, &destination, true)
                             .await?
                         {
                             let ticket_price = myself.get_indexer_data(Some(tx)).await?.ticket_price;
