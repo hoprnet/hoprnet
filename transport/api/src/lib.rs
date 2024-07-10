@@ -49,6 +49,7 @@ pub use {
 };
 
 use async_lock::RwLock;
+use constants::RESERVED_TAG_UPPER_LIMIT;
 use hopr_db_api::{
     peers::HoprDbPeersOperations, registry::HoprDbRegistryOperations, resolver::HoprDbResolverOperations,
     tickets::HoprDbTicketOperations, HoprDbAllOperations,
@@ -410,6 +411,14 @@ where
         hops: Option<u16>,
         application_tag: Option<u16>,
     ) -> crate::errors::Result<HalfKeyChallenge> {
+        if let Some(application_tag) = application_tag {
+            if application_tag < RESERVED_TAG_UPPER_LIMIT {
+                return Err(crate::errors::HoprTransportError::Api(format!(
+                    "Application tag must not be lower than {RESERVED_TAG_UPPER_LIMIT}"
+                )));
+            }
+        }
+
         let app_data = ApplicationData::new(application_tag, &msg)?;
 
         if msg.len() > PAYLOAD_SIZE {

@@ -60,9 +60,8 @@ lazy_static::lazy_static! {
 }
 
 #[derive(Clone)]
-pub struct State<'a> {
-    pub hopr: Arc<Hopr>,         // checks
-    pub config: Arc<Config<'a>>, // swagger
+pub struct State {
+    pub hopr: Arc<Hopr>, // checks
 }
 
 pub type MessageEncoder = fn(&[u8]) -> Box<[u8]>;
@@ -194,7 +193,7 @@ impl Middleware<InternalState> for TokenBasedAuthenticationMiddleware {
                 // Use "Authorization Bearer <token>" and "X-Auth-Token <token>" headers and "Sec-Websocket-Protocol"
                 (!auth_headers.is_empty()
                     && (auth_headers.contains(&(&AUTHORIZATION, &format!("Bearer {}", expected_token)))
-                        || auth_headers.contains(&(&x_auth_header, &expected_token)))
+                        || auth_headers.contains(&(&x_auth_header, expected_token)))
                 )
 
                 // TODO: Replace with proper JS compliant solution
@@ -246,12 +245,11 @@ impl<T: Clone + Send + Sync + 'static> Middleware<T> for PrometheusMetricsMiddle
     }
 }
 
-async fn serve_swagger(request: tide::Request<State<'_>>) -> tide::Result<Response> {
-    let config = request.state().config.clone();
+async fn serve_swagger(request: tide::Request<State>) -> tide::Result<Response> {
     let path = request.url().path().to_string();
     let tail = path.strip_prefix("/swagger-ui/").unwrap();
 
-    match utoipa_swagger_ui::serve(tail, config) {
+    match utoipa_swagger_ui::serve(tail, Arc::new(Config::from("/api-docs/openapi.json"))) {
         Ok(swagger_file) => swagger_file
             .map(|file| {
                 Ok(Response::builder(200)
@@ -282,10 +280,7 @@ pub async fn run_hopr_api(
     let aliases: Arc<RwLock<BiHashMap<String, PeerId>>> = Arc::new(RwLock::new(BiHashMap::new()));
     aliases.write().await.insert("me".to_owned(), hopr.me_peer_id());
 
-    let state = State {
-        hopr,
-        config: Arc::new(Config::from("/api-docs/openapi.json")),
-    };
+    let state = State { hopr };
 
     let mut app = tide::with_state(state.clone());
 
@@ -381,11 +376,11 @@ pub async fn run_hopr_api(
                         match v {
                             WebSocketInput::Network(net_in) => match net_in {
                                 TransportOutput::Received(data) => {
-                                    debug!("websocket notifying client with received msg {data}");
+                                    debug!("websocket notifying client with received msg");
                                     ws_con.send_json(&json!(messages::WebSocketReadMsg::from(data))).await?;
                                 }
                                 TransportOutput::Sent(hkc) => {
-                                    debug!("websocket notifying client with received ack {hkc}");
+                                    debug!("websocket notifying client with received ack");
                                     ws_con
                                         .send_json(&json!(messages::WebSocketReadAck::from_ack(hkc)))
                                         .await?;
@@ -405,6 +400,7 @@ pub async fn run_hopr_api(
                                             .as_ref()
                                             .map(|enc| enc(&data.args.body))
                                             .unwrap_or_else(|| data.args.body.into_boxed_slice());
+                                        // let msg_body =  data.args.body.into_bytes().into_boxed_slice();
 
                                         let hkc = hopr
                                             .send_message(
@@ -417,7 +413,6 @@ pub async fn run_hopr_api(
                                             )
                                             .await?;
 
-                                        debug!("websocket notifying client with sent ack {hkc}");
                                         ws_con
                                             .send_json(&json!(messages::WebSocketReadAck::from_ack_challenge(hkc)))
                                             .await?;
@@ -425,9 +420,11 @@ pub async fn run_hopr_api(
                                         warn!("skipping an unsupported websocket command '{}'", data.cmd);
                                     }
                                 }
-                                Ok(_) => {
-                                    warn!("encountered an unsupported websocket input type");
+                                Ok(Message::Close(_)) => {
+                                    debug!("websocket client closed connection");
+                                    break;
                                 }
+                                Ok(_message) => {}
                                 Err(e) => error!("failed to get a valid websocket message: {e}"),
                             },
                         }
@@ -471,6 +468,8 @@ pub(crate) struct ApiError {
 #[strum(serialize_all = "SCREAMING_SNAKE_CASE")]
 enum ApiErrorStatus {
     InvalidInput,
+    /// An invalid application tag from the reserved range was provided.
+    InvalidApplicationTag,
     InvalidChannelId,
     InvalidPeerId,
     ChannelNotFound,
@@ -1420,9 +1419,9 @@ mod channels {
 }
 
 mod messages {
+    use hopr_lib::{AsUnixTimestamp, HalfKeyChallenge, RESERVED_TAG_UPPER_LIMIT};
     use std::time::Duration;
-
-    use hopr_lib::{AsUnixTimestamp, HalfKeyChallenge};
+    use validator::Validate;
 
     use super::*;
 
@@ -1462,10 +1461,10 @@ mod messages {
         #[schema(value_type = String)]
         pub peer_id: PeerId,
         #[serde_as(as = "Option<Vec<DisplayFromStr>>")]
-        // #[validate(length(min=0, max=3))]        // NOTE: issue in serde_as with validator -> no order is correct
+        #[validate(length(min = 0, max = 3))]
         #[schema(value_type = Option<Vec<String>>)]
         pub path: Option<Vec<PeerId>>,
-        #[validate(range(min = 1, max = 3))]
+        #[validate(range(min = 0, max = 3))]
         pub hops: Option<u16>,
     }
 
@@ -1524,6 +1523,12 @@ mod messages {
         let args: SendMessageBodyRequest = req.body_json().await?;
         let hopr = req.state().hopr.clone();
 
+        if let Err(e) = args.validate() {
+            return Ok(Response::builder(422)
+                .body(ApiErrorStatus::UnknownFailure(e.to_string()))
+                .build());
+        }
+
         // Use the message encoder, if any
         let msg_body = req
             .state()
@@ -1532,15 +1537,13 @@ mod messages {
             .map(|enc| enc(&args.body))
             .unwrap_or_else(|| args.body.into_boxed_slice());
 
-        if let Some(path) = &args.path {
-            if path.len() > 3 {
-                return Ok(Response::builder(422)
-                    .body(ApiErrorStatus::UnknownFailure(
-                        "The path components must contain at most 3 elements".into(),
-                    ))
-                    .build());
-            }
-        }
+        if args.path.is_none() && args.hops.is_none() {
+            return Ok(Response::builder(422)
+                .body(ApiErrorStatus::UnknownFailure(
+                    "One of either hops or intermediate path must be specified".to_owned(),
+                ))
+                .build());
+        };
 
         let timestamp = std::time::SystemTime::now().as_unix_timestamp();
 
@@ -1557,6 +1560,7 @@ mod messages {
 
     #[derive(Debug, Default, Clone, serde::Deserialize, utoipa::ToSchema)]
     #[schema(value_type = String)] //, format = Binary)]
+    #[allow(dead_code)] // not dead code, just for codegen
     pub struct Text(String);
 
     #[derive(Debug, Clone, serde::Deserialize)]
@@ -1679,6 +1683,7 @@ mod messages {
         params(TagQueryRequest),
         responses(
             (status = 204, description = "Messages successfully deleted."),
+            (status = 400, description = "Bad request.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
         ),
         tag = "Messages",
@@ -1689,8 +1694,13 @@ mod messages {
     )]
     pub async fn delete_messages(req: Request<InternalState>) -> tide::Result<Response> {
         let tag: TagQueryRequest = req.query()?;
-        let inbox = req.state().inbox.clone();
+        if tag.tag.map_or(false, |tag| tag < RESERVED_TAG_UPPER_LIMIT) {
+            return Ok(Response::builder(400)
+                .body(ApiErrorStatus::InvalidApplicationTag)
+                .build());
+        }
 
+        let inbox = req.state().inbox.clone();
         inbox.write().await.pop_all(tag.tag).await;
         Ok(Response::builder(204).build())
     }
@@ -1702,6 +1712,7 @@ mod messages {
         params(TagQueryRequest),
         responses(
             (status = 200, description = "Returns the message inbox size filtered by the given tag", body = SizeResponse),
+            (status = 400, description = "Bad request.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
         ),
         security(
@@ -1712,8 +1723,13 @@ mod messages {
     )]
     pub async fn size(req: Request<InternalState>) -> tide::Result<Response> {
         let query: TagQueryRequest = req.query()?;
-        let inbox = req.state().inbox.clone();
+        if query.tag.map_or(false, |tag| tag < RESERVED_TAG_UPPER_LIMIT) {
+            return Ok(Response::builder(400)
+                .body(ApiErrorStatus::InvalidApplicationTag)
+                .build());
+        }
 
+        let inbox = req.state().inbox.clone();
         let size = inbox.read().await.size(query.tag).await;
 
         Ok(Response::builder(200).body(json!(SizeResponse { size })).build())
@@ -1763,6 +1779,7 @@ mod messages {
         ),
         responses(
             (status = 200, description = "Message successfully extracted.", body = MessagePopResponse),
+            (status = 400, description = "Bad request.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "The specified resource was not found."),
             (status = 422, description = "Unknown failure", body = ApiError)
@@ -1775,8 +1792,13 @@ mod messages {
     )]
     pub async fn pop(mut req: Request<InternalState>) -> tide::Result<Response> {
         let tag: TagQueryRequest = req.body_json().await?;
-        let inbox = req.state().inbox.clone();
+        if tag.tag.map_or(false, |tag| tag < RESERVED_TAG_UPPER_LIMIT) {
+            return Ok(Response::builder(400)
+                .body(ApiErrorStatus::InvalidApplicationTag)
+                .build());
+        }
 
+        let inbox = req.state().inbox.clone();
         let inbox = inbox.write().await;
         if let Some((data, ts)) = inbox.pop(tag.tag).await {
             match to_api_message(data, ts) {
@@ -1806,6 +1828,7 @@ mod messages {
         ),
         responses(
             (status = 200, description = "All message successfully extracted.", body = MessagePopAllResponse),
+            (status = 400, description = "Bad request.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "The specified resource was not found."),
             (status = 422, description = "Unknown failure", body = ApiError)
@@ -1818,6 +1841,12 @@ mod messages {
     )]
     pub async fn pop_all(mut req: Request<InternalState>) -> tide::Result<Response> {
         let tag: TagQueryRequest = req.body_json().await?;
+        if tag.tag.map_or(false, |tag| tag < RESERVED_TAG_UPPER_LIMIT) {
+            return Ok(Response::builder(400)
+                .body(ApiErrorStatus::InvalidApplicationTag)
+                .build());
+        }
+
         let inbox = req.state().inbox.clone();
 
         let inbox = inbox.write().await;
@@ -1852,6 +1881,7 @@ mod messages {
         ),
         responses(
             (status = 200, description = "Message successfully peeked at.", body = MessagePopResponse),
+            (status = 400, description = "Bad request.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "The specified resource was not found."),
             (status = 422, description = "Unknown failure", body = ApiError)
@@ -1864,6 +1894,12 @@ mod messages {
     )]
     pub async fn peek(mut req: Request<InternalState>) -> tide::Result<Response> {
         let tag: TagQueryRequest = req.body_json().await?;
+        if tag.tag.map_or(false, |tag| tag < RESERVED_TAG_UPPER_LIMIT) {
+            return Ok(Response::builder(400)
+                .body(ApiErrorStatus::InvalidApplicationTag)
+                .build());
+        }
+
         let inbox = req.state().inbox.clone();
 
         let inbox = inbox.write().await;
@@ -1890,6 +1926,7 @@ mod messages {
         ),
         responses(
             (status = 200, description = "All messages successfully peeked at.", body = MessagePopAllResponse),
+            (status = 400, description = "Bad request.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "The specified resource was not found."),
             (status = 422, description = "Unknown failure", body = ApiError)
@@ -1903,6 +1940,12 @@ mod messages {
 
     pub async fn peek_all(mut req: Request<InternalState>) -> tide::Result<Response> {
         let args: GetMessageBodyRequest = req.body_json().await?;
+        if args.tag.map_or(false, |tag| tag < RESERVED_TAG_UPPER_LIMIT) {
+            return Ok(Response::builder(400)
+                .body(ApiErrorStatus::InvalidApplicationTag)
+                .build());
+        }
+
         let inbox = req.state().inbox.clone();
 
         let inbox = inbox.read().await;
@@ -2638,7 +2681,7 @@ mod checks {
         ),
         tag = "Checks"
     )]
-    pub(super) async fn startedz(req: Request<State<'_>>) -> tide::Result<Response> {
+    pub(super) async fn startedz(req: Request<State>) -> tide::Result<Response> {
         is_running(req).await
     }
 
@@ -2652,7 +2695,7 @@ mod checks {
         ),
         tag = "Checks"
     )]
-    pub(super) async fn readyz(req: Request<State<'_>>) -> tide::Result<Response> {
+    pub(super) async fn readyz(req: Request<State>) -> tide::Result<Response> {
         is_running(req).await
     }
 
@@ -2666,11 +2709,11 @@ mod checks {
         ),
         tag = "Checks"
     )]
-    pub(super) async fn healthyz(req: Request<State<'_>>) -> tide::Result<Response> {
+    pub(super) async fn healthyz(req: Request<State>) -> tide::Result<Response> {
         is_running(req).await
     }
 
-    async fn is_running(req: Request<State<'_>>) -> tide::Result<Response> {
+    async fn is_running(req: Request<State>) -> tide::Result<Response> {
         match req.state().hopr.status() {
             hopr_lib::HoprState::Running => Ok(Response::builder(200).build()),
             _ => Ok(Response::builder(412).build()),
