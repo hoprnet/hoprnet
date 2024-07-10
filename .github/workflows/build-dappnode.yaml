@@ -5,11 +5,14 @@
 name: Build DappNode
 
 on:
-  pull_request:
-    types:
-      - labeled
-      # - unlabeled
-
+  workflow_call:
+    inputs:
+      branch:
+        required: true
+        type: string
+      repository:
+        required: true
+        type: string
 
 concurrency:
   group: dappnode
@@ -19,10 +22,12 @@ jobs:
   build:
     name: build-dappnode
     runs-on: self-hosted-hoprnet-small
-    if: github.event.label.name == 'build_dappnode_test' && github.event.action == 'labeled'
+    if: contains(github.event.pull_request.labels.*.name, format('package:{0}', inputs.repository))
     steps:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch }}
 
       - name: Set up Google Cloud Credentials
         id: auth
@@ -50,7 +55,7 @@ jobs:
       - name: Checkout DAppNodePackage-Hopr
         uses: actions/checkout@v4
         with:
-          repository: dappnode/DAppNodePackage-Hopr-testnet
+          repository: dappnode/${{ inputs.repository }}
           path: "./dappnode"
           token: ${{ secrets.GH_RUNNER_TOKEN }}
           ref: main
