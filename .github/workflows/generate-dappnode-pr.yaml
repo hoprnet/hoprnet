@@ -2,7 +2,7 @@
 #################################################################################
 # Pipeline to build dappnode package
 #################################################################################
-name: Build DappNode
+name: Create DappNode Release
 
 on:
   workflow_call:
