@@ -82,6 +82,7 @@ NODES = {
         "localhost",
         NETWORK1,
         FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_barebone.cfg.yaml"),
+        True,
     ),
     "2": Node(
         19092,

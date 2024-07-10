@@ -15,6 +15,7 @@ class Node:
         host_addr: str,
         network: str,
         cfg_file: Path = None,
+        perf: bool = False,
     ):
         # initialized
         self.api_port: int = api_port
@@ -23,6 +24,7 @@ class Node:
         self.host_addr: str = host_addr
         self.api_token: str = api_token
         self.network: str = network
+        self.perf = perf
 
         # optional
         self.cfg_file: Path = cfg_file
@@ -88,6 +90,19 @@ class Node:
             "HOPRD_NETWORK_QUALITY_THRESHOLD": "0.3",
         }
 
+        prof = [
+            "perf",
+            "record",
+            "--freq",
+            "997",
+            "--call-graph",
+            "dwarf",
+            "--no-buffering",
+            "-q",
+            "-o",
+            f"{self.dir}.prof",
+        ]
+
         cmd = [
             "hoprd",
             "--announce",
@@ -106,6 +121,10 @@ class Node:
             f"--protocolConfig={config_file}",
             api_token_param,
         ]
+
+        if self.perf:
+            cmd = prof + cmd
+
         if self.cfg_file is not None:
             cmd += [f"--configurationFilePath={self.cfg_file}"]
 
@@ -121,7 +140,8 @@ class Node:
         return self.proc is not None
 
     def clean_up(self):
-        self.proc.kill()
+        # self.proc.kill()
+        self.proc.terminate()
 
     def __str__(self):
         return f"node@{self.host_addr}:{self.p2p_port}"

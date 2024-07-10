@@ -53,7 +53,7 @@ class ApiWrapper:
 @pytest.mark.skipif(
     os.getenv("CI", "false") == "true", reason="stress tests fail randomly on CI due to resource constraints"
 )
-async def test_stress_relayed_flood_test_with_sources_performing_1_hop_to_self(stress_fixture):
+async def test_stress_relayed_flood_test_with_sources_performing_1_hop_to_self(stress_fixture, swarm7):
     STRESS_1_HOP_TO_SELF_MESSAGE_COUNT = stress_fixture["request_count"]
 
     api_sources = [HoprdAPI(f'http://{d["url"]}', d["token"]) for d in stress_fixture["sources"]]
