@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   build:
-    name: package
+    name: build-dappnode
     runs-on: self-hosted-hoprnet-small
     if: github.event.label.name == 'build_dappnode_test' && github.event.action == 'labeled'
     steps:
@@ -36,6 +36,11 @@ jobs:
         with:
           project_id: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
           install_components: beta
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
 
       - name: Checkout DAppNodePackage-Hopr
         uses: actions/checkout@v4
