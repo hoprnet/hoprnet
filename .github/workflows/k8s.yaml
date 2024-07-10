@@ -16,7 +16,6 @@ jobs:
   deploy:
     name: deploy
     runs-on: self-hosted-hoprnet-small
-    timeout-minutes: 30
     if: github.event.label.name == 'deploy_nodes' && github.event.action == 'labeled'
     steps:
       - name: Set up Python
@@ -65,7 +64,6 @@ jobs:
   undeploy:
     name: undeploy
     runs-on: self-hosted-hoprnet-small
-    timeout-minutes: 30
     if: github.event.label.name == 'deploy_nodes' && github.event.action == 'unlabeled'
     steps:
       - name: Set up Python
