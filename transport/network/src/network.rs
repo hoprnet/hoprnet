@@ -243,7 +243,6 @@ where
                 entry.update_quality(0.0_f64.max(entry.get_quality() - self.cfg.quality_step));
 
                 if entry.get_quality() < (self.cfg.quality_step / 2.0) {
-                    self.db.remove_network_peer(&entry.id.1).await?;
                     return Ok(Some(NetworkTriggeredEvent::CloseConnection(entry.id.1)));
                 } else if entry.get_quality() < self.cfg.quality_bad_threshold {
                     entry.ignored = Some(current_time());
@@ -715,7 +714,7 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn test_network_should_remove_the_peer_once_it_reaches_the_lowest_possible_quality() {
+    async fn test_network_should_close_connection_to_peer_once_it_reaches_the_lowest_possible_quality() {
         let peer: PeerId = OffchainKeypair::random().public().into();
         let public = peer;
         let me: PeerId = OffchainKeypair::random().public().into();
@@ -744,7 +743,7 @@ mod tests {
             Some(NetworkTriggeredEvent::CloseConnection(peer))
         );
 
-        assert!(!peers.has(&public).await);
+        assert!(peers.has(&public).await);
     }
 
     #[async_std::test]

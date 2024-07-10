@@ -1,46 +1,45 @@
 [workspace]
 
-exclude = [
-    "vendor/cargo/scale-info-2.10.0"
-]
+exclude = ["vendor/cargo/scale-info-2.10.0"]
 
 resolver = "2"
 
 members = [
-    "common/internal-types",
-    "common/network-types",
-    "common/primitive-types",
-    "common/parallelize",
-    "crypto/packet",
-    "crypto/random",
-    "crypto/sphinx",
-    "crypto/types",
-    "chain/actions",
-    "chain/api",
-    "chain/indexer",
-    "chain/types",
-    "chain/rpc",
-    "db/api",
-    "db/sql",
-    "db/migration",
-    "db/entity",
-    "ethereum/bindings",
-    "hopli",
-    "hopr-socks/hopr-socks-server",
-    "hopr/hopr-lib",
-    "hoprd/rest-api",
-    "hoprd/hoprd",
-    "hoprd/inbox",
-    "hoprd/keypair",
-    "logic/path",
-    "logic/strategy",
-    "misc/metrics",
-    "misc/platform",
-    "transport/api",
-    "transport/network",
-    "transport/p2p",
-    "transport/protocol",
-    "transport/session"
+  "common/internal-types",
+  "common/async-runtime",
+  "common/network-types",
+  "common/primitive-types",
+  "common/parallelize",
+  "crypto/packet",
+  "crypto/random",
+  "crypto/sphinx",
+  "crypto/types",
+  "chain/actions",
+  "chain/api",
+  "chain/indexer",
+  "chain/types",
+  "chain/rpc",
+  "db/api",
+  "db/sql",
+  "db/migration",
+  "db/entity",
+  "ethereum/bindings",
+  "hopli",
+  "hopr-socks/hopr-socks-server",
+  "hopr/hopr-lib",
+  "hoprd/rest-api",
+  "hoprd/hoprd",
+  "hoprd/inbox",
+  "hoprd/keypair",
+  "logic/path",
+  "logic/strategy",
+  "misc/metrics",
+  "misc/platform",
+  "transport/api",
+  "transport/network",
+  "transport/p2p",
+  "transport/protocol",
+  "transport/session",
 ]
 
 [workspace.dependencies]
@@ -75,7 +74,11 @@ getrandom = "0.2.15"
 hex = "0.4.3"
 hex-literal = "0.4.1"
 lazy_static = "1.4.0"
-libp2p-identity = { version = "0.2.9", features = ["peerid", "ed25519", "rand"] }
+libp2p-identity = { version = "0.2.9", features = [
+  "peerid",
+  "ed25519",
+  "rand",
+] }
 libp2p-mplex = "0.41.0"
 libp2p = { version = "0.53.2" }
 moka = { version = "0.12.7", features = ["future"] }
@@ -100,19 +103,35 @@ serde_repr = "0.1.19"
 serde_yaml = { version = "0.9.33" }
 serde_with = { version = "3.8.1" }
 serial_test = "3.1.1"
-sea-orm = { version = "0.12.15", features = ["sqlx-sqlite", "with-chrono", "debug-print"] }
+sea-orm = { version = "0.12.15", features = [
+  "sqlx-sqlite",
+  "with-chrono",
+  "debug-print",
+] }
 sea-orm-cli = { version = "0.12.15", features = ["codegen"] }
-sea-orm-migration = { version = "0.12.15", features = ["sqlx-sqlite", "with-chrono"]}
+sea-orm-migration = { version = "0.12.15", features = [
+  "sqlx-sqlite",
+  "with-chrono",
+] }
 signal-hook = "0.3.17"
 smart-default = "0.7.1"
-sqlx = { version = "0.7.4", default-features = false, features = ["sqlite", "macros", "migrate"] }
+sqlx = { version = "0.7.4", default-features = false, features = [
+  "sqlite",
+  "macros",
+  "migrate",
+] }
 strum = { version = "0.26.2", features = ["derive"] }
 tempfile = "3.10.1"
 thiserror = "1.0.61"
 tokio = { version = "1.38.0", features = ["rt-multi-thread", "macros"] }
 tracing = { version = "0.1.40" }
 tracing-futures = { version = "0.2.5" }
-tracing-subscriber = { version = "0.3.18", features = ["env-filter", "fmt", "registry", "std"]}
+tracing-subscriber = { version = "0.3.18", features = [
+  "env-filter",
+  "fmt",
+  "registry",
+  "std",
+] }
 tracing-test = { version = "0.2.5", features = ["no-env-filter"] }
 typenum = "1.17.0"
 uuid = { version = "1.8.0" }
@@ -130,12 +149,15 @@ core-protocol = { path = "transport/protocol", default-features = false }
 core-transport = { path = "transport/api", default-features = false }
 hopr-crypto-random = { path = "crypto/random", default-features = false }
 hopr-crypto-packet = { path = "crypto/packet", default-features = false }
-hopr-crypto-sphinx = { path = "crypto/sphinx", default-features = false, features = ["x25519"] }
+hopr-crypto-sphinx = { path = "crypto/sphinx", default-features = false, features = [
+  "x25519",
+] }
 hopr-crypto-types = { path = "crypto/types", default-features = false }
 hopr-db-api = { path = "db/api" }
 hopr-db-sql = { path = "db/sql" }
 hopr-db-entity = { path = "db/entity" }
 hopr-db-migration = { path = "db/migration" }
+hopr-async-runtime = { path = "common/async-runtime" }
 hopr-internal-types = { path = "common/internal-types", default-features = false }
 hopr-lib = { path = "hopr/hopr-lib" }
 hopr-metrics = { path = "misc/metrics", default-features = false }

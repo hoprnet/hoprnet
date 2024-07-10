@@ -8,12 +8,12 @@ use std::time::{Duration, SystemTime};
 #[derive(Copy, Clone, Debug, smart_default::SmartDefault, Serialize, Deserialize, strum::Display)]
 #[strum(serialize_all = "PascalCase")]
 pub enum ChannelStatus {
-    /// Channel is closed.
+    /// The channel is closed.
     #[default]
     Closed,
-    /// Channel is opened.
+    /// The channel is opened.
     Open,
-    /// Channel is pending to be closed.
+    /// The channel is pending to be closed.
     /// The timestamp marks the *earliest* possible time when the channel can transition into the `Closed` state.
     #[strum(serialize = "PendingToClose")]
     PendingToClose(SystemTime),

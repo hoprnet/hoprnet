@@ -1,23 +1,19 @@
 use async_trait::async_trait;
+use futures::future::Either;
+use futures::{pin_mut, FutureExt};
+use serde::{Deserialize, Serialize};
+use std::marker::PhantomData;
+use std::time::Duration;
+
 use chain_actions::action_queue::TransactionExecutor;
 use chain_actions::payload::PayloadGenerator;
 use chain_rpc::errors::RpcError;
 use chain_rpc::{HoprRpcOperations, PendingTransaction};
 use chain_types::TypedTransaction;
-use futures::future::Either;
-use futures::{pin_mut, FutureExt};
+use hopr_async_runtime::prelude::sleep;
 use hopr_crypto_types::types::Hash;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use serde::{Deserialize, Serialize};
-use std::marker::PhantomData;
-use std::time::Duration;
-
-#[cfg(feature = "runtime-async-std")]
-use async_std::task::sleep;
-
-#[cfg(feature = "runtime-tokio")]
-use tokio::time::sleep;
 
 /// Represents an abstract client that is capable of submitting
 /// an Ethereum transaction-like object to the blockchain.

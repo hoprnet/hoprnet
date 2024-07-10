@@ -28,7 +28,7 @@
 //!
 //! ### Data segmentation
 //! Once data is written to the [`SessionSocket`], it is segmented and written
-//! automatically to the underlying transport. Every write to the `SessionSocket` corresponds to
+//! automatically to the underlying transport. Every writing to the `SessionSocket` corresponds to
 //! a [`Frame`](crate::session::frame::Frame).
 //!
 //! ## Frame reassembly
@@ -38,7 +38,7 @@
 //!
 //! ## Frame acknowledgement
 //!
-//! The recipient can acknowledge frames to the sender, once all its segments have been received.
+//! The recipient can acknowledge frames to the sender once all its segments have been received.
 //! This is done with a [`FrameAcknowledgements`] message sent back
 //! to the sender.
 //!
@@ -72,33 +72,17 @@
 //! However, retransmissions decay with an exponential backoff given by `backoff_base`
 //! and `rto_base_sender` timeout in [`SessionConfig`] up until
 //! the `frame_expiration_age`.
-//! The retransmissions of a frame by the sender stop, if the frame has been acknowledged by the
+//! The retransmissions of a frame by the sender stop if the frame has been acknowledged by the
 //! recipient *or* the recipient started requesting segment retransmission.
 //!
 //! ### Retransmission timing
 //! Both retransmission methods will work up until `frame_expiration_age`. Since the
-//! recipient request based method is more targeted, at least one should be allowed to happen
-//! before the sender initiated retransmission kicks in. Therefore, it is recommended to set
+//! recipient-request-based method is more targeted, at least one should be allowed to happen
+//! before the sender-initiated retransmission kicks in. Therefore, it is recommended to set
 //! the `rto_base_sender` at least twice the `rto_base_receiver`.
 //!
-//! ## State stepping
-//!
-//! As mentioned in the above text, the only responsibility of the user so far is to
-//! pass the data received by the transport to the `SessionState` of the socket.
-//!
-//! This, however, takes care only of the basic payload transmission function.
-//! If the user wishes to use the retransmission and acknowledgement features of the protocol,
-//! it must periodically call (in order) the corresponding methods of [`SessionState`]:
-//! 1) [`acknowledge_segments`](SessionState::acknowledge_segments)
-//! 2) [`request_missing_segments`](SessionState::request_missing_segments)
-//! 3) [`retransmit_unacknowledged_frames`](SessionState::retransmit_unacknowledged_frames)
-//!
-//! These should be called multiple times within the `frame_expiration_age` period, in order
-//! for the session state to advance.
-//!
-//! For convenience, the [`SessionState::advance`](SessionState::advance) method
-//! combines all three above methods in a single call
-//!
+//! The above protocol features can be enabled by setting [SessionFeature] options in the configuration
+//! during [SessionSocket] construction.
 use crossbeam_queue::ArrayQueue;
 use crossbeam_skiplist::SkipMap;
 use dashmap::mapref::entry::Entry;
@@ -109,7 +93,7 @@ use governor::prelude::StreamRateLimitExt;
 use governor::{Jitter, Quota, RateLimiter};
 use pin_project::pin_project;
 use smart_default::SmartDefault;
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashSet};
 use std::fmt::{Debug, Display};
 use std::future::Future;
 use std::pin::Pin;
@@ -119,23 +103,39 @@ use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
 use tracing::{debug, warn};
 
+use hopr_async_runtime::prelude::{sleep, spawn, spawn_local};
+
 use crate::errors::NetworkTypeError;
 use crate::session::errors::SessionError;
 use crate::session::frame::{segment, FrameId, FrameReassembler, Segment, SegmentId};
 use crate::session::protocol::{FrameAcknowledgements, SegmentRequest, SessionMessage};
 use crate::session::utils::{AsyncReadStreamer, RetryResult, RetryToken};
 
-#[cfg(any(feature = "runtime-async-std", test))]
-use async_std::task::spawn;
+/// Represents individual Session protocol features that can be enabled.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum SessionFeature {
+    /// Enable requesting of incomplete frames by the recipient.
+    RequestIncompleteFrames,
+    /// Enable frame retransmission by the sender.
+    /// This requires `AcknowledgeFrames` to be enabled at the recipient.
+    RetransmitFrames,
+    /// Enable frame acknowledgement by the recipient.
+    AcknowledgeFrames,
+}
 
-#[cfg(all(feature = "runtime-tokio", not(test)))]
-use tokio::task::spawn;
+impl SessionFeature {
+    /// All features
+    fn all() -> Vec<SessionFeature> {
+        vec![
+            SessionFeature::AcknowledgeFrames,
+            SessionFeature::RequestIncompleteFrames,
+            SessionFeature::RetransmitFrames,
+        ]
+    }
+}
 
-#[cfg(all(feature = "runtime-async-std", feature = "runtime-tokio"))]
-compile_error!("Only one of the runtime features can be specified for the build");
-
-/// Configuration of session.
-#[derive(Debug, Clone, Copy, PartialEq, SmartDefault)]
+/// Configuration of Session protocol.
+#[derive(Debug, Clone, SmartDefault)]
 pub struct SessionConfig {
     /// Maximum number of buffered segments.
     /// This value should be large enough to accommodate segments for an at least
@@ -144,7 +144,7 @@ pub struct SessionConfig {
     pub max_buffered_segments: usize,
 
     /// Size of the buffer for acknowledged frame IDs.
-    /// This value should be large enough, so that the buffer can accommodate segments
+    /// This value should be large enough so that the buffer can accommodate segments
     /// for an at least `frame_expiration_age` period, given the expected maximum bandwidth.
     /// If set to 0, no frame acknowledgement will be sent.
     #[default = 1024]
@@ -159,7 +159,7 @@ pub struct SessionConfig {
     /// with exponential backoff starting at this initial retry timeout (RTO).
     /// Requests will be sent until `frame_expiration_age` is reached.
     /// NOTE that this value should be offset from `rto_base_sender`, so that the receiver's
-    /// retransmission requests are interleaved with sender's retransmissions.
+    /// retransmission requests are interleaved with the sender's retransmissions.
     #[default(Duration::from_millis(1000))]
     pub rto_base_receiver: Duration,
 
@@ -167,7 +167,7 @@ pub struct SessionConfig {
     /// with exponential backoff starting at this initial retry timeout (RTO).
     /// Frames will be retransmitted until `frame_expiration_age` is reached.
     /// NOTE that this value should be offset from `rto_base_receiver`, so that the receiver's
-    /// retransmission requests are interleaved with sender's retransmissions.
+    /// retransmission requests are interleaved with the sender's retransmissions.
     #[default(Duration::from_millis(1500))]
     pub rto_base_sender: Duration,
 
@@ -180,6 +180,10 @@ pub struct SessionConfig {
     /// to the underlying transport.
     #[default(None)]
     pub max_msg_per_sec: Option<usize>,
+
+    /// Set of [features](SessionFeature) that should be enabled on this Session.
+    #[default(_code = "HashSet::from_iter(SessionFeature::all())")]
+    pub enabled_features: HashSet<SessionFeature>,
 }
 
 /// Contains the cloneable state of the session bound to a [`SessionSocket`].
@@ -287,7 +291,7 @@ impl<const C: usize> SessionState<C> {
     /// are set for all incomplete frames.
     /// Recurring requests have an [`rto_base_receiver`](SessionConfig) timeout with backoff.
     /// Returns the number of sent request messages.
-    pub async fn request_missing_segments(&mut self, max_requests: Option<usize>) -> crate::errors::Result<usize> {
+    async fn request_missing_segments(&mut self, max_requests: Option<usize>) -> crate::errors::Result<usize> {
         let num_evicted = self.frame_reassembler.evict()?;
         debug!("{:?}: evicted {} frames", self.session_id, num_evicted);
 
@@ -382,7 +386,7 @@ impl<const C: usize> SessionState<C> {
     /// frame IDs will be discarded.
     /// Single [message](SessionMessage::Acknowledge) can accommodate up to [`FrameAcknowledgements::MAX_ACK_FRAMES`] frame IDs, so
     /// this method sends as many messages as needed, or at most `max_message` if was given.
-    pub async fn acknowledge_segments(&mut self, max_messages: Option<usize>) -> crate::errors::Result<usize> {
+    async fn acknowledge_segments(&mut self, max_messages: Option<usize>) -> crate::errors::Result<usize> {
         let mut len = 0;
         let mut msgs = 0;
 
@@ -423,12 +427,9 @@ impl<const C: usize> SessionState<C> {
     /// If [`acknowledged_frames_buffer`](SessionConfig) was set to `0` during the construction,
     /// this method will do nothing and return `0`.
     /// Otherwise, it returns the number of retransmitted frames.
-    /// Recurring retransmissions have a [`rto_base_sender`](SessionConfig) timeout with backoff.
+    /// Recurring retransmissions have an [`rto_base_sender`](SessionConfig) timeout with backoff.
     /// At most `max_messages` frames are resent if the argument was specified.
-    pub async fn retransmit_unacknowledged_frames(
-        &mut self,
-        max_messages: Option<usize>,
-    ) -> crate::errors::Result<usize> {
+    async fn retransmit_unacknowledged_frames(&mut self, max_messages: Option<usize>) -> crate::errors::Result<usize> {
         if max_messages == Some(0) || self.cfg.acknowledged_frames_buffer == 0 {
             return Ok(0);
         }
@@ -548,10 +549,20 @@ impl<const C: usize> SessionState<C> {
     ///
     /// The given optional limit is per each method call and is not shared, meaning
     /// each method gets the same limit.
-    pub async fn advance(&mut self, max_messages: Option<usize>) -> crate::errors::Result<()> {
-        self.acknowledge_segments(max_messages).await?;
-        self.request_missing_segments(max_messages).await?;
-        self.retransmit_unacknowledged_frames(max_messages).await?;
+    async fn advance(&mut self, max_messages: Option<usize>) -> crate::errors::Result<()> {
+        if self.cfg.enabled_features.contains(&SessionFeature::AcknowledgeFrames) {
+            self.acknowledge_segments(max_messages).await?;
+        }
+        if self
+            .cfg
+            .enabled_features
+            .contains(&SessionFeature::RequestIncompleteFrames)
+        {
+            self.request_missing_segments(max_messages).await?;
+        }
+        if self.cfg.enabled_features.contains(&SessionFeature::RetransmitFrames) {
+            self.retransmit_unacknowledged_frames(max_messages).await?;
+        }
         Ok(())
     }
 
@@ -656,7 +667,7 @@ impl<const C: usize> SessionSocket<C> {
             to_acknowledge,
             incoming_frame_retries,
             segment_egress_send,
-            cfg,
+            cfg: cfg.clone(),
         };
 
         let (downstream_read, downstream_write) = transport.split();
@@ -688,6 +699,17 @@ impl<const C: usize> SessionSocket<C> {
                 .map_err(|e| NetworkTypeError::SessionProtocolError(SessionError::ProcessingError(e.to_string())))
                 .forward(state.clone()),
         );
+
+        // Advance the state until the socket is closed
+        if !cfg.enabled_features.is_empty() {
+            let mut state_clone = state.clone();
+            spawn_local(async move {
+                // TODO: make the max message configurable or derive it
+                while state_clone.advance(None).await.is_ok() {
+                    sleep(cfg.frame_expiration_age / 3).await;
+                }
+            });
+        }
 
         Self { state, frame_egress }
     }
@@ -761,7 +783,6 @@ mod tests {
     pub struct FaultyNetworkConfig {
         pub fault_prob: f64,
         pub mixing_factor: usize,
-        pub step_interval: Duration,
     }
 
     impl Default for FaultyNetworkConfig {
@@ -769,7 +790,6 @@ mod tests {
             Self {
                 fault_prob: 0.0,
                 mixing_factor: 0,
-                step_interval: Duration::from_millis(50),
             }
         }
     }
@@ -818,15 +838,6 @@ mod tests {
 
         let alice_to_bob = SessionSocket::new("alice", DuplexIO(alice_reader, bob_writer), cfg.clone());
         let bob_to_alice = SessionSocket::new("bob", DuplexIO(bob_reader, alice_writer), cfg.clone());
-
-        let state_proc = |mut s: SessionState<MTU>| async move {
-            while let Ok(_) = s.advance(None).await {
-                async_std::task::sleep(network_cfg.step_interval).await;
-            }
-        };
-
-        async_std::task::spawn_local(state_proc(alice_to_bob.state.clone()));
-        async_std::task::spawn_local(state_proc(bob_to_alice.state.clone()));
 
         (alice_to_bob, bob_to_alice)
     }
@@ -1173,7 +1184,6 @@ mod tests {
         let net_cfg = FaultyNetworkConfig {
             fault_prob: 1.0, // throws away 100% of packets
             mixing_factor: 0,
-            step_interval: Duration::from_millis(200),
         };
 
         let (mut alice_to_bob, mut bob_to_alice) = setup_alice_bob(cfg, net_cfg);
@@ -1205,7 +1215,6 @@ mod tests {
         let net_cfg = FaultyNetworkConfig {
             fault_prob: 0.5, // throws away 50% of packets
             mixing_factor: 0,
-            step_interval: Duration::from_millis(200),
         };
 
         let (mut alice_to_bob, mut bob_to_alice) = setup_alice_bob(cfg, net_cfg);
