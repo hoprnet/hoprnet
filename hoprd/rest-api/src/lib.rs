@@ -24,7 +24,7 @@ use tide::{
 };
 use tide_tracing::TraceMiddleware;
 use tide_websockets::{Message, WebSocket};
-use tracing::{debug, error, trace, warn};
+use tracing::{debug, error, warn};
 use utoipa::openapi::security::{ApiKey, ApiKeyValue, HttpAuthScheme, HttpBuilder, SecurityScheme};
 use utoipa::{Modify, OpenApi};
 use utoipa_swagger_ui::Config;
@@ -420,52 +420,11 @@ pub async fn run_hopr_api(
                                         warn!("skipping an unsupported websocket command '{}'", data.cmd);
                                     }
                                 }
-                                Ok(Message::Binary(input)) => {
-                                    let data: messages::WebSocketSendMsg = serde_json::from_slice(&input)?;
-                                    if data.cmd == "sendmsg" {
-                                        let hopr = request.state().hopr.clone();
-
-                                        // Use the message encoder, if any
-                                        // TODO: remove RLP in 3.0
-                                        let msg_body = request
-                                            .state()
-                                            .msg_encoder
-                                            .as_ref()
-                                            .map(|enc| enc(&data.args.body))
-                                            .unwrap_or_else(|| data.args.body.into_boxed_slice());
-                                        // let msg_body =  data.args.body.into_bytes().into_boxed_slice();
-
-                                        let hkc = hopr
-                                            .send_message(
-                                                // data.args.body.into_bytes().into_boxed_slice(),
-                                                msg_body,
-                                                data.args.peer_id,
-                                                data.args.path,
-                                                data.args.hops,
-                                                Some(data.args.tag),
-                                            )
-                                            .await?;
-
-                                        ws_con
-                                            .send_json(&json!(messages::WebSocketReadAck::from_ack_challenge(hkc)))
-                                            .await?;
-                                    } else {
-                                        warn!("skipping an unsupported websocket command '{}'", data.cmd);
-                                    }
-                                }
                                 Ok(Message::Close(_)) => {
                                     debug!("websocket client closed connection");
                                     break;
                                 }
-                                Ok(Message::Ping(msg)) => {
-                                    // pong is queued automatically:
-                                    // https://docs.rs/tungstenite/latest/tungstenite/protocol/struct.WebSocket.html#method.flush
-                                    trace!("websocket: received a ping message");
-                                    ws_con.send(Message::Pong(msg)).await?;
-                                }
-                                Ok(Message::Pong(_)) => {
-                                    trace!("websocket: encountered an unsolicited pong message");
-                                }
+                                Ok(_message) => {}
                                 Err(e) => error!("failed to get a valid websocket message: {e}"),
                             },
                         }
