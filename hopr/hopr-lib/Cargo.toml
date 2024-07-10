@@ -20,6 +20,7 @@ runtime-async-std = [
   "chain-rpc/runtime-async-std",
   "core-transport/runtime-async-std",
   "hopr-db-sql/runtime-async-std",
+  "hopr-async-runtime/runtime-async-std",
   "hopr-network-types/runtime-async-std",
   "hopr-network-types/runtime-async-std",
   "hopr-strategy/runtime-async-std",
