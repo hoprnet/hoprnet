@@ -1,6 +1,6 @@
 [package]
 name = "chain-api"
-version = "0.3.0"
+version = "0.3.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Implements the main HOPR chain interface"
 edition = "2021"
@@ -12,16 +12,16 @@ crate-type = ["rlib"]
 [features]
 default = []
 runtime-async-std = [
-  "async-std",
+  "chain-actions/runtime-async-std",
   "chain-indexer/runtime-async-std",
   "hopr-db-sql/runtime-async-std",
-  "chain-actions/runtime-async-std",
+  "hopr-async-runtime/runtime-async-std",
 ]
 runtime-tokio = [
-  "tokio",
+  "chain-actions/runtime-tokio",
   "chain-indexer/runtime-tokio",
   "hopr-db-sql/runtime-tokio",
-  "chain-actions/runtime-tokio",
+  "hopr-async-runtime/runtime-tokio",
 ]
 prometheus = [
   "chain-rpc/prometheus",
@@ -32,7 +32,6 @@ prometheus = [
 
 [dependencies]
 async-channel = { workspace = true }
-async-std = { workspace = true, optional = true }
 async-trait = { workspace = true }
 futures = { workspace = true }
 semver = { workspace = true }
@@ -42,7 +41,6 @@ serde_with = { workspace = true }
 smart-default = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }
-tokio = { workspace = true, optional = true }
 tracing = { workspace = true }
 validator = { workspace = true }
 
@@ -54,6 +52,7 @@ chain-types = { workspace = true }
 hopr-internal-types = { workspace = true }
 hopr-primitive-types = { workspace = true }
 hopr-db-sql = { workspace = true }
+hopr-async-runtime = { workspace = true }
 
 [dev-dependencies]
 async-std = { workspace = true }

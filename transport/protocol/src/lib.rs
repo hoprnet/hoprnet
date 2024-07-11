@@ -48,6 +48,8 @@ pub mod config;
 /// Errors produced by the crate.
 pub mod errors;
 
+/// Bloom filter for the transport layer.
+pub mod bloom;
 // protocols
 /// `ack` p2p protocol
 pub mod ack;
@@ -57,11 +59,3 @@ pub mod heartbeat;
 pub mod msg;
 /// `ticket_aggregation` p2p protocol
 pub mod ticket_aggregation;
-
-pub(crate) mod executor {
-    #[cfg(any(test, feature = "runtime-async-std"))]
-    pub(crate) use async_std::task::{sleep, spawn};
-
-    #[cfg(all(not(test), feature = "runtime-tokio", not(feature = "runtime-async-std")))]
-    pub(crate) use tokio::{task::spawn, time::sleep};
-}

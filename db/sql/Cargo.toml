@@ -1,6 +1,6 @@
 [package]
 name = "hopr-db-sql"
-version = "0.3.1"
+version = "0.3.2"
 edition = "2021"
 description = "Contains SQL DB functionality implementing the DB API traits to be used by other crates in the code base"
 homepage = "https://hoprnet.org/"
@@ -11,13 +11,13 @@ license = "GPL-3.0-only"
 default = ["traits"]
 traits = []
 runtime-async-std = [
-  "async-std",
+  "hopr-async-runtime/runtime-async-std",
   "sea-orm/runtime-async-std",
   "sea-query-binder/runtime-async-std-rustls",
   "sqlx/runtime-async-std-rustls",
 ]
 runtime-tokio = [
-  "tokio",
+  "hopr-async-runtime/runtime-tokio",
   "sea-orm/runtime-tokio",
   "sea-query-binder/runtime-tokio-rustls",
   "sqlx/runtime-tokio-rustls",
@@ -25,7 +25,6 @@ runtime-tokio = [
 prometheus = ["dep:lazy_static", "dep:hopr-metrics"]
 
 [dependencies]
-async-std = { workspace = true, optional = true }
 async-lock = { workspace = true }
 async-stream = { workspace = true }
 async-trait = { workspace = true }
@@ -47,18 +46,18 @@ smart-default = { workspace = true }
 sqlx = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }
-tokio = { workspace = true, optional = true }
 tracing = { workspace = true }
 
-hopr-crypto-types = { workspace = true }
 hopr-crypto-packet = { workspace = true }
-hopr-parallelize = { workspace = true, features = ["rayon"] }
-hopr-primitive-types = { workspace = true }
+hopr-crypto-types = { workspace = true }
 hopr-db-api = { workspace = true }
 hopr-db-entity = { workspace = true }
 hopr-db-migration = { workspace = true }
+hopr-async-runtime = { workspace = true }
 hopr-internal-types = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
+hopr-parallelize = { workspace = true, features = ["rayon"] }
+hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
 async-std = { workspace = true }

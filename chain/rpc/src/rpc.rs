@@ -246,12 +246,13 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
 pub mod tests {
     use crate::rpc::{RpcOperations, RpcOperationsConfig};
     use crate::{HoprRpcOperations, PendingTransaction};
-    use async_std::task::sleep;
     use chain_types::{ContractAddresses, ContractInstances};
     use hex_literal::hex;
+    use std::time::Duration;
+
+    use hopr_async_runtime::prelude::sleep;
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
     use hopr_primitive_types::prelude::*;
-    use std::time::Duration;
 
     use crate::client::surf_client::SurfRequestor;
     use crate::client::{create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy};
@@ -291,7 +292,7 @@ pub mod tests {
         );
 
         // Wait until contracts deployments are final
-        async_std::task::sleep((1 + cfg.finality) * expected_block_time).await;
+        sleep((1 + cfg.finality) * expected_block_time).await;
 
         let rpc = RpcOperations::new(client, &chain_key_0, cfg).expect("failed to construct rpc");
 
@@ -333,7 +334,7 @@ pub mod tests {
         );
 
         // Wait until contracts deployments are final
-        async_std::task::sleep((1 + cfg.finality) * expected_block_time).await;
+        sleep((1 + cfg.finality) * expected_block_time).await;
 
         let rpc = RpcOperations::new(client, &chain_key_0, cfg).expect("failed to construct rpc");
 
@@ -390,7 +391,7 @@ pub mod tests {
         );
 
         // Wait until contracts deployments are final
-        async_std::task::sleep((1 + cfg.finality) * expected_block_time).await;
+        sleep((1 + cfg.finality) * expected_block_time).await;
 
         let rpc = RpcOperations::new(client, &chain_key_0, cfg).expect("failed to construct rpc");
 
@@ -450,7 +451,7 @@ pub mod tests {
         );
 
         // Wait until contracts deployments are final
-        async_std::task::sleep((1 + cfg.finality) * expected_block_time).await;
+        sleep((1 + cfg.finality) * expected_block_time).await;
 
         let rpc = RpcOperations::new(client, &chain_key_0, cfg).expect("failed to construct rpc");
 

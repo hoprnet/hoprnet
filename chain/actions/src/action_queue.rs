@@ -23,12 +23,7 @@ use crate::action_state::{ActionState, IndexerExpectation};
 use crate::errors::ChainActionsError::{ChannelAlreadyClosed, InvalidState, Timeout, TransactionSubmissionFailed};
 use crate::errors::{ChainActionsError, Result};
 
-#[cfg(any(test, feature = "runtime-async-std"))]
-use async_std::task::spawn;
-
-#[cfg(all(not(test), feature = "runtime-tokio", not(feature = "runtime-async-std")))]
-use tokio::task::spawn;
-
+use hopr_async_runtime::prelude::spawn;
 use hopr_db_sql::api::tickets::HoprDbTicketOperations;
 use hopr_db_sql::info::HoprDbInfoOperations;
 

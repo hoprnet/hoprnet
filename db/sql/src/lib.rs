@@ -34,14 +34,6 @@ use hopr_db_api::protocol::HoprDbProtocolOperations;
 use hopr_db_api::resolver::HoprDbResolverOperations;
 use hopr_db_api::tickets::HoprDbTicketOperations;
 
-pub(crate) mod executor {
-    #[cfg(any(test, feature = "runtime-async-std"))]
-    pub(crate) use async_std::task::spawn;
-
-    #[cfg(all(not(test), feature = "runtime-tokio", not(feature = "runtime-async-std")))]
-    pub(crate) use tokio::task::spawn;
-}
-
 /// Primary key used in tables that contain only a single row.
 pub const SINGULAR_TABLE_FIXED_ID: i32 = 1;
 

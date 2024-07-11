@@ -25,6 +25,7 @@
 //! For details on default parameters see [AggregatingStrategyConfig].
 use async_trait::async_trait;
 use core_protocol::ticket_aggregation::processor::TicketAggregatorTrait;
+use hopr_async_runtime::prelude::{spawn, JoinHandle};
 use hopr_crypto_types::prelude::Hash;
 use hopr_db_sql::api::tickets::{AggregationPrerequisites, HoprDbTicketOperations};
 use hopr_db_sql::channels::HoprDbChannelOperations;
@@ -41,12 +42,6 @@ use std::{
 };
 use tracing::{debug, error, info, warn};
 use validator::Validate;
-
-#[cfg(feature = "runtime-async-std")]
-use async_std::task::{spawn, JoinHandle};
-
-#[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
-use tokio::task::{spawn, JoinHandle};
 
 use crate::{strategy::SingularStrategy, Strategy};
 

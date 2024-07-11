@@ -18,8 +18,9 @@ use serde_json::json;
 use serde_with::{serde_as, Bytes, DisplayFromStr, DurationMilliSeconds};
 use std::{sync::Arc, time::Duration};
 use tracing::{debug, error, warn};
+use validator::Validate;
 
-use hopr_lib::{AsUnixTimestamp, HalfKeyChallenge, TransportOutput, RESERVED_TAG_UPPER_LIMIT};
+use hopr_lib::{AsUnixTimestamp, HalfKeyChallenge, PathOptions, TransportOutput, RESERVED_TAG_UPPER_LIMIT};
 
 use crate::{ApiErrorStatus, InternalState, BASE_PATH};
 
@@ -58,10 +59,10 @@ pub(crate) struct SendMessageBodyRequest {
     #[schema(value_type = String)]
     peer_id: PeerId,
     #[serde_as(as = "Option<Vec<DisplayFromStr>>")]
-    // #[validate(length(min=0, max=3))]        // NOTE: issue in serde_as with validator -> no order is correct
+    #[validate(length(min = 0, max = 3))]
     #[schema(value_type = Option<Vec<String>>)]
     path: Option<Vec<PeerId>>,
-    #[validate(range(min = 1, max = 3))]
+    #[validate(range(min = 0, max = 3))]
     hops: Option<u16>,
 }
 
@@ -120,6 +121,14 @@ pub(super) async fn send_message(
 ) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
+    if let Err(e) = args.validate() {
+        return (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            ApiErrorStatus::UnknownFailure(e.to_string()),
+        )
+            .into_response();
+    }
+
     // Use the message encoder, if any
     let msg_body = state
         .msg_encoder
@@ -127,22 +136,21 @@ pub(super) async fn send_message(
         .map(|enc| enc(&args.body))
         .unwrap_or_else(|| args.body.into_boxed_slice());
 
-    if let Some(path) = &args.path {
-        if path.len() > 3 {
-            return (
-                StatusCode::UNPROCESSABLE_ENTITY,
-                ApiErrorStatus::UnknownFailure("The path components must contain at most 3 elements".into()),
-            )
-                .into_response();
-        }
-    }
+    let options = if let Some(intermediate_path) = args.path {
+        PathOptions::IntermediatePath(intermediate_path)
+    } else if let Some(hops) = args.hops {
+        PathOptions::Hops(hops)
+    } else {
+        return (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            ApiErrorStatus::UnknownFailure("One of either hops or intermediate path must be specified".to_string()),
+        )
+            .into_response();
+    };
 
     let timestamp = std::time::SystemTime::now().as_unix_timestamp();
 
-    match hopr
-        .send_message(msg_body, args.peer_id, args.path, args.hops, Some(args.tag))
-        .await
-    {
+    match hopr.send_message(msg_body, args.peer_id, options, Some(args.tag)).await {
         Ok(challenge) => (StatusCode::ACCEPTED, Json(SendMessageResponse { challenge, timestamp })).into_response(),
         Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
     }
@@ -283,7 +291,7 @@ async fn websocket_connection(socket: WebSocket, state: Arc<InternalState>) {
         match v {
             WebSocketInput::Network(net_in) => match net_in {
                 TransportOutput::Received(data) => {
-                    debug!("websocket notifying client with received msg {data}");
+                    debug!("websocket notifying client: received msg");
                     match sender
                         .send(Message::Text(json!(WebSocketReadMsg::from(data)).to_string()))
                         .await
@@ -293,7 +301,7 @@ async fn websocket_connection(socket: WebSocket, state: Arc<InternalState>) {
                     };
                 }
                 TransportOutput::Sent(hkc) => {
-                    debug!("websocket notifying client with received ack {hkc}");
+                    debug!("websocket notifying client: received next hop receive confirmation");
                     match sender
                         .send(Message::Text(json!(WebSocketReadAck::from_ack(hkc)).to_string()))
                         .await
@@ -342,18 +350,20 @@ async fn handle_send_message_data(
             .map(|enc| enc(&msg.args.body))
             .unwrap_or_else(|| msg.args.body.into_boxed_slice());
 
+        let options = if let Some(intermediate_path) = msg.args.path {
+            PathOptions::IntermediatePath(intermediate_path)
+        } else if let Some(hops) = msg.args.hops {
+            PathOptions::Hops(hops)
+        } else {
+            return Err(format!("one of hops or intermediate path must be provided"));
+        };
+
         let hkc = hopr
-            .send_message(
-                msg_body,
-                msg.args.peer_id,
-                msg.args.path,
-                msg.args.hops,
-                Some(msg.args.tag),
-            )
+            .send_message(msg_body, msg.args.peer_id, options, Some(msg.args.tag))
             .await;
+
         match hkc {
             Ok(challenge) => {
-                debug!("websocket notifying client with sent msg {challenge}");
                 if let Err(e) = sender
                     .send(Message::Text(
                         json!(WebSocketReadAck::from_ack_challenge(challenge)).to_string(),

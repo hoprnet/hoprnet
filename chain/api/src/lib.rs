@@ -8,15 +8,6 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
-#[cfg(feature = "runtime-async-std")]
-use async_std::task::{sleep, spawn, JoinHandle};
-
-#[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
-use tokio::{
-    task::{spawn, JoinHandle},
-    time::sleep,
-};
-
 use tracing::{debug, error, info, warn};
 
 use chain_actions::action_queue::{ActionQueue, ActionQueueConfig};
@@ -32,6 +23,7 @@ pub use chain_types::chain_events::SignificantChainEvent;
 use chain_types::ContractAddresses;
 use config::ChainNetworkConfig;
 use executors::{EthereumTransactionExecutor, RpcEthereumClient, RpcEthereumClientConfig};
+use hopr_async_runtime::prelude::{sleep, spawn, JoinHandle};
 use hopr_crypto_types::prelude::*;
 use hopr_db_sql::HoprDbAllOperations;
 use hopr_internal_types::account::AccountEntry;
@@ -47,6 +39,8 @@ use crate::errors::{HoprChainError, Result};
 #[cfg(feature = "runtime-async-std")]
 pub type DefaultHttpPostRequestor = chain_rpc::client::surf_client::SurfRequestor;
 
+// Both features could be enabled during testing, therefore we only use tokio when its
+// exclusively enabled.
 #[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
 pub type DefaultHttpPostRequestor = chain_rpc::client::reqwest_client::ReqwestRequestor;
 

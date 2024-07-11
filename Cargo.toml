@@ -5,39 +5,41 @@ exclude = ["vendor/cargo/scale-info-2.10.0"]
 resolver = "2"
 
 members = [
+  "chain/actions",
+  "chain/api",
+  "chain/indexer",
+  "chain/rpc",
+  "chain/types",
+  "common/async-runtime",
   "common/internal-types",
   "common/network-types",
-  "common/primitive-types",
   "common/parallelize",
+  "common/primitive-types",
   "crypto/packet",
   "crypto/random",
   "crypto/sphinx",
   "crypto/types",
-  "chain/actions",
-  "chain/api",
-  "chain/indexer",
-  "chain/types",
-  "chain/rpc",
   "db/api",
-  "db/sql",
-  "db/migration",
   "db/entity",
+  "db/migration",
+  "db/sql",
   "ethereum/bindings",
   "hopli",
   "hopr-socks/hopr-socks-server",
   "hopr/hopr-lib",
-  "hoprd/rest-api",
   "hoprd/hoprd",
   "hoprd/inbox",
   "hoprd/keypair",
+  "hoprd/rest-api",
   "logic/path",
   "logic/strategy",
   "misc/metrics",
   "misc/platform",
-  "transport/network",
-  "transport/protocol",
-  "transport/p2p",
   "transport/api",
+  "transport/network",
+  "transport/p2p",
+  "transport/protocol",
+  "transport/session",
 ]
 
 [workspace.dependencies]
@@ -145,6 +147,7 @@ core-network = { path = "transport/network", default-features = false }
 core-path = { path = "logic/path", default-features = false }
 core-protocol = { path = "transport/protocol", default-features = false }
 core-transport = { path = "transport/api", default-features = false }
+hopr-async-runtime = { path = "common/async-runtime" }
 hopr-crypto-packet = { path = "crypto/packet", default-features = false }
 hopr-crypto-random = { path = "crypto/random", default-features = false }
 hopr-crypto-sphinx = { path = "crypto/sphinx", default-features = false, features = [
@@ -164,6 +167,7 @@ hopr-platform = { path = "misc/platform" }
 hopr-primitive-types = { path = "common/primitive-types", default-features = false }
 hopr-strategy = { path = "logic/strategy", default-features = false }
 hopr-transport-p2p = { path = "transport/p2p", default-features = false }
+hopr-transport-session = { path = "transport/session" }
 hoprd-api = { path = "hoprd/rest-api", default-features = false }
 hoprd-inbox = { path = "hoprd/inbox", default-features = false }
 hoprd-keypair = { path = "hoprd/keypair", default-features = false }

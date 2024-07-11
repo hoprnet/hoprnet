@@ -1194,7 +1194,7 @@ dependencies = [
 
 [[package]]
 name = "chain-actions"
-version = "0.7.0"
+version = "0.7.1"
 dependencies = [
  "async-channel 2.3.1",
  "async-lock 3.4.0",
@@ -1207,6 +1207,7 @@ dependencies = [
  "futures",
  "futures-timer",
  "hex-literal",
+ "hopr-async-runtime",
  "hopr-crypto-random",
  "hopr-crypto-types",
  "hopr-db-sql",
@@ -1220,14 +1221,13 @@ dependencies = [
  "serde",
  "smart-default",
  "thiserror",
- "tokio",
  "tracing",
  "tracing-test",
 ]
 
 [[package]]
 name = "chain-api"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "async-channel 2.3.1",
  "async-std",
@@ -1237,6 +1237,7 @@ dependencies = [
  "chain-rpc",
  "chain-types",
  "futures",
+ "hopr-async-runtime",
  "hopr-crypto-types",
  "hopr-db-sql",
  "hopr-internal-types",
@@ -1248,14 +1249,13 @@ dependencies = [
  "smart-default",
  "strum 0.26.2",
  "thiserror",
- "tokio",
  "tracing",
  "validator",
 ]
 
 [[package]]
 name = "chain-indexer"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "async-channel 2.3.1",
  "async-std",
@@ -1266,6 +1266,7 @@ dependencies = [
  "ethers",
  "futures",
  "hex-literal",
+ "hopr-async-runtime",
  "hopr-crypto-random",
  "hopr-crypto-types",
  "hopr-db-entity",
@@ -1280,13 +1281,12 @@ dependencies = [
  "sea-orm",
  "smart-default",
  "thiserror",
- "tokio",
  "tracing",
 ]
 
 [[package]]
 name = "chain-rpc"
-version = "0.2.3"
+version = "0.2.4"
 dependencies = [
  "async-std",
  "async-stream",
@@ -1299,6 +1299,7 @@ dependencies = [
  "futures-timer",
  "governor",
  "hex-literal",
+ "hopr-async-runtime",
  "hopr-crypto-types",
  "hopr-metrics",
  "hopr-primitive-types",
@@ -1574,11 +1575,12 @@ checksum = "06ea2b9bc92be3c2baa9334a323ebca2d6f074ff852cd1d7b11064035cd3868f"
 
 [[package]]
 name = "core-network"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "async-std",
  "async-trait",
  "futures",
+ "hopr-async-runtime",
  "hopr-crypto-random",
  "hopr-crypto-sphinx",
  "hopr-crypto-types",
@@ -1597,7 +1599,6 @@ dependencies = [
  "smart-default",
  "strum 0.26.2",
  "thiserror",
- "tokio",
  "tracing",
  "validator",
 ]
@@ -1612,6 +1613,7 @@ dependencies = [
  "hex-literal",
  "hopr-crypto-random",
  "hopr-crypto-types",
+ "hopr-db-api",
  "hopr-db-sql",
  "hopr-internal-types",
  "hopr-metrics",
@@ -1627,7 +1629,7 @@ dependencies = [
 
 [[package]]
 name = "core-protocol"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "async-lock 3.4.0",
  "async-std",
@@ -1635,6 +1637,7 @@ dependencies = [
  "core-path",
  "futures",
  "hex-literal",
+ "hopr-async-runtime",
  "hopr-crypto-packet",
  "hopr-crypto-random",
  "hopr-crypto-types",
@@ -1655,7 +1658,6 @@ dependencies = [
  "serial_test",
  "smart-default",
  "thiserror",
- "tokio",
  "tracing",
  "tracing-test",
  "validator",
@@ -1663,7 +1665,7 @@ dependencies = [
 
 [[package]]
 name = "core-transport"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "async-lock 3.4.0",
  "async-std",
@@ -1673,7 +1675,9 @@ dependencies = [
  "core-path",
  "core-protocol",
  "futures",
+ "hopr-async-runtime",
  "hopr-crypto-packet",
+ "hopr-crypto-random",
  "hopr-crypto-types",
  "hopr-db-sql",
  "hopr-internal-types",
@@ -1681,12 +1685,13 @@ dependencies = [
  "hopr-platform",
  "hopr-primitive-types",
  "hopr-transport-p2p",
+ "hopr-transport-session",
  "lazy_static",
  "libp2p",
+ "moka",
  "proc-macro-regex",
  "serde",
  "thiserror",
- "tokio",
  "tracing",
  "uuid 1.8.0",
  "validator",
@@ -3381,6 +3386,7 @@ dependencies = [
  "hex-literal",
  "hopr-crypto-random",
  "hopr-crypto-types",
+ "hopr-lib",
  "hopr-primitive-types",
  "hoprd-keypair",
  "serde",
@@ -3391,6 +3397,14 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "uuid 1.8.0",
+]
+
+[[package]]
+name = "hopr-async-runtime"
+version = "0.1.0"
+dependencies = [
+ "async-std",
+ "tokio",
 ]
 
 [[package]]
@@ -3526,7 +3540,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-sql"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "async-lock 3.4.0",
  "async-std",
@@ -3536,6 +3550,7 @@ dependencies = [
  "chrono",
  "futures",
  "hex-literal",
+ "hopr-async-runtime",
  "hopr-crypto-packet",
  "hopr-crypto-random",
  "hopr-crypto-types",
@@ -3558,7 +3573,6 @@ dependencies = [
  "sqlx",
  "strum 0.26.2",
  "thiserror",
- "tokio",
  "tracing",
  "tracing-test",
 ]
@@ -3599,6 +3613,7 @@ dependencies = [
  "async-channel 2.3.1",
  "async-lock 3.4.0",
  "async-std",
+ "async-trait",
  "atomic_enum",
  "chain-actions",
  "chain-api",
@@ -3611,6 +3626,7 @@ dependencies = [
  "ethers",
  "futures",
  "futures-concurrency",
+ "hopr-async-runtime",
  "hopr-crypto-types",
  "hopr-db-sql",
  "hopr-internal-types",
@@ -3626,7 +3642,6 @@ dependencies = [
  "smart-default",
  "strum 0.26.2",
  "thiserror",
- "tokio",
  "tracing",
  "validator",
 ]
@@ -3640,7 +3655,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-network-types"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "async-std",
@@ -3654,6 +3669,7 @@ dependencies = [
  "governor",
  "hex",
  "hex-literal",
+ "hopr-async-runtime",
  "hopr-crypto-random",
  "hopr-platform",
  "hopr-primitive-types",
@@ -3669,13 +3685,12 @@ dependencies = [
  "strum 0.26.2",
  "test-log",
  "thiserror",
- "tokio",
  "tracing",
 ]
 
 [[package]]
 name = "hopr-parallelize"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "async-std",
  "futures",
@@ -3722,7 +3737,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-strategy"
-version = "0.11.0"
+version = "0.11.1"
 dependencies = [
  "async-lock 3.4.0",
  "async-std",
@@ -3733,6 +3748,7 @@ dependencies = [
  "core-protocol",
  "futures",
  "hex-literal",
+ "hopr-async-runtime",
  "hopr-crypto-random",
  "hopr-crypto-types",
  "hopr-db-sql",
@@ -3749,7 +3765,6 @@ dependencies = [
  "smart-default",
  "strum 0.26.2",
  "thiserror",
- "tokio",
  "tracing",
  "validator",
 ]
@@ -3775,6 +3790,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "hopr-transport-session"
+version = "0.1.0"
+dependencies = [
+ "async-std",
+ "async-trait",
+ "futures",
+ "hopr-crypto-random",
+ "hopr-crypto-types",
+ "hopr-internal-types",
+ "hopr-network-types",
+ "libp2p-identity",
+ "mockall",
+ "ringbuffer",
+ "serde",
+ "serde_with",
+ "thiserror",
+]
+
+[[package]]
 name = "hoprd"
 version = "2.2.0"
 dependencies = [
@@ -3787,6 +3821,7 @@ dependencies = [
  "clap",
  "futures",
  "home",
+ "hopr-async-runtime",
  "hopr-lib",
  "hopr-metrics",
  "hopr-platform",

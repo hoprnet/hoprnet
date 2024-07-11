@@ -4,12 +4,7 @@ use futures::FutureExt;
 use std::time::Duration;
 use tracing::{trace, warn};
 
-#[cfg(any(test, feature = "runtime-async-std"))]
-use async_std::task::sleep;
-
-#[cfg(all(not(test), feature = "runtime-tokio", not(feature = "runtime-async-std")))]
-use tokio::time::sleep;
-
+use hopr_async_runtime::prelude::sleep;
 use hopr_platform::time::native::current_time;
 use hopr_primitive_types::prelude::AsUnixTimestamp;
 
