@@ -53,7 +53,7 @@ utoipa = { version = "4.2.3" }
 utoipa-rapidoc = { version = "4.0.0", features = ["axum"] }
 utoipa-redoc = { version = "4.0.0", features = ["axum"] }
 utoipa-scalar = { version = "0.1.0", features = ["axum"] }
-utoipa-swagger-ui = { version = "7.1.0", features = ["axum"] }
+utoipa-swagger-ui = { version = "7.1.0", features = ["axum", "vendored"] }
 validator = { workspace = true }
 
 hopr-crypto-types = { workspace = true }
