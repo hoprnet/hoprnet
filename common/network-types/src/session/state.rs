@@ -111,7 +111,6 @@ use crate::session::frame::{segment, FrameId, FrameReassembler, Segment, Segment
 use crate::session::protocol::{FrameAcknowledgements, SegmentRequest, SessionMessage};
 use crate::session::utils::{AsyncReadStreamer, RetryResult, RetryToken};
 
-/// Configuration of session.
 /// Represents individual Session protocol features that can be enabled.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SessionFeature {
