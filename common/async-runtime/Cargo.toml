@@ -17,5 +17,5 @@ runtime-async-std = ["dep:async-std"]
 runtime-tokio = ["dep:tokio"]
 
 [dependencies]
-async-std = { workspace = true, optional = true }
+async-std = { workspace = true, optional = true, features = ["unstable"] }
 tokio = { workspace = true, optional = true }
