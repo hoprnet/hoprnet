@@ -336,6 +336,13 @@
             hooks = {
               treefmt.enable = true;
               treefmt.package = config.treefmt.build.wrapper;
+              immutable-files = {
+                enable = true;
+                name = "Immutable files - the files should not change";
+                entry = "bash .github/scripts/immutable-files-check.sh";
+                files = "";
+                language = "system";
+              };
             };
             tools = pkgs;
           };
