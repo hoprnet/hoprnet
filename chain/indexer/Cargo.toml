@@ -16,12 +16,10 @@ default = []
 runtime-async-std = [
   "hopr-db-sql/runtime-async-std",
   "hopr-async-runtime/runtime-async-std",
-  "sea-orm/runtime-async-std",
 ]
 runtime-tokio = [
   "hopr-db-sql/runtime-tokio",
   "hopr-async-runtime/runtime-tokio",
-  "sea-orm/runtime-tokio",
 ]
 prometheus = [
   "dep:hopr-metrics",

@@ -35,7 +35,7 @@ pub struct HoprDb {
     pub(crate) tickets_db: sea_orm::DatabaseConnection,
     pub(crate) peers_db: sea_orm::DatabaseConnection,
     pub(crate) ticket_manager: Arc<TicketManager>,
-    pub(crate) chain_key: ChainKeypair, // TODO: remove this once chain keypairs are not needed to reconstruct tickets
+    pub(crate) chain_key: ChainKeypair,
     pub(crate) me_onchain: Address,
     pub(crate) caches: Arc<HoprDbCaches>,
 }

@@ -57,6 +57,7 @@ impl HoprDbProtocolOperations for HoprDb {
                                     Some(tx),
                                     unacknowledged.ticket.verified_issuer(),
                                     &myself.me_onchain,
+                                    true,
                                 )
                                 .await?
                                 .is_some_and(|c| {
@@ -74,7 +75,7 @@ impl HoprDbProtocolOperations for HoprDb {
                                     crate::errors::DbSqlError::LogicalError("domain separator missing".into())
                                 })?;
 
-                            // This explicitly checks whether the acknowledgement matches
+                            // This explicitly checks whether the acknowledgement
                             // solves the challenge on the ticket. It must be done before we
                             // check that the ticket is winning, which is a lengthy operation
                             // and should not be done for bogus unacknowledged tickets
@@ -285,9 +286,8 @@ impl HoprDbProtocolOperations for HoprDb {
                                 .ticket_price
                                 .ok_or_else(|| DbSqlError::LogicalError("failed to fetch the ticket price".into()))?;
 
-                            // TODO: cache this DB call too, or use the channel graph
                             let channel = myself
-                                .get_channel_by_parties(Some(tx), &previous_hop_addr, &myself.me_onchain)
+                                .get_channel_by_parties(Some(tx), &previous_hop_addr, &myself.me_onchain, true)
                                 .await?
                                 .ok_or_else(|| {
                                     DbSqlError::LogicalError(format!(
@@ -338,7 +338,7 @@ impl HoprDbProtocolOperations for HoprDb {
                                 )));
                             }
 
-                            // Create next ticket for the packet
+                            // Create the next ticket for the packet
                             let ticket_builder = if ticket_path_pos == 1 {
                                 TicketBuilder::zero_hop().direction(&myself.me_onchain, &next_hop_addr)
                             } else {
@@ -418,7 +418,7 @@ impl HoprDb {
                 Box::pin(async move {
                     Ok::<_, DbSqlError>(
                         if let Some(channel) = myself
-                            .get_channel_by_parties(Some(tx), &me_onchain, &destination)
+                            .get_channel_by_parties(Some(tx), &me_onchain, &destination, true)
                             .await?
                         {
                             let ticket_price = myself.get_indexer_data(Some(tx)).await?.ticket_price;
