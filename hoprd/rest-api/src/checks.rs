@@ -16,7 +16,7 @@ use crate::AppState;
         tag = "Checks"
     )]
 pub(super) async fn startedz(State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    is_running(state).await
+    is_running(state)
 }
 
 /// Check whether the node is ready to accept connections.
@@ -30,7 +30,7 @@ pub(super) async fn startedz(State(state): State<Arc<AppState>>) -> impl IntoRes
         tag = "Checks"
     )]
 pub(super) async fn readyz(State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    is_running(state).await
+    is_running(state)
 }
 
 /// Check whether the node is healthy.
@@ -44,10 +44,10 @@ pub(super) async fn readyz(State(state): State<Arc<AppState>>) -> impl IntoRespo
         tag = "Checks"
     )]
 pub(super) async fn healthyz(State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    is_running(state).await
+    is_running(state)
 }
 
-async fn is_running(state: Arc<AppState>) -> impl IntoResponse {
+fn is_running(state: Arc<AppState>) -> impl IntoResponse {
     match state.hopr.status() {
         HoprState::Running => (StatusCode::OK, "").into_response(),
         _ => (StatusCode::PRECONDITION_FAILED, "").into_response(),

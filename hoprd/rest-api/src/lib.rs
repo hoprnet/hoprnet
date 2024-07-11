@@ -213,7 +213,7 @@ async fn build_api(
                 .route("/api-docs/openapi.json", get(serve_openapi_spec)),
         )
         .nest(
-            BASE_PATH,
+            "/",
             Router::new()
                 .route("/startedz", get(checks::startedz))
                 .route("/readyz", get(checks::readyz))

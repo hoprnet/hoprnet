@@ -316,8 +316,15 @@ async fn websocket_connection(socket: WebSocket, state: Arc<InternalState>) {
                     Ok(_) => {}
                     Err(e) => error!("failed to send message: {e}"),
                 },
-                Err(e) => error!("failed to get a valid websocket message: {e}"),
-                Ok(_) => warn!("skipping an unsupported websocket message"),
+                Ok(Message::Close(_)) => {
+                    debug!("received close frame, closing connection");
+                    break;
+                }
+                Err(e) => {
+                    error!("failed to get a valid websocket message: {e}, closing connection");
+                    break;
+                }
+                Ok(m) => warn!("skipping an unsupported websocket message: {:?}", m),
             },
         }
     }
