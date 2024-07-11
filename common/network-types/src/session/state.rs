@@ -705,8 +705,12 @@ impl<const C: usize> SessionSocket<C> {
             let mut state_clone = state.clone();
             spawn_local(async move {
                 // TODO: make the max message configurable or derive it
+                let timeout = cfg
+                    .rto_base_receiver
+                    .min(cfg.rto_base_sender)
+                    .min(cfg.frame_expiration_age / 3);
                 while state_clone.advance(None).await.is_ok() {
-                    sleep(cfg.frame_expiration_age / 3).await;
+                    sleep(timeout).await;
                 }
             });
         }
@@ -771,13 +775,18 @@ mod tests {
     use futures::io::{AsyncReadExt, AsyncWriteExt};
     use futures::pin_mut;
     use futures::stream::BoxStream;
+    use hex_literal::hex;
     use parameterized::parameterized;
-    use rand::{thread_rng, Rng};
+    use rand::rngs::StdRng;
+    use rand::{Rng, SeedableRng};
     use std::fmt::Debug;
     use std::iter::Extend;
     use test_log::test;
 
     const MTU: usize = 466; // MTU used by HOPR
+
+    // Using static RNG seed to make tests reproducible between different runs
+    const RNG_SEED: [u8; 32] = hex!("d8a471f1c20490a3442b96fdde9d1807428096e1601b0cef0eea7e6d44a24c01");
 
     #[derive(Debug, Clone)]
     pub struct FaultyNetworkConfig {
@@ -846,11 +855,13 @@ mod tests {
         pub fn new(cfg: FaultyNetworkConfig) -> Self {
             let (ingress, egress) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
 
-            let egress = egress.filter(move |_| futures::future::ready(thread_rng().gen_bool(1.0 - cfg.fault_prob)));
+            let mut rng = StdRng::from_seed(RNG_SEED);
+            let egress = egress.filter(move |_| futures::future::ready(rng.gen_bool(1.0 - cfg.fault_prob)));
 
             let egress = if cfg.mixing_factor > 0 {
+                let mut rng = StdRng::from_seed(RNG_SEED);
                 egress
-                    .map(|e| futures::future::ready(e).delay(Duration::from_micros(thread_rng().gen_range(0..20))))
+                    .map(move |e| futures::future::ready(e).delay(Duration::from_micros(rng.gen_range(0..20))))
                     .buffer_unordered(cfg.mixing_factor)
                     .boxed()
             } else {
