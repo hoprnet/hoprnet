@@ -11,9 +11,9 @@ build = "build.rs"
 
 [features]
 default = [
-  "runtime-async-std",
+  "runtime-tokio",
   "prometheus",
-] # must be async-std due to tide framework
+] # uses tokio by default because of axum
 prometheus = [
   "dep:hopr-metrics",
   "dep:lazy_static",

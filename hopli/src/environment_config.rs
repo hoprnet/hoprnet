@@ -11,6 +11,7 @@
 //! the deployed contract addresses in [NetworkContractAddresses]
 
 use crate::utils::HelperErrors;
+use chain_api::config::{Addresses as ContractAddresses, EnvironmentType};
 use chain_api::{DefaultHttpPostRequestor, JsonRpcClient};
 use chain_rpc::{client::SimpleJsonRpcRetryPolicy, errors::RpcError, rpc::RpcOperationsConfig};
 use clap::Parser;
@@ -22,7 +23,6 @@ use ethers::{
 };
 use hopr_crypto_types::keypairs::ChainKeypair;
 use hopr_crypto_types::keypairs::Keypair;
-use hopr_lib::{EnvironmentType, NetworkContractAddresses};
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use std::{
@@ -43,7 +43,7 @@ pub struct NetworkDetail {
     #[serde_as(as = "DisplayFromStr")]
     pub environment_type: EnvironmentType,
     /// contract addresses used by the network
-    pub addresses: NetworkContractAddresses,
+    pub addresses: ContractAddresses,
 }
 
 /// mapping of networks with its details

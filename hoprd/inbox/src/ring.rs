@@ -108,11 +108,13 @@ where
     }
 
     async fn pop(&mut self, tag: Option<T>) -> Option<(M, Duration)> {
-        let specific_tag = self.tag_resolution(tag).unwrap();
-
-        self.buffers
-            .get_mut(&specific_tag)
-            .and_then(|buf| buf.dequeue().map(|w| (w.payload, w.ts)))
+        if let Some(specific_tag) = self.tag_resolution(tag) {
+            self.buffers
+                .get_mut(&specific_tag)
+                .and_then(|buf| buf.dequeue().map(|w| (w.payload, w.ts)))
+        } else {
+            None
+        }
     }
 
     async fn pop_all(&mut self, tag: Option<T>) -> Vec<(M, Duration)> {
@@ -143,11 +145,13 @@ where
     }
 
     async fn peek(&mut self, tag: Option<T>) -> Option<(M, Duration)> {
-        let specific_tag = self.tag_resolution(tag).unwrap();
-
-        self.buffers
-            .get(&specific_tag)
-            .and_then(|buf| buf.peek().map(|w| (w.payload.clone(), w.ts)))
+        if let Some(specific_tag) = self.tag_resolution(tag) {
+            self.buffers
+                .get(&specific_tag)
+                .and_then(|buf| buf.peek().map(|w| (w.payload.clone(), w.ts)))
+        } else {
+            None
+        }
     }
 
     async fn peek_all(&mut self, tag: Option<T>, timestamp: Option<Duration>) -> Vec<(M, Duration)> {
