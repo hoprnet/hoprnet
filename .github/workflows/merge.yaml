@@ -161,6 +161,13 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
 
+      - name: "Undeploy PR deployment"
+        if: contains(github.event.pull_request.labels.*.name, 'deploy_nodes')
+        run: |
+          gh pr edit ${{ github.event.pull_request.number }} --remove-label "deploy_nodes"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   load_test:
     name: Load Testing
     if: contains(github.event.pull_request.labels.*.name, 'load_tests')
