@@ -40,10 +40,7 @@ use tower_http::{
 };
 use utoipa::openapi::security::{ApiKey, ApiKeyValue, HttpAuthScheme, HttpBuilder, SecurityScheme};
 use utoipa::{Modify, OpenApi};
-use utoipa_rapidoc::RapiDoc;
-use utoipa_redoc::{Redoc, Servable};
-use utoipa_scalar::{Scalar, Servable as ScalarServable};
-use utoipa_swagger_ui::SwaggerUi;
+use utoipa_scalar::{Scalar, Servable};
 
 use hopr_lib::{errors::HoprLibError, Hopr, TransportOutput};
 
@@ -161,10 +158,6 @@ impl Modify for SecurityAddon {
     }
 }
 
-async fn serve_openapi_spec() -> impl IntoResponse {
-    (StatusCode::OK, Json(ApiDoc::openapi())).into_response()
-}
-
 pub async fn serve_api(
     listener: TcpListener,
     hoprd_cfg: String,
@@ -203,15 +196,7 @@ async fn build_api(
 
     Router::new()
         // FIXME: Remove API UIs which are not going to be used.
-        .nest(
-            "/",
-            Router::new()
-                .merge(SwaggerUi::new("/swagger-ui").url("/api-docs2/openapi.json", ApiDoc::openapi()))
-                .merge(Redoc::with_url("/redoc", ApiDoc::openapi()))
-                .merge(RapiDoc::new("/api-docs/openapi.json").path("/rapidoc"))
-                .merge(Scalar::with_url("/scalar", ApiDoc::openapi()))
-                .route("/api-docs/openapi.json", get(serve_openapi_spec)),
-        )
+        .nest("/", Router::new().merge(Scalar::with_url("/scalar", ApiDoc::openapi())))
         .nest(
             "/",
             Router::new()

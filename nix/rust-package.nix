@@ -67,8 +67,6 @@ let
     buildInputs = [ openssl ] ++ stdenv.extraBuildInputs ++ darwinBuildInputs;
 
     CARGO_HOME = ".cargo";
-    # this env var is used by utoipa-swagger-ui to prevent internet access
-    CARGO_FEATURE_VENDORED = "true";
     cargoExtraArgs = "--offline -p ${pname} ";
     cargoVendorDir = "vendor/cargo";
     # disable running tests automatically for now
