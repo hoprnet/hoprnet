@@ -116,7 +116,7 @@ pub(super) async fn show_all_tickets() -> impl IntoResponse {
 
 #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
 #[schema(example = json!({
-        "winning_count": "0",
+        "winning_count": 0,
         "neglectedValue": "0",
         "redeemedValue": "100",
         "rejectedValue": "0",
