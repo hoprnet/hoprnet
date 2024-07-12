@@ -307,7 +307,7 @@ jobs:
     if: contains(github.event.pull_request.labels.*.name, 'release')
     needs:
       - create-release
-    uses: ./.github/workflows/build-dappnode.yaml
+    uses: ./.github/workflows/generate-dappnode-pr.yaml
     with:
       base_branch: ${{ github.event.pull_request.base.ref }}
     secrets: inherit

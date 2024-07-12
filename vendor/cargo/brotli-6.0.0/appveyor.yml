@@ -1,0 +1,51 @@
+environment:
+  RUST_VERSION: stable
+  CRATE_NAME: brotli
+  matrix:
+  - TARGET: x86_64-pc-windows-gnu
+    BITS: 64
+    MSYS2: 1
+  - TARGET: x86_64-pc-windows-msvc
+    BITS: 64
+  - TARGET: i686-pc-windows-gnu
+    BITS: 32
+    MSYS2: 1
+  - TARGET: i686-pc-windows-msvc
+    BITS: 32
+install:
+  - curl -sSf -o rustup-init.exe https://win.rustup.rs/
+  - rustup-init.exe -y --default-host %TARGET% --default-toolchain %RUST_VERSION%
+  - set PATH=%PATH%;C:\Users\appveyor\.cargo\bin
+  - if defined MSYS2 set PATH=C:\msys64\mingw%BITS%\bin;%PATH%
+  - rustc -V
+  - cargo -V
+build: false
+test_script:
+  - cargo test --verbose
+  - set RUSTFLAGS=-C panic=abort
+  - set CARGO_PROFILE_RELEASE=panic=abort
+  - cargo build --verbose --release --features=validation
+before_deploy:
+  - set CARGO_PROFILE_RELEASE=panic=abort
+  - set RUSTFLAGS=-C panic=abort
+  - cargo build --verbose --release --features=validation
+  - ps: ci\before_deploy.ps1
+
+deploy:
+  artifact: /.*\.zip/
+  auth_token:
+    secure: jKP3OCU0ukoMKenkxB/lhG9/tOXppd8ZWxCm9dS1VLzbkUoIUKt3+18pG3S54VdL
+  descriprion: 'windows rust-brotli build'
+  on:
+     RUST_VERSION: stable
+  provider: GitHub
+
+cache:
+  - C:\Users\appveyor\.cargo\registry
+  - target
+
+branches:
+  only:
+    # Release tags
+    - /^v\d+\.\d+\.\d+.*$/
+    - master
