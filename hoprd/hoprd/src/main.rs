@@ -133,7 +133,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let ipv4 = std::net::Ipv4Addr::from_str(address).map_err(|e| HoprdError::ConfigError(e.to_string()))?;
 
         if ipv4.is_loopback() && !cfg.hopr.transport.announce_local_addresses {
-            return Err(hopr_lib::errors::HoprLibError::GeneralError(
+            Err(hopr_lib::errors::HoprLibError::GeneralError(
                 "Cannot announce a loopback address".into(),
             ))?;
         }

@@ -251,7 +251,7 @@ async fn build_api(
                 .route("/node/metrics", get(node::metrics))
                 .with_state(inner_state.clone().into())
                 .layer(middleware::from_fn_with_state(
-                    inner_state.into(),
+                    inner_state,
                     token_authentication::authenticate,
                 )),
         )
@@ -327,7 +327,7 @@ impl IntoResponse for ApiErrorStatus {
 
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
-        (StatusCode::INTERNAL_SERVER_ERROR, Json(ApiError::from(self))).into_response()
+        (StatusCode::INTERNAL_SERVER_ERROR, self).into_response()
     }
 }
 

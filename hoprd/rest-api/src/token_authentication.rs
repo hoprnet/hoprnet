@@ -44,7 +44,7 @@ pub(crate) async fn authenticate(
             // Use "Authorization Bearer <token>" and "X-Auth-Token <token>" headers and "Sec-Websocket-Protocol"
             (!auth_headers.is_empty()
                     && (auth_headers.contains(&(&AUTHORIZATION, &format!("Bearer {}", expected_token)))
-                        || auth_headers.contains(&(&x_auth_header, &expected_token)))
+                        || auth_headers.contains(&(&x_auth_header, expected_token)))
                 )
                 // TODO: Replace with proper JS compliant solution
                 // The following line would never be needed, if the JavaScript browser was able to properly
@@ -59,5 +59,5 @@ pub(crate) async fn authenticate(
     }
 
     // Go forward to the next middleware or request handler
-    return next.run(request).await;
+    next.run(request).await
 }

@@ -335,7 +335,7 @@ async fn handle_send_message(
     state: Arc<InternalState>,
     sender: &mut SplitSink<WebSocket, Message>,
 ) -> Result<(), String> {
-    match serde_json::from_str(&input) {
+    match serde_json::from_str(input) {
         Ok(data) => handle_send_message_data(data, state, sender).await,
         Err(e) => Err(format!("failed to parse websocket message: {e}")),
     }
@@ -362,7 +362,7 @@ async fn handle_send_message_data(
         } else if let Some(hops) = msg.args.hops {
             PathOptions::Hops(hops)
         } else {
-            return Err(format!("one of hops or intermediate path must be provided"));
+            return Err("one of hops or intermediate path must be provided".to_string());
         };
 
         let hkc = hopr
