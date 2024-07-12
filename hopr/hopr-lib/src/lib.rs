@@ -1016,8 +1016,7 @@ impl Hopr {
     ///
     /// @param msg message to send
     /// @param destination PeerId of the destination
-    /// @param intermediatePath optional set path manually
-    /// @param hops optional number of required intermediate nodes
+    /// @param options optional configuration of the message path using hops and intermediatePath
     /// @param applicationTag optional tag identifying the sending application
     /// @returns ack challenge
     #[tracing::instrument(level = "debug", skip(self, msg))]

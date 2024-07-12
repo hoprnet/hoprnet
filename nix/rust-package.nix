@@ -2,6 +2,7 @@
 , CARGO_PROFILE ? "release"
 , cargoToml
 , craneLib
+, curl
 , depsSrc
 , foundryBin
 , git

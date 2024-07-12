@@ -40,6 +40,6 @@ hopr-async-runtime = { workspace = true }
 
 [dev-dependencies]
 async-std = { workspace = true }
-hopr-db-sql = { workspace = true, features = ["runtime-async-std"] }
 mockall = { workspace = true }
 more-asserts = { workspace = true }
+hopr-db-sql = { workspace = true, features = ["runtime-async-std"] }

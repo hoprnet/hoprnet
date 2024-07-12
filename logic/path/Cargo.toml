@@ -13,7 +13,9 @@ crate-type = ["rlib"]
 
 [features]
 default = []
-prometheus = ["dep:hopr-metrics"]
+runtime-async-std = ["hopr-db-sql/runtime-async-std"]
+runtime-tokio = ["hopr-db-sql/runtime-tokio"]
+prometheus = ["dep:hopr-metrics", "hopr-db-sql/prometheus"]
 
 [dependencies]
 async-trait = { workspace = true }

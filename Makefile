@@ -71,7 +71,7 @@ clean: # Cleanup build directories
 
 .PHONY: test
 test: smart-contract-test ## run unit tests for all packages, or a single package if package= is set
-	$(cargo) test
+	$(cargo) test --features runtime-async-std
 
 .PHONY: smoke-tests
 smoke-tests: ## run smoke tests

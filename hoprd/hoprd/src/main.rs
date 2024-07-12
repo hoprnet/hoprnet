@@ -21,7 +21,7 @@ use hopr_async_runtime::prelude::{cancel_join_handle, spawn, JoinHandle};
 use hopr_lib::{ApplicationData, AsUnixTimestamp, HoprLibProcesses, ToHex, TransportOutput};
 use hoprd::cli::CliArgs;
 use hoprd::errors::HoprdError;
-use hoprd_api::{build_hopr_api, Listener};
+use hoprd_api::serve_api;
 use hoprd_keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -110,7 +110,7 @@ enum HoprdProcesses {
 }
 
 #[cfg_attr(feature = "runtime-async-std", async_std::main)]
-#[cfg_attr(feature = "runtime-tokio", tokio::main)]
+#[cfg_attr(all(feature = "runtime-tokio", not(feature = "runtime-async-std")), tokio::main)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let _ = init_logger();
 
@@ -133,7 +133,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let ipv4 = std::net::Ipv4Addr::from_str(address).map_err(|e| HoprdError::ConfigError(e.to_string()))?;
 
         if ipv4.is_loopback() && !cfg.hopr.transport.announce_local_addresses {
-            return Err(hopr_lib::errors::HoprLibError::GeneralError(
+            Err(hopr_lib::errors::HoprLibError::GeneralError(
                 "Cannot announce a loopback address".into(),
             ))?;
         }
@@ -205,29 +205,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         };
 
-        let server = build_hopr_api(
-            node_cfg_str,
-            api_cfg,
-            node_clone,
-            inbox,
-            ws_events_rx,
-            Some(msg_encoder),
-        )
-        .await;
-
-        let mut api_listen = server
-            .bind(&listen_address)
+        let api_listener = tokio::net::TcpListener::bind(&listen_address)
             .await
             .unwrap_or_else(|e| panic!("REST API bind failed for {listen_address}: {e}"));
-        info!("Node REST API is listening on {api_listen}");
+
+        info!("Node REST API is listening on {listen_address}");
 
         processes.insert(
             HoprdProcesses::RestApi,
             spawn(async move {
-                api_listen
-                    .accept()
-                    .await
-                    .expect("the REST API server should run successfully")
+                serve_api(
+                    api_listener,
+                    node_cfg_str,
+                    api_cfg,
+                    node_clone,
+                    inbox,
+                    ws_events_rx,
+                    Some(msg_encoder),
+                )
+                .await
+                .expect("the REST API server should start successfully")
             }),
         );
     }

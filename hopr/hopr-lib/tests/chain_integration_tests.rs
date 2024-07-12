@@ -234,7 +234,7 @@ async fn start_node_chain_logic(
 }
 
 #[cfg_attr(feature = "runtime-async-std", async_std::test)]
-#[cfg_attr(feature = "runtime-tokio", tokio::test)]
+#[cfg_attr(all(feature = "runtime-tokio", not(feature = "runtime-async-std")), tokio::test)]
 async fn integration_test_indexer() {
     let block_time = Duration::from_secs(1);
     let anvil = create_anvil(Some(block_time));
