@@ -175,6 +175,11 @@ pub struct SessionConfig {
     #[default(2.0)]
     pub backoff_base: f64,
 
+    /// Standard deviation of a Gaussian jitter applied to `rto_base_receiver` and
+    /// `rto_base_sender`.
+    #[default(0.05)]
+    pub rto_jitter: f64,
+
     /// Optional rate limiting of egress messages per second.
     /// This will force the [SessionSocket] not to pass more than this quota of messages
     /// to the underlying transport.
@@ -307,9 +312,12 @@ impl<const C: usize> SessionState<C> {
             match self.incoming_frame_retries.entry(info.frame_id) {
                 Entry::Occupied(e) => {
                     // Check if we can retry this frame now
-                    let rto_check = e
-                        .get()
-                        .check(now, self.cfg.rto_base_receiver, self.cfg.frame_expiration_age);
+                    let rto_check = e.get().check(
+                        now,
+                        self.cfg.rto_base_receiver,
+                        self.cfg.frame_expiration_age,
+                        self.cfg.rto_jitter,
+                    );
                     match rto_check {
                         RetryResult::RetryNow(next_rto) => {
                             // Retry this frame and plan ahead of the time of the next retry
@@ -427,7 +435,12 @@ impl<const C: usize> SessionState<C> {
         // Retain only non-expired frames, collect all which are due for re-send
         let mut frames_to_resend = BTreeSet::new();
         self.outgoing_frame_resends.retain(|frame_id, retry_log| {
-            let check_res = retry_log.check(now, self.cfg.rto_base_sender, self.cfg.frame_expiration_age);
+            let check_res = retry_log.check(
+                now,
+                self.cfg.rto_base_sender,
+                self.cfg.frame_expiration_age,
+                self.cfg.rto_jitter,
+            );
             match check_res {
                 RetryResult::Wait(d) => {
                     debug!("{:?}: frame {frame_id} will retransmit in {d:?}", self.session_id);
@@ -437,11 +450,7 @@ impl<const C: usize> SessionState<C> {
                     // Single segment frame scenario
                     frames_to_resend.insert(*frame_id);
                     *retry_log = next_retry;
-                    debug!(
-                        "{:?}: frame {frame_id} will self-resend now, next retry in {:?}",
-                        self.session_id,
-                        next_retry.retry_in(self.cfg.rto_base_sender, self.cfg.frame_expiration_age)
-                    );
+                    debug!("{:?}: frame {frame_id} will self-resend now", self.session_id,);
                     true
                 }
                 RetryResult::Expired => {

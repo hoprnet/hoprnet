@@ -1,17 +1,18 @@
 use futures::{AsyncRead, AsyncWrite, Stream};
+use rand::prelude::{thread_rng, Distribution};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct RetryToken {
+pub(crate) struct RetryToken {
     pub num_retry: usize,
     pub started_at: Instant,
     backoff_base: f64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub enum RetryResult {
+pub(crate) enum RetryResult {
     Wait(Duration),
     RetryNow(RetryToken),
     Expired,
@@ -26,13 +27,23 @@ impl RetryToken {
         }
     }
 
-    pub fn retry_in(&self, base: Duration, max_duration: Duration) -> Option<Duration> {
-        let duration = base.mul_f64(self.backoff_base.powi(self.num_retry as i32));
+    fn retry_in(&self, base: Duration, max_duration: Duration, jitter_dev: f64) -> Option<Duration> {
+        let jitter_coeff = if jitter_dev > 0.0 {
+            rand_distr::Normal::new(1.0, jitter_dev)
+                .unwrap()
+                .sample(&mut thread_rng())
+                .abs()
+        } else {
+            1.0
+        };
+
+        // jitter * base * backoff_base ^ num_retry
+        let duration = base.mul_f64(jitter_coeff * self.backoff_base.powi(self.num_retry as i32));
         (duration < max_duration).then_some(duration)
     }
 
-    pub fn check(&self, now: Instant, base: Duration, max: Duration) -> RetryResult {
-        match self.retry_in(base, max) {
+    pub fn check(&self, now: Instant, base: Duration, max: Duration, jitter_dev: f64) -> RetryResult {
+        match self.retry_in(base, max, jitter_dev) {
             None => RetryResult::Expired,
             Some(retry_in) if self.started_at + retry_in >= now => RetryResult::Wait(self.started_at + retry_in - now),
             _ => RetryResult::RetryNow(Self {

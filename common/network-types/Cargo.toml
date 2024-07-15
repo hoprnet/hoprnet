@@ -22,6 +22,8 @@ futures = { workspace = true }
 governor = "0.6.3"
 hex = { workspace = true }
 pin-project = "1.1"
+rand = { workspace = true }
+rand_distr = "0.4.3"
 serde = { workspace = true }
 serde_bytes = { workspace = true }
 smart-default = { workspace = true }
