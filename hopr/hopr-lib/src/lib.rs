@@ -958,6 +958,11 @@ impl Hopr {
         Ok(self.transport_api.get_public_nodes().await?)
     }
 
+    /// Gets the current indexer state: last indexed block ID and checksum
+    pub async fn get_indexer_state(&self) -> errors::Result<(u32, Hash)> {
+        Ok(self.db.get_last_indexed_block(None).await?)
+    }
+
     /// Test whether the peer with PeerId is allowed to access the network
     pub async fn is_allowed_to_access_network(&self, peer: &PeerId) -> errors::Result<bool> {
         Ok(self.transport_api.is_allowed_to_access_network(peer).await?)
