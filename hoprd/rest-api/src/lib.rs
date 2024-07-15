@@ -2269,6 +2269,7 @@ mod node {
     use futures::StreamExt;
     use hopr_lib::{AsUnixTimestamp, Health, Multiaddr};
 
+    use hopr_crypto_types::prelude::Hash;
     use {std::str::FromStr, tide::Body};
 
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
@@ -2532,7 +2533,9 @@ mod node {
         "listeningAddress": [
             "/ip4/10.0.2.100/tcp/19092"
         ],
-        "network": "anvil-localhost"
+        "network": "anvil-localhost",
+        "indexerBlock": 123456,
+        "indexerChecksum": "cfde556a7e9ff0848998aa4a9a9f2ccfde556a7e9ff0848998aa4a0cfd8863ae"
     }))]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct NodeInfoResponse {
@@ -2568,6 +2571,10 @@ mod node {
         connectivity_status: Health,
         /// Channel closure period in seconds
         channel_closure_period: u64,
+        indexer_block: u32,
+        #[serde_as(as = "DisplayFromStr")]
+        #[schema(value_type = String)]
+        indexer_checksum: Hash,
     }
 
     /// Get information about this HOPR Node.
@@ -2591,28 +2598,35 @@ mod node {
         let safe_config = hopr.get_safe_config();
         let network = hopr.network();
 
-        match hopr.get_channel_closure_notice_period().await {
-            Ok(channel_closure_notice_period) => {
-                let body = NodeInfoResponse {
-                    network,
-                    announced_address: hopr.local_multiaddresses(),
-                    listening_address: hopr.local_multiaddresses(),
-                    chain: chain_config.id,
-                    hopr_token: chain_config.token,
-                    hopr_channels: chain_config.channels,
-                    hopr_network_registry: chain_config.network_registry,
-                    hopr_node_safe_registry: chain_config.node_safe_registry,
-                    hopr_management_module: chain_config.module_implementation,
-                    hopr_node_safe: safe_config.safe_address,
-                    is_eligible: hopr.is_allowed_to_access_network(&hopr.me_peer_id()).await?,
-                    connectivity_status: hopr.network_health().await,
-                    channel_closure_period: channel_closure_notice_period.as_secs(),
-                };
+        let channel_closure_notice_period = match hopr.get_channel_closure_notice_period().await {
+            Ok(p) => p,
+            Err(error) => return Ok(Response::builder(422).body(ApiErrorStatus::from(error)).build()),
+        };
 
-                Ok(Response::builder(200).body(json!(body)).build())
-            }
-            Err(error) => Ok(Response::builder(422).body(ApiErrorStatus::from(error)).build()),
-        }
+        let (indexer_block, indexer_checksum) = match hopr.get_indexer_state().await {
+            Ok(p) => p,
+            Err(error) => return Ok(Response::builder(422).body(ApiErrorStatus::from(error)).build()),
+        };
+
+        let body = NodeInfoResponse {
+            network,
+            announced_address: hopr.local_multiaddresses(),
+            listening_address: hopr.local_multiaddresses(),
+            chain: chain_config.id,
+            hopr_token: chain_config.token,
+            hopr_channels: chain_config.channels,
+            hopr_network_registry: chain_config.network_registry,
+            hopr_node_safe_registry: chain_config.node_safe_registry,
+            hopr_management_module: chain_config.module_implementation,
+            hopr_node_safe: safe_config.safe_address,
+            is_eligible: hopr.is_allowed_to_access_network(&hopr.me_peer_id()).await?,
+            connectivity_status: hopr.network_health().await,
+            channel_closure_period: channel_closure_notice_period.as_secs(),
+            indexer_block,
+            indexer_checksum,
+        };
+
+        Ok(Response::builder(200).body(json!(body)).build())
     }
 
     #[serde_as]
