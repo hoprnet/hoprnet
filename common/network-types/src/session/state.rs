@@ -295,9 +295,6 @@ impl<const C: usize> SessionState<C> {
     /// Recurring requests have an [`rto_base_receiver`](SessionConfig) timeout with backoff.
     /// Returns the number of sent request messages.
     async fn request_missing_segments(&mut self) -> crate::errors::Result<usize> {
-        let num_evicted = self.frame_reassembler.evict()?;
-        debug!("{:?}: evicted {} frames", self.session_id, num_evicted);
-
         let tracked_incomplete = self.frame_reassembler.incomplete_frames();
         debug!(
             "{:?}: tracking {} incomplete frames",
@@ -541,6 +538,9 @@ impl<const C: usize> SessionState<C> {
     /// - [`SessionState::retransmit_unacknowledged_frames`]
     ///
     async fn advance(&mut self) -> crate::errors::Result<()> {
+        let num_evicted = self.frame_reassembler.evict()?;
+        debug!("{:?}: evicted {} frames", self.session_id, num_evicted);
+
         if self.cfg.enabled_features.contains(&SessionFeature::AcknowledgeFrames) {
             self.acknowledge_segments().await?;
         }

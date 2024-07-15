@@ -576,7 +576,7 @@ impl FrameReassembler {
                     .store(current_time().as_unix_timestamp().as_millis() as u64, Ordering::Relaxed);
                 count += 1;
             } else {
-                // Break on first incomplete and non-expired frame
+                // Break on the first incomplete and non-expired frame
                 break;
             }
         }
