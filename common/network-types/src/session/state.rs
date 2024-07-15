@@ -286,18 +286,12 @@ impl<const C: usize> SessionState<C> {
 
     /// Sends a request for missing segments in incomplete frames.
     /// One [request](SessionMessage::Request) message is sent per incomplete frame. The message contains
-    /// the segment indices missing from that frame. The `max_requests` argument can provide a maximum
-    /// number of request messages sent by this call. If `max_requests` is `None`, request messages
-    /// are set for all incomplete frames.
+    /// the segment indices missing from that frame.
     /// Recurring requests have an [`rto_base_receiver`](SessionConfig) timeout with backoff.
     /// Returns the number of sent request messages.
-    async fn request_missing_segments(&mut self, max_requests: Option<usize>) -> crate::errors::Result<usize> {
+    async fn request_missing_segments(&mut self) -> crate::errors::Result<usize> {
         let num_evicted = self.frame_reassembler.evict()?;
         debug!("{:?}: evicted {} frames", self.session_id, num_evicted);
-
-        if max_requests == Some(0) {
-            return Ok(0); // don't even bother
-        }
 
         let tracked_incomplete = self.frame_reassembler.incomplete_frames();
         debug!(
@@ -318,7 +312,7 @@ impl<const C: usize> SessionState<C> {
                         .check(now, self.cfg.rto_base_receiver, self.cfg.frame_expiration_age);
                     match rto_check {
                         RetryResult::RetryNow(next_rto) => {
-                            // Retry this frame and plan ahead the time of the next retry
+                            // Retry this frame and plan ahead of the time of the next retry
                             debug!(
                                 "{:?}: going to perform frame {} retransmission req. #{}",
                                 self.session_id, info.frame_id, next_rto.num_retry
@@ -357,7 +351,6 @@ impl<const C: usize> SessionState<C> {
         let mut sent = 0;
         let to_retry = to_retry
             .chunks(SegmentRequest::<C>::MAX_ENTRIES)
-            .take(max_requests.unwrap_or(usize::MAX))
             .map(|chunk| Ok(SessionMessage::<C>::Request(chunk.iter().cloned().collect())))
             .inspect(|r| {
                 debug!("{:?}: SENDING: {:?}", self.session_id, r);
@@ -385,31 +378,27 @@ impl<const C: usize> SessionState<C> {
     /// which means if this method is not called sufficiently often, the oldest acknowledged
     /// frame IDs will be discarded.
     /// Single [message](SessionMessage::Acknowledge) can accommodate up to [`FrameAcknowledgements::MAX_ACK_FRAMES`] frame IDs, so
-    /// this method sends as many messages as needed, or at most `max_message` if was given.
-    async fn acknowledge_segments(&mut self, max_messages: Option<usize>) -> crate::errors::Result<usize> {
+    /// this method sends as many messages as needed.
+    async fn acknowledge_segments(&mut self) -> crate::errors::Result<usize> {
         let mut len = 0;
         let mut msgs = 0;
 
         while !self.to_acknowledge.is_empty() {
             let mut ack_frames = FrameAcknowledgements::<C>::default();
 
-            if max_messages.map(|max| msgs < max).unwrap_or(true) {
-                while !ack_frames.is_full() && !self.to_acknowledge.is_empty() {
-                    if let Some(ack_id) = self.to_acknowledge.pop() {
-                        ack_frames.push(ack_id);
-                        len += 1;
-                    }
+            while !ack_frames.is_full() && !self.to_acknowledge.is_empty() {
+                if let Some(ack_id) = self.to_acknowledge.pop() {
+                    ack_frames.push(ack_id);
+                    len += 1;
                 }
-
-                debug!("{:?}: SENDING: acks of {} frames", self.session_id, ack_frames.len());
-                self.segment_egress_send
-                    .feed(SessionMessage::Acknowledge(ack_frames))
-                    .await
-                    .map_err(|e| SessionError::ProcessingError(e.to_string()))?;
-                msgs += 1;
-            } else {
-                break; // break out if we sent max allowed
             }
+
+            debug!("{:?}: SENDING: acks of {} frames", self.session_id, ack_frames.len());
+            self.segment_egress_send
+                .feed(SessionMessage::Acknowledge(ack_frames))
+                .await
+                .map_err(|e| SessionError::ProcessingError(e.to_string()))?;
+            msgs += 1;
         }
         self.segment_egress_send
             .flush()
@@ -428,14 +417,12 @@ impl<const C: usize> SessionState<C> {
     /// this method will do nothing and return `0`.
     /// Otherwise, it returns the number of retransmitted frames.
     /// Recurring retransmissions have an [`rto_base_sender`](SessionConfig) timeout with backoff.
-    /// At most `max_messages` frames are resent if the argument was specified.
-    async fn retransmit_unacknowledged_frames(&mut self, max_messages: Option<usize>) -> crate::errors::Result<usize> {
-        if max_messages == Some(0) || self.cfg.acknowledged_frames_buffer == 0 {
+    async fn retransmit_unacknowledged_frames(&mut self) -> crate::errors::Result<usize> {
+        if self.cfg.acknowledged_frames_buffer == 0 {
             return Ok(0);
         }
 
         let now = Instant::now();
-        let max = max_messages.unwrap_or(usize::MAX);
 
         // Retain only non-expired frames, collect all which are due for re-send
         let mut frames_to_resend = BTreeSet::new();
@@ -448,15 +435,13 @@ impl<const C: usize> SessionState<C> {
                 }
                 RetryResult::RetryNow(next_retry) => {
                     // Single segment frame scenario
-                    if frames_to_resend.len() < max {
-                        frames_to_resend.insert(*frame_id);
-                        *retry_log = next_retry;
-                        debug!(
-                            "{:?}: frame {frame_id} will self-resend now, next retry in {:?}",
-                            self.session_id,
-                            next_retry.retry_in(self.cfg.rto_base_sender, self.cfg.frame_expiration_age)
-                        )
-                    }
+                    frames_to_resend.insert(*frame_id);
+                    *retry_log = next_retry;
+                    debug!(
+                        "{:?}: frame {frame_id} will self-resend now, next retry in {:?}",
+                        self.session_id,
+                        next_retry.retry_in(self.cfg.rto_base_sender, self.cfg.frame_expiration_age)
+                    );
                     true
                 }
                 RetryResult::Expired => {
@@ -478,7 +463,6 @@ impl<const C: usize> SessionState<C> {
         let frames_to_resend = frames_to_resend
             .into_iter()
             .flat_map(|f| self.lookbehind.iter().filter(move |e| e.key().0 == f))
-            .take(max)
             .inspect(|e| {
                 debug!("{:?}: SENDING: auto-retransmitted {}", self.session_id, e.key());
                 count += 1
@@ -547,21 +531,19 @@ impl<const C: usize> SessionState<C> {
     /// - [`SessionState::request_missing_segments`]
     /// - [`SessionState::retransmit_unacknowledged_frames`]
     ///
-    /// The given optional limit is per each method call and is not shared, meaning
-    /// each method gets the same limit.
-    async fn advance(&mut self, max_messages: Option<usize>) -> crate::errors::Result<()> {
+    async fn advance(&mut self) -> crate::errors::Result<()> {
         if self.cfg.enabled_features.contains(&SessionFeature::AcknowledgeFrames) {
-            self.acknowledge_segments(max_messages).await?;
+            self.acknowledge_segments().await?;
         }
         if self
             .cfg
             .enabled_features
             .contains(&SessionFeature::RequestIncompleteFrames)
         {
-            self.request_missing_segments(max_messages).await?;
+            self.request_missing_segments().await?;
         }
         if self.cfg.enabled_features.contains(&SessionFeature::RetransmitFrames) {
-            self.retransmit_unacknowledged_frames(max_messages).await?;
+            self.retransmit_unacknowledged_frames().await?;
         }
         Ok(())
     }
@@ -704,12 +686,12 @@ impl<const C: usize> SessionSocket<C> {
         if !cfg.enabled_features.is_empty() {
             let mut state_clone = state.clone();
             spawn_local(async move {
-                // TODO: make the max message configurable or derive it
                 let timeout = cfg
                     .rto_base_receiver
                     .min(cfg.rto_base_sender)
                     .min(cfg.frame_expiration_age / 3);
-                while state_clone.advance(None).await.is_ok() {
+
+                while state_clone.advance().await.is_ok() {
                     sleep(timeout).await;
                 }
             });

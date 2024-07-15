@@ -31,14 +31,10 @@ impl RetryToken {
         (duration < max_duration).then_some(duration)
     }
 
-    pub fn retry_at(&self, base: Duration, max_duration: Duration) -> Option<Instant> {
-        self.retry_in(base, max_duration).map(|d| self.started_at + d)
-    }
-
     pub fn check(&self, now: Instant, base: Duration, max: Duration) -> RetryResult {
-        match self.retry_at(base, max) {
+        match self.retry_in(base, max) {
             None => RetryResult::Expired,
-            Some(retry_at) if retry_at >= now => RetryResult::Wait(retry_at - now),
+            Some(retry_in) if self.started_at + retry_in >= now => RetryResult::Wait(self.started_at + retry_in - now),
             _ => RetryResult::RetryNow(Self {
                 num_retry: self.num_retry + 1,
                 started_at: self.started_at,
