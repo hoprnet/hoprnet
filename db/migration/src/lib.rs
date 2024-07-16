@@ -115,3 +115,12 @@ impl MigratorTrait for MigratorTickets {
         ]
     }
 }
+
+pub struct MigratorChainLogs;
+
+#[async_trait::async_trait]
+impl MigratorTrait for MigratorChainLogs {
+    fn migrations() -> Vec<Box<dyn MigrationTrait>> {
+        vec![Box::new(m20240715_000001_logs_create_log::Migration)]
+    }
+}
