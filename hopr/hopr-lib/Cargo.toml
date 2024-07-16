@@ -13,46 +13,45 @@ crate-type = ["rlib"]
 
 [features]
 default = []
-session = []            # session based message sending used for SOCKS5
-sessionless = []        # session-less message sending used for async sending
+session-client = []
+session-server = []
 runtime-async-std = [
-    "async-std",
-    "chain-api/runtime-async-std",
-    "chain-rpc/runtime-async-std",
-    "core-transport/runtime-async-std",
-    "hopr-db-sql/runtime-async-std",
-    "hopr-network-types/runtime-async-std",
-    "hopr-strategy/runtime-async-std",
+  "chain-api/runtime-async-std",
+  "chain-rpc/runtime-async-std",
+  "core-transport/runtime-async-std",
+  "hopr-db-sql/runtime-async-std",
+  "hopr-async-runtime/runtime-async-std",
+  "hopr-network-types/runtime-async-std",
+  "hopr-strategy/runtime-async-std",
 ]
 runtime-tokio = [
-    "tokio",
-    "chain-api/runtime-tokio",
-    "chain-rpc/runtime-tokio",
-    "core-transport/runtime-tokio",
-    "hopr-db-sql/runtime-tokio",
-    "hopr-network-types/runtime-tokio",
-    "hopr-strategy/runtime-tokio"
+  "chain-api/runtime-tokio",
+  "chain-rpc/runtime-tokio",
+  "core-transport/runtime-tokio",
+  "hopr-db-sql/runtime-tokio",
+  "hopr-async-runtime/runtime-tokio",
+  "hopr-network-types/runtime-tokio",
+  "hopr-strategy/runtime-tokio",
 ]
 prometheus = [
-    "dep:hopr-metrics",
-    "core-transport/prometheus",
-    "chain-api/prometheus",
-    "chain-indexer/prometheus",
-    "chain-rpc/prometheus",
-    "hopr-db-sql/prometheus"
+  "chain-api/prometheus",
+  "chain-indexer/prometheus",
+  "chain-rpc/prometheus",
+  "core-transport/prometheus",
+  "dep:hopr-metrics",
+  "hopr-db-sql/prometheus",
 ]
 
 [dependencies]
 async-channel = { workspace = true }
 async-lock = { workspace = true }
-async-std = { workspace = true, optional = true }
+async-trait = { workspace = true }
 atomic_enum = { workspace = true }
-const_format ={ workspace = true }
+const_format = { workspace = true }
 futures = { workspace = true }
 futures-concurrency = { workspace = true }
 lazy_static = { workspace = true }
 tracing = { workspace = true }
-tokio = { workspace = true, optional = true }
 serde = { workspace = true }
 serde_with = { workspace = true }
 strum = { workspace = true }
@@ -75,6 +74,7 @@ hopr-platform = { workspace = true }
 hopr-primitive-types = { workspace = true }
 hopr-strategy = { workspace = true }
 hopr-network-types = { workspace = true }
+hopr-async-runtime = { workspace = true }
 
 [dev-dependencies]
 async-std = { workspace = true }

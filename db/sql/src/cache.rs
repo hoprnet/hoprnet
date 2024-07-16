@@ -51,6 +51,9 @@ impl<K, V> Expiry<K, V> for ExpiryNever {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) struct ChannelParties(pub(crate) Address, pub(crate) Address);
+
 /// Contains all caches used by the [crate::db::HoprDb].
 #[derive(Debug, Clone)]
 pub struct HoprDbCaches {
@@ -60,6 +63,7 @@ pub struct HoprDbCaches {
     pub(crate) unrealized_value: Cache<Hash, Balance>,
     pub(crate) chain_to_offchain: Cache<Address, Option<OffchainPublicKey>>,
     pub(crate) offchain_to_chain: Cache<OffchainPublicKey, Option<Address>>,
+    pub(crate) src_dst_to_channel: Cache<ChannelParties, Option<ChannelEntry>>,
 }
 
 impl Default for HoprDbCaches {
@@ -85,6 +89,11 @@ impl Default for HoprDbCaches {
             .max_capacity(100_000)
             .build();
 
+        let src_dst_to_channel = Cache::builder()
+            .time_to_live(Duration::from_secs(600))
+            .max_capacity(10_000)
+            .build();
+
         Self {
             single_values,
             unacked_tickets,
@@ -92,6 +101,7 @@ impl Default for HoprDbCaches {
             unrealized_value,
             chain_to_offchain,
             offchain_to_chain,
+            src_dst_to_channel,
         }
     }
 }
@@ -104,5 +114,6 @@ impl HoprDbCaches {
         self.unrealized_value.invalidate_all();
         self.chain_to_offchain.invalidate_all();
         self.offchain_to_chain.invalidate_all();
+        self.src_dst_to_channel.invalidate_all();
     }
 }

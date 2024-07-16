@@ -14,7 +14,7 @@ crate-type = ["rlib"]
 [dependencies]
 hex = { workspace = true }
 primitive-types = { workspace = true }
-rlp = "0.5.2" # TODO: remove in 3.0
+rlp = "0.5.2"                          # TODO: remove in 3.0
 regex = { workspace = true }
 strum = { workspace = true }
 serde = { workspace = true }
@@ -27,4 +27,3 @@ hex-literal = { workspace = true }
 
 [features]
 default = []
-

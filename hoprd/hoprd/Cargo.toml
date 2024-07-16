@@ -10,30 +10,43 @@ license = "GPL-3.0-only"
 build = "build.rs"
 
 [features]
-default = ["runtime-async-std", "prometheus"]   # must be async-std due to tide framework
+default = [
+  "runtime-tokio",
+  "prometheus",
+] # uses tokio by default because of axum
 prometheus = [
-    "dep:hopr-metrics",
-    "dep:lazy_static",
-    "hopr-lib/prometheus",
-    "hoprd-api/prometheus"
+  "dep:hopr-metrics",
+  "dep:lazy_static",
+  "hopr-lib/prometheus",
+  "hoprd-api/prometheus",
 ]
 runtime-async-std = [
-    "dep:async-std",
-    "hopr-lib/runtime-async-std",
-    "opentelemetry_sdk?/rt-async-std"
+  "dep:async-std",
+  "hopr-lib/runtime-async-std",
+  "hopr-async-runtime/runtime-async-std",
+  "opentelemetry_sdk?/rt-async-std",
 ]
 runtime-tokio = [
-    "dep:tokio",
-    "hopr-lib/runtime-tokio",
-    "opentelemetry_sdk?/rt-tokio"
+  "dep:tokio",
+  "hopr-lib/runtime-tokio",
+  "hopr-async-runtime/runtime-tokio",
+  "opentelemetry_sdk?/rt-tokio",
 ]
-telemetry = ["dep:opentelemetry", "dep:opentelemetry-otlp", "dep:opentelemetry_sdk", "dep:tracing-opentelemetry"]
+telemetry = [
+  "dep:opentelemetry",
+  "dep:opentelemetry-otlp",
+  "dep:opentelemetry_sdk",
+  "dep:tracing-opentelemetry",
+]
 
 [dependencies]
 async-broadcast = { workspace = true }
 async-lock = { workspace = true }
 async-signal = { workspace = true }
-async-std = { workspace = true, features = ["attributes", "tokio1"], optional = true }
+async-std = { workspace = true, features = [
+  "attributes",
+  "tokio1",
+], optional = true }
 clap = { workspace = true }
 chrono = { workspace = true }
 futures = { workspace = true }
@@ -52,7 +65,13 @@ tracing-subscriber = { workspace = true }
 validator = { workspace = true }
 
 opentelemetry = { version = "0.23.0", optional = true }
-opentelemetry-otlp = { version = "0.15", default-features = false, features = ["trace", "reqwest-client", "tls-roots", "http-proto", "grpc-tonic"], optional = true }
+opentelemetry-otlp = { version = "0.15", default-features = false, features = [
+  "trace",
+  "reqwest-client",
+  "tls-roots",
+  "http-proto",
+  "grpc-tonic",
+], optional = true }
 opentelemetry_sdk = { version = "0.23.0", optional = true }
 tracing-opentelemetry = { version = "0.24.0", optional = true }
 
@@ -62,6 +81,7 @@ hoprd-inbox = { workspace = true }
 hoprd-keypair = { workspace = true }
 hopr-platform = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
+hopr-async-runtime = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

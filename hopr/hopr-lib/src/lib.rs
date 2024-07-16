@@ -13,32 +13,12 @@
 //! For most of the practical use cases, the `hoprd` application should be a preferable
 //! choice.
 
-#[cfg(all(feature = "runtime-async-std", feature = "runtime-tokio"))]
-compile_error!("Only one of the runtime features can be specified for the build");
-
 /// Configuration related public types
 pub mod config;
 /// Various public constants.
 pub mod constants;
 /// Enumerates all errors thrown from this library.
 pub mod errors;
-
-pub use {
-    chain_actions::errors::ChainActionsError,
-    chain_api::config::{
-        Addresses as NetworkContractAddresses, EnvironmentType, Network as ChainNetwork, ProtocolsConfig,
-    },
-    core_transport::{
-        config::{looks_like_domain, HostConfig, HostType},
-        constants::RESERVED_TAG_UPPER_LIMIT,
-        errors::{HoprTransportError, ProtocolError},
-        ApplicationData, HalfKeyChallenge, Health, Keypair, Multiaddr, PathOptions, TicketStatistics, TransportOutput,
-    },
-    hopr_internal_types::prelude::*,
-    hopr_primitive_types::prelude::*,
-    hopr_primitive_types::rlp,
-    hopr_strategy::Strategy,
-};
 
 use std::{
     collections::HashMap,
@@ -53,15 +33,7 @@ use futures::{
     Stream, StreamExt,
 };
 use futures_concurrency::stream::StreamExt as _;
-
-#[cfg(feature = "runtime-async-std")]
-use async_std::task::{sleep, spawn, JoinHandle};
-
-#[cfg(feature = "runtime-tokio")]
-use tokio::{
-    task::{spawn, JoinHandle},
-    time::sleep,
-};
+use tracing::{debug, error, info, warn};
 
 use chain_actions::{
     action_state::{ActionState, IndexerActionTracker},
@@ -76,29 +48,44 @@ use chain_api::{
 use chain_types::chain_events::ChainEventType;
 use chain_types::ContractAddresses;
 use core_path::channel_graph::ChannelGraph;
-use core_transport::{build_network, execute_on_tick, PeerTransportEvent};
-use core_transport::{libp2p::identity::PeerId, Session};
+use core_transport::{execute_on_tick, HoprTransportConfig, HoprTransportProcess, PeerTransportEvent};
 use core_transport::{ChainKeypair, Hash, HoprTransport, OffchainKeypair};
 use core_transport::{IndexerTransportEvent, Network, PeerEligibility, PeerOrigin};
-use hopr_platform::file::native::{join, read_file, remove_dir_all, write};
+use hopr_async_runtime::prelude::{sleep, spawn, JoinHandle};
+use hopr_crypto_types::prelude::OffchainPublicKey;
+use hopr_db_sql::{
+    accounts::HoprDbAccountOperations,
+    api::{info::SafeInfo, resolver::HoprDbResolverOperations, tickets::HoprDbTicketOperations},
+    channels::HoprDbChannelOperations,
+    db::{HoprDb, HoprDbConfig},
+    info::HoprDbInfoOperations,
+    prelude::{ChainOrPacketKey::ChainKey, DbSqlError, HoprDbPeersOperations},
+    HoprDbAllOperations, HoprDbGeneralModelOperations,
+};
+use hopr_platform::file::native::{join, remove_dir_all};
 use hopr_strategy::strategy::{MultiStrategy, SingularStrategy};
-use tracing::{debug, error, info, warn};
+pub use {
+    chain_actions::errors::ChainActionsError,
+    chain_api::config::{
+        Addresses as NetworkContractAddresses, EnvironmentType, Network as ChainNetwork, ProtocolsConfig,
+    },
+    core_transport::{
+        config::{looks_like_domain, HostConfig, HostType},
+        constants::RESERVED_TAG_UPPER_LIMIT,
+        errors::{HoprTransportError, ProtocolError},
+        libp2p::identity::PeerId,
+        ApplicationData, HalfKeyChallenge, Health, Keypair, Multiaddr, PathOptions, Session as HoprSession,
+        SessionComponents, TicketStatistics, TransportOutput,
+    },
+    hopr_internal_types::prelude::*,
+    hopr_primitive_types::prelude::*,
+    hopr_primitive_types::rlp,
+    hopr_strategy::Strategy,
+};
 
 use crate::constants::{MIN_NATIVE_BALANCE, ONBOARDING_INFORMATION_INTERVAL, SUGGESTED_NATIVE_BALANCE};
 use crate::{config::SafeModule, errors::HoprLibError};
 
-use hopr_db_sql::{
-    accounts::HoprDbAccountOperations,
-    api::{info::SafeInfo, resolver::HoprDbResolverOperations, tickets::HoprDbTicketOperations},
-    db::{HoprDb, HoprDbConfig},
-    info::HoprDbInfoOperations,
-    HoprDbGeneralModelOperations,
-};
-use hopr_db_sql::{channels::HoprDbChannelOperations, HoprDbAllOperations};
-
-use hopr_crypto_types::prelude::OffchainPublicKey;
-use hopr_db_sql::prelude::ChainOrPacketKey::ChainKey;
-use hopr_db_sql::prelude::{DbSqlError, HoprDbPeersOperations};
 #[cfg(all(feature = "prometheus", not(test)))]
 use {
     hopr_metrics::metrics::{MultiGauge, SimpleGauge},
@@ -121,6 +108,15 @@ lazy_static::lazy_static! {
         "Node on-chain and off-chain addresses",
         &["peerid", "address", "safe_address", "module_address"]
     ).unwrap();
+}
+
+/// Interface representing the HOPR server behavior for each incoming session instance
+/// supplied as an argument.
+#[cfg(feature = "session-server")]
+#[async_trait::async_trait]
+pub trait HoprSessionServerActionable {
+    /// Fully process a single HOPR session
+    async fn process(&self, session: HoprSession) -> errors::Result<()>;
 }
 
 /// An enum representing the current state of the HOPR node
@@ -152,8 +148,11 @@ pub struct CloseChannelResult {
 pub enum HoprLibProcesses {
     #[strum(to_string = "libp2p component responsible for the handling of the p2p communication")]
     Swarm,
-    #[strum(to_string = "session unwrapper pairing the session data")]
-    Sessions,
+    #[strum(to_string = "session router pairing the session streams based on the PeerId and ApplicationTag")]
+    SessionsRouter,
+    #[cfg(feature = "session-server")]
+    #[strum(to_string = "session server providing the exit node session stream functionality")]
+    SessionServer,
     #[strum(to_string = "heartbeat component responsible for maintaining the network quality measurements")]
     Heartbeat,
     #[strum(to_string = "tick wake up the strategies to perform an action")]
@@ -177,6 +176,17 @@ impl HoprLibProcesses {
     /// run indefinitely.
     pub fn can_finish(&self) -> bool {
         matches!(self, HoprLibProcesses::Indexing)
+    }
+}
+
+impl From<HoprTransportProcess> for HoprLibProcesses {
+    fn from(value: HoprTransportProcess) -> Self {
+        match value {
+            core_transport::HoprTransportProcess::Swarm => HoprLibProcesses::Swarm,
+            core_transport::HoprTransportProcess::Heartbeat => HoprLibProcesses::Heartbeat,
+            core_transport::HoprTransportProcess::SessionsRouter => HoprLibProcesses::SessionsRouter,
+            core_transport::HoprTransportProcess::BloomFilterSave => HoprLibProcesses::BloomFilterSave,
+        }
     }
 }
 
@@ -358,46 +368,6 @@ where
     .flat_map(futures::stream::iter)
 }
 
-#[derive(Debug, Clone)]
-struct WrappedTagBloomFilter {
-    path: String,
-    tbf: Arc<RwLock<TagBloomFilter>>,
-}
-
-impl WrappedTagBloomFilter {
-    pub fn new(path: String) -> Self {
-        info!("Creating the Bloom filter storage at: {}", path);
-        let tbf = read_file(&path)
-            .and_then(|data| {
-                TagBloomFilter::from_bytes(&data)
-                    .map_err(|e| hopr_platform::error::PlatformError::GeneralError(e.to_string()))
-            })
-            .unwrap_or_else(|_| {
-                debug!("No tag Bloom filter found, using empty");
-                TagBloomFilter::default()
-            });
-
-        Self {
-            path,
-            tbf: Arc::new(RwLock::new(tbf)),
-        }
-    }
-
-    pub fn raw_filter(&self) -> Arc<RwLock<TagBloomFilter>> {
-        self.tbf.clone()
-    }
-
-    pub async fn save(&self) {
-        let bloom = self.tbf.read().await.clone(); // Clone to immediately release the lock
-
-        if let Err(e) = write(&self.path, bloom.to_bytes()) {
-            error!("Tag Bloom filter save failed: {e}")
-        } else {
-            info!("Tag Bloom filter saved successfully")
-        };
-    }
-}
-
 /// Represents the socket behavior of the hopr-lib spawned [`Hopr`] object.
 ///
 /// Provides a read and write stream for Hopr socket recognized data formats.
@@ -458,12 +428,10 @@ pub struct Hopr {
     transport_api: HoprTransport<HoprDb>,
     chain_api: HoprChain<HoprDb>,
     // objects that could be removed pending architectural cleanup ========
-    network: Arc<Network<HoprDb>>,
     db: HoprDb,
     chain_cfg: ChainNetworkConfig,
     channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
     multistrategy: Arc<MultiStrategy>,
-    tbf: WrappedTagBloomFilter,
     rx_indexer_significant_events: async_channel::Receiver<SignificantChainEvent>,
 }
 
@@ -516,20 +484,7 @@ impl Hopr {
         // let mut packetCfg = PacketInteractionConfig::new(packetKeypair, chainKeypair)
         // packetCfg.check_unrealized_balance = cfg.chain.check_unrealized_balance
 
-        let tbf =
-            WrappedTagBloomFilter::new(join(&[&cfg.db.data, "tbf"]).expect("Could not create a tbf storage path"));
-
-        let identity: core_transport::libp2p::identity::Keypair = me.into();
         let my_multiaddresses = vec![multiaddress];
-
-        info!("Creating local network registry and registering own external multiaddresses: {my_multiaddresses:?}",);
-
-        let network = build_network(
-            identity.public().to_peer_id(),
-            my_multiaddresses.clone(),
-            cfg.network_options.clone(),
-            db.clone(),
-        );
 
         let (tx_indexer_events, rx_indexer_events) = async_channel::unbounded::<SignificantChainEvent>();
 
@@ -538,11 +493,13 @@ impl Hopr {
         let hopr_transport_api = HoprTransport::new(
             me,
             me_onchain,
-            cfg.transport.clone(),
-            cfg.protocol,
-            cfg.heartbeat,
+            HoprTransportConfig {
+                transport: cfg.transport.clone(),
+                network: cfg.network_options.clone(),
+                protocol: cfg.protocol,
+                heartbeat: cfg.heartbeat,
+            },
             db.clone(),
-            network.clone(),
             channel_graph.clone(),
             my_multiaddresses,
         );
@@ -600,11 +557,9 @@ impl Hopr {
             transport_api: hopr_transport_api,
             chain_api: hopr_chain_api,
             db,
-            network,
             chain_cfg: resolved_environment,
             channel_graph,
             multistrategy: multi_strategy,
-            tbf,
             rx_indexer_significant_events: rx_indexer_events,
         }
     }
@@ -678,7 +633,10 @@ impl Hopr {
         self.cfg.chain.announce
     }
 
-    pub async fn run(&self) -> errors::Result<(HoprSocket, HashMap<HoprLibProcesses, JoinHandle<()>>)> {
+    pub async fn run<#[cfg(feature = "session-server")] T: HoprSessionServerActionable + Clone + Send + 'static>(
+        &self,
+        #[cfg(feature = "session-server")] serve_handler: T,
+    ) -> errors::Result<(HoprSocket, HashMap<HoprLibProcesses, JoinHandle<()>>)> {
         self.error_if_not_in_state(
             HoprState::Uninitialized,
             "Cannot start the hopr node multiple times".into(),
@@ -751,7 +709,7 @@ impl Hopr {
             self.multistrategy.clone(),
             self.channel_graph.clone(),
             self.chain_api.action_state(),
-            self.network.clone(),
+            self.transport_api.network(),
         )
         .await;
 
@@ -813,7 +771,8 @@ impl Hopr {
                 // Self-reference is not needed in the network storage
                 if &peer != self.transport_api.me() {
                     if let Err(e) = self
-                        .network
+                        .transport_api
+                        .network()
                         .add(&peer, PeerOrigin::Initialization, multiaddresses)
                         .await
                     {
@@ -931,16 +890,31 @@ impl Hopr {
             }),
         );
 
-        // TODO: 2.2: add support for transport session handling
-        let (session_tx, _session_rx) = unbounded::<Session>();
+        let (session_tx, _session_rx) = unbounded::<HoprSession>();
+
+        #[cfg(feature = "session-server")]
+        {
+            processes.insert(
+                HoprLibProcesses::SessionServer,
+                spawn(_session_rx.for_each_concurrent(None, move |session| {
+                    let serve_handler = serve_handler.clone();
+                    async move {
+                        let _ = serve_handler.process(session).await;
+                    }
+                })),
+            );
+        }
+
         for (id, proc) in self
             .transport_api
             .run(
                 &self.me,
                 &self.me_onchain,
                 String::from(constants::APP_VERSION),
-                self.network.clone(),
-                self.tbf.raw_filter(),
+                self.transport_api.network(),
+                join(&[&self.cfg.db.data, "tbf"]).map_err(|e| {
+                    errors::HoprLibError::GeneralError(format!("Failed to construct the bloom filter: {e}"))
+                })?,
                 transport_output_tx,
                 on_ack_tkt_tx,
                 indexer_peer_update_rx,
@@ -949,23 +923,8 @@ impl Hopr {
             .await
             .into_iter()
         {
-            let nid = match id {
-                core_transport::HoprTransportProcess::Swarm => HoprLibProcesses::Swarm,
-                core_transport::HoprTransportProcess::Heartbeat => HoprLibProcesses::Heartbeat,
-                core_transport::HoprTransportProcess::Sessions => HoprLibProcesses::Sessions,
-            };
-            processes.insert(nid, proc);
+            processes.insert(id.into(), proc);
         }
-
-        let tbf_clone = self.tbf.clone();
-        processes.insert(
-            HoprLibProcesses::BloomFilterSave,
-            spawn(Box::pin(execute_on_tick(Duration::from_secs(90), move || {
-                let tbf_clone = tbf_clone.clone();
-
-                async move { tbf_clone.save().await }
-            }))),
-        );
 
         let db_clone = self.db.clone();
         processes.insert(
@@ -1003,9 +962,11 @@ impl Hopr {
 
         self.state.store(HoprState::Running, Ordering::Relaxed);
 
-        info!("# STARTED NODE");
-        info!("ID {}", self.transport_api.me());
-        info!("Protocol version {}", constants::APP_VERSION);
+        info!(
+            id = self.transport_api.me().to_string(),
+            version = constants::APP_VERSION,
+            "NODE STARTED AND RUNNING"
+        );
 
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_HOPR_NODE_INFO.set(
@@ -1044,12 +1005,18 @@ impl Hopr {
         Ok(self.transport_api.ping(peer).await?)
     }
 
+    #[cfg(feature = "session_client")]
+    pub async fn connect_to(&self, peer: PeerId, path_opts: PathOptions) -> errors::Result<HoprSession> {
+        self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
+
+        Ok(self.transport_api.new_session(peer, path_opts).await?)
+    }
+
     /// Send a message to another peer in the network
     ///
     /// @param msg message to send
     /// @param destination PeerId of the destination
-    /// @param intermediatePath optional set path manually
-    /// @param hops optional number of required intermediate nodes
+    /// @param options optional configuration of the message path using hops and intermediatePath
     /// @param applicationTag optional tag identifying the sending application
     /// @returns ack challenge
     #[tracing::instrument(level = "debug", skip(self, msg))]

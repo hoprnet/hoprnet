@@ -336,6 +336,13 @@
             hooks = {
               treefmt.enable = true;
               treefmt.package = config.treefmt.build.wrapper;
+              immutable-files = {
+                enable = true;
+                name = "Immutable files - the files should not change";
+                entry = "bash .github/scripts/immutable-files-check.sh";
+                files = "";
+                language = "system";
+              };
             };
             tools = pkgs;
           };
@@ -387,6 +394,9 @@
 
             programs.nixpkgs-fmt.enable = true;
             settings.formatter.nixpkgs-fmt.excludes = [ "./vendor/*" ];
+
+            programs.taplo.enable = true;
+            settings.formatter.taplo.excludes = [ "./vendor/*" ];
 
             # FIXME: currently broken in treefmt
             # programs.ruff.check = true;

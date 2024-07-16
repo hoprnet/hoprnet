@@ -1,6 +1,5 @@
-use std::{pin::Pin, sync::Arc};
+use std::pin::Pin;
 
-use async_lock::RwLock;
 use futures::channel::mpsc::{channel, Receiver, Sender};
 use futures::future::{poll_fn, Either};
 use futures::{pin_mut, stream::Stream, StreamExt};
@@ -9,6 +8,7 @@ use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use tracing::{debug, error, warn};
 
 use core_path::path::{Path, TransportPath};
+use hopr_async_runtime::prelude::{sleep, spawn};
 use hopr_crypto_packet::errors::{
     PacketError::{Retry, TagReplay, TransportError},
     Result,
@@ -19,7 +19,7 @@ use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 
 use super::packet::{PacketConstructing, TransportPacket};
-use crate::executor::{sleep, spawn};
+use crate::bloom;
 use crate::msg::mixer::MixerConfig;
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -350,7 +350,7 @@ pub struct PacketInteraction {
 
 impl PacketInteraction {
     /// Creates a new instance given the DB and our public key used to verify the acknowledgements.
-    pub fn new<Db>(db: Db, tbf: Arc<RwLock<TagBloomFilter>>, cfg: PacketInteractionConfig) -> Self
+    pub fn new<Db>(db: Db, tbf: bloom::WrappedTagBloomFilter, cfg: PacketInteractionConfig) -> Self
     where
         Db: HoprDbProtocolOperations + Send + Sync + std::fmt::Debug + Clone + 'static,
     {
@@ -393,7 +393,10 @@ impl PacketInteraction {
                         if let Some(tag) = packet_tag {
                             // There is a 0.1% chance that the positive result is not a replay
                             // because a Bloom filter is used
-                            if tbf.write().await.check_and_set(tag) {
+                            if tbf
+                                .with_write_lock(|inner: &mut TagBloomFilter| inner.check_and_set(tag))
+                                .await
+                            {
                                 return (Err(TagReplay), metadata);
                             }
                         }
@@ -546,7 +549,6 @@ impl Stream for PacketInteraction {
     type Item = MsgProcessed;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Option<Self::Item>> {
-        use futures::stream::StreamExt;
         Pin::new(self).msg_event_queue.1.poll_next_unpin(cx)
     }
 }
@@ -556,9 +558,10 @@ mod tests {
     use super::{ApplicationData, MsgProcessed, PacketInteraction, PacketInteractionConfig, DEFAULT_PRICE_PER_PACKET};
     use crate::{
         ack::processor::{AckProcessed, AckResult, AcknowledgementInteraction},
+        bloom::WrappedTagBloomFilter,
         msg::mixer::MixerConfig,
     };
-    use async_lock::RwLock;
+
     use async_trait::async_trait;
     use core_path::channel_graph::ChannelGraph;
     use core_path::path::{Path, TransportPath};
@@ -579,7 +582,7 @@ mod tests {
     use libp2p::Multiaddr;
     use libp2p_identity::PeerId;
     use serial_test::serial;
-    use std::{str::FromStr, sync::Arc, time::Duration};
+    use std::{str::FromStr, time::Duration};
     use tracing::debug;
 
     lazy_static! {
@@ -738,7 +741,7 @@ mod tests {
                 let ack = AcknowledgementInteraction::new(db.clone(), &PEERS_CHAIN[i]);
                 let pkt = PacketInteraction::new(
                     db.clone(),
-                    Arc::new(RwLock::new(TagBloomFilter::default())),
+                    WrappedTagBloomFilter::new("/ratata/invalid_path".into()),
                     PacketInteractionConfig {
                         check_unrealized_balance: true,
                         packet_keypair: PEERS[i].clone(),

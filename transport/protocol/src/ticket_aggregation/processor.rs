@@ -13,6 +13,7 @@ use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use std::{pin::Pin, task::Poll};
 use tracing::{error, warn};
 
+use hopr_async_runtime::prelude::{sleep, spawn};
 use hopr_crypto_types::prelude::*;
 use hopr_db_api::{
     errors::DbError,
@@ -24,7 +25,6 @@ use crate::errors::{
     ProtocolError::{Retry, TransportError},
     Result,
 };
-use crate::executor::{sleep, spawn};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleCounter;

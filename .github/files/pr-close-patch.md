@@ -6,3 +6,4 @@ This Pull requests contains all the required changes needed before releasing a n
 - [ ] Check that binary aarch64-linux works correctly by setting up a node on that architecture and platform
 - [ ] Check that binary aarch64-darwin works correctly by setting up a node on that architecture and platform
 - [ ] Check that binary x86_64-darwin works correctly by setting up a node on that architecture and platform
+- [ ] Create a new baseline for load testing following [Load testing guide](https://github.com/hoprnet/hoprnet/blob/master/.processes/release.md#load-testing).

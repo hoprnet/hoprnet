@@ -20,7 +20,12 @@ digest = "0.10"
 elliptic-curve = { version = "0.13", features = ["serde"] }
 generic-array = { workspace = true }
 hkdf = "0.12"
-k256 = { version = "0.13.0", features = ["arithmetic", "ecdh", "hash2curve", "serde"] }
+k256 = { version = "0.13.0", features = [
+  "arithmetic",
+  "ecdh",
+  "hash2curve",
+  "serde",
+] }
 sha3 = "0.10"
 typenum = { workspace = true }
 zeroize = { version = "1.7", features = ["zeroize_derive"] }
@@ -35,7 +40,7 @@ parameterized = { workspace = true }
 subtle = "2.5.0"
 
 [features]
-default = [ "x25519" ]
+default = ["x25519"]
 secp256k1 = []
 ed25519 = []
 x25519 = []

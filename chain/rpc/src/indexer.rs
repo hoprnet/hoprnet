@@ -219,6 +219,7 @@ mod test {
     use bindings::hopr_channels::*;
     use bindings::hopr_token::{ApprovalFilter, TransferFilter};
     use chain_types::{ContractAddresses, ContractInstances};
+    use hopr_async_runtime::prelude::{sleep, spawn};
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
     use tracing::debug;
 
@@ -298,13 +299,13 @@ mod test {
         };
 
         // Wait until contracts deployments are final
-        async_std::task::sleep((1 + cfg.finality) * expected_block_time).await;
+        sleep((1 + cfg.finality) * expected_block_time).await;
 
         let rpc = RpcOperations::new(client, &chain_key_0, cfg).expect("failed to construct rpc");
 
         let b1 = rpc.block_number().await.expect("should get block number");
 
-        async_std::task::sleep(expected_block_time * 2).await;
+        sleep(expected_block_time * 2).await;
 
         let b2 = rpc.block_number().await.expect("should get block number");
 
@@ -349,7 +350,7 @@ mod test {
         );
 
         // Wait until contracts deployments are final
-        async_std::task::sleep((1 + cfg.finality) * expected_block_time).await;
+        sleep((1 + cfg.finality) * expected_block_time).await;
 
         let rpc = RpcOperations::new(client, &chain_key_0, cfg).expect("failed to construct rpc");
 
@@ -367,7 +368,7 @@ mod test {
         debug!("{:#?}", log_filter);
 
         // Spawn channel funding
-        async_std::task::spawn(async move {
+        spawn(async move {
             chain_types::utils::fund_channel(
                 chain_key_1.public().to_address(),
                 contract_instances.token,
@@ -460,7 +461,7 @@ mod test {
         );
 
         // Wait until contracts deployments are final
-        async_std::task::sleep((1 + cfg.finality) * expected_block_time).await;
+        sleep((1 + cfg.finality) * expected_block_time).await;
 
         let rpc = RpcOperations::new(client, &chain_key_0, cfg).expect("failed to construct rpc");
 
@@ -476,7 +477,7 @@ mod test {
         debug!("{:#?}", log_filter);
 
         // Spawn channel funding
-        async_std::task::spawn(async move {
+        spawn(async move {
             chain_types::utils::fund_channel(
                 chain_key_1.public().to_address(),
                 contract_instances.token,

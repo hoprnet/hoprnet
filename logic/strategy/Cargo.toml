@@ -1,6 +1,6 @@
 [package]
 name = "hopr-strategy"
-version = "0.11.0"
+version = "0.11.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Contains implementations of different HOPR strategies"
 edition = "2021"
@@ -13,14 +13,27 @@ crate-type = ["rlib"]
 
 [features]
 default = []
-runtime-async-std = ["async-std", "core-protocol/runtime-async-std", "hopr-db-sql/runtime-async-std"]
-runtime-tokio = ["tokio", "core-protocol/runtime-tokio", "hopr-db-sql/runtime-tokio"]
-prometheus = [ "dep:hopr-metrics", "core-network/prometheus", "core-protocol/prometheus", "chain-actions/prometheus", "hopr-db-sql/prometheus" ]
+runtime-async-std = [
+  "core-protocol/runtime-async-std",
+  "hopr-db-sql/runtime-async-std",
+  "hopr-async-runtime/runtime-async-std",
+]
+runtime-tokio = [
+  "core-protocol/runtime-tokio",
+  "hopr-db-sql/runtime-tokio",
+  "hopr-async-runtime/runtime-tokio",
+]
+prometheus = [
+  "dep:hopr-metrics",
+  "core-network/prometheus",
+  "core-protocol/prometheus",
+  "chain-actions/prometheus",
+  "hopr-db-sql/prometheus",
+]
 
 [dependencies]
 async-lock = { workspace = true }
 async-trait = { workspace = true }
-async-std = { workspace = true, optional = true }
 futures = { workspace = true }
 rand = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
@@ -30,7 +43,6 @@ semver = { workspace = true }
 smart-default = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }
-tokio = { workspace = true, optional = true }
 validator = { workspace = true }
 
 hopr-crypto-random = { workspace = true }
@@ -44,6 +56,7 @@ hopr-metrics = { workspace = true, optional = true, default-features = false }
 hopr-internal-types = { workspace = true }
 hopr-primitive-types = { workspace = true }
 hopr-db-sql = { workspace = true }
+hopr-async-runtime = { workspace = true }
 
 [dev-dependencies]
 async-std = { workspace = true }
@@ -53,4 +66,3 @@ mockall = { workspace = true }
 hex-literal = { workspace = true }
 hopr-crypto-random = { workspace = true }
 futures = { workspace = true }
-

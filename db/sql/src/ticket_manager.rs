@@ -6,11 +6,11 @@ use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, Query
 use std::sync::Arc;
 use tracing::error;
 
+use hopr_async_runtime::prelude::spawn;
 use hopr_internal_types::tickets::AcknowledgedTicket;
 use hopr_primitive_types::prelude::ToHex;
 
 use crate::cache::HoprDbCaches;
-use crate::executor::spawn;
 use crate::prelude::DbSqlError;
 use crate::tickets::WrappedTicketSelector;
 use crate::{errors::Result, OpenTransaction};
@@ -18,15 +18,15 @@ use crate::{errors::Result, OpenTransaction};
 /// Functionality related to locking and structural improvements to the underlying SQLite database
 ///
 /// With SQLite, it is only possible to have a single write lock per database, meaning that
-/// high frequency database access to tickets needed to be split from the rest of the database
+/// high-frequency database access to tickets needed to be split from the rest of the database
 /// operations.
 ///
-/// High frequency of locking originating from the ticket processing pipeline could starve the DB,
-/// and lock with other concurrent processes, therefore a single mutex for write operations exists,
+/// High frequency of locking originating from the ticket processing pipeline could starve the DB
+/// and lock with other concurrent processes. Therefore, a single mutex for write operations exists,
 /// which allows bottle-necking the database write access on the mutex, as well as allowing arbitrary
 /// numbers of concurrent read operations.
 ///
-/// The queue based mechanism also splits the storage of the ticket inside the database from the processing,
+/// The queue-based mechanism also splits the storage of the ticket inside the database from the processing,
 /// effectively allowing the processing pipelines to be independent of a database write access.
 #[derive(Debug, Clone)]
 pub(crate) struct TicketManager {

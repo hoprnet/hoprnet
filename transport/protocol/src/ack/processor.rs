@@ -7,14 +7,13 @@ use libp2p_identity::PeerId;
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use tracing::{error, trace, warn};
 
+use hopr_async_runtime::prelude::spawn;
 use hopr_crypto_packet::errors::PacketError::{Retry, TransportError};
 use hopr_crypto_packet::errors::Result;
 use hopr_crypto_types::prelude::*;
 pub use hopr_db_api::protocol::AckResult;
 use hopr_db_api::protocol::HoprDbProtocolOperations;
 use hopr_internal_types::prelude::*;
-
-use crate::executor::spawn;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::{MultiCounter, SimpleCounter};
@@ -216,7 +215,6 @@ impl Stream for AcknowledgementInteraction {
     type Item = AckProcessed;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Option<Self::Item>> {
-        use futures::stream::StreamExt;
         Pin::new(self).ack_event_queue.1.poll_next_unpin(cx)
     }
 }
