@@ -84,7 +84,7 @@ pub(crate) async fn create_client(
         || data.capabilities.contains(&SessionCapability::Segmentation);
 
     if is_tcp_like {
-        let session = state.hopr.clone().connect_to(data.into()).await.map_err(|e| {
+        let session = state.hopr.clone().connect_to(data).await.map_err(|e| {
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 ApiErrorStatus::UnknownFailure(e.to_string()),
