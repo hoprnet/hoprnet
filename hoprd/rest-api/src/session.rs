@@ -91,12 +91,22 @@ pub(crate) async fn create_client(
             )
         })?;
 
-        let tcp_listener = TcpListener::bind("0.0.0.0:{port}").await.map_err(|e| {
+        let tcp_listener = TcpListener::bind("127.0.0.1:{port}").await.map_err(|e| {
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                ApiErrorStatus::UnknownFailure(format!("Failed to bind on 0.0.0.0:{port}: {e}")),
+                ApiErrorStatus::UnknownFailure(format!("Failed to bind on 127.0.0.1:{port}: {e}")),
             )
         })?;
+
+        let port = tcp_listener
+            .local_addr()
+            .map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    ApiErrorStatus::UnknownFailure(format!("Failed to get the port number: {e}")),
+                )
+            })?
+            .port();
 
         tokio::task::spawn(async move {
             match tcp_listener
@@ -109,13 +119,13 @@ pub(crate) async fn create_client(
                 Err(e) => error!("Failed to accept connection: {e:?}")
             }
         });
+
+        Ok((StatusCode::OK, Json(SessionClientResponse { port })).into_response())
     } else {
         // let s = UdpSocket::bind("0.0.0.0:{port}").await?.connect().await;
-        return Err((
+        Err((
             StatusCode::INTERNAL_SERVER_ERROR,
             ApiErrorStatus::UnknownFailure("No UDP socket support yet".to_string()),
-        ));
-    };
-
-    Ok((StatusCode::OK, Json(SessionClientResponse { port })).into_response())
+        ))
+    }
 }
