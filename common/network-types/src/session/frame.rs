@@ -43,7 +43,6 @@ use bitvec::{bitarr, BitArr};
 use dashmap::mapref::entry::Entry;
 use dashmap::DashMap;
 use futures::{Sink, Stream};
-use serde::{Deserialize, Serialize};
 use std::collections::BinaryHeap;
 use std::fmt::{Debug, Display, Formatter};
 use std::mem;
@@ -66,6 +65,7 @@ pub type SeqNum = u8;
 
 /// Convenience type that identifies a segment within a frame.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize), derive(serde::Deserialize))]
 pub struct SegmentId(pub FrameId, pub SeqNum);
 
 impl From<&Segment> for SegmentId {
@@ -139,7 +139,8 @@ impl AsRef<[u8]> for Frame {
 /// Besides the data, a segment carries information about the total number of
 /// segments in the original frame, its index within the frame and
 /// ID of that frame.
-#[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize), derive(serde::Deserialize))]
 pub struct Segment {
     /// ID of the [Frame] this segment belongs to.
     pub frame_id: FrameId,
@@ -148,7 +149,7 @@ pub struct Segment {
     /// Total number of segments within this segment sequence.
     pub seq_len: SeqNum,
     /// Data in this segment.
-    #[serde(with = "serde_bytes")]
+    #[cfg_attr(feature = "serde", serde(with = "serde_bytes"))]
     pub data: Box<[u8]>,
 }
 

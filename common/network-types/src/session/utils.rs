@@ -29,7 +29,8 @@ impl RetryToken {
 
     fn retry_in(&self, base: Duration, max_duration: Duration, jitter_dev: f64) -> Option<Duration> {
         let jitter_coeff = if jitter_dev > 0.0 {
-            rand_distr::Normal::new(1.0, jitter_dev)
+            // Should not use jitter with sigma > 0.25
+            rand_distr::Normal::new(1.0, jitter_dev.min(0.25))
                 .unwrap()
                 .sample(&mut thread_rng())
                 .abs()
