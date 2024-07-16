@@ -507,8 +507,6 @@ impl<const C: usize> SessionState<C> {
         let segments = segment(data, real_payload_len, frame_id)?;
 
         for segment in segments {
-            self.lookbehind.insert((&segment).into(), segment.clone());
-
             let msg = SessionMessage::<C>::Segment(segment.clone());
             debug!("{:?}: SENDING: segment {:?}", self.session_id, segment.id());
             self.segment_egress_send
@@ -516,7 +514,8 @@ impl<const C: usize> SessionState<C> {
                 .await
                 .map_err(|e| SessionError::ProcessingError(e.to_string()))?;
 
-            // TODO: prevent stalling here
+            // This is the only place where we insert into the lookbehind buffer
+            self.lookbehind.insert((&segment).into(), segment.clone());
             while self.lookbehind.len() > self.cfg.max_buffered_segments {
                 self.lookbehind.pop_front();
             }
