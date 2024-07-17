@@ -33,7 +33,6 @@ use futures::{
     channel::mpsc::{UnboundedReceiver, UnboundedSender},
     FutureExt, StreamExt,
 };
-use hopr_transport_session::{Capability, ClientSessionConfig};
 use tracing::{error, info, warn};
 
 use core_network::{
@@ -74,7 +73,10 @@ pub use {
         swarm::HoprSwarmWithProcessors, PeerTransportEvent, TransportOutput,
     },
     hopr_transport_session::PathOptions,
-    hopr_transport_session::{errors::TransportSessionError, traits::SendMsg, Session, SessionId},
+    hopr_transport_session::{
+        errors::TransportSessionError, traits::SendMsg, Capability as SessionCapability, Session, SessionClientConfig,
+        SessionId,
+    },
 };
 
 use crate::errors::HoprTransportError;
@@ -89,11 +91,6 @@ pub enum HoprTransportProcess {
     Swarm,
     SessionsRouter,
     BloomFilterSave,
-}
-
-pub enum SessionComponents {
-    Segmentation,
-    Retransmission,
 }
 
 #[derive(Debug, Clone)]
@@ -365,7 +362,10 @@ where
                                                         session_id,
                                                         me,
                                                         PathOptions::Hops(1),
-                                                        vec![Capability::Segmentation, Capability::Retransmission],
+                                                        vec![
+                                                            SessionCapability::Segmentation,
+                                                            SessionCapability::Retransmission,
+                                                        ],
                                                         message_sender.clone(),
                                                         rx,
                                                     ))
@@ -454,7 +454,7 @@ where
             .map(|status| status.last_seen.as_unix_timestamp().saturating_sub(start)))
     }
 
-    pub async fn new_session(&self, cfg: ClientSessionConfig) -> errors::Result<Session> {
+    pub async fn new_session(&self, cfg: SessionClientConfig) -> errors::Result<Session> {
         // TODO: 2.2 session initiation protocol is necessary to establish an application tag instead of this random approach
         let mut session_id: Option<SessionId> = None;
         for _ in 0..100 {
