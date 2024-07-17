@@ -196,7 +196,7 @@ function create_local_safes() {
   mapfile -t id_files <<< "$(find -L "${tmp_dir}" -maxdepth 1 -type f -name "${node_prefix}_*.id" | sort || true)"
 
   # create a loop so safes are created for all the nodes TODO:
-  for id_file in ${id_files[@]}; do
+  for id_file in "${id_files[@]}"; do
     # store the returned `safe <safe_address> \n node_module <module_address>` to `safe_i.log` for each id
     # `hopli create-safe-module` will also add nodes to network registry and approve token transfers for safe
     env \
@@ -217,35 +217,6 @@ function create_local_safes() {
   done
 }
 
-# read various identity files located at $id_path
-# create one safe and one module for all the identity files
-function create_local_safe_for_multi_nodes() {
-  log "Create safe"
-
-  mapfile -t id_files <<< "$(find -L "${tmp_dir}" -maxdepth 1 -type f -name "${node_prefix}_*.id" | sort || true)"
-
-  # create one safe for all the nodes
-  # store the returned `safe <safe_address> \n node_module <module_address>` to `${node_prefix}_all_nodes.safe.log`
-  # `hopli create-safe-module` will also add nodes to network registry and approve token transfers for safe
-  env \
-    ETHERSCAN_API_KEY="" \
-    IDENTITY_PASSWORD="${password}" \
-    PRIVATE_KEY="${deployer_private_key}" \
-    MANAGER_PRIVATE_KEY="${deployer_private_key}" \
-    hopli safe-module create \
-      --network anvil-localhost \
-      --identity-directory "${tmp_dir}" \
-      --identity-prefix "${node_prefix}" \
-      --hopr-amount 1000 --native-amount 1 \
-      --provider-url "http://localhost:8545" \
-      --contracts-root "./ethereum/contracts" > "${node_prefix}_all_nodes.safe.log"
-
-  # store safe arguments in separate file for later use (as in `create_local_safes` function)
-  for id_file in ${id_files[@]}; do
-    grep -E '^(safe|node_module)' "${node_prefix}_all_nodes.safe.log" | sed -e 's/^safe/--safeAddress/' -e ':a;N;$!ba;s/\nnode_module/ --moduleAddress/' > "${id_file%.id}.safe.args"
-  done
-  rm "${node_prefix}_all_nodes.safe.log"
-}
 
 function fund_all_local_identities() {
   log "Funding nodes"
@@ -312,9 +283,8 @@ update_protocol_config_addresses "${protocol_config}" "${deployments_summary}" "
 generate_local_identities
 
 # create safe and modules for all the ids, store them in args files
+#  each node has its own pair of safe and module
 create_local_safes
-# or running the following command to attach all the nodes to one safe
-# create_local_safe_for_multi_nodes
 
 #  --- Run nodes --- {{{
 for node_id in ${!id_files[@]}; do
