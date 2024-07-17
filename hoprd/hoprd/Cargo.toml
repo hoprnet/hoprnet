@@ -65,7 +65,7 @@ tracing-subscriber = { workspace = true }
 validator = { workspace = true }
 
 opentelemetry = { version = "0.24.0", optional = true }
-opentelemetry-otlp = { version = "0.17", default-features = false, features = [
+opentelemetry-otlp = { version = "0.17.0", default-features = false, features = [
   "trace",
   "reqwest-client",
   "tls-roots",
@@ -87,5 +87,5 @@ hopr-async-runtime = { workspace = true }
 tempfile = { workspace = true }
 
 [build-dependencies]
-vergen-gitcl = { version = "1.0.0-beta.2", features = ["build"] }
+vergen-gix = { version = "1.0.0", features = ["build"] }
 anyhow = { workspace = true }
