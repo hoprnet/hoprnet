@@ -75,7 +75,7 @@ pub use {
         errors::{HoprTransportError, ProtocolError},
         libp2p::identity::PeerId,
         ApplicationData, HalfKeyChallenge, Health, Keypair, Multiaddr, PathOptions, Session as HoprSession,
-        SessionComponents, TicketStatistics, TransportOutput,
+        SessionCapability, SessionClientConfig, TicketStatistics, TransportOutput,
     },
     hopr_internal_types::prelude::*,
     hopr_primitive_types::prelude::*,
@@ -1005,11 +1005,11 @@ impl Hopr {
         Ok(self.transport_api.ping(peer).await?)
     }
 
-    #[cfg(feature = "session_client")]
-    pub async fn connect_to(&self, peer: PeerId, path_opts: PathOptions) -> errors::Result<HoprSession> {
+    #[cfg(feature = "session-client")]
+    pub async fn connect_to(&self, cfg: SessionClientConfig) -> errors::Result<HoprSession> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
-        Ok(self.transport_api.new_session(peer, path_opts).await?)
+        Ok(self.transport_api.new_session(cfg).await?)
     }
 
     /// Send a message to another peer in the network
