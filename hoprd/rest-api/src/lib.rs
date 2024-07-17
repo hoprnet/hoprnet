@@ -252,7 +252,7 @@ async fn build_api(
                 .route("/node/peers", get(node::peers))
                 .route("/node/entryNodes", get(node::entry_nodes))
                 .route("/node/metrics", get(node::metrics))
-                .route("/session/client", get(session::create_client))
+                .route("/session", post(session::create_client))
                 .with_state(inner_state.clone().into())
                 .layer(middleware::from_fn_with_state(
                     inner_state,

@@ -42,8 +42,11 @@ pub enum Capability {
 #[derive(Debug, PartialEq, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct SessionClientConfig {
+    /// The peer to which the session should be established.
     #[cfg_attr(feature = "serde", serde(with = "As::<DisplayFromStr>"))]
     pub peer: PeerId,
+    /// The fixed path options for the session.
     pub path_options: PathOptions,
+    /// Capabilities offered by the session.
     pub capabilities: Vec<Capability>,
 }

@@ -15,6 +15,9 @@ use tracing::{error, info};
 
 use crate::{ApiErrorStatus, InternalState, BASE_PATH};
 
+pub const SESSION_TO_SOCKET_BUFEER: usize = 1456;
+pub const SOCKET_TO_SESSION_BUFEER: usize = 1456;
+
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 #[schema(example = json!({
@@ -22,15 +25,15 @@ use crate::{ApiErrorStatus, InternalState, BASE_PATH};
         "path": {
             "Hops": 1
         },
-        "capabilities": ["Segmentation", "Retransmission"]
+        "port": 0
     }))]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct SessionClientRequest {
     #[serde_as(as = "DisplayFromStr")]
     pub destination: PeerId,
     pub path: PathOptions,
-    pub capabilities: Vec<SessionCapability>,
-    pub port: Option<u16>,
+    #[serde(default)]
+    pub port: u16,
 }
 
 impl From<SessionClientRequest> for SessionClientConfig {
@@ -38,7 +41,7 @@ impl From<SessionClientRequest> for SessionClientConfig {
         Self {
             peer: value.destination,
             path_options: value.path,
-            capabilities: value.capabilities,
+            capabilities: vec![SessionCapability::Retransmission, SessionCapability::Retransmission],
         }
     }
 }
@@ -54,19 +57,20 @@ pub(crate) struct SessionClientResponse {
 }
 
 /// Creates a new client session returing a dedicated session listening port.
+///
+/// Once the port is bound, it is possible to use the socket for bidirectional read and write communication.
 #[utoipa::path(
-        get,
-        path = const_format::formatcp!("{BASE_PATH}/session/client"),
+        post,
+        path = const_format::formatcp!("{BASE_PATH}/session"),
         request_body(
             content = SessionClientRequest,
-            description = "Configuration of the client session to be created",
+            description = "Creates a new client HOPR session that will start listening on a dedicated port. Once the port is bound, it is possible to use the socketfor bidirectional read and write communication.",
             content_type = "application/json"),
         responses(
             (status = 200, description = "Successfully created a new client session", body = SessionClientResponse),
-            (status = 400, description = "Bad request.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError),
-            (status = 500, description = "Internal server error", body = ApiError)
+            (status = 501, description = "Feature not implemented", body = ApiError)
         ),
         security(
             ("api_token" = []),
@@ -78,7 +82,7 @@ pub(crate) async fn create_client(
     State(state): State<Arc<InternalState>>,
     Json(args): Json<SessionClientRequest>,
 ) -> Result<impl IntoResponse, impl IntoResponse> {
-    let port = args.port.unwrap_or(0);
+    let port = args.port;
     let data: SessionClientConfig = args.into();
     let is_tcp_like = data.capabilities.contains(&SessionCapability::Retransmission)
         || data.capabilities.contains(&SessionCapability::Segmentation);
@@ -86,14 +90,14 @@ pub(crate) async fn create_client(
     if is_tcp_like {
         let session = state.hopr.clone().connect_to(data).await.map_err(|e| {
             (
-                StatusCode::INTERNAL_SERVER_ERROR,
+                StatusCode::UNPROCESSABLE_ENTITY,
                 ApiErrorStatus::UnknownFailure(e.to_string()),
             )
         })?;
 
-        let tcp_listener = TcpListener::bind("127.0.0.1:{port}").await.map_err(|e| {
+        let tcp_listener = TcpListener::bind(format!("127.0.0.1:{port}")).await.map_err(|e| {
             (
-                StatusCode::INTERNAL_SERVER_ERROR,
+                StatusCode::UNPROCESSABLE_ENTITY,
                 ApiErrorStatus::UnknownFailure(format!("Failed to bind on 127.0.0.1:{port}: {e}")),
             )
         })?;
@@ -102,7 +106,7 @@ pub(crate) async fn create_client(
             .local_addr()
             .map_err(|e| {
                 (
-                    StatusCode::INTERNAL_SERVER_ERROR,
+                    StatusCode::UNPROCESSABLE_ENTITY,
                     ApiErrorStatus::UnknownFailure(format!("Failed to get the port number: {e}")),
                 )
             })?
@@ -112,7 +116,7 @@ pub(crate) async fn create_client(
             match tcp_listener
             .accept()
             .await {
-                Ok((mut tcp_stream, _sock_addr)) => match copy_bidirectional_with_sizes(&mut session.compat(), &mut tcp_stream, 1024, 1024).await {
+                Ok((mut tcp_stream, _sock_addr)) => match copy_bidirectional_with_sizes(&mut session.compat(), &mut tcp_stream, SESSION_TO_SOCKET_BUFEER, SOCKET_TO_SESSION_BUFEER).await {
                     Ok(bound_stream_finished) => info!("Client session through TCP port {port} ended with {bound_stream_finished:?} bytes transferred in both directions."),
                     Err(e) => error!("Failed to bind the TCP stream (port {port}) to the session: {e:?}")
                 },
@@ -124,7 +128,7 @@ pub(crate) async fn create_client(
     } else {
         // let s = UdpSocket::bind("0.0.0.0:{port}").await?.connect().await;
         Err((
-            StatusCode::INTERNAL_SERVER_ERROR,
+            StatusCode::NOT_IMPLEMENTED,
             ApiErrorStatus::UnknownFailure("No UDP socket support yet".to_string()),
         ))
     }
