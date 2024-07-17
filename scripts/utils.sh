@@ -7,7 +7,7 @@ test "$?" -eq "0" || { echo "This script should only be sourced." >&2; exit 1; }
 # exit on errors, undefined variables, ensure errors in pipes are not hidden
 set -Eeuo pipefail
 
-function install_package() {
+function check_package() {
   local package_name="$1"
   local exit_code=0
 
@@ -16,37 +16,10 @@ function install_package() {
   if [ "${exit_code}" = "0" ]; then
     log "$package_name already installed"
     return 0
-  fi
-
-  declare kernel
-  kernel=$(uname -s)
-
-  if [ "${kernel}" = "Linux" ]; then
-    exit_code=0
-    which apt-get > /dev/null || exit_code=$?
-    if [ "${exit_code}" != "0" ]; then
-      log "⛔️ apt-get not found"
-      return 1
-    fi
-    sudo apt-get update
-    sudo apt-get install "$package_name" -y
-  elif [ "${kernel}" = "Darwin" ]; then
-    exit_code=0
-    which brew > /dev/null || exit_code=$?
-    if [ "${exit_code}" != "0" ]; then
-      log "⛔️ Homebrew not found. Please install Homebrew manually first"
-      return 1
-    fi
-    log "Installing $package_name..."
-    brew install "$package_name"
   else
-    log "⛔️ cannot install $package_name for unsupported platform ${kernel}"
+    log "$package_name not found"
     return 1
   fi
-
-  log "Checking $package_name is installed..."
-  which "$package_name" > /dev/null
-  log "$package_name successfully installed"
 }
 
 # $1=version string, semver
@@ -348,5 +321,5 @@ get_eth_block_number() {
 setup_colors
 
 # Ensure that jq and curl are installed
-install_package jq
-install_package curl
+check_package jq
+check_package curl
