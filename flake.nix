@@ -348,6 +348,7 @@
           };
           defaultDevShell = import ./nix/shell.nix { inherit pkgs config crane pre-commit-check solcDefault; };
           smoketestsDevShell = import ./nix/shell.nix { inherit pkgs config crane pre-commit-check solcDefault; extraPackages = [ hoprd hopli ]; };
+          docsDevShell = import ./nix/shell.nix { inherit pkgs config crane pre-commit-check solcDefault; extraPackages = with pkgs; [ html-tidy pandoc ]; useRustNightly = true; };
           run-check = flake-utils.lib.mkApp {
             drv = pkgs.writeShellScriptBin "run-check" ''
               set -e
@@ -454,6 +455,7 @@
 
           devShells.default = defaultDevShell;
           devShells.smoke-tests = smoketestsDevShell;
+          devShells.docs = docsDevShell;
 
           formatter = config.treefmt.build.wrapper;
         };

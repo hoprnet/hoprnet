@@ -1,5 +1,5 @@
 //! The crate aggregates and composes individual transport level objects and functionality
-//! into a unified [`HoprTransport`] object with the goal of isolating the transport layer
+//! into a unified [`crate::HoprTransport`] object with the goal of isolating the transport layer
 //! and defining a fully specified transport API.
 //!
 //! As such, the transport layer components should be only those that are directly needed in
@@ -10,7 +10,7 @@
 //! 4. algorithms associated with the transport layer operational management
 //! 5. interface specifications to allow modular behavioral extensions
 
-/// Configuration of the [HoprTransport].
+/// Configuration of the [crate::HoprTransport].
 pub mod config;
 /// Constants used and exposed by the crate.
 pub mod constants;
@@ -217,10 +217,11 @@ where
         self.network.clone()
     }
 
-    /// Execute all processes of the [`HoprTransport`] object.
+    /// Execute all processes of the [`crate::HoprTransport`] object.
     ///
-    /// This method will spawn the [`HoprTransportProcessType::Heartbeat`] and [`HoprTransportProcessType::SwarmEventLoop`] processes and return
-    /// join handles to the calling function. Both processes are not started immediately, but are
+    /// This method will spawn the [`crate::HoprTransportProcess::Heartbeat`], [`crate::HoprTransportProcess::BloomFilterSave`],
+    /// [`crate::HoprTransportProcess::Swarm`] and [`crate::HoprTransportProcess::SessionsRouter`] processes and return
+    /// join handles to the calling function. These processes are not started immediately, but are
     /// waiting for a trigger from this piece of code.
     #[allow(clippy::too_many_arguments)]
     pub async fn run(

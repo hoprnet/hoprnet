@@ -1005,7 +1005,7 @@ impl Hopr {
         Ok(self.transport_api.ping(peer).await?)
     }
 
-    #[cfg(feature = "session_client")]
+    #[cfg(feature = "session-client")]
     pub async fn connect_to(&self, peer: PeerId, path_opts: PathOptions) -> errors::Result<HoprSession> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 

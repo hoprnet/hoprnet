@@ -32,7 +32,7 @@
 //! The [Action](chain_types::actions::Action) enum instance is then passed via
 //! an [ActionSender] into the [ActionQueue](action_queue::ActionQueue).
 //! The [ActionQueue](action_queue::ActionQueue) takes care of ensuring the FIFO order of the
-//! actions which is driven by a standalone [action loop](`action_queue::ActionQueue::action_loop()`) and must be instantiated
+//! actions which is driven by a standalone [action loop](`action_queue::ActionQueue::start()`) and must be instantiated
 //! before [ChainActions], so that it can provide it with an [ActionSender].
 //!
 //! ### Queueing of actions

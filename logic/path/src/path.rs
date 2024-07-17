@@ -105,9 +105,10 @@ impl ChannelPath {
     }
 
     // TODO: this method could be turned sync once the `PeerAddressResolver` is sync too.
+
     /// Resolves this on-chain `ChannelPath` into the off-chain [TransportPath] and adds the final hop
     /// to the given `destination` (which does not require an open channel).
-    /// The given [resolver](PeerAddressResolver) is used for the mapping between `PeerId`s and `Address`es.
+    /// The given [resolver](HoprDbResolverOperations) is used for the mapping between `PeerId`s and `Address`es.
     pub async fn into_path<R: HoprDbResolverOperations>(
         self,
         resolver: &R,
@@ -172,7 +173,7 @@ impl TransportPath {
     ///  also the multi-hop `ChannelPath`.
     /// To do an inverse resolution, from [Addresses](Address) to `PeerId`s, construct the [ChannelPath] and use its `to_path()` method to resolve the
     /// on-chain path.
-    /// The given [resolver](PeerAddressResolver) is used for the mapping between `PeerId`s and `Address`es.
+    /// The given [resolver](HoprDbResolverOperations) is used for the mapping between `PeerId`s and `Address`es.
     pub async fn resolve<R: HoprDbResolverOperations>(
         peers: Vec<PeerId>,
         resolver: &R,
