@@ -1,1 +1,0 @@
-# vergen-lib - Common code used to support the vergen libraries
