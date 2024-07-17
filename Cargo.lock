@@ -4265,6 +4265,8 @@ dependencies = [
  "futures-concurrency",
  "hopr-crypto-types",
  "hopr-internal-types",
+ "hopr-metrics",
+ "lazy_static",
  "libp2p",
  "libp2p-mplex",
  "multiaddr",

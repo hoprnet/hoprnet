@@ -44,7 +44,7 @@ impl From<NetworkRegistryStatus> for PeerEligibility {
     }
 }
 
-/// Indexer events triggered externally from the [`HoprTransport`] object.
+/// Indexer events triggered externally from the [`crate::HoprTransport`] object.
 pub enum IndexerTransportEvent {
     EligibilityUpdate(PeerId, PeerEligibility),
     Announce(PeerId, Vec<Multiaddr>),

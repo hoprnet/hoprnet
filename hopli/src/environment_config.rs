@@ -8,7 +8,7 @@
 //! Network is a collection of several major/minor releases.
 //!
 //! [NetworkDetail] specifies the environment type of the network, the starting block number, and
-//! the deployed contract addresses in [NetworkContractAddresses]
+//! the deployed contract addresses in [ContractAddresses]
 
 use crate::utils::HelperErrors;
 use chain_api::config::{Addresses as ContractAddresses, EnvironmentType};

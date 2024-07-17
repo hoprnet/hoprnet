@@ -10,12 +10,14 @@ crate-type = ["rlib"]
 
 [features]
 default = []
+prometheus = ["dep:lazy_static", "dep:hopr-metrics"]
 runtime-async-std = ["libp2p/async-std"]
 runtime-tokio = ["libp2p/tokio"]
 
 [dependencies]
 futures = { workspace = true }
 futures-concurrency = { workspace = true }
+lazy_static = { workspace = true, optional = true }
 libp2p = { workspace = true, features = [
   "noise",
   "request-response",
@@ -37,6 +39,7 @@ core-network = { workspace = true }
 core-protocol = { workspace = true }
 hopr-internal-types = { workspace = true }
 hopr-crypto-types = { workspace = true }
+hopr-metrics = { workspace = true, optional = true }
 
 [dev-dependencies]
 async-std = { workspace = true }
