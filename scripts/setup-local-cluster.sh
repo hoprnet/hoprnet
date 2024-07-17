@@ -18,7 +18,6 @@ PATH="${mydir}/../.foundry/bin:${mydir}/../.cargo/bin:${PATH}"
 
 # verify and set parameters
 declare api_token="^^LOCAL-testing-123^^"
-declare myne_chat_url="http://app.myne.chat"
 declare init_script=""
 declare hoprd_command="hoprd"
 declare listen_host="127.0.0.1"
@@ -28,10 +27,9 @@ declare deployer_private_key=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efca
 
 usage() {
   msg
-  msg "Usage: $0 [-h|--help] [-t|--api-token <api_token>] [-m|--myne-chat-url <myne_chat_url>] [-i|--init-script <init_script>] [--hoprd-command <hoprd_command>] [--listen-host|-l <list_host>] [-p|--production]"
+  msg "Usage: $0 [-h|--help] [-t|--api-token <api_token>] [-i|--init-script <init_script>] [--hoprd-command <hoprd_command>] [--listen-host|-l <list_host>] [-p|--production]"
   msg
   msg "<api_token> is set to '${api_token}' by default"
-  msg "<myne_chat_url> is set to '${myne_chat_url}' by default"
   msg "<init_script> is empty by default, expected to be path to a script which is called with all node API endpoints as parameters"
   msg "<hoprd_command> is used to start hoprd, default is '${hoprd_command}'"
   msg "<listen_host> is listened on by all hoprd instances, default is '${listen_host}'"
@@ -51,11 +49,6 @@ while (( "$#" )); do
       ;;
     -t|--api-token)
       api_token="${2}"
-      shift
-      shift
-      ;;
-    -m|--myne-chat-url)
-      myne_chat_url="${2}"
       shift
       shift
       ;;
