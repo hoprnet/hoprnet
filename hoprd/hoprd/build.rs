@@ -1,9 +1,8 @@
 use anyhow::Result;
-use vergen_gitcl::{Emitter, GitclBuilder};
+use vergen_gix::{Emitter, GixBuilder};
 
 pub fn main() -> Result<()> {
-    // Add short SHA hash of the commit as `VERGEN_GIT_SHA` env variable
-    let git = GitclBuilder::default().sha(true).build()?;
-
+    // Adds a short SHA hash of the commit as `VERGEN_GIT_SHA` env variable
+    let git = GixBuilder::default().sha(true).build()?;
     Emitter::default().add_instructions(&git)?.emit()
 }
