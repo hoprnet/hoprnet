@@ -146,6 +146,7 @@ run-local-dev-compose: ## run local development Compose setup
 fund-local-all: id_dir=/tmp/
 fund-local-all: id_password=local
 fund-local-all: id_prefix=
+fund-local-all: provider_url=http://localhost:8545
 fund-local-all: ## use faucet script to fund all the local identities
 	ETHERSCAN_API_KEY="anykey" IDENTITY_PASSWORD="${id_password}" PRIVATE_KEY=ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
 		hopli faucet \
@@ -153,7 +154,7 @@ fund-local-all: ## use faucet script to fund all the local identities
 		--contracts-root "./ethereum/contracts" \
 		--identity-prefix "${id_prefix}" \
 		--identity-directory "${id_dir}" \
-		--provider-url "http://localhost:8545"
+		--provider-url "${provider_url}"
 
 .PHONY: create-safe-module-all
 create-safe-module-all: id_dir=/tmp/
