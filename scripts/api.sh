@@ -49,7 +49,7 @@ api_call(){
   then
     api_endpoint=$api_endpoint
   else
-    api_endpoint=api/v3$api_endpoint
+    api_endpoint=/api/v3$api_endpoint
   fi
   local cmd="curl -X ${rest_method} -m ${step_time} --connect-timeout ${step_time} -s -H X-Auth-Token:${api_token} -H Content-Type:application/json --url ${source_api}${api_endpoint} ${response_type}"
   # if no end time was given we need to calculate it once
