@@ -64,18 +64,18 @@ tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 validator = { workspace = true }
 
-opentelemetry = { version = "0.23.0", optional = true }
-opentelemetry-otlp = { version = "0.15", default-features = false, features = [
+opentelemetry = { version = "0.24.0", optional = true }
+opentelemetry-otlp = { version = "0.17", default-features = false, features = [
   "trace",
   "reqwest-client",
   "tls-roots",
   "http-proto",
   "grpc-tonic",
 ], optional = true }
-opentelemetry_sdk = { version = "0.23.0", optional = true }
+opentelemetry_sdk = { version = "0.24.0", optional = true }
 tracing-opentelemetry = { version = "0.24.0", optional = true }
 
-hopr-lib = { workspace = true }
+hopr-lib = { workspace = true, features = ["runtime-tokio"] }
 hoprd-api = { workspace = true }
 hoprd-inbox = { workspace = true }
 hoprd-keypair = { workspace = true }
