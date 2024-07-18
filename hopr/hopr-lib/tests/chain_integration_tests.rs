@@ -1,5 +1,6 @@
+mod common;
+
 use ethers::providers::Middleware;
-use ethers::utils::AnvilInstance;
 use futures::{pin_mut, StreamExt};
 use std::time::Duration;
 use tracing::info;
@@ -14,19 +15,18 @@ use chain_actions::ChainActions;
 use chain_api::executors::{EthereumTransactionExecutor, RpcEthereumClient, RpcEthereumClientConfig};
 use chain_indexer::{block::Indexer, handlers::ContractEventHandlers, IndexerConfig};
 use chain_rpc::client::surf_client::SurfRequestor;
-use chain_rpc::client::{create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy};
+use chain_rpc::client::{JsonRpcProviderClient, SimpleJsonRpcRetryPolicy};
 use chain_rpc::rpc::{RpcOperations, RpcOperationsConfig};
 use chain_types::chain_events::ChainEventType;
-use chain_types::utils::{
-    add_announcement_as_target, approve_channel_transfer_from_safe, create_anvil, include_node_to_module_by_safe,
-};
-use chain_types::{ContractAddresses, ContractInstances};
+use chain_types::ContractInstances;
 use core_transport::{ChainKeypair, Hash, Keypair, Multiaddr, OffchainKeypair};
 use hopr_async_runtime::prelude::{cancel_join_handle, sleep, spawn, JoinHandle};
 use hopr_crypto_types::prelude::*;
 use hopr_db_sql::{api::info::DomainSeparator, prelude::*};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
+
+use crate::common::{deploy_test_environment, onboard_node, TestChainEnv};
 
 // Helper function to generate the first acked ticket (channel_epoch 1, index 0, offset 0) of win prob 100%
 async fn generate_the_first_ack_ticket<M: Middleware>(
@@ -63,77 +63,6 @@ async fn generate_the_first_ack_ticket<M: Middleware>(
         .expect("should store ack key");
 }
 
-async fn onboard_node<M: Middleware>(
-    instances: &ContractInstances<M>,
-    contract_deployer: &ChainKeypair,
-    node_chain_key: &ChainKeypair,
-) -> (Address, Address) {
-    let client = instances.token.client();
-
-    // Deploy Safe and Module for node
-    let (module, safe) = chain_types::utils::deploy_one_safe_one_module_and_setup_for_testing(
-        instances,
-        client.clone(),
-        contract_deployer,
-    )
-    .await
-    .expect("could not deploy safe and module");
-
-    // ----------------
-    // Onboarding:
-    // Include node to the module
-    // Add announcement contract to be a target in the module
-    // Mint HOPR tokens to the Safe
-    // Approve token transfer for Channel contract
-
-    // Include node to the module
-    include_node_to_module_by_safe(
-        client.clone(),
-        safe,
-        module,
-        node_chain_key.public().to_address(),
-        contract_deployer,
-    )
-    .await
-    .expect("could not include node to module");
-
-    // Add announcement as target into the module
-    add_announcement_as_target(
-        client.clone(),
-        safe,
-        module,
-        instances.announcements.address().into(),
-        contract_deployer,
-    )
-    .await
-    .expect("could not add announcement to module");
-
-    // Fund the node's Safe with 10 native token and 10 000 * 1e-18 HOPR token
-    chain_types::utils::fund_node(safe, 10_u128.into(), 10_000_u128.into(), instances.token.clone()).await;
-
-    // Fund node's address with 10 native token
-    chain_types::utils::fund_node(
-        node_chain_key.public().to_address(),
-        10_u128.into(),
-        0.into(),
-        instances.token.clone(),
-    )
-    .await;
-
-    // Approve token transfer for channels contract
-    approve_channel_transfer_from_safe(
-        client.clone(),
-        safe,
-        instances.token.address().into(),
-        instances.channels.address().into(),
-        contract_deployer,
-    )
-    .await
-    .expect("could not approve channels to be a spender for safe");
-
-    (module, safe)
-}
-
 type TestRpc = RpcOperations<JsonRpcProviderClient<SurfRequestor, SimpleJsonRpcRetryPolicy>>;
 
 struct ChainNode {
@@ -149,8 +78,7 @@ struct ChainNode {
 async fn start_node_chain_logic(
     chain_key: &ChainKeypair,
     offchain_key: &OffchainKeypair,
-    anvil: &AnvilInstance,
-    contract_addrs: ContractAddresses,
+    chain_env: &TestChainEnv,
     module_addr: Address,
     safe_addr: Address,
     rpc_cfg: RpcOperationsConfig,
@@ -180,7 +108,7 @@ async fn start_node_chain_logic(
 
     // RPC
     let json_rpc_client = JsonRpcProviderClient::new(
-        &anvil.endpoint(),
+        &chain_env.anvil.endpoint(),
         SurfRequestor::default(),
         SimpleJsonRpcRetryPolicy::default(),
     );
@@ -191,7 +119,7 @@ async fn start_node_chain_logic(
     let eth_client = RpcEthereumClient::new(rpc_ops.clone(), RpcEthereumClientConfig::default());
     let tx_exec = EthereumTransactionExecutor::new(
         eth_client,
-        SafePayloadGenerator::new(chain_key, contract_addrs, module_addr),
+        SafePayloadGenerator::new(chain_key, chain_env.contract_addresses, module_addr),
     );
 
     // Actions
@@ -218,7 +146,8 @@ async fn start_node_chain_logic(
     }));
 
     // Indexer
-    let chain_log_handler = ContractEventHandlers::new(contract_addrs, safe_addr, chain_key.clone(), db.clone());
+    let chain_log_handler =
+        ContractEventHandlers::new(chain_env.contract_addresses, safe_addr, chain_key.clone(), db.clone());
 
     let mut indexer = Indexer::new(rpc_ops.clone(), chain_log_handler, db.clone(), indexer_cfg, sce_tx);
     indexer.start().await.expect("indexer should sync");
@@ -237,35 +166,22 @@ async fn start_node_chain_logic(
 #[cfg_attr(all(feature = "runtime-tokio", not(feature = "runtime-async-std")), tokio::test)]
 async fn integration_test_indexer() {
     let block_time = Duration::from_secs(1);
-    let anvil = create_anvil(Some(block_time));
-    let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
+    let finality = 2;
 
-    let alice_chain_key = ChainKeypair::from_secret(anvil.keys()[1].to_bytes().as_ref()).unwrap();
-    let bob_chain_key = ChainKeypair::from_secret(anvil.keys()[2].to_bytes().as_ref()).unwrap();
+    let chain_env = deploy_test_environment(block_time, finality).await;
+
+    let alice_chain_key = chain_env.node_chain_keys[0].clone();
+    let bob_chain_key = chain_env.node_chain_keys[1].clone();
 
     let alice_offchain_key = OffchainKeypair::random();
     let bob_offchain_key = OffchainKeypair::random();
 
-    let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &contract_deployer);
-    info!("Deploying SCs to Anvil...");
-    let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
-        .await
-        .expect("failed to deploy");
-
-    // Mint some tokens
-    chain_types::utils::mint_tokens(instances.token.clone(), 1_000_000_u128.into()).await;
-
-    let contract_addrs = ContractAddresses::from(&instances);
-
-    let finality = 2;
-    sleep((1 + finality) * block_time).await;
-
     // ----------------------------------------
 
     let mut rpc_cfg = RpcOperationsConfig {
-        chain_id: anvil.chain_id(),
+        chain_id: chain_env.anvil.chain_id(),
         finality,
-        contract_addrs,
+        contract_addrs: chain_env.contract_addresses,
         module_address: Address::default(),
         expected_block_time: block_time,
         tx_polling_interval: Duration::from_millis(100),
@@ -278,17 +194,17 @@ async fn integration_test_indexer() {
 
     let indexer_cfg = IndexerConfig { start_block_number: 1 };
 
-    // Setup ALICE
+    // Set up ALICE
     info!("Setting up ALICE");
-    let (alice_module_addr, alice_safe_addr) = onboard_node(&instances, &contract_deployer, &alice_chain_key).await;
+    let (alice_module_addr, alice_safe_addr) =
+        onboard_node(&chain_env, &alice_chain_key, 10_u32.into(), 10_000_u32.into()).await;
 
     rpc_cfg.module_address = alice_module_addr;
 
     let alice_node = start_node_chain_logic(
         &alice_chain_key,
         &alice_offchain_key,
-        &anvil,
-        contract_addrs,
+        &chain_env,
         alice_module_addr,
         alice_safe_addr,
         rpc_cfg,
@@ -299,15 +215,15 @@ async fn integration_test_indexer() {
 
     // Setup BOB
     info!("Setting up BOB");
-    let (bob_module_addr, bob_safe_addr) = onboard_node(&instances, &contract_deployer, &bob_chain_key).await;
+    let (bob_module_addr, bob_safe_addr) =
+        onboard_node(&chain_env, &bob_chain_key, 10_u32.into(), 10_000_u32.into()).await;
 
     rpc_cfg.module_address = bob_module_addr;
 
     let bob_node = start_node_chain_logic(
         &bob_chain_key,
         &bob_offchain_key,
-        &anvil,
-        contract_addrs,
+        &chain_env,
         bob_module_addr,
         bob_safe_addr,
         rpc_cfg,
@@ -598,8 +514,8 @@ async fn integration_test_indexer() {
 
     let ticket_price = Balance::new(1, BalanceType::HOPR);
 
-    // Create ticket from Alice in Bob's DB
-    generate_the_first_ack_ticket(&bob_node, &alice_chain_key, ticket_price, &instances).await;
+    // Create a ticket from Alice in Bob's DB
+    generate_the_first_ack_ticket(&bob_node, &alice_chain_key, ticket_price, &chain_env.contract_instances).await;
 
     let bob_ack_tickets = bob_node
         .db
@@ -624,13 +540,15 @@ async fn integration_test_indexer() {
         .expect("db call should not fail")
         .expect("should contain a channel from Bob");
 
-    let (on_chain_channel_bob_alice_balance, _, _, _, _) = instances
+    let (on_chain_channel_bob_alice_balance, _, _, _, _) = chain_env
+        .contract_instances
         .channels
         .channels(channel_bob_alice.get_id().into())
         .call()
         .await
         .unwrap();
-    let (on_chain_channel_alice_bob_balance, _, _, _, _) = instances
+    let (on_chain_channel_alice_bob_balance, _, _, _, _) = chain_env
+        .contract_instances
         .channels
         .channels(channel_alice_bob.get_id().into())
         .call()
@@ -726,14 +644,16 @@ async fn integration_test_indexer() {
         .expect("db call should not fail")
         .expect("should contain a channel from Alice");
 
-    let (on_chain_channel_bob_alice_balance, _, _, _, _) = instances
+    let (on_chain_channel_bob_alice_balance, _, _, _, _) = chain_env
+        .contract_instances
         .channels
         .channels(channel_bob_alice.get_id().into())
         .call()
         .await
         .unwrap();
 
-    let (on_chain_channel_alice_bob_balance, _, _, _, _) = instances
+    let (on_chain_channel_alice_bob_balance, _, _, _, _) = chain_env
+        .contract_instances
         .channels
         .channels(channel_alice_bob.get_id().into())
         .call()

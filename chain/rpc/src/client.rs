@@ -17,6 +17,7 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Formatter};
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
+use std::sync::Arc;
 use std::time::Duration;
 use tracing::{debug, trace, warn};
 use validator::Validate;
@@ -600,11 +601,10 @@ pub mod reqwest_client {
     }
 }
 
-type AnvilRpcClient<R> = std::sync::Arc<
-    ethers::middleware::SignerMiddleware<
-        ethers::providers::Provider<JsonRpcProviderClient<R, SimpleJsonRpcRetryPolicy>>,
-        ethers::signers::Wallet<ethers::core::k256::ecdsa::SigningKey>,
-    >,
+/// Used for testing
+pub type AnvilRpcClient<R> = ethers::middleware::SignerMiddleware<
+    ethers::providers::Provider<JsonRpcProviderClient<R, SimpleJsonRpcRetryPolicy>>,
+    ethers::signers::Wallet<ethers::core::k256::ecdsa::SigningKey>,
 >;
 
 /// Used for testing. Creates Ethers RPC client to the local Anvil instance.
@@ -613,7 +613,7 @@ pub fn create_rpc_client_to_anvil<R: HttpPostRequestor + Debug>(
     backend: R,
     anvil: &ethers::utils::AnvilInstance,
     signer: &hopr_crypto_types::keypairs::ChainKeypair,
-) -> AnvilRpcClient<R> {
+) -> Arc<AnvilRpcClient<R>> {
     use ethers::signers::Signer;
     use hopr_crypto_types::keypairs::Keypair;
 
@@ -622,7 +622,7 @@ pub fn create_rpc_client_to_anvil<R: HttpPostRequestor + Debug>(
     let json_client = JsonRpcProviderClient::new(&anvil.endpoint(), backend, SimpleJsonRpcRetryPolicy::default());
     let provider = ethers::providers::Provider::new(json_client).interval(Duration::from_millis(10_u64));
 
-    std::sync::Arc::new(ethers::middleware::SignerMiddleware::new(
+    Arc::new(ethers::middleware::SignerMiddleware::new(
         provider,
         wallet.with_chain_id(anvil.chain_id()),
     ))
