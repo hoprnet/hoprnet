@@ -41,6 +41,9 @@ let
 
   crateInfo = craneLib.crateNameFromCargoToml { inherit cargoToml; };
   pname = crateInfo.pname;
+  pnameSuffix =
+    if CARGO_PROFILE == "release" then ""
+    else "-${CARGO_PROFILE}";
   version = lib.strings.concatStringsSep "." (lib.lists.take 3 (builtins.splitVersion crateInfo.version));
 
   isDarwinForDarwin = buildPlatform.isDarwin && hostPlatform.isDarwin;
@@ -59,7 +62,7 @@ let
       [ setupHookDarwin ] else [ ];
 
   sharedArgsBase = {
-    inherit pname version CARGO_PROFILE;
+    inherit pname pnameSuffix version CARGO_PROFILE;
 
     # FIXME: some dev dependencies depend on OpenSSL, would be nice to remove
     # this dependency
