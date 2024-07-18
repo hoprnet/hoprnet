@@ -114,11 +114,11 @@ enum HoprdProcesses {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let _ = init_logger();
 
-    let git_hash = option_env!("VERGEN_GIT_SHA").unwrap_or("unknown");
-    info!("This is HOPRd {} ({})", hopr_lib::constants::APP_VERSION, git_hash);
-
     let args = <CliArgs as clap::Parser>::parse();
     let cfg = hoprd::config::HoprdConfig::from_cli_args(args, false)?;
+
+    let git_hash = option_env!("VERGEN_GIT_SHA").unwrap_or("unknown");
+    info!("This is HOPRd {} ({})", hopr_lib::constants::APP_VERSION, git_hash);
 
     if std::env::var("DAPPNODE")
         .map(|v| v.to_lowercase() == "true")
