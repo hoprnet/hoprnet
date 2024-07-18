@@ -67,7 +67,7 @@ fn is_running(state: Arc<AppState>) -> impl IntoResponse {
 pub(super) async fn eligiblez(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
-    match hopr.get_eligiblity_status().await {
+    match hopr.get_eligibility_status().await {
         Ok(true) => (StatusCode::OK, "").into_response(),
         _ => (StatusCode::PRECONDITION_FAILED, "").into_response(),
     }
