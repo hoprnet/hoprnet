@@ -4,6 +4,10 @@
 #################################################################################
 name: Build Docker
 
+env:
+  RUST_BACKTRACE: "1"
+  needs_nix_setup: false
+
 on:
   workflow_call:
     inputs:
@@ -18,7 +22,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   build-docker:
-    runs-on: self-hosted-hoprnet-big
+    runs-on: self-hosted-hoprnet-bigger
     timeout-minutes: 60
     steps:
       - name: Checkout hoprnet repository
@@ -41,11 +45,13 @@ jobs:
           password: ${{ steps.auth.outputs.access_token }}
 
       - name: Install Nix
+        if: env.needs_nix_setup == true
         uses: cachix/install-nix-action@v27
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: cachix/cachix-action@v15
+        if: env.needs_nix_setup == true
         with:
           name: hoprnet
           authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
@@ -134,4 +140,3 @@ jobs:
             echo "[INFO] Restarting hoprd node ${namespace}/${deployments}"
             kubectl rollout restart deployments -n ${namespace} $deployment;
           done
-
