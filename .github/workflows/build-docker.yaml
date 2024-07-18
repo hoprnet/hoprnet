@@ -86,13 +86,13 @@ jobs:
           COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
 
       - name: Build and push ${{ inputs.package }} docker image - Default
-        run: nix run .#${{ env.NIX_BUILD_TARGET }}
+        run: nix run .#${{ steps.options.outputs.NIX_BUILD_TARGET }}
         env:
           GOOGLE_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
           IMAGE_TARGET: europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/${{ inputs.package }}:${{ steps.options.outputs.DOCKER_TAG }}
 
       - name: Build and push ${{ inputs.package }} docker image - PR
-        run: nix run .#${{ env.NIX_BUILD_TARGET }}
+        run: nix run .#${{ steps.options.outputs.NIX_BUILD_TARGET }}
         if: github.event_name == 'pull_request'
         env:
           GOOGLE_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
