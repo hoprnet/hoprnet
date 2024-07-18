@@ -1,7 +1,19 @@
-{ config, pkgs, crane, pre-commit-check, solcDefault, extraPackages ? [ ] }:
+{ config
+, pkgs
+, crane
+, pre-commit-check
+, solcDefault
+, extraPackages ? [ ]
+, useRustNightly ? false
+}:
 let
   cargoTarget = pkgs.stdenv.buildPlatform.config;
-  rustToolchain = (pkgs.rust-bin.fromRustupToolchainFile ./../rust-toolchain.toml).override { targets = [ cargoTarget ]; };
+  rustToolchain =
+    if useRustNightly
+    then pkgs.rust-bin.selectLatestNightlyWith (toolchain: toolchain.default)
+    else
+      (pkgs.pkgsBuildHost.rust-bin.fromRustupToolchainFile
+        ../rust-toolchain.toml).override { targets = [ cargoTarget ]; };
   craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchain;
 in
 craneLib.devShell {
@@ -24,10 +36,6 @@ craneLib.devShell {
 
     # test Github automation
     act
-
-    # documentation utilities
-    pandoc
-    swagger-codegen3
 
     # docker image inspection and handling
     dive
@@ -61,4 +69,5 @@ craneLib.devShell {
   postShellHook = ''
     ${pre-commit-check.shellHook}
   '';
+  LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [ pkgs.pkgsBuildHost.openssl ];
 }

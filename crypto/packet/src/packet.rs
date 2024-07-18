@@ -64,7 +64,7 @@ fn remove_padding(msg: &[u8]) -> Option<&[u8]> {
 /// An encrypted packet.
 ///
 /// A sender can create a new packet via [MetaPacket::new] and send it.
-/// Once received by the recipient, it is parsed first by calling [MetaPacket::from_bytes]
+/// Once received by the recipient, it is parsed first by calling [MetaPacket::try_from]
 /// and then it can be transformed into [ForwardedMetaPacket] by calling
 /// the [MetaPacket::into_forwarded] method. The [ForwardedMetaPacket] then contains the information
 /// about the next recipient of this packet.

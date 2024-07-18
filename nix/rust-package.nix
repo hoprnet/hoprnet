@@ -82,15 +82,17 @@ let
 
   docsArgs = {
     cargoArtifacts = null;
-    buildPhaseCargoCommand = "cargo doc --offline --no-deps";
+    cargoExtraArgs = "--offline"; # overwrite the default to build all docs
+    cargoDocExtraArgs = "--workspace --no-deps";
     RUSTDOCFLAGS = "--enable-index-page -Z unstable-options";
     CARGO_TARGET_DIR = "target/";
     LD_LIBRARY_PATH = lib.makeLibraryPath [ pkgs.pkgsBuildHost.openssl ];
     postBuild = ''
       ${pandoc}/bin/pandoc -f markdown+hard_line_breaks -t html README.md > readme.html
       mv target/''${CARGO_BUILD_TARGET}/doc target/
-      ${html-tidy}/bin/tidy -q -i target/doc/index.html > index.html || :
+      ${html-tidy}/bin/tidy -q --custom-tags yes -i target/doc/index.html > index.html || :
       sed '/<section id="main-content" class="content">/ r readme.html' index.html > target/doc/index.html
+      cp index.html target/doc/index-old.html
       rm readme.html index.html
     '';
   };

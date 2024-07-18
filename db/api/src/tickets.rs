@@ -147,15 +147,15 @@ pub struct AggregationPrerequisites {
 pub trait HoprDbTicketOperations {
     /// Retrieve acknowledged winning tickets according to the given `selector`.
     ///
-    /// The optional transaction `tx` must be in the [tickets database](TargetDb::Tickets).
+    /// The optional transaction `tx` must be in the database.
     async fn get_all_tickets(&self) -> Result<Vec<AcknowledgedTicket>>;
 
     /// Retrieve acknowledged winning tickets according to the given `selector`.
     ///
-    /// The optional transaction `tx` must be in the [tickets database](TargetDb::Tickets).
+    /// The optional transaction `tx` must be in the database.
     async fn get_tickets(&self, selector: TicketSelector) -> Result<Vec<AcknowledgedTicket>>;
 
-    /// Marks tickets as redeemed (removing them from the DB) and updating the statistics.\
+    /// Marks tickets as redeemed (removing them from the DB) and updating the statistics.
     /// Returns the number of tickets that were redeemed.
     async fn mark_tickets_redeemed(&self, selector: TicketSelector) -> Result<usize>;
 
@@ -191,7 +191,7 @@ pub trait HoprDbTicketOperations {
 
     /// Counts the tickets matching the given `selector` and their total value.
     ///
-    /// The optional transaction `tx` must be in the [tickets database](TargetDb::Tickets).
+    /// The optional transaction `tx` must be in the database.
     async fn get_tickets_value(&self, selector: TicketSelector) -> Result<(usize, Balance)>;
 
     /// Sets the stored outgoing ticket index to `index`, only if the currently stored value

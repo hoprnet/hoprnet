@@ -34,6 +34,7 @@ prometheus = [
   "core-path/prometheus",
   "core-protocol/prometheus",
   "hopr-db-sql/prometheus",
+  "hopr-transport-p2p/prometheus",
 ]
 
 [dependencies]

@@ -67,7 +67,7 @@ while (( "$#" )); do
       shift
       ;;
     -p|--prune-history)
-      prune_history="--prune-history"
+      prune_history="--prune-history 100"
       shift
       ;;
     -*|--*=)

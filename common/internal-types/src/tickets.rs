@@ -177,7 +177,7 @@ impl TicketBuilder {
 
     /// Sets the encoded ticket winning probability.
     /// Mutually exlusive with [TicketBuilder::win_prob].
-    /// Defaults to [ALWAYS_WINNING].
+    /// Defaults to encoded(1.0)
     #[must_use]
     pub fn win_prob_encoded(mut self, win_prob: EncodedWinProb) -> Self {
         self.win_prob = None;
@@ -331,7 +331,7 @@ impl From<Ticket> for TicketBuilder {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Ticket {
     /// Channel ID.
-    /// See [generate_channel_id](channels::generate_channel_id) for how this value is generated.
+    /// See [generate_channel_id] for how this value is generated.
     pub channel_id: Hash,
     /// Amount of HOPR tokens this ticket is worth.
     /// Always between 0 and 2^92.
@@ -675,7 +675,6 @@ impl Ord for VerifiedTicket {
 }
 
 /// Decodes [0x00000000000000, 0xffffffffffffff] to [0.0f64, 1.0f64]
-/// See [ALWAYS_WINNING] and [NEVER_WINNING].
 pub fn win_prob_to_f64(encoded_win_prob: &EncodedWinProb) -> f64 {
     if encoded_win_prob.eq(&NEVER_WINNING) {
         return 0.0;
@@ -697,7 +696,6 @@ pub fn win_prob_to_f64(encoded_win_prob: &EncodedWinProb) -> f64 {
 }
 
 /// Encodes [0.0f64, 1.0f64] to [0x00000000000000, 0xffffffffffffff]
-/// See [ALWAYS_WINNING] and [NEVER_WINNING].
 pub fn f64_to_win_prob(win_prob: f64) -> errors::Result<EncodedWinProb> {
     if !(0.0..=1.0).contains(&win_prob) {
         return Err(CoreTypesError::InvalidInputData(
