@@ -246,6 +246,7 @@ async fn build_api(
                 .route("/messages/size", get(messages::size))
                 .route("/messages/websocket", get(messages::websocket))
                 .route("/network/price", get(network::price))
+                .route("/network/probability", get(network::probability))
                 .route("/node/version", get(node::version))
                 .route("/node/configuration", get(node::configuration))
                 .route("/node/info", get(node::info))

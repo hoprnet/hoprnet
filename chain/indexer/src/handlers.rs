@@ -671,6 +671,34 @@ where
         Ok(None)
     }
 
+    async fn on_ticket_probability_oracle_event(
+        &self,
+        _db: &OpenTransaction,
+        _event: HoprTicketProbabilityOracleEvents,
+    ) -> Result<Option<ChainEventType>> {
+        #[cfg(all(feature = "prometheus", not(test)))]
+        METRIC_INDEXER_LOG_COUNTERS.increment(&["probability_oracle"]);
+
+        match event {
+            HoprTicketProbabilityOracleEvents::TicketProbabilityUpdatedFilter(update) => {
+                // TODO (Jean): Define HoprTicketProbabilityOracleEvents
+                trace!(
+                    "on_ticket_probability_updated - old: {:?} - new: {:?}",
+                    update.0.to_string(),
+                    update.1.to_string()
+                );
+
+                self.db.update_ticket_probability(Some(tx), update.1).await?;
+
+                info!("ticket probability has been set to {}", update.1);
+            }
+            HoprTicketPriceOracleEvents::OwnershipTransferredFilter(_event) => {
+                // ignore ownership transfer event
+            }
+        }
+        Ok(None)
+    }
+
     #[tracing::instrument(level = "debug", skip(self))]
     async fn process_log_event(&self, tx: &OpenTransaction, log: Log) -> Result<Option<ChainEventType>> {
         trace!("processing events in {log}");
