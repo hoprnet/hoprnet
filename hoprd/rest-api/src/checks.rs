@@ -53,3 +53,22 @@ fn is_running(state: Arc<AppState>) -> impl IntoResponse {
         _ => (StatusCode::PRECONDITION_FAILED, "").into_response(),
     }
 }
+
+/// Check whether the node is eligible in the network.
+#[utoipa::path(
+        get,
+        path = "/eligiblez",
+        responses(
+            (status = 200, description = "The node is allowed in the network"),
+            (status = 412, description = "The node is not allowed in the network"),
+        ),
+        tag = "Checks"
+    )]
+pub(super) async fn eligiblez(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    let hopr = state.hopr.clone();
+
+    match hopr.get_eligiblity_status().await {
+        Ok(true) => (StatusCode::OK, "").into_response(),
+        _ => (StatusCode::PRECONDITION_FAILED, "").into_response(),
+    }
+}

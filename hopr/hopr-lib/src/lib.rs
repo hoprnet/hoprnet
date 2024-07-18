@@ -592,6 +592,10 @@ impl Hopr {
         Ok(self.chain_api.get_balance(balance_type).await?)
     }
 
+    pub async fn get_eligiblity_status(&self) -> errors::Result<bool> {
+        Ok(self.chain_api.get_eligibility_status().await?)
+    }
+
     pub async fn get_safe_balance(&self, balance_type: BalanceType) -> errors::Result<Balance> {
         let safe_balance = self
             .chain_api

@@ -168,6 +168,23 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
         }
     }
 
+    async fn get_eligibility_status(&self, address: Address) -> Result<bool> {
+        match self
+            .contract_instances
+            .network_registry
+            .is_node_registered_and_eligible(address.into())
+            .call()
+            .await
+        {
+            Ok(eligible) => Ok(eligible),
+            Err(e) => Err(ContractError(
+                "NetworkRegistry".to_string(),
+                "is_node_registered_and_eligible".to_string(),
+                e.to_string(),
+            )),
+        }
+    }
+
     async fn get_node_management_module_target_info(&self, target: Address) -> Result<Option<U256>> {
         match self.node_module.try_get_target(target.into()).call().await {
             Ok((exists, target)) => Ok(exists.then_some(target)),
