@@ -103,7 +103,7 @@ fn init_logger() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-const FIXED_SERVER_PORT_OFFSET_FROM_APP_TAG: u16 = 5000;
+const LISTENING_SESSION_RETRANSMISSION_SERVER_PORT: u16 = 5000;
 
 #[derive(Debug, Clone)]
 struct HoprServerReactor {}
@@ -111,7 +111,7 @@ struct HoprServerReactor {}
 #[hopr_lib::async_trait]
 impl hopr_lib::HoprSessionServerActionable for HoprServerReactor {
     async fn process(&self, session: hopr_lib::HoprSession) -> hopr_lib::errors::Result<()> {
-        let server_port = FIXED_SERVER_PORT_OFFSET_FROM_APP_TAG + session.id().tag();
+        let server_port = LISTENING_SESSION_RETRANSMISSION_SERVER_PORT;
 
         let mut tcp_bridge = tokio::net::TcpStream::connect(format!("127.0.0.1:{server_port}"))
             .await

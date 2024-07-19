@@ -76,7 +76,7 @@ pub(crate) struct SessionClientResponse {
             ("api_token" = []),
             ("bearer_token" = [])
         ),
-        tag = "Messages"
+        tag = "Session"
     )]
 pub(crate) async fn create_client(
     State(state): State<Arc<InternalState>>,
@@ -118,9 +118,9 @@ pub(crate) async fn create_client(
             .await {
                 Ok((mut tcp_stream, _sock_addr)) => match copy_bidirectional_with_sizes(&mut session.compat(), &mut tcp_stream, SESSION_TO_SOCKET_BUFEER, SOCKET_TO_SESSION_BUFEER).await {
                     Ok(bound_stream_finished) => info!("Client session through TCP port {port} ended with {bound_stream_finished:?} bytes transferred in both directions."),
-                    Err(e) => error!("Failed to bind the TCP stream (port {port}) to the session: {e:?}")
+                    Err(e) => error!("Failed to bind the TCP stream (port {port}) to the session: {e}")
                 },
-                Err(e) => error!("Failed to accept connection: {e:?}")
+                Err(e) => error!("Failed to accept connection: {e}")
             }
         });
 

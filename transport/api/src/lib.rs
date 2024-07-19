@@ -33,7 +33,7 @@ use futures::{
     channel::mpsc::{UnboundedReceiver, UnboundedSender},
     FutureExt, StreamExt,
 };
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 
 use core_network::{
     heartbeat::Heartbeat,
@@ -455,6 +455,7 @@ where
             .map(|status| status.last_seen.as_unix_timestamp().saturating_sub(start)))
     }
 
+    #[tracing::instrument(level = "debug", skip(self))]
     pub async fn new_session(&self, cfg: SessionClientConfig) -> errors::Result<Session> {
         // TODO: 2.2 session initiation protocol is necessary to establish an application tag instead of this random approach
         let mut session_id: Option<SessionId> = None;
@@ -471,6 +472,11 @@ where
 
         let session_id = session_id
             .ok_or_else(|| errors::HoprTransportError::Api("Failed to generate a non-occupied session ID".into()))?;
+
+        debug!(
+            session_id = tracing::field::debug(session_id),
+            "Generated a new session ID"
+        );
 
         let (tx, rx) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
 

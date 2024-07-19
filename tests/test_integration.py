@@ -2,6 +2,7 @@ import asyncio
 import multiprocessing
 import random
 import re
+import socket
 import string
 from contextlib import AsyncExitStack, asynccontextmanager
 from threading import Thread
@@ -864,29 +865,46 @@ def run_echo_server(port: int):
                 data = conn.recv(1024)
                 conn.sendall(data)
 
+from contextlib import contextmanager
+
+@contextmanager
+def echo_server(port: int):
+    process = multiprocessing.Process(target=run_echo_server, args=(port,))
+    process.start()
+    try:
+        yield port
+    finally:
+        process.terminate()
+        
+
+@contextmanager
+def connect_socket(port):
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.connect(('127.0.0.1', port))
+    
+    try:
+        yield s
+    finally:
+        s.close()
+
+
+SERVER_LISTENING_PORT_HARDCODED_IN_HOPRD_CODE = 5000
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("src,dest", random_distinct_pairs_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
 async def test_session_communication_with_an_echo_server(src: str, dest: str, swarm7: dict[str, Node]):
-    port = random.randint(APPLICATION_TAG_THRESHOLD_FOR_SESIONS - 100, APPLICATION_TAG_THRESHOLD_FOR_SESIONS)
-    process = multiprocessing.Process(target=run_echo_server, args=(port,))
-    process.start()
+    message_size = 10000
+    message = ''.join(random.choices(string.ascii_uppercase + string.digits, k=message_size))
+
+    src_peer = swarm7[src]
+    dest_peer = swarm7[dest]
+
+    src_sock_port = await src_peer.api.session_client(dest_peer.peer_id, path={"Hops": 0})
     
-    # message_count = int(TICKET_AGGREGATION_THRESHOLD / 10)
-    # random_tag = random.randint(10, 65530)
+    with echo_server(SERVER_LISTENING_PORT_HARDCODED_IN_HOPRD_CODE):
+        with connect_socket(src_sock_port) as s:
+            s.send(message.encode())
 
-    # src_peer = swarm7[src]
-    # dest_peer = swarm7[dest]
-
-    # packets = [f"0 hop message #{i:08d}" for i in range(message_count)]
-    # timestamps = []
-    # for packet in packets:
-    #     res = await src_peer.api.send_message(dest_peer.peer_id, packet, [], random_tag)
-    #     timestamps.append(res.timestamp)
-
-    # assert len(timestamps) == message_count
-    # assert timestamps == sorted(timestamps)
-    
-    process.terminate()
-
-
+            import waiting;
+            waiting.wait(lambda: message == s.recv(message_size), timeout_seconds=20) 
+            
