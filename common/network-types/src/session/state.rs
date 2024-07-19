@@ -559,6 +559,10 @@ impl<const C: usize> SessionState<C> {
     /// - [`SessionState::retransmit_unacknowledged_frames`]
     ///
     async fn advance(&mut self) -> crate::errors::Result<()> {
+        if self.segment_egress_send.is_closed() {
+            return Err(SessionError::SessionClosed.into());
+        }
+
         let num_evicted = self.frame_reassembler.evict()?;
         trace!(session_id = self.session_id, "evicted {num_evicted} frames");
 

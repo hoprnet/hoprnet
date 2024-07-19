@@ -16,6 +16,9 @@ pub enum SessionError {
 
     #[error("the message has an unknown tag")]
     UnknownMessageTag,
+
+    #[error("session is closed")]
+    SessionClosed,
 }
 
 pub type Result<T> = std::result::Result<T, SessionError>;
