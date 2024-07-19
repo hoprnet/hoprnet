@@ -202,7 +202,10 @@ where
             my_multiaddresses,
             process_packet_send: Arc::new(OnceLock::new()),
             process_ticket_aggregate: Arc::new(OnceLock::new()),
-            sessions: moka::future::Cache::new(u16::MAX as u64),
+            sessions: moka::future::Cache::builder()
+                .max_capacity(u16::MAX as u64)
+                .time_to_idle(std::time::Duration::from_secs(5 * 60))
+                .build(),
         }
     }
 
