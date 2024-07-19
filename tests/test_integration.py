@@ -752,14 +752,13 @@ async def test_hoprd_strategy_UNFINISHED():
 @pytest.mark.asyncio
 @pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
 async def test_hoprd_check_native_withdraw(peer, swarm7: dict[str, Node]):
-    amount = 10
+    amount = "9876"
+
     before_balance = await swarm7[peer].api.balances()
-
-    await swarm7[peer].api.withdraw(f"{amount}", swarm7[peer].safe_address, "native")
-
+    await swarm7[peer].api.withdraw(amount, swarm7[peer].safe_address, "Native")
     after_balance = await swarm7[peer].api.balances()
 
-    assert after_balance.native + amount == before_balance.native
+    assert int(after_balance.safe_native) - int(before_balance.safe_native) == int(amount)
 
 
 @pytest.mark.asyncio

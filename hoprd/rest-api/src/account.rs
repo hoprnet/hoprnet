@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use std::sync::Arc;
 
-use hopr_lib::{Address, Balance, BalanceType, U256};
+use hopr_lib::{Address, Balance, BalanceType};
 
 use crate::{ApiErrorStatus, InternalState, BASE_PATH};
 
@@ -132,7 +132,7 @@ pub(crate) struct WithdrawBodyRequest {
     currency: BalanceType,
     #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String)]
-    amount: U256,
+    amount: String,
     #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String)]
     address: Address,
@@ -173,7 +173,10 @@ pub(super) async fn withdraw(
 ) -> impl IntoResponse {
     match state
         .hopr
-        .withdraw(req_data.address, Balance::new(req_data.amount, req_data.currency))
+        .withdraw(
+            req_data.address,
+            Balance::new_from_str(&req_data.amount, req_data.currency),
+        )
         .await
     {
         Ok(receipt) => (
