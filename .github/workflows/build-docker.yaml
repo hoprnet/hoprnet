@@ -17,6 +17,10 @@ on:
       package:
         required: true
         type: string
+      production:
+        required: false
+        type: boolean
+        default: false
 
 concurrency:
   group: ${{ github.head_ref }}-build-docker-${{ inputs.package }}
@@ -66,22 +70,27 @@ jobs:
       - name: Determine build options
         id: options
         run: |
+          docker_tag_suffix="-debug"
+          if ${{ inputs.production }}; then
+            docker_tag_suffix=""
+          fi
+
           if ${{ contains(steps.pr-labels.outputs.labels, ' release ') }}; then
             docker_tag=$(./scripts/get-current-version.sh docker)
-            echo "DOCKER_TAG=${docker_tag}" >> $GITHUB_OUTPUT
-            echo "DOCKER_TAG_PR=${docker_tag}-pr.${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
-            echo "NIX_BUILD_TARGET=${{ inputs.package}}-docker-build-and-upload" >> $GITHUB_OUTPUT
+            echo "DOCKER_TAG=${docker_tag}${docker_tag_suffix}" >> $GITHUB_OUTPUT
+            echo "DOCKER_TAG_PR=${docker_tag}-pr.${{ github.event.pull_request.number }}${docker_tag_suffix}" >> $GITHUB_OUTPUT
+            echo "NIX_BUILD_TARGET=${{ inputs.package }}${docker_tag_suffix}-docker-build-and-upload" >> $GITHUB_OUTPUT
           else
             next_version=$(./scripts/get-next-version.sh Build)
             ./scripts/bump-version.sh ${next_version}
             docker_tag_pr=$(echo "${next_version}" | sed 's/+.*/-pr.'${{ github.event.pull_request.number }}'/')
             docker_tag=$(echo "${next_version}" | sed 's/+/-/')
-            echo "DOCKER_TAG=${docker_tag}" >> $GITHUB_OUTPUT
-            echo "DOCKER_TAG_PR=${docker_tag_pr}" >> $GITHUB_OUTPUT
-            echo "NIX_BUILD_TARGET=${{ inputs.package}}-debug-docker-build-and-upload" >> $GITHUB_OUTPUT
+            echo "DOCKER_TAG=${docker_tag}${docker_tag_suffix}" >> $GITHUB_OUTPUT
+            echo "DOCKER_TAG_PR=${docker_tag_pr}${docker_tag_suffix}" >> $GITHUB_OUTPUT
+            echo "NIX_BUILD_TARGET=${{ inputs.package }}${docker_tag_suffix}-docker-build-and-upload" >> $GITHUB_OUTPUT
           fi
-          echo "DOCKER_TAG=${docker_tag}"
-          echo "DOCKER_TAG_PR=${docker_tag_pr}"
+          echo "DOCKER_TAG=${docker_tag}${docker_tag_suffix}"
+          echo "DOCKER_TAG_PR=${docker_tag_pr}${docker_tag_suffix}"
         env:
           COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
 
@@ -107,13 +116,13 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Google Cloud Credentials
-        uses: google-github-actions/auth@v1
+        uses: google-github-actions/auth@v2
         with:
           token_format: "access_token"
           credentials_json: ${{ secrets.GCP_SA_TERRAFORM_JSON }}
 
       - name: Set up Google Cloud SDK
-        uses: google-github-actions/setup-gcloud@v1
+        uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: hopr-staging
           install_components: beta

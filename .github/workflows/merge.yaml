@@ -23,7 +23,7 @@ permissions:
   contents: write
 
 jobs:
-  cleanup-actions:
+  cleanup_actions:
     name: Cleanup Actions
     runs-on: self-hosted-hoprnet-small
     steps:
@@ -50,10 +50,26 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  tag-images:
+  build_production_docker:
+    strategy:
+      matrix:
+        package:
+          - hopli
+          - hoprd
+    name: ${{ matrix.package }}
+    uses: ./.github/workflows/build-docker.yaml
+    with:
+      branch: ${{ github.event.pull_request.base.ref }}
+      package: ${{ matrix.package }}
+      production: true
+    secrets: inherit
+
+  tag_images:
     name: Tag images
     runs-on: self-hosted-hoprnet-small
     if: github.event.pull_request.merged == true && (github.event.pull_request.base.ref == 'master' || contains(github.event.pull_request.base.ref,'release/'))
+    needs:
+      - build_production_docker
     steps:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4
@@ -68,7 +84,7 @@ jobs:
           credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
 
       - name: Set up Google Cloud SDK
-        uses: google-github-actions/setup-gcloud@v1
+        uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
           install_components: beta
@@ -83,13 +99,15 @@ jobs:
       - name: Tag docker images
         run: |
           docker_registry="europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images"
-          # Set docker PR tag
+
+          # Find docker PR tag
           if ${{ contains(github.event.pull_request.labels.*.name, 'release') }}; then
             docker_pr_tag=$(./scripts/get-current-version.sh docker)
           else
             docker_pr_tag=$(./scripts/get-next-version.sh Build | sed 's/+.*/-pr.'${{ github.event.pull_request.number }}'/')
           fi
-          # Set docker release latest tag
+
+          # Find docker release latest tag
           declare base_branch=${{ github.event.pull_request.base.ref }}
           if [ "${base_branch}" == "master" ]; then
             docker_release_latest_tag=${{ vars.BRANCH_MASTER_RELEASE_NAME }}-latest
@@ -108,26 +126,25 @@ jobs:
             fi
           done
 
-  deploy-nodes:
+  deploy_nodes:
     name: Deploy nodes
     runs-on: self-hosted-hoprnet-small
-    if: needs.tag-images.result == 'success'
+    if: needs.tag_images.result == 'success'
     needs:
-      - tag-images
+      - tag_images
     steps:
-
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4
 
       - name: Set up Google Cloud Credentials
         id: auth
-        uses: google-github-actions/auth@v1
+        uses: google-github-actions/auth@v2
         with:
           token_format: "access_token"
           credentials_json: ${{ secrets.GCP_SA_TERRAFORM_JSON }}
 
       - name: Set up Google Cloud SDK
-        uses: google-github-actions/setup-gcloud@v1
+        uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: hopr-staging
           install_components: beta
@@ -180,15 +197,14 @@ jobs:
       workload: one-hop
       duration: ${{ vars.LOAD_TESTING_DURATION }}
       rate: "${{ vars.LOAD_TESTING_RATE }}"
-
     secrets: inherit
 
-  create-release:
+  create_release:
     name: Create Release
     runs-on: ubuntu-latest-4-cores # Cannot use a self-hosted runner because of the docker daemon not running
     if: contains(github.event.pull_request.labels.*.name, 'release')
     needs:
-      - tag-images
+      - tag_images
     steps:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4
@@ -295,7 +311,7 @@ jobs:
     name: Open new release
     if: contains(github.event.pull_request.labels.*.name, 'release')
     needs:
-      - create-release
+      - create_release
     uses: ./.github/workflows/open-release.yaml
     with:
       release_type: ${{ vars.NEXT_RELEASE_TYPE }}
@@ -306,7 +322,7 @@ jobs:
     name: Build dappNode
     if: contains(github.event.pull_request.labels.*.name, 'release')
     needs:
-      - create-release
+      - create_release
     uses: ./.github/workflows/generate-dappnode-pr.yaml
     with:
       base_branch: ${{ github.event.pull_request.base.ref }}
@@ -316,7 +332,7 @@ jobs:
     name: Generate SDK
     if: contains(github.event.pull_request.labels.*.name, 'release')
     needs:
-      - create-release
+      - create_release
     uses: ./.github/workflows/generate-sdk.yaml
     with:
       base_branch: ${{ github.event.pull_request.base.ref }}
