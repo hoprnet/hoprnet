@@ -110,6 +110,9 @@ lazy_static::lazy_static! {
     ).unwrap();
 }
 
+#[cfg(feature = "session-server")]
+pub use async_trait::async_trait;
+
 /// Interface representing the HOPR server behavior for each incoming session instance
 /// supplied as an argument.
 #[cfg(feature = "session-server")]

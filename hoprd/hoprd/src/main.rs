@@ -6,6 +6,7 @@ use async_lock::RwLock;
 use async_signal::{Signal, Signals};
 use chrono::{DateTime, Utc};
 use futures::StreamExt;
+use tokio_util::compat::FuturesAsyncReadCompatExt;
 
 #[cfg(feature = "telemetry")]
 use {
@@ -100,6 +101,35 @@ fn init_logger() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     Ok(())
+}
+
+const FIXED_SERVER_PORT_OFFSET_FROM_APP_TAG: u16 = 5000;
+
+#[derive(Debug, Clone)]
+struct HoprServerReactor {}
+
+#[hopr_lib::async_trait]
+impl hopr_lib::HoprSessionServerActionable for HoprServerReactor {
+    async fn process(&self, session: hopr_lib::HoprSession) -> hopr_lib::errors::Result<()> {
+        let server_port = FIXED_SERVER_PORT_OFFSET_FROM_APP_TAG + session.id().tag();
+
+        let mut tcp_bridge = tokio::net::TcpStream::connect(format!("127.0.0.1:{server_port}"))
+            .await
+            .map_err(|e| {
+                hopr_lib::errors::HoprLibError::GeneralError(format!(
+                    "Could not bridge the incoming session to port {server_port}: {e}"
+                ))
+            })?;
+
+        tokio::task::spawn(async move {
+            match tokio::io::copy_bidirectional(&mut session.compat(), &mut tcp_bridge).await {
+                Ok(bound_stream_finished) => info!("Server bridged session through TCP port {server_port} ended with {bound_stream_finished:?} bytes transferred in both directions."),
+                Err(e) => error!("Failed to bind the TCP server stream (port {server_port}) to the server session: {e:?}")
+            }
+        });
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -229,7 +259,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
     }
 
-    let (hopr_socket, hopr_processes) = node.run().await?;
+    let (hopr_socket, hopr_processes) = node.run(HoprServerReactor {}).await?;
 
     // process extracting the received data from the socket
     let mut ingress = hopr_socket.reader();
