@@ -122,7 +122,7 @@ pub(super) async fn balances(State(state): State<Arc<InternalState>>) -> impl In
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 #[schema(example = json!({
         "address": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
-        "amount": 20000,
+        "amount": "20000",
         "currency": "HOPR"
     }))]
 #[serde(rename_all = "camelCase")]
