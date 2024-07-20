@@ -217,7 +217,7 @@ async fn build_api(
                 .route("/aliases/:alias", delete(alias::delete_alias))
                 .route("/account/addresses", get(account::addresses))
                 .route("/account/balances", get(account::balances))
-                .route("/account/withdraw", get(account::withdraw))
+                .route("/account/withdraw", post(account::withdraw))
                 .route("/peers/:peerId", get(peers::show_peer_info))
                 .route("/peers/:peerId/ping", post(peers::ping_peer))
                 .route("/channels", get(channels::list_channels))
