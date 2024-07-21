@@ -176,7 +176,7 @@ pub struct SessionConfig {
     pub backoff_base: f64,
 
     /// Standard deviation of a Gaussian jitter applied to `rto_base_receiver` and
-    /// `rto_base_sender`.
+    /// `rto_base_sender`. Must be between 0 and 0.25.
     #[default(0.05)]
     pub rto_jitter: f64,
 
@@ -588,15 +588,16 @@ impl<const C: usize> SessionState<C> {
     }
 }
 
-impl<const C: usize, T: AsRef<[u8]>> Sink<T> for SessionState<C> {
+// Sink for data coming from downstream
+impl<const C: usize> Sink<SessionMessage<C>> for SessionState<C> {
     type Error = NetworkTypeError;
 
     fn poll_ready(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
     }
 
-    fn start_send(mut self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
-        match SessionMessage::try_from(item.as_ref())? {
+    fn start_send(mut self: Pin<&mut Self>, item: SessionMessage<C>) -> Result<(), Self::Error> {
+        match item {
             SessionMessage::Segment(s) => self.consume_segment(s),
             SessionMessage::Request(r) => self.retransmit_segments(r),
             SessionMessage::Acknowledge(f) => self.acknowledged_frames(f),
@@ -713,23 +714,30 @@ impl<const C: usize> SessionSocket<C> {
         spawn(
             AsyncReadStreamer::<_, C>::new(downstream_read)
                 .map_err(|e| NetworkTypeError::SessionProtocolError(SessionError::ProcessingError(e.to_string())))
+                .and_then(|m| {
+                    futures::future::ready(SessionMessage::try_from(m.as_ref()).map_err(NetworkTypeError::from))
+                })
                 .forward(state.clone()),
         );
 
         // Advance the state until the socket is closed
-        if !cfg.enabled_features.is_empty() {
-            let mut state_clone = state.clone();
-            spawn_local(async move {
-                let timeout = cfg
-                    .rto_base_receiver
-                    .min(cfg.rto_base_sender)
-                    .min(cfg.frame_expiration_age / 3);
+        let mut state_clone = state.clone();
+        spawn_local(async move {
+            let timeout = cfg
+                .rto_base_receiver
+                .min(cfg.rto_base_sender)
+                .min(cfg.frame_expiration_age / 3);
 
-                while state_clone.advance().await.is_ok() {
-                    sleep(timeout).await;
+            loop {
+                match state_clone.advance().await {
+                    Ok(_) => sleep(timeout).await,
+                    Err(e) => {
+                        debug!(session_id = state_clone.session_id(), "session is closing: {e}");
+                        break;
+                    }
                 }
-            });
-        }
+            }
+        });
 
         Self { state, frame_egress }
     }
@@ -756,7 +764,6 @@ impl<const C: usize> AsyncWrite for SessionSocket<C> {
     }
 
     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
-        // Only flush the underlying transport
         let mut flush_future = self.state.segment_egress_send.flush();
         match Pin::new(&mut flush_future).poll(cx) {
             Poll::Ready(Ok(())) => Poll::Ready(Ok(())),
