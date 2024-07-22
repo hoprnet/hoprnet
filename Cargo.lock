@@ -4181,6 +4181,7 @@ dependencies = [
  "futures",
  "rayon",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -4287,12 +4288,14 @@ dependencies = [
  "hopr-crypto-types",
  "hopr-internal-types",
  "hopr-network-types",
+ "hopr-primitive-types",
  "libp2p-identity",
  "mockall",
  "ringbuffer",
  "serde",
  "serde_with",
  "thiserror",
+ "tracing",
 ]
 
 [[package]]

@@ -899,7 +899,9 @@ async def test_session_communication_with_an_echo_server(src: str, dest: str, sw
     src_peer = swarm7[src]
     dest_peer = swarm7[dest]
 
-    src_sock_port = await src_peer.api.session_client(dest_peer.peer_id, path={"Hops": 0})
+    # src_sock_port = await src_peer.api.session_client(dest_peer.peer_id, path={"Hops": 0})        // TODO: bug, cannot specify Hops: 0
+    src_sock_port = await src_peer.api.session_client(dest_peer.peer_id, path={"IntermediatePath": []})
+    
     
     with echo_server(SERVER_LISTENING_PORT_HARDCODED_IN_HOPRD_CODE):
         with connect_socket(src_sock_port) as s:

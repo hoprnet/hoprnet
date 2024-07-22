@@ -41,7 +41,7 @@ impl From<SessionClientRequest> for SessionClientConfig {
         Self {
             peer: value.destination,
             path_options: value.path,
-            capabilities: vec![SessionCapability::Retransmission, SessionCapability::Retransmission],
+            capabilities: vec![SessionCapability::Retransmission, SessionCapability::Segmentation],
         }
     }
 }

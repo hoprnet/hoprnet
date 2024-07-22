@@ -36,6 +36,7 @@ pub mod cpu {
         let (tx, rx) = futures::channel::oneshot::channel();
         rayon::spawn(|| {
             tx.send(std::panic::catch_unwind(std::panic::AssertUnwindSafe(f)))
+                //.unwrap_or_else(|_e| tracing::error!("failed to spawn task in a blocking fashion"))
                 .unwrap_or_else(|_| unreachable!())
         });
         rx.await
@@ -45,12 +46,13 @@ pub mod cpu {
 
     /// Spawn an awaitable non-blocking execution of the given blocking function on a `rayon` CPU thread pool.
     ///
-    /// Executed tasks are loaded using a FIFO (First In First Out) (Last In First Out) scheduling policy.
+    /// Executed tasks are loaded using a FIFO (First In First Out) scheduling policy.
     #[cfg(feature = "rayon")]
     pub async fn spawn_fifo_blocking<R: Send + 'static>(f: impl FnOnce() -> R + Send + 'static) -> R {
         let (tx, rx) = futures::channel::oneshot::channel();
         rayon::spawn_fifo(|| {
             tx.send(std::panic::catch_unwind(std::panic::AssertUnwindSafe(f)))
+                //.unwrap_or_else(|_e| tracing::error!("failed to spawn task in a fifo blocking fashion"))
                 .unwrap_or_else(|_| unreachable!())
         });
         rx.await

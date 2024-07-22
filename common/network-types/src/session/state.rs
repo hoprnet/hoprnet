@@ -531,6 +531,8 @@ impl<const C: usize> SessionState<C> {
                 .await
                 .map_err(|e| SessionError::ProcessingError(e.to_string()))?;
 
+            debug!("===> Got after sending the segment");
+
             // This is the only place where we insert into the lookbehind buffer
             self.lookbehind.insert((&segment).into(), segment.clone());
             while self.lookbehind.len() > self.cfg.max_buffered_segments {
@@ -696,18 +698,25 @@ impl<const C: usize> SessionSocket<C> {
             let jitter = Jitter::up_to(Duration::from_millis(5));
 
             spawn(async move {
-                segment_egress_recv
-                    .map(|m: SessionMessage<C>| Ok(m.into_encoded()))
-                    .ratelimit_stream_with_jitter(&rate_limiter, jitter)
-                    .forward(downstream_write.into_sink())
-                    .await
+                debug!(
+                    "FINISHED spawned egress to downstream: {:?}",
+                    segment_egress_recv
+                        .map(|m: SessionMessage<C>| Ok(m.into_encoded()))
+                        .ratelimit_stream_with_jitter(&rate_limiter, jitter)
+                        .forward(downstream_write.into_sink())
+                        .await
+                );
             });
         } else {
-            spawn(
-                segment_egress_recv
-                    .map(|m| Ok(m.into_encoded()))
-                    .forward(downstream_write.into_sink()),
-            );
+            spawn(async move {
+                debug!(
+                    "FINISHED spawned egress to downstream: {:?}",
+                    segment_egress_recv
+                        .map(|m| Ok(m.into_encoded()))
+                        .forward(downstream_write.into_sink())
+                        .await,
+                )
+            });
         }
 
         // Segment ingress from downstream
@@ -755,6 +764,7 @@ impl<const C: usize> SessionSocket<C> {
 
 impl<const C: usize> AsyncWrite for SessionSocket<C> {
     fn poll_write(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
+        tracing::debug!("Polling write on socket reader inside session");
         let mut socket_future = self.state.send_frame_data(buf).boxed();
         match Pin::new(&mut socket_future).poll(cx) {
             Poll::Ready(Ok(())) => Poll::Ready(Ok(buf.len())),
@@ -764,6 +774,8 @@ impl<const C: usize> AsyncWrite for SessionSocket<C> {
     }
 
     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+        tracing::debug!("Polling flush on socket reader inside session");
+        // Only flush the underlying transport
         let mut flush_future = self.state.segment_egress_send.flush();
         match Pin::new(&mut flush_future).poll(cx) {
             Poll::Ready(Ok(())) => Poll::Ready(Ok(())),
@@ -773,6 +785,7 @@ impl<const C: usize> AsyncWrite for SessionSocket<C> {
     }
 
     fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+        tracing::debug!("Polling close on socket reader inside session");
         // Close the underlying transport
         let mut close_future = self.state.segment_egress_send.close().boxed();
         match Pin::new(&mut close_future).poll(cx) {
@@ -785,6 +798,7 @@ impl<const C: usize> AsyncWrite for SessionSocket<C> {
 
 impl<const C: usize> AsyncRead for SessionSocket<C> {
     fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<std::io::Result<usize>> {
+        tracing::debug!("Polling read on socket reader inside session");
         self.project().frame_egress.poll_read(cx, buf)
     }
 }
