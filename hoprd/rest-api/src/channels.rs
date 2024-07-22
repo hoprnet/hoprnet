@@ -400,6 +400,7 @@ pub(crate) struct CloseChannelResponse {
             (status = 400, description = "Invalid channel id.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "Channel not found.", body = ApiError),
+            (status = 412, description = "The node is not ready.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(

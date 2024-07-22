@@ -214,6 +214,7 @@ async fn build_api(
                 .route("/account/withdraw", get(account::withdraw))
                 .route("/peers/:peerId/ping", post(peers::ping_peer))
                 .route("/channels", post(channels::open_channel))
+                .route("/channels/:channelId", delete(channels::close_channel))
                 .route("/channels/:channelId/fund", post(channels::fund_channel))
                 .route(
                     "/channels/:channelId/tickets/redeem",
