@@ -248,7 +248,6 @@ async fn build_api(
                 .route("/peers/:peerId", get(peers::show_peer_info))
                 .route("/channels", get(channels::list_channels))
                 .route("/channels/:channelId", get(channels::show_channel))
-                .route("/channels/:channelId", delete(channels::close_channel))
                 .route("/channels/:channelId/tickets", get(tickets::show_channel_tickets))
                 .route("/tickets", get(tickets::show_all_tickets))
                 .route("/tickets/statistics", get(tickets::show_ticket_statistics))
