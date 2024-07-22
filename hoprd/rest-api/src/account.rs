@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use std::sync::Arc;
 
-use hopr_lib::{Address, Balance, BalanceType, U256};
+use hopr_lib::{Address, Balance, BalanceType};
 
 use crate::{ApiErrorStatus, InternalState, BASE_PATH};
 
@@ -123,7 +123,7 @@ pub(super) async fn balances(State(state): State<Arc<InternalState>>) -> impl In
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 #[schema(example = json!({
         "address": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
-        "amount": 20000,
+        "amount": "20000",
         "currency": "HOPR"
     }))]
 #[serde(rename_all = "camelCase")]
@@ -133,7 +133,7 @@ pub(crate) struct WithdrawBodyRequest {
     currency: BalanceType,
     #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String)]
-    amount: U256,
+    amount: String,
     #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String)]
     address: Address,
@@ -175,7 +175,10 @@ pub(super) async fn withdraw(
 ) -> impl IntoResponse {
     match state
         .hopr
-        .withdraw(req_data.address, Balance::new(req_data.amount, req_data.currency))
+        .withdraw(
+            req_data.address,
+            Balance::new_from_str(&req_data.amount, req_data.currency),
+        )
         .await
     {
         Ok(receipt) => (

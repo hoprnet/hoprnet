@@ -21,6 +21,7 @@ from hoprd_sdk.models import (
     OpenChannelBodyRequest,
     SendMessageBodyRequest,
     TagQueryRequest,
+    WithdrawBodyRequest,
 )
 from hoprd_sdk.rest import ApiException
 from urllib3.exceptions import MaxRetryError
@@ -61,7 +62,7 @@ class HoprdAPI:
                 )
                 return (True, response)
         except ApiException as e:
-            log.info(
+            log.error(
                 f"ApiException calling {api_callback.__qualname__} with kwargs: {kwargs}, args: {args}, error is: {e}"
             )
             return (False, None)
@@ -381,6 +382,18 @@ class HoprdAPI:
         """
         _, response = self.__call_api(NetworkApi, "price")
         return int(response.price) if hasattr(response, "price") else None
+
+    async def withdraw(self, amount: str, receipient: str, currency: str):
+        """
+        Withdraws the given amount of token (Native or HOPR) to the given receipient.
+        :param: amount: str
+        :param: receipient: str
+        :param: currency: str
+        :return:
+        """
+        body = WithdrawBodyRequest(receipient, amount, currency)
+        status, response = self.__call_api(AccountApi, "withdraw", body=body)
+        return status, response
 
     async def startedz(self):
         """
