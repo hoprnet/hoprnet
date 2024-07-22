@@ -26,4 +26,4 @@ pub mod future {
     pub use super::from_fn::ResponseFuture as FromFnResponseFuture;
     pub use super::map_request::ResponseFuture as MapRequestResponseFuture;
     pub use super::map_response::ResponseFuture as MapResponseResponseFuture;
-} 
+}
