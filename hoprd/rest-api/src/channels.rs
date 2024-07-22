@@ -275,6 +275,7 @@ pub(crate) struct OpenChannelResponse {
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 403, description = "Failed to open the channel because of insufficient HOPR balance or allowance.", body = ApiError),
             (status = 409, description = "Failed to open the channel because the channel between this nodes already exists.", body = ApiError),
+            (status = 412, description = "The node is not ready.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
@@ -463,6 +464,7 @@ pub(crate) struct FundBodyRequest {
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 403, description = "Failed to fund the channel because of insufficient HOPR balance or allowance.", body = ApiError),
             (status = 404, description = "Channel not found.", body = ApiError),
+            (status = 412, description = "The node is not ready.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
