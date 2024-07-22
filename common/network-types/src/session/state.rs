@@ -833,6 +833,13 @@ mod tests {
 
     impl AsyncWrite for FaultyNetwork<'_> {
         fn poll_write(self: Pin<&mut Self>, _cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
+            if buf.len() > MTU {
+                return Poll::Ready(Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "data length passed to downstream must be less or equal to MTU",
+                )));
+            }
+
             self.ingress.unbounded_send(buf.into()).unwrap();
             Poll::Ready(Ok(buf.len()))
         }
@@ -914,7 +921,7 @@ mod tests {
                 for _ in 0..num_frames {
                     let mut write = vec![0u8; frame_size];
                     hopr_crypto_random::random_fill(&mut write);
-                    socket.write(&write).await.unwrap();
+                    socket.write(&write).await?;
                     sent.extend(write);
                 }
                 socket.close().await.unwrap();
@@ -923,12 +930,12 @@ mod tests {
             if d == Direction::Recv || d == Direction::Both {
                 for _ in 0..num_frames {
                     let mut read = vec![0u8; frame_size];
-                    socket.read_exact(&mut read).await.unwrap();
+                    socket.read_exact(&mut read).await?;
                     received.extend(read);
                 }
             }
 
-            (sent, received)
+            Ok::<_, std::io::Error>((sent, received))
         };
 
         let alice_worker = async_std::task::spawn(socket_worker(
@@ -947,7 +954,7 @@ mod tests {
         pin_mut!(timeout);
 
         match futures::future::select(send_recv, timeout).await {
-            Either::Left((((alice_sent, alice_recv), (bob_sent, bob_recv)), _)) => {
+            Either::Left(((Ok((alice_sent, alice_recv)), Ok((bob_sent, bob_recv))), _)) => {
                 assert_eq!(
                     hex::encode(alice_sent),
                     hex::encode(bob_recv),
@@ -959,6 +966,8 @@ mod tests {
                     "bob sent must be equal to alice received",
                 );
             }
+            Either::Left(((Err(e), _), _)) => panic!("send recv error: {e}"),
+            Either::Left(((_, Err(e)), _)) => panic!("send recv error: {e}"),
             Either::Right(_) => panic!("timeout"),
         }
     }
