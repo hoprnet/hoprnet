@@ -281,6 +281,7 @@ mod tests {
 
         let cfg = AutoRedeemingStrategyConfig {
             redeem_only_aggregated: false,
+            minimum_redeem_ticket_value: BalanceType::HOPR.zero(),
             ..Default::default()
         };
 
@@ -309,6 +310,7 @@ mod tests {
 
         let cfg = AutoRedeemingStrategyConfig {
             redeem_only_aggregated: true,
+            minimum_redeem_ticket_value: BalanceType::HOPR.zero(),
             ..Default::default()
         };
 
