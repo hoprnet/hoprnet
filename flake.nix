@@ -164,13 +164,10 @@
 
           profileDeps = with pkgs; [
             gdb
-            # FIXME: would be useful, but 700MB larger image size (unpacked)
-            # heaptrack
-            # FIXME: would be useful, but 1300MB larger image size (unpacked)
+            # FIXME: heaptrack would be useful, but it adds 700MB to the image size (unpacked)
             # lldb
             rust-bin.stable.latest.minimal
             valgrind
-
           ];
           # FIXME: the docker image built is not working on macOS arm platforms
           # and will simply lead to a non-working image. Likely, some form of
