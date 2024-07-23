@@ -22,4 +22,3 @@ async-std = { workspace = true, optional = true }
 futures = { workspace = true }
 rayon = { workspace = true, optional = true }
 tokio = { workspace = true, optional = true }
-tracing = { workspace = true }

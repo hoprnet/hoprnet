@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::net::{IpAddr, SocketAddr};
 use std::str::FromStr;
 use std::{sync::Arc, time::SystemTime};
 
@@ -15,7 +16,7 @@ use {
 };
 
 use signal_hook::low_level;
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 
 use hopr_async_runtime::prelude::{cancel_join_handle, spawn, JoinHandle};
@@ -110,21 +111,27 @@ struct HoprServerReactor {}
 
 #[hopr_lib::async_trait]
 impl hopr_lib::HoprSessionServerActionable for HoprServerReactor {
+    #[tracing::instrument(level = "debug", skip(self, session))]
     async fn process(&self, session: hopr_lib::HoprSession) -> hopr_lib::errors::Result<()> {
         let server_port = LISTENING_SESSION_RETRANSMISSION_SERVER_PORT;
 
-        let mut tcp_bridge = tokio::net::TcpStream::connect(format!("127.0.0.1:{server_port}"))
-            .await
-            .map_err(|e| {
-                hopr_lib::errors::HoprLibError::GeneralError(format!(
-                    "Could not bridge the incoming session to port {server_port}: {e}"
-                ))
-            })?;
+        debug!("Creating a connection to the TCP server on port 127.0.0.1:{server_port}...");
+        let mut tcp_bridge = tokio::net::TcpStream::connect(SocketAddr::new(
+            IpAddr::V4(std::net::Ipv4Addr::new(127, 0, 0, 1)),
+            server_port,
+        ))
+        .await
+        .map_err(|e| {
+            hopr_lib::errors::HoprLibError::GeneralError(format!(
+                "Could not bridge the incoming session to port {server_port}: {e}"
+            ))
+        })?;
 
+        debug!("Bridging the session to the TCP server...");
         tokio::task::spawn(async move {
             match tokio::io::copy_bidirectional(&mut session.compat(), &mut tcp_bridge).await {
                 Ok(bound_stream_finished) => info!("Server bridged session through TCP port {server_port} ended with {bound_stream_finished:?} bytes transferred in both directions."),
-                Err(e) => error!("Failed to bind the TCP server stream (port {server_port}) to the server session: {e:?}")
+                Err(e) => error!("The TCP server stream (port {server_port}) is closed: {e:?}")
             }
         });
 

@@ -4181,7 +4181,6 @@ dependencies = [
  "futures",
  "rayon",
  "tokio",
- "tracing",
 ]
 
 [[package]]

@@ -538,8 +538,6 @@ impl<const C: usize> SessionState<C> {
                 .await
                 .map_err(|e| SessionError::ProcessingError(e.to_string()))?;
 
-            debug!("===> Got after sending the segment");
-
             // This is the only place where we insert into the lookbehind buffer
             self.lookbehind.insert((&segment).into(), segment.clone());
             while self.lookbehind.len() > self.cfg.max_buffered_segments {

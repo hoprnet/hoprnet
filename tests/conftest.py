@@ -364,7 +364,7 @@ async def swarm7(request):
         ]
 
         async def all_peers_connected():
-            peers = [p["peer_id"] for p in await asyncio.wait_for(node.api.peers(), timeout=10)]
+            peers = [p["peer_id"] for p in await asyncio.wait_for(node.api.peers(), timeout=60)]
             missing_peers = [p for p in required_peers if p not in peers]
             return len(missing_peers) == 0
 

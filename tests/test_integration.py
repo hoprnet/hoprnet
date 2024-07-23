@@ -889,14 +889,22 @@ def connect_socket(port):
 
 
 SERVER_LISTENING_PORT_HARDCODED_IN_HOPRD_CODE = 4677
+HOPR_SESSION_MAX_PAYLOAD_SIZE = 462
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("src,dest", random_distinct_pairs_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
-async def test_session_communication_with_an_echo_server(src: str, dest: str, swarm7: dict[str, Node]):
-    import logging
+async def test_session_communication_with_an_echo_server_ver_wireguard_style_communication(src: str, dest: str, swarm7: dict[str, Node]):
+    """
+    HOPR TCP socket buffers are set to 8292 bytes, so the packet count should be chosen to ensure that the buffer is not exceeded.
     
-    message_size = 462
-    message = ''.join(random.choices(string.ascii_uppercase + string.digits, k=message_size))
+    In real-world scenarios, the read and write operations are interleaved, but the test goes further to force the socket to hold the buffer.
+    """
+
+    packet_count = 1
+    # packet_count = 3      # TODO: having the 462 packet size it regularly fails to send the packets due to missing write/flush buffering
+    
+    message_size = HOPR_SESSION_MAX_PAYLOAD_SIZE
+    expected = set([''.join(random.choices(string.ascii_uppercase + string.digits, k=message_size)) for _ in range(packet_count)])
 
     src_peer = swarm7[src]
     dest_peer = swarm7[dest]
@@ -905,12 +913,13 @@ async def test_session_communication_with_an_echo_server(src: str, dest: str, sw
     src_sock_port = await src_peer.api.session_client(dest_peer.peer_id, path={"IntermediatePath": []})
 
     with echo_server(SERVER_LISTENING_PORT_HARDCODED_IN_HOPRD_CODE):
+        # socket.listen does not actually listen immediately and needs some time to be working
+        # otherwise a `ConnectionRefusedError: [Errno 61] Connection refused` will be encountered
+        await asyncio.sleep(1.0)
+
         with connect_socket(src_sock_port) as s:
             s.settimeout(20.0)
-            s.send(message.encode())
-
-            logging.info(f"Waiting for echo server to respond")
-            assert message == s.recv(message_size).decode()
-
-            logging.info("Finished")
             
+            for message in expected:
+                s.send(message.encode())
+                assert s.recv(message_size).decode() == message

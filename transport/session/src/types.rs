@@ -234,7 +234,6 @@ impl futures::AsyncRead for InnerSession {
         cx: &mut std::task::Context<'_>,
         buf: &mut [u8],
     ) -> Poll<std::io::Result<usize>> {
-        tracing::debug!("Polling read on inner session {}", &self.id);
         if self.rx_buffer_range.0 != self.rx_buffer_range.1 {
             tracing::debug!("Something in the buffer");
 

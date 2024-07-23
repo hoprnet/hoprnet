@@ -902,7 +902,11 @@ impl Hopr {
                 spawn(_session_rx.for_each_concurrent(None, move |session| {
                     let serve_handler = serve_handler.clone();
                     async move {
-                        let _ = serve_handler.process(session).await;
+                        let session_id = *session.id();
+                        match serve_handler.process(session).await {
+                            Ok(_) => debug!("Client session {session_id} finished successfully"),
+                            Err(e) => error!("Client session {session_id} failed: {e}"),
+                        }
                     }
                 })),
             );
