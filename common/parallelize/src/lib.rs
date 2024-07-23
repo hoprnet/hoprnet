@@ -36,7 +36,6 @@ pub mod cpu {
         let (tx, rx) = futures::channel::oneshot::channel();
         rayon::spawn(|| {
             tx.send(std::panic::catch_unwind(std::panic::AssertUnwindSafe(f)))
-                //.unwrap_or_else(|_e| tracing::error!("failed to spawn task in a blocking fashion"))
                 .unwrap_or_else(|_| unreachable!())
         });
         rx.await
@@ -52,7 +51,6 @@ pub mod cpu {
         let (tx, rx) = futures::channel::oneshot::channel();
         rayon::spawn_fifo(|| {
             tx.send(std::panic::catch_unwind(std::panic::AssertUnwindSafe(f)))
-                //.unwrap_or_else(|_e| tracing::error!("failed to spawn task in a fifo blocking fashion"))
                 .unwrap_or_else(|_| unreachable!())
         });
         rx.await

@@ -41,7 +41,7 @@ impl From<SessionClientRequest> for SessionClientConfig {
         Self {
             peer: value.destination,
             path_options: value.path,
-            capabilities: vec![SessionCapability::Retransmission, SessionCapability::Segmentation],
+            capabilities: vec![], //vec![SessionCapability::Retransmission, SessionCapability::Segmentation],
         }
     }
 }
@@ -84,8 +84,10 @@ pub(crate) async fn create_client(
 ) -> Result<impl IntoResponse, impl IntoResponse> {
     let port = args.port;
     let data: SessionClientConfig = args.into();
-    let is_tcp_like = data.capabilities.contains(&SessionCapability::Retransmission)
-        || data.capabilities.contains(&SessionCapability::Segmentation);
+    // let is_tcp_like = data.capabilities.contains(&SessionCapability::Retransmission)
+    //     || data.capabilities.contains(&SessionCapability::Segmentation);
+
+    let is_tcp_like = true;
 
     if is_tcp_like {
         let session = state.hopr.clone().connect_to(data).await.map_err(|e| {

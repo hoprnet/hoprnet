@@ -138,14 +138,17 @@ impl SessionFeature {
 #[derive(Debug, Clone, SmartDefault)]
 pub struct SessionConfig {
     /// Maximum number of buffered segments.
-    /// This value should be large enough to accommodate segments for an at least
+    ///
+    /// The value should be large enough to accommodate segments for an at least
     /// `frame_expiration_age` period, considering the expected maximum bandwidth.
     #[default = 50_000]
     pub max_buffered_segments: usize,
 
     /// Size of the buffer for acknowledged frame IDs.
-    /// This value should be large enough so that the buffer can accommodate segments
+    ///
+    /// The value should be large enough so that the buffer can accommodate segments
     /// for an at least `frame_expiration_age` period, given the expected maximum bandwidth.
+    ///
     /// If set to 0, no frame acknowledgement will be sent.
     #[default = 1024]
     pub acknowledged_frames_buffer: usize,
@@ -157,7 +160,9 @@ pub struct SessionConfig {
 
     /// If a frame is incomplete (on the receiver), retransmission requests will be made
     /// with exponential backoff starting at this initial retry timeout (RTO).
+    ///
     /// Requests will be sent until `frame_expiration_age` is reached.
+    ///
     /// NOTE that this value should be offset from `rto_base_sender`, so that the receiver's
     /// retransmission requests are interleaved with the sender's retransmissions.
     #[default(Duration::from_millis(1000))]
@@ -165,7 +170,9 @@ pub struct SessionConfig {
 
     /// If a frame is unacknowledged (on the sender), entire frame retransmissions will be made
     /// with exponential backoff starting at this initial retry timeout (RTO).
+    ///
     /// Frames will be retransmitted until `frame_expiration_age` is reached.
+    ///
     /// NOTE that this value should be offset from `rto_base_receiver`, so that the receiver's
     /// retransmission requests are interleaved with the sender's retransmissions.
     #[default(Duration::from_millis(1500))]

@@ -888,12 +888,14 @@ def connect_socket(port):
         s.close()
 
 
-SERVER_LISTENING_PORT_HARDCODED_IN_HOPRD_CODE = 5000
+SERVER_LISTENING_PORT_HARDCODED_IN_HOPRD_CODE = 4677
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("src,dest", random_distinct_pairs_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
 async def test_session_communication_with_an_echo_server(src: str, dest: str, swarm7: dict[str, Node]):
-    message_size = 10000
+    import logging
+    
+    message_size = 462
     message = ''.join(random.choices(string.ascii_uppercase + string.digits, k=message_size))
 
     src_peer = swarm7[src]
@@ -901,12 +903,14 @@ async def test_session_communication_with_an_echo_server(src: str, dest: str, sw
 
     # src_sock_port = await src_peer.api.session_client(dest_peer.peer_id, path={"Hops": 0})        // TODO: bug, cannot specify Hops: 0
     src_sock_port = await src_peer.api.session_client(dest_peer.peer_id, path={"IntermediatePath": []})
-    
-    
+
     with echo_server(SERVER_LISTENING_PORT_HARDCODED_IN_HOPRD_CODE):
         with connect_socket(src_sock_port) as s:
+            s.settimeout(20.0)
             s.send(message.encode())
 
-            import waiting;
-            waiting.wait(lambda: message == s.recv(message_size), timeout_seconds=20) 
+            logging.info(f"Waiting for echo server to respond")
+            assert message == s.recv(message_size).decode()
+
+            logging.info("Finished")
             

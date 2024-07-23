@@ -45,10 +45,12 @@ impl Display for SessionId {
     }
 }
 
-const PEER_ID_BINARY_SIZE: usize = 32;
+const PADDING_HEADER_SIZE: usize = 4;
 // Inner MTU size of what the HOPR payload can take (payload - peer_id - application_tag)
-const INNER_MTU_SIZE: usize =
-    PAYLOAD_SIZE - PEER_ID_BINARY_SIZE - std::mem::size_of::<hopr_internal_types::protocol::Tag>();
+const INNER_MTU_SIZE: usize = PAYLOAD_SIZE
+    - OffchainPublicKey::SIZE
+    - std::mem::size_of::<hopr_internal_types::protocol::Tag>()
+    - PADDING_HEADER_SIZE;
 
 /// Helper trait to allow Box aliasing
 trait AsyncReadWrite: futures::AsyncWrite + futures::AsyncRead + Send {}
@@ -56,7 +58,6 @@ impl<T: futures::AsyncWrite + futures::AsyncRead + Send> AsyncReadWrite for T {}
 
 pub struct Session {
     id: SessionId,
-    // inner: SessionSocket<INNER_MTU_SIZE>,
     inner: Pin<Box<dyn AsyncReadWrite>>,
 }
 
@@ -235,6 +236,8 @@ impl futures::AsyncRead for InnerSession {
     ) -> Poll<std::io::Result<usize>> {
         tracing::debug!("Polling read on inner session {}", &self.id);
         if self.rx_buffer_range.0 != self.rx_buffer_range.1 {
+            tracing::debug!("Something in the buffer");
+
             let start = self.rx_buffer_range.0;
             let copy_len = self.rx_buffer_range.1.min(buf.len());
 
@@ -245,17 +248,22 @@ impl futures::AsyncRead for InnerSession {
                 self.rx_buffer_range = (0, 0);
             }
 
+            tracing::debug!("Had {copy_len} bytes in the buffer");
+
             return Poll::Ready(Ok(copy_len));
         }
 
         match self.rx.poll_next_unpin(cx) {
             Poll::Ready(Some(data)) => {
+                tracing::debug!("Something on the rx endpoint");
+
                 let data_len = data.len();
                 let copy_len = data_len.min(buf.len());
                 if copy_len < data_len {
                     self.rx_buffer[0..data_len - copy_len].copy_from_slice(&data[copy_len..]);
                     self.rx_buffer_range = (0, data_len - copy_len);
                 }
+                tracing::debug!("Had {copy_len} bytes in the rx endpoint");
 
                 buf[..copy_len].copy_from_slice(&data[..copy_len]);
 
@@ -270,7 +278,7 @@ impl futures::AsyncRead for InnerSession {
 // TODO: 2.2 use a more compact representation of the PeerId in the binary form
 // TODO: 3.0 remove if return path is implemented
 pub fn wrap_with_offchain_key(peer: &PeerId, data: Box<[u8]>) -> crate::errors::Result<Vec<u8>> {
-    if data.len() > PAYLOAD_SIZE.saturating_sub(OffchainPublicKey::SIZE) {
+    if data.len() > PAYLOAD_SIZE.saturating_sub(OffchainPublicKey::SIZE + PADDING_HEADER_SIZE) {
         return Err(TransportSessionError::PayloadSize);
     }
 

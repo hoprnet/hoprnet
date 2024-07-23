@@ -350,13 +350,22 @@ where
                                         if let Ok((peer, data)) =
                                             hopr_transport_session::types::unwrap_offchain_key(data.plain_text.clone())
                                         {
-                                            // data belongs to an outgoing session
                                             if let Some(sender) = sessions.get(&SessionId::new(app_tag, peer)).await {
                                                 // if the data does not get into the session, it can recover
-                                                let _ = sender.unbounded_send(data);
-                                            }
-                                            // data belongs to a new incoming session
-                                            else {
+                                                debug!(
+                                                    app_tag,
+                                                    peer_id = tracing::field::debug(peer),
+                                                    "Received data for a registered session"
+                                                );
+                                                if let Err(e) = sender.unbounded_send(data) {
+                                                    error!("Failed to send data to session: {e}");
+                                                }
+                                            } else {
+                                                debug!(
+                                                    app_tag,
+                                                    peer_id = tracing::field::debug(peer),
+                                                    "Detected a new incoming session"
+                                                );
                                                 let session_id = SessionId::new(app_tag, peer);
 
                                                 let (tx, rx) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
@@ -365,16 +374,21 @@ where
                                                     .unbounded_send(Session::new(
                                                         session_id,
                                                         me,
-                                                        PathOptions::Hops(1),
+                                                        PathOptions::IntermediatePath(vec![]),
                                                         vec![
-                                                            SessionCapability::Segmentation,
-                                                            SessionCapability::Retransmission,
+                                                            // SessionCapability::Segmentation,
+                                                            // SessionCapability::Retransmission,
                                                         ],
                                                         message_sender.clone(),
                                                         rx,
                                                     ))
                                                     .is_ok()
                                                 {
+                                                    // if the data does not get into the session, it can recover
+                                                    if let Err(e) = tx.unbounded_send(data) {
+                                                        error!("Failed to send data to session: {e}");
+                                                    }
+
                                                     sessions.insert(session_id, tx).await;
                                                 } else {
                                                     warn!("Failed to send session to incoming session queue");
@@ -463,11 +477,11 @@ where
         // TODO: 2.2 session initiation protocol is necessary to establish an application tag instead of this random approach
         let mut session_id: Option<SessionId> = None;
         for _ in 0..100 {
-            let hopr_ra = hopr_crypto_random::random_integer(
+            let random_app_tag = hopr_crypto_random::random_integer(
                 RESERVED_SUBPROTOCOL_TAG_UPPER_LIMIT as u64,
                 Some(RESERVED_SESSION_TAG_UPPER_LIMIT as u64),
             ) as u16;
-            let id = SessionId::new(hopr_ra, cfg.peer);
+            let id = SessionId::new(random_app_tag, cfg.peer);
             if !self.sessions.contains_key(&id) {
                 session_id = Some(id);
             }

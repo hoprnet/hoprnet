@@ -103,7 +103,7 @@ fn init_logger() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-const LISTENING_SESSION_RETRANSMISSION_SERVER_PORT: u16 = 5000;
+const LISTENING_SESSION_RETRANSMISSION_SERVER_PORT: u16 = 4677;
 
 #[derive(Debug, Clone)]
 struct HoprServerReactor {}
