@@ -534,7 +534,7 @@ mod alias {
         pub peer_id: PeerId,
     }
 
-    /// Get each previously set alias and its corresponding PeerId.
+    /// (deprecated, will be removed in v3.0) Get each previously set alias and its corresponding PeerId.
     #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/aliases"),
@@ -551,6 +551,7 @@ mod alias {
         ),
         tag = "Alias",
     )]
+    #[deprecated]
     pub async fn aliases(req: Request<InternalState>) -> tide::Result<Response> {
         let aliases = req
             .state()
@@ -564,7 +565,7 @@ mod alias {
         Ok(Response::builder(200).body(json!(aliases)).build())
     }
 
-    /// Set alias for a peer with a specific PeerId.
+    /// (deprecated, will be removed in v3.0) Set alias for a peer with a specific PeerId.
     #[utoipa::path(
         post,
         path = const_format::formatcp!("{BASE_PATH}/aliases"),
@@ -585,6 +586,7 @@ mod alias {
         ),
         tag = "Alias",
     )]
+    #[deprecated]
     pub async fn set_alias(mut req: Request<InternalState>) -> tide::Result<Response> {
         let args: AliasPeerIdBodyRequest = req.body_json().await?;
 
@@ -598,7 +600,7 @@ mod alias {
         }
     }
 
-    /// Get alias for the PeerId (Hopr address) that have this alias assigned to it.
+    /// (deprecated, will be removed in v3.0) Get alias for the PeerId (Hopr address) that have this alias assigned to it.
     #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/aliases/{{alias}}"),
@@ -616,6 +618,7 @@ mod alias {
         ),
         tag = "Alias",
     )]
+    #[deprecated]
     pub async fn get_alias(req: Request<InternalState>) -> tide::Result<Response> {
         let alias = req.param("alias")?.parse::<String>()?;
         let alias = urlencoding::decode(&alias)?.into_owned();
@@ -630,7 +633,7 @@ mod alias {
         }
     }
 
-    /// Delete an alias.
+    /// (deprecated, will be removed in v3.0) Delete an alias.
     #[utoipa::path(
         delete,
         path = const_format::formatcp!("{BASE_PATH}/aliases/{{alias}}"),
@@ -648,6 +651,7 @@ mod alias {
         ),
         tag = "Alias",
     )]
+    #[deprecated]
     pub async fn delete_alias(req: Request<InternalState>) -> tide::Result<Response> {
         let alias = req.param("alias")?.parse::<String>()?;
         let alias = urlencoding::decode(&alias)?.into_owned();
