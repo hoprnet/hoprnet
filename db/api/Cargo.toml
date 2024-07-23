@@ -26,6 +26,7 @@ multiaddr = { workspace = true }
 num_enum = { workspace = true }
 sea-orm = { workspace = true }
 sea-query = { version = "0", default-features = false, features = ["with-chrono", "derive", "backend-sqlite", "attr"]}
+serde_json = { workspace = true }
 sea-query-binder = { version = "0",  default-features = false, features = ["with-chrono", "sqlx-sqlite", "runtime-async-std-rustls"]}
 smart-default = { workspace = true }
 sqlx = { workspace = true }

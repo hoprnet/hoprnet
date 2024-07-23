@@ -48,7 +48,7 @@ impl MigratorTrait for Migrator {
 }
 
 /// SQLite does not allow writing lock tables only, and the write lock
-/// will apple to the entire database file. It is therefore beneficial
+/// will apply to the entire database file. It is therefore beneficial
 /// to separate the exclusive concurrently accessing components into
 /// separate database files to benefit from multiple write locks over
 /// different parts of the database.
@@ -64,9 +64,17 @@ impl MigratorTrait for MigratorIndex {
             Box::new(m20240226_000004_index_create_node_info::Migration),
             Box::new(m20240226_000005_index_create_chain_info::Migration),
             Box::new(m20240226_000006_index_create_network_eligibility::Migration),
-            Box::new(m20240226_000008_node_create_settings::Migration),
             Box::new(m20240226_000007_index_initial_seed::Migration),
         ]
+    }
+}
+
+pub struct MigratorSettings;
+
+#[async_trait::async_trait]
+impl MigratorTrait for MigratorSettings {
+    fn migrations() -> Vec<Box<dyn MigrationTrait>> {
+        vec![Box::new(m20240226_000008_node_create_settings::Migration)]
     }
 }
 

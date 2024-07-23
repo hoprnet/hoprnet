@@ -3611,6 +3611,7 @@ dependencies = [
  "sea-orm",
  "sea-query",
  "sea-query-binder",
+ "serde_json",
  "smart-default",
  "sqlx",
  "strum 0.25.0",

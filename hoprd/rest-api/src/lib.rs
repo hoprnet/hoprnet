@@ -6,8 +6,6 @@ use std::str::FromStr;
 use std::{collections::HashMap, sync::Arc};
 
 use async_lock::RwLock;
-use bimap::BiHashMap;
-// use base64::{engine::general_purpose::STANDARD_NO_PAD, Engine as _};
 use futures::StreamExt;
 use futures_concurrency::stream::Merge;
 use libp2p_identity::PeerId;
@@ -72,7 +70,6 @@ pub struct InternalState {
     pub auth: Arc<Auth>,
     pub hopr: Arc<Hopr>,
     pub inbox: Arc<RwLock<hoprd_inbox::Inbox>>,
-    pub aliases: Arc<RwLock<BiHashMap<String, PeerId>>>,
     pub websocket_rx: async_broadcast::InactiveReceiver<TransportOutput>,
     pub msg_encoder: Option<MessageEncoder>,
 }
@@ -276,10 +273,6 @@ pub async fn run_hopr_api(
     websocket_rx: async_broadcast::InactiveReceiver<TransportOutput>,
     msg_encoder: Option<MessageEncoder>,
 ) {
-    // Prepare alias part of the state
-    let aliases: Arc<RwLock<BiHashMap<String, PeerId>>> = Arc::new(RwLock::new(BiHashMap::new()));
-    aliases.write().await.insert("me".to_owned(), hopr.me_peer_id());
-
     let state = State { hopr };
 
     let mut app = tide::with_state(state.clone());
@@ -310,7 +303,6 @@ pub async fn run_hopr_api(
             msg_encoder,
             inbox,
             websocket_rx,
-            aliases,
         });
 
         api.with(TokenBasedAuthenticationMiddleware);
@@ -560,13 +552,13 @@ mod alias {
         tag = "Alias",
     )]
     pub async fn aliases(req: Request<InternalState>) -> tide::Result<Response> {
-        let aliases = req.state().aliases.clone();
-
-        let aliases = aliases
-            .read()
-            .await
+        let aliases = req
+            .state()
+            .hopr
+            .get_aliases()
+            .await?
             .iter()
-            .map(|(key, value)| (key.clone(), value.to_string()))
+            .map(|obj| (obj.peer_id.to_string(), obj.alias.clone()))
             .collect::<HashMap<String, String>>();
 
         Ok(Response::builder(200).body(json!(aliases)).build())
@@ -595,14 +587,14 @@ mod alias {
     )]
     pub async fn set_alias(mut req: Request<InternalState>) -> tide::Result<Response> {
         let args: AliasPeerIdBodyRequest = req.body_json().await?;
-        let aliases = req.state().aliases.clone();
 
-        let inserted = aliases.write().await.insert_no_overwrite(args.alias, args.peer_id);
+        let inserted = req.state().hopr.set_alias(args.peer_id.to_string(), args.alias).await?;
+
         match inserted {
-            Ok(_) => Ok(Response::builder(201)
+            true => Ok(Response::builder(201)
                 .body(json!(PeerIdResponse { peer_id: args.peer_id }))
                 .build()),
-            Err(_) => Ok(Response::builder(409).body(ApiErrorStatus::AliasAlreadyExists).build()),
+            false => Ok(Response::builder(409).body(ApiErrorStatus::AliasAlreadyExists).build()),
         }
     }
 
@@ -627,15 +619,14 @@ mod alias {
     pub async fn get_alias(req: Request<InternalState>) -> tide::Result<Response> {
         let alias = req.param("alias")?.parse::<String>()?;
         let alias = urlencoding::decode(&alias)?.into_owned();
-        let aliases = req.state().aliases.clone();
 
-        let aliases = aliases.read().await;
-        if let Some(peer_id) = aliases.get_by_left(&alias) {
-            Ok(Response::builder(200)
-                .body(json!(PeerIdResponse { peer_id: *peer_id }))
-                .build())
-        } else {
-            Ok(Response::builder(404).body(ApiErrorStatus::InvalidInput).build())
+        match req.state().hopr.get_alias(alias.clone()).await? {
+            Some(entry) => Ok(Response::builder(200)
+                .body(json!(PeerIdResponse {
+                    peer_id: PeerId::from_str(&entry).unwrap()
+                }))
+                .build()),
+            None => Ok(Response::builder(404).body(ApiErrorStatus::InvalidInput).build()),
         }
     }
 
@@ -660,9 +651,8 @@ mod alias {
     pub async fn delete_alias(req: Request<InternalState>) -> tide::Result<Response> {
         let alias = req.param("alias")?.parse::<String>()?;
         let alias = urlencoding::decode(&alias)?.into_owned();
-        let aliases = req.state().aliases.clone();
 
-        let _ = aliases.write().await.remove_by_left(&alias);
+        req.state().hopr.delete_alias(alias).await?;
 
         Ok(Response::builder(204).build())
     }

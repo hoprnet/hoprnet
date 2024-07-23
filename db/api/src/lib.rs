@@ -11,6 +11,7 @@ pub mod peers;
 pub mod protocol;
 pub mod registry;
 pub mod resolver;
+pub mod settings;
 mod ticket_manager;
 pub mod tickets;
 
@@ -19,6 +20,8 @@ pub use sea_orm::DatabaseTransaction;
 
 use crate::accounts::HoprDbAccountOperations;
 use crate::channels::HoprDbChannelOperations;
+use crate::settings::HoprDbSettingsOperations;
+use crate::tickets::HoprDbTicketOperations;
 use async_trait::async_trait;
 use futures::future::BoxFuture;
 use sea_orm::TransactionTrait;
@@ -30,7 +33,6 @@ use crate::peers::HoprDbPeersOperations;
 use crate::protocol::HoprDbProtocolOperations;
 use crate::registry::HoprDbRegistryOperations;
 use crate::resolver::HoprDbResolverOperations;
-use crate::tickets::HoprDbTicketOperations;
 
 /// Primary key used in tables that contain only a single row.
 pub const SINGULAR_TABLE_FIXED_ID: i32 = 1;
@@ -92,7 +94,7 @@ impl From<OpenTransaction> for DatabaseTransaction {
 pub type OptTx<'a> = Option<&'a OpenTransaction>;
 
 /// When Sqlite is used as a backend, model needs to be split
-/// into 3 different databases to avoid locking the database.
+/// into 4 different databases to avoid locking the database.
 /// On Postgres backend, these should actually point to the same database.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Default)]
 pub enum TargetDb {
@@ -103,6 +105,8 @@ pub enum TargetDb {
     Tickets,
     /// Network peers database
     Peers,
+    /// Key-Value settings database
+    Settings,
 }
 
 #[async_trait]
@@ -153,6 +157,7 @@ impl HoprDbGeneralModelOperations for HoprDb {
             TargetDb::Index => &self.db,
             TargetDb::Tickets => &self.tickets_db,
             TargetDb::Peers => &self.peers_db,
+            TargetDb::Settings => &self.settings_db,
         }
     }
 
@@ -167,6 +172,10 @@ impl HoprDbGeneralModelOperations for HoprDb {
             )),
             TargetDb::Peers => Ok(OpenTransaction(
                 self.peers_db.begin_with_config(None, None).await?,
+                target_db,
+            )),
+            TargetDb::Settings => Ok(OpenTransaction(
+                self.settings_db.begin_with_config(None, None).await?,
                 target_db,
             )),
         }
@@ -184,6 +193,7 @@ pub trait HoprDbAllOperations:
     + HoprDbPeersOperations
     + HoprDbResolverOperations
     + HoprDbProtocolOperations
+    + HoprDbSettingsOperations
 {
 }
 
