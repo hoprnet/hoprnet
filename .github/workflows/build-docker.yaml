@@ -23,7 +23,7 @@ on:
         default: false
 
 concurrency:
-  group: ${{ github.head_ref }}-build-docker-${{ inputs.package }}
+  group: ${{ github.ref }}-build-docker-${{ inputs.package }}
   cancel-in-progress: true
 jobs:
   build-docker:
