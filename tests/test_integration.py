@@ -900,8 +900,8 @@ async def test_session_communication_with_an_echo_server_ver_wireguard_style_com
     In real-world scenarios, the read and write operations are interleaved, but the test goes further to force the socket to hold the buffer.
     """
 
-    packet_count = 1
-    # packet_count = 3      # TODO: having the 462 packet size it regularly fails to send the packets due to missing write/flush buffering
+    # packet_count = 1
+    packet_count = 3      # TODO: having the 462 packet size it regularly fails to send the packets due to missing write/flush buffering
     
     message_size = HOPR_SESSION_MAX_PAYLOAD_SIZE
     expected = set([''.join(random.choices(string.ascii_uppercase + string.digits, k=message_size)) for _ in range(packet_count)])
@@ -911,6 +911,8 @@ async def test_session_communication_with_an_echo_server_ver_wireguard_style_com
 
     # src_sock_port = await src_peer.api.session_client(dest_peer.peer_id, path={"Hops": 0})        // TODO: bug, cannot specify Hops: 0
     src_sock_port = await src_peer.api.session_client(dest_peer.peer_id, path={"IntermediatePath": []})
+    
+    actual = []
 
     with echo_server(SERVER_LISTENING_PORT_HARDCODED_IN_HOPRD_CODE):
         # socket.listen does not actually listen immediately and needs some time to be working
@@ -922,4 +924,6 @@ async def test_session_communication_with_an_echo_server_ver_wireguard_style_com
             
             for message in expected:
                 s.send(message.encode())
-                assert s.recv(message_size).decode() == message
+                actual.append(s.recv(message_size).decode())
+                
+    assert list(set(actual)) == list(expected)

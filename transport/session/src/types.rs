@@ -188,10 +188,12 @@ impl futures::AsyncWrite for InnerSession {
         cx: &mut std::task::Context<'_>,
         buf: &[u8],
     ) -> Poll<std::io::Result<usize>> {
-        tracing::debug!("Polling write on inner session {}", &self.id);
+        tracing::debug!("Polling write of {} on inner session {}", buf.len(), &self.id);
 
         let tag = self.id.tag();
-        let payload = wrap_with_offchain_key(&self.me, buf.to_vec().into_boxed_slice())
+        let data_len = buf.len().min(INNER_MTU_SIZE);
+
+        let payload = wrap_with_offchain_key(&self.me, buf[..data_len].to_vec().into_boxed_slice())
             .map_err(|e| {
                 error!("failed to wrap the payload with offchain key: {e}");
                 Error::new(ErrorKind::InvalidData, e)
@@ -208,7 +210,7 @@ impl futures::AsyncWrite for InnerSession {
             .send_message(payload, *self.id.peer(), self.options.clone())
             .poll_unpin(cx)
         {
-            Poll::Ready(Ok(_)) => Poll::Ready(Ok(buf.len())),
+            Poll::Ready(Ok(_)) => Poll::Ready(Ok(data_len)),
             Poll::Ready(Err(e)) => {
                 error!("failed to send the message inside a session: {e}");
                 Poll::Ready(Err(Error::from(ErrorKind::BrokenPipe)))
@@ -315,8 +317,6 @@ mod tests {
     use super::*;
     use crate::traits::MockSendMsg;
 
-    const PAYLOAD: usize = PAYLOAD_SIZE - OffchainPublicKey::SIZE;
-
     #[test]
     fn use_the_offchain_binary_form_because_it_is_more_compact() {
         let opk = OffchainKeypair::random().public().clone();
@@ -328,7 +328,7 @@ mod tests {
     #[test]
     fn wrapping_and_unwrapping_with_offchain_key_should_be_an_identity() {
         let peer: PeerId = OffchainKeypair::random().public().into();
-        let data = hopr_crypto_random::random_bytes::<PAYLOAD>()
+        let data = hopr_crypto_random::random_bytes::<INNER_MTU_SIZE>()
             .as_ref()
             .to_vec()
             .into_boxed_slice();
@@ -344,7 +344,7 @@ mod tests {
     #[test]
     fn wrapping_with_offchain_key_should_succeed_for_valid_peer_id_and_valid_payload_size() {
         let peer: PeerId = OffchainKeypair::random().public().into();
-        let data = hopr_crypto_random::random_bytes::<PAYLOAD>()
+        let data = hopr_crypto_random::random_bytes::<INNER_MTU_SIZE>()
             .as_ref()
             .to_vec()
             .into_boxed_slice();
@@ -357,7 +357,7 @@ mod tests {
     #[test]
     fn wrapping_with_offchain_key_should_fail_for_invalid_peer_id() {
         let peer: PeerId = PeerId::random();
-        let data = hopr_crypto_random::random_bytes::<PAYLOAD>()
+        let data = hopr_crypto_random::random_bytes::<INNER_MTU_SIZE>()
             .as_ref()
             .to_vec()
             .into_boxed_slice();
@@ -499,5 +499,33 @@ mod tests {
         let bytes_written = session.write(&data).await.expect("Write should work #1");
 
         assert_eq!(bytes_written, data.len());
+    }
+
+    #[async_std::test]
+    async fn session_should_write_data_at_most_the_length_of_a_usable_mtu_size() {
+        const TO_SEND: usize = INNER_MTU_SIZE * 2;
+
+        let id = SessionId::new(1, OffchainKeypair::random().public().into());
+        let (_tx, rx) = futures::channel::mpsc::unbounded();
+        let mut mock = MockSendMsg::new();
+
+        let data = hopr_crypto_random::random_bytes::<TO_SEND>()
+            .as_ref()
+            .to_vec()
+            .into_boxed_slice();
+
+        mock.expect_send_message().times(1).returning(|_, _, _| Ok(()));
+
+        let mut session = InnerSession::new(
+            id,
+            OffchainKeypair::random().public().into(),
+            PathOptions::Hops(1),
+            Box::new(mock),
+            rx,
+        );
+
+        let bytes_written = session.write(&data).await.expect("Write should work #1");
+
+        assert_eq!(bytes_written, INNER_MTU_SIZE);
     }
 }
