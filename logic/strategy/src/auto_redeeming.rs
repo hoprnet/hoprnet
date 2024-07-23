@@ -47,10 +47,10 @@ pub struct AutoRedeemingStrategyConfig {
     /// If 0 is given, the strategy will redeem tickets regardless of their value.
     /// This is not used for cases where `on_close_redeem_single_tickets_value_min` applies.
     ///
-    /// Default is 0 HOPR.
+    /// Default is 30 HOPR.
     #[serde(default = "zero_hopr")]
     #[serde_as(as = "DisplayFromStr")]
-    #[default(Balance::zero(BalanceType::HOPR))]
+    #[default(Balance::new_from_str("30000000000000000000", BalanceType::HOPR))]
     pub minimum_redeem_ticket_value: Balance,
 
     /// The strategy will automatically redeem if there's a single ticket left when a channel
@@ -281,6 +281,7 @@ mod tests {
 
         let cfg = AutoRedeemingStrategyConfig {
             redeem_only_aggregated: false,
+            minimum_redeem_ticket_value: BalanceType::HOPR.zero(),
             ..Default::default()
         };
 
@@ -309,6 +310,7 @@ mod tests {
 
         let cfg = AutoRedeemingStrategyConfig {
             redeem_only_aggregated: true,
+            minimum_redeem_ticket_value: BalanceType::HOPR.zero(),
             ..Default::default()
         };
 

@@ -100,7 +100,7 @@ pub fn hopr_default_strategies() -> MultiStrategyConfig {
             }),
             AutoRedeeming(AutoRedeemingStrategyConfig {
                 redeem_only_aggregated: true,
-                minimum_redeem_ticket_value: BalanceType::HOPR.zero(),
+                minimum_redeem_ticket_value: Balance::new_from_str("30000000000000000000", BalanceType::HOPR),
                 on_close_redeem_single_tickets_value_min: Balance::new_from_str("90000000000000000", BalanceType::HOPR),
             }),
         ],
