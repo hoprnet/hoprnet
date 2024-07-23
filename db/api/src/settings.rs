@@ -28,7 +28,7 @@ pub trait HoprDbSettingsOperations {
 impl HoprDbSettingsOperations for HoprDb {
     async fn get_alias(&self, alias: String) -> Result<Option<String>> {
         let aliases = self.get_aliases().await?;
-        let alias_entry = aliases.into_iter().find(|entry| entry.alias.to_string() == alias);
+        let alias_entry = aliases.into_iter().find(|entry| entry.alias == alias);
 
         match alias_entry {
             Some(alias_entry) => return Ok(Some(alias_entry.peer_id)),
@@ -91,7 +91,7 @@ impl HoprDbSettingsOperations for HoprDb {
             alias,
         };
 
-        if let Some(_) = aliases.iter_mut().find(|alias| alias.peer_id == peer) {
+        if aliases.iter().any(|alias| alias.peer_id == peer) {
             return Ok(false);
         }
 
