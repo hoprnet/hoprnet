@@ -61,7 +61,10 @@ impl HoprDbSettingsOperations for HoprDb {
     }
 
     async fn set_aliases(&self, aliases: Vec<AliasEntry>) -> Result<bool> {
-        let aliases_str = serde_json::to_string(&aliases).unwrap();
+        let aliases_str = match serde_json::to_string(&aliases) {
+            Ok(str) => str,
+            Err(_) => return Ok(false),
+        };
 
         let model = hopr_db_entity::global_settings::Entity::find()
             .filter(hopr_db_entity::global_settings::Column::Key.eq("aliases"))
@@ -105,8 +108,6 @@ impl HoprDbSettingsOperations for HoprDb {
     async fn delete_alias(&self, alias: String) -> Result<bool> {
         let aliases = self.get_aliases().await?;
         let aliases = aliases.into_iter().filter(|a| a.alias != alias).collect::<Vec<_>>();
-
-        println!("aliases: {:?}", aliases);
 
         self.set_aliases(aliases).await?;
 
