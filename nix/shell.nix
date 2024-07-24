@@ -37,6 +37,7 @@ craneLib.devShell {
     # test Github automation
     act
 
+    # documentation utilities
     swagger-codegen3
 
     # docker image inspection and handling
