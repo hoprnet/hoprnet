@@ -32,6 +32,10 @@ def shuffled(coll):
     return coll
 
 
+def gen_random_tag():
+    return random.randint(RESERVED_TAG_UPPER_BOUND + 1, 65530)
+
+
 @asynccontextmanager
 async def create_channel(src: Node, dest: Node, funding: int, close_from_dest=True):
     channel = await src.api.open_channel(dest.address, str(int(funding)))
@@ -164,7 +168,7 @@ async def check_all_tickets_redeemed(src: Node):
 async def send_and_receive_packets_with_pop(
     packets, src: Node, dest: Node, path: str, timeout: int = MULTIHOP_MESSAGE_SEND_TIMEOUT
 ):
-    random_tag = random.randint(10, 65530)
+    random_tag = gen_random_tag()
 
     for packet in packets:
         assert await src.api.send_message(dest.peer_id, packet, path, random_tag)
@@ -175,7 +179,7 @@ async def send_and_receive_packets_with_pop(
 async def send_and_receive_packets_with_peek(
     packets, src: Node, dest: Node, path: str, timeout: int = MULTIHOP_MESSAGE_SEND_TIMEOUT
 ):
-    random_tag = random.randint(10, 65530)
+    random_tag = gen_random_tag()
 
     for packet in packets:
         assert await src.api.send_message(dest.peer_id, packet, path, random_tag)
@@ -356,7 +360,7 @@ async def test_hoprd_should_be_able_to_send_0_hop_messages_without_open_channels
 @pytest.mark.parametrize("src, dest", random_distinct_pairs_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
 async def test_hoprd_should_fail_sending_a_message_that_is_too_large(src: Node, dest: Node, swarm7: dict[str, Node]):
     MAXIMUM_PAYLOAD_SIZE = 500
-    random_tag = random.randint(10, 65530)
+    random_tag = gen_random_tag()
 
     packet = "0 hop message too large: " + "".join(
         random.choices(string.ascii_uppercase + string.digits, k=MAXIMUM_PAYLOAD_SIZE)
@@ -796,7 +800,7 @@ async def test_peeking_messages_with_timestamp(src: str, dest: str, swarm7: dict
     message_count = int(TICKET_AGGREGATION_THRESHOLD / 10)
     split_index = int(message_count * 0.66)
 
-    random_tag = random.randint(10, 65530)
+    random_tag = gen_random_tag()
 
     src_peer = swarm7[src]
     dest_peer = swarm7[dest]
@@ -834,7 +838,7 @@ async def test_peeking_messages_with_timestamp(src: str, dest: str, swarm7: dict
 @pytest.mark.parametrize("src,dest", random_distinct_pairs_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
 async def test_send_message_return_timestamp(src: str, dest: str, swarm7: dict[str, Node]):
     message_count = int(TICKET_AGGREGATION_THRESHOLD / 10)
-    random_tag = random.randint(10, 65530)
+    random_tag = gen_random_tag()
 
     src_peer = swarm7[src]
     dest_peer = swarm7[dest]
