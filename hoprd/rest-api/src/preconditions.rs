@@ -1,4 +1,3 @@
-use crate::{ApiErrorStatus, Auth, InternalState};
 use axum::{
     extract::{OriginalUri, Request, State},
     http::{
@@ -9,8 +8,10 @@ use axum::{
     middleware::Next,
     response::IntoResponse,
 };
-use hopr_lib::HoprState;
 use std::str::FromStr;
+
+use crate::{ApiErrorStatus, Auth, InternalState};
+use hopr_lib::HoprState;
 
 pub(crate) async fn authenticate(
     State(state): State<InternalState>,

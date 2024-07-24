@@ -4337,7 +4337,7 @@ dependencies = [
 
 [[package]]
 name = "hoprd-api"
-version = "3.2.0"
+version = "3.2.1"
 dependencies = [
  "async-broadcast",
  "async-lock 3.4.0",
