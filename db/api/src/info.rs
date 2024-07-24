@@ -14,8 +14,6 @@ pub struct IndexerData {
     pub channels_dst: Option<Hash>,
     /// Current ticket price
     pub ticket_price: Option<Balance>,
-    /// Current ticket probability
-    pub ticket_probability: Option<U256>,
     /// Network registry state
     pub nr_enabled: bool,
 }

@@ -14,8 +14,8 @@ from .conftest import (
     TICKET_AGGREGATION_THRESHOLD,
     TICKET_PRICE_PER_HOP,
     barebone_nodes,
-    nodes_with_auth,
     default_nodes,
+    nodes_with_auth,
     random_distinct_pairs_from,
 )
 from .hopr import HoprdAPI
@@ -778,6 +778,15 @@ async def test_hoprd_check_ticket_price_is_default(peer, swarm7: dict[str, Node]
     price = await swarm7[peer].api.ticket_price()
 
     assert isinstance(price, int)
+    assert price > 0
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
+async def test_hoprd_check_ticket_winn_prob_is_default(peer, swarm7: dict[str, Node]):
+    price = await swarm7[peer].api.ticket_winn_prob()
+
+    assert isinstance(price, float)
     assert price > 0
 
 

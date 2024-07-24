@@ -31,6 +31,9 @@ const ALWAYS_WINNING: EncodedWinProb = hex!("ffffffffffffff");
 /// Encodes 0% winning probability
 const NEVER_WINNING: EncodedWinProb = hex!("00000000000000");
 
+/// Winnning probability of a ticket
+pub const WINNING_PROB: f64 = 1.0;
+
 /// Helper function to checks if the given ticket values belong to a winning ticket.
 pub(crate) fn check_ticket_win(
     ticket_hash: &Hash,
@@ -75,7 +78,7 @@ pub struct TicketBuilder {
     index_offset: u32,
     #[default = 1]
     channel_epoch: u32,
-    #[default(Some(1.0))]
+    #[default(Some(WINNING_PROB))]
     win_prob: Option<f64>,
     win_prob_enc: Option<EncodedWinProb>,
     challenge: Option<EthereumChallenge>,
@@ -177,7 +180,7 @@ impl TicketBuilder {
 
     /// Sets the encoded ticket winning probability.
     /// Mutually exlusive with [TicketBuilder::win_prob].
-    /// Defaults to encoded(1.0)
+    /// Defaults to encoded(WINNING_PROB)
     #[must_use]
     pub fn win_prob_encoded(mut self, win_prob: EncodedWinProb) -> Self {
         self.win_prob = None;

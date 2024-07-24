@@ -1151,8 +1151,8 @@ impl Hopr {
     }
 
     /// Get ticket winning probability
-    pub async fn get_ticket_probability(&self) -> errors::Result<Option<U256>> {
-        Ok(self.chain_api.ticket_probability().await?)
+    pub async fn get_ticket_probability(&self) -> errors::Result<f64> {
+        Ok(hopr_internal_types::tickets::WINNING_PROB)
     }
 
     /// List of all accounts announced on the chain

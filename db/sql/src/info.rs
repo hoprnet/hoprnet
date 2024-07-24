@@ -67,11 +67,6 @@ pub trait HoprDbInfoOperations {
     /// note that this setter should invalidate the cache.
     async fn update_ticket_price<'a>(&'a self, tx: OptTx<'a>, price: Balance) -> Result<()>;
 
-    /// Updates the ticket winning probability
-    /// To retrieve the stored ticket winning probability, use [`HoprDbInfoOperations::get_indexer_data`],
-    /// note that this setter should invalidate the cache.
-    async fn update_ticke_probability<'a>(&'a self, tx: OptTx<'a>, probability: Vec<u8>) -> Result<()>;
-
     /// Retrieves the last indexed block number.
     async fn get_last_indexed_block<'a>(&'a self, tx: OptTx<'a>) -> Result<(u32, Hash)>;
 
@@ -273,7 +268,6 @@ impl HoprDbInfoOperations for HoprDb {
                                     safe_registry_dst,
                                     channels_dst,
                                     ticket_price: model.ticket_price.map(|p| BalanceType::HOPR.balance_bytes(p)),
-                                    ticket_probability: "1", // TODO (jean): use dynamic probability
                                     nr_enabled: model.network_registry_enabled,
                                 }))
                             })
@@ -330,31 +324,6 @@ impl HoprDbInfoOperations for HoprDb {
                     chain_info::ActiveModel {
                         id: Set(SINGULAR_TABLE_FIXED_ID),
                         ticket_price: Set(Some(price.amount().to_be_bytes().into())),
-                        ..Default::default()
-                    }
-                    .update(tx.as_ref())
-                    .await?;
-
-                    Ok::<(), DbSqlError>(())
-                })
-            })
-            .await?;
-
-        self.caches
-            .single_values
-            .invalidate(&CachedValueDiscriminants::IndexerDataCache)
-            .await;
-        Ok(())
-    }
-
-    async fn update_ticke_probability<'a>(&'a self, tx: OptTx<'a>, probability: Vec<u8>) -> Result<()> {
-        self.nest_transaction(tx)
-            .await?
-            .perform(|tx| {
-                Box::pin(async move {
-                    chain_info::ActiveModel {
-                        id: Set(SINGULAR_TABLE_FIXED_ID),
-                        ticket_probability: Set(Some(probability)),
                         ..Default::default()
                     }
                     .update(tx.as_ref())
