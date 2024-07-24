@@ -61,6 +61,7 @@ fn is_running(state: Arc<AppState>) -> impl IntoResponse {
         responses(
             (status = 200, description = "The node is allowed in the network"),
             (status = 412, description = "The node is not allowed in the network"),
+            (status = 500, description = "Internal server error"),
         ),
         tag = "Checks"
     )]
@@ -69,6 +70,7 @@ pub(super) async fn eligiblez(State(state): State<Arc<AppState>>) -> impl IntoRe
 
     match hopr.get_eligibility_status().await {
         Ok(true) => (StatusCode::OK, "").into_response(),
-        _ => (StatusCode::PRECONDITION_FAILED, "").into_response(),
+        Ok(false) => (StatusCode::PRECONDITION_FAILED, "Node not eligible").into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("Error: {}", e)).into_response(),
     }
 }
