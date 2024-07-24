@@ -391,7 +391,7 @@ class HoprdAPI:
         _, response = self.__call_api(NetworkApi, "probability")
         return float(response.probability) if hasattr(response, "probability") else None
 
-     async def withdraw(self, amount: str, receipient: str, currency: str):
+    async def withdraw(self, amount: str, receipient: str, currency: str):
         """
         Withdraws the given amount of token (Native or HOPR) to the given receipient.
         :param: amount: str
