@@ -61,6 +61,8 @@ hopr:
     on_fail_continue: true
     # Allows nesting strategy chains via !MultiStrategy
     allow_recursive: false
+    # Sets the interval between strategy executions in seconds.
+    execution_interval: 60
     # Contains the actual chain of strategies to execute in the given order.
     # If left empty, the node will behave as if only `!Passive` strategy
     # was given.

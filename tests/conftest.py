@@ -343,7 +343,8 @@ def fund_nodes(test_suite_name, test_dir: Path, anvil_port):
         capture_output=True,
     )
 
-async def shared_nodes_bringup(test_suite_name: str, test_dir: Path, anvil_port, nodes):
+async def shared_nodes_bringup(test_suite_name: str, test_dir: Path, anvil_port,
+                               nodes, skip_funding=False):
     for node in nodes.values():
         logging.info(f"Setting up {node}")
         node.setup(PASSWORD, protocol_config_file(test_suite_name), PWD.parent)
@@ -356,9 +357,10 @@ async def shared_nodes_bringup(test_suite_name: str, test_dir: Path, anvil_port,
         await asyncio.wait_for(node.api.startedz(), timeout=60)
         logging.info(f"Node {id} is up")
 
-    # FUND NODES
-    logging.info("Funding nodes")
-    fund_nodes(test_suite_name, test_dir, anvil_port)
+    if not skip_funding:
+      # FUND NODES
+      logging.info("Funding nodes")
+      fund_nodes(test_suite_name, test_dir, anvil_port)
 
     # WAIT FOR NODES TO BE UP
     logging.info("Node setup finished, waiting for nodes to be ready")
@@ -455,6 +457,9 @@ async def swarm7(request):
             cwd=PWD.parent.joinpath("scripts"),
         )
 
+        # BRING UP NODES (without funding)
+        await shared_nodes_bringup(test_suite_name, test_dir, anvil_port, nodes, skip_funding=True)
+
     else:
         logging.info("Snapshot not usable")
 
@@ -497,11 +502,9 @@ async def swarm7(request):
         # wait before contract deployments are finalized
         await asyncio.sleep(5)
 
-    # BRING UP NODES
-    await shared_nodes_bringup(test_suite_name, test_dir, anvil_port, nodes)
+        # BRING UP NODES (with funding)
+        await shared_nodes_bringup(test_suite_name, test_dir, anvil_port, nodes)
 
-    # if the snapshot was not used, take a snapshot for future use
-    if not use_snapshot:
         logging.info("Taking snapshot")
         snapshot_create(anvil_port, test_dir, nodes)
 
@@ -513,7 +516,8 @@ async def swarm7(request):
             cwd=PWD.parent.joinpath("scripts"),
         )
 
-        await shared_nodes_bringup(test_suite_name, test_dir, anvil_port, nodes)
+        # BRING UP NODES (again, without funding)
+        await shared_nodes_bringup(test_suite_name, test_dir, anvil_port, nodes, skip_funding=True)
 
     # YIELD NODES
     logging.info("Nodes all ready, starting test")

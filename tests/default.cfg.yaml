@@ -2,6 +2,7 @@
 hopr:
   strategy:
     on_fail_continue: true
+    execution_interval: 1
     strategies:
       - !AutoFunding
         funding_amount: "10000000000000000000 HOPR"

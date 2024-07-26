@@ -60,7 +60,8 @@ jobs:
           nix build .#hopli-test
         env:
           HOPR_NETWORK: anvil-localhost
-  tests-smoke:
+
+  tests-smoke-websocket:
     # FIXME: smoke tests currently cannot be executed on the bigger runners
     runs-on: self-hosted-hoprnet-big
     timeout-minutes: 60
@@ -93,16 +94,81 @@ jobs:
         env:
           USER: runner
 
-      - name: Run smoke tests
-        run: nix develop .#smoke-tests -c make smoke-tests
+      - name: Run smoke tests websocket
+        run: nix develop .#smoke-tests -c python3 -m pytest tests/test_websocket_api.py
 
       - name: Compress test logs
         if: ${{ !env.ACT && always() }}
         run: |
           # Copy all the logs to a directory to avoid log file changes and simplify tar command
-          test_path=/tmp/test-smoke-${{ github.run_id }}-${{ github.run_number }}
+          test_path=/tmp/test-smoke-websocket-${{ github.run_id }}-${{ github.run_number }}
           mkdir -p ${test_path}
-          cp -r /tmp/hopr-smoke-test* ${test_path} || echo "no files to copy"
+          cp -r /tmp/hopr-smoke-test/* ${test_path} || echo "no files to copy"
+          cd ${test_path}
+          tar -czvf ${test_path}.tgz ${test_path}
+        working-directory: "/tmp"
+
+      - name: Upload test logs
+        uses: "google-github-actions/upload-cloud-storage@v2"
+        if: ${{ !env.ACT && always() }}
+        with:
+          path: /tmp/
+          glob: "test-smoke-*"
+          parent: false
+          destination: hoprnet-test-logs/pr-${{ github.event.pull_request.number }}
+
+  tests-smoke:
+    # FIXME: smoke tests currently cannot be executed on the bigger runners
+    runs-on: self-hosted-hoprnet-big
+    timeout-minutes: 60
+    # the websocket suite is completed first so that the build artifacts can be
+    # reused for the other suites
+    needs:
+      - tests-smoke-websocket
+    env:
+      needs_nix_setup: true
+    strategy:
+      matrix:
+        suite:
+          - tests/test_integration.py
+          - tests/test_hopli.py
+    if: github.event.pull_request.draft == false
+    steps:
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@v4
+
+      - name: Set up Google Cloud Credentials
+        id: auth
+        uses: google-github-actions/auth@v2
+        if: ${{ !env.ACT }}
+        with:
+          token_format: "access_token"
+          credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+
+      - name: Install Nix
+        if: env.needs_nix_setup == 'true'
+        uses: cachix/install-nix-action@v27
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: cachix/cachix-action@v15
+        if: env.needs_nix_setup == 'true'
+        with:
+          name: hoprnet
+          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
+        env:
+          USER: runner
+
+      - name: Run smoke tests ${{ matrix.suite }}
+        run: nix develop .#smoke-tests -c python3 -m pytest tests/test_${{ matrix.suite }}.py
+
+      - name: Compress test logs
+        if: ${{ !env.ACT && always() }}
+        run: |
+          # Copy all the logs to a directory to avoid log file changes and simplify tar command
+          test_path=/tmp/test-smoke-${{ matrix.suite }}-${{ github.run_id }}-${{ github.run_number }}
+          mkdir -p ${test_path}
+          cp -r /tmp/hopr-smoke-test/* ${test_path} || echo "no files to copy"
           cd ${test_path}
           tar -czvf ${test_path}.tgz ${test_path}
         working-directory: "/tmp"
