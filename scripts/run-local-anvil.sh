@@ -16,9 +16,9 @@ source "${mydir}/utils.sh"
 
 usage() {
   msg
-  msg "This script can be used to run a local Anvil instance at 0.0.0.0:8545"
+  msg "This script can be used to run a local Anvil instance at 0.0.0.0:PORT"
   msg
-  msg "Usage: $0 [-h|--help] [-f] [-l <log_file>] [-c <cfg_file>] [-s]"
+  msg "Usage: $0 [-h|--help] [-f] [-l <log_file>] [-c <cfg_file>] [-p <port>] [-ls <state_file>] [-ds <state_file>] [-s]"
   msg
   msg "Options:"
   msg
@@ -27,6 +27,9 @@ usage() {
   msg "-f: Start anvil in foreground, blocking the script execution"
   msg "-c <cfg_file>: Use particular anvil config file; default is ../.anvil.cfg"
   msg "-l <log_file>: Use particular anvil log file; default is /tmp/anvil.log"
+  msg "-p <port>: Use particular port; default is 8545"
+  msg "-ds <state_file>: Use particular state file to dump state on exit"
+  msg "-ls <state_file>: Use particular state file to load state on startup"
   msg
 }
 
@@ -36,10 +39,12 @@ usage() {
 declare tmp="$(find_tmp_dir)"
 declare log_file="${tmp}/anvil.log"
 declare cfg_file="${mydir}/../.anvil.cfg"
+declare port="8545"
 declare deployer_private_key=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
 declare foreground="false"
 declare skip_deploy="false"
-declare prune_history=""
+declare dump_state_file=""
+declare load_state_file=""
 
 while (( "$#" )); do
   case "$1" in
@@ -66,8 +71,19 @@ while (( "$#" )); do
       foreground="true"
       shift
       ;;
-    -p|--prune-history)
-      prune_history="--prune-history 100"
+    -p)
+      port="$2"
+      shift
+      shift
+      ;;
+    -ds)
+      dump_state_file="$2"
+      shift
+      shift
+      ;;
+    -ls)
+      load_state_file="$2"
+      shift
       shift
       ;;
     -*|--*=)
@@ -91,7 +107,7 @@ function cleanup {
   set +Eeuo pipefail
 
   log "Stop anvil chain"
-  lsof -i ":8545" -s TCP:LISTEN -t | xargs -I {} -n 1 kill {}
+  lsof -i ":${port}" -s TCP:LISTEN -t | xargs -I {} -n 1 kill {}
 
   log "Remove anvil configuration file ${cfg_file}"
   rm -f "${cfg_file}"
@@ -103,7 +119,13 @@ function cleanup {
 trap cleanup SIGINT SIGTERM ERR
 
 # mine a block every 2 seconds
-declare flags="--host 0.0.0.0 --block-time 2 --config-out ${cfg_file} ${prune_history}"
+declare flags="--host 0.0.0.0 --port ${port} --block-time 2 --config-out ${cfg_file}"
+if [ -n "${dump_state_file}" ]; then
+  flags="${flags} --dump-state ${dump_state_file}"
+fi
+if [ -n "${load_state_file}" ]; then
+  flags="${flags} --load-state ${load_state_file}"
+fi
 
 # prepare PATH if anvil is not present yet
 if ! command -v anvil ; then
@@ -114,7 +136,7 @@ if ! command -v anvil ; then
   exit 1
 fi
 
-if ! lsof -i ":8545" -s TCP:LISTEN; then
+if ! lsof -i ":${port}" -s TCP:LISTEN; then
   log "Start local anvil chain"
   if [ "${foreground}" = "true" ]; then
     anvil ${flags} > "${log_file}" 2>&1 &
@@ -123,15 +145,19 @@ if ! lsof -i ":8545" -s TCP:LISTEN; then
     # notice
     nohup nice anvil ${flags} > "${log_file}" 2>&1 &
   fi
-  get_eth_block_number "http://localhost:8545"
-  log "Anvil chain started (0.0.0.0:8545)"
+  get_eth_block_number "http://localhost:${port}"
+  log "Anvil chain started (0.0.0.0:${port})"
 else
   log "Anvil chain already running, skipping"
 fi
 
 if [ "${skip_deploy}" != "true" ]; then
   log "Deploying contracts"
-  DEPLOYER_PRIVATE_KEY=${deployer_private_key} make -C "${mydir}"/../ethereum/contracts/ anvil-deploy-all
+  env \
+    FOUNDRY_ETH_RPC_URL="http://127.0.0.1:${port}" \
+    ETH_RPC_URL="http://127.0.0.1:${port}" \
+    DEPLOYER_PRIVATE_KEY=${deployer_private_key} \
+    make -C "${mydir}"/../ethereum/contracts/ anvil-deploy-all
   log "Deploying contracts finished"
 fi
 

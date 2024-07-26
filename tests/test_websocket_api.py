@@ -11,6 +11,9 @@ import websockets
 from .conftest import API_TOKEN, nodes_with_auth, random_distinct_pairs_from, to_ws_url
 from .node import Node
 
+# used by nodes to get unique port assignments
+PORT_BASE = 19100
+
 
 EXTRA_HEADERS = [("X-Auth-Token", API_TOKEN)]
 
