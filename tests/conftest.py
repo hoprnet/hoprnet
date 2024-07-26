@@ -229,18 +229,28 @@ def snapshot_reuse(parent_dir: Path, nodes):
     sdir = snapshot_dir(parent_dir)
 
     # copy anvil state
+    parent_dir.joinpath("anvil.state.json").unlink(missing_ok=True)
     shutil.copy(sdir.joinpath("anvil.state.json"), parent_dir)
+
+    # copy configuration files
+    for f in sdir.glob(f"*.cfg.yaml"):
+        parent_dir.joinpath(f.name).unlink(missing_ok=True)
+        shutil.copy(f, parent_dir)
 
     # copy node data
     for i in range(len(nodes)):
         node_target_dir = parent_dir.joinpath(f"{NODE_NAME_PREFIX}_{i+1}/db/")
         node_snapshot_dir = sdir.joinpath(f"{NODE_NAME_PREFIX}_{i+1}/db/")
 
-        node_target_dir.mkdir(parents=True, exist_ok=True)
+        shutil.rmtree(node_target_dir, ignore_errors=True)
+        node_target_dir.mkdir(parents=True, exist_ok=False)
 
         shutil.copy(node_snapshot_dir.joinpath("hopr_index.db"), node_target_dir)
         shutil.copy(node_snapshot_dir.joinpath("hopr_index.db-shm"), node_target_dir)
         shutil.copy(node_snapshot_dir.joinpath("hopr_index.db-wal"), node_target_dir)
+
+        parent_dir.joinpath(f"{NODE_NAME_PREFIX}_{i+1}.env").unlink(missing_ok=True)
+        shutil.copy(sdir.joinpath(f"{NODE_NAME_PREFIX}_{i+1}.env"), parent_dir)
 
 def snapshot_create(anvil_port, parent_dir: Path, nodes):
     sdir = snapshot_dir(parent_dir)
@@ -258,14 +268,20 @@ def snapshot_create(anvil_port, parent_dir: Path, nodes):
     # copy anvil state
     shutil.copy(anvil_state_file(parent_dir), sdir)
 
-    # copy node data
+    # copy configuration files
+    for f in parent_dir.glob(f"*.cfg.yaml"):
+        shutil.copy(f, sdir)
+
+    # copy node data and env files
     for i in range(len(nodes)):
+        node_dir = parent_dir.joinpath(f"{NODE_NAME_PREFIX}_{i+1}")
         node_target_dir = sdir.joinpath(f"{NODE_NAME_PREFIX}_{i+1}/db/")
         node_target_dir.mkdir(parents=True, exist_ok=True)
 
-        shutil.copy(f"{parent_dir}/{NODE_NAME_PREFIX}_{i+1}/db/hopr_index.db", node_target_dir)
-        shutil.copy(f"{parent_dir}/{NODE_NAME_PREFIX}_{i+1}/db/hopr_index.db-shm", node_target_dir)
-        shutil.copy(f"{parent_dir}/{NODE_NAME_PREFIX}_{i+1}/db/hopr_index.db-wal", node_target_dir)
+        shutil.copy(f"{node_dir}/db/hopr_index.db", node_target_dir)
+        shutil.copy(f"{node_dir}/db/hopr_index.db-shm", node_target_dir)
+        shutil.copy(f"{node_dir}/db/hopr_index.db-wal", node_target_dir)
+        shutil.copy(f"{node_dir}.env", sdir)
 
 
 def snapshot_usable(parent_dir: Path, nodes):
@@ -279,11 +295,15 @@ def snapshot_usable(parent_dir: Path, nodes):
 
     expected_files = [
         "anvil.state.json",
+        "barebone.cfg.yaml",
+        "default.cfg.yaml",
     ]
     for i in range(len(nodes)):
-        expected_files.append(f"{NODE_NAME_PREFIX}_{i+1}/db/hopr_index.db")
-        expected_files.append(f"{NODE_NAME_PREFIX}_{i+1}/db/hopr_index.db-shm")
-        expected_files.append(f"{NODE_NAME_PREFIX}_{i+1}/db/hopr_index.db-wal")
+        node_dir = parent_dir.joinpath(f"{NODE_NAME_PREFIX}_{i+1}")
+        expected_files.append(f"{node_dir}/db/hopr_index.db")
+        expected_files.append(f"{node_dir}/db/hopr_index.db-shm")
+        expected_files.append(f"{node_dir}/db/hopr_index.db-wal")
+        expected_files.append(f"{node_dir}.env")
 
     if not all([sdir.joinpath(f).exists() for f in expected_files]):
        return False
@@ -411,6 +431,7 @@ async def swarm7(request):
     test_dir = fixtures_dir(test_suite_name)
     test_dir.mkdir(parents=True, exist_ok=True)
     anvil_port = test_suite.PORT_BASE
+    logging.info(f"Setting test suite {test_suite_name} up: test_dir={test_dir}, anvil_port={anvil_port}")
 
     nodes: dict[str, Node] = deepcopy(NODES)
     for node in nodes.values():
@@ -471,7 +492,7 @@ async def swarm7(request):
 
         for node in nodes.values():
             logging.info(f"Creating safe and module for {node}")
-            node.create_local_safe(safe_custom_env)
+            assert node.create_local_safe(safe_custom_env)
 
         # wait before contract deployments are finalized
         await asyncio.sleep(5)
@@ -495,6 +516,7 @@ async def swarm7(request):
         await shared_nodes_bringup(test_suite_name, test_dir, anvil_port, nodes)
 
     # YIELD NODES
+    logging.info("Nodes all ready, starting test")
     yield nodes
 
     # POST TEST CLEANUP

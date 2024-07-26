@@ -1,9 +1,19 @@
 import os
+import logging
 from pathlib import Path
 from subprocess import STDOUT, Popen, run
 
 from .hopr import HoprdAPI
 
+def load_env_file(env_file: str) -> dict:
+    env = {}
+    with open(env_file, "r") as f:
+        for line in f:
+            if line.startswith("#"):
+                continue
+            key, value = line.strip().split("=", 1)
+            env[key] = value
+    return env
 
 class Node:
     def __init__(
@@ -83,7 +93,15 @@ class Node:
             if el.startswith("node_module 0x"):
                 self.module_address = el.split()[-1]
 
-        return self.address is not None and self.module_address is not None
+        # store the addresses in a file which can be loaded later
+        if self.safe_address is not None and self.module_address is not None:
+            with open(f"{self.dir}.env", "w") as env_file:
+                env_file.write(f"HOPRD_SAFE_ADDRESS={self.safe_address}\n")
+                env_file.write(f"HOPRD_MODULE_ADDRESS={self.module_address}\n")
+            return True
+
+        logging.error(f"Failed to create safe for node {self.id}: {res.stdout} - {res.stderr}")
+        return False
 
     def setup(self, password: str, config_file: Path, dir: Path):
         api_token_param = f"--api-token={self.api_token}" if self.api_token else "--disableApiAuthentication"
@@ -95,6 +113,7 @@ class Node:
             "HOPRD_HEARTBEAT_VARIANCE": "1000",
             "HOPRD_NETWORK_QUALITY_THRESHOLD": "0.3",
         }
+        loaded_env = load_env_file(f"{self.dir}.env")
 
         cmd = [
             "hoprd",
@@ -107,10 +126,8 @@ class Node:
             f"--data={self.dir}",
             f"--host={self.host_addr}:{self.p2p_port}",
             f"--identity={self.dir}.id",
-            f"--moduleAddress={self.module_address}",
             f"--network={self.network}",
             f"--password={password}",
-            f"--safeAddress={self.safe_address}",
             f"--protocolConfig={config_file}",
             f"--provider=http://127.0.0.1:{self.anvil_port}",
             api_token_param,
@@ -123,7 +140,7 @@ class Node:
                 cmd,
                 stdout=log_file,
                 stderr=STDOUT,
-                env=os.environ | custom_env,
+                env=os.environ | custom_env | loaded_env,
                 cwd=dir,
             )
 
