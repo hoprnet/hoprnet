@@ -351,8 +351,9 @@ jobs:
           api-key: ${{ secrets.ZULIP_API_KEY }}
           email: ${{ secrets.ZULIP_EMAIL }}
           organization-url: "https://hopr.zulipchat.com"
-          type: "private"
-          to: "ronny.esterluss@hoprnet.org"
+          type: "stream"
+          to: "Alerts"
+          topic: "uhttp-production"
           content: |
             The PR ${{ github.event.pull_request.number }} has changed the folder `deploy/` which contains the deployment files for hoprnet.
             Please review manually the changes and update repository `uhttp-docker` accordingly.
