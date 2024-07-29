@@ -356,5 +356,5 @@ jobs:
           topic: "uHTTP"
           content: |
             The PR ${{ github.event.pull_request.number }} has changed the folder `deploy/` which contains the deployment files for hoprnet.
-            Please review manually the changes and update repository `uhttp-docker` accordingly.
+            Review the changes manually and update the `uhttp-docker` repository accordingly.
 
