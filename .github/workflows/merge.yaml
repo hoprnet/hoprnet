@@ -108,7 +108,7 @@ jobs:
             fi
           done
 
-  deploy-nodes:
+  deploy_nodes:
     name: Deploy nodes
     runs-on: self-hosted-hoprnet-small
     if: needs.tag-images.result == 'success'
@@ -321,3 +321,46 @@ jobs:
     with:
       base_branch: ${{ github.event.pull_request.base.ref }}
     secrets: inherit
+
+  notify:
+    name: Notify Changes
+    runs-on: self-hosted-hoprnet-small
+    steps:
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@v4
+      - name: Cleanup
+        run: |
+          gh extension install actions/gh-actions-cache
+
+          REPO=${{ github.repository }}
+          BRANCH="refs/pull/${{ github.event.pull_request.number }}/merge"
+
+          echo "Fetching list of cache key"
+          cacheKeysForPR=$(gh actions-cache list -R $REPO -B $BRANCH | cut -f 1 )
+
+          ## Setting this to not fail the workflow while deleting cache keys.
+          set +e
+          echo "Deleting caches..."
+          for cacheKey in $cacheKeysForPR
+          do
+            gh actions-cache delete $cacheKey -R $REPO -B $BRANCH --confirm
+          done
+          echo "Done"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # New step to check for changes in the specific folder
+      - name: Check for changes in specific folder
+        id: folder_changes
+        run: |
+          if git diff --name-only ${{ github.sha }}~ ${{ github.sha }} | grep -q '^deploy/'; then
+            echo "folder_changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "folder_changed=false" >> $GITHUB_OUTPUT
+          fi
+
+      # Conditional step to notify if the folder has changed
+      - name: Send notification
+        if: steps.folder_changes.outputs.folder_changed == 'true'
+        run: |
+          echo "Folder 'your-folder' has been modified."
+          curl -X POST -H 'Content-type: application/json' --data '{"text":"Folder `your-folder` has been modified in the master branch."}' ${{ secrets.SLACK_WEBHOOK_URL }}
