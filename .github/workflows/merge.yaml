@@ -339,8 +339,16 @@ jobs:
           fi
 
       # Conditional step to notify if the folder has changed
-      - name: Send notification
+      - name: Notify deployment changes
         if: steps.folder_changes.outputs.folder_changed == 'true'
-        run: |
-          echo "Folder 'your-folder' has been modified."
-          curl -X POST -H 'Content-type: application/json' --data '{"text":"Folder `your-folder` has been modified in the master branch."}' ${{ secrets.SLACK_WEBHOOK_URL }}
+        uses: zulip/github-actions-zulip/send-message@v1
+        with:
+          api-key: ${{ secrets.ZULIP_API_KEY }}
+          email: ${{ secrets.ZULIP_EMAIL }}
+          organization-url: "https://hopr.zulipchat.com"
+          type: "private"
+          to: "ronny.esterluss@hoprnet.org"
+          content: |
+            The PR ${{ github.event.pull_request.number }} has changed the folder `deploy/` which contains the deployment files for hoprnet.
+            Please review manually the changes and update repository `uhttp-docker` accordingly.
+
