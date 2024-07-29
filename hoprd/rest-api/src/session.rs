@@ -8,7 +8,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 
-use hopr_lib::{PathOptions, PeerId, SessionCapability, SessionClientConfig};
+use hopr_lib::{PathOptions, PeerId, SessionClientConfig};
 use tokio::{io::copy_bidirectional_with_sizes, net::TcpListener};
 use tokio_util::compat::FuturesAsyncReadCompatExt;
 use tracing::{error, info};
@@ -41,7 +41,7 @@ impl From<SessionClientRequest> for SessionClientConfig {
         Self {
             peer: value.destination,
             path_options: value.path,
-            capabilities: vec![], //vec![SessionCapability::Retransmission, SessionCapability::Segmentation],
+            capabilities: vec![],
         }
     }
 }

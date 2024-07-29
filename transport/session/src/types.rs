@@ -5,7 +5,7 @@ use std::{
     task::Poll,
 };
 
-use futures::{channel::mpsc::UnboundedReceiver, pin_mut, FutureExt, StreamExt};
+use futures::{channel::mpsc::UnboundedReceiver, pin_mut, StreamExt};
 use hopr_network_types::session::state::{SessionConfig, SessionSocket};
 use hopr_primitive_types::traits::BytesRepresentable;
 use libp2p_identity::PeerId;
@@ -191,31 +191,44 @@ impl futures::AsyncWrite for InnerSession {
         tracing::debug!("Polling write of {} on inner session {}", buf.len(), &self.id);
 
         let tag = self.id.tag();
-        let data_len = buf.len().min(INNER_MTU_SIZE);
 
-        let payload = wrap_with_offchain_key(&self.me, buf[..data_len].to_vec().into_boxed_slice())
-            .map_err(|e| {
-                error!("failed to wrap the payload with offchain key: {e}");
-                Error::new(ErrorKind::InvalidData, e)
-            })
-            .and_then(move |payload| {
-                ApplicationData::new_from_owned(Some(tag), payload.into_boxed_slice()).map_err(|e| {
-                    error!("failed to extract application data from the payload: {e}");
+        let mut futures = futures::stream::FuturesUnordered::new();
+
+        for i in 0..(buf.len() / INNER_MTU_SIZE + ((buf.len() % INNER_MTU_SIZE != 0) as usize)) {
+            let start = i * INNER_MTU_SIZE;
+            let end = ((i + 1) * INNER_MTU_SIZE).min(buf.len());
+
+            let payload = wrap_with_offchain_key(&self.me, buf[start..end].to_vec().into_boxed_slice())
+                .map_err(|e| {
+                    error!("failed to wrap the payload with offchain key: {e}");
                     Error::new(ErrorKind::InvalidData, e)
                 })
-            })?;
+                .and_then(move |payload| {
+                    ApplicationData::new_from_owned(Some(tag), payload.into_boxed_slice()).map_err(|e| {
+                        error!("failed to extract application data from the payload: {e}");
+                        Error::new(ErrorKind::InvalidData, e)
+                    })
+                })?;
 
-        match self
-            .tx
-            .send_message(payload, *self.id.peer(), self.options.clone())
-            .poll_unpin(cx)
-        {
-            Poll::Ready(Ok(_)) => Poll::Ready(Ok(data_len)),
-            Poll::Ready(Err(e)) => {
-                error!("failed to send the message inside a session: {e}");
-                Poll::Ready(Err(Error::from(ErrorKind::BrokenPipe)))
+            futures.push(async {
+                self.tx
+                    .send_message(payload, *self.id.peer(), self.options.clone())
+                    .await
+            });
+        }
+
+        loop {
+            match futures.poll_next_unpin(cx) {
+                Poll::Ready(Some(Ok(()))) => {
+                    continue;
+                }
+                Poll::Ready(Some(Err(e))) => {
+                    error!("failed to send the message chunk inside a session: {e}");
+                    break Poll::Ready(Err(Error::from(ErrorKind::BrokenPipe)));
+                }
+                Poll::Ready(None) => break Poll::Ready(Ok(buf.len())),
+                Poll::Pending => break Poll::Pending,
             }
-            Poll::Pending => Poll::Pending,
         }
     }
 
@@ -502,8 +515,9 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn session_should_write_data_at_most_the_length_of_a_usable_mtu_size() {
-        const TO_SEND: usize = INNER_MTU_SIZE * 2;
+    async fn session_should_chunk_the_data_if_without_segmentation_the_write_size_is_greater_than_the_usable_mtu_size()
+    {
+        const TO_SEND: usize = INNER_MTU_SIZE * 2 + 10;
 
         let id = SessionId::new(1, OffchainKeypair::random().public().into());
         let (_tx, rx) = futures::channel::mpsc::unbounded();
@@ -514,7 +528,7 @@ mod tests {
             .to_vec()
             .into_boxed_slice();
 
-        mock.expect_send_message().times(1).returning(|_, _, _| Ok(()));
+        mock.expect_send_message().times(3).returning(|_, _, _| Ok(()));
 
         let mut session = InnerSession::new(
             id,
@@ -526,6 +540,6 @@ mod tests {
 
         let bytes_written = session.write(&data).await.expect("Write should work #1");
 
-        assert_eq!(bytes_written, INNER_MTU_SIZE);
+        assert_eq!(bytes_written, TO_SEND);
     }
 }
