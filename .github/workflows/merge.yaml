@@ -352,8 +352,8 @@ jobs:
           email: ${{ secrets.ZULIP_EMAIL }}
           organization-url: "https://hopr.zulipchat.com"
           type: "stream"
-          to: "Alerts"
-          topic: "uhttp-production"
+          to: "Products"
+          topic: "uHTTP"
           content: |
             The PR ${{ github.event.pull_request.number }} has changed the folder `deploy/` which contains the deployment files for hoprnet.
             Please review manually the changes and update repository `uhttp-docker` accordingly.
