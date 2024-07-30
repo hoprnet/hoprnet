@@ -58,6 +58,13 @@ class Node:
         self.api_port = port_base + (self.id * 10) + 1
         self.p2p_port = port_base + (self.id * 10) + 2
 
+    def load_addresses(self):
+        loaded_env = load_env_file(f"{self.dir}.env")
+        self.safe_address = loaded_env.get('HOPRD_SAFE_ADDRESS')
+        self.module_address = loaded_env.get('HOPRD_MODULE_ADDRESS')
+        assert self.safe_address is not None
+        assert self.module_address is not None
+
     def create_local_safe(self, custom_env: dict):
         res = run(
             [

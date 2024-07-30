@@ -192,23 +192,24 @@ def mirror_contract_data(dest_file_path: Path, src_file_path: Path, src_network:
         json.dump(dest_data, file, sort_keys=True)
 
 
-def copy_identities(dir: Path):
-    # Remove old identities
-    for f in dir.glob(f"{FIXTURES_PREFIX}-*.id"):
-        os.remove(f)
-    logging.info(f"Removed '*.id' files in {dir}")
-
-    # Remove old logs
-    for f in dir.glob(f"{FIXTURES_PREFIX}-*.log"):
-        os.remove(f)
-    logging.info(f"Removed '*.log' files in {dir}")
-
+def cleanup_data(dir: Path):
     # Remove old db
-    for f in dir.glob(f"{FIXTURES_PREFIX}-*"):
+    for f in dir.glob(f"{NODE_NAME_PREFIX}_*"):
         if not f.is_dir():
             continue
         shutil.rmtree(f, ignore_errors=True)
     logging.info(f"Removed dbs in {dir}")
+
+def copy_identities(dir: Path):
+    # Remove old identities
+    for f in dir.glob(f"{NODE_NAME_PREFIX}*.id"):
+        os.remove(f)
+    logging.info(f"Removed '*.id' files in {dir}")
+
+    # Remove old logs
+    for f in dir.glob(f"{NODE_NAME_PREFIX}_*.log"):
+        os.remove(f)
+    logging.info(f"Removed '*.log' files in {dir}")
 
     # Copy new identity files
     for node_id in range(len(NODES)):
@@ -445,22 +446,9 @@ async def swarm7(request):
 
     use_snapshot = snapshot_usable(test_dir, nodes)
 
-    if use_snapshot:
-        logging.info("Reusing snapshot")
-        snapshot_reuse(test_dir, nodes)
+    cleanup_data(test_dir)
 
-        logging.info("Starting and waiting for local anvil server to be up (load state enabled)")
-        run(
-            f"./run-local-anvil.sh -s -l {anvil_log_file(test_suite_name)} -c {anvil_cfg_file(test_suite_name)} -p {anvil_port} -ls {anvil_state_file(test_dir)}".split(),
-            check=True,
-            capture_output=True,
-            cwd=PWD.parent.joinpath("scripts"),
-        )
-
-        # BRING UP NODES (without funding)
-        await shared_nodes_bringup(test_suite_name, test_dir, anvil_port, nodes, skip_funding=True)
-
-    else:
+    if not use_snapshot:
         logging.info("Snapshot not usable")
 
         # START NEW LOCAL ANVIL SERVER
@@ -508,16 +496,25 @@ async def swarm7(request):
         logging.info("Taking snapshot")
         snapshot_create(anvil_port, test_dir, nodes)
 
-        logging.info("Starting and waiting for local anvil server to be up (load state enabled)")
-        run(
-            f"./run-local-anvil.sh -s -l {anvil_log_file(test_suite_name)} -c {anvil_cfg_file(test_suite_name)} -p {anvil_port} -ls {anvil_state_file(test_dir)}".split(),
-            check=True,
-            capture_output=True,
-            cwd=PWD.parent.joinpath("scripts"),
-        )
+    logging.info("Re-using snapshot")
+    snapshot_reuse(test_dir, nodes)
 
-        # BRING UP NODES (again, without funding)
-        await shared_nodes_bringup(test_suite_name, test_dir, anvil_port, nodes, skip_funding=True)
+    logging.info("Starting and waiting for local anvil server to be up (load state enabled)")
+    run(
+        f"./run-local-anvil.sh -s -l {anvil_log_file(test_suite_name)} -c {anvil_cfg_file(test_suite_name)} -p {anvil_port} -ls {anvil_state_file(test_dir)}".split(),
+        check=True,
+        capture_output=True,
+        cwd=PWD.parent.joinpath("scripts"),
+    )
+
+    # SETUP NODES USING STORED IDENTITIES
+    logging.info("Reuse pre-generated identities and configs")
+    copy_identities(test_dir)
+    for node in nodes.values():
+        node.load_addresses()
+
+    # BRING UP NODES (without funding)
+    await shared_nodes_bringup(test_suite_name, test_dir, anvil_port, nodes, skip_funding=True)
 
     # YIELD NODES
     logging.info("Nodes all ready, starting test")

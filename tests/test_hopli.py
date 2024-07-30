@@ -25,11 +25,16 @@ from .test_integration import (
 )
 from .node import Node
 
-FIXTURES_PREFIX_NEW = "hopr-smoke-test-new"
+FIXTURES_PREFIX_NEW = "hopr-node-new_"
 PASSWORD_NEW = "e2e-test-new"
 
 PORT_BASE = 19200
 ANVIL_ENDPOINT = f"http://127.0.0.1:{PORT_BASE}"
+
+def run_cast_cmd(cmd: str, params: list[str]):
+    cast_cmd = ["cast", cmd, "-r", ANVIL_ENDPOINT] + params
+    logging.info("Running cast command: %s", ' '.join(cast_cmd))
+    return run(cast_cmd, check=True, capture_output=True)
 
 def run_hopli_cmd(cmd: list[str], custom_env):
     env = os.environ | custom_env
@@ -154,7 +159,7 @@ def manager_force_sync(private_key: str, safes: str, eligibility: str):
     )
 
 
-def new_identity():
+def new_identity(extra_prefix: str):
     test_suite_name = __name__.split('.')[-1]
     test_dir = fixtures_dir(test_suite_name)
 
@@ -169,7 +174,7 @@ def new_identity():
             "identity",
             "create",
             "--identity-prefix",
-            FIXTURES_PREFIX_NEW,
+            FIXTURES_PREFIX_NEW + extra_prefix,
             "--identity-directory",
             test_dir,
             "--number",
@@ -179,7 +184,7 @@ def new_identity():
     )
 
 
-def read_identity(pwd: str):
+def read_identity(extra_prefix: str, pwd: str):
     test_suite_name = __name__.split('.')[-1]
     test_dir = fixtures_dir(test_suite_name)
 
@@ -194,7 +199,7 @@ def read_identity(pwd: str):
             "identity",
             "read",
             "--identity-prefix",
-            FIXTURES_PREFIX_NEW,
+            FIXTURES_PREFIX_NEW + extra_prefix,
             "--identity-directory",
             test_dir,
         ],
@@ -209,7 +214,7 @@ def read_identity(pwd: str):
                 return p.split("]")[0]
 
 
-def update_identity(old_pwd: str, new_pwd: str):
+def update_identity(extra_prefix: str, old_pwd: str, new_pwd: str):
     test_suite_name = __name__.split('.')[-1]
     test_dir = fixtures_dir(test_suite_name)
 
@@ -225,7 +230,7 @@ def update_identity(old_pwd: str, new_pwd: str):
             "identity",
             "update",
             "--identity-prefix",
-            FIXTURES_PREFIX_NEW,
+            FIXTURES_PREFIX_NEW + extra_prefix,
             "--identity-directory",
             test_dir,
         ],
@@ -233,7 +238,7 @@ def update_identity(old_pwd: str, new_pwd: str):
     )
 
 
-def create_safe_module(private_key: str, manager_private_key: str):
+def create_safe_module(extra_prefix: str, private_key: str, manager_private_key: str):
     test_suite_name = __name__.split('.')[-1]
     test_dir = fixtures_dir(test_suite_name)
 
@@ -252,7 +257,7 @@ def create_safe_module(private_key: str, manager_private_key: str):
             "--network",
             NETWORK1,
             "--identity-prefix",
-            FIXTURES_PREFIX_NEW,
+            FIXTURES_PREFIX_NEW + extra_prefix,
             "--identity-directory",
             test_dir,
             "--contracts-root",
@@ -357,10 +362,8 @@ async def test_hopli_should_be_able_to_deregister_nodes_and_register_it(peer: st
         address_data: dict = json.load(file)
         network_registry_contract = address_data["networks"][NETWORK1]["addresses"]["network_registry"]
 
-    res_before = run(
-        ["cast", "call", network_registry_contract, "nodeRegisterdToAccount(address)(address)", swarm7[peer].address],
-        check=True,
-        capture_output=True,
+    res_before = run_cast_cmd(
+        "call", [network_registry_contract, "nodeRegisterdToAccount(address)(address)", swarm7[peer].address]
     )
 
     # check the returned value is address safe
@@ -370,11 +373,9 @@ async def test_hopli_should_be_able_to_deregister_nodes_and_register_it(peer: st
     manager_deregsiter(private_key, swarm7[peer].address)
 
     # Check if nodes are removed from the network
-    run(["cast", "code", network_registry_contract], check=True, capture_output=True)
-    res_after_deregster = run(
-        ["cast", "call", network_registry_contract, "nodeRegisterdToAccount(address)(address)", swarm7[peer].address],
-        check=True,
-        capture_output=True,
+    run_cast_cmd("code", [network_registry_contract])
+    res_after_deregster = run_cast_cmd(
+        "call", [network_registry_contract, "nodeRegisterdToAccount(address)(address)", swarm7[peer].address]
     )
 
     # check the returned value is address zero
@@ -387,11 +388,9 @@ async def test_hopli_should_be_able_to_deregister_nodes_and_register_it(peer: st
     manager_register(private_key, swarm7[peer].address, swarm7[peer].safe_address)
 
     # Check if nodes are removed from the network
-    run(["cast", "code", network_registry_contract], check=True, capture_output=True)
-    res_after_regsiter = run(
-        ["cast", "call", network_registry_contract, "nodeRegisterdToAccount(address)(address)", swarm7[peer].address],
-        check=True,
-        capture_output=True,
+    run_cast_cmd("code", [network_registry_contract])
+    res_after_regsiter = run_cast_cmd(
+        "call", [network_registry_contract, "nodeRegisterdToAccount(address)(address)", swarm7[peer].address]
     )
 
     # check the returned value is address safe
@@ -412,52 +411,33 @@ async def test_hopli_should_be_able_to_sync_eligibility_for_all_nodes(peer: str,
 async def test_hopli_create_update_read_identity():
     test_suite_name = __name__.split('.')[-1]
     test_dir = fixtures_dir(test_suite_name)
+    extra_prefix = "one"
 
     # create a new identity
-    new_identity()
+    new_identity(extra_prefix)
 
     # read the identity
-    res_first_read = read_identity(PASSWORD)
+    res_first_read = read_identity(extra_prefix, PASSWORD)
 
     # udpate identtiy password
-    update_identity(PASSWORD, PASSWORD_NEW)
+    update_identity(extra_prefix, PASSWORD, PASSWORD_NEW)
 
     # still can read the identity
-    res_second_read = read_identity(PASSWORD_NEW)
+    res_second_read = read_identity(extra_prefix, PASSWORD_NEW)
 
     assert res_first_read == res_second_read
 
     # Remove the created identity
-    run(["rm", "-f", test_dir.joinpath(f"{FIXTURES_PREFIX_NEW}0.id")], check=True, capture_output=True)
+    run(["rm", "-f", test_dir.joinpath(f"{FIXTURES_PREFIX_NEW}{extra_prefix}0.id")], check=True, capture_output=True)
 
 
 @pytest.mark.asyncio
-async def test_hopli_should_be_able_to_create_safe_module():
-    test_suite_name = __name__.split('.')[-1]
-
-    # STOP OLD LOCAL ANVIL SERVER
-    logging.info("Ensure local anvil server is not running")
-    run(["make", "kill-anvil"], cwd=PWD.parent, check=True)
-
-    # START NEW LOCAL ANVIL SERVER
-    logging.info("Starting and waiting for local anvil server to be up")
-    run(
-        f"./run-local-anvil.sh -l {anvil_log_file(test_suite_name)} -c {anvil_cfg_file(test_suite_name)}".split(),
-        check=True,
-        capture_output=True,
-        cwd=PWD.parent.joinpath("scripts"),
-    )
-    # DEPLOY A DIFFERENT LOCAL NETWORK
-    run(
-        f"make anvil-deploy-contracts network={NETWORK2} environment-type=local".split(),
-        cwd=PWD.parent.joinpath("ethereum/contracts"),
-        check=True,
-    )
-
+async def test_hopli_should_be_able_to_create_safe_module(swarm7: dict[str, Node]):
     test_suite_name = __name__.split('.')[-1]
     test_dir = fixtures_dir(test_suite_name)
     manager_private_key = load_private_key(test_suite_name)
     private_key = load_private_key(test_suite_name, 1)
+    extra_prefix = "two"
 
     # READ CONTRACT ADDRESS
     with open(INPUT_DEPLOYMENTS_SUMMARY_FILE, "r") as file:
@@ -466,29 +446,24 @@ async def test_hopli_should_be_able_to_create_safe_module():
         # network_registry_contract_2 = address_data["networks"][NETWORK2]["addresses"]["network_registry"]
 
     # create identity
-    new_identity()
+    new_identity(extra_prefix)
 
     # read the identity
-    new_node = read_identity(PASSWORD)
+    new_node = read_identity(extra_prefix, PASSWORD)
 
     # create safe and module for
-    new_safe_module = create_safe_module(private_key, manager_private_key)
-    node_balance = run(["cast", "balance", new_node], check=True, capture_output=True)
-    logging.info(node_balance)
-    safe_code = run(["cast", "code", new_safe_module[0]], check=True, capture_output=True)
-    logging.info(safe_code)
-    module_code = run(["cast", "code", new_safe_module[1]], check=True, capture_output=True)
-    logging.info(module_code)
+    new_safe_module = create_safe_module(extra_prefix, private_key, manager_private_key)
+    node_balance = run_cast_cmd("balance", [new_node])
+    safe_code = run_cast_cmd("code", [new_safe_module[0]])
+    module_code = run_cast_cmd("code", [new_safe_module[1]])
 
     # Check the node node is registered with the new safe
-    res_check_created_safe_registration = run(
-        ["cast", "call", network_registry_contract_1, "nodeRegisterdToAccount(address)(address)", new_node],
-        check=True,
-        capture_output=True,
+    res_check_created_safe_registration = run_cast_cmd(
+        "call", [network_registry_contract_1, "nodeRegisterdToAccount(address)(address)", new_node]
     )
-    assert (
-        res_check_created_safe_registration.stdout.decode("utf-8").split("\n")[0].lower() == new_safe_module[0].lower()
-    )
+    new_safe_module_address = new_safe_module[0].lower()
+    res_registration = res_check_created_safe_registration.stdout.decode("utf-8").split("\n")[0].lower()
+    assert res_registration == new_safe_module_address
 
     # Remove the created identity
-    run(["rm", "-f", test_dir.joinpath(f"{FIXTURES_PREFIX_NEW}0.id")], check=True, capture_output=True)
+    run(["rm", "-f", test_dir.joinpath(f"{FIXTURES_PREFIX_NEW}{extra_prefix}0.id")], check=True, capture_output=True)
