@@ -94,8 +94,22 @@ jobs:
         env:
           USER: runner
 
+      - name: Download snapshot for test_websocket_api
+        if: ${{ !env.ACT }}
+        uses: actions/download-artifact@v4
+        with:
+          name: snapshot-test_websocket_api
+          path: /tmp/hopr-smoke-test/test_websocket_api/snapshot
+
       - name: Run smoke tests websocket
         run: nix develop .#smoke-tests -c python3 -m pytest tests/test_websocket_api.py
+
+      - name: Upload snapshot for test_websocket_api
+        if: ${{ !env.ACT && always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: snapshot-test_websocket_api
+          path: /tmp/hopr-smoke-test/test_websocket_api/snapshot
 
       - name: Compress test logs
         if: ${{ !env.ACT && always() }}
@@ -130,8 +144,8 @@ jobs:
     strategy:
       matrix:
         suite:
-          - tests/test_integration
-          - tests/test_hopli
+          - integration
+          - hopli
     if: github.event.pull_request.draft == false
     steps:
       - name: Checkout hoprnet repository
@@ -159,8 +173,22 @@ jobs:
         env:
           USER: runner
 
+      - name: Download snapshot for test_${{ matrix.suite }}
+        if: ${{ !env.ACT }}
+        uses: actions/download-artifact@v4
+        with:
+          name: snapshot-test_${{ matrix.suite }}
+          path: /tmp/hopr-smoke-test/test_${{ matrix.suite }}/snapshot
+
       - name: Run smoke tests ${{ matrix.suite }}
         run: nix develop .#smoke-tests -c python3 -m pytest tests/test_${{ matrix.suite }}.py
+
+      - name: Upload snapshot for test_${{ matrix.suite }}
+        if: ${{ !env.ACT && always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: snapshot-test_${{ matrix.suite }}
+          path: /tmp/hopr-smoke-test/test_${{ matrix.suite }}/snapshot
 
       - name: Compress test logs
         if: ${{ !env.ACT && always() }}
