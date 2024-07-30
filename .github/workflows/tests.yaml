@@ -130,8 +130,8 @@ jobs:
     strategy:
       matrix:
         suite:
-          - tests/test_integration.py
-          - tests/test_hopli.py
+          - tests/test_integration
+          - tests/test_hopli
     if: github.event.pull_request.draft == false
     steps:
       - name: Checkout hoprnet repository
