@@ -8,7 +8,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 
-use hopr_lib::{PathOptions, PeerId, SessionClientConfig};
+use hopr_lib::{HoprSession, PathOptions, PeerId, SessionClientConfig};
 use tokio::{io::copy_bidirectional, net::TcpListener};
 use tokio_util::compat::FuturesAsyncReadCompatExt;
 use tracing::{error, info};
@@ -94,34 +94,14 @@ pub(crate) async fn create_client(
             )
         })?;
 
-        let tcp_listener = TcpListener::bind(format!("127.0.0.1:{port}")).await.map_err(|e| {
+        let (port, tcp_listener) = listen_on(format!("127.0.0.1:{port}")).await.map_err(|e| {
             (
                 StatusCode::UNPROCESSABLE_ENTITY,
                 ApiErrorStatus::UnknownFailure(format!("Failed to bind on 127.0.0.1:{port}: {e}")),
             )
         })?;
 
-        let port = tcp_listener
-            .local_addr()
-            .map_err(|e| {
-                (
-                    StatusCode::UNPROCESSABLE_ENTITY,
-                    ApiErrorStatus::UnknownFailure(format!("Failed to get the port number: {e}")),
-                )
-            })?
-            .port();
-
-        tokio::task::spawn(async move {
-            match tcp_listener
-            .accept()
-            .await {
-                Ok((mut tcp_stream, _sock_addr)) => match copy_bidirectional(&mut session.compat(), &mut tcp_stream).await {
-                    Ok(bound_stream_finished) => info!("Client session through TCP port {port} ended with {bound_stream_finished:?} bytes transferred in both directions."),
-                    Err(e) => error!("Failed to bind the TCP stream (port {port}) to the session: {e}")
-                },
-                Err(e) => error!("Failed to accept connection: {e}")
-            }
-        });
+        tokio::task::spawn(bind_session_to_connection(session, tcp_listener));
 
         Ok((StatusCode::OK, Json(SessionClientResponse { port })).into_response())
     } else {
@@ -137,6 +117,19 @@ async fn listen_on(address: String) -> std::io::Result<(u16, TcpListener)> {
     let tcp_listener = TcpListener::bind(address).await?;
 
     Ok((tcp_listener.local_addr()?.port(), tcp_listener))
+}
+
+async fn bind_session_to_connection(session: HoprSession, tcp_listener: TcpListener) {
+    let session_id = session.id().clone();
+    match tcp_listener.accept().await {
+        Ok((mut tcp_stream, _sock_addr)) => match copy_bidirectional(&mut session.compat(), &mut tcp_stream).await {
+            Ok(bound_stream_finished) => info!(
+                "Client session {session_id} ended with {bound_stream_finished:?} bytes transferred in both directions.",
+            ),
+            Err(e) => error!("Failed to bind the TCP stream to session {session_id}: {e}"),
+        },
+        Err(e) => error!("Failed to accept connection: {e}"),
+    }
 }
 
 #[cfg(test)]
@@ -193,18 +186,7 @@ mod tests {
         );
 
         let (port, tcp_listener) = listen_on(format!("127.0.0.1:0")).await.expect("listen_on succeeded");
-
-        tokio::task::spawn(async move {
-            match tcp_listener
-            .accept()
-            .await {
-                Ok((mut tcp_stream, _sock_addr)) => match copy_bidirectional(&mut session.compat(), &mut tcp_stream).await {
-                    Ok(bound_stream_finished) => info!("Client session through TCP port {port} ended with {bound_stream_finished:?} bytes transferred in both directions."),
-                    Err(e) => error!("Failed to bind the TCP stream (port {port}) to the session: {e}")
-                },
-                Err(e) => error!("Failed to accept connection: {e}")
-            }
-        });
+        tokio::task::spawn(bind_session_to_connection(session, tcp_listener));
 
         let mut tcp_stream = tokio::net::TcpStream::connect(format!("127.0.0.1:{port}"))
             .await
