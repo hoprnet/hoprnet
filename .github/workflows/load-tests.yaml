@@ -41,6 +41,7 @@ on:
         options:
           - one-hop
           - sanity-check
+          - incremental
           - multiple-hops
         required: true
         description: 'Workload type'
@@ -51,7 +52,7 @@ on:
         description: 'Test duration'
       rate:
         type: string
-        default: "300"
+        default: "200"
         required: true
         description: 'Number of messages per seconds'
 concurrency:
