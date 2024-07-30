@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::net::{IpAddr, SocketAddr};
 use std::str::FromStr;
 use std::{sync::Arc, time::SystemTime};
 
@@ -7,7 +6,6 @@ use async_lock::RwLock;
 use async_signal::{Signal, Signals};
 use chrono::{DateTime, Utc};
 use futures::StreamExt;
-use tokio_util::compat::FuturesAsyncReadCompatExt;
 
 #[cfg(feature = "telemetry")]
 use {
@@ -16,7 +14,7 @@ use {
 };
 
 use signal_hook::low_level;
-use tracing::{debug, error, info, warn};
+use tracing::{error, info, warn};
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 
 use hopr_async_runtime::prelude::{cancel_join_handle, spawn, JoinHandle};
@@ -25,6 +23,8 @@ use hoprd::cli::CliArgs;
 use hoprd::errors::HoprdError;
 use hoprd_api::serve_api;
 use hoprd_keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
+
+use hoprd::HoprServerReactor;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleHistogram;
@@ -102,41 +102,6 @@ fn init_logger() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     Ok(())
-}
-
-const LISTENING_SESSION_RETRANSMISSION_SERVER_PORT: u16 = 4677;
-
-#[derive(Debug, Clone)]
-struct HoprServerReactor {}
-
-#[hopr_lib::async_trait]
-impl hopr_lib::HoprSessionServerActionable for HoprServerReactor {
-    #[tracing::instrument(level = "debug", skip(self, session))]
-    async fn process(&self, session: hopr_lib::HoprSession) -> hopr_lib::errors::Result<()> {
-        let server_port = LISTENING_SESSION_RETRANSMISSION_SERVER_PORT;
-
-        debug!("Creating a connection to the TCP server on port 127.0.0.1:{server_port}...");
-        let mut tcp_bridge = tokio::net::TcpStream::connect(SocketAddr::new(
-            IpAddr::V4(std::net::Ipv4Addr::new(127, 0, 0, 1)),
-            server_port,
-        ))
-        .await
-        .map_err(|e| {
-            hopr_lib::errors::HoprLibError::GeneralError(format!(
-                "Could not bridge the incoming session to port {server_port}: {e}"
-            ))
-        })?;
-
-        debug!("Bridging the session to the TCP server...");
-        tokio::task::spawn(async move {
-            match tokio::io::copy_bidirectional(&mut session.compat(), &mut tcp_bridge).await {
-                Ok(bound_stream_finished) => info!("Server bridged session through TCP port {server_port} ended with {bound_stream_finished:?} bytes transferred in both directions."),
-                Err(e) => error!("The TCP server stream (port {server_port}) is closed: {e:?}")
-            }
-        });
-
-        Ok(())
-    }
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]

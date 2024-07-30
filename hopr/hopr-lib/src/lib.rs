@@ -75,7 +75,7 @@ pub use {
         errors::{HoprTransportError, ProtocolError},
         libp2p::identity::PeerId,
         ApplicationData, HalfKeyChallenge, Health, Keypair, Multiaddr, PathOptions, Session as HoprSession,
-        SessionCapability, SessionClientConfig, TicketStatistics, TransportOutput,
+        SessionCapability, SessionClientConfig, SessionId as HoprSessionId, TicketStatistics, TransportOutput,
     },
     hopr_internal_types::prelude::*,
     hopr_primitive_types::prelude::*,

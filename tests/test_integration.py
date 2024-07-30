@@ -893,7 +893,7 @@ HOPR_SESSION_MAX_PAYLOAD_SIZE = 462
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("src,dest", random_distinct_pairs_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
-async def test_session_communication_with_an_echo_server_ver_wireguard_style_communication(src: str, dest: str, swarm7: dict[str, Node]):
+async def test_session_communication_with_an_echo_server_wireguard_style_communication(src: str, dest: str, swarm7: dict[str, Node]):
     """
     HOPR TCP socket buffers are set to 8292 bytes, so the packet count should be chosen to ensure that the buffer is not exceeded.
     
@@ -901,9 +901,10 @@ async def test_session_communication_with_an_echo_server_ver_wireguard_style_com
     """
 
     # packet_count = 1
-    packet_count = 3      # TODO: having the 462 packet size it regularly fails to send the packets due to missing write/flush buffering
+    packet_count = 10      # TODO: having the 462 packet size it regularly fails to send the packets due to missing write/flush buffering
     
     message_size = HOPR_SESSION_MAX_PAYLOAD_SIZE
+    # message_size = 5
     expected = set([''.join(random.choices(string.ascii_uppercase + string.digits, k=message_size)) for _ in range(packet_count)])
 
     src_peer = swarm7[src]
@@ -920,10 +921,11 @@ async def test_session_communication_with_an_echo_server_ver_wireguard_style_com
         await asyncio.sleep(1.0)
 
         with connect_socket(src_sock_port) as s:
-            s.settimeout(20.0)
-            
+            s.settimeout(20)
             for message in expected:
                 s.send(message.encode())
-                actual.append(s.recv(message_size).decode())
                 
-    assert list(set(actual)) == list(expected)
+            for message in expected:
+                actual.append(s.recv(len(message)).decode())
+
+    assert set(actual) == expected

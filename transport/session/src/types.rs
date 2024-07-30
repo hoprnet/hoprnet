@@ -188,7 +188,12 @@ impl futures::AsyncWrite for InnerSession {
         cx: &mut std::task::Context<'_>,
         buf: &[u8],
     ) -> Poll<std::io::Result<usize>> {
-        tracing::debug!("Polling write of {} on inner session {}", buf.len(), &self.id);
+        tracing::debug!(
+            "Polling write of {} on inner session {}, sample: {}",
+            buf.len(),
+            &self.id,
+            String::from_utf8_lossy(&buf[..buf.len().min(30)])
+        );
 
         let tag = self.id.tag();
 
