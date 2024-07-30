@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 
 use hopr_lib::{HoprSession, PathOptions, PeerId, SessionClientConfig};
-use tokio::{io::copy_bidirectional, net::TcpListener};
+use tokio::net::TcpListener;
 use tokio_util::compat::FuturesAsyncReadCompatExt;
 use tracing::{error, info};
 
@@ -122,7 +122,7 @@ async fn listen_on(address: String) -> std::io::Result<(u16, TcpListener)> {
 async fn bind_session_to_connection(session: HoprSession, tcp_listener: TcpListener) {
     let session_id = session.id().clone();
     match tcp_listener.accept().await {
-        Ok((mut tcp_stream, _sock_addr)) => match copy_bidirectional(&mut session.compat(), &mut tcp_stream).await {
+        Ok((mut tcp_stream, _sock_addr)) => match tokio::io::copy_bidirectional_with_sizes(&mut session.compat(), &mut tcp_stream, 462, 462).await {
             Ok(bound_stream_finished) => info!(
                 "Client session {session_id} ended with {bound_stream_finished:?} bytes transferred in both directions.",
             ),

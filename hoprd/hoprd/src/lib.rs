@@ -121,7 +121,7 @@ impl hopr_lib::HoprSessionServerActionable for HoprServerReactor {
 
         tracing::debug!("Bridging the session to the TCP server...");
         tokio::task::spawn(async move {
-            match tokio::io::copy_bidirectional(&mut tokio_util::compat::FuturesAsyncReadCompatExt::compat(session), &mut tcp_bridge).await {
+            match tokio::io::copy_bidirectional_with_sizes(&mut tokio_util::compat::FuturesAsyncReadCompatExt::compat(session), &mut tcp_bridge, 462, 462).await {
                 Ok(bound_stream_finished) => tracing::info!("Server bridged session through TCP port {server_port} ended with {bound_stream_finished:?} bytes transferred in both directions."),
                 Err(e) => tracing::error!("The TCP server stream (port {server_port}) is closed: {e:?}")
             }

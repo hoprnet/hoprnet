@@ -901,7 +901,7 @@ async def test_session_communication_with_an_echo_server_wireguard_style_communi
     In real-world scenarios, the read and write operations are interleaved, but the test goes further to force the socket to hold the buffer.
     """
 
-    packet_count = 15
+    packet_count = 1000
     expected = [f"{i}".rjust(HOPR_SESSION_MAX_PAYLOAD_SIZE) for i in range(packet_count)]
     
     assert [len(x) for x in expected] == packet_count * [HOPR_SESSION_MAX_PAYLOAD_SIZE]
