@@ -325,7 +325,7 @@ where
         let (tx, rx) = futures::channel::mpsc::unbounded::<TransportOutput>();
         let sessions = self.sessions.clone();
         let me = self.me;
-        let message_sender = Box::new(helpers::MessageSender::new(
+        let message_sender = Arc::new(helpers::MessageSender::new(
             self.process_packet_send.clone(),
             self.path_planner.clone(),
         ));
@@ -374,10 +374,7 @@ where
                                                         session_id,
                                                         me,
                                                         PathOptions::IntermediatePath(vec![]),
-                                                        vec![
-                                                            // SessionCapability::Segmentation,
-                                                            // SessionCapability::Retransmission,
-                                                        ],
+                                                        vec![],
                                                         message_sender.clone(),
                                                         rx,
                                                     ))
@@ -503,7 +500,7 @@ where
             self.me,
             cfg.path_options,
             cfg.capabilities,
-            Box::new(helpers::MessageSender::new(
+            Arc::new(helpers::MessageSender::new(
                 self.process_packet_send.clone(),
                 self.path_planner.clone(),
             )),

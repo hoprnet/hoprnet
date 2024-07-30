@@ -851,7 +851,11 @@ async def test_send_message_return_timestamp(src: str, dest: str, swarm7: dict[s
 
     assert len(timestamps) == message_count
     assert timestamps == sorted(timestamps)
-    
+
+
+SERVER_LISTENING_PORT_HARDCODED_IN_HOPRD_CODE = 4677
+HOPR_SESSION_MAX_PAYLOAD_SIZE = 462
+
 
 def run_echo_server(port: int):
     import socket
@@ -862,7 +866,7 @@ def run_echo_server(port: int):
         conn, _addr = s.accept()
         with conn:
             while True:
-                data = conn.recv(1024)
+                data = conn.recv(HOPR_SESSION_MAX_PAYLOAD_SIZE)
                 conn.sendall(data)
 
 from contextlib import contextmanager
@@ -888,9 +892,6 @@ def connect_socket(port):
         s.close()
 
 
-SERVER_LISTENING_PORT_HARDCODED_IN_HOPRD_CODE = 4677
-HOPR_SESSION_MAX_PAYLOAD_SIZE = 462
-
 @pytest.mark.asyncio
 @pytest.mark.parametrize("src,dest", random_distinct_pairs_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
 async def test_session_communication_with_an_echo_server_wireguard_style_communication(src: str, dest: str, swarm7: dict[str, Node]):
@@ -900,17 +901,15 @@ async def test_session_communication_with_an_echo_server_wireguard_style_communi
     In real-world scenarios, the read and write operations are interleaved, but the test goes further to force the socket to hold the buffer.
     """
 
-    # packet_count = 1
-    packet_count = 10      # TODO: having the 462 packet size it regularly fails to send the packets due to missing write/flush buffering
+    packet_count = 15
+    expected = [f"{i}".rjust(HOPR_SESSION_MAX_PAYLOAD_SIZE) for i in range(packet_count)]
     
-    message_size = HOPR_SESSION_MAX_PAYLOAD_SIZE
-    # message_size = 5
-    expected = set([''.join(random.choices(string.ascii_uppercase + string.digits, k=message_size)) for _ in range(packet_count)])
+    assert [len(x) for x in expected] == packet_count * [HOPR_SESSION_MAX_PAYLOAD_SIZE]
 
     src_peer = swarm7[src]
     dest_peer = swarm7[dest]
 
-    # src_sock_port = await src_peer.api.session_client(dest_peer.peer_id, path={"Hops": 0})        // TODO: bug, cannot specify Hops: 0
+    # src_sock_port = await src_peer.api.session_client(dest_peer.peer_id, path={"Hops": 0})        # https://github.com/hoprnet/hoprnet/issues/6411
     src_sock_port = await src_peer.api.session_client(dest_peer.peer_id, path={"IntermediatePath": []})
     
     actual = []
@@ -924,8 +923,10 @@ async def test_session_communication_with_an_echo_server_wireguard_style_communi
             s.settimeout(20)
             for message in expected:
                 s.send(message.encode())
-                
+
             for message in expected:
                 actual.append(s.recv(len(message)).decode())
 
-    assert set(actual) == expected
+    actual.sort()
+    expected.sort()
+    assert actual == expected

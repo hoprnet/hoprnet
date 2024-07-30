@@ -90,17 +90,14 @@ where
             PathOptions::IntermediatePath(mut path) => {
                 path.push(destination);
 
-                debug!(
-                    full_path = format!("{path:?}"),
-                    "Sending a message using a specific path"
-                );
+                debug!(full_path = format!("{path:?}"), "Resolving a specific path");
 
                 let cg = self.channel_graph.read().await;
 
                 TransportPath::resolve(path, &self.db, &cg).await.map(|(p, _)| p)?
             }
             PathOptions::Hops(hops) => {
-                debug!(hops, "Sending a message using a random path");
+                debug!(hops, "Resolving a path using hop count");
 
                 let pk = OffchainPublicKey::try_from(destination)?;
 
@@ -159,6 +156,7 @@ impl<T> SendMsg for MessageSender<T>
 where
     T: HoprDbAllOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
 {
+    #[tracing::instrument(level = "debug", skip(self, data, destination, options))]
     async fn send_message(
         &self,
         data: ApplicationData,
@@ -170,12 +168,14 @@ where
             .then_some(())
             .ok_or(TransportSessionError::Tag)?;
 
+        debug!("Resolve path");
         let path = self
             .resolver
             .resolve_path(destination, options)
             .await
             .map_err(|_| TransportSessionError::Path)?;
 
+        debug!("Send packet");
         self.process_packet_send
             .get()
             .ok_or_else(|| TransportSessionError::Closed)?
@@ -185,6 +185,8 @@ where
             .consume_and_wait(crate::constants::PACKET_QUEUE_TIMEOUT_MILLISECONDS)
             .await
             .map_err(|_e| TransportSessionError::Timeout)?;
+
+        debug!("Processing finished");
 
         Ok(())
     }

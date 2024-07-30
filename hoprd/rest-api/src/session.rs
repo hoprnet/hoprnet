@@ -181,7 +181,7 @@ mod tests {
             peer,
             hopr_lib::PathOptions::IntermediatePath(vec![]),
             vec![],
-            Box::new(SendMsgResender::new(tx)),
+            Arc::new(SendMsgResender::new(tx)),
             rx,
         );
 

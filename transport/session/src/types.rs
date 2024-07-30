@@ -2,6 +2,7 @@ use std::{
     fmt::Display,
     io::{Error, ErrorKind},
     pin::Pin,
+    sync::Arc,
     task::Poll,
 };
 
@@ -67,7 +68,7 @@ impl Session {
         me: PeerId,
         options: PathOptions,
         capabilities: Vec<Capability>,
-        tx: Box<dyn SendMsg + Send>,
+        tx: Arc<dyn SendMsg + Send + Sync>,
         rx: UnboundedReceiver<Box<[u8]>>,
     ) -> Self {
         Self {
@@ -84,6 +85,8 @@ impl Session {
                         options,
                         rx,
                         tx,
+                        tx_bytes: 0,
+                        tx_buffer: futures::stream::FuturesUnordered::new(),
                         rx_buffer: [0; PAYLOAD_SIZE],
                         rx_buffer_range: (0, 0),
                     },
@@ -96,6 +99,8 @@ impl Session {
                     options,
                     rx,
                     tx,
+                    tx_bytes: 0,
+                    tx_buffer: futures::stream::FuturesUnordered::new(),
                     rx_buffer: [0; PAYLOAD_SIZE],
                     rx_buffer_range: (0, 0),
                 })
@@ -153,7 +158,11 @@ pub struct InnerSession {
     me: PeerId,
     options: PathOptions,
     rx: UnboundedReceiver<Box<[u8]>>,
-    tx: Box<dyn SendMsg + Send>,
+    tx: Arc<dyn SendMsg + Send + Sync>,
+    tx_bytes: usize,
+    tx_buffer: futures::stream::FuturesUnordered<
+        Pin<Box<dyn std::future::Future<Output = Result<(), TransportSessionError>> + Send>>,
+    >,
     rx_buffer: [u8; PAYLOAD_SIZE],
     rx_buffer_range: (usize, usize),
 }
@@ -163,7 +172,7 @@ impl InnerSession {
         id: SessionId,
         me: PeerId,
         options: PathOptions,
-        tx: Box<dyn SendMsg + Send>,
+        tx: Arc<dyn SendMsg + Send + Sync>,
         rx: UnboundedReceiver<Box<[u8]>>,
     ) -> Self {
         Self {
@@ -172,6 +181,8 @@ impl InnerSession {
             options,
             rx,
             tx,
+            tx_bytes: 0,
+            tx_buffer: futures::stream::FuturesUnordered::new(),
             rx_buffer: [0; PAYLOAD_SIZE],
             rx_buffer_range: (0, 0),
         }
@@ -184,20 +195,49 @@ impl InnerSession {
 
 impl futures::AsyncWrite for InnerSession {
     fn poll_write(
-        self: std::pin::Pin<&mut Self>,
+        mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
         buf: &[u8],
     ) -> Poll<std::io::Result<usize>> {
+        if !self.tx_buffer.is_empty() {
+            loop {
+                match self.tx_buffer.poll_next_unpin(cx) {
+                    Poll::Ready(Some(Ok(()))) => {
+                        tracing::warn!("===> PREEXISTING: I HAVE SENT A MSG");
+                        continue;
+                    }
+                    Poll::Ready(Some(Err(e))) => {
+                        error!("failed to send the message chunk inside a session: {e}");
+                        return Poll::Ready(Err(Error::from(ErrorKind::BrokenPipe)));
+                    }
+                    Poll::Ready(None) => {
+                        tracing::warn!("===> PREEXISTING: I AM DONE, transmitted {}", buf.len());
+                        self.tx_buffer.clear();
+                        return Poll::Ready(Ok(self.tx_bytes));
+                    }
+                    Poll::Pending => {
+                        tracing::warn!(
+                            "===> PREEXISTING: I AM PENDING (empty: {}, size: {})",
+                            self.tx_buffer.is_empty(),
+                            self.tx_buffer.len()
+                        );
+                        return Poll::Pending;
+                    }
+                }
+            }
+        }
+
         tracing::debug!(
             "Polling write of {} on inner session {}, sample: {}",
             buf.len(),
             &self.id,
-            String::from_utf8_lossy(&buf[..buf.len().min(30)])
+            String::from_utf8_lossy(&buf[..buf.len().min(10)])
         );
 
         let tag = self.id.tag();
 
-        let mut futures = futures::stream::FuturesUnordered::new();
+        self.tx_buffer.clear();
+        self.tx_bytes = 0;
 
         for i in 0..(buf.len() / INNER_MTU_SIZE + ((buf.len() % INNER_MTU_SIZE != 0) as usize)) {
             let start = i * INNER_MTU_SIZE;
@@ -215,24 +255,40 @@ impl futures::AsyncWrite for InnerSession {
                     })
                 })?;
 
-            futures.push(async {
-                self.tx
-                    .send_message(payload, *self.id.peer(), self.options.clone())
-                    .await
-            });
+            let sender = self.tx.clone();
+            let peer_id = *self.id.peer();
+            let options = self.options.clone();
+
+            self.tx_buffer.push(Box::pin(
+                async move { sender.send_message(payload, peer_id, options).await },
+            ));
+
+            self.tx_bytes += end - start;
         }
 
         loop {
-            match futures.poll_next_unpin(cx) {
-                Poll::Ready(Some(Ok(()))) => {
+            match self.tx_buffer.poll_next_unpin(cx) {
+                Poll::Ready(Some(Ok(_))) => {
+                    tracing::warn!("===> I HAVE SENT a MSG");
                     continue;
                 }
                 Poll::Ready(Some(Err(e))) => {
                     error!("failed to send the message chunk inside a session: {e}");
                     break Poll::Ready(Err(Error::from(ErrorKind::BrokenPipe)));
                 }
-                Poll::Ready(None) => break Poll::Ready(Ok(buf.len())),
-                Poll::Pending => break Poll::Pending,
+                Poll::Ready(None) => {
+                    tracing::warn!("===> I AM DONE");
+                    self.tx_buffer.clear();
+                    break Poll::Ready(Ok(self.tx_bytes));
+                }
+                Poll::Pending => {
+                    tracing::warn!(
+                        "===> I AM PENDING (empty: {}, size: {})",
+                        self.tx_buffer.is_empty(),
+                        self.tx_buffer.len()
+                    );
+                    break Poll::Pending;
+                }
             }
         }
     }
@@ -275,6 +331,13 @@ impl futures::AsyncRead for InnerSession {
         match self.rx.poll_next_unpin(cx) {
             Poll::Ready(Some(data)) => {
                 tracing::debug!("Something on the rx endpoint");
+                tracing::debug!(
+                    "Polling read with buffer {} on inner session {}, that holds {}b: {}",
+                    buf.len(),
+                    &self.id,
+                    data.len(),
+                    String::from_utf8_lossy(&data[data.len() - 10..data.len()])
+                );
 
                 let data_len = data.len();
                 let copy_len = data_len.min(buf.len());
@@ -431,7 +494,7 @@ mod tests {
         let (_tx, rx) = futures::channel::mpsc::unbounded();
         let mock = MockSendMsg::new();
 
-        let session = InnerSession::new(id, PeerId::random(), PathOptions::Hops(1), Box::new(mock), rx);
+        let session = InnerSession::new(id, PeerId::random(), PathOptions::Hops(1), Arc::new(mock), rx);
 
         assert_eq!(session.id(), &id);
     }
@@ -442,7 +505,7 @@ mod tests {
         let (tx, rx) = futures::channel::mpsc::unbounded();
         let mock = MockSendMsg::new();
 
-        let mut session = InnerSession::new(id, PeerId::random(), PathOptions::Hops(1), Box::new(mock), rx);
+        let mut session = InnerSession::new(id, PeerId::random(), PathOptions::Hops(1), Arc::new(mock), rx);
 
         let random_data = hopr_crypto_random::random_bytes::<PAYLOAD_SIZE>()
             .as_ref()
@@ -465,7 +528,7 @@ mod tests {
         let (tx, rx) = futures::channel::mpsc::unbounded();
         let mock = MockSendMsg::new();
 
-        let mut session = InnerSession::new(id, PeerId::random(), PathOptions::Hops(1), Box::new(mock), rx);
+        let mut session = InnerSession::new(id, PeerId::random(), PathOptions::Hops(1), Arc::new(mock), rx);
 
         let random_data = hopr_crypto_random::random_bytes::<PAYLOAD_SIZE>()
             .as_ref()
@@ -510,7 +573,7 @@ mod tests {
             id,
             OffchainKeypair::random().public().into(),
             PathOptions::Hops(1),
-            Box::new(mock),
+            Arc::new(mock),
             rx,
         );
 
@@ -539,7 +602,7 @@ mod tests {
             id,
             OffchainKeypair::random().public().into(),
             PathOptions::Hops(1),
-            Box::new(mock),
+            Arc::new(mock),
             rx,
         );
 
