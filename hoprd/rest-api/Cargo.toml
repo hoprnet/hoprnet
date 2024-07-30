@@ -58,3 +58,6 @@ hopr-lib = { workspace = true, features = ["runtime-tokio", "session-client"] }
 hoprd-inbox = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
+
+[dev-dependencies]
+hopr-transport-session = { workspace = true }

@@ -72,10 +72,9 @@ pub use {
         libp2p, libp2p::swarm::derive_prelude::Multiaddr, multiaddrs::strip_p2p_protocol,
         swarm::HoprSwarmWithProcessors, PeerTransportEvent, TransportOutput,
     },
-    hopr_transport_session::PathOptions,
     hopr_transport_session::{
-        errors::TransportSessionError, traits::SendMsg, Capability as SessionCapability, Session, SessionClientConfig,
-        SessionId,
+        errors::TransportSessionError, traits::SendMsg, Capability as SessionCapability, PathOptions, Session,
+        SessionClientConfig, SessionId,
     },
 };
 

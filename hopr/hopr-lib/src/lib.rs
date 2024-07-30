@@ -74,8 +74,9 @@ pub use {
         constants::RESERVED_TAG_UPPER_LIMIT,
         errors::{HoprTransportError, ProtocolError},
         libp2p::identity::PeerId,
-        ApplicationData, HalfKeyChallenge, Health, Keypair, Multiaddr, PathOptions, Session as HoprSession,
-        SessionCapability, SessionClientConfig, SessionId as HoprSessionId, TicketStatistics, TransportOutput,
+        ApplicationData, HalfKeyChallenge, Health, Keypair, Multiaddr, OffchainKeypair as HoprOffchainKeypair,
+        PathOptions, SendMsg, Session as HoprSession, SessionCapability, SessionClientConfig,
+        SessionId as HoprSessionId, TicketStatistics, TransportOutput,
     },
     hopr_internal_types::prelude::*,
     hopr_primitive_types::prelude::*,
@@ -110,7 +111,6 @@ lazy_static::lazy_static! {
     ).unwrap();
 }
 
-#[cfg(feature = "session-server")]
 pub use async_trait::async_trait;
 
 /// Interface representing the HOPR server behavior for each incoming session instance

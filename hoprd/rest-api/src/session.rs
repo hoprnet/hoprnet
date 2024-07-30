@@ -9,14 +9,11 @@ use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 
 use hopr_lib::{PathOptions, PeerId, SessionClientConfig};
-use tokio::{io::copy_bidirectional_with_sizes, net::TcpListener};
+use tokio::{io::copy_bidirectional, net::TcpListener};
 use tokio_util::compat::FuturesAsyncReadCompatExt;
 use tracing::{error, info};
 
 use crate::{ApiErrorStatus, InternalState, BASE_PATH};
-
-pub const SESSION_TO_SOCKET_BUFEER: usize = 1456;
-pub const SOCKET_TO_SESSION_BUFEER: usize = 1456;
 
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
@@ -118,7 +115,7 @@ pub(crate) async fn create_client(
             match tcp_listener
             .accept()
             .await {
-                Ok((mut tcp_stream, _sock_addr)) => match copy_bidirectional_with_sizes(&mut session.compat(), &mut tcp_stream, SESSION_TO_SOCKET_BUFEER, SOCKET_TO_SESSION_BUFEER).await {
+                Ok((mut tcp_stream, _sock_addr)) => match copy_bidirectional(&mut session.compat(), &mut tcp_stream).await {
                     Ok(bound_stream_finished) => info!("Client session through TCP port {port} ended with {bound_stream_finished:?} bytes transferred in both directions."),
                     Err(e) => error!("Failed to bind the TCP stream (port {port}) to the session: {e}")
                 },
@@ -133,5 +130,95 @@ pub(crate) async fn create_client(
             StatusCode::NOT_IMPLEMENTED,
             ApiErrorStatus::UnknownFailure("No UDP socket support yet".to_string()),
         ))
+    }
+}
+
+async fn listen_on(address: String) -> std::io::Result<(u16, TcpListener)> {
+    let tcp_listener = TcpListener::bind(address).await?;
+
+    Ok((tcp_listener.local_addr()?.port(), tcp_listener))
+}
+
+#[cfg(test)]
+mod tests {
+    use futures::channel::mpsc::UnboundedSender;
+    use hopr_lib::{ApplicationData, Keypair, PathOptions, PeerId, SendMsg};
+    use hopr_transport_session::errors::TransportSessionError;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    use super::*;
+
+    pub struct SendMsgResender {
+        tx: UnboundedSender<Box<[u8]>>,
+    }
+
+    impl SendMsgResender {
+        pub fn new(tx: UnboundedSender<Box<[u8]>>) -> Self {
+            Self { tx }
+        }
+    }
+
+    #[hopr_lib::async_trait]
+    impl SendMsg for SendMsgResender {
+        // Mimics the echo server
+        async fn send_message(
+            &self,
+            data: ApplicationData,
+            _destination: PeerId,
+            _options: PathOptions,
+        ) -> std::result::Result<(), TransportSessionError> {
+            let (_peer, data) = hopr_transport_session::types::unwrap_offchain_key(data.plain_text)?;
+
+            self.tx
+                .clone()
+                .unbounded_send(data)
+                .expect("send message: failed to send data");
+
+            Ok(())
+        }
+    }
+
+    #[tokio::test]
+    async fn test_hoprd_server_reactor() {
+        let (tx, rx) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
+
+        let peer: hopr_lib::PeerId = hopr_lib::HoprOffchainKeypair::random().public().into();
+        let session = hopr_lib::HoprSession::new(
+            hopr_lib::HoprSessionId::new(4567, peer),
+            peer,
+            hopr_lib::PathOptions::IntermediatePath(vec![]),
+            vec![],
+            Box::new(SendMsgResender::new(tx)),
+            rx,
+        );
+
+        let (port, tcp_listener) = listen_on(format!("127.0.0.1:0")).await.expect("listen_on succeeded");
+
+        tokio::task::spawn(async move {
+            match tcp_listener
+            .accept()
+            .await {
+                Ok((mut tcp_stream, _sock_addr)) => match copy_bidirectional(&mut session.compat(), &mut tcp_stream).await {
+                    Ok(bound_stream_finished) => info!("Client session through TCP port {port} ended with {bound_stream_finished:?} bytes transferred in both directions."),
+                    Err(e) => error!("Failed to bind the TCP stream (port {port}) to the session: {e}")
+                },
+                Err(e) => error!("Failed to accept connection: {e}")
+            }
+        });
+
+        let mut tcp_stream = tokio::net::TcpStream::connect(format!("127.0.0.1:{port}"))
+            .await
+            .unwrap();
+
+        let data = vec![b"hello", b"world", b"this ", b"is   ", b"    a", b" test"];
+
+        for d in data.clone().into_iter() {
+            tcp_stream.write_all(d).await.unwrap();
+        }
+
+        for d in data.iter() {
+            let mut buf = vec![0; d.len()];
+            tcp_stream.read_exact(&mut buf).await.unwrap();
+        }
     }
 }
