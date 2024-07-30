@@ -100,6 +100,7 @@ jobs:
         with:
           name: snapshot-test_websocket_api
           path: /tmp/hopr-smoke-test/test_websocket_api/snapshot
+        continue-on-error: true
 
       - name: Run smoke tests websocket
         run: nix develop .#smoke-tests -c python3 -m pytest tests/test_websocket_api.py
@@ -179,6 +180,7 @@ jobs:
         with:
           name: snapshot-test_${{ matrix.suite }}
           path: /tmp/hopr-smoke-test/test_${{ matrix.suite }}/snapshot
+        continue-on-error: true
 
       - name: Run smoke tests ${{ matrix.suite }}
         run: nix develop .#smoke-tests -c python3 -m pytest tests/test_${{ matrix.suite }}.py
