@@ -102,6 +102,9 @@ jobs:
           path: /tmp/hopr-smoke-test/test_websocket_api/snapshot
         continue-on-error: true
 
+      - name: Check snapshot for test_websocket_api
+        run: ls -lR /tmp/hopr-smoke-test/test_websocket_api/snapshot || echo "no snapshot found"
+
       - name: Run smoke tests websocket
         run: nix develop .#smoke-tests -c python3 -m pytest tests/test_websocket_api.py
 
@@ -181,6 +184,9 @@ jobs:
           name: snapshot-test_${{ matrix.suite }}
           path: /tmp/hopr-smoke-test/test_${{ matrix.suite }}/snapshot
         continue-on-error: true
+
+      - name: Check snapshot for test_${{ matrix.suite }}
+        run: ls -lR /tmp/hopr-smoke-test/test_${{ matrix.suite }}/snapshot || echo "no snapshot found"
 
       - name: Run smoke tests ${{ matrix.suite }}
         run: nix develop .#smoke-tests -c python3 -m pytest tests/test_${{ matrix.suite }}.py
