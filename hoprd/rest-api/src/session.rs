@@ -56,6 +56,10 @@ pub(crate) struct SessionClientResponse {
 /// Creates a new client session returing a dedicated session listening port.
 ///
 /// Once the port is bound, it is possible to use the socket for bidirectional read and write communication.
+/// Various services require diffrent types of socket communications. This is set by the capabilities field.
+///
+/// TODO: The prototype implementation does not support UDP sockets yet and forces the usage of a TCP socket.
+/// Such a restriction is not ideal and should be removed in the future.
 #[utoipa::path(
         post,
         path = const_format::formatcp!("{BASE_PATH}/session"),
@@ -122,7 +126,7 @@ async fn listen_on(address: String) -> std::io::Result<(u16, TcpListener)> {
 async fn bind_session_to_connection(session: HoprSession, tcp_listener: TcpListener) {
     let session_id = session.id().clone();
     match tcp_listener.accept().await {
-        Ok((mut tcp_stream, _sock_addr)) => match tokio::io::copy_bidirectional_with_sizes(&mut session.compat(), &mut tcp_stream, 462, 462).await {
+        Ok((mut tcp_stream, _sock_addr)) => match tokio::io::copy_bidirectional_with_sizes(&mut session.compat(), &mut tcp_stream, hopr_lib::SESSION_USABLE_MTU_SIZE, hopr_lib::SESSION_USABLE_MTU_SIZE).await {
             Ok(bound_stream_finished) => info!(
                 "Client session {session_id} ended with {bound_stream_finished:?} bytes transferred in both directions.",
             ),
@@ -153,7 +157,7 @@ mod tests {
 
     #[hopr_lib::async_trait]
     impl SendMsg for SendMsgResender {
-        // Mimics the echo server
+        // Mimics the echo server by feeding the data back in instead of sending it over the wire
         async fn send_message(
             &self,
             data: ApplicationData,
@@ -172,7 +176,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_hoprd_server_reactor() {
+    async fn hoprd_session_connection_should_create_a_working_socket_through_which_data_can_be_sent_and_received() {
         let (tx, rx) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
 
         let peer: hopr_lib::PeerId = hopr_lib::HoprOffchainKeypair::random().public().into();

@@ -17,9 +17,11 @@ use tracing::error;
 
 use crate::{errors::TransportSessionError, traits::SendMsg, Capability, PathOptions};
 
-/// ID tracking the session uniquely.
+/// Unique ID of a specific session.
 ///
 /// Simple wrapper around the maximum range of the port like session unique identifier.
+/// It is a simple combination of an application tag and a peer id that will in future be
+/// replaced by a more robust session id representation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SessionId {
     tag: u16,
@@ -48,7 +50,7 @@ impl Display for SessionId {
 
 const PADDING_HEADER_SIZE: usize = 4;
 // Inner MTU size of what the HOPR payload can take (payload - peer_id - application_tag)
-const INNER_MTU_SIZE: usize = PAYLOAD_SIZE
+pub const SESSION_USABLE_MTU_SIZE: usize = PAYLOAD_SIZE
     - OffchainPublicKey::SIZE
     - std::mem::size_of::<hopr_internal_types::protocol::Tag>()
     - PADDING_HEADER_SIZE;
@@ -71,39 +73,20 @@ impl Session {
         tx: Arc<dyn SendMsg + Send + Sync>,
         rx: UnboundedReceiver<Box<[u8]>>,
     ) -> Self {
+        let inner_session = InnerSession::new(id, me, options, tx, rx);
+
         Self {
             id,
             inner: if capabilities.contains(&Capability::Retransmission)
                 || capabilities.contains(&Capability::Segmentation)
             {
-                // TODO: 2.2 implement retransmission and segmentation loading and unloading based on configuration
-                Box::pin(SessionSocket::<INNER_MTU_SIZE>::new(
+                Box::pin(SessionSocket::<SESSION_USABLE_MTU_SIZE>::new(
                     id,
-                    InnerSession {
-                        id,
-                        me,
-                        options,
-                        rx,
-                        tx,
-                        tx_bytes: 0,
-                        tx_buffer: futures::stream::FuturesUnordered::new(),
-                        rx_buffer: [0; PAYLOAD_SIZE],
-                        rx_buffer_range: (0, 0),
-                    },
+                    inner_session,
                     SessionConfig::default(),
                 ))
             } else {
-                Box::pin(InnerSession {
-                    id,
-                    me,
-                    options,
-                    rx,
-                    tx,
-                    tx_bytes: 0,
-                    tx_buffer: futures::stream::FuturesUnordered::new(),
-                    rx_buffer: [0; PAYLOAD_SIZE],
-                    rx_buffer_range: (0, 0),
-                })
+                Box::pin(inner_session)
             },
         }
     }
@@ -119,7 +102,6 @@ impl futures::AsyncRead for Session {
         cx: &mut std::task::Context<'_>,
         buf: &mut [u8],
     ) -> Poll<std::io::Result<usize>> {
-        tracing::debug!("Polling read on session {}", &self.id);
         let inner = self.inner.as_mut();
         pin_mut!(inner);
         inner.poll_read(cx, buf)
@@ -132,21 +114,18 @@ impl futures::AsyncWrite for Session {
         cx: &mut std::task::Context<'_>,
         buf: &[u8],
     ) -> Poll<std::io::Result<usize>> {
-        tracing::debug!("Polling write on session {}", &self.id);
         let inner = &mut self.inner;
         pin_mut!(inner);
         inner.poll_write(cx, buf)
     }
 
     fn poll_flush(mut self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<std::io::Result<()>> {
-        tracing::debug!("Polling flush on session {}", &self.id);
         let inner = &mut self.inner;
         pin_mut!(inner);
         inner.poll_flush(cx)
     }
 
     fn poll_close(mut self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<std::io::Result<()>> {
-        tracing::debug!("Polling close on session {}", &self.id);
         let inner = &mut self.inner;
         pin_mut!(inner);
         inner.poll_flush(cx)
@@ -203,7 +182,6 @@ impl futures::AsyncWrite for InnerSession {
             loop {
                 match self.tx_buffer.poll_next_unpin(cx) {
                     Poll::Ready(Some(Ok(()))) => {
-                        tracing::warn!("===> PREEXISTING: I HAVE SENT A MSG");
                         continue;
                     }
                     Poll::Ready(Some(Err(e))) => {
@@ -211,37 +189,24 @@ impl futures::AsyncWrite for InnerSession {
                         return Poll::Ready(Err(Error::from(ErrorKind::BrokenPipe)));
                     }
                     Poll::Ready(None) => {
-                        tracing::warn!("===> PREEXISTING: I AM DONE, transmitted {}", buf.len());
                         self.tx_buffer.clear();
                         return Poll::Ready(Ok(self.tx_bytes));
                     }
                     Poll::Pending => {
-                        tracing::warn!(
-                            "===> PREEXISTING: I AM PENDING (empty: {}, size: {})",
-                            self.tx_buffer.is_empty(),
-                            self.tx_buffer.len()
-                        );
                         return Poll::Pending;
                     }
                 }
             }
         }
 
-        tracing::debug!(
-            "Polling write of {} on inner session {}, sample: {}",
-            buf.len(),
-            &self.id,
-            String::from_utf8_lossy(&buf[..buf.len().min(10)])
-        );
-
         let tag = self.id.tag();
 
         self.tx_buffer.clear();
         self.tx_bytes = 0;
 
-        for i in 0..(buf.len() / INNER_MTU_SIZE + ((buf.len() % INNER_MTU_SIZE != 0) as usize)) {
-            let start = i * INNER_MTU_SIZE;
-            let end = ((i + 1) * INNER_MTU_SIZE).min(buf.len());
+        for i in 0..(buf.len() / SESSION_USABLE_MTU_SIZE + ((buf.len() % SESSION_USABLE_MTU_SIZE != 0) as usize)) {
+            let start = i * SESSION_USABLE_MTU_SIZE;
+            let end = ((i + 1) * SESSION_USABLE_MTU_SIZE).min(buf.len());
 
             let payload = wrap_with_offchain_key(&self.me, buf[start..end].to_vec().into_boxed_slice())
                 .map_err(|e| {
@@ -269,7 +234,6 @@ impl futures::AsyncWrite for InnerSession {
         loop {
             match self.tx_buffer.poll_next_unpin(cx) {
                 Poll::Ready(Some(Ok(_))) => {
-                    tracing::warn!("===> I HAVE SENT a MSG");
                     continue;
                 }
                 Poll::Ready(Some(Err(e))) => {
@@ -277,16 +241,10 @@ impl futures::AsyncWrite for InnerSession {
                     break Poll::Ready(Err(Error::from(ErrorKind::BrokenPipe)));
                 }
                 Poll::Ready(None) => {
-                    tracing::warn!("===> I AM DONE");
                     self.tx_buffer.clear();
                     break Poll::Ready(Ok(self.tx_bytes));
                 }
                 Poll::Pending => {
-                    tracing::warn!(
-                        "===> I AM PENDING (empty: {}, size: {})",
-                        self.tx_buffer.is_empty(),
-                        self.tx_buffer.len()
-                    );
                     break Poll::Pending;
                 }
             }
@@ -294,12 +252,10 @@ impl futures::AsyncWrite for InnerSession {
     }
 
     fn poll_flush(self: std::pin::Pin<&mut Self>, _cx: &mut std::task::Context<'_>) -> Poll<std::io::Result<()>> {
-        tracing::debug!("Polling flush on inner session {}", &self.id);
         Poll::Ready(Ok(()))
     }
 
     fn poll_close(self: std::pin::Pin<&mut Self>, _cx: &mut std::task::Context<'_>) -> Poll<std::io::Result<()>> {
-        tracing::debug!("Polling close on inner session {}", &self.id);
         Poll::Ready(Ok(()))
     }
 }
@@ -311,8 +267,6 @@ impl futures::AsyncRead for InnerSession {
         buf: &mut [u8],
     ) -> Poll<std::io::Result<usize>> {
         if self.rx_buffer_range.0 != self.rx_buffer_range.1 {
-            tracing::debug!("Something in the buffer");
-
             let start = self.rx_buffer_range.0;
             let copy_len = self.rx_buffer_range.1.min(buf.len());
 
@@ -323,29 +277,17 @@ impl futures::AsyncRead for InnerSession {
                 self.rx_buffer_range = (0, 0);
             }
 
-            tracing::debug!("Had {copy_len} bytes in the buffer");
-
             return Poll::Ready(Ok(copy_len));
         }
 
         match self.rx.poll_next_unpin(cx) {
             Poll::Ready(Some(data)) => {
-                tracing::debug!("Something on the rx endpoint");
-                tracing::debug!(
-                    "Polling read with buffer {} on inner session {}, that holds {}b: {}",
-                    buf.len(),
-                    &self.id,
-                    data.len(),
-                    String::from_utf8_lossy(&data[data.len() - 10..data.len()])
-                );
-
                 let data_len = data.len();
                 let copy_len = data_len.min(buf.len());
                 if copy_len < data_len {
                     self.rx_buffer[0..data_len - copy_len].copy_from_slice(&data[copy_len..]);
                     self.rx_buffer_range = (0, data_len - copy_len);
                 }
-                tracing::debug!("Had {copy_len} bytes in the rx endpoint");
 
                 buf[..copy_len].copy_from_slice(&data[..copy_len]);
 
@@ -357,8 +299,7 @@ impl futures::AsyncRead for InnerSession {
     }
 }
 
-// TODO: 2.2 use a more compact representation of the PeerId in the binary form
-// TODO: 3.0 remove if return path is implemented
+// TODO: 3.0 remove once return path is implemented
 pub fn wrap_with_offchain_key(peer: &PeerId, data: Box<[u8]>) -> crate::errors::Result<Vec<u8>> {
     if data.len() > PAYLOAD_SIZE.saturating_sub(OffchainPublicKey::SIZE + PADDING_HEADER_SIZE) {
         return Err(TransportSessionError::PayloadSize);
@@ -373,7 +314,6 @@ pub fn wrap_with_offchain_key(peer: &PeerId, data: Box<[u8]>) -> crate::errors::
     Ok(packet)
 }
 
-// TODO: 2.2 use a more compact representation of the PeerId in the binary form
 // TODO: 3.0 remove if return path is implemented
 pub fn unwrap_offchain_key(payload: Box<[u8]>) -> crate::errors::Result<(PeerId, Box<[u8]>)> {
     if payload.len() > PAYLOAD_SIZE {
@@ -409,7 +349,7 @@ mod tests {
     #[test]
     fn wrapping_and_unwrapping_with_offchain_key_should_be_an_identity() {
         let peer: PeerId = OffchainKeypair::random().public().into();
-        let data = hopr_crypto_random::random_bytes::<INNER_MTU_SIZE>()
+        let data = hopr_crypto_random::random_bytes::<SESSION_USABLE_MTU_SIZE>()
             .as_ref()
             .to_vec()
             .into_boxed_slice();
@@ -425,7 +365,7 @@ mod tests {
     #[test]
     fn wrapping_with_offchain_key_should_succeed_for_valid_peer_id_and_valid_payload_size() {
         let peer: PeerId = OffchainKeypair::random().public().into();
-        let data = hopr_crypto_random::random_bytes::<INNER_MTU_SIZE>()
+        let data = hopr_crypto_random::random_bytes::<SESSION_USABLE_MTU_SIZE>()
             .as_ref()
             .to_vec()
             .into_boxed_slice();
@@ -438,7 +378,7 @@ mod tests {
     #[test]
     fn wrapping_with_offchain_key_should_fail_for_invalid_peer_id() {
         let peer: PeerId = PeerId::random();
-        let data = hopr_crypto_random::random_bytes::<INNER_MTU_SIZE>()
+        let data = hopr_crypto_random::random_bytes::<SESSION_USABLE_MTU_SIZE>()
             .as_ref()
             .to_vec()
             .into_boxed_slice();
@@ -473,19 +413,6 @@ mod tests {
         let unwrapped = unwrap_offchain_key(data.clone());
 
         assert!(matches!(unwrapped, Err(TransportSessionError::PayloadSize)));
-    }
-
-    #[ignore] // fails due to incorrect unwrap operation in the OffcahinPublicKey -> PeerId conversion
-    #[test]
-    fn unwrapping_offchain_key_should_fail_for_invalid_peer_id() {
-        let data = hopr_crypto_random::random_bytes::<PAYLOAD_SIZE>()
-            .as_ref()
-            .to_vec()
-            .into_boxed_slice();
-
-        let unwrapped = unwrap_offchain_key(data.clone());
-
-        assert!(matches!(unwrapped, Err(TransportSessionError::PeerId)));
     }
 
     #[test]
@@ -585,7 +512,7 @@ mod tests {
     #[async_std::test]
     async fn session_should_chunk_the_data_if_without_segmentation_the_write_size_is_greater_than_the_usable_mtu_size()
     {
-        const TO_SEND: usize = INNER_MTU_SIZE * 2 + 10;
+        const TO_SEND: usize = SESSION_USABLE_MTU_SIZE * 2 + 10;
 
         let id = SessionId::new(1, OffchainKeypair::random().public().into());
         let (_tx, rx) = futures::channel::mpsc::unbounded();

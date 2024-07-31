@@ -33,7 +33,7 @@ use futures::{
     channel::mpsc::{UnboundedReceiver, UnboundedSender},
     FutureExt, StreamExt,
 };
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info, trace, warn};
 
 use core_network::{
     heartbeat::Heartbeat,
@@ -74,7 +74,7 @@ pub use {
     },
     hopr_transport_session::{
         errors::TransportSessionError, traits::SendMsg, Capability as SessionCapability, PathOptions, Session,
-        SessionClientConfig, SessionId,
+        SessionClientConfig, SessionId, SESSION_USABLE_MTU_SIZE,
     },
 };
 
@@ -350,8 +350,7 @@ where
                                             hopr_transport_session::types::unwrap_offchain_key(data.plain_text.clone())
                                         {
                                             if let Some(sender) = sessions.get(&SessionId::new(app_tag, peer)).await {
-                                                // if the data does not get into the session, it can recover
-                                                debug!(
+                                                trace!(
                                                     app_tag,
                                                     peer_id = tracing::field::debug(peer),
                                                     "Received data for a registered session"
@@ -360,7 +359,7 @@ where
                                                     error!("Failed to send data to session: {e}");
                                                 }
                                             } else {
-                                                debug!(
+                                                info!(
                                                     app_tag,
                                                     peer_id = tracing::field::debug(peer),
                                                     "Detected a new incoming session"

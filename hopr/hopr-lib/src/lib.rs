@@ -76,7 +76,7 @@ pub use {
         libp2p::identity::PeerId,
         ApplicationData, HalfKeyChallenge, Health, Keypair, Multiaddr, OffchainKeypair as HoprOffchainKeypair,
         PathOptions, SendMsg, Session as HoprSession, SessionCapability, SessionClientConfig,
-        SessionId as HoprSessionId, TicketStatistics, TransportOutput,
+        SessionId as HoprSessionId, TicketStatistics, TransportOutput, SESSION_USABLE_MTU_SIZE,
     },
     hopr_internal_types::prelude::*,
     hopr_primitive_types::prelude::*,

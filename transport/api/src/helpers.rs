@@ -4,7 +4,7 @@ use async_lock::RwLock;
 use core_protocol::msg::processor::PacketActions;
 use hopr_internal_types::protocol::ApplicationData;
 use libp2p::{Multiaddr, PeerId};
-use tracing::debug;
+use tracing::{debug, trace};
 
 use chain_types::chain_events::NetworkRegistryStatus;
 use core_path::{
@@ -168,14 +168,13 @@ where
             .then_some(())
             .ok_or(TransportSessionError::Tag)?;
 
-        debug!("Resolve path");
         let path = self
             .resolver
             .resolve_path(destination, options)
             .await
             .map_err(|_| TransportSessionError::Path)?;
 
-        debug!("Send packet");
+        trace!("Send packet");
         self.process_packet_send
             .get()
             .ok_or_else(|| TransportSessionError::Closed)?
@@ -186,7 +185,7 @@ where
             .await
             .map_err(|_e| TransportSessionError::Timeout)?;
 
-        debug!("Processing finished");
+        trace!("Packet sent to the outgoing queue");
 
         Ok(())
     }
