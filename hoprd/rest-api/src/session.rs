@@ -124,7 +124,7 @@ async fn listen_on(address: String) -> std::io::Result<(u16, TcpListener)> {
 }
 
 async fn bind_session_to_connection(session: HoprSession, tcp_listener: TcpListener) {
-    let session_id = session.id().clone();
+    let session_id = *session.id();
     match tcp_listener.accept().await {
         Ok((mut tcp_stream, _sock_addr)) => match tokio::io::copy_bidirectional_with_sizes(&mut session.compat(), &mut tcp_stream, hopr_lib::SESSION_USABLE_MTU_SIZE, hopr_lib::SESSION_USABLE_MTU_SIZE).await {
             Ok(bound_stream_finished) => info!(

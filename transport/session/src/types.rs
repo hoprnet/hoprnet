@@ -132,6 +132,9 @@ impl futures::AsyncWrite for Session {
     }
 }
 
+type FuturesBuffer = futures::stream::FuturesUnordered<
+    Pin<Box<dyn std::future::Future<Output = Result<(), TransportSessionError>> + Send>>,
+>;
 pub struct InnerSession {
     id: SessionId,
     me: PeerId,
@@ -139,9 +142,7 @@ pub struct InnerSession {
     rx: UnboundedReceiver<Box<[u8]>>,
     tx: Arc<dyn SendMsg + Send + Sync>,
     tx_bytes: usize,
-    tx_buffer: futures::stream::FuturesUnordered<
-        Pin<Box<dyn std::future::Future<Output = Result<(), TransportSessionError>> + Send>>,
-    >,
+    tx_buffer: FuturesBuffer,
     rx_buffer: [u8; PAYLOAD_SIZE],
     rx_buffer_range: (usize, usize),
 }
@@ -325,9 +326,7 @@ pub fn unwrap_offchain_key(payload: Box<[u8]>) -> crate::errors::Result<(PeerId,
 
     let opk = OffchainPublicKey::try_from(payload.as_slice()).map_err(|_e| TransportSessionError::PeerId)?;
 
-    let peer = PeerId::try_from(opk).map_err(|_e| TransportSessionError::PeerId)?;
-
-    Ok((peer, data))
+    Ok((opk.into(), data))
 }
 
 #[cfg(test)]
