@@ -16,7 +16,6 @@ services:
     platform: ${DOCKER_PLATFORM}
     container_name: hoprd
     hostname: hoprd
-    stop_signal: SIGINT
     networks:
       - hoprnet
     ports:
