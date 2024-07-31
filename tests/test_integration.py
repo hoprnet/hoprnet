@@ -5,7 +5,6 @@ import re
 import socket
 import string
 from contextlib import AsyncExitStack, asynccontextmanager
-from threading import Thread
 
 import pytest
 import requests
