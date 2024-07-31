@@ -1,10 +1,11 @@
 import asyncio
 import multiprocessing
+import os
 import random
 import re
 import socket
 import string
-from contextlib import AsyncExitStack, asynccontextmanager
+from contextlib import AsyncExitStack, asynccontextmanager, contextmanager
 
 import pytest
 import requests
@@ -857,7 +858,6 @@ HOPR_SESSION_MAX_PAYLOAD_SIZE = 462
 
 
 def run_echo_server(port: int):
-    import socket
 
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(('127.0.0.1', port))
@@ -867,8 +867,7 @@ def run_echo_server(port: int):
             while True:
                 data = conn.recv(HOPR_SESSION_MAX_PAYLOAD_SIZE)
                 conn.sendall(data)
-
-from contextlib import contextmanager
+                
 
 @contextmanager
 def echo_server(port: int):
@@ -898,7 +897,7 @@ async def test_session_communication_with_an_echo_server_wireguard_style_communi
     HOPR TCP socket buffers are set to 462 bytes to mimic the underlying MTU of the HOPR protocol.
     """
 
-    packet_count = 500
+    packet_count = 1000 if os.getenv("CI", default="false") == "false" else 50
     expected = [f"{i}".rjust(HOPR_SESSION_MAX_PAYLOAD_SIZE) for i in range(packet_count)]
     
     assert [len(x) for x in expected] == packet_count * [HOPR_SESSION_MAX_PAYLOAD_SIZE]
