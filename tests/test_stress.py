@@ -11,6 +11,7 @@ import websockets
 
 from .conftest import TICKET_PRICE_PER_HOP, to_ws_url
 from .hopr import HoprdAPI
+from .node import Node
 from .test_integration import create_channel
 
 
@@ -53,7 +54,7 @@ class ApiWrapper:
 @pytest.mark.skipif(
     os.getenv("CI", "false") == "true", reason="stress tests fail randomly on CI due to resource constraints"
 )
-async def test_stress_relayed_flood_test_with_sources_performing_1_hop_to_self(stress_fixture):
+async def test_stress_relayed_flood_test_with_sources_performing_1_hop_to_self(stress_fixture, swarm7: dict[str, Node]):
     STRESS_1_HOP_TO_SELF_MESSAGE_COUNT = stress_fixture["request_count"]
 
     api_sources = [HoprdAPI(f'http://{d["url"]}', d["token"]) for d in stress_fixture["sources"]]
