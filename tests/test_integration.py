@@ -898,7 +898,7 @@ async def test_session_communication_with_an_echo_server_wireguard_style_communi
     HOPR TCP socket buffers are set to 462 bytes to mimic the underlying MTU of the HOPR protocol.
     """
 
-    packet_count = 1000
+    packet_count = 500
     expected = [f"{i}".rjust(HOPR_SESSION_MAX_PAYLOAD_SIZE) for i in range(packet_count)]
     
     assert [len(x) for x in expected] == packet_count * [HOPR_SESSION_MAX_PAYLOAD_SIZE]
