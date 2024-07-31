@@ -34,10 +34,7 @@ services:
       - "OTEL_SERVICE_NAME=${OTEL_SERVICE_NAME}"
       - "OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT}"
     volumes:
-      - ./hoprd.cfg.yaml:/app/hoprd.cfg.yaml
-      - ./hopr.id:/app/hopr.id
-      - hoprd_data:/app/hoprd/
-      - '/var/run/docker.sock:/var/run/docker.sock'
+      - ./hoprd_data:/app
     deploy:
       resources:
         reservations:
