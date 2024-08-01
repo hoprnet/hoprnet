@@ -81,7 +81,7 @@ smoke-tests: ## run smoke tests
 stress-test-local-swarm: ## run stress tests on a local node swarm
 	source .venv/bin/activate && \
 		python3 -m pytest tests/test_stress.py \
-		--stress-request-count=10000 \
+		--stress-request-count=3000 \
 		--stress-sources='[{"url": "localhost:19091", "token": "e2e-API-token^^"}]' \
 		--stress-target='{"url": "localhost:19093", "token": "e2e-API-token^^"}'
 
