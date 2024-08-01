@@ -192,13 +192,14 @@ def mirror_contract_data(dest_file_path: Path, src_file_path: Path, src_network:
         json.dump(dest_data, file, sort_keys=True)
 
 
-def cleanup_data(dir: Path):
+def cleanup_data(parent_dir: Path):
     # Remove old db
-    for f in dir.glob(f"{NODE_NAME_PREFIX}_*"):
+    for f in parent_dir.glob(f"{NODE_NAME_PREFIX}_*"):
         if not f.is_dir():
             continue
+        logging.info(f"Remove db in {f}")
         shutil.rmtree(f, ignore_errors=True)
-    logging.info(f"Removed dbs in {dir}")
+    logging.info(f"Removed all dbs in {parent_dir}")
 
 def copy_identities(dir: Path):
     # Remove old identities
@@ -288,12 +289,6 @@ def snapshot_create(anvil_port, parent_dir: Path, nodes):
 def snapshot_usable(parent_dir: Path, nodes):
     sdir = snapshot_dir(parent_dir)
 
-    if not parent_dir.exists():
-        return False
-
-    if not sdir.exists():
-        return False
-
     expected_files = [
         "anvil.state.json",
         "barebone.cfg.yaml",
@@ -306,10 +301,7 @@ def snapshot_usable(parent_dir: Path, nodes):
         expected_files.append(f"{node_dir}/db/hopr_index.db-wal")
         expected_files.append(f"{node_dir}.env")
 
-    if not all([sdir.joinpath(f).exists() for f in expected_files]):
-       return False
-
-    return True
+    return all([sdir.joinpath(f).exists() for f in expected_files])
 
 def fund_nodes(test_suite_name, test_dir: Path, anvil_port):
     private_key = load_private_key(test_suite_name)
