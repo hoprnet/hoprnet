@@ -46,6 +46,7 @@ fn init_logger() -> Result<(), Box<dyn std::error::Error>> {
         Ok(filter) => filter,
         Err(_) => tracing_subscriber::filter::EnvFilter::new("info")
             .add_directive("libp2p_mplex=info".parse()?)
+            .add_directive("libp2p_swarm=info".parse()?)
             .add_directive("multistream_select=info".parse()?)
             .add_directive("isahc::handler=error".parse()?)
             .add_directive("isahc::client=error".parse()?)
@@ -71,8 +72,7 @@ fn init_logger() -> Result<(), Box<dyn std::error::Error>> {
                     .with_exporter(
                         opentelemetry_otlp::new_exporter()
                             .tonic()
-                            // .http()
-                            .with_protocol(opentelemetry_otlp::Protocol::HttpBinary)
+                            .with_protocol(opentelemetry_otlp::Protocol::Grpc)
                             .with_timeout(std::time::Duration::from_secs(5)),
                     )
                     .with_trace_config(
@@ -83,7 +83,7 @@ fn init_logger() -> Result<(), Box<dyn std::error::Error>> {
                             .with_max_attributes_per_span(16)
                             .with_resource(opentelemetry_sdk::Resource::new(vec![opentelemetry::KeyValue::new(
                                 "service.name",
-                                env!("CARGO_PKG_NAME"),
+                                std::env::var("OTEL_SERVICE_NAME").unwrap_or(env!("CARGO_PKG_NAME").into()),
                             )])),
                     )
                     .install_batch(opentelemetry_sdk::runtime::Tokio)?
@@ -95,11 +95,13 @@ fn init_logger() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    Ok(if let Some(telemetry) = telemetry {
+    if let Some(telemetry) = telemetry {
         tracing::subscriber::set_global_default(registry.with(telemetry))?
     } else {
         tracing::subscriber::set_global_default(registry)?
-    })
+    }
+
+    Ok(())
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
