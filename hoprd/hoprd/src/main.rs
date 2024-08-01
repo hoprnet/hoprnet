@@ -24,6 +24,8 @@ use hoprd::errors::HoprdError;
 use hoprd_api::serve_api;
 use hoprd_keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
 
+use hoprd::HoprServerReactor;
+
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleHistogram;
 
@@ -114,11 +116,11 @@ enum HoprdProcesses {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let _ = init_logger();
 
-    let git_hash = option_env!("VERGEN_GIT_SHA").unwrap_or("unknown");
-    info!("This is HOPRd {} ({})", hopr_lib::constants::APP_VERSION, git_hash);
-
     let args = <CliArgs as clap::Parser>::parse();
     let cfg = hoprd::config::HoprdConfig::from_cli_args(args, false)?;
+
+    let git_hash = option_env!("VERGEN_GIT_SHA").unwrap_or("unknown");
+    info!("This is HOPRd {} ({})", hopr_lib::constants::APP_VERSION, git_hash);
 
     if std::env::var("DAPPNODE")
         .map(|v| v.to_lowercase() == "true")
@@ -229,7 +231,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
     }
 
-    let (hopr_socket, hopr_processes) = node.run().await?;
+    let (hopr_socket, hopr_processes) = node.run(HoprServerReactor {}).await?;
 
     // process extracting the received data from the socket
     let mut ingress = hopr_socket.reader();

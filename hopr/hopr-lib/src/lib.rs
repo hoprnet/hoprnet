@@ -74,8 +74,9 @@ pub use {
         constants::RESERVED_TAG_UPPER_LIMIT,
         errors::{HoprTransportError, ProtocolError},
         libp2p::identity::PeerId,
-        ApplicationData, HalfKeyChallenge, Health, Keypair, Multiaddr, PathOptions, Session as HoprSession,
-        SessionCapability, SessionClientConfig, TicketStatistics, TransportOutput,
+        ApplicationData, HalfKeyChallenge, Health, Keypair, Multiaddr, OffchainKeypair as HoprOffchainKeypair,
+        PathOptions, SendMsg, Session as HoprSession, SessionCapability, SessionClientConfig,
+        SessionId as HoprSessionId, TicketStatistics, TransportOutput, SESSION_USABLE_MTU_SIZE,
     },
     hopr_internal_types::prelude::*,
     hopr_primitive_types::prelude::*,
@@ -109,6 +110,8 @@ lazy_static::lazy_static! {
         &["peerid", "address", "safe_address", "module_address"]
     ).unwrap();
 }
+
+pub use async_trait::async_trait;
 
 /// Interface representing the HOPR server behavior for each incoming session instance
 /// supplied as an argument.
@@ -903,7 +906,11 @@ impl Hopr {
                 spawn(_session_rx.for_each_concurrent(None, move |session| {
                     let serve_handler = serve_handler.clone();
                     async move {
-                        let _ = serve_handler.process(session).await;
+                        let session_id = *session.id();
+                        match serve_handler.process(session).await {
+                            Ok(_) => debug!("Client session {session_id} finished successfully"),
+                            Err(e) => error!("Client session {session_id} failed: {e}"),
+                        }
                     }
                 })),
             );

@@ -4,7 +4,7 @@ use async_lock::RwLock;
 use core_protocol::msg::processor::PacketActions;
 use hopr_internal_types::protocol::ApplicationData;
 use libp2p::{Multiaddr, PeerId};
-use tracing::debug;
+use tracing::{debug, trace};
 
 use chain_types::chain_events::NetworkRegistryStatus;
 use core_path::{
@@ -90,17 +90,14 @@ where
             PathOptions::IntermediatePath(mut path) => {
                 path.push(destination);
 
-                debug!(
-                    full_path = format!("{path:?}"),
-                    "Sending a message using a specific path"
-                );
+                debug!(full_path = format!("{path:?}"), "Resolving a specific path");
 
                 let cg = self.channel_graph.read().await;
 
                 TransportPath::resolve(path, &self.db, &cg).await.map(|(p, _)| p)?
             }
             PathOptions::Hops(hops) => {
-                debug!(hops, "Sending a message using a random path");
+                debug!(hops, "Resolving a path using hop count");
 
                 let pk = OffchainPublicKey::try_from(destination)?;
 
@@ -159,6 +156,7 @@ impl<T> SendMsg for MessageSender<T>
 where
     T: HoprDbAllOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
 {
+    #[tracing::instrument(level = "debug", skip(self, data, destination, options))]
     async fn send_message(
         &self,
         data: ApplicationData,
@@ -176,6 +174,7 @@ where
             .await
             .map_err(|_| TransportSessionError::Path)?;
 
+        trace!("Send packet");
         self.process_packet_send
             .get()
             .ok_or_else(|| TransportSessionError::Closed)?
@@ -185,6 +184,8 @@ where
             .consume_and_wait(crate::constants::PACKET_QUEUE_TIMEOUT_MILLISECONDS)
             .await
             .map_err(|_e| TransportSessionError::Timeout)?;
+
+        trace!("Packet sent to the outgoing queue");
 
         Ok(())
     }
