@@ -80,12 +80,14 @@ class Node:
     def setup(self, password: str, config_file: Path, dir: Path):
         api_token_param = f"--api-token={self.api_token}" if self.api_token else "--disableApiAuthentication"
         custom_env = {
-            "RUST_LOG": "debug,libp2p_mplex=info,multistream_select=info,isahc::handler=error,isahc::client=error",
+            "RUST_LOG": "debug,libp2p_swarm=info,libp2p_mplex=info,multistream_select=info,isahc::handler=error,isahc::client=error",
             "RUST_BACKTRACE": "full",
             "HOPRD_HEARTBEAT_INTERVAL": "2500",
             "HOPRD_HEARTBEAT_THRESHOLD": "2500",
             "HOPRD_HEARTBEAT_VARIANCE": "1000",
             "HOPRD_NETWORK_QUALITY_THRESHOLD": "0.3",
+            "HOPRD_USE_OPENTELEMETRY": "false",
+            "OTEL_SERVICE_NAME": f"hoprd-{self.p2p_port}" 
         }
 
         cmd = [

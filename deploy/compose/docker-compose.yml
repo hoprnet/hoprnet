@@ -30,7 +30,9 @@ services:
       - RUST_BACKTRACE=full
       - HOPRD_CONFIGURATION_FILE_PATH=/app/hoprd.cfg.yaml
       - HOPRD_API_PORT=3001
-      # - OPENTELEMETRY_COLLECTOR_URL=http://server.
+      - "HOPRD_USE_OPENTELEMETRY=${HOPRD_USE_OPENTELEMETRY}"
+      - "OTEL_SERVICE_NAME=${OTEL_SERVICE_NAME}"
+      - "OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT}"
     volumes:
       - ./hoprd.cfg.yaml:/app/hoprd.cfg.yaml
       - ./hopr.id:/app/hopr.id
@@ -68,6 +70,23 @@ services:
           memory: "${HOPR_ADMIN_MEM_LIMIT}"
     profiles:
       - admin-ui
+
+  jaeger:
+    image: "${JAEGER_IMAGE}"
+    restart: unless-stopped
+    platform: ${DOCKER_PLATFORM}
+    container_name: jaeger
+    hostname: jaeger
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+      - "16686:16686"
+    networks:
+      - hoprnet
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    profiles:
+      - tracing
 
   cadvisor:
     image: "${METRICS_CADVISOR_IMAGE}"

@@ -13,6 +13,7 @@ build = "build.rs"
 default = [
   "runtime-tokio",
   "prometheus",
+  "telemetry",
 ] # uses tokio by default because of axum
 prometheus = [
   "dep:hopr-metrics",
