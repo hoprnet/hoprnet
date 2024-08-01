@@ -1,6 +1,7 @@
 black==23.3.0
 pytest==7.2.1
 pytest-asyncio==0.21.0
+pytest-xdist==3.6.1
 requests==2.28.2
 rlp==3.0.0
 ruff==0.0.261

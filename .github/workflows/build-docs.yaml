@@ -16,7 +16,7 @@ on:
   workflow_call:
 
 concurrency:
-  group: ${{ github.head_ref }}-docs
+  group: ${{ github.ref }}-docs
   cancel-in-progress: true
 
 jobs:

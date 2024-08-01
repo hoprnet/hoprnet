@@ -55,21 +55,20 @@ on:
         default: "200"
         required: true
         description: 'Number of messages per seconds'
+
 concurrency:
   group: load-tests
   cancel-in-progress: true
 
 jobs:
-
   load-tests:
     name: Load Tests
     runs-on: self-hosted-hoprnet-small
     steps:
-
       - name: Set environment variables
         id: vars
         run: |
-          if [ -z "${{ github.event.inputs.test_id }}" ]; then 
+          if [ -z "${{ github.event.inputs.test_id }}" ]; then
             echo "The workflow is triggered by other pipeline"
             echo "ENVIRONMENT_NAME=${{ inputs.network }}" >> $GITHUB_OUTPUT
             echo "WORKLOAD_NAME=${{ inputs.workload }}" >> $GITHUB_OUTPUT
@@ -92,13 +91,13 @@ jobs:
           ref: main
 
       - name: Set up Google Cloud Credentials
-        uses: google-github-actions/auth@v1
+        uses: google-github-actions/auth@v2
         with:
           token_format: "access_token"
           credentials_json: ${{ secrets.GCP_SA_TERRAFORM_JSON }}
 
       - name: Set up Google Cloud SDK
-        uses: google-github-actions/setup-gcloud@v1
+        uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: hopr-staging
           install_components: beta
@@ -113,7 +112,7 @@ jobs:
       - name: Setup NodeJs
         uses: actions/setup-node@v3
         with:
-          node-version: 18
+          node-version: 20
 
       - name: Get Hoprd Api token
         id: token

@@ -1,31 +1,37 @@
 import os
+import logging
 from pathlib import Path
 from subprocess import STDOUT, Popen, run
 
 from .hopr import HoprdAPI
 
+def load_env_file(env_file: str) -> dict:
+    env = {}
+    with open(env_file, "r") as f:
+        for line in f:
+            if line.startswith("#"):
+                continue
+            key, value = line.strip().split("=", 1)
+            env[key] = value
+    return env
 
 class Node:
     def __init__(
         self,
-        api_port: int,
-        p2p_prt: int,
+        id: int,
         api_token: str,
-        dir: Path,
         host_addr: str,
         network: str,
-        cfg_file: Path = None,
+        cfg_file: str,
     ):
         # initialized
-        self.api_port: int = api_port
-        self.p2p_port: int = p2p_prt
-        self.dir: Path = dir
+        self.id = id
         self.host_addr: str = host_addr
         self.api_token: str = api_token
         self.network: str = network
 
         # optional
-        self.cfg_file: Path = cfg_file
+        self.cfg_file: str = cfg_file
 
         # generated
         self.safe_address: str = None
@@ -35,10 +41,29 @@ class Node:
         # private
         self.peer_id: str = None
         self.address: str = None
+        self.dir: Path = None
+        self.cfg_file_path: Path = None
+        self.api_port: int = 0
+        self.p2p_port: int = 0
+        self.anvil_port: int = 0
 
     @property
     def api(self):
         return HoprdAPI(f"http://{self.host_addr}:{self.api_port}", self.api_token)
+
+    def prepare(self, port_base: int, parent_dir: Path, prefix: str):
+        self.anvil_port = port_base
+        self.dir = parent_dir.joinpath(f"{prefix}_{self.id}")
+        self.cfg_file_path = parent_dir.joinpath(self.cfg_file)
+        self.api_port = port_base + (self.id * 10) + 1
+        self.p2p_port = port_base + (self.id * 10) + 2
+
+    def load_addresses(self):
+        loaded_env = load_env_file(f"{self.dir}.env")
+        self.safe_address = loaded_env.get('HOPRD_SAFE_ADDRESS')
+        self.module_address = loaded_env.get('HOPRD_MODULE_ADDRESS')
+        assert self.safe_address is not None
+        assert self.module_address is not None
 
     def create_local_safe(self, custom_env: dict):
         res = run(
@@ -61,7 +86,7 @@ class Node:
                 "--manager-private-key",
                 "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
                 "--provider-url",
-                "localhost:8545",
+                f"http://127.0.0.1:{self.anvil_port}",
             ],
             env=os.environ | custom_env,
             check=True,
@@ -75,7 +100,15 @@ class Node:
             if el.startswith("node_module 0x"):
                 self.module_address = el.split()[-1]
 
-        return self.address is not None and self.module_address is not None
+        # store the addresses in a file which can be loaded later
+        if self.safe_address is not None and self.module_address is not None:
+            with open(f"{self.dir}.env", "w") as env_file:
+                env_file.write(f"HOPRD_SAFE_ADDRESS={self.safe_address}\n")
+                env_file.write(f"HOPRD_MODULE_ADDRESS={self.module_address}\n")
+            return True
+
+        logging.error(f"Failed to create safe for node {self.id}: {res.stdout} - {res.stderr}")
+        return False
 
     def setup(self, password: str, config_file: Path, dir: Path):
         api_token_param = f"--api-token={self.api_token}" if self.api_token else "--disableApiAuthentication"
@@ -87,6 +120,7 @@ class Node:
             "HOPRD_HEARTBEAT_VARIANCE": "1000",
             "HOPRD_NETWORK_QUALITY_THRESHOLD": "0.3",
         }
+        loaded_env = load_env_file(f"{self.dir}.env")
 
         cmd = [
             "hoprd",
@@ -99,22 +133,21 @@ class Node:
             f"--data={self.dir}",
             f"--host={self.host_addr}:{self.p2p_port}",
             f"--identity={self.dir}.id",
-            f"--moduleAddress={self.module_address}",
             f"--network={self.network}",
             f"--password={password}",
-            f"--safeAddress={self.safe_address}",
             f"--protocolConfig={config_file}",
+            f"--provider=http://127.0.0.1:{self.anvil_port}",
             api_token_param,
         ]
-        if self.cfg_file is not None:
-            cmd += [f"--configurationFilePath={self.cfg_file}"]
+        if self.cfg_file_path is not None:
+            cmd += [f"--configurationFilePath={self.cfg_file_path}"]
 
         with open(f"{self.dir}.log", "w") as log_file:
             self.proc = Popen(
                 cmd,
                 stdout=log_file,
                 stderr=STDOUT,
-                env=os.environ | custom_env,
+                env=os.environ | custom_env | loaded_env,
                 cwd=dir,
             )
 

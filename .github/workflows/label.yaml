@@ -14,7 +14,7 @@ on:
   pull_request:
 
 concurrency:
-  group: ${{ github.head_ref }}-label
+  group: ${{ github.ref }}-label
   cancel-in-progress: true
 
 jobs:

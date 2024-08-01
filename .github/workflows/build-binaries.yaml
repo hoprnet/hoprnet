@@ -32,7 +32,7 @@ on:
         type: string
         default: ''
 concurrency:
-  group: ${{ github.head_ref }}-build-binary-${{ inputs.binary }}-${{ inputs.target }}
+  group: ${{ github.ref }}-build-binary-${{ inputs.binary }}-${{ inputs.target }}
   cancel-in-progress: true
 jobs:
   build-binary:
