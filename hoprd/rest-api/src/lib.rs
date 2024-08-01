@@ -265,7 +265,9 @@ async fn build_api(
                 .layer(
                     CorsLayer::new()
                         .allow_methods([Method::GET, Method::POST, Method::OPTIONS, Method::DELETE])
-                        .allow_origin(Any),
+                        .allow_origin(Any)
+                        .allow_headers(Any)
+                        .max_age(std::time::Duration::from_secs(86400)),
                 )
                 .layer(middleware::from_fn(prometheus::record))
                 .layer(CompressionLayer::new())
