@@ -82,6 +82,7 @@ pub(crate) struct InternalState {
         channels::list_channels,
         channels::open_channel,
         channels::show_channel,
+        checks::eligiblez,
         checks::healthyz,
         checks::readyz,
         checks::startedz,
@@ -206,6 +207,7 @@ async fn build_api(
                 .route("/startedz", get(checks::startedz))
                 .route("/readyz", get(checks::readyz))
                 .route("/healthyz", get(checks::healthyz))
+                .route("/eligiblez", get(checks::eligiblez))
                 .with_state(state.into()),
         )
         .nest(
