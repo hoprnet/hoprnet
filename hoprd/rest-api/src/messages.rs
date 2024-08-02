@@ -46,7 +46,7 @@ pub(crate) struct SizeResponse {
             "12D3KooWR4uwjKCDCAY1xsEFB4esuWLF9Q5ijYvCjz5PNkTbnu33"
         ],
         "peerId": "12D3KooWEDc1vGJevww48trVDDf6pr1f6N3F86sGJfQrKCyc8kJ1",
-        "tag": 20
+        "tag": 2000
     }))]
 pub(crate) struct SendMessageBodyRequest {
     /// The message tag used to filter messages based on application
@@ -459,7 +459,7 @@ pub(super) async fn size(
 #[schema(example = json!({
         "body": "Test message 1",
         "receivedAt": 1704453953073i64,
-        "tag": 20
+        "tag": 2000
     }))]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct MessagePopResponse {
