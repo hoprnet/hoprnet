@@ -961,7 +961,7 @@ mod tests {
                 assert_eq!(
                     ack_tkts.len(),
                     pending_packets,
-                    "did not receive all Powledgement tickets"
+                    "did not receive all acknowledgement tickets"
                 );
 
                 true
