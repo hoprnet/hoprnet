@@ -363,78 +363,72 @@ impl HoprSwarmWithProcessors {
                 event = swarm.select_next_some() => match event {
                     // ---------------
                     // msg/ack protocol
-                    SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::MessageWithAcknowledgement(libp2p::request_response::Event::<Box<[u8]>, Acknowledgement>::Message {
-                        peer,
-                        message:
-                        libp2p::request_response::Message::<Box<[u8]>, Acknowledgement>::Request {
-                            request_id, request, .. //channel
+                    SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::MessageWithAcknowledgement(event)) => match event {
+                        libp2p::request_response::Event::<Box<[u8]>, Acknowledgement>::Message {
+                            peer,
+                            message,
+                        } => match message {
+                            libp2p::request_response::Message::<Box<[u8]>, Acknowledgement>::Request {
+                                request_id, request, .. //channel
+                            } => {
+                                debug!(peer = %peer, "p2p - protocol - msg/ack 0.1.0 - Received a message");
+
+                                if let Err(e) = pkt_writer.receive_packet(request, peer) {
+                                    error!(peer = %peer, request_id = %request_id, "p2p - protocol - msg/ack 0.1.0 - Failed to process a message: {e}");
+                                };
+                            },
+                            libp2p::request_response::Message::<Box<[u8]>, Acknowledgement>::Response {
+                                request_id, ..
+                            } => {
+                                trace!(peer = %peer, request_id = %request_id, "p2p - protocol - msg/ack 0.1.0 - Received an acknowledgement");
+
+                            }
                         },
-                    })) => {
-                        debug!("transport protocol - p2p - msg/ack 0.1.0 - received a message from {peer}");
-
-                        if let Err(e) = pkt_writer.receive_packet(request, peer) {
-                            error!("transport protocol - p2p - msg/ack 0.1.0 - failed to process a message from '{peer}': {e} (#{request_id})");
-                        };
-
-                        // TODO: Add implementation for sending a response to the sender
-
-                        // if swarm.behaviour_mut().msg.send_response(channel, ()).is_err() {
-                        //     error!("transport protocol - p2p - msg - failed to send a response to '{peer}', likely a timeout");
-                        // };
-                    },
-                    SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::MessageWithAcknowledgement(libp2p::request_response::Event::<Box<[u8]>, Acknowledgement>::Message {
-                        peer,
-                        message:
-                        libp2p::request_response::Message::<Box<[u8]>, Acknowledgement>::Response {
-                            request_id, ..
+                        libp2p::request_response::Event::<Box<[u8]>, Acknowledgement>::OutboundFailure {
+                            peer, error, request_id
+                        } => {
+                            error!(peer = %peer, request_id = %request_id, "p2p - protocol - msg/ack 0.1.0 - Failed to send a message: {error}");
                         },
-                    })) => {
-                        trace!("transport protocol - p2p - msg/ack 0.1.0 - received a response for sending message with id {request_id} from '{peer}'");
-                    },
-                    SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::MessageWithAcknowledgement(libp2p::request_response::Event::<Box<[u8]>, Acknowledgement>::OutboundFailure {
-                        peer, error, request_id
-                    })) => {
-                        error!("transport protocol - p2p - msg/ack 0.1.0 - failed to send a message (#{request_id}) to '{peer}': {error}");
-                    },
-                    SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::MessageWithAcknowledgement(libp2p::request_response::Event::<Box<[u8]>, Acknowledgement>::InboundFailure {..}))
-                    | SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::MessageWithAcknowledgement(libp2p::request_response::Event::<Box<[u8]>, Acknowledgement>::ResponseSent {..})) => {
+                        libp2p::request_response::Event::<Box<[u8]>, Acknowledgement>::InboundFailure {..}
+                        | libp2p::request_response::Event::<Box<[u8]>, Acknowledgement>::ResponseSent {..} => {
+                        },
                     },
                     // ---------------
                     // msg protocol
-                    SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Message(libp2p::request_response::Event::<Box<[u8]>, ()>::Message {
-                        peer,
-                        message:
-                        libp2p::request_response::Message::<Box<[u8]>, ()>::Request {
-                            request_id, request, channel
-                        },
-                    })) => {
-                        debug!("transport protocol - p2p - msg - received a message from {peer}");
+                    SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Message(event)) => match event {
+                        libp2p::request_response::Event::<Box<[u8]>, ()>::Message {
+                            peer,
+                            message:
+                            libp2p::request_response::Message::<Box<[u8]>, ()>::Request {
+                                request_id, request, channel
+                            },
+                        } => {
+                            debug!("transport protocol - p2p - msg - received a message from {peer}");
 
-                        if let Err(e) = pkt_writer.receive_packet(request, peer) {
-                            error!("transport protocol - p2p - msg - failed to process a message from '{peer}': {e} (#{request_id})");
-                        };
+                            if let Err(e) = pkt_writer.receive_packet(request, peer) {
+                                error!("transport protocol - p2p - msg - failed to process a message from '{peer}': {e} (#{request_id})");
+                            };
 
-                        if swarm.behaviour_mut().msg.send_response(channel, ()).is_err() {
-                            error!("transport protocol - p2p - msg - failed to send a response to '{peer}', likely a timeout");
-                        };
-                    },
-                    SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Message(libp2p::request_response::Event::<Box<[u8]>, ()>::Message {
-                        peer,
-                        message:
-                        libp2p::request_response::Message::<Box<[u8]>, ()>::Response {
-                            request_id, ..
+                            if swarm.behaviour_mut().msg.send_response(channel, ()).is_err() {
+                                error!("transport protocol - p2p - msg - failed to send a response to '{peer}', likely a timeout");
+                            };
                         },
-                    })) => {
-                        trace!("transport protocol - p2p - msg - received a response for sending message with id {request_id} from '{peer}'");
-                    },
-                    SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Message(libp2p::request_response::Event::<Box<[u8]>, ()>::OutboundFailure {
-                        peer, error, request_id
-                    })) => {
-                        error!("transport protocol - p2p - msg - failed to send a message (#{}) to peer {} with an error: {}", request_id, peer, error);
-                    },
-                    SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Message(libp2p::request_response::Event::<Box<[u8]>, ()>::InboundFailure {..}))
-                    | SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Message(libp2p::request_response::Event::<Box<[u8]>, ()>::ResponseSent {..})) => {
-                    },
+                        libp2p::request_response::Event::<Box<[u8]>, ()>::Message {
+                            peer,
+                            message:
+                            libp2p::request_response::Message::<Box<[u8]>, ()>::Response {
+                                request_id, ..
+                            },
+                        } => {
+                            trace!("transport protocol - p2p - msg - received a response for sending message with id {request_id} from '{peer}'");
+                        },
+                        libp2p::request_response::Event::<Box<[u8]>, ()>::OutboundFailure {
+                            peer, error, request_id
+                        } => {
+                            error!("transport protocol - p2p - msg - failed to send a message (#{}) to peer {} with an error: {}", request_id, peer, error);
+                        },
+                        libp2p::request_response::Event::<Box<[u8]>, ()>::InboundFailure {..} | libp2p::request_response::Event::<Box<[u8]>, ()>::ResponseSent {..} => {}
+                    }
                     // ---------------
                     // ack protocol
                     SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Acknowledgement(libp2p::request_response::Event::<Acknowledgement,()>::Message {
@@ -558,6 +552,7 @@ impl HoprSwarmWithProcessors {
                         match event {
                             crate::discovery::Event::NewPeerMultiddress(peer, multiaddress) => {
                                 info!(peer = %peer, multiaddress = %multiaddress, "transport - p2p - discovery - New record");
+                                // TODO: enable adding an address to the msg_ack protocol
                                 // swarm.behaviour_mut().msg_ack.add_address(&peer, multiaddress.clone());
                                 swarm.behaviour_mut().heartbeat.add_address(&peer, multiaddress.clone());
                                 swarm.behaviour_mut().msg.add_address(&peer, multiaddress.clone());
