@@ -37,8 +37,8 @@ lazy_static::lazy_static! {
     ).unwrap();
 }
 
-/// Allows selecting multiple tickets (if `index` is `None`)
-/// or a single ticket (with given `index`) in the given channel and epoch.
+/// Allows selecting multiple tickets (if `index` does not contain a single value)
+/// or a single ticket (with unitary `index`) in the given channel and epoch.
 /// The selection can be further restricted to select ticket only in the given `state`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TicketSelector {
