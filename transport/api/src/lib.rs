@@ -70,7 +70,7 @@ pub use {
     hopr_internal_types::protocol::ApplicationData,
     hopr_transport_p2p::{
         libp2p, libp2p::swarm::derive_prelude::Multiaddr, multiaddrs::strip_p2p_protocol,
-        swarm::HoprSwarmWithProcessors, PeerTransportEvent, TransportOutput,
+        swarm::HoprSwarmWithProcessors, PeerDiscovery, TransportOutput,
     },
     hopr_transport_session::{
         errors::TransportSessionError, traits::SendMsg, Capability as SessionCapability, PathOptions, Session,
@@ -232,7 +232,7 @@ where
         tbf_path: String,
         on_transport_output: UnboundedSender<TransportOutput>,
         on_acknowledged_ticket: UnboundedSender<AcknowledgedTicket>,
-        transport_updates: UnboundedReceiver<PeerTransportEvent>,
+        transport_updates: UnboundedReceiver<PeerDiscovery>,
         incoming_session_queue: UnboundedSender<Session>,
     ) -> HashMap<HoprTransportProcess, JoinHandle<()>> {
         // network event processing channel
@@ -255,7 +255,7 @@ where
                 network.clone(),
                 self.db.clone(),
                 self.path_planner.channel_graph(),
-                network_events_tx.clone(),
+                network_events_tx,
             ),
         );
 
@@ -264,7 +264,14 @@ where
             .set(ping)
             .expect("must set the ping executor only once");
 
-        let transport_layer = HoprSwarm::new(me.into(), self.my_multiaddresses.clone(), self.cfg.protocol).await;
+        let transport_layer = HoprSwarm::new(
+            me.into(),
+            network_events_rx,
+            transport_updates,
+            self.my_multiaddresses.clone(),
+            self.cfg.protocol,
+        )
+        .await;
 
         let ack_proc = AcknowledgementInteraction::new(self.db.clone(), me_onchain);
 
@@ -308,14 +315,7 @@ where
             Box::new(|dur| Box::pin(sleep(dur))),
         );
 
-        let transport_layer = transport_layer.with_processors(
-            network_events_rx,
-            transport_updates,
-            ack_proc,
-            packet_proc,
-            ticket_agg_proc,
-            ping_rx,
-        );
+        let transport_layer = transport_layer.with_processors(ack_proc, packet_proc, ticket_agg_proc, ping_rx);
 
         processes.insert(
             HoprTransportProcess::Heartbeat,

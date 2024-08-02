@@ -168,11 +168,11 @@ impl AcknowledgementInteraction {
                                     }
                                 }
                             } else {
-                                error!("failed to verify signature on acknowledgement from peer {}", peer);
+                                error!("failed to verify signature on acknowledgement from peer {peer}");
                                 None
                             }
                         } else {
-                            error!("invalid remote peer id {}", peer);
+                            error!("invalid remote peer id {peer}");
                             None
                         }
                     }
