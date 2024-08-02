@@ -1002,7 +1002,7 @@ impl HoprDbTicketOperations for HoprDb {
                             .exec(tx.as_ref())
                             .await?;
 
-                        if marked.rows_affected as usize != to_be_aggregated.len() {
+                        if marked.rows_affected as usize != to_be_aggregated.len() + neglected.index.len() {
                             return Err(DbError::LogicalError(format!(
                                 "expected to mark {}, but was able to mark {}",
                                 to_be_aggregated.len(),
@@ -2445,6 +2445,59 @@ mod tests {
             .await? as usize;
 
         assert_eq!(actual_being_aggregated_count, COUNT_TICKETS);
+
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn test_ticket_aggregation_prepare_request_with_duplicate_tickets_should_return_dedup_aggregated_ticket(
+    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        let (db, channel, _) = create_alice_db_with_tickets_from_bob(0).await?;
+        let mut tickets = vec![
+            generate_random_ack_ticket(&BOB, &ALICE, 1, None),
+            generate_random_ack_ticket(&BOB, &ALICE, 0, Some(2)),
+            generate_random_ack_ticket(&BOB, &ALICE, 2, None),
+            generate_random_ack_ticket(&BOB, &ALICE, 3, None),
+        ];
+
+        let tickets_clone = tickets.clone();
+        let db_clone = db.clone();
+        db.nest_transaction_in_db(None, TargetDb::Tickets)
+            .await?
+            .perform(|tx| {
+                Box::pin(async move {
+                    for ticket in tickets_clone {
+                        db_clone.upsert_ticket(tx.into(), ticket).await?;
+                    }
+                    Ok::<_, DbError>(())
+                })
+            })
+            .await?;
+
+        let existing_channel_with_multiple_tickets = channel.get_id();
+
+        let stats = db.get_ticket_statistics(None, Some(channel.get_id())).await?;
+        assert_eq!(stats.neglected_value, BalanceType::HOPR.zero());
+
+        let actual = db
+            .prepare_aggregation_in_channel(&existing_channel_with_multiple_tickets, Default::default())
+            .await?;
+
+        // We expect the first ticket to be removed
+        let removed = tickets.remove(0);
+        assert_eq!(actual, Some((BOB_OFFCHAIN.public().clone(), tickets)));
+
+        let actual_being_aggregated_count = hopr_db_entity::ticket::Entity::find()
+            .filter(hopr_db_entity::ticket::Column::State.eq(AcknowledgedTicketStatus::BeingAggregated as u8))
+            .count(&db.tickets_db)
+            .await? as usize;
+
+        assert_eq!(actual_being_aggregated_count, 3);
+
+        let stats = db.get_ticket_statistics(None, Some(channel.get_id())).await?;
+        assert_eq!(stats.neglected_value, removed.ticket.amount);
 
         Ok(())
     }
