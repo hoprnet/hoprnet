@@ -48,7 +48,7 @@ use chain_api::{
 use chain_types::chain_events::ChainEventType;
 use chain_types::ContractAddresses;
 use core_path::channel_graph::ChannelGraph;
-use core_transport::{execute_on_tick, HoprTransportConfig, HoprTransportProcess, PeerTransportEvent};
+use core_transport::{execute_on_tick, HoprTransportConfig, HoprTransportProcess, PeerDiscovery};
 use core_transport::{ChainKeypair, Hash, HoprTransport, OffchainKeypair};
 use core_transport::{IndexerTransportEvent, Network, PeerEligibility, PeerOrigin};
 use hopr_async_runtime::prelude::{sleep, spawn, JoinHandle};
@@ -212,7 +212,7 @@ pub async fn chain_events_to_transport_events<StreamIn, StreamInPreloading, Db>(
     channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
     indexer_action_tracker: Arc<IndexerActionTracker>,
     network: Arc<Network<Db>>,
-) -> impl Stream<Item = PeerTransportEvent> + Send + 'static
+) -> impl Stream<Item = PeerDiscovery> + Send + 'static
 where
     Db: HoprDbAllOperations + Clone + Send + Sync + std::fmt::Debug + 'static,
     StreamIn: Stream<Item = SignificantChainEvent> + Send + 'static,
@@ -354,16 +354,16 @@ where
         async move {
             match event {
                 IndexerTransportEvent::EligibilityUpdate(peer, eligibility) => match eligibility {
-                    PeerEligibility::Eligible => Some(vec![PeerTransportEvent::Allow(peer)]),
+                    PeerEligibility::Eligible => Some(vec![PeerDiscovery::Allow(peer)]),
                     PeerEligibility::Ineligible => {
                         if let Err(e) = network.remove(&peer).await {
                             error!("failed to remove '{peer}' from the local registry: {e}")
                         }
-                        Some(vec![PeerTransportEvent::Ban(peer)])
+                        Some(vec![PeerDiscovery::Ban(peer)])
                     }
                 },
                 IndexerTransportEvent::Announce(peer, multiaddress) => {
-                    Some(vec![PeerTransportEvent::Announce(peer, multiaddress)])
+                    Some(vec![PeerDiscovery::Announce(peer, multiaddress)])
                 }
             }
         }
@@ -704,8 +704,7 @@ impl Hopr {
 
         let (to_process_tx, to_process_rx) = async_channel::unbounded::<IndexerTransportEvent>();
 
-        let (indexer_peer_update_tx, indexer_peer_update_rx) =
-            futures::channel::mpsc::unbounded::<PeerTransportEvent>();
+        let (indexer_peer_update_tx, indexer_peer_update_rx) = futures::channel::mpsc::unbounded::<PeerDiscovery>();
 
         let indexer_event_pipeline = chain_events_to_transport_events(
             self.rx_indexer_significant_events.clone(),

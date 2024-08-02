@@ -42,8 +42,11 @@ impl Acknowledgement {
         }
     }
 
-    /// Validates the acknowledgement. Must be called immediately after deserialization or otherwise
+    /// Validates the acknowledgement.
+    ///
+    /// Must be called immediately after deserialization or otherwise
     /// any operations with the deserialized acknowledgement will panic.
+    #[tracing::instrument(level = "debug", skip(self, sender_node_key))]
     pub fn validate(&mut self, sender_node_key: &OffchainPublicKey) -> bool {
         self.validated = self
             .ack_signature

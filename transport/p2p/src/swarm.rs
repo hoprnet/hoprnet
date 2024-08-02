@@ -1,10 +1,7 @@
 use futures::{channel::mpsc::UnboundedSender, pin_mut, select, StreamExt};
 use futures_concurrency::stream::Merge;
 use libp2p::{request_response::OutboundRequestId, PeerId};
-use std::{
-    collections::{HashMap, HashSet},
-    num::NonZeroU8,
-};
+use std::{collections::HashMap, num::NonZeroU8};
 use tracing::{debug, error, info, trace, warn};
 
 use core_network::{messaging::ControlMessage, network::NetworkTriggeredEvent, ping::PingQueryReplier};
@@ -23,7 +20,7 @@ use crate::{
     errors::Result,
     libp2p::{request_response::ResponseChannel, swarm::SwarmEvent},
     multiaddrs::{replace_transport_with_unspecified, resolve_dns_if_any, Multiaddr},
-    HoprNetworkBehavior, HoprNetworkBehaviorEvent, PeerTransportEvent, Ping, Pong, TransportOutput,
+    HoprNetworkBehavior, HoprNetworkBehaviorEvent, PeerDiscovery, Ping, Pong, TransportOutput,
 };
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -42,6 +39,8 @@ lazy_static::lazy_static! {
 /// Returns a built [libp2p::Swarm] object implementing the HoprNetworkBehavior functionality.
 async fn build_p2p_network(
     me: libp2p::identity::Keypair,
+    network_update_input: futures::channel::mpsc::Receiver<NetworkTriggeredEvent>,
+    indexer_update_input: futures::channel::mpsc::UnboundedReceiver<PeerDiscovery>,
     protocol_cfg: ProtocolConfig,
 ) -> Result<libp2p::Swarm<HoprNetworkBehavior>> {
     let tcp_upgrade = libp2p::core::upgrade::SelectUpgrade::new(
@@ -53,6 +52,8 @@ async fn build_p2p_network(
             .set_max_buffer_behaviour(libp2p_mplex::MaxBufferBehaviour::Block)
             .clone(),
     );
+
+    let me_peerid: PeerId = me.public().into();
 
     #[cfg(feature = "runtime-async-std")]
     let swarm = libp2p::SwarmBuilder::with_existing_identity(me)
@@ -77,6 +78,9 @@ async fn build_p2p_network(
         .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?
         .with_behaviour(|_key| {
             HoprNetworkBehavior::new(
+                me_peerid,
+                network_update_input,
+                indexer_update_input,
                 protocol_cfg.msg,
                 protocol_cfg.ack,
                 protocol_cfg.heartbeat,
@@ -110,10 +114,12 @@ pub struct HoprSwarm {
 impl HoprSwarm {
     pub async fn new(
         identity: libp2p::identity::Keypair,
+        network_update_input: futures::channel::mpsc::Receiver<NetworkTriggeredEvent>,
+        indexer_update_input: futures::channel::mpsc::UnboundedReceiver<PeerDiscovery>,
         my_multiaddresses: Vec<Multiaddr>,
         protocol_cfg: ProtocolConfig,
     ) -> Self {
-        let mut swarm = build_p2p_network(identity, protocol_cfg)
+        let mut swarm = build_p2p_network(identity, network_update_input, indexer_update_input, protocol_cfg)
             .await
             .expect("swarm must be constructible");
 
@@ -156,8 +162,6 @@ impl HoprSwarm {
 
     pub fn with_processors(
         self,
-        network_update_input: futures::channel::mpsc::Receiver<NetworkTriggeredEvent>,
-        indexer_update_input: futures::channel::mpsc::UnboundedReceiver<PeerTransportEvent>,
         ack_interactions: AcknowledgementInteraction,
         pkt_interactions: PacketInteraction,
         ticket_aggregation_interactions: TicketAggregationInteraction<
@@ -168,8 +172,6 @@ impl HoprSwarm {
     ) -> HoprSwarmWithProcessors {
         HoprSwarmWithProcessors {
             swarm: self,
-            network_update_input,
-            indexer_update_input,
             ack_interactions,
             pkt_interactions,
             ticket_aggregation_interactions,
@@ -189,24 +191,16 @@ impl From<HoprSwarm> for libp2p::Swarm<HoprNetworkBehavior> {
 #[derive(Debug)]
 pub enum Inputs {
     Heartbeat((PeerId, PingQueryReplier)),
-    NetworkUpdate(NetworkTriggeredEvent),
     Message(MsgProcessed),
     TicketAggregation(
         TicketAggregationProcessed<ResponseChannel<std::result::Result<Ticket, String>>, OutboundRequestId>,
     ),
     Acknowledgement(AckProcessed),
-    Indexer(PeerTransportEvent),
 }
 
 impl From<(PeerId, PingQueryReplier)> for Inputs {
     fn from(value: (PeerId, PingQueryReplier)) -> Self {
         Self::Heartbeat(value)
-    }
-}
-
-impl From<NetworkTriggeredEvent> for Inputs {
-    fn from(value: NetworkTriggeredEvent) -> Self {
-        Self::NetworkUpdate(value)
     }
 }
 
@@ -228,12 +222,6 @@ impl From<TicketAggregationProcessed<TicketAggregationResponseType, TicketAggreg
     }
 }
 
-impl From<PeerTransportEvent> for Inputs {
-    fn from(value: PeerTransportEvent) -> Self {
-        Self::Indexer(value)
-    }
-}
-
 use hopr_internal_types::legacy;
 
 pub type TicketAggregationRequestType = OutboundRequestId;
@@ -241,8 +229,6 @@ pub type TicketAggregationResponseType = ResponseChannel<std::result::Result<Tic
 
 pub struct HoprSwarmWithProcessors {
     swarm: HoprSwarm,
-    network_update_input: futures::channel::mpsc::Receiver<NetworkTriggeredEvent>,
-    indexer_update_input: futures::channel::mpsc::UnboundedReceiver<PeerTransportEvent>,
     ack_interactions: AcknowledgementInteraction,
     pkt_interactions: PacketInteraction,
     ticket_aggregation_interactions:
@@ -282,15 +268,11 @@ impl HoprSwarmWithProcessors {
             TicketAggregationFinalizer,
         > = HashMap::new();
 
-        let mut allowed_peers: HashSet<PeerId> = HashSet::new();
-
         let inputs = (
             self.heartbeat_requests.map(Inputs::Heartbeat),
-            self.network_update_input.map(Inputs::NetworkUpdate),
             self.ack_interactions.map(Inputs::Acknowledgement),
             self.pkt_interactions.map(Inputs::Message),
             self.ticket_aggregation_interactions.map(Inputs::TicketAggregation),
-            self.indexer_update_input.map(Inputs::Indexer),
         )
             .merge()
             .fuse();
@@ -304,15 +286,6 @@ impl HoprSwarmWithProcessors {
                         trace!("transport input - heartbeat - executing ping to peer '{peer}'");
                         let req_id = swarm.behaviour_mut().heartbeat.send_request(&peer, Ping(replier.challenge()));
                         active_pings.insert(req_id, replier);
-                    },
-                    Inputs::NetworkUpdate(event) => match event {
-                        NetworkTriggeredEvent::CloseConnection(peer) => {
-                            debug!("transport input - network event - closing connection to '{peer}' (reason: low ping connection quality)");
-                            if swarm.is_connected(&peer) {
-                                let _ = swarm.disconnect_peer_id(peer);
-                            }
-                        },
-                        NetworkTriggeredEvent::UpdateQuality(_, _) => {}
                     },
                     Inputs::Acknowledgement(task) => match task {
                         AckProcessed::Receive(peer, reply) => {
@@ -386,46 +359,46 @@ impl HoprSwarmWithProcessors {
                             }
                         }
                     },
-                    Inputs::Indexer(task) => match task {
-                        PeerTransportEvent::Allow(peer) => {
-                            debug!("transport input - indexer - allowing '{peer}'");
-                            let _ = allowed_peers.insert(peer);
-                        }
-                        PeerTransportEvent::Ban(peer) => {
-                            debug!("transport input - indexer - banning '{peer}'");
-                            allowed_peers.remove(&peer);
-
-                            if swarm.is_connected(&peer) {
-                                match swarm.disconnect_peer_id(peer) {
-                                    Ok(_) => debug!("Peer '{peer}' disconnected on network registry update"),
-                                    Err(e) => error!("Failed to disconnect peer '{peer}' on network registry update: {:?}", e)
-                                }
-                            }
-                        },
-                        PeerTransportEvent::Announce(peer, multiaddresses) => {
-                            if &peer != swarm.local_peer_id() {
-                                trace!("transport input - indexer - processing announcement for '{peer}' with addresses: '{multiaddresses:?}'");
-                                for multiaddress in multiaddresses.iter() {
-                                    if !swarm.is_connected(&peer) {
-                                        match swarm.dial(multiaddress.clone()) {
-                                            Ok(_) => {
-                                                debug!("transport input - indexer - storing '{multiaddress}' as valid for '{peer}'");
-                                                swarm.behaviour_mut().heartbeat.add_address(&peer, multiaddress.clone());
-                                                swarm.behaviour_mut().msg.add_address(&peer, multiaddress.clone());
-                                                swarm.behaviour_mut().ack.add_address(&peer, multiaddress.clone());
-                                                swarm.behaviour_mut().ticket_aggregation.add_address(&peer, multiaddress.clone());
-                                            },
-                                            Err(e) => {
-                                                warn!("transport input - indexer - failed to dial an announced peer '{peer}': {e}, ignoring the address '{multiaddress}'");
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
                 },
                 event = swarm.select_next_some() => match event {
+                    // ---------------
+                    // msg/ack protocol
+                    SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::MessageWithAcknowledgement(libp2p::request_response::Event::<Box<[u8]>, Acknowledgement>::Message {
+                        peer,
+                        message:
+                        libp2p::request_response::Message::<Box<[u8]>, Acknowledgement>::Request {
+                            request_id, request, .. //channel
+                        },
+                    })) => {
+                        debug!("transport protocol - p2p - msg/ack 0.1.0 - received a message from {peer}");
+
+                        if let Err(e) = pkt_writer.receive_packet(request, peer) {
+                            error!("transport protocol - p2p - msg/ack 0.1.0 - failed to process a message from '{peer}': {e} (#{request_id})");
+                        };
+
+                        // TODO: Add implementation for sending a response to the sender
+
+                        // if swarm.behaviour_mut().msg.send_response(channel, ()).is_err() {
+                        //     error!("transport protocol - p2p - msg - failed to send a response to '{peer}', likely a timeout");
+                        // };
+                    },
+                    SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::MessageWithAcknowledgement(libp2p::request_response::Event::<Box<[u8]>, Acknowledgement>::Message {
+                        peer,
+                        message:
+                        libp2p::request_response::Message::<Box<[u8]>, Acknowledgement>::Response {
+                            request_id, ..
+                        },
+                    })) => {
+                        trace!("transport protocol - p2p - msg/ack 0.1.0 - received a response for sending message with id {request_id} from '{peer}'");
+                    },
+                    SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::MessageWithAcknowledgement(libp2p::request_response::Event::<Box<[u8]>, Acknowledgement>::OutboundFailure {
+                        peer, error, request_id
+                    })) => {
+                        error!("transport protocol - p2p - msg/ack 0.1.0 - failed to send a message (#{request_id}) to '{peer}': {error}");
+                    },
+                    SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::MessageWithAcknowledgement(libp2p::request_response::Event::<Box<[u8]>, Acknowledgement>::InboundFailure {..}))
+                    | SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::MessageWithAcknowledgement(libp2p::request_response::Event::<Box<[u8]>, Acknowledgement>::ResponseSent {..})) => {
+                    },
                     // ---------------
                     // msg protocol
                     SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Message(libp2p::request_response::Event::<Box<[u8]>, ()>::Message {
@@ -580,6 +553,23 @@ impl HoprSwarmWithProcessors {
                     }
                     SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Heartbeat(libp2p::request_response::Event::<Ping,Pong>::ResponseSent {..})) => {},
                     SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::KeepAlive(_)) => {}
+                    SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Discovery(event)) => {
+                        trace!(event = tracing::field::debug(&event), "transport - p2p - discovery - Received a discovery event");
+                        match event {
+                            crate::discovery::Event::NewPeerMultiddress(peer, multiaddress) => {
+                                info!(peer = %peer, multiaddress = %multiaddress, "transport - p2p - discovery - New record");
+                                // swarm.behaviour_mut().msg_ack.add_address(&peer, multiaddress.clone());
+                                swarm.behaviour_mut().heartbeat.add_address(&peer, multiaddress.clone());
+                                swarm.behaviour_mut().msg.add_address(&peer, multiaddress.clone());
+                                swarm.behaviour_mut().ack.add_address(&peer, multiaddress.clone());
+                                swarm.behaviour_mut().ticket_aggregation.add_address(&peer, multiaddress.clone());
+
+                                if let Err(e) = swarm.dial(multiaddress.clone()) {
+                                    error!(peer = %peer, address = %multiaddress,  "transport - p2p - discovery - Failed to dial peer: {e}");
+                                }
+                            },
+                        }
+                    },
                     SwarmEvent::ConnectionEstablished {
                         peer_id,
                         connection_id,
@@ -589,27 +579,22 @@ impl HoprSwarmWithProcessors {
                         // concurrent_dial_errors,
                         // established_in,
                     } => {
-                        debug!("transport - p2p - connection ({connection_id}) established with {peer_id}");
+                        debug!(peer = %peer_id, connection_id = %connection_id, "transport - p2p - connection established");
 
                         #[cfg(all(feature = "prometheus", not(test)))]
                         {
                             METRIC_TRANSPORT_P2P_OPEN_CONNECTION_COUNT.increment(1.0);
                         }
-
-                        if !allowed_peers.contains(&peer_id) {
-                            info!("transport - p2p - DISCONNECTING '{peer_id}': not allowed in the network registry)");
-                            let _ = swarm.disconnect_peer_id(peer_id);
-                        }
                     },
                     SwarmEvent::ConnectionClosed {
                         peer_id,
+                        connection_id,
                         cause,
                         ..
-                        // connection_id,
                         // endpoint,
                         // num_established,
                     } => {
-                        debug!("transport - p2p - connection closed for peer '{peer_id}': {cause:?}");
+                        debug!(peer = %peer_id, connection_id = %connection_id, "transport - p2p - connection closed: {cause:?}");
 
                         #[cfg(all(feature = "prometheus", not(test)))]
                         {
@@ -621,64 +606,53 @@ impl HoprSwarmWithProcessors {
                         local_addr,
                         send_back_addr,
                     } => {
-                        debug!("transport - p2p - incoming connection at {local_addr} from {send_back_addr} ({connection_id:?})");
+                        trace!(local_addr = %local_addr, send_back_addr = %send_back_addr, connection_id = %connection_id, "transport - p2p - incoming connection");
                     },
                     SwarmEvent::IncomingConnectionError {
                         local_addr,
+                        connection_id,
                         error,
-                        ..
-                        // connection_id,
-                        // send_back_addr,
+                        send_back_addr,
                     } => {
-                        error!("transport - p2p - incoming connection error on {local_addr}: {error}")
+                        error!(local_addr = %local_addr, send_back_addr = %send_back_addr, connection_id = %connection_id, "transport - p2p - incoming connection error: {error}")
                     },
                     SwarmEvent::OutgoingConnectionError {
                         connection_id,
                         error,
                         peer_id
                     } => {
-                        error!("transport - p2p - outgoing connection error for peer '{peer_id:?}' ({connection_id:?}): {error}")
+                        error!(peer = tracing::field::debug(peer_id), connection_id = %connection_id, "transport - p2p - outgoing connection error: {error}")
                     },
                     SwarmEvent::NewListenAddr {
                         listener_id,
-                        ..
-                        // address,
+                        address,
                     } => {
-                        debug!("transport - p2p - new listen address on {listener_id:?}")
+                        debug!(listener_id = %listener_id, address = %address, "transport - p2p - new listen address")
                     },
                     SwarmEvent::ExpiredListenAddr {
                         listener_id,
-                        ..
-                        // address,
+                        address,
                     } => {
-                        debug!("transport - p2p - expired listen address on {listener_id:?}")
+                        debug!(listener_id = %listener_id, address = %address, "transport - p2p - expired listen address")
                     },
                     SwarmEvent::ListenerClosed {
                         listener_id,
-                        ..
-                        // addresses,
-                        // reason,
+                        addresses,
+                        reason,
                     } => {
-                        debug!("transport - p2p - listener closed on {listener_id:?}", )
+                        debug!(listener_id = %listener_id, addresses = tracing::field::debug(addresses), "transport - p2p - listener closed: {reason:?}", )
                     },
                     SwarmEvent::ListenerError {
                         listener_id,
                         error,
                     } => {
-                        debug!("transport - p2p - listener error for {listener_id:?}: {error}")
+                        debug!(listener_id = %listener_id, "transport - p2p - listener error: {error}")
                     },
                     SwarmEvent::Dialing {
                         peer_id,
                         connection_id,
                     } => {
-                        if let Some(peer_id) = peer_id {
-                            if !allowed_peers.contains(&peer_id) {
-                                info!("transport - p2p - dialing '{peer_id}': not allowed in the network registry)");
-                                let _ = swarm.disconnect_peer_id(peer_id);
-                            } else {
-                                debug!("transport - p2p - dialing peer {peer_id:?} ({connection_id:?}")
-                            }
-                        }
+                        debug!(peer = tracing::field::debug(peer_id), connection_id = %connection_id, "transport - p2p - dialing")
                     },
                     _ => error!("transport - p2p - unimplemented message type in p2p processing chain encountered")
                 }
