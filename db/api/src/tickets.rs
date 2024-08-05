@@ -1,6 +1,5 @@
 use async_stream::stream;
 use hopr_db_entity::ticket_statistics;
-use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::ops::Add;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -679,7 +678,7 @@ impl HoprDbTicketOperations for HoprDb {
         match channel_id {
             None => {
                 #[cfg(all(feature = "prometheus", not(test)))]
-                let mut per_channel_unredeemed = HashMap::new();
+                let mut per_channel_unredeemed = std::collections::HashMap::new();
 
                 self.nest_transaction_in_db(tx, TargetDb::Tickets)
                     .await?
