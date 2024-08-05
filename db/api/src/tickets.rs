@@ -694,7 +694,7 @@ impl HoprDbTicketOperations for HoprDb {
                                     #[cfg(all(feature = "prometheus", not(test)))]
                                     per_channel_unredeemed
                                         .entry(x.channel_id)
-                                        .and_modify(|v| *v = *v + unredeemed_value)
+                                        .and_modify(|v| *v += unredeemed_value)
                                         .or_insert(U256::zero());
 
                                     futures::future::ok(amount + unredeemed_value)
