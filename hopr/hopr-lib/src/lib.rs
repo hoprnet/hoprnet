@@ -94,7 +94,8 @@ use hopr_db_api::{channels::HoprDbChannelOperations, HoprDbAllOperations};
 
 use hopr_crypto_types::prelude::OffchainPublicKey;
 use hopr_db_api::prelude::ChainOrPacketKey::ChainKey;
-use hopr_db_api::prelude::HoprDbPeersOperations;
+use hopr_db_api::prelude::{HoprDbPeersOperations, HoprDbTicketOperations};
+
 #[cfg(all(feature = "prometheus", not(test)))]
 use {
     hopr_metrics::metrics::{MultiGauge, SimpleGauge},
@@ -684,6 +685,11 @@ impl Hopr {
                 ))
                 .unwrap_or(0.0),
             );
+
+            // Calling get_ticket_statistics will initialize the respective metrics on tickets
+            if let Err(e) = async_std::task::block_on(db.get_ticket_statistics(None, None)) {
+                error!("failed to initialize ticket statistics metrics: {e}");
+            }
         }
 
         Self {

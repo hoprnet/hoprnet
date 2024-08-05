@@ -15,7 +15,7 @@ use crate::{errors::Result, tickets::TicketSelector, OpenTransaction};
 /// Functionality related to locking and structural improvements to the underlying SQLite database
 ///
 /// With SQLite, it is only possible to have a single write lock per database, meaning that
-/// high frequency database access to tickets needed to be split from the rest of the database
+/// high-frequency database access to tickets needed to be split from the rest of the database
 /// operations.
 ///
 /// High frequency of locking originating from the ticket processing pipeline could starve the DB,
@@ -23,7 +23,7 @@ use crate::{errors::Result, tickets::TicketSelector, OpenTransaction};
 /// which allows bottle-necking the database write access on the mutex, as well as allowing arbitrary
 /// numbers of concurrent read operations.
 ///
-/// The queue based mechanism also splits the storage of the ticket inside the database from the processing,
+/// The queue-based mechanism also splits the storage of the ticket inside the database from the processing,
 /// effectively allowing the processing pipelines to be independent of a database write access.
 #[derive(Debug, Clone)]
 pub(crate) struct TicketManager {
