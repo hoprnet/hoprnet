@@ -28,8 +28,8 @@ lazy_static::lazy_static! {
         SimpleCounter::new("hopr_strategy_auto_redeem_redeem_count", "Count of initiated automatic redemptions").unwrap();
 }
 
-fn zero_hopr() -> Balance {
-    BalanceType::HOPR.zero()
+fn thirty_hopr() -> Balance {
+    Balance::new_from_str("30000000000000000000", BalanceType::HOPR)
 }
 
 /// Configuration object for the `AutoRedeemingStrategy`
@@ -48,9 +48,9 @@ pub struct AutoRedeemingStrategyConfig {
     /// This is not used for cases where `on_close_redeem_single_tickets_value_min` applies.
     ///
     /// Default is 30 HOPR.
-    #[serde(default = "zero_hopr")]
+    #[serde(default = "thirty_hopr")]
     #[serde_as(as = "DisplayFromStr")]
-    #[default(Balance::new_from_str("30000000000000000000", BalanceType::HOPR))]
+    #[default(thirty_hopr())]
     pub minimum_redeem_ticket_value: Balance,
 
     /// The strategy will automatically redeem if there's a single ticket left when a channel
