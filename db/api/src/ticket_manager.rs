@@ -147,6 +147,7 @@ impl TicketManager {
             crate::TargetDb::Tickets,
         );
 
+        let selector_clone = selector.clone();
         Ok(self
             .caches
             .unrealized_value
@@ -155,7 +156,7 @@ impl TicketManager {
                     .perform(|tx| {
                         Box::pin(async move {
                             ticket::Entity::find()
-                                .filter(selector)
+                                .filter(selector_clone)
                                 .stream(tx.as_ref())
                                 .await
                                 .map_err(crate::errors::DbError::from)?
