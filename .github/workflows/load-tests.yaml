@@ -10,7 +10,7 @@ on:
       test_id:
         type: string
         required: true
-      network:
+      nodes:
         type: string
         required: true
       workload:
@@ -28,12 +28,13 @@ on:
         type: string
         required: true
         description: 'Test name'
-      network:
+      nodes:
         type: choice
         options:
           - rotsee
           - dufour
           - team
+          - relayer
         required: true
         description: 'Cluster of hoprd nodes'
       workload:
@@ -71,14 +72,14 @@ jobs:
         run: |
           if [ -z "${{ github.event.inputs.test_id }}" ]; then 
             echo "The workflow is triggered by other pipeline"
-            echo "ENVIRONMENT_NAME=${{ inputs.network }}" >> $GITHUB_OUTPUT
+            echo "NODES=${{ inputs.nodes }}" >> $GITHUB_OUTPUT
             echo "WORKLOAD_NAME=${{ inputs.workload }}" >> $GITHUB_OUTPUT
             echo "SCENARIO_ITERATIONS=${{ github.event.inputs.rate }}" >> $GITHUB_OUTPUT
             echo "TESTID=${{ inputs.test_id }}" >> $GITHUB_OUTPUT
             echo "SCENARIO_DURATION=${{ inputs.duration }}" >> $GITHUB_OUTPUT
           else
             echo "The workflow is triggered manually"
-            echo "ENVIRONMENT_NAME=${{ github.event.inputs.network }}" >> $GITHUB_OUTPUT
+            echo "NODES=${{ github.event.inputs.nodes }}" >> $GITHUB_OUTPUT
             echo "WORKLOAD_NAME=${{ github.event.inputs.workload }}" >> $GITHUB_OUTPUT
             echo "SCENARIO_ITERATIONS=${{ github.event.inputs.rate }}" >> $GITHUB_OUTPUT
             echo "TESTID=${{ github.event.inputs.test_id }}" >> $GITHUB_OUTPUT
@@ -118,17 +119,17 @@ jobs:
       - name: Get Hoprd Api token
         id: token
         run: |
-          hoprdApiToken=$(kubectl get secret -n k6-operator-system -o json hoprd-api-tokens | jq -r '.data.${{ steps.vars.outputs.ENVIRONMENT_NAME }}' | base64 -d)
+          hoprdApiToken=$(kubectl get secret -n k6-operator-system -o json hoprd-api-tokens | jq -r '.data.${{ steps.vars.outputs.NODES }}' | base64 -d)
           echo "HOPRD_API_TOKEN=${hoprdApiToken}" >> $GITHUB_OUTPUT
 
       - name: Setup Load Testing environment
         run: |
           npm install
-          npm run test:${{ steps.vars.outputs.ENVIRONMENT_NAME }}:setup
+          npm run test:${{ steps.vars.outputs.NODES }}:setup
         working-directory: "./k6"
         env:
           HOPRD_API_TOKEN: ${{ steps.token.outputs.HOPRD_API_TOKEN }}
-          ENVIRONMENT_NAME: ${{ steps.vars.outputs.ENVIRONMENT_NAME }}
+          NODES: ${{ steps.vars.outputs.NODES }}
           WORKLOAD_NAME: ${{ steps.vars.outputs.WORKLOAD_NAME }}
           SCENARIO_ITERATIONS: ${{ steps.vars.outputs.SCENARIO_ITERATIONS }}
           TESTID: ${{ steps.vars.outputs.TESTID }}
