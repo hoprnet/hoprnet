@@ -94,6 +94,8 @@ mod tests {
             assert_eq!(w_buf, r_buf);
         }
 
+        stream.shutdown().await?;
+
         Ok(())
     }
 }

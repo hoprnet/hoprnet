@@ -227,7 +227,7 @@ impl<const C: usize> SessionState<C> {
 
         match self.frame_reassembler.push_segment(segment) {
             Ok(_) => {
-                debug!(session_id = self.session_id, "RECEIVED: segment {id:?}");
+                trace!(session_id = self.session_id, "RECEIVED: segment {id:?}");
                 match self.incoming_frame_retries.entry(id.0) {
                     Entry::Occupied(e) => {
                         // Restart the retry token for this frame
@@ -264,7 +264,7 @@ impl<const C: usize> SessionState<C> {
                     .get(&segment_id)
                     .map(|e| SessionMessage::<C>::Segment(e.value().clone()));
                 if ret.is_some() {
-                    debug!(
+                    trace!(
                         session_id = self.session_id,
                         "SENDING: retransmitted segment: {segment_id:?}"
                     );
@@ -334,8 +334,8 @@ impl<const C: usize> SessionState<C> {
                             // Retry this frame and plan ahead of the time of the next retry
                             trace!(
                                 session_id = self.session_id,
-                                "going to perform frame {} retransmission req. #{}",
-                                info.frame_id,
+                                frame_id = info.frame_id,
+                                "going to perform frame retransmission req. #{}",
                                 next_rto.num_retry
                             );
                             e.replace_entry(next_rto);
@@ -345,14 +345,15 @@ impl<const C: usize> SessionState<C> {
                             // Frame is expired, so no more retries
                             debug!(
                                 session_id = self.session_id,
-                                "frame {} is already expired and will be evicted", info.frame_id
+                                frame_id = info.frame_id,
+                                "frame is already expired and will be evicted"
                             );
                             e.remove();
                         }
                         RetryResult::Wait(d) => trace!(
                             session_id = self.session_id,
-                            "frame {} needs to wait {d:?} for next retransmission request (#{})",
-                            info.frame_id,
+                            frame_id = info.frame_id,
+                            "frame needs to wait {d:?} for next retransmission request (#{})",
                             e.get().num_retry
                         ),
                     }
@@ -361,7 +362,8 @@ impl<const C: usize> SessionState<C> {
                     // Happens when no segment of this frame has been received yet
                     debug!(
                         session_id = self.session_id,
-                        "frame {} does not have a retry token", info.frame_id
+                        frame_id = info.frame_id,
+                        "frame does not have a retry token"
                     );
                     v.insert(RetryToken::new(now, self.cfg.backoff_base));
                     to_retry.push(info);
@@ -374,7 +376,7 @@ impl<const C: usize> SessionState<C> {
             .chunks(SegmentRequest::<C>::MAX_ENTRIES)
             .map(|chunk| Ok(SessionMessage::<C>::Request(chunk.iter().cloned().collect())))
             .inspect(|r| {
-                debug!(session_id = self.session_id, "SENDING: {r:?}");
+                trace!(session_id = self.session_id, "SENDING: {r:?}");
                 sent += 1;
             });
 
@@ -414,9 +416,9 @@ impl<const C: usize> SessionState<C> {
                 }
             }
 
-            debug!(
+            trace!(
                 session_id = self.session_id,
-                "SENDING: acks of {} frames",
+                "SENDING: acknowledgements of {} frames",
                 ack_frames.len()
             );
             self.segment_egress_send
@@ -462,7 +464,8 @@ impl<const C: usize> SessionState<C> {
                 RetryResult::Wait(d) => {
                     trace!(
                         session_id = self.session_id,
-                        "frame {frame_id} will retransmit in {d:?}"
+                        frame_id = frame_id,
+                        "frame will retransmit in {d:?}"
                     );
                     true
                 }
@@ -470,11 +473,15 @@ impl<const C: usize> SessionState<C> {
                     // Single segment frame scenario
                     frames_to_resend.insert(*frame_id);
                     *retry_log = next_retry;
-                    debug!(session_id = self.session_id, "frame {frame_id} will self-resend now");
+                    debug!(
+                        session_id = self.session_id,
+                        frame_id = frame_id,
+                        "frame will self-resend now"
+                    );
                     true
                 }
                 RetryResult::Expired => {
-                    debug!("{:?}: frame {frame_id} expired", self.session_id);
+                    debug!(session_id = self.session_id, frame_id = frame_id, "frame expired");
                     false
                 }
             }
@@ -493,7 +500,7 @@ impl<const C: usize> SessionState<C> {
             .into_iter()
             .flat_map(|f| self.lookbehind.iter().filter(move |e| e.key().0 == f))
             .inspect(|e| {
-                debug!(session_id = self.session_id, "SENDING: auto-retransmitted {}", e.key());
+                trace!(session_id = self.session_id, "SENDING: auto-retransmitted {}", e.key());
                 count += 1
             })
             .map(|e| Ok(SessionMessage::<C>::Segment(e.value().clone())));
@@ -532,7 +539,7 @@ impl<const C: usize> SessionState<C> {
 
         for segment in segments {
             let msg = SessionMessage::<C>::Segment(segment.clone());
-            debug!(session_id = self.session_id, "SENDING: segment {:?}", segment.id());
+            trace!(session_id = self.session_id, "SENDING: segment {:?}", segment.id());
             self.segment_egress_send
                 .feed(msg)
                 .await
@@ -554,7 +561,8 @@ impl<const C: usize> SessionState<C> {
 
         trace!(
             session_id = self.session_id,
-            "FRAME {frame_id} SEND COMPLETE: sent {count} segments",
+            frame_id = frame_id,
+            "FRAME SEND COMPLETE: sent {count} segments",
         );
 
         Ok(())
@@ -659,7 +667,7 @@ impl<const C: usize> SessionSocket<C> {
                 .inspect(move |maybe_frame| {
                     match maybe_frame {
                         Ok(frame) => {
-                            debug!(session_id = id_clone, "COMPLETE: frame {}", frame.frame_id);
+                            trace!(session_id = id_clone, frame_id = frame.frame_id, "frame completed");
                             // The frame has been completed, so remove its retry record
                             incoming_frame_retries_clone.remove(&frame.frame_id);
                             if let Some(ack_buffer) = &is_acknowledging {
@@ -671,7 +679,7 @@ impl<const C: usize> SessionSocket<C> {
                         Err(NetworkTypeError::FrameDiscarded(id)) | Err(NetworkTypeError::IncompleteFrame(id)) => {
                             // Remove the retry token because the frame has been discarded
                             incoming_frame_retries_clone.remove(id);
-                            warn!(session_id = id_clone, "frame {id} skipped");
+                            warn!(session_id = id_clone, frame_id = id, "frame skipped");
                         }
                         _ => {}
                     }
@@ -704,28 +712,22 @@ impl<const C: usize> SessionSocket<C> {
             let jitter = Jitter::up_to(Duration::from_millis(5));
 
             spawn(async move {
-                match segment_egress_recv
+                if let Err(e) = segment_egress_recv
                     .ratelimit_stream_with_jitter(&rate_limiter, jitter)
                     .forward(downstream_write.into_sink())
                     .await
                 {
-                    Ok(_) => {
-                        debug!("FINISHED: forwarding to downstream done");
-                    }
-                    Err(e) => {
-                        error!("FINISHED: forwarding to downstream terminated with error {e}")
-                    }
+                    error!("FINISHED: forwarding to downstream terminated with error {e}")
+                } else {
+                    debug!("FINISHED: forwarding to downstream done");
                 }
             });
         } else {
             spawn(async move {
-                match segment_egress_recv.forward(downstream_write.into_sink()).await {
-                    Ok(_) => {
-                        debug!("FINISHED: forwarding to downstream done");
-                    }
-                    Err(e) => {
-                        error!("FINISHED: forwarding to downstream terminated with error {e}")
-                    }
+                if let Err(e) = segment_egress_recv.forward(downstream_write.into_sink()).await {
+                    error!("FINISHED: forwarding to downstream terminated with error {e}")
+                } else {
+                    debug!("FINISHED: forwarding to downstream done");
                 }
             });
         }
