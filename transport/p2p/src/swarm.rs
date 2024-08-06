@@ -41,6 +41,7 @@ async fn build_p2p_network(
     me: libp2p::identity::Keypair,
     network_update_input: futures::channel::mpsc::Receiver<NetworkTriggeredEvent>,
     indexer_update_input: futures::channel::mpsc::UnboundedReceiver<PeerDiscovery>,
+    heartbeat_requests: futures::channel::mpsc::UnboundedReceiver<(PeerId, PingQueryReplier)>,
     protocol_cfg: ProtocolConfig,
 ) -> Result<libp2p::Swarm<HoprNetworkBehavior>> {
     let tcp_upgrade = libp2p::core::upgrade::SelectUpgrade::new(
@@ -81,6 +82,7 @@ async fn build_p2p_network(
                 me_peerid,
                 network_update_input,
                 indexer_update_input,
+                heartbeat_requests,
                 protocol_cfg.msg,
                 protocol_cfg.ack,
                 protocol_cfg.heartbeat,
@@ -116,12 +118,19 @@ impl HoprSwarm {
         identity: libp2p::identity::Keypair,
         network_update_input: futures::channel::mpsc::Receiver<NetworkTriggeredEvent>,
         indexer_update_input: futures::channel::mpsc::UnboundedReceiver<PeerDiscovery>,
+        heartbeat_requests: futures::channel::mpsc::UnboundedReceiver<(PeerId, PingQueryReplier)>,
         my_multiaddresses: Vec<Multiaddr>,
         protocol_cfg: ProtocolConfig,
     ) -> Self {
-        let mut swarm = build_p2p_network(identity, network_update_input, indexer_update_input, protocol_cfg)
-            .await
-            .expect("swarm must be constructible");
+        let mut swarm = build_p2p_network(
+            identity,
+            network_update_input,
+            indexer_update_input,
+            heartbeat_requests,
+            protocol_cfg,
+        )
+        .await
+        .expect("swarm must be constructible");
 
         for multiaddress in my_multiaddresses.iter() {
             match resolve_dns_if_any(multiaddress) {
@@ -168,14 +177,12 @@ impl HoprSwarm {
             TicketAggregationResponseType,
             TicketAggregationRequestType,
         >,
-        heartbeat_requests: futures::channel::mpsc::UnboundedReceiver<(PeerId, PingQueryReplier)>,
     ) -> HoprSwarmWithProcessors {
         HoprSwarmWithProcessors {
             swarm: self,
             ack_interactions,
             pkt_interactions,
             ticket_aggregation_interactions,
-            heartbeat_requests,
         }
     }
 }
@@ -186,22 +193,49 @@ impl From<HoprSwarm> for libp2p::Swarm<HoprNetworkBehavior> {
     }
 }
 
+pub enum WriteOps {
+    OutgoingRequest,
+    Response,
+}
+
+pub enum ReadOps {
+    IncomingRequest,
+}
+
+pub trait TransportReadWrite {
+    fn split(
+        self,
+    ) -> (
+        impl futures::stream::Stream<Item = ReadOps>,
+        impl futures::sink::Sink<WriteOps>,
+    );
+}
+
+pub struct P2PTransport {
+    tx: futures::channel::mpsc::UnboundedSender<WriteOps>,
+    rx: futures::channel::mpsc::UnboundedReceiver<ReadOps>,
+}
+
+impl TransportReadWrite for P2PTransport {
+    fn split(
+        self,
+    ) -> (
+        impl futures::stream::Stream<Item = ReadOps>,
+        impl futures::sink::Sink<WriteOps>,
+    ) {
+        (self.rx, self.tx)
+    }
+}
+
 /// Composition of all inputs allowing to produce a single stream of
 /// input events passed into the swarm processing logic.
 #[derive(Debug)]
 pub enum Inputs {
-    Heartbeat((PeerId, PingQueryReplier)),
     Message(MsgProcessed),
     TicketAggregation(
         TicketAggregationProcessed<ResponseChannel<std::result::Result<Ticket, String>>, OutboundRequestId>,
     ),
     Acknowledgement(AckProcessed),
-}
-
-impl From<(PeerId, PingQueryReplier)> for Inputs {
-    fn from(value: (PeerId, PingQueryReplier)) -> Self {
-        Self::Heartbeat(value)
-    }
 }
 
 impl From<AckProcessed> for Inputs {
@@ -233,7 +267,6 @@ pub struct HoprSwarmWithProcessors {
     pkt_interactions: PacketInteraction,
     ticket_aggregation_interactions:
         TicketAggregationInteraction<TicketAggregationResponseType, TicketAggregationRequestType>,
-    heartbeat_requests: futures::channel::mpsc::UnboundedReceiver<(PeerId, PingQueryReplier)>,
 }
 
 impl std::fmt::Debug for HoprSwarmWithProcessors {
@@ -269,7 +302,6 @@ impl HoprSwarmWithProcessors {
         > = HashMap::new();
 
         let inputs = (
-            self.heartbeat_requests.map(Inputs::Heartbeat),
             self.ack_interactions.map(Inputs::Acknowledgement),
             self.pkt_interactions.map(Inputs::Message),
             self.ticket_aggregation_interactions.map(Inputs::TicketAggregation),
@@ -282,11 +314,6 @@ impl HoprSwarmWithProcessors {
         loop {
             select! {
                 input = inputs.select_next_some() => match input {
-                    Inputs::Heartbeat((peer, replier)) => {
-                        trace!("transport input - heartbeat - executing ping to peer '{peer}'");
-                        let req_id = swarm.behaviour_mut().heartbeat.send_request(&peer, Ping(replier.challenge()));
-                        active_pings.insert(req_id, replier);
-                    },
                     Inputs::Acknowledgement(task) => match task {
                         AckProcessed::Receive(peer, reply) => {
                             debug!("transport input - ack - received an acknowledgement from '{peer}'");
@@ -550,7 +577,7 @@ impl HoprSwarmWithProcessors {
                     SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Discovery(event)) => {
                         trace!(event = tracing::field::debug(&event), "transport - p2p - discovery - Received a discovery event");
                         match event {
-                            crate::discovery::Event::NewPeerMultiddress(peer, multiaddress) => {
+                            crate::behavior::discovery::Event::NewPeerMultiddress(peer, multiaddress) => {
                                 info!(peer = %peer, multiaddress = %multiaddress, "transport - p2p - discovery - New record");
                                 // TODO: enable adding an address to the msg_ack protocol
                                 // swarm.behaviour_mut().msg_ack.add_address(&peer, multiaddress.clone());
@@ -562,6 +589,15 @@ impl HoprSwarmWithProcessors {
                                 if let Err(e) = swarm.dial(multiaddress.clone()) {
                                     error!(peer = %peer, address = %multiaddress,  "transport - p2p - discovery - Failed to dial peer: {e}");
                                 }
+                            },
+                        }
+                    },
+                    SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::HeartbeatGenerator(event)) => {
+                        trace!(event = tracing::field::debug(&event), "transport - p2p - heartbeat generator - Received a heartbeat generation event");
+                        match event {
+                            crate::behavior::heartbeat::Event::ToProbe((peer, replier)) => {
+                                let req_id = swarm.behaviour_mut().heartbeat.send_request(&peer, Ping(replier.challenge()));
+                                active_pings.insert(req_id, replier);
                             },
                         }
                     },

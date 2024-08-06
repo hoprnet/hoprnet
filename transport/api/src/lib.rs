@@ -268,6 +268,7 @@ where
             me.into(),
             network_events_rx,
             transport_updates,
+            ping_rx,
             self.my_multiaddresses.clone(),
             self.cfg.protocol,
         )
@@ -315,7 +316,7 @@ where
             Box::new(|dur| Box::pin(sleep(dur))),
         );
 
-        let transport_layer = transport_layer.with_processors(ack_proc, packet_proc, ticket_agg_proc, ping_rx);
+        let transport_layer = transport_layer.with_processors(ack_proc, packet_proc, ticket_agg_proc);
 
         processes.insert(
             HoprTransportProcess::Heartbeat,
