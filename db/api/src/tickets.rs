@@ -694,7 +694,7 @@ impl HoprDbTicketOperations for HoprDb {
                                     per_channel_unredeemed
                                         .entry(x.channel_id)
                                         .and_modify(|v| *v += unredeemed_value)
-                                        .or_insert(U256::zero());
+                                        .or_insert(unredeemed_value);
 
                                     futures::future::ok(amount + unredeemed_value)
                                 })
