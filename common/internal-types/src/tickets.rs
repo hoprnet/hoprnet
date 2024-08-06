@@ -31,7 +31,7 @@ const ALWAYS_WINNING: EncodedWinProb = hex!("ffffffffffffff");
 /// Encodes 0% winning probability
 const NEVER_WINNING: EncodedWinProb = hex!("00000000000000");
 
-/// Winnning probability of a ticket
+/// Ticket winning probability
 pub const WINNING_PROB: f64 = 1.0;
 
 /// Helper function to checks if the given ticket values belong to a winning ticket.

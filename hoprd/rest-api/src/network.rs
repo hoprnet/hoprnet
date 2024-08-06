@@ -53,7 +53,7 @@ pub(super) async fn price(State(state): State<Arc<InternalState>>) -> impl IntoR
 #[serde(rename_all = "camelCase")]
 pub(crate) struct TicketProbabilityResponse {
     /// Winning probability of a ticket.
-    probability: String,
+    probability: f64,
 }
 
 /// Obtains the current ticket winning probability.
@@ -61,7 +61,7 @@ pub(crate) struct TicketProbabilityResponse {
         get,
         path = const_format::formatcp!("{BASE_PATH}/network/probability"),
         responses(
-            (status = 200, description = "Current ticket winning probablity", body = TicketProbabilityResponse),
+            (status = 200, description = "Winning ticket probablity", body = TicketProbabilityResponse),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
@@ -78,7 +78,7 @@ pub(super) async fn probability(State(state): State<Arc<InternalState>>) -> impl
         Ok(probability) => (
             StatusCode::OK,
             Json(TicketProbabilityResponse {
-                probability: probability.to_string(),
+                probability: probability,
             }),
         )
             .into_response(),

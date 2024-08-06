@@ -302,7 +302,7 @@ async def test_hoprd_ping_should_work_between_nodes_in_the_same_network(src: str
 async def test_hoprd_ping_to_self_should_fail(peer: str, swarm7: dict[str, Node]):
     response = await swarm7[peer].api.ping(swarm7[peer].peer_id)
 
-    assert response is None, f"Pinging self should fail"
+    assert response is None, "Pinging self should fail"
 
 
 @pytest.mark.asyncio
@@ -365,7 +365,7 @@ async def test_hoprd_should_fail_sending_a_message_that_is_too_large(src: Node, 
     packet = "0 hop message too large: " + "".join(
         random.choices(string.ascii_uppercase + string.digits, k=MAXIMUM_PAYLOAD_SIZE)
     )
-    assert await swarm7[src].api.send_message(swarm7[dest].peer_id, packet, [], random_tag) == None
+    assert await swarm7[src].api.send_message(swarm7[dest].peer_id, packet, [], random_tag) is None
 
 
 @pytest.mark.asyncio
@@ -779,8 +779,8 @@ async def test_hoprd_check_ticket_price_is_default(peer, swarm7: dict[str, Node]
 async def test_hoprd_check_ticket_winn_prob_is_default(peer, swarm7: dict[str, Node]):
     price = await swarm7[peer].api.ticket_winn_prob()
 
-    assert isinstance(price, float)
-    assert price > 0
+    assert price is not None
+    assert 0.0 <= round(price, 5) <= 1.0
 
 
 @pytest.mark.asyncio
@@ -869,14 +869,14 @@ HOPR_SESSION_MAX_PAYLOAD_SIZE = 462
 def run_echo_server(port: int):
 
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(('127.0.0.1', port))
+        s.bind(("127.0.0.1", port))
         s.listen()
         conn, _addr = s.accept()
         with conn:
             while True:
                 data = conn.recv(HOPR_SESSION_MAX_PAYLOAD_SIZE)
                 conn.sendall(data)
-                
+
 
 @contextmanager
 def echo_server(port: int):
@@ -886,13 +886,13 @@ def echo_server(port: int):
         yield port
     finally:
         process.terminate()
-        
+
 
 @contextmanager
 def connect_socket(port):
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.connect(('127.0.0.1', port))
-    
+    s.connect(("127.0.0.1", port))
+
     try:
         yield s
     finally:
@@ -901,14 +901,16 @@ def connect_socket(port):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("src,dest", random_distinct_pairs_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
-async def test_session_communication_with_an_echo_server_wireguard_style_communication(src: str, dest: str, swarm7: dict[str, Node]):
+async def test_session_communication_with_an_echo_server_wireguard_style_communication(
+    src: str, dest: str, swarm7: dict[str, Node]
+):
     """
     HOPR TCP socket buffers are set to 462 bytes to mimic the underlying MTU of the HOPR protocol.
     """
 
     packet_count = 1000 if os.getenv("CI", default="false") == "false" else 50
     expected = [f"{i}".rjust(HOPR_SESSION_MAX_PAYLOAD_SIZE) for i in range(packet_count)]
-    
+
     assert [len(x) for x in expected] == packet_count * [HOPR_SESSION_MAX_PAYLOAD_SIZE]
 
     src_peer = swarm7[src]
@@ -916,7 +918,7 @@ async def test_session_communication_with_an_echo_server_wireguard_style_communi
 
     # src_sock_port = await src_peer.api.session_client(dest_peer.peer_id, path={"Hops": 0})        # https://github.com/hoprnet/hoprnet/issues/6411
     src_sock_port = await src_peer.api.session_client(dest_peer.peer_id, path={"IntermediatePath": []})
-    
+
     actual = []
 
     with echo_server(SERVER_LISTENING_PORT_HARDCODED_IN_HOPRD_CODE):
