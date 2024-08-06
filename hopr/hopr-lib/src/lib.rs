@@ -76,7 +76,7 @@ pub use {
         libp2p::identity::PeerId,
         ApplicationData, HalfKeyChallenge, Health, Keypair, Multiaddr, OffchainKeypair as HoprOffchainKeypair,
         PathOptions, SendMsg, Session as HoprSession, SessionCapability, SessionClientConfig,
-        SessionId as HoprSessionId, TicketStatistics, TransportOutput, SESSION_USABLE_MTU_SIZE,
+        SessionId as HoprSessionId, TicketStatistics, TransportIngress, SESSION_USABLE_MTU_SIZE,
     },
     hopr_internal_types::prelude::*,
     hopr_primitive_types::prelude::*,
@@ -375,13 +375,13 @@ where
 ///
 /// Provides a read and write stream for Hopr socket recognized data formats.
 pub struct HoprSocket {
-    rx: UnboundedReceiver<TransportOutput>,
-    tx: UnboundedSender<TransportOutput>,
+    rx: UnboundedReceiver<TransportIngress>,
+    tx: UnboundedSender<TransportIngress>,
 }
 
 impl Default for HoprSocket {
     fn default() -> Self {
-        let (tx, rx) = unbounded::<TransportOutput>();
+        let (tx, rx) = unbounded::<TransportIngress>();
         Self { rx, tx }
     }
 }
@@ -391,11 +391,11 @@ impl HoprSocket {
         Self::default()
     }
 
-    pub fn reader(self) -> UnboundedReceiver<TransportOutput> {
+    pub fn reader(self) -> UnboundedReceiver<TransportIngress> {
         self.rx
     }
 
-    pub fn writer(&self) -> UnboundedSender<TransportOutput> {
+    pub fn writer(&self) -> UnboundedSender<TransportIngress> {
         self.tx.clone()
     }
 }
@@ -1036,15 +1036,14 @@ impl Hopr {
         destination: PeerId,
         options: PathOptions,
         application_tag: Option<u16>,
-    ) -> errors::Result<HalfKeyChallenge> {
+    ) -> errors::Result<()> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
-        let result = self
-            .transport_api
+        self.transport_api
             .send_message(msg, destination, options, application_tag)
-            .await;
+            .await?;
 
-        Ok(result?)
+        Ok(())
     }
 
     /// Attempts to aggregate all tickets in the given channel

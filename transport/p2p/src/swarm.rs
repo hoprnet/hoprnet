@@ -20,7 +20,7 @@ use crate::{
     errors::Result,
     libp2p::{request_response::ResponseChannel, swarm::SwarmEvent},
     multiaddrs::{replace_transport_with_unspecified, resolve_dns_if_any, Multiaddr},
-    HoprNetworkBehavior, HoprNetworkBehaviorEvent, PeerDiscovery, Ping, Pong, TransportOutput,
+    HoprNetworkBehavior, HoprNetworkBehaviorEvent, PeerDiscovery, Ping, Pong, TransportIngress,
 };
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -207,7 +207,7 @@ pub trait TransportReadWrite {
         self,
     ) -> (
         impl futures::stream::Stream<Item = ReadOps>,
-        impl futures::sink::Sink<WriteOps>,
+        impl futures::sink::Sink<WriteOps> + Clone,
     );
 }
 
@@ -221,7 +221,7 @@ impl TransportReadWrite for P2PTransport {
         self,
     ) -> (
         impl futures::stream::Stream<Item = ReadOps>,
-        impl futures::sink::Sink<WriteOps>,
+        impl futures::sink::Sink<WriteOps> + Clone,
     ) {
         (self.rx, self.tx)
     }
@@ -285,7 +285,7 @@ impl HoprSwarmWithProcessors {
     pub async fn run(
         self,
         version: String,
-        on_transport_output: UnboundedSender<TransportOutput>,
+        on_transport_output: UnboundedSender<TransportIngress>,
         on_acknowledged_ticket: UnboundedSender<AcknowledgedTicket>,
     ) {
         let mut swarm: libp2p::Swarm<HoprNetworkBehavior> = self.swarm.into();
@@ -317,19 +317,9 @@ impl HoprSwarmWithProcessors {
                     Inputs::Acknowledgement(task) => match task {
                         AckProcessed::Receive(peer, reply) => {
                             debug!("transport input - ack - received an acknowledgement from '{peer}'");
-                            if let Ok(reply) = reply {
-                                match reply {
-                                    AckResult::Sender(half_key_challenge) => {
-                                        if let Err(e) = on_transport_output.unbounded_send(TransportOutput::Sent(half_key_challenge)) {
-                                            error!("transport input - ack - failed to emit received acknowledgement: {e}")
-                                        }
-                                    },
-                                    AckResult::RelayerWinning(acknowledged_ticket) => {
-                                        if let Err(e) = on_acknowledged_ticket.unbounded_send(acknowledged_ticket) {
-                                            error!("transport input - ack -failed to emit acknowledged ticket: {e}");
-                                        }
-                                    }
-                                    AckResult::RelayerLosing => {}
+                            if let Ok(AckResult::RelayerWinning(acknowledged_ticket)) = reply {
+                                if let Err(e) = on_acknowledged_ticket.unbounded_send(acknowledged_ticket) {
+                                    error!("transport input - ack -failed to emit acknowledged ticket: {e}");
                                 }
                             }
                         },
@@ -337,11 +327,11 @@ impl HoprSwarmWithProcessors {
                             trace!("transport input - ack - sending an acknowledgement to '{peer}'");
                             let _req_id = swarm.behaviour_mut().ack.send_request(&peer, ack);
                         }
-                    }
+                    },
                     Inputs::Message(task) => match task {
                         MsgProcessed::Receive(peer, data, ack) => {
                             debug!("transport input - msg - received packet from '{peer}'");
-                            if let Err(e) = on_transport_output.unbounded_send(TransportOutput::Received(data)) {
+                            if let Err(e) = on_transport_output.unbounded_send(TransportIngress::Received(data)) {
                                 error!("transport input - msg - failed to store a received message in the inbox: {}", e);
                             }
 
@@ -437,7 +427,7 @@ impl HoprSwarmWithProcessors {
                             };
 
                             if swarm.behaviour_mut().msg.send_response(channel, ()).is_err() {
-                                error!("transport protocol - p2p - msg - failed to send a response to '{peer}', likely a timeout");
+                                error!("transport protocol - p2p - msg - failed to send a response to '{peer}'");
                             };
                         },
                         libp2p::request_response::Event::<Box<[u8]>, ()>::Message {

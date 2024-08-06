@@ -7,10 +7,7 @@ use axum::{
     response::IntoResponse,
     Error,
 };
-use futures::{
-    sink::SinkExt,
-    stream::{SplitSink, StreamExt},
-};
+use futures::{sink::SinkExt, stream::StreamExt};
 use futures_concurrency::stream::Merge;
 use libp2p_identity::PeerId;
 use serde::Deserialize;
@@ -20,7 +17,7 @@ use std::{sync::Arc, time::Duration};
 use tracing::{debug, error, warn};
 use validator::Validate;
 
-use hopr_lib::{AsUnixTimestamp, HalfKeyChallenge, PathOptions, TransportOutput, RESERVED_TAG_UPPER_LIMIT};
+use hopr_lib::{AsUnixTimestamp, PathOptions, TransportIngress, RESERVED_TAG_UPPER_LIMIT};
 
 use crate::{ApiErrorStatus, InternalState, BASE_PATH};
 
@@ -73,9 +70,6 @@ pub(crate) struct SendMessageBodyRequest {
     }))]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct SendMessageResponse {
-    #[serde_as(as = "DisplayFromStr")]
-    #[schema(value_type = String)]
-    challenge: HalfKeyChallenge,
     #[serde_as(as = "DurationMilliSeconds<u64>")]
     #[schema(value_type = u64)]
     timestamp: std::time::Duration,
@@ -150,9 +144,10 @@ pub(super) async fn send_message(
 
     let timestamp = std::time::SystemTime::now().as_unix_timestamp();
 
-    match hopr.send_message(msg_body, args.peer_id, options, Some(args.tag)).await {
-        Ok(challenge) => (StatusCode::ACCEPTED, Json(SendMessageResponse { challenge, timestamp })).into_response(),
-        Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
+    if let Err(e) = hopr.send_message(msg_body, args.peer_id, options, Some(args.tag)).await {
+        (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response()
+    } else {
+        (StatusCode::ACCEPTED, Json(SendMessageResponse { timestamp })).into_response()
     }
 }
 
@@ -161,11 +156,7 @@ pub(super) async fn send_message(
 #[allow(dead_code)] // not dead code, just for codegen
 struct Text(String);
 
-#[derive(Debug, Clone, Deserialize)]
-struct WebSocketSendMsg {
-    cmd: String,
-    args: SendMessageBodyRequest,
-}
+type WebSocketSendMsg = SendMessageBodyRequest;
 
 #[derive(Debug, Clone, serde::Serialize)]
 struct WebSocketReadMsg {
@@ -182,31 +173,6 @@ impl From<hopr_lib::ApplicationData> for WebSocketReadMsg {
             tag: value.application_tag.unwrap_or(0),
             // TODO: Byte order structures should be used instead of the String object
             body: String::from_utf8_lossy(value.plain_text.as_ref()).to_string(),
-        }
-    }
-}
-
-#[serde_as]
-#[derive(Debug, Clone, serde::Serialize)]
-struct WebSocketReadAck {
-    #[serde(rename = "type")]
-    type_: String,
-    #[serde_as(as = "DisplayFromStr")]
-    id: HalfKeyChallenge,
-}
-
-impl WebSocketReadAck {
-    pub fn from_ack(value: HalfKeyChallenge) -> Self {
-        Self {
-            type_: "message-ack".into(),
-            id: value,
-        }
-    }
-
-    pub fn from_ack_challenge(value: HalfKeyChallenge) -> Self {
-        Self {
-            type_: "message-ack-challenge".into(),
-            id: value,
         }
     }
 }
@@ -272,7 +238,7 @@ pub(crate) async fn websocket(ws: WebSocketUpgrade, State(state): State<Arc<Inte
 }
 
 enum WebSocketInput {
-    Network(TransportOutput),
+    Network(TransportIngress),
     WsInput(core::result::Result<Message, Error>),
 }
 
@@ -290,105 +256,65 @@ async fn websocket_connection(socket: WebSocket, state: Arc<InternalState>) {
     while let Some(v) = queue.next().await {
         match v {
             WebSocketInput::Network(net_in) => match net_in {
-                TransportOutput::Received(data) => {
+                TransportIngress::Received(data) => {
                     debug!("websocket notifying client: received msg");
-                    match sender
+                    if let Err(e) = sender
                         .send(Message::Text(json!(WebSocketReadMsg::from(data)).to_string()))
                         .await
                     {
-                        Ok(_) => {}
-                        Err(e) => error!("failed to send websocket message: {e}"),
-                    };
-                }
-                TransportOutput::Sent(hkc) => {
-                    debug!("websocket notifying client: received next hop receive confirmation");
-                    match sender
-                        .send(Message::Text(json!(WebSocketReadAck::from_ack(hkc)).to_string()))
-                        .await
-                    {
-                        Ok(_) => {}
-                        Err(e) => error!("failed to send websocket message: {e}"),
+                        error!("failed to emit read data onto the websocket: {e}");
                     };
                 }
             },
             WebSocketInput::WsInput(ws_in) => match ws_in {
-                Ok(Message::Text(input)) => match handle_send_message(&input, state.clone(), &mut sender).await {
-                    Ok(_) => {}
-                    Err(e) => error!("failed to send message: {e}"),
-                },
+                Ok(Message::Text(input)) => {
+                    if let Err(e) = handle_send_message(&input, state.clone()).await {
+                        error!("failed to send message: {e}");
+                    }
+                }
                 Ok(Message::Close(_)) => {
                     debug!("received close frame, closing connection");
                     break;
                 }
+                Ok(m) => warn!("skipping an unsupported websocket message: {m:?}"),
                 Err(e) => {
                     error!("failed to get a valid websocket message: {e}, closing connection");
                     break;
                 }
-                Ok(m) => warn!("skipping an unsupported websocket message: {:?}", m),
             },
         }
     }
 }
 
-async fn handle_send_message(
-    input: &str,
-    state: Arc<InternalState>,
-    sender: &mut SplitSink<WebSocket, Message>,
-) -> Result<(), String> {
-    match serde_json::from_str(input) {
-        Ok(data) => handle_send_message_data(data, state, sender).await,
-        Err(e) => Err(format!("failed to parse websocket message: {e}")),
-    }
-}
+async fn handle_send_message(input: &str, state: Arc<InternalState>) -> Result<(), String> {
+    match serde_json::from_str::<WebSocketSendMsg>(input) {
+        Ok(msg) => {
+            let hopr = state.hopr.clone();
 
-async fn handle_send_message_data(
-    msg: WebSocketSendMsg,
-    state: Arc<InternalState>,
-    sender: &mut SplitSink<WebSocket, Message>,
-) -> Result<(), String> {
-    if msg.cmd == "sendmsg" {
-        let hopr = state.hopr.clone();
+            // Use the message encoder, if any
+            // TODO: remove RLP in 3.0
+            let msg_body = state
+                .msg_encoder
+                .as_ref()
+                .map(|enc| enc(&msg.body))
+                .unwrap_or_else(|| msg.body.into_boxed_slice());
 
-        // Use the message encoder, if any
-        // TODO: remove RLP in 3.0
-        let msg_body = state
-            .msg_encoder
-            .as_ref()
-            .map(|enc| enc(&msg.args.body))
-            .unwrap_or_else(|| msg.args.body.into_boxed_slice());
+            let options = if let Some(intermediate_path) = msg.path {
+                PathOptions::IntermediatePath(intermediate_path)
+            } else if let Some(hops) = msg.hops {
+                PathOptions::Hops(hops)
+            } else {
+                return Err("one of hops or intermediate path must be provided".to_string());
+            };
 
-        let options = if let Some(intermediate_path) = msg.args.path {
-            PathOptions::IntermediatePath(intermediate_path)
-        } else if let Some(hops) = msg.args.hops {
-            PathOptions::Hops(hops)
-        } else {
-            return Err("one of hops or intermediate path must be provided".to_string());
-        };
-
-        let hkc = hopr
-            .send_message(msg_body, msg.args.peer_id, options, Some(msg.args.tag))
-            .await;
-
-        match hkc {
-            Ok(challenge) => {
-                if let Err(e) = sender
-                    .send(Message::Text(
-                        json!(WebSocketReadAck::from_ack_challenge(challenge)).to_string(),
-                    ))
-                    .await
-                {
-                    return Err(format!("failed to send websocket message: {e}"));
-                }
-            }
-            Err(e) => {
+            if let Err(e) = hopr.send_message(msg_body, msg.peer_id, options, Some(msg.tag)).await {
                 return Err(e.to_string());
             }
-        }
-    } else {
-        warn!("skipping an unsupported websocket command '{}'", msg.cmd);
-    }
 
-    Ok(())
+            Ok(())
+        }
+        Err(e) => Err(format!("failed to parse websocket message: {e}")),
+    }
 }
 
 /// Delete messages from nodes message inbox.

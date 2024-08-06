@@ -41,7 +41,6 @@ use core_protocol::{
 };
 
 use futures::Stream;
-use hopr_crypto_types::types::HalfKeyChallenge;
 /// Re-export of the entire libp2p functionality
 ///
 /// NOTE: likely can be reduced to [libp2p::PeerId] and [libp2p::multiaddr]
@@ -220,11 +219,10 @@ impl From<libp2p::request_response::Event<Box<[u8]>, Acknowledgement>> for HoprN
 
 pub use swarm::HoprSwarm;
 
-/// Composite output from the transport layer.
+/// Composite ingress from the transport layer.
 #[derive(Clone)]
-pub enum TransportOutput {
+pub enum TransportIngress {
     Received(ApplicationData),
-    Sent(HalfKeyChallenge),
 }
 
 #[derive(Debug)]
