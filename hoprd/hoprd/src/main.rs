@@ -167,6 +167,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }),
     ));
 
+    // Ensures that "me" is set as alias
+    node.set_alias(node.me_peer_id().to_string(), "me".to_string())
+        .await
+        .unwrap();
+
     let (mut ws_events_tx, ws_events_rx) =
         async_broadcast::broadcast::<TransportOutput>(WEBSOCKET_EVENT_BROADCAST_CAPACITY);
     let ws_events_rx = ws_events_rx.deactivate(); // No need to copy the data unless the websocket is opened, but leaves the channel open
