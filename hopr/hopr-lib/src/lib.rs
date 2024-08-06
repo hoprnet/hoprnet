@@ -84,17 +84,13 @@ use crate::config::HoprLibConfig;
 use crate::config::SafeModule;
 use crate::constants::{MIN_NATIVE_BALANCE, SUGGESTED_NATIVE_BALANCE};
 
-use hopr_db_api::{
-    accounts::HoprDbAccountOperations,
-    db::{HoprDb, HoprDbConfig},
-    info::{HoprDbInfoOperations, SafeInfo},
-    resolver::HoprDbResolverOperations,
+use hopr_db_api::prelude::{
+    ChainOrPacketKey::ChainKey, HoprDb, HoprDbAccountOperations, HoprDbAllOperations, HoprDbChannelOperations,
+    HoprDbConfig, HoprDbInfoOperations, HoprDbPeersOperations, HoprDbResolverOperations, SafeInfo,
 };
-use hopr_db_api::{channels::HoprDbChannelOperations, HoprDbAllOperations};
 
 use hopr_crypto_types::prelude::OffchainPublicKey;
-use hopr_db_api::prelude::ChainOrPacketKey::ChainKey;
-use hopr_db_api::prelude::HoprDbPeersOperations;
+
 #[cfg(all(feature = "prometheus", not(test)))]
 use {
     hopr_metrics::metrics::{MultiGauge, SimpleGauge},
@@ -684,6 +680,12 @@ impl Hopr {
                 ))
                 .unwrap_or(0.0),
             );
+
+            // Calling get_ticket_statistics will initialize the respective metrics on tickets
+            use hopr_db_api::prelude::HoprDbTicketOperations;
+            if let Err(e) = async_std::task::block_on(db.get_ticket_statistics(None, None)) {
+                error!("failed to initialize ticket statistics metrics: {e}");
+            }
         }
 
         Self {
