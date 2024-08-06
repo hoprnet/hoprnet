@@ -61,7 +61,7 @@ pub(crate) struct TicketProbabilityResponse {
         get,
         path = const_format::formatcp!("{BASE_PATH}/network/probability"),
         responses(
-            (status = 200, description = "Winning ticket probablity", body = TicketProbabilityResponse),
+            (status = 200, description = "Winning ticket probability", body = TicketProbabilityResponse),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
