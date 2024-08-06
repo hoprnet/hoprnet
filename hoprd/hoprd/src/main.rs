@@ -5,6 +5,7 @@ use std::{sync::Arc, time::SystemTime};
 use async_lock::RwLock;
 use async_signal::{Signal, Signals};
 use chrono::{DateTime, Utc};
+use const_format::formatcp;
 use futures::StreamExt;
 
 #[cfg(feature = "telemetry")]
@@ -25,7 +26,7 @@ use hoprd::errors::HoprdError;
 use hoprd_api::serve_api;
 use hoprd_keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
 
-use hoprd::HoprServerReactor;
+use hoprd::HoprServerTcpReactor;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleHistogram;
@@ -231,7 +232,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
     }
 
-    let (hopr_socket, hopr_processes) = node.run(HoprServerReactor {}).await?;
+    let reactor = HoprServerTcpReactor {
+        target: formatcp!("127.0.0.1:{}", hoprd::LISTENING_SESSION_RETRANSMISSION_SERVER_PORT).parse()?,
+    };
+
+    let (hopr_socket, hopr_processes) = node.run(reactor).await?;
 
     // process extracting the received data from the socket
     let mut ingress = hopr_socket.reader();

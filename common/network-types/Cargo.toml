@@ -12,7 +12,11 @@ license = "GPL-3.0-only"
 default = []
 serde = ["dep:serde", "dep:serde_bytes"]
 runtime-async-std = ["hopr-async-runtime/runtime-async-std"]
-runtime-tokio = ["hopr-async-runtime/runtime-tokio"]
+runtime-tokio = [
+    "dep:tokio",
+    "dep:tokio-util",
+    "hopr-async-runtime/runtime-tokio"
+]
 
 [dependencies]
 bitvec = "1.0.1"
@@ -29,8 +33,10 @@ serde = { workspace = true, optional = true }
 serde_bytes = { workspace = true, optional = true }
 smart-default = { workspace = true }
 strum = { workspace = true }
-tracing = { workspace = true }
 thiserror = { workspace = true }
+tokio = { workspace = true, optional = true}
+tokio-util = { workspace = true, optional = true, features = ["net"]}
+tracing = { workspace = true }
 
 hopr-platform = { workspace = true }
 hopr-primitive-types = { workspace = true }

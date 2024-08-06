@@ -49,8 +49,9 @@ async-std = { workspace = true, features = [
   "attributes",
   "tokio1",
 ], optional = true }
-clap = { workspace = true }
 chrono = { workspace = true }
+clap = { workspace = true }
+const_format = { workspace = true }
 futures = { workspace = true }
 home = "0.5.9"
 lazy_static = { workspace = true, optional = true }
@@ -88,6 +89,7 @@ hoprd-inbox = { workspace = true }
 hoprd-keypair = { workspace = true }
 hopr-platform = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
+hopr-network-types = { workspace = true, features = ["runtime-tokio"] }
 hopr-async-runtime = { workspace = true }
 
 [dev-dependencies]

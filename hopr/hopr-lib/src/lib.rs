@@ -117,7 +117,7 @@ pub use async_trait::async_trait;
 /// supplied as an argument.
 #[cfg(feature = "session-server")]
 #[async_trait::async_trait]
-pub trait HoprSessionServerActionable {
+pub trait HoprSessionReactor {
     /// Fully process a single HOPR session
     async fn process(&self, session: HoprSession) -> errors::Result<()>;
 }
@@ -640,7 +640,7 @@ impl Hopr {
         self.cfg.chain.announce
     }
 
-    pub async fn run<#[cfg(feature = "session-server")] T: HoprSessionServerActionable + Clone + Send + 'static>(
+    pub async fn run<#[cfg(feature = "session-server")] T: HoprSessionReactor + Clone + Send + 'static>(
         &self,
         #[cfg(feature = "session-server")] serve_handler: T,
     ) -> errors::Result<(HoprSocket, HashMap<HoprLibProcesses, JoinHandle<()>>)> {
