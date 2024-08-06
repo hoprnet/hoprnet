@@ -4170,6 +4170,8 @@ dependencies = [
  "strum 0.26.2",
  "test-log",
  "thiserror",
+ "tokio",
+ "tokio-util",
  "tracing",
 ]
 
@@ -4308,11 +4310,13 @@ dependencies = [
  "async-std",
  "chrono",
  "clap",
+ "const_format",
  "futures",
  "home",
  "hopr-async-runtime",
  "hopr-lib",
  "hopr-metrics",
+ "hopr-network-types",
  "hopr-platform",
  "hoprd-api",
  "hoprd-inbox",
