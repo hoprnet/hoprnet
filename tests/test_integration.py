@@ -757,12 +757,19 @@ async def test_hoprd_strategy_UNFINISHED():
 @pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
 async def test_hoprd_check_native_withdraw(peer, swarm7: dict[str, Node]):
     amount = "9876"
+    remaining_attempts = 10
 
-    before_balance = await swarm7[peer].api.balances()
+    before_balance = int((await swarm7[peer].api.balances()).safe_native)
     await swarm7[peer].api.withdraw(amount, swarm7[peer].safe_address, "Native")
-    after_balance = await swarm7[peer].api.balances()
 
-    assert int(after_balance.safe_native) - int(before_balance.safe_native) == int(amount)
+    while remaining_attempts > 0:
+        after_balance = int((await swarm7[peer].api.balances()).safe_native)
+        if after_balance != before_balance:
+            break
+        await asyncio.sleep(0.5)
+        remaining_attempts -= 1
+
+    assert after_balance - before_balance == int(amount)
 
 
 @pytest.mark.asyncio
@@ -860,14 +867,14 @@ HOPR_SESSION_MAX_PAYLOAD_SIZE = 462
 def run_echo_server(port: int):
 
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(('127.0.0.1', port))
+        s.bind(("127.0.0.1", port))
         s.listen()
         conn, _addr = s.accept()
         with conn:
             while True:
                 data = conn.recv(HOPR_SESSION_MAX_PAYLOAD_SIZE)
                 conn.sendall(data)
-                
+
 
 @contextmanager
 def echo_server(port: int):
@@ -877,13 +884,13 @@ def echo_server(port: int):
         yield port
     finally:
         process.terminate()
-        
+
 
 @contextmanager
 def connect_socket(port):
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.connect(('127.0.0.1', port))
-    
+    s.connect(("127.0.0.1", port))
+
     try:
         yield s
     finally:
@@ -892,14 +899,16 @@ def connect_socket(port):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("src,dest", random_distinct_pairs_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
-async def test_session_communication_with_an_echo_server_wireguard_style_communication(src: str, dest: str, swarm7: dict[str, Node]):
+async def test_session_communication_with_an_echo_server_wireguard_style_communication(
+    src: str, dest: str, swarm7: dict[str, Node]
+):
     """
     HOPR TCP socket buffers are set to 462 bytes to mimic the underlying MTU of the HOPR protocol.
     """
 
     packet_count = 1000 if os.getenv("CI", default="false") == "false" else 50
     expected = [f"{i}".rjust(HOPR_SESSION_MAX_PAYLOAD_SIZE) for i in range(packet_count)]
-    
+
     assert [len(x) for x in expected] == packet_count * [HOPR_SESSION_MAX_PAYLOAD_SIZE]
 
     src_peer = swarm7[src]
@@ -907,7 +916,7 @@ async def test_session_communication_with_an_echo_server_wireguard_style_communi
 
     # src_sock_port = await src_peer.api.session_client(dest_peer.peer_id, path={"Hops": 0})        # https://github.com/hoprnet/hoprnet/issues/6411
     src_sock_port = await src_peer.api.session_client(dest_peer.peer_id, path={"IntermediatePath": []})
-    
+
     actual = []
 
     with echo_server(SERVER_LISTENING_PORT_HARDCODED_IN_HOPRD_CODE):
