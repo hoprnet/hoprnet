@@ -9,10 +9,10 @@ mod messages;
 mod network;
 mod node;
 mod peers;
+mod preconditions;
 mod prometheus;
 mod session;
 mod tickets;
-mod token_authentication;
 
 use async_lock::RwLock;
 use axum::{
@@ -210,24 +210,14 @@ async fn build_api(
                 .route("/eligiblez", get(checks::eligiblez))
                 .with_state(state.into()),
         )
+        // the following routes are protected by an additional middleware `ensure_running` because they either require some interaction with an other node, or they require the node to be funded to properly work. In either case, the if the node is not in `Running` state, the return code will be 412.
         .nest(
             BASE_PATH,
-            axum::Router::new()
-                .route("/aliases", get(alias::aliases))
-                .route("/aliases", post(alias::set_alias))
-                .route("/aliases/:alias", get(alias::get_alias))
-                .route("/aliases/:alias", delete(alias::delete_alias))
-                .route("/account/addresses", get(account::addresses))
-                .route("/account/balances", get(account::balances))
-                .route("/account/withdraw", post(account::withdraw))
-                .route("/peers/:peerId", get(peers::show_peer_info))
-                .route("/peers/:peerId/ping", post(peers::ping_peer))
-                .route("/channels", get(channels::list_channels))
+            Router::new()
+                .route("/account/withdraw", get(account::withdraw))
                 .route("/channels", post(channels::open_channel))
-                .route("/channels/:channelId", get(channels::show_channel))
                 .route("/channels/:channelId", delete(channels::close_channel))
                 .route("/channels/:channelId/fund", post(channels::fund_channel))
-                .route("/channels/:channelId/tickets", get(tickets::show_channel_tickets))
                 .route(
                     "/channels/:channelId/tickets/redeem",
                     post(tickets::redeem_tickets_in_channel),
@@ -236,10 +226,34 @@ async fn build_api(
                     "/channels/:channelId/tickets/aggregate",
                     post(tickets::aggregate_tickets_in_channel),
                 )
+                .route("/peers/:peerId/ping", post(peers::ping_peer))
+                .route("/messages", post(messages::send_message))
+                .route("/tickets/redeem", post(tickets::redeem_all_tickets))
+                .with_state(inner_state.clone().into())
+                .layer(middleware::from_fn_with_state(
+                    inner_state.clone(),
+                    preconditions::authenticate,
+                ))
+                .layer(middleware::from_fn_with_state(
+                    inner_state.clone(),
+                    preconditions::ensure_running,
+                )),
+        )
+        .nest(
+            BASE_PATH,
+            Router::new()
+                .route("/aliases", get(alias::aliases))
+                .route("/aliases", post(alias::set_alias))
+                .route("/aliases/:alias", get(alias::get_alias))
+                .route("/aliases/:alias", delete(alias::delete_alias))
+                .route("/account/addresses", get(account::addresses))
+                .route("/account/balances", get(account::balances))
+                .route("/peers/:peerId", get(peers::show_peer_info))
+                .route("/channels", get(channels::list_channels))
+                .route("/channels/:channelId", get(channels::show_channel))
+                .route("/channels/:channelId/tickets", get(tickets::show_channel_tickets))
                 .route("/tickets", get(tickets::show_all_tickets))
                 .route("/tickets/statistics", get(tickets::show_ticket_statistics))
-                .route("/tickets/redeem", post(tickets::redeem_all_tickets))
-                .route("/messages", post(messages::send_message))
                 .route("/messages", delete(messages::delete_messages))
                 .route("/messages/pop", post(messages::pop))
                 .route("/messages/pop-all", post(messages::pop_all))
@@ -257,8 +271,8 @@ async fn build_api(
                 .route("/session", post(session::create_client))
                 .with_state(inner_state.clone().into())
                 .layer(middleware::from_fn_with_state(
-                    inner_state,
-                    token_authentication::authenticate,
+                    inner_state.clone(),
+                    preconditions::authenticate,
                 )),
         )
         .layer(
