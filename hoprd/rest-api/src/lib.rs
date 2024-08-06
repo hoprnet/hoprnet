@@ -94,6 +94,7 @@ pub(crate) struct InternalState {
         messages::send_message,
         messages::size,
         network::price,
+        network::probability,
         node::configuration,
         node::entry_nodes,
         node::info,
@@ -120,6 +121,7 @@ pub(crate) struct InternalState {
             messages::MessagePopAllResponse,
             messages::MessagePopResponse, messages::SendMessageResponse, messages::SendMessageBodyRequest, messages::SizeResponse, messages::TagQueryRequest, messages::GetMessageBodyRequest,
             network::TicketPriceResponse,
+            network::TicketProbabilityResponse,
             node::EntryNode, node::NodeInfoResponse, node::NodePeersQueryRequest,
             node::HeartbeatInfo, node::PeerInfo, node::AnnouncedPeer, node::NodePeersResponse, node::NodeVersionResponse,
             peers::NodePeerInfoResponse, peers::PingResponse,
@@ -248,6 +250,7 @@ async fn build_api(
                 .route("/messages/size", get(messages::size))
                 .route("/messages/websocket", get(messages::websocket))
                 .route("/network/price", get(network::price))
+                .route("/network/probability", get(network::probability))
                 .route("/node/version", get(node::version))
                 .route("/node/configuration", get(node::configuration))
                 .route("/node/info", get(node::info))
