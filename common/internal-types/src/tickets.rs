@@ -180,7 +180,7 @@ impl TicketBuilder {
 
     /// Sets the encoded ticket winning probability.
     /// Mutually exlusive with [TicketBuilder::win_prob].
-    /// Defaults to encoded(WINNING_PROB)
+    /// Defaults to encoded [WINNING_PROB]
     #[must_use]
     pub fn win_prob_encoded(mut self, win_prob: EncodedWinProb) -> Self {
         self.win_prob = None;
