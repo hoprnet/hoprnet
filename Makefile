@@ -75,9 +75,7 @@ test: smart-contract-test ## run unit tests for all packages, or a single packag
 
 .PHONY: smoke-tests
 smoke-tests: ## run smoke tests
-	source .venv/bin/activate
-	make generate-python-sdk && pip install -e hoprd-sdk-python
-	python3 -m pytest tests/
+	source .venv/bin/activate && python3 -m pytest tests/
 
 .PHONY: stress-test-local-swarm
 stress-test-local-swarm: ## run stress tests on a local node swarm

@@ -59,6 +59,7 @@ craneLib.devShell {
   venvDir = "./.venv";
   postVenvCreation = ''
     unset SOURCE_DATE_EPOCH
+    make generate-python-sdk
     pip install -U pip setuptools wheel
     pip install -r tests/requirements.txt
   '' + pkgs.lib.optionalString pkgs.stdenv.isLinux ''
