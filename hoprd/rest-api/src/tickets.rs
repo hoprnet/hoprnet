@@ -176,7 +176,7 @@ pub(super) async fn show_ticket_statistics(State(state): State<Arc<InternalState
         responses(
             (status = 204, description = "Tickets redeemed successfully."),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
-            (status = 412, description = "The node is not ready.", body = ApiError),
+            (status = 412, description = "The node is not ready."),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
@@ -208,7 +208,7 @@ pub(super) async fn redeem_all_tickets(State(state): State<Arc<InternalState>>) 
             (status = 400, description = "Invalid channel id.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "Tickets were not found for that channel. That means that no messages were sent inside this channel yet.", body = ApiError),
-            (status = 412, description = "The node is not ready.", body = ApiError),
+            (status = 412, description = "The node is not ready."),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(

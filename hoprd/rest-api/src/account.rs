@@ -160,7 +160,7 @@ pub(crate) struct WithdrawResponse {
         responses(
             (status = 200, description = "The node's funds have been withdrawn", body = WithdrawResponse),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
-            (status = 412, description = "The node is not ready.", body = ApiError),
+            (status = 412, description = "The node is not ready."),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
