@@ -75,13 +75,7 @@ pub(super) async fn probability(State(state): State<Arc<InternalState>>) -> impl
     let hopr = state.hopr.clone();
 
     match hopr.get_ticket_probability().await {
-        Ok(probability) => (
-            StatusCode::OK,
-            Json(TicketProbabilityResponse {
-                probability: probability,
-            }),
-        )
-            .into_response(),
+        Ok(probability) => (StatusCode::OK, Json(TicketProbabilityResponse { probability })).into_response(),
         Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
     }
 }
