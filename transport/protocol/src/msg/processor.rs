@@ -227,8 +227,8 @@ impl PacketSendFinalizer {
         if let Some(sender) = self.tx.take() {
             match sender.send(challenge) {
                 Ok(_) => {}
-                Err(_) => {
-                    error!("Failed to notify the awaiter about the successful packet transmission")
+                Err(e) => {
+                    error!("Failed to notify the awaiter about the successful packet transmission {e}")
                 }
             }
         } else {

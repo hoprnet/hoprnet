@@ -82,6 +82,7 @@ pub(crate) struct InternalState {
         channels::list_channels,
         channels::open_channel,
         channels::show_channel,
+        checks::eligiblez,
         checks::healthyz,
         checks::readyz,
         checks::startedz,
@@ -208,6 +209,7 @@ async fn build_api(
                 .route("/startedz", get(checks::startedz))
                 .route("/readyz", get(checks::readyz))
                 .route("/healthyz", get(checks::healthyz))
+                .route("/eligiblez", get(checks::eligiblez))
                 .with_state(state.into()),
         )
         .nest(
@@ -268,7 +270,9 @@ async fn build_api(
                 .layer(
                     CorsLayer::new()
                         .allow_methods([Method::GET, Method::POST, Method::OPTIONS, Method::DELETE])
-                        .allow_origin(Any),
+                        .allow_origin(Any)
+                        .allow_headers(Any)
+                        .max_age(std::time::Duration::from_secs(86400)),
                 )
                 .layer(middleware::from_fn(prometheus::record))
                 .layer(CompressionLayer::new())
