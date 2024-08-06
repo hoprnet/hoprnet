@@ -5,7 +5,7 @@ use futures::future::{poll_fn, Either};
 use futures::{pin_mut, stream::Stream, StreamExt};
 use libp2p_identity::PeerId;
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
-use tracing::{debug, error, warn};
+use tracing::{debug, error, trace, warn};
 
 use core_path::path::{Path, TransportPath};
 use hopr_async_runtime::prelude::{sleep, spawn};
@@ -215,21 +215,18 @@ where
 /// architectural overhaul of the hopr daemon.
 #[derive(Debug)]
 pub struct PacketSendFinalizer {
-    tx: Option<futures::channel::oneshot::Sender<HalfKeyChallenge>>,
+    tx: Option<futures::channel::oneshot::Sender<()>>,
 }
 
 impl PacketSendFinalizer {
-    pub fn new(tx: futures::channel::oneshot::Sender<HalfKeyChallenge>) -> Self {
+    pub fn new(tx: futures::channel::oneshot::Sender<()>) -> Self {
         Self { tx: Some(tx) }
     }
 
-    pub fn finalize(mut self, challenge: HalfKeyChallenge) {
+    pub fn finalize(mut self) {
         if let Some(sender) = self.tx.take() {
-            match sender.send(challenge) {
-                Ok(_) => {}
-                Err(e) => {
-                    error!("Failed to notify the awaiter about the successful packet transmission {e}")
-                }
+            if sender.send(()).is_err() {
+                error!("Failed to notify the awaiter about the successful packet transmission")
             }
         } else {
             error!("Sender for packet send signalization is already spent")
@@ -240,17 +237,17 @@ impl PacketSendFinalizer {
 /// Await on future until the confirmation of packet reception is received
 #[derive(Debug)]
 pub struct PacketSendAwaiter {
-    rx: Option<futures::channel::oneshot::Receiver<HalfKeyChallenge>>,
+    rx: Option<futures::channel::oneshot::Receiver<()>>,
 }
 
-impl From<futures::channel::oneshot::Receiver<HalfKeyChallenge>> for PacketSendAwaiter {
-    fn from(value: futures::channel::oneshot::Receiver<HalfKeyChallenge>) -> Self {
+impl From<futures::channel::oneshot::Receiver<()>> for PacketSendAwaiter {
+    fn from(value: futures::channel::oneshot::Receiver<()>) -> Self {
         Self { rx: Some(value) }
     }
 }
 
 impl PacketSendAwaiter {
-    pub async fn consume_and_wait(&mut self, until_timeout: std::time::Duration) -> Result<HalfKeyChallenge> {
+    pub async fn consume_and_wait(&mut self, until_timeout: std::time::Duration) -> Result<()> {
         match self.rx.take() {
             Some(resolve) => {
                 let timeout = sleep(until_timeout);
@@ -277,7 +274,7 @@ pub struct PacketActions {
 impl PacketActions {
     /// Pushes a new packet from this node into processing.
     pub fn send_packet(&mut self, data: ApplicationData, path: TransportPath) -> Result<PacketSendAwaiter> {
-        let (tx, rx) = futures::channel::oneshot::channel::<HalfKeyChallenge>();
+        let (tx, rx) = futures::channel::oneshot::channel::<()>();
 
         self.process(MsgToProcess::ToSend(data, path, PacketSendFinalizer::new(tx)))
             .map(move |_| {
@@ -406,14 +403,15 @@ impl PacketInteraction {
                 }
             })
             // process packet operation
-            .then_concurrent(move |(packet, mut metadata)| async move {
+            .then_concurrent(move |(packet, metadata)| async move {
                 match packet {
                     Err(e) => Err(e),
                     Ok(packet) => match packet {
                         TransportPacket::Outgoing {
                             next_hop,
-                            ack_challenge,
                             data,
+                            ..
+                            // ack_challenge,
                         } => {
                             #[cfg(all(feature = "prometheus", not(test)))]
                             {
@@ -421,9 +419,6 @@ impl PacketInteraction {
                                 METRIC_PACKET_COUNT.increment(&["sent"]);
                             }
 
-                            if let Some(finalizer) = metadata.send_finalizer.take() {
-                                finalizer.finalize(ack_challenge);
-                            }
                             Ok((MsgProcessed::Send(next_hop, data), metadata))
                         }
 
@@ -501,19 +496,24 @@ impl PacketInteraction {
 
                 async move {
                     match processed {
-                        Ok((processed_msg, _metadata)) => {
+                        Ok((processed_msg, mut metadata)) => {
                             #[cfg(all(feature = "prometheus", not(test)))]
                             if let MsgProcessed::Forward(_, _, _, _) = &processed_msg {
                                 METRIC_RELAYED_PACKET_IN_MIXER_TIME.observe(
                                     hopr_platform::time::native::current_time()
-                                        .saturating_sub(_metadata.start_time)
+                                        .saturating_sub(metadata.start_time)
                                         .as_secs_f64(),
                                 )
                             };
 
                             match poll_fn(|cx| Pin::new(&mut processed_tx).poll_ready(cx)).await {
                                 Ok(_) => match processed_tx.start_send(processed_msg) {
-                                    Ok(_) => debug!("Pipeline resulted in a processed msg"),
+                                    Ok(_) => {
+                                        if let Some(finalizer) = metadata.send_finalizer.take() {
+                                            finalizer.finalize();
+                                        }
+                                        trace!("Pipeline resulted in a processed msg")
+                                    }
                                     Err(e) => error!("Failed to pass a processed ack message: {}", e),
                                 },
                                 Err(e) => {
@@ -695,18 +695,17 @@ mod tests {
     }
 
     #[async_std::test]
-    pub async fn test_packet_send_finalizer_succeeds_with_a_stored_challenge() {
-        let (tx, rx) = futures::channel::oneshot::channel::<HalfKeyChallenge>();
+    pub async fn test_packet_send_finalizer_succeeds() {
+        let (tx, rx) = futures::channel::oneshot::channel::<()>();
 
         let finalizer = super::PacketSendFinalizer::new(tx);
-        let challenge = HalfKeyChallenge::default();
         let mut awaiter: super::PacketSendAwaiter = rx.into();
 
-        finalizer.finalize(challenge);
+        finalizer.finalize();
 
         let result = awaiter.consume_and_wait(Duration::from_millis(20)).await;
 
-        assert_eq!(challenge, result.expect("HalfKeyChallange should be transmitted"));
+        assert!(result.is_ok());
     }
 
     async fn peer_setup_for(count: usize) -> Vec<(AcknowledgementInteraction, PacketInteraction)> {
@@ -758,10 +757,10 @@ mod tests {
     async fn emulate_channel_communication(
         pending_packet_count: usize,
         mut components: Vec<(AcknowledgementInteraction, PacketInteraction)>,
-    ) -> (Vec<ApplicationData>, Vec<HalfKeyChallenge>, Vec<AcknowledgedTicket>) {
+    ) -> (Vec<ApplicationData>, usize, Vec<AcknowledgedTicket>) {
         let component_length = components.len();
         let mut received_packets: Vec<ApplicationData> = vec![];
-        let mut received_challenges: Vec<HalfKeyChallenge> = vec![];
+        let mut received_challenges: usize = 0;
         let mut received_tickets: Vec<AcknowledgedTicket> = vec![];
 
         for _ in 0..pending_packet_count {
@@ -833,9 +832,9 @@ mod tests {
                         assert!(reply.is_ok());
 
                         match reply.unwrap() {
-                            AckResult::Sender(hkc) => {
+                            AckResult::Sender(_hkc) => {
                                 assert_eq!(i - 1, 0, "Only the sender can receive a half key challenge");
-                                received_challenges.push(hkc);
+                                received_challenges += 1;
                             }
                             AckResult::RelayerWinning(tkt) => {
                                 // choose the last relayer before the receiver
@@ -952,11 +951,7 @@ mod tests {
                     "some received packet data does not match"
                 );
 
-                assert_eq!(acks.len(), pending_packets, "did not receive all acknowledgements");
-                assert!(
-                    packet_challenges.iter().all(|c| acks.contains(c)),
-                    "received some unknown acknowledgement"
-                );
+                assert_eq!(acks, pending_packets, "did not receive all acknowledgements");
 
                 assert_eq!(
                     ack_tkts.len(),

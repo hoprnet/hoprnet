@@ -517,7 +517,7 @@ where
         destination: PeerId,
         options: PathOptions,
         application_tag: Option<u16>,
-    ) -> errors::Result<HalfKeyChallenge> {
+    ) -> errors::Result<()> {
         if let Some(application_tag) = application_tag {
             if application_tag < RESERVED_SESSION_TAG_UPPER_LIMIT {
                 return Err(HoprTransportError::Api(format!(
