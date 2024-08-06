@@ -64,7 +64,7 @@ class HoprdAPI:
                 )
                 return (True, response)
         except ApiException as e:
-            log.error(
+            log.debug(
                 f"ApiException calling {api_callback.__qualname__} with kwargs: {kwargs}, args: {args}, error is: {e}"
             )
             return (False, None)

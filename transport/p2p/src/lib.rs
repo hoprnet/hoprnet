@@ -28,12 +28,13 @@ pub mod multiaddrs;
 /// Raw swarm definition for the HOPR network.
 pub mod swarm;
 
-/// Definition of the HOPR discovery mechanism for the network.
-mod discovery;
+/// P2P behavior definitions for the transport level interactions not related to the HOPR protocol
+mod behavior;
 
 use std::fmt::Debug;
 
 use core_network::network::NetworkTriggeredEvent;
+use core_network::ping::PingQueryReplier;
 use core_protocol::{
     ack::config::AckProtocolConfig, heartbeat::config::HeartbeatProtocolConfig, msg::config::MsgProtocolConfig,
     ticket_aggregation::config::TicketAggregationProtocolConfig,
@@ -78,7 +79,8 @@ pub struct Pong(pub ControlMessage, pub String);
 #[derive(NetworkBehaviour)]
 #[behaviour(to_swarm = "HoprNetworkBehaviorEvent")]
 pub struct HoprNetworkBehavior {
-    pub discovery: discovery::Behaviour,
+    discovery: behavior::discovery::Behaviour,
+    heartbeat_generator: behavior::heartbeat::Behaviour,
     pub heartbeat: libp2p::request_response::cbor::Behaviour<Ping, Pong>,
     pub msg: libp2p::request_response::cbor::Behaviour<Box<[u8]>, ()>,
     pub ack: libp2p::request_response::cbor::Behaviour<Acknowledgement, ()>,
@@ -93,10 +95,11 @@ impl Debug for HoprNetworkBehavior {
 }
 
 impl HoprNetworkBehavior {
-    pub fn new<T, U>(
+    pub fn new<T, U, V>(
         me: PeerId,
         network_events: T,
         onchain_events: U,
+        heartbeat_requests: V,
         msg_cfg: MsgProtocolConfig,
         ack_cfg: AckProtocolConfig,
         hb_cfg: HeartbeatProtocolConfig,
@@ -105,9 +108,11 @@ impl HoprNetworkBehavior {
     where
         T: Stream<Item = NetworkTriggeredEvent> + Send + 'static,
         U: Stream<Item = PeerDiscovery> + Send + 'static,
+        V: Stream<Item = (PeerId, PingQueryReplier)> + Send + 'static,
     {
         Self {
-            discovery: discovery::Behaviour::new(me, network_events, onchain_events),
+            discovery: behavior::discovery::Behaviour::new(me, network_events, onchain_events),
+            heartbeat_generator: behavior::heartbeat::Behaviour::new(heartbeat_requests),
             heartbeat: libp2p::request_response::cbor::Behaviour::<Ping, Pong>::new(
                 [(
                     StreamProtocol::new(HOPR_HEARTBEAT_PROTOCOL_V_0_1_0),
@@ -149,7 +154,8 @@ impl HoprNetworkBehavior {
 /// processing in the business logic loop.
 #[derive(Debug)]
 pub enum HoprNetworkBehaviorEvent {
-    Discovery(discovery::Event),
+    Discovery(behavior::discovery::Event),
+    HeartbeatGenerator(behavior::heartbeat::Event),
     Heartbeat(libp2p::request_response::Event<Ping, Pong>),
     Message(libp2p::request_response::Event<Box<[u8]>, ()>),
     Acknowledgement(libp2p::request_response::Event<Acknowledgement, ()>),
@@ -166,9 +172,15 @@ impl From<void::Void> for HoprNetworkBehaviorEvent {
     }
 }
 
-impl From<discovery::Event> for HoprNetworkBehaviorEvent {
-    fn from(event: discovery::Event) -> Self {
+impl From<behavior::discovery::Event> for HoprNetworkBehaviorEvent {
+    fn from(event: behavior::discovery::Event) -> Self {
         Self::Discovery(event)
+    }
+}
+
+impl From<behavior::heartbeat::Event> for HoprNetworkBehaviorEvent {
+    fn from(event: behavior::heartbeat::Event) -> Self {
+        Self::HeartbeatGenerator(event)
     }
 }
 
