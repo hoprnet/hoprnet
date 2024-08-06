@@ -20,6 +20,9 @@ pub mod helpers;
 pub mod network_notifier;
 mod timer;
 
+/// Transport layer API handling on the wire protocol
+mod wire;
+
 use std::{
     collections::HashMap,
     sync::{Arc, OnceLock},
@@ -70,7 +73,7 @@ pub use {
     hopr_internal_types::protocol::ApplicationData,
     hopr_transport_p2p::{
         libp2p, libp2p::swarm::derive_prelude::Multiaddr, multiaddrs::strip_p2p_protocol,
-        swarm::HoprSwarmWithProcessors, PeerDiscovery, TransportOutput,
+        swarm::HoprSwarmWithProcessors, PeerDiscovery, TransportIngress,
     },
     hopr_transport_session::{
         errors::TransportSessionError, traits::SendMsg, Capability as SessionCapability, PathOptions, Session,
@@ -230,7 +233,7 @@ where
         version: String,
         network: Arc<Network<T>>,
         tbf_path: String,
-        on_transport_output: UnboundedSender<TransportOutput>,
+        on_transport_output: UnboundedSender<TransportIngress>,
         on_acknowledged_ticket: UnboundedSender<AcknowledgedTicket>,
         transport_updates: UnboundedReceiver<PeerDiscovery>,
         incoming_session_queue: UnboundedSender<Session>,
@@ -323,7 +326,7 @@ where
             spawn(async move { heartbeat.heartbeat_loop().await }),
         );
 
-        let (tx, rx) = futures::channel::mpsc::unbounded::<TransportOutput>();
+        let (tx, rx) = futures::channel::mpsc::unbounded::<TransportIngress>();
         let sessions = self.sessions.clone();
         let me = self.me;
         let message_sender = Arc::new(helpers::MessageSender::new(
@@ -342,7 +345,7 @@ where
 
                     async move {
                         match output {
-                            TransportOutput::Received(data) => {
+                            TransportIngress::Received(data) => {
                                 if let Some(app_tag) = data.application_tag {
                                     if app_tag < RESERVED_SUBPROTOCOL_TAG_UPPER_LIMIT {
                                         None
@@ -393,13 +396,12 @@ where
                                         }
                                         None
                                     } else {
-                                        Some(TransportOutput::Received(data))
+                                        Some(TransportIngress::Received(data))
                                     }
                                 } else {
-                                    Some(TransportOutput::Received(data))
+                                    Some(TransportIngress::Received(data))
                                 }
                             }
-                            TransportOutput::Sent(hkc) => Some(TransportOutput::Sent(hkc)),
                         }
                     }
                 })

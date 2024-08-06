@@ -19,7 +19,7 @@ use tracing::{error, info, warn};
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 
 use hopr_async_runtime::prelude::{cancel_join_handle, spawn, JoinHandle};
-use hopr_lib::{ApplicationData, AsUnixTimestamp, HoprLibProcesses, ToHex, TransportOutput};
+use hopr_lib::{ApplicationData, AsUnixTimestamp, HoprLibProcesses, ToHex, TransportIngress};
 use hoprd::cli::CliArgs;
 use hoprd::errors::HoprdError;
 use hoprd_api::serve_api;
@@ -183,7 +183,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ));
 
     let (mut ws_events_tx, ws_events_rx) =
-        async_broadcast::broadcast::<TransportOutput>(WEBSOCKET_EVENT_BROADCAST_CAPACITY);
+        async_broadcast::broadcast::<TransportIngress>(WEBSOCKET_EVENT_BROADCAST_CAPACITY);
     let ws_events_rx = ws_events_rx.deactivate(); // No need to copy the data unless the websocket is opened, but leaves the channel open
     ws_events_tx.set_overflow(true); // Set overflow in case of full the oldest record is discarded
 
@@ -240,7 +240,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         spawn(async move {
             while let Some(output) = ingress.next().await {
                 match output {
-                    TransportOutput::Received(data) => {
+                    TransportIngress::Received(data) => {
                         let recv_at = SystemTime::now();
 
                         // TODO: remove RLP in 3.0
@@ -260,7 +260,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                                 if cfg.api.enable && ws_events_tx.receiver_count() > 0 {
                                     if let Err(e) =
-                                        ws_events_tx.try_broadcast(TransportOutput::Received(ApplicationData {
+                                        ws_events_tx.try_broadcast(TransportIngress::Received(ApplicationData {
                                             application_tag: data.application_tag,
                                             plain_text: msg.clone(),
                                         }))
@@ -285,13 +285,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 }
                             }
                             Err(_) => error!("RLP decoding failed"),
-                        }
-                    }
-                    TransportOutput::Sent(ack_challenge) => {
-                        if cfg.api.enable && ws_events_tx.receiver_count() > 0 {
-                            if let Err(e) = ws_events_tx.try_broadcast(TransportOutput::Sent(ack_challenge)) {
-                                error!("failed to notify websockets about a new acknowledgement: {e}");
-                            }
                         }
                     }
                 }
