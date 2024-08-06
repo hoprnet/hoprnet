@@ -307,6 +307,9 @@ pub trait HoprRpcOperations {
     /// Retrieves the node's account balance of the given type.
     async fn get_balance(&self, address: Address, balance_type: BalanceType) -> Result<Balance>;
 
+    /// Retrieves the node's eligibility status
+    async fn get_eligibility_status(&self, address: Address) -> Result<bool>;
+
     /// Retrieves info of the given node module's target.
     async fn get_node_management_module_target_info(&self, target: Address) -> Result<Option<U256>>;
 

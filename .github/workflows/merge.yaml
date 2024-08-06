@@ -29,6 +29,7 @@ jobs:
     steps:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4
+
       - name: Cleanup
         run: |
           gh extension install actions/gh-actions-cache
@@ -68,7 +69,7 @@ jobs:
           credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
 
       - name: Set up Google Cloud SDK
-        uses: google-github-actions/setup-gcloud@v1
+        uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
           install_components: beta
@@ -108,7 +109,7 @@ jobs:
             fi
           done
 
-  deploy-nodes:
+  deploy_nodes:
     name: Deploy nodes
     runs-on: self-hosted-hoprnet-small
     if: needs.tag-images.result == 'success'
@@ -121,13 +122,13 @@ jobs:
 
       - name: Set up Google Cloud Credentials
         id: auth
-        uses: google-github-actions/auth@v1
+        uses: google-github-actions/auth@v2
         with:
           token_format: "access_token"
           credentials_json: ${{ secrets.GCP_SA_TERRAFORM_JSON }}
 
       - name: Set up Google Cloud SDK
-        uses: google-github-actions/setup-gcloud@v1
+        uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: hopr-staging
           install_components: beta
@@ -146,10 +147,10 @@ jobs:
           # Identify parameters depending on branch
           if [[ "${base_branch}" == "master" ]]; then
             hoprd_cluster=hoprd-core-rotsee
-            gh variable set LOAD_TESTING_NETWORK --body "rotsee"
+            gh variable set LOAD_TESTING_NODES --body "rotsee"
           elif [[ "${base_branch}" =~ ^"release" ]]; then
             hoprd_cluster=hoprd-core-dufour
-            gh variable set LOAD_TESTING_NETWORK --body "dufour"
+            gh variable set LOAD_TESTING_NODES --body "dufour"
           else
             echo "Skipping deployment"
             exit 0
@@ -176,7 +177,7 @@ jobs:
     uses: ./.github/workflows/load-tests.yaml
     with:
       test_id: pr-${{ github.event.pull_request.number }}
-      network: ${{ vars.LOAD_TESTING_NETWORK }}
+      nodes: ${{ vars.LOAD_TESTING_NODES }}
       workload: one-hop
       duration: ${{ vars.LOAD_TESTING_DURATION }}
       rate: "${{ vars.LOAD_TESTING_RATE }}"
@@ -321,3 +322,39 @@ jobs:
     with:
       base_branch: ${{ github.event.pull_request.base.ref }}
     secrets: inherit
+
+  notify:
+    name: Notify Changes
+    runs-on: self-hosted-hoprnet-small
+    steps:
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@v4
+
+      - name: Check for changes in specific folder
+        id: folder_changes
+        run: |
+          # Fetch the base branch
+          git fetch origin ${{ github.event.pull_request.base.ref }}
+
+          # Check if any file in the folder 'deploy' has changed
+          if git diff --name-only origin/${{ github.event.pull_request.base.ref }} ${{ github.sha }} | grep -q '^deploy/'; then
+            echo "folder_changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "folder_changed=false" >> $GITHUB_OUTPUT
+          fi
+
+      # Conditional step to notify if the folder has changed
+      - name: Notify deployment changes
+        if: steps.folder_changes.outputs.folder_changed == 'true'
+        uses: zulip/github-actions-zulip/send-message@v1
+        with:
+          api-key: ${{ secrets.ZULIP_API_KEY }}
+          email: ${{ secrets.ZULIP_EMAIL }}
+          organization-url: "https://hopr.zulipchat.com"
+          type: "stream"
+          to: "Products"
+          topic: "uHTTP"
+          content: |
+            The PR ${{ github.event.pull_request.number }} has changed the folder `deploy/` which contains the deployment files for hoprnet.
+            Review the changes manually and update the `uhttp-docker` repository accordingly.
+

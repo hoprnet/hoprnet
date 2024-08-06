@@ -33,7 +33,7 @@ use futures::{
     channel::mpsc::{UnboundedReceiver, UnboundedSender},
     FutureExt, StreamExt,
 };
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, trace, warn};
 
 use core_network::{
     heartbeat::Heartbeat,
@@ -72,10 +72,9 @@ pub use {
         libp2p, libp2p::swarm::derive_prelude::Multiaddr, multiaddrs::strip_p2p_protocol,
         swarm::HoprSwarmWithProcessors, PeerTransportEvent, TransportOutput,
     },
-    hopr_transport_session::PathOptions,
     hopr_transport_session::{
-        errors::TransportSessionError, traits::SendMsg, Capability as SessionCapability, Session, SessionClientConfig,
-        SessionId,
+        errors::TransportSessionError, traits::SendMsg, Capability as SessionCapability, PathOptions, Session,
+        SessionClientConfig, SessionId, SESSION_USABLE_MTU_SIZE,
     },
 };
 
@@ -202,7 +201,10 @@ where
             my_multiaddresses,
             process_packet_send: Arc::new(OnceLock::new()),
             process_ticket_aggregate: Arc::new(OnceLock::new()),
-            sessions: moka::future::Cache::new(u16::MAX as u64),
+            sessions: moka::future::Cache::builder()
+                .max_capacity(u16::MAX as u64)
+                .time_to_idle(std::time::Duration::from_secs(5 * 60))
+                .build(),
         }
     }
 
@@ -323,7 +325,7 @@ where
         let (tx, rx) = futures::channel::mpsc::unbounded::<TransportOutput>();
         let sessions = self.sessions.clone();
         let me = self.me;
-        let message_sender = Box::new(helpers::MessageSender::new(
+        let message_sender = Arc::new(helpers::MessageSender::new(
             self.process_packet_send.clone(),
             self.path_planner.clone(),
         ));
@@ -347,13 +349,21 @@ where
                                         if let Ok((peer, data)) =
                                             hopr_transport_session::types::unwrap_offchain_key(data.plain_text.clone())
                                         {
-                                            // data belongs to an outgoing session
                                             if let Some(sender) = sessions.get(&SessionId::new(app_tag, peer)).await {
-                                                // if the data does not get into the session, it can recover
-                                                let _ = sender.unbounded_send(data);
-                                            }
-                                            // data belongs to a new incoming session
-                                            else {
+                                                trace!(
+                                                    app_tag,
+                                                    peer_id = tracing::field::debug(peer),
+                                                    "Received data for a registered session"
+                                                );
+                                                if let Err(e) = sender.unbounded_send(data) {
+                                                    error!("Failed to send data to session: {e}");
+                                                }
+                                            } else {
+                                                info!(
+                                                    app_tag,
+                                                    peer_id = tracing::field::debug(peer),
+                                                    "Detected a new incoming session"
+                                                );
                                                 let session_id = SessionId::new(app_tag, peer);
 
                                                 let (tx, rx) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
@@ -362,16 +372,18 @@ where
                                                     .unbounded_send(Session::new(
                                                         session_id,
                                                         me,
-                                                        PathOptions::Hops(1),
-                                                        vec![
-                                                            SessionCapability::Segmentation,
-                                                            SessionCapability::Retransmission,
-                                                        ],
+                                                        PathOptions::IntermediatePath(vec![]),
+                                                        vec![],
                                                         message_sender.clone(),
                                                         rx,
                                                     ))
                                                     .is_ok()
                                                 {
+                                                    // if the data does not get into the session, it can recover
+                                                    if let Err(e) = tx.unbounded_send(data) {
+                                                        error!("Failed to send data to session: {e}");
+                                                    }
+
                                                     sessions.insert(session_id, tx).await;
                                                 } else {
                                                     warn!("Failed to send session to incoming session queue");
@@ -455,15 +467,16 @@ where
             .map(|status| status.last_seen.as_unix_timestamp().saturating_sub(start)))
     }
 
+    #[tracing::instrument(level = "debug", skip(self))]
     pub async fn new_session(&self, cfg: SessionClientConfig) -> errors::Result<Session> {
         // TODO: 2.2 session initiation protocol is necessary to establish an application tag instead of this random approach
         let mut session_id: Option<SessionId> = None;
         for _ in 0..100 {
-            let hopr_ra = hopr_crypto_random::random_integer(
+            let random_app_tag = hopr_crypto_random::random_integer(
                 RESERVED_SUBPROTOCOL_TAG_UPPER_LIMIT as u64,
                 Some(RESERVED_SESSION_TAG_UPPER_LIMIT as u64),
             ) as u16;
-            let id = SessionId::new(hopr_ra, cfg.peer);
+            let id = SessionId::new(random_app_tag, cfg.peer);
             if !self.sessions.contains_key(&id) {
                 session_id = Some(id);
             }
@@ -471,6 +484,11 @@ where
 
         let session_id = session_id
             .ok_or_else(|| errors::HoprTransportError::Api("Failed to generate a non-occupied session ID".into()))?;
+
+        debug!(
+            session_id = tracing::field::debug(session_id),
+            "Generated a new session ID"
+        );
 
         let (tx, rx) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
 
@@ -481,7 +499,7 @@ where
             self.me,
             cfg.path_options,
             cfg.capabilities,
-            Box::new(helpers::MessageSender::new(
+            Arc::new(helpers::MessageSender::new(
                 self.process_packet_send.clone(),
                 self.path_planner.clone(),
             )),

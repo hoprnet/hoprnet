@@ -449,8 +449,10 @@ deactivate
 With the environment activated, execute the tests locally:
 
 ```shell
-make smoke-test-full
+make smoke-tests
 ```
+
+####
 
 ## Contact
 

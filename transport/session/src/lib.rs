@@ -14,7 +14,7 @@ use {
     serde_with::{As, DisplayFromStr},
 };
 
-pub use types::{Session, SessionId};
+pub use types::{Session, SessionId, SESSION_USABLE_MTU_SIZE};
 
 /// Send options for the session.
 ///

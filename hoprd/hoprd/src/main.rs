@@ -9,6 +9,7 @@ use futures::StreamExt;
 
 #[cfg(feature = "telemetry")]
 use {
+    opentelemetry::trace::TracerProvider,
     opentelemetry_otlp::WithExportConfig as _,
     opentelemetry_sdk::trace::{RandomIdGenerator, Sampler},
 };
@@ -23,6 +24,8 @@ use hoprd::cli::CliArgs;
 use hoprd::errors::HoprdError;
 use hoprd_api::serve_api;
 use hoprd_keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
+
+use hoprd::HoprServerReactor;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleHistogram;
@@ -43,6 +46,7 @@ fn init_logger() -> Result<(), Box<dyn std::error::Error>> {
         Ok(filter) => filter,
         Err(_) => tracing_subscriber::filter::EnvFilter::new("info")
             .add_directive("libp2p_mplex=info".parse()?)
+            .add_directive("libp2p_swarm=info".parse()?)
             .add_directive("multistream_select=info".parse()?)
             .add_directive("isahc::handler=error".parse()?)
             .add_directive("isahc::client=error".parse()?)
@@ -55,48 +59,46 @@ fn init_logger() -> Result<(), Box<dyn std::error::Error>> {
         .with_thread_ids(true)
         .with_thread_names(false);
 
-    #[cfg(not(feature = "telemetry"))]
-    tracing::subscriber::set_global_default(tracing_subscriber::Registry::default().with(env_filter).with(format))
-        .expect("Failed to set tracing subscriber");
+    let registry = tracing_subscriber::Registry::default().with(env_filter).with(format);
+
+    let mut telemetry = None;
 
     #[cfg(feature = "telemetry")]
     {
-        if let Ok(telemetry_url) = std::env::var("HOPRD_OPENTELEMETRY_COLLECTOR_URL") {
-            let tracer = opentelemetry_otlp::new_pipeline()
-                .tracing()
-                .with_exporter(
-                    opentelemetry_otlp::new_exporter()
-                        .http()
-                        .with_endpoint(telemetry_url)
-                        .with_protocol(opentelemetry_otlp::Protocol::HttpBinary)
-                        .with_timeout(std::time::Duration::from_secs(5)),
-                )
-                .with_trace_config(
-                    opentelemetry_sdk::trace::config()
-                        .with_sampler(Sampler::AlwaysOn)
-                        .with_id_generator(RandomIdGenerator::default())
-                        .with_max_events_per_span(64)
-                        .with_max_attributes_per_span(16)
-                        .with_resource(opentelemetry_sdk::Resource::new(vec![opentelemetry::KeyValue::new(
-                            "service.name",
-                            env!("CARGO_PKG_NAME"),
-                        )])),
-                )
-                .install_batch(opentelemetry_sdk::runtime::AsyncStd)?;
+        match std::env::var("HOPRD_USE_OPENTELEMETRY") {
+            Ok(v) if v == "true" => {
+                let tracer = opentelemetry_otlp::new_pipeline()
+                    .tracing()
+                    .with_exporter(
+                        opentelemetry_otlp::new_exporter()
+                            .tonic()
+                            .with_protocol(opentelemetry_otlp::Protocol::Grpc)
+                            .with_timeout(std::time::Duration::from_secs(5)),
+                    )
+                    .with_trace_config(
+                        opentelemetry_sdk::trace::Config::default()
+                            .with_sampler(Sampler::AlwaysOn)
+                            .with_id_generator(RandomIdGenerator::default())
+                            .with_max_events_per_span(64)
+                            .with_max_attributes_per_span(16)
+                            .with_resource(opentelemetry_sdk::Resource::new(vec![opentelemetry::KeyValue::new(
+                                "service.name",
+                                std::env::var("OTEL_SERVICE_NAME").unwrap_or(env!("CARGO_PKG_NAME").into()),
+                            )])),
+                    )
+                    .install_batch(opentelemetry_sdk::runtime::Tokio)?
+                    .tracer(env!("CARGO_PKG_NAME"));
 
-            tracing::subscriber::set_global_default(
-                tracing_subscriber::Registry::default()
-                    .with(env_filter)
-                    .with(format)
-                    .with(tracing_opentelemetry::layer().with_tracer(tracer)),
-            )
-            .expect("Failed to set tracing subscriber");
-        } else {
-            tracing::subscriber::set_global_default(
-                tracing_subscriber::Registry::default().with(env_filter).with(format),
-            )
-            .expect("Failed to set tracing subscriber");
-        };
+                telemetry = Some(tracing_opentelemetry::layer().with_tracer(tracer))
+            }
+            _ => {}
+        }
+    }
+
+    if let Some(telemetry) = telemetry {
+        tracing::subscriber::set_global_default(registry.with(telemetry))?
+    } else {
+        tracing::subscriber::set_global_default(registry)?
     }
 
     Ok(())
@@ -112,13 +114,13 @@ enum HoprdProcesses {
 #[cfg_attr(feature = "runtime-async-std", async_std::main)]
 #[cfg_attr(all(feature = "runtime-tokio", not(feature = "runtime-async-std")), tokio::main)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let _ = init_logger();
-
-    let git_hash = option_env!("VERGEN_GIT_SHA").unwrap_or("unknown");
-    info!("This is HOPRd {} ({})", hopr_lib::constants::APP_VERSION, git_hash);
+    init_logger()?;
 
     let args = <CliArgs as clap::Parser>::parse();
     let cfg = hoprd::config::HoprdConfig::from_cli_args(args, false)?;
+
+    let git_hash = option_env!("VERGEN_GIT_SHA").unwrap_or("unknown");
+    info!("This is HOPRd {} ({})", hopr_lib::constants::APP_VERSION, git_hash);
 
     if std::env::var("DAPPNODE")
         .map(|v| v.to_lowercase() == "true")
@@ -229,7 +231,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
     }
 
-    let (hopr_socket, hopr_processes) = node.run().await?;
+    let (hopr_socket, hopr_processes) = node.run(HoprServerReactor {}).await?;
 
     // process extracting the received data from the socket
     let mut ingress = hopr_socket.reader();

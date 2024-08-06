@@ -138,14 +138,17 @@ impl SessionFeature {
 #[derive(Debug, Clone, SmartDefault)]
 pub struct SessionConfig {
     /// Maximum number of buffered segments.
-    /// This value should be large enough to accommodate segments for an at least
+    ///
+    /// The value should be large enough to accommodate segments for an at least
     /// `frame_expiration_age` period, considering the expected maximum bandwidth.
     #[default = 50_000]
     pub max_buffered_segments: usize,
 
     /// Size of the buffer for acknowledged frame IDs.
-    /// This value should be large enough so that the buffer can accommodate segments
+    ///
+    /// The value should be large enough so that the buffer can accommodate segments
     /// for an at least `frame_expiration_age` period, given the expected maximum bandwidth.
+    ///
     /// If set to 0, no frame acknowledgement will be sent.
     #[default = 1024]
     pub acknowledged_frames_buffer: usize,
@@ -157,7 +160,9 @@ pub struct SessionConfig {
 
     /// If a frame is incomplete (on the receiver), retransmission requests will be made
     /// with exponential backoff starting at this initial retry timeout (RTO).
+    ///
     /// Requests will be sent until `frame_expiration_age` is reached.
+    ///
     /// NOTE that this value should be offset from `rto_base_sender`, so that the receiver's
     /// retransmission requests are interleaved with the sender's retransmissions.
     #[default(Duration::from_millis(1000))]
@@ -165,7 +170,9 @@ pub struct SessionConfig {
 
     /// If a frame is unacknowledged (on the sender), entire frame retransmissions will be made
     /// with exponential backoff starting at this initial retry timeout (RTO).
+    ///
     /// Frames will be retransmitted until `frame_expiration_age` is reached.
+    ///
     /// NOTE that this value should be offset from `rto_base_receiver`, so that the receiver's
     /// retransmission requests are interleaved with the sender's retransmissions.
     #[default(Duration::from_millis(1500))]
@@ -176,7 +183,7 @@ pub struct SessionConfig {
     pub backoff_base: f64,
 
     /// Standard deviation of a Gaussian jitter applied to `rto_base_receiver` and
-    /// `rto_base_sender`.
+    /// `rto_base_sender`. Must be between 0 and 0.25.
     #[default(0.05)]
     pub rto_jitter: f64,
 
@@ -559,6 +566,10 @@ impl<const C: usize> SessionState<C> {
     /// - [`SessionState::retransmit_unacknowledged_frames`]
     ///
     async fn advance(&mut self) -> crate::errors::Result<()> {
+        if self.segment_egress_send.is_closed() {
+            return Err(SessionError::SessionClosed.into());
+        }
+
         let num_evicted = self.frame_reassembler.evict()?;
         trace!(session_id = self.session_id, "evicted {num_evicted} frames");
 
@@ -584,15 +595,16 @@ impl<const C: usize> SessionState<C> {
     }
 }
 
-impl<const C: usize, T: AsRef<[u8]>> Sink<T> for SessionState<C> {
+// Sink for data coming from downstream
+impl<const C: usize> Sink<SessionMessage<C>> for SessionState<C> {
     type Error = NetworkTypeError;
 
     fn poll_ready(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
     }
 
-    fn start_send(mut self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
-        match SessionMessage::try_from(item.as_ref())? {
+    fn start_send(mut self: Pin<&mut Self>, item: SessionMessage<C>) -> Result<(), Self::Error> {
+        match item {
             SessionMessage::Segment(s) => self.consume_segment(s),
             SessionMessage::Request(r) => self.retransmit_segments(r),
             SessionMessage::Acknowledge(f) => self.acknowledged_frames(f),
@@ -691,41 +703,55 @@ impl<const C: usize> SessionSocket<C> {
             let jitter = Jitter::up_to(Duration::from_millis(5));
 
             spawn(async move {
-                segment_egress_recv
-                    .map(|m: SessionMessage<C>| Ok(m.into_encoded()))
-                    .ratelimit_stream_with_jitter(&rate_limiter, jitter)
-                    .forward(downstream_write.into_sink())
-                    .await
+                debug!(
+                    "FINISHED spawned egress to downstream: {:?}",
+                    segment_egress_recv
+                        .map(|m: SessionMessage<C>| Ok(m.into_encoded()))
+                        .ratelimit_stream_with_jitter(&rate_limiter, jitter)
+                        .forward(downstream_write.into_sink())
+                        .await
+                );
             });
         } else {
-            spawn(
-                segment_egress_recv
-                    .map(|m| Ok(m.into_encoded()))
-                    .forward(downstream_write.into_sink()),
-            );
+            spawn(async move {
+                debug!(
+                    "FINISHED spawned egress to downstream: {:?}",
+                    segment_egress_recv
+                        .map(|m| Ok(m.into_encoded()))
+                        .forward(downstream_write.into_sink())
+                        .await,
+                )
+            });
         }
 
         // Segment ingress from downstream
         spawn(
             AsyncReadStreamer::<_, C>::new(downstream_read)
                 .map_err(|e| NetworkTypeError::SessionProtocolError(SessionError::ProcessingError(e.to_string())))
+                .and_then(|m| {
+                    futures::future::ready(SessionMessage::try_from(m.as_ref()).map_err(NetworkTypeError::from))
+                })
                 .forward(state.clone()),
         );
 
         // Advance the state until the socket is closed
-        if !cfg.enabled_features.is_empty() {
-            let mut state_clone = state.clone();
-            spawn_local(async move {
-                let timeout = cfg
-                    .rto_base_receiver
-                    .min(cfg.rto_base_sender)
-                    .min(cfg.frame_expiration_age / 3);
+        let mut state_clone = state.clone();
+        spawn_local(async move {
+            let timeout = cfg
+                .rto_base_receiver
+                .min(cfg.rto_base_sender)
+                .min(cfg.frame_expiration_age / 3);
 
-                while state_clone.advance().await.is_ok() {
-                    sleep(timeout).await;
+            loop {
+                match state_clone.advance().await {
+                    Ok(_) => sleep(timeout).await,
+                    Err(e) => {
+                        debug!(session_id = state_clone.session_id(), "session is closing: {e}");
+                        break;
+                    }
                 }
-            });
-        }
+            }
+        });
 
         Self { state, frame_egress }
     }
@@ -743,6 +769,7 @@ impl<const C: usize> SessionSocket<C> {
 
 impl<const C: usize> AsyncWrite for SessionSocket<C> {
     fn poll_write(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
+        tracing::debug!("Polling write on socket reader inside session");
         let mut socket_future = self.state.send_frame_data(buf).boxed();
         match Pin::new(&mut socket_future).poll(cx) {
             Poll::Ready(Ok(())) => Poll::Ready(Ok(buf.len())),
@@ -752,6 +779,7 @@ impl<const C: usize> AsyncWrite for SessionSocket<C> {
     }
 
     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+        tracing::debug!("Polling flush on socket reader inside session");
         // Only flush the underlying transport
         let mut flush_future = self.state.segment_egress_send.flush();
         match Pin::new(&mut flush_future).poll(cx) {
@@ -762,6 +790,7 @@ impl<const C: usize> AsyncWrite for SessionSocket<C> {
     }
 
     fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+        tracing::debug!("Polling close on socket reader inside session");
         // Close the underlying transport
         let mut close_future = self.state.segment_egress_send.close().boxed();
         match Pin::new(&mut close_future).poll(cx) {
@@ -774,6 +803,7 @@ impl<const C: usize> AsyncWrite for SessionSocket<C> {
 
 impl<const C: usize> AsyncRead for SessionSocket<C> {
     fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<std::io::Result<usize>> {
+        tracing::debug!("Polling read on socket reader inside session");
         self.project().frame_egress.poll_read(cx, buf)
     }
 }
@@ -822,6 +852,13 @@ mod tests {
 
     impl AsyncWrite for FaultyNetwork<'_> {
         fn poll_write(self: Pin<&mut Self>, _cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
+            if buf.len() > MTU {
+                return Poll::Ready(Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "data length passed to downstream must be less or equal to MTU",
+                )));
+            }
+
             self.ingress.unbounded_send(buf.into()).unwrap();
             Poll::Ready(Ok(buf.len()))
         }
@@ -903,7 +940,7 @@ mod tests {
                 for _ in 0..num_frames {
                     let mut write = vec![0u8; frame_size];
                     hopr_crypto_random::random_fill(&mut write);
-                    socket.write(&write).await.unwrap();
+                    socket.write(&write).await?;
                     sent.extend(write);
                 }
                 socket.close().await.unwrap();
@@ -912,12 +949,12 @@ mod tests {
             if d == Direction::Recv || d == Direction::Both {
                 for _ in 0..num_frames {
                     let mut read = vec![0u8; frame_size];
-                    socket.read_exact(&mut read).await.unwrap();
+                    socket.read_exact(&mut read).await?;
                     received.extend(read);
                 }
             }
 
-            (sent, received)
+            Ok::<_, std::io::Error>((sent, received))
         };
 
         let alice_worker = async_std::task::spawn(socket_worker(
@@ -936,7 +973,7 @@ mod tests {
         pin_mut!(timeout);
 
         match futures::future::select(send_recv, timeout).await {
-            Either::Left((((alice_sent, alice_recv), (bob_sent, bob_recv)), _)) => {
+            Either::Left(((Ok((alice_sent, alice_recv)), Ok((bob_sent, bob_recv))), _)) => {
                 assert_eq!(
                     hex::encode(alice_sent),
                     hex::encode(bob_recv),
@@ -948,6 +985,8 @@ mod tests {
                     "bob sent must be equal to alice received",
                 );
             }
+            Either::Left(((Err(e), _), _)) => panic!("send recv error: {e}"),
+            Either::Left(((_, Err(e)), _)) => panic!("send recv error: {e}"),
             Either::Right(_) => panic!("timeout"),
         }
     }
