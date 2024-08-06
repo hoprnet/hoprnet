@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["SESSION_USABLE_MTU_SIZE"],"fn":["unwrap_offchain_key","wrap_with_offchain_key"],"struct":["InnerSession","Session","SessionId"]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["Capability","PathOptions"],"mod":["errors","traits","types"],"struct":["SessionClientConfig"]};

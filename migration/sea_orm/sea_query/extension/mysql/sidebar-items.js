@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["IndexHintScope","IndexHintType"],"struct":["IndexHint"],"trait":["MySqlSelectStatementExt"],"type":["IndexName"]};

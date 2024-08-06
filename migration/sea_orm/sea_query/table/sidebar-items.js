@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["BlobSize","ColumnSpec","ColumnType","MySqlYear","PgInterval","TableAlterOption","TableDropOpt","TableOpt","TablePartition","TableStatement"],"struct":["AddColumnOption","ColumnDef","Table","TableAlterStatement","TableCreateStatement","TableDropStatement","TableRenameStatement","TableTruncateStatement"]};

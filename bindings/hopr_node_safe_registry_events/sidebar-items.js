@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["HoprNodeSafeRegistryEventsEvents"],"mod":["hopr_node_safe_registry_events"],"static":["HOPRNODESAFEREGISTRYEVENTS_ABI"],"struct":["DergisteredNodeSafeFilter","DomainSeparatorUpdatedFilter","HoprNodeSafeRegistryEvents","RegisteredNodeSafeFilter"]};

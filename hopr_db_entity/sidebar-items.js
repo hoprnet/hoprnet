@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"mod":["account","announcement","chain_info","channel","conversions","errors","global_settings","network_eligibility","network_peer","network_registry","node_info","outgoing_ticket_index","prelude","ticket","ticket_statistics"]};

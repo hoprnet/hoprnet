@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["PACKET_RX_QUEUE_SIZE","PACKET_TX_QUEUE_SIZE"],"enum":["MsgProcessed","MsgToProcess"],"struct":["PacketActions","PacketInteraction","PacketInteractionConfig","PacketMetadata","PacketProcessor","PacketSendAwaiter","PacketSendFinalizer"]};

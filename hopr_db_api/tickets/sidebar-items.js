@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":["AggregationPrerequisites","ChannelTicketStatistics","TicketSelector"],"trait":["HoprDbTicketOperations"]};

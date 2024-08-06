@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["SQL_DB_INDEX_FILE_NAME","SQL_DB_PEERS_FILE_NAME","SQL_DB_TICKETS_FILE_NAME"],"struct":["HoprDb","HoprDbConfig"]};

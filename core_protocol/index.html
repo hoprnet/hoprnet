@@ -1,0 +1,52 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Collection of objects and functionality allowing building of p2p or stream protocols for the higher business logic layers."><title>core_protocol - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../static.files/rustdoc-dd39b87e5fcfba68.css"><meta name="rustdoc-vars" data-root-path="../" data-static-root-path="../static.files/" data-current-crate="core_protocol" data-themes="" data-resource-suffix="" data-rustdoc-version="1.80.0-nightly (b1ec1bd65 2024-05-18)" data-channel="nightly" data-search-js="search-d52510db62a78183.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../static.files/storage-118b08c4c78b968e.js"></script><script defer src="../crates.js"></script><script defer src="../static.files/main-20a3ad099b048cf2.js"></script><noscript><link rel="stylesheet" href="../static.files/noscript-df360f571f6edeae.css"></noscript><link rel="alternate icon" type="image/png" href="../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc mod crate"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle" title="show sidebar"></button></nav><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../core_protocol/index.html">core_protocol</a><span class="version">0.2.5</span></h2></div><div class="sidebar-elems"><ul class="block"><li><a id="all-types" href="all.html">All Items</a></li></ul><section><ul class="block"><li><a href="#modules">Modules</a></li></ul></section></div></nav><div class="sidebar-resizer"></div><main><div class="width-limiter"><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><h1>Crate <a class="mod" href="#">core_protocol</a><button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><span class="out-of-band"><a class="src" href="../src/core_protocol/lib.rs.html#1-61">source</a> · <button id="toggle-all-docs" title="collapse all docs">[<span>&#x2212;</span>]</button></span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Collection of objects and functionality allowing building of p2p or stream protocols for the higher business logic layers.</p>
+<h3 id="contents"><a class="doc-anchor" href="#contents">§</a>Contents</h3>
+<p>Supported protocol configurations:</p>
+<ul>
+<li><code>msg</code></li>
+<li><code>ack</code></li>
+<li><code>heartbeat</code></li>
+<li><code>ticket_aggregation</code></li>
+</ul>
+<p>Supported protocol processors:</p>
+<ul>
+<li><code>ticket_aggregation</code></li>
+</ul>
+<h4 id="ticket_aggregation"><a class="doc-anchor" href="#ticket_aggregation">§</a><code>ticket_aggregation</code></h4>
+<p>Ticket aggregation processing mechanism is responsible for ingesting the ticket aggregation related requests:</p>
+<ul>
+<li><code>Receive(PeerId, U)</code>,</li>
+<li><code>Reply(PeerId, std::result::Result&lt;Ticket, String&gt;, T)</code>,</li>
+<li><code>Send(PeerId, Vec&lt;AcknowledgedTicket&gt;, TicketAggregationFinalizer)</code>,</li>
+</ul>
+<p>where <code>U</code> is the type of an aggregated ticket extractable (<code>ResponseChannel&lt;Result&lt;Ticket, String&gt;&gt;</code>) and <code>T</code> represents a network negotiated identifier (<code>RequestId</code>).</p>
+<p>In broader context the protocol flow is as follows:</p>
+<ol>
+<li>
+<p>requesting ticket aggregation</p>
+<ul>
+<li>the peer A desires to aggregate tickets, collects the tickets into a data collection and sends a request containing the collection to aggregate <code>Vec&lt;AcknowledgedTicket&gt;</code> to peer B using the <code>Send</code> mechanism</li>
+</ul>
+</li>
+<li>
+<p>responding to ticket aggregation</p>
+<ul>
+<li>peer B obtains the request from peer A, performs the ticket aggregation and returns a result of that operation in the form of <code>std::result::Result&lt;Ticket, String&gt;</code> using the <code>Reply</code> mechanism</li>
+</ul>
+</li>
+<li>
+<p>accepting the aggregated ticket</p>
+<ul>
+<li>peer A receives the aggregated ticket using the <code>Receive</code> mechanism</li>
+</ul>
+</li>
+</ol>
+<p>Furthermore, apart from the basic positive case scenario, standard mechanics of protocol communication apply:</p>
+<ul>
+<li>the requesting side can time out, if the responding side takes too long to provide an aggregated ticket, in which case the ticket is not considered aggregated, even if eventually an aggregated ticket is delivered</li>
+<li>the responder can fail to aggregate tickets in which case it replies with an error string describing the failure reason and it is the requester’s responsibility to handle the negative case as well
+<ul>
+<li>in the absence of response, the requester will time out</li>
+</ul>
+</li>
+</ul>
+</div></details><h2 id="modules" class="section-header">Modules<a href="#modules" class="anchor">§</a></h2><ul class="item-table"><li><div class="item-name"><a class="mod" href="ack/index.html" title="mod core_protocol::ack">ack</a></div><div class="desc docblock-short"><code>ack</code> p2p protocol</div></li><li><div class="item-name"><a class="mod" href="bloom/index.html" title="mod core_protocol::bloom">bloom</a></div><div class="desc docblock-short">Bloom filter for the transport layer.</div></li><li><div class="item-name"><a class="mod" href="config/index.html" title="mod core_protocol::config">config</a></div><div class="desc docblock-short">Configuration of the protocol components.</div></li><li><div class="item-name"><a class="mod" href="errors/index.html" title="mod core_protocol::errors">errors</a></div><div class="desc docblock-short">Errors produced by the crate.</div></li><li><div class="item-name"><a class="mod" href="heartbeat/index.html" title="mod core_protocol::heartbeat">heartbeat</a></div><div class="desc docblock-short"><code>heartbeat</code> p2p protocol</div></li><li><div class="item-name"><a class="mod" href="msg/index.html" title="mod core_protocol::msg">msg</a></div><div class="desc docblock-short"><code>msg</code> p2p protocol</div></li><li><div class="item-name"><a class="mod" href="ticket_aggregation/index.html" title="mod core_protocol::ticket_aggregation">ticket_aggregation</a></div><div class="desc docblock-short"><code>ticket_aggregation</code> p2p protocol</div></li></ul></section></div></main></body></html>

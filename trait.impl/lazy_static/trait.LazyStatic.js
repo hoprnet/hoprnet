@@ -1,0 +1,3 @@
+(function() {var implementors = {
+"hopr_db_sql":[["impl <a class=\"trait\" href=\"https://docs.rs/lazy_static/1.4.0/lazy_static/trait.LazyStatic.html\" title=\"trait lazy_static::LazyStatic\">LazyStatic</a> for <a class=\"struct\" href=\"hopr_db_sql/tickets/struct.METRIC_HOPR_TICKETS_INCOMING_STATISTICS.html\" title=\"struct hopr_db_sql::tickets::METRIC_HOPR_TICKETS_INCOMING_STATISTICS\">METRIC_HOPR_TICKETS_INCOMING_STATISTICS</a>"]]
+};if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

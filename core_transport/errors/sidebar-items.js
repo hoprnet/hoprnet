@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["HoprTransportError","ProtocolError"],"type":["Result"]};
