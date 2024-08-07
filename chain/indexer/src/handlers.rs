@@ -2002,6 +2002,8 @@ pub mod tests {
         let mut ticket = mock_acknowledged_ticket(&COUNTERPARTY_CHAIN_KEY, &SELF_CHAIN_KEY, ticket_index.as_u64());
         ticket.status = AcknowledgedTicketStatus::BeingRedeemed;
 
+        let ticket_value = ticket.ticket.amount;
+
         db.upsert_channel(None, channel).await.unwrap();
         db.upsert_ticket(None, ticket.clone()).await.unwrap();
 
@@ -2020,6 +2022,18 @@ pub mod tests {
             .await
             .expect("must get ticket index")
             .load(Ordering::Relaxed);
+
+        let stats = db.get_ticket_statistics(None, Some(channel.get_id())).await.unwrap();
+        assert_eq!(
+            BalanceType::HOPR.zero(),
+            stats.redeemed_value,
+            "there should not be any redeemed value"
+        );
+        assert_eq!(
+            BalanceType::HOPR.zero(),
+            stats.neglected_value,
+            "there should not be any neglected value"
+        );
 
         let event_type = db
             .begin_transaction()
@@ -2050,6 +2064,125 @@ pub mod tests {
         assert_eq!(
             outgoing_ticket_index_before, outgoing_ticket_index_after,
             "outgoing ticket index must not change"
+        );
+
+        let tickets = db.get_tickets(None, (&channel).into()).await.unwrap();
+        assert!(tickets.is_empty(), "there should not be any tickets left");
+
+        let stats = db.get_ticket_statistics(None, Some(channel.get_id())).await.unwrap();
+        assert_eq!(
+            ticket_value, stats.redeemed_value,
+            "there should be redeemed value worth 1 ticket"
+        );
+        assert_eq!(
+            BalanceType::HOPR.zero(),
+            stats.neglected_value,
+            "there should not be any neglected ticket"
+        );
+    }
+
+    #[async_std::test]
+    async fn on_channel_ticket_redeemed_incoming_channel_neglect_left_over_tickets() {
+        let db = create_db().await;
+        db.set_domain_separator(None, DomainSeparator::Channel, Hash::default())
+            .await
+            .unwrap();
+
+        let handlers = init_handlers(db.clone());
+
+        let channel = ChannelEntry::new(
+            *COUNTERPARTY_CHAIN_ADDRESS,
+            *SELF_CHAIN_ADDRESS,
+            Balance::new(U256::from((1u128 << 96) - 1), BalanceType::HOPR),
+            U256::zero(),
+            ChannelStatus::Open,
+            U256::one(),
+        );
+
+        let ticket_index = U256::from((1u128 << 48) - 1);
+        let next_ticket_index = ticket_index + 1;
+
+        let mut ticket = mock_acknowledged_ticket(&COUNTERPARTY_CHAIN_KEY, &SELF_CHAIN_KEY, ticket_index.as_u64());
+        ticket.status = AcknowledgedTicketStatus::BeingRedeemed;
+
+        let ticket_value = ticket.ticket.amount;
+
+        db.upsert_channel(None, channel).await.unwrap();
+        db.upsert_ticket(None, ticket.clone()).await.unwrap();
+
+        let old_ticket = mock_acknowledged_ticket(&COUNTERPARTY_CHAIN_KEY, &SELF_CHAIN_KEY, ticket_index.as_u64() - 1);
+        db.upsert_ticket(None, old_ticket.clone()).await.unwrap();
+
+        let ticket_redeemed_log = ethers::prelude::Log {
+            address: handlers.addresses.channels.into(),
+            topics: vec![
+                TicketRedeemedFilter::signature(),
+                H256::from_slice(&channel.get_id().to_bytes()),
+            ],
+            data: Vec::from(next_ticket_index.to_bytes()).into(),
+            ..test_log()
+        };
+
+        let outgoing_ticket_index_before = db
+            .get_outgoing_ticket_index(channel.get_id())
+            .await
+            .expect("must get ticket index")
+            .load(Ordering::Relaxed);
+
+        let stats = db.get_ticket_statistics(None, Some(channel.get_id())).await.unwrap();
+        assert_eq!(
+            BalanceType::HOPR.zero(),
+            stats.redeemed_value,
+            "there should not be any redeemed value"
+        );
+        assert_eq!(
+            BalanceType::HOPR.zero(),
+            stats.neglected_value,
+            "there should not be any neglected value"
+        );
+
+        let event_type = db
+            .begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, ticket_redeemed_log.into()).await }))
+            .await
+            .unwrap();
+
+        let channel = db.get_channel_by_id(None, &channel.get_id()).await.unwrap().unwrap();
+
+        assert!(
+            matches!(event_type, Some(ChainEventType::TicketRedeemed(c, t)) if channel == c && t == Some(ticket)),
+            "must return the updated channel entry and the redeemed ticket"
+        );
+
+        assert_eq!(
+            channel.ticket_index, next_ticket_index,
+            "channel entry must contain next ticket index"
+        );
+
+        let outgoing_ticket_index_after = db
+            .get_outgoing_ticket_index(channel.get_id())
+            .await
+            .expect("must get ticket index")
+            .load(Ordering::Relaxed);
+
+        assert_eq!(
+            outgoing_ticket_index_before, outgoing_ticket_index_after,
+            "outgoing ticket index must not change"
+        );
+
+        let tickets = db.get_tickets(None, (&channel).into()).await.unwrap();
+        assert!(tickets.is_empty(), "there should not be any tickets left");
+
+        let stats = db.get_ticket_statistics(None, Some(channel.get_id())).await.unwrap();
+        assert_eq!(
+            ticket_value, stats.redeemed_value,
+            "there should be redeemed value worth 1 ticket"
+        );
+        assert_eq!(
+            ticket_value, stats.neglected_value,
+            "there should neglected value worth 1 ticket"
         );
     }
 
