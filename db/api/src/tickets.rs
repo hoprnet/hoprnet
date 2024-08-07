@@ -1006,7 +1006,7 @@ impl HoprDbTicketOperations for HoprDb {
                 })
                 .await?;
 
-        let (tickets, neglected) = self
+        let tickets = self
             .ticket_manager
             .with_write_locked_db(|tx| {
                 Box::pin(async move {
@@ -1054,7 +1054,7 @@ impl HoprDbTicketOperations for HoprDb {
                         .map(|m| model_to_acknowledged_ticket(&m, &ds, &chain_keypair).map_err(DbError::from))
                         .collect::<Result<Vec<_>>>()?;
 
-                    let mut neglected = TicketSelector::from(&channel_entry);
+                    let mut neglected_idxs = Vec::new();
 
                     if !to_be_aggregated.is_empty() {
                         // Clean up any tickets in this channel that are already inside an aggregated ticket.
@@ -1063,7 +1063,6 @@ impl HoprDbTicketOperations for HoprDb {
                         // The following code *assumes* that only the first ticket with the lowest index *can be* an aggregate.
                         let first_ticket = to_be_aggregated[0].ticket.clone();
                         let mut i = 1;
-                        let mut count_neglected = 0;
                         while i < to_be_aggregated.len() {
                             let current_idx = to_be_aggregated[i].ticket.index;
                             if (first_ticket.index..first_ticket.index + first_ticket.index_offset as u64).contains(&current_idx) {
@@ -1071,12 +1070,17 @@ impl HoprDbTicketOperations for HoprDb {
                                 // since the aggregator will check for index range overlaps and deny
                                 // the aggregation of the entire batch otherwise.
                                 warn!("ticket {current_idx} in channel {channel_id} has been already aggregated in {first_ticket} and will be removed");
-                                neglected = neglected.with_index(current_idx);
+                                neglected_idxs.push(current_idx);
                                 to_be_aggregated.remove(i);
-                                count_neglected += 1;
                             } else {
                                 i += 1;
                             }
+                        }
+
+                        // The cleanup (neglecting of tickets) is not made directly here but on the next ticket redemption in this channel
+                        // See handler.rs around L402
+                        if !neglected_idxs.is_empty() {
+                            warn!("{} tickets were neglected in channel {channel_id} due to duplication in an aggregated ticket!", neglected_idxs.len());
                         }
 
                         // mark all tickets with appropriate characteristics as being aggregated
@@ -1085,6 +1089,7 @@ impl HoprDbTicketOperations for HoprDb {
                             .filter(TicketSelector::from(&channel_entry))
                             .filter(ticket::Column::Index.gte(first_idx_to_take.to_be_bytes().to_vec()))
                             .filter(ticket::Column::Index.lte(last_idx_to_take.to_be_bytes().to_vec()))
+                            .filter(ticket::Column::Index.is_not_in(neglected_idxs.into_iter().map(|i| i.to_be_bytes().to_vec())))
                             .filter(ticket::Column::State.ne(AcknowledgedTicketStatus::BeingAggregated as u8))
                             .col_expr(
                                 ticket::Column::State,
@@ -1093,7 +1098,7 @@ impl HoprDbTicketOperations for HoprDb {
                             .exec(tx.as_ref())
                             .await?;
 
-                        if marked.rows_affected as usize != to_be_aggregated.len() + count_neglected {
+                        if marked.rows_affected as usize != to_be_aggregated.len() {
                             return Err(DbError::LogicalError(format!(
                                 "expected to mark {}, but was able to mark {}",
                                 to_be_aggregated.len(),
@@ -1108,16 +1113,10 @@ impl HoprDbTicketOperations for HoprDb {
                         channel_entry.channel_epoch,
                     );
 
-                    Ok((to_be_aggregated, neglected))
+                    Ok(to_be_aggregated)
                 })
             })
             .await?;
-
-        // Neglect the tickets that were found as duplicates within a single transaction
-        if !matches!(neglected.index, TicketIndexSelector::None) {
-            let neglected_due_to_duplication = self.mark_tickets_neglected(neglected).await?;
-            warn!("{neglected_due_to_duplication} were neglected in channel {channel_id} due to duplication in an aggregated ticket!");
-        }
 
         Ok((!tickets.is_empty()).then_some((peer, tickets)))
     }
@@ -2577,7 +2576,7 @@ mod tests {
             .await?;
 
         // We expect the first ticket to be removed
-        let removed = tickets.remove(0);
+        tickets.remove(0);
         assert_eq!(actual, Some((BOB_OFFCHAIN.public().clone(), tickets)));
 
         let actual_being_aggregated_count = hopr_db_entity::ticket::Entity::find()
@@ -2586,9 +2585,6 @@ mod tests {
             .await? as usize;
 
         assert_eq!(actual_being_aggregated_count, 3);
-
-        let stats = db.get_ticket_statistics(None, Some(channel.get_id())).await?;
-        assert_eq!(stats.neglected_value, removed.ticket.amount);
 
         Ok(())
     }
