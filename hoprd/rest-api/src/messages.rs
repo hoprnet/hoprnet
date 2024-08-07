@@ -14,7 +14,7 @@ use serde::Deserialize;
 use serde_json::json;
 use serde_with::{serde_as, Bytes, DisplayFromStr, DurationMilliSeconds};
 use std::{sync::Arc, time::Duration};
-use tracing::{debug, error, warn};
+use tracing::{debug, error, trace, warn};
 use validator::Validate;
 
 use hopr_lib::{AsUnixTimestamp, PathOptions, TransportIngress, RESERVED_TAG_UPPER_LIMIT};
@@ -184,18 +184,15 @@ impl From<hopr_lib::ApplicationData> for WebSocketReadMsg {
 /// The following message can be set to the server by the client:
 /// ```json
 /// {
-///     cmd: "sendmsg",
-///     args: {
-///         peerId: "SOME_PEER_ID",
-///         path: [],
-///         hops: 1,
-///         body: "asdasd",
-///         tag: 2
-///     }
+///     peerId: "SOME_PEER_ID",
+///     path: [],
+///     hops: 1,
+///     body: "asdasd",
+///     tag: 2
 /// }
 /// ```
 ///
-/// The command arguments follow the same semantics as in the dedicated API endpoint for sending messages.
+/// The arguments follow the same semantics as in the dedicated API endpoint for sending messages.
 ///
 /// The following messages may be sent by the server over the Websocket connection:
 /// ````json
@@ -203,16 +200,6 @@ impl From<hopr_lib::ApplicationData> for WebSocketReadMsg {
 ///   type: "message",
 ///   tag: 12,
 ///   body: "my example message"
-/// }
-///
-/// {
-///   type: "message-ack",
-///   id: "some challenge id"
-/// }
-///
-/// {
-///   type: "message-ack-challenge",
-///   id: "some challenge id"
 /// }
 ///
 /// Authentication (if enabled) is done by cookie `X-Auth-Token`.
@@ -242,6 +229,7 @@ enum WebSocketInput {
     WsInput(core::result::Result<Message, Error>),
 }
 
+#[tracing::instrument(level = "debug", skip(socket, state))]
 async fn websocket_connection(socket: WebSocket, state: Arc<InternalState>) {
     let (mut sender, receiver) = socket.split();
 
@@ -257,28 +245,28 @@ async fn websocket_connection(socket: WebSocket, state: Arc<InternalState>) {
         match v {
             WebSocketInput::Network(net_in) => match net_in {
                 TransportIngress::Received(data) => {
-                    debug!("websocket notifying client: received msg");
+                    debug!("Received a msg");
                     if let Err(e) = sender
                         .send(Message::Text(json!(WebSocketReadMsg::from(data)).to_string()))
                         .await
                     {
-                        error!("failed to emit read data onto the websocket: {e}");
+                        error!("Failed to emit read data onto the websocket: {e}");
                     };
                 }
             },
             WebSocketInput::WsInput(ws_in) => match ws_in {
                 Ok(Message::Text(input)) => {
                     if let Err(e) = handle_send_message(&input, state.clone()).await {
-                        error!("failed to send message: {e}");
+                        error!("Failed to send message: {e}");
                     }
                 }
                 Ok(Message::Close(_)) => {
-                    debug!("received close frame, closing connection");
+                    debug!("Received close frame, closing connection");
                     break;
                 }
-                Ok(m) => warn!("skipping an unsupported websocket message: {m:?}"),
+                Ok(m) => trace!("skipping an unsupported websocket message: {m:?}"),
                 Err(e) => {
-                    error!("failed to get a valid websocket message: {e}, closing connection");
+                    error!("Failed to get a valid websocket message: {e}, closing connection");
                     break;
                 }
             },
