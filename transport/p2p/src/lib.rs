@@ -80,6 +80,7 @@ pub struct Pong(pub ControlMessage, pub String);
 pub struct HoprNetworkBehavior {
     discovery: behavior::discovery::Behaviour,
     heartbeat_generator: behavior::heartbeat::Behaviour,
+    ticket_aggregation_behavior: behavior::ticket_aggregation::Behaviour,
     pub heartbeat: libp2p::request_response::cbor::Behaviour<Ping, Pong>,
     pub msg: libp2p::request_response::cbor::Behaviour<Box<[u8]>, ()>,
     pub ack: libp2p::request_response::cbor::Behaviour<Acknowledgement, ()>,
@@ -94,11 +95,12 @@ impl Debug for HoprNetworkBehavior {
 }
 
 impl HoprNetworkBehavior {
-    pub fn new<T, U, V>(
+    pub fn new<T, U, V, W>(
         me: PeerId,
         network_events: T,
         onchain_events: U,
         heartbeat_requests: V,
+        ticket_aggregation_processed_events: W,
         msg_cfg: MsgProtocolConfig,
         ack_cfg: AckProtocolConfig,
         hb_cfg: HeartbeatProtocolConfig,
@@ -108,10 +110,14 @@ impl HoprNetworkBehavior {
         T: Stream<Item = NetworkTriggeredEvent> + Send + 'static,
         U: Stream<Item = PeerDiscovery> + Send + 'static,
         V: Stream<Item = (PeerId, PingQueryReplier)> + Send + 'static,
+        W: Stream<Item = behavior::ticket_aggregation::Event> + Send + 'static,
     {
         Self {
             discovery: behavior::discovery::Behaviour::new(me, network_events, onchain_events),
             heartbeat_generator: behavior::heartbeat::Behaviour::new(heartbeat_requests),
+            ticket_aggregation_behavior: behavior::ticket_aggregation::Behaviour::new(
+                ticket_aggregation_processed_events,
+            ),
             heartbeat: libp2p::request_response::cbor::Behaviour::<Ping, Pong>::new(
                 [(
                     StreamProtocol::new(HOPR_HEARTBEAT_PROTOCOL_V_0_1_0),
@@ -155,6 +161,7 @@ impl HoprNetworkBehavior {
 pub enum HoprNetworkBehaviorEvent {
     Discovery(behavior::discovery::Event),
     HeartbeatGenerator(behavior::heartbeat::Event),
+    TicketAggregationBehavior(behavior::ticket_aggregation::Event),
     Heartbeat(libp2p::request_response::Event<Ping, Pong>),
     Message(libp2p::request_response::Event<Box<[u8]>, ()>),
     Acknowledgement(libp2p::request_response::Event<Acknowledgement, ()>),
@@ -179,6 +186,12 @@ impl From<behavior::discovery::Event> for HoprNetworkBehaviorEvent {
 impl From<behavior::heartbeat::Event> for HoprNetworkBehaviorEvent {
     fn from(event: behavior::heartbeat::Event) -> Self {
         Self::HeartbeatGenerator(event)
+    }
+}
+
+impl From<behavior::ticket_aggregation::Event> for HoprNetworkBehaviorEvent {
+    fn from(event: behavior::ticket_aggregation::Event) -> Self {
+        Self::TicketAggregationBehavior(event)
     }
 }
 
