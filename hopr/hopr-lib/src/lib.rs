@@ -151,6 +151,8 @@ pub struct CloseChannelResult {
 pub enum HoprLibProcesses {
     #[strum(to_string = "libp2p component responsible for the handling of the p2p communication")]
     Swarm,
+    #[strum(to_string = "HOPR protocol processing")]
+    Protocol,
     #[strum(to_string = "session router pairing the session streams based on the PeerId and ApplicationTag")]
     SessionsRouter,
     #[cfg(feature = "session-server")]
@@ -186,6 +188,7 @@ impl From<HoprTransportProcess> for HoprLibProcesses {
     fn from(value: HoprTransportProcess) -> Self {
         match value {
             core_transport::HoprTransportProcess::Swarm => HoprLibProcesses::Swarm,
+            core_transport::HoprTransportProcess::Protocol => HoprLibProcesses::Protocol,
             core_transport::HoprTransportProcess::Heartbeat => HoprLibProcesses::Heartbeat,
             core_transport::HoprTransportProcess::SessionsRouter => HoprLibProcesses::SessionsRouter,
             core_transport::HoprTransportProcess::BloomFilterSave => HoprLibProcesses::BloomFilterSave,

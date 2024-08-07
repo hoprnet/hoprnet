@@ -17,6 +17,9 @@ pub enum ProtocolError {
     #[error("timeout on protocol operation")]
     Timeout,
 
+    #[error("invalidate acknowledgement signature")]
+    InvalidSignature,
+
     #[error("underlying transport error while sending packet: {0}")]
     TransportError(String),
 
