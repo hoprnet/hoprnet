@@ -18,6 +18,8 @@ use hopr_internal_types::prelude::*;
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::{MultiCounter, SimpleCounter};
 
+use crate::errors::ProtocolError;
+
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
     static ref METRIC_RECEIVED_ACKS: MultiCounter = MultiCounter::new(
@@ -45,7 +47,7 @@ pub enum AckToProcess {
 #[allow(clippy::large_enum_variant)] // TODO: Uses too large objects
 #[derive(Debug)]
 pub enum AckProcessed {
-    Receive(PeerId, Result<AckResult>),
+    Receive(PeerId, AckResult),
     Send(PeerId, Acknowledgement),
 }
 
@@ -64,12 +66,45 @@ impl<Db: HoprDbProtocolOperations> AcknowledgementProcessor<Db> {
         }
     }
 
-    #[tracing::instrument(level = "debug", skip(self))]
-    pub async fn handle_acknowledgement(
-        &self,
-        ack: Acknowledgement,
-    ) -> std::result::Result<AckResult, hopr_db_api::errors::DbError> {
-        self.db.handle_acknowledgement(ack, &self.chain_key).await
+    /// Handles the incoming acknowledgement.
+    #[tracing::instrument(level = "debug", skip(self, ack))]
+    pub async fn recv(&self, peer: &PeerId, mut ack: Acknowledgement) -> crate::errors::Result<AckResult> {
+        let remote_pk = OffchainPublicKey::try_from(peer)?;
+        let ack = ack.validate(&remote_pk).then_some(ack).ok_or_else(|| {
+            trace!("Failed to verify signature on received acknowledgement");
+            ProtocolError::InvalidSignature
+        })?;
+
+        Ok(self
+            .db
+            .handle_acknowledgement(ack, &self.chain_key)
+            .await
+            .map(|reply| {
+                #[cfg(all(feature = "prometheus", not(test)))]
+                match &reply {
+                    AckResult::Sender(_) => {
+                        METRIC_RECEIVED_ACKS.increment(&["true"]);
+                    }
+                    AckResult::RelayerWinning(_) => {
+                        METRIC_RECEIVED_ACKS.increment(&["true"]);
+                        METRIC_TICKETS_COUNT.increment(&["winning"]);
+                    }
+                    AckResult::RelayerLosing => {
+                        METRIC_RECEIVED_ACKS.increment(&["true"]);
+                        METRIC_TICKETS_COUNT.increment(&["losing"]);
+                    }
+                }
+
+                reply
+            })
+            .map_err(|e| {
+                #[cfg(all(feature = "prometheus", not(test)))]
+                METRIC_RECEIVED_ACKS.increment(&["false"]);
+
+                trace!("Encountered error while processinig received acknowledgement: {e}");
+                let error: ProtocolError = e.into();
+                error
+            })?)
     }
 }
 
@@ -133,47 +168,14 @@ impl AcknowledgementInteraction {
 
             async move {
                 let processed: Option<AckProcessed> = match event {
-                    AckToProcess::ToReceive(peer, mut ack) => {
-                        if let Ok(remote_pk) = OffchainPublicKey::try_from(peer) {
-                            trace!("validating incoming acknowledgement from {}", peer);
-                            if ack.validate(&remote_pk) {
-                                match processor.handle_acknowledgement(ack).await {
-                                    Ok(reply) => {
-                                        #[cfg(all(feature = "prometheus", not(test)))]
-                                        match &reply {
-                                            AckResult::Sender(_) => {
-                                                METRIC_RECEIVED_ACKS.increment(&["true"]);
-                                            }
-                                            AckResult::RelayerWinning(_) => {
-                                                METRIC_RECEIVED_ACKS.increment(&["true"]);
-                                                METRIC_TICKETS_COUNT.increment(&["winning"]);
-                                            }
-                                            AckResult::RelayerLosing => {
-                                                METRIC_RECEIVED_ACKS.increment(&["true"]);
-                                                METRIC_TICKETS_COUNT.increment(&["losing"]);
-                                            }
-                                        }
-
-                                        Some(AckProcessed::Receive(peer, Ok(reply)))
-                                    }
-                                    Err(e) => {
-                                        #[cfg(all(feature = "prometheus", not(test)))]
-                                        METRIC_RECEIVED_ACKS.increment(&["false"]);
-
-                                        error!(
-                                            "Encountered error while handling acknowledgement from peer '{peer}': {e}",
-                                        );
-
-                                        None
-                                    }
-                                }
-                            } else {
-                                error!("failed to verify signature on acknowledgement from peer {peer}");
+                    AckToProcess::ToReceive(peer, ack) => {
+                        match processor.recv(&peer, ack).await {
+                            Ok(v) => Some(AckProcessed::Receive(peer, v)),
+                            Err(e) => {
+                                // TODO: decide whether to always send an ack back
+                                error!("Failed to process received ack: {e}");
                                 None
                             }
-                        } else {
-                            error!("invalid remote peer id {peer}");
-                            None
                         }
                     }
                     AckToProcess::ToSend(peer, ack) => Some(AckProcessed::Send(peer, ack)),

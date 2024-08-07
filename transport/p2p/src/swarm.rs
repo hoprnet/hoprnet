@@ -6,9 +6,7 @@ use tracing::{debug, error, info, trace, warn};
 
 use core_network::{messaging::ControlMessage, network::NetworkTriggeredEvent, ping::PingQueryReplier};
 use core_protocol::{
-    ack::processor::{AckProcessed, AckResult, AcknowledgementInteraction},
     config::ProtocolConfig,
-    msg::processor::{MsgProcessed, PacketInteraction},
     ticket_aggregation::processor::{
         TicketAggregationFinalizer, TicketAggregationInteraction, TicketAggregationProcessed,
     },
@@ -20,7 +18,7 @@ use crate::{
     errors::Result,
     libp2p::{request_response::ResponseChannel, swarm::SwarmEvent},
     multiaddrs::{replace_transport_with_unspecified, resolve_dns_if_any, Multiaddr},
-    HoprNetworkBehavior, HoprNetworkBehaviorEvent, PeerDiscovery, Ping, Pong, TransportIngress,
+    HoprNetworkBehavior, HoprNetworkBehaviorEvent, PeerDiscovery, Ping, Pong,
 };
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -169,10 +167,13 @@ impl HoprSwarm {
         Self { swarm }
     }
 
+    // TODO: rename to with_outputs
     pub fn with_processors(
         self,
-        ack_interactions: AcknowledgementInteraction,
-        pkt_interactions: PacketInteraction,
+        ack_to_send: futures::channel::mpsc::UnboundedReceiver<(PeerId, Acknowledgement)>,
+        ack_received: futures::channel::mpsc::UnboundedSender<(PeerId, Acknowledgement)>,
+        msg_to_send: futures::channel::mpsc::UnboundedReceiver<(PeerId, Box<[u8]>)>,
+        msg_received: futures::channel::mpsc::UnboundedSender<(PeerId, Box<[u8]>)>,
         ticket_aggregation_interactions: TicketAggregationInteraction<
             TicketAggregationResponseType,
             TicketAggregationRequestType,
@@ -180,8 +181,10 @@ impl HoprSwarm {
     ) -> HoprSwarmWithProcessors {
         HoprSwarmWithProcessors {
             swarm: self,
-            ack_interactions,
-            pkt_interactions,
+            ack_to_send,
+            ack_received,
+            msg_to_send,
+            msg_received,
             ticket_aggregation_interactions,
         }
     }
@@ -231,21 +234,21 @@ impl TransportReadWrite for P2PTransport {
 /// input events passed into the swarm processing logic.
 #[derive(Debug)]
 pub enum Inputs {
-    Message(MsgProcessed),
+    Message((PeerId, Box<[u8]>)),
     TicketAggregation(
         TicketAggregationProcessed<ResponseChannel<std::result::Result<Ticket, String>>, OutboundRequestId>,
     ),
-    Acknowledgement(AckProcessed),
+    Acknowledgement((PeerId, Acknowledgement)),
 }
 
-impl From<AckProcessed> for Inputs {
-    fn from(value: AckProcessed) -> Self {
+impl From<(PeerId, Acknowledgement)> for Inputs {
+    fn from(value: (PeerId, Acknowledgement)) -> Self {
         Self::Acknowledgement(value)
     }
 }
 
-impl From<MsgProcessed> for Inputs {
-    fn from(value: MsgProcessed) -> Self {
+impl From<(PeerId, Box<[u8]>)> for Inputs {
+    fn from(value: (PeerId, Box<[u8]>)) -> Self {
         Self::Message(value)
     }
 }
@@ -263,8 +266,10 @@ pub type TicketAggregationResponseType = ResponseChannel<std::result::Result<Tic
 
 pub struct HoprSwarmWithProcessors {
     swarm: HoprSwarm,
-    ack_interactions: AcknowledgementInteraction,
-    pkt_interactions: PacketInteraction,
+    ack_to_send: futures::channel::mpsc::UnboundedReceiver<(PeerId, Acknowledgement)>,
+    ack_received: futures::channel::mpsc::UnboundedSender<(PeerId, Acknowledgement)>,
+    msg_to_send: futures::channel::mpsc::UnboundedReceiver<(PeerId, Box<[u8]>)>,
+    msg_received: futures::channel::mpsc::UnboundedSender<(PeerId, Box<[u8]>)>,
     ticket_aggregation_interactions:
         TicketAggregationInteraction<TicketAggregationResponseType, TicketAggregationRequestType>,
 }
@@ -282,16 +287,9 @@ impl HoprSwarmWithProcessors {
     /// The function represents the entirety of the business logic of the hopr daemon related to core operations.
     ///
     /// This future can only be resolved by an unrecoverable error or a panic.
-    pub async fn run(
-        self,
-        version: String,
-        on_transport_output: UnboundedSender<TransportIngress>,
-        on_acknowledged_ticket: UnboundedSender<AcknowledgedTicket>,
-    ) {
+    pub async fn run(self, version: String) {
         let mut swarm: libp2p::Swarm<HoprNetworkBehavior> = self.swarm.into();
 
-        let mut ack_writer = self.ack_interactions.writer();
-        let mut pkt_writer = self.pkt_interactions.writer();
         let mut aggregation_writer = self.ticket_aggregation_interactions.writer();
 
         // NOTE: an improvement would be a forgetting cache for the active requests
@@ -302,8 +300,8 @@ impl HoprSwarmWithProcessors {
         > = HashMap::new();
 
         let inputs = (
-            self.ack_interactions.map(Inputs::Acknowledgement),
-            self.pkt_interactions.map(Inputs::Message),
+            self.ack_to_send.map(Inputs::Acknowledgement),
+            self.msg_to_send.map(Inputs::Message),
             self.ticket_aggregation_interactions.map(Inputs::TicketAggregation),
         )
             .merge()
@@ -314,42 +312,13 @@ impl HoprSwarmWithProcessors {
         loop {
             select! {
                 input = inputs.select_next_some() => match input {
-                    Inputs::Acknowledgement(task) => match task {
-                        AckProcessed::Receive(peer, reply) => {
-                            debug!("transport input - ack - received an acknowledgement from '{peer}'");
-                            if let Ok(AckResult::RelayerWinning(acknowledged_ticket)) = reply {
-                                if let Err(e) = on_acknowledged_ticket.unbounded_send(acknowledged_ticket) {
-                                    error!("transport input - ack -failed to emit acknowledged ticket: {e}");
-                                }
-                            }
-                        },
-                        AckProcessed::Send(peer, ack) => {
-                            trace!("transport input - ack - sending an acknowledgement to '{peer}'");
-                            let _req_id = swarm.behaviour_mut().ack.send_request(&peer, ack);
-                        }
+                    Inputs::Acknowledgement((peer, ack)) => {
+                        let req_id = swarm.behaviour_mut().ack.send_request(&peer, ack);
+                        trace!(peer = %peer, request_id = %req_id, "transport - ack - Sending an acknowledgement");
                     },
-                    Inputs::Message(task) => match task {
-                        MsgProcessed::Receive(peer, data, ack) => {
-                            debug!("transport input - msg - received packet from '{peer}'");
-                            if let Err(e) = on_transport_output.unbounded_send(TransportIngress::Received(data)) {
-                                error!("transport input - msg - failed to store a received message in the inbox: {}", e);
-                            }
-
-                            if let Err(e) = ack_writer.send_acknowledgement(peer, ack) {
-                                error!("transport input - msg - failed to acknowledge the received final packet: {e}");
-                            }
-                        },
-                        MsgProcessed::Send(peer, octets) => {
-                            debug!("transport input - msg - sending packet as source to '{peer}'");
-                            let _request_id = swarm.behaviour_mut().msg.send_request(&peer, octets);
-                        },
-                        MsgProcessed::Forward(peer, octets, previous_peer, ack) => {
-                            debug!("transport input - msg - forwarding packet from '{previous_peer}' to '{peer}'");
-                            let _request_id = swarm.behaviour_mut().msg.send_request(&peer, octets);
-                            if let Err(e) = ack_writer.send_acknowledgement(previous_peer, ack) {
-                                error!("transport input - msg - failed to acknowledge relayed packet: {e}");
-                            }
-                        }
+                    Inputs::Message((peer, octets)) => {
+                        let req_id = swarm.behaviour_mut().msg.send_request(&peer, octets);
+                        trace!(peer = %peer, request_id = %req_id, "transport - msg - Sending a message");
                     },
                     Inputs::TicketAggregation(task) => match task {
                         TicketAggregationProcessed::Send(peer, acked_tickets, finalizer) => {
@@ -364,9 +333,10 @@ impl HoprSwarmWithProcessors {
                             }
                         },
                         TicketAggregationProcessed::Receive(peer, acked_ticket, request) => {
-                            if let Err(e) = on_acknowledged_ticket.unbounded_send(acked_ticket) {
-                                error!("transport input - ticket aggregation - failed to emit acknowledged aggregated ticket to '{peer}': {e}");
-                            }
+                            // TODO: This may not be skipped !!!
+                            // self.ack_received.unbounded_send((peer, acked_ticket)).unwrap_or_else(|e| {
+                            //     error!(peer = %peer, request_id = %request, "Failed to process an aggregated acknowledgement: {e}");
+                            // });
 
                             match active_aggregation_requests.remove(&request) {
                                 Some(finalizer) => finalizer.finalize(),
@@ -379,109 +349,86 @@ impl HoprSwarmWithProcessors {
                 },
                 event = swarm.select_next_some() => match event {
                     // ---------------
-                    // msg/ack protocol
-                    SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::MessageWithAcknowledgement(event)) => match event {
-                        libp2p::request_response::Event::<Box<[u8]>, Acknowledgement>::Message {
-                            peer,
-                            message,
-                        } => match message {
-                            libp2p::request_response::Message::<Box<[u8]>, Acknowledgement>::Request {
-                                request_id, request, .. //channel
-                            } => {
-                                debug!(peer = %peer, "p2p - protocol - msg/ack 0.1.0 - Received a message");
-
-                                if let Err(e) = pkt_writer.receive_packet(request, peer) {
-                                    error!(peer = %peer, request_id = %request_id, "p2p - protocol - msg/ack 0.1.0 - Failed to process a message: {e}");
-                                };
-                            },
-                            libp2p::request_response::Message::<Box<[u8]>, Acknowledgement>::Response {
-                                request_id, ..
-                            } => {
-                                trace!(peer = %peer, request_id = %request_id, "p2p - protocol - msg/ack 0.1.0 - Received an acknowledgement");
-
-                            }
-                        },
-                        libp2p::request_response::Event::<Box<[u8]>, Acknowledgement>::OutboundFailure {
-                            peer, error, request_id
-                        } => {
-                            error!(peer = %peer, request_id = %request_id, "p2p - protocol - msg/ack 0.1.0 - Failed to send a message: {error}");
-                        },
-                        libp2p::request_response::Event::<Box<[u8]>, Acknowledgement>::InboundFailure {..}
-                        | libp2p::request_response::Event::<Box<[u8]>, Acknowledgement>::ResponseSent {..} => {
-                        },
-                    },
-                    // ---------------
                     // msg protocol
-                    SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Message(event)) => match event {
-                        libp2p::request_response::Event::<Box<[u8]>, ()>::Message {
-                            peer,
-                            message:
-                            libp2p::request_response::Message::<Box<[u8]>, ()>::Request {
-                                request_id, request, channel
-                            },
-                        } => {
-                            debug!("transport protocol - p2p - msg - received a message from {peer}");
+                    SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Message(event)) => {
+                        let _debug_span = tracing::span!(tracing::Level::DEBUG, "swarm protocol ACK", version = "0.1.0");
+                            match event {
+                            libp2p::request_response::Event::<Box<[u8]>, ()>::Message {
+                                peer,
+                                message,
+                            } => match message {
+                                libp2p::request_response::Message::<Box<[u8]>, ()>::Request {
+                                    request_id, request, channel
+                                } => {
+                                    trace!(peer = %peer, request_id = %request_id, "Received a message");
 
-                            if let Err(e) = pkt_writer.receive_packet(request, peer) {
-                                error!("transport protocol - p2p - msg - failed to process a message from '{peer}': {e} (#{request_id})");
-                            };
+                                    if let Err(e) = self.msg_received.unbounded_send((peer, request)) {
+                                        error!(peer = %peer, request_id = %request_id, "Failed to process a message: {e}");
+                                    };
 
-                            if swarm.behaviour_mut().msg.send_response(channel, ()).is_err() {
-                                error!("transport protocol - p2p - msg - failed to send a response to '{peer}'");
-                            };
-                        },
-                        libp2p::request_response::Event::<Box<[u8]>, ()>::Message {
-                            peer,
-                            message:
-                            libp2p::request_response::Message::<Box<[u8]>, ()>::Response {
-                                request_id, ..
+                                    if swarm.behaviour_mut().msg.send_response(channel, ()).is_err() {
+                                        error!("transport protocol - p2p - msg - failed to send a response to '{peer}'");
+                                    };
+                                },
+                                libp2p::request_response::Message::<Box<[u8]>, ()>::Response {
+                                    request_id, ..
+                                } => {
+                                    error!(peer = %peer, request_id = %request_id, "Failed to confirm receiving a message, likely a timeout");
+                                }
+                            }
+                            libp2p::request_response::Event::<Box<[u8]>, ()>::OutboundFailure {
+                                peer, error, ..
+                            } => {
+                                error!(peer = %peer, "Failed to send a message: {error}");
                             },
-                        } => {
-                            trace!("transport protocol - p2p - msg - received a response for sending message with id {request_id} from '{peer}'");
-                        },
-                        libp2p::request_response::Event::<Box<[u8]>, ()>::OutboundFailure {
-                            peer, error, request_id
-                        } => {
-                            error!("transport protocol - p2p - msg - failed to send a message (#{}) to peer {} with an error: {}", request_id, peer, error);
-                        },
-                        libp2p::request_response::Event::<Box<[u8]>, ()>::InboundFailure {..} | libp2p::request_response::Event::<Box<[u8]>, ()>::ResponseSent {..} => {}
+                            libp2p::request_response::Event::<Box<[u8]>, ()>::InboundFailure {peer, request_id, error} => {
+                                warn!(peer = %peer, request_id = %request_id, "Failed to receive a message: {error}");
+                            }
+                            libp2p::request_response::Event::<Box<[u8]>, ()>::ResponseSent {..} => {
+                                // trace!("Discarded messages not relevant for the protocol!");
+                            },
+                        }
                     }
                     // ---------------
                     // ack protocol
-                    SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Acknowledgement(libp2p::request_response::Event::<Acknowledgement,()>::Message {
-                        peer,
-                        message:
-                        libp2p::request_response::Message::<Acknowledgement,()>::Request {
-                            request_id, request, channel
-                        },
-                    })) => {
-                        debug!("transport protocol - p2p - ack - received an acknowledgment from '{peer}'");
+                    SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Acknowledgement(event)) => {
+                        let _debug_span = tracing::span!(tracing::Level::DEBUG, "swarm protocol ACK", version = "0.1.0");
+                        match event {
+                            libp2p::request_response::Event::<Acknowledgement,()>::Message {
+                                peer,
+                                message
+                            } => match message {
+                                libp2p::request_response::Message::<Acknowledgement,()>::Request {
+                                    request_id, request, channel
+                                } => {
+                                    trace!(peer = %peer, request_id = %request_id, "Received an acknowledgment");
 
-                        if let Err(e) = ack_writer.receive_acknowledgement(peer, request) {
-                            error!("transport protocol - p2p - ack - failed to process an acknowledgement from '{peer}': {e} (#{request_id})");
-                        };
+                                    self.ack_received.unbounded_send((peer, request)).unwrap_or_else(|e| {
+                                        error!(peer = %peer, request_id = %request_id, "Failed to process an acknowledgement: {e}");
+                                    });
 
-                        if swarm.behaviour_mut().ack.send_response(channel, ()).is_err() {
-                            error!("transport protocol - p2p - ack - failed to send a response to '{peer}', likely a timeout");
-                        };
-                    },
-                    SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Acknowledgement(libp2p::request_response::Event::<Acknowledgement,()>::Message {
-                        peer,
-                        message:
-                        libp2p::request_response::Message::<Acknowledgement,()>::Response {
-                            request_id, ..
-                        },
-                    })) => {
-                        trace!("transport protocol - p2p - ack - received a response for sending message with id {} from {}", request_id, peer);
-                    },
-                    SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Acknowledgement(libp2p::request_response::Event::<Acknowledgement,()>::OutboundFailure {
-                        peer, error, ..
-                    })) => {
-                        error!("transport protocol - p2p - ack - failed to send an acknowledgement to '{peer}': {error}");
-                    },
-                    SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Acknowledgement(libp2p::request_response::Event::<Acknowledgement,()>::InboundFailure {..}))
-                    | SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Acknowledgement(libp2p::request_response::Event::<Acknowledgement,()>::ResponseSent {..})) => {
-                        // debug!("Discarded messages not relevant for the protocol!");
+                                    if swarm.behaviour_mut().ack.send_response(channel, ()).is_err() {
+                                        error!(peer = %peer, request_id = %request_id, "Failed to confirm receiving an acknowledgement, likely a timeout");
+                                    };
+                                },
+                                libp2p::request_response::Message::<Acknowledgement,()>::Response {
+                                    request_id, ..
+                                } => {
+                                    trace!(peer = %peer, request_id = %request_id, "Ack reception confirmed");
+                                }
+                            },
+                            libp2p::request_response::Event::<Acknowledgement,()>::OutboundFailure {
+                                peer, error, ..
+                            } => {
+                                error!(peer = %peer, "Failed to send an acknowledgement: {error}");
+                            },
+                            libp2p::request_response::Event::<Acknowledgement,()>::InboundFailure {peer, request_id, error} => {
+                                warn!(peer = %peer, request_id = %request_id, "Failed to receive an acknowledgement: {error}");
+                            }
+                            libp2p::request_response::Event::<Acknowledgement,()>::ResponseSent {..} => {
+                                // trace!("Discarded messages not relevant for the protocol!");
+                            },
+                        }
                     },
                     // --------------
                     // ticket aggregation protocol
@@ -565,25 +512,27 @@ impl HoprSwarmWithProcessors {
                     SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Heartbeat(libp2p::request_response::Event::<Ping,Pong>::ResponseSent {..})) => {},
                     SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::KeepAlive(_)) => {}
                     SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Discovery(event)) => {
-                        trace!(event = tracing::field::debug(&event), "transport - p2p - discovery - Received a discovery event");
+                        let _debug_span = tracing::span!(tracing::Level::DEBUG, "swarm behavior 'discovery'");
+
+                        trace!(event = tracing::field::debug(&event), "Received a discovery event");
                         match event {
                             crate::behavior::discovery::Event::NewPeerMultiddress(peer, multiaddress) => {
-                                info!(peer = %peer, multiaddress = %multiaddress, "transport - p2p - discovery - New record");
-                                // TODO: enable adding an address to the msg_ack protocol
-                                // swarm.behaviour_mut().msg_ack.add_address(&peer, multiaddress.clone());
+                                info!(peer = %peer, multiaddress = %multiaddress, "New record");
                                 swarm.behaviour_mut().heartbeat.add_address(&peer, multiaddress.clone());
                                 swarm.behaviour_mut().msg.add_address(&peer, multiaddress.clone());
                                 swarm.behaviour_mut().ack.add_address(&peer, multiaddress.clone());
                                 swarm.behaviour_mut().ticket_aggregation.add_address(&peer, multiaddress.clone());
 
                                 if let Err(e) = swarm.dial(multiaddress.clone()) {
-                                    error!(peer = %peer, address = %multiaddress,  "transport - p2p - discovery - Failed to dial peer: {e}");
+                                    error!(peer = %peer, address = %multiaddress,  "Failed to dial the peer: {e}");
                                 }
                             },
                         }
                     },
                     SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::HeartbeatGenerator(event)) => {
-                        trace!(event = tracing::field::debug(&event), "transport - p2p - heartbeat generator - Received a heartbeat generation event");
+                        let _debug_span = tracing::span!(tracing::Level::DEBUG, "swarm behavior 'heartbeat generator'");
+
+                        trace!(event = tracing::field::debug(&event), "Received a heartbeat event");
                         match event {
                             crate::behavior::heartbeat::Event::ToProbe((peer, replier)) => {
                                 let req_id = swarm.behaviour_mut().heartbeat.send_request(&peer, Ping(replier.challenge()));

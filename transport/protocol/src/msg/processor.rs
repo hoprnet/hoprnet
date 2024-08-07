@@ -829,9 +829,8 @@ mod tests {
                 {
                     AckProcessed::Receive(peer, reply) => {
                         assert_eq!(peer, PEERS[i].public().into());
-                        assert!(reply.is_ok());
 
-                        match reply.unwrap() {
+                        match reply {
                             AckResult::Sender(_hkc) => {
                                 assert_eq!(i - 1, 0, "Only the sender can receive a half key challenge");
                                 received_challenges += 1;

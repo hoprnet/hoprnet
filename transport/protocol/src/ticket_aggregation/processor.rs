@@ -127,7 +127,7 @@ where
 {
     #[tracing::instrument(level = "debug", skip(self))]
     async fn aggregate_tickets(&self, channel: &Hash, prerequisites: AggregationPrerequisites) -> Result<()> {
-        let mut awaiter = self.writer.clone().aggregate_tickets(channel, prerequisites)?;
+        let awaiter = self.writer.clone().aggregate_tickets(channel, prerequisites)?;
 
         if let Err(e) = awaiter.consume_and_wait(self.agg_timeout).await {
             warn!("Error occured on ticket aggregation for '{channel}', performing a rollback: {e}");
@@ -140,29 +140,24 @@ where
 
 #[derive(Debug)]
 pub struct TicketAggregationAwaiter {
-    rx: Option<oneshot::Receiver<()>>,
+    rx: oneshot::Receiver<()>,
 }
 
 impl From<oneshot::Receiver<()>> for TicketAggregationAwaiter {
     fn from(value: oneshot::Receiver<()>) -> Self {
-        Self { rx: Some(value) }
+        Self { rx: value }
     }
 }
 
 impl TicketAggregationAwaiter {
-    pub async fn consume_and_wait(&mut self, until_timeout: std::time::Duration) -> Result<()> {
-        match self.rx.take() {
-            Some(resolve) => {
-                let timeout = sleep(until_timeout);
-                pin_mut!(resolve, timeout);
-                match futures::future::select(resolve, timeout).await {
-                    Either::Left((result, _)) => result.map_err(|_| TransportError("Canceled".to_owned())),
-                    Either::Right(_) => Err(TransportError("Timed out on sending a packet".to_owned())),
-                }
-            }
-            None => Err(TransportError(
-                "Packet send process observation already consumed".to_owned(),
-            )),
+    pub async fn consume_and_wait(self, until_timeout: std::time::Duration) -> Result<()> {
+        let timeout = sleep(until_timeout);
+        let resolve = self.rx;
+
+        pin_mut!(resolve, timeout);
+        match futures::future::select(resolve, timeout).await {
+            Either::Left((result, _)) => result.map_err(|_| TransportError("Canceled".to_owned())),
+            Either::Right(_) => Err(TransportError("Timed out on sending a packet".to_owned())),
         }
     }
 }
