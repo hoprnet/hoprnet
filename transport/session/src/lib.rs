@@ -38,7 +38,7 @@ pub enum Capability {
 /// Configuration for the session.
 ///
 /// Relevant primarily for the client, since the server is only
-/// a reactive component with regards to the session concept.
+/// a reactive component in regard to the session concept.
 #[derive(Debug, PartialEq, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct SessionClientConfig {

@@ -15,14 +15,9 @@ impl ConnectedUdpStream {
         sock.connect(connect).await?;
         Ok(Self { sock, closed: false })
     }
-}
 
-impl From<UdpSocket> for ConnectedUdpStream {
-    fn from(value: UdpSocket) -> Self {
-        Self {
-            sock: value,
-            closed: false,
-        }
+    pub fn socket(&self) -> &UdpSocket {
+        &self.sock
     }
 }
 

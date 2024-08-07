@@ -101,27 +101,25 @@ pub struct HoprServerTcpReactor {
 impl hopr_lib::HoprSessionReactor for HoprServerTcpReactor {
     #[tracing::instrument(level = "debug", skip(self, session))]
     async fn process(&self, session: hopr_lib::HoprSession) -> hopr_lib::errors::Result<()> {
+        let target = self.target;
         tracing::debug!("Creating a connection to the TCP server {}...", self.target);
         let mut tcp_bridge = tokio::net::TcpStream::connect(self.target).await.map_err(|e| {
             hopr_lib::errors::HoprLibError::GeneralError(format!(
-                "Could not bridge the incoming session to {}: {e}",
-                self.target
+                "Could not bridge the incoming session to {target}: {e}"
             ))
         })?;
 
         tcp_bridge.set_nodelay(true).map_err(|e| {
             hopr_lib::errors::HoprLibError::GeneralError(format!(
-                "Could not set the TCP_NODELAY option for the bridged session to {}: {e}",
-                self.target
+                "Could not set the TCP_NODELAY option for the bridged session to {target}: {e}",
             ))
         })?;
 
-        tracing::debug!("Bridging the session to the TCP server {} ...", self.target);
-        let target = self.target;
+        tracing::debug!("Bridging the session to the TCP server {target} ...");
         tokio::task::spawn(async move {
             match tokio::io::copy_bidirectional_with_sizes(&mut tokio_util::compat::FuturesAsyncReadCompatExt::compat(session), &mut tcp_bridge, hopr_lib::SESSION_USABLE_MTU_SIZE, hopr_lib::SESSION_USABLE_MTU_SIZE).await {
-                Ok(bound_stream_finished) => tracing::info!("Server bridged session through TCP {} ended with {bound_stream_finished:?} bytes transferred in both directions.", target),
-                Err(e) => tracing::error!("The TCP server stream ({}) is closed: {e:?}", target)
+                Ok(bound_stream_finished) => tracing::info!("Server bridged session through TCP {target} ended with {bound_stream_finished:?} bytes transferred in both directions."),
+                Err(e) => tracing::error!("The TCP server stream ({target}) is closed: {e:?}")
             }
         });
 
@@ -137,23 +135,22 @@ pub struct HoprServerUdpReactor {
 impl hopr_lib::HoprSessionReactor for HoprServerUdpReactor {
     #[tracing::instrument(level = "debug", skip(self, session))]
     async fn process(&self, session: hopr_lib::HoprSession) -> hopr_lib::errors::Result<()> {
-        tracing::debug!("Creating a connection to the UDP server {}...", self.target);
+        let target = self.target;
+        tracing::debug!("Creating a connection to the UDP server {target}...");
         let bind_addr = std::net::SocketAddr::new(std::net::Ipv4Addr::new(127, 0, 0, 1).into(), 0);
         let mut udp_bridge = hopr_network_types::udp::ConnectedUdpStream::bind_and_connect(bind_addr, self.target)
             .await
             .map_err(|e| {
                 hopr_lib::errors::HoprLibError::GeneralError(format!(
-                    "Could not bridge the incoming session to {}: {e}",
-                    self.target
+                    "Could not bridge the incoming session to {target}: {e}"
                 ))
             })?;
 
-        tracing::debug!("Bridging the session to the UDP server {} ...", self.target);
-        let target = self.target;
+        tracing::debug!("Bridging the session to the UDP server {target} ...");
         tokio::task::spawn(async move {
             match tokio::io::copy_bidirectional_with_sizes(&mut tokio_util::compat::FuturesAsyncReadCompatExt::compat(session), &mut udp_bridge, hopr_lib::SESSION_USABLE_MTU_SIZE, hopr_lib::SESSION_USABLE_MTU_SIZE).await {
-                Ok(bound_stream_finished) => tracing::info!("Server bridged session through UDP {} ended with {bound_stream_finished:?} bytes transferred in both directions.", target),
-                Err(e) => tracing::error!("The UDP server stream ({}) is closed: {e:?}", target)
+                Ok(bound_stream_finished) => tracing::info!("Server bridged session through UDP {target} ended with {bound_stream_finished:?} bytes transferred in both directions."),
+                Err(e) => tracing::error!("The UDP server stream ({target}) is closed: {e:?}")
             }
         });
 
