@@ -60,13 +60,7 @@ impl Behaviour {
     }
 
     fn is_peer_connected(&self, peer: &PeerId) -> bool {
-        if let Some(connection_count) = self.connected_peers.get(peer) {
-            if *connection_count > 0 {
-                return true;
-            }
-        }
-
-        false
+        self.connected_peers.get(peer).map(|v| *v > 0).unwrap_or(false)
     }
 }
 
