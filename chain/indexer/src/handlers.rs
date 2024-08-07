@@ -397,6 +397,14 @@ where
                     active_channel.ticket_index = Set(ticket_redeemed.new_ticket_index.to_be_bytes().into());
                     let channel = active_channel.update(tx.as_ref()).await?;
 
+                    // Neglect all the tickets in this channel
+                    // which have a lower ticket index than `ticket_redeemed.new_ticket_index`
+                    self.db
+                        .mark_tickets_neglected(
+                            TicketSelector::from(&channel_entry).with_index_lt(ticket_redeemed.new_ticket_index),
+                        )
+                        .await?;
+
                     Ok(Some(ChainEventType::TicketRedeemed(channel.try_into()?, ack_ticket)))
                 } else {
                     error!("observed ticket redeem on a channel that we don't have in the DB");

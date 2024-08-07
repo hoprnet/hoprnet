@@ -19,7 +19,7 @@ pub enum DbError {
     #[error("ticket aggregation error: {0}")]
     TicketAggregationError(String),
 
-    #[error("ticket validation error for {0:?}")]
+    #[error("ticket validation error for {:?}: {}", 0.0, 0.1)]
     TicketValidationError(Box<(Ticket, String)>),
 
     #[error("transaction error: {0}")]
