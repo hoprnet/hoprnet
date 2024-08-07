@@ -265,11 +265,15 @@ where
             .set(ping)
             .expect("must set the ping executor only once");
 
+        let ticket_agg_proc = TicketAggregationInteraction::new(self.db.clone(), me_onchain);
+        let tkt_agg_writer = ticket_agg_proc.writer();
+
         let transport_layer = HoprSwarm::new(
             me.into(),
             network_events_rx,
             transport_updates,
             ping_rx,
+            ticket_agg_proc,
             self.my_multiaddresses.clone(),
             self.cfg.protocol,
         )
@@ -301,10 +305,9 @@ where
             .set(packet_proc.writer())
             .expect("must set the packet processing writer only once");
 
-        let ticket_agg_proc = TicketAggregationInteraction::new(self.db.clone(), me_onchain);
         self.process_ticket_aggregate
             .clone()
-            .set(ticket_agg_proc.writer())
+            .set(tkt_agg_writer.clone())
             .expect("must set the ticket aggregation writer only once");
 
         // heartbeat
@@ -329,7 +332,7 @@ where
             ack_received_tx,
             msg_to_send_rx,
             msg_received_tx,
-            ticket_agg_proc,
+            tkt_agg_writer,
         );
 
         processes.insert(
@@ -510,7 +513,10 @@ where
             }),
         );
 
-        processes.insert(HoprTransportProcess::Swarm, spawn(transport_layer.run(version)));
+        processes.insert(
+            HoprTransportProcess::Swarm,
+            spawn(transport_layer.run(version, on_acknowledged_ticket)),
+        );
 
         processes
     }

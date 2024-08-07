@@ -14,7 +14,7 @@ use serde::Deserialize;
 use serde_json::json;
 use serde_with::{serde_as, Bytes, DisplayFromStr, DurationMilliSeconds};
 use std::{sync::Arc, time::Duration};
-use tracing::{debug, error, trace, warn};
+use tracing::{debug, error, trace};
 use validator::Validate;
 
 use hopr_lib::{AsUnixTimestamp, PathOptions, TransportIngress, RESERVED_TAG_UPPER_LIMIT};
