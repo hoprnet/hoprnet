@@ -1,18 +1,13 @@
-use std::pin::Pin;
-
-use futures::channel::mpsc::{channel, Receiver, Sender};
-use futures::future::{poll_fn, Either};
-use futures::{pin_mut, stream::Stream, StreamExt};
-use hopr_crypto_packet::packet;
+use futures::pin_mut;
+use futures::{future::Either, SinkExt};
 use hopr_db_api::protocol::TransportPacketWithChainData;
 use libp2p_identity::PeerId;
-use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
-use tracing::{debug, error, trace, warn};
+use tracing::{debug, error};
 
 use core_path::path::{Path, TransportPath};
-use hopr_async_runtime::prelude::{sleep, spawn};
+use hopr_async_runtime::prelude::sleep;
 use hopr_crypto_packet::errors::{
-    PacketError::{Retry, TagReplay, TransportError},
+    PacketError::{TagReplay, TransportError},
     Result,
 };
 use hopr_crypto_types::prelude::*;
@@ -20,7 +15,7 @@ use hopr_db_api::prelude::HoprDbProtocolOperations;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 
-use super::packet::{IncomingPacket, OutgoingPacket, TransportPacket};
+use super::packet::OutgoingPacket;
 use crate::bloom;
 use crate::msg::mixer::MixerConfig;
 
@@ -63,10 +58,6 @@ lazy_static::lazy_static! {
     static ref DEFAULT_PRICE_PER_PACKET: U256 = 10000000000000000u128.into();
 }
 
-// Default sizes of the packet queues
-pub const PACKET_TX_QUEUE_SIZE: usize = 8192;
-pub const PACKET_RX_QUEUE_SIZE: usize = 8192;
-
 #[async_trait::async_trait]
 pub trait PacketWrapping {
     type Input;
@@ -94,47 +85,6 @@ pub trait PacketUnwrapping {
     type Packet;
 
     async fn recv(&self, peer: &PeerId, data: Box<[u8]>) -> Result<Self::Packet>;
-}
-
-pub enum MsgToProcess {
-    ToReceive(Box<[u8]>, PeerId),
-    ToSend(ApplicationData, TransportPath, PacketSendFinalizer),
-    ToForward(Box<[u8]>, PeerId),
-}
-
-// Custom implementation of Debug used by tracing, the data content
-// itself should not be displayed for any case.
-impl std::fmt::Debug for MsgToProcess {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::ToReceive(_, peer) => f.debug_tuple("ToReceive").field(peer).finish(),
-            Self::ToSend(_, path, _) => f.debug_tuple("ToSend").field(path).finish(),
-            Self::ToForward(_, peer) => f.debug_tuple("ToForward").field(peer).finish(),
-        }
-    }
-}
-
-pub enum MsgProcessed {
-    Receive(PeerId, ApplicationData, Acknowledgement),
-    Send(PeerId, Box<[u8]>),
-    Forward(PeerId, Box<[u8]>, PeerId, Acknowledgement),
-}
-
-// Custom implementation of Debug used by tracing, the data content
-// itself should not be displayed for any case.
-impl std::fmt::Debug for MsgProcessed {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Receive(peer, _, ack) => f.debug_tuple("Receive").field(peer).field(ack).finish(),
-            Self::Send(peer, _) => f.debug_tuple("Send").field(peer).finish(),
-            Self::Forward(source_peer, _, dest_peer, ack) => f
-                .debug_tuple("Forward")
-                .field(source_peer)
-                .field(dest_peer)
-                .field(ack)
-                .finish(),
-        }
-    }
 }
 
 /// Implements protocol acknowledgement logic for msg packets
@@ -289,50 +239,6 @@ where
         Self { db, tbf, cfg }
     }
 
-    #[tracing::instrument(level = "debug", skip(self))]
-    pub async fn to_transport_packet_with_metadata(
-        &self,
-        event: MsgToProcess,
-    ) -> (Result<TransportPacket>, PacketMetadata) {
-        let mut metadata = PacketMetadata::default();
-
-        let packet = match event {
-            MsgToProcess::ToReceive(data, peer) | MsgToProcess::ToForward(data, peer) => {
-                let previous_hop = OffchainPublicKey::try_from(&peer).map_err(|e| {
-                    hopr_crypto_packet::errors::PacketError::LogicError(format!(
-                        "failed to convert '{peer}' into the public key: {e}"
-                    ))
-                });
-
-                unimplemented!("TODO: to be removed");
-                // match previous_hop {
-                //     Ok(previous_hop) => self
-                //         .recv(data, &self.cfg.packet_keypair, previous_hop)
-                //         .await
-                //         .map(|p| p.into()),
-                //     Err(e) => Err(e),
-                // }
-            }
-            MsgToProcess::ToSend(data, path, finalizer) => {
-                metadata.send_finalizer.replace(finalizer);
-
-                // let path: std::result::Result<Vec<OffchainPublicKey>, hopr_primitive_types::errors::GeneralError> =
-                //     path.hops().iter().map(OffchainPublicKey::try_from).collect()?;
-                // let packet = self
-                //     .db
-                //     .to_send(data.to_bytes(), self.cfg.chain_keypair.clone(), path?)
-                //     .await
-                //     .map_err(|e| hopr_crypto_packet::errors::PacketError::PacketConstructionError(e.to_string()))?;
-
-                // Ok(packet.into())
-                // TODO: deprecate
-                unimplemented!()
-            }
-        };
-
-        (packet, metadata)
-    }
-
     #[tracing::instrument(level = "trace", name = "check_tag_replay", skip(self, tag))]
     /// Check whether the packet is replayed using a packet tag.
     ///
@@ -384,21 +290,17 @@ where
 /// architectural overhaul of the hopr daemon.
 #[derive(Debug)]
 pub struct PacketSendFinalizer {
-    tx: Option<futures::channel::oneshot::Sender<()>>,
+    tx: futures::channel::oneshot::Sender<()>,
 }
 
 impl PacketSendFinalizer {
     pub fn new(tx: futures::channel::oneshot::Sender<()>) -> Self {
-        Self { tx: Some(tx) }
+        Self { tx }
     }
 
-    pub fn finalize(mut self) {
-        if let Some(sender) = self.tx.take() {
-            if sender.send(()).is_err() {
-                error!("Failed to notify the awaiter about the successful packet transmission")
-            }
-        } else {
-            error!("Sender for packet send signalization is already spent")
+    pub fn finalize(self) {
+        if self.tx.send(()).is_err() {
+            error!("Failed to notify the awaiter about the successful packet transmission")
         }
     }
 }
@@ -406,67 +308,54 @@ impl PacketSendFinalizer {
 /// Await on future until the confirmation of packet reception is received
 #[derive(Debug)]
 pub struct PacketSendAwaiter {
-    rx: Option<futures::channel::oneshot::Receiver<()>>,
+    rx: futures::channel::oneshot::Receiver<()>,
 }
 
 impl From<futures::channel::oneshot::Receiver<()>> for PacketSendAwaiter {
     fn from(value: futures::channel::oneshot::Receiver<()>) -> Self {
-        Self { rx: Some(value) }
+        Self { rx: value }
     }
 }
 
 impl PacketSendAwaiter {
-    pub async fn consume_and_wait(&mut self, until_timeout: std::time::Duration) -> Result<()> {
-        match self.rx.take() {
-            Some(resolve) => {
-                let timeout = sleep(until_timeout);
-                pin_mut!(resolve, timeout);
-                match futures::future::select(resolve, timeout).await {
-                    Either::Left((challenge, _)) => challenge.map_err(|_| TransportError("Canceled".to_owned())),
-                    Either::Right(_) => Err(TransportError("Timed out on sending a packet".to_owned())),
-                }
-            }
-            None => Err(TransportError(
-                "Packet send process observation already consumed".to_owned(),
-            )),
+    #[tracing::instrument(level = "trace", skip(self))]
+    pub async fn consume_and_wait(self, until_timeout: std::time::Duration) -> Result<()> {
+        let timeout = sleep(until_timeout);
+        let rx = self.rx;
+        pin_mut!(rx, timeout);
+        match futures::future::select(rx, timeout).await {
+            Either::Left((challenge, _)) => challenge.map_err(|_| TransportError("Canceled".to_owned())),
+            Either::Right(_) => Err(TransportError("Timed out on sending a packet".to_owned())),
         }
     }
 }
 
-/// External API for feeding Packet actions into the Packet processor
-#[derive(Debug, Clone)]
-pub struct PacketActions {
-    pub queue: Sender<MsgToProcess>,
+#[derive(Debug)]
+pub struct MsgSender {
+    tx: futures::channel::mpsc::UnboundedSender<(ApplicationData, TransportPath, PacketSendFinalizer)>,
 }
 
-/// Pushes the packet with the given payload for sending via the given valid path.
-impl PacketActions {
-    /// Pushes a new packet from this node into processing.
-    pub fn send_packet(&mut self, data: ApplicationData, path: TransportPath) -> Result<PacketSendAwaiter> {
+impl MsgSender {
+    pub fn new(
+        tx: futures::channel::mpsc::UnboundedSender<(ApplicationData, TransportPath, PacketSendFinalizer)>,
+    ) -> Self {
+        Self { tx }
+    }
+
+    /// Pushes a new packet into processing.
+    #[tracing::instrument(level = "debug", skip(self))]
+    pub async fn send_packet(&self, data: ApplicationData, path: TransportPath) -> Result<PacketSendAwaiter> {
         let (tx, rx) = futures::channel::oneshot::channel::<()>();
 
-        self.process(MsgToProcess::ToSend(data, path, PacketSendFinalizer::new(tx)))
+        self.tx
+            .clone()
+            .send((data, path, PacketSendFinalizer::new(tx)))
+            .await
+            .map_err(|_| TransportError("Failed to send a message".to_owned()))
             .map(move |_| {
                 let awaiter: PacketSendAwaiter = rx.into();
                 awaiter
             })
-    }
-
-    /// Pushes the packet received from the transport layer into processing.
-    pub fn receive_packet(&mut self, payload: Box<[u8]>, source: PeerId) -> Result<()> {
-        self.process(MsgToProcess::ToReceive(payload, source))
-    }
-
-    fn process(&mut self, event: MsgToProcess) -> Result<()> {
-        self.queue.try_send(event).map_err(|e| {
-            if e.is_full() {
-                Retry
-            } else if e.is_disconnected() {
-                TransportError("queue is closed".to_string())
-            } else {
-                TransportError(format!("Unknown error: {}", e))
-            }
-        })
     }
 }
 
@@ -492,225 +381,9 @@ impl PacketInteractionConfig {
 
 #[derive(Debug, smart_default::SmartDefault)]
 pub struct PacketMetadata {
-    #[default(None)]
-    pub send_finalizer: Option<PacketSendFinalizer>,
     #[cfg(all(feature = "prometheus", not(test)))]
     #[default(std::time::UNIX_EPOCH)]
     pub start_time: std::time::SystemTime,
-}
-
-/// Sets up processing of packet interactions and returns relevant read and write mechanism.
-///
-/// Packet processing logic:
-/// * When a new packet is delivered from the transport the `receive_packet` method is used
-/// to push it into the processing queue of incoming packets.
-/// * When a new packet is delivered from the transport and is designated for forwarding,
-/// the `forward_packet` method is used.
-/// * When a packet is generated to be sent over the network the `send_packet` is used to
-/// push it into the processing queue.
-///
-/// The result of packet processing can be extracted as a stream.
-pub struct PacketInteraction {
-    msg_event_queue: (Sender<MsgToProcess>, Receiver<MsgProcessed>),
-}
-
-impl PacketInteraction {
-    /// Creates a new instance given the DB and our public key used to verify the acknowledgements.
-    pub fn new<Db>(db: Db, tbf: bloom::WrappedTagBloomFilter, cfg: PacketInteractionConfig) -> Self
-    where
-        Db: HoprDbProtocolOperations + Send + Sync + std::fmt::Debug + Clone + 'static,
-    {
-        let (to_process_tx, to_process_rx) = channel::<MsgToProcess>(PACKET_RX_QUEUE_SIZE + PACKET_TX_QUEUE_SIZE);
-        let (processed_tx, processed_rx) = channel::<MsgProcessed>(PACKET_RX_QUEUE_SIZE + PACKET_TX_QUEUE_SIZE);
-
-        let mixer_cfg = cfg.mixer;
-        let processor = PacketProcessor::new(db, tbf.clone(), cfg);
-
-        let mut processing_stream = to_process_rx
-            .then_concurrent(move |event| {
-                let processor = processor.clone();
-
-                async move {
-                    #[cfg_attr(not(all(feature = "prometheus", not(test))), allow(unused_mut))]
-                    let (packet, mut metadata) = processor.to_transport_packet_with_metadata(event).await;
-
-                    #[cfg(all(feature = "prometheus", not(test)))]
-                    if let Ok(TransportPacket::Forwarded { .. }) = &packet {
-                        metadata.start_time = hopr_platform::time::native::current_time();
-                    }
-
-                    (packet, metadata)
-                }
-            })
-            // check tag replay
-            .then_concurrent(move |(packet, metadata)| {
-                let tbf = tbf.clone();
-
-                async move {
-                    tracing::debug!("tbf: check tag replay");
-
-                    if let Ok(p) = &packet {
-                        let packet_tag = match p {
-                            TransportPacket::Final { packet_tag, .. } => Some(packet_tag),
-                            TransportPacket::Forwarded { packet_tag, .. } => Some(packet_tag),
-                            _ => None,
-                        };
-
-                        if let Some(tag) = packet_tag {
-                            // There is a 0.1% chance that the positive result is not a replay
-                            // because a Bloom filter is used
-                            if tbf
-                                .with_write_lock(|inner: &mut TagBloomFilter| inner.check_and_set(tag))
-                                .await
-                            {
-                                return (Err(TagReplay), metadata);
-                            }
-                        }
-                    };
-
-                    (packet, metadata)
-                }
-            })
-            // process packet operation
-            .then_concurrent(move |(packet, metadata)| async move {
-                match packet {
-                    Err(e) => Err(e),
-                    Ok(packet) => match packet {
-                        TransportPacket::Outgoing {
-                            next_hop,
-                            data,
-                            ..
-                            // ack_challenge,
-                        } => {
-                            #[cfg(all(feature = "prometheus", not(test)))]
-                            {
-                                METRIC_PACKET_COUNT_PER_PEER.increment(&["out", &next_hop.to_string()]);
-                                METRIC_PACKET_COUNT.increment(&["sent"]);
-                            }
-
-                            Ok((MsgProcessed::Send(next_hop, data), metadata))
-                        }
-
-                        TransportPacket::Final {
-                            previous_hop,
-                            plain_text,
-                            ack,
-                            ..
-                        } => match ApplicationData::from_bytes(plain_text.as_ref()) {
-                            Ok(app_data) => {
-                                #[cfg(all(feature = "prometheus", not(test)))]
-                                {
-                                    METRIC_PACKET_COUNT_PER_PEER.increment(&["in", &previous_hop.to_string()]);
-                                    METRIC_PACKET_COUNT.increment(&["received"]);
-                                }
-
-                                Ok((MsgProcessed::Receive(previous_hop, app_data, ack), metadata))
-                            }
-                            Err(e) => Err(e.into()),
-                        },
-
-                        TransportPacket::Forwarded {
-                            previous_hop,
-                            next_hop,
-                            data,
-                            ack,
-                            ..
-                        } => {
-                            #[cfg(all(feature = "prometheus", not(test)))]
-                            {
-                                METRIC_PACKET_COUNT_PER_PEER.increment(&["in", &previous_hop.to_string()]);
-                                METRIC_PACKET_COUNT_PER_PEER.increment(&["out", &next_hop.to_string()]);
-                                METRIC_PACKET_COUNT.increment(&["forwarded"]);
-                            }
-
-                            Ok((MsgProcessed::Forward(next_hop, data, previous_hop, ack), metadata))
-                        }
-                    },
-                }
-            })
-            // introduce random timeout to mix packets asynchrounously
-            .then_concurrent(move |event| async move {
-                match event {
-                    Ok((processed, metadata)) => match processed {
-                        MsgProcessed::Send(..) | MsgProcessed::Forward(..) => {
-                            let random_delay = mixer_cfg.random_delay();
-                            debug!("Mixer created a random packet delay {}ms", random_delay.as_millis());
-
-                            #[cfg(all(feature = "prometheus", not(test)))]
-                            METRIC_QUEUE_SIZE.increment(1.0f64);
-
-                            sleep(random_delay).await;
-
-                            #[cfg(all(feature = "prometheus", not(test)))]
-                            {
-                                METRIC_QUEUE_SIZE.decrement(1.0f64);
-
-                                let weight = 1.0f64 / mixer_cfg.metric_delay_window as f64;
-                                METRIC_MIXER_AVERAGE_DELAY.set(
-                                    (weight * random_delay.as_millis() as f64)
-                                        + ((1.0f64 - weight) * METRIC_MIXER_AVERAGE_DELAY.get()),
-                                );
-                            }
-
-                            Ok((processed, metadata))
-                        }
-                        MsgProcessed::Receive(..) => Ok((processed, metadata)),
-                    },
-                    Err(e) => Err(e),
-                }
-            })
-            // output processed packet into the event mechanism
-            .then_concurrent(move |processed| {
-                let mut processed_tx = processed_tx.clone();
-
-                async move {
-                    match processed {
-                        Ok((processed_msg, mut metadata)) => {
-                            match poll_fn(|cx| Pin::new(&mut processed_tx).poll_ready(cx)).await {
-                                Ok(_) => match processed_tx.start_send(processed_msg) {
-                                    Ok(_) => {
-                                        if let Some(finalizer) = metadata.send_finalizer.take() {
-                                            finalizer.finalize();
-                                        }
-                                        trace!("Pipeline resulted in a processed msg")
-                                    }
-                                    Err(e) => error!("Failed to pass a processed ack message: {}", e),
-                                },
-                                Err(e) => {
-                                    warn!("The receiver for processed packets no longer exists: {}", e);
-                                }
-                            };
-                        }
-                        Err(e) => error!("Packet processing error: {}", e),
-                    }
-                }
-            });
-
-        // NOTE: This spawned task does not need to be explicitly canceled, since it will
-        // be automatically dropped when the event sender object is dropped.
-        spawn(async move {
-            // poll the stream until it's done
-            while processing_stream.next().await.is_some() {}
-        });
-
-        Self {
-            msg_event_queue: (to_process_tx, processed_rx),
-        }
-    }
-
-    pub fn writer(&self) -> PacketActions {
-        PacketActions {
-            queue: self.msg_event_queue.0.clone(),
-        }
-    }
-}
-
-impl Stream for PacketInteraction {
-    type Item = MsgProcessed;
-
-    fn poll_next(self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Option<Self::Item>> {
-        Pin::new(self).msg_event_queue.1.poll_next_unpin(cx)
-    }
 }
 
 #[cfg(test)]

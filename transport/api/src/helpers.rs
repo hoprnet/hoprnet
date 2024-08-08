@@ -1,7 +1,7 @@
 use std::sync::{Arc, OnceLock};
 
 use async_lock::RwLock;
-use core_protocol::msg::processor::PacketActions;
+use core_protocol::msg::processor::MsgSender;
 use hopr_internal_types::protocol::ApplicationData;
 use libp2p::{Multiaddr, PeerId};
 use tracing::{debug, trace};
@@ -136,7 +136,7 @@ pub(crate) struct MessageSender<T>
 where
     T: HoprDbAllOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
 {
-    process_packet_send: Arc<OnceLock<PacketActions>>,
+    process_packet_send: Arc<OnceLock<MsgSender>>,
     resolver: PathPlanner<T>,
 }
 
@@ -144,7 +144,7 @@ impl<T> MessageSender<T>
 where
     T: HoprDbAllOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
 {
-    pub(crate) fn new(process_packet_send: Arc<OnceLock<PacketActions>>, resolver: PathPlanner<T>) -> Self {
+    pub(crate) fn new(process_packet_send: Arc<OnceLock<MsgSender>>, resolver: PathPlanner<T>) -> Self {
         Self {
             process_packet_send,
             resolver,
@@ -181,6 +181,7 @@ where
             .ok_or_else(|| TransportSessionError::Closed)?
             .clone()
             .send_packet(data, path)
+            .await
             .map_err(|_| TransportSessionError::Closed)?
             .consume_and_wait(crate::constants::PACKET_QUEUE_TIMEOUT_MILLISECONDS)
             .await
