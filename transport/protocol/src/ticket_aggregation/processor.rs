@@ -561,7 +561,7 @@ mod tests {
         let mut alice = super::TicketAggregationInteraction::<(), ()>::new(db_alice.clone(), &PEERS_CHAIN[0]);
         let mut bob = super::TicketAggregationInteraction::<(), ()>::new(db_bob.clone(), &PEERS_CHAIN[1]);
 
-        let mut awaiter = bob
+        let awaiter = bob
             .writer()
             .aggregate_tickets(&channel_alice_bob.get_id(), Default::default())
             .unwrap();
