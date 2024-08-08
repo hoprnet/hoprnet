@@ -1659,6 +1659,7 @@ dependencies = [
  "libp2p",
  "moka",
  "proc-macro-regex",
+ "rust-stream-ext-concurrent",
  "serde",
  "thiserror",
  "tracing",

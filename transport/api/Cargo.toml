@@ -45,6 +45,7 @@ lazy_static = { workspace = true, optional = true }
 libp2p = { workspace = true, features = ["request-response"] }
 moka = { workspace = true }
 proc-macro-regex = "~1.1.0"
+rust-stream-ext-concurrent = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }

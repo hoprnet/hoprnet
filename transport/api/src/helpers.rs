@@ -81,6 +81,7 @@ where
         self.channel_graph.clone()
     }
 
+    #[tracing::instrument(level = "debug", skip(self))]
     pub(crate) async fn resolve_path(
         &self,
         destination: PeerId,
@@ -90,7 +91,7 @@ where
             PathOptions::IntermediatePath(mut path) => {
                 path.push(destination);
 
-                debug!(full_path = format!("{path:?}"), "Resolving a specific path");
+                debug!(full_path = format!("{path:?}"), "Resolved a specific path");
 
                 let cg = self.channel_graph.read().await;
 
