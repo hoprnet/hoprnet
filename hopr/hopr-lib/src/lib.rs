@@ -48,7 +48,7 @@ use chain_api::{
 use chain_types::chain_events::ChainEventType;
 use chain_types::ContractAddresses;
 use core_path::channel_graph::ChannelGraph;
-use core_transport::{execute_on_tick, HoprTransportConfig, HoprTransportProcess, PeerTransportEvent};
+use core_transport::{execute_on_tick, HoprTransportConfig, HoprTransportProcess, PeerDiscovery};
 use core_transport::{ChainKeypair, Hash, HoprTransport, OffchainKeypair};
 use core_transport::{IndexerTransportEvent, Network, PeerEligibility, PeerOrigin};
 use hopr_async_runtime::prelude::{sleep, spawn, JoinHandle};
@@ -76,7 +76,7 @@ pub use {
         libp2p::identity::PeerId,
         ApplicationData, HalfKeyChallenge, Health, Keypair, Multiaddr, OffchainKeypair as HoprOffchainKeypair,
         PathOptions, SendMsg, Session as HoprSession, SessionCapability, SessionClientConfig,
-        SessionId as HoprSessionId, TicketStatistics, TransportOutput, SESSION_USABLE_MTU_SIZE,
+        SessionId as HoprSessionId, TicketStatistics, SESSION_USABLE_MTU_SIZE,
     },
     hopr_internal_types::prelude::*,
     hopr_primitive_types::prelude::*,
@@ -151,6 +151,14 @@ pub struct CloseChannelResult {
 pub enum HoprLibProcesses {
     #[strum(to_string = "libp2p component responsible for the handling of the p2p communication")]
     Swarm,
+    #[strum(to_string = "HOPR protocol processing: ack ingress")]
+    ProtocolAckIn,
+    #[strum(to_string = "HOPR protocol processing: ack egress")]
+    ProtocolAckOut,
+    #[strum(to_string = "HOPR protocol processing: msg ingress")]
+    ProtocolMsgIn,
+    #[strum(to_string = "HOPR protocol processing: msg egress")]
+    ProtocolMsgOut,
     #[strum(to_string = "session router pairing the session streams based on the PeerId and ApplicationTag")]
     SessionsRouter,
     #[cfg(feature = "session-server")]
@@ -186,8 +194,12 @@ impl From<HoprTransportProcess> for HoprLibProcesses {
     fn from(value: HoprTransportProcess) -> Self {
         match value {
             core_transport::HoprTransportProcess::Swarm => HoprLibProcesses::Swarm,
+            core_transport::HoprTransportProcess::ProtocolAckIn => HoprLibProcesses::ProtocolAckIn,
+            core_transport::HoprTransportProcess::ProtocolAckOut => HoprLibProcesses::ProtocolAckIn,
+            core_transport::HoprTransportProcess::ProtocolMsgIn => HoprLibProcesses::ProtocolAckIn,
+            core_transport::HoprTransportProcess::ProtocolMsgOut => HoprLibProcesses::ProtocolAckIn,
             core_transport::HoprTransportProcess::Heartbeat => HoprLibProcesses::Heartbeat,
-            core_transport::HoprTransportProcess::SessionsRouter => HoprLibProcesses::SessionsRouter,
+            core_transport::HoprTransportProcess::SessionsManagement => HoprLibProcesses::SessionsRouter,
             core_transport::HoprTransportProcess::BloomFilterSave => HoprLibProcesses::BloomFilterSave,
         }
     }
@@ -212,7 +224,7 @@ pub async fn chain_events_to_transport_events<StreamIn, StreamInPreloading, Db>(
     channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
     indexer_action_tracker: Arc<IndexerActionTracker>,
     network: Arc<Network<Db>>,
-) -> impl Stream<Item = PeerTransportEvent> + Send + 'static
+) -> impl Stream<Item = PeerDiscovery> + Send + 'static
 where
     Db: HoprDbAllOperations + Clone + Send + Sync + std::fmt::Debug + 'static,
     StreamIn: Stream<Item = SignificantChainEvent> + Send + 'static,
@@ -354,16 +366,16 @@ where
         async move {
             match event {
                 IndexerTransportEvent::EligibilityUpdate(peer, eligibility) => match eligibility {
-                    PeerEligibility::Eligible => Some(vec![PeerTransportEvent::Allow(peer)]),
+                    PeerEligibility::Eligible => Some(vec![PeerDiscovery::Allow(peer)]),
                     PeerEligibility::Ineligible => {
                         if let Err(e) = network.remove(&peer).await {
                             error!("failed to remove '{peer}' from the local registry: {e}")
                         }
-                        Some(vec![PeerTransportEvent::Ban(peer)])
+                        Some(vec![PeerDiscovery::Ban(peer)])
                     }
                 },
                 IndexerTransportEvent::Announce(peer, multiaddress) => {
-                    Some(vec![PeerTransportEvent::Announce(peer, multiaddress)])
+                    Some(vec![PeerDiscovery::Announce(peer, multiaddress)])
                 }
             }
         }
@@ -375,13 +387,13 @@ where
 ///
 /// Provides a read and write stream for Hopr socket recognized data formats.
 pub struct HoprSocket {
-    rx: UnboundedReceiver<TransportOutput>,
-    tx: UnboundedSender<TransportOutput>,
+    rx: UnboundedReceiver<ApplicationData>,
+    tx: UnboundedSender<ApplicationData>,
 }
 
 impl Default for HoprSocket {
     fn default() -> Self {
-        let (tx, rx) = unbounded::<TransportOutput>();
+        let (tx, rx) = unbounded::<ApplicationData>();
         Self { rx, tx }
     }
 }
@@ -391,11 +403,11 @@ impl HoprSocket {
         Self::default()
     }
 
-    pub fn reader(self) -> UnboundedReceiver<TransportOutput> {
+    pub fn reader(self) -> UnboundedReceiver<ApplicationData> {
         self.rx
     }
 
-    pub fn writer(&self) -> UnboundedSender<TransportOutput> {
+    pub fn writer(&self) -> UnboundedSender<ApplicationData> {
         self.tx.clone()
     }
 }
@@ -704,8 +716,7 @@ impl Hopr {
 
         let (to_process_tx, to_process_rx) = async_channel::unbounded::<IndexerTransportEvent>();
 
-        let (indexer_peer_update_tx, indexer_peer_update_rx) =
-            futures::channel::mpsc::unbounded::<PeerTransportEvent>();
+        let (indexer_peer_update_tx, indexer_peer_update_rx) = futures::channel::mpsc::unbounded::<PeerDiscovery>();
 
         let indexer_event_pipeline = chain_events_to_transport_events(
             self.rx_indexer_significant_events.clone(),
@@ -1037,15 +1048,14 @@ impl Hopr {
         destination: PeerId,
         options: PathOptions,
         application_tag: Option<u16>,
-    ) -> errors::Result<HalfKeyChallenge> {
+    ) -> errors::Result<()> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
-        let result = self
-            .transport_api
+        self.transport_api
             .send_message(msg, destination, options, application_tag)
-            .await;
+            .await?;
 
-        Ok(result?)
+        Ok(())
     }
 
     /// Attempts to aggregate all tickets in the given channel

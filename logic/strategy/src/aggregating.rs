@@ -24,12 +24,12 @@
 //!
 //! For details on default parameters see [AggregatingStrategyConfig].
 use async_trait::async_trait;
-use core_protocol::ticket_aggregation::processor::TicketAggregatorTrait;
 use hopr_async_runtime::prelude::{spawn, JoinHandle};
 use hopr_crypto_types::prelude::Hash;
 use hopr_db_sql::api::tickets::{AggregationPrerequisites, HoprDbTicketOperations};
 use hopr_db_sql::channels::HoprDbChannelOperations;
 use hopr_internal_types::prelude::*;
+use hopr_transport_protocol::ticket_aggregation::processor::TicketAggregatorTrait;
 
 use async_lock::RwLock;
 use serde::{Deserialize, Serialize};
@@ -282,9 +282,6 @@ where
 mod tests {
     use crate::strategy::SingularStrategy;
     use async_std::prelude::FutureExt as AsyncStdFutureExt;
-    use core_protocol::ticket_aggregation::processor::{
-        AwaitingAggregator, TicketAggregationInteraction, TicketAggregationProcessed,
-    };
     use futures::{FutureExt, StreamExt};
     use hex_literal::hex;
     use hopr_crypto_types::prelude::*;
@@ -297,6 +294,9 @@ mod tests {
     use hopr_db_sql::{HoprDbGeneralModelOperations, TargetDb};
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
+    use hopr_transport_protocol::ticket_aggregation::processor::{
+        AwaitingAggregator, TicketAggregationInteraction, TicketAggregationProcessed,
+    };
     use lazy_static::lazy_static;
     use std::ops::Add;
     use std::pin::pin;

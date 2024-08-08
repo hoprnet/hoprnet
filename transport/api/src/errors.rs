@@ -1,4 +1,4 @@
-pub use core_protocol::errors::ProtocolError;
+pub use hopr_transport_protocol::errors::ProtocolError;
 use thiserror::Error;
 
 /// Errors produced by the crate.
@@ -17,7 +17,7 @@ pub enum HoprTransportError {
     Path(#[from] core_path::errors::PathError),
 
     #[error("Protocol error: {0}")]
-    Protocol(#[from] core_protocol::errors::ProtocolError),
+    Protocol(#[from] hopr_transport_protocol::errors::ProtocolError),
 
     #[error("Packet error: {0}")]
     Packet(#[from] hopr_crypto_packet::errors::PacketError),
