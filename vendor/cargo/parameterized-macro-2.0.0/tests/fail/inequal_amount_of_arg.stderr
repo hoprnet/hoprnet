@@ -1,0 +1,8 @@
+error: custom attribute panicked
+ --> tests/fail/inequal_amount_of_arg.rs:3:1
+  |
+3 | #[parameterized(v = { "a", "b" }, w = { 1, 2, 3 })]
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = help: message: parameterized-macro error: Each test-case parameter should have an equal amount of values passed to it.
+          Expected 2 arguments for 'w', but got: 3

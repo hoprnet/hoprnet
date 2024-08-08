@@ -1,0 +1,16 @@
+---
+hopr:
+  strategy:
+    on_fail_continue: true
+    strategies:
+      - !AutoFunding
+        funding_amount: "10000000000000000000 HOPR"
+        min_stake_threshold: "1000000000000000000 HOPR"
+      - !Aggregating
+        aggregation_threshold: 100
+        unrealized_balance_ratio: 0.9
+        aggregation_timeout: 60
+        aggregate_on_channel_close: true
+      - !AutoRedeeming
+        redeem_only_aggregated: true
+        on_close_redeem_single_tickets_value_min: "2000000000000000000 HOPR"

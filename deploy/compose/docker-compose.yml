@@ -1,0 +1,199 @@
+---
+networks:
+  hoprnet:
+    driver: bridge
+
+volumes:
+  prometheus_data: {}
+  grafana_data: {}
+  hoprd_data: {}
+
+services:
+  hoprd:
+    image: "${HOPRD_IMAGE}"
+    restart: unless-stopped
+    pull_policy: always
+    platform: ${DOCKER_PLATFORM}
+    container_name: hoprd
+    hostname: hoprd
+    stop_signal: SIGINT
+    networks:
+      - hoprnet
+    ports:
+      - "${HOPRD_P2P_PORT}:${HOPRD_P2P_PORT}/tcp"
+      - "${HOPRD_P2P_PORT}:${HOPRD_P2P_PORT}/udp"
+      - "${HOPRD_API_PORT}:3001"
+    env_file:
+      - .env-secrets
+    environment:
+      - "RUST_LOG=${HOPRD_LOG_LEVEL}"
+      - RUST_BACKTRACE=full
+      - HOPRD_CONFIGURATION_FILE_PATH=/app/hoprd.cfg.yaml
+      - HOPRD_API_PORT=3001
+      - "HOPRD_USE_OPENTELEMETRY=${HOPRD_USE_OPENTELEMETRY}"
+      - "OTEL_SERVICE_NAME=${OTEL_SERVICE_NAME}"
+      - "OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT}"
+    volumes:
+      - ./hoprd.cfg.yaml:/app/hoprd.cfg.yaml
+      - ./hopr.id:/app/hopr.id
+      - hoprd_data:/app/hoprd/
+      - '/var/run/docker.sock:/var/run/docker.sock'
+    deploy:
+      resources:
+        reservations:
+          memory: "${HOPRD_MEM_REQUEST}"
+        limits:
+          memory: "${HOPRD_MEM_LIMIT}"
+    logging:
+      driver: json-file
+      options:
+        max-size: "${HOPRD_LOG_MAX_SIZE}"
+        max-file: 5
+    profiles:
+      - hoprd
+
+  hopr-admin:
+    image: "${HOPR_ADMIN_IMAGE}"
+    restart: unless-stopped
+    platform: ${DOCKER_PLATFORM}
+    container_name: admin
+    hostname: admin
+    ports:
+      - "${HOPR_ADMIN_PORT}:80"
+    networks:
+      - hoprnet
+    deploy:
+      resources:
+        reservations:
+          memory: "${HOPR_ADMIN_MEM_REQUEST}"
+        limits:
+          memory: "${HOPR_ADMIN_MEM_LIMIT}"
+    profiles:
+      - admin-ui
+
+  jaeger:
+    image: "${JAEGER_IMAGE}"
+    restart: unless-stopped
+    platform: ${DOCKER_PLATFORM}
+    container_name: jaeger
+    hostname: jaeger
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+      - "16686:16686"
+    networks:
+      - hoprnet
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    profiles:
+      - tracing
+
+  cadvisor:
+    image: "${METRICS_CADVISOR_IMAGE}"
+    container_name: cadvisor
+    hostname: cadvisor
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    privileged: true
+    #expose:
+    #  - "${METRICS_CADVISOR_PORT}"
+    ports:
+      - "${METRICS_CADVISOR_PORT}:8080"
+    networks:
+      - hoprnet
+    devices:
+      - /dev/kmsg:/dev/kmsg
+    profiles:
+      - metrics
+      - metrics-vis
+
+  nodeexporter:
+    image: "${METRICS_NODE_EXPORTER_IMAGE}"
+    restart: unless-stopped
+    platform: ${DOCKER_PLATFORM}
+    container_name: nodeexporter
+    hostname: nodeexporter
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.ignored-mount-points=^/(sys|proc|dev|host|etc)($$|/)'
+    ports:
+      - "${METRICS_NODE_EXPORTER_PORT}:9100"
+    networks:
+      - hoprnet
+    profiles:
+      - metrics
+      - metrics-vis
+
+  metricspusher:
+    image: curlimages/curl:latest
+    container_name: metricspusher
+    hostname: metricspusher
+    command: /bin/sh /app/metricspusher.sh ${METRICS_PUSH_URL}
+    volumes:
+      - ./prometheus/metricspusher.sh:/app/metricspusher.sh
+    networks:
+      - hoprnet
+    env_file:
+      - .env-secrets
+    profiles:
+      - metrics-push
+
+  prometheus:
+    image: "${PROMETHEUS_IMAGE}"
+    restart: always
+    platform: ${DOCKER_PLATFORM}
+    container_name: prometheus
+    hostname: prometheus
+    depends_on:
+      - cadvisor
+      - nodeexporter
+    command: |
+      --web.listen-address=0.0.0.0:9090
+      --config.file=/etc/prometheus/prometheus.yml
+      --storage.tsdb.path=/prometheus
+      --web.console.libraries=/usr/share/prometheus/console_libraries
+      --web.console.templates=/usr/share/prometheus/consoles
+    environment:
+      DATA_RETENTION_DAYS: 30
+    ports:
+      - "${PROMETHEUS_PORT}:9090"
+    volumes:
+      - "${PROMETHEUS_CONFIG_FILE}:/etc/prometheus/prometheus.yml"
+      - prometheus_data:/prometheus
+    networks:
+      - hoprnet
+    profiles:
+      - metrics-vis
+
+  grafana:
+    image: "${GRAFANA_IMAGE}"
+    platform: ${DOCKER_PLATFORM}
+    container_name: grafana
+    hostname: grafana
+    user: '472'
+    restart: always
+    environment:
+      GF_INSTALL_PLUGINS: 'grafana-clock-panel,grafana-simple-json-datasource,yesoreyeram-infinity-datasource'
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning/:/etc/grafana/provisioning/
+    env_file:
+      - ./grafana/config.monitoring
+    ports:
+      - "${GRAFANA_PORT}:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - hoprnet
+    profiles:
+      - metrics-vis

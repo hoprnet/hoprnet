@@ -1,5 +1,4 @@
 [toolchain]
-channel = "1.75"
+channel = "1.78"
 profile = "default"
-components = [ "cargo", "clippy", "rust-src" ]
-targets = [ "x86_64-unknown-linux-gnu" ]
+components = ["cargo", "clippy", "rust-src"]

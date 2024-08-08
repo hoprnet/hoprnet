@@ -28,7 +28,7 @@ jobs:
 
   open-release:
     name: Open Release
-    runs-on: ubuntu-2-core
+    runs-on: self-hosted-hoprnet-small
     steps:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4
@@ -43,7 +43,7 @@ jobs:
             echo "next_version=${next_version}" >> $GITHUB_OUTPUT
 
       - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v5
+        uses: peter-evans/create-pull-request@v6
         with:
             token: ${{ secrets.GH_RUNNER_TOKEN }}
             commit-message: "Bump to version ${{ steps.bump.outputs.next_version }}"

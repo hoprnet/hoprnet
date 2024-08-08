@@ -13,6 +13,12 @@ pub enum HoprdError {
 
     #[error("validation failed: '{0}'")]
     ValidationError(String),
+
+    #[error(transparent)]
+    HoprLibError(#[from] hopr_lib::errors::HoprLibError),
+
+    #[error("os error: '{0}'")]
+    OsError(String),
 }
 
 pub type Result<T> = std::result::Result<T, HoprdError>;

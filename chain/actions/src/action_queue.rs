@@ -1,29 +1,31 @@
-use async_lock::RwLock;
+//! Defines the main FIFO MPSC queue for actions - the [ActionQueue] type.
+//!
+//! The [ActionQueue] acts as a MPSC queue of [Actions](chain_types::actions::Action) which are executed one-by-one
+//! as they are being popped up from the queue by a runner task.
+use async_channel::{bounded, Receiver, Sender};
 use async_trait::async_trait;
-use chain_db::traits::HoprCoreEthereumDbActions;
 use chain_types::actions::Action;
 use chain_types::chain_events::ChainEventType;
-use futures::channel::mpsc::{channel, Receiver, Sender};
 use futures::future::Either;
 use futures::{pin_mut, FutureExt, StreamExt};
 use hopr_crypto_types::types::Hash;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use log::{debug, error, info, trace, warn};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
-use std::future::{poll_fn, Future};
+use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
+use tracing::{debug, error, info, trace, warn};
 
 use crate::action_state::{ActionState, IndexerExpectation};
-use crate::errors::CoreEthereumActionsError::{
-    ChannelAlreadyClosed, InvalidState, MissingDomainSeparator, Timeout, TransactionSubmissionFailed,
-};
-use crate::errors::Result;
+use crate::errors::ChainActionsError::{ChannelAlreadyClosed, InvalidState, Timeout, TransactionSubmissionFailed};
+use crate::errors::{ChainActionsError, Result};
 
-use async_std::task::spawn;
+use hopr_async_runtime::prelude::spawn;
+use hopr_db_sql::api::tickets::HoprDbTicketOperations;
+use hopr_db_sql::info::HoprDbInfoOperations;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::MultiCounter;
@@ -39,12 +41,12 @@ lazy_static::lazy_static! {
 }
 
 /// Implements execution of transactions underlying each `Action`
-/// Each operation returns a transaction hash and may timeout.
+/// Each operation returns a transaction hash and may time out.
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait TransactionExecutor {
     /// Executes ticket redemption transaction given a ticket.
-    async fn redeem_ticket(&self, ticket: AcknowledgedTicket, domain_separator: Hash) -> Result<Hash>;
+    async fn redeem_ticket(&self, ticket: RedeemableTicket) -> Result<Hash>;
 
     /// Executes channel funding transaction (or channel opening) to the given `destination` and stake.
     /// Channel funding and channel opening are both same transactions.
@@ -96,18 +98,20 @@ pub type PendingAction = Pin<Box<dyn Future<Output = Result<ActionConfirmation>>
 /// Future that resolves once the transaction has been confirmed by the Indexer.
 type ActionFinisher = futures::channel::oneshot::Sender<Result<ActionConfirmation>>;
 
-/// Sends a future Ethereum transaction into the `TransactionQueue`.
+/// Sends a future Ethereum transaction into the `ActionQueue`.
 #[derive(Debug, Clone)]
 pub struct ActionSender(Sender<(Action, ActionFinisher)>);
 
 impl ActionSender {
     /// Delivers the future action into the `ActionQueue` for processing.
+    #[tracing::instrument(level = "debug", skip(self))]
     pub async fn send(&self, action: Action) -> Result<PendingAction> {
         let completer = futures::channel::oneshot::channel();
-        let mut sender = self.0.clone();
-        poll_fn(|cx| Pin::new(&mut sender).poll_ready(cx))
+        let sender = self.0.clone();
+
+        sender
+            .send((action, completer.0))
             .await
-            .and_then(move |_| sender.start_send((action, completer.0)))
             .map(|_| {
                 completer
                     .1
@@ -118,43 +122,35 @@ impl ActionSender {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+/// Configuration for the [ActionQueue]
+#[derive(Debug, Clone, Copy, PartialEq, smart_default::SmartDefault, Serialize, Deserialize)]
 pub struct ActionQueueConfig {
     /// Maximum time (in seconds) to wait for the action to be confirmed on-chain and indexed
+    ///
     /// Defaults to 150 seconds.
+    #[default(Duration::from_secs(150))]
     pub max_action_confirmation_wait: Duration,
 }
 
-impl Default for ActionQueueConfig {
-    fn default() -> Self {
-        Self {
-            max_action_confirmation_wait: Duration::from_secs(150),
-        }
-    }
-}
-
-struct ExecutionContext<Db, S, TxExec>
+#[derive(Debug)]
+struct ExecutionContext<S, TxExec>
 where
-    Db: HoprCoreEthereumDbActions,
     S: ActionState,
     TxExec: TransactionExecutor,
 {
-    db: Arc<RwLock<Db>>,
     action_state: Arc<S>,
     tx_exec: Arc<TxExec>,
     cfg: ActionQueueConfig,
 }
 
 // Needs manual implementation, so we don't need to impose Clone restrictions on the generic args
-impl<Db, S, TxExec> Clone for ExecutionContext<Db, S, TxExec>
+impl<S, TxExec> Clone for ExecutionContext<S, TxExec>
 where
-    Db: HoprCoreEthereumDbActions,
     S: ActionState,
     TxExec: TransactionExecutor,
 {
     fn clone(&self) -> Self {
         Self {
-            db: self.db.clone(),
             action_state: self.action_state.clone(),
             tx_exec: self.tx_exec.clone(),
             cfg: self.cfg,
@@ -162,32 +158,22 @@ where
     }
 }
 
-impl<Db, S, TxExec> ExecutionContext<Db, S, TxExec>
+impl<S, TxExec> ExecutionContext<S, TxExec>
 where
-    Db: HoprCoreEthereumDbActions,
     S: ActionState,
     TxExec: TransactionExecutor,
 {
-    pub async fn execute_action(self, action: Action) -> Result<ActionConfirmation> {
+    #[tracing::instrument(level = "debug", skip(self))]
+    pub async fn execute_action(self, action: Action, channel_dst: Hash) -> Result<ActionConfirmation> {
         let expectation = match action.clone() {
-            Action::RedeemTicket(ack) => match ack.status {
-                AcknowledgedTicketStatus::BeingRedeemed { .. } => {
-                    let domain_separator = self
-                        .db
-                        .read()
-                        .await
-                        .get_channels_domain_separator()
-                        .await?
-                        .ok_or(MissingDomainSeparator)?;
-
-                    let tx_hash = self.tx_exec.redeem_ticket(ack.clone(), domain_separator).await?;
-                    IndexerExpectation::new(
-                        tx_hash,
-                        move |event| matches!(event, ChainEventType::TicketRedeemed(channel, _) if ack.ticket.channel_id == channel.get_id()),
-                    )
-                }
-                _ => return Err(InvalidState(ack.to_string())),
-            },
+            Action::RedeemTicket(ack) => {
+                let ticket_channel_id = ack.verified_ticket().channel_id;
+                let tx_hash = self.tx_exec.redeem_ticket(ack).await?;
+                IndexerExpectation::new(
+                    tx_hash,
+                    move |event| matches!(event, ChainEventType::TicketRedeemed(channel, _) if ticket_channel_id == channel.get_id()),
+                )
+            }
 
             Action::OpenChannel(address, stake) => {
                 let tx_hash = self.tx_exec.fund_channel(address, stake).await?;
@@ -211,7 +197,7 @@ where
 
             Action::CloseChannel(channel, direction) => match direction {
                 ChannelDirection::Incoming => match channel.status {
-                    ChannelStatus::Open | ChannelStatus::PendingToClose => {
+                    ChannelStatus::Open | ChannelStatus::PendingToClose(_) => {
                         let tx_hash = self.tx_exec.close_incoming_channel(channel.source).await?;
                         IndexerExpectation::new(
                             tx_hash,
@@ -235,7 +221,7 @@ where
                             move |event| matches!(event, ChainEventType::ChannelClosureInitiated(r_channel) if r_channel.get_id() == channel.get_id()),
                         )
                     }
-                    ChannelStatus::PendingToClose => {
+                    ChannelStatus::PendingToClose(_) => {
                         debug!("finalizing closure of {channel}");
                         let tx_hash = self
                             .tx_exec
@@ -306,35 +292,39 @@ where
     }
 }
 
-/// A queue of outgoing Ethereum transactions.
-/// This queue awaits new transactions to arrive and calls the corresponding
-/// method of the `TransactionExecutor` to execute it and await its confirmation.
+/// A queue of [Actions](Action) to be executed.
+///
+/// This queue awaits new Actions to arrive, translates them into Ethereum
+/// transactions via [TransactionExecutor] to execute them and await their confirmation
+/// by registering their corresponding expectations in [ActionState].
+#[derive(Debug, Clone)]
 pub struct ActionQueue<Db, S, TxExec>
 where
-    Db: HoprCoreEthereumDbActions + Send + Sync,
+    Db: HoprDbInfoOperations + HoprDbTicketOperations + Send + Sync,
     S: ActionState + Send + Sync,
     TxExec: TransactionExecutor + Send + Sync,
 {
+    db: Db,
     queue_send: Sender<(Action, ActionFinisher)>,
     queue_recv: Receiver<(Action, ActionFinisher)>,
-    ctx: ExecutionContext<Db, S, TxExec>,
+    ctx: ExecutionContext<S, TxExec>,
 }
 
 impl<Db, S, TxExec> ActionQueue<Db, S, TxExec>
 where
-    Db: HoprCoreEthereumDbActions + Send + Sync + 'static,
+    Db: HoprDbInfoOperations + HoprDbTicketOperations + Clone + Send + Sync + 'static,
     S: ActionState + Send + Sync + 'static,
     TxExec: TransactionExecutor + Send + Sync + 'static,
 {
     /// Number of pending transactions in the queue
     pub const ACTION_QUEUE_SIZE: usize = 2048;
 
-    /// Creates a new instance with the given `TransactionExecutor` implementation.
-    pub fn new(db: Arc<RwLock<Db>>, action_state: S, tx_exec: TxExec, cfg: ActionQueueConfig) -> Self {
-        let (queue_send, queue_recv) = channel(Self::ACTION_QUEUE_SIZE);
+    /// Creates a new instance with the given [TransactionExecutor] and [ActionState] implementations.
+    pub fn new(db: Db, action_state: S, tx_exec: TxExec, cfg: ActionQueueConfig) -> Self {
+        let (queue_send, queue_recv) = bounded(Self::ACTION_QUEUE_SIZE);
         Self {
+            db,
             ctx: ExecutionContext {
-                db,
                 action_state: Arc::new(action_state),
                 tx_exec: Arc::new(tx_exec),
                 cfg,
@@ -355,19 +345,34 @@ where
     }
 
     /// Consumes self and runs the main queue processing loop until the queue is closed.
-    pub async fn action_loop(mut self) {
-        while let Some((act, tx_finisher)) = self.queue_recv.next().await {
+    ///
+    /// The method will panic if Channel Domain Separator is not yet populated in the DB.
+    #[allow(clippy::async_yields_async)]
+    #[tracing::instrument(level = "debug", skip(self))]
+    pub async fn start(self) {
+        let queue_recv = self.queue_recv.clone();
+        pin_mut!(queue_recv);
+        while let Some((act, tx_finisher)) = queue_recv.next().await {
             // Some minimum separation to avoid batching txs
             futures_timer::Delay::new(Duration::from_millis(100)).await;
 
             let exec_context = self.ctx.clone();
+            let db_clone = self.db.clone();
+            let channel_dst = self
+                .db
+                .get_indexer_data(None)
+                .await
+                .map_err(ChainActionsError::from)
+                .and_then(|data| data.channels_dst.ok_or(InvalidState("missing channels dst".into())))
+                .unwrap();
+
+            // NOTE: the process is "daemonized" and not awaited, so it will run in the background
             spawn(async move {
                 let act_id = act.to_string();
                 let act_name: &'static str = (&act).into();
                 trace!("start executing {act_id} ({act_name})");
 
-                let db_clone = exec_context.db.clone();
-                let tx_result = exec_context.execute_action(act.clone()).await;
+                let tx_result = exec_context.execute_action(act.clone(), channel_dst).await;
                 match &tx_result {
                     Ok(confirmation) => {
                         info!("successful {confirmation}");
@@ -377,10 +382,13 @@ where
                     }
                     Err(err) => {
                         // On error in Ticket redeem action, we also need to reset ack ticket state
-                        if let Action::RedeemTicket(mut ack) = act {
+                        if let Action::RedeemTicket(ack) = act {
                             error!("marking the acknowledged ticket as untouched - redeem action failed: {err}");
-                            ack.status = AcknowledgedTicketStatus::Untouched;
-                            if let Err(e) = db_clone.write().await.update_acknowledged_ticket(&ack).await {
+
+                            if let Err(e) = db_clone
+                                .update_ticket_states((&ack).into(), AcknowledgedTicketStatus::Untouched)
+                                .await
+                            {
                                 error!("cannot mark {ack} as untouched: {e}");
                             }
                         }
@@ -403,6 +411,6 @@ where
                 let _ = tx_finisher.send(tx_result);
             });
         }
-        warn!("action queue has finished");
+        error!("action queue has finished, it should be running for the node to be able to process chain actions");
     }
 }

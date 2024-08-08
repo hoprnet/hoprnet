@@ -1,6 +1,6 @@
 [package]
-name = "core-p2p"
-version = "0.2.0"
+name = "hopr-transport-p2p"
+version = "0.4.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 license = "GPL-3.0-only"
@@ -10,20 +10,36 @@ crate-type = ["rlib"]
 
 [features]
 default = []
+prometheus = ["dep:lazy_static", "dep:hopr-metrics"]
+runtime-async-std = ["libp2p/async-std"]
+runtime-tokio = ["libp2p/tokio"]
 
 [dependencies]
 futures = { workspace = true }
-futures-lite = { workspace = true }
-libp2p = { workspace = true, features = ["async-std", "noise", "request-response", "cbor", "macros", "tcp", "dns"] }
+futures-concurrency = { workspace = true }
+lazy_static = { workspace = true, optional = true }
+libp2p = { workspace = true, features = [
+  "noise",
+  "request-response",
+  "cbor",
+  "macros",
+  "tcp",
+  "quic",
+  "dns",
+  "yamux",
+] }
 libp2p-mplex = { workspace = true }
-serde = { workspace = true, features = ["derive"]}
+multiaddr = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
 thiserror = { workspace = true }
-void = "1"          # needed for Behavior implementations from libp2p
+tracing = { workspace = true }
+void = "1.0.2" # needed for Behavior implementations from libp2p
 
 core-network = { workspace = true }
 core-protocol = { workspace = true }
-log = { workspace = true }
 hopr-internal-types = { workspace = true }
+hopr-crypto-types = { workspace = true }
+hopr-metrics = { workspace = true, optional = true }
 
 [dev-dependencies]
-async-std = { version = "1.12.0", features = ["attributes"] }
+async-std = { workspace = true }

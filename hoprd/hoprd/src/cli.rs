@@ -1,9 +1,7 @@
-use std::str::FromStr;
-
 use clap::builder::{PossibleValuesParser, ValueParser};
 use clap::{ArgAction, Parser};
-use hex;
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 use strum::VariantNames;
 
 use hopr_lib::{looks_like_domain, HostConfig, Strategy};
@@ -15,32 +13,13 @@ pub const MINIMAL_API_TOKEN_LENGTH: usize = 8;
 
 fn parse_host(s: &str) -> Result<HostConfig, String> {
     let host = s.split_once(':').map_or(s, |(h, _)| h);
-    if !(validator::validate_ip_v4(host) || looks_like_domain(host)) {
+    if !(validator::ValidateIp::validate_ipv4(&host) || looks_like_domain(host)) {
         return Err(format!(
             "Given string {s} is not a valid host, should have a format: <ip>:<port> or <domain>(:<port>)"
         ));
     }
 
     HostConfig::from_str(s)
-}
-
-/// Parse a hex string private key to a boxed u8 slice
-pub fn parse_private_key(s: &str) -> Result<Box<[u8]>, String> {
-    if crate::config::validate_private_key(s).is_ok() {
-        let mut decoded = [0u8; 64];
-
-        let priv_key = match s.strip_prefix("0x") {
-            Some(priv_without_prefix) => priv_without_prefix,
-            None => s,
-        };
-
-        // no errors because filtered by regex
-        hex::decode_to_slice(priv_key, &mut decoded).unwrap();
-
-        Ok(Box::new(decoded))
-    } else {
-        Err("Given string is not a private key. A private key must contain 128 hex chars.".into())
-    }
 }
 
 fn parse_api_token(mut s: &str) -> Result<String, String> {
@@ -79,7 +58,7 @@ pub struct CliArgs {
     )]
     pub network: Option<String>,
 
-    // Identitiy details
+    // Identity details
     #[arg(
         long,
         env = "HOPRD_IDENTITY",
@@ -166,38 +145,30 @@ pub struct CliArgs {
     pub password: Option<String>,
 
     #[arg(
-        long = "defaultStrategy",
-        help = "Default channel strategy to use after node starts up",
-        env = "HOPRD_DEFAULT_STRATEGY",
-        value_name = "DEFAULT_STRATEGY",
-        value_parser = PossibleValuesParser::new(Strategy::VARIANTS)
-    )]
-    pub default_strategy: Option<String>,
-
-    #[arg(
-        long = "maxAutoChannels",
-        help = "Maximum number of channel a strategy can open. If not specified, square root of number of available peers is used.",
-        env = "HOPRD_MAX_AUTO_CHANNELS",
-        value_name = "MAX_AUTO_CHANNELS",
-        value_parser = clap::value_parser ! (u32)
-    )]
-    pub max_auto_channels: Option<u32>, // Make this a string if we want to supply functions instead in the future.
-
-    #[arg(
-        long = "disableTicketAutoRedeem",
-        env = "HOPRD_DISABLE_AUTO_REDEEEM_TICKETS",
-        help = "Disables automatic redeeming of winning tickets.",
-        action = ArgAction::Count
-    )]
-    pub auto_redeem_tickets: u8,
-
-    #[arg(
         long = "disableUnrealizedBalanceCheck",
         env = "HOPRD_DISABLE_UNREALIZED_BALANCE_CHECK",
         help = "Disables checking of unrealized balance before validating unacknowledged tickets.",
         action = ArgAction::Count
     )]
     pub check_unrealized_balance: u8,
+
+    #[arg(
+        long = "maxBlockRange",
+        help = "Maximum number of blocks that can be fetched in a batch request from the RPC provider.",
+        env = "HOPRD_MAX_BLOCK_RANGE",
+        value_name = "MAX_BLOCK_RANGE",
+        value_parser = clap::value_parser ! (u64)
+    )]
+    pub max_block_range: Option<u64>,
+
+    #[arg(
+        long = "maxRequestsPerSec",
+        help = "Maximum number of RPC requestes that can be performed per second.",
+        env = "HOPRD_MAX_RPC_REQUESTS_PER_SEC",
+        value_name = "MAX_RPC_REQUESTS_PER_SEC",
+        value_parser = clap::value_parser ! (u32)
+    )]
+    pub max_rpc_requests_per_sec: Option<u32>,
 
     #[arg(
         long,
@@ -384,67 +355,33 @@ pub struct CliArgs {
         help = "DEPRECATED",
     )]
     pub health_check_port: Option<u16>,
-}
 
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn parse_private_key() {
-        let parsed =
-            super::parse_private_key("56b29cefcdf576eea306ba2fd5f32e651c09e0abbc018c47bdc6ef44f6b7506f1050f95137770478f50b456267f761f1b8b341a13da68bc32e5c96984fcd52ae").unwrap();
+    //#[deprecated] not marked as deprecated to allow showing a warning
+    #[arg(
+    long = "defaultStrategy",
+    help = "DEPRECATED",
+    env = "HOPRD_DEFAULT_STRATEGY",
+    value_name = "DEFAULT_STRATEGY",
+    value_parser = PossibleValuesParser::new(Strategy::VARIANTS)
+    )]
+    pub default_strategy: Option<String>,
 
-        let priv_key: Vec<u8> = vec![
-            86, 178, 156, 239, 205, 245, 118, 238, 163, 6, 186, 47, 213, 243, 46, 101, 28, 9, 224, 171, 188, 1, 140,
-            71, 189, 198, 239, 68, 246, 183, 80, 111, 16, 80, 249, 81, 55, 119, 4, 120, 245, 11, 69, 98, 103, 247, 97,
-            241, 184, 179, 65, 161, 61, 166, 139, 195, 46, 92, 150, 152, 79, 205, 82, 174,
-        ];
+    //#[deprecated] not marked as deprecated to allow showing a warning
+    #[arg(
+    long = "maxAutoChannels",
+    help = "DEPRECATED",
+    env = "HOPRD_MAX_AUTO_CHANNELS",
+    value_name = "MAX_AUTO_CHANNELS",
+    value_parser = clap::value_parser ! (u32)
+    )]
+    pub max_auto_channels: Option<u32>, // Make this a string if we want to supply functions instead in the future.
 
-        assert_eq!(parsed, priv_key.into())
-    }
-
-    #[test]
-    fn parse_private_key_with_prefix() {
-        let parsed_with_prefix =
-            super::parse_private_key("0x56b29cefcdf576eea306ba2fd5f32e651c09e0abbc018c47bdc6ef44f6b7506f1050f95137770478f50b456267f761f1b8b341a13da68bc32e5c96984fcd52ae").unwrap();
-
-        let priv_key: Vec<u8> = vec![
-            86, 178, 156, 239, 205, 245, 118, 238, 163, 6, 186, 47, 213, 243, 46, 101, 28, 9, 224, 171, 188, 1, 140,
-            71, 189, 198, 239, 68, 246, 183, 80, 111, 16, 80, 249, 81, 55, 119, 4, 120, 245, 11, 69, 98, 103, 247, 97,
-            241, 184, 179, 65, 161, 61, 166, 139, 195, 46, 92, 150, 152, 79, 205, 82, 174,
-        ];
-
-        assert_eq!(parsed_with_prefix, priv_key.into())
-    }
-
-    #[test]
-    fn parse_too_short_private_key() {
-        let parsed =
-            super::parse_private_key("56b29cefcdf576eea306ba2fd5f32e651c09e0abbc018c47bdc6ef44f6b7506f1050f95137770478f50b456267f761f1b8b341a13da68bc32e5c96984fcd52").unwrap_err();
-
-        assert_eq!(
-            parsed,
-            "Given string is not a private key. A private key must contain 128 hex chars."
-        )
-    }
-
-    #[test]
-    fn parse_too_long_private_key() {
-        let parsed =
-            super::parse_private_key("0x56b29cefcdf576eea306ba2fd5f32e651c09e0abbc018c47bdc6ef44f6b7506f1050f95137770478f50b456267f761f1b8b341a13da68bc32e5c96984fcd52aeae").unwrap_err();
-
-        assert_eq!(
-            parsed,
-            "Given string is not a private key. A private key must contain 128 hex chars."
-        )
-    }
-
-    #[test]
-    fn parse_non_hex_values() {
-        let parsed = super::parse_private_key("really not a private key").unwrap_err();
-
-        assert_eq!(
-            parsed,
-            "Given string is not a private key. A private key must contain 128 hex chars."
-        )
-    }
+    //#[deprecated] not marked as deprecated to allow showing a warning
+    #[arg(
+    long = "disableTicketAutoRedeem",
+    env = "HOPRD_DISABLE_AUTO_REDEEEM_TICKETS",
+    help = "DEPRECATED",
+    action = ArgAction::Count
+    )]
+    pub auto_redeem_tickets: u8,
 }

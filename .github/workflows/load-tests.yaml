@@ -5,36 +5,57 @@
 name: Load Tests
 
 on:
-# Starts at 2:00 AM CET
-  # schedule:
-  #   - cron: '00 2 * * *'
+  workflow_call:
+    inputs:
+      test_id:
+        type: string
+        required: true
+      nodes:
+        type: string
+        required: true
+      workload:
+        type: string
+        required: true
+      duration:
+        type: string
+        required: true
+      rate:
+        type: string
+        required: true
   workflow_dispatch:
     inputs:
       test_id:
         type: string
         required: true
         description: 'Test name'
-      network:
+      nodes:
         type: choice
         options:
           - rotsee
           - dufour
+          - team
+          - relayer
         required: true
-        description: 'Cluster of nodes'
+        description: 'Cluster of hoprd nodes'
       workload:
         type: choice
         options:
+          - one-hop
           - sanity-check
-          - endurance
-          - full
+          - incremental
+          - multiple-hops
         required: true
-        description: 'Type of workload'
+        description: 'Workload type'
+      duration:
+        type: string
+        default: 30m
+        required: true
+        description: 'Test duration'
       rate:
-        type: number
-        default: 1
+        type: string
+        default: "200"
         required: true
         description: 'Number of messages per seconds'
-
 concurrency:
   group: load-tests
   cancel-in-progress: true
@@ -43,32 +64,89 @@ jobs:
 
   load-tests:
     name: Load Tests
-    runs-on: ubuntu-2-core
+    runs-on: self-hosted-hoprnet-small
     steps:
 
-      - name: Checkout hoprnet repository
+      - name: Set environment variables
+        id: vars
+        run: |
+          if [ -z "${{ github.event.inputs.test_id }}" ]; then 
+            echo "The workflow is triggered by other pipeline"
+            echo "NODES=${{ inputs.nodes }}" >> $GITHUB_OUTPUT
+            echo "WORKLOAD_NAME=${{ inputs.workload }}" >> $GITHUB_OUTPUT
+            echo "SCENARIO_ITERATIONS=${{ github.event.inputs.rate }}" >> $GITHUB_OUTPUT
+            echo "TESTID=${{ inputs.test_id }}" >> $GITHUB_OUTPUT
+            echo "SCENARIO_DURATION=${{ inputs.duration }}" >> $GITHUB_OUTPUT
+          else
+            echo "The workflow is triggered manually"
+            echo "NODES=${{ github.event.inputs.nodes }}" >> $GITHUB_OUTPUT
+            echo "WORKLOAD_NAME=${{ github.event.inputs.workload }}" >> $GITHUB_OUTPUT
+            echo "SCENARIO_ITERATIONS=${{ github.event.inputs.rate }}" >> $GITHUB_OUTPUT
+            echo "TESTID=${{ github.event.inputs.test_id }}" >> $GITHUB_OUTPUT
+            echo "SCENARIO_DURATION=${{ github.event.inputs.duration }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Checkout hoprd-test repository
         uses: actions/checkout@v4
         with:
           repository: hoprnet/hoprd-test
           ref: main
+
+      - name: Set up Google Cloud Credentials
+        uses: google-github-actions/auth@v2
+        with:
+          token_format: "access_token"
+          credentials_json: ${{ secrets.GCP_SA_TERRAFORM_JSON }}
+
+      - name: Set up Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: hopr-staging
+          install_components: beta
+
+      - name: Get credentials
+        uses: google-github-actions/get-gke-credentials@v2
+        with:
+          cluster_name: cluster-staging
+          location: europe-west3
+          project_id: hopr-staging
 
       - name: Setup NodeJs
         uses: actions/setup-node@v3
         with:
           node-version: 18
 
-      - name: Run Load test
+      - name: Get Hoprd Api token
+        id: token
+        run: |
+          hoprdApiToken=$(kubectl get secret -n k6-operator-system -o json hoprd-api-tokens | jq -r '.data.${{ steps.vars.outputs.NODES }}' | base64 -d)
+          echo "HOPRD_API_TOKEN=${hoprdApiToken}" >> $GITHUB_OUTPUT
+
+      - name: Setup Load Testing environment
         run: |
           npm install
-          npm run test:${{ github.event.inputs.network }}:setup
-          kubectl delete -f k6-test-run.yaml 2> /dev/null || true
-          kubectl apply -f k6-test-run.yaml
+          npm run test:${{ steps.vars.outputs.NODES }}:setup
         working-directory: "./k6"
         env:
-          ENVIRONMENT_NAME: ${{ github.event.inputs.network }}
-          WORKLOAD_NAME: ${{ github.event.inputs.workload }}
-          SCENARIO_ITERATIONS: ${{ github.event.inputs.rate }}
-          TESTID: ${{ github.event.inputs.test_id }}
-          HOPRD_API_TOKEN: ${{ secrets.HOPRD_API_TOKEN }}
+          HOPRD_API_TOKEN: ${{ steps.token.outputs.HOPRD_API_TOKEN }}
+          NODES: ${{ steps.vars.outputs.NODES }}
+          WORKLOAD_NAME: ${{ steps.vars.outputs.WORKLOAD_NAME }}
+          SCENARIO_ITERATIONS: ${{ steps.vars.outputs.SCENARIO_ITERATIONS }}
+          TESTID: ${{ steps.vars.outputs.TESTID }}
+          SCENARIO_DURATION: ${{ steps.vars.outputs.SCENARIO_DURATION }}
 
+      - name: Run Load test
+        run: |
+          kubectl delete -f k6-test-run.yaml 2> /dev/null || true
+          kubectl apply -f k6-test-run.yaml
+          echo "Waiting for test to bootstrap..."
+          sleep 2m # Wait for test to bootstrap
+          echo "Waiting for test to finish..."
+          sleep ${{ steps.vars.outputs.SCENARIO_DURATION }} # wait for the test to finish
+        working-directory: "./k6"
 
+      - name: Parse results
+        run: |
+          kubectl delete -f k6-test-results.yaml 2> /dev/null || true
+          kubectl apply -f k6-test-results.yaml
+        working-directory: "./k6"

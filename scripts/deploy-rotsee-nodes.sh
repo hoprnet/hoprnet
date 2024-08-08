@@ -22,7 +22,7 @@ mapfile -t ssh_hosts <<< "$(<${1})"
 action="${2:-deploy}"
 docker_image="${3:-europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd:latest}"
 
-CONTAINER_NAME=hoprd-node-rotsee-providence
+CONTAINER_NAME=hoprd-node-rotsee-saint-louis
 SSH_USER=root
 NETWORK=rotsee
 
@@ -141,8 +141,7 @@ generate_local_identities() {
   mkdir -p "${mydir}/tmp"
 
   env ETHERSCAN_API_KEY="" IDENTITY_PASSWORD="${IDENTITY_PASSWORD}" \
-    hopli identity \
-    --action create \
+    hopli identity create \
     --identity-directory "${mydir}/tmp/" \
     --identity-prefix ".hopr-id_" \
     --number "${#ssh_hosts[@]}"
@@ -204,14 +203,15 @@ deploy_safes() {
       ETHERSCAN_API_KEY="" \
       IDENTITY_PASSWORD="${IDENTITY_PASSWORD}" \
       PRIVATE_KEY="${DEPLOYER_PRIVATE_KEY}" \
-      DEPLOYER_PRIVATE_KEY="${DEPLOYER_PRIVATE_KEY}" \
-      hopli create-safe-module \
+      MANAGER_PRIVATE_KEY="${DEPLOYER_PRIVATE_KEY}" \
+      hopli safe-module create \
       --network "${NETWORK}" \
       --identity-from-path "${id_path}" \
+      --hopr-amount 100 --native-amount 1 \
       --contracts-root "./ethereum/contracts" > safe.log
 
     # store safe arguments in separate file for later use
-    grep -oE "(\-\-safeAddress.*)" safe.log > "${id_path}.safe.args"
+    grep -oE "(.*)" safe.log > "${id_path}.safe.args"
     rm safe.log
 
     # upload safe args to host for later use

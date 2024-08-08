@@ -18,8 +18,8 @@ pub enum KeyPairError {
     #[error("hex parsing ")]
     HexParsingError(#[from] FromHexError),
 
-    #[error("key derivation error {err:?}")]
-    KeyDerivationError { err: String },
+    #[error("key derivation error {0}")]
+    KeyDerivationError(String),
 
     #[error("crypto error: macs do not match. Key store may have been altered.")]
     MacMismatch,

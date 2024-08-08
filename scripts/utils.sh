@@ -1,11 +1,26 @@
 #!/usr/bin/env bash
 
-# prevent execution of this script, only allow execution
+# prevent execution of this script, only allow sourcing
 $(return >/dev/null 2>&1)
 test "$?" -eq "0" || { echo "This script should only be sourced." >&2; exit 1; }
 
 # exit on errors, undefined variables, ensure errors in pipes are not hidden
 set -Eeuo pipefail
+
+function check_package() {
+  local package_name="$1"
+  local exit_code=0
+
+  which "$package_name" > /dev/null || exit_code=$?
+
+  if [ "${exit_code}" = "0" ]; then
+    log "$package_name already installed"
+    return 0
+  else
+    log "$package_name not found"
+    return 1
+  fi
+}
 
 # $1=version string, semver
 function get_version_maj_min() {
@@ -293,4 +308,18 @@ update_protocol_config_addresses() {
   log "contract addresses are updated in protocol configuration"
 }
 
+# $1 - rpc endpoint
+get_eth_block_number() {
+  local cmd endpoint
+
+  endpoint="$1"
+  cmd="curl --silent --retry-connrefused --retry 10 --retry-delay 1 --json '{\"jsonrpc\":\"2.0\",\"method\":\"eth_blockNumber\",\"params\":[],\"id\":67}' ${endpoint}"
+
+  try_cmd "${cmd}" 10 1
+}
+
 setup_colors
+
+# Ensure that jq and curl are installed
+check_package jq
+check_package curl

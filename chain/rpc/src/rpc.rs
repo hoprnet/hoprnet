@@ -1,18 +1,22 @@
+//! General purpose high-level RPC operations implementation (`HoprRpcOperations`).
+//!
+//! The purpose of this module is to give implementation of the [HoprRpcOperations] trait:
+//! [RpcOperations] type, which is the main API exposed by this crate.
 use async_trait::async_trait;
 use bindings::hopr_node_management_module::HoprNodeManagementModule;
 use chain_types::{ContractAddresses, ContractInstances};
 use ethers::middleware::{MiddlewareBuilder, NonceManagerMiddleware, SignerMiddleware};
 use ethers::prelude::k256::ecdsa::SigningKey;
 use ethers::prelude::transaction::eip2718::TypedTransaction;
+use ethers::providers::{JsonRpcClient, Middleware, Provider};
 use ethers::signers::{LocalWallet, Signer, Wallet};
 use ethers::types::{BlockId, NameOrAddress};
-use ethers_providers::{JsonRpcClient, Middleware, Provider};
 use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
 use hopr_primitive_types::prelude::*;
-use log::debug;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
+use tracing::debug;
 use validator::Validate;
 
 use crate::errors::Result;
@@ -20,32 +24,38 @@ use crate::errors::RpcError::ContractError;
 use crate::{HoprRpcOperations, PendingTransaction};
 
 /// Configuration of the RPC related parameters.
-#[derive(Clone, Debug, Copy, PartialEq, Eq, Serialize, Deserialize, Validate)]
+#[derive(Clone, Debug, Copy, PartialEq, Eq, smart_default::SmartDefault, Serialize, Deserialize, Validate)]
 pub struct RpcOperationsConfig {
     /// Blockchain id
+    ///
     /// Default is 100.
+    #[default = 100]
     pub chain_id: u64,
     /// Addresses of all deployed contracts
+    ///
     /// Default contains empty (null) addresses.
     pub contract_addrs: ContractAddresses,
     /// Address of the node's module.
+    ///
     /// Defaults to null address.
     pub module_address: Address,
     /// Expected block time of the blockchain
+    ///
     /// Defaults to 5 seconds
+    #[default(Duration::from_secs(5))]
     pub expected_block_time: Duration,
-    /// Minimum size of the block range where batch fetch query should be used.
-    /// For block ranges smaller than this size, the ordinary `getLogs` will be called without pagination.
-    /// Defaults to 3.
-    #[validate(range(min = 1))]
-    pub min_block_range_fetch_size: u64,
     /// The largest amount of blocks to fetch at once when fetching a range of blocks.
+    ///
     /// If the requested block range size is N, then the client will always fetch `min(N, max_block_range_fetch_size)`
-    /// Defaults to 2500 blocks
+    ///
+    /// Defaults to 2000 blocks
     #[validate(range(min = 1))]
+    #[default = 2000]
     pub max_block_range_fetch_size: u64,
     /// Interval for polling on TX submission
+    ///
     /// Defaults to 7 seconds.
+    #[default(Duration::from_secs(7))]
     pub tx_polling_interval: Duration,
     /// Finalization chain length
     ///
@@ -55,22 +65,8 @@ pub struct RpcOperationsConfig {
     ///
     /// Defaults to 8
     #[validate(range(min = 1, max = 100))]
+    #[default = 8]
     pub finality: u32,
-}
-
-impl Default for RpcOperationsConfig {
-    fn default() -> Self {
-        Self {
-            chain_id: 100,
-            contract_addrs: Default::default(),
-            module_address: Default::default(),
-            min_block_range_fetch_size: 3,
-            max_block_range_fetch_size: 2500,
-            expected_block_time: Duration::from_secs(5),
-            tx_polling_interval: Duration::from_secs(7),
-            finality: 8,
-        }
-    }
 }
 
 pub(crate) type HoprMiddleware<P> = NonceManagerMiddleware<SignerMiddleware<Provider<P>, Wallet<SigningKey>>>;
@@ -172,6 +168,23 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
         }
     }
 
+    async fn get_eligibility_status(&self, address: Address) -> Result<bool> {
+        match self
+            .contract_instances
+            .network_registry
+            .is_node_registered_and_eligible(address.into())
+            .call()
+            .await
+        {
+            Ok(eligible) => Ok(eligible),
+            Err(e) => Err(ContractError(
+                "NetworkRegistry".to_string(),
+                "is_node_registered_and_eligible".to_string(),
+                e.to_string(),
+            )),
+        }
+    }
+
     async fn get_node_management_module_target_info(&self, target: Address) -> Result<Option<U256>> {
         match self.node_module.try_get_target(target.into()).call().await {
             Ok((exists, target)) => Ok(exists.then_some(target)),
@@ -250,14 +263,20 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
 pub mod tests {
     use crate::rpc::{RpcOperations, RpcOperationsConfig};
     use crate::{HoprRpcOperations, PendingTransaction};
-    use async_std::task::sleep;
     use chain_types::{ContractAddresses, ContractInstances};
-    use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
-    use hopr_primitive_types::prelude::*;
+    use hex_literal::hex;
     use std::time::Duration;
 
-    use crate::client::native::SurfRequestor;
+    use hopr_async_runtime::prelude::sleep;
+    use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
+    use hopr_primitive_types::prelude::*;
+
+    use crate::client::surf_client::SurfRequestor;
     use crate::client::{create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy};
+
+    lazy_static::lazy_static! {
+        static ref RANDY: Address = hex!("762614a5ed652457a2f1cdb8006380530c26ae6a").into();
+    }
 
     pub async fn wait_until_tx(pending: PendingTransaction<'_>, timeout: Duration) {
         let tx_hash = pending.tx_hash();
@@ -290,7 +309,7 @@ pub mod tests {
         );
 
         // Wait until contracts deployments are final
-        async_std::task::sleep((1 + cfg.finality) * expected_block_time).await;
+        sleep((1 + cfg.finality) * expected_block_time).await;
 
         let rpc = RpcOperations::new(client, &chain_key_0, cfg).expect("failed to construct rpc");
 
@@ -302,10 +321,7 @@ pub mod tests {
 
         // Send 1 ETH to some random address
         let tx_hash = rpc
-            .send_transaction(chain_types::utils::create_native_transfer(
-                Address::random(),
-                1000000_u32.into(),
-            ))
+            .send_transaction(chain_types::utils::create_native_transfer(*RANDY, 1000000_u32.into()))
             .await
             .expect("failed to send tx");
 
@@ -335,7 +351,7 @@ pub mod tests {
         );
 
         // Wait until contracts deployments are final
-        async_std::task::sleep((1 + cfg.finality) * expected_block_time).await;
+        sleep((1 + cfg.finality) * expected_block_time).await;
 
         let rpc = RpcOperations::new(client, &chain_key_0, cfg).expect("failed to construct rpc");
 
@@ -350,14 +366,11 @@ pub mod tests {
 
         // Send 1 ETH to some random address
         futures::future::join_all((0..txs_count).map(|_| async {
-            rpc.send_transaction(chain_types::utils::create_native_transfer(
-                Address::random(),
-                send_amount.into(),
-            ))
-            .await
-            .expect("tx should be sent")
-            .await
-            .expect("tx should resolve")
+            rpc.send_transaction(chain_types::utils::create_native_transfer(*RANDY, send_amount.into()))
+                .await
+                .expect("tx should be sent")
+                .await
+                .expect("tx should resolve")
         }))
         .await;
 
@@ -395,7 +408,7 @@ pub mod tests {
         );
 
         // Wait until contracts deployments are final
-        async_std::task::sleep((1 + cfg.finality) * expected_block_time).await;
+        sleep((1 + cfg.finality) * expected_block_time).await;
 
         let rpc = RpcOperations::new(client, &chain_key_0, cfg).expect("failed to construct rpc");
 
@@ -407,10 +420,7 @@ pub mod tests {
 
         // Send 1 ETH to some random address
         let tx_hash = rpc
-            .send_transaction(chain_types::utils::create_native_transfer(
-                Address::random(),
-                1_u32.into(),
-            ))
+            .send_transaction(chain_types::utils::create_native_transfer(*RANDY, 1_u32.into()))
             .await
             .expect("failed to send tx");
 
@@ -458,7 +468,7 @@ pub mod tests {
         );
 
         // Wait until contracts deployments are final
-        async_std::task::sleep((1 + cfg.finality) * expected_block_time).await;
+        sleep((1 + cfg.finality) * expected_block_time).await;
 
         let rpc = RpcOperations::new(client, &chain_key_0, cfg).expect("failed to construct rpc");
 

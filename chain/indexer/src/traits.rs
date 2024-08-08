@@ -1,7 +1,9 @@
 use async_trait::async_trait;
 
-use chain_types::chain_events::ChainEventType;
-use ethers::abi::RawLog;
+use crate::errors::Result;
+use chain_rpc::BlockWithLogs;
+use chain_types::chain_events::SignificantChainEvent;
+use ethers::types::TxHash;
 use hopr_primitive_types::prelude::*;
 
 #[cfg_attr(test, mockall::automock)]
@@ -9,11 +11,7 @@ use hopr_primitive_types::prelude::*;
 pub trait ChainLogHandler {
     fn contract_addresses(&self) -> Vec<Address>;
 
-    async fn on_event(
-        &self,
-        address: Address,
-        block_number: u32,
-        log: RawLog,
-        snapshot: Snapshot,
-    ) -> crate::errors::Result<Option<ChainEventType>>;
+    fn contract_address_topics(&self, contract: Address) -> Vec<TxHash>;
+
+    async fn collect_block_events(&self, block_with_logs: BlockWithLogs) -> Result<Vec<SignificantChainEvent>>;
 }

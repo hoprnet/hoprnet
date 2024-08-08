@@ -22,9 +22,9 @@ on:
         required: true
         description: 'Name of the release'
         options:
-          - providence
           - saint-louis
           - singapore
+          - kaunas
 concurrency:
   group: close-release
   cancel-in-progress: true
@@ -32,17 +32,17 @@ concurrency:
 jobs:
   close-release:
     name: Close Release
-    runs-on: ubuntu-2-core
+    runs-on: self-hosted-hoprnet-small
     steps:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4
 
       - name: Install Nix
-        uses: cachix/install-nix-action@v25
+        uses: cachix/install-nix-action@v27
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: cachix/cachix-action@v14
+      - uses: cachix/cachix-action@v15
         if: ${{ !env.ACT }}
         with:
           name: hoprnet
@@ -69,25 +69,25 @@ jobs:
           GH_TOKEN: ${{ github.token }}
 
       - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v5
+        uses: peter-evans/create-pull-request@v6
         with:
-            token: ${{ secrets.GH_RUNNER_TOKEN }}
-            commit-message: "Close release ${{ steps.template.outputs.current_version }}"
-            title: "Close release ${{ steps.template.outputs.current_version }}"
-            body-path: .github/files/${{ steps.template.outputs.pr_template }}
-            branch: bot/close-${{ steps.template.outputs.current_version }}
-            delete-branch: true
-            labels: release
-            draft: true
-            assignees: ${{ github.actor }}
-            team-reviewers: "@hoprnet/hopr-development"
+          token: ${{ secrets.GH_RUNNER_TOKEN }}
+          commit-message: "Close release ${{ steps.template.outputs.current_version }}"
+          title: "Close release ${{ steps.template.outputs.current_version }}"
+          body-path: .github/files/${{ steps.template.outputs.pr_template }}
+          branch: bot/close-${{ steps.template.outputs.current_version }}
+          delete-branch: true
+          labels: release,load_tests,component:hopli,binary:x86_64-linux,binary:aarch64-linux,binary:aarch64-darwin,binary:x86_64-darwin,binary:armv7l-linux
+          draft: true
+          assignees: ${{ github.actor }}
+          team-reviewers: "@hoprnet/hopr-development"
 
       - name: Enable Auto Merge
         run: |
-            git fetch
-            git checkout bot/close-${{ steps.template.outputs.current_version }}
-            gh pr ready
-            gh pr merge --auto --delete-branch --squash
+          git fetch
+          git checkout bot/close-${{ steps.template.outputs.current_version }}
+          gh pr ready
+          gh pr merge --auto --delete-branch --squash
         env:
           GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
 

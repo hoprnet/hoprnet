@@ -1,38 +1,55 @@
 //! Crate containing the API object for chain operations used by the HOPRd node.
 
+pub mod config;
 pub mod errors;
 pub mod executors;
 
-pub use chain_types::chain_events::SignificantChainEvent;
-pub use hopr_internal_types::channels::ChannelEntry;
-
-use async_lock::RwLock;
-use chain_db::db::CoreEthereumDb;
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
-use chain_actions::CoreEthereumActions;
-use chain_db::traits::HoprCoreEthereumDbActions;
-use chain_indexer::block::{Indexer, IndexerConfig};
-use chain_indexer::handlers::ContractEventHandlers;
+use tracing::{debug, error, info, warn};
+
+use chain_actions::action_queue::{ActionQueue, ActionQueueConfig};
+use chain_actions::action_state::IndexerActionTracker;
+use chain_actions::payload::SafePayloadGenerator;
+use chain_actions::ChainActions;
+use chain_indexer::{block::Indexer, handlers::ContractEventHandlers, IndexerConfig};
+use chain_rpc::client::SimpleJsonRpcRetryPolicy;
 use chain_rpc::rpc::RpcOperations;
+use chain_rpc::rpc::RpcOperationsConfig;
 use chain_rpc::HoprRpcOperations;
+pub use chain_types::chain_events::SignificantChainEvent;
 use chain_types::ContractAddresses;
+use config::ChainNetworkConfig;
+use executors::{EthereumTransactionExecutor, RpcEthereumClient, RpcEthereumClientConfig};
+use hopr_async_runtime::prelude::{sleep, spawn, JoinHandle};
 use hopr_crypto_types::prelude::*;
+use hopr_db_sql::HoprDbAllOperations;
 use hopr_internal_types::account::AccountEntry;
+pub use hopr_internal_types::channels::ChannelEntry;
+use hopr_internal_types::prelude::ChannelDirection;
 use hopr_primitive_types::prelude::*;
-use log::{debug, error, info, warn};
-use utils_db::CurrentDbShim;
 
 use crate::errors::{HoprChainError, Result};
 
-use async_std::task::sleep;
-use chain_rpc::client::SimpleJsonRpcRetryPolicy;
+/// The default HTTP request engine
+///
+/// TODO: Should be an internal type, `hopr_lib::chain` must be moved to this package
+#[cfg(feature = "runtime-async-std")]
+pub type DefaultHttpPostRequestor = chain_rpc::client::surf_client::SurfRequestor;
 
-pub type DefaultHttpPostRequestor = chain_rpc::client::native::SurfRequestor;
+// Both features could be enabled during testing, therefore we only use tokio when its
+// exclusively enabled.
+#[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
+pub type DefaultHttpPostRequestor = chain_rpc::client::reqwest_client::ReqwestRequestor;
 
+/// The default JSON RPC provider client
+///
+/// TODO: Should be an internal type, `hopr_lib::chain` must be moved to this package
 pub type JsonRpcClient = chain_rpc::client::JsonRpcProviderClient<DefaultHttpPostRequestor, SimpleJsonRpcRetryPolicy>;
 
+/// Checks whether the node can be registered with the Safe in the NodeSafeRegistry
 pub async fn can_register_with_safe<Rpc: HoprRpcOperations>(
     me: Address,
     safe_address: Address,
@@ -65,7 +82,8 @@ pub async fn can_register_with_safe<Rpc: HoprRpcOperations>(
 }
 
 /// Waits until the given address is funded.
-/// This is done by querying the RPC provider for balance with backoff until `max_delay`
+///
+/// This is done by querying the RPC provider for balance with backoff until `max_delay` argument.
 pub async fn wait_for_funds<Rpc: HoprRpcOperations>(
     address: Address,
     min_balance: Balance,
@@ -96,32 +114,119 @@ pub async fn wait_for_funds<Rpc: HoprRpcOperations>(
     Err(HoprChainError::Api("timeout waiting for funds".into()))
 }
 
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
+pub enum HoprChainProcess {
+    Indexer,
+    OutgoingOnchainActionQueue,
+}
+
+type ActionQueueType<T> = ActionQueue<
+    T,
+    IndexerActionTracker,
+    EthereumTransactionExecutor<
+        chain_rpc::TypedTransaction,
+        RpcEthereumClient<
+            RpcOperations<chain_rpc::client::JsonRpcProviderClient<DefaultHttpPostRequestor, SimpleJsonRpcRetryPolicy>>,
+        >,
+        SafePayloadGenerator,
+    >,
+>;
+
+/// Represents all chain interactions exported to be used in the hopr-lib
+///
+/// NOTE: instead of creating a unified interface the [HoprChain] exports
+/// some functionality (e.g. the [ChainActions] as a referentially used)
+/// object. This behavior will be refactored and hidden behind a trait
+/// in the future implementations.
 #[derive(Debug, Clone)]
-pub struct HoprChain {
+pub struct HoprChain<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug> {
     me_onchain: ChainKeypair,
     safe_address: Address,
     contract_addresses: ContractAddresses,
     indexer_cfg: IndexerConfig,
-    indexer_events_tx: futures::channel::mpsc::UnboundedSender<SignificantChainEvent>,
-    db: Arc<RwLock<CoreEthereumDb<utils_db::CurrentDbShim>>>,
-    chain_actions: CoreEthereumActions<CoreEthereumDb<CurrentDbShim>>,
+    indexer_events_tx: async_channel::Sender<SignificantChainEvent>,
+    db: T,
+    chain_actions: ChainActions<T>,
+    action_queue: ActionQueueType<T>,
+    action_state: Arc<IndexerActionTracker>,
     rpc_operations: RpcOperations<JsonRpcClient>,
-    channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
 }
 
-impl HoprChain {
+impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> HoprChain<T> {
     #[allow(clippy::too_many_arguments)] // TODO: refactor this function into a reasonable group of components once fully rearchitected
     pub fn new(
         me_onchain: ChainKeypair,
-        db: Arc<RwLock<CoreEthereumDb<CurrentDbShim>>>,
+        db: T,
+        // --
+        chain_config: ChainNetworkConfig,
+        module_address: Address,
+        // --
         contract_addresses: ContractAddresses,
         safe_address: Address,
         indexer_cfg: IndexerConfig,
-        indexer_events_tx: futures::channel::mpsc::UnboundedSender<SignificantChainEvent>,
-        chain_actions: CoreEthereumActions<CoreEthereumDb<CurrentDbShim>>,
-        rpc_operations: RpcOperations<JsonRpcClient>,
-        channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
+        indexer_events_tx: async_channel::Sender<SignificantChainEvent>,
     ) -> Self {
+        // TODO: extract this from the global config type
+        let mut rpc_http_config = chain_rpc::HttpPostRequestorConfig::default();
+        if let Some(max_rpc_req) = chain_config.max_requests_per_sec {
+            rpc_http_config.max_requests_per_sec = Some(max_rpc_req); // override the default if set
+        }
+
+        // TODO: extract this from the global config type
+        let rpc_http_retry_policy = SimpleJsonRpcRetryPolicy {
+            min_retries: Some(2),
+            ..SimpleJsonRpcRetryPolicy::default()
+        };
+
+        // TODO: extract this from the global config type
+        let rpc_cfg = RpcOperationsConfig {
+            chain_id: chain_config.chain.chain_id as u64,
+            contract_addrs: contract_addresses,
+            module_address,
+            expected_block_time: Duration::from_millis(chain_config.chain.block_time),
+            tx_polling_interval: Duration::from_millis(chain_config.tx_polling_interval),
+            finality: chain_config.confirmations,
+            max_block_range_fetch_size: chain_config.max_block_range,
+        };
+
+        // TODO: extract this from the global config type
+        let rpc_client_cfg = RpcEthereumClientConfig::default();
+
+        // TODO: extract this from the global config type
+        let action_queue_cfg = ActionQueueConfig::default();
+
+        // --- Configs done ---
+
+        // Build JSON RPC client
+        let rpc_client = JsonRpcClient::new(
+            &chain_config.chain.default_provider,
+            DefaultHttpPostRequestor::new(rpc_http_config),
+            rpc_http_retry_policy,
+        );
+
+        // Build RPC operations
+        let rpc_operations = RpcOperations::new(rpc_client, &me_onchain, rpc_cfg).expect("failed to initialize RPC");
+
+        // Build the Ethereum Transaction Executor that uses RpcOperations as backend
+        let ethereum_tx_executor = EthereumTransactionExecutor::new(
+            RpcEthereumClient::new(rpc_operations.clone(), rpc_client_cfg),
+            SafePayloadGenerator::new(&me_onchain, contract_addresses, module_address),
+        );
+
+        // Build the Action Queue
+        let action_queue = ActionQueue::new(
+            db.clone(),
+            IndexerActionTracker::default(),
+            ethereum_tx_executor,
+            action_queue_cfg,
+        );
+
+        let action_state = action_queue.action_state();
+        let action_sender = action_queue.new_sender();
+
+        // Instantiate Chain Actions
+        let chain_actions = ChainActions::new(&me_onchain, db.clone(), action_sender);
+
         Self {
             me_onchain,
             safe_address,
@@ -130,43 +235,59 @@ impl HoprChain {
             indexer_events_tx,
             db,
             chain_actions,
+            action_queue,
+            action_state,
             rpc_operations,
-            channel_graph,
         }
     }
 
-    pub async fn sync_chain(&self) -> errors::Result<()> {
-        let db_processor = ContractEventHandlers::new(
-            self.contract_addresses,
-            self.safe_address,
-            (&self.me_onchain).into(),
-            self.db.clone(),
+    /// Execute all processes of the [`HoprChain`] object.
+    ///
+    /// This method will spawn the [`HoprChainProcess::Indexer`] and [`HoprChainProcess::OutgoingOnchainActionQueue`]
+    /// processes and return join handles to the calling function.
+    pub async fn start(&self) -> errors::Result<HashMap<HoprChainProcess, JoinHandle<()>>> {
+        let mut processes: HashMap<HoprChainProcess, JoinHandle<()>> = HashMap::new();
+
+        processes.insert(
+            HoprChainProcess::OutgoingOnchainActionQueue,
+            spawn(self.action_queue.clone().start()),
+        );
+        processes.insert(
+            HoprChainProcess::Indexer,
+            Indexer::new(
+                self.rpc_operations.clone(),
+                ContractEventHandlers::new(
+                    self.contract_addresses,
+                    self.safe_address,
+                    self.me_onchain.clone(),
+                    self.db.clone(),
+                ),
+                self.db.clone(),
+                self.indexer_cfg,
+                self.indexer_events_tx.clone(),
+            )
+            .start()
+            .await?,
         );
 
-        let mut indexer = Indexer::new(
-            self.rpc_operations.clone(),
-            db_processor,
-            self.db.clone(),
-            self.indexer_cfg,
-            self.indexer_events_tx.clone(),
-        );
-
-        Ok(indexer.start().await?)
+        Ok(processes)
     }
 
     pub fn me_onchain(&self) -> Address {
         self.me_onchain.public().to_address()
     }
 
+    pub fn action_state(&self) -> Arc<IndexerActionTracker> {
+        self.action_state.clone()
+    }
+
     pub async fn accounts_announced_on_chain(&self) -> errors::Result<Vec<AccountEntry>> {
-        Ok(self.db.read().await.get_accounts().await?)
+        Ok(self.db.get_accounts(None, true).await?)
     }
 
     pub async fn channel(&self, src: &Address, dest: &Address) -> errors::Result<ChannelEntry> {
         self.db
-            .read()
-            .await
-            .get_channel_x(src, dest)
+            .get_channel_by_parties(None, src, dest, false)
             .await
             .map_err(HoprChainError::from)
             .and_then(|v| {
@@ -178,41 +299,31 @@ impl HoprChain {
     }
 
     pub async fn channels_from(&self, src: &Address) -> errors::Result<Vec<ChannelEntry>> {
-        Ok(self.db.read().await.get_channels_from(src).await?)
+        Ok(self.db.get_channels_via(None, ChannelDirection::Outgoing, src).await?)
     }
 
     pub async fn channels_to(&self, dest: &Address) -> errors::Result<Vec<ChannelEntry>> {
-        Ok(self.db.read().await.get_channels_to(dest).await?)
+        Ok(self.db.get_channels_via(None, ChannelDirection::Incoming, dest).await?)
     }
 
     pub async fn all_channels(&self) -> errors::Result<Vec<ChannelEntry>> {
-        Ok(self.db.read().await.get_channels().await?)
+        Ok(self.db.get_all_channels(None).await?)
     }
 
     pub async fn ticket_price(&self) -> errors::Result<Option<U256>> {
-        Ok(self.db.read().await.get_ticket_price().await?)
+        Ok(self.db.get_indexer_data(None).await?.ticket_price.map(|b| b.amount()))
     }
 
     pub async fn safe_allowance(&self) -> errors::Result<Balance> {
-        Ok(self.db.read().await.get_staking_safe_allowance().await?)
+        Ok(self.db.get_safe_hopr_allowance(None).await?)
     }
 
-    pub fn actions_ref(&self) -> &CoreEthereumActions<CoreEthereumDb<CurrentDbShim>> {
+    pub fn actions_ref(&self) -> &ChainActions<T> {
         &self.chain_actions
     }
 
-    pub fn actions_mut_ref(&mut self) -> &mut CoreEthereumActions<CoreEthereumDb<CurrentDbShim>> {
+    pub fn actions_mut_ref(&mut self) -> &mut ChainActions<T> {
         &mut self.chain_actions
-    }
-
-    // NOTE: needed early in the initialization to sync
-    pub fn channel_graph(&self) -> Arc<RwLock<core_path::channel_graph::ChannelGraph>> {
-        self.channel_graph.clone()
-    }
-
-    // NOTE: needed early in the initialization to sync
-    pub fn db(&self) -> Arc<RwLock<CoreEthereumDb<utils_db::CurrentDbShim>>> {
-        self.db.clone()
     }
 
     pub fn rpc(&self) -> &RpcOperations<JsonRpcClient> {
@@ -229,5 +340,9 @@ impl HoprChain {
 
     pub async fn get_channel_closure_notice_period(&self) -> errors::Result<Duration> {
         Ok(self.rpc_operations.get_channel_closure_notice_period().await?)
+    }
+
+    pub async fn get_eligibility_status(&self) -> errors::Result<bool> {
+        Ok(self.rpc_operations.get_eligibility_status(self.me_onchain()).await?)
     }
 }

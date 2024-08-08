@@ -11,7 +11,7 @@ declare workspace_dir
 workspace_dir="${script_dir}/.."
 
 
-: "${DEPLOYER_PRIVATE_KEY?"Missing environment variable DEPLOYER_PRIVATE_KEY"}"
+: "${MANAGER_PRIVATE_KEY?"Missing environment variable MANAGER_PRIVATE_KEY"}"
 : "${PRIVATE_KEY?"Missing environment variable PRIVATE_KEY"}"
 : "${IDENTITY_PASSWORD?"Missing environment variable IDENTITY_PASSWORD"}"
 : "${HOPRD_API_TOKEN?"Missing environment variable HOPRD_API_TOKEN"}"
@@ -34,18 +34,18 @@ for (( i=1; i<=${number}; i++ )) do
     identity_directory="${workspace_dir}/identities/identity-${random}/$i"
     mkdir -p ${identity_directory}
 
-    hopli identity --action create --identity-directory "${identity_directory}" --identity-prefix .hoprd
+    hopli identity create --identity-directory "${identity_directory}" --identity-prefix .hoprd
     mv "${identity_directory}/.hoprd0.id" "${identity_directory}/.hoprd.id"
-    hopli identity --action read --identity-directory "${identity_directory}" | tee "${identity_directory}/hoprd.json"
+    hopli identity read --identity-directory "${identity_directory}" | tee "${identity_directory}/hoprd.json"
 
     echo "Generate safes"
-    hopli create-safe-module --network "${network}" --contracts-root "${workspace_dir}/ethereum/contracts" --identity-from-path "${identity_directory}/.hoprd.id" --hopr-amount "${hopr_amount}" --native-amount "${native_amount}" | tee "${identity_directory}/safe.log"
+    hopli safe-module create --network "${network}" --contracts-root "${workspace_dir}/ethereum/contracts" --identity-from-path "${identity_directory}/.hoprd.id" --hopr-amount "${hopr_amount}" --native-amount "${native_amount}" | tee "${identity_directory}/safe.log"
 
     declare -a safe_address
-    safe_address=$(grep "Logs" -A 3 "${identity_directory}/safe.log" | grep safeAddress | cut -d ' ' -f 4)
+    safe_address=$(grep "safe" "${identity_directory}/safe.log" | cut -d ' ' -f 2)
 
     declare -a module_address
-    module_address=$(grep "Logs" -A 3 "${identity_directory}/safe.log" | grep safeAddress | cut -d ' ' -f 6)
+    module_address=$(grep "node_module" "${identity_directory}/safe.log" | cut -d ' ' -f 2)
 
     cat <<EOF > "${identity_directory}/.env"
 HOPRD_NETWORK=${network}

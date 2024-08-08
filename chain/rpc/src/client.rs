@@ -1,12 +1,27 @@
+//! Extended `JsonRpcClient` abstraction.
+//!
+//! This module contains custom implementation of `ethers::providers::JsonRpcClient`
+//! which allows usage of non-`reqwest` based HTTP clients.
+//!
+//! The major type implemented in this module is the [JsonRpcProviderClient]
+//! which implements the [ethers::providers::JsonRpcClient] trait. That makes it possible to use it with `ethers`.
+//!
+//! The [JsonRpcProviderClient] is abstract over the [HttpPostRequestor] trait, which makes it possible
+//! to make the underlying HTTP client implementation easily replaceable. This is needed to make it possible
+//! for `ethers` to work with different async runtimes, since the HTTP client is typically not agnostic to
+//! async runtimes (the default HTTP client in `ethers` is using `reqwest`, which is `tokio` specific).
+//! Secondly, this abstraction also allows to implement WASM-compatible HTTP client if needed at some point.
 use async_trait::async_trait;
-use ethers_providers::{JsonRpcClient, JsonRpcError};
-use log::{debug, trace, warn};
+use ethers::providers::{JsonRpcClient, JsonRpcError};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Formatter};
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::time::Duration;
+use tracing::{debug, trace, warn};
 use validator::Validate;
+
+use hopr_async_runtime::prelude::sleep;
 
 use crate::client::RetryAction::{NoRetry, RetryAfter};
 use crate::errors::{HttpRequestError, JsonRpcProviderClientError};
@@ -41,70 +56,92 @@ lazy_static::lazy_static! {
 }
 
 /// Defines a retry policy suitable for `JsonRpcProviderClient`.
+///
 /// This retry policy distinguishes between 4 types of RPC request failures:
 /// - JSON RPC error (based on error code)
 /// - HTTP error (based on HTTP status)
 /// - Transport error (e.g. connection timeout)
 /// - Serde error (some of these are treated as JSON RPC error above, if an error code can be obtained).
+///
 /// The policy will make up to `max_retries` once a JSON RPC request fails.
+/// The minimum number of retries `min_retries` can be also specified and applies to any type of error regardless.
 /// Each retry `k > 0` will be separated by a delay of `initial_backoff * (1 + backoff_coefficient)^(k - 1)`,
 /// namely all the JSON RPC error codes specified in `retryable_json_rpc_errors` and all the HTTP errors
 /// specified in `retryable_http_errors`.
+///
+/// The total wait time will be `(initial_backoff/backoff_coefficient) * ((1 + backoff_coefficient)^max_retries - 1)`.
+/// or `max_backoff`, whatever is lower.
+///
 /// Transport and connection errors (such as connection timeouts) are retried without backoff
 /// at a constant delay of `initial_backoff` if `backoff_on_transport_errors` is not set.
+///
 /// No more additional retries are allowed on new requests, if the maximum number of concurrent
 /// requests being retried has reached `max_retry_queue_size`.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Validate)]
+#[derive(Clone, Debug, PartialEq, smart_default::SmartDefault, Serialize, Deserialize, Validate)]
 pub struct SimpleJsonRpcRetryPolicy {
+    /// Minimum number of retries of any error, regardless the error code.
+    ///
+    /// Default is 0.
+    #[validate(range(min = 0))]
+    #[default(Some(0))]
+    pub min_retries: Option<u32>,
+
     /// Maximum number of retries.
+    ///
     /// If `None` is given, will keep retrying indefinitely.
-    /// Default is 10.
+    ///
+    /// Default is 12.
     #[validate(range(min = 1))]
+    #[default(Some(12))]
     pub max_retries: Option<u32>,
     /// Initial wait before retries.
+    ///
     /// NOTE: Transport and connection errors (such as connection timeouts) are retried at
     /// a constant rate (no backoff) with this delay if `backoff_on_transport_errors` is not set.
+    ///
     /// Default is 1 second.
+    #[default(Duration::from_secs(1))]
     pub initial_backoff: Duration,
     /// Backoff coefficient by which will be each retry multiplied.
+    ///
     /// Must be non-negative. If set to `0`, no backoff will be applied and the
     /// requests will be retried at a constant rate.
-    /// Default is 1.001
-    #[validate(range(min = 0))]
+    ///
+    /// Default is 0.3
+    #[validate(range(min = 0.0))]
+    #[default(0.3)]
     pub backoff_coefficient: f64,
     /// Maximum backoff value.
+    ///
     /// Once reached, the requests will be retried at a constant rate with this timeout.
-    /// Default is 120 seconds.
+    ///
+    /// Default is 30 seconds.
+    #[default(Duration::from_secs(30))]
     pub max_backoff: Duration,
     /// Indicates whether to also apply backoff to transport and connection errors (such as connection timeouts).
+    ///
     /// Default is false.
     pub backoff_on_transport_errors: bool,
     /// List of JSON RPC errors that should be retried with backoff
+    ///
     /// Default is \[429, -32005, -32016\]
+    #[default(_code = "vec![-32005, -32016, 429]")]
     pub retryable_json_rpc_errors: Vec<i64>,
     /// List of HTTP errors that should be retried with backoff.
-    /// Default is \[429\]
+    ///
+    /// Default is \[429, 504, 503\]
+    #[default(
+        _code = "vec![http_types::StatusCode::TooManyRequests,http_types::StatusCode::GatewayTimeout,http_types::StatusCode::ServiceUnavailable]"
+    )]
     pub retryable_http_errors: Vec<http_types::StatusCode>,
     /// Maximum number of different requests that are being retried at the same time.
+    ///
     /// If any additional request fails after this number is attained, it won't be retried.
-    /// Defaults to 3
-    #[validate(range(min = 1))]
+    ///
+    /// Default is 100
+    #[validate(range(min = 5))]
+    #[default = 100]
     pub max_retry_queue_size: u32,
-}
-
-impl Default for SimpleJsonRpcRetryPolicy {
-    fn default() -> Self {
-        Self {
-            max_retries: Some(10),
-            initial_backoff: Duration::from_secs(1),
-            backoff_coefficient: 1.001,
-            max_backoff: Duration::from_secs(120),
-            backoff_on_transport_errors: false,
-            retryable_json_rpc_errors: vec![-32005, -32016, 429],
-            retryable_http_errors: vec![http_types::StatusCode::TooManyRequests],
-            max_retry_queue_size: 3,
-        }
-    }
 }
 
 impl SimpleJsonRpcRetryPolicy {
@@ -129,6 +166,8 @@ impl RetryPolicy<JsonRpcProviderClientError> for SimpleJsonRpcRetryPolicy {
             return NoRetry;
         }
 
+        debug!("retry queue size is {retry_queue_size}");
+
         if retry_queue_size > self.max_retry_queue_size {
             warn!(
                 "maximum size of retry queue {} has been reached",
@@ -142,6 +181,12 @@ impl RetryPolicy<JsonRpcProviderClientError> for SimpleJsonRpcRetryPolicy {
             .initial_backoff
             .mul_f64(f64::powi(1.0 + self.backoff_coefficient, (num_retries - 1) as i32))
             .min(self.max_backoff);
+
+        // Retry if a global minimum of number of retries was given and wasn't yet attained
+        if self.min_retries.is_some_and(|min| num_retries <= min) {
+            debug!("retrying because {num_retries} is not yet minimum number of retries");
+            return RetryAfter(backoff);
+        }
 
         match err {
             // Retryable JSON RPC errors are retries with backoff
@@ -228,12 +273,18 @@ impl<Req: HttpPostRequestor, R: RetryPolicy<JsonRpcProviderClientError>> JsonRpc
         let next_id = self.id.fetch_add(1, Ordering::SeqCst);
         let payload = Request::new(next_id, method, params);
 
+        debug!("sending rpc {method} request");
+        trace!(
+            "sending rpc {method} request: {}",
+            serde_json::to_string(&payload).expect("request must be serializable")
+        );
+
         // Perform the actual request
         let start = std::time::Instant::now();
         let body = self.requestor.http_post(self.url.as_ref(), payload).await?;
         let req_duration = start.elapsed();
 
-        trace!("rpc call {method} took {}ms", req_duration.as_millis());
+        debug!("rpc {method} request took {}ms", req_duration.as_millis());
 
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_RPC_CALLS_TIMING.observe(&[method], req_duration.as_secs_f64());
@@ -269,7 +320,10 @@ impl<Req: HttpPostRequestor, R: RetryPolicy<JsonRpcProviderClientError>> JsonRpc
         };
 
         // Next, deserialize the data out of the Response object
-        let res = serde_json::from_str(raw.get()).map_err(|err| JsonRpcProviderClientError::SerdeJson {
+        let json_str = raw.get();
+        trace!("rpc {method} request got response: {json_str}");
+
+        let res = serde_json::from_str(json_str).map_err(|err| JsonRpcProviderClientError::SerdeJson {
             err,
             text: raw.to_string(),
         })?;
@@ -335,7 +389,8 @@ where
             RetryParams::Value(params)
         };
 
-        let in_queue = self.requests_enqueued.fetch_add(1, Ordering::SeqCst);
+        self.requests_enqueued.fetch_add(1, Ordering::SeqCst);
+        let start = std::time::Instant::now();
 
         let mut num_retries = 0;
         loop {
@@ -356,6 +411,10 @@ where
                         #[cfg(all(feature = "prometheus", not(test)))]
                         METRIC_RETRIES_PER_RPC_CALL.observe(&[method], num_retries as f64);
 
+                        debug!(
+                            "successful request {method} spent {}ms in the retry queue",
+                            start.elapsed().as_millis()
+                        );
                         return Ok(ret);
                     }
                     Err(req_err) => {
@@ -365,7 +424,10 @@ where
                 }
             }
 
-            match self.retry_policy.is_retryable_error(&err, num_retries, in_queue) {
+            match self
+                .retry_policy
+                .is_retryable_error(&err, num_retries, self.requests_enqueued.load(Ordering::SeqCst))
+            {
                 NoRetry => {
                     self.requests_enqueued.fetch_sub(1, Ordering::SeqCst);
                     warn!("no more retries for RPC call {method}");
@@ -373,46 +435,30 @@ where
                     #[cfg(all(feature = "prometheus", not(test)))]
                     METRIC_RETRIES_PER_RPC_CALL.observe(&[method], num_retries as f64);
 
+                    debug!(
+                        "failed request {method} spent {}ms in the retry queue",
+                        start.elapsed().as_millis()
+                    );
                     return Err(err);
                 }
                 RetryAfter(backoff) => {
                     warn!("RPC call {method} will retry in {}ms", backoff.as_millis());
-                    async_std::task::sleep(backoff).await
+                    sleep(backoff).await
                 }
             }
         }
     }
 }
 
-pub mod native {
+#[cfg(any(test, feature = "runtime-async-std"))]
+pub mod surf_client {
     use async_std::prelude::FutureExt;
     use async_trait::async_trait;
-    use serde::{Deserialize, Serialize};
-    use std::time::Duration;
+    use serde::Serialize;
+    use tracing::info;
 
     use crate::errors::HttpRequestError;
-    use crate::HttpPostRequestor;
-
-    /// Common configuration for all native `HttpPostRequestor`s
-    #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-    pub struct HttpPostRequestorConfig {
-        /// Timeout for HTTP POST request
-        /// Defaults to 5 seconds.
-        pub http_request_timeout: Duration,
-
-        /// Maximum number of HTTP redirects to follow
-        /// Defaults to 3
-        pub max_redirects: u8,
-    }
-
-    impl Default for HttpPostRequestorConfig {
-        fn default() -> Self {
-            Self {
-                http_request_timeout: Duration::from_secs(5),
-                max_redirects: 3,
-            }
-        }
-    }
+    use crate::{HttpPostRequestor, HttpPostRequestorConfig};
 
     /// HTTP client that uses a non-Tokio runtime based HTTP client library, such as `surf`.
     /// `surf` works also for Browsers in WASM environments.
@@ -424,12 +470,18 @@ pub mod native {
 
     impl SurfRequestor {
         pub fn new(cfg: HttpPostRequestorConfig) -> Self {
-            // Here we do not set the timeout into the client's configuration
-            // but rather the timeout is set on the entire Future in `http_post`
-            Self {
-                client: surf::client().with(surf::middleware::Redirect::new(cfg.max_redirects)),
-                cfg,
+            let mut client = surf::client().with(surf::middleware::Redirect::new(cfg.max_redirects));
+
+            // Rate limit of 0 also means unlimited as if None was given
+            if let Some(max) = cfg.max_requests_per_sec.and_then(|r| (r > 0).then_some(r)) {
+                client = client.with(
+                    surf_governor::GovernorMiddleware::per_second(max)
+                        .expect("cannot setup http rate limiter middleware"),
+                );
+                info!("client will be limited to {max} HTTP requests per second");
             }
+
+            Self { client, cfg }
         }
     }
 
@@ -459,6 +511,91 @@ pub mod native {
             .timeout(self.cfg.http_request_timeout)
             .await
             .map_err(|_| HttpRequestError::Timeout)?
+        }
+    }
+}
+
+#[cfg(any(test, feature = "runtime-tokio"))]
+pub mod reqwest_client {
+    use crate::errors::HttpRequestError;
+    use crate::{HttpPostRequestor, HttpPostRequestorConfig};
+    use async_trait::async_trait;
+    use http_types::StatusCode;
+    use serde::Serialize;
+    use std::sync::Arc;
+
+    /// HTTP client that uses a Tokio runtime-based HTTP client library, such as `reqwest`.
+    #[derive(Clone, Debug, Default)]
+    pub struct ReqwestRequestor {
+        client: reqwest::Client,
+        limiter: Option<Arc<governor::DefaultKeyedRateLimiter<String>>>,
+    }
+
+    impl ReqwestRequestor {
+        pub fn new(cfg: HttpPostRequestorConfig) -> Self {
+            Self {
+                client: reqwest::Client::builder()
+                    .timeout(cfg.http_request_timeout)
+                    .redirect(reqwest::redirect::Policy::limited(cfg.max_redirects as usize))
+                    .build()
+                    .expect("could not build reqwest client"),
+                limiter: cfg
+                    .max_requests_per_sec
+                    .filter(|reqs| *reqs > 0) // Ensures the following unwrapping won't fail
+                    .map(|reqs| {
+                        Arc::new(governor::DefaultKeyedRateLimiter::keyed(governor::Quota::per_second(
+                            reqs.try_into().unwrap(),
+                        )))
+                    }),
+            }
+        }
+    }
+
+    #[async_trait]
+    impl HttpPostRequestor for ReqwestRequestor {
+        async fn http_post<T>(&self, url: &str, data: T) -> Result<Box<[u8]>, HttpRequestError>
+        where
+            T: Serialize + Send + Sync,
+        {
+            let url = reqwest::Url::parse(url)
+                .map_err(|e| HttpRequestError::UnknownError(format!("url parse error: {e}")))?;
+
+            if self
+                .limiter
+                .clone()
+                .map(|limiter| limiter.check_key(&url.host_str().unwrap_or(".").to_string()).is_ok())
+                .unwrap_or(true)
+            {
+                let resp = self
+                    .client
+                    .post(url)
+                    .header("content-type", "application/json")
+                    .body(
+                        serde_json::to_string(&data)
+                            .map_err(|e| HttpRequestError::UnknownError(format!("serialize error: {e}")))?,
+                    )
+                    .send()
+                    .await
+                    .map_err(|e| {
+                        if e.is_status() {
+                            HttpRequestError::HttpError(
+                                StatusCode::try_from(e.status().map(|s| s.as_u16()).unwrap_or(500))
+                                    .expect("status code must be compatible"), // cannot happen
+                            )
+                        } else if e.is_timeout() {
+                            HttpRequestError::Timeout
+                        } else {
+                            HttpRequestError::UnknownError(e.to_string())
+                        }
+                    })?;
+
+                resp.bytes()
+                    .await
+                    .map(|b| Box::from(b.as_ref()))
+                    .map_err(|e| HttpRequestError::UnknownError(format!("error retrieving body: {e}")))
+            } else {
+                Err(HttpRequestError::HttpError(StatusCode::TooManyRequests))
+            }
         }
     }
 }
@@ -493,32 +630,52 @@ pub fn create_rpc_client_to_anvil<R: HttpPostRequestor + Debug>(
 
 #[cfg(test)]
 pub mod tests {
-    use chain_types::utils::create_anvil;
-    use chain_types::{ContractAddresses, ContractInstances};
-    use ethers_providers::JsonRpcClient;
-    use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
-    use hopr_primitive_types::primitives::Address;
+    use ethers::providers::JsonRpcClient;
     use serde_json::json;
+    use std::fmt::Debug;
     use std::sync::atomic::Ordering;
     use std::time::Duration;
 
-    use crate::client::native::SurfRequestor;
+    use chain_types::utils::create_anvil;
+    use chain_types::{ContractAddresses, ContractInstances};
+    use hopr_async_runtime::prelude::sleep;
+    use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
+    use hopr_primitive_types::primitives::Address;
+
+    use crate::client::reqwest_client::ReqwestRequestor;
+    use crate::client::surf_client::SurfRequestor;
     use crate::client::{create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy};
     use crate::errors::JsonRpcProviderClientError;
-    use crate::ZeroRetryPolicy;
+    use crate::{HttpPostRequestor, ZeroRetryPolicy};
 
-    #[async_std::test]
-    async fn test_client_should_deploy_contracts() {
+    async fn deploy_contracts<R: HttpPostRequestor + Debug>(req: R) -> ContractAddresses {
         let anvil = create_anvil(None);
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
 
-        let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &chain_key_0);
+        let client = create_rpc_client_to_anvil(req, &anvil, &chain_key_0);
 
-        let contract_addrs = ContractAddresses::from(
+        ContractAddresses::from(
             &ContractInstances::deploy_for_testing(client.clone(), &chain_key_0)
                 .await
                 .expect("failed to deploy"),
-        );
+        )
+    }
+
+    #[async_std::test]
+    async fn test_client_should_deploy_contracts_via_surf() {
+        let contract_addrs = deploy_contracts(SurfRequestor::default()).await;
+
+        assert_ne!(contract_addrs.token, Address::default());
+        assert_ne!(contract_addrs.channels, Address::default());
+        assert_ne!(contract_addrs.announcements, Address::default());
+        assert_ne!(contract_addrs.network_registry, Address::default());
+        assert_ne!(contract_addrs.safe_registry, Address::default());
+        assert_ne!(contract_addrs.price_oracle, Address::default());
+    }
+
+    #[tokio::test]
+    async fn test_client_should_deploy_contracts_via_reqwest() {
+        let contract_addrs = deploy_contracts(ReqwestRequestor::default()).await;
 
         assert_ne!(contract_addrs.token, Address::default());
         assert_ne!(contract_addrs.channels, Address::default());
@@ -542,7 +699,7 @@ pub mod tests {
         let mut last_number = 0;
 
         for _ in 0..3 {
-            async_std::task::sleep(block_time).await;
+            sleep(block_time).await;
 
             let number: ethers::types::U64 = client
                 .request("eth_blockNumber", ())
@@ -740,6 +897,53 @@ pub mod tests {
             &server.url(),
             SurfRequestor::default(),
             SimpleJsonRpcRetryPolicy {
+                max_retries: Some(2),
+                retryable_json_rpc_errors: vec![],
+                initial_backoff: Duration::from_millis(100),
+                ..SimpleJsonRpcRetryPolicy::default()
+            },
+        );
+
+        let err = client
+            .request::<_, ethers::types::U64>("eth_blockNumber", ())
+            .await
+            .expect_err("expected error");
+
+        m.assert();
+        assert!(matches!(err, JsonRpcProviderClientError::JsonRpcError(_)));
+        assert_eq!(
+            0,
+            client.requests_enqueued.load(Ordering::SeqCst),
+            "retry queue should be zero when policy says no more retries"
+        );
+    }
+
+    #[async_std::test]
+    async fn test_client_should_retry_on_nonretryable_json_rpc_error_if_min_retries_is_given() {
+        let mut server = mockito::Server::new_async().await;
+
+        let m = server
+            .mock("POST", "/")
+            .with_status(200)
+            .match_body(mockito::Matcher::PartialJson(json!({"method": "eth_blockNumber"})))
+            .with_body(
+                r#"{
+              "jsonrpc": "2.0",
+              "id": 1,
+              "error": {
+                "message": "some message",
+                "code": -32000
+              }
+            }"#,
+            )
+            .expect(2)
+            .create();
+
+        let client = JsonRpcProviderClient::new(
+            &server.url(),
+            SurfRequestor::default(),
+            SimpleJsonRpcRetryPolicy {
+                min_retries: Some(1),
                 max_retries: Some(2),
                 retryable_json_rpc_errors: vec![],
                 initial_backoff: Duration::from_millis(100),

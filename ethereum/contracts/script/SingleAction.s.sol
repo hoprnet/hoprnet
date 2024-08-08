@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity >=0.8.0 <0.9.0;
 
-import "forge-std/Script.sol";
-import "forge-std/Test.sol";
+import { Script } from "forge-std/Script.sol";
+import { Test, stdStorage, StdStorage } from "forge-std/Test.sol";
+
 import "./utils/NetworkConfig.s.sol";
 import "./utils/BoostUtilsLib.sol";
 import "../src/utils/TargetUtils.sol";

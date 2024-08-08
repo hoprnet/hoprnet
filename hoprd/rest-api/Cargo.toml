@@ -1,9 +1,9 @@
 [package]
 name = "hoprd-api"
-version = "0.2.0"
+version = "3.2.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
-description = "API server using the hopr-lib created HOPR node and exposing it using a HTTP REST API"
+description = "This Rest API enables developers to interact with a hoprd node programatically through HTTP."
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"
@@ -14,27 +14,50 @@ crate-type = ["rlib"]
 [features]
 default = ["prometheus"]
 prometheus = ["hopr-lib/prometheus", "dep:hopr-metrics", "dep:lazy_static"]
+# placeholder feature so we can enable it globally during tests
+runtime-async-std = []
 
 [dependencies]
 async-broadcast = { workspace = true }
-async-std = { workspace = true, features = ["attributes"] }
-const_format = "0.2.32"
+async-lock = { workspace = true }
+axum = { version = "0.7.5", features = ["ws", "http2"] }
+bimap = { workspace = true }
+const_format = { workspace = true }
 futures = { workspace = true }
 futures-concurrency = { workspace = true }
+hyper = { version = "1.3.1", features = ["http1", "http2", "server"] }
 lazy_static = { workspace = true, optional = true }
-libp2p-identity = { workspace = true, features = ["peerid", "ed25519", "serde"] }
-log = { workspace = true }
-serde = { workspace = true, features = ["derive"] }
-serde_with = { workspace = true }
+libp2p-identity = { workspace = true, features = [
+  "peerid",
+  "ed25519",
+  "serde",
+] }
+mime = "0.3.17"
+serde = { workspace = true }
 serde_json = { workspace = true }
+serde_with = { workspace = true }
+smart-default = { workspace = true }
 strum = { workspace = true }
-tide = { version = "0.16.0", default-features = false, features = ["h1-server"] }
-tide-websockets = "0.4"
-utoipa = { version = "4.1" }
-utoipa-swagger-ui = { version = "5.0.0" }
+tokio = { workspace = true }
+tokio-util = { workspace = true, features = ["compat"] }
+tower = "0.4.13"
+tower-http = { version = "0.5.2", features = [
+  "validate-request",
+  "compression-full",
+  "cors",
+  "trace",
+  "sensitive-headers",
+] }
+tracing = { workspace = true }
+urlencoding = "2.1.3"
+utoipa = { version = "4.2.3" }
+utoipa-scalar = { version = "0.1.0", features = ["axum"] }
 validator = { workspace = true }
 
-hopr-lib = { workspace = true }
+hopr-lib = { workspace = true, features = ["runtime-tokio", "session-client"] }
 hoprd-inbox = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
+
+[dev-dependencies]
+hopr-transport-session = { workspace = true }

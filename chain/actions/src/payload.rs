@@ -1,5 +1,17 @@
+//! Module defining various Ethereum transaction payload generators for the actions.
+//!
+//! This module defines the basic [PayloadGenerator] trait that describes how an action
+//! is translated into a [TypedTransaction] that can be submitted on-chain (via an RPC provider)
+//! using a [TransactionExecutor](crate::action_queue::TransactionExecutor).
+//!
+//! There are two main implementations:
+//! - [BasicPayloadGenerator] which implements generation of a direct EIP1559 transaction payload. This is currently
+//! not used by a HOPR node.
+//! - [SafePayloadGenerator] which implements generation of a payload that embeds the transaction data into the
+//! SAFE transaction. This is currently the main mode of HOPR node operation.
+//!
 use crate::errors::{
-    CoreEthereumActionsError::{InvalidArguments, InvalidState},
+    ChainActionsError::{InvalidArguments, InvalidState},
     Result,
 };
 use bindings::{
@@ -8,7 +20,7 @@ use bindings::{
         CloseIncomingChannelCall, CloseIncomingChannelSafeCall, CompactSignature, FinalizeOutgoingChannelClosureCall,
         FinalizeOutgoingChannelClosureSafeCall, FundChannelCall, FundChannelSafeCall,
         InitiateOutgoingChannelClosureCall, InitiateOutgoingChannelClosureSafeCall, RedeemTicketCall,
-        RedeemTicketSafeCall, RedeemableTicket, TicketData, Vrfparameters,
+        RedeemTicketSafeCall, RedeemableTicket as OnChainRedeemableTicket, TicketData, Vrfparameters,
     },
     hopr_node_management_module::ExecTransactionFromModuleCall,
     hopr_node_safe_registry::{DeregisterNodeBySafeCall, RegisterSafeByNodeCall},
@@ -27,9 +39,9 @@ use hopr_primitive_types::prelude::*;
 
 #[repr(u8)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum Operation {
+enum Operation {
     Call = 0,
-    DelegateCall = 1,
+    // Future use: DelegateCall = 1,
 }
 
 /// Trait for various implementations of generators of common on-chain transaction payloads.
@@ -61,7 +73,7 @@ pub trait PayloadGenerator<T: Into<TypedTransaction>> {
     fn finalize_outgoing_channel_closure(&self, destination: Address) -> Result<T>;
 
     /// Used to create the payload to claim incentives for relaying a mixnet packet.
-    fn redeem_ticket(&self, acked_ticket: AcknowledgedTicket, domain_separator: Hash) -> Result<T>;
+    fn redeem_ticket(&self, acked_ticket: RedeemableTicket) -> Result<T>;
 
     /// Creates a transaction payload to register a Safe instance which is used
     /// to manage the node's funds
@@ -166,18 +178,18 @@ impl PayloadGenerator<TypedTransaction> for BasicPayloadGenerator {
         tx.set_data(
             match &announcement.key_binding {
                 Some(binding) => {
-                    let serialized_signature = binding.signature.to_bytes();
+                    let serialized_signature = binding.signature.as_ref();
 
                     BindKeysAnnounceCall {
                         ed_25519_sig_0: H256::from_slice(&serialized_signature[0..32]).into(),
                         ed_25519_sig_1: H256::from_slice(&serialized_signature[32..64]).into(),
-                        ed_25519_pub_key: H256::from_slice(&binding.packet_key.to_bytes()).into(),
-                        base_multiaddr: announcement.to_multiaddress_str(),
+                        ed_25519_pub_key: H256::from_slice(binding.packet_key.as_ref()).into(),
+                        base_multiaddr: announcement.multiaddress().to_string(),
                     }
                     .encode()
                 }
                 None => AnnounceCall {
-                    base_multiaddr: announcement.to_multiaddress_str(),
+                    base_multiaddr: announcement.multiaddress().to_string(),
                 }
                 .encode(),
             }
@@ -263,12 +275,15 @@ impl PayloadGenerator<TypedTransaction> for BasicPayloadGenerator {
         Ok(tx)
     }
 
-    fn redeem_ticket(&self, acked_ticket: AcknowledgedTicket, domain_separator: Hash) -> Result<TypedTransaction> {
+    fn redeem_ticket(&self, acked_ticket: RedeemableTicket) -> Result<TypedTransaction> {
         let redeemable = convert_acknowledged_ticket(&acked_ticket)?;
 
-        let ticket_hash = acked_ticket.ticket.get_hash(&domain_separator);
-
-        let params = convert_vrf_parameters(&acked_ticket.vrf_params, &self.me, &ticket_hash, &domain_separator);
+        let params = convert_vrf_parameters(
+            &acked_ticket.vrf_params,
+            &self.me,
+            acked_ticket.ticket.verified_hash(),
+            &acked_ticket.channel_dst,
+        );
         let mut tx = create_eip1559_transaction();
         tx.set_data(RedeemTicketCall { redeemable, params }.encode().into());
         tx.set_to(NameOrAddress::Address(self.contract_addrs.channels.into()));
@@ -339,20 +354,20 @@ impl PayloadGenerator<TypedTransaction> for SafePayloadGenerator {
     fn announce(&self, announcement: AnnouncementData) -> Result<TypedTransaction> {
         let call_data = match &announcement.key_binding {
             Some(binding) => {
-                let serialized_signature = binding.signature.to_bytes();
+                let serialized_signature = binding.signature.as_ref();
 
                 BindKeysAnnounceSafeCall {
-                    self_: H160::from_slice(&self.me.to_bytes()),
+                    self_: self.me.into(),
                     ed_25519_sig_0: H256::from_slice(&serialized_signature[0..32]).into(),
                     ed_25519_sig_1: H256::from_slice(&serialized_signature[32..64]).into(),
-                    ed_25519_pub_key: H256::from_slice(&binding.packet_key.to_bytes()).into(),
-                    base_multiaddr: announcement.to_multiaddress_str(),
+                    ed_25519_pub_key: H256::from_slice(binding.packet_key.as_ref()).into(),
+                    base_multiaddr: announcement.multiaddress().to_string(),
                 }
                 .encode()
             }
             None => AnnounceSafeCall {
                 self_: self.me.into(),
-                base_multiaddr: announcement.to_multiaddress_str(),
+                base_multiaddr: announcement.multiaddress().to_string(),
             }
             .encode(),
         };
@@ -461,12 +476,15 @@ impl PayloadGenerator<TypedTransaction> for SafePayloadGenerator {
         Ok(tx)
     }
 
-    fn redeem_ticket(&self, acked_ticket: AcknowledgedTicket, domain_separator: Hash) -> Result<TypedTransaction> {
+    fn redeem_ticket(&self, acked_ticket: RedeemableTicket) -> Result<TypedTransaction> {
         let redeemable = convert_acknowledged_ticket(&acked_ticket)?;
 
-        let ticket_hash = acked_ticket.ticket.get_hash(&domain_separator);
-
-        let params = convert_vrf_parameters(&acked_ticket.vrf_params, &self.me, &ticket_hash, &domain_separator);
+        let params = convert_vrf_parameters(
+            &acked_ticket.vrf_params,
+            &self.me,
+            acked_ticket.ticket.verified_hash(),
+            &acked_ticket.channel_dst,
+        );
 
         let call_data = RedeemTicketSafeCall {
             self_: self.me.into(),
@@ -518,22 +536,26 @@ pub fn convert_vrf_parameters(
     domain_separator: &Hash,
 ) -> Vrfparameters {
     // skip the secp256k1 curvepoint prefix
-    let v = off_chain.get_decompressed_v().unwrap().to_bytes();
+    let v = off_chain.v.as_uncompressed();
     let s_b = off_chain
-        .get_s_b_witness(signer, &ticket_hash.into(), domain_separator.as_slice())
-        .to_bytes();
+        .get_s_b_witness(signer, &ticket_hash.into(), domain_separator.as_ref())
+        // Safe: hash value is always in the allowed length boundaries,
+        //       only fails for longer values
+        // Safe: always encoding to secp256k1 whose field elements are in
+        //       allowed length boundaries
+        .expect("ticket hash exceeded hash2field boundaries or encoding to unsupported curve");
 
-    let h_v = off_chain.get_h_v_witness().to_bytes();
+    let h_v = off_chain.get_h_v_witness();
 
     Vrfparameters {
-        vx: U256::from_big_endian(&v[1..33]),
-        vy: U256::from_big_endian(&v[33..65]),
+        vx: U256::from_big_endian(&v.as_bytes()[1..33]),
+        vy: U256::from_big_endian(&v.as_bytes()[33..65]),
         s: U256::from_big_endian(&off_chain.s.to_bytes()),
         h: U256::from_big_endian(&off_chain.h.to_bytes()),
-        s_bx: U256::from_big_endian(&s_b[1..33]),
-        s_by: U256::from_big_endian(&s_b[33..65]),
-        h_vx: U256::from_big_endian(&h_v[1..33]),
-        h_vy: U256::from_big_endian(&h_v[33..65]),
+        s_bx: U256::from_big_endian(&s_b.as_bytes()[1..33]),
+        s_by: U256::from_big_endian(&s_b.as_bytes()[33..65]),
+        h_vx: U256::from_big_endian(&h_v.as_bytes()[1..33]),
+        h_vy: U256::from_big_endian(&h_v.as_bytes()[33..65]),
     }
 }
 
@@ -541,27 +563,27 @@ pub fn convert_vrf_parameters(
 /// that the smart contract understands
 ///
 /// Not implemented using From trait because logic fits better here
-pub fn convert_acknowledged_ticket(off_chain: &AcknowledgedTicket) -> Result<RedeemableTicket> {
-    if let Some(ref signature) = off_chain.ticket.signature {
-        let serialized_signature = signature.to_bytes();
+pub fn convert_acknowledged_ticket(off_chain: &RedeemableTicket) -> Result<OnChainRedeemableTicket> {
+    if let Some(ref signature) = off_chain.verified_ticket().signature {
+        let serialized_signature = signature.as_ref();
 
         let mut encoded_win_prob = [0u8; 8];
-        encoded_win_prob[1..].copy_from_slice(&off_chain.ticket.encoded_win_prob);
+        encoded_win_prob[1..].copy_from_slice(&off_chain.verified_ticket().encoded_win_prob);
 
-        Ok(RedeemableTicket {
+        Ok(OnChainRedeemableTicket {
             data: TicketData {
-                channel_id: off_chain.ticket.channel_id.into(),
-                amount: off_chain.ticket.amount.amount().as_u128(),
-                ticket_index: off_chain.ticket.index,
-                index_offset: off_chain.ticket.index_offset,
-                epoch: off_chain.ticket.channel_epoch,
+                channel_id: off_chain.verified_ticket().channel_id.into(),
+                amount: off_chain.verified_ticket().amount.amount().as_u128(),
+                ticket_index: off_chain.verified_ticket().index,
+                index_offset: off_chain.verified_ticket().index_offset,
+                epoch: off_chain.verified_ticket().channel_epoch,
                 win_prob: u64::from_be_bytes(encoded_win_prob),
             },
             signature: CompactSignature {
                 r: H256::from_slice(&serialized_signature[0..32]).into(),
                 vs: H256::from_slice(&serialized_signature[32..64]).into(),
             },
-            por_secret: U256::from_big_endian(&off_chain.response.to_bytes()),
+            por_secret: U256::from_big_endian(off_chain.response.as_ref()),
         })
     } else {
         Err(InvalidArguments("Acknowledged ticket must be signed".into()))
@@ -571,13 +593,12 @@ pub fn convert_acknowledged_ticket(off_chain: &AcknowledgedTicket) -> Result<Red
 #[cfg(test)]
 pub mod tests {
     use chain_rpc::client::create_rpc_client_to_anvil;
-    use chain_rpc::client::native::SurfRequestor;
+    use chain_rpc::client::surf_client::SurfRequestor;
     use chain_types::ContractInstances;
     use ethers::providers::Middleware;
     use hex_literal::hex;
     use hopr_crypto_types::prelude::*;
     use hopr_internal_types::prelude::*;
-    use hopr_primitive_types::prelude::*;
     use multiaddr::Multiaddr;
     use std::str::FromStr;
 
@@ -602,7 +623,7 @@ pub mod tests {
         let generator = BasicPayloadGenerator::new((&chain_key_0).into(), (&contract_instances).into());
 
         let ad = AnnouncementData::new(
-            &test_multiaddr,
+            test_multiaddr,
             Some(KeyBinding::new(
                 (&chain_key_0).into(),
                 &OffchainKeypair::from_secret(&PRIVATE_KEY).unwrap(),
@@ -622,7 +643,7 @@ pub mod tests {
 
         let test_multiaddr_reannounce = Multiaddr::from_str("/ip4/5.6.7.8/tcp/99").unwrap();
 
-        let ad_reannounce = AnnouncementData::new(&test_multiaddr_reannounce, None).unwrap();
+        let ad_reannounce = AnnouncementData::new(test_multiaddr_reannounce, None).unwrap();
         let reannounce_tx = generator.announce(ad_reannounce).expect("should generate tx");
 
         assert!(client
@@ -675,37 +696,29 @@ pub mod tests {
         )
         .await;
 
-        let response = Response::from_bytes(&RESPONSE_TO_CHALLENGE).unwrap();
+        let response = Response::try_from(RESPONSE_TO_CHALLENGE.as_ref()).unwrap();
 
         // Alice issues a ticket to Bob
-        let ticket = Ticket::new(
-            &(&chain_key_bob).into(),
-            &Balance::new(U256::one(), BalanceType::HOPR),
-            U256::one(),
-            U256::one(),
-            1.0_f64,
-            U256::one(),
-            response.to_challenge().to_ethereum_challenge(),
-            &chain_key_alice,
-            &domain_separator,
-        )
-        .unwrap();
+        let ticket = TicketBuilder::default()
+            .addresses(&chain_key_alice, &chain_key_bob)
+            .amount(1)
+            .index(1)
+            .index_offset(1)
+            .win_prob(1.0)
+            .channel_epoch(1)
+            .challenge(response.to_challenge().into())
+            .build_signed(&chain_key_alice, &domain_separator)
+            .unwrap();
 
         // Bob acknowledges the ticket using the HalfKey from the Response
-        let acked_ticket = AcknowledgedTicket::new(
-            ticket,
-            response,
-            (&chain_key_alice).into(),
-            &chain_key_bob,
-            &domain_separator,
-        )
-        .unwrap();
+        let acked_ticket = ticket
+            .into_acknowledged(response)
+            .into_redeemable(&chain_key_bob, &domain_separator)
+            .expect("should create a redeemable ticket");
 
         // Bob redeems the ticket
         let generator = BasicPayloadGenerator::new((&chain_key_bob).into(), (&contract_instances).into());
-        let redeem_ticket_tx = generator
-            .redeem_ticket(acked_ticket, domain_separator)
-            .expect("should create tx");
+        let redeem_ticket_tx = generator.redeem_ticket(acked_ticket).expect("should create tx");
         let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &chain_key_bob);
         println!(
             "{:?}",

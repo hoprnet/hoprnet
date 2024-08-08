@@ -2,7 +2,7 @@
 name: Bounty Template
 about: Create a bounty
 title: ''
-labels: 'bounty, new issue, epic'
+labels: 'bounty, status:new, epic'
 assignees: ''
 ---
 

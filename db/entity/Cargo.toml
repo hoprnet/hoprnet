@@ -1,0 +1,44 @@
+[package]
+name = "hopr-db-entity"
+description = "Contains all HOPR database entities"
+version = "0.2.0"
+edition = "2021"
+homepage = "https://hoprnet.org/"
+repository = "https://github.com/hoprnet/hoprnet"
+license = "GPL-3.0-only"
+
+[features]
+default = ["sqlite"]
+runtime-async-std = [
+  "async-std",
+  "sea-orm/runtime-async-std-rustls",
+  "sea-orm-cli/runtime-async-std-rustls",
+  "sea-orm-migration/runtime-async-std-rustls",
+]
+runtime-tokio = [
+  "tokio",
+  "sea-orm/runtime-tokio-rustls",
+  "sea-orm-cli/runtime-tokio-rustls",
+  "sea-orm-migration/runtime-tokio-rustls",
+]
+sqlite = []
+
+[build-dependencies]
+async-std = { workspace = true, optional = true }
+clap = { workspace = true }
+futures = { workspace = true }
+sea-orm = { workspace = true }
+sea-orm-cli = { workspace = true }
+sea-orm-migration = { workspace = true }
+tokio = { workspace = true, optional = true }
+
+hopr-db-migration = { workspace = true }
+
+[dependencies]
+chrono = { workspace = true }
+sea-orm = { workspace = true }
+thiserror = { workspace = true }
+
+hopr-crypto-types = { workspace = true }
+hopr-internal-types = { workspace = true }
+hopr-primitive-types = { workspace = true }

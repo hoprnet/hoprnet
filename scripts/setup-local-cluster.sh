@@ -18,7 +18,6 @@ PATH="${mydir}/../.foundry/bin:${mydir}/../.cargo/bin:${PATH}"
 
 # verify and set parameters
 declare api_token="^^LOCAL-testing-123^^"
-declare myne_chat_url="http://app.myne.chat"
 declare init_script=""
 declare hoprd_command="hoprd"
 declare listen_host="127.0.0.1"
@@ -28,10 +27,9 @@ declare deployer_private_key=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efca
 
 usage() {
   msg
-  msg "Usage: $0 [-h|--help] [-t|--api-token <api_token>] [-m|--myne-chat-url <myne_chat_url>] [-i|--init-script <init_script>] [--hoprd-command <hoprd_command>] [--listen-host|-l <list_host>] [-p|--production]"
+  msg "Usage: $0 [-h|--help] [-t|--api-token <api_token>] [-i|--init-script <init_script>] [--hoprd-command <hoprd_command>] [--listen-host|-l <list_host>] [-p|--production]"
   msg
   msg "<api_token> is set to '${api_token}' by default"
-  msg "<myne_chat_url> is set to '${myne_chat_url}' by default"
   msg "<init_script> is empty by default, expected to be path to a script which is called with all node API endpoints as parameters"
   msg "<hoprd_command> is used to start hoprd, default is '${hoprd_command}'"
   msg "<listen_host> is listened on by all hoprd instances, default is '${listen_host}'"
@@ -51,11 +49,6 @@ while (( "$#" )); do
       ;;
     -t|--api-token)
       api_token="${2}"
-      shift
-      shift
-      ;;
-    -m|--myne-chat-url)
-      myne_chat_url="${2}"
       shift
       shift
       ;;
@@ -161,7 +154,7 @@ function setup_node() {
     HOPRD_HEARTBEAT_THRESHOLD=3 \
     HOPRD_HEARTBEAT_VARIANCE=1 \
     HOPRD_NETWORK_QUALITY_THRESHOLD="0.3" \
-    RUST_LOG="debug" \
+    RUST_LOG="debug,libp2p_mplex=info,multistream_select=info,isahc::handler=error,isahc::client=error" \
     RUST_BACKTRACE=1 \
     ${hoprd_command} \
       --announce \
@@ -189,8 +182,7 @@ function generate_local_identities() {
   find -L "${tmp_dir}" -maxdepth 1 -type f -name "${node_prefix}_*.id"  -exec rm {} \; || true
 
   env ETHERSCAN_API_KEY="" IDENTITY_PASSWORD="${password}" \
-    hopli identity \
-    --action create \
+    hopli identity create \
     --identity-directory "${tmp_dir}" \
     --identity-prefix "${node_prefix}_" \
     --number "${cluster_size}"
@@ -204,51 +196,41 @@ function create_local_safes() {
   mapfile -t id_files <<< "$(find -L "${tmp_dir}" -maxdepth 1 -type f -name "${node_prefix}_*.id" | sort || true)"
 
   # create a loop so safes are created for all the nodes TODO:
-  for id_file in ${id_files[@]}; do
-    # store the returned `--safeAddress <safe_address> --moduleAddress <module_address>` to `safe_i.log` for each id
+  for id_file in "${id_files[@]}"; do
+    # store the returned `safe <safe_address> \n node_module <module_address>` to `safe_i.log` for each id
     # `hopli create-safe-module` will also add nodes to network registry and approve token transfers for safe
     env \
       ETHERSCAN_API_KEY="" \
       IDENTITY_PASSWORD="${password}" \
       PRIVATE_KEY="${deployer_private_key}" \
-      DEPLOYER_PRIVATE_KEY="${deployer_private_key}" \
-      hopli create-safe-module \
+      MANAGER_PRIVATE_KEY="${deployer_private_key}" \
+      hopli safe-module create \
         --network anvil-localhost \
         --identity-from-path "${id_file}" \
+        --hopr-amount 1000 --native-amount 1 \
+        --provider-url "http://localhost:8545" \
         --contracts-root "./ethereum/contracts" > "${id_file%.id}.safe.log"
 
     # store safe arguments in separate file for later use
-    grep -oE "\--safeAddress.*--moduleAddress.*" "${id_file%.id}.safe.log" > "${id_file%.id}.safe.args"
+    grep -E '^(safe|node_module)' "${id_file%.id}.safe.log" | sed -e 's/^safe/--safeAddress/' -e ':a;N;$!ba;s/\nnode_module/ --moduleAddress/' > "${id_file%.id}.safe.args"
     rm "${id_file%.id}.safe.log"
   done
 }
 
-# read various identity files located at $id_path
-# create one safe and one module for all the identity files
-function create_local_safe_for_multi_nodes() {
-  log "Create safe"
 
-  mapfile -t id_files <<< "$(find -L "${tmp_dir}" -maxdepth 1 -type f -name "${node_prefix}_*.id" | sort || true)"
+function fund_all_local_identities() {
+  log "Funding nodes"
 
-  # create one safe for all the nodes
-  # store the returned `--safeAddress <safe_address> --moduleAddress <module_address>` to `${node_prefix}_all_nodes.safe.log`
-  # `hopli create-safe-module` will also add nodes to network registry and approve token transfers for safe
   env \
     ETHERSCAN_API_KEY="" \
     IDENTITY_PASSWORD="${password}" \
     PRIVATE_KEY="${deployer_private_key}" \
-    DEPLOYER_PRIVATE_KEY="${deployer_private_key}" \
-    hopli create-safe-module \
+    hopli faucet \
       --network anvil-localhost \
       --identity-directory "${tmp_dir}" \
       --identity-prefix "${node_prefix}" \
-      --contracts-root "./ethereum/contracts" > "${node_prefix}_all_nodes.safe.log"
-
-  # store safe arguments in separate file for later use (as in `create_local_safes` function)
-  for id_file in ${id_files[@]}; do
-    grep -oE "\--safeAddress.*--moduleAddress.*" "${node_prefix}_all_nodes.safe.log" > "${id_file%.id}.safe.args"
-  done
-  rm "${node_prefix}_all_nodes.safe.log"
+      --provider-url "http://localhost:8545" \
+      --contracts-root "./ethereum/contracts"
 }
 
 # --- Log setup info {{{
@@ -301,9 +283,8 @@ update_protocol_config_addresses "${protocol_config}" "${deployments_summary}" "
 generate_local_identities
 
 # create safe and modules for all the ids, store them in args files
+#  each node has its own pair of safe and module
 create_local_safes
-# or running the following command to attach all the nodes to one safe
-# create_local_safe_for_multi_nodes
 
 #  --- Run nodes --- {{{
 for node_id in ${!id_files[@]}; do
@@ -317,12 +298,8 @@ for node_id in ${!id_files[@]}; do
 done
 # }}}
 
-log "Funding nodes"
-
-#  --- Fund nodes --- {{{
-make -C "${mydir}/../" fund-local-all \
-  id_dir="${tmp_dir}"
-# }}}
+# fund all the local nodes
+fund_all_local_identities
 
 log "Waiting for nodes startup"
 
@@ -406,7 +383,7 @@ for node_id in ${!id_files[@]}; do
   log "\t${node_name}"
   log "\t\tPeer Id:\t${peers[$node_id]}"
   log "\t\tAddress:\t${node_addrs[$node_id]}"
-  log "\t\tRest API:\thttp://${listen_host}:${api_port}/swagger-ui/index.html"
+  log "\t\tRest API:\thttp://${listen_host}:${api_port}/scalar"
   log "\t\tAdmin UI:\thttp://${listen_host}:3000/?apiEndpoint=http://${listen_host}:${api_port}&apiToken=${api_token}"
   log "\t\tWebSocket:\tws://${listen_host}:${api_port}/api/v3/messages/websocket?apiToken=${api_token}"
 

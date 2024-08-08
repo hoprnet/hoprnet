@@ -43,12 +43,19 @@
 //!   - in the absence of response, the requester will time out
 //!
 
+/// Configuration of the protocol components.
 pub mod config;
-pub mod constants;
+/// Errors produced by the crate.
 pub mod errors;
 
+/// Bloom filter for the transport layer.
+pub mod bloom;
 // protocols
+/// `ack` p2p protocol
 pub mod ack;
+/// `heartbeat` p2p protocol
 pub mod heartbeat;
+/// `msg` p2p protocol
 pub mod msg;
+/// `ticket_aggregation` p2p protocol
 pub mod ticket_aggregation;

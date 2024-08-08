@@ -1,0 +1,52 @@
+[package]
+name = "hopr-network-types"
+version = "0.2.2"
+authors = ["HOPR Association <tech@hoprnet.org>"]
+description = "Contains types used for networking over the HOPR protocol"
+edition = "2021"
+homepage = "https://hoprnet.org/"
+repository = "https://github.com/hoprnet/hoprnet"
+license = "GPL-3.0-only"
+
+[features]
+default = []
+serde = ["dep:serde", "dep:serde_bytes"]
+runtime-async-std = ["hopr-async-runtime/runtime-async-std"]
+runtime-tokio = ["hopr-async-runtime/runtime-tokio"]
+
+[dependencies]
+bitvec = "1.0.1"
+crossbeam-queue = "0.3.11"
+crossbeam-skiplist = { workspace = true }
+dashmap = { workspace = true }
+futures = { workspace = true }
+governor = "0.6.3"
+hex = { workspace = true }
+pin-project = "1.1"
+rand = { workspace = true }
+rand_distr = "0.4.3"
+serde = { workspace = true, optional = true }
+serde_bytes = { workspace = true, optional = true }
+smart-default = { workspace = true }
+strum = { workspace = true }
+tracing = { workspace = true }
+thiserror = { workspace = true }
+
+hopr-platform = { workspace = true }
+hopr-primitive-types = { workspace = true }
+hopr-async-runtime = { workspace = true }
+
+[dev-dependencies]
+anyhow = "1.0"
+async-std = { workspace = true, features = ["attributes", "unstable"] }
+async-stream = { workspace = true }
+ctor = "0.2.8"
+hex-literal = { workspace = true }
+lazy_static = { workspace = true }
+parameterized = { workspace = true }
+rand = { workspace = true }
+rand_distr = "0.4.3"
+rayon = { workspace = true }
+test-log = { version = "0.2.16", features = ["trace"] }
+
+hopr-crypto-random = { workspace = true }

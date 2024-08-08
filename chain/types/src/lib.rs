@@ -1,6 +1,4 @@
-//! This crate contains various on-chain related modules and types:
-//! - `constants`: constants related to on-chain operations
-//! - `actions`: types related to high-level core-ethereum Actions
+//! This crate contains various on-chain related modules and types.
 
 use bindings::hopr_announcements::HoprAnnouncements;
 use bindings::hopr_channels::HoprChannels;
@@ -23,7 +21,8 @@ use std::sync::Arc;
 
 pub mod actions;
 pub mod chain_events;
-pub mod constants;
+
+// Various (mostly testing related) utility functions
 pub mod utils;
 
 pub use ethers::core::types::transaction::eip2718::TypedTransaction;

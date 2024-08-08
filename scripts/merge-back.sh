@@ -7,7 +7,7 @@ usage() {
   echo ""
   echo "Usage: $0 <release_name>"
   echo ""
-  echo "$0 providence"
+  echo "$0 saint-louis"
   echo
 }
 
@@ -30,7 +30,6 @@ if [ "$(jq '.["'${release_name}'"]' "${mydir}/../releases.json")" = "null" ]; th
   exit 1
 fi
 
-exit 1
 if [ -z "$(git status --porcelain)" ]; then
   git checkout "release/${release_name}"
   git pull
@@ -45,7 +44,7 @@ if [ -z "$(git status --porcelain)" ]; then
   echo "[INFO] Created remote branch merge-back-release-${release_name}"
   today=`date +%Y-%m-%d`
   echo "Creating github pull request using github cli"
-  gh pr create --title "Merge back from ${release_name} - ${today}" --base master --label merge-back --reviewer hoprnet/hopr-development --body "The scope of this PR is to merge back to master all the bug fixing found in release ${release_type}"
+  gh pr create --title "Merge back from ${release_name} - ${today}" --base master --label merge-back --reviewer hoprnet/hopr-development --body "The scope of this PR is to merge back to \`master\` all the changes from the release branch \`release/${release_name}\`"
 else
   echo "[ERROR] Clean your workspace before"
   exit 1

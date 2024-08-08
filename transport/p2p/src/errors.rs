@@ -1,5 +1,6 @@
 use thiserror::Error;
 
+/// All errors raised by the crate.
 #[derive(Error, Debug, PartialEq)]
 pub enum P2PError {
     #[error("Failed to notify an external process: {0}")]
@@ -15,4 +16,5 @@ pub enum P2PError {
     Libp2p(String),
 }
 
+/// Result utilizing the [P2PError] as the error type.
 pub type Result<T> = core::result::Result<T, P2PError>;

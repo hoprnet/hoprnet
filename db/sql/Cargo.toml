@@ -1,0 +1,75 @@
+[package]
+name = "hopr-db-sql"
+version = "0.4.0"
+edition = "2021"
+description = "Contains SQL DB functionality implementing the DB API traits to be used by other crates in the code base"
+homepage = "https://hoprnet.org/"
+repository = "https://github.com/hoprnet/hoprnet"
+license = "GPL-3.0-only"
+
+[features]
+default = ["traits"]
+traits = []
+runtime-async-std = [
+  "hopr-async-runtime/runtime-async-std",
+  "sea-orm/runtime-async-std",
+  "sea-query-binder/runtime-async-std-rustls",
+  "sqlx/runtime-async-std-rustls",
+]
+runtime-tokio = [
+  "hopr-async-runtime/runtime-tokio",
+  "sea-orm/runtime-tokio",
+  "sea-query-binder/runtime-tokio-rustls",
+  "sqlx/runtime-tokio-rustls",
+]
+prometheus = ["dep:lazy_static", "dep:hopr-metrics"]
+
+[dependencies]
+async-lock = { workspace = true }
+async-stream = { workspace = true }
+async-trait = { workspace = true }
+chrono = { workspace = true }
+bincode = { workspace = true }
+futures = { workspace = true }
+lazy_static = { workspace = true, optional = true }
+libp2p-identity = { workspace = true }
+moka = { workspace = true }
+multiaddr = { workspace = true }
+sea-orm = { workspace = true }
+sea-query = { version = "0.30.7", default-features = false, features = [
+  "with-chrono",
+  "derive",
+  "backend-sqlite",
+  "attr",
+] }
+smart-default = { workspace = true }
+sqlx = { workspace = true }
+strum = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+hopr-crypto-packet = { workspace = true }
+hopr-crypto-types = { workspace = true }
+hopr-db-api = { workspace = true }
+hopr-db-entity = { workspace = true }
+hopr-db-migration = { workspace = true }
+hopr-async-runtime = { workspace = true }
+hopr-internal-types = { workspace = true }
+hopr-metrics = { workspace = true, optional = true }
+hopr-parallelize = { workspace = true, features = ["rayon"] }
+hopr-primitive-types = { workspace = true }
+
+[dev-dependencies]
+async-std = { workspace = true }
+rand = { workspace = true }
+sea-orm = { workspace = true, features = ["runtime-async-std-rustls"] }
+sea-query-binder = { version = "0.5.0", default-features = false, features = [
+  "with-chrono",
+  "sqlx-sqlite",
+  "runtime-async-std-rustls",
+] }
+sqlx = { workspace = true, features = ["runtime-async-std-rustls"] }
+lazy_static = { workspace = true }
+hopr-crypto-random = { workspace = true }
+hex-literal = { workspace = true }
+tracing-test = { workspace = true }

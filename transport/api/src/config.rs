@@ -1,10 +1,11 @@
+use std::fmt::{Display, Formatter};
 use std::num::ParseIntError;
 use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
 use validator::{Validate, ValidationError};
 
-pub use core_network::{heartbeat::HeartbeatConfig, network::NetworkConfig};
+pub use core_network::{config::NetworkConfig, heartbeat::HeartbeatConfig};
 pub use core_protocol::config::ProtocolConfig;
 
 use std::net::ToSocketAddrs;
@@ -13,18 +14,23 @@ use proc_macro_regex::regex;
 
 regex!(is_dns_address_regex "^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)*[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$");
 
+/// Check whether the string looks like a valid domain.
 #[inline]
 pub fn looks_like_domain(s: &str) -> bool {
     is_dns_address_regex(s)
 }
 
+/// Check whether the string is an actual reachable domain.
 pub fn is_reachable_domain(host: &str) -> bool {
     host.to_socket_addrs().map_or(false, |i| i.into_iter().next().is_some())
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+/// Enumeration of possible host types.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum HostType {
+    /// IPv4 based host
     IPv4(String),
+    /// DNS based host
     Domain(String),
 }
 
@@ -34,13 +40,20 @@ impl Default for HostType {
     }
 }
 
-#[derive(Debug, Default, Serialize, Deserialize, Validate, Clone, PartialEq)]
+/// Configuration of the listening host.
+///
+/// This is used for the P2P and REST API listeners.
+///
+/// Intentionally has no default, because it depends on the use case.
+#[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct HostConfig {
-    #[validate(custom = "validate_host_address")]
-    #[serde(default)]
+    /// Host on which to listen
+    #[serde(default)] // must be defaulted to be mergeable from CLI args
     pub address: HostType,
+    /// Listening TCP or UDP port (mandatory).
     #[validate(range(min = 1u16))]
-    #[serde(default)]
+    #[serde(default)] // must be defaulted to be mergeable from CLI args
     pub port: u16,
 }
 
@@ -55,7 +68,7 @@ impl FromStr for HostConfig {
 
         let port = str_port.parse().map_err(|e: ParseIntError| e.to_string())?;
 
-        if validator::validate_ip_v4(ip_or_dns) {
+        if validator::ValidateIp::validate_ipv4(&ip_or_dns) {
             Ok(Self {
                 address: HostType::IPv4(ip_or_dns.to_owned()),
                 port,
@@ -71,14 +84,22 @@ impl FromStr for HostConfig {
     }
 }
 
-impl ToString for HostConfig {
-    fn to_string(&self) -> String {
-        format!("{:?}:{}", self.address, self.port)
+impl Display for HostConfig {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}:{}", self.address, self.port)
     }
 }
 
 fn validate_ipv4_address(s: &str) -> Result<(), ValidationError> {
-    if validator::validate_ip(s) {
+    if validator::ValidateIp::validate_ipv4(&s) {
+        let ipv4 = std::net::Ipv4Addr::from_str(s)
+            .map_err(|_| ValidationError::new("Failed to deserialize the string into an ipv4 address"))?;
+
+        if ipv4.is_private() || ipv4.is_multicast() || ipv4.is_unspecified() {
+            return Err(ValidationError::new(
+                "IPv4 cannot be private, multicast or unspecified (0.0.0.0)",
+            ))?;
+        }
         Ok(())
     } else {
         Err(ValidationError::new("Invalid IPv4 address provided"))
@@ -93,17 +114,20 @@ fn validate_dns_address(s: &str) -> Result<(), ValidationError> {
     }
 }
 
-fn validate_host_address(host: &HostType) -> Result<(), ValidationError> {
-    match host {
+/// Validates the HostConfig to be used as an external host
+pub fn validate_external_host(host: &HostConfig) -> Result<(), ValidationError> {
+    match &host.address {
         HostType::IPv4(ip4) => validate_ipv4_address(ip4),
         HostType::Domain(domain) => validate_dns_address(domain),
     }
 }
 
+/// Configuration of the physical transport mechanism.
 #[derive(Debug, Default, Serialize, Deserialize, Validate, Clone, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct TransportConfig {
     /// When true, assume that the node is running in an isolated network and does
-    /// not need any connection to nodes outside of the subnet
+    /// not need any connection to nodes outside the subnet
     #[serde(default)]
     pub announce_local_addresses: bool,
     /// When true, assume a testnet with multiple nodes running on the same machine
@@ -140,7 +164,6 @@ mod tests {
         assert!(validate_ipv4_address("1.255.1.1").is_ok());
         assert!(validate_ipv4_address("187.1.1.255").is_ok());
         assert!(validate_ipv4_address("127.0.0.1").is_ok());
-        assert!(validate_ipv4_address("0.0.0.0").is_ok());
     }
 
     #[test]

@@ -4,14 +4,14 @@
 //! The MI works as a non-persistent storage of received HOPR packets categorized by the application tag.
 //! The application tag works as a distinguisher of applications running on top of the HOPR protocol, similarly like
 //! ports work in TCP or UDP.
-//! Application tag is represented by a 16-bit payload prefix and is built-in the HOPR protocol (see `core-packet`).
+//! Application tag is [represented](hopr_internal_types::protocol::Tag) by a 16-bit payload prefix and is built-in the HOPR protocol.
 //! If no tag is given, it defaults to `0`.
 //!
-//! The MI can use different backends, which must implement the `InboxBackend` trait.
+//! The MI can use different backends, which must implement the [InboxBackend](inbox::InboxBackend) trait.
 //!
 //! ## How `InboxBackend` works
 //! The backend must ensure that both tagged and untagged messages can be `push`ed and `pop`ed to/from it.
-//! Backend can be persistent, but the current `RingBufferInboxBackend` is in-memory only.
+//! Backend can be persistent, but the current [RingBufferInboxBackend](ring::RingBufferInboxBackend) is in-memory only.
 //!
 //! The backend must have a finite capacity of messages, overwriting the oldest elements on `push` if the total capacity is reached.
 //! Messages can be `pop`ed by one (oldest first), or can be drained entirely using `pop_all` (sorted by oldest to latest).
@@ -23,11 +23,11 @@
 //! the backend must also support a `purge` operation which removes messages older than the given Unix timestamp.
 //!
 //! ## The Frontend
-//! The MI has a front-end type `MessageInbox`, which is thin thread-safe wrapper over a selected backend. It contains choices
+//! The MI has a front-end type [MessageInbox](inbox::MessageInbox), which is thin thread-safe wrapper over a selected backend. It contains choices
 //! of specific parameters: tag type is fixed as a 16-bit unsigned integer to correspond with `core-packet`, the message
-//! type is set to `ApplicationData` type from `core-packet`.
+//! type is set to [ApplicationData](hopr_internal_types::protocol::ApplicationData) type.
 //!
-//! The `MessageInbox` currently uses a `RingBufferInboxBacked` as its `InboxBackend` implementations.
+//! The `MessageInbox` currently uses the `RingBufferInboxBacked` as its `InboxBackend` implementations.
 //! This backend is implemented as hash map (with application tag as a key) of ring-buffers of certain capacity `N`.
 //! Each bucket can therefore hold `N` messages which can be `pop`ed from oldest to newest.
 //! The maximum number of messages held in this instantiation of MI is therefore 65536 \* `N`
@@ -39,18 +39,19 @@
 //!
 //! ## Usage
 //!
-//! The `MessageInbox` is supposed to live a singleton in the `hoprd` application, and as messages arrive, they
+//! The [Inbox] instance is supposed to live a singleton in the `hoprd` application, and as messages arrive, they
 //! will be pushed into the inbox. The REST API can then access this singleton to pop messages per request.
 //!
-//! ## Default configuration
-//! - capacity per tag: 512
-//! - maximum message age: 15 minutes
-//! - excluded tags: `0` (this is the default tag, which means untagged messages are excluded at `push`)
+//! For details on default configuration see [MessageInboxConfiguration](crate::config::MessageInboxConfiguration).
 
+/// Contains configuration object for [MessageInbox](inbox::MessageInbox).
 pub mod config;
+/// Defines the common traits and the [MessageInbox](inbox::MessageInbox) type.
 pub mod inbox;
+/// Implements ring-buffer based in-memory [InboxBackend](inbox::InboxBackend).
 pub mod ring;
 
+/// Alias type for message inbox.
 pub type Inbox = inbox::MessageInbox<
     ring::RingBufferInboxBackend<hopr_internal_types::protocol::Tag, hopr_internal_types::protocol::ApplicationData>,
 >;

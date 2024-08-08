@@ -1,19 +1,19 @@
-use async_trait::async_trait;
+use crate::tickets::UnacknowledgedTicket;
 use bloomfilter::Bloom;
 use ethers::utils::hex;
 use hopr_crypto_random::random_bytes;
 use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use log::warn;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
+use tracing::warn;
 
-use crate::errors::{CoreTypesError::PayloadSizeExceeded, Result};
+use crate::errors::{CoreTypesError, CoreTypesError::PayloadSizeExceeded, Result};
 
 /// Number of intermediate hops: 3 relayers and 1 destination
 pub const INTERMEDIATE_HOPS: usize = 3;
 
-/// Maximum size of the packet payload
+/// Maximum size of the packet payload in bytes.
 pub const PAYLOAD_SIZE: usize = 500;
 
 /// Fixed ticket winning probability
@@ -25,16 +25,53 @@ pub type Tag = u16;
 /// Represent a default application tag if none is specified in `send_packet`.
 pub const DEFAULT_APPLICATION_TAG: Tag = 0;
 
-/// Trait for linking and resolving the corresponding `OffchainPublicKey` and on-chain `Address`.
-#[async_trait] // TODO: the resolver should not be async once detached from the DB ?
-pub trait PeerAddressResolver {
-    /// Tries to resolve off-chain public key given the on-chain address
-    async fn resolve_packet_key(&self, onchain_key: &Address) -> Option<OffchainPublicKey>;
-    /// Tries to resolve on-chain public key given the off-chain public key
-    async fn resolve_chain_key(&self, offchain_key: &OffchainPublicKey) -> Option<Address>;
+/// Represents packet acknowledgement
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Acknowledgement {
+    ack_signature: OffchainSignature,
+    pub ack_key_share: HalfKey,
+    validated: bool,
+}
+
+impl Acknowledgement {
+    pub fn new(ack_key_share: HalfKey, node_keypair: &OffchainKeypair) -> Self {
+        Self {
+            ack_signature: OffchainSignature::sign_message(ack_key_share.as_ref(), node_keypair),
+            ack_key_share,
+            validated: true,
+        }
+    }
+
+    /// Validates the acknowledgement. Must be called immediately after deserialization or otherwise
+    /// any operations with the deserialized acknowledgement will panic.
+    pub fn validate(&mut self, sender_node_key: &OffchainPublicKey) -> bool {
+        self.validated = self
+            .ack_signature
+            .verify_message(self.ack_key_share.as_ref(), sender_node_key);
+
+        self.validated
+    }
+
+    /// Obtains the acknowledged challenge out of this acknowledgment.
+    pub fn ack_challenge(&self) -> HalfKeyChallenge {
+        assert!(self.validated, "acknowledgement not validated");
+        self.ack_key_share.to_challenge()
+    }
+}
+
+/// Contains either unacknowledged ticket if we're waiting for the acknowledgement as a relayer
+/// or information if we wait for the acknowledgement as a sender.
+#[allow(clippy::large_enum_variant)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PendingAcknowledgement {
+    /// We're waiting for acknowledgement as a sender
+    WaitingAsSender,
+    /// We're waiting for the acknowledgement as a relayer with a ticket
+    WaitingAsRelayer(UnacknowledgedTicket),
 }
 
 /// Bloom filter for packet tags to detect packet replays.
+///
 /// In addition, this structure also holds the number of items in the filter
 /// to determine if the filter needs to be refreshed. Once this happens, packet replays
 /// of past packets might be possible.
@@ -84,9 +121,17 @@ impl TagBloomFilter {
             false
         }
     }
-}
 
-impl AutoBinarySerializable for TagBloomFilter {}
+    pub fn from_bytes(data: &[u8]) -> Result<Self> {
+        bincode::deserialize(data).map_err(|e| CoreTypesError::ParseError(e.to_string()))
+    }
+
+    pub fn to_bytes(&self) -> Box<[u8]> {
+        bincode::serialize(&self)
+            .expect("serialization must not fail")
+            .into_boxed_slice()
+    }
+}
 
 impl Default for TagBloomFilter {
     fn default() -> Self {
@@ -100,6 +145,7 @@ impl Default for TagBloomFilter {
 /// Represents the received decrypted packet carrying the application-layer data.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ApplicationData {
+    // TODO: 3.0: Remove the Option and replace with the Tag.
     pub application_tag: Option<Tag>,
     #[serde(with = "serde_bytes")]
     pub plain_text: Box<[u8]>,
@@ -111,6 +157,17 @@ impl ApplicationData {
             Ok(Self {
                 application_tag,
                 plain_text: plain_text.into(),
+            })
+        } else {
+            Err(PayloadSizeExceeded)
+        }
+    }
+
+    pub fn new_from_owned(application_tag: Option<Tag>, plain_text: Box<[u8]>) -> Result<Self> {
+        if plain_text.len() <= PAYLOAD_SIZE - Self::SIZE {
+            Ok(Self {
+                application_tag,
+                plain_text,
             })
         } else {
             Err(PayloadSizeExceeded)
@@ -133,10 +190,10 @@ impl Display for ApplicationData {
     }
 }
 
-impl BinarySerializable for ApplicationData {
+impl ApplicationData {
     const SIZE: usize = 2; // minimum size
 
-    fn from_bytes(data: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
+    pub fn from_bytes(data: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
         if data.len() <= PAYLOAD_SIZE && data.len() >= Self::SIZE {
             let mut tag = [0u8; 2];
             tag.copy_from_slice(&data[0..2]);
@@ -154,7 +211,7 @@ impl BinarySerializable for ApplicationData {
         }
     }
 
-    fn to_bytes(&self) -> Box<[u8]> {
+    pub fn to_bytes(&self) -> Box<[u8]> {
         let mut buf = Vec::with_capacity(Self::SIZE + self.plain_text.len());
         let tag = self.application_tag.unwrap_or(DEFAULT_APPLICATION_TAG);
         buf.extend_from_slice(&tag.to_be_bytes());
@@ -167,7 +224,6 @@ impl BinarySerializable for ApplicationData {
 mod tests {
     use crate::protocol::{ApplicationData, TagBloomFilter};
     use hopr_crypto_random::random_bytes;
-    use hopr_primitive_types::traits::BinarySerializable;
 
     #[test]
     fn test_application_data() {

@@ -1,14 +1,13 @@
 use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use log::debug;
 use multiaddr::Multiaddr;
-use std::{
-    fmt::{Display, Formatter},
-    str::FromStr,
-};
+use std::fmt::{Display, Formatter};
+use tracing::debug;
 
 /// Holds the signed binding of the chain key and the packet key.
-/// The signature
+///
+/// The signature is done via the offchain key to bind it with the on-chain key. The structure
+/// then makes it on-chain, making it effectively cross-signed with both keys (offchain and onchain).
 /// This is used to attest on-chain that node owns the corresponding packet key and links it with
 /// the chain key.
 #[derive(Clone, Debug, PartialEq)]
@@ -19,12 +18,13 @@ pub struct KeyBinding {
 }
 
 impl KeyBinding {
-    fn prepare_for_signing(chain_key: &Address, packet_key: &OffchainPublicKey) -> Box<[u8]> {
-        let mut to_sign = Vec::with_capacity(70);
-        to_sign.extend_from_slice(b"HOPR_KEY_BINDING");
-        to_sign.extend_from_slice(&chain_key.to_bytes());
-        to_sign.extend_from_slice(&packet_key.to_bytes());
-        to_sign.into_boxed_slice()
+    const SIGNING_SIZE: usize = 16 + Address::SIZE + OffchainPublicKey::SIZE;
+    fn prepare_for_signing(chain_key: &Address, packet_key: &OffchainPublicKey) -> [u8; Self::SIGNING_SIZE] {
+        let mut to_sign = [0u8; Self::SIGNING_SIZE];
+        to_sign[0..16].copy_from_slice(b"HOPR_KEY_BINDING");
+        to_sign[16..36].copy_from_slice(chain_key.as_ref());
+        to_sign[36..].copy_from_slice(packet_key.as_ref());
+        to_sign
     }
 
     /// Create and sign new key binding of the given chain key and packet key.
@@ -64,9 +64,20 @@ impl Display for KeyBinding {
     }
 }
 
+/// Decapsulates the multiaddress (= strips the /p2p/<peer_id> suffix).
+/// If it is already decapsulated, the function is an identity.
+pub fn decapsulate_multiaddress(multiaddr: Multiaddr) -> Multiaddr {
+    multiaddr
+        .into_iter()
+        .take_while(|p| !matches!(p, multiaddr::Protocol::P2p(_)))
+        .collect()
+}
+
 /// Structure containing data used for on-chain announcement.
 /// That is the decapsulated multiaddress (with the /p2p/{peer_id} suffix removed) and
 /// optional `KeyBinding` (announcement can be done with key bindings or without)
+///
+/// NOTE: This currently supports only announcing of a single multiaddress
 #[derive(Clone, Debug, PartialEq)]
 pub struct AnnouncementData {
     multiaddress: Multiaddr,
@@ -74,57 +85,42 @@ pub struct AnnouncementData {
 }
 
 impl AnnouncementData {
-    pub fn to_multiaddress_str(&self) -> String {
-        self.multiaddress.to_string()
-    }
-}
-
-impl AnnouncementData {
     /// Constructs structure from multiaddress and optionally also `KeyBinding`.
     /// The multiaddress must not be empty. It should be the external address of the node.
     /// It may contain a trailing PeerId (encapsulated multiaddr) or come without. If the
     /// peerId is present, it must match with the keybinding.
-    pub fn new(multiaddress: &Multiaddr, key_binding: Option<KeyBinding>) -> Result<Self, GeneralError> {
-        if let Some(ending) = multiaddress.protocol_stack().last() {
-            if let Some(ref binding) = key_binding {
-                if ending == "p2p" {
-                    let expected: String = format!("/p2p/{}", binding.packet_key.to_peerid_str());
-                    // We got a keybinding and we get a multiaddress with trailing PeerId, so
-                    // fail if they don't match
-                    if multiaddress.ends_with(
-                        &Multiaddr::from_str(expected.as_str())
-                            .map_err(|e| GeneralError::NonSpecificError(e.to_string()))?,
-                    ) {
-                        let mut decapsulated = multiaddress.clone();
-                        decapsulated.pop();
-                        Ok(Self {
-                            multiaddress: decapsulated,
-                            key_binding,
-                        })
-                    } else {
-                        Err(GeneralError::NonSpecificError(format!(
-                            "Received a multiaddr with a PeerId that doesn't match the keybinding, got {} but expected {}",
-                            multiaddress, expected
-                        )))
-                    }
-                } else {
+    pub fn new(multiaddress: Multiaddr, key_binding: Option<KeyBinding>) -> Result<Self, GeneralError> {
+        if multiaddress.is_empty() {
+            debug!("Received empty multiaddr");
+            return Err(GeneralError::InvalidInput);
+        }
+
+        if let Some(binding) = &key_binding {
+            // Encapsulate first (if already encapsulated the operation verifies that peer id matches the given one)
+            match multiaddress.with_p2p(binding.packet_key.into()) {
+                Ok(mut multiaddress) => {
+                    // Now decapsulate again, because we store decapsulated multiaddress only (without the /p2p/<peer_id> suffix)
+                    multiaddress.pop();
                     Ok(Self {
-                        multiaddress: multiaddress.to_owned(),
+                        multiaddress,
                         key_binding,
                     })
                 }
-            } else {
-                Ok(Self {
-                    multiaddress: multiaddress.to_owned(),
-                    key_binding,
-                })
+                Err(multiaddress) => Err(GeneralError::NonSpecificError(format!(
+                    "{multiaddress} does not match the keybinding {} peer id",
+                    binding.packet_key.to_peerid_str()
+                ))),
             }
         } else {
-            debug!("Received empty multiaddr");
-            Err(GeneralError::InvalidInput)
+            Ok(Self {
+                multiaddress: multiaddress.to_owned(),
+                key_binding: None,
+            })
         }
     }
 
+    /// Returns the multiaddress associated with this announcement.
+    /// Note that the returned multiaddress is *always* decapsulated (= without the /p2p/<peer_id> suffix)
     pub fn multiaddress(&self) -> &Multiaddr {
         &self.multiaddress
     }
@@ -143,14 +139,15 @@ impl Display for AnnouncementData {
 #[cfg(test)]
 mod tests {
     use crate::announcement::{AnnouncementData, KeyBinding};
+    use crate::prelude::decapsulate_multiaddress;
     use hex_literal::hex;
     use hopr_crypto_types::keypairs::{Keypair, OffchainKeypair};
-    use hopr_primitive_types::{primitives::Address, traits::BinarySerializable};
+    use hopr_primitive_types::primitives::Address;
     use multiaddr::Multiaddr;
 
     lazy_static::lazy_static! {
         static ref KEY_PAIR: OffchainKeypair = OffchainKeypair::from_secret(&hex!("60741b83b99e36aa0c1331578156e16b8e21166d01834abb6c64b103f885734d")).unwrap();
-        static ref CHAIN_ADDR: Address = Address::from_bytes(&hex!("78392d47e3522219e2802e7d6c45ee84b5d5c185")).unwrap();
+        static ref CHAIN_ADDR: Address = Address::try_from(hex!("78392d47e3522219e2802e7d6c45ee84b5d5c185").as_ref()).unwrap();
         static ref SECOND_KEY_PAIR: OffchainKeypair = OffchainKeypair::from_secret(&hex!("c24bd833704dd2abdae3933fcc9962c2ac404f84132224c474147382d4db2299")).unwrap();
     }
 
@@ -192,9 +189,9 @@ mod tests {
         ] {
             let maddr: Multiaddr = ma_str.parse().unwrap();
 
-            let ad = AnnouncementData::new(&maddr, Some(key_binding.clone()))
+            let ad = AnnouncementData::new(maddr, Some(key_binding.clone()))
                 .expect("construction of announcement data should work");
-            assert_eq!(decapsulated_ma_str, ad.to_multiaddress_str());
+            assert_eq!(decapsulated_ma_str, ad.multiaddress().to_string());
             assert_eq!(Some(key_binding.clone()), ad.key_binding);
         }
     }
@@ -203,7 +200,7 @@ mod tests {
     fn test_announcement_no_keybinding() {
         let maddr: Multiaddr = "/ip4/127.0.0.1/tcp/10000".to_string().parse().unwrap();
 
-        let ad = AnnouncementData::new(&maddr, None).expect("construction of announcement data should work");
+        let ad = AnnouncementData::new(maddr, None).expect("construction of announcement data should work");
 
         assert_eq!(None, ad.key_binding);
     }
@@ -213,9 +210,9 @@ mod tests {
         let key_binding = KeyBinding::new(*CHAIN_ADDR, &KEY_PAIR);
         let maddr: Multiaddr = "/ip4/127.0.0.1/tcp/10000".to_string().parse().unwrap();
 
-        let ad = AnnouncementData::new(&maddr, Some(key_binding.clone()))
+        let ad = AnnouncementData::new(maddr, Some(key_binding.clone()))
             .expect("construction of announcement data should work");
-        assert_eq!("/ip4/127.0.0.1/tcp/10000", ad.to_multiaddress_str());
+        assert_eq!("/ip4/127.0.0.1/tcp/10000", ad.multiaddress().to_string());
         assert_eq!(Some(key_binding), ad.key_binding);
     }
 
@@ -225,6 +222,22 @@ mod tests {
         let peer_id = SECOND_KEY_PAIR.public().to_peerid_str();
         let maddr: Multiaddr = format!("/ip4/127.0.0.1/tcp/10000/p2p/{peer_id}").parse().unwrap();
 
-        assert!(AnnouncementData::new(&maddr, Some(key_binding.clone())).is_err());
+        assert!(AnnouncementData::new(maddr, Some(key_binding.clone())).is_err());
+    }
+
+    #[test]
+    fn test_decapsulate_multiaddr() {
+        let maddr_1: Multiaddr = "/ip4/127.0.0.1/tcp/10000".parse().unwrap();
+        let maddr_2 = maddr_1
+            .clone()
+            .with_p2p(OffchainKeypair::random().public().into())
+            .unwrap();
+
+        assert_eq!(maddr_1, decapsulate_multiaddress(maddr_2), "multiaddresses must match");
+        assert_eq!(
+            maddr_1,
+            decapsulate_multiaddress(maddr_1.clone()),
+            "decapsulation must be idempotent"
+        );
     }
 }

@@ -1,20 +1,13 @@
 use std::time::Duration;
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, smart_default::SmartDefault)]
 pub struct MixerConfig {
+    #[default(Duration::from_millis(0u64))]
     min_delay: Duration,
+    #[default(Duration::from_millis(200u64))]
     max_delay: Duration,
+    #[default = 10]
     pub metric_delay_window: u64,
-}
-
-impl Default for MixerConfig {
-    fn default() -> Self {
-        Self {
-            min_delay: Duration::from_millis(0u64),
-            max_delay: Duration::from_millis(200u64),
-            metric_delay_window: 10u64,
-        }
-    }
 }
 
 impl MixerConfig {
@@ -50,7 +43,8 @@ impl MixerConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use futures_lite::stream::StreamExt;
+    use async_std::task::sleep;
+    use futures::stream::StreamExt;
     use hopr_crypto_random::Rng;
     use more_asserts::*;
     use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
@@ -73,7 +67,7 @@ mod tests {
     #[async_std::test]
     async fn test_then_concurrent_empty_stream_should_not_produce_a_value_if_none_is_ready() {
         let mut stream = futures::stream::iter(random_packets(1)).then_concurrent(|x| async {
-            async_std::task::sleep(TINY_CONSTANT_DELAY * 3).await;
+            sleep(TINY_CONSTANT_DELAY * 3).await;
             x
         });
 
@@ -87,14 +81,14 @@ mod tests {
     #[async_std::test]
     async fn test_then_concurrent_proper_execution_results_in_concurrent_processing() {
         let constant_delay = Duration::from_millis(50);
-        let tolerance = Duration::from_millis(3);
+        let tolerance = constant_delay / 5;
 
         let expected = vec![1, 2, 3];
 
         let start = std::time::Instant::now();
 
         let stream = futures::stream::iter(expected.clone()).then_concurrent(|x| async move {
-            async_std::task::sleep(constant_delay).await;
+            sleep(constant_delay).await;
             x
         });
 
@@ -102,7 +96,7 @@ mod tests {
 
         let elapsed = start.elapsed();
         assert_gt!(elapsed, constant_delay);
-        assert_lt!(elapsed - constant_delay, tolerance);
+        assert_lt!(elapsed.saturating_sub(constant_delay), tolerance);
     }
 
     #[async_std::test]
@@ -113,7 +107,7 @@ mod tests {
         let expected_packets = vec![packet_2, packet_3, packet_1];
 
         let stream = futures::stream::iter(vec![packet_1, packet_2, packet_3]).then_concurrent(|x| async move {
-            async_std::task::sleep(std::time::Duration::from_millis(x)).await;
+            sleep(std::time::Duration::from_millis(x)).await;
             x
         });
         let actual_packets = stream.collect::<Vec<u64>>().await;

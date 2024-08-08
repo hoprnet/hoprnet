@@ -5,6 +5,5 @@ edition = "2021"
 description = "This package only exists to automate the export and generation of Rust bindings into the HOPR project"
 
 [dependencies]
-ethers = { version = "2", default-features = false, features = ["abigen"] }
-serde = "1"
-
+ethers = { workspace = true, default-features = false, features = ["abigen"] }
+serde = { workspace = true }

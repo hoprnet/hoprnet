@@ -1,12 +1,19 @@
-/// Application version as presented externally using the heartbeat mechanism
-pub const APP_VERSION: &str = "2.1.0-rc.1";
+/// The maximum waiting time for a message send to produce a half key challenge reply
+pub const PACKET_QUEUE_TIMEOUT_MILLISECONDS: std::time::Duration = std::time::Duration::from_millis(15000);
 
-/// Name of the metadata key holding the protocol version
-pub const PEER_METADATA_PROTOCOL_VERSION: &str = "protocol_version";
-
-pub const MAX_PARALLEL_PINGS: usize = 14;
-
-pub const PACKET_SIZE: usize = 500;
-pub const PACKET_QUEUE_TIMEOUT_MILLISECONDS: u64 = 15000;
-
+/// The maximum queue size for the network update events
 pub(crate) const MAXIMUM_NETWORK_UPDATE_EVENT_QUEUE_SIZE: usize = 4000;
+
+pub const RESERVED_TAG_UPPER_LIMIT: u16 = RESERVED_SESSION_TAG_UPPER_LIMIT;
+
+/// The upper limit value for the session reserved tag range.
+///
+/// The reserved tags are from range <[`RESERVED_SUBPROTOCOL_TAG_UPPER_LIMIT`], [`RESERVED_SESSION_TAG_UPPER_LIMIT`]) and are
+/// specifically dedicated for the internal use of the protocol.
+pub(crate) const RESERVED_SESSION_TAG_UPPER_LIMIT: u16 = 1024;
+
+/// The upper limit value for subprotocol reserved tag range.
+///
+/// The reserved tags are from range <0,[`RESERVED_SUBPROTOCOL_TAG_UPPER_LIMIT`]) and are
+/// specifically dedicated for the internal use by the subprotocols.
+pub(crate) const RESERVED_SUBPROTOCOL_TAG_UPPER_LIMIT: u16 = 16;

@@ -19,7 +19,7 @@ concurrency:
 jobs:
   sdk-python:
     name: Python
-    runs-on: ubuntu-2-core
+    runs-on: self-hosted-hoprnet-small
     steps:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4
@@ -27,24 +27,24 @@ jobs:
           ref: ${{ inputs.base_branch }}
 
       - name: Sccache Setup
-        uses: mozilla-actions/sccache-action@v0.0.3
+        uses: mozilla-actions/sccache-action@v0.0.5
         with:
           version: "v0.4.0"
 
       - name: Install Nix
-        uses: cachix/install-nix-action@v25
+        uses: cachix/install-nix-action@v27
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Nix Cache
-        uses: cachix/cachix-action@v14
+        uses: cachix/cachix-action@v15
         with:
           name: hoprnet
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
         continue-on-error: true
 
       - name: Restore cargo cache
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
           path: |
@@ -75,7 +75,7 @@ jobs:
           nix develop -c make generate-python-sdk
 
       - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v5
+        uses: peter-evans/create-pull-request@v6
         with:
             token: ${{ secrets.GH_RUNNER_TOKEN }}
             path: ./hoprd-sdk-python

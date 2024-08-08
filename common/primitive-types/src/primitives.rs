@@ -6,12 +6,13 @@ use std::ops::{Add, Mul, Sub};
 use std::str::FromStr;
 
 use crate::errors::{GeneralError, GeneralError::InvalidInput, GeneralError::ParseError, Result};
-use crate::traits::{BinarySerializable, ToHex, UnitaryFloatOps};
+use crate::prelude::BytesRepresentable;
+use crate::traits::{IntoEndian, ToHex, UnitaryFloatOps};
 
 pub type U256 = primitive_types::U256;
 
 /// Represents an Ethereum address
-#[derive(Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Hash, PartialOrd, Ord)]
+#[derive(Clone, Copy, Eq, PartialEq, Default, Serialize, Deserialize, Hash, PartialOrd, Ord)]
 pub struct Address([u8; Self::SIZE]);
 
 impl Debug for Address {
@@ -24,13 +25,6 @@ impl Debug for Address {
 impl Display for Address {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.to_hex())
-    }
-}
-
-impl Default for Address {
-    /// Defaults to all zeroes.
-    fn default() -> Self {
-        Self([0u8; Self::SIZE])
     }
 }
 
@@ -49,38 +43,40 @@ impl Address {
         ret.into_boxed_slice()
     }
 
-    /// Creates a random Ethereum address, mostly used for testing
-    pub fn random() -> Self {
-        Self(hopr_crypto_random::random_bytes())
-    }
-
     /// Checks if the address is all zeroes.
     pub fn is_zero(&self) -> bool {
         self.0.iter().all(|e| 0_u8.eq(e))
     }
 }
 
-impl BinarySerializable for Address {
+impl AsRef<[u8]> for Address {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl TryFrom<&[u8]> for Address {
+    type Error = GeneralError;
+
+    fn try_from(value: &[u8]) -> std::result::Result<Self, Self::Error> {
+        Ok(Self(value.try_into().map_err(|_| ParseError)?))
+    }
+}
+
+impl BytesRepresentable for Address {
+    /// Fixed size of the address when encoded as bytes (e.g. via `as_ref()`).
     const SIZE: usize = 20;
-
-    fn from_bytes(data: &[u8]) -> Result<Self> {
-        if data.len() == Self::SIZE {
-            let mut ret = Self([0u8; Self::SIZE]);
-            ret.0.copy_from_slice(data);
-            Ok(ret)
-        } else {
-            Err(ParseError)
-        }
-    }
-
-    fn to_bytes(&self) -> Box<[u8]> {
-        self.0.into()
-    }
 }
 
 impl From<[u8; Address::SIZE]> for Address {
     fn from(value: [u8; Address::SIZE]) -> Self {
         Self(value)
+    }
+}
+
+impl From<Address> for [u8; Address::SIZE] {
+    fn from(value: Address) -> Self {
+        value.0
     }
 }
 
@@ -127,6 +123,13 @@ impl BalanceType {
     /// Creates [Balance] of the given `amount` of this type.
     pub fn balance<T: Into<U256>>(self, amount: T) -> Balance {
         Balance::new(amount, self)
+    }
+
+    /// Deserializes the given amount and creates a new [Balance] instance.
+    /// The bytes are assumed to be in Big Endian order.
+    /// The method panics if more than 32 `bytes` were given.
+    pub fn balance_bytes<T: AsRef<[u8]>>(self, bytes: T) -> Balance {
+        Balance::new(U256::from_be_bytes(bytes), self)
     }
 }
 
@@ -313,113 +316,57 @@ impl FromStr for Balance {
 }
 
 /// Represents and Ethereum challenge.
-#[derive(Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
-pub struct EthereumChallenge {
-    challenge: [u8; Self::SIZE],
-}
-
-impl Default for EthereumChallenge {
-    fn default() -> Self {
-        Self {
-            challenge: [0u8; Self::SIZE],
-        }
-    }
-}
+/// This is a one-way encoding of the secp256k1 curve point to an Ethereum address.
+#[derive(Clone, Copy, Eq, PartialEq, Debug, Default, Serialize, Deserialize)]
+pub struct EthereumChallenge([u8; Self::SIZE]);
 
 impl EthereumChallenge {
     pub fn new(data: &[u8]) -> Self {
         assert_eq!(data.len(), Self::SIZE);
 
         let mut ret = Self::default();
-        ret.challenge.copy_from_slice(data);
+        ret.0.copy_from_slice(data);
         ret
     }
 }
 
-impl BinarySerializable for EthereumChallenge {
+impl AsRef<[u8]> for EthereumChallenge {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl TryFrom<&[u8]> for EthereumChallenge {
+    type Error = GeneralError;
+
+    fn try_from(value: &[u8]) -> std::result::Result<Self, Self::Error> {
+        Ok(Self(value.try_into().map_err(|_| ParseError)?))
+    }
+}
+
+impl BytesRepresentable for EthereumChallenge {
     const SIZE: usize = 20;
-
-    fn from_bytes(data: &[u8]) -> Result<Self> {
-        if data.len() == Self::SIZE {
-            Ok(EthereumChallenge::new(data))
-        } else {
-            Err(ParseError)
-        }
-    }
-
-    fn to_bytes(&self) -> Box<[u8]> {
-        self.challenge.into()
-    }
 }
 
-/// Represents a snapshot in the blockchain
-#[derive(Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
-pub struct Snapshot {
-    pub block_number: U256,
-    pub transaction_index: U256,
-    pub log_index: U256,
-}
-
-impl Default for Snapshot {
-    fn default() -> Self {
-        Self {
-            block_number: U256::zero(),
-            transaction_index: U256::zero(),
-            log_index: U256::zero(),
-        }
-    }
-}
-
-impl Snapshot {
-    pub fn new(block_number: U256, transaction_index: U256, log_index: U256) -> Self {
-        Self {
-            block_number,
-            transaction_index,
-            log_index,
-        }
-    }
-}
-
-impl BinarySerializable for Snapshot {
-    const SIZE: usize = 3 * U256::SIZE;
-
-    fn from_bytes(data: &[u8]) -> Result<Self> {
-        if data.len() == Self::SIZE {
-            Ok(Self {
-                block_number: U256::from_bytes(&data[0..U256::SIZE])?,
-                transaction_index: U256::from_bytes(&data[U256::SIZE..2 * U256::SIZE])?,
-                log_index: U256::from_bytes(&data[2 * U256::SIZE..3 * U256::SIZE])?,
-            })
-        } else {
-            Err(ParseError)
-        }
+impl IntoEndian<32> for U256 {
+    fn from_be_bytes<T: AsRef<[u8]>>(bytes: T) -> Self {
+        U256::from_big_endian(bytes.as_ref())
     }
 
-    fn to_bytes(&self) -> Box<[u8]> {
-        let mut ret = Vec::<u8>::with_capacity(Self::SIZE);
-
-        ret.extend_from_slice(&self.block_number.to_bytes());
-        ret.extend_from_slice(&self.transaction_index.to_bytes());
-        ret.extend_from_slice(&self.log_index.to_bytes());
-        ret.into_boxed_slice()
-    }
-}
-
-impl BinarySerializable for U256 {
-    const SIZE: usize = 32;
-
-    fn from_bytes(data: &[u8]) -> Result<Self> {
-        if data.len() <= Self::SIZE {
-            Ok(Self::from_big_endian(data))
-        } else {
-            Err(GeneralError::ParseError)
-        }
+    fn from_le_bytes<T: AsRef<[u8]>>(bytes: T) -> Self {
+        U256::from_little_endian(bytes.as_ref())
     }
 
-    fn to_bytes(&self) -> Box<[u8]> {
-        let mut ret = [0u8; Self::SIZE];
+    fn to_le_bytes(self) -> [u8; 32] {
+        let mut ret = [0u8; 32];
+        self.to_little_endian(&mut ret);
+        ret
+    }
+
+    fn to_be_bytes(self) -> [u8; 32] {
+        let mut ret = [0u8; 32];
         self.to_big_endian(&mut ret);
-        ret.into()
+        ret
     }
 }
 
@@ -464,13 +411,14 @@ impl UnitaryFloatOps for U256 {
 mod tests {
     use super::*;
     use hex_literal::hex;
+    use primitive_types::U256;
     use std::cmp::Ordering;
     use std::str::FromStr;
 
     #[test]
     fn address_tests() {
-        let addr_1 = Address::from_bytes(&hex!("Cf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9")).unwrap();
-        let addr_2 = Address::from_bytes(&addr_1.to_bytes()).unwrap();
+        let addr_1 = Address::try_from(hex!("Cf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9")).unwrap();
+        let addr_2 = Address::try_from(addr_1.as_ref()).unwrap();
 
         assert_eq!(addr_1, addr_2, "deserialized address does not match");
         assert_eq!(
@@ -566,17 +514,9 @@ mod tests {
     #[test]
     fn eth_challenge_tests() {
         let e_1 = EthereumChallenge::default();
-        let e_2 = EthereumChallenge::from_bytes(&e_1.to_bytes()).unwrap();
+        let e_2 = EthereumChallenge::try_from(e_1.as_ref()).unwrap();
 
         assert_eq!(e_1, e_2);
-    }
-
-    #[test]
-    fn snapshot_tests() {
-        let s1 = Snapshot::new(1234_u32.into(), 4567_u32.into(), 102030_u32.into());
-        let s2 = Snapshot::from_bytes(&s1.to_bytes()).unwrap();
-
-        assert_eq!(s1, s2);
     }
 
     #[test]
@@ -599,5 +539,26 @@ mod tests {
         // bad examples
         assert!(U256::one().div_f64(0.0).is_err());
         assert!(U256::one().div_f64(1.1).is_err());
+    }
+
+    #[test]
+    fn u256_endianness() {
+        let num: U256 = 123456789000_u128.into();
+
+        let be_bytes = num.to_be_bytes();
+        let le_bytes = num.to_le_bytes();
+
+        assert_ne!(
+            be_bytes, le_bytes,
+            "sanity check: input number must have different endianness"
+        );
+
+        let expected_be = hex!("0000000000000000000000000000000000000000000000000000001CBE991A08");
+        assert_eq!(expected_be, be_bytes);
+        assert_eq!(U256::from_be_bytes(expected_be), num);
+
+        let expected_le = hex!("081A99BE1C000000000000000000000000000000000000000000000000000000");
+        assert_eq!(expected_le, le_bytes);
+        assert_eq!(U256::from_le_bytes(expected_le), num);
     }
 }
