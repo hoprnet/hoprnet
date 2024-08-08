@@ -55,7 +55,7 @@ lazy_static::lazy_static! {
 
 lazy_static::lazy_static! {
     /// Fixed price per packet to 0.01 HOPR
-    static ref DEFAULT_PRICE_PER_PACKET: U256 = 10000000000000000u128.into();
+    pub static ref DEFAULT_PRICE_PER_PACKET: U256 = 10000000000000000u128.into();
 }
 
 #[async_trait::async_trait]
@@ -119,8 +119,6 @@ where
         let packet: OutgoingPacket = packet.try_into().map_err(|e: crate::errors::ProtocolError| {
             hopr_crypto_packet::errors::PacketError::LogicError(e.to_string())
         })?;
-
-        self.add_mixing_delay().await;
 
         #[cfg(all(feature = "prometheus", not(test)))]
         {
@@ -256,10 +254,21 @@ where
 
         is_replay_attempt
     }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct Delayer {
+    cfg: MixerConfig,
+}
+
+impl Delayer {
+    pub fn new(cfg: MixerConfig) -> Self {
+        Self { cfg }
+    }
 
     #[tracing::instrument(level = "debug", skip(self))]
-    pub async fn add_mixing_delay(&self) {
-        let random_delay = self.cfg.mixer.random_delay();
+    pub async fn add_delay(&self) {
+        let random_delay = self.cfg.random_delay();
         debug!(
             delay_in_ms = random_delay.as_millis(),
             "Mixer created a random packet delay",
@@ -274,7 +283,7 @@ where
         {
             METRIC_QUEUE_SIZE.decrement(1.0f64);
 
-            let weight = 1.0f64 / self.cfg.mixer.metric_delay_window as f64;
+            let weight = 1.0f64 / self.cfg.metric_delay_window as f64;
             METRIC_MIXER_AVERAGE_DELAY.set(
                 (weight * random_delay.as_millis() as f64) + ((1.0f64 - weight) * METRIC_MIXER_AVERAGE_DELAY.get()),
             );

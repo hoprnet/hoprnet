@@ -1,9 +1,10 @@
 /// TODO: Add heartbeat documentation here
 use std::collections::VecDeque;
 
-use core_protocol::ticket_aggregation::processor::TicketAggregationProcessed;
 use futures::stream::{BoxStream, Stream, StreamExt};
 use libp2p::swarm::{dummy::ConnectionHandler, NetworkBehaviour, ToSwarm};
+
+use hopr_transport_protocol::ticket_aggregation::processor::TicketAggregationProcessed;
 
 use crate::swarm::{TicketAggregationRequestType, TicketAggregationResponseType};
 

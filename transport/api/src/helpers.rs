@@ -1,8 +1,6 @@
 use std::sync::{Arc, OnceLock};
 
 use async_lock::RwLock;
-use core_protocol::msg::processor::MsgSender;
-use hopr_internal_types::protocol::ApplicationData;
 use libp2p::{Multiaddr, PeerId};
 use tracing::{debug, trace};
 
@@ -13,8 +11,11 @@ use core_path::{
 };
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_db_sql::HoprDbAllOperations;
+use hopr_internal_types::protocol::ApplicationData;
 use hopr_primitive_types::primitives::Address;
+use hopr_transport_protocol::msg::processor::MsgSender;
 use hopr_transport_session::{errors::TransportSessionError, traits::SendMsg, PathOptions};
+
 #[cfg(all(feature = "prometheus", not(test)))]
 use {core_path::path::Path, hopr_metrics::metrics::SimpleHistogram};
 
@@ -179,7 +180,6 @@ where
         self.process_packet_send
             .get()
             .ok_or_else(|| TransportSessionError::Closed)?
-            .clone()
             .send_packet(data, path)
             .await
             .map_err(|_| TransportSessionError::Closed)?

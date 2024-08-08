@@ -35,7 +35,7 @@ use std::fmt::Debug;
 
 use core_network::network::NetworkTriggeredEvent;
 use core_network::ping::PingQueryReplier;
-use core_protocol::{
+use hopr_transport_protocol::{
     ack::config::AckProtocolConfig, heartbeat::config::HeartbeatProtocolConfig, msg::config::MsgProtocolConfig,
     ticket_aggregation::config::TicketAggregationProtocolConfig,
 };
@@ -224,12 +224,6 @@ impl From<libp2p::request_response::Event<Acknowledgement, ()>> for HoprNetworkB
 }
 
 pub use swarm::HoprSwarm;
-
-/// Composite ingress from the transport layer.
-#[derive(Clone)]
-pub enum TransportIngress {
-    Received(ApplicationData),
-}
 
 #[derive(Debug)]
 /// Processed indexer generated events.
