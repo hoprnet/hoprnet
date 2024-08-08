@@ -1,10 +1,8 @@
-use core_path::path::TransportPath;
 use hopr_db_api::protocol::TransportPacketWithChainData;
 use libp2p_identity::PeerId;
 
-use hopr_crypto_packet::errors::Result;
 use hopr_crypto_types::prelude::*;
-use hopr_internal_types::protocol::{Acknowledgement, ApplicationData};
+use hopr_internal_types::protocol::Acknowledgement;
 
 use crate::errors::ProtocolError;
 

@@ -46,11 +46,11 @@ use core_network::{
 };
 use core_network::{ping::PingConfig, PeerId};
 use core_protocol::{
-    ack::processor::{AcknowledgementInteraction, AcknowledgementProcessor},
+    ack::processor::AcknowledgementProcessor,
     bloom::WrappedTagBloomFilter,
     errors::ProtocolError,
     msg::processor::{
-        PacketActions, PacketInteraction, PacketInteractionConfig, PacketProcessor, PacketUnwrapping, PacketWrapping,
+        MsgSender, PacketInteractionConfig, PacketProcessor, PacketSendFinalizer, PacketUnwrapping, PacketWrapping,
     },
     ticket_aggregation::processor::{
         AwaitingAggregator, TicketAggregationActions, TicketAggregationInteraction, TicketAggregatorTrait,
@@ -176,7 +176,7 @@ where
     network: Arc<Network<T>>,
     path_planner: helpers::PathPlanner<T>,
     my_multiaddresses: Vec<Multiaddr>,
-    process_packet_send: Arc<OnceLock<PacketActions>>,
+    process_packet_send: Arc<OnceLock<MsgSender>>,
     process_ticket_aggregate:
         Arc<OnceLock<TicketAggregationActions<TicketAggregationResponseType, TicketAggregationRequestType>>>,
     sessions: moka::future::Cache<SessionId, UnboundedSender<Box<[u8]>>>,
@@ -307,11 +307,13 @@ where
             ))),
         );
 
+        let (external_msg_send, external_msg_rx) =
+            futures::channel::mpsc::unbounded::<(ApplicationData, TransportPath, PacketSendFinalizer)>();
+
         let packet_cfg = PacketInteractionConfig::new(me, me_onchain);
-        let packet_proc = PacketInteraction::new(self.db.clone(), tbf, packet_cfg.clone());
         self.process_packet_send
             .clone()
-            .set(packet_proc.writer())
+            .set(MsgSender::new(external_msg_send))
             .expect("must set the packet processing writer only once");
 
         self.process_ticket_aggregate
@@ -438,8 +440,6 @@ where
         let on_ack_ticket = on_acknowledged_ticket.clone();
 
         let (internal_ack_send, internal_ack_rx) = futures::channel::mpsc::unbounded::<(PeerId, Acknowledgement)>();
-        let (external_msg_send, external_msg_rx) =
-            futures::channel::mpsc::unbounded::<(ApplicationData, TransportPath)>();
 
         let ack_processor_read = AcknowledgementProcessor::new(self.db.clone(), me_onchain);
         let ack_processor_write = ack_processor_read.clone();
@@ -488,9 +488,11 @@ where
             HoprTransportProcess::ProtocolMsgOut,
             spawn(async move {
                 let _neverending = external_msg_rx
-                    .then_concurrent(|(data, path)| {
+                    .then_concurrent(|(data, path, finalizer)| {
                         let msg_processor = msg_processor_write.clone();
 
+                        // TODO: the finalizer should be moved further, but mixing must be extracted as a separate step before that
+                        finalizer.finalize();
                         async move { PacketWrapping::send(&msg_processor, data, path).await }
                     })
                     .filter_map(|v| async move {
@@ -676,27 +678,17 @@ where
 
         let path = self.path_planner.resolve_path(destination, options).await?;
 
-        let mut sender = self
-            .process_packet_send
-            .get()
-            .ok_or_else(|| {
-                HoprTransportError::Api(
-                    "send msg: failed to send a message, because message processing is not yet initialized".into(),
-                )
-            })?
-            .clone();
+        let sender = self.process_packet_send.get().ok_or_else(|| {
+            HoprTransportError::Api("send msg: failed because message processing is not yet initialized".into())
+        })?;
 
-        match sender.send_packet(app_data, path) {
-            Ok(mut awaiter) => {
-                tracing::trace!("Awaiting the HalfKeyChallenge");
-                Ok(awaiter
-                    .consume_and_wait(crate::constants::PACKET_QUEUE_TIMEOUT_MILLISECONDS)
-                    .await?)
-            }
-            Err(e) => Err(HoprTransportError::Api(format!(
-                "send msg: failed to enqueue msg send: {e}"
-            ))),
-        }
+        Ok(sender
+            .send_packet(app_data, path)
+            .await
+            .map_err(|e| HoprTransportError::Api(format!("send msg failed to enqueue msg: {e}")))?
+            .consume_and_wait(crate::constants::PACKET_QUEUE_TIMEOUT_MILLISECONDS)
+            .await
+            .map_err(|e| HoprTransportError::Api(format!("send msg timed out: {e}")))?)
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
