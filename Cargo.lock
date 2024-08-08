@@ -1597,42 +1597,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "core-protocol"
-version = "0.2.5"
-dependencies = [
- "async-lock 3.4.0",
- "async-std",
- "async-trait",
- "core-path",
- "futures",
- "hex-literal",
- "hopr-async-runtime",
- "hopr-crypto-packet",
- "hopr-crypto-random",
- "hopr-crypto-types",
- "hopr-db-api",
- "hopr-db-sql",
- "hopr-internal-types",
- "hopr-metrics",
- "hopr-platform",
- "hopr-primitive-types",
- "lazy_static",
- "libp2p",
- "libp2p-identity",
- "more-asserts",
- "parameterized",
- "rust-stream-ext-concurrent",
- "serde",
- "serde_with",
- "serial_test",
- "smart-default",
- "thiserror",
- "tracing",
- "tracing-test",
- "validator",
-]
-
-[[package]]
 name = "core-transport"
 version = "0.6.1"
 dependencies = [
@@ -1642,7 +1606,6 @@ dependencies = [
  "chain-types",
  "core-network",
  "core-path",
- "core-protocol",
  "futures",
  "hopr-async-runtime",
  "hopr-crypto-packet",
@@ -1654,6 +1617,7 @@ dependencies = [
  "hopr-platform",
  "hopr-primitive-types",
  "hopr-transport-p2p",
+ "hopr-transport-protocol",
  "hopr-transport-session",
  "lazy_static",
  "libp2p",
@@ -4231,7 +4195,6 @@ dependencies = [
  "chain-actions",
  "chain-types",
  "core-network",
- "core-protocol",
  "futures",
  "hex-literal",
  "hopr-async-runtime",
@@ -4242,6 +4205,7 @@ dependencies = [
  "hopr-metrics",
  "hopr-platform",
  "hopr-primitive-types",
+ "hopr-transport-protocol",
  "lazy_static",
  "mockall",
  "rand 0.8.5",
@@ -4257,16 +4221,16 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-p2p"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "async-std",
  "core-network",
- "core-protocol",
  "futures",
  "futures-concurrency",
  "hopr-crypto-types",
  "hopr-internal-types",
  "hopr-metrics",
+ "hopr-transport-protocol",
  "lazy_static",
  "libp2p",
  "libp2p-mplex",
@@ -4275,6 +4239,42 @@ dependencies = [
  "thiserror",
  "tracing",
  "void",
+]
+
+[[package]]
+name = "hopr-transport-protocol"
+version = "0.3.0"
+dependencies = [
+ "async-lock 3.4.0",
+ "async-std",
+ "async-trait",
+ "core-path",
+ "futures",
+ "hex-literal",
+ "hopr-async-runtime",
+ "hopr-crypto-packet",
+ "hopr-crypto-random",
+ "hopr-crypto-types",
+ "hopr-db-api",
+ "hopr-db-sql",
+ "hopr-internal-types",
+ "hopr-metrics",
+ "hopr-platform",
+ "hopr-primitive-types",
+ "lazy_static",
+ "libp2p",
+ "libp2p-identity",
+ "more-asserts",
+ "parameterized",
+ "rust-stream-ext-concurrent",
+ "serde",
+ "serde_with",
+ "serial_test",
+ "smart-default",
+ "thiserror",
+ "tracing",
+ "tracing-test",
+ "validator",
 ]
 
 [[package]]

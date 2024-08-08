@@ -43,7 +43,7 @@ use utoipa::openapi::security::{ApiKey, ApiKeyValue, HttpAuthScheme, HttpBuilder
 use utoipa::{Modify, OpenApi};
 use utoipa_scalar::{Scalar, Servable};
 
-use hopr_lib::{errors::HoprLibError, Hopr, TransportIngress};
+use hopr_lib::{errors::HoprLibError, ApplicationData, Hopr};
 
 use crate::config::Auth;
 
@@ -63,7 +63,7 @@ pub(crate) struct InternalState {
     pub hopr: Arc<Hopr>,
     pub inbox: Arc<RwLock<hoprd_inbox::Inbox>>,
     pub aliases: Arc<RwLock<BiHashMap<String, PeerId>>>,
-    pub websocket_rx: async_broadcast::InactiveReceiver<TransportIngress>,
+    pub websocket_rx: async_broadcast::InactiveReceiver<ApplicationData>,
     pub msg_encoder: Option<MessageEncoder>,
 }
 
@@ -168,7 +168,7 @@ pub async fn serve_api(
     cfg: crate::config::Api,
     hopr: Arc<hopr_lib::Hopr>,
     inbox: Arc<RwLock<hoprd_inbox::Inbox>>,
-    websocket_rx: async_broadcast::InactiveReceiver<TransportIngress>,
+    websocket_rx: async_broadcast::InactiveReceiver<ApplicationData>,
     msg_encoder: Option<MessageEncoder>,
 ) -> Result<(), std::io::Error> {
     let router = build_api(hoprd_cfg, cfg, hopr, inbox, websocket_rx, msg_encoder).await;
@@ -180,7 +180,7 @@ async fn build_api(
     cfg: crate::config::Api,
     hopr: Arc<hopr_lib::Hopr>,
     inbox: Arc<RwLock<hoprd_inbox::Inbox>>,
-    websocket_rx: async_broadcast::InactiveReceiver<TransportIngress>,
+    websocket_rx: async_broadcast::InactiveReceiver<ApplicationData>,
     msg_encoder: Option<MessageEncoder>,
 ) -> Router {
     // Prepare alias part of the state

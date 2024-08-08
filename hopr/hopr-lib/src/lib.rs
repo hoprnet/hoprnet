@@ -76,7 +76,7 @@ pub use {
         libp2p::identity::PeerId,
         ApplicationData, HalfKeyChallenge, Health, Keypair, Multiaddr, OffchainKeypair as HoprOffchainKeypair,
         PathOptions, SendMsg, Session as HoprSession, SessionCapability, SessionClientConfig,
-        SessionId as HoprSessionId, TicketStatistics, TransportIngress, SESSION_USABLE_MTU_SIZE,
+        SessionId as HoprSessionId, TicketStatistics, SESSION_USABLE_MTU_SIZE,
     },
     hopr_internal_types::prelude::*,
     hopr_primitive_types::prelude::*,
@@ -199,7 +199,7 @@ impl From<HoprTransportProcess> for HoprLibProcesses {
             core_transport::HoprTransportProcess::ProtocolMsgIn => HoprLibProcesses::ProtocolAckIn,
             core_transport::HoprTransportProcess::ProtocolMsgOut => HoprLibProcesses::ProtocolAckIn,
             core_transport::HoprTransportProcess::Heartbeat => HoprLibProcesses::Heartbeat,
-            core_transport::HoprTransportProcess::SessionsRouter => HoprLibProcesses::SessionsRouter,
+            core_transport::HoprTransportProcess::SessionsManagement => HoprLibProcesses::SessionsRouter,
             core_transport::HoprTransportProcess::BloomFilterSave => HoprLibProcesses::BloomFilterSave,
         }
     }
@@ -387,13 +387,13 @@ where
 ///
 /// Provides a read and write stream for Hopr socket recognized data formats.
 pub struct HoprSocket {
-    rx: UnboundedReceiver<TransportIngress>,
-    tx: UnboundedSender<TransportIngress>,
+    rx: UnboundedReceiver<ApplicationData>,
+    tx: UnboundedSender<ApplicationData>,
 }
 
 impl Default for HoprSocket {
     fn default() -> Self {
-        let (tx, rx) = unbounded::<TransportIngress>();
+        let (tx, rx) = unbounded::<ApplicationData>();
         Self { rx, tx }
     }
 }
@@ -403,11 +403,11 @@ impl HoprSocket {
         Self::default()
     }
 
-    pub fn reader(self) -> UnboundedReceiver<TransportIngress> {
+    pub fn reader(self) -> UnboundedReceiver<ApplicationData> {
         self.rx
     }
 
-    pub fn writer(&self) -> UnboundedSender<TransportIngress> {
+    pub fn writer(&self) -> UnboundedSender<ApplicationData> {
         self.tx.clone()
     }
 }

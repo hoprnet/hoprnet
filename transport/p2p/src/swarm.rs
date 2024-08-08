@@ -5,13 +5,13 @@ use std::{collections::HashMap, num::NonZeroU8};
 use tracing::{debug, error, info, trace, warn};
 
 use core_network::{messaging::ControlMessage, network::NetworkTriggeredEvent, ping::PingQueryReplier};
-use core_protocol::{
+use hopr_internal_types::prelude::*;
+use hopr_transport_protocol::{
     config::ProtocolConfig,
     ticket_aggregation::processor::{
         TicketAggregationActions, TicketAggregationFinalizer, TicketAggregationInteraction, TicketAggregationProcessed,
     },
 };
-use hopr_internal_types::prelude::*;
 
 use crate::{
     constants,

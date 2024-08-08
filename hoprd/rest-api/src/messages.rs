@@ -17,7 +17,7 @@ use std::{sync::Arc, time::Duration};
 use tracing::{debug, error, trace};
 use validator::Validate;
 
-use hopr_lib::{AsUnixTimestamp, PathOptions, TransportIngress, RESERVED_TAG_UPPER_LIMIT};
+use hopr_lib::{ApplicationData, AsUnixTimestamp, PathOptions, RESERVED_TAG_UPPER_LIMIT};
 
 use crate::{ApiErrorStatus, InternalState, BASE_PATH};
 
@@ -225,7 +225,7 @@ pub(crate) async fn websocket(ws: WebSocketUpgrade, State(state): State<Arc<Inte
 }
 
 enum WebSocketInput {
-    Network(TransportIngress),
+    Network(ApplicationData),
     WsInput(core::result::Result<Message, Error>),
 }
 
@@ -243,17 +243,14 @@ async fn websocket_connection(socket: WebSocket, state: Arc<InternalState>) {
 
     while let Some(v) = queue.next().await {
         match v {
-            WebSocketInput::Network(net_in) => match net_in {
-                TransportIngress::Received(data) => {
-                    debug!("Received a msg");
-                    if let Err(e) = sender
-                        .send(Message::Text(json!(WebSocketReadMsg::from(data)).to_string()))
-                        .await
-                    {
-                        error!("Failed to emit read data onto the websocket: {e}");
-                    };
-                }
-            },
+            WebSocketInput::Network(net_in) => {
+                if let Err(e) = sender
+                    .send(Message::Text(json!(WebSocketReadMsg::from(net_in)).to_string()))
+                    .await
+                {
+                    error!("Failed to emit read data onto the websocket: {e}");
+                };
+            }
             WebSocketInput::WsInput(ws_in) => match ws_in {
                 Ok(Message::Text(input)) => {
                     if let Err(e) = handle_send_message(&input, state.clone()).await {
