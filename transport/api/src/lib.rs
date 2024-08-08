@@ -27,12 +27,17 @@ use std::{
 
 use async_lock::RwLock;
 use constants::{RESERVED_SESSION_TAG_UPPER_LIMIT, RESERVED_SUBPROTOCOL_TAG_UPPER_LIMIT};
-use futures::future::{select, Either};
+use core_path::path::TransportPath;
 use futures::pin_mut;
 use futures::{
     channel::mpsc::{UnboundedReceiver, UnboundedSender},
     FutureExt, StreamExt,
 };
+use futures::{
+    future::{select, Either},
+    SinkExt,
+};
+use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use tracing::{debug, error, info, trace, warn};
 
 use core_network::{
@@ -41,10 +46,12 @@ use core_network::{
 };
 use core_network::{ping::PingConfig, PeerId};
 use core_protocol::{
-    ack::processor::AcknowledgementInteraction,
+    ack::processor::{AcknowledgementInteraction, AcknowledgementProcessor},
     bloom::WrappedTagBloomFilter,
     errors::ProtocolError,
-    msg::processor::{PacketActions, PacketInteraction, PacketInteractionConfig},
+    msg::processor::{
+        PacketActions, PacketInteraction, PacketInteractionConfig, PacketProcessor, PacketUnwrapping, PacketWrapping,
+    },
     ticket_aggregation::processor::{
         AwaitingAggregator, TicketAggregationActions, TicketAggregationInteraction, TicketAggregatorTrait,
     },
@@ -88,7 +95,10 @@ pub use crate::{
 pub enum HoprTransportProcess {
     Heartbeat,
     Swarm,
-    Protocol,
+    ProtocolAckIn,
+    ProtocolAckOut,
+    ProtocolMsgIn,
+    ProtocolMsgOut,
     SessionsRouter,
     BloomFilterSave,
 }
@@ -279,11 +289,10 @@ where
         )
         .await;
 
-        let mut ack_proc = AcknowledgementInteraction::new(self.db.clone(), me_onchain);
-
         let tbf = WrappedTagBloomFilter::new(tbf_path);
 
         let tbf_clone = tbf.clone();
+        let tbf_clone_2 = tbf.clone();
 
         let mut processes: HashMap<HoprTransportProcess, JoinHandle<()>> = HashMap::new();
         processes.insert(
@@ -298,8 +307,8 @@ where
             ))),
         );
 
-        let mut packet_proc =
-            PacketInteraction::new(self.db.clone(), tbf, PacketInteractionConfig::new(me, me_onchain));
+        let packet_cfg = PacketInteractionConfig::new(me, me_onchain);
+        let packet_proc = PacketInteraction::new(self.db.clone(), tbf, packet_cfg.clone());
         self.process_packet_send
             .clone()
             .set(packet_proc.writer())
@@ -322,10 +331,10 @@ where
         );
 
         let (ack_to_send_tx, ack_to_send_rx) = futures::channel::mpsc::unbounded::<(PeerId, Acknowledgement)>();
-        let (ack_received_tx, mut ack_received_rx) = futures::channel::mpsc::unbounded::<(PeerId, Acknowledgement)>();
+        let (ack_received_tx, ack_received_rx) = futures::channel::mpsc::unbounded::<(PeerId, Acknowledgement)>();
 
         let (msg_to_send_tx, msg_to_send_rx) = futures::channel::mpsc::unbounded::<(PeerId, Box<[u8]>)>();
-        let (msg_received_tx, mut msg_received_rx) = futures::channel::mpsc::unbounded::<(PeerId, Box<[u8]>)>();
+        let (msg_received_tx, msg_received_rx) = futures::channel::mpsc::unbounded::<(PeerId, Box<[u8]>)>();
 
         let transport_layer = transport_layer.with_processors(
             ack_to_send_rx,
@@ -341,6 +350,7 @@ where
         );
 
         let (tx_to_session, rx) = futures::channel::mpsc::unbounded::<TransportIngress>();
+
         let sessions = self.sessions.clone();
         let me = self.me;
         let message_sender = Arc::new(helpers::MessageSender::new(
@@ -425,91 +435,119 @@ where
             }),
         );
 
-        // TODO: replace with actual processing
-        let mut ack_proc_writer = ack_proc.writer();
-        let mut ack_packet_writer = ack_proc.writer();
-        let mut pkt_writer = packet_proc.writer();
         let on_ack_ticket = on_acknowledged_ticket.clone();
+
+        let (internal_ack_send, internal_ack_rx) = futures::channel::mpsc::unbounded::<(PeerId, Acknowledgement)>();
+        let (external_msg_send, external_msg_rx) =
+            futures::channel::mpsc::unbounded::<(ApplicationData, TransportPath)>();
+
+        let ack_processor_read = AcknowledgementProcessor::new(self.db.clone(), me_onchain);
+        let ack_processor_write = ack_processor_read.clone();
+        let msg_processor_read = PacketProcessor::new(self.db.clone(), tbf_clone_2, packet_cfg.clone());
+        let msg_processor_write = msg_processor_read.clone();
+
         processes.insert(
-            HoprTransportProcess::Protocol,
+            HoprTransportProcess::ProtocolAckIn,
             spawn(async move {
-                let incoming_ack = spawn(async move {
-                    while let Some((peer, ack)) = ack_received_rx.next().await {
-                        if let Err(e) = ack_proc_writer.receive_acknowledgement(peer, ack) {
-                            error!("Failed to process received ack: {e}");
+                let _neverending = ack_received_rx
+                    .then_concurrent(move |(peer, ack)| {
+                        let ack_processor = ack_processor_read.clone();
+
+                        async move { ack_processor.recv(&peer, ack).await }
+                    })
+                    .filter_map(|v| async move {
+                        if let Ok(core_protocol::ack::processor::AckResult::RelayerWinning(acknowledged_ticket)) = v {
+                            Some(acknowledged_ticket)
+                        } else {
+                            None
                         }
-                    }
-                });
+                    })
+                    .map(Ok)
+                    .forward(on_ack_ticket)
+                    .await;
+            }),
+        );
 
-                let ack_processing = spawn(async move {
-                    while let Some(result) = ack_proc.next().await {
-                        match result {
-                            core_protocol::ack::processor::AckProcessed::Receive(
-                                peer,
-                                hopr_db_sql::api::protocol::AckResult::RelayerWinning(acknowledged_ticket),
-                            ) => {
-                                if let Err(e) = on_ack_ticket.unbounded_send(acknowledged_ticket) {
-                                    error!(peer = %peer, "Failed to emit an acknowledged ticket: {e}");
-                                }
-                            }
-                            core_protocol::ack::processor::AckProcessed::Send(peer, ack) => {
-                                if let Err(e) = ack_to_send_tx.unbounded_send((peer, ack)) {
-                                    error!(peer = %peer, "Failed to emit an acknowledged ticket: {e}");
-                                }
-                            }
-                            _ => {}
+        processes.insert(
+            HoprTransportProcess::ProtocolAckOut,
+            spawn(async move {
+                let _neverending = internal_ack_rx
+                    .then_concurrent(move |(peer, ack)| {
+                        let ack_processor = ack_processor_write.clone();
+
+                        async move { (peer, ack_processor.send(&peer, ack).await) }
+                    })
+                    .map(Ok)
+                    .forward(ack_to_send_tx)
+                    .await;
+            }),
+        );
+
+        let msg_to_send_tx_2 = msg_to_send_tx.clone();
+        processes.insert(
+            HoprTransportProcess::ProtocolMsgOut,
+            spawn(async move {
+                let _neverending = external_msg_rx
+                    .then_concurrent(|(data, path)| {
+                        let msg_processor = msg_processor_write.clone();
+
+                        async move { PacketWrapping::send(&msg_processor, data, path).await }
+                    })
+                    .filter_map(|v| async move {
+                        if let Ok((peer, octets)) = v {
+                            Some((peer, octets))
+                        } else {
+                            None
                         }
-                    }
-                });
+                    })
+                    .map(Ok)
+                    .forward(msg_to_send_tx)
+                    .await;
+            }),
+        );
 
-                let incoming_packet = spawn(async move {
-                    while let Some((peer, octets)) = msg_received_rx.next().await {
-                        if let Err(e) = pkt_writer.receive_packet(octets, peer) {
-                            error!("Failed to process received ack: {e}");
-                        }
-                    }
-                });
+        processes.insert(
+            HoprTransportProcess::ProtocolMsgIn,
+            spawn(async move {
+                let _neverending = msg_received_rx
+                    .then_concurrent(move |(peer, data)| {
+                        let msg_processor = msg_processor_read.clone();
 
-                let packet_processing = spawn(async move {
-                    let pkt_writer = packet_proc.writer();
+                        async move { msg_processor.recv(&peer, data).await }
+                    })
+                    .filter_map(move |v| {
+                        let mut internal_ack_send = internal_ack_send.clone();
+                        let mut msg_to_send_tx_2 = msg_to_send_tx_2.clone();
 
-                    while let Some(result) = packet_proc.next().await {
-                        match result {
-                            core_protocol::msg::processor::MsgProcessed::Receive(peer, data, ack) => {
-                                debug!("transport input - msg - received packet from '{peer}'");
-                                if let Err(e) = tx_to_session.unbounded_send(TransportIngress::Received(data)) {
-                                    error!(
-                                        "transport input - msg - failed to store a received message in the inbox: {}",
-                                        e
-                                    );
-                                }
-
-                                if let Err(e) = ack_packet_writer.send_acknowledgement(peer, ack) {
-                                    error!(
-                                        "transport input - msg - failed to acknowledge the received final packet: {e}"
-                                    );
-                                }
-                            }
-                            core_protocol::msg::processor::MsgProcessed::Send(peer, octets) => {
-                                if let Err(e) = msg_to_send_tx.unbounded_send((peer, octets)) {
-                                    error!(peer = %peer, "Failed to emit a packet: {e}");
-                                }
-                            }
-                            core_protocol::msg::processor::MsgProcessed::Forward(peer, octets, previous_peer, ack) => {
-                                debug!("transport input - msg - forwarding packet from '{previous_peer}' to '{peer}'");
-                                if let Err(e) = msg_to_send_tx.unbounded_send((peer, octets)) {
-                                    error!(peer = %peer, "Failed to emit a packet: {e}");
-                                }
-
-                                if let Err(e) = ack_packet_writer.send_acknowledgement(previous_peer, ack) {
-                                    error!(
-                                        "transport input - msg - failed to acknowledge the received final packet: {e}"
-                                    );
+                        async move {
+                            match v {
+                                Ok(v) => match v {
+                                    core_protocol::msg::processor::RecvOperation::Receive { data, ack } => {
+                                        internal_ack_send.send((ack.peer, ack.ack)).await.unwrap_or_else(|e| {
+                                            error!("Failed to forward an acknowledgement to the transport layer: {e}");
+                                        });
+                                        Some(TransportIngress::Received(data))
+                                    }
+                                    core_protocol::msg::processor::RecvOperation::Forward { msg, ack } => {
+                                        msg_to_send_tx_2.send((msg.peer, msg.data)).await.unwrap_or_else(|e| {
+                                            error!("Failed to forward a message to the transport layer: {e}");
+                                        });
+                                        internal_ack_send.send((ack.peer, ack.ack)).await.unwrap_or_else(|e| {
+                                            error!("Failed to forward an acknowledgement to the transport layer: {e}");
+                                        });
+                                        None
+                                    }
+                                },
+                                Err(e) => {
+                                    error!("Failed to process received message: {e}");
+                                    None
                                 }
                             }
                         }
-                    }
-                });
+                    })
+                    .map(Ok)
+                    .forward(tx_to_session)
+                    .await;
             }),
         );
 

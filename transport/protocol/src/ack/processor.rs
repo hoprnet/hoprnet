@@ -66,7 +66,14 @@ impl<Db: HoprDbProtocolOperations> AcknowledgementProcessor<Db> {
         }
     }
 
-    /// Handles the incoming acknowledgement.
+    /// Processes the outgoing acknowledgement.
+    #[inline]
+    #[tracing::instrument(level = "debug", skip(self, ack))]
+    pub async fn send(&self, peer: &PeerId, ack: Acknowledgement) -> Acknowledgement {
+        ack
+    }
+
+    /// Processes the incoming acknowledgement.
     #[tracing::instrument(level = "debug", skip(self, ack))]
     pub async fn recv(&self, peer: &PeerId, mut ack: Acknowledgement) -> crate::errors::Result<AckResult> {
         let remote_pk = OffchainPublicKey::try_from(peer)?;
@@ -123,9 +130,6 @@ impl AcknowledgementActions {
 
     /// Pushes a new outgoing acknowledgement into the processing.
     pub fn send_acknowledgement(&mut self, destination: PeerId, acknowledgement: Acknowledgement) -> Result<()> {
-        #[cfg(all(feature = "prometheus", not(test)))]
-        METRIC_SENT_ACKS.increment();
-
         self.process(AckToProcess::ToSend(destination, acknowledgement))
     }
 
@@ -142,6 +146,7 @@ impl AcknowledgementActions {
     }
 }
 
+// TODO: Obsolete, can be deleted
 /// Sets up processing of acknowledgement interactions and returns relevant read and write mechanism.
 ///
 /// When a new acknowledgement is delivered from the transport, the `receive_acknowledgement`
@@ -178,7 +183,7 @@ impl AcknowledgementInteraction {
                             }
                         }
                     }
-                    AckToProcess::ToSend(peer, ack) => Some(AckProcessed::Send(peer, ack)),
+                    AckToProcess::ToSend(peer, ack) => Some(AckProcessed::Send(peer, processor.send(&peer, ack).await)),
                 };
 
                 if let Some(event) = processed {

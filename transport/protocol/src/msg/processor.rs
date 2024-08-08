@@ -3,6 +3,8 @@ use std::pin::Pin;
 use futures::channel::mpsc::{channel, Receiver, Sender};
 use futures::future::{poll_fn, Either};
 use futures::{pin_mut, stream::Stream, StreamExt};
+use hopr_crypto_packet::packet;
+use hopr_db_api::protocol::TransportPacketWithChainData;
 use libp2p_identity::PeerId;
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use tracing::{debug, error, trace, warn};
@@ -18,12 +20,12 @@ use hopr_db_api::prelude::HoprDbProtocolOperations;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 
-use super::packet::{PacketConstructing, TransportPacket};
+use super::packet::{IncomingPacket, OutgoingPacket, TransportPacket};
 use crate::bloom;
 use crate::msg::mixer::MixerConfig;
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use hopr_metrics::metrics::{MultiCounter, SimpleCounter, SimpleGauge, SimpleHistogram};
+use hopr_metrics::metrics::{MultiCounter, SimpleCounter, SimpleGauge};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -50,10 +52,9 @@ lazy_static::lazy_static! {
         "Average mixer packet delay averaged over a packet window"
     )
     .unwrap();
-    static ref METRIC_RELAYED_PACKET_IN_MIXER_TIME: SimpleHistogram = SimpleHistogram::new(
-        "hopr_relayed_packet_processing_time_with_mixing_sec",
-        "Histogram of measured processing and mixing time for a relayed packet in seconds",
-        vec![0.01, 0.025, 0.050, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
+    static ref METRIC_REPLAYED_PACKET_COUNT: SimpleCounter = SimpleCounter::new(
+        "hopr_replayed_packet_count",
+        "The total count of replayed packets during the packet processing pipeline run",
     ).unwrap();
 }
 
@@ -65,6 +66,35 @@ lazy_static::lazy_static! {
 // Default sizes of the packet queues
 pub const PACKET_TX_QUEUE_SIZE: usize = 8192;
 pub const PACKET_RX_QUEUE_SIZE: usize = 8192;
+
+#[async_trait::async_trait]
+pub trait PacketWrapping {
+    type Input;
+
+    async fn send(&self, data: ApplicationData, path: TransportPath) -> Result<(PeerId, Box<[u8]>)>;
+}
+
+pub struct SendPkt {
+    pub peer: PeerId,
+    pub data: Box<[u8]>,
+}
+
+pub struct SendAck {
+    pub peer: PeerId,
+    pub ack: Acknowledgement,
+}
+
+pub enum RecvOperation {
+    Receive { data: ApplicationData, ack: SendAck },
+    Forward { msg: SendPkt, ack: SendAck },
+}
+
+#[async_trait::async_trait]
+pub trait PacketUnwrapping {
+    type Packet;
+
+    async fn recv(&self, peer: &PeerId, data: Box<[u8]>) -> Result<Self::Packet>;
+}
 
 pub enum MsgToProcess {
     ToReceive(Box<[u8]>, PeerId),
@@ -114,49 +144,139 @@ where
     Db: HoprDbProtocolOperations + Send + Sync + std::fmt::Debug + Clone,
 {
     db: Db,
+    tbf: bloom::WrappedTagBloomFilter,
     cfg: PacketInteractionConfig,
 }
 
 #[async_trait::async_trait]
-impl<Db> crate::msg::packet::PacketConstructing for PacketProcessor<Db>
+impl<Db> PacketWrapping for PacketProcessor<Db>
 where
     Db: HoprDbProtocolOperations + Send + Sync + std::fmt::Debug + Clone,
 {
     type Input = ApplicationData;
-    type Packet = TransportPacket;
 
-    async fn to_send(&self, data: Self::Input, path: Vec<OffchainPublicKey>) -> Result<Self::Packet> {
-        Ok(self
-            .db
-            .to_send(data.to_bytes(), self.cfg.chain_keypair.clone(), path.clone())
-            .await
-            .map_err(|e| hopr_crypto_packet::errors::PacketError::PacketConstructionError(e.to_string()))?
-            .into())
-    }
+    #[tracing::instrument(level = "debug", skip(self, data))]
+    async fn send(&self, data: ApplicationData, path: TransportPath) -> Result<(PeerId, Box<[u8]>)> {
+        let path: std::result::Result<Vec<OffchainPublicKey>, hopr_primitive_types::errors::GeneralError> =
+            path.hops().iter().map(OffchainPublicKey::try_from).collect();
 
-    async fn from_recv(
-        &self,
-        data: Box<[u8]>,
-        pkt_keypair: &OffchainKeypair,
-        sender: OffchainPublicKey,
-    ) -> Result<Self::Packet> {
-        match self
+        let packet = self
             .db
-            .from_recv(data, self.cfg.chain_keypair.clone(), pkt_keypair, sender)
+            .to_send(data.to_bytes(), self.cfg.chain_keypair.clone(), path?)
             .await
+            .map_err(|e| hopr_crypto_packet::errors::PacketError::PacketConstructionError(e.to_string()))?;
+
+        let packet: OutgoingPacket = packet.try_into().map_err(|e: crate::errors::ProtocolError| {
+            hopr_crypto_packet::errors::PacketError::LogicError(e.to_string())
+        })?;
+
+        self.add_mixing_delay().await;
+
+        #[cfg(all(feature = "prometheus", not(test)))]
         {
-            Ok(v) => Ok(v.into()),
-            Err(e) => {
+            METRIC_PACKET_COUNT_PER_PEER.increment(&["out", &packet.next_hop.to_string()]);
+            METRIC_PACKET_COUNT.increment(&["sent"]);
+        }
+
+        Ok((packet.next_hop, packet.data))
+    }
+}
+
+#[async_trait::async_trait]
+impl<Db> PacketUnwrapping for PacketProcessor<Db>
+where
+    Db: HoprDbProtocolOperations + Send + Sync + std::fmt::Debug + Clone,
+{
+    type Packet = RecvOperation;
+
+    #[tracing::instrument(level = "debug", skip(self, data))]
+    async fn recv(&self, peer: &PeerId, data: Box<[u8]>) -> Result<RecvOperation> {
+        #[cfg(all(feature = "prometheus", not(test)))]
+        let mut metadata = PacketMetadata::default();
+
+        let previous_hop = OffchainPublicKey::try_from(peer).map_err(|e| {
+            hopr_crypto_packet::errors::PacketError::LogicError(format!(
+                "failed to convert '{peer}' into the public key: {e}"
+            ))
+        })?;
+
+        let packet = self
+            .db
+            .from_recv(
+                data,
+                self.cfg.chain_keypair.clone(),
+                &self.cfg.packet_keypair,
+                previous_hop,
+            )
+            .await
+            .map_err(|e| {
                 #[cfg(all(feature = "prometheus", not(test)))]
                 if let hopr_db_api::errors::DbError::TicketValidationError(_) = e {
                     METRIC_REJECTED_TICKETS_COUNT.increment();
                 }
 
-                Err(hopr_crypto_packet::errors::PacketError::PacketConstructionError(
-                    e.to_string(),
+                hopr_crypto_packet::errors::PacketError::PacketConstructionError(e.to_string())
+            })?;
+
+        if let TransportPacketWithChainData::Final { packet_tag, .. }
+        | TransportPacketWithChainData::Forwarded { packet_tag, .. } = &packet
+        {
+            self.is_tag_replay(packet_tag).await.then_some(()).ok_or(TagReplay)?;
+        };
+
+        Ok(match packet {
+            TransportPacketWithChainData::Final {
+                previous_hop,
+                plain_text,
+                ack,
+                ..
+            } => {
+                let app_data = ApplicationData::from_bytes(plain_text.as_ref())?;
+                #[cfg(all(feature = "prometheus", not(test)))]
+                {
+                    METRIC_PACKET_COUNT_PER_PEER.increment(&["in", &previous_hop.to_string()]);
+                    METRIC_PACKET_COUNT.increment(&["received"]);
+                }
+                RecvOperation::Receive {
+                    data: app_data,
+                    ack: SendAck {
+                        peer: previous_hop.into(),
+                        ack,
+                    },
+                }
+            }
+            TransportPacketWithChainData::Forwarded {
+                previous_hop,
+                next_hop,
+                data,
+                ack,
+                ..
+            } => {
+                #[cfg(all(feature = "prometheus", not(test)))]
+                {
+                    metadata.start_time = hopr_platform::time::native::current_time();
+                    METRIC_PACKET_COUNT_PER_PEER.increment(&["in", &previous_hop.to_string()]);
+                    METRIC_PACKET_COUNT_PER_PEER.increment(&["out", &next_hop.to_string()]);
+                    METRIC_PACKET_COUNT.increment(&["forwarded"]);
+                }
+
+                RecvOperation::Forward {
+                    msg: SendPkt {
+                        peer: next_hop.into(),
+                        data,
+                    },
+                    ack: SendAck {
+                        peer: previous_hop.into(),
+                        ack,
+                    },
+                }
+            }
+            TransportPacketWithChainData::Outgoing { .. } => {
+                return Err(hopr_crypto_packet::errors::PacketError::LogicError(
+                    "Attempting to process an outgoing packet in the incoming pipeline".into(),
                 ))
             }
-        }
+        })
     }
 }
 
@@ -165,8 +285,8 @@ where
     Db: HoprDbProtocolOperations + Send + Sync + std::fmt::Debug + Clone,
 {
     /// Creates a new instance given the DB and configuration.
-    pub fn new(db: Db, cfg: PacketInteractionConfig) -> Self {
-        Self { db, cfg }
+    pub fn new(db: Db, tbf: bloom::WrappedTagBloomFilter, cfg: PacketInteractionConfig) -> Self {
+        Self { db, tbf, cfg }
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
@@ -180,30 +300,79 @@ where
             MsgToProcess::ToReceive(data, peer) | MsgToProcess::ToForward(data, peer) => {
                 let previous_hop = OffchainPublicKey::try_from(&peer).map_err(|e| {
                     hopr_crypto_packet::errors::PacketError::LogicError(format!(
-                        "failed to convert '{peer}' into the public key {e}"
+                        "failed to convert '{peer}' into the public key: {e}"
                     ))
                 });
 
-                match previous_hop {
-                    Ok(previous_hop) => self.from_recv(data, &self.cfg.packet_keypair, previous_hop).await,
-                    Err(e) => Err(e),
-                }
+                unimplemented!("TODO: to be removed");
+                // match previous_hop {
+                //     Ok(previous_hop) => self
+                //         .recv(data, &self.cfg.packet_keypair, previous_hop)
+                //         .await
+                //         .map(|p| p.into()),
+                //     Err(e) => Err(e),
+                // }
             }
             MsgToProcess::ToSend(data, path, finalizer) => {
                 metadata.send_finalizer.replace(finalizer);
 
-                let path: std::result::Result<Vec<OffchainPublicKey>, hopr_primitive_types::errors::GeneralError> =
-                    path.hops().iter().map(OffchainPublicKey::try_from).collect();
-                match path {
-                    Ok(path) => self.to_send(data, path).await,
-                    Err(e) => Err(hopr_crypto_packet::errors::PacketError::PacketConstructionError(
-                        e.to_string(),
-                    )),
-                }
+                // let path: std::result::Result<Vec<OffchainPublicKey>, hopr_primitive_types::errors::GeneralError> =
+                //     path.hops().iter().map(OffchainPublicKey::try_from).collect()?;
+                // let packet = self
+                //     .db
+                //     .to_send(data.to_bytes(), self.cfg.chain_keypair.clone(), path?)
+                //     .await
+                //     .map_err(|e| hopr_crypto_packet::errors::PacketError::PacketConstructionError(e.to_string()))?;
+
+                // Ok(packet.into())
+                // TODO: deprecate
+                unimplemented!()
             }
         };
 
         (packet, metadata)
+    }
+
+    #[tracing::instrument(level = "trace", name = "check_tag_replay", skip(self, tag))]
+    /// Check whether the packet is replayed using a packet tag.
+    ///
+    /// There is a 0.1% chance that the positive result is not a replay because a Bloom filter is used.
+    pub async fn is_tag_replay(&self, tag: &PacketTag) -> bool {
+        let is_replay_attempt = self
+            .tbf
+            .with_write_lock(|inner: &mut TagBloomFilter| inner.check_and_set(tag))
+            .await;
+
+        #[cfg(all(feature = "prometheus", not(test)))]
+        {
+            METRIC_REPLAYED_PACKET_COUNT.increment();
+        }
+
+        is_replay_attempt
+    }
+
+    #[tracing::instrument(level = "debug", skip(self))]
+    pub async fn add_mixing_delay(&self) {
+        let random_delay = self.cfg.mixer.random_delay();
+        debug!(
+            delay_in_ms = random_delay.as_millis(),
+            "Mixer created a random packet delay",
+        );
+
+        #[cfg(all(feature = "prometheus", not(test)))]
+        METRIC_QUEUE_SIZE.increment(1.0f64);
+
+        sleep(random_delay).await;
+
+        #[cfg(all(feature = "prometheus", not(test)))]
+        {
+            METRIC_QUEUE_SIZE.decrement(1.0f64);
+
+            let weight = 1.0f64 / self.cfg.mixer.metric_delay_window as f64;
+            METRIC_MIXER_AVERAGE_DELAY.set(
+                (weight * random_delay.as_millis() as f64) + ((1.0f64 - weight) * METRIC_MIXER_AVERAGE_DELAY.get()),
+            );
+        }
     }
 }
 
@@ -355,7 +524,7 @@ impl PacketInteraction {
         let (processed_tx, processed_rx) = channel::<MsgProcessed>(PACKET_RX_QUEUE_SIZE + PACKET_TX_QUEUE_SIZE);
 
         let mixer_cfg = cfg.mixer;
-        let processor = PacketProcessor::new(db, cfg);
+        let processor = PacketProcessor::new(db, tbf.clone(), cfg);
 
         let mut processing_stream = to_process_rx
             .then_concurrent(move |event| {
@@ -497,15 +666,6 @@ impl PacketInteraction {
                 async move {
                     match processed {
                         Ok((processed_msg, mut metadata)) => {
-                            #[cfg(all(feature = "prometheus", not(test)))]
-                            if let MsgProcessed::Forward(_, _, _, _) = &processed_msg {
-                                METRIC_RELAYED_PACKET_IN_MIXER_TIME.observe(
-                                    hopr_platform::time::native::current_time()
-                                        .saturating_sub(metadata.start_time)
-                                        .as_secs_f64(),
-                                )
-                            };
-
                             match poll_fn(|cx| Pin::new(&mut processed_tx).poll_ready(cx)).await {
                                 Ok(_) => match processed_tx.start_send(processed_msg) {
                                     Ok(_) => {
