@@ -11,7 +11,7 @@ function check_package() {
   local package_name="$1"
   local exit_code=0
 
-  which "$package_name" > /dev/null || exit_code=$?
+  command -v "$package_name" > /dev/null || exit_code=$?
 
   if [ "${exit_code}" = "0" ]; then
     log "$package_name already installed"
