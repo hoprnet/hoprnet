@@ -115,7 +115,7 @@ pub trait HoprDbInfoOperations {
     async fn update_ticket_price<'a>(&'a self, tx: OptTx<'a>, price: Balance) -> Result<()>;
 
     /// Retrieves the last indexed block number.
-    async fn get_last_indexed_block<'a>(&'a self, tx: OptTx<'a>) -> Result<(u32, Hash)>;
+    async fn get_last_indexed_block<'a>(&'a self, tx: OptTx<'a>) -> Result<(u32, Hash, u32)>;
 
     /// Updates the last indexed block number together with the checksum of log TXs processed
     /// in that block (if there were any logs in this block).
@@ -389,7 +389,7 @@ impl HoprDbInfoOperations for HoprDb {
         Ok(())
     }
 
-    async fn get_last_indexed_block<'a>(&'a self, tx: OptTx<'a>) -> Result<(u32, Hash)> {
+    async fn get_last_indexed_block<'a>(&'a self, tx: OptTx<'a>) -> Result<(u32, Hash, u32)> {
         self.nest_transaction(tx)
             .await?
             .perform(|tx| {
@@ -404,7 +404,11 @@ impl HoprDbInfoOperations for HoprDb {
                             } else {
                                 Hash::default()
                             };
-                            (m.last_indexed_block as u32, chain_checksum)
+                            (
+                                m.last_indexed_block as u32,
+                                chain_checksum,
+                                m.previous_indexed_block_prio_to_checksum_update as u32,
+                            )
                         })
                 })
             })
@@ -426,6 +430,7 @@ impl HoprDbInfoOperations for HoprDb {
                         .await?
                         .ok_or(MissingFixedTableEntry("chain_info".into()))?;
 
+                    let current_last_indexed_block = model.last_indexed_block;
                     let current_checksum = model
                         .chain_checksum
                         .clone()
@@ -437,7 +442,9 @@ impl HoprDbInfoOperations for HoprDb {
                     if let Some(block_log_hash) = block_log_tx_hash {
                         let new_hash = Hash::create(&[current_checksum.as_slice(), block_log_hash.as_slice()]);
                         active_model.chain_checksum = Set(Some(new_hash.as_slice().to_vec()));
-                        debug!("updating block checksum {current_checksum} -> {new_hash} @ {block_num}");
+                        // when a new checksum is computed, we need to update previous_indexed_block_prio_to_checksum_update
+                        active_model.previous_indexed_block_prio_to_checksum_update = Set(current_last_indexed_block);
+                        debug!("updating block checksum {current_checksum} @ {current_last_indexed_block} -> {new_hash} @ {block_num}");
                     }
 
                     active_model.last_indexed_block = Set(block_num as i32);
@@ -631,8 +638,9 @@ mod tests {
     async fn test_set_last_indexed_block() {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
 
-        let (block_num, last_checksum) = db.get_last_indexed_block(None).await.unwrap();
+        let (block_num, last_checksum, num_block_with_old_checksum) = db.get_last_indexed_block(None).await.unwrap();
         assert_eq!(0, block_num);
+        assert_eq!(0, num_block_with_old_checksum);
 
         let checksum = Hash::default().hash();
         let expexted_block_num = 100000;
@@ -641,8 +649,10 @@ mod tests {
             .await
             .unwrap();
 
-        let (next_block_num, next_checksum) = db.get_last_indexed_block(None).await.unwrap();
+        let (next_block_num, next_checksum, next_block_with_old_checksum) =
+            db.get_last_indexed_block(None).await.unwrap();
         assert_eq!(expexted_block_num, next_block_num);
+        assert_eq!(0, next_block_with_old_checksum);
 
         let expected_next_checksum = Hash::create(&[last_checksum.as_slice(), checksum.as_slice()]);
         assert_eq!(expected_next_checksum, next_checksum);

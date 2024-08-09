@@ -97,7 +97,7 @@ where
         let db = self.db.clone();
         let tx_significant_events = self.egress.clone();
 
-        let (db_latest_block, checksum) = self.db.get_last_indexed_block(None).await?;
+        let (db_latest_block, checksum, _) = self.db.get_last_indexed_block(None).await?;
         info!("Loaded indexer state at block #{db_latest_block} with checksum: {checksum}");
 
         let next_block_to_process = if self.cfg.start_block_number < db_latest_block as u64 {
@@ -206,7 +206,7 @@ where
                     // Printout indexer state, we can do this on every processed block because not
                     // every block will have events
                     match db.get_last_indexed_block(None).await {
-                        Ok((_, checksum)) => {
+                        Ok((_, checksum, _)) => {
                             info!("Current indexer state at block #{block_id} with checksum: {checksum}");
                         }
                         Err(e) => error!("Cannot retrieve indexer state: {e}"),
