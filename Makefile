@@ -146,13 +146,15 @@ run-local-dev-compose: ## run local development Compose setup
 fund-local-all: id_dir=/tmp/
 fund-local-all: id_password=local
 fund-local-all: id_prefix=
+fund-local-all: provider_url=http://localhost:8545
 fund-local-all: ## use faucet script to fund all the local identities
 	ETHERSCAN_API_KEY="anykey" IDENTITY_PASSWORD="${id_password}" PRIVATE_KEY=ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
 		hopli faucet \
 		--network anvil-localhost \
 		--contracts-root "./ethereum/contracts" \
 		--identity-prefix "${id_prefix}" \
-		--identity-directory "${id_dir}"
+		--identity-directory "${id_dir}" \
+		--provider-url "${provider_url}"
 
 .PHONY: create-safe-module-all
 create-safe-module-all: id_dir=/tmp/
@@ -348,11 +350,11 @@ run-docker-dev: ## start a local development Docker container
 		develop
 
 .PHONY: run-hopr-admin
-run-hopr-admin: version=07aec21b
+run-hopr-admin: version=latest
 run-hopr-admin: port=3000
 run-hopr-admin: ## launches HOPR Admin in a Docker container, supports port= and version=, use http://host.docker.internal to access the host machine
-	docker run -p $(port):3000 --add-host=host.docker.internal:host-gateway \
-		gcr.io/hoprassociation/hopr-admin:$(version)
+	docker run -p $(port):80 --name hopr-admin --platform linux/amd64 \
+		europe-west3-docker.pkg.dev/hoprassociation/docker-images/hopr-admin:$(version)
 
 .PHONY: exec-script
 exec-script: ## execute given script= with the correct PATH set

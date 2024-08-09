@@ -961,7 +961,7 @@ impl Hopr {
     }
 
     /// Gets the current indexer state: last indexed block ID and checksum
-    pub async fn get_indexer_state(&self) -> errors::Result<(u32, Hash)> {
+    pub async fn get_indexer_state(&self) -> errors::Result<(u32, Hash, u32)> {
         Ok(self.db.get_last_indexed_block(None).await?)
     }
 
