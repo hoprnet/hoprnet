@@ -170,6 +170,7 @@ function setup_node() {
       --testAnnounceLocalAddresses \
       --testPreferLocalAddresses \
       --protocolConfig ${protocol_config} \
+      --configurationFilePath "${mydir}/local-cluster-hoprd.cfg.yaml" \
       ${additional_args} \
       > "${log}" 2>&1 &
 }
