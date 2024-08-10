@@ -19,13 +19,6 @@ impl MigrationTrait for Migration {
                             .primary_key(),
                     )
                     .col(
-                        ColumnDef::new(ChainInfo::PreviousIndexedBlockPrioToChecksumUpdate)
-                            .integer()
-                            .unsigned()
-                            .not_null()
-                            .default(0),
-                    )
-                    .col(
                         ColumnDef::new(ChainInfo::LastIndexedBlock)
                             .integer()
                             .unsigned()
@@ -63,7 +56,6 @@ impl MigrationTrait for Migration {
 enum ChainInfo {
     Table,
     Id,
-    PreviousIndexedBlockPrioToChecksumUpdate,
     LastIndexedBlock,
     TicketPrice,
     ChannelsDST,
