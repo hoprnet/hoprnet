@@ -23,7 +23,9 @@ There are some manual actions that a developer can trigger on a PR:
 
 - [Deploy hoprd](./k8s.yaml): By attaching label **deploy_nodes**, the workflow will deploy this specific PR commit into a new created hoprd node.
 - [Build binaries](./build-binaries.yaml): By attaching label **binary:??-??**, the workflow will generate a binary for that specific platform attached to the PR so it can be manually tested.
-+ [Build binaries](./build-binaries.yaml): By attaching label **binary:<platform>**, the workflow will generate a binary for that specific platform attached to the PR so it can be manually tested. For example, **binary:linux-amd64**.
+
+* [Build binaries](./build-binaries.yaml): By attaching label **binary:<platform>**, the workflow will generate a binary for that specific platform attached to the PR so it can be manually tested. For example, **binary:linux-amd64**.
+
 - [Build dappnode](./build-dappnode.yaml): By attaching label **package:DAppNodePackage-Hopr** or **package:DAppNodePackage-Hopr-testnet**, the workflow will generate a dappNode package for that specific environment attached to the PR so it can be manually tested.
 
 ## Promote Release Workflow

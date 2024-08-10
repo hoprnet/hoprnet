@@ -17,7 +17,7 @@ on:
         type: string
         required: true
       duration:
-        type: string
+        type: number
         required: true
       rate:
         type: string
@@ -35,22 +35,24 @@ on:
           - dufour
           - team
           - relayer
+          - sender
         required: true
-        description: 'Cluster of hoprd nodes'
+        description: 'hoprd nodes setup'
       workload:
         type: choice
         options:
-          - one-hop
-          - sanity-check
+          - constant
           - incremental
+          - hysteresis
+          - sanity-check
           - multiple-hops
         required: true
         description: 'Workload type'
       duration:
-        type: string
-        default: 30m
+        type: number
+        default: 30
         required: true
-        description: 'Test duration'
+        description: 'Test duration in minutes'
       rate:
         type: string
         default: "200"
@@ -142,7 +144,7 @@ jobs:
           echo "Waiting for test to bootstrap..."
           sleep 2m # Wait for test to bootstrap
           echo "Waiting for test to finish..."
-          sleep ${{ steps.vars.outputs.SCENARIO_DURATION }} # wait for the test to finish
+          sleep ${{ steps.vars.outputs.SCENARIO_DURATION }}m # wait for the test to finish
         working-directory: "./k6"
 
       - name: Parse results
