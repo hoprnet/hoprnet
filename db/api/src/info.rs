@@ -412,11 +412,11 @@ impl HoprDbInfoOperations for HoprDb {
                             } else {
                                 Hash::default()
                             };
-                            return DescribedBlock {
+                            DescribedBlock {
                                 latest_block_number: m.last_indexed_block as u32,
                                 checksum: chain_checksum,
                                 block_prior_to_checksum_update: m.previous_indexed_block_prio_to_checksum_update as u32,
-                            };
+                            }
                         })
                 })
             })
