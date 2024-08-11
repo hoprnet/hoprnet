@@ -2606,7 +2606,7 @@ mod node {
         };
 
         let (indexer_block, indexer_checksum, index_block_prev_checksum) = match hopr.get_indexer_state().await {
-            Ok(p) => p,
+            Ok(p) => (p.latest_block_number, p.checksum, p.block_prior_to_checksum_update),
             Err(error) => return Ok(Response::builder(422).body(ApiErrorStatus::from(error)).build()),
         };
 

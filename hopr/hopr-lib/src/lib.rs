@@ -84,9 +84,12 @@ use crate::config::HoprLibConfig;
 use crate::config::SafeModule;
 use crate::constants::{MIN_NATIVE_BALANCE, SUGGESTED_NATIVE_BALANCE};
 
-use hopr_db_api::prelude::{
-    ChainOrPacketKey::ChainKey, HoprDb, HoprDbAccountOperations, HoprDbAllOperations, HoprDbChannelOperations,
-    HoprDbConfig, HoprDbInfoOperations, HoprDbPeersOperations, HoprDbResolverOperations, SafeInfo,
+use hopr_db_api::{
+    info::DescribedBlock,
+    prelude::{
+        ChainOrPacketKey::ChainKey, HoprDb, HoprDbAccountOperations, HoprDbAllOperations, HoprDbChannelOperations,
+        HoprDbConfig, HoprDbInfoOperations, HoprDbPeersOperations, HoprDbResolverOperations, SafeInfo,
+    },
 };
 
 use hopr_crypto_types::prelude::OffchainPublicKey;
@@ -961,7 +964,7 @@ impl Hopr {
     }
 
     /// Gets the current indexer state: last indexed block ID and checksum
-    pub async fn get_indexer_state(&self) -> errors::Result<(u32, Hash, u32)> {
+    pub async fn get_indexer_state(&self) -> errors::Result<DescribedBlock> {
         Ok(self.db.get_last_indexed_block(None).await?)
     }
 

@@ -152,7 +152,7 @@ pub trait HoprDbPeersOperations {
     /// Should return `None` if such peer does not exist in the store.
     async fn get_network_peer(&self, peer: &PeerId) -> Result<Option<PeerStatus>>;
 
-    /// Returns a stream of all stored peers, optionally matching the given SimpleExpr filter.
+    /// Returns a stream of all stored peers, optionally matching the given [`SimpleExpr`] filter.
     ///
     /// The `sort_last_seen_asc` indicates whether the results should be sorted in ascending
     /// or descending order of the `last_seen` field.
