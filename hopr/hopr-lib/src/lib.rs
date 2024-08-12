@@ -48,9 +48,6 @@ use chain_api::{
 use chain_types::chain_events::ChainEventType;
 use chain_types::ContractAddresses;
 use core_path::channel_graph::ChannelGraph;
-use core_transport::{execute_on_tick, HoprTransportConfig, HoprTransportProcess, PeerDiscovery};
-use core_transport::{ChainKeypair, Hash, HoprTransport, OffchainKeypair};
-use core_transport::{IndexerTransportEvent, Network, PeerEligibility, PeerOrigin};
 use hopr_async_runtime::prelude::{sleep, spawn, JoinHandle};
 use hopr_crypto_types::prelude::OffchainPublicKey;
 use hopr_db_sql::{
@@ -64,12 +61,20 @@ use hopr_db_sql::{
 };
 use hopr_platform::file::native::{join, remove_dir_all};
 use hopr_strategy::strategy::{MultiStrategy, SingularStrategy};
+use hopr_transport::{
+    execute_on_tick, ChainKeypair, Hash, HoprTransport, HoprTransportConfig, HoprTransportProcess,
+    IndexerTransportEvent, Network, OffchainKeypair, PeerDiscovery, PeerEligibility, PeerOrigin,
+};
 pub use {
     chain_actions::errors::ChainActionsError,
     chain_api::config::{
         Addresses as NetworkContractAddresses, EnvironmentType, Network as ChainNetwork, ProtocolsConfig,
     },
-    core_transport::{
+    hopr_internal_types::prelude::*,
+    hopr_primitive_types::prelude::*,
+    hopr_primitive_types::rlp,
+    hopr_strategy::Strategy,
+    hopr_transport::{
         config::{looks_like_domain, HostConfig, HostType},
         constants::RESERVED_TAG_UPPER_LIMIT,
         errors::{HoprTransportError, ProtocolError},
@@ -78,10 +83,6 @@ pub use {
         PathOptions, SendMsg, Session as HoprSession, SessionCapability, SessionClientConfig,
         SessionId as HoprSessionId, TicketStatistics, SESSION_USABLE_MTU_SIZE,
     },
-    hopr_internal_types::prelude::*,
-    hopr_primitive_types::prelude::*,
-    hopr_primitive_types::rlp,
-    hopr_strategy::Strategy,
 };
 
 use crate::constants::{MIN_NATIVE_BALANCE, ONBOARDING_INFORMATION_INTERVAL, SUGGESTED_NATIVE_BALANCE};
@@ -193,14 +194,14 @@ impl HoprLibProcesses {
 impl From<HoprTransportProcess> for HoprLibProcesses {
     fn from(value: HoprTransportProcess) -> Self {
         match value {
-            core_transport::HoprTransportProcess::Swarm => HoprLibProcesses::Swarm,
-            core_transport::HoprTransportProcess::ProtocolAckIn => HoprLibProcesses::ProtocolAckIn,
-            core_transport::HoprTransportProcess::ProtocolAckOut => HoprLibProcesses::ProtocolAckIn,
-            core_transport::HoprTransportProcess::ProtocolMsgIn => HoprLibProcesses::ProtocolAckIn,
-            core_transport::HoprTransportProcess::ProtocolMsgOut => HoprLibProcesses::ProtocolAckIn,
-            core_transport::HoprTransportProcess::Heartbeat => HoprLibProcesses::Heartbeat,
-            core_transport::HoprTransportProcess::SessionsManagement => HoprLibProcesses::SessionsRouter,
-            core_transport::HoprTransportProcess::BloomFilterSave => HoprLibProcesses::BloomFilterSave,
+            hopr_transport::HoprTransportProcess::Swarm => HoprLibProcesses::Swarm,
+            hopr_transport::HoprTransportProcess::ProtocolAckIn => HoprLibProcesses::ProtocolAckIn,
+            hopr_transport::HoprTransportProcess::ProtocolAckOut => HoprLibProcesses::ProtocolAckIn,
+            hopr_transport::HoprTransportProcess::ProtocolMsgIn => HoprLibProcesses::ProtocolAckIn,
+            hopr_transport::HoprTransportProcess::ProtocolMsgOut => HoprLibProcesses::ProtocolAckIn,
+            hopr_transport::HoprTransportProcess::Heartbeat => HoprLibProcesses::Heartbeat,
+            hopr_transport::HoprTransportProcess::SessionsManagement => HoprLibProcesses::SessionsRouter,
+            hopr_transport::HoprTransportProcess::BloomFilterSave => HoprLibProcesses::BloomFilterSave,
         }
     }
 }
@@ -250,7 +251,7 @@ where
                         // decapsulate the `p2p/<peer_id>` to remove duplicities
                         let mas = multiaddresses
                             .into_iter()
-                            .map(|ma| core_transport::strip_p2p_protocol(&ma))
+                            .map(|ma| hopr_transport::strip_p2p_protocol(&ma))
                             .filter(|v| !v.is_empty())
                             .collect::<Vec<_>>();
 
@@ -414,10 +415,10 @@ impl HoprSocket {
 
 fn as_host_multiaddress(host_cfg: &crate::HostConfig) -> Multiaddr {
     match &host_cfg.address {
-        core_transport::config::HostType::IPv4(ip) => {
+        hopr_transport::config::HostType::IPv4(ip) => {
             Multiaddr::from_str(format!("/ip4/{}/tcp/{}", ip.as_str(), host_cfg.port).as_str()).unwrap()
         }
-        core_transport::config::HostType::Domain(domain) => {
+        hopr_transport::config::HostType::Domain(domain) => {
             Multiaddr::from_str(format!("/dns4/{}/tcp/{}", domain.as_str(), host_cfg.port).as_str()).unwrap()
         }
     }
@@ -1114,7 +1115,7 @@ impl Hopr {
     }
 
     /// Get all data collected from the network relevant for a PeerId
-    pub async fn network_peer_info(&self, peer: &PeerId) -> errors::Result<Option<core_transport::PeerStatus>> {
+    pub async fn network_peer_info(&self, peer: &PeerId) -> errors::Result<Option<hopr_transport::PeerStatus>> {
         Ok(self.transport_api.network_peer_info(peer).await?)
     }
 
@@ -1122,7 +1123,7 @@ impl Hopr {
     pub async fn all_network_peers(
         &self,
         minimum_quality: f64,
-    ) -> errors::Result<Vec<(Option<Address>, PeerId, core_transport::PeerStatus)>> {
+    ) -> errors::Result<Vec<(Option<Address>, PeerId, hopr_transport::PeerStatus)>> {
         Ok(
             futures::stream::iter(self.transport_api.network_connected_peers().await?)
                 .filter_map(|peer| async move {
@@ -1362,7 +1363,7 @@ impl Hopr {
     }
 
     pub async fn peerid_to_chain_key(&self, peer_id: &PeerId) -> errors::Result<Option<Address>> {
-        let pk = core_transport::OffchainPublicKey::try_from(peer_id)?;
+        let pk = hopr_transport::OffchainPublicKey::try_from(peer_id)?;
         Ok(self.db.resolve_chain_key(&pk).await?)
     }
 

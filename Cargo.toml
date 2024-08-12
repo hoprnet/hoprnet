@@ -147,7 +147,7 @@ chain-types = { path = "chain/types", default-features = false }
 core-network = { path = "transport/network", default-features = false }
 core-path = { path = "logic/path", default-features = false }
 hopr-transport-protocol = { path = "transport/protocol", default-features = false }
-core-transport = { path = "transport/api", default-features = false }
+hopr-transport = { path = "transport/api", default-features = false }
 hopr-async-runtime = { path = "common/async-runtime" }
 hopr-crypto-packet = { path = "crypto/packet", default-features = false }
 hopr-crypto-random = { path = "crypto/random", default-features = false }

@@ -1597,41 +1597,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "core-transport"
-version = "0.6.1"
-dependencies = [
- "async-lock 3.4.0",
- "async-std",
- "async-trait",
- "chain-types",
- "core-network",
- "core-path",
- "futures",
- "hopr-async-runtime",
- "hopr-crypto-packet",
- "hopr-crypto-random",
- "hopr-crypto-types",
- "hopr-db-sql",
- "hopr-internal-types",
- "hopr-metrics",
- "hopr-platform",
- "hopr-primitive-types",
- "hopr-transport-p2p",
- "hopr-transport-protocol",
- "hopr-transport-session",
- "lazy_static",
- "libp2p",
- "moka",
- "proc-macro-regex",
- "rust-stream-ext-concurrent",
- "serde",
- "thiserror",
- "tracing",
- "uuid 1.8.0",
- "validator",
-]
-
-[[package]]
 name = "core2"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4072,7 +4037,6 @@ dependencies = [
  "chain-types",
  "const_format",
  "core-path",
- "core-transport",
  "ethers",
  "futures",
  "futures-concurrency",
@@ -4085,6 +4049,7 @@ dependencies = [
  "hopr-platform",
  "hopr-primitive-types",
  "hopr-strategy",
+ "hopr-transport",
  "lazy_static",
  "serde",
  "serde_with",
@@ -4216,6 +4181,41 @@ dependencies = [
  "strum 0.26.2",
  "thiserror",
  "tracing",
+ "validator",
+]
+
+[[package]]
+name = "hopr-transport"
+version = "0.6.1"
+dependencies = [
+ "async-lock 3.4.0",
+ "async-std",
+ "async-trait",
+ "chain-types",
+ "core-network",
+ "core-path",
+ "futures",
+ "hopr-async-runtime",
+ "hopr-crypto-packet",
+ "hopr-crypto-random",
+ "hopr-crypto-types",
+ "hopr-db-sql",
+ "hopr-internal-types",
+ "hopr-metrics",
+ "hopr-platform",
+ "hopr-primitive-types",
+ "hopr-transport-p2p",
+ "hopr-transport-protocol",
+ "hopr-transport-session",
+ "lazy_static",
+ "libp2p",
+ "moka",
+ "proc-macro-regex",
+ "rust-stream-ext-concurrent",
+ "serde",
+ "thiserror",
+ "tracing",
+ "uuid 1.8.0",
  "validator",
 ]
 

@@ -18,28 +18,28 @@ session-server = []
 runtime-async-std = [
   "chain-api/runtime-async-std",
   "chain-rpc/runtime-async-std",
-  "core-transport/runtime-async-std",
-  "hopr-db-sql/runtime-async-std",
   "hopr-async-runtime/runtime-async-std",
+  "hopr-db-sql/runtime-async-std",
   "hopr-network-types/runtime-async-std",
   "hopr-strategy/runtime-async-std",
+  "hopr-transport/runtime-async-std",
 ]
 runtime-tokio = [
   "chain-api/runtime-tokio",
   "chain-rpc/runtime-tokio",
-  "core-transport/runtime-tokio",
-  "hopr-db-sql/runtime-tokio",
   "hopr-async-runtime/runtime-tokio",
+  "hopr-db-sql/runtime-tokio",
   "hopr-network-types/runtime-tokio",
   "hopr-strategy/runtime-tokio",
+  "hopr-transport/runtime-tokio",
 ]
 prometheus = [
   "chain-api/prometheus",
   "chain-indexer/prometheus",
   "chain-rpc/prometheus",
-  "core-transport/prometheus",
   "dep:hopr-metrics",
   "hopr-db-sql/prometheus",
+  "hopr-transport/prometheus",
 ]
 
 [dependencies]
@@ -60,7 +60,7 @@ thiserror = { workspace = true }
 validator = { workspace = true }
 
 core-path = { workspace = true }
-core-transport = { workspace = true }
+hopr-transport = { workspace = true }
 chain-actions = { workspace = true }
 chain-api = { workspace = true }
 chain-rpc = { workspace = true }
