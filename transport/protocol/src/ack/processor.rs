@@ -56,8 +56,6 @@ impl<Db: HoprDbProtocolOperations> AcknowledgementProcessor<Db> {
             return Err(ProtocolError::InvalidSignature);
         };
 
-        tracing::error!("===> Handling acknowledgement");
-
         Ok(self
             .db
             .handle_acknowledgement(ack, &self.chain_key)

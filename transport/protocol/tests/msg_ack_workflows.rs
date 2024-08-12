@@ -213,12 +213,7 @@ async fn peer_setup_for(count: usize) -> (Vec<WireChannels>, Vec<LogicalChannels
             cfg,
             db,
             &PEERS_CHAIN[i],
-            Some(
-                rand::Rng::sample_iter(rand::thread_rng(), &rand::distributions::Alphanumeric)
-                    .take(10)
-                    .map(char::from)
-                    .collect::<String>(),
-            ),
+            None,
             received_ack_tickets_tx,
             (wire_ack_recv_tx, wire_ack_send_rx),
             (wire_msg_recv_tx, wire_msg_send_rx),
@@ -240,35 +235,12 @@ async fn peer_setup_for(count: usize) -> (Vec<WireChannels>, Vec<LogicalChannels
 
 #[tracing::instrument(level = "debug", skip(components))]
 async fn emulate_channel_communication(pending_packet_count: usize, mut components: Vec<WireChannels>) {
-    for i in 0..pending_packet_count {
-        let (peer, data) = components[0].1 .1.next().await.expect("expected packet did not arrive");
-
-        debug!("sending packet peer 0 to peer 1");
-        assert_eq!(peer, PEERS[1].public().into());
-        components[1]
-            .1
-             .0
-            .send((PEERS[0].public().into(), data))
-            .await
-            .expect("Send to relayer should succeed")
-    }
-
-    for i in 1..components.len() {
+    for i in 0..components.len() {
         for j in 0..pending_packet_count {
             debug!("Component: {i} on packet {j}");
 
-            debug!("Peeking into the ack queue");
-            let (peer, ack) = components[i]
-                .0
-                 .1
-                .next()
-                .await
-                .expect("MSG relayer should ack the forwarded packet back");
-
-            assert_eq!(peer, PEERS[i - 1].public().into());
-
             if i != components.len() - 1 {
-                debug!("Peeking into the msg queue");
+                debug!("Resending message to the next");
                 let (peer, data) = components[i]
                     .1
                      .1
@@ -279,7 +251,6 @@ async fn emulate_channel_communication(pending_packet_count: usize, mut componen
                 assert_eq!(peer, PEERS[i + 1].public().into());
 
                 debug!(from = i, to = i + 1, "relaying packet");
-                // forward message
                 components[i + 1]
                     .1
                      .0
@@ -288,13 +259,25 @@ async fn emulate_channel_communication(pending_packet_count: usize, mut componen
                     .expect("Send to relayer should succeed");
             }
 
-            debug!(from = i, to = i - 1, "sending ack back");
-            components[i - 1]
-                .0
-                 .0
-                .send((PEERS[i].public().into(), ack))
-                .await
-                .expect("ACK send to originator should succeed");
+            if i != 0 {
+                debug!("Peeking into the ack queue");
+                let (peer, ack) = components[i]
+                    .0
+                     .1
+                    .next()
+                    .await
+                    .expect("MSG relayer should ack the forwarded packet back");
+
+                assert_eq!(peer, PEERS[i - 1].public().into());
+
+                debug!(from = i, to = i - 1, "sending ack back");
+                components[i - 1]
+                    .0
+                     .0
+                    .send((PEERS[i].public().into(), ack))
+                    .await
+                    .expect("ACK send to originator should succeed");
+            }
         }
     }
 }
