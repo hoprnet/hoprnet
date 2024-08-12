@@ -13,6 +13,7 @@ services:
     image: "${HOPRD_IMAGE}"
     restart: unless-stopped
     pull_policy: always
+    stop_signal: SIGINT
     platform: ${DOCKER_PLATFORM}
     container_name: hoprd
     hostname: hoprd
