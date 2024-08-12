@@ -82,7 +82,7 @@ where
         self.channel_graph.clone()
     }
 
-    #[tracing::instrument(level = "debug", skip(self))]
+    #[tracing::instrument(level = "trace", skip(self))]
     pub(crate) async fn resolve_path(
         &self,
         destination: PeerId,
@@ -158,7 +158,7 @@ impl<T> SendMsg for MessageSender<T>
 where
     T: HoprDbAllOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
 {
-    #[tracing::instrument(level = "debug", skip(self, data, destination, options))]
+    #[tracing::instrument(level = "debug", skip(self, data))]
     async fn send_message(
         &self,
         data: ApplicationData,

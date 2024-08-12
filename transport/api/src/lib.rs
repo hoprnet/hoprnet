@@ -25,21 +25,19 @@ use std::{
 };
 
 use async_lock::RwLock;
-use constants::{RESERVED_SESSION_TAG_UPPER_LIMIT, RESERVED_SUBPROTOCOL_TAG_UPPER_LIMIT};
-use core_path::path::TransportPath;
-use futures::future::{select, Either};
-use futures::pin_mut;
 use futures::{
     channel::mpsc::{UnboundedReceiver, UnboundedSender},
-    FutureExt, StreamExt,
+    future::{select, Either},
+    pin_mut, FutureExt, StreamExt,
 };
 use tracing::{debug, error, info, trace, warn};
 
 use core_network::{
     heartbeat::Heartbeat,
-    ping::{PingQueryReplier, Pinger, Pinging},
+    ping::{PingConfig, PingQueryReplier, Pinger, Pinging},
+    PeerId,
 };
-use core_network::{ping::PingConfig, PeerId};
+use core_path::path::TransportPath;
 use hopr_async_runtime::prelude::{sleep, spawn, JoinHandle};
 use hopr_db_sql::{
     api::tickets::{AggregationPrerequisites, HoprDbTicketOperations},
@@ -77,7 +75,11 @@ pub use {
     },
 };
 
-use crate::errors::HoprTransportError;
+use crate::{
+    constants::{RESERVED_SESSION_TAG_UPPER_LIMIT, RESERVED_SUBPROTOCOL_TAG_UPPER_LIMIT},
+    errors::HoprTransportError,
+};
+
 pub use crate::helpers::{IndexerTransportEvent, PeerEligibility, TicketStatistics};
 
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
@@ -93,7 +95,7 @@ pub enum HoprTransportProcess {
 }
 
 #[derive(Debug, Clone)]
-pub struct AggregatorProxy<Db>
+pub struct TicketAggregatorProxy<Db>
 where
     Db: HoprDbTicketOperations + Send + Sync + Clone + std::fmt::Debug,
 {
@@ -103,7 +105,7 @@ where
     agg_timeout: std::time::Duration,
 }
 
-impl<Db> AggregatorProxy<Db>
+impl<Db> TicketAggregatorProxy<Db>
 where
     Db: HoprDbTicketOperations + Send + Sync + Clone + std::fmt::Debug,
 {
@@ -123,7 +125,7 @@ where
 }
 
 #[async_trait::async_trait]
-impl<Db> TicketAggregatorTrait for AggregatorProxy<Db>
+impl<Db> TicketAggregatorTrait for TicketAggregatorProxy<Db>
 where
     Db: HoprDbTicketOperations + Send + Sync + Clone + std::fmt::Debug,
 {
@@ -151,8 +153,8 @@ pub struct HoprTransportConfig {
     pub heartbeat: core_network::heartbeat::HeartbeatConfig,
 }
 
-/// Interface into the physical transport mechanism allowing all HOPR related tasks on
-/// the transport mechanism, as well as off-chain ticket manipulation.
+/// Interface into the physical transport mechanism allowing all off-chain HOPR related tasks on
+/// the transport, as well as off-chain ticket manipulation.
 pub struct HoprTransport<T>
 where
     T: HoprDbAllOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
@@ -446,7 +448,7 @@ where
     }
 
     pub fn ticket_aggregator(&self) -> Arc<dyn TicketAggregatorTrait + Send + Sync + 'static> {
-        Arc::new(AggregatorProxy::new(
+        Arc::new(TicketAggregatorProxy::new(
             self.db.clone(),
             self.process_ticket_aggregate.clone(),
             self.cfg.protocol.ticket_aggregation.timeout,
@@ -595,7 +597,7 @@ where
             return Err(ProtocolError::ChannelClosed.into());
         }
 
-        Ok(Arc::new(AggregatorProxy::new(
+        Ok(Arc::new(TicketAggregatorProxy::new(
             self.db.clone(),
             self.process_ticket_aggregate.clone(),
             self.cfg.protocol.ticket_aggregation.timeout,
