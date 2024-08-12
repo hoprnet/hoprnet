@@ -169,7 +169,9 @@ where
         if let TransportPacketWithChainData::Final { packet_tag, .. }
         | TransportPacketWithChainData::Forwarded { packet_tag, .. } = &packet
         {
-            self.is_tag_replay(packet_tag).await.then_some(()).ok_or(TagReplay)?;
+            if self.is_tag_replay(packet_tag).await {
+                return Err(TagReplay);
+            }
         };
 
         Ok(match packet {

@@ -51,10 +51,12 @@ impl<Db: HoprDbProtocolOperations> AcknowledgementProcessor<Db> {
     #[tracing::instrument(level = "debug", skip(self, ack))]
     pub async fn recv(&self, peer: &PeerId, mut ack: Acknowledgement) -> Result<AckResult> {
         let remote_pk = OffchainPublicKey::try_from(peer)?;
-        let ack = ack.validate(&remote_pk).then_some(ack).ok_or_else(|| {
-            trace!("Failed to verify signature on received acknowledgement");
-            ProtocolError::InvalidSignature
-        })?;
+        if !ack.validate(&remote_pk) {
+            tracing::error!("Failed to verify signature on received acknowledgement");
+            return Err(ProtocolError::InvalidSignature);
+        };
+
+        tracing::error!("===> Handling acknowledgement");
 
         Ok(self
             .db

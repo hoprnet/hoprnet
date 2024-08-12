@@ -23,7 +23,7 @@ use hopr_parallelize::cpu::spawn_fifo_blocking;
 
 #[async_trait]
 impl HoprDbProtocolOperations for HoprDb {
-    #[instrument(level = "trace", skip(self))]
+    #[instrument(level = "trace", skip(self, ack, me), ret)]
     async fn handle_acknowledgement(&self, ack: Acknowledgement, me: &ChainKeypair) -> Result<AckResult> {
         let myself = self.clone();
         let me_ckp = me.clone();

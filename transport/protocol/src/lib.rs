@@ -150,6 +150,7 @@ where
                 })
                 .filter_map(|v| async move {
                     if let Ok(ack::processor::AckResult::RelayerWinning(acknowledged_ticket)) = v {
+                        error!("===> WINNING TICKET: {acknowledged_ticket}");
                         Some(acknowledged_ticket)
                     } else {
                         None

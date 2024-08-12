@@ -4266,6 +4266,7 @@ dependencies = [
  "libp2p-identity",
  "more-asserts",
  "parameterized",
+ "rand 0.8.5",
  "rust-stream-ext-concurrent",
  "serde",
  "serde_with",
