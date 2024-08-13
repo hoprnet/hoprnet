@@ -61,6 +61,7 @@ pub mod msg;
 pub mod ticket_aggregation;
 
 pub mod timer;
+use ack::processor::AckResult;
 use core_path::path::TransportPath;
 use hopr_crypto_types::keypairs::ChainKeypair;
 pub use timer::execute_on_tick;
@@ -80,6 +81,23 @@ use hopr_internal_types::{
     protocol::{Acknowledgement, ApplicationData},
     tickets::AcknowledgedTicket,
 };
+
+#[cfg(all(feature = "prometheus", not(test)))]
+use hopr_metrics::metrics::{MultiCounter, SimpleCounter};
+
+#[cfg(all(feature = "prometheus", not(test)))]
+lazy_static::lazy_static! {
+    static ref METRIC_RECEIVED_ACKS: MultiCounter = MultiCounter::new(
+        "hopr_received_ack_count",
+        "Number of received acknowledgements",
+        &["valid"]
+    )
+    .unwrap();
+    static ref METRIC_SENT_ACKS: SimpleCounter =
+        SimpleCounter::new("hopr_sent_acks_count", "Number of sent message acknowledgements").unwrap();
+    static ref METRIC_TICKETS_COUNT: MultiCounter =
+        MultiCounter::new("hopr_tickets_count", "Number of winning tickets", &["type"]).unwrap();
+}
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum ProtocolProcesses {
@@ -150,7 +168,26 @@ where
                     async move { ack_processor.recv(&peer, ack).await }
                 })
                 .filter_map(|v| async move {
-                    if let Ok(ack::processor::AckResult::RelayerWinning(acknowledged_ticket)) = v {
+                    #[cfg(all(feature = "prometheus", not(test)))]
+                    match &v {
+                        Ok(AckResult::Sender(_)) => {
+                            METRIC_RECEIVED_ACKS.increment(&["true"]);
+                        }
+                        Ok(AckResult::RelayerWinning(_)) => {
+                            METRIC_RECEIVED_ACKS.increment(&["true"]);
+                            METRIC_TICKETS_COUNT.increment(&["winning"]);
+                        }
+                        Ok(AckResult::RelayerLosing) => {
+                            METRIC_RECEIVED_ACKS.increment(&["true"]);
+                            METRIC_TICKETS_COUNT.increment(&["losing"]);
+                        }
+                        Err(_e) => {
+                            #[cfg(all(feature = "prometheus", not(test)))]
+                            METRIC_RECEIVED_ACKS.increment(&["false"]);
+                        }
+                    }
+
+                    if let Ok(AckResult::RelayerWinning(acknowledged_ticket)) = v {
                         Some(acknowledged_ticket)
                     } else {
                         None
@@ -171,7 +208,12 @@ where
                 .then_concurrent(move |(peer, ack)| {
                     let ack_processor = ack_processor_write.clone();
 
-                    async move { (peer, ack_processor.send(&peer, ack).await) }
+                    async move {
+                        #[cfg(all(feature = "prometheus", not(test)))]
+                        METRIC_SENT_ACKS.increment();
+
+                        (peer, ack_processor.send(&peer, ack).await)
+                    }
                 })
                 .map(Ok)
                 .forward(wire_ack.0)

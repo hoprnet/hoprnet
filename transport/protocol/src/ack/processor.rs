@@ -6,24 +6,7 @@ pub use hopr_db_api::protocol::AckResult;
 use hopr_db_api::protocol::HoprDbProtocolOperations;
 use hopr_internal_types::prelude::*;
 
-#[cfg(all(feature = "prometheus", not(test)))]
-use hopr_metrics::metrics::{MultiCounter, SimpleCounter};
-
 use crate::errors::{ProtocolError, Result};
-
-#[cfg(all(feature = "prometheus", not(test)))]
-lazy_static::lazy_static! {
-    static ref METRIC_RECEIVED_ACKS: MultiCounter = MultiCounter::new(
-        "hopr_received_ack_count",
-        "Number of received acknowledgements",
-        &["valid"]
-    )
-    .unwrap();
-    static ref METRIC_SENT_ACKS: SimpleCounter =
-        SimpleCounter::new("hopr_sent_acks_count", "Number of sent message acknowledgements").unwrap();
-    static ref METRIC_TICKETS_COUNT: MultiCounter =
-        MultiCounter::new("hopr_tickets_count", "Number of winning tickets", &["type"]).unwrap();
-}
 
 /// Implements protocol acknowledgement logic for acknowledgements
 #[derive(Clone)]
@@ -56,34 +39,10 @@ impl<Db: HoprDbProtocolOperations> AcknowledgementProcessor<Db> {
             return Err(ProtocolError::InvalidSignature);
         };
 
-        self.db
-            .handle_acknowledgement(ack, &self.chain_key)
-            .await
-            .map(|reply| {
-                #[cfg(all(feature = "prometheus", not(test)))]
-                match &reply {
-                    AckResult::Sender(_) => {
-                        METRIC_RECEIVED_ACKS.increment(&["true"]);
-                    }
-                    AckResult::RelayerWinning(_) => {
-                        METRIC_RECEIVED_ACKS.increment(&["true"]);
-                        METRIC_TICKETS_COUNT.increment(&["winning"]);
-                    }
-                    AckResult::RelayerLosing => {
-                        METRIC_RECEIVED_ACKS.increment(&["true"]);
-                        METRIC_TICKETS_COUNT.increment(&["losing"]);
-                    }
-                }
-
-                reply
-            })
-            .map_err(|e| {
-                #[cfg(all(feature = "prometheus", not(test)))]
-                METRIC_RECEIVED_ACKS.increment(&["false"]);
-
-                trace!("Failed to process a received acknowledgement: {e}");
-                let error: ProtocolError = e.into();
-                error
-            })
+        self.db.handle_acknowledgement(ack, &self.chain_key).await.map_err(|e| {
+            trace!("Failed to process a received acknowledgement: {e}");
+            let error: ProtocolError = e.into();
+            error
+        })
     }
 }
