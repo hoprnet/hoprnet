@@ -241,18 +241,19 @@ where
                     let msg_processor = msg_processor_write.clone();
 
                     async move {
-                        let p = PacketWrapping::send(&msg_processor, data, path).await;
-                        finalizer.finalize();
-                        p
+                        match PacketWrapping::send(&msg_processor, data, path).await {
+                            Ok(v) => {
+                                finalizer.finalize(Ok(()));
+                                Some(v)
+                            }
+                            Err(e) => {
+                                finalizer.finalize(Err(e));
+                                None
+                            }
+                        }
                     }
                 })
-                .filter_map(|v| async move {
-                    if let Ok((peer, octets)) = v {
-                        Some((peer, octets))
-                    } else {
-                        None
-                    }
-                })
+                .filter_map(|v| async move { v })
                 // delay purposefully isolated into a separate concurrent task
                 .then_concurrent(|v| async {
                     msg::processor::Delayer::new(msg::mixer::MixerConfig::default())

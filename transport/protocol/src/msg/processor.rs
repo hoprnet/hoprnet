@@ -1,5 +1,6 @@
 use futures::pin_mut;
 use futures::{future::Either, SinkExt};
+use hopr_crypto_packet::errors::PacketError;
 use hopr_db_api::protocol::TransportPacketWithChainData;
 use libp2p_identity::PeerId;
 use tracing::{debug, error};
@@ -297,19 +298,19 @@ impl Delayer {
 /// architectural overhaul of the hopr daemon.
 #[derive(Debug)]
 pub struct PacketSendFinalizer {
-    tx: futures::channel::oneshot::Sender<()>,
+    tx: futures::channel::oneshot::Sender<std::result::Result<(), PacketError>>,
 }
 
 impl PacketSendFinalizer {
-    pub fn finalize(self) {
-        if self.tx.send(()).is_err() {
+    pub fn finalize(self, result: std::result::Result<(), PacketError>) {
+        if self.tx.send(result).is_err() {
             error!("Failed to notify the awaiter about the successful packet transmission")
         }
     }
 }
 
-impl From<futures::channel::oneshot::Sender<()>> for PacketSendFinalizer {
-    fn from(value: futures::channel::oneshot::Sender<()>) -> Self {
+impl From<futures::channel::oneshot::Sender<std::result::Result<(), PacketError>>> for PacketSendFinalizer {
+    fn from(value: futures::channel::oneshot::Sender<std::result::Result<(), PacketError>>) -> Self {
         Self { tx: value }
     }
 }
@@ -317,11 +318,11 @@ impl From<futures::channel::oneshot::Sender<()>> for PacketSendFinalizer {
 /// Await on future until the confirmation of packet reception is received
 #[derive(Debug)]
 pub struct PacketSendAwaiter {
-    rx: futures::channel::oneshot::Receiver<()>,
+    rx: futures::channel::oneshot::Receiver<std::result::Result<(), PacketError>>,
 }
 
-impl From<futures::channel::oneshot::Receiver<()>> for PacketSendAwaiter {
-    fn from(value: futures::channel::oneshot::Receiver<()>) -> Self {
+impl From<futures::channel::oneshot::Receiver<std::result::Result<(), PacketError>>> for PacketSendAwaiter {
+    fn from(value: futures::channel::oneshot::Receiver<std::result::Result<(), PacketError>>) -> Self {
         Self { rx: value }
     }
 }
@@ -333,7 +334,9 @@ impl PacketSendAwaiter {
         let rx = self.rx;
         pin_mut!(rx, timeout);
         match futures::future::select(rx, timeout).await {
-            Either::Left((challenge, _)) => challenge.map_err(|_| TransportError("Canceled".to_owned())),
+            Either::Left((Ok(Ok(v)), _)) => Ok(v),
+            Either::Left((Ok(Err(e)), _)) => Err(TransportError(e.to_string())),
+            Either::Left((Err(_), _)) => Err(TransportError("Canceled".to_owned())),
             Either::Right(_) => Err(TransportError("Timed out on sending a packet".to_owned())),
         }
     }
@@ -354,7 +357,7 @@ impl MsgSender {
     /// Pushes a new packet into processing.
     #[tracing::instrument(level = "debug", skip(self, data))]
     pub async fn send_packet(&self, data: ApplicationData, path: TransportPath) -> Result<PacketSendAwaiter> {
-        let (tx, rx) = futures::channel::oneshot::channel::<()>();
+        let (tx, rx) = futures::channel::oneshot::channel::<std::result::Result<(), PacketError>>();
 
         self.tx
             .clone()
@@ -405,12 +408,12 @@ mod tests {
 
     #[async_std::test]
     pub async fn packet_send_finalizer_is_triggered() {
-        let (tx, rx) = futures::channel::oneshot::channel::<()>();
+        let (tx, rx) = futures::channel::oneshot::channel::<std::result::Result<(), PacketError>>();
 
         let finalizer: PacketSendFinalizer = tx.into();
         let awaiter: PacketSendAwaiter = rx.into();
 
-        finalizer.finalize();
+        finalizer.finalize(Ok(()));
 
         let result = awaiter.consume_and_wait(Duration::from_millis(20)).await;
 
@@ -440,7 +443,7 @@ mod tests {
 
         async_std::task::spawn(async move {
             async_std::task::sleep(Duration::from_millis(3)).await;
-            finalizer.finalize()
+            finalizer.finalize(Ok(()))
         });
 
         assert!(result

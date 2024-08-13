@@ -574,7 +574,7 @@ where
             .map_err(|e| HoprTransportError::Api(format!("send msg failed to enqueue msg: {e}")))?
             .consume_and_wait(crate::constants::PACKET_QUEUE_TIMEOUT_MILLISECONDS)
             .await
-            .map_err(|e| HoprTransportError::Api(format!("send msg timed out: {e}")))
+            .map_err(|e| HoprTransportError::Api(e.to_string()))
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
