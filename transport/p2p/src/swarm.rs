@@ -268,7 +268,7 @@ impl HoprSwarmWithProcessors {
             .time_to_live(std::time::Duration::from_secs(40))
             .build();
 
-        let mut aggregation_writer = self.ticket_aggregation_writer.clone();
+        let mut aggregation_writer = self.ticket_aggregation_writer;
 
         let inputs = (
             self.ack_to_send.map(Inputs::Acknowledgement),
@@ -436,6 +436,7 @@ impl HoprSwarmWithProcessors {
                                         request_id, response
                                     } => {
                                         if let Some(replier) = active_pings.remove(&request_id).await {
+                                            active_pings.run_pending_tasks().await;     // needed to remove the invalidated, but still present instance of Arc inside
                                             trace!(peer = %peer, request_id = %request_id, "Processing manual ping response");
                                             if let Some(replier) = Arc::<PingQueryReplier>::into_inner(replier) {
                                                 replier.notify(response.0, response.1)
@@ -451,7 +452,7 @@ impl HoprSwarmWithProcessors {
                             libp2p::request_response::Event::<Ping,Pong>::OutboundFailure {
                                 peer, request_id, error,
                             } => {
-                                active_pings.remove(&request_id).await;
+                                active_pings.invalidate(&request_id).await;
                                 error!(peer = %peer, request_id = %request_id, "Failed to send a Pong reply: {error}");
                             },
                             libp2p::request_response::Event::<Ping,Pong>::InboundFailure {
@@ -506,10 +507,13 @@ impl HoprSwarmWithProcessors {
                                 });
 
                                 match active_aggregation_requests.remove(&request).await {
-                                    Some(finalizer) => if let Some(finalizer) = Arc::<TicketAggregationFinalizer>::into_inner(finalizer) {
-                                        finalizer.finalize();
-                                    } else {
-                                        warn!(peer = %peer, request_id = %request, "Failed to finalize ticket aggregation, multiple instances of request exist")
+                                    Some(finalizer) => {
+                                        active_aggregation_requests.run_pending_tasks().await;     // needed to remove the invalidated, but still present instance of Arc inside
+                                        if let Some(finalizer) = Arc::<TicketAggregationFinalizer>::into_inner(finalizer) {
+                                            finalizer.finalize();
+                                        } else {
+                                            warn!(peer = %peer, request_id = %request, "Failed to finalize ticket aggregation, multiple instances of request exist")
+                                        }
                                     },
                                     None => {
                                         warn!(peer = %peer, request_id = %request, "Response already handled")
