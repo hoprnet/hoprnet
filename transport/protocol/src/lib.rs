@@ -63,7 +63,10 @@ pub mod ticket_aggregation;
 pub mod timer;
 use ack::processor::AckResult;
 use core_path::path::TransportPath;
-use hopr_crypto_types::keypairs::ChainKeypair;
+use hopr_crypto_types::{
+    keypairs::{ChainKeypair, Keypair, OffchainKeypair},
+    types::HalfKey,
+};
 pub use timer::execute_on_tick;
 
 use futures::{SinkExt, StreamExt};
@@ -97,6 +100,15 @@ lazy_static::lazy_static! {
         SimpleCounter::new("hopr_sent_acks_count", "Number of sent message acknowledgements").unwrap();
     static ref METRIC_TICKETS_COUNT: MultiCounter =
         MultiCounter::new("hopr_tickets_count", "Number of winning tickets", &["type"]).unwrap();
+}
+
+lazy_static::lazy_static! {
+    static ref GIBBERISH_HALF_KEY_CHALLENGE: HalfKey = HalfKey::random();
+    static ref GIBBERISH_OFFCHAIN_KEYPAIR: OffchainKeypair = OffchainKeypair::random();
+    static ref GIBBERISH_ACK: Acknowledgement = Acknowledgement::new(
+        *GIBBERISH_HALF_KEY_CHALLENGE,
+        &GIBBERISH_OFFCHAIN_KEYPAIR,
+    );
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
@@ -208,12 +220,10 @@ where
                 .then_concurrent(move |(peer, ack)| {
                     let ack_processor = ack_processor_write.clone();
 
-                    async move {
-                        #[cfg(all(feature = "prometheus", not(test)))]
-                        METRIC_SENT_ACKS.increment();
+                    #[cfg(all(feature = "prometheus", not(test)))]
+                    METRIC_SENT_ACKS.increment();
 
-                        (peer, ack_processor.send(&peer, ack).await)
-                    }
+                    async move { (peer, ack_processor.send(&peer, ack).await) }
                 })
                 .map(Ok)
                 .forward(wire_ack.0)
@@ -264,7 +274,7 @@ where
                 .then_concurrent(move |(peer, data)| {
                     let msg_processor = msg_processor_read.clone();
 
-                    async move { msg_processor.recv(&peer, data).await }
+                    async move { msg_processor.recv(&peer, data).await.map_err(|e| (peer, e)) }
                 })
                 .filter_map(move |v| {
                     let mut internal_ack_send = internal_ack_send.clone();
@@ -289,8 +299,19 @@ where
                                     None
                                 }
                             },
-                            Err(e) => {
-                                error!("Failed to process received message: {e}");
+                            Err((peer, e)) => {
+                                error!(peer = %peer, "Failed to process received message: {e}");
+                                // send gibberish ack in order to give feedback to the sender
+                                internal_ack_send
+                                    .send((
+                                        peer,
+                                        GIBBERISH_ACK.clone(),
+                                    ))
+                                    .await
+                                    .unwrap_or_else(|e| {
+                                        error!("Failed to forward an acknowledgement for a failed packet recv to the transport layer: {e}");
+                                    });
+
                                 None
                             }
                         }
