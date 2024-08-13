@@ -129,11 +129,11 @@ jobs:
             echo "project_id=hopr-staging" >> $GITHUB_OUTPUT
             echo "cluster_name=cluster-staging" >> $GITHUB_OUTPUT
             ## GCP_SA_TERRAFORM_JSON contains service account credentials for terraform staging
-            echo "credentials_json=${{ secrets.GCP_SA_TERRAFORM_JSON }}" >> $GITHUB_OUTPUT
+            echo "credentials_json=$(echo '${{ secrets.GCP_SA_TERRAFORM_JSON }}' | jq -c .)"  >> $GITHUB_OUTPUT
           elif [[ "${base_branch}" =~ ^"release" ]]; then
             echo "project_id=hopr-prod" >> $GITHUB_OUTPUT
             echo "cluster_name=cluster-prod" >> $GITHUB_OUTPUT
-            echo "credentials_json=${{ secrets.GCP_SA_TERRAFORM_JSON_PROD }}" >> $GITHUB_OUTPUT
+            echo "credentials_json=$(echo '${{ secrets.GCP_SA_TERRAFORM_JSON_PROD }}' | jq -c .)"  >> $GITHUB_OUTPUT
           else
             echo "Skipping kubernetes deployment"
             exit 0
