@@ -135,7 +135,7 @@ jobs:
             echo "cluster_name=cluster-prod" >> $GITHUB_OUTPUT
             echo "credentials_json=${{ secrets.GCP_SA_TERRAFORM_JSON_PROD }}" >> $GITHUB_OUTPUT
           else
-            echo "Skipping deployment"
+            echo "Skipping kubernetes deployment"
             exit 0
           fi
         env:
