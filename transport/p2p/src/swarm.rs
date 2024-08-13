@@ -1,7 +1,7 @@
 use futures::{channel::mpsc::UnboundedSender, pin_mut, select, StreamExt};
 use futures_concurrency::stream::Merge;
 use libp2p::{request_response::OutboundRequestId, PeerId};
-use std::{collections::HashMap, num::NonZeroU8};
+use std::{num::NonZeroU8, sync::Arc};
 use tracing::{debug, error, info, trace, warn};
 
 use core_network::{messaging::ControlMessage, network::NetworkTriggeredEvent, ping::PingQueryReplier};
@@ -257,11 +257,16 @@ impl HoprSwarmWithProcessors {
         let mut swarm: libp2p::Swarm<HoprNetworkBehavior> = self.swarm.into();
 
         // NOTE: an improvement would be a forgetting cache for the active requests
-        let mut active_pings: HashMap<libp2p::request_response::OutboundRequestId, PingQueryReplier> = HashMap::new();
-        let mut active_aggregation_requests: HashMap<
+        let active_pings: moka::future::Cache<libp2p::request_response::OutboundRequestId, Arc<PingQueryReplier>> =
+            moka::future::CacheBuilder::new(1000)
+                .time_to_live(std::time::Duration::from_secs(40))
+                .build();
+        let active_aggregation_requests: moka::future::Cache<
             libp2p::request_response::OutboundRequestId,
-            TicketAggregationFinalizer,
-        > = HashMap::new();
+            Arc<TicketAggregationFinalizer>,
+        > = moka::future::CacheBuilder::new(1000)
+            .time_to_live(std::time::Duration::from_secs(40))
+            .build();
 
         let mut aggregation_writer = self.ticket_aggregation_writer.clone();
 
@@ -430,9 +435,13 @@ impl HoprSwarmWithProcessors {
                                     libp2p::request_response::Message::<Ping,Pong>::Response {
                                         request_id, response
                                     } => {
-                                        if let Some(replier) = active_pings.remove(&request_id) {
+                                        if let Some(replier) = active_pings.remove(&request_id).await {
                                             trace!(peer = %peer, request_id = %request_id, "Processing manual ping response");
-                                            replier.notify(response.0, response.1)
+                                            if let Some(replier) = Arc::<PingQueryReplier>::into_inner(replier) {
+                                                replier.notify(response.0, response.1)
+                                            } else {
+                                                warn!(peer = %peer, request_id = %request_id, "Failed to notify with replier, multiple instances exist")
+                                            }
                                         } else {
                                             debug!(peer = %peer, request_id = %request_id, "Failed to find heartbeat replier");
                                         }
@@ -442,7 +451,7 @@ impl HoprSwarmWithProcessors {
                             libp2p::request_response::Event::<Ping,Pong>::OutboundFailure {
                                 peer, request_id, error,
                             } => {
-                                active_pings.remove(&request_id);
+                                active_pings.remove(&request_id).await;
                                 error!(peer = %peer, request_id = %request_id, "Failed to send a Pong reply: {error}");
                             },
                             libp2p::request_response::Event::<Ping,Pong>::InboundFailure {
@@ -483,7 +492,7 @@ impl HoprSwarmWithProcessors {
                                 let ack_tkt_count = acked_tickets.len();
                                 let request_id = swarm.behaviour_mut().ticket_aggregation.send_request(&peer, acked_tickets);
                                 debug!(peer = %peer, request_id = %request_id, "Sending request to aggregate {ack_tkt_count} tickets");
-                                active_aggregation_requests.insert(request_id, finalizer);
+                                active_aggregation_requests.insert(request_id, Arc::new(finalizer)).await;
                             },
                             TicketAggregationProcessed::Reply(peer, ticket, response) => {
                                 debug!(peer = %peer, "Enqueuing a response'");
@@ -496,10 +505,14 @@ impl HoprSwarmWithProcessors {
                                     error!(peer = %peer, request_id = %request, "Failed to process an aggregated acknowledgement: {e}");
                                 });
 
-                                match active_aggregation_requests.remove(&request) {
-                                    Some(finalizer) => finalizer.finalize(),
+                                match active_aggregation_requests.remove(&request).await {
+                                    Some(finalizer) => if let Some(finalizer) = Arc::<TicketAggregationFinalizer>::into_inner(finalizer) {
+                                        finalizer.finalize();
+                                    } else {
+                                        warn!(peer = %peer, request_id = %request, "Failed to finalize ticket aggregation, multiple instances of request exist")
+                                    },
                                     None => {
-                                        warn!("transport input - ticket aggregation - response already handled")
+                                        warn!(peer = %peer, request_id = %request, "Response already handled")
                                     }
                                 }
                             }
@@ -512,7 +525,7 @@ impl HoprSwarmWithProcessors {
                         match event {
                             crate::behavior::heartbeat::Event::ToProbe((peer, replier)) => {
                                 let req_id = swarm.behaviour_mut().heartbeat.send_request(&peer, Ping(replier.challenge()));
-                                active_pings.insert(req_id, replier);
+                                active_pings.insert(req_id, Arc::new(replier)).await;
                             },
                         }
                     }

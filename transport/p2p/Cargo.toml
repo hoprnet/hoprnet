@@ -29,6 +29,7 @@ libp2p = { workspace = true, features = [
   "yamux",
 ] }
 libp2p-mplex = { workspace = true }
+moka = { workspace = true }
 multiaddr = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 thiserror = { workspace = true }

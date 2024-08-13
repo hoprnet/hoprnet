@@ -4234,6 +4234,7 @@ dependencies = [
  "lazy_static",
  "libp2p",
  "libp2p-mplex",
+ "moka",
  "multiaddr",
  "serde",
  "thiserror",
