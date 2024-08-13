@@ -196,9 +196,9 @@ impl From<HoprTransportProcess> for HoprLibProcesses {
         match value {
             hopr_transport::HoprTransportProcess::Swarm => HoprLibProcesses::Swarm,
             hopr_transport::HoprTransportProcess::ProtocolAckIn => HoprLibProcesses::ProtocolAckIn,
-            hopr_transport::HoprTransportProcess::ProtocolAckOut => HoprLibProcesses::ProtocolAckIn,
-            hopr_transport::HoprTransportProcess::ProtocolMsgIn => HoprLibProcesses::ProtocolAckIn,
-            hopr_transport::HoprTransportProcess::ProtocolMsgOut => HoprLibProcesses::ProtocolAckIn,
+            hopr_transport::HoprTransportProcess::ProtocolAckOut => HoprLibProcesses::ProtocolAckOut,
+            hopr_transport::HoprTransportProcess::ProtocolMsgIn => HoprLibProcesses::ProtocolMsgIn,
+            hopr_transport::HoprTransportProcess::ProtocolMsgOut => HoprLibProcesses::ProtocolMsgOut,
             hopr_transport::HoprTransportProcess::Heartbeat => HoprLibProcesses::Heartbeat,
             hopr_transport::HoprTransportProcess::SessionsManagement => HoprLibProcesses::SessionsRouter,
             hopr_transport::HoprTransportProcess::BloomFilterSave => HoprLibProcesses::BloomFilterSave,

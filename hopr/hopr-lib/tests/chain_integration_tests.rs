@@ -21,12 +21,12 @@ use chain_types::utils::{
     add_announcement_as_target, approve_channel_transfer_from_safe, create_anvil, include_node_to_module_by_safe,
 };
 use chain_types::{ContractAddresses, ContractInstances};
-use core_transport::{ChainKeypair, Hash, Keypair, Multiaddr, OffchainKeypair};
 use hopr_async_runtime::prelude::{cancel_join_handle, sleep, spawn, JoinHandle};
 use hopr_crypto_types::prelude::*;
 use hopr_db_sql::{api::info::DomainSeparator, prelude::*};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
+use hopr_transport::{ChainKeypair, Hash, Keypair, Multiaddr, OffchainKeypair};
 
 // Helper function to generate the first acked ticket (channel_epoch 1, index 0, offset 0) of win prob 100%
 async fn generate_the_first_ack_ticket<M: Middleware>(

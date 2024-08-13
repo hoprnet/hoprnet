@@ -170,6 +170,10 @@ where
         | TransportPacketWithChainData::Forwarded { packet_tag, .. } = &packet
         {
             if self.is_tag_replay(packet_tag).await {
+                #[cfg(all(feature = "prometheus", not(test)))]
+                {
+                    METRIC_REPLAYED_PACKET_COUNT.increment();
+                }
                 return Err(TagReplay);
             }
         };
@@ -244,17 +248,9 @@ where
     ///
     /// There is a 0.1% chance that the positive result is not a replay because a Bloom filter is used.
     pub async fn is_tag_replay(&self, tag: &PacketTag) -> bool {
-        let is_replay_attempt = self
-            .tbf
+        self.tbf
             .with_write_lock(|inner: &mut TagBloomFilter| inner.check_and_set(tag))
-            .await;
-
-        #[cfg(all(feature = "prometheus", not(test)))]
-        {
-            METRIC_REPLAYED_PACKET_COUNT.increment();
-        }
-
-        is_replay_attempt
+            .await
     }
 }
 

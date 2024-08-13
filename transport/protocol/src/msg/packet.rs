@@ -88,7 +88,6 @@ impl TryFrom<TransportPacketWithChainData> for OutgoingPacket {
     }
 }
 
-// TODO: deprecated, remove!
 pub enum TransportPacket {
     /// Packet is intended for us
     Final {

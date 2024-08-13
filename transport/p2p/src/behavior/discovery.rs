@@ -107,7 +107,10 @@ impl NetworkBehaviour for Behaviour {
                 *self.connected_peers.entry(data.peer_id).or_insert(0) += 1
             }
             libp2p::swarm::FromSwarm::ConnectionClosed(data) => {
-                *self.connected_peers.entry(data.peer_id).or_insert(0) -= 1
+                let v = self.connected_peers.entry(data.peer_id).or_insert(0);
+                if *v > 0 {
+                    *v -= 1;
+                };
             }
             _ => {}
         }

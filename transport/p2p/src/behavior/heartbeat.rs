@@ -1,5 +1,11 @@
-/// TODO: Add heartbeat documentation here
-use std::collections::VecDeque;
+/// Behavior generating heartbeat requests for peers to be pinged.
+///
+/// This behavior is used with cooperation with the heartbeat request response protocol
+/// and as such is used primarily as the source of peers to be pinged.
+use std::{
+    collections::VecDeque,
+    task::{Context, Poll},
+};
 
 use futures::stream::{BoxStream, Stream, StreamExt};
 use libp2p::{
@@ -76,25 +82,19 @@ impl NetworkBehaviour for Behaviour {
 
     fn poll(
         &mut self,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<libp2p::swarm::ToSwarm<Self::ToSwarm, libp2p::swarm::THandlerInEvent<Self>>> {
+        cx: &mut Context<'_>,
+    ) -> Poll<libp2p::swarm::ToSwarm<Self::ToSwarm, libp2p::swarm::THandlerInEvent<Self>>> {
         if let Some(value) = self.pending_events.pop_front() {
-            return std::task::Poll::Ready(value);
+            return Poll::Ready(value);
         };
 
-        let poll_result = self.events.poll_next_unpin(cx).map(|e| {
-            if let Some((peer_id, replier)) = e {
+        match self.events.poll_next_unpin(cx) {
+            Poll::Ready(Some((peer_id, replier))) => {
                 self.pending_events
                     .push_back(ToSwarm::GenerateEvent(Event::ToProbe((peer_id, replier))));
+                Poll::Ready(self.pending_events.pop_front().unwrap())
             }
-        });
-
-        if matches!(poll_result, std::task::Poll::Pending) {
-            std::task::Poll::Pending
-        } else if let Some(value) = self.pending_events.pop_front() {
-            std::task::Poll::Ready(value)
-        } else {
-            std::task::Poll::Pending
+            Poll::Ready(None) | Poll::Pending => Poll::Pending,
         }
     }
 }

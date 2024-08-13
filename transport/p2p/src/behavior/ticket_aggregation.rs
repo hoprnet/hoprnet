@@ -1,5 +1,13 @@
-/// TODO: Add heartbeat documentation here
-use std::collections::VecDeque;
+/// Behavior emitting the ticket aggregation processor events used to trigger the ticket
+/// aggregation request response protocol.
+///
+/// This behavior is used with cooperation with the ticket aggregation request response protocol
+/// and as such is used primarily as the source of events to be performed with ticket aggregation
+/// on the wire level.
+use std::{
+    collections::VecDeque,
+    task::{Context, Poll},
+};
 
 use futures::stream::{BoxStream, Stream, StreamExt};
 use libp2p::swarm::{dummy::ConnectionHandler, NetworkBehaviour, ToSwarm};
@@ -72,24 +80,18 @@ impl NetworkBehaviour for Behaviour {
 
     fn poll(
         &mut self,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<libp2p::swarm::ToSwarm<Self::ToSwarm, libp2p::swarm::THandlerInEvent<Self>>> {
+        cx: &mut Context<'_>,
+    ) -> Poll<libp2p::swarm::ToSwarm<Self::ToSwarm, libp2p::swarm::THandlerInEvent<Self>>> {
         if let Some(value) = self.pending_events.pop_front() {
-            return std::task::Poll::Ready(value);
+            return Poll::Ready(value);
         };
 
-        let poll_result = self.events.poll_next_unpin(cx).map(|e| {
-            if let Some(ticket_agg_event) = e {
+        match self.events.poll_next_unpin(cx) {
+            std::task::Poll::Ready(Some(ticket_agg_event)) => {
                 self.pending_events.push_back(ToSwarm::GenerateEvent(ticket_agg_event));
+                std::task::Poll::Ready(self.pending_events.pop_front().unwrap())
             }
-        });
-
-        if matches!(poll_result, std::task::Poll::Pending) {
-            std::task::Poll::Pending
-        } else if let Some(value) = self.pending_events.pop_front() {
-            std::task::Poll::Ready(value)
-        } else {
-            std::task::Poll::Pending
+            std::task::Poll::Ready(None) | std::task::Poll::Pending => std::task::Poll::Pending,
         }
     }
 }
