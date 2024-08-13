@@ -356,7 +356,7 @@ impl MsgSender {
     }
 
     /// Pushes a new packet into processing.
-    #[tracing::instrument(level = "debug", skip(self))]
+    #[tracing::instrument(level = "debug", skip(self, data))]
     pub async fn send_packet(&self, data: ApplicationData, path: TransportPath) -> Result<PacketSendAwaiter> {
         let (tx, rx) = futures::channel::oneshot::channel::<()>();
 

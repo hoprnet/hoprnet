@@ -95,6 +95,7 @@ impl Debug for HoprNetworkBehavior {
 }
 
 impl HoprNetworkBehavior {
+    #[allow(clippy::too_many_arguments)]
     pub fn new<T, U, V, W>(
         me: PeerId,
         network_events: T,

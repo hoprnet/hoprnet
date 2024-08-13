@@ -142,7 +142,7 @@ impl HoprDbProtocolOperations for HoprDb {
         let myself = self.clone();
         let next_peer = myself.resolve_chain_key(&path[0]).await?.ok_or_else(|| {
             crate::errors::DbSqlError::LogicalError(format!(
-                "failed to find channel key for packet key {} on previous hop",
+                "failed to find chain key for packet key {} on previous hop",
                 path[0].to_peerid_str()
             ))
         })?;

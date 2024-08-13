@@ -123,7 +123,7 @@ impl From<IncomingPacket> for TransportPacket {
                 ack,
             } => TransportPacket::Final {
                 packet_tag,
-                previous_hop: previous_hop.into(),
+                previous_hop,
                 plain_text,
                 ack,
             },
@@ -135,8 +135,8 @@ impl From<IncomingPacket> for TransportPacket {
                 ack,
             } => TransportPacket::Forwarded {
                 packet_tag,
-                previous_hop: previous_hop.into(),
-                next_hop: next_hop.into(),
+                previous_hop,
+                next_hop,
                 data,
                 ack,
             },
@@ -147,7 +147,7 @@ impl From<IncomingPacket> for TransportPacket {
 impl From<OutgoingPacket> for TransportPacket {
     fn from(value: OutgoingPacket) -> Self {
         TransportPacket::Outgoing {
-            next_hop: value.next_hop.into(),
+            next_hop: value.next_hop,
             ack_challenge: value.ack_challenge,
             data: value.data,
         }

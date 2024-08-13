@@ -82,11 +82,11 @@ impl NetworkBehaviour for Behaviour {
             return std::task::Poll::Ready(value);
         };
 
-        let poll_result = self.events.poll_next_unpin(cx).map(|e| match e {
-            Some((peer_id, replier)) => self
-                .pending_events
-                .push_back(ToSwarm::GenerateEvent(Event::ToProbe((peer_id, replier)))),
-            None => {}
+        let poll_result = self.events.poll_next_unpin(cx).map(|e| {
+            if let Some((peer_id, replier)) = e {
+                self.pending_events
+                    .push_back(ToSwarm::GenerateEvent(Event::ToProbe((peer_id, replier))));
+            }
         });
 
         if matches!(poll_result, std::task::Poll::Pending) {

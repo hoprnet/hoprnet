@@ -56,8 +56,7 @@ impl<Db: HoprDbProtocolOperations> AcknowledgementProcessor<Db> {
             return Err(ProtocolError::InvalidSignature);
         };
 
-        Ok(self
-            .db
+        self.db
             .handle_acknowledgement(ack, &self.chain_key)
             .await
             .map(|reply| {
@@ -85,6 +84,6 @@ impl<Db: HoprDbProtocolOperations> AcknowledgementProcessor<Db> {
                 trace!("Failed to process a received acknowledgement: {e}");
                 let error: ProtocolError = e.into();
                 error
-            })?)
+            })
     }
 }

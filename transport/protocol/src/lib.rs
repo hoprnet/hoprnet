@@ -90,6 +90,7 @@ pub enum ProtocolProcesses {
     BloomPersist,
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn run_msg_ack_protocol<Db>(
     cfg: msg::processor::PacketInteractionConfig,
     db: Db,

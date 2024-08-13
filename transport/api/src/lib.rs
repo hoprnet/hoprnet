@@ -568,13 +568,13 @@ where
             HoprTransportError::Api("send msg: failed because message processing is not yet initialized".into())
         })?;
 
-        Ok(sender
+        sender
             .send_packet(app_data, path)
             .await
             .map_err(|e| HoprTransportError::Api(format!("send msg failed to enqueue msg: {e}")))?
             .consume_and_wait(crate::constants::PACKET_QUEUE_TIMEOUT_MILLISECONDS)
             .await
-            .map_err(|e| HoprTransportError::Api(format!("send msg timed out: {e}")))?)
+            .map_err(|e| HoprTransportError::Api(format!("send msg timed out: {e}")))
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
