@@ -15,4 +15,5 @@
   "[solidity]": {
     "editor.defaultFormatter": "JuanBlanco.solidity"
   },
+  "makefile.configureOnOpen": false
 }

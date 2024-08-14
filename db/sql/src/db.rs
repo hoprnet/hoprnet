@@ -179,7 +179,7 @@ mod tests {
     async fn test_basic_db_init() {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
 
-        // TODO: cfg-if this on Postgres to do only `Migrator::status(db.conn(Default::default)).await.expect("status must be ok");`
+        // NOTE: cfg-if this on Postgres to do only `Migrator::status(db.conn(Default::default)).await.expect("status must be ok");`
         MigratorIndex::status(db.conn(TargetDb::Index))
             .await
             .expect("status must be ok");

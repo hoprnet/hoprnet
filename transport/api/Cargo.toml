@@ -1,5 +1,5 @@
 [package]
-name = "core-transport"
+name = "hopr-transport"
 version = "0.6.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Implements the main HOPR interface for the core library"
@@ -13,18 +13,18 @@ crate-type = ["rlib"]
 default = []
 runtime-async-std = [
   "core-network/runtime-async-std",
-  "core-protocol/runtime-async-std",
   "hopr-async-runtime/runtime-async-std",
   "hopr-db-sql/runtime-async-std",
   "hopr-transport-p2p/runtime-async-std",
+  "hopr-transport-protocol/runtime-async-std",
   "hopr-transport-session/runtime-async-std",
 ]
 runtime-tokio = [
   "core-network/runtime-tokio",
-  "core-protocol/runtime-tokio",
   "hopr-async-runtime/runtime-tokio",
   "hopr-db-sql/runtime-tokio",
   "hopr-transport-p2p/runtime-tokio",
+  "hopr-transport-protocol/runtime-tokio",
   "hopr-transport-session/runtime-tokio",
 ]
 prometheus = [
@@ -32,9 +32,9 @@ prometheus = [
   "dep:hopr-metrics",
   "core-network/prometheus",
   "core-path/prometheus",
-  "core-protocol/prometheus",
   "hopr-db-sql/prometheus",
   "hopr-transport-p2p/prometheus",
+  "hopr-transport-protocol/prometheus",
 ]
 
 [dependencies]
@@ -45,6 +45,7 @@ lazy_static = { workspace = true, optional = true }
 libp2p = { workspace = true, features = ["request-response"] }
 moka = { workspace = true }
 proc-macro-regex = "~1.1.0"
+rust-stream-ext-concurrent = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
@@ -54,7 +55,6 @@ validator = { workspace = true }
 core-network = { workspace = true }
 chain-types = { workspace = true }
 core-path = { workspace = true }
-core-protocol = { workspace = true }
 hopr-crypto-packet = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-crypto-random = { workspace = true }
@@ -64,6 +64,7 @@ hopr-metrics = { workspace = true, optional = true }
 hopr-platform = { workspace = true }
 hopr-primitive-types = { workspace = true }
 hopr-transport-p2p = { workspace = true }
+hopr-transport-protocol = { workspace = true }
 hopr-transport-session = { workspace = true }
 hopr-async-runtime = { workspace = true }
 
@@ -71,5 +72,5 @@ hopr-async-runtime = { workspace = true }
 async-std = { workspace = true }
 hopr-db-sql = { workspace = true, features = ["runtime-async-std"] }
 core-network = { workspace = true, features = ["runtime-async-std"] }
-core-protocol = { workspace = true, features = ["runtime-async-std"] }
+hopr-transport-protocol = { workspace = true, features = ["runtime-async-std"] }
 hopr-transport-p2p = { workspace = true, features = ["runtime-async-std"] }

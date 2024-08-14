@@ -13,14 +13,14 @@ pub struct WrappedTagBloomFilter {
 
 impl WrappedTagBloomFilter {
     pub fn new(path: String) -> Self {
-        info!("Creating the Bloom filter storage at: {path}");
         let tbf = read_file(&path)
             .and_then(|data| {
+                debug!(path = &path, "Found and loading a tag Bloom filter");
                 TagBloomFilter::from_bytes(&data)
                     .map_err(|e| hopr_platform::error::PlatformError::GeneralError(e.to_string()))
             })
             .unwrap_or_else(|_| {
-                debug!("No tag Bloom filter found, using empty");
+                debug!(path = &path, "No tag Bloom filter found, using empty");
                 TagBloomFilter::default()
             });
 

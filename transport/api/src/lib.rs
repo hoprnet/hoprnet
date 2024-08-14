@@ -18,7 +18,6 @@ pub mod constants;
 pub mod errors;
 pub mod helpers;
 pub mod network_notifier;
-mod timer;
 
 use std::{
     collections::HashMap,
@@ -26,29 +25,19 @@ use std::{
 };
 
 use async_lock::RwLock;
-use constants::{RESERVED_SESSION_TAG_UPPER_LIMIT, RESERVED_SUBPROTOCOL_TAG_UPPER_LIMIT};
-use futures::future::{select, Either};
-use futures::pin_mut;
 use futures::{
     channel::mpsc::{UnboundedReceiver, UnboundedSender},
-    FutureExt, StreamExt,
+    future::{select, Either},
+    pin_mut, FutureExt, StreamExt,
 };
 use tracing::{debug, error, info, trace, warn};
 
 use core_network::{
     heartbeat::Heartbeat,
-    ping::{PingQueryReplier, Pinger, Pinging},
+    ping::{PingConfig, PingQueryReplier, Pinger, Pinging},
+    PeerId,
 };
-use core_network::{ping::PingConfig, PeerId};
-use core_protocol::{
-    ack::processor::AcknowledgementInteraction,
-    bloom::WrappedTagBloomFilter,
-    errors::ProtocolError,
-    msg::processor::{PacketActions, PacketInteraction, PacketInteractionConfig},
-    ticket_aggregation::processor::{
-        AwaitingAggregator, TicketAggregationActions, TicketAggregationInteraction, TicketAggregatorTrait,
-    },
-};
+use core_path::path::TransportPath;
 use hopr_async_runtime::prelude::{sleep, spawn, JoinHandle};
 use hopr_db_sql::{
     api::tickets::{AggregationPrerequisites, HoprDbTicketOperations},
@@ -61,6 +50,13 @@ use hopr_transport_p2p::{
     swarm::{TicketAggregationRequestType, TicketAggregationResponseType},
     HoprSwarm,
 };
+use hopr_transport_protocol::{
+    errors::ProtocolError,
+    msg::processor::{MsgSender, PacketInteractionConfig, PacketSendFinalizer},
+    ticket_aggregation::processor::{
+        AwaitingAggregator, TicketAggregationActions, TicketAggregationInteraction, TicketAggregatorTrait,
+    },
+};
 pub use {
     core_network::network::{Health, Network, NetworkTriggeredEvent, PeerOrigin, PeerStatus},
     hopr_crypto_types::{
@@ -70,30 +66,36 @@ pub use {
     hopr_internal_types::protocol::ApplicationData,
     hopr_transport_p2p::{
         libp2p, libp2p::swarm::derive_prelude::Multiaddr, multiaddrs::strip_p2p_protocol,
-        swarm::HoprSwarmWithProcessors, PeerTransportEvent, TransportOutput,
+        swarm::HoprSwarmWithProcessors, PeerDiscovery,
     },
+    hopr_transport_protocol::execute_on_tick,
     hopr_transport_session::{
         errors::TransportSessionError, traits::SendMsg, Capability as SessionCapability, PathOptions, Session,
         SessionClientConfig, SessionId, SESSION_USABLE_MTU_SIZE,
     },
 };
 
-use crate::errors::HoprTransportError;
-pub use crate::{
-    helpers::{IndexerTransportEvent, PeerEligibility, TicketStatistics},
-    timer::execute_on_tick,
+use crate::{
+    constants::{RESERVED_SESSION_TAG_UPPER_LIMIT, RESERVED_SUBPROTOCOL_TAG_UPPER_LIMIT},
+    errors::HoprTransportError,
 };
+
+pub use crate::helpers::{IndexerTransportEvent, PeerEligibility, TicketStatistics};
 
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
 pub enum HoprTransportProcess {
     Heartbeat,
     Swarm,
-    SessionsRouter,
+    ProtocolAckIn,
+    ProtocolAckOut,
+    ProtocolMsgIn,
+    ProtocolMsgOut,
+    SessionsManagement,
     BloomFilterSave,
 }
 
 #[derive(Debug, Clone)]
-pub struct AggregatorProxy<Db>
+pub struct TicketAggregatorProxy<Db>
 where
     Db: HoprDbTicketOperations + Send + Sync + Clone + std::fmt::Debug,
 {
@@ -103,7 +105,7 @@ where
     agg_timeout: std::time::Duration,
 }
 
-impl<Db> AggregatorProxy<Db>
+impl<Db> TicketAggregatorProxy<Db>
 where
     Db: HoprDbTicketOperations + Send + Sync + Clone + std::fmt::Debug,
 {
@@ -123,7 +125,7 @@ where
 }
 
 #[async_trait::async_trait]
-impl<Db> TicketAggregatorTrait for AggregatorProxy<Db>
+impl<Db> TicketAggregatorTrait for TicketAggregatorProxy<Db>
 where
     Db: HoprDbTicketOperations + Send + Sync + Clone + std::fmt::Debug,
 {
@@ -131,13 +133,13 @@ where
         &self,
         channel: &Hash,
         prerequisites: AggregationPrerequisites,
-    ) -> core_protocol::errors::Result<()> {
+    ) -> hopr_transport_protocol::errors::Result<()> {
         if let Some(writer) = self.maybe_writer.clone().get() {
             AwaitingAggregator::new(self.db.clone(), writer.clone(), self.agg_timeout)
                 .aggregate_tickets(channel, prerequisites)
                 .await
         } else {
-            Err(core_protocol::errors::ProtocolError::TransportError(
+            Err(ProtocolError::TransportError(
                 "Ticket aggregation writer not available, the object was not yet initialized".to_string(),
             ))
         }
@@ -147,12 +149,12 @@ where
 pub struct HoprTransportConfig {
     pub transport: config::TransportConfig,
     pub network: core_network::config::NetworkConfig,
-    pub protocol: core_protocol::config::ProtocolConfig,
+    pub protocol: hopr_transport_protocol::config::ProtocolConfig,
     pub heartbeat: core_network::heartbeat::HeartbeatConfig,
 }
 
-/// Interface into the physical transport mechanism allowing all HOPR related tasks on
-/// the transport mechanism, as well as off-chain ticket manipulation.
+/// Interface into the physical transport mechanism allowing all off-chain HOPR related tasks on
+/// the transport, as well as off-chain ticket manipulation.
 pub struct HoprTransport<T>
 where
     T: HoprDbAllOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
@@ -165,7 +167,7 @@ where
     network: Arc<Network<T>>,
     path_planner: helpers::PathPlanner<T>,
     my_multiaddresses: Vec<Multiaddr>,
-    process_packet_send: Arc<OnceLock<PacketActions>>,
+    process_packet_send: Arc<OnceLock<MsgSender>>,
     process_ticket_aggregate:
         Arc<OnceLock<TicketAggregationActions<TicketAggregationResponseType, TicketAggregationRequestType>>>,
     sessions: moka::future::Cache<SessionId, UnboundedSender<Box<[u8]>>>,
@@ -230,11 +232,13 @@ where
         version: String,
         network: Arc<Network<T>>,
         tbf_path: String,
-        on_transport_output: UnboundedSender<TransportOutput>,
+        on_transport_output: UnboundedSender<ApplicationData>,
         on_acknowledged_ticket: UnboundedSender<AcknowledgedTicket>,
-        transport_updates: UnboundedReceiver<PeerTransportEvent>,
+        transport_updates: UnboundedReceiver<PeerDiscovery>,
         incoming_session_queue: UnboundedSender<Session>,
     ) -> HashMap<HoprTransportProcess, JoinHandle<()>> {
+        let mut processes: HashMap<HoprTransportProcess, JoinHandle<()>> = HashMap::new();
+
         // network event processing channel
         let (network_events_tx, network_events_rx) = futures::channel::mpsc::channel::<NetworkTriggeredEvent>(
             constants::MAXIMUM_NETWORK_UPDATE_EVENT_QUEUE_SIZE,
@@ -255,7 +259,7 @@ where
                 network.clone(),
                 self.db.clone(),
                 self.path_planner.channel_graph(),
-                network_events_tx.clone(),
+                network_events_tx,
             ),
         );
 
@@ -264,37 +268,31 @@ where
             .set(ping)
             .expect("must set the ping executor only once");
 
-        let transport_layer = HoprSwarm::new(me.into(), self.my_multiaddresses.clone(), self.cfg.protocol).await;
+        let ticket_agg_proc = TicketAggregationInteraction::new(self.db.clone(), me_onchain);
+        let tkt_agg_writer = ticket_agg_proc.writer();
 
-        let ack_proc = AcknowledgementInteraction::new(self.db.clone(), me_onchain);
+        let transport_layer = HoprSwarm::new(
+            me.into(),
+            network_events_rx,
+            transport_updates,
+            ping_rx,
+            ticket_agg_proc,
+            self.my_multiaddresses.clone(),
+            self.cfg.protocol,
+        )
+        .await;
 
-        let tbf = WrappedTagBloomFilter::new(tbf_path);
+        let (external_msg_send, external_msg_rx) =
+            futures::channel::mpsc::unbounded::<(ApplicationData, TransportPath, PacketSendFinalizer)>();
 
-        let tbf_clone = tbf.clone();
-
-        let mut processes: HashMap<HoprTransportProcess, JoinHandle<()>> = HashMap::new();
-        processes.insert(
-            HoprTransportProcess::BloomFilterSave,
-            spawn(Box::pin(execute_on_tick(
-                std::time::Duration::from_secs(90),
-                move || {
-                    let tbf_clone = tbf_clone.clone();
-
-                    async move { tbf_clone.save().await }
-                },
-            ))),
-        );
-
-        let packet_proc = PacketInteraction::new(self.db.clone(), tbf, PacketInteractionConfig::new(me, me_onchain));
         self.process_packet_send
             .clone()
-            .set(packet_proc.writer())
+            .set(MsgSender::new(external_msg_send))
             .expect("must set the packet processing writer only once");
 
-        let ticket_agg_proc = TicketAggregationInteraction::new(self.db.clone(), me_onchain);
         self.process_ticket_aggregate
             .clone()
-            .set(ticket_agg_proc.writer())
+            .set(tkt_agg_writer.clone())
             .expect("must set the ticket aggregation writer only once");
 
         // heartbeat
@@ -308,21 +306,56 @@ where
             Box::new(|dur| Box::pin(sleep(dur))),
         );
 
+        // initiate the libp2p transport layer
+        let (ack_to_send_tx, ack_to_send_rx) = futures::channel::mpsc::unbounded::<(PeerId, Acknowledgement)>();
+        let (ack_received_tx, ack_received_rx) = futures::channel::mpsc::unbounded::<(PeerId, Acknowledgement)>();
+
+        let (msg_to_send_tx, msg_to_send_rx) = futures::channel::mpsc::unbounded::<(PeerId, Box<[u8]>)>();
+        let (msg_received_tx, msg_received_rx) = futures::channel::mpsc::unbounded::<(PeerId, Box<[u8]>)>();
+
         let transport_layer = transport_layer.with_processors(
-            network_events_rx,
-            transport_updates,
-            ack_proc,
-            packet_proc,
-            ticket_agg_proc,
-            ping_rx,
+            ack_to_send_rx,
+            ack_received_tx,
+            msg_to_send_rx,
+            msg_received_tx,
+            tkt_agg_writer,
         );
 
         processes.insert(
-            HoprTransportProcess::Heartbeat,
-            spawn(async move { heartbeat.heartbeat_loop().await }),
+            HoprTransportProcess::Swarm,
+            spawn(transport_layer.run(version, on_acknowledged_ticket.clone())),
         );
 
-        let (tx, rx) = futures::channel::mpsc::unbounded::<TransportOutput>();
+        // initiate the msg-ack protocol stack over the wire transport
+        let packet_cfg = PacketInteractionConfig::new(me, me_onchain);
+
+        let (tx_from_protocol, rx_from_protocol) = futures::channel::mpsc::unbounded::<ApplicationData>();
+        for (k, v) in hopr_transport_protocol::run_msg_ack_protocol(
+            packet_cfg,
+            self.db.clone(),
+            me_onchain,
+            Some(tbf_path),
+            on_acknowledged_ticket,
+            (ack_to_send_tx, ack_received_rx),
+            (msg_to_send_tx, msg_received_rx),
+            (tx_from_protocol, external_msg_rx),
+        )
+        .await
+        .into_iter()
+        {
+            processes.insert(
+                match k {
+                    hopr_transport_protocol::ProtocolProcesses::AckIn => HoprTransportProcess::ProtocolAckIn,
+                    hopr_transport_protocol::ProtocolProcesses::AckOut => HoprTransportProcess::ProtocolAckOut,
+                    hopr_transport_protocol::ProtocolProcesses::MsgIn => HoprTransportProcess::ProtocolMsgIn,
+                    hopr_transport_protocol::ProtocolProcesses::MsgOut => HoprTransportProcess::ProtocolMsgOut,
+                    hopr_transport_protocol::ProtocolProcesses::BloomPersist => HoprTransportProcess::BloomFilterSave,
+                },
+                v,
+            );
+        }
+
+        // initiate session handling over the msg-ack protocol stack
         let sessions = self.sessions.clone();
         let me = self.me;
         let message_sender = Arc::new(helpers::MessageSender::new(
@@ -331,74 +364,71 @@ where
         ));
 
         processes.insert(
-            HoprTransportProcess::SessionsRouter,
+            HoprTransportProcess::SessionsManagement,
             spawn(async move {
-                let _the_process_should_not_end = StreamExt::filter_map(rx, move |output| {
+                let _the_process_should_not_end = StreamExt::filter_map(rx_from_protocol, move |data| {
                     let sessions = sessions.clone();
                     let me = me;
                     let message_sender = message_sender.clone();
                     let incoming_session_queue = incoming_session_queue.clone();
 
                     async move {
-                        match output {
-                            TransportOutput::Received(data) => {
-                                if let Some(app_tag) = data.application_tag {
-                                    if app_tag < RESERVED_SUBPROTOCOL_TAG_UPPER_LIMIT {
-                                        None
-                                    } else if app_tag < RESERVED_SESSION_TAG_UPPER_LIMIT {
-                                        if let Ok((peer, data)) =
-                                            hopr_transport_session::types::unwrap_offchain_key(data.plain_text.clone())
-                                        {
-                                            if let Some(sender) = sessions.get(&SessionId::new(app_tag, peer)).await {
-                                                trace!(
-                                                    app_tag,
-                                                    peer_id = tracing::field::debug(peer),
-                                                    "Received data for a registered session"
-                                                );
-                                                if let Err(e) = sender.unbounded_send(data) {
+                        if let Some(app_tag) = data.application_tag {
+                            const SPECIAL_TAG_HIGHEST_VALUE: u16 = RESERVED_SUBPROTOCOL_TAG_UPPER_LIMIT - 1;
+                            const SESSION_TAG_HIGHEST_VALUE: u16 = RESERVED_SESSION_TAG_UPPER_LIMIT - 1;
+                            match app_tag {
+                                0..=SPECIAL_TAG_HIGHEST_VALUE => None,
+                                RESERVED_SUBPROTOCOL_TAG_UPPER_LIMIT..=SESSION_TAG_HIGHEST_VALUE => {
+                                    if let Ok((peer, data)) =
+                                        hopr_transport_session::types::unwrap_offchain_key(data.plain_text.clone())
+                                    {
+                                        if let Some(sender) = sessions.get(&SessionId::new(app_tag, peer)).await {
+                                            trace!(
+                                                app_tag,
+                                                peer_id = tracing::field::debug(peer),
+                                                "Received data for a registered session"
+                                            );
+                                            if let Err(e) = sender.unbounded_send(data) {
+                                                error!("Failed to send data to session: {e}");
+                                            }
+                                        } else {
+                                            info!(
+                                                app_tag,
+                                                peer_id = tracing::field::debug(peer),
+                                                "Detected a new incoming session"
+                                            );
+                                            let session_id = SessionId::new(app_tag, peer);
+
+                                            let (tx, rx) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
+
+                                            if incoming_session_queue
+                                                .unbounded_send(Session::new(
+                                                    session_id,
+                                                    me,
+                                                    PathOptions::IntermediatePath(vec![]),
+                                                    vec![],
+                                                    message_sender.clone(),
+                                                    rx,
+                                                ))
+                                                .is_ok()
+                                            {
+                                                // if the data does not get into the session, it can recover
+                                                if let Err(e) = tx.unbounded_send(data) {
                                                     error!("Failed to send data to session: {e}");
                                                 }
+
+                                                sessions.insert(session_id, tx).await;
                                             } else {
-                                                info!(
-                                                    app_tag,
-                                                    peer_id = tracing::field::debug(peer),
-                                                    "Detected a new incoming session"
-                                                );
-                                                let session_id = SessionId::new(app_tag, peer);
-
-                                                let (tx, rx) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
-
-                                                if incoming_session_queue
-                                                    .unbounded_send(Session::new(
-                                                        session_id,
-                                                        me,
-                                                        PathOptions::IntermediatePath(vec![]),
-                                                        vec![],
-                                                        message_sender.clone(),
-                                                        rx,
-                                                    ))
-                                                    .is_ok()
-                                                {
-                                                    // if the data does not get into the session, it can recover
-                                                    if let Err(e) = tx.unbounded_send(data) {
-                                                        error!("Failed to send data to session: {e}");
-                                                    }
-
-                                                    sessions.insert(session_id, tx).await;
-                                                } else {
-                                                    warn!("Failed to send session to incoming session queue");
-                                                }
+                                                warn!("Failed to send session to incoming session queue");
                                             }
                                         }
-                                        None
-                                    } else {
-                                        Some(TransportOutput::Received(data))
                                     }
-                                } else {
-                                    Some(TransportOutput::Received(data))
+                                    None
                                 }
+                                _ => Some(data),
                             }
-                            TransportOutput::Sent(hkc) => Some(TransportOutput::Sent(hkc)),
+                        } else {
+                            Some(data)
                         }
                     }
                 })
@@ -408,16 +438,17 @@ where
             }),
         );
 
+        // initiate the network telemetry
         processes.insert(
-            HoprTransportProcess::Swarm,
-            spawn(transport_layer.run(version, tx, on_acknowledged_ticket)),
+            HoprTransportProcess::Heartbeat,
+            spawn(async move { heartbeat.heartbeat_loop().await }),
         );
 
         processes
     }
 
     pub fn ticket_aggregator(&self) -> Arc<dyn TicketAggregatorTrait + Send + Sync + 'static> {
-        Arc::new(AggregatorProxy::new(
+        Arc::new(TicketAggregatorProxy::new(
             self.db.clone(),
             self.process_ticket_aggregate.clone(),
             self.cfg.protocol.ticket_aggregation.timeout,
@@ -514,7 +545,7 @@ where
         destination: PeerId,
         options: PathOptions,
         application_tag: Option<u16>,
-    ) -> errors::Result<HalfKeyChallenge> {
+    ) -> errors::Result<()> {
         if let Some(application_tag) = application_tag {
             if application_tag < RESERVED_SESSION_TAG_UPPER_LIMIT {
                 return Err(HoprTransportError::Api(format!(
@@ -533,27 +564,17 @@ where
 
         let path = self.path_planner.resolve_path(destination, options).await?;
 
-        let mut sender = self
-            .process_packet_send
-            .get()
-            .ok_or_else(|| {
-                HoprTransportError::Api(
-                    "send msg: failed to send a message, because message processing is not yet initialized".into(),
-                )
-            })?
-            .clone();
+        let sender = self.process_packet_send.get().ok_or_else(|| {
+            HoprTransportError::Api("send msg: failed because message processing is not yet initialized".into())
+        })?;
 
-        match sender.send_packet(app_data, path) {
-            Ok(mut awaiter) => {
-                tracing::trace!("Awaiting the HalfKeyChallenge");
-                Ok(awaiter
-                    .consume_and_wait(crate::constants::PACKET_QUEUE_TIMEOUT_MILLISECONDS)
-                    .await?)
-            }
-            Err(e) => Err(HoprTransportError::Api(format!(
-                "send msg: failed to enqueue msg send: {e}"
-            ))),
-        }
+        sender
+            .send_packet(app_data, path)
+            .await
+            .map_err(|e| HoprTransportError::Api(format!("send msg failed to enqueue msg: {e}")))?
+            .consume_and_wait(crate::constants::PACKET_QUEUE_TIMEOUT_MILLISECONDS)
+            .await
+            .map_err(|e| HoprTransportError::Api(e.to_string()))
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
@@ -568,15 +589,15 @@ where
                 if let Some(c) = c {
                     Ok(c)
                 } else {
-                    Err(core_protocol::errors::ProtocolError::ChannelNotFound.into())
+                    Err(ProtocolError::ChannelNotFound.into())
                 }
             })?;
 
         if entry.status != ChannelStatus::Open {
-            return Err(core_protocol::errors::ProtocolError::ChannelClosed.into());
+            return Err(ProtocolError::ChannelClosed.into());
         }
 
-        Ok(Arc::new(AggregatorProxy::new(
+        Ok(Arc::new(TicketAggregatorProxy::new(
             self.db.clone(),
             self.process_ticket_aggregate.clone(),
             self.cfg.protocol.ticket_aggregation.timeout,
