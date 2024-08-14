@@ -18,7 +18,7 @@ ethers = { workspace = true, default-features = false }
 hex-literal = { workspace = true }
 num_enum = { workspace = true }
 multiaddr = "0.18"
-serde = { version = "1.0", features = ["derive"] }
+serde = { workspace = true, features = ["derive"] }
 serde_repr = "0.1"
 serde_bytes = { workspace = true }
 smart-default = { workspace = true }

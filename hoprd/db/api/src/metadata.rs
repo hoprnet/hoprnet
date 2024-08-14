@@ -1,10 +1,21 @@
 use async_trait::async_trait;
-use hopr_internal_types::alias::AliasEntry;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+use serde::{Deserialize, Serialize};
 
 use crate::{db::HoprdDb, errors::Result};
 
-pub const ALIASES_ENTRY_NAME: &str = "aliases";
+/// Represents an alias
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AliasEntry {
+    pub peer_id: String,
+    pub alias: String,
+}
+
+impl AliasEntry {
+    pub fn new(peer_id: String, alias: String) -> Self {
+        Self { peer_id, alias }
+    }
+}
 
 /// Defines DB API for accessing HOPR settings (mainly aliases for now)
 #[async_trait]

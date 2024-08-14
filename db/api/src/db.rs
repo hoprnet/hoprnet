@@ -34,7 +34,6 @@ pub struct HoprDb {
     pub(crate) db: sea_orm::DatabaseConnection,
     pub(crate) tickets_db: sea_orm::DatabaseConnection,
     pub(crate) peers_db: sea_orm::DatabaseConnection,
-    pub(crate) settings_db: sea_orm::DatabaseConnection,
     pub(crate) ticket_manager: Arc<TicketManager>,
     pub(crate) chain_key: ChainKeypair, // TODO: remove this once chain keypairs are not needed to reconstruct tickets
     pub(crate) me_onchain: Address,
@@ -44,7 +43,6 @@ pub struct HoprDb {
 pub const SQL_DB_INDEX_FILE_NAME: &str = "hopr_index.db";
 pub const SQL_DB_PEERS_FILE_NAME: &str = "hopr_peers.db";
 pub const SQL_DB_TICKETS_FILE_NAME: &str = "hopr_tickets.db";
-pub const SQL_DB_SETTINGS_FILE_NAME: &str = "hopr_settings.db";
 
 impl HoprDb {
     pub async fn new(directory: String, chain_key: ChainKeypair, cfg: HoprDbConfig) -> Self {
@@ -92,20 +90,12 @@ impl HoprDb {
             .await
             .unwrap_or_else(|e| panic!("failed to create main database: {e}"));
 
-        let settings = PoolOptions::new()
-            .min_connections(0)
-            .max_connections(50)
-            .connect_with(cfg_template.clone().filename(dir.join(SQL_DB_SETTINGS_FILE_NAME)))
-            .await
-            .unwrap_or_else(|e| panic!("failed to create main database: {e}"));
-
-        Self::new_sqlx_sqlite(chain_key, index, peers, tickets, settings).await
+        Self::new_sqlx_sqlite(chain_key, index, peers, tickets).await
     }
 
     pub async fn new_in_memory(chain_key: ChainKeypair) -> Self {
         Self::new_sqlx_sqlite(
             chain_key,
-            SqlitePool::connect(":memory:").await.unwrap(),
             SqlitePool::connect(":memory:").await.unwrap(),
             SqlitePool::connect(":memory:").await.unwrap(),
             SqlitePool::connect(":memory:").await.unwrap(),
@@ -118,7 +108,6 @@ impl HoprDb {
         index_db: SqlitePool,
         peers_db: SqlitePool,
         tickets_db: SqlitePool,
-        settings_db: SqlitePool,
     ) -> Self {
         let index_db = SqlxSqliteConnector::from_sqlx_sqlite_pool(index_db);
 
@@ -137,8 +126,6 @@ impl HoprDb {
         MigratorPeers::up(&peers_db, None)
             .await
             .expect("cannot apply database migration");
-
-        let settings_db = SqlxSqliteConnector::from_sqlx_sqlite_pool(settings_db);
 
         // Reset the peer network information
         let res = hopr_db_entity::network_peer::Entity::delete_many()
@@ -167,7 +154,6 @@ impl HoprDb {
             chain_key,
             db: index_db,
             peers_db,
-            settings_db,
             ticket_manager: Arc::new(TicketManager::new(tickets_db.clone(), caches.clone())),
             tickets_db,
             caches,

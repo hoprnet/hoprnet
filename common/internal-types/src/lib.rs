@@ -7,9 +7,6 @@ pub mod account;
 pub mod acknowledgement;
 /// Implements types for on-chain announcement of nodes.
 pub mod announcement;
-
-/// Implements types for alias-handling
-pub mod alias;
 /// Implements types related to HOPR payment channels.
 pub mod channels;
 /// Enumerates all errors in this crate.
@@ -24,7 +21,6 @@ pub mod legacy; // TODO: remove this in 3.0
 pub mod prelude {
     pub use super::account::*;
     pub use super::acknowledgement::*;
-    pub use super::alias::*;
     pub use super::announcement::*;
     pub use super::channels::*;
     pub use super::errors::CoreTypesError;

@@ -11,7 +11,6 @@ pub mod peers;
 pub mod protocol;
 pub mod registry;
 pub mod resolver;
-pub mod settings;
 mod ticket_manager;
 pub mod tickets;
 
@@ -20,7 +19,6 @@ pub use sea_orm::DatabaseTransaction;
 
 use crate::accounts::HoprDbAccountOperations;
 use crate::channels::HoprDbChannelOperations;
-use crate::settings::HoprDbSettingsOperations;
 use crate::tickets::HoprDbTicketOperations;
 use async_trait::async_trait;
 use futures::future::BoxFuture;
@@ -105,8 +103,6 @@ pub enum TargetDb {
     Tickets,
     /// Network peers database
     Peers,
-    /// Key-Value settings database
-    Settings,
 }
 
 #[async_trait]
@@ -157,7 +153,6 @@ impl HoprDbGeneralModelOperations for HoprDb {
             TargetDb::Index => &self.db,
             TargetDb::Tickets => &self.tickets_db,
             TargetDb::Peers => &self.peers_db,
-            TargetDb::Settings => &self.settings_db,
         }
     }
 
@@ -172,10 +167,6 @@ impl HoprDbGeneralModelOperations for HoprDb {
             )),
             TargetDb::Peers => Ok(OpenTransaction(
                 self.peers_db.begin_with_config(None, None).await?,
-                target_db,
-            )),
-            TargetDb::Settings => Ok(OpenTransaction(
-                self.settings_db.begin_with_config(None, None).await?,
                 target_db,
             )),
         }
@@ -193,7 +184,6 @@ pub trait HoprDbAllOperations:
     + HoprDbPeersOperations
     + HoprDbResolverOperations
     + HoprDbProtocolOperations
-    + HoprDbSettingsOperations
 {
 }
 
