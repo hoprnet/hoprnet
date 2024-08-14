@@ -92,7 +92,7 @@ impl From<OpenTransaction> for DatabaseTransaction {
 pub type OptTx<'a> = Option<&'a OpenTransaction>;
 
 /// When Sqlite is used as a backend, model needs to be split
-/// into 4 different databases to avoid locking the database.
+/// into 3 different databases to avoid locking the database.
 /// On Postgres backend, these should actually point to the same database.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Default)]
 pub enum TargetDb {
