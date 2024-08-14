@@ -35,10 +35,6 @@ use std::fmt::Debug;
 
 use core_network::network::NetworkTriggeredEvent;
 use core_network::ping::PingQueryReplier;
-use hopr_transport_protocol::{
-    ack::config::AckProtocolConfig, heartbeat::config::HeartbeatProtocolConfig, msg::config::MsgProtocolConfig,
-    ticket_aggregation::config::TicketAggregationProtocolConfig,
-};
 
 use futures::Stream;
 /// Re-export of the entire libp2p functionality
@@ -60,6 +56,8 @@ use crate::constants::{
     HOPR_ACKNOWLEDGE_PROTOCOL_V_0_1_0, HOPR_HEARTBEAT_PROTOCOL_V_0_1_0, HOPR_MESSAGE_PROTOCOL_V_0_1_0,
     HOPR_TICKET_AGGREGATION_PROTOCOL_V_0_1_0,
 };
+
+pub const MSG_ACK_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 
 /// `Ping` protocol base type for the ping operation
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -102,10 +100,8 @@ impl HoprNetworkBehavior {
         onchain_events: U,
         heartbeat_requests: V,
         ticket_aggregation_processed_events: W,
-        msg_cfg: MsgProtocolConfig,
-        ack_cfg: AckProtocolConfig,
-        hb_cfg: HeartbeatProtocolConfig,
-        ticket_aggregation_cfg: TicketAggregationProtocolConfig,
+        hb_timeout: std::time::Duration,
+        ticket_aggregation_timeout: std::time::Duration,
     ) -> Self
     where
         T: Stream<Item = NetworkTriggeredEvent> + Send + 'static,
@@ -124,21 +120,21 @@ impl HoprNetworkBehavior {
                     StreamProtocol::new(HOPR_HEARTBEAT_PROTOCOL_V_0_1_0),
                     libp2p::request_response::ProtocolSupport::Full,
                 )],
-                libp2p::request_response::Config::default().with_request_timeout(hb_cfg.timeout),
+                libp2p::request_response::Config::default().with_request_timeout(hb_timeout),
             ),
             msg: libp2p::request_response::cbor::Behaviour::<Box<[u8]>, ()>::new(
                 [(
                     StreamProtocol::new(HOPR_MESSAGE_PROTOCOL_V_0_1_0),
                     libp2p::request_response::ProtocolSupport::Full,
                 )],
-                libp2p::request_response::Config::default().with_request_timeout(msg_cfg.timeout),
+                libp2p::request_response::Config::default().with_request_timeout(MSG_ACK_TIMEOUT),
             ),
             ack: libp2p::request_response::cbor::Behaviour::<Acknowledgement, ()>::new(
                 [(
                     StreamProtocol::new(HOPR_ACKNOWLEDGE_PROTOCOL_V_0_1_0),
                     libp2p::request_response::ProtocolSupport::Full,
                 )],
-                libp2p::request_response::Config::default().with_request_timeout(ack_cfg.timeout),
+                libp2p::request_response::Config::default().with_request_timeout(MSG_ACK_TIMEOUT),
             ),
             ticket_aggregation: libp2p::request_response::cbor::Behaviour::<
                 Vec<legacy::AcknowledgedTicket>,
@@ -148,7 +144,7 @@ impl HoprNetworkBehavior {
                     StreamProtocol::new(HOPR_TICKET_AGGREGATION_PROTOCOL_V_0_1_0),
                     libp2p::request_response::ProtocolSupport::Full,
                 )],
-                libp2p::request_response::Config::default().with_request_timeout(ticket_aggregation_cfg.timeout),
+                libp2p::request_response::Config::default().with_request_timeout(ticket_aggregation_timeout),
             ),
         }
     }

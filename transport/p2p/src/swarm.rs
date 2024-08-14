@@ -86,10 +86,8 @@ async fn build_p2p_network(
                 indexer_update_input,
                 heartbeat_requests,
                 ticket_aggregation_interactions,
-                protocol_cfg.msg,
-                protocol_cfg.ack,
-                protocol_cfg.heartbeat,
-                protocol_cfg.ticket_aggregation,
+                protocol_cfg.heartbeat.timeout,
+                protocol_cfg.ticket_aggregation.timeout,
             )
         })
         .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?
