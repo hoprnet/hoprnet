@@ -32,7 +32,7 @@ where
                 .await
                 .expect("Fail to acquire database connection");
 
-            sea_orm_migration::cli::run_migrate(migration::Migrator {}, db, command, cli.verbose)
+            sea_orm_migration::cli::run_migrate(hoprd_migration::Migrator {}, db, command, cli.verbose)
                 .await
                 .unwrap_or_else(handle_error);
         }

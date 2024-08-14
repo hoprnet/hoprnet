@@ -1,6 +1,8 @@
-use crate::{db::HoprdDb, errors::Result};
 use async_trait::async_trait;
-use hopr_internal_types::prelude::AliasEntry;
+use hopr_internal_types::alias::AliasEntry;
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+
+use crate::{db::HoprdDb, errors::Result};
 
 pub const ALIASES_ENTRY_NAME: &str = "aliases";
 
@@ -14,41 +16,93 @@ pub trait HoprdDbMetadataOperations {
     async fn get_aliases(&self) -> Result<Vec<AliasEntry>>;
 
     /// Create new key pair value in the db
-    async fn set_alias(&self, peer: String, alias: String) -> Result<bool>;
+    async fn set_alias(&self, peer: String, alias: String) -> Result<()>;
 
     /// Update aliases
-    async fn set_aliases(&self, aliases: Vec<AliasEntry>) -> Result<bool>;
+    async fn set_aliases(&self, aliases: Vec<AliasEntry>) -> Result<()>;
 
     /// Delete alias
-    async fn delete_alias(&self, alias: String) -> Result<bool>;
+    async fn delete_alias(&self, alias: String) -> Result<()>;
 }
 
 #[async_trait]
 impl HoprdDbMetadataOperations for HoprdDb {
     async fn resolve_alias(&self, alias: String) -> Result<Option<String>> {
-        let aliases = self.get_aliases().await?;
-        let alias_entry = aliases.into_iter().find(|entry| entry.alias == alias);
+        let row = hoprd_db_entity::aliases::Entity::find()
+            .filter(hoprd_db_entity::aliases::Column::Alias.eq(alias))
+            .one(&self.metadata)
+            .await?;
 
-        match alias_entry {
-            Some(alias_entry) => return Ok(Some(alias_entry.peer_id)),
-            None => return Ok(None),
+        if let Some(model) = row {
+            return Ok(Some(model.peer_id));
+        } else {
+            return Ok(None);
         }
     }
 
     async fn get_aliases(&self) -> Result<Vec<AliasEntry>> {
-        return Ok(vec![]);
+        let rows = hoprd_db_entity::aliases::Entity::find().all(&self.metadata).await?;
+
+        let aliases = rows
+            .iter()
+            .map(|row| AliasEntry {
+                peer_id: row.peer_id.clone(),
+                alias: row.alias.clone(),
+            })
+            .collect();
+
+        Ok(aliases)
     }
 
-    async fn set_aliases(&self, aliases: Vec<AliasEntry>) -> Result<bool> {
-        Ok(true)
+    async fn set_aliases(&self, aliases: Vec<AliasEntry>) -> Result<()> {
+        let new_aliases = aliases
+            .iter()
+            .map(|entry| hoprd_db_entity::aliases::ActiveModel {
+                peer_id: sea_orm::ActiveValue::Set(entry.peer_id.clone()),
+                alias: sea_orm::ActiveValue::Set(entry.alias.clone()),
+                ..Default::default()
+            })
+            .collect::<Vec<_>>();
+
+        let _ = hoprd_db_entity::aliases::Entity::insert_many(new_aliases)
+            .exec(&self.metadata)
+            .await?;
+
+        Ok(())
     }
 
-    async fn set_alias(&self, peer: String, alias: String) -> Result<bool> {
-        Ok(true)
+    async fn set_alias(&self, peer: String, alias: String) -> Result<()> {
+        let new_alias = hoprd_db_entity::aliases::ActiveModel {
+            peer_id: sea_orm::ActiveValue::Set(peer),
+            alias: sea_orm::ActiveValue::Set(alias),
+            ..Default::default()
+        };
+
+        // insert should fail if the new alias, or the peer is already in the db
+        let res = hoprd_db_entity::aliases::Entity::insert(new_alias)
+            .exec(&self.metadata)
+            .await;
+
+        if let Err(_e) = res {
+            Err(crate::errors::DbError::LogicalError("alias can't be added".into()))
+        } else {
+            Ok(())
+        }
     }
 
-    async fn delete_alias(&self, alias: String) -> Result<bool> {
-        Ok(true)
+    async fn delete_alias(&self, alias: String) -> Result<()> {
+        let res: sea_orm::DeleteResult = hoprd_db_entity::aliases::Entity::delete_many()
+            .filter(hoprd_db_entity::aliases::Column::Alias.eq(alias))
+            .exec(&self.metadata)
+            .await?;
+
+        if res.rows_affected > 0 {
+            Ok(())
+        } else {
+            Err(crate::errors::DbError::LogicalError(
+                "peer cannot be removed because it does not exist".into(),
+            ))
+        }
     }
 }
 
@@ -104,11 +158,7 @@ mod tests {
 
         db.set_alias(peer_id.clone(), alias.clone())
             .await
-            .expect("should add alias");
-
-        let aliases = db.get_aliases().await.expect("should get aliases");
-
-        assert_eq!(aliases.len(), 1);
+            .expect_err("should fail adding existing alias");
     }
 
     #[async_std::test]

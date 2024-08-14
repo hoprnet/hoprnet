@@ -10,7 +10,7 @@ license = "GPL-3.0-only"
 
 
 [lib]
-name = "migration"
+name = "hoprd_migration"
 path = "src/lib.rs"
 
 [dependencies]

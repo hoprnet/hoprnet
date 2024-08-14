@@ -6,8 +6,11 @@ use chrono::{DateTime, Utc};
 
 use futures::Stream;
 use hopr_lib::{ApplicationData, AsUnixTimestamp, ToHex, TransportOutput};
+
+use hopr_platform::file::native::join;
 use hoprd::cli::CliArgs;
 use hoprd_api::run_hopr_api;
+use hoprd_db_api::metadata::HoprdDbMetadataOperations;
 use hoprd_keypair::key_pair::{HoprKeys, IdentityOptions};
 use opentelemetry_otlp::WithExportConfig as _;
 use opentelemetry_sdk::trace::{RandomIdGenerator, Sampler};
@@ -168,15 +171,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ));
 
     // Create the metadata database
-    // FIXME (jean)
-    let hoprd_db = Arc::new(RwLock::new(
-        hoprd_db_api::db::HoprdDb::new(Default::default(), Default::default()).await,
-    ));
+    let db_path: String = join(&[&cfg.hopr.db.data, "db"]).expect("Could not create a db storage path");
+
+    let hoprd_db = Arc::new(RwLock::new(hoprd_db_api::db::HoprdDb::new(db_path.clone()).await));
 
     // Ensures that "me" is set as alias
-    node.set_alias(node.me_peer_id().to_string(), "me".to_string())
+    let add_me_alias = hoprd_db
+        .write()
         .await
-        .unwrap();
+        .set_alias(node.me_peer_id().to_string(), "me".to_string())
+        .await;
+
+    if let Err(e) = add_me_alias {
+        warn!("'me' alias already set: {e}");
+    } else {
+        info!("'me' alias set");
+    }
 
     let (mut ws_events_tx, ws_events_rx) =
         async_broadcast::broadcast::<TransportOutput>(WEBSOCKET_EVENT_BROADCAST_CAPACITY);

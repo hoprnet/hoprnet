@@ -8,6 +8,11 @@ use std::{collections::HashMap, sync::Arc};
 use async_lock::RwLock;
 use futures::StreamExt;
 use futures_concurrency::stream::Merge;
+use hopr_lib::{
+    errors::HoprLibError,
+    TransportOutput, {Address, Balance, BalanceType, Hopr},
+};
+use hoprd_db_api::metadata::HoprdDbMetadataOperations;
 use libp2p_identity::PeerId;
 use serde_json::json;
 use serde_with::{serde_as, Bytes, DisplayFromStr, DurationMilliSeconds};
@@ -26,11 +31,6 @@ use tracing::{debug, error, warn};
 use utoipa::openapi::security::{ApiKey, ApiKeyValue, HttpAuthScheme, HttpBuilder, SecurityScheme};
 use utoipa::{Modify, OpenApi};
 use utoipa_swagger_ui::Config;
-
-use hopr_lib::{
-    errors::HoprLibError,
-    TransportOutput, {Address, Balance, BalanceType, Hopr},
-};
 
 use crate::config::Auth;
 
@@ -265,6 +265,7 @@ enum WebSocketInput {
     WsInput(std::result::Result<tide_websockets::Message, tide_websockets::Error>),
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn run_hopr_api(
     host: &str,
     hoprd_cfg: String,
@@ -554,16 +555,9 @@ mod alias {
         ),
         tag = "Alias",
     )]
-    #[deprecated]
+
     pub async fn aliases(req: Request<InternalState>) -> tide::Result<Response> {
-        let aliases = req
-            .state()
-            .hopr
-            .get_aliases()
-            .await?
-            .iter()
-            .map(|obj| (obj.peer_id.to_string(), obj.alias.clone()))
-            .collect::<HashMap<String, String>>();
+        let aliases = req.state().hoprd_db.read().await.get_aliases().await?;
 
         Ok(Response::builder(200).body(json!(aliases)).build())
     }
@@ -589,20 +583,24 @@ mod alias {
         ),
         tag = "Alias",
     )]
-    #[deprecated]
     pub async fn set_alias(mut req: Request<InternalState>) -> tide::Result<Response> {
         let args: AliasPeerIdBodyRequest = req.body_json().await?;
 
-        let inserted = req.state().hopr.set_alias(args.peer_id.to_string(), args.alias).await?;
+        let inserted = req
+            .state()
+            .hoprd_db
+            .write()
+            .await
+            .set_alias(args.peer_id.to_string(), args.alias)
+            .await;
 
         match inserted {
-            true => Ok(Response::builder(201)
+            Ok(_) => Ok(Response::builder(201)
                 .body(json!(PeerIdResponse { peer_id: args.peer_id }))
                 .build()),
-            false => Ok(Response::builder(409).body(ApiErrorStatus::AliasAlreadyExists).build()),
+            Err(_e) => Ok(Response::builder(409).body(ApiErrorStatus::AliasAlreadyExists).build()),
         }
     }
-
     /// (deprecated, will be removed in v3.0) Get alias for the PeerId (Hopr address) that have this alias assigned to it.
     #[utoipa::path(
         get,
@@ -621,12 +619,11 @@ mod alias {
         ),
         tag = "Alias",
     )]
-    #[deprecated]
     pub async fn get_alias(req: Request<InternalState>) -> tide::Result<Response> {
         let alias = req.param("alias")?.parse::<String>()?;
         let alias = urlencoding::decode(&alias)?.into_owned();
 
-        match req.state().hopr.get_alias(alias.clone()).await? {
+        match req.state().hoprd_db.read().await.resolve_alias(alias.clone()).await? {
             Some(entry) => Ok(Response::builder(200)
                 .body(json!(PeerIdResponse {
                     peer_id: PeerId::from_str(&entry).unwrap()
@@ -654,14 +651,14 @@ mod alias {
         ),
         tag = "Alias",
     )]
-    #[deprecated]
     pub async fn delete_alias(req: Request<InternalState>) -> tide::Result<Response> {
         let alias = req.param("alias")?.parse::<String>()?;
         let alias = urlencoding::decode(&alias)?.into_owned();
 
-        req.state().hopr.delete_alias(alias).await?;
-
-        Ok(Response::builder(204).build())
+        match req.state().hoprd_db.write().await.delete_alias(alias.clone()).await {
+            Ok(_) => Ok(Response::builder(204).build()),
+            Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
+        }
     }
 }
 

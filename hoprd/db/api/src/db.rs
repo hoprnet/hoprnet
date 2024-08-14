@@ -1,6 +1,4 @@
-use std::sync::Arc;
-
-use migration::{MigratorMetadata, MigratorTrait};
+use hoprd_migration::{MigratorMetadata, MigratorTrait};
 use sea_orm::SqlxSqliteConnector;
 use sqlx::pool::PoolOptions;
 use sqlx::sqlite::{SqliteAutoVacuum, SqliteConnectOptions, SqliteJournalMode, SqliteSynchronous};
@@ -10,15 +8,6 @@ use std::time::Duration;
 use tracing::log::LevelFilter;
 
 use crate::HoprdDbAllOperations;
-#[derive(Debug, Clone, PartialEq, Eq, smart_default::SmartDefault)]
-pub struct HoprdDbConfig {
-    #[default(true)]
-    pub create_if_missing: bool,
-    #[default(false)]
-    pub force_create: bool,
-    #[default(Duration::from_secs(5))]
-    pub log_slow_queries: Duration,
-}
 
 #[derive(Debug, Clone)]
 pub struct HoprdDb {
@@ -28,15 +17,15 @@ pub struct HoprdDb {
 pub const SQL_DB_METADATA_FILE_NAME: &str = "hopr_metadata.db";
 
 impl HoprdDb {
-    pub async fn new(directory: String, cfg: HoprdDbConfig) -> Self {
+    pub async fn new(directory: String) -> Self {
         let dir = Path::new(&directory);
         std::fs::create_dir_all(dir).unwrap_or_else(|_| panic!("cannot create main database directory {directory}")); // hard-failure
 
         // Default SQLite config values for all 3 DBs.
         // Each DB can customize with its own specific values
         let cfg_template = SqliteConnectOptions::default()
-            .create_if_missing(cfg.create_if_missing)
-            .log_slow_statements(LevelFilter::Warn, cfg.log_slow_queries)
+            .create_if_missing(true)
+            .log_slow_statements(LevelFilter::Warn, Duration::from_millis(150))
             .log_statements(LevelFilter::Debug)
             .journal_mode(SqliteJournalMode::Wal)
             .synchronous(SqliteSynchronous::Normal)

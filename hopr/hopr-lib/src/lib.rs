@@ -92,7 +92,6 @@ use hopr_db_api::{
         ChainOrPacketKey::ChainKey, HoprDbAllOperations, HoprDbChannelOperations, HoprDbPeersOperations,
         HoprDbResolverOperations,
     },
-    settings::HoprDbSettingsOperations,
 };
 
 use hopr_crypto_types::prelude::OffchainPublicKey;
@@ -1324,21 +1323,5 @@ impl Hopr {
             .resolve_packet_key(address)
             .await
             .map(|pk| pk.map(|v| v.into()))?)
-    }
-
-    pub async fn get_aliases(&self) -> errors::Result<Vec<AliasEntry>> {
-        Ok(self.db.get_aliases().await?)
-    }
-
-    pub async fn get_alias(&self, alias: String) -> errors::Result<Option<String>> {
-        Ok(self.db.resolve_alias(alias).await?)
-    }
-
-    pub async fn set_alias(&self, peer: String, alias: String) -> errors::Result<bool> {
-        Ok(self.db.set_alias(peer, alias).await?)
-    }
-
-    pub async fn delete_alias(&self, alias: String) -> errors::Result<bool> {
-        Ok(self.db.delete_alias(alias).await?)
     }
 }

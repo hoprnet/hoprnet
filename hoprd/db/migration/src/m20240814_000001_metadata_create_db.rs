@@ -18,8 +18,8 @@ impl MigrationTrait for Migration {
                             .auto_increment()
                             .primary_key(),
                     )
-                    .col(ColumnDef::new(Aliases::Alias).string().not_null())
-                    .col(ColumnDef::new(Aliases::PeerID).string().not_null())
+                    .col(ColumnDef::new(Aliases::Alias).string().not_null().unique_key())
+                    .col(ColumnDef::new(Aliases::PeerID).string().not_null().unique_key())
                     .to_owned(),
             )
             .await
