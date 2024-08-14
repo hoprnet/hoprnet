@@ -6,7 +6,7 @@ use hopr_crypto_types::prelude::ChainKeypair;
 use hopr_db_entity::ticket;
 use hopr_internal_types::prelude::AcknowledgedTicketStatus;
 use hopr_primitive_types::primitives::Address;
-use migration::{MigratorIndex, MigratorPeers, MigratorSettings, MigratorTickets, MigratorTrait};
+use migration::{MigratorIndex, MigratorPeers, MigratorTickets, MigratorTrait};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, SqlxSqliteConnector};
 use sea_query::Expr;
 use sqlx::pool::PoolOptions;
@@ -140,10 +140,6 @@ impl HoprDb {
 
         let settings_db = SqlxSqliteConnector::from_sqlx_sqlite_pool(settings_db);
 
-        MigratorSettings::up(&settings_db, None)
-            .await
-            .expect("cannot apply database migration");
-
         // Reset the peer network information
         let res = hopr_db_entity::network_peer::Entity::delete_many()
             .filter(sea_orm::Condition::all())
@@ -189,7 +185,7 @@ mod tests {
     use hopr_crypto_types::keypairs::{ChainKeypair, OffchainKeypair};
     use hopr_crypto_types::prelude::Keypair;
     use libp2p_identity::PeerId;
-    use migration::{MigratorIndex, MigratorPeers, MigratorSettings, MigratorTickets, MigratorTrait};
+    use migration::{MigratorIndex, MigratorPeers, MigratorTickets, MigratorTrait};
     use multiaddr::Multiaddr;
     use rand::{distributions::Alphanumeric, Rng}; // 0.8
 
@@ -205,9 +201,6 @@ mod tests {
             .await
             .expect("status must be ok");
         MigratorPeers::status(db.conn(TargetDb::Peers))
-            .await
-            .expect("status must be ok");
-        MigratorSettings::status(db.conn(TargetDb::Settings))
             .await
             .expect("status must be ok");
     }

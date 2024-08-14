@@ -167,6 +167,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }),
     ));
 
+    // Create the metadata database
+    // FIXME (jean)
+    let hoprd_db = Arc::new(RwLock::new(
+        hoprd_db_api::db::HoprdDb::new(Default::default(), Default::default()).await,
+    ));
+
     // Ensures that "me" is set as alias
     node.set_alias(node.me_peer_id().to_string(), "me".to_string())
         .await
@@ -295,6 +301,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 cfg.as_redacted_string()?,
                 &cfg.api,
                 node,
+                hoprd_db,
                 inbox.clone(),
                 ws_events_rx,
                 Some(msg_encoder)

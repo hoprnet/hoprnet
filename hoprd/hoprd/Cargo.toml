@@ -39,6 +39,7 @@ opentelemetry_sdk = { version = "0.22", features = ["rt-async-std"] }
 tracing-opentelemetry = "0.23"
 
 hopr-lib = { workspace = true }
+hoprd-db-api = { workspace = true }
 hoprd-api = { workspace = true }
 hoprd-inbox = { workspace = true }
 hoprd-keypair = { workspace = true }

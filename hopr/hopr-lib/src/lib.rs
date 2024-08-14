@@ -89,10 +89,9 @@ use hopr_db_api::{
     db::{HoprDb, HoprDbConfig},
     info::{DescribedBlock, HoprDbInfoOperations, SafeInfo},
     prelude::{
-        ChainOrPacketKey::ChainKey, HoprDb, HoprDbAccountOperations, HoprDbAllOperations, HoprDbChannelOperations,
-        HoprDbConfig, HoprDbInfoOperations, HoprDbPeersOperations, HoprDbResolverOperations, SafeInfo,
+        ChainOrPacketKey::ChainKey, HoprDbAllOperations, HoprDbChannelOperations, HoprDbPeersOperations,
+        HoprDbResolverOperations,
     },
-    resolver::HoprDbResolverOperations,
     settings::HoprDbSettingsOperations,
 };
 
