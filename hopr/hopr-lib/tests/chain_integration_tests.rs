@@ -823,7 +823,7 @@ async fn integration_test_indexer() {
     info!("bob completed at {:?}", bob_checksum);
 
     assert_eq!(
-        alice_checksum.1, bob_checksum.1,
+        alice_checksum.checksum, bob_checksum.checksum,
         "alice and bob must be at the same checksum"
     );
 

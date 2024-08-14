@@ -2,7 +2,7 @@
 
 This file is documenting and tracking all the metrics which can be collected
 by a Prometheus server. The metrics can be scraped by Prometheus from
-the `api/v2/node/metrics` API endpoint.
+the `api/v3/node/metrics` API endpoint.
 
 ## Example Prometheus configuration
 
@@ -66,3 +66,4 @@ scrape_configs:
 - `hopr_indexer_sync_progress`: Sync progress of the historical data by the indexer
 - `hopr_chain_actions_count`: Number of different chain actions and their results, keys: `action`, `result`
 - `hopr_indexer_contract_log_counters`: Counts of different HOPR contract logs processed by the Indexer, keys: `contract`
+- `hopr_tickets_incoming_statistics`: Ticket statistics for channels with incoming tickets, keys: `channel`, `statistic`

@@ -12,6 +12,7 @@ mod m20240226_000009_peers_create_peer_store;
 mod m20240301_000010_tickets_create_ticket;
 mod m20240301_000011_tickets_create_ticket_stats;
 mod m20240301_000012_tickets_create_outgoing_ticket_index;
+mod m20240810_000013_index_extend_chain_info_with_pre_checksum_block;
 
 #[derive(PartialEq)]
 pub enum BackendType {
@@ -43,6 +44,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20240301_000012_tickets_create_outgoing_ticket_index::Migration(
                 BackendType::Postgres,
             )),
+            Box::new(m20240810_000013_index_extend_chain_info_with_pre_checksum_block::Migration),
         ]
     }
 }
@@ -65,6 +67,7 @@ impl MigratorTrait for MigratorIndex {
             Box::new(m20240226_000005_index_create_chain_info::Migration),
             Box::new(m20240226_000006_index_create_network_eligibility::Migration),
             Box::new(m20240226_000007_index_initial_seed::Migration),
+            Box::new(m20240810_000013_index_extend_chain_info_with_pre_checksum_block::Migration),
         ]
     }
 }

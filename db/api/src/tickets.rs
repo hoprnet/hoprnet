@@ -1,5 +1,6 @@
 use async_stream::stream;
 use hopr_db_entity::ticket_statistics;
+use std::collections::HashSet;
 use std::fmt::{Display, Formatter};
 use std::ops::Add;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -37,6 +38,32 @@ lazy_static::lazy_static! {
     ).unwrap();
 }
 
+/// Allows selecting a range of ticket indices in [TicketSelector].
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub enum TicketIndexSelector {
+    /// Selects no ticket index specifically.
+    /// This makes the [TicketSelector] less restrictive.
+    #[default]
+    None,
+    /// Selects a single ticket with the given index.
+    Single(u64),
+    /// Selects multiple tickets with the given indices.
+    Multiple(HashSet<u64>),
+    /// Selects multiple tickets with indices strictly less than the given bound.
+    LessThan(u64),
+}
+
+impl Display for TicketIndexSelector {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match &self {
+            TicketIndexSelector::None => write!(f, ""),
+            TicketIndexSelector::Single(idx) => write!(f, "with index {idx}"),
+            TicketIndexSelector::Multiple(indices) => write!(f, "with indices {indices:?}"),
+            TicketIndexSelector::LessThan(bound) => write!(f, "with indices less than {bound}"),
+        }
+    }
+}
+
 /// Allows selecting multiple tickets (if `index` does not contain a single value)
 /// or a single ticket (with unitary `index`) in the given channel and epoch.
 /// The selection can be further restricted to select ticket only in the given `state`.
@@ -46,9 +73,10 @@ pub struct TicketSelector {
     pub channel_id: Hash,
     /// Channel epoch
     pub epoch: U256,
-    /// If given, will select ticket(s) with the given index
+    /// If given, will select ticket(s) with the given indices
     /// in the given channel and epoch.
-    pub index: Vec<u64>,
+    /// See [TicketIndexSelector] for possible options.
+    pub index: TicketIndexSelector,
     /// Further restriction to tickets with the given state.
     pub state: Option<AcknowledgedTicketStatus>,
     /// Further restrict to only aggregated tickets.
@@ -57,21 +85,17 @@ pub struct TicketSelector {
 
 impl Display for TicketSelector {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "ticket selector in {} epoch {}{}{}{}",
+        let out = format!(
+            "ticket selector in {} epoch {} {}{}{}",
             self.channel_id,
             self.epoch,
-            if !self.index.is_empty() {
-                format!(" with indices {:?}", self.index)
-            } else {
-                String::default()
-            },
+            self.index,
             self.state
                 .map(|state| format!(" in state {state}"))
                 .unwrap_or("".into()),
             if self.only_aggregated { " only aggregated" } else { "" }
-        )
+        );
+        write!(f, "{}", out.trim())
     }
 }
 
@@ -81,7 +105,7 @@ impl TicketSelector {
         Self {
             channel_id,
             epoch: epoch.into(),
-            index: vec![],
+            index: TicketIndexSelector::None,
             state: None,
             only_aggregated: false,
         }
@@ -89,13 +113,31 @@ impl TicketSelector {
 
     /// If `false` is returned, the selector can fetch more than a single ticket.
     pub fn is_unique(&self) -> bool {
-        self.index.len() == 1
+        matches!(&self.index, TicketIndexSelector::Single(_))
+            || matches!(&self.index, TicketIndexSelector::Multiple(indices) if indices.len() == 1)
     }
 
     /// Returns this instance with a ticket index set.
     /// This method can be called multiple times to select multiple tickets.
+    /// /// If [TicketSelector::with_index_lt] was previously called, it will be replaced.
     pub fn with_index(mut self, index: u64) -> Self {
-        self.index.push(index);
+        self.index = match self.index {
+            TicketIndexSelector::None | TicketIndexSelector::LessThan(_) => TicketIndexSelector::Single(index),
+            TicketIndexSelector::Single(existing) => {
+                TicketIndexSelector::Multiple(HashSet::from_iter([existing, index]))
+            }
+            TicketIndexSelector::Multiple(mut existing) => {
+                existing.insert(index);
+                TicketIndexSelector::Multiple(existing)
+            }
+        };
+        self
+    }
+
+    /// Returns this instance with a ticket index upper bound set.
+    /// If [TicketSelector::with_index] was previously called, it will be replaced.
+    pub fn with_index_lt(mut self, index_bound: u64) -> Self {
+        self.index = TicketIndexSelector::LessThan(index_bound);
         self
     }
 
@@ -123,7 +165,7 @@ impl From<&AcknowledgedTicket> for TicketSelector {
         Self {
             channel_id: value.ticket.channel_id,
             epoch: value.ticket.channel_epoch.into(),
-            index: vec![value.ticket.index],
+            index: TicketIndexSelector::Single(value.ticket.index),
             state: Some(value.status),
             only_aggregated: value.ticket.index_offset > 1,
         }
@@ -135,7 +177,7 @@ impl From<&ChannelEntry> for TicketSelector {
         Self {
             channel_id: value.get_id(),
             epoch: value.channel_epoch,
-            index: vec![],
+            index: TicketIndexSelector::None,
             state: None,
             only_aggregated: false,
         }
@@ -154,8 +196,15 @@ impl IntoCondition for TicketSelector {
             .eq(self.channel_id.to_hex())
             .and(ticket::Column::ChannelEpoch.eq(self.epoch.to_be_bytes().to_vec()));
 
-        if !self.index.is_empty() {
-            expr = expr.and(ticket::Column::Index.is_in(self.index.iter().map(|i| i.to_be_bytes().to_vec())));
+        match self.index {
+            TicketIndexSelector::None => {}
+            TicketIndexSelector::Single(idx) => expr = expr.and(ticket::Column::Index.eq(idx.to_be_bytes().to_vec())),
+            TicketIndexSelector::Multiple(idxs) => {
+                expr = expr.and(ticket::Column::Index.is_in(idxs.into_iter().map(|i| i.to_be_bytes().to_vec())));
+            }
+            TicketIndexSelector::LessThan(bound) => {
+                expr = expr.and(ticket::Column::Index.lt(bound.to_be_bytes().to_vec()))
+            }
         }
 
         if let Some(state) = self.state {
@@ -677,6 +726,9 @@ impl HoprDbTicketOperations for HoprDb {
     ) -> Result<ChannelTicketStatistics> {
         match channel_id {
             None => {
+                #[cfg(all(feature = "prometheus", not(test)))]
+                let mut per_channel_unredeemed = std::collections::HashMap::new();
+
                 self.nest_transaction_in_db(tx, TargetDb::Tickets)
                     .await?
                     .perform(|tx| {
@@ -684,23 +736,57 @@ impl HoprDbTicketOperations for HoprDb {
                             let unredeemed_value = ticket::Entity::find()
                                 .stream(tx.as_ref())
                                 .await?
-                                .try_fold(U256::zero(), |amount, x| async move {
-                                    Ok(amount + U256::from_be_bytes(x.amount))
+                                .try_fold(U256::zero(), |amount, x| {
+                                    let unredeemed_value = U256::from_be_bytes(x.amount);
+
+                                    #[cfg(all(feature = "prometheus", not(test)))]
+                                    per_channel_unredeemed
+                                        .entry(x.channel_id)
+                                        .and_modify(|v| *v += unredeemed_value)
+                                        .or_insert(unredeemed_value);
+
+                                    futures::future::ok(amount + unredeemed_value)
                                 })
                                 .await?;
+
+                            #[cfg(all(feature = "prometheus", not(test)))]
+                            for (channel_id, unredeemed_value) in per_channel_unredeemed {
+                                METRIC_HOPR_TICKETS_INCOMING_STATISTICS
+                                    .set(&[&channel_id, "unredeemed"], unredeemed_value.as_u128() as f64);
+                            }
 
                             let mut all_stats = ticket_statistics::Entity::find()
                                 .all(tx.as_ref())
                                 .await?
                                 .into_iter()
                                 .fold(ChannelTicketStatistics::default(), |mut acc, stats| {
-                                    acc.neglected_value =
-                                        acc.neglected_value + BalanceType::HOPR.balance_bytes(stats.neglected_value);
-                                    acc.redeemed_value =
-                                        acc.redeemed_value + BalanceType::HOPR.balance_bytes(stats.redeemed_value);
-                                    acc.rejected_value =
-                                        acc.rejected_value + BalanceType::HOPR.balance_bytes(stats.rejected_value);
+                                    let neglected_value = BalanceType::HOPR.balance_bytes(stats.neglected_value);
+                                    acc.neglected_value = acc.neglected_value + neglected_value;
+                                    let redeemed_value = BalanceType::HOPR.balance_bytes(stats.redeemed_value);
+                                    acc.redeemed_value = acc.redeemed_value + redeemed_value;
+                                    let rejected_value = BalanceType::HOPR.balance_bytes(stats.rejected_value);
+                                    acc.rejected_value = acc.rejected_value + rejected_value;
+
                                     acc.winning_tickets += stats.winning_tickets as u128;
+
+                                    #[cfg(all(feature = "prometheus", not(test)))]
+                                    {
+                                        METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(
+                                            &[&stats.channel_id, "neglected"],
+                                            neglected_value.amount().as_u128() as f64,
+                                        );
+
+                                        METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(
+                                            &[&stats.channel_id, "redeemed"],
+                                            redeemed_value.amount().as_u128() as f64,
+                                        );
+
+                                        METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(
+                                            &[&stats.channel_id, "rejected"],
+                                            rejected_value.amount().as_u128() as f64,
+                                        );
+                                    }
+
                                     acc
                                 });
 
@@ -712,8 +798,8 @@ impl HoprDbTicketOperations for HoprDb {
                     .await
             }
             Some(channel) => {
-                // We need to make sure the channel exists, to avoid creating
-                // stats entry for a non-existing channel
+                // We need to make sure the channel exists to avoid creating
+                // statistic entry for a non-existing channel
                 if self.get_channel_by_id(None, &channel).await?.is_none() {
                     return Err(DbError::ChannelNotFound(channel));
                 }
@@ -727,8 +813,8 @@ impl HoprDbTicketOperations for HoprDb {
                                 .filter(ticket::Column::ChannelId.eq(channel.to_hex()))
                                 .stream(tx.as_ref())
                                 .await?
-                                .try_fold(U256::zero(), |amount, x| async move {
-                                    Ok(amount + U256::from_be_bytes(x.amount))
+                                .try_fold(U256::zero(), |amount, x| {
+                                    futures::future::ok(amount + U256::from_be_bytes(x.amount))
                                 })
                                 .await?;
 
@@ -920,7 +1006,7 @@ impl HoprDbTicketOperations for HoprDb {
                 })
                 .await?;
 
-        let (tickets, neglected) = self
+        let tickets = self
             .ticket_manager
             .with_write_locked_db(|tx| {
                 Box::pin(async move {
@@ -949,6 +1035,9 @@ impl HoprDbTicketOperations for HoprDb {
                         .map(|m| U256::from_be_bytes(m.index).as_u64() + 1)
                         .unwrap_or(0_u64); // go from the lowest possible index of none is found
 
+                    // The first index to take should not be less than the ticket index on the Channel entry
+                    let first_idx_to_take = first_idx_to_take.max(channel_entry.ticket_index.as_u64());
+
                     // get the list of all tickets to be aggregated
                     let to_be_aggregated = ticket::Entity::find()
                         .filter(TicketSelector::from(&channel_entry))
@@ -965,13 +1054,13 @@ impl HoprDbTicketOperations for HoprDb {
                         .map(|m| model_to_acknowledged_ticket(&m, &ds, &chain_keypair).map_err(DbError::from))
                         .collect::<Result<Vec<_>>>()?;
 
-                    let mut neglected = TicketSelector::from(&channel_entry);
+                    let mut neglected_idxs = Vec::new();
 
                     if !to_be_aggregated.is_empty() {
                         // Clean up any tickets in this channel that are already inside an aggregated ticket.
                         // This situation cannot be avoided 100% as aggregation can be triggered when out-of-order
                         // tickets arrive and only some of them are necessary to satisfy the aggregation threshold.
-                        // The following code assumes that only the first ticket with the lowest index can be an aggregate.
+                        // The following code *assumes* that only the first ticket with the lowest index *can be* an aggregate.
                         let first_ticket = to_be_aggregated[0].ticket.clone();
                         let mut i = 1;
                         while i < to_be_aggregated.len() {
@@ -981,11 +1070,17 @@ impl HoprDbTicketOperations for HoprDb {
                                 // since the aggregator will check for index range overlaps and deny
                                 // the aggregation of the entire batch otherwise.
                                 warn!("ticket {current_idx} in channel {channel_id} has been already aggregated in {first_ticket} and will be removed");
-                                neglected = neglected.with_index(current_idx);
+                                neglected_idxs.push(current_idx);
                                 to_be_aggregated.remove(i);
                             } else {
                                 i += 1;
                             }
+                        }
+
+                        // The cleanup (neglecting of tickets) is not made directly here but on the next ticket redemption in this channel
+                        // See handler.rs around L402
+                        if !neglected_idxs.is_empty() {
+                            warn!("{} tickets were neglected in channel {channel_id} due to duplication in an aggregated ticket!", neglected_idxs.len());
                         }
 
                         // mark all tickets with appropriate characteristics as being aggregated
@@ -994,6 +1089,7 @@ impl HoprDbTicketOperations for HoprDb {
                             .filter(TicketSelector::from(&channel_entry))
                             .filter(ticket::Column::Index.gte(first_idx_to_take.to_be_bytes().to_vec()))
                             .filter(ticket::Column::Index.lte(last_idx_to_take.to_be_bytes().to_vec()))
+                            .filter(ticket::Column::Index.is_not_in(neglected_idxs.into_iter().map(|i| i.to_be_bytes().to_vec())))
                             .filter(ticket::Column::State.ne(AcknowledgedTicketStatus::BeingAggregated as u8))
                             .col_expr(
                                 ticket::Column::State,
@@ -1002,7 +1098,7 @@ impl HoprDbTicketOperations for HoprDb {
                             .exec(tx.as_ref())
                             .await?;
 
-                        if marked.rows_affected as usize != to_be_aggregated.len() + neglected.index.len() {
+                        if marked.rows_affected as usize != to_be_aggregated.len() {
                             return Err(DbError::LogicalError(format!(
                                 "expected to mark {}, but was able to mark {}",
                                 to_be_aggregated.len(),
@@ -1017,16 +1113,10 @@ impl HoprDbTicketOperations for HoprDb {
                         channel_entry.channel_epoch,
                     );
 
-                    Ok((to_be_aggregated, neglected))
+                    Ok(to_be_aggregated)
                 })
             })
             .await?;
-
-        // Neglect the tickets that were found as duplicates within a single transaction
-        if !neglected.index.is_empty() {
-            let neglected_due_to_duplication = self.mark_tickets_neglected(neglected).await?;
-            warn!("{neglected_due_to_duplication} were neglected in channel {channel_id} due to duplication in an aggregated ticket!");
-        }
 
         Ok((!tickets.is_empty()).then_some((peer, tickets)))
     }
@@ -1336,7 +1426,7 @@ impl HoprDb {
             .await?
             .perform(|tx| {
                 Box::pin(async move {
-                    // For purpose of upserting, we must select only by the triplet (channel id, epoch, index)
+                    // For upserting, we must select only by the triplet (channel id, epoch, index)
                     let selector = TicketSelector::new(
                         acknowledged_ticket.ticket.channel_id,
                         acknowledged_ticket.ticket.channel_epoch,
@@ -1444,7 +1534,7 @@ mod tests {
             BOB.public().to_address(),
             ALICE.public().to_address(),
             BalanceType::HOPR.balance(u32::MAX),
-            (count_tickets + 1).into(),
+            0_u32.into(),
             ChannelStatus::Open,
             4_u32.into(),
         );
@@ -2486,7 +2576,7 @@ mod tests {
             .await?;
 
         // We expect the first ticket to be removed
-        let removed = tickets.remove(0);
+        tickets.remove(0);
         assert_eq!(actual, Some((BOB_OFFCHAIN.public().clone(), tickets)));
 
         let actual_being_aggregated_count = hopr_db_entity::ticket::Entity::find()
@@ -2495,9 +2585,6 @@ mod tests {
             .await? as usize;
 
         assert_eq!(actual_being_aggregated_count, 3);
-
-        let stats = db.get_ticket_statistics(None, Some(channel.get_id())).await?;
-        assert_eq!(stats.neglected_value, removed.ticket.amount);
 
         Ok(())
     }

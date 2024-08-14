@@ -2529,7 +2529,8 @@ mod node {
         ],
         "network": "anvil-localhost",
         "indexerBlock": 123456,
-        "indexerChecksum": "cfde556a7e9ff0848998aa4a9a9f2ccfde556a7e9ff0848998aa4a0cfd8863ae"
+        "indexerChecksum": "cfde556a7e9ff0848998aa4a9a9f2ccfde556a7e9ff0848998aa4a0cfd8863ae",
+        "indexBlockPrevChecksum": 123450,
     }))]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct NodeInfoResponse {
@@ -2569,6 +2570,7 @@ mod node {
         #[serde_as(as = "DisplayFromStr")]
         #[schema(value_type = String)]
         indexer_checksum: Hash,
+        index_block_prev_checksum: u32,
     }
 
     /// Get information about this HOPR Node.
@@ -2597,8 +2599,8 @@ mod node {
             Err(error) => return Ok(Response::builder(422).body(ApiErrorStatus::from(error)).build()),
         };
 
-        let (indexer_block, indexer_checksum) = match hopr.get_indexer_state().await {
-            Ok(p) => p,
+        let (indexer_block, indexer_checksum, index_block_prev_checksum) = match hopr.get_indexer_state().await {
+            Ok(p) => (p.latest_block_number, p.checksum, p.block_prior_to_checksum_update),
             Err(error) => return Ok(Response::builder(422).body(ApiErrorStatus::from(error)).build()),
         };
 
@@ -2618,6 +2620,7 @@ mod node {
             channel_closure_period: channel_closure_notice_period.as_secs(),
             indexer_block,
             indexer_checksum,
+            index_block_prev_checksum,
         };
 
         Ok(Response::builder(200).body(json!(body)).build())
