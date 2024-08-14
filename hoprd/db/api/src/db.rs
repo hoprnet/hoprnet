@@ -67,4 +67,16 @@ impl HoprdDb {
 impl HoprdDbAllOperations for HoprdDb {}
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use crate::db::HoprdDb;
+    use crate::HoprdDbGeneralModelOperations;
+    use hoprd_migration::{MigratorMetadata, MigratorTrait};
+
+    #[async_std::test]
+    async fn test_basic_db_init() {
+        let db = HoprdDb::new_in_memory().await;
+
+        // TODO: cfg-if this on Postgres to do only `Migrator::status(db.conn(Default::default)).await.expect("status must be ok");`
+        MigratorMetadata::status(db.conn()).await.expect("status must be ok");
+    }
+}

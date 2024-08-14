@@ -3844,6 +3844,7 @@ dependencies = [
  "hoprd-db-entity",
  "hoprd-db-migration",
  "lazy_static",
+ "libp2p-identity",
  "sea-orm",
  "sea-query",
  "sea-query-binder",
