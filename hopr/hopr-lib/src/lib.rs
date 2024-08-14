@@ -1161,6 +1161,11 @@ impl Hopr {
         Ok(self.chain_api.ticket_price().await?)
     }
 
+    /// Get ticket winning probability
+    pub async fn get_ticket_probability(&self) -> errors::Result<f64> {
+        Ok(hopr_internal_types::tickets::WINNING_PROB)
+    }
+
     /// List of all accounts announced on the chain
     pub async fn accounts_announced_on_chain(&self) -> errors::Result<Vec<AccountEntry>> {
         Ok(self.db.get_accounts(None, false).await?)
