@@ -473,9 +473,6 @@ impl HoprSwarmWithProcessors {
                             crate::behavior::discovery::Event::NewPeerMultiddress(peer, multiaddress) => {
                                 info!(peer = %peer, multiaddress = %multiaddress, "New record");
                                 swarm.add_peer_address(peer, multiaddress.clone());
-                                swarm.add_peer_address(peer, multiaddress.clone());
-                                swarm.add_peer_address(peer, multiaddress.clone());
-                                swarm.add_peer_address(peer, multiaddress.clone());
 
                                 if let Err(e) = swarm.dial(multiaddress.clone()) {
                                     error!(peer = %peer, address = %multiaddress,  "Failed to dial the peer: {e}");
