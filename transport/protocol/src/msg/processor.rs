@@ -3,7 +3,7 @@ use futures::{future::Either, SinkExt};
 use hopr_crypto_packet::errors::PacketError;
 use hopr_db_api::protocol::TransportPacketWithChainData;
 use libp2p_identity::PeerId;
-use tracing::{debug, error};
+use tracing::error;
 
 use core_path::path::{Path, TransportPath};
 use hopr_async_runtime::prelude::sleep;
@@ -19,40 +19,6 @@ use hopr_primitive_types::prelude::*;
 use super::packet::OutgoingPacket;
 use crate::bloom;
 use crate::msg::mixer::MixerConfig;
-
-#[cfg(all(feature = "prometheus", not(test)))]
-use hopr_metrics::metrics::{MultiCounter, SimpleCounter, SimpleGauge};
-
-#[cfg(all(feature = "prometheus", not(test)))]
-lazy_static::lazy_static! {
-    // packet processing
-    static ref METRIC_PACKET_COUNT: MultiCounter =
-        MultiCounter::new(
-        "hopr_packets_count",
-        "Number of processed packets of different types (sent, received, forwarded)",
-        &["type"]
-    ).unwrap();
-    static ref METRIC_PACKET_COUNT_PER_PEER: MultiCounter =
-        MultiCounter::new(
-        "hopr_packets_per_peer_count",
-        "Number of processed packets to/from distinct peers",
-        &["peer", "direction"]
-    ).unwrap();
-    static ref METRIC_REJECTED_TICKETS_COUNT: SimpleCounter =
-        SimpleCounter::new("hopr_rejected_tickets_count", "Number of rejected tickets").unwrap();
-    // mixer
-    static ref METRIC_QUEUE_SIZE: SimpleGauge =
-        SimpleGauge::new("hopr_mixer_queue_size", "Current mixer queue size").unwrap();
-    static ref METRIC_MIXER_AVERAGE_DELAY: SimpleGauge = SimpleGauge::new(
-        "hopr_mixer_average_packet_delay",
-        "Average mixer packet delay averaged over a packet window"
-    )
-    .unwrap();
-    static ref METRIC_REPLAYED_PACKET_COUNT: SimpleCounter = SimpleCounter::new(
-        "hopr_replayed_packet_count",
-        "The total count of replayed packets during the packet processing pipeline run",
-    ).unwrap();
-}
 
 lazy_static::lazy_static! {
     /// Fixed price per packet to 0.01 HOPR
@@ -115,17 +81,11 @@ where
             .db
             .to_send(data.to_bytes(), self.cfg.chain_keypair.clone(), path?)
             .await
-            .map_err(|e| hopr_crypto_packet::errors::PacketError::PacketConstructionError(e.to_string()))?;
+            .map_err(|e| PacketError::PacketConstructionError(e.to_string()))?;
 
-        let packet: OutgoingPacket = packet.try_into().map_err(|e: crate::errors::ProtocolError| {
-            hopr_crypto_packet::errors::PacketError::LogicError(e.to_string())
-        })?;
-
-        #[cfg(all(feature = "prometheus", not(test)))]
-        {
-            METRIC_PACKET_COUNT_PER_PEER.increment(&["out", &packet.next_hop.to_string()]);
-            METRIC_PACKET_COUNT.increment(&["sent"]);
-        }
+        let packet: OutgoingPacket = packet
+            .try_into()
+            .map_err(|e: crate::errors::ProtocolError| PacketError::LogicError(e.to_string()))?;
 
         Ok((packet.next_hop, packet.data))
     }
@@ -140,14 +100,8 @@ where
 
     #[tracing::instrument(level = "debug", skip(self, data))]
     async fn recv(&self, peer: &PeerId, data: Box<[u8]>) -> Result<RecvOperation> {
-        #[cfg(all(feature = "prometheus", not(test)))]
-        let mut metadata = PacketMetadata::default();
-
-        let previous_hop = OffchainPublicKey::try_from(peer).map_err(|e| {
-            hopr_crypto_packet::errors::PacketError::LogicError(format!(
-                "failed to convert '{peer}' into the public key: {e}"
-            ))
-        })?;
+        let previous_hop = OffchainPublicKey::try_from(peer)
+            .map_err(|e| PacketError::LogicError(format!("failed to convert '{peer}' into the public key: {e}")))?;
 
         let packet = self
             .db
@@ -158,23 +112,20 @@ where
                 previous_hop,
             )
             .await
-            .map_err(|e| {
-                #[cfg(all(feature = "prometheus", not(test)))]
-                if let hopr_db_api::errors::DbError::TicketValidationError(_) = e {
-                    METRIC_REJECTED_TICKETS_COUNT.increment();
+            .map_err(|e| match e {
+                hopr_db_api::errors::DbError::TicketValidationError(v) => {
+                    PacketError::TicketValidation(hopr_crypto_packet::errors::TicketValidationError {
+                        reason: v.1,
+                        ticket: Box::new(v.0),
+                    })
                 }
-
-                hopr_crypto_packet::errors::PacketError::PacketConstructionError(e.to_string())
+                _ => PacketError::PacketConstructionError(e.to_string()),
             })?;
 
         if let TransportPacketWithChainData::Final { packet_tag, .. }
         | TransportPacketWithChainData::Forwarded { packet_tag, .. } = &packet
         {
             if self.is_tag_replay(packet_tag).await {
-                #[cfg(all(feature = "prometheus", not(test)))]
-                {
-                    METRIC_REPLAYED_PACKET_COUNT.increment();
-                }
                 return Err(TagReplay);
             }
         };
@@ -187,11 +138,6 @@ where
                 ..
             } => {
                 let app_data = ApplicationData::from_bytes(plain_text.as_ref())?;
-                #[cfg(all(feature = "prometheus", not(test)))]
-                {
-                    METRIC_PACKET_COUNT_PER_PEER.increment(&["in", &previous_hop.to_string()]);
-                    METRIC_PACKET_COUNT.increment(&["received"]);
-                }
                 RecvOperation::Receive {
                     data: app_data,
                     ack: SendAck {
@@ -206,28 +152,18 @@ where
                 data,
                 ack,
                 ..
-            } => {
-                #[cfg(all(feature = "prometheus", not(test)))]
-                {
-                    metadata.start_time = hopr_platform::time::native::current_time();
-                    METRIC_PACKET_COUNT_PER_PEER.increment(&["in", &previous_hop.to_string()]);
-                    METRIC_PACKET_COUNT_PER_PEER.increment(&["out", &next_hop.to_string()]);
-                    METRIC_PACKET_COUNT.increment(&["forwarded"]);
-                }
-
-                RecvOperation::Forward {
-                    msg: SendPkt {
-                        peer: next_hop.into(),
-                        data,
-                    },
-                    ack: SendAck {
-                        peer: previous_hop.into(),
-                        ack,
-                    },
-                }
-            }
+            } => RecvOperation::Forward {
+                msg: SendPkt {
+                    peer: next_hop.into(),
+                    data,
+                },
+                ack: SendAck {
+                    peer: previous_hop.into(),
+                    ack,
+                },
+            },
             TransportPacketWithChainData::Outgoing { .. } => {
-                return Err(hopr_crypto_packet::errors::PacketError::LogicError(
+                return Err(PacketError::LogicError(
                     "Attempting to process an outgoing packet in the incoming pipeline".into(),
                 ))
             }
@@ -252,41 +188,6 @@ where
         self.tbf
             .with_write_lock(|inner: &mut TagBloomFilter| inner.check_and_set(tag))
             .await
-    }
-}
-
-#[derive(Debug, Clone, Default)]
-pub struct Delayer {
-    cfg: MixerConfig,
-}
-
-impl Delayer {
-    pub fn new(cfg: MixerConfig) -> Self {
-        Self { cfg }
-    }
-
-    #[tracing::instrument(level = "debug", skip(self))]
-    pub async fn add_delay(&self) {
-        let random_delay = self.cfg.random_delay();
-        debug!(
-            delay_in_ms = random_delay.as_millis(),
-            "Mixer created a random packet delay",
-        );
-
-        #[cfg(all(feature = "prometheus", not(test)))]
-        METRIC_QUEUE_SIZE.increment(1.0f64);
-
-        sleep(random_delay).await;
-
-        #[cfg(all(feature = "prometheus", not(test)))]
-        {
-            METRIC_QUEUE_SIZE.decrement(1.0f64);
-
-            let weight = 1.0f64 / self.cfg.metric_delay_window as f64;
-            METRIC_MIXER_AVERAGE_DELAY.set(
-                (weight * random_delay.as_millis() as f64) + ((1.0f64 - weight) * METRIC_MIXER_AVERAGE_DELAY.get()),
-            );
-        }
     }
 }
 
@@ -389,13 +290,6 @@ impl PacketInteractionConfig {
             mixer: MixerConfig::default(),
         }
     }
-}
-
-#[derive(Debug, smart_default::SmartDefault)]
-pub struct PacketMetadata {
-    #[cfg(all(feature = "prometheus", not(test)))]
-    #[default(std::time::UNIX_EPOCH)]
-    pub start_time: std::time::SystemTime,
 }
 
 #[cfg(test)]

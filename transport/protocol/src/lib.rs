@@ -76,9 +76,9 @@ use msg::processor::{PacketSendFinalizer, PacketUnwrapping, PacketWrapping};
 use libp2p::PeerId;
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use std::collections::HashMap;
-use tracing::error;
+use tracing::{debug, error};
 
-use hopr_async_runtime::prelude::spawn;
+use hopr_async_runtime::prelude::{sleep, spawn};
 use hopr_db_api::protocol::HoprDbProtocolOperations;
 use hopr_internal_types::{
     protocol::{Acknowledgement, ApplicationData},
@@ -86,10 +86,11 @@ use hopr_internal_types::{
 };
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use hopr_metrics::metrics::{MultiCounter, SimpleCounter};
+use hopr_metrics::metrics::{MultiCounter, SimpleCounter, SimpleGauge};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
+    // acknowledgement
     static ref METRIC_RECEIVED_ACKS: MultiCounter = MultiCounter::new(
         "hopr_received_ack_count",
         "Number of received acknowledgements",
@@ -100,6 +101,31 @@ lazy_static::lazy_static! {
         SimpleCounter::new("hopr_sent_acks_count", "Number of sent message acknowledgements").unwrap();
     static ref METRIC_TICKETS_COUNT: MultiCounter =
         MultiCounter::new("hopr_tickets_count", "Number of winning tickets", &["type"]).unwrap();
+    // packet
+    static ref METRIC_PACKET_COUNT: MultiCounter = MultiCounter::new(
+        "hopr_packets_count",
+        "Number of processed packets of different types (sent, received, forwarded)",
+        &["type"]
+    ).unwrap();
+    static ref METRIC_PACKET_COUNT_PER_PEER: MultiCounter = MultiCounter::new(
+        "hopr_packets_per_peer_count",
+        "Number of processed packets to/from distinct peers",
+        &["peer", "direction"]
+    ).unwrap();
+    static ref METRIC_REPLAYED_PACKET_COUNT: SimpleCounter = SimpleCounter::new(
+        "hopr_replayed_packet_count",
+        "The total count of replayed packets during the packet processing pipeline run",
+    ).unwrap();
+    static ref METRIC_REJECTED_TICKETS_COUNT: SimpleCounter =
+        SimpleCounter::new("hopr_rejected_tickets_count", "Number of rejected tickets").unwrap();
+    // mixer
+    static ref METRIC_QUEUE_SIZE: SimpleGauge =
+        SimpleGauge::new("hopr_mixer_queue_size", "Current mixer queue size").unwrap();
+    static ref METRIC_MIXER_AVERAGE_DELAY: SimpleGauge = SimpleGauge::new(
+        "hopr_mixer_average_packet_delay",
+        "Average mixer packet delay averaged over a packet window"
+    )
+    .unwrap();
 }
 
 lazy_static::lazy_static! {
@@ -240,9 +266,17 @@ where
                 .then_concurrent(|(data, path, finalizer)| {
                     let msg_processor = msg_processor_write.clone();
 
+                    #[cfg(all(feature = "prometheus", not(test)))]
+                    METRIC_QUEUE_SIZE.increment(1.0f64);
+
                     async move {
                         match PacketWrapping::send(&msg_processor, data, path).await {
                             Ok(v) => {
+                                #[cfg(all(feature = "prometheus", not(test)))]
+                                {
+                                    METRIC_PACKET_COUNT_PER_PEER.increment(&["out", &v.0.to_string()]);
+                                    METRIC_PACKET_COUNT.increment(&["sent"]);
+                                }
                                 finalizer.finalize(Ok(()));
                                 Some(v)
                             }
@@ -255,11 +289,31 @@ where
                 })
                 .filter_map(|v| async move { v })
                 // delay purposefully isolated into a separate concurrent task
-                .then_concurrent(|v| async {
-                    msg::processor::Delayer::new(msg::mixer::MixerConfig::default())
-                        .add_delay()
-                        .await;
-                    v
+                .then_concurrent(|v| {
+                    let cfg = msg::mixer::MixerConfig::default();
+
+                    async move {
+                        let random_delay = cfg.random_delay();
+                        debug!(
+                            delay_in_ms = random_delay.as_millis(),
+                            "Mixer created a random packet delay",
+                        );
+
+                        sleep(random_delay).await;
+
+                        #[cfg(all(feature = "prometheus", not(test)))]
+                        {
+                            METRIC_QUEUE_SIZE.decrement(1.0f64);
+
+                            let weight = 1.0f64 / cfg.metric_delay_window as f64;
+                            METRIC_MIXER_AVERAGE_DELAY.set(
+                                (weight * random_delay.as_millis() as f64)
+                                    + ((1.0f64 - weight) * METRIC_MIXER_AVERAGE_DELAY.get()),
+                            );
+                        }
+
+                        v
+                    }
                 })
                 .map(Ok)
                 .forward(wire_msg.0)
@@ -285,12 +339,24 @@ where
                         match v {
                             Ok(v) => match v {
                                 msg::processor::RecvOperation::Receive { data, ack } => {
+                                    #[cfg(all(feature = "prometheus", not(test)))]
+                                    {
+                                        METRIC_PACKET_COUNT_PER_PEER.increment(&["in", &ack.peer.to_string()]);
+                                        METRIC_PACKET_COUNT.increment(&["received"]);
+                                    }
                                     internal_ack_send.send((ack.peer, ack.ack)).await.unwrap_or_else(|e| {
                                         error!("Failed to forward an acknowledgement to the transport layer: {e}");
                                     });
                                     Some(data)
                                 }
                                 msg::processor::RecvOperation::Forward { msg, ack } => {
+                                    #[cfg(all(feature = "prometheus", not(test)))]
+                                    {
+                                        METRIC_PACKET_COUNT_PER_PEER.increment(&["in", &ack.peer.to_string()]);
+                                        METRIC_PACKET_COUNT_PER_PEER.increment(&["out", &msg.peer.to_string()]);
+                                        METRIC_PACKET_COUNT.increment(&["forwarded"]);
+                                    }
+
                                     msg_to_send_tx.send((msg.peer, msg.data)).await.unwrap_or_else(|_e| {
                                         error!("Failed to forward a message to the transport layer");
                                     });
@@ -301,6 +367,17 @@ where
                                 }
                             },
                             Err((peer, e)) => {
+                                #[cfg(all(feature = "prometheus", not(test)))]
+                                match e {
+                                    hopr_crypto_packet::errors::PacketError::TagReplay => {
+                                        METRIC_REPLAYED_PACKET_COUNT.increment();
+                                    },
+                                    hopr_crypto_packet::errors::PacketError::TicketValidation(_) => {
+                                        METRIC_REJECTED_TICKETS_COUNT.increment();
+                                    },
+                                    _ => {}
+                                }
+
                                 error!(peer = %peer, "Failed to process received message: {e}");
                                 // send gibberish ack in order to give feedback to the sender
                                 internal_ack_send
