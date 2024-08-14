@@ -66,18 +66,10 @@ impl MigratorTrait for MigratorIndex {
             Box::new(m20240226_000004_index_create_node_info::Migration),
             Box::new(m20240226_000005_index_create_chain_info::Migration),
             Box::new(m20240226_000006_index_create_network_eligibility::Migration),
+            Box::new(m20240226_000008_node_create_settings::Migration),
             Box::new(m20240226_000007_index_initial_seed::Migration),
             Box::new(m20240810_000013_index_extend_chain_info_with_pre_checksum_block::Migration),
         ]
-    }
-}
-
-pub struct MigratorSettings;
-
-#[async_trait::async_trait]
-impl MigratorTrait for MigratorSettings {
-    fn migrations() -> Vec<Box<dyn MigrationTrait>> {
-        vec![Box::new(m20240226_000008_node_create_settings::Migration)]
     }
 }
 

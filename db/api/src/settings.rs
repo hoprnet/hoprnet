@@ -9,7 +9,7 @@ pub const ALIASES_ENTRY_NAME: &str = "aliases";
 #[async_trait]
 pub trait HoprDbSettingsOperations {
     /// Retrieve the alias for a given PeerID
-    async fn get_alias(&self, alias: String) -> Result<Option<String>>;
+    async fn resolve_alias(&self, alias: String) -> Result<Option<String>>;
 
     /// Retrive all aliases
     async fn get_aliases(&self) -> Result<Vec<AliasEntry>>;
@@ -26,7 +26,7 @@ pub trait HoprDbSettingsOperations {
 
 #[async_trait]
 impl HoprDbSettingsOperations for HoprDb {
-    async fn get_alias(&self, alias: String) -> Result<Option<String>> {
+    async fn resolve_alias(&self, alias: String) -> Result<Option<String>> {
         let aliases = self.get_aliases().await?;
         let alias_entry = aliases.into_iter().find(|entry| entry.alias == alias);
 
@@ -186,7 +186,7 @@ mod tests {
             .await
             .expect("should add alias");
 
-        let alias = db.get_alias(alias).await.expect("should get alias");
+        let alias = db.resolve_alias(alias).await.expect("should get alias");
 
         assert!(alias.is_some());
     }
@@ -203,7 +203,7 @@ mod tests {
             .expect("should add alias");
 
         let alias = db
-            .get_alias(PeerId::random().to_string())
+            .resolve_alias(PeerId::random().to_string())
             .await
             .expect("should get alias");
 

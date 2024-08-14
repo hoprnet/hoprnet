@@ -87,13 +87,13 @@ use crate::constants::{MIN_NATIVE_BALANCE, SUGGESTED_NATIVE_BALANCE};
 use hopr_db_api::{
     accounts::HoprDbAccountOperations,
     db::{HoprDb, HoprDbConfig},
-    info::{HoprDbInfoOperations, SafeInfo, DescribedBlock},
-    resolver::HoprDbResolverOperations,
-    settings::HoprDbSettingsOperations,
+    info::{DescribedBlock, HoprDbInfoOperations, SafeInfo},
     prelude::{
         ChainOrPacketKey::ChainKey, HoprDb, HoprDbAccountOperations, HoprDbAllOperations, HoprDbChannelOperations,
         HoprDbConfig, HoprDbInfoOperations, HoprDbPeersOperations, HoprDbResolverOperations, SafeInfo,
     },
+    resolver::HoprDbResolverOperations,
+    settings::HoprDbSettingsOperations,
 };
 
 use hopr_crypto_types::prelude::OffchainPublicKey;
@@ -1332,7 +1332,7 @@ impl Hopr {
     }
 
     pub async fn get_alias(&self, alias: String) -> errors::Result<Option<String>> {
-        Ok(self.db.get_alias(alias).await?)
+        Ok(self.db.resolve_alias(alias).await?)
     }
 
     pub async fn set_alias(&self, peer: String, alias: String) -> errors::Result<bool> {
