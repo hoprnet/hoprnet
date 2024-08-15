@@ -14,16 +14,14 @@ pub mod resolver;
 mod ticket_manager;
 pub mod tickets;
 
+use async_trait::async_trait;
+use futures::future::BoxFuture;
 pub use sea_orm::DatabaseConnection;
 pub use sea_orm::DatabaseTransaction;
+use sea_orm::TransactionTrait;
 
 use crate::accounts::HoprDbAccountOperations;
 use crate::channels::HoprDbChannelOperations;
-use crate::tickets::HoprDbTicketOperations;
-use async_trait::async_trait;
-use futures::future::BoxFuture;
-use sea_orm::TransactionTrait;
-
 use crate::db::HoprDb;
 use crate::errors::{DbError, Result};
 use crate::info::HoprDbInfoOperations;
@@ -31,6 +29,7 @@ use crate::peers::HoprDbPeersOperations;
 use crate::protocol::HoprDbProtocolOperations;
 use crate::registry::HoprDbRegistryOperations;
 use crate::resolver::HoprDbResolverOperations;
+use crate::tickets::HoprDbTicketOperations;
 
 /// Primary key used in tables that contain only a single row.
 pub const SINGULAR_TABLE_FIXED_ID: i32 = 1;
