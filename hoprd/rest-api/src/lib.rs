@@ -221,7 +221,7 @@ async fn build_api(
                 .route("/aliases/:alias", delete(alias::delete_alias))
                 .route("/account/addresses", get(account::addresses))
                 .route("/account/balances", get(account::balances))
-                .route("/account/withdraw", get(account::withdraw))
+                .route("/account/withdraw", post(account::withdraw))
                 .route("/peers/:peerId", get(peers::show_peer_info))
                 .route("/channels", get(channels::list_channels))
                 .route("/channels", post(channels::open_channel))
@@ -259,10 +259,7 @@ async fn build_api(
                 .route("/peers/:peerId/ping", post(peers::ping_peer))
                 .route("/session", post(session::create_client))
                 .with_state(inner_state.clone().into())
-                .layer(middleware::from_fn_with_state(
-                    inner_state.clone(),
-                    preconditions::authenticate,
-                )),
+                .layer(middleware::from_fn_with_state(inner_state, preconditions::authenticate)),
         )
         .layer(
             ServiceBuilder::new()
