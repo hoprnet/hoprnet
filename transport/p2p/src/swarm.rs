@@ -64,8 +64,7 @@ async fn build_p2p_network(
         .with_tcp(Default::default(), libp2p::noise::Config::new, move || tcp_upgrade)
         .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?
         .with_quic()
-        .with_dns()
-        .await;
+        .with_dns();
 
     // Both features could be enabled during testing, therefore we only use tokio when its
     // exclusively enabled.
@@ -471,10 +470,7 @@ impl HoprSwarmWithProcessors {
                         match event {
                             crate::behavior::discovery::Event::NewPeerMultiddress(peer, multiaddress) => {
                                 info!(peer = %peer, multiaddress = %multiaddress, "New record");
-                                swarm.behaviour_mut().heartbeat.add_address(&peer, multiaddress.clone());
-                                swarm.behaviour_mut().msg.add_address(&peer, multiaddress.clone());
-                                swarm.behaviour_mut().ack.add_address(&peer, multiaddress.clone());
-                                swarm.behaviour_mut().ticket_aggregation.add_address(&peer, multiaddress.clone());
+                                swarm.add_peer_address(peer, multiaddress.clone());
 
                                 if let Err(e) = swarm.dial(multiaddress.clone()) {
                                     error!(peer = %peer, address = %multiaddress,  "Failed to dial the peer: {e}");
