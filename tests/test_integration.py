@@ -13,8 +13,8 @@ from .conftest import (
     TICKET_AGGREGATION_THRESHOLD,
     TICKET_PRICE_PER_HOP,
     barebone_nodes,
-    nodes_with_auth,
     default_nodes,
+    nodes_with_auth,
     random_distinct_pairs_from,
 )
 from .hopr import HoprdAPI
@@ -277,9 +277,12 @@ async def test_hoprd_node_should_be_able_to_alias_other_peers(peer: str, swarm7:
     assert await swarm7[peer].api.aliases_set_alias("Alice", alice_peer_id) is True
 
     assert await swarm7[peer].api.aliases_get_alias("Alice") == alice_peer_id
-    assert await swarm7[peer].api.aliases_set_alias("Alice", alice_peer_id) is False
+    assert await swarm7[peer].api.aliases_set_alias("Alice New", alice_peer_id) is True
 
-    assert await swarm7[peer].api.aliases_remove_alias("Alice")
+    aliases = await swarm7[peer].api.aliases_get_aliases()
+
+    assert await swarm7[peer].api.aliases_remove_alias("Alice New") is True
+    assert await swarm7[peer].api.aliases_get_alias("Alice New") is None
     assert await swarm7[peer].api.aliases_get_alias("Alice") is None
 
 

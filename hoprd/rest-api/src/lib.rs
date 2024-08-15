@@ -482,7 +482,6 @@ enum ApiErrorStatus {
     Timeout,
     Unauthorized,
     InvalidQuality,
-    AliasAlreadyExists,
     #[strum(serialize = "UNKNOWN_FAILURE")]
     UnknownFailure(String),
 }
@@ -579,7 +578,6 @@ mod alias {
             (status = 201, description = "Alias set successfully.", body = PeerIdResponse),
             (status = 400, description = "Invalid PeerId: The format or length of the peerId is incorrect.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
-            (status = 409, description = "Given PeerId is already aliased.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
@@ -591,7 +589,7 @@ mod alias {
     pub async fn set_alias(mut req: Request<InternalState>) -> tide::Result<Response> {
         let args: AliasPeerIdBodyRequest = req.body_json().await?;
 
-        let inserted = req
+        let _ = req
             .state()
             .hoprd_db
             .write()
@@ -599,12 +597,9 @@ mod alias {
             .set_alias(args.peer_id.to_string(), args.alias)
             .await;
 
-        match inserted {
-            Ok(_) => Ok(Response::builder(201)
-                .body(json!(PeerIdResponse { peer_id: args.peer_id }))
-                .build()),
-            Err(_e) => Ok(Response::builder(409).body(ApiErrorStatus::AliasAlreadyExists).build()),
-        }
+        Ok(Response::builder(201)
+            .body(json!(PeerIdResponse { peer_id: args.peer_id }))
+            .build())
     }
     /// (deprecated, will be removed in v3.0) Get alias for the PeerId (Hopr address) that have this alias assigned to it.
     #[utoipa::path(

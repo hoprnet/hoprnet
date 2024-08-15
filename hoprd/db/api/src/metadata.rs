@@ -75,22 +75,18 @@ impl HoprdDbMetadataOperations for HoprdDb {
             .one(&self.metadata)
             .await?;
 
-        if let Some(mut row) = row {
-            row.alias = alias;
-            let _ = hoprd_db_entity::aliases::Entity::update_many()
-                .filter(hoprd_db_entity::aliases::Column::PeerId.eq(peer.clone()))
-                .exec(&self.metadata)
-                .await?;
-        } else {
-            let new_alias = hoprd_db_entity::aliases::ActiveModel {
-                peer_id: sea_orm::ActiveValue::Set(peer.clone()),
-                alias: sea_orm::ActiveValue::Set(alias.clone()),
-                ..Default::default()
-            };
-            let _ = hoprd_db_entity::aliases::Entity::insert(new_alias)
-                .exec(&self.metadata)
-                .await?;
+        if let Some(model) = row {
+            self.delete_alias(model.alias).await?;
         }
+
+        let new_alias = hoprd_db_entity::aliases::ActiveModel {
+            peer_id: sea_orm::ActiveValue::Set(peer.clone()),
+            alias: sea_orm::ActiveValue::Set(alias.clone()),
+            ..Default::default()
+        };
+        let _ = hoprd_db_entity::aliases::Entity::insert(new_alias)
+            .exec(&self.metadata)
+            .await?;
 
         Ok(())
     }
@@ -176,14 +172,14 @@ mod tests {
             .await
             .expect("should add alias");
 
-        db.set_alias(peer_id.clone(), alias.clone())
+        db.set_alias(peer_id.clone(), alias.clone().to_uppercase())
             .await
             .expect("should replace alias");
 
         let aliases = db.get_aliases().await.unwrap();
 
         assert_eq!(aliases.len(), 1);
-        assert_eq!(aliases[0].alias, alias);
+        assert_eq!(aliases[0].alias, alias.to_uppercase());
     }
 
     #[async_std::test]
