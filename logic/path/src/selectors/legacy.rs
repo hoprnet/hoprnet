@@ -342,7 +342,7 @@ mod tests {
             let caps = re.captures(edge).unwrap();
 
             if caps.get(0).is_none() {
-                panic!("no matching edge. got `{}`", edge);
+                panic!("no matching edge. got `{edge}`");
             }
 
             let addr_a = ADDRESSES[usize::from_str(caps.get(1).unwrap().as_str()).unwrap()];

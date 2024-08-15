@@ -50,8 +50,6 @@ impl TicketManager {
         // NOTE: This spawned task does not need to be explicitly canceled, since it will
         // be automatically dropped when the event sender object is dropped.
         spawn(async move {
-            // TODO: it would be beneficial to check the size hint and extract as much, as possible
-            // in this step to avoid relocking for each individual ticket.
             while let Some(acknowledged_ticket) = rx.next().await {
                 match db_clone
                     .begin_with_config(None, None)

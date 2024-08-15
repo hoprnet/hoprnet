@@ -209,19 +209,11 @@ hopr:
     prefer_local_addresses: false
   # Configuration of various HOPR sub-protocols.
   protocol:
-    # Message acknowledgement sub-protocol configuration.
-    ack:
-      # Timeout in seconds
-      timeout: 15
     # Heartbeat sub-protocol configuration
     heartbeat:
       # Timeout in seconds
       timeout: 15
     # Message sub-protocol configuration
-    msg:
-      # Timeout in seconds
-      timeout: 15
-    # Ticket aggregation sub-protocol configuration
     ticket_aggregation:
       # Timeout in seconds
       timeout: 15

@@ -703,24 +703,20 @@ impl<const C: usize> SessionSocket<C> {
             let jitter = Jitter::up_to(Duration::from_millis(5));
 
             spawn(async move {
-                debug!(
-                    "FINISHED spawned egress to downstream: {:?}",
-                    segment_egress_recv
-                        .map(|m: SessionMessage<C>| Ok(m.into_encoded()))
-                        .ratelimit_stream_with_jitter(&rate_limiter, jitter)
-                        .forward(downstream_write.into_sink())
-                        .await
-                );
+                let res = segment_egress_recv
+                    .map(|m: SessionMessage<C>| Ok(m.into_encoded()))
+                    .ratelimit_stream_with_jitter(&rate_limiter, jitter)
+                    .forward(downstream_write.into_sink())
+                    .await;
+                debug!("FINISHED spawned egress to downstream: {res:?}");
             });
         } else {
             spawn(async move {
-                debug!(
-                    "FINISHED spawned egress to downstream: {:?}",
-                    segment_egress_recv
-                        .map(|m| Ok(m.into_encoded()))
-                        .forward(downstream_write.into_sink())
-                        .await,
-                )
+                let res = segment_egress_recv
+                    .map(|m| Ok(m.into_encoded()))
+                    .forward(downstream_write.into_sink())
+                    .await;
+                debug!("FINISHED spawned egress to downstream: {res:?}")
             });
         }
 

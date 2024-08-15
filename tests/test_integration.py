@@ -302,7 +302,7 @@ async def test_hoprd_ping_should_work_between_nodes_in_the_same_network(src: str
 async def test_hoprd_ping_to_self_should_fail(peer: str, swarm7: dict[str, Node]):
     response = await swarm7[peer].api.ping(swarm7[peer].peer_id)
 
-    assert response is None, f"Pinging self should fail"
+    assert response is None, "Pinging self should fail"
 
 
 @pytest.mark.asyncio
@@ -365,7 +365,7 @@ async def test_hoprd_should_fail_sending_a_message_that_is_too_large(src: Node, 
     packet = "0 hop message too large: " + "".join(
         random.choices(string.ascii_uppercase + string.digits, k=MAXIMUM_PAYLOAD_SIZE)
     )
-    assert await swarm7[src].api.send_message(swarm7[dest].peer_id, packet, [], random_tag) == None
+    assert await swarm7[src].api.send_message(swarm7[dest].peer_id, packet, [], random_tag) is None
 
 
 @pytest.mark.asyncio
@@ -779,6 +779,15 @@ async def test_hoprd_check_ticket_price_is_default(peer, swarm7: dict[str, Node]
 
     assert isinstance(price, int)
     assert price > 0
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
+async def test_hoprd_check_ticket_winn_prob_is_default(peer, swarm7: dict[str, Node]):
+    price = await swarm7[peer].api.ticket_winn_prob()
+
+    assert price is not None
+    assert 0.0 <= round(price, 5) <= 1.0
 
 
 @pytest.mark.asyncio
