@@ -51,6 +51,7 @@ services:
   hopr-admin:
     image: "${HOPR_ADMIN_IMAGE}"
     restart: unless-stopped
+    pull_policy: always
     platform: ${DOCKER_PLATFORM}
     container_name: admin
     hostname: admin
