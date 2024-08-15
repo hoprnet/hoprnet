@@ -1,36 +1,16 @@
-use hoprd_db_entity::errors::DbEntityError;
 use sea_orm::TransactionError;
-use std::sync::Arc;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum DbError {
-    #[error("missing fixed entry in table {0}")]
-    MissingFixedTableEntry(String),
-
     #[error("transaction error: {0}")]
     TransactionError(Box<dyn std::error::Error + Send + Sync>),
-
-    #[error("error while decoding db entity")]
-    DecodingError,
 
     #[error("logical error: {0}")]
     LogicalError(String),
 
-    #[error("ack validation error: {0}")]
-    AcknowledgementValidationError(String),
-
     #[error(transparent)]
     BackendError(#[from] sea_orm::DbErr),
-
-    #[error(transparent)]
-    EntityError(#[from] DbEntityError),
-
-    #[error("error while inserting into cache: {0}")]
-    CacheError(#[from] Arc<Self>),
-
-    #[error(transparent)]
-    NonSpecificError(#[from] hopr_primitive_types::errors::GeneralError),
 }
 
 impl<E: std::error::Error + Send + Sync + 'static> From<TransactionError<E>> for DbError {

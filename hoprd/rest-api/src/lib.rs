@@ -513,6 +513,7 @@ impl<T: Error> From<T> for ApiErrorStatus {
     }
 }
 
+// TODO: Remove the module in v3.0
 mod alias {
     use super::*;
 

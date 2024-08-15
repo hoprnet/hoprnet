@@ -176,17 +176,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let hoprd_db = Arc::new(RwLock::new(hoprd_db_api::db::HoprdDb::new(db_path.clone()).await));
 
     // Ensures that "me" is set as alias
-    let add_me_alias = hoprd_db
+    let _ = hoprd_db
         .write()
         .await
         .set_alias(node.me_peer_id().to_string(), "me".to_string())
         .await;
-
-    if let Err(e) = add_me_alias {
-        warn!("'me' alias already set: {e}");
-    } else {
-        info!("'me' alias set");
-    }
 
     let (mut ws_events_tx, ws_events_rx) =
         async_broadcast::broadcast::<TransportOutput>(WEBSOCKET_EVENT_BROADCAST_CAPACITY);
