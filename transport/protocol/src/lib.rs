@@ -281,6 +281,9 @@ where
                                 Some(v)
                             }
                             Err(e) => {
+                                #[cfg(all(feature = "prometheus", not(test)))]
+                                METRIC_QUEUE_SIZE.decrement(1.0f64);
+
                                 finalizer.finalize(Err(e));
                                 None
                             }
