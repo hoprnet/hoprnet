@@ -85,6 +85,7 @@ pub struct InternalState {
         alias::set_alias,
         alias::get_alias,
         alias::delete_alias,
+        alias::clear_aliases,
         account::addresses,
         account::balances,
         account::withdraw,
@@ -311,7 +312,10 @@ pub async fn run_hopr_api(
 
         api.with(TokenBasedAuthenticationMiddleware);
 
-        api.at("/aliases").get(alias::aliases).post(alias::set_alias);
+        api.at("/aliases")
+            .get(alias::aliases)
+            .post(alias::set_alias)
+            .delete(alias::clear_aliases);
 
         api.at("/aliases/:alias")
             .get(alias::get_alias)
@@ -656,6 +660,28 @@ mod alias {
         let alias = urlencoding::decode(&alias)?.into_owned();
 
         match req.state().hoprd_db.write().await.delete_alias(alias.clone()).await {
+            Ok(_) => Ok(Response::builder(204).build()),
+            Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
+        }
+    }
+
+    /// (deprecated, will be removed in v3.0) Clear all aliases.
+    #[utoipa::path(
+        delete,
+        path = const_format::formatcp!("{BASE_PATH}/aliases"),
+        responses(
+            (status = 204, description = "All aliases removed successfully"),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
+            (status = 422, description = "Unknown failure", body = ApiError)   // This can never happen
+        ),
+        security(
+            ("api_token" = []),
+            ("bearer_token" = [])
+        ),
+        tag = "Alias",
+    )]
+    pub async fn clear_aliases(req: Request<InternalState>) -> tide::Result<Response> {
+        match req.state().hoprd_db.write().await.clear_aliases().await {
             Ok(_) => Ok(Response::builder(204).build()),
             Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
         }

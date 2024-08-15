@@ -34,6 +34,9 @@ pub trait HoprdDbMetadataOperations {
 
     /// Delete alias
     async fn delete_alias(&self, alias: String) -> Result<()>;
+
+    /// Delete all aliases
+    async fn clear_aliases(&self) -> Result<()>;
 }
 
 #[async_trait]
@@ -44,11 +47,7 @@ impl HoprdDbMetadataOperations for HoprdDb {
             .one(&self.metadata)
             .await?;
 
-        if let Some(model) = row {
-            return Ok(Some(model.peer_id));
-        } else {
-            return Ok(None);
-        }
+        Ok(row.map(|model| model.peer_id))
     }
 
     async fn get_aliases(&self) -> Result<Vec<AliasEntry>> {
@@ -113,6 +112,19 @@ impl HoprdDbMetadataOperations for HoprdDb {
             Err(crate::errors::DbError::LogicalError(
                 "peer cannot be removed because it does not exist".into(),
             ))
+        }
+    }
+
+    async fn clear_aliases(&self) -> Result<()> {
+        let res: sea_orm::DeleteResult = hoprd_db_entity::aliases::Entity::delete_many()
+            .filter(hoprd_db_entity::aliases::Column::Alias.ne("me".to_string()))
+            .exec(&self.metadata)
+            .await?;
+
+        if res.rows_affected > 0 {
+            Ok(())
+        } else {
+            Err(crate::errors::DbError::LogicalError("No aliases removed".into()))
         }
     }
 }
@@ -223,5 +235,29 @@ mod tests {
         db.delete_alias(alias).await.expect("should delete alias");
         let aliases = db.get_aliases().await.expect("should get aliases");
         assert_eq!(aliases.len(), 0);
+    }
+
+    #[async_std::test]
+    async fn test_clear() {
+        let db = HoprdDb::new_in_memory().await;
+
+        let me_peer_id = PeerId::random().to_string();
+        let peer_id = PeerId::random().to_string();
+        let alias = "test_alias".to_string();
+
+        db.set_alias(peer_id.clone(), alias.clone())
+            .await
+            .expect("should add alias");
+        db.set_alias(me_peer_id.clone(), "me".to_string())
+            .await
+            .expect("should add alias");
+
+        let aliases = db.get_aliases().await.expect("should get aliases");
+        assert_eq!(aliases.len(), 2);
+
+        db.clear_aliases().await.expect("should clear aliases except 'me'");
+        let aliases = db.get_aliases().await.expect("should get aliases");
+        assert_eq!(aliases.len(), 1);
+        assert_eq!(aliases[0].peer_id, me_peer_id);
     }
 }
