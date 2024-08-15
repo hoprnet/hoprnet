@@ -23,8 +23,8 @@ The `docker compose` setup is profile driven. Based on which profiles are activa
 The supported profiles are:
 
 - `hoprd`: runs a single hoprd node with configuration taken from config file
-   - requires the `./hoprd_data/hoprd.cfg.yaml` to be edited with relevant information
-   - takes the `./hoprd_data/hopr.id` file or generates a new id encrypted with `HOPRD_PASSWORD` from `./env-secrets`
+  - requires the `./hoprd_data/hoprd.cfg.yaml` to be edited with relevant information
+  - takes the `./hoprd_data/hopr.id` file or generates a new id encrypted with `HOPRD_PASSWORD` from `./env-secrets`
 - `admin-ui`: runs a `hopr-admin` frontend
 - `metrics`: utilites exporting system, docker and node metrics
 - `metrics-push`: a utility cronjob to publish metrics to an external prometheus push gateway
