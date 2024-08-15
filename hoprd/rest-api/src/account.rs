@@ -7,7 +7,10 @@ use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use std::sync::Arc;
 
-use hopr_lib::{Address, Balance, BalanceType};
+use hopr_lib::{
+    errors::{HoprLibError, HoprStatusError},
+    Address, Balance, BalanceType,
+};
 
 use crate::{ApiErrorStatus, InternalState, BASE_PATH};
 
@@ -77,7 +80,6 @@ pub(crate) struct AccountBalancesResponse {
         responses(
             (status = 200, description = "The node's HOPR and Safe balances", body = AccountBalancesResponse),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
-            (status = 412, description = "The node is not ready."),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
@@ -188,6 +190,10 @@ pub(super) async fn withdraw(
             }),
         )
             .into_response(),
+        Err(HoprLibError::StatusError(HoprStatusError::NotRunningError)) => {
+            (StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response()
+        }
+
         Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
     }
 }

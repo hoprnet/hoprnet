@@ -3,7 +3,7 @@ use axum::{
     http::status::StatusCode,
     response::IntoResponse,
 };
-use hopr_lib::{HoprTransportError, Multiaddr};
+use hopr_lib::{errors::HoprStatusError, HoprTransportError, Multiaddr};
 use libp2p_identity::PeerId;
 use serde::Deserialize;
 use serde_with::{serde_as, DisplayFromStr, DurationMilliSeconds};
@@ -103,7 +103,7 @@ pub(crate) struct PingResponse {
         (status = 200, description = "Ping successful", body = PingResponse),
         (status = 400, description = "Invalid peer id", body = ApiError),
         (status = 401, description = "Invalid authorization token.", body = ApiError),
-            (status = 412, description = "The node is not ready."),
+        (status = 412, description = "The node is not ready."),
         (status = 422, description = "Unknown failure", body = ApiError)
     ),
     security(
@@ -129,6 +129,9 @@ pub(super) async fn ping_peer(
             }
             Err(HoprLibError::TransportError(HoprTransportError::Protocol(hopr_lib::ProtocolError::Timeout))) => {
                 Ok((StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::Timeout).into_response())
+            }
+            Err(HoprLibError::StatusError(HoprStatusError::NotRunningError)) => {
+                Ok((StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response())
             }
             Err(e) => Ok((StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response()),
         },

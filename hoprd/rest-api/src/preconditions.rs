@@ -11,7 +11,6 @@ use axum::{
 use std::str::FromStr;
 
 use crate::{ApiErrorStatus, Auth, InternalState};
-use hopr_lib::HoprState;
 
 pub(crate) async fn authenticate(
     State(state): State<InternalState>,
@@ -60,18 +59,5 @@ pub(crate) async fn authenticate(
     }
 
     // Go forward to the next middleware or request handler
-    next.run(request).await
-}
-
-pub(crate) async fn ensure_running(
-    State(state): State<InternalState>,
-    _uri: OriginalUri,
-    _headers: HeaderMap,
-    request: Request,
-    next: Next,
-) -> impl IntoResponse {
-    if state.hopr.status() != HoprState::Running {
-        return (StatusCode::PRECONDITION_FAILED, "Node is not ready to accept requests").into_response();
-    }
     next.run(request).await
 }

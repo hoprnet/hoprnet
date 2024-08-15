@@ -28,6 +28,7 @@ use std::{
 };
 
 use async_lock::RwLock;
+use errors::HoprStatusError;
 use futures::{
     channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender},
     Stream, StreamExt,
@@ -570,8 +571,10 @@ impl Hopr {
     fn error_if_not_in_state(&self, state: HoprState, error: String) -> errors::Result<()> {
         if self.status() == state {
             Ok(())
+        } else if state == HoprState::Running {
+            Err(errors::HoprLibError::StatusError(HoprStatusError::NotRunningError))
         } else {
-            Err(errors::HoprLibError::StatusError(error))
+            Err(errors::HoprLibError::StatusError(HoprStatusError::General(error)))
         }
     }
 
@@ -1277,6 +1280,8 @@ impl Hopr {
         channel_id: Hash,
         redeem_before_close: bool,
     ) -> errors::Result<CloseChannelResult> {
+        self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
+
         match self.channel_from_hash(&channel_id).await? {
             Some(channel) => match channel.orientation(&self.me_onchain()) {
                 Some((direction, counterparty)) => {

@@ -20,7 +20,10 @@ use std::{sync::Arc, time::Duration};
 use tracing::{debug, error, warn};
 use validator::Validate;
 
-use hopr_lib::{AsUnixTimestamp, HalfKeyChallenge, PathOptions, TransportOutput, RESERVED_TAG_UPPER_LIMIT};
+use hopr_lib::{
+    errors::{HoprLibError, HoprStatusError},
+    AsUnixTimestamp, HalfKeyChallenge, PathOptions, TransportOutput, RESERVED_TAG_UPPER_LIMIT,
+};
 
 use crate::{ApiErrorStatus, InternalState, BASE_PATH};
 
@@ -153,6 +156,9 @@ pub(super) async fn send_message(
 
     match hopr.send_message(msg_body, args.peer_id, options, Some(args.tag)).await {
         Ok(challenge) => (StatusCode::ACCEPTED, Json(SendMessageResponse { challenge, timestamp })).into_response(),
+        Err(HoprLibError::StatusError(HoprStatusError::NotRunningError)) => {
+            (StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response()
+        }
         Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
     }
 }

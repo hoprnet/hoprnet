@@ -12,8 +12,8 @@ use tracing::warn;
 
 use hopr_crypto_types::types::Hash;
 use hopr_lib::{
-    errors::HoprLibError, Address, AsUnixTimestamp, Balance, BalanceType, ChainActionsError, ChannelEntry,
-    ChannelStatus, Hopr, ToHex,
+    errors::{HoprLibError, HoprStatusError},
+    Address, AsUnixTimestamp, Balance, BalanceType, ChainActionsError, ChannelEntry, ChannelStatus, Hopr, ToHex,
 };
 
 use crate::{ApiErrorStatus, InternalState, BASE_PATH};
@@ -314,6 +314,9 @@ pub(super) async fn open_channel(
         Err(HoprLibError::ChainError(ChainActionsError::ChannelAlreadyExists)) => {
             (StatusCode::CONFLICT, ApiErrorStatus::ChannelAlreadyOpen).into_response()
         }
+        Err(HoprLibError::StatusError(HoprStatusError::NotRunningError)) => {
+            (StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response()
+        }
         Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
     }
 }
@@ -431,6 +434,9 @@ pub(super) async fn close_channel(
             Err(HoprLibError::ChainError(ChainActionsError::InvalidArguments(_))) => {
                 (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::UnsupportedFeature).into_response()
             }
+            Err(HoprLibError::StatusError(HoprStatusError::NotRunningError)) => {
+                (StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response()
+            }
             Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
         },
         Err(_) => (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidChannelId).into_response(),
@@ -494,6 +500,9 @@ pub(super) async fn fund_channel(
             }
             Err(HoprLibError::ChainError(ChainActionsError::BalanceTooLow)) => {
                 (StatusCode::FORBIDDEN, ApiErrorStatus::NotEnoughBalance).into_response()
+            }
+            Err(HoprLibError::StatusError(HoprStatusError::NotRunningError)) => {
+                (StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response()
             }
             Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
         },
