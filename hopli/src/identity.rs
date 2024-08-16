@@ -4,7 +4,7 @@
 //! For all three actions around identity files, at least two arguments are needed:
 //! - Path to files
 //! - Password to encrypt or decrypt the file
-//! To update identity files, a new password must be provided.
+//!   - To update identity files, a new password must be provided.
 //!
 //! Some sample commands:
 //!

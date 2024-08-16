@@ -8,7 +8,7 @@
 //! The trait requires to have the following building blocks:
 //! - elliptic curve group ([GroupElement](shared_keys::GroupElement)) and corresponding the scalar type ([Scalar](shared_keys::Scalar))
 //! - type representing public and private keypair and their conversion to [Scalar](shared_keys::Scalar)
-//! and [GroupElement](shared_keys::GroupElement) (by the means of the corresponding `From` trait implementation)
+//!   and [GroupElement](shared_keys::GroupElement) (by the means of the corresponding `From` trait implementation)
 //!
 //! Currently, there are the following [SphinxSuite](crate::shared_keys::SphinxSuite) implementations :
 //! - `Secp256k1Suite`: deprecated, used in previous HOPR versions

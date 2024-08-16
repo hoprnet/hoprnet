@@ -19,9 +19,9 @@
 //!
 //! 1. the action gets confirmed, meaning it has been successfully executed.
 //! 2. awaiting the confirmation returns an error, which typically means a failure during action prerequisite checks,
-//! an invalid state to execute the action or invalid arguments given to the action
+//!    an invalid state to execute the action or invalid arguments given to the action
 //! 3. awaiting the confirmation times out, meaning the execution failed on-chain and the "action expectations"
-//! did not yield (see below for details on how "action expectations work").
+//!    did not yield (see below for details on how "action expectations work").
 //!
 //! Not awaiting the returned [PendingAction](action_queue::PendingAction) future does not give the caller any guarantees
 //! on how the action has executed, although this might be perfectly fine for certain cases (fire & forget).
@@ -39,16 +39,17 @@
 //! The [ActionQueue](action_queue::ActionQueue) operates a MPSC queue, which picks up the [Actions](chain_types::actions::Action) submitted
 //! to it one by one. With each such action it will:
 //! 1. transform [Action](chain_types::actions::Action) into a [TypedTransaction](chain_types::TypedTransaction)
-//! via a [PayloadGenerator](payload::PayloadGenerator<T>)
+//!    via a [PayloadGenerator](payload::PayloadGenerator<T>)
 //! 2. submit the [TypedTransaction](chain_types::TypedTransaction) on-chain via a [TransactionExecutor](action_queue::TransactionExecutor)
 //! 3. generate an [IndexerExpectation](action_state::IndexerExpectation) from the submitted action
 //! 4. submit the [IndexerExpectation](action_state::IndexerExpectation) in an [ActionState](action_state::ActionState) implementation
 //! 5. wait for expectation to be resolved (or timeout, see [ActionQueueConfig](action_queue::ActionQueueConfig)
-//! and resolve the action submitter's [PendingAction](action_queue::PendingAction).
+//!    and resolve the action submitter's [PendingAction](action_queue::PendingAction).
 //!
 //! In other words, the [ActionQueue](action_queue::ActionQueue) takes care of two important mappings:
 //! 1. [Action](chain_types::actions::Action) to [TypedTransaction](chain_types::TypedTransaction)
 //! 2. [Action](chain_types::actions::Action) to [IndexerExpectation](action_state::IndexerExpectation)
+//!
 //! The first one makes it possible for an action to make it on-chain, the second one allows to
 //! be informed of the action's result and effect.
 //!
