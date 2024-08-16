@@ -563,7 +563,12 @@ mod alias {
     pub async fn aliases(req: Request<InternalState>) -> tide::Result<Response> {
         let aliases = req.state().hoprd_db.read().await.get_aliases().await?;
 
-        Ok(Response::builder(200).body(json!(aliases)).build())
+        Ok(Response::builder(200)
+            .body(json!(aliases
+                .iter()
+                .map(|alias| (alias.peer_id.clone(), alias.alias.clone()))
+                .collect::<HashMap<_, _>>()))
+            .build())
     }
 
     /// (deprecated, will be removed in v3.0) Set alias for a peer with a specific PeerId.
