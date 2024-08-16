@@ -130,7 +130,7 @@ pub(super) async fn ping_peer(
             Err(HoprLibError::TransportError(HoprTransportError::Protocol(hopr_lib::ProtocolError::Timeout))) => {
                 Ok((StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::Timeout).into_response())
             }
-            Err(HoprLibError::StatusError(HoprStatusError::NotRunningError)) => {
+            Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(_, _))) => {
                 Ok((StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response())
             }
             Err(e) => Ok((StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response()),

@@ -314,7 +314,7 @@ pub(super) async fn open_channel(
         Err(HoprLibError::ChainError(ChainActionsError::ChannelAlreadyExists)) => {
             (StatusCode::CONFLICT, ApiErrorStatus::ChannelAlreadyOpen).into_response()
         }
-        Err(HoprLibError::StatusError(HoprStatusError::NotRunningError)) => {
+        Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(_, _))) => {
             (StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response()
         }
         Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
@@ -434,7 +434,7 @@ pub(super) async fn close_channel(
             Err(HoprLibError::ChainError(ChainActionsError::InvalidArguments(_))) => {
                 (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::UnsupportedFeature).into_response()
             }
-            Err(HoprLibError::StatusError(HoprStatusError::NotRunningError)) => {
+            Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(_, _))) => {
                 (StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response()
             }
             Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
@@ -501,7 +501,7 @@ pub(super) async fn fund_channel(
             Err(HoprLibError::ChainError(ChainActionsError::BalanceTooLow)) => {
                 (StatusCode::FORBIDDEN, ApiErrorStatus::NotEnoughBalance).into_response()
             }
-            Err(HoprLibError::StatusError(HoprStatusError::NotRunningError)) => {
+            Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(_, _))) => {
                 (StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response()
             }
             Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),

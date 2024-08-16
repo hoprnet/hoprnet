@@ -1,13 +1,15 @@
 use thiserror::Error;
 
+use crate::HoprState;
+
 /// Enumeration of status errors thrown from this library.
 #[derive(Error, Debug)]
 pub enum HoprStatusError {
-    #[error("HOPR status error: '{0}'")]
+    #[error("HOPR status general error: '{0}'")]
     General(String),
 
-    #[error("HOPR status error: node not running.")]
-    NotRunningError,
+    #[error("HOPR status error: '{0}'")]
+    NotThereYet(HoprState, String),
 }
 
 /// Enumeration of errors thrown from this library.

@@ -192,7 +192,7 @@ pub(super) async fn redeem_all_tickets(State(state): State<Arc<InternalState>>) 
     let hopr = state.hopr.clone();
     match hopr.redeem_all_tickets(false).await {
         Ok(()) => (StatusCode::NO_CONTENT, "").into_response(),
-        Err(HoprLibError::StatusError(HoprStatusError::NotRunningError)) => {
+        Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(_, _))) => {
             (StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response()
         }
         Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
@@ -233,7 +233,7 @@ pub(super) async fn redeem_tickets_in_channel(
         Ok(channel_id) => match hopr.redeem_tickets_in_channel(&channel_id, false).await {
             Ok(count) if count > 0 => (StatusCode::NO_CONTENT, "").into_response(),
             Ok(_) => (StatusCode::NOT_FOUND, ApiErrorStatus::ChannelNotFound).into_response(),
-            Err(HoprLibError::StatusError(HoprStatusError::NotRunningError)) => {
+            Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(_, _))) => {
                 (StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response()
             }
             Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),

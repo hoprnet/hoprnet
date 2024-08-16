@@ -150,7 +150,7 @@ pub(super) async fn send_message(
 
     match hopr.send_message(msg_body, args.peer_id, options, Some(args.tag)).await {
         Ok(_) => (StatusCode::ACCEPTED, Json(SendMessageResponse { timestamp })).into_response(),
-        Err(HoprLibError::StatusError(HoprStatusError::NotRunningError)) => {
+        Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(_, _))) => {
             (StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response()
         }
         Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),

@@ -190,7 +190,7 @@ pub(super) async fn withdraw(
             }),
         )
             .into_response(),
-        Err(HoprLibError::StatusError(HoprStatusError::NotRunningError)) => {
+        Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(_, _))) => {
             (StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response()
         }
 
