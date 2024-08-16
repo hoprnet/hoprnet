@@ -272,9 +272,22 @@ impl HoprDbTicketOperations for HoprDb {
 
                             #[cfg(all(feature = "prometheus", not(test)))]
                             {
+                                let channel = channel_id.to_string();
                                 METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(
-                                    &[&channel_id.to_string(), "redeemed"],
+                                    &[&channel, "redeemed"],
                                     (current_redeemed_value + redeemed_value.amount()).as_u128() as f64,
+                                );
+
+                                let unredeemed_value = myself
+                                    .caches
+                                    .unrealized_value
+                                    .get(&channel_id)
+                                    .await
+                                    .unwrap_or(Balance::zero(BalanceType::HOPR));
+
+                                METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(
+                                    &[&channel, "unredeemed"],
+                                    (unredeemed_value - redeemed_value.amount()).amount().as_u128() as f64,
                                 );
                             }
 
@@ -326,9 +339,22 @@ impl HoprDbTicketOperations for HoprDb {
 
                             #[cfg(all(feature = "prometheus", not(test)))]
                             {
+                                let channel = selector.channel_id.to_string();
                                 METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(
-                                    &[&selector.channel_id.to_string(), "neglected"],
+                                    &[&channel, "neglected"],
                                     (current_neglected_value + neglectable_value.amount()).as_u128() as f64,
+                                );
+
+                                let unredeemed_value = myself
+                                    .caches
+                                    .unrealized_value
+                                    .get(&selector.channel_id)
+                                    .await
+                                    .unwrap_or(Balance::zero(BalanceType::HOPR));
+
+                                METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(
+                                    &[&channel, "unredeemed"],
+                                    (unredeemed_value - neglectable_value.amount()).amount().as_u128() as f64,
                                 );
                             }
 
