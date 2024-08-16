@@ -1,4 +1,4 @@
 [toolchain]
-channel = "1.78"
+channel = "1.80"
 profile = "default"
 components = ["cargo", "clippy", "rust-src"]
