@@ -64,13 +64,14 @@ pub struct NetworkProviderArgs {
     #[clap(help = "Network name. E.g. monte_rosa", long, short)]
     network: String,
 
-    /// Path to the root of foundry project (etehereum/contracts), where all the contracts and `contracts-addresses.json` are stored
+    /// Path to the root of foundry project (ethereum/contracts), where all the contracts and `contracts-addresses.json` are stored
+    /// Default to "./ethereum/contracts", which is the path to the `contracts` folder from the root of monorepo
     #[clap(
         env = "HOPLI_CONTRACTS_ROOT",
         help = "Specify path pointing to the contracts root",
         long,
         short,
-        default_value = None
+        default_value = "./ethereum/contracts"
     )]
     contracts_root: Option<String>,
 
@@ -83,7 +84,7 @@ impl Default for NetworkProviderArgs {
     fn default() -> Self {
         Self {
             network: "anvil-localhost".into(),
-            contracts_root: None,
+            contracts_root: Some("./ethereum/contracts".into()),
             provider_url: "http://127.0.0.1:8545".into(),
         }
     }
