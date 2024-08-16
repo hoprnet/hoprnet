@@ -168,9 +168,10 @@ impl TransportPath {
     /// Resolves vector of [PeerIds](PeerId) into the corresponding [TransportPath] and optionally an associated [ChannelPath].
     ///
     /// - If `peers` contains only a single entry (destination), the resulting `TransportPath` contains just this entry.
-    /// Since in this case the [ChannelPath] would be empty (0-hop), it is `None`. This case is equivalent to construction with `direct()`.
+    ///   Since in this case the [ChannelPath] would be empty (0-hop), it is `None`. This case is equivalent to construction with `direct()`.
     /// - If `peers` contains more than a single entry, it first resolves `PeerId`s into `Address`es and then validates and returns
-    ///  also the multi-hop `ChannelPath`.
+    ///   also the multi-hop `ChannelPath`.
+    ///
     /// To do an inverse resolution, from [Addresses](Address) to `PeerId`s, construct the [ChannelPath] and use its `to_path()` method to resolve the
     /// on-chain path.
     /// The given [resolver](HoprDbResolverOperations) is used for the mapping between `PeerId`s and `Address`es.
