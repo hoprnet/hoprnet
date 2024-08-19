@@ -546,7 +546,7 @@ mod tests {
             alice_addr,
             bob_addr,
             agg_balance.mul(10),
-            NUM_TICKETS.into(),
+            1_u32.into(),
             ChannelStatus::Open,
             1u32.into(),
         );
@@ -570,6 +570,11 @@ mod tests {
         match bob.next().timeout(Duration::from_secs(5)).await {
             Ok(Some(TicketAggregationProcessed::Send(_, acked_tickets, request_finalizer))) => {
                 let _ = finalizer.insert(request_finalizer);
+                assert_eq!(
+                    NUM_TICKETS - 1,
+                    acked_tickets.len() as u64,
+                    "invalid number of tickets to aggregate"
+                );
                 alice
                     .writer()
                     .receive_aggregation_request(
@@ -612,7 +617,7 @@ mod tests {
         );
         assert!(
             stored_acked_tickets[1].verified_ticket().is_aggregated(),
-            "aggregated balance invalid"
+            "last ticket must be the aggregated one"
         );
         assert_eq!(
             AcknowledgedTicketStatus::Untouched,
@@ -622,6 +627,121 @@ mod tests {
         assert_eq!(
             agg_balance,
             stored_acked_tickets[1].verified_ticket().amount,
+            "aggregated balance invalid"
+        );
+
+        awaiter.consume_and_wait(Duration::from_millis(2000)).await.unwrap();
+    }
+
+    #[async_std::test]
+    async fn test_ticket_aggregation_skip_lower_indices() {
+        let db_alice = HoprDb::new_in_memory(PEERS_CHAIN[0].clone()).await;
+        let db_bob = HoprDb::new_in_memory(PEERS_CHAIN[1].clone()).await;
+        init_db(db_alice.clone()).await;
+        init_db(db_bob.clone()).await;
+
+        const NUM_TICKETS: u64 = 30;
+        const CHANNEL_TICKET_IDX: u64 = 20;
+
+        let mut tickets = vec![];
+        let mut agg_balance = Balance::zero(BalanceType::HOPR);
+        // Generate acknowledged tickets
+        for i in 1..=NUM_TICKETS {
+            let ack_ticket = mock_acknowledged_ticket(&PEERS_CHAIN[0], &PEERS_CHAIN[1], i);
+            if i >= CHANNEL_TICKET_IDX {
+                agg_balance = agg_balance.add(&ack_ticket.verified_ticket().amount);
+            }
+            tickets.push(ack_ticket)
+        }
+
+        let alice_addr: Address = (&PEERS_CHAIN[0]).into();
+        let bob_addr: Address = (&PEERS_CHAIN[1]).into();
+
+        let alice_packet_key = PEERS[0].public().into();
+        let bob_packet_key = PEERS[1].public().into();
+
+        let channel_alice_bob = ChannelEntry::new(
+            alice_addr,
+            bob_addr,
+            agg_balance.mul(10),
+            CHANNEL_TICKET_IDX.into(),
+            ChannelStatus::Open,
+            1u32.into(),
+        );
+
+        db_alice.upsert_channel(None, channel_alice_bob).await.unwrap();
+        db_bob.upsert_channel(None, channel_alice_bob).await.unwrap();
+
+        for ticket in tickets.into_iter() {
+            db_bob.upsert_ticket(None, ticket).await.unwrap();
+        }
+
+        let mut alice = super::TicketAggregationInteraction::<(), ()>::new(db_alice.clone(), &PEERS_CHAIN[0]);
+        let mut bob = super::TicketAggregationInteraction::<(), ()>::new(db_bob.clone(), &PEERS_CHAIN[1]);
+
+        let awaiter = bob
+            .writer()
+            .aggregate_tickets(&channel_alice_bob.get_id(), Default::default())
+            .unwrap();
+
+        let mut finalizer = None;
+        match bob.next().timeout(Duration::from_secs(5)).await {
+            Ok(Some(TicketAggregationProcessed::Send(_, acked_tickets, request_finalizer))) => {
+                let _ = finalizer.insert(request_finalizer);
+                assert_eq!(
+                    NUM_TICKETS - CHANNEL_TICKET_IDX + 1,
+                    acked_tickets.len() as u64,
+                    "invalid number of tickets to aggregate"
+                );
+                alice
+                    .writer()
+                    .receive_aggregation_request(
+                        bob_packet_key,
+                        acked_tickets.into_iter().map(TransferableWinningTicket::from).collect(),
+                        (),
+                    )
+                    .unwrap();
+            }
+            _ => panic!("unexpected action happened while sending agg request by Bob"),
+        };
+
+        match alice.next().timeout(Duration::from_secs(5)).await {
+            Ok(Some(TicketAggregationProcessed::Reply(_, aggregated_ticket, ()))) => bob
+                .writer()
+                .receive_ticket(alice_packet_key, aggregated_ticket, ())
+                .unwrap(),
+            _ => panic!("unexpected action happened while awaiting agg request at Alice"),
+        };
+
+        match bob.next().timeout(Duration::from_secs(5)).await {
+            Ok(Some(TicketAggregationProcessed::Receive(_destination, _acked_tkt, ()))) => {
+                finalizer.take().unwrap().finalize()
+            }
+            _ => panic!("unexpected action happened while awaiting agg response at Bob"),
+        }
+
+        let stored_acked_tickets = db_bob.get_tickets((&channel_alice_bob).into()).await.unwrap();
+
+        assert_eq!(
+            stored_acked_tickets.len(),
+            20,
+            "there should be 1 aggregated ticket and 19 old tickets"
+        );
+
+        assert!(
+            stored_acked_tickets[19].verified_ticket().is_aggregated(),
+            "last ticket must be the aggregated one"
+        );
+        for i in 0..19 {
+            assert_eq!(
+                AcknowledgedTicketStatus::Untouched,
+                stored_acked_tickets[i].status,
+                "ticket #{i} must be untouched"
+            );
+        }
+        assert_eq!(
+            agg_balance,
+            stored_acked_tickets[19].verified_ticket().amount,
             "aggregated balance invalid"
         );
 
