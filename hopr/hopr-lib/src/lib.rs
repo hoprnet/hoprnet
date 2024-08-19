@@ -561,6 +561,11 @@ impl Hopr {
                 ))
                 .unwrap_or(0.0),
             );
+
+            // Calling get_ticket_statistics will initialize the respective metrics on tickets
+            if let Err(e) = futures::executor::block_on(db.get_ticket_statistics(None)) {
+                error!("failed to initialize ticket statistics metrics: {e}");
+            }
         }
 
         Self {

@@ -483,6 +483,9 @@ impl HoprDbTicketOperations for HoprDb {
     async fn get_ticket_statistics(&self, channel_id: Option<Hash>) -> Result<ChannelTicketStatistics> {
         let res = match channel_id {
             None => {
+                #[cfg(all(feature = "prometheus", not(test)))]
+                let mut per_channel_unredeemed = std::collections::HashMap::new();
+
                 self.nest_transaction_in_db(None, TargetDb::Tickets)
                     .await?
                     .perform(|tx| {
@@ -490,23 +493,56 @@ impl HoprDbTicketOperations for HoprDb {
                             let unredeemed_value = ticket::Entity::find()
                                 .stream(tx.as_ref())
                                 .await?
-                                .try_fold(U256::zero(), |amount, x| async move {
-                                    Ok(amount + U256::from_be_bytes(x.amount))
+                                .try_fold(U256::zero(), |amount, x| {
+                                    let unredeemed_value = U256::from_be_bytes(x.amount);
+
+                                    #[cfg(all(feature = "prometheus", not(test)))]
+                                    per_channel_unredeemed
+                                        .entry(x.channel_id)
+                                        .and_modify(|v| *v += unredeemed_value)
+                                        .or_insert(unredeemed_value);
+
+                                    futures::future::ok(amount + unredeemed_value)
                                 })
                                 .await?;
+
+                            #[cfg(all(feature = "prometheus", not(test)))]
+                            for (channel_id, unredeemed_value) in per_channel_unredeemed {
+                                METRIC_HOPR_TICKETS_INCOMING_STATISTICS
+                                    .set(&[&channel_id, "unredeemed"], unredeemed_value.as_u128() as f64);
+                            }
 
                             let mut all_stats = ticket_statistics::Entity::find()
                                 .all(tx.as_ref())
                                 .await?
                                 .into_iter()
                                 .fold(ChannelTicketStatistics::default(), |mut acc, stats| {
-                                    acc.neglected_value =
-                                        acc.neglected_value + BalanceType::HOPR.balance_bytes(stats.neglected_value);
-                                    acc.redeemed_value =
-                                        acc.redeemed_value + BalanceType::HOPR.balance_bytes(stats.redeemed_value);
-                                    acc.rejected_value =
-                                        acc.rejected_value + BalanceType::HOPR.balance_bytes(stats.rejected_value);
+                                    let neglected_value = BalanceType::HOPR.balance_bytes(stats.neglected_value);
+                                    acc.neglected_value = acc.neglected_value + neglected_value;
+                                    let redeemed_value = BalanceType::HOPR.balance_bytes(stats.redeemed_value);
+                                    acc.redeemed_value = acc.redeemed_value + redeemed_value;
+                                    let rejected_value = BalanceType::HOPR.balance_bytes(stats.rejected_value);
+                                    acc.rejected_value = acc.rejected_value + rejected_value;
                                     acc.winning_tickets += stats.winning_tickets as u128;
+
+                                    #[cfg(all(feature = "prometheus", not(test)))]
+                                    {
+                                        METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(
+                                            &[&stats.channel_id, "neglected"],
+                                            neglected_value.amount().as_u128() as f64,
+                                        );
+
+                                        METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(
+                                            &[&stats.channel_id, "redeemed"],
+                                            redeemed_value.amount().as_u128() as f64,
+                                        );
+
+                                        METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(
+                                            &[&stats.channel_id, "rejected"],
+                                            rejected_value.amount().as_u128() as f64,
+                                        );
+                                    }
+
                                     acc
                                 });
 
@@ -518,8 +554,8 @@ impl HoprDbTicketOperations for HoprDb {
                     .await
             }
             Some(channel) => {
-                // We need to make sure the channel exists, to avoid creating
-                // stats entry for a non-existing channel
+                // We need to make sure the channel exists to avoid creating
+                // statistic entry for a non-existing channel
                 if self.get_channel_by_id(None, &channel).await?.is_none() {
                     return Err(DbSqlError::ChannelNotFound(channel).into());
                 }
@@ -533,8 +569,8 @@ impl HoprDbTicketOperations for HoprDb {
                                 .filter(ticket::Column::ChannelId.eq(channel.to_hex()))
                                 .stream(tx.as_ref())
                                 .await?
-                                .try_fold(U256::zero(), |amount, x| async move {
-                                    Ok(amount + U256::from_be_bytes(x.amount))
+                                .try_fold(U256::zero(), |amount, x| {
+                                    futures::future::ok(amount + U256::from_be_bytes(x.amount))
                                 })
                                 .await?;
 
@@ -1146,7 +1182,7 @@ impl HoprDb {
             .await?
             .perform(|tx| {
                 Box::pin(async move {
-                    // For purpose of upserting, we must select only by the triplet (channel id, epoch, index)
+                    // For upserting, we must select only by the triplet (channel id, epoch, index)
                     let selector = WrappedTicketSelector::from(
                         TicketSelector::new(
                             acknowledged_ticket.verified_ticket().channel_id,
