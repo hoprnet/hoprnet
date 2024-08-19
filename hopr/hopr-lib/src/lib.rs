@@ -113,6 +113,7 @@ lazy_static::lazy_static! {
 }
 
 pub use async_trait::async_trait;
+use hopr_db_sql::prelude::DescribedBlock;
 
 /// Interface representing the HOPR server behavior for each incoming session instance
 /// supplied as an argument.
@@ -1017,6 +1018,11 @@ impl Hopr {
     /// Get the list of all announced public nodes in the network
     pub async fn get_public_nodes(&self) -> errors::Result<Vec<(PeerId, Address, Vec<Multiaddr>)>> {
         Ok(self.transport_api.get_public_nodes().await?)
+    }
+
+    /// Gets the current indexer state: last indexed block ID and checksum
+    pub async fn get_indexer_state(&self) -> errors::Result<DescribedBlock> {
+        Ok(self.db.get_last_indexed_block(None).await?)
     }
 
     /// Test whether the peer with PeerId is allowed to access the network
