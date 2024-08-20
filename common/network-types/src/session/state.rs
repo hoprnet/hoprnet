@@ -668,7 +668,7 @@ impl<const C: usize> SessionSocket<C> {
                                 ack_buffer.force_push(frame.frame_id);
                             }
                         }
-                        Err(NetworkTypeError::FrameDiscarded(id)) | Err(NetworkTypeError::IncompleteFrame(id)) => {
+                        Err(SessionError::FrameDiscarded(id)) | Err(SessionError::IncompleteFrame(id)) => {
                             // Remove the retry token because the frame has been discarded
                             incoming_frame_retries_clone.remove(id);
                             warn!(session_id = id_clone, frame_id = id, "frame skipped");

@@ -57,6 +57,7 @@ use hopr_platform::time::native::current_time;
 use hopr_primitive_types::prelude::AsUnixTimestamp;
 
 use crate::errors::NetworkTypeError;
+use crate::session::errors::SessionError;
 
 /// ID of a [Frame].
 pub type FrameId = u32;
@@ -80,20 +81,20 @@ impl Display for SegmentId {
     }
 }
 
-/// Helper function to segment `data` into segments of given `max_segment_size` length.
+/// Helper function to segment `data` into segments of a given ` max_segment_size ` length.
 /// All segments are tagged with the same `frame_id`.
-pub fn segment(data: &[u8], max_segment_size: usize, frame_id: u32) -> crate::errors::Result<Vec<Segment>> {
+pub fn segment(data: &[u8], max_segment_size: usize, frame_id: u32) -> crate::session::errors::Result<Vec<Segment>> {
     if frame_id == 0 {
-        return Err(NetworkTypeError::InvalidFrameId);
+        return Err(SessionError::InvalidFrameId);
     }
 
     if max_segment_size == 0 {
-        return Err(NetworkTypeError::InvalidSegmentSize);
+        return Err(SessionError::InvalidSegmentSize);
     }
 
     let num_chunks = (data.len() + max_segment_size - 1) / max_segment_size;
     if num_chunks > SeqNum::MAX as usize {
-        return Err(NetworkTypeError::DataTooLong);
+        return Err(SessionError::DataTooLong);
     }
 
     let chunks = data.chunks(max_segment_size);
@@ -124,7 +125,7 @@ pub struct Frame {
 impl Frame {
     /// Segments this frame into a list of [segments](Segment) each of maximum sizes `mtu`.
     #[inline]
-    pub fn segment(&self, max_segment_size: usize) -> crate::errors::Result<Vec<Segment>> {
+    pub fn segment(&self, max_segment_size: usize) -> crate::session::errors::Result<Vec<Segment>> {
         segment(self.data.as_ref(), max_segment_size, self.frame_id)
     }
 }
@@ -206,14 +207,14 @@ impl TryFrom<&[u8]> for Segment {
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         let (header, data) = value.split_at(Self::HEADER_SIZE);
         let segment = Segment {
-            frame_id: FrameId::from_be_bytes(header[0..4].try_into().map_err(|_| NetworkTypeError::InvalidSegment)?),
-            seq_idx: SeqNum::from_be_bytes(header[4..5].try_into().map_err(|_| NetworkTypeError::InvalidSegment)?),
-            seq_len: SeqNum::from_be_bytes(header[5..6].try_into().map_err(|_| NetworkTypeError::InvalidSegment)?),
+            frame_id: FrameId::from_be_bytes(header[0..4].try_into().map_err(|_| SessionError::InvalidSegment)?),
+            seq_idx: SeqNum::from_be_bytes(header[4..5].try_into().map_err(|_| SessionError::InvalidSegment)?),
+            seq_len: SeqNum::from_be_bytes(header[5..6].try_into().map_err(|_| SessionError::InvalidSegment)?),
             data: data.into(),
         };
         (segment.frame_id > 0 && segment.seq_idx < segment.seq_len)
             .then_some(segment)
-            .ok_or(NetworkTypeError::InvalidSegment)
+            .ok_or(SessionError::InvalidSegment.into())
     }
 }
 
@@ -246,7 +247,7 @@ impl FrameBuilder {
 
     /// Adds a new [`segment`](Segment) to the builder with a timestamp `ts`.
     /// Returns the number of segments remaining in this builder.
-    fn put(&self, segment: Segment, ts: SystemTime) -> crate::errors::Result<SeqNum> {
+    fn put(&self, segment: Segment, ts: SystemTime) -> crate::session::errors::Result<SeqNum> {
         if self.frame_id == segment.frame_id {
             if !self.is_complete() {
                 if self.segments[segment.seq_idx as usize].set(segment.data).is_ok() {
@@ -261,7 +262,7 @@ impl FrameBuilder {
                 Ok(0)
             }
         } else {
-            Err(NetworkTypeError::InvalidFrameId)
+            Err(SessionError::InvalidFrameId)
         }
     }
 
@@ -295,7 +296,7 @@ impl FrameBuilder {
     }
 
     /// Reassembles the [Frame]. Returns [`NetworkTypeError::IncompleteFrame`] if not [complete](FrameBuilder::is_complete).
-    fn reassemble(self) -> crate::errors::Result<Frame> {
+    fn reassemble(self) -> crate::session::errors::Result<Frame> {
         if self.is_complete() {
             Ok(Frame {
                 frame_id: self.frame_id,
@@ -308,7 +309,7 @@ impl FrameBuilder {
                     .into_boxed_slice(),
             })
         } else {
-            Err(NetworkTypeError::IncompleteFrame(self.frame_id))
+            Err(SessionError::IncompleteFrame(self.frame_id))
         }
     }
 }
@@ -321,7 +322,7 @@ pub struct FrameInfo {
     pub frame_id: FrameId,
     /// Indices of segments that are missing. Empty if the frame is complete.
     pub missing_segments: BitArr!(for 256),
-    /// The total number of segments this frame consists from.
+    /// The total number of segments in this frame.
     pub total_segments: SeqNum,
     /// Time of the last received segment in this frame.
     pub last_update: SystemTime,
@@ -412,7 +413,7 @@ pub struct FrameReassembler {
     highest_buffered_frame: AtomicU32,
     next_emitted_frame: AtomicU32,
     last_emission: AtomicU64,
-    reassembled: futures::channel::mpsc::UnboundedSender<crate::errors::Result<Frame>>,
+    reassembled: futures::channel::mpsc::UnboundedSender<crate::session::errors::Result<Frame>>,
     max_age: Duration,
 }
 
@@ -421,7 +422,7 @@ impl FrameReassembler {
     /// for reassembled [Frames](Frame).
     /// An optional `max_age` of segments can be specified,
     /// which allows the [`evict`](FrameReassembler::evict) method to remove stale incomplete segments.
-    pub fn new(max_age: Duration) -> (Self, impl Stream<Item = crate::errors::Result<Frame>>) {
+    pub fn new(max_age: Duration) -> (Self, impl Stream<Item = crate::session::errors::Result<Frame>>) {
         let (reassembled, reassembled_recv) = futures::channel::mpsc::unbounded();
         (
             Self {
@@ -438,15 +439,15 @@ impl FrameReassembler {
 
     /// Emits the frame if it is the next in sequence and complete.
     /// If it is not next in the sequence or incomplete, it is discarded forever.
-    fn emit_if_complete_discard_otherwise(&self, builder: FrameBuilder) -> crate::errors::Result<()> {
+    fn emit_if_complete_discard_otherwise(&self, builder: FrameBuilder) -> crate::session::errors::Result<()> {
         if self.next_emitted_frame.fetch_add(1, Ordering::SeqCst) == builder.frame_id && builder.is_complete() {
             self.reassembled
                 .unbounded_send(builder.reassemble())
-                .map_err(|_| NetworkTypeError::ReassemblerClosed)?;
+                .map_err(|_| SessionError::ReassemblerClosed)?;
         } else {
             self.reassembled
-                .unbounded_send(Err(NetworkTypeError::FrameDiscarded(builder.frame_id)))
-                .map_err(|_| NetworkTypeError::ReassemblerClosed)?;
+                .unbounded_send(Err(SessionError::FrameDiscarded(builder.frame_id)))
+                .map_err(|_| SessionError::ReassemblerClosed)?;
         }
         self.last_emission
             .store(current_time().as_unix_timestamp().as_millis() as u64, Ordering::Relaxed);
@@ -457,15 +458,15 @@ impl FrameReassembler {
     /// This function also pushes out the reassembled frame if this segment completed it.
     /// Pushing a segment belonging to a frame ID that has been already
     /// previously completed or [evicted](FrameReassembler::evict) will fail.
-    pub fn push_segment(&self, segment: Segment) -> crate::errors::Result<()> {
+    pub fn push_segment(&self, segment: Segment) -> crate::session::errors::Result<()> {
         if self.reassembled.is_closed() {
-            return Err(NetworkTypeError::ReassemblerClosed);
+            return Err(SessionError::ReassemblerClosed);
         }
 
         // Check if this frame has not been emitted yet.
         let frame_id = segment.frame_id;
         if frame_id < self.next_emitted_frame.load(Ordering::SeqCst) {
-            return Err(NetworkTypeError::OldSegment(frame_id));
+            return Err(SessionError::OldSegment(frame_id));
         }
 
         let ts = current_time();
@@ -483,7 +484,7 @@ impl FrameReassembler {
                     // Emit this complete frame
                     self.reassembled
                         .unbounded_send(e.remove().reassemble())
-                        .map_err(|_| NetworkTypeError::ReassemblerClosed)?;
+                        .map_err(|_| SessionError::ReassemblerClosed)?;
                     self.last_emission
                         .store(current_time().as_unix_timestamp().as_millis() as u64, Ordering::Relaxed);
                     cascade = true; // Try to emit next frames in sequence
@@ -501,12 +502,12 @@ impl FrameReassembler {
                     // Emit this frame if already complete
                     self.reassembled
                         .unbounded_send(builder.reassemble())
-                        .map_err(|_| NetworkTypeError::ReassemblerClosed)?;
+                        .map_err(|_| SessionError::ReassemblerClosed)?;
                     self.last_emission
                         .store(current_time().as_unix_timestamp().as_millis() as u64, Ordering::Relaxed);
-                    cascade = true; // Try to emit next frames in sequence
+                    cascade = true; // Try to emit the next frames in sequence
                 } else {
-                    // If not complete or not the next one to be emitted, just start building it
+                    // If not complete nor the next one to be emitted, just start building it
                     v.insert(builder);
                     self.highest_buffered_frame.fetch_max(frame_id, Ordering::Relaxed);
                 }
@@ -550,9 +551,9 @@ impl FrameReassembler {
     /// According to the [max_age](FrameReassembler::new) set during construction, evicts
     /// leading incomplete frames that are expired at the time this method was called.
     /// Returns that total number of frames that were evicted.
-    pub fn evict(&self) -> crate::errors::Result<usize> {
+    pub fn evict(&self) -> crate::session::errors::Result<usize> {
         if self.reassembled.is_closed() {
-            return Err(NetworkTypeError::ReassemblerClosed);
+            return Err(SessionError::ReassemblerClosed);
         }
 
         if self.sequences.is_empty() {
@@ -615,11 +616,11 @@ impl Sink<Segment> for FrameReassembler {
     }
 
     fn start_send(self: Pin<&mut Self>, item: Segment) -> Result<(), Self::Error> {
-        self.push_segment(item)
+        Ok(self.push_segment(item)?)
     }
 
     fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(self.evict().map(|_| ()))
+        Poll::Ready(self.evict().map(|_| ()).map_err(NetworkTypeError::SessionProtocolError))
     }
 
     fn poll_close(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -780,7 +781,7 @@ pub(crate) mod tests {
         let mut reassembled_frames = reassembled.try_collect::<Vec<_>>().await?;
 
         assert_eq!(1, reassembled_frames.len());
-        let frame = reassembled_frames.pop().ok_or(NetworkTypeError::InvalidSegment)?;
+        let frame = reassembled_frames.pop().ok_or(SessionError::InvalidSegment)?;
 
         assert_eq!(1, frame.frame_id);
         assert_eq!(&data, frame.data.as_ref());
@@ -940,7 +941,7 @@ pub(crate) mod tests {
             // Frame #2 will yield an error once `evict` has been called
             assert!(matches!(
                 reassembled.try_next().await,
-                Err(NetworkTypeError::FrameDiscarded(2))
+                Err(SessionError::FrameDiscarded(2))
             ));
 
             // Frame #3 will yield normally
@@ -1124,7 +1125,7 @@ pub(crate) mod tests {
         let discarded_frames = discarded_frames
             .into_par_iter()
             .filter_map(|s| match s {
-                Some(NetworkTypeError::FrameDiscarded(f)) => Some(f),
+                Some(SessionError::FrameDiscarded(f)) => Some(f),
                 _ => None,
             })
             .collect::<Vec<_>>();

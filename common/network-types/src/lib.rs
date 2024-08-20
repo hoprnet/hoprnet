@@ -8,7 +8,7 @@ pub mod session;
 pub mod udp;
 
 /// Contains low-level protocol that aids HOPR session establishment.
-mod initiation;
+pub mod start;
 
 #[doc(hidden)]
 pub mod prelude {
