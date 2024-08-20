@@ -12,7 +12,7 @@ use hopr_lib::{
     errors::HoprLibError,
     TransportOutput, {Address, Balance, BalanceType, Hopr},
 };
-use hoprd_db_api::metadata::HoprdDbMetadataOperations;
+use hoprd_db_api::aliases::HoprdDbAliasesOperations;
 use libp2p_identity::PeerId;
 use serde_json::json;
 use serde_with::{serde_as, Bytes, DisplayFromStr, DurationMilliSeconds};
@@ -69,7 +69,7 @@ pub struct InternalState {
     pub hoprd_cfg: String,
     pub auth: Arc<Auth>,
     pub hopr: Arc<Hopr>,
-    pub hoprd_db: Arc<RwLock<hoprd_db_api::db::HoprdDb>>,
+    pub hoprd_db: Arc<hoprd_db_api::db::HoprdDb>,
     pub inbox: Arc<RwLock<hoprd_inbox::Inbox>>,
     pub websocket_rx: async_broadcast::InactiveReceiver<TransportOutput>,
     pub msg_encoder: Option<MessageEncoder>,
@@ -272,7 +272,7 @@ pub async fn run_hopr_api(
     hoprd_cfg: String,
     cfg: &crate::config::Api,
     hopr: Arc<hopr_lib::Hopr>,
-    hoprd_db: Arc<RwLock<hoprd_db_api::db::HoprdDb>>,
+    hoprd_db: Arc<hoprd_db_api::db::HoprdDb>,
     inbox: Arc<RwLock<hoprd_inbox::Inbox>>,
     websocket_rx: async_broadcast::InactiveReceiver<TransportOutput>,
     msg_encoder: Option<MessageEncoder>,
@@ -514,6 +514,8 @@ impl<T: Error> From<T> for ApiErrorStatus {
 
 // TODO: Remove the module in v3.0
 mod alias {
+    use hoprd_db_api::errors::DbError;
+
     use super::*;
 
     #[serde_as]
@@ -561,7 +563,7 @@ mod alias {
     )]
 
     pub async fn aliases(req: Request<InternalState>) -> tide::Result<Response> {
-        let aliases = req.state().hoprd_db.read().await.get_aliases().await?;
+        let aliases = req.state().hoprd_db.get_aliases().await?;
 
         Ok(Response::builder(200)
             .body(json!(aliases
@@ -594,17 +596,18 @@ mod alias {
     pub async fn set_alias(mut req: Request<InternalState>) -> tide::Result<Response> {
         let args: AliasPeerIdBodyRequest = req.body_json().await?;
 
-        let _ = req
+        match req
             .state()
             .hoprd_db
-            .write()
-            .await
             .set_alias(args.peer_id.to_string(), args.alias)
-            .await;
-
-        Ok(Response::builder(201)
-            .body(json!(PeerIdResponse { peer_id: args.peer_id }))
-            .build())
+            .await
+        {
+            Ok(()) => Ok(Response::builder(201)
+                .body(json!(PeerIdResponse { peer_id: args.peer_id }))
+                .build()),
+            Err(DbError::LogicalError(_)) => Ok(Response::builder(400).body(ApiErrorStatus::InvalidPeerId).build()),
+            Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
+        }
     }
     /// (deprecated, will be removed in v3.0) Get alias for the PeerId (Hopr address) that have this alias assigned to it.
     #[utoipa::path(
@@ -628,7 +631,7 @@ mod alias {
         let alias = req.param("alias")?.parse::<String>()?;
         let alias = urlencoding::decode(&alias)?.into_owned();
 
-        match req.state().hoprd_db.read().await.resolve_alias(alias.clone()).await? {
+        match req.state().hoprd_db.resolve_alias(alias.clone()).await? {
             Some(entry) => Ok(Response::builder(200)
                 .body(json!(PeerIdResponse {
                     peer_id: PeerId::from_str(&entry).unwrap()
@@ -660,7 +663,7 @@ mod alias {
         let alias = req.param("alias")?.parse::<String>()?;
         let alias = urlencoding::decode(&alias)?.into_owned();
 
-        match req.state().hoprd_db.write().await.delete_alias(alias.clone()).await {
+        match req.state().hoprd_db.delete_alias(alias.clone()).await {
             Ok(_) => Ok(Response::builder(204).build()),
             Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
         }
@@ -682,10 +685,8 @@ mod alias {
         tag = "Alias",
     )]
     pub async fn clear_aliases(req: Request<InternalState>) -> tide::Result<Response> {
-        match req.state().hoprd_db.write().await.clear_aliases().await {
-            Ok(_) => Ok(Response::builder(204).build()),
-            Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
-        }
+        let _ = req.state().hoprd_db.clear_aliases().await;
+        Ok(Response::builder(204).build())
     }
 }
 

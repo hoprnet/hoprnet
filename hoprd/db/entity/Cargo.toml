@@ -22,6 +22,7 @@ sea-orm-migration = { workspace = true }
 [dependencies]
 sea-orm = { workspace = true }
 thiserror = { workspace = true }
+serde = { workspace = true }
 
 hopr-crypto-types = { workspace = true}
 hopr-internal-types = { workspace = true }

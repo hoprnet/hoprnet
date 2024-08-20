@@ -496,19 +496,6 @@ impl UnitaryFloatOps for U256 {
     }
 }
 
-/// Represents an alias
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Alias {
-    pub peer_id: String,
-    pub alias: String,
-}
-
-impl Alias {
-    pub fn new(peer_id: String, alias: String) -> Self {
-        Self { peer_id, alias }
-    }
-}
-
 /// Unit tests of pure Rust code
 #[cfg(test)]
 mod tests {

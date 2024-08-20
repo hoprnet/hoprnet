@@ -2,12 +2,6 @@ pub use sea_orm_migration::prelude::*;
 
 mod m20240814_000001_metadata_create_db;
 
-#[derive(PartialEq)]
-pub enum BackendType {
-    SQLite,
-    Postgres,
-}
-
 pub struct Migrator;
 
 /// Used to instantiate all tables to generate the corresponding entities in

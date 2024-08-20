@@ -8,6 +8,8 @@ pub mod conversions;
 
 pub mod errors;
 
+pub mod types;
+
 #[cfg(feature = "sqlite")]
 #[cfg_attr(rustfmt, rustfmt_skip)]
 pub use codegen::sqlite::*;
