@@ -13,10 +13,10 @@ services:
     image: "${HOPRD_IMAGE}"
     restart: unless-stopped
     pull_policy: always
+    stop_signal: SIGINT
     platform: ${DOCKER_PLATFORM}
     container_name: hoprd
     hostname: hoprd
-    stop_signal: SIGINT
     networks:
       - hoprnet
     ports:
@@ -29,15 +29,11 @@ services:
       - "RUST_LOG=${HOPRD_LOG_LEVEL}"
       - RUST_BACKTRACE=full
       - HOPRD_CONFIGURATION_FILE_PATH=/app/hoprd.cfg.yaml
-      - HOPRD_API_PORT=3001
       - "HOPRD_USE_OPENTELEMETRY=${HOPRD_USE_OPENTELEMETRY}"
       - "OTEL_SERVICE_NAME=${OTEL_SERVICE_NAME}"
       - "OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT}"
     volumes:
-      - ./hoprd.cfg.yaml:/app/hoprd.cfg.yaml
-      - ./hopr.id:/app/hopr.id
-      - hoprd_data:/app/hoprd/
-      - '/var/run/docker.sock:/var/run/docker.sock'
+      - ./hoprd_data:/app
     deploy:
       resources:
         reservations:
@@ -55,6 +51,7 @@ services:
   hopr-admin:
     image: "${HOPR_ADMIN_IMAGE}"
     restart: unless-stopped
+    pull_policy: always
     platform: ${DOCKER_PLATFORM}
     container_name: admin
     hostname: admin
