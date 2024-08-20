@@ -384,7 +384,7 @@ mod tests {
             (&PEERS_CHAIN[0]).into(),
             (&PEERS_CHAIN[1]).into(),
             total_value,
-            (amount as u32).into(),
+            0_u32.into(),
             ChannelStatus::Open,
             1u32.into(),
         );

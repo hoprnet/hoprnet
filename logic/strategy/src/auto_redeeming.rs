@@ -1,8 +1,8 @@
 //! ## Auto Redeeming Strategy
 //! This strategy listens for newly added acknowledged tickets and automatically issues a redeem transaction on that ticket.
-//! It can be configured to automatically redeem all tickets or only aggregated tickets (which results in far less on-chain transactions being issued).
+//! It can be configured to automatically redeem all tickets or only aggregated tickets (which results in far fewer on-chain transactions being issued).
 //!
-//! For details on default parameters see [AutoRedeemingStrategyConfig].
+//! For details on default parameters, see [AutoRedeemingStrategyConfig].
 use async_trait::async_trait;
 use chain_actions::redeem::TicketRedeemActions;
 use hopr_db_sql::api::tickets::HoprDbTicketOperations;
@@ -28,6 +28,10 @@ lazy_static::lazy_static! {
         SimpleCounter::new("hopr_strategy_auto_redeem_redeem_count", "Count of initiated automatic redemptions").unwrap();
 }
 
+fn thirty_hopr() -> Balance {
+    Balance::new_from_str("30000000000000000000", BalanceType::HOPR)
+}
+
 /// Configuration object for the `AutoRedeemingStrategy`
 #[serde_as]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, smart_default::SmartDefault, Validate, Serialize, Deserialize)]
@@ -38,11 +42,12 @@ pub struct AutoRedeemingStrategyConfig {
 
     /// The strategy will automatically redeem if there's a single ticket left when a channel
     /// transitions to `PendingToClose` and it has at least this value of HOPR.
-    /// This happens regardless the `redeem_only_aggregated` setting.
+    /// This happens regardless of the `redeem_only_aggregated` setting.
     ///
     /// Default is 2 HOPR.
+    #[serde(default = "thirty_hopr")]
     #[serde_as(as = "DisplayFromStr")]
-    #[default(Balance::new_from_str("2000000000000000000", BalanceType::HOPR))]
+    #[default(thirty_hopr())]
     pub on_close_redeem_single_tickets_value_min: Balance,
 }
 
