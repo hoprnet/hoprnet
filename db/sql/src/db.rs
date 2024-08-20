@@ -58,7 +58,7 @@ impl HoprDb {
             .journal_mode(SqliteJournalMode::Wal)
             .synchronous(SqliteSynchronous::Normal)
             .auto_vacuum(SqliteAutoVacuum::Full)
-            .optimize_on_close(true, None)
+            //.optimize_on_close(true, None) // Removed, because it causes optimization on each connection, due to min_connections being set to 0
             .page_size(4096)
             .pragma("cache_size", "-30000") // 32M
             .pragma("busy_timeout", "1000"); // 1000ms

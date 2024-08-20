@@ -374,11 +374,9 @@ where
 
                     async move {
                         if let Some(app_tag) = data.application_tag {
-                            const SPECIAL_TAG_HIGHEST_VALUE: u16 = RESERVED_SUBPROTOCOL_TAG_UPPER_LIMIT - 1;
-                            const SESSION_TAG_HIGHEST_VALUE: u16 = RESERVED_SESSION_TAG_UPPER_LIMIT - 1;
                             match app_tag {
-                                0..=SPECIAL_TAG_HIGHEST_VALUE => None,
-                                RESERVED_SUBPROTOCOL_TAG_UPPER_LIMIT..=SESSION_TAG_HIGHEST_VALUE => {
+                                0..RESERVED_SUBPROTOCOL_TAG_UPPER_LIMIT => None,
+                                RESERVED_SUBPROTOCOL_TAG_UPPER_LIMIT..RESERVED_SESSION_TAG_UPPER_LIMIT => {
                                     if let Ok((peer, data)) =
                                         hopr_transport_session::types::unwrap_offchain_key(data.plain_text.clone())
                                     {
