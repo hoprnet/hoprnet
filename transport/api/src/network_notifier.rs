@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use async_lock::RwLock;
 use async_trait::async_trait;
-use hopr_db_sql::api::resolver::HoprDbResolverOperations;
 use tracing::{debug, error};
 
 use core_network::{
@@ -12,6 +11,7 @@ use core_network::{
 };
 use core_path::channel_graph::ChannelGraph;
 use hopr_crypto_types::types::OffchainPublicKey;
+use hopr_db_sql::api::resolver::HoprDbResolverOperations;
 
 /// Implementor of the ping external API.
 ///

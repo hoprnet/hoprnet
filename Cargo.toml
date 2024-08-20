@@ -74,14 +74,14 @@ getrandom = "0.2.15"
 hex = "0.4.3"
 hex-literal = "0.4.1"
 lazy_static = "1.4.0"
-libp2p = { version = "0.53.2" }
+libp2p = { version = "0.54.0" }
 libp2p-identity = { version = "0.2.9", features = [
   "peerid",
   "ed25519",
   "rand",
 ] }
-libp2p-mplex = "0.41.0"
-mockall = "0.12.1"
+libp2p-mplex = "0.42.0"
+mockall = "0.13.0"
 mockito = "1.4.0"
 moka = { version = "0.12.7", features = ["future"] }
 more-asserts = "0.3.1"
@@ -146,8 +146,8 @@ chain-rpc = { path = "chain/rpc", default-features = false }
 chain-types = { path = "chain/types", default-features = false }
 core-network = { path = "transport/network", default-features = false }
 core-path = { path = "logic/path", default-features = false }
-core-protocol = { path = "transport/protocol", default-features = false }
-core-transport = { path = "transport/api", default-features = false }
+hopr-transport-protocol = { path = "transport/protocol", default-features = false }
+hopr-transport = { path = "transport/api", default-features = false }
 hopr-async-runtime = { path = "common/async-runtime" }
 hopr-crypto-packet = { path = "crypto/packet", default-features = false }
 hopr-crypto-random = { path = "crypto/random", default-features = false }

@@ -16,7 +16,7 @@ pub enum HoprLibError {
     DbError(#[from] hopr_db_sql::api::errors::DbError),
 
     #[error(transparent)]
-    TransportError(#[from] core_transport::errors::HoprTransportError),
+    TransportError(#[from] hopr_transport::errors::HoprTransportError),
 
     #[error(transparent)]
     ChainError(#[from] chain_actions::errors::ChainActionsError),

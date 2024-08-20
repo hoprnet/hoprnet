@@ -2,7 +2,7 @@
 
 This file is documenting and tracking all the metrics which can be collected
 by a Prometheus server. The metrics can be scraped by Prometheus from
-the `api/v2/node/metrics` API endpoint.
+the `api/v4/node/metrics` API endpoint.
 
 ## Example Prometheus configuration
 
@@ -24,6 +24,7 @@ scrape_configs:
 
 - `hopr_packets_count`: Number of processed packets of different types (sent, received, forwarded), keys: `type`
 - `hopr_packets_per_peer_count`: Number of processed packets to/from distinct peers, keys: `peer`, `direction`
+- `hopr_replayed_packet_count`: The total count of replayed packets during the packet processing pipeline run
 - `hopr_rejected_tickets_count`: Number of rejected tickets
 - `hopr_mixer_queue_size`: Current mixer queue size
 - `hopr_mixer_average_packet_delay`: Average mixer packet delay averaged over a packet window
@@ -67,3 +68,4 @@ scrape_configs:
 - `hopr_indexer_checksum`: Contains an unsigned integer that represents the low 32-bits of the Indexer checksum.
 - `hopr_chain_actions_count`: Number of different chain actions and their results, keys: `action`, `result`
 - `hopr_indexer_contract_log_counters`: Counts of different HOPR contract logs processed by the Indexer, keys: `contract`
+- `hopr_tickets_incoming_statistics`: Ticket statistics for channels with incoming tickets, keys: `channel`, `statistic`

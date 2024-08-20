@@ -43,7 +43,7 @@ use utoipa::openapi::security::{ApiKey, ApiKeyValue, HttpAuthScheme, HttpBuilder
 use utoipa::{Modify, OpenApi};
 use utoipa_scalar::{Scalar, Servable};
 
-use hopr_lib::{errors::HoprLibError, Hopr, TransportOutput};
+use hopr_lib::{errors::HoprLibError, ApplicationData, Hopr};
 
 use crate::config::Auth;
 
@@ -63,7 +63,7 @@ pub(crate) struct InternalState {
     pub hopr: Arc<Hopr>,
     pub inbox: Arc<RwLock<hoprd_inbox::Inbox>>,
     pub aliases: Arc<RwLock<BiHashMap<String, PeerId>>>,
-    pub websocket_rx: async_broadcast::InactiveReceiver<TransportOutput>,
+    pub websocket_rx: async_broadcast::InactiveReceiver<ApplicationData>,
     pub msg_encoder: Option<MessageEncoder>,
 }
 
@@ -94,6 +94,7 @@ pub(crate) struct InternalState {
         messages::send_message,
         messages::size,
         network::price,
+        network::probability,
         node::configuration,
         node::entry_nodes,
         node::info,
@@ -120,6 +121,7 @@ pub(crate) struct InternalState {
             messages::MessagePopAllResponse,
             messages::MessagePopResponse, messages::SendMessageResponse, messages::SendMessageBodyRequest, messages::SizeResponse, messages::TagQueryRequest, messages::GetMessageBodyRequest,
             network::TicketPriceResponse,
+            network::TicketProbabilityResponse,
             node::EntryNode, node::NodeInfoResponse, node::NodePeersQueryRequest,
             node::HeartbeatInfo, node::PeerInfo, node::AnnouncedPeer, node::NodePeersResponse, node::NodeVersionResponse,
             peers::NodePeerInfoResponse, peers::PingResponse,
@@ -168,7 +170,7 @@ pub async fn serve_api(
     cfg: crate::config::Api,
     hopr: Arc<hopr_lib::Hopr>,
     inbox: Arc<RwLock<hoprd_inbox::Inbox>>,
-    websocket_rx: async_broadcast::InactiveReceiver<TransportOutput>,
+    websocket_rx: async_broadcast::InactiveReceiver<ApplicationData>,
     msg_encoder: Option<MessageEncoder>,
 ) -> Result<(), std::io::Error> {
     let router = build_api(hoprd_cfg, cfg, hopr, inbox, websocket_rx, msg_encoder).await;
@@ -180,7 +182,7 @@ async fn build_api(
     cfg: crate::config::Api,
     hopr: Arc<hopr_lib::Hopr>,
     inbox: Arc<RwLock<hoprd_inbox::Inbox>>,
-    websocket_rx: async_broadcast::InactiveReceiver<TransportOutput>,
+    websocket_rx: async_broadcast::InactiveReceiver<ApplicationData>,
     msg_encoder: Option<MessageEncoder>,
 ) -> Router {
     // Prepare alias part of the state
@@ -248,6 +250,7 @@ async fn build_api(
                 .route("/messages/size", get(messages::size))
                 .route("/messages/websocket", get(messages::websocket))
                 .route("/network/price", get(network::price))
+                .route("/network/probability", get(network::probability))
                 .route("/node/version", get(node::version))
                 .route("/node/configuration", get(node::configuration))
                 .route("/node/info", get(node::info))
