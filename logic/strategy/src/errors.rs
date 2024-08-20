@@ -15,7 +15,7 @@ pub enum StrategyError {
     DbError(#[from] hopr_db_sql::api::errors::DbError),
 
     #[error(transparent)]
-    ProtocolError(#[from] core_protocol::errors::ProtocolError),
+    ProtocolError(#[from] hopr_transport_protocol::errors::ProtocolError),
 
     #[error(transparent)]
     ActionsError(#[from] ChainActionsError),

@@ -2,10 +2,10 @@ use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use validator::{Validate, ValidationError};
 
-pub use core_transport::config::{
+pub use hopr_strategy::StrategyConfig;
+pub use hopr_transport::config::{
     validate_external_host, HeartbeatConfig, HostConfig, HostType, NetworkConfig, ProtocolConfig, TransportConfig,
 };
-pub use hopr_strategy::StrategyConfig;
 
 use hopr_primitive_types::prelude::*;
 

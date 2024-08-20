@@ -18,9 +18,6 @@
 //!
 //! For details on default parameters see [MultiStrategyConfig].
 use async_trait::async_trait;
-use chain_actions::ChainActions;
-use core_protocol::ticket_aggregation::processor::TicketAggregatorTrait;
-use hopr_internal_types::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::{
     fmt::{Debug, Display, Formatter},
@@ -28,6 +25,10 @@ use std::{
 };
 use tracing::{error, warn};
 use validator::Validate;
+
+use chain_actions::ChainActions;
+use hopr_internal_types::prelude::*;
+use hopr_transport_protocol::ticket_aggregation::processor::TicketAggregatorTrait;
 
 use crate::aggregating::AggregatingStrategy;
 use crate::auto_funding::AutoFundingStrategy;

@@ -46,7 +46,6 @@ pub(crate) async fn authenticate(
                     && (auth_headers.contains(&(&AUTHORIZATION, &format!("Bearer {}", expected_token)))
                         || auth_headers.contains(&(&x_auth_header, expected_token)))
                 )
-                // TODO: Replace with proper JS compliant solution
                 // The following line would never be needed, if the JavaScript browser was able to properly
                 // pass the x-auth-token or Bearer headers.
                 || is_ws_auth
