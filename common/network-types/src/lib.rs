@@ -3,9 +3,12 @@ pub mod errors;
 
 pub mod session;
 
-/// Contains UDP socket related helpers.
+/// Contains UDP socket-related helpers.
 #[cfg(feature = "runtime-tokio")]
 pub mod udp;
+
+/// Contains low-level protocol that aids HOPR session establishment.
+mod initiation;
 
 #[doc(hidden)]
 pub mod prelude {

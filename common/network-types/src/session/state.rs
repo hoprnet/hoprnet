@@ -462,26 +462,18 @@ impl<const C: usize> SessionState<C> {
             );
             match check_res {
                 RetryResult::Wait(d) => {
-                    trace!(
-                        session_id = self.session_id,
-                        frame_id = frame_id,
-                        "frame will retransmit in {d:?}"
-                    );
+                    trace!(session_id = self.session_id, frame_id, "frame will retransmit in {d:?}");
                     true
                 }
                 RetryResult::RetryNow(next_retry) => {
                     // Single segment frame scenario
                     frames_to_resend.insert(*frame_id);
                     *retry_log = next_retry;
-                    debug!(
-                        session_id = self.session_id,
-                        frame_id = frame_id,
-                        "frame will self-resend now"
-                    );
+                    debug!(session_id = self.session_id, frame_id, "frame will self-resend now");
                     true
                 }
                 RetryResult::Expired => {
-                    debug!(session_id = self.session_id, frame_id = frame_id, "frame expired");
+                    debug!(session_id = self.session_id, frame_id, "frame expired");
                     false
                 }
             }
@@ -561,7 +553,7 @@ impl<const C: usize> SessionState<C> {
 
         trace!(
             session_id = self.session_id,
-            frame_id = frame_id,
+            frame_id,
             "FRAME SEND COMPLETE: sent {count} segments",
         );
 
