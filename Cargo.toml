@@ -24,6 +24,9 @@ members = [
     "ethereum/bindings",
     "hopli",
     "hopr/hopr-lib",
+    "hoprd/db/api",
+    "hoprd/db/migration",
+    "hoprd/db/entity",
     "hoprd/rest-api",
     "hoprd/hoprd",
     "hoprd/inbox",
@@ -112,6 +115,9 @@ hopr-primitive-types = { path = "common/primitive-types", default-features = fal
 hoprd-api = { path = "hoprd/rest-api", default-features = false }
 hoprd-inbox = { path = "hoprd/inbox", default-features = false }
 hoprd-keypair = { path = "hoprd/keypair", default-features = false }
+hoprd-db-api = { path = "hoprd/db/api" }
+hoprd-db-entity = { path = "hoprd/db/entity" }
+hoprd-db-migration = { path = "hoprd/db/migration" }
 
 # [build]
 # rustflags = ["-C", "link-arg=-fuse-ld=lld"]       # needs the "pkgs.llvmPackages.bintools" nix package

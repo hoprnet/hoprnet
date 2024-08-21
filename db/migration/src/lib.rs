@@ -50,7 +50,7 @@ impl MigratorTrait for Migrator {
 }
 
 /// SQLite does not allow writing lock tables only, and the write lock
-/// will apple to the entire database file. It is therefore beneficial
+/// will apply to the entire database file. It is therefore beneficial
 /// to separate the exclusive concurrently accessing components into
 /// separate database files to benefit from multiple write locks over
 /// different parts of the database.

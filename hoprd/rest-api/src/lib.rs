@@ -6,10 +6,13 @@ use std::str::FromStr;
 use std::{collections::HashMap, sync::Arc};
 
 use async_lock::RwLock;
-use bimap::BiHashMap;
-// use base64::{engine::general_purpose::STANDARD_NO_PAD, Engine as _};
 use futures::StreamExt;
 use futures_concurrency::stream::Merge;
+use hopr_lib::{
+    errors::HoprLibError,
+    TransportOutput, {Address, Balance, BalanceType, Hopr},
+};
+use hoprd_db_api::aliases::HoprdDbAliasesOperations;
 use libp2p_identity::PeerId;
 use serde_json::json;
 use serde_with::{serde_as, Bytes, DisplayFromStr, DurationMilliSeconds};
@@ -28,11 +31,6 @@ use tracing::{debug, error, warn};
 use utoipa::openapi::security::{ApiKey, ApiKeyValue, HttpAuthScheme, HttpBuilder, SecurityScheme};
 use utoipa::{Modify, OpenApi};
 use utoipa_swagger_ui::Config;
-
-use hopr_lib::{
-    errors::HoprLibError,
-    TransportOutput, {Address, Balance, BalanceType, Hopr},
-};
 
 use crate::config::Auth;
 
@@ -71,8 +69,8 @@ pub struct InternalState {
     pub hoprd_cfg: String,
     pub auth: Arc<Auth>,
     pub hopr: Arc<Hopr>,
+    pub hoprd_db: Arc<hoprd_db_api::db::HoprdDb>,
     pub inbox: Arc<RwLock<hoprd_inbox::Inbox>>,
-    pub aliases: Arc<RwLock<BiHashMap<String, PeerId>>>,
     pub websocket_rx: async_broadcast::InactiveReceiver<TransportOutput>,
     pub msg_encoder: Option<MessageEncoder>,
 }
@@ -87,6 +85,7 @@ pub struct InternalState {
         alias::set_alias,
         alias::get_alias,
         alias::delete_alias,
+        alias::clear_aliases,
         account::addresses,
         account::balances,
         account::withdraw,
@@ -267,19 +266,17 @@ enum WebSocketInput {
     WsInput(std::result::Result<tide_websockets::Message, tide_websockets::Error>),
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn run_hopr_api(
     host: &str,
     hoprd_cfg: String,
     cfg: &crate::config::Api,
     hopr: Arc<hopr_lib::Hopr>,
+    hoprd_db: Arc<hoprd_db_api::db::HoprdDb>,
     inbox: Arc<RwLock<hoprd_inbox::Inbox>>,
     websocket_rx: async_broadcast::InactiveReceiver<TransportOutput>,
     msg_encoder: Option<MessageEncoder>,
 ) {
-    // Prepare alias part of the state
-    let aliases: Arc<RwLock<BiHashMap<String, PeerId>>> = Arc::new(RwLock::new(BiHashMap::new()));
-    aliases.write().await.insert("me".to_owned(), hopr.me_peer_id());
-
     let state = State { hopr };
 
     let mut app = tide::with_state(state.clone());
@@ -307,15 +304,18 @@ pub async fn run_hopr_api(
             auth: Arc::new(cfg.auth.clone()),
             hoprd_cfg,
             hopr: state.hopr.clone(),
+            hoprd_db,
             msg_encoder,
             inbox,
             websocket_rx,
-            aliases,
         });
 
         api.with(TokenBasedAuthenticationMiddleware);
 
-        api.at("/aliases").get(alias::aliases).post(alias::set_alias);
+        api.at("/aliases")
+            .get(alias::aliases)
+            .post(alias::set_alias)
+            .delete(alias::clear_aliases);
 
         api.at("/aliases/:alias")
             .get(alias::get_alias)
@@ -482,7 +482,6 @@ enum ApiErrorStatus {
     Timeout,
     Unauthorized,
     InvalidQuality,
-    AliasAlreadyExists,
     #[strum(serialize = "UNKNOWN_FAILURE")]
     UnknownFailure(String),
 }
@@ -513,7 +512,10 @@ impl<T: Error> From<T> for ApiErrorStatus {
     }
 }
 
+// TODO: Remove the module in v3.0
 mod alias {
+    use hoprd_db_api::errors::DbError;
+
     use super::*;
 
     #[serde_as]
@@ -542,7 +544,7 @@ mod alias {
         pub peer_id: PeerId,
     }
 
-    /// Get each previously set alias and its corresponding PeerId.
+    /// (deprecated, will be removed in v3.0) Get each previously set alias and its corresponding PeerId.
     #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/aliases"),
@@ -559,20 +561,19 @@ mod alias {
         ),
         tag = "Alias",
     )]
+
     pub async fn aliases(req: Request<InternalState>) -> tide::Result<Response> {
-        let aliases = req.state().aliases.clone();
+        let aliases = req.state().hoprd_db.get_aliases().await?;
 
-        let aliases = aliases
-            .read()
-            .await
-            .iter()
-            .map(|(key, value)| (key.clone(), value.to_string()))
-            .collect::<HashMap<String, String>>();
-
-        Ok(Response::builder(200).body(json!(aliases)).build())
+        Ok(Response::builder(200)
+            .body(json!(aliases
+                .iter()
+                .map(|alias| (alias.peer_id.clone(), alias.alias.clone()))
+                .collect::<HashMap<_, _>>()))
+            .build())
     }
 
-    /// Set alias for a peer with a specific PeerId.
+    /// (deprecated, will be removed in v3.0) Set alias for a peer with a specific PeerId.
     #[utoipa::path(
         post,
         path = const_format::formatcp!("{BASE_PATH}/aliases"),
@@ -584,7 +585,6 @@ mod alias {
             (status = 201, description = "Alias set successfully.", body = PeerIdResponse),
             (status = 400, description = "Invalid PeerId: The format or length of the peerId is incorrect.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
-            (status = 409, description = "Given PeerId is already aliased.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
@@ -595,18 +595,21 @@ mod alias {
     )]
     pub async fn set_alias(mut req: Request<InternalState>) -> tide::Result<Response> {
         let args: AliasPeerIdBodyRequest = req.body_json().await?;
-        let aliases = req.state().aliases.clone();
 
-        let inserted = aliases.write().await.insert_no_overwrite(args.alias, args.peer_id);
-        match inserted {
-            Ok(_) => Ok(Response::builder(201)
+        match req
+            .state()
+            .hoprd_db
+            .set_alias(args.peer_id.to_string(), args.alias)
+            .await
+        {
+            Ok(()) => Ok(Response::builder(201)
                 .body(json!(PeerIdResponse { peer_id: args.peer_id }))
                 .build()),
-            Err(_) => Ok(Response::builder(409).body(ApiErrorStatus::AliasAlreadyExists).build()),
+            Err(DbError::LogicalError(_)) => Ok(Response::builder(400).body(ApiErrorStatus::InvalidPeerId).build()),
+            Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
         }
     }
-
-    /// Get alias for the PeerId (Hopr address) that have this alias assigned to it.
+    /// (deprecated, will be removed in v3.0) Get alias for the PeerId (Hopr address) that have this alias assigned to it.
     #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/aliases/{{alias}}"),
@@ -627,19 +630,18 @@ mod alias {
     pub async fn get_alias(req: Request<InternalState>) -> tide::Result<Response> {
         let alias = req.param("alias")?.parse::<String>()?;
         let alias = urlencoding::decode(&alias)?.into_owned();
-        let aliases = req.state().aliases.clone();
 
-        let aliases = aliases.read().await;
-        if let Some(peer_id) = aliases.get_by_left(&alias) {
-            Ok(Response::builder(200)
-                .body(json!(PeerIdResponse { peer_id: *peer_id }))
-                .build())
-        } else {
-            Ok(Response::builder(404).body(ApiErrorStatus::InvalidInput).build())
+        match req.state().hoprd_db.resolve_alias(alias.clone()).await? {
+            Some(entry) => Ok(Response::builder(200)
+                .body(json!(PeerIdResponse {
+                    peer_id: PeerId::from_str(&entry).unwrap()
+                }))
+                .build()),
+            None => Ok(Response::builder(404).body(ApiErrorStatus::InvalidInput).build()),
         }
     }
 
-    /// Delete an alias.
+    /// (deprecated, will be removed in v3.0) Delete an alias.
     #[utoipa::path(
         delete,
         path = const_format::formatcp!("{BASE_PATH}/aliases/{{alias}}"),
@@ -660,10 +662,30 @@ mod alias {
     pub async fn delete_alias(req: Request<InternalState>) -> tide::Result<Response> {
         let alias = req.param("alias")?.parse::<String>()?;
         let alias = urlencoding::decode(&alias)?.into_owned();
-        let aliases = req.state().aliases.clone();
 
-        let _ = aliases.write().await.remove_by_left(&alias);
+        match req.state().hoprd_db.delete_alias(alias.clone()).await {
+            Ok(_) => Ok(Response::builder(204).build()),
+            Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
+        }
+    }
 
+    /// (deprecated, will be removed in v3.0) Clear all aliases.
+    #[utoipa::path(
+        delete,
+        path = const_format::formatcp!("{BASE_PATH}/aliases"),
+        responses(
+            (status = 204, description = "All aliases removed successfully"),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
+            (status = 422, description = "Unknown failure", body = ApiError)   // This can never happen
+        ),
+        security(
+            ("api_token" = []),
+            ("bearer_token" = [])
+        ),
+        tag = "Alias",
+    )]
+    pub async fn clear_aliases(req: Request<InternalState>) -> tide::Result<Response> {
+        let _ = req.state().hoprd_db.clear_aliases().await;
         Ok(Response::builder(204).build())
     }
 }

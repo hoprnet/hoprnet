@@ -6,16 +6,18 @@ use chrono::{DateTime, Utc};
 
 use futures::Stream;
 use hopr_lib::{ApplicationData, AsUnixTimestamp, ToHex, TransportOutput};
+
+#[cfg(all(feature = "prometheus", not(test)))]
+use hopr_metrics::metrics::SimpleHistogram;
+use hopr_platform::file::native::join;
 use hoprd::cli::CliArgs;
 use hoprd_api::run_hopr_api;
+use hoprd_db_api::aliases::{HoprdDbAliasesOperations, ME_AS_ALIAS};
 use hoprd_keypair::key_pair::{HoprKeys, IdentityOptions};
 use opentelemetry_otlp::WithExportConfig as _;
 use opentelemetry_sdk::trace::{RandomIdGenerator, Sampler};
 use tracing::{error, info, warn};
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
-
-#[cfg(all(feature = "prometheus", not(test)))]
-use hopr_metrics::metrics::SimpleHistogram;
 
 const ONBOARDING_INFORMATION_INTERVAL: std::time::Duration = std::time::Duration::from_secs(30);
 const WEBSOCKET_EVENT_BROADCAST_CAPACITY: usize = 10000;
@@ -167,6 +169,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }),
     ));
 
+    // Create the metadata database
+    let db_path: String = join(&[&cfg.hopr.db.data, "db"]).expect("Could not create a db storage path");
+
+    let hoprd_db = Arc::new(hoprd_db_api::db::HoprdDb::new(db_path.clone()).await);
+
+    // Ensures that "OWN_ALIAS" is set as alias
+    let _ = hoprd_db
+        .set_alias(node.me_peer_id().to_string(), ME_AS_ALIAS.to_string())
+        .await;
+
     let (mut ws_events_tx, ws_events_rx) =
         async_broadcast::broadcast::<TransportOutput>(WEBSOCKET_EVENT_BROADCAST_CAPACITY);
     let ws_events_rx = ws_events_rx.deactivate(); // No need to copy the data unless the websocket is opened, but leaves the channel open
@@ -290,6 +302,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 cfg.as_redacted_string()?,
                 &cfg.api,
                 node,
+                hoprd_db,
                 inbox.clone(),
                 ws_events_rx,
                 Some(msg_encoder)

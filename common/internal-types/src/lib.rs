@@ -7,7 +7,6 @@ pub mod account;
 pub mod acknowledgement;
 /// Implements types for on-chain announcement of nodes.
 pub mod announcement;
-
 /// Implements types related to HOPR payment channels.
 pub mod channels;
 /// Enumerates all errors in this crate.

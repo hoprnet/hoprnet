@@ -85,10 +85,12 @@ use crate::config::SafeModule;
 use crate::constants::{MIN_NATIVE_BALANCE, SUGGESTED_NATIVE_BALANCE};
 
 use hopr_db_api::{
-    info::DescribedBlock,
+    accounts::HoprDbAccountOperations,
+    db::{HoprDb, HoprDbConfig},
+    info::{DescribedBlock, HoprDbInfoOperations, SafeInfo},
     prelude::{
-        ChainOrPacketKey::ChainKey, HoprDb, HoprDbAccountOperations, HoprDbAllOperations, HoprDbChannelOperations,
-        HoprDbConfig, HoprDbInfoOperations, HoprDbPeersOperations, HoprDbResolverOperations, SafeInfo,
+        ChainOrPacketKey::ChainKey, HoprDbAllOperations, HoprDbChannelOperations, HoprDbPeersOperations,
+        HoprDbResolverOperations,
     },
 };
 
