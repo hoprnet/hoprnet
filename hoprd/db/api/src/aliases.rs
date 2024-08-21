@@ -44,7 +44,7 @@ impl HoprdDbAliasesOperations for HoprdDb {
     async fn get_aliases(&self) -> Result<Vec<Alias>> {
         let rows = hoprd_db_entity::aliases::Entity::find().all(&self.metadata).await?;
 
-        let aliases: Vec<Alias> = rows.iter().map(|row| Alias::from(row.to_owned())).collect();
+        let aliases: Vec<Alias> = rows.into_iter().map(Alias::from).collect();
 
         Ok(aliases)
     }
@@ -69,7 +69,17 @@ impl HoprdDbAliasesOperations for HoprdDb {
 
         let _ = hoprd_db_entity::aliases::Entity::insert_many(new_aliases)
             .on_conflict(
+                OnConflict::columns([Column::Alias, Column::PeerId])
+                    .do_nothing()
+                    .to_owned(),
+            )
+            .on_conflict(
                 OnConflict::columns([Column::PeerId])
+                    .update_column(Column::Alias)
+                    .to_owned(),
+            )
+            .on_conflict(
+                OnConflict::columns([Column::Alias])
                     .update_column(Column::PeerId)
                     .to_owned(),
             )
@@ -87,7 +97,7 @@ impl HoprdDbAliasesOperations for HoprdDb {
                 ));
             }
         }
-        let _ = self
+        let res = self
             .metadata
             .transaction::<_, (), DbErr>(|tx| {
                 Box::pin(async move {
@@ -112,9 +122,9 @@ impl HoprdDbAliasesOperations for HoprdDb {
                     Ok(())
                 })
             })
-            .await;
+            .await?;
 
-        Ok(())
+        Ok(res)
     }
 
     async fn delete_alias(&self, alias: String) -> Result<()> {

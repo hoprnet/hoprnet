@@ -25,7 +25,7 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 
 hopr-primitive-types = { workspace = true }
-hoprd-db-entity = { workspace = true }
+hoprd-db-entity = { workspace = true, features = ["serde"] }
 hoprd-db-migration = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 
