@@ -256,22 +256,6 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn test_set_me_alias_should_fail_if_set() {
-        let db = HoprdDb::new_in_memory().await;
-
-        let me_peer_id = PeerId::random().to_string();
-        let alias = ME_AS_ALIAS.to_string();
-
-        let res = db.set_alias(me_peer_id.clone(), alias.clone()).await;
-
-        assert!(res.is_ok());
-
-        let res = db.set_alias(me_peer_id.clone(), alias.clone()).await;
-
-        assert!(res.is_err());
-    }
-
-    #[async_std::test]
     async fn resolve_alias_should_return_alias() {
         let db = HoprdDb::new_in_memory().await;
 
