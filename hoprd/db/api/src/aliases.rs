@@ -97,9 +97,8 @@ impl HoprdDbAliasesOperations for HoprdDb {
                 ));
             }
         }
-        let res = self
-            .metadata
-            .transaction::<_, (), DbErr>(|tx| {
+        self.metadata
+            .transaction::<_, _, DbErr>(|tx| {
                 Box::pin(async move {
                     let row = hoprd_db_entity::aliases::Entity::find()
                         .filter(hoprd_db_entity::aliases::Column::PeerId.eq(peer.clone()))
@@ -122,9 +121,8 @@ impl HoprdDbAliasesOperations for HoprdDb {
                     Ok(())
                 })
             })
-            .await?;
-
-        Ok(res)
+            .await
+            .map_err(|e| e.into())
     }
 
     async fn delete_alias(&self, alias: String) -> Result<()> {
