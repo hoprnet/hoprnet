@@ -8,3 +8,5 @@ pub enum StartError {
     #[error("cannot decode protocol message")]
     ParseError,
 }
+
+pub type Result<T> = std::result::Result<T, StartError>;

@@ -10,10 +10,17 @@ pub mod udp;
 /// Contains low-level protocol that aids HOPR session establishment.
 pub mod start;
 
+/// Contains various networking-related types
+pub mod types;
+
 #[doc(hidden)]
 pub mod prelude {
     pub use crate::session::*;
 
+    pub use crate::start::initiation::*;
+
     #[cfg(feature = "runtime-tokio")]
     pub use crate::udp::*;
+
+    pub use crate::types::*;
 }
