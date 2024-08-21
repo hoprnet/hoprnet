@@ -1,8 +1,8 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::fmt::{self, Display, Formatter};
 
 /// Represents an alias
-#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Alias {
     pub peer_id: String,

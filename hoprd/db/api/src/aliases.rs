@@ -20,7 +20,7 @@ pub trait HoprdDbAliasesOperations {
     /// Create new key pair value in the db. If peer is already aliased, db entry will be updated with the new alias. If `peer` is node's PeerID, throws an error
     async fn set_alias(&self, peer: String, alias: String) -> Result<()>;
 
-    /// Update aliases. If peers are already aliased, db entries will be updated with the new aliases. If `peer` is among passed list of aliases, throws an error
+    /// Update aliases. If some peers or aliases are already in the db, db entries will be updated with the new aliases. If node's PeerID is among passed aliases, throws an error
     async fn set_aliases(&self, aliases: Vec<Alias>) -> Result<()>;
 
     /// Delete alias. If not found, throws an error.
@@ -59,7 +59,7 @@ impl HoprdDbAliasesOperations for HoprdDb {
         }
 
         let new_aliases = aliases
-            .iter()
+            .into_iter()
             .map(|entry| hoprd_db_entity::aliases::ActiveModel {
                 id: Default::default(),
                 peer_id: sea_orm::ActiveValue::Set(entry.peer_id.clone()),
@@ -69,22 +69,12 @@ impl HoprdDbAliasesOperations for HoprdDb {
 
         let _ = hoprd_db_entity::aliases::Entity::insert_many(new_aliases)
             .on_conflict(
-                OnConflict::columns([Column::Alias, Column::PeerId])
-                    .do_nothing()
-                    .to_owned(),
-            )
-            .on_conflict(
-                OnConflict::columns([Column::PeerId])
-                    .update_column(Column::Alias)
-                    .to_owned(),
-            )
-            .on_conflict(
-                OnConflict::columns([Column::Alias])
-                    .update_column(Column::PeerId)
+                OnConflict::new()
+                    .update_columns([Column::PeerId, Column::Alias])
                     .to_owned(),
             )
             .exec(&self.metadata)
-            .await?;
+            .await;
 
         Ok(())
     }
@@ -97,7 +87,8 @@ impl HoprdDbAliasesOperations for HoprdDb {
                 ));
             }
         }
-        self.metadata
+        let res = self
+            .metadata
             .transaction::<_, _, DbErr>(|tx| {
                 Box::pin(async move {
                     let row = hoprd_db_entity::aliases::Entity::find()
@@ -121,13 +112,15 @@ impl HoprdDbAliasesOperations for HoprdDb {
                     Ok(())
                 })
             })
-            .await
-            .map_err(|e| e.into())
+            .await;
+
+        Ok(res?)
     }
 
     async fn delete_alias(&self, alias: String) -> Result<()> {
         let res = hoprd_db_entity::aliases::Entity::delete_many()
             .filter(hoprd_db_entity::aliases::Column::Alias.eq(alias))
+            .filter(hoprd_db_entity::aliases::Column::Alias.ne(ME_AS_ALIAS.to_string()))
             .exec(&self.metadata)
             .await?;
 
@@ -135,7 +128,7 @@ impl HoprdDbAliasesOperations for HoprdDb {
             Ok(())
         } else {
             Err(crate::errors::DbError::LogicalError(
-                "peer cannot be removed because it does not exist".into(),
+                "peer cannot be removed because it does not exist or is self".into(),
             ))
         }
     }
@@ -170,7 +163,7 @@ mod tests {
 
     #[async_std::test]
     async fn set_alias_should_set_multiple_aliases_in_a_transaction() -> Result<()> {
-        let db = HoprdDb::new_in_memory().await;
+        let db: HoprdDb = HoprdDb::new_in_memory().await;
         let entries = vec![
             Alias {
                 peer_id: PeerId::random().to_string(),
@@ -332,5 +325,77 @@ mod tests {
         let aliases = db.get_aliases().await.expect("should get aliases");
         assert_eq!(aliases.len(), 1);
         assert_eq!(aliases[0].peer_id, me_peer_id);
+    }
+
+    #[async_std::test]
+    async fn set_aliases_with_existing_alias_should_replace_peer_id() {
+        let db = HoprdDb::new_in_memory().await;
+
+        let peer_id = PeerId::random().to_string();
+        let alias = "test_alias".to_string();
+
+        db.set_alias(peer_id.clone(), alias.clone())
+            .await
+            .expect("should add alias");
+
+        let new_peer_id = PeerId::random().to_string();
+        db.set_aliases(vec![Alias {
+            peer_id: new_peer_id.clone(),
+            alias: alias.clone(),
+        }])
+        .await
+        .expect("should replace peer_id");
+
+        let aliases = db.get_aliases().await.expect("should get aliases");
+
+        assert_eq!(aliases.len(), 1);
+        assert_eq!(aliases[0].peer_id, new_peer_id);
+    }
+
+    #[async_std::test]
+    async fn set_aliases_with_existing_peer_id_should_replace_alias() {
+        let db = HoprdDb::new_in_memory().await;
+
+        let peer_id = PeerId::random().to_string();
+        let alias = "test_alias".to_string();
+
+        db.set_alias(peer_id.clone(), alias.clone())
+            .await
+            .expect("should add alias");
+
+        db.set_aliases(vec![Alias {
+            peer_id: peer_id.clone(),
+            alias: alias.clone().to_uppercase(),
+        }])
+        .await
+        .expect("should replace alias");
+
+        let aliases = db.get_aliases().await.expect("should get aliases");
+
+        assert_eq!(aliases.len(), 1);
+        assert_eq!(aliases[0].alias, alias.to_uppercase());
+    }
+
+    #[async_std::test]
+    async fn set_aliases_with_existing_entry_shoud_do_nothing() {
+        let db = HoprdDb::new_in_memory().await;
+
+        let peer_id = PeerId::random().to_string();
+        let alias = "test_alias".to_string();
+
+        db.set_alias(peer_id.clone(), alias.clone())
+            .await
+            .expect("should add alias");
+
+        db.set_aliases(vec![Alias {
+            peer_id: peer_id.clone(),
+            alias: alias.clone(),
+        }])
+        .await
+        .expect("should do nothing");
+
+        let aliases = db.get_aliases().await.expect("should get aliases");
+
+        assert_eq!(aliases.len(), 1);
     }
 }
