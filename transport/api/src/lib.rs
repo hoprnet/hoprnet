@@ -159,11 +159,12 @@ pub struct HoprTransportConfig {
     pub heartbeat: core_network::heartbeat::HeartbeatConfig,
 }
 
-async fn reserve_or_set_next_free_cache_slot<K, V, F>(
-    cache: &moka::future::Cache<K, Option<V>>,
-    gen: F,
-    value: Option<V>,
-) -> Option<K>
+/// This function will use the given generator to generate an initial seeding key.
+/// It will check whether the given cache already contains a value for that key and if not,
+/// calls the generator (with the previous value) to generate a new seeding key and retry.
+/// The function either finds a suitable free slot, inserting the `value` or terminates with `None`
+/// when `gen` returns the initial seed again.
+async fn set_next_free_slot<K, V, F>(cache: &moka::future::Cache<K, V>, gen: F, value: V) -> Option<K>
 where
     K: Copy + std::hash::Hash + Eq + Send + Sync + 'static,
     V: Clone + Send + Sync + 'static,
@@ -246,7 +247,7 @@ where
                 "got new session request, searching for a free session slot"
             );
 
-            if let Some(session_id) = reserve_or_set_next_free_cache_slot(
+            if let Some(session_id) = set_next_free_slot(
                 &sessions,
                 |sid| {
                     let next_tag = if let Some(session_id) = sid {
@@ -719,7 +720,7 @@ where
     pub async fn new_session(&self, cfg: SessionClientConfig) -> errors::Result<Session> {
         let (tx_initiation_done, rx_initiation_done) = futures::channel::mpsc::unbounded();
 
-        let challenge = reserve_or_set_next_free_cache_slot(
+        let challenge = set_next_free_slot(
             &self.session_initiations,
             |ch| {
                 if let Some(challenge) = ch {
