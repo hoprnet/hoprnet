@@ -21,8 +21,8 @@ pub fn random_float() -> f64 {
     OsRng.gen()
 }
 
-/// Generates random unsigned integer which is at least `start` and optionally strictly less than `end`.
-/// If `end` is not given, `MAX_RANDOM_INTEGER` value is used.
+/// Generates a random unsigned integer which is at least `start` and optionally strictly less than `end`.
+/// If `end` is not given, the ` MAX_RANDOM_INTEGER ` value is used.
 /// The caller must make sure that 0 <= `start` < `end` <= `MAX_RANDOM_INTEGER`, otherwise the function will panic.
 pub fn random_integer(start: u64, end: Option<u64>) -> u64 {
     let real_end = end.unwrap_or(MAX_RANDOM_INTEGER);
@@ -34,6 +34,29 @@ pub fn random_integer(start: u64, end: Option<u64>) -> u64 {
 
     let bound = real_end - start;
     start + OsRng.gen_range(0..bound)
+}
+
+/// Generates a random unsigned integer via [`random_integer`] and increments it by one
+/// until the given `filter` is satisfied.
+/// If a satisfying number is found, it is guaranteed
+/// to be within 0 <= `start` < `end` <= `MAX_RANDOM_INTEGER`.
+pub fn random_integer_with<F>(start: u64, end: Option<u64>, filter: F) -> Option<u64>
+where
+    F: Fn(u64) -> bool,
+{
+    let real_end = end.unwrap_or(MAX_RANDOM_INTEGER);
+    let initial = random_integer(start, end);
+    let mut next = initial;
+    loop {
+        if filter(next) {
+            return Some(next);
+        } else {
+            next = ((next + 1) % real_end).max(start);
+            if initial == next {
+                return None;
+            }
+        }
+    }
 }
 
 /// Fills the specific number of bytes starting from the given offset in the given buffer.

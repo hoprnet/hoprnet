@@ -14,8 +14,9 @@ use hopr_db_sql::HoprDbAllOperations;
 use hopr_internal_types::protocol::ApplicationData;
 use hopr_primitive_types::primitives::Address;
 use hopr_transport_protocol::msg::processor::MsgSender;
-use hopr_transport_session::{errors::TransportSessionError, traits::SendMsg, PathOptions};
+use hopr_transport_session::{errors::TransportSessionError, traits::SendMsg};
 
+use hopr_network_types::prelude::RoutingOptions;
 #[cfg(all(feature = "prometheus", not(test)))]
 use {core_path::path::Path, hopr_metrics::metrics::SimpleHistogram};
 
@@ -86,20 +87,22 @@ where
     pub(crate) async fn resolve_path(
         &self,
         destination: PeerId,
-        options: PathOptions,
+        options: RoutingOptions,
     ) -> crate::errors::Result<TransportPath> {
         let path = match options {
-            PathOptions::IntermediatePath(mut path) => {
-                path.push(destination);
+            RoutingOptions::IntermediatePath(path) => {
+                let complete_path = Vec::from_iter(path.into_iter().chain([destination]));
 
-                debug!(full_path = format!("{path:?}"), "Resolved a specific path");
+                debug!(full_path = format!("{complete_path:?}"), "Resolved a specific path");
 
                 let cg = self.channel_graph.read().await;
 
-                TransportPath::resolve(path, &self.db, &cg).await.map(|(p, _)| p)?
+                TransportPath::resolve(complete_path, &self.db, &cg)
+                    .await
+                    .map(|(p, _)| p)?
             }
-            PathOptions::Hops(hops) => {
-                debug!(hops, "Resolving a path using hop count");
+            RoutingOptions::Hops(hops) => {
+                debug!(hops = tracing::field::display(hops), "Resolving a path using hop count");
 
                 let pk = OffchainPublicKey::try_from(destination)?;
 
@@ -113,7 +116,7 @@ where
                     let target_chain_key: Address = chain_key.try_into()?;
                     let cp = {
                         let cg = self.channel_graph.read().await;
-                        selector.select_path(&cg, cg.my_address(), target_chain_key, hops as usize, hops as usize)?
+                        selector.select_path(&cg, cg.my_address(), target_chain_key, hops.into(), hops.into())?
                     };
 
                     cp.into_path(&self.db, target_chain_key).await?
@@ -163,7 +166,7 @@ where
         &self,
         data: ApplicationData,
         destination: PeerId,
-        options: PathOptions,
+        options: RoutingOptions,
     ) -> std::result::Result<(), TransportSessionError> {
         data.application_tag
             .is_some_and(|application_tag| application_tag < RESERVED_SESSION_TAG_UPPER_LIMIT)

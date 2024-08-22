@@ -7,6 +7,9 @@ pub enum StartError {
 
     #[error("cannot decode protocol message")]
     ParseError,
+
+    #[error("cannot encode protocol message")]
+    SerializerError,
 }
 
 pub type Result<T> = std::result::Result<T, StartError>;

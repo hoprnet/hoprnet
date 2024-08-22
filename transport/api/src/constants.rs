@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 /// The maximum waiting time for a message send to produce a half key challenge reply
 pub const PACKET_QUEUE_TIMEOUT_MILLISECONDS: std::time::Duration = std::time::Duration::from_millis(15000);
 
@@ -17,3 +19,9 @@ pub(crate) const RESERVED_SESSION_TAG_UPPER_LIMIT: u16 = 1024;
 /// The reserved tags are from range <0,[`RESERVED_SUBPROTOCOL_TAG_UPPER_LIMIT`]) and are
 /// specifically dedicated for the internal use by the subprotocols.
 pub(crate) const RESERVED_SUBPROTOCOL_TAG_UPPER_LIMIT: u16 = 16;
+
+/// Time within Start protocol must finish session initiation.
+pub(crate) const SESSION_INITIATION_TIMEOUT: Duration = Duration::from_secs(3 * 60);
+
+/// Maximum lifetime of an idle session.
+pub(crate) const SESSION_LIFETIME: Duration = Duration::from_secs(5 * 60);

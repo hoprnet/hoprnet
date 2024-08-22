@@ -17,7 +17,7 @@ use std::{sync::Arc, time::Duration};
 use tracing::{debug, error, trace};
 use validator::Validate;
 
-use hopr_lib::{ApplicationData, AsUnixTimestamp, PathOptions, RESERVED_TAG_UPPER_LIMIT};
+use hopr_lib::{ApplicationData, AsUnixTimestamp, RoutingOptions, RESERVED_TAG_UPPER_LIMIT};
 
 use crate::{ApiErrorStatus, InternalState, BASE_PATH};
 
@@ -131,9 +131,32 @@ pub(super) async fn send_message(
         .unwrap_or_else(|| args.body.into_boxed_slice());
 
     let options = if let Some(intermediate_path) = args.path {
-        PathOptions::IntermediatePath(intermediate_path)
+        if intermediate_path.len() > RoutingOptions::MAX_INTERMEDIATE_HOPS {
+            return (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                ApiErrorStatus::UnknownFailure(format!(
+                    "Intermediate path cannot be longer than {}",
+                    RoutingOptions::MAX_INTERMEDIATE_HOPS
+                )),
+            )
+                .into_response();
+        }
+        // Unwrap will not fail due to the above check
+        RoutingOptions::IntermediatePath(Box::new(intermediate_path.as_slice().try_into().unwrap()))
     } else if let Some(hops) = args.hops {
-        PathOptions::Hops(hops)
+        if hops > RoutingOptions::MAX_INTERMEDIATE_HOPS as u16 {
+            return (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                ApiErrorStatus::UnknownFailure(format!(
+                    "Intermediate path cannot be longer than {}",
+                    RoutingOptions::MAX_INTERMEDIATE_HOPS
+                )),
+            )
+                .into_response();
+        }
+
+        // Unwrap will not fail due to the above check
+        RoutingOptions::Hops((hops as u8).try_into().unwrap())
     } else {
         return (
             StatusCode::UNPROCESSABLE_ENTITY,
@@ -285,9 +308,18 @@ async fn handle_send_message(input: &str, state: Arc<InternalState>) -> Result<(
                 .unwrap_or_else(|| msg.body.into_boxed_slice());
 
             let options = if let Some(intermediate_path) = msg.path {
-                PathOptions::IntermediatePath(intermediate_path)
+                RoutingOptions::IntermediatePath(Box::new(
+                    intermediate_path
+                        .as_slice()
+                        .try_into()
+                        .map_err(|_| "invalid number of intermediate hops".to_string())?,
+                ))
             } else if let Some(hops) = msg.hops {
-                PathOptions::Hops(hops)
+                RoutingOptions::Hops(
+                    (hops as u8)
+                        .try_into()
+                        .map_err(|_| "invalid number of intermediate hops".to_string())?,
+                )
             } else {
                 return Err("one of hops or intermediate path must be provided".to_string());
             };

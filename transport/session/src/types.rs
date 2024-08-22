@@ -7,15 +7,15 @@ use std::{
 };
 
 use futures::{channel::mpsc::UnboundedReceiver, pin_mut, StreamExt};
+use hopr_network_types::prelude::RoutingOptions;
 use hopr_network_types::session::state::{SessionConfig, SessionSocket};
 use hopr_primitive_types::traits::BytesRepresentable;
 use libp2p_identity::PeerId;
 
+use crate::{errors::TransportSessionError, traits::SendMsg, Capability};
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_internal_types::protocol::{ApplicationData, PAYLOAD_SIZE};
 use tracing::error;
-
-use crate::{errors::TransportSessionError, traits::SendMsg, Capability, PathOptions};
 
 /// Unique ID of a specific session.
 ///
@@ -23,6 +23,7 @@ use crate::{errors::TransportSessionError, traits::SendMsg, Capability, PathOpti
 /// It is a simple combination of an application tag and a peer id that will in future be
 /// replaced by a more robust session id representation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SessionId {
     tag: u16,
     peer: PeerId,
@@ -68,7 +69,7 @@ impl Session {
     pub fn new(
         id: SessionId,
         me: PeerId,
-        options: PathOptions,
+        options: RoutingOptions,
         capabilities: Vec<Capability>,
         tx: Arc<dyn SendMsg + Send + Sync>,
         rx: UnboundedReceiver<Box<[u8]>>,
@@ -138,7 +139,7 @@ type FuturesBuffer = futures::stream::FuturesUnordered<
 pub struct InnerSession {
     id: SessionId,
     me: PeerId,
-    options: PathOptions,
+    options: RoutingOptions,
     rx: UnboundedReceiver<Box<[u8]>>,
     tx: Arc<dyn SendMsg + Send + Sync>,
     tx_bytes: usize,
@@ -151,7 +152,7 @@ impl InnerSession {
     pub fn new(
         id: SessionId,
         me: PeerId,
-        options: PathOptions,
+        options: RoutingOptions,
         tx: Arc<dyn SendMsg + Send + Sync>,
         rx: UnboundedReceiver<Box<[u8]>>,
     ) -> Self {

@@ -1,6 +1,6 @@
 [package]
 name = "hopr-network-types"
-version = "0.2.2"
+version = "0.3.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Contains types used for networking over the HOPR protocol"
 edition = "2021"
@@ -10,15 +10,17 @@ license = "GPL-3.0-only"
 
 [features]
 default = []
-serde = ["dep:serde", "dep:serde_bytes"]
+serde = ["dep:serde", "dep:serde_bytes", "dep:bincode", "arrayvec/serde"]
 runtime-async-std = ["hopr-async-runtime/runtime-async-std"]
 runtime-tokio = [
-    "dep:tokio",
-    "dep:tokio-util",
-    "hopr-async-runtime/runtime-tokio"
+  "dep:tokio",
+  "dep:tokio-util",
+  "hopr-async-runtime/runtime-tokio",
 ]
 
 [dependencies]
+arrayvec = "0.7"
+bincode = { workspace = true, optional = true }
 bitvec = "1.0.1"
 crossbeam-queue = "0.3.11"
 crossbeam-skiplist = { workspace = true }
@@ -30,17 +32,19 @@ pin-project = "1.1"
 rand = { workspace = true }
 rand_distr = "0.4.3"
 serde = { workspace = true, optional = true }
+serde_with = { workspace = true, optional = true }
 serde_bytes = { workspace = true, optional = true }
 smart-default = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }
-tokio = { workspace = true, optional = true}
-tokio-util = { workspace = true, optional = true, features = ["net"]}
+tokio = { workspace = true, optional = true }
+tokio-util = { workspace = true, optional = true, features = ["net"] }
 tracing = { workspace = true }
 
 hopr-platform = { workspace = true }
 hopr-primitive-types = { workspace = true }
 hopr-async-runtime = { workspace = true }
+hopr-crypto-types = { workspace = true }
 
 [dev-dependencies]
 anyhow = "1.0"

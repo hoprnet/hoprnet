@@ -277,6 +277,9 @@ name = "arrayvec"
 version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "96d30a06541fbafbc7f82ed10c06164cfbd2c401138f6addd8404629c4b16711"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "asn1-rs"
@@ -4075,11 +4078,13 @@ dependencies = [
 
 [[package]]
 name = "hopr-network-types"
-version = "0.2.2"
+version = "0.3.0"
 dependencies = [
  "anyhow",
+ "arrayvec",
  "async-std",
  "async-stream",
+ "bincode",
  "bitvec",
  "crossbeam-queue",
  "crossbeam-skiplist",
@@ -4091,6 +4096,7 @@ dependencies = [
  "hex-literal",
  "hopr-async-runtime",
  "hopr-crypto-random",
+ "hopr-crypto-types",
  "hopr-platform",
  "hopr-primitive-types",
  "lazy_static",
@@ -4101,6 +4107,7 @@ dependencies = [
  "rayon",
  "serde",
  "serde_bytes",
+ "serde_with",
  "smart-default",
  "strum 0.26.3",
  "test-log",
@@ -4193,7 +4200,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.6.1"
+version = "0.7.0"
 dependencies = [
  "async-lock 3.4.0",
  "async-std",
@@ -4209,6 +4216,7 @@ dependencies = [
  "hopr-db-sql",
  "hopr-internal-types",
  "hopr-metrics",
+ "hopr-network-types",
  "hopr-platform",
  "hopr-primitive-types",
  "hopr-transport-p2p",

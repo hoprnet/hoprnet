@@ -56,7 +56,7 @@ use hopr_db_sql::{
     channels::HoprDbChannelOperations,
     db::{HoprDb, HoprDbConfig},
     info::HoprDbInfoOperations,
-    prelude::{ChainOrPacketKey::ChainKey, DbSqlError, HoprDbPeersOperations},
+    prelude::{ChainOrPacketKey::ChainKey, DbSqlError, DescribedBlock, HoprDbPeersOperations},
     HoprDbAllOperations, HoprDbGeneralModelOperations,
 };
 use hopr_platform::file::native::{join, remove_dir_all};
@@ -71,6 +71,7 @@ pub use {
         Addresses as NetworkContractAddresses, EnvironmentType, Network as ChainNetwork, ProtocolsConfig,
     },
     hopr_internal_types::prelude::*,
+    hopr_network_types::prelude::{IpProtocol, RoutingOptions},
     hopr_primitive_types::prelude::*,
     hopr_primitive_types::rlp,
     hopr_strategy::Strategy,
@@ -79,9 +80,9 @@ pub use {
         constants::RESERVED_TAG_UPPER_LIMIT,
         errors::{HoprTransportError, ProtocolError},
         libp2p::identity::PeerId,
-        ApplicationData, HalfKeyChallenge, Health, Keypair, Multiaddr, OffchainKeypair as HoprOffchainKeypair,
-        PathOptions, SendMsg, Session as HoprSession, SessionCapability, SessionClientConfig,
-        SessionId as HoprSessionId, TicketStatistics, SESSION_USABLE_MTU_SIZE,
+        ApplicationData, HalfKeyChallenge, Health, Keypair, Multiaddr, OffchainKeypair as HoprOffchainKeypair, SendMsg,
+        Session as HoprSession, SessionCapability, SessionClientConfig, SessionId as HoprSessionId, TicketStatistics,
+        SESSION_USABLE_MTU_SIZE,
     },
 };
 
@@ -113,7 +114,6 @@ lazy_static::lazy_static! {
 }
 
 pub use async_trait::async_trait;
-use hopr_db_sql::prelude::DescribedBlock;
 
 /// Interface representing the HOPR server behavior for each incoming session instance
 /// supplied as an argument.
@@ -1056,7 +1056,7 @@ impl Hopr {
         &self,
         msg: Box<[u8]>,
         destination: PeerId,
-        options: PathOptions,
+        options: RoutingOptions,
         application_tag: Option<u16>,
     ) -> errors::Result<()> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;

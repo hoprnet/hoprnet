@@ -8,7 +8,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 
-use hopr_lib::{HoprSession, PathOptions, PeerId, SessionClientConfig};
+use hopr_lib::{HoprSession, IpProtocol, PeerId, RoutingOptions, SessionClientConfig};
 use tokio::net::TcpListener;
 use tokio_util::compat::FuturesAsyncReadCompatExt;
 use tracing::{error, info};
@@ -28,7 +28,7 @@ use crate::{ApiErrorStatus, InternalState, BASE_PATH};
 pub(crate) struct SessionClientRequest {
     #[serde_as(as = "DisplayFromStr")]
     pub destination: PeerId,
-    pub path: PathOptions,
+    pub path: RoutingOptions,
     #[serde(default)]
     pub port: u16,
 }
@@ -38,6 +38,8 @@ impl From<SessionClientRequest> for SessionClientConfig {
         Self {
             peer: value.destination,
             path_options: value.path,
+            target_protocol: IpProtocol::TCP,
+            target: "127.0.0.1:3000".parse().unwrap(),
             capabilities: vec![],
         }
     }
@@ -138,12 +140,12 @@ async fn bind_session_to_connection(session: HoprSession, tcp_listener: TcpListe
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use futures::channel::mpsc::UnboundedSender;
     use hopr_lib::{ApplicationData, Keypair, PathOptions, PeerId, SendMsg};
     use hopr_transport_session::errors::TransportSessionError;
+    use hopr_transport_session::RoutingOptions;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
-
-    use super::*;
 
     pub struct SendMsgResender {
         tx: UnboundedSender<Box<[u8]>>,
@@ -162,7 +164,7 @@ mod tests {
             &self,
             data: ApplicationData,
             _destination: PeerId,
-            _options: PathOptions,
+            _options: RoutingOptions,
         ) -> std::result::Result<(), TransportSessionError> {
             let (_peer, data) = hopr_transport_session::types::unwrap_offchain_key(data.plain_text)?;
 
