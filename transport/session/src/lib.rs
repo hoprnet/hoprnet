@@ -4,6 +4,7 @@
 //! advanced interactions and functionality.
 
 pub mod errors;
+pub mod initiation;
 pub mod traits;
 pub mod types;
 
@@ -17,10 +18,14 @@ use {
 pub use hopr_network_types::types::*;
 pub use types::{Session, SessionId, SESSION_USABLE_MTU_SIZE};
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+/// Capabilities of a session.
+#[repr(u8)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum Capability {
+    /// Frame segmentation
     Segmentation,
+    /// Frame reassembly
     Retransmission,
 }
 

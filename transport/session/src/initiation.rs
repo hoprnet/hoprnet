@@ -1,8 +1,11 @@
-use hopr_crypto_types::prelude::PeerId;
+//! This module defines the Start sub-protocol used for HOPR Session initiation and management.
 
-use crate::errors::NetworkTypeError;
-use crate::start::prelude::StartError;
-use crate::types::RoutingOptions;
+use crate::errors::TransportSessionError;
+use crate::Capability;
+use hopr_crypto_types::prelude::PeerId;
+use hopr_internal_types::prelude::ApplicationData;
+use hopr_network_types::prelude::RoutingOptions;
+use std::collections::HashSet;
 
 /// Challenge that identifies a Start initiation protocol message.
 pub type StartChallenge = u64;
@@ -51,6 +54,8 @@ pub struct StartInitiation {
     pub challenge: StartChallenge,
     /// [Target](StartSessionTarget) of the session, i.e., what should the other party do with the traffic.
     pub target: StartSessionTarget,
+    /// Capabilities of the session.
+    pub capabilities: HashSet<Capability>,
     /// Optional information on back routing from the other party back towards the
     /// session initiator.
     ///
@@ -95,30 +100,30 @@ impl<'a, T: serde::Serialize + serde::Deserialize<'a>> StartProtocol<T> {
             StartProtocol::SessionEstablished(est) => bincode::serialize(&est),
             StartProtocol::SessionError(err) => bincode::serialize(&err),
             StartProtocol::CloseSession(id) => bincode::serialize(&id),
-        }
-        .map_err(|_| NetworkTypeError::StartProtocolError(StartError::SerializerError))?;
+        }?;
 
         Ok((disc as u16, inner.into_boxed_slice()))
+    }
+
+    /// Convenience method to [encode] directly into [ApplicationData].
+    pub fn encode_as_app_data(self) -> crate::errors::Result<ApplicationData> {
+        let (tag, plain_text) = self.encode()?;
+        Ok(ApplicationData {
+            application_tag: Some(tag),
+            plain_text,
+        })
     }
 
     /// Deserialize the message from message tag and message data.
     /// Data is deserialized using `bincode`.
     pub fn decode(tag: u16, data: &'a [u8]) -> crate::errors::Result<Self> {
-        match StartProtocolDiscriminants::from_repr(tag as u8)
-            .ok_or(NetworkTypeError::StartProtocolError(StartError::ParseError))?
-        {
-            StartProtocolDiscriminants::StartSession => Ok(StartProtocol::StartSession(
-                bincode::deserialize(data).map_err(|_| StartError::SerializerError)?,
-            )),
-            StartProtocolDiscriminants::SessionEstablished => Ok(StartProtocol::SessionEstablished(
-                bincode::deserialize(data).map_err(|_| StartError::SerializerError)?,
-            )),
-            StartProtocolDiscriminants::SessionError => Ok(StartProtocol::SessionError(
-                bincode::deserialize(data).map_err(|_| StartError::SerializerError)?,
-            )),
-            StartProtocolDiscriminants::CloseSession => Ok(StartProtocol::CloseSession(
-                bincode::deserialize(data).map_err(|_| StartError::SerializerError)?,
-            )),
+        match StartProtocolDiscriminants::from_repr(tag as u8).ok_or(TransportSessionError::PayloadSize)? {
+            StartProtocolDiscriminants::StartSession => Ok(StartProtocol::StartSession(bincode::deserialize(data)?)),
+            StartProtocolDiscriminants::SessionEstablished => {
+                Ok(StartProtocol::SessionEstablished(bincode::deserialize(data)?))
+            }
+            StartProtocolDiscriminants::SessionError => Ok(StartProtocol::SessionError(bincode::deserialize(data)?)),
+            StartProtocolDiscriminants::CloseSession => Ok(StartProtocol::CloseSession(bincode::deserialize(data)?)),
         }
     }
 }

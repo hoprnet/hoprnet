@@ -4080,7 +4080,6 @@ dependencies = [
  "anyhow",
  "async-std",
  "async-stream",
- "bincode",
  "bitvec",
  "crossbeam-queue",
  "crossbeam-skiplist",
@@ -4291,10 +4290,11 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-session"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-std",
  "async-trait",
+ "bincode",
  "futures",
  "hopr-crypto-random",
  "hopr-crypto-types",
@@ -4306,6 +4306,7 @@ dependencies = [
  "ringbuffer",
  "serde",
  "serde_with",
+ "strum 0.26.3",
  "thiserror",
  "tracing",
 ]

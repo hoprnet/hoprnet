@@ -44,10 +44,6 @@ use hopr_db_sql::{
     HoprDbAllOperations,
 };
 use hopr_internal_types::prelude::*;
-use hopr_network_types::prelude::{
-    StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation, StartProtocol,
-    StartSessionTarget,
-};
 use hopr_platform::time::native::current_time;
 use hopr_primitive_types::prelude::*;
 use hopr_transport_p2p::{
@@ -87,6 +83,10 @@ use crate::{
 
 pub use crate::helpers::{IndexerTransportEvent, PeerEligibility, TicketStatistics};
 pub use hopr_network_types::prelude::RoutingOptions;
+use hopr_transport_session::initiation::{
+    StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation, StartProtocol,
+    StartSessionTarget,
+};
 
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
 pub enum HoprTransportProcess {
@@ -249,7 +249,6 @@ where
 
             // Construct the session
             let (tx, rx) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
-
             if let Some(session_id) = insert_into_next_slot(
                 &sessions,
                 |sid| {
@@ -273,7 +272,14 @@ where
                     "assigning a new session"
                 );
 
-                let session = Session::new(session_id, me, route.clone(), vec![], message_sender.clone(), rx);
+                let session = Session::new(
+                    session_id,
+                    me,
+                    route.clone(),
+                    session_req.capabilities,
+                    message_sender.clone(),
+                    rx,
+                );
 
                 // Notify that a new session has been created
                 if let Err(e) = new_session_notifier.unbounded_send(session) {
@@ -286,25 +292,15 @@ where
                 );
 
                 // Notify the sender that the session has been established
-                let (tag, plain_text) = StartProtocol::SessionEstablished(StartEstablished {
+                let data = StartProtocol::SessionEstablished(StartEstablished {
                     orig_challenge: session_req.challenge,
                     session_id,
                 })
-                .encode()?;
+                .encode_as_app_data()?;
 
-                message_sender
-                    .send_message(
-                        ApplicationData {
-                            application_tag: tag.into(),
-                            plain_text,
-                        },
-                        peer,
-                        route,
-                    )
-                    .await
-                    .map_err(|e| {
-                        HoprTransportError::Api(format!("failed to send session establishment message: {e}"))
-                    })?;
+                message_sender.send_message(data, peer, route).await.map_err(|e| {
+                    HoprTransportError::Api(format!("failed to send session establishment message: {e}"))
+                })?;
 
                 info!(
                     session_id = tracing::field::display(session_id),
@@ -317,25 +313,15 @@ where
                 );
 
                 // Notify the sender that the session could not be established
-                let (tag, plain_text) = StartProtocol::<SessionId>::SessionError(StartErrorType {
+                let data = StartProtocol::<SessionId>::SessionError(StartErrorType {
                     challenge: session_req.challenge,
                     reason: StartErrorReason::NoSlotsAvailable,
                 })
-                .encode()?;
+                .encode_as_app_data()?;
 
-                message_sender
-                    .send_message(
-                        ApplicationData {
-                            application_tag: tag.into(),
-                            plain_text,
-                        },
-                        peer,
-                        route,
-                    )
-                    .await
-                    .map_err(|e| {
-                        HoprTransportError::Api(format!("failed to send session establishment error message: {e}"))
-                    })?;
+                message_sender.send_message(data, peer, route).await.map_err(|e| {
+                    HoprTransportError::Api(format!("failed to send session establishment error message: {e}"))
+                })?;
 
                 trace!(
                     peer = tracing::field::display(peer),
@@ -633,7 +619,7 @@ where
                                             if let Err(e) = session_data_sender.unbounded_send(data) {
                                                 error!(
                                                     session_id = tracing::field::debug(session_id),
-                                                    "failed to send data to session: {e}"
+                                                    "failed to send received data to session: {e}"
                                                 );
                                             }
                                         } else {
@@ -746,6 +732,7 @@ where
                 IpProtocol::TCP => StartSessionTarget::TcpStream(cfg.target),
                 IpProtocol::UDP => StartSessionTarget::UdpStream(cfg.target),
             },
+            capabilities: cfg.capabilities.iter().copied().collect(),
             // Back-routing currently uses the same (inverted) route as session initiation
             back_routing: Some((cfg.path_options.clone().invert(), self.me)),
         })
@@ -781,7 +768,7 @@ where
                     session_id,
                     self.me,
                     cfg.path_options,
-                    cfg.capabilities,
+                    cfg.capabilities.into_iter().collect(),
                     Arc::new(helpers::MessageSender::new(
                         self.process_packet_send.clone(),
                         self.path_planner.clone(),

@@ -35,3 +35,4 @@ tempfile = { workspace = true }
 [features]
 default = []
 hopli = []
+geth-compat = []

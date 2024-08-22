@@ -1,8 +1,12 @@
+use crate::{errors::TransportSessionError, traits::SendMsg, Capability};
 use futures::{channel::mpsc::UnboundedReceiver, pin_mut, StreamExt};
+use hopr_crypto_types::types::OffchainPublicKey;
+use hopr_internal_types::protocol::{ApplicationData, PAYLOAD_SIZE};
 use hopr_network_types::prelude::RoutingOptions;
 use hopr_network_types::session::state::{SessionConfig, SessionSocket};
 use hopr_primitive_types::traits::BytesRepresentable;
 use libp2p_identity::PeerId;
+use std::collections::HashSet;
 use std::fmt::Formatter;
 use std::{
     fmt::Display,
@@ -11,10 +15,6 @@ use std::{
     sync::Arc,
     task::Poll,
 };
-
-use crate::{errors::TransportSessionError, traits::SendMsg, Capability};
-use hopr_crypto_types::types::OffchainPublicKey;
-use hopr_internal_types::protocol::{ApplicationData, PAYLOAD_SIZE};
 use tracing::error;
 
 /// Unique ID of a specific session.
@@ -71,7 +71,7 @@ impl Session {
         id: SessionId,
         me: PeerId,
         options: RoutingOptions,
-        capabilities: Vec<Capability>,
+        capabilities: HashSet<Capability>,
         tx: Arc<dyn SendMsg + Send + Sync>,
         rx: UnboundedReceiver<Box<[u8]>>,
     ) -> Self {
@@ -436,7 +436,13 @@ mod tests {
         let (_tx, rx) = futures::channel::mpsc::unbounded();
         let mock = MockSendMsg::new();
 
-        let session = InnerSession::new(id, PeerId::random(), PathOptions::Hops(1), Arc::new(mock), rx);
+        let session = InnerSession::new(
+            id,
+            PeerId::random(),
+            RoutingOptions::Hops(1_u32.try_into().unwrap()),
+            Arc::new(mock),
+            rx,
+        );
 
         assert_eq!(session.id(), &id);
     }
@@ -447,7 +453,13 @@ mod tests {
         let (tx, rx) = futures::channel::mpsc::unbounded();
         let mock = MockSendMsg::new();
 
-        let mut session = InnerSession::new(id, PeerId::random(), PathOptions::Hops(1), Arc::new(mock), rx);
+        let mut session = InnerSession::new(
+            id,
+            PeerId::random(),
+            RoutingOptions::Hops(1_u32.try_into().unwrap()),
+            Arc::new(mock),
+            rx,
+        );
 
         let random_data = hopr_crypto_random::random_bytes::<PAYLOAD_SIZE>()
             .as_ref()
@@ -470,7 +482,13 @@ mod tests {
         let (tx, rx) = futures::channel::mpsc::unbounded();
         let mock = MockSendMsg::new();
 
-        let mut session = InnerSession::new(id, PeerId::random(), PathOptions::Hops(1), Arc::new(mock), rx);
+        let mut session = InnerSession::new(
+            id,
+            PeerId::random(),
+            RoutingOptions::Hops(1_u32.try_into().unwrap()),
+            Arc::new(mock),
+            rx,
+        );
 
         let random_data = hopr_crypto_random::random_bytes::<PAYLOAD_SIZE>()
             .as_ref()
@@ -506,7 +524,7 @@ mod tests {
             .withf(move |data, _peer, options| {
                 let (_peer_id, data) = unwrap_offchain_key(data.plain_text.clone()).expect("Unwrapping should work");
                 assert_eq!(data, b"Hello, world!".to_vec().into_boxed_slice());
-                assert_eq!(options, &PathOptions::Hops(1));
+                assert_eq!(options, &RoutingOptions::Hops(1_u32.try_into().unwrap()));
                 true
             })
             .returning(|_, _, _| Ok(()));
@@ -514,7 +532,7 @@ mod tests {
         let mut session = InnerSession::new(
             id,
             OffchainKeypair::random().public().into(),
-            PathOptions::Hops(1),
+            RoutingOptions::Hops(1_u32.try_into().unwrap()),
             Arc::new(mock),
             rx,
         );
@@ -543,7 +561,7 @@ mod tests {
         let mut session = InnerSession::new(
             id,
             OffchainKeypair::random().public().into(),
-            PathOptions::Hops(1),
+            RoutingOptions::Hops(1_u32.try_into().unwrap()),
             Arc::new(mock),
             rx,
         );

@@ -142,9 +142,10 @@ async fn bind_session_to_connection(session: HoprSession, tcp_listener: TcpListe
 mod tests {
     use super::*;
     use futures::channel::mpsc::UnboundedSender;
-    use hopr_lib::{ApplicationData, Keypair, PathOptions, PeerId, SendMsg};
+    use hopr_lib::{ApplicationData, Keypair, PeerId, SendMsg};
     use hopr_transport_session::errors::TransportSessionError;
     use hopr_transport_session::RoutingOptions;
+    use std::collections::HashSet;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
     pub struct SendMsgResender {
@@ -185,8 +186,8 @@ mod tests {
         let session = hopr_lib::HoprSession::new(
             hopr_lib::HoprSessionId::new(4567, peer),
             peer,
-            hopr_lib::PathOptions::IntermediatePath(vec![]),
-            vec![],
+            hopr_lib::RoutingOptions::IntermediatePath(Default::default()),
+            HashSet::default(),
             Arc::new(SendMsgResender::new(tx)),
             rx,
         );

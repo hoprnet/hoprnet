@@ -1048,7 +1048,7 @@ impl Hopr {
     pub async fn disconnect_from(&self, session: HoprSession) -> errors::Result<()> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
-        Ok(self.transport_api.close_session(session)?)
+        Ok(self.transport_api.close_session(session).await?)
     }
 
     /// Send a message to another peer in the network

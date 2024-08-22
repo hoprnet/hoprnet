@@ -19,8 +19,8 @@ pub enum HoprTransportError {
     #[error("Protocol error: {0}")]
     Protocol(#[from] hopr_transport_protocol::errors::ProtocolError),
 
-    #[error("Sub-protocol error: {0}")]
-    SubProtocol(#[from] hopr_network_types::errors::NetworkTypeError),
+    #[error("Transport session error: {0}")]
+    Session(#[from] hopr_transport_session::errors::TransportSessionError),
 
     #[error("Packet error: {0}")]
     Packet(#[from] hopr_crypto_packet::errors::PacketError),
