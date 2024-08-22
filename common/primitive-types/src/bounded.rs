@@ -1,0 +1,145 @@
+use crate::prelude::GeneralError;
+use std::fmt::{Display, Formatter};
+
+/// Unsigned integer (`usize`) that has an explicit upper bound.
+/// Trying to convert an integer that's above this bound will fail.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash, serde::Serialize, serde::Deserialize)]
+pub struct BoundedSize<const B: usize>(usize);
+
+impl<const B: usize> TryFrom<u8> for BoundedSize<B> {
+    type Error = GeneralError;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        (value as usize).try_into()
+    }
+}
+
+impl<const B: usize> TryFrom<u16> for BoundedSize<B> {
+    type Error = GeneralError;
+
+    fn try_from(value: u16) -> Result<Self, Self::Error> {
+        (value as usize).try_into()
+    }
+}
+
+impl<const B: usize> TryFrom<u32> for BoundedSize<B> {
+    type Error = GeneralError;
+
+    fn try_from(value: u32) -> Result<Self, Self::Error> {
+        (value as usize).try_into()
+    }
+}
+
+impl<const B: usize> TryFrom<u64> for BoundedSize<B> {
+    type Error = GeneralError;
+
+    fn try_from(value: u64) -> Result<Self, Self::Error> {
+        (value as usize).try_into()
+    }
+}
+
+impl<const B: usize> TryFrom<usize> for BoundedSize<B> {
+    type Error = GeneralError;
+
+    fn try_from(value: usize) -> Result<Self, Self::Error> {
+        if value <= B {
+            Ok(Self(value))
+        } else {
+            Err(GeneralError::InvalidInput)
+        }
+    }
+}
+
+impl<const B: usize> Display for BoundedSize<B> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl<const B: usize> From<BoundedSize<B>> for u8 {
+    fn from(value: BoundedSize<B>) -> Self {
+        value.0 as u8
+    }
+}
+
+impl<const B: usize> From<BoundedSize<B>> for u16 {
+    fn from(value: BoundedSize<B>) -> Self {
+        value.0 as u16
+    }
+}
+
+impl<const B: usize> From<BoundedSize<B>> for u32 {
+    fn from(value: BoundedSize<B>) -> Self {
+        value.0 as u32
+    }
+}
+
+impl<const B: usize> From<BoundedSize<B>> for u64 {
+    fn from(value: BoundedSize<B>) -> Self {
+        value.0 as u64
+    }
+}
+
+impl<const B: usize> From<BoundedSize<B>> for usize {
+    fn from(value: BoundedSize<B>) -> Self {
+        value.0
+    }
+}
+
+/// Wrapper for [Vec<T>] that has an explicit upper bound on the number of elements.
+/// Structure remains heap-allocated to avoid blowing up the size of types where it is used.
+#[derive(Debug, Clone, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+pub struct BoundedVec<T, const N: usize>(Vec<T>);
+
+impl<T, const N: usize> TryFrom<Vec<T>> for BoundedVec<T, N> {
+    type Error = GeneralError;
+
+    fn try_from(value: Vec<T>) -> Result<Self, Self::Error> {
+        if value.len() <= N {
+            Ok(Self(value))
+        } else {
+            Err(GeneralError::InvalidInput)
+        }
+    }
+}
+
+impl<T, const N: usize> IntoIterator for BoundedVec<T, N> {
+    type Item = T;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+impl<T, const N: usize> FromIterator<T> for BoundedVec<T, N> {
+    fn from_iter<V: IntoIterator<Item = T>>(iter: V) -> Self {
+        Self(iter.into_iter().take(N).collect())
+    }
+}
+
+impl<T, const N: usize> From<[T; N]> for BoundedVec<T, N> {
+    fn from(value: [T; N]) -> Self {
+        Self(Vec::from(value))
+    }
+}
+
+impl<T, const N: usize> From<BoundedVec<T, N>> for Vec<T> {
+    fn from(value: BoundedVec<T, N>) -> Self {
+        value.0
+    }
+}
+
+impl<T, const N: usize> AsRef<[T]> for BoundedVec<T, N> {
+    fn as_ref(&self) -> &[T] {
+        &self.0
+    }
+}
+
+impl<T: Default + Copy, const N: usize> From<BoundedVec<T, N>> for [T; N] {
+    fn from(value: BoundedVec<T, N>) -> Self {
+        let mut out = [T::default(); N];
+        value.0.into_iter().enumerate().for_each(|(i, e)| out[i] = e);
+        out
+    }
+}

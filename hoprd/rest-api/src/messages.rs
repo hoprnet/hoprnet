@@ -142,7 +142,7 @@ pub(super) async fn send_message(
                 .into_response();
         }
         // Unwrap will not fail due to the above check
-        RoutingOptions::IntermediatePath(Box::new(intermediate_path.as_slice().try_into().unwrap()))
+        RoutingOptions::IntermediatePath(intermediate_path.try_into().unwrap())
     } else if let Some(hops) = args.hops {
         if hops > RoutingOptions::MAX_INTERMEDIATE_HOPS as u16 {
             return (
@@ -308,12 +308,11 @@ async fn handle_send_message(input: &str, state: Arc<InternalState>) -> Result<(
                 .unwrap_or_else(|| msg.body.into_boxed_slice());
 
             let options = if let Some(intermediate_path) = msg.path {
-                RoutingOptions::IntermediatePath(Box::new(
+                RoutingOptions::IntermediatePath(
                     intermediate_path
-                        .as_slice()
                         .try_into()
                         .map_err(|_| "invalid number of intermediate hops".to_string())?,
-                ))
+                )
             } else if let Some(hops) = msg.hops {
                 RoutingOptions::Hops(
                     (hops as u8)

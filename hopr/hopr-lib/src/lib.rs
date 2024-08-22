@@ -1044,6 +1044,13 @@ impl Hopr {
         Ok(self.transport_api.new_session(cfg).await?)
     }
 
+    #[cfg(feature = "session-client")]
+    pub async fn disconnect_from(&self, session: HoprSession) -> errors::Result<()> {
+        self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
+
+        Ok(self.transport_api.close_session(session)?)
+    }
+
     /// Send a message to another peer in the network
     ///
     /// @param msg message to send

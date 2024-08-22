@@ -164,7 +164,7 @@ pub struct HoprTransportConfig {
 /// calls the generator (with the previous value) to generate a new seeding key and retry.
 /// The function either finds a suitable free slot, inserting the `value` or terminates with `None`
 /// when `gen` returns the initial seed again.
-async fn set_next_free_slot<K, V, F>(cache: &moka::future::Cache<K, V>, gen: F, value: V) -> Option<K>
+async fn insert_into_next_slot<K, V, F>(cache: &moka::future::Cache<K, V>, gen: F, value: V) -> Option<K>
 where
     K: Copy + std::hash::Hash + Eq + Send + Sync + 'static,
     V: Clone + Send + Sync + 'static,
@@ -200,7 +200,7 @@ where
 // because Moka cache requires the oneshot Sender to be Clone.
 // It also cannot be enclosed in an Arc, since calling `send` consumes the sender.
 type SessionInitiationCache =
-    moka::future::Cache<StartChallenge, Option<UnboundedSender<Result<StartEstablished<SessionId>, StartErrorType>>>>;
+    moka::future::Cache<StartChallenge, UnboundedSender<Result<StartEstablished<SessionId>, StartErrorType>>>;
 
 /// Interface into the physical transport mechanism allowing all off-chain HOPR-related tasks on
 /// the transport, as well as off-chain ticket manipulation.
@@ -220,7 +220,7 @@ where
     process_ticket_aggregate:
         Arc<OnceLock<TicketAggregationActions<TicketAggregationResponseType, TicketAggregationRequestType>>>,
     session_initiations: SessionInitiationCache,
-    sessions: moka::future::Cache<SessionId, Option<UnboundedSender<Box<[u8]>>>>,
+    sessions: moka::future::Cache<SessionId, UnboundedSender<Box<[u8]>>>,
 }
 
 async fn handle_start_protocol_message<T>(
@@ -229,7 +229,7 @@ async fn handle_start_protocol_message<T>(
     me: PeerId,
     new_session_notifier: UnboundedSender<Session>,
     message_sender: Arc<helpers::MessageSender<T>>,
-    sessions: moka::future::Cache<SessionId, Option<UnboundedSender<Box<[u8]>>>>,
+    sessions: moka::future::Cache<SessionId, UnboundedSender<Box<[u8]>>>,
     session_initiations: SessionInitiationCache,
 ) -> errors::Result<()>
 where
@@ -247,7 +247,10 @@ where
                 "got new session request, searching for a free session slot"
             );
 
-            if let Some(session_id) = set_next_free_slot(
+            // Construct the session
+            let (tx, rx) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
+
+            if let Some(session_id) = insert_into_next_slot(
                 &sessions,
                 |sid| {
                     let next_tag = if let Some(session_id) = sid {
@@ -261,35 +264,34 @@ where
                     };
                     SessionId::new(next_tag, peer)
                 },
-                None,
+                tx,
             )
             .await
             {
-                info!(
+                debug!(
                     session_id = tracing::field::debug(session_id),
                     "assigning a new session"
                 );
 
-                // Construct the session
-                let (tx, rx) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
                 let session = Session::new(session_id, me, route.clone(), vec![], message_sender.clone(), rx);
 
                 // Notify that a new session has been created
-                match new_session_notifier.unbounded_send(session) {
-                    Ok(_) => {
-                        sessions.insert(session_id, Some(tx)).await;
-                        debug!(session_id = tracing::field::debug(session_id), "session created");
-                    }
-                    Err(e) => warn!("failed to send session to incoming session queue: {e}"),
+                if let Err(e) = new_session_notifier.unbounded_send(session) {
+                    warn!("failed to send session to incoming session queue: {e}");
                 }
 
+                trace!(
+                    session_id = tracing::field::debug(session_id),
+                    "session notification sent"
+                );
+
                 // Notify the sender that the session has been established
-                let session_est = StartProtocol::SessionEstablished(StartEstablished {
+                let (tag, plain_text) = StartProtocol::SessionEstablished(StartEstablished {
                     orig_challenge: session_req.challenge,
                     session_id,
-                });
+                })
+                .encode()?;
 
-                let (tag, plain_text) = session_est.encode()?;
                 message_sender
                     .send_message(
                         ApplicationData {
@@ -304,9 +306,9 @@ where
                         HoprTransportError::Api(format!("failed to send session establishment message: {e}"))
                     })?;
 
-                trace!(
-                    session_id = tracing::field::debug(session_id),
-                    "session establishment message sent"
+                info!(
+                    session_id = tracing::field::display(session_id),
+                    "new session established"
                 );
             } else {
                 error!(
@@ -315,12 +317,12 @@ where
                 );
 
                 // Notify the sender that the session could not be established
-                let session_est = StartProtocol::<SessionId>::SessionError(StartErrorType {
+                let (tag, plain_text) = StartProtocol::<SessionId>::SessionError(StartErrorType {
                     challenge: session_req.challenge,
                     reason: StartErrorReason::NoSlotsAvailable,
-                });
+                })
+                .encode()?;
 
-                let (tag, plain_text) = session_est.encode()?;
                 message_sender
                     .send_message(
                         ApplicationData {
@@ -343,7 +345,7 @@ where
         }
         StartProtocol::SessionEstablished(est) => {
             let challenge = est.orig_challenge;
-            if let Some(Some(tx_est)) = session_initiations.remove(&est.orig_challenge).await {
+            if let Some(tx_est) = session_initiations.remove(&est.orig_challenge).await {
                 if let Err(e) = tx_est.unbounded_send(Ok(est)) {
                     return Err(
                         GeneralError::NonSpecificError(format!("could not notify session establishment: {e}")).into(),
@@ -357,7 +359,7 @@ where
         StartProtocol::SessionError(err) => {
             // Currently, we don't distinguish the error types
             // and just discard the initiation attempt and pass on the error.
-            if let Some(Some(tx_est)) = session_initiations.remove(&err.challenge).await {
+            if let Some(tx_est) = session_initiations.remove(&err.challenge).await {
                 if let Err(e) = tx_est.unbounded_send(Err(err)) {
                     return Err(GeneralError::NonSpecificError(format!(
                         "could not notify session establishment error {err:?}: {e}"
@@ -376,7 +378,7 @@ where
             }
         }
         StartProtocol::CloseSession(session_id) => {
-            if let Some(Some(sender)) = sessions.remove(&session_id).await {
+            if let Some(sender) = sessions.remove(&session_id).await {
                 sender.close_channel();
                 debug!(
                     session_id = tracing::field::debug(session_id),
@@ -623,7 +625,7 @@ where
                                         hopr_transport_session::types::unwrap_offchain_key(data.plain_text.clone())
                                     {
                                         let session_id = SessionId::new(app_tag, peer);
-                                        if let Some(Some(session_data_sender)) = sessions.get(&session_id).await {
+                                        if let Some(session_data_sender) = sessions.get(&session_id).await {
                                             trace!(
                                                 session_id = tracing::field::debug(session_id),
                                                 "received data for a registered session"
@@ -720,22 +722,25 @@ where
     pub async fn new_session(&self, cfg: SessionClientConfig) -> errors::Result<Session> {
         let (tx_initiation_done, rx_initiation_done) = futures::channel::mpsc::unbounded();
 
-        let challenge = set_next_free_slot(
+        const MIN_CHALLENGE: StartChallenge = 1;
+
+        let challenge = insert_into_next_slot(
             &self.session_initiations,
             |ch| {
                 if let Some(challenge) = ch {
-                    ((challenge + 1) % hopr_crypto_random::MAX_RANDOM_INTEGER).max(1)
+                    ((challenge + 1) % hopr_crypto_random::MAX_RANDOM_INTEGER).max(MIN_CHALLENGE)
                 } else {
-                    hopr_crypto_random::random_integer(1, None)
+                    hopr_crypto_random::random_integer(MIN_CHALLENGE, None)
                 }
             },
-            Some(tx_initiation_done),
+            tx_initiation_done,
         )
         .await
         .ok_or(HoprTransportError::Api("all challenge slots are occupied".into()))?; // almost impossible with u64
 
         // Prepare the session initiation message in the Start protocol
-        let session_initiation = StartProtocol::<SessionId>::StartSession(StartInitiation {
+        debug!(challenge, "initiating session with config {cfg:?}");
+        let (tag, msg) = StartProtocol::<SessionId>::StartSession(StartInitiation {
             challenge,
             target: match cfg.target_protocol {
                 IpProtocol::TCP => StartSessionTarget::TcpStream(cfg.target),
@@ -743,10 +748,10 @@ where
             },
             // Back-routing currently uses the same (inverted) route as session initiation
             back_routing: Some((cfg.path_options.clone().invert(), self.me)),
-        });
+        })
+        .encode()?;
 
-        debug!(challenge, "initiating session with config {cfg:?}");
-        let (tag, msg) = session_initiation.encode()?;
+        // Send the Session initiation message
         self.send_message(msg, cfg.peer, cfg.path_options.clone(), tag.into())
             .await?;
 
@@ -768,8 +773,9 @@ where
                     "started a new session"
                 );
 
+                // Insert the Session object, forcibly overwrite any other session with the same ID
                 let (tx, rx) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
-                self.sessions.insert(session_id, Some(tx)).await;
+                self.sessions.insert(session_id, tx).await;
 
                 Ok(Session::new(
                     session_id,
@@ -794,6 +800,30 @@ where
                 )))
             }
             Either::Right(_) => Err(errors::HoprTransportError::Api("timeout establishing session".into())),
+        }
+    }
+
+    #[tracing::instrument(level = "debug", skip(self))]
+    pub async fn close_session(&self, session: Session) -> errors::Result<()> {
+        let session_id = *session.id();
+        if let Some(session_tx) = self.sessions.remove(&session_id).await {
+            let (tag, msg) = StartProtocol::CloseSession(session_id).encode()?;
+
+            trace!(
+                session_id = tracing::field::debug(session_id),
+                "sending session termination"
+            );
+            self.send_message(msg, *session_id.peer(), session.routing_options().clone(), tag.into())
+                .await?;
+            session_tx.close_channel();
+
+            info!(
+                session_id = tracing::field::debug(session_id),
+                "session has been closed"
+            );
+            Ok(())
+        } else {
+            Err(HoprTransportError::Api("cannot find session".into()))
         }
     }
 

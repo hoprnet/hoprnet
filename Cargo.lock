@@ -277,9 +277,6 @@ name = "arrayvec"
 version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "96d30a06541fbafbc7f82ed10c06164cfbd2c401138f6addd8404629c4b16711"
-dependencies = [
- "serde",
-]
 
 [[package]]
 name = "asn1-rs"
@@ -4081,7 +4078,6 @@ name = "hopr-network-types"
 version = "0.3.0"
 dependencies = [
  "anyhow",
- "arrayvec",
  "async-std",
  "async-stream",
  "bincode",

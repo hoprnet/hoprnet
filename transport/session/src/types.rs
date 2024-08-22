@@ -1,3 +1,9 @@
+use futures::{channel::mpsc::UnboundedReceiver, pin_mut, StreamExt};
+use hopr_network_types::prelude::RoutingOptions;
+use hopr_network_types::session::state::{SessionConfig, SessionSocket};
+use hopr_primitive_types::traits::BytesRepresentable;
+use libp2p_identity::PeerId;
+use std::fmt::Formatter;
 use std::{
     fmt::Display,
     io::{Error, ErrorKind},
@@ -5,12 +11,6 @@ use std::{
     sync::Arc,
     task::Poll,
 };
-
-use futures::{channel::mpsc::UnboundedReceiver, pin_mut, StreamExt};
-use hopr_network_types::prelude::RoutingOptions;
-use hopr_network_types::session::state::{SessionConfig, SessionSocket};
-use hopr_primitive_types::traits::BytesRepresentable;
-use libp2p_identity::PeerId;
 
 use crate::{errors::TransportSessionError, traits::SendMsg, Capability};
 use hopr_crypto_types::types::OffchainPublicKey;
@@ -63,6 +63,7 @@ impl<T: futures::AsyncWrite + futures::AsyncRead + Send> AsyncReadWrite for T {}
 pub struct Session {
     id: SessionId,
     inner: Pin<Box<dyn AsyncReadWrite>>,
+    routing_options: RoutingOptions,
 }
 
 impl Session {
@@ -74,7 +75,7 @@ impl Session {
         tx: Arc<dyn SendMsg + Send + Sync>,
         rx: UnboundedReceiver<Box<[u8]>>,
     ) -> Self {
-        let inner_session = InnerSession::new(id, me, options, tx, rx);
+        let inner_session = InnerSession::new(id, me, options.clone(), tx, rx);
 
         Self {
             id,
@@ -89,11 +90,25 @@ impl Session {
             } else {
                 Box::pin(inner_session)
             },
+            routing_options: options,
         }
     }
 
     pub fn id(&self) -> &SessionId {
         &self.id
+    }
+
+    pub fn routing_options(&self) -> &RoutingOptions {
+        &self.routing_options
+    }
+}
+
+impl std::fmt::Debug for Session {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Session")
+            .field("id", &self.id)
+            .field("routing_options", &self.routing_options)
+            .finish_non_exhaustive()
     }
 }
 

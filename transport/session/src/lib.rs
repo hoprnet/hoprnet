@@ -34,9 +34,11 @@ pub struct SessionClientConfig {
     /// The peer to which the session should be established.
     #[cfg_attr(feature = "serde", serde(with = "As::<DisplayFromStr>"))]
     pub peer: PeerId,
+
     /// The fixed path options for the session.
     pub path_options: RoutingOptions,
 
+    /// Protocol to be used to connect to the target
     pub target_protocol: IpProtocol,
 
     /// Target of the session.
