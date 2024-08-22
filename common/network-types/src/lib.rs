@@ -8,7 +8,7 @@ pub mod session;
 pub mod udp;
 
 /// Contains low-level protocol that aids HOPR session establishment.
-pub mod start;
+pub mod start; // TODO: move this to hopr-transport-session
 
 /// Contains various networking-related types
 pub mod types;
