@@ -10,7 +10,7 @@ license = "GPL-3.0-only"
 
 [features]
 default = []
-serde = ["dep:serde", "dep:serde_bytes", "dep:bincode"]
+serde = ["dep:serde", "dep:serde_bytes"]
 runtime-async-std = ["hopr-async-runtime/runtime-async-std"]
 runtime-tokio = [
   "dep:tokio",
@@ -19,7 +19,6 @@ runtime-tokio = [
 ]
 
 [dependencies]
-bincode = { workspace = true, optional = true }
 bitvec = "1.0.1"
 crossbeam-queue = "0.3.11"
 crossbeam-skiplist = { workspace = true }
