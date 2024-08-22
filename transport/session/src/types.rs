@@ -2,6 +2,7 @@ use crate::{errors::TransportSessionError, traits::SendMsg, Capability};
 use futures::{channel::mpsc::UnboundedReceiver, pin_mut, StreamExt};
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_internal_types::protocol::{ApplicationData, PAYLOAD_SIZE};
+use hopr_network_types::prelude::state::SessionFeature;
 use hopr_network_types::prelude::RoutingOptions;
 use hopr_network_types::session::state::{SessionConfig, SessionSocket};
 use hopr_primitive_types::traits::BytesRepresentable;
@@ -70,27 +71,40 @@ impl Session {
     pub fn new(
         id: SessionId,
         me: PeerId,
-        options: RoutingOptions,
+        routing_options: RoutingOptions,
         capabilities: HashSet<Capability>,
         tx: Arc<dyn SendMsg + Send + Sync>,
         rx: UnboundedReceiver<Box<[u8]>>,
     ) -> Self {
-        let inner_session = InnerSession::new(id, me, options.clone(), tx, rx);
+        let inner_session = InnerSession::new(id, me, routing_options.clone(), tx, rx);
+        let avail_caps = HashSet::from_iter([Capability::Retransmission, Capability::Segmentation]);
 
-        Self {
-            id,
-            inner: if capabilities.contains(&Capability::Retransmission)
-                || capabilities.contains(&Capability::Segmentation)
-            {
-                Box::pin(SessionSocket::<SESSION_USABLE_MTU_SIZE>::new(
-                    id,
-                    inner_session,
-                    SessionConfig::default(),
-                ))
-            } else {
-                Box::pin(inner_session)
-            },
-            routing_options: options,
+        if !capabilities.is_disjoint(&avail_caps) {
+            let mut enabled_features = HashSet::new();
+            if capabilities.contains(&Capability::Retransmission) {
+                enabled_features.extend([
+                    SessionFeature::AcknowledgeFrames,
+                    SessionFeature::RequestIncompleteFrames,
+                    SessionFeature::RetransmitFrames,
+                ]);
+            }
+
+            let cfg = SessionConfig {
+                enabled_features,
+                ..Default::default()
+            };
+
+            Self {
+                id,
+                inner: Box::pin(SessionSocket::<SESSION_USABLE_MTU_SIZE>::new(id, inner_session, cfg)),
+                routing_options,
+            }
+        } else {
+            Self {
+                id,
+                inner: Box::pin(inner_session),
+                routing_options,
+            }
         }
     }
 

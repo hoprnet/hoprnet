@@ -39,7 +39,7 @@ impl From<SessionClientRequest> for SessionClientConfig {
             peer: value.destination,
             path_options: value.path,
             target_protocol: IpProtocol::TCP,
-            target: "127.0.0.1:3000".parse().unwrap(),
+            target: "127.0.0.1:3000".parse().unwrap(), // TODO: change this
             capabilities: vec![],
         }
     }
