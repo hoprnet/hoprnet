@@ -2,7 +2,7 @@
 hopr:
   host:
     address: !IPv4 127.0.0.1 # NOTE: adapt this to reflect your public IP
-    port: 9091 # NOTE: adapt this to reflect your public p2p port
+    port: 9091
   db:
     data: /app/hoprd/
   strategy:
