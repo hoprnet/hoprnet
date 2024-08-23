@@ -14,7 +14,7 @@ The `docker compose` deployment is multi-faceted, allowing different combination
 - Copy the `.env.sample` file to `.env`, replacing placeholder values with your specific configurations.
 - Similarly, copy `.env-secrets.sample` to `.env-secrets` and ensure all sensitive configurations are securely set.
 - Update `./hoprd_data/hoprd.cfg.yaml` with your node configuration as guided by the onboarding process at [HOPR Staking Hub](https://hub.hoprnet.org).
-- Make sure to keep default ports inside `./hoprd_data/hoprd.cfg.yaml`. Only change ports inside `.env`. Those are refering to the published ports of docker.
+- Make sure to keep the default ports inside `./hoprd_data/hoprd.cfg.yaml`. Only change the ports inside `.env`, as those refer to the published ports of Docker.
 - Modify the prometheus config file at `./prometheus/prometheus.yml` to set the correct values for credentials and labels.
 
 ### Profiles
