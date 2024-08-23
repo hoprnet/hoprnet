@@ -4089,6 +4089,7 @@ dependencies = [
  "governor",
  "hex",
  "hex-literal",
+ "hickory-resolver",
  "hopr-async-runtime",
  "hopr-crypto-random",
  "hopr-crypto-types",

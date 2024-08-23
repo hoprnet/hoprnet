@@ -3,7 +3,7 @@ use futures::{channel::mpsc::UnboundedReceiver, pin_mut, StreamExt};
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_internal_types::protocol::{ApplicationData, PAYLOAD_SIZE};
 use hopr_network_types::prelude::state::SessionFeature;
-use hopr_network_types::prelude::RoutingOptions;
+use hopr_network_types::prelude::{IpOrHost, RoutingOptions};
 use hopr_network_types::session::state::{SessionConfig, SessionSocket};
 use hopr_primitive_types::traits::BytesRepresentable;
 use libp2p_identity::PeerId;
@@ -64,15 +64,13 @@ impl<T: futures::AsyncWrite + futures::AsyncRead + Send> AsyncReadWrite for T {}
 
 /// Defines what should happen with the data at the recipient where the
 /// data from the established session are supposed to be forwarded to some `target`.
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum SessionTarget {
     /// Target is running over UDP with the given IP address and port.
-    /// Host names are not supported.
-    UdpStream(std::net::SocketAddr),
+    UdpStream(IpOrHost),
     /// Target is running over TCP with the given address and port.
-    /// Host names are not supported
-    TcpStream(std::net::SocketAddr),
+    TcpStream(IpOrHost),
     /// Target is a service directly at the exit node with a given service ID.
     ExitNode(u32),
 }

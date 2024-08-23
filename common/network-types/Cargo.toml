@@ -26,6 +26,7 @@ dashmap = { workspace = true }
 futures = { workspace = true }
 governor = "0.6.3"
 hex = { workspace = true }
+hickory-resolver = "0.24.1"
 pin-project = "1.1"
 rand = { workspace = true }
 rand_distr = "0.4.3"

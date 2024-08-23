@@ -109,11 +109,15 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
             hopr_lib::SessionTarget::UdpStream(udp_target) => {
                 tracing::debug!("Binding socket to the UDP server {udp_target}...");
                 let bind_addr = std::net::SocketAddr::new(std::net::Ipv4Addr::new(127, 0, 0, 1).into(), 0);
+                let udp_target = udp_target
+                    .resolve_first()
+                    .ok_or(HoprLibError::GeneralError("failed to resolve DNS name".into()))?;
+
                 let mut udp_bridge =
                     hopr_network_types::udp::ConnectedUdpStream::bind_and_connect(bind_addr, udp_target)
                         .await
                         .map_err(|e| {
-                            hopr_lib::errors::HoprLibError::GeneralError(format!(
+                            HoprLibError::GeneralError(format!(
                                 "Could not bridge the incoming session to {udp_target}: {e}"
                             ))
                         })?;
@@ -130,14 +134,15 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
             }
             hopr_lib::SessionTarget::TcpStream(tcp_target) => {
                 tracing::debug!("Creating a connection to the TCP server {tcp_target}...");
+                let tcp_target = tcp_target
+                    .resolve_first()
+                    .ok_or(HoprLibError::GeneralError("failed to resolve DNS name".into()))?;
                 let mut tcp_bridge = tokio::net::TcpStream::connect(tcp_target).await.map_err(|e| {
-                    hopr_lib::errors::HoprLibError::GeneralError(format!(
-                        "Could not bridge the incoming session to {tcp_target}: {e}"
-                    ))
+                    HoprLibError::GeneralError(format!("Could not bridge the incoming session to {tcp_target}: {e}"))
                 })?;
 
                 tcp_bridge.set_nodelay(true).map_err(|e| {
-                    hopr_lib::errors::HoprLibError::GeneralError(format!(
+                    HoprLibError::GeneralError(format!(
                         "Could not set the TCP_NODELAY option for the bridged session to {tcp_target}: {e}",
                     ))
                 })?;

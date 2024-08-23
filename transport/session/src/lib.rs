@@ -47,7 +47,7 @@ pub struct SessionClientConfig {
     pub target_protocol: IpProtocol,
 
     /// Target of the session.
-    pub target: std::net::SocketAddr,
+    pub target: IpOrHost,
 
     /// Capabilities offered by the session.
     pub capabilities: Vec<Capability>,

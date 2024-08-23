@@ -8,12 +8,12 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 
-use hopr_lib::{HoprSession, IpProtocol, PeerId, RoutingOptions, SessionClientConfig};
+use crate::{ApiErrorStatus, InternalState, BASE_PATH};
+use hopr_lib::errors::HoprLibError;
+use hopr_lib::{HoprSession, IpProtocol, PeerId, RoutingOptions, SessionCapability, SessionClientConfig};
 use tokio::net::TcpListener;
 use tokio_util::compat::FuturesAsyncReadCompatExt;
 use tracing::{error, info};
-
-use crate::{ApiErrorStatus, InternalState, BASE_PATH};
 
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
@@ -22,26 +22,37 @@ use crate::{ApiErrorStatus, InternalState, BASE_PATH};
         "path": {
             "Hops": 1
         },
-        "port": 0
+        "protocol": "TCP",
+        "target": "localhost:8080",
     }))]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct SessionClientRequest {
     #[serde_as(as = "DisplayFromStr")]
     pub destination: PeerId,
     pub path: RoutingOptions,
-    #[serde(default)]
-    pub port: u16,
+    pub protocol: IpProtocol,
+    pub target: String,
 }
 
-impl From<SessionClientRequest> for SessionClientConfig {
-    fn from(value: SessionClientRequest) -> Self {
-        Self {
+impl TryFrom<SessionClientRequest> for SessionClientConfig {
+    type Error = HoprLibError;
+
+    fn try_from(value: SessionClientRequest) -> Result<Self, Self::Error> {
+        Ok(Self {
             peer: value.destination,
             path_options: value.path,
-            target_protocol: IpProtocol::TCP,
-            target: "127.0.0.1:3000".parse().unwrap(), // TODO: change this
-            capabilities: vec![],
-        }
+            target_protocol: value.protocol,
+            target: value
+                .target
+                .parse()
+                .map_err(|e| HoprLibError::GeneralError(format!("target host parse error: {e}")))?,
+            // TODO: can make the capabilities more fine-grained configurable by the client
+            capabilities: if value.protocol == IpProtocol::TCP {
+                vec![SessionCapability::Retransmission, SessionCapability::Segmentation]
+            } else {
+                vec![]
+            },
+        })
     }
 }
 
@@ -85,37 +96,41 @@ pub(crate) async fn create_client(
     State(state): State<Arc<InternalState>>,
     Json(args): Json<SessionClientRequest>,
 ) -> Result<impl IntoResponse, impl IntoResponse> {
-    let port = args.port;
-    let data: SessionClientConfig = args.into();
-    // let is_tcp_like = data.capabilities.contains(&SessionCapability::Retransmission)
-    //     || data.capabilities.contains(&SessionCapability::Segmentation);
+    let data = SessionClientConfig::try_from(args).map_err(|e| {
+        (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            ApiErrorStatus::UnknownFailure(e.to_string()),
+        )
+    })?;
+    let port = data.target.port();
 
-    let is_tcp_like = true;
+    match data.target_protocol {
+        IpProtocol::TCP => {
+            let session = state.hopr.clone().connect_to(data).await.map_err(|e| {
+                (
+                    StatusCode::UNPROCESSABLE_ENTITY,
+                    ApiErrorStatus::UnknownFailure(e.to_string()),
+                )
+            })?;
 
-    if is_tcp_like {
-        let session = state.hopr.clone().connect_to(data).await.map_err(|e| {
-            (
-                StatusCode::UNPROCESSABLE_ENTITY,
-                ApiErrorStatus::UnknownFailure(e.to_string()),
-            )
-        })?;
+            let (port, tcp_listener) = listen_on(format!("127.0.0.1:{port}")).await.map_err(|e| {
+                (
+                    StatusCode::UNPROCESSABLE_ENTITY,
+                    ApiErrorStatus::UnknownFailure(format!("Failed to bind on 127.0.0.1:{port}: {e}")),
+                )
+            })?;
 
-        let (port, tcp_listener) = listen_on(format!("127.0.0.1:{port}")).await.map_err(|e| {
-            (
-                StatusCode::UNPROCESSABLE_ENTITY,
-                ApiErrorStatus::UnknownFailure(format!("Failed to bind on 127.0.0.1:{port}: {e}")),
-            )
-        })?;
+            tokio::task::spawn(bind_session_to_connection(session, tcp_listener));
 
-        tokio::task::spawn(bind_session_to_connection(session, tcp_listener));
-
-        Ok((StatusCode::OK, Json(SessionClientResponse { port })).into_response())
-    } else {
-        // let s = UdpSocket::bind("0.0.0.0:{port}").await?.connect().await;
-        Err((
-            StatusCode::NOT_IMPLEMENTED,
-            ApiErrorStatus::UnknownFailure("No UDP socket support yet".to_string()),
-        ))
+            Ok((StatusCode::OK, Json(SessionClientResponse { port })).into_response())
+        }
+        IpProtocol::UDP => {
+            // TODO: bind UDP socket here
+            Err((
+                StatusCode::NOT_IMPLEMENTED,
+                ApiErrorStatus::UnknownFailure("No UDP socket support yet".to_string()),
+            ))
+        }
     }
 }
 
