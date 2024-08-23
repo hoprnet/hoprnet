@@ -81,8 +81,8 @@ pub use {
         errors::{HoprTransportError, ProtocolError},
         libp2p::identity::PeerId,
         ApplicationData, HalfKeyChallenge, Health, Keypair, Multiaddr, OffchainKeypair as HoprOffchainKeypair, SendMsg,
-        Session as HoprSession, SessionCapability, SessionClientConfig, SessionId as HoprSessionId, TicketStatistics,
-        SESSION_USABLE_MTU_SIZE,
+        Session as HoprSession, SessionCapability, SessionClientConfig, SessionId as HoprSessionId, SessionTarget,
+        TicketStatistics, SESSION_USABLE_MTU_SIZE,
     },
 };
 
@@ -121,7 +121,7 @@ pub use async_trait::async_trait;
 #[async_trait::async_trait]
 pub trait HoprSessionReactor {
     /// Fully process a single HOPR session
-    async fn process(&self, session: HoprSession) -> errors::Result<()>;
+    async fn process(&self, session: HoprSession, target: SessionTarget) -> errors::Result<()>;
 }
 
 /// An enum representing the current state of the HOPR node
@@ -861,9 +861,9 @@ impl Hopr {
                 Err(ChainActionsError::AlreadyAnnounced) => {
                     info!("Node already announced on chain as {:?}", multiaddresses_to_announce)
                 }
-                // If the announcement fails we keep going to prevent the node from retrying
-                // after restart. Functionality is limited and users must check the logs for
-                // errors.
+                // If the announcement fails, we keep going to prevent the node from retrying
+                // after restart.
+                // Functionality is limited, and users must check the logs for errors.
                 Err(e) => error!("Failed to transmit node announcement: {e}"),
             }
         }
@@ -913,17 +913,17 @@ impl Hopr {
             }),
         );
 
-        let (session_tx, _session_rx) = unbounded::<HoprSession>();
+        let (session_tx, _session_rx) = unbounded::<(HoprSession, SessionTarget)>();
 
         #[cfg(feature = "session-server")]
         {
             processes.insert(
                 HoprLibProcesses::SessionServer,
-                spawn(_session_rx.for_each_concurrent(None, move |session| {
+                spawn(_session_rx.for_each_concurrent(None, move |(session, target)| {
                     let serve_handler = serve_handler.clone();
                     async move {
                         let session_id = *session.id();
-                        match serve_handler.process(session).await {
+                        match serve_handler.process(session, target).await {
                             Ok(_) => debug!("Client session {session_id} finished successfully"),
                             Err(e) => error!("Client session {session_id} failed: {e}"),
                         }

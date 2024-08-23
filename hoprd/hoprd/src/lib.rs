@@ -86,6 +86,8 @@
 //!           Print version
 //! ```
 
+use hopr_lib::errors::HoprLibError;
+
 pub mod cli;
 pub mod config;
 pub mod errors;
@@ -93,67 +95,66 @@ pub mod errors;
 pub const LISTENING_SESSION_RETRANSMISSION_SERVER_PORT: u16 = 4677;
 
 #[derive(Debug, Clone)]
-pub struct HoprServerTcpReactor {
-    pub target: std::net::SocketAddr,
-}
+pub struct HoprServerIpForwardingReactor;
 
 #[hopr_lib::async_trait]
-impl hopr_lib::HoprSessionReactor for HoprServerTcpReactor {
+impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
     #[tracing::instrument(level = "debug", skip(self, session))]
-    async fn process(&self, session: hopr_lib::HoprSession) -> hopr_lib::errors::Result<()> {
-        let target = self.target;
-        tracing::debug!("Creating a connection to the TCP server {}...", self.target);
-        let mut tcp_bridge = tokio::net::TcpStream::connect(self.target).await.map_err(|e| {
-            hopr_lib::errors::HoprLibError::GeneralError(format!(
-                "Could not bridge the incoming session to {target}: {e}"
-            ))
-        })?;
+    async fn process(
+        &self,
+        session: hopr_lib::HoprSession,
+        target: hopr_lib::SessionTarget,
+    ) -> hopr_lib::errors::Result<()> {
+        match target {
+            hopr_lib::SessionTarget::UdpStream(udp_target) => {
+                tracing::debug!("Binding socket to the UDP server {udp_target}...");
+                let bind_addr = std::net::SocketAddr::new(std::net::Ipv4Addr::new(127, 0, 0, 1).into(), 0);
+                let mut udp_bridge =
+                    hopr_network_types::udp::ConnectedUdpStream::bind_and_connect(bind_addr, udp_target)
+                        .await
+                        .map_err(|e| {
+                            hopr_lib::errors::HoprLibError::GeneralError(format!(
+                                "Could not bridge the incoming session to {udp_target}: {e}"
+                            ))
+                        })?;
 
-        tcp_bridge.set_nodelay(true).map_err(|e| {
-            hopr_lib::errors::HoprLibError::GeneralError(format!(
-                "Could not set the TCP_NODELAY option for the bridged session to {target}: {e}",
-            ))
-        })?;
+                tracing::debug!("Bridging the session to the UDP server {udp_target} ...");
+                tokio::task::spawn(async move {
+                    match tokio::io::copy_bidirectional_with_sizes(&mut tokio_util::compat::FuturesAsyncReadCompatExt::compat(session), &mut udp_bridge, hopr_lib::SESSION_USABLE_MTU_SIZE, hopr_lib::SESSION_USABLE_MTU_SIZE).await {
+                        Ok(bound_stream_finished) => tracing::info!("Server bridged session through UDP {udp_target} ended with {bound_stream_finished:?} bytes transferred in both directions."),
+                        Err(e) => tracing::error!("The UDP server stream ({udp_target}) is closed: {e:?}")
+                    }
+                });
 
-        tracing::debug!("Bridging the session to the TCP server {target} ...");
-        tokio::task::spawn(async move {
-            match tokio::io::copy_bidirectional_with_sizes(&mut tokio_util::compat::FuturesAsyncReadCompatExt::compat(session), &mut tcp_bridge, hopr_lib::SESSION_USABLE_MTU_SIZE, hopr_lib::SESSION_USABLE_MTU_SIZE).await {
-                Ok(bound_stream_finished) => tracing::info!("Server bridged session through TCP {target} ended with {bound_stream_finished:?} bytes transferred in both directions."),
-                Err(e) => tracing::error!("The TCP server stream ({target}) is closed: {e:?}")
+                Ok(())
             }
-        });
+            hopr_lib::SessionTarget::TcpStream(tcp_target) => {
+                tracing::debug!("Creating a connection to the TCP server {tcp_target}...");
+                let mut tcp_bridge = tokio::net::TcpStream::connect(tcp_target).await.map_err(|e| {
+                    hopr_lib::errors::HoprLibError::GeneralError(format!(
+                        "Could not bridge the incoming session to {tcp_target}: {e}"
+                    ))
+                })?;
 
-        Ok(())
-    }
-}
+                tcp_bridge.set_nodelay(true).map_err(|e| {
+                    hopr_lib::errors::HoprLibError::GeneralError(format!(
+                        "Could not set the TCP_NODELAY option for the bridged session to {tcp_target}: {e}",
+                    ))
+                })?;
 
-pub struct HoprServerUdpReactor {
-    pub target: std::net::SocketAddr,
-}
+                tracing::debug!("Bridging the session to the TCP server {tcp_target} ...");
+                tokio::task::spawn(async move {
+                    match tokio::io::copy_bidirectional_with_sizes(&mut tokio_util::compat::FuturesAsyncReadCompatExt::compat(session), &mut tcp_bridge, hopr_lib::SESSION_USABLE_MTU_SIZE, hopr_lib::SESSION_USABLE_MTU_SIZE).await {
+                        Ok(bound_stream_finished) => tracing::info!("Server bridged session through TCP {tcp_target} ended with {bound_stream_finished:?} bytes transferred in both directions."),
+                        Err(e) => tracing::error!("The TCP server stream ({tcp_target}) is closed: {e:?}")
+                    }
+                });
 
-#[hopr_lib::async_trait]
-impl hopr_lib::HoprSessionReactor for HoprServerUdpReactor {
-    #[tracing::instrument(level = "debug", skip(self, session))]
-    async fn process(&self, session: hopr_lib::HoprSession) -> hopr_lib::errors::Result<()> {
-        let target = self.target;
-        tracing::debug!("Creating a connection to the UDP server {target}...");
-        let bind_addr = std::net::SocketAddr::new(std::net::Ipv4Addr::new(127, 0, 0, 1).into(), 0);
-        let mut udp_bridge = hopr_network_types::udp::ConnectedUdpStream::bind_and_connect(bind_addr, self.target)
-            .await
-            .map_err(|e| {
-                hopr_lib::errors::HoprLibError::GeneralError(format!(
-                    "Could not bridge the incoming session to {target}: {e}"
-                ))
-            })?;
-
-        tracing::debug!("Bridging the session to the UDP server {target} ...");
-        tokio::task::spawn(async move {
-            match tokio::io::copy_bidirectional_with_sizes(&mut tokio_util::compat::FuturesAsyncReadCompatExt::compat(session), &mut udp_bridge, hopr_lib::SESSION_USABLE_MTU_SIZE, hopr_lib::SESSION_USABLE_MTU_SIZE).await {
-                Ok(bound_stream_finished) => tracing::info!("Server bridged session through UDP {target} ended with {bound_stream_finished:?} bytes transferred in both directions."),
-                Err(e) => tracing::error!("The UDP server stream ({target}) is closed: {e:?}")
+                Ok(())
             }
-        });
-
-        Ok(())
+            hopr_lib::SessionTarget::ExitNode(_) => Err(HoprLibError::GeneralError(
+                "server does not support internal session processing".into(),
+            )),
+        }
     }
 }

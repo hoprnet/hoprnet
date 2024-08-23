@@ -85,8 +85,8 @@ pub use crate::helpers::{IndexerTransportEvent, PeerEligibility, TicketStatistic
 pub use hopr_network_types::prelude::RoutingOptions;
 use hopr_transport_session::initiation::{
     StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation, StartProtocol,
-    StartSessionTarget,
 };
+pub use hopr_transport_session::types::SessionTarget;
 
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
 pub enum HoprTransportProcess {
@@ -227,7 +227,7 @@ async fn handle_start_protocol_message<T>(
     tag: Tag,
     data: Box<[u8]>,
     me: PeerId,
-    new_session_notifier: UnboundedSender<Session>,
+    new_session_notifier: UnboundedSender<(Session, SessionTarget)>,
     message_sender: Arc<helpers::MessageSender<T>>,
     sessions: moka::future::Cache<SessionId, UnboundedSender<Box<[u8]>>>,
     session_initiations: SessionInitiationCache,
@@ -282,7 +282,7 @@ where
                 );
 
                 // Notify that a new session has been created
-                if let Err(e) = new_session_notifier.unbounded_send(session) {
+                if let Err(e) = new_session_notifier.unbounded_send((session, session_req.target)) {
                     warn!("failed to send session to incoming session queue: {e}");
                 }
 
@@ -448,7 +448,7 @@ where
         on_transport_output: UnboundedSender<ApplicationData>,
         on_acknowledged_ticket: UnboundedSender<AcknowledgedTicket>,
         transport_updates: UnboundedReceiver<PeerDiscovery>,
-        new_session_notifier: UnboundedSender<Session>,
+        new_session_notifier: UnboundedSender<(Session, SessionTarget)>,
     ) -> HashMap<HoprTransportProcess, JoinHandle<()>> {
         let mut processes: HashMap<HoprTransportProcess, JoinHandle<()>> = HashMap::new();
 
@@ -729,8 +729,8 @@ where
         let (tag, msg) = StartProtocol::<SessionId>::StartSession(StartInitiation {
             challenge,
             target: match cfg.target_protocol {
-                IpProtocol::TCP => StartSessionTarget::TcpStream(cfg.target),
-                IpProtocol::UDP => StartSessionTarget::UdpStream(cfg.target),
+                IpProtocol::TCP => SessionTarget::TcpStream(cfg.target),
+                IpProtocol::UDP => SessionTarget::UdpStream(cfg.target),
             },
             capabilities: cfg.capabilities.iter().copied().collect(),
             // Back-routing currently uses the same (inverted) route as session initiation

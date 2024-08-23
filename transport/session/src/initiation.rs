@@ -1,6 +1,7 @@
 //! This module defines the Start sub-protocol used for HOPR Session initiation and management.
 
 use crate::errors::TransportSessionError;
+use crate::types::SessionTarget;
 use crate::Capability;
 use hopr_crypto_types::prelude::PeerId;
 use hopr_internal_types::prelude::ApplicationData;
@@ -31,29 +32,14 @@ pub struct StartErrorType {
     pub reason: StartErrorReason,
 }
 
-/// Defines what should happen with the data at the recipient where the
-/// data from the established session are supposed to be forwarded to some `target`.
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum StartSessionTarget {
-    /// Target is running over UDP with the given IP address and port.
-    /// Host names are not supported.
-    UdpStream(std::net::SocketAddr),
-    /// Target is running over TCP with the given address and port.
-    /// Host names are not supported
-    TcpStream(std::net::SocketAddr),
-    /// Target is a service directly at the exit node with a given service ID.
-    ExitNode(u32),
-}
-
 /// The session initiation message of the Start protocol.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct StartInitiation {
     /// Random challenge for this initiation.
     pub challenge: StartChallenge,
-    /// [Target](StartSessionTarget) of the session, i.e., what should the other party do with the traffic.
-    pub target: StartSessionTarget,
+    /// [Target](SessionTarget) of the session, i.e., what should the other party do with the traffic.
+    pub target: SessionTarget,
     /// Capabilities of the session.
     pub capabilities: HashSet<Capability>,
     /// Optional information on back routing from the other party back towards the

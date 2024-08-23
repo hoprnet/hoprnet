@@ -61,6 +61,22 @@ pub const SESSION_USABLE_MTU_SIZE: usize = PAYLOAD_SIZE
 trait AsyncReadWrite: futures::AsyncWrite + futures::AsyncRead + Send {}
 impl<T: futures::AsyncWrite + futures::AsyncRead + Send> AsyncReadWrite for T {}
 
+/// Defines what should happen with the data at the recipient where the
+/// data from the established session are supposed to be forwarded to some `target`.
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum SessionTarget {
+    /// Target is running over UDP with the given IP address and port.
+    /// Host names are not supported.
+    UdpStream(std::net::SocketAddr),
+    /// Target is running over TCP with the given address and port.
+    /// Host names are not supported
+    TcpStream(std::net::SocketAddr),
+    /// Target is a service directly at the exit node with a given service ID.
+    ExitNode(u32),
+}
+
+// TODO: missing docs
 pub struct Session {
     id: SessionId,
     inner: Pin<Box<dyn AsyncReadWrite>>,
