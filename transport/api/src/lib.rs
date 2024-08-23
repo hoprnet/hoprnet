@@ -162,8 +162,8 @@ pub struct HoprTransportConfig {
 /// This function will use the given generator to generate an initial seeding key.
 /// It will check whether the given cache already contains a value for that key and if not,
 /// calls the generator (with the previous value) to generate a new seeding key and retry.
-/// The function either finds a suitable free slot, inserting the `value` or terminates with `None`
-/// when `gen` returns the initial seed again.
+/// The function either finds a suitable free slot, inserting the `value` and returns the found key,
+/// or terminates with `None` when `gen` returns the initial seed again.
 async fn insert_into_next_slot<K, V, F>(cache: &moka::future::Cache<K, V>, gen: F, value: V) -> Option<K>
 where
     K: Copy + std::hash::Hash + Eq + Send + Sync + 'static,
@@ -223,6 +223,7 @@ where
     sessions: moka::future::Cache<SessionId, UnboundedSender<Box<[u8]>>>,
 }
 
+/// Handles session initiation (the Start protocol)
 async fn handle_start_protocol_message<T>(
     tag: Tag,
     data: Box<[u8]>,
@@ -237,6 +238,8 @@ where
 {
     match StartProtocol::<SessionId>::decode(tag, &data)? {
         StartProtocol::StartSession(session_req) => {
+            trace!(challenge = session_req.challenge, "received session initiation request");
+
             // Back-routing information is mandatory until the Return Path is introduced
             let (route, peer) = session_req.back_routing.ok_or(errors::HoprTransportError::Api(
                 "no back-routing information given".into(),
@@ -330,6 +333,10 @@ where
             }
         }
         StartProtocol::SessionEstablished(est) => {
+            trace!(
+                session_id = tracing::field::debug(est.session_id),
+                "received session establishment confirmation"
+            );
             let challenge = est.orig_challenge;
             if let Some(tx_est) = session_initiations.remove(&est.orig_challenge).await {
                 if let Err(e) = tx_est.unbounded_send(Ok(est)) {
@@ -343,7 +350,12 @@ where
             }
         }
         StartProtocol::SessionError(err) => {
-            // Currently, we don't distinguish the error types
+            trace!(
+                challenge = err.challenge,
+                "received error during session initiation: {}",
+                err.reason
+            );
+            // Currently, we don't distinguish between individual error types
             // and just discard the initiation attempt and pass on the error.
             if let Some(tx_est) = session_initiations.remove(&err.challenge).await {
                 if let Err(e) = tx_est.unbounded_send(Err(err)) {
@@ -364,6 +376,10 @@ where
             }
         }
         StartProtocol::CloseSession(session_id) => {
+            trace!(
+                session_id = tracing::field::debug(session_id),
+                "received session close request"
+            );
             if let Some(sender) = sessions.remove(&session_id).await {
                 sender.close_channel();
                 debug!(
@@ -708,15 +724,13 @@ where
     pub async fn new_session(&self, cfg: SessionClientConfig) -> errors::Result<Session> {
         let (tx_initiation_done, rx_initiation_done) = futures::channel::mpsc::unbounded();
 
-        const MIN_CHALLENGE: StartChallenge = 1;
-
         let challenge = insert_into_next_slot(
             &self.session_initiations,
             |ch| {
                 if let Some(challenge) = ch {
-                    ((challenge + 1) % hopr_crypto_random::MAX_RANDOM_INTEGER).max(MIN_CHALLENGE)
+                    ((challenge + 1) % hopr_crypto_random::MAX_RANDOM_INTEGER).max(constants::MIN_CHALLENGE)
                 } else {
-                    hopr_crypto_random::random_integer(MIN_CHALLENGE, None)
+                    hopr_crypto_random::random_integer(constants::MIN_CHALLENGE, None)
                 }
             },
             tx_initiation_done,
@@ -725,7 +739,7 @@ where
         .ok_or(HoprTransportError::Api("all challenge slots are occupied".into()))?; // almost impossible with u64
 
         // Prepare the session initiation message in the Start protocol
-        debug!(challenge, "initiating session with config {cfg:?}");
+        trace!(challenge, "initiating session with config {cfg:?}");
         let (tag, msg) = StartProtocol::<SessionId>::StartSession(StartInitiation {
             challenge,
             target: match cfg.target_protocol {
@@ -781,12 +795,17 @@ where
             )),
             Either::Left((Err(e), _)) => {
                 // The other side didn't allow us to establish a session
-                Err(errors::HoprTransportError::Api(format!(
-                    "exit node didn't allow session initiation with challenge {}: {}",
-                    e.challenge, e.reason
-                )))
+                error!(
+                    challenge = e.challenge,
+                    "the other party rejected the session initiation with error: {}", e.reason
+                );
+                Err(TransportSessionError::Rejected(e.reason).into())
             }
-            Either::Right(_) => Err(errors::HoprTransportError::Api("timeout establishing session".into())),
+            Either::Right(_) => {
+                // Timeout waiting for a session establishment
+                error!(challenge, "session initiation attempt timed out");
+                Err(TransportSessionError::Timeout.into())
+            }
         }
     }
 

@@ -1,6 +1,7 @@
+use hopr_transport_session::initiation::StartChallenge;
 use std::time::Duration;
 
-/// The maximum waiting time for a message send to produce a half key challenge reply
+/// The maximum waiting time for a message send to produce a half-key challenge reply
 pub const PACKET_QUEUE_TIMEOUT_MILLISECONDS: std::time::Duration = std::time::Duration::from_millis(15000);
 
 /// The maximum queue size for the network update events
@@ -25,3 +26,6 @@ pub(crate) const SESSION_INITIATION_TIMEOUT: Duration = Duration::from_secs(3 * 
 
 /// Maximum lifetime of an idle session.
 pub(crate) const SESSION_LIFETIME: Duration = Duration::from_secs(5 * 60);
+
+/// The first challenge value used in Start protocol to initiate a session.
+pub(crate) const MIN_CHALLENGE: StartChallenge = 1;

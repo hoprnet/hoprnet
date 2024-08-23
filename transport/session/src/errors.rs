@@ -1,3 +1,4 @@
+use crate::initiation::StartErrorReason;
 use thiserror::Error;
 
 /// Enumeration of errors thrown from this library.
@@ -20,6 +21,9 @@ pub enum TransportSessionError {
 
     #[error("impossible transport path")]
     Path,
+
+    #[error("the other party rejected session initiation with error: {0}")]
+    Rejected(StartErrorReason),
 
     #[error("session is closed")]
     Closed,

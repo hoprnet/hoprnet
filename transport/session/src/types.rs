@@ -16,6 +16,7 @@ use std::{
     sync::Arc,
     task::Poll,
 };
+use strum::IntoEnumIterator;
 use tracing::error;
 
 /// Unique ID of a specific session.
@@ -93,9 +94,11 @@ impl Session {
         rx: UnboundedReceiver<Box<[u8]>>,
     ) -> Self {
         let inner_session = InnerSession::new(id, me, routing_options.clone(), tx, rx);
-        let avail_caps = HashSet::from_iter([Capability::Retransmission, Capability::Segmentation]);
 
-        if !capabilities.is_disjoint(&avail_caps) {
+        // If we request any capability, we need to use Session protocol
+        if Capability::iter().any(|c| capabilities.contains(&c)) {
+            // In addition, if retransmission is requested,
+            // we need to enable more Session protocol features.
             let mut enabled_features = HashSet::new();
             if capabilities.contains(&Capability::Retransmission) {
                 enabled_features.extend([
@@ -105,6 +108,7 @@ impl Session {
                 ]);
             }
 
+            // TODO: tweak the default Session protocol config
             let cfg = SessionConfig {
                 enabled_features,
                 ..Default::default()
@@ -116,6 +120,7 @@ impl Session {
                 routing_options,
             }
         } else {
+            // Otherwise, no additional sub protocol is necessary
             Self {
                 id,
                 inner: Box::pin(inner_session),
@@ -124,10 +129,12 @@ impl Session {
         }
     }
 
+    /// ID of this Session.
     pub fn id(&self) -> &SessionId {
         &self.id
     }
 
+    /// Routing options used to deliver data.
     pub fn routing_options(&self) -> &RoutingOptions {
         &self.routing_options
     }
