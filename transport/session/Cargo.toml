@@ -13,7 +13,12 @@ crate-type = ["rlib"]
 
 [features]
 default = ["serde"]
-serde = ["dep:serde", "dep:serde_with", "dep:bincode"]
+serde = [
+  "dep:serde",
+  "dep:serde_with",
+  "dep:bincode",
+  "hopr-network-types/serde",
+]
 runtime-async-std = ["hopr-network-types/runtime-async-std"]
 runtime-tokio = ["hopr-network-types/runtime-tokio"]
 
@@ -36,6 +41,7 @@ hopr-internal-types = { workspace = true }
 hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
+anyhow = { workspace = true }
 async-std = { workspace = true }
 hopr-network-types = { workspace = true, features = ["runtime-async-std"] }
 mockall = { workspace = true }

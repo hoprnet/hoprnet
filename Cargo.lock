@@ -4092,10 +4092,10 @@ dependencies = [
  "hickory-resolver",
  "hopr-async-runtime",
  "hopr-crypto-random",
- "hopr-crypto-types",
  "hopr-platform",
  "hopr-primitive-types",
  "lazy_static",
+ "libp2p-identity",
  "parameterized",
  "pin-project",
  "rand 0.8.5",
@@ -4293,6 +4293,7 @@ dependencies = [
 name = "hopr-transport-session"
 version = "0.2.0"
 dependencies = [
+ "anyhow",
  "async-std",
  "async-trait",
  "bincode",

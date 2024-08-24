@@ -1,11 +1,10 @@
-use hopr_crypto_types::prelude::PeerId;
-use std::fmt::{Display, Formatter};
-use std::net::ToSocketAddrs;
-use std::str::FromStr;
-
 use crate::errors::NetworkTypeError;
 use hopr_primitive_types::bounded::{BoundedSize, BoundedVec};
+use libp2p_identity::PeerId;
+use std::fmt::{Display, Formatter};
+use std::str::FromStr;
 
+/// Lists some of the IP protocols.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, strum::Display)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum IpProtocol {
@@ -19,7 +18,7 @@ pub enum IpProtocol {
 ///
 /// This object implements [`std::net::ToSocketAddrs`] which performs automatic
 /// DNS name resolution in case this is a [`IpOrHost::Dns`] instance.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum IpOrHost {
     /// DNS name and port.
@@ -81,7 +80,7 @@ impl IpOrHost {
     /// Tries to resolve the DNS name and returns the first IP address found.
     /// If this enum is already an IP address and port, it will simply return it.
     pub fn resolve_first(self) -> Option<std::net::SocketAddr> {
-        self.to_socket_addrs().ok()?.next()
+        std::net::ToSocketAddrs::to_socket_addrs(&self).ok()?.next()
     }
 
     /// Gets the port number.
@@ -98,6 +97,38 @@ impl IpOrHost {
             IpOrHost::Dns(host, _) => host.clone(),
             IpOrHost::Ip(addr) => addr.ip().to_string(),
         }
+    }
+
+    /// Checks if this instance is a [DNS name](IpOrHost::Dns).
+    pub fn is_dns(&self) -> bool {
+        matches!(self, IpOrHost::Dns(..))
+    }
+
+    /// Checks if this instance is an [IP address](IpOrHost::Ip) and whether it is
+    /// an IPv4 address.
+    ///
+    /// Always returns `false` if this instance is a [DNS name](IpOrHost::Dns),
+    /// i.e.: it does not perform any DNS resolution.
+    pub fn is_ipv4(&self) -> bool {
+        matches!(self, IpOrHost::Ip(addr) if addr.is_ipv4())
+    }
+
+    /// Checks if this instance is an [IP address](IpOrHost::Ip) and whether it is
+    /// an IPv6 address.
+    ///
+    /// Always returns `false` if this instance is a [DNS name](IpOrHost::Dns),
+    /// i.e.: it does not perform any DNS resolution.
+    pub fn is_ipv6(&self) -> bool {
+        matches!(self, IpOrHost::Ip(addr) if addr.is_ipv6())
+    }
+
+    /// Checks if this instance is an [IP address](IpOrHost::Ip) and whether it is
+    /// a loopback address.
+    ///
+    /// Always returns `false` if this instance is a [DNS name](IpOrHost::Dns),
+    /// i.e.: it does not perform any DNS resolution.
+    pub fn is_loopback_ip(&self) -> bool {
+        matches!(self, IpOrHost::Ip(addr) if addr.ip().is_loopback())
     }
 }
 
@@ -123,5 +154,48 @@ impl RoutingOptions {
             RoutingOptions::IntermediatePath(v) => RoutingOptions::IntermediatePath(v.into_iter().rev().collect()),
             _ => self,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use anyhow::anyhow;
+    use std::net::SocketAddr;
+
+    #[test]
+    fn ip_or_host_must_resolve_dns_name() -> anyhow::Result<()> {
+        match IpOrHost::Dns("localhost".to_string(), 1000)
+            .resolve_first()
+            .ok_or(anyhow!("must resolve"))?
+        {
+            SocketAddr::V4(addr) => assert_eq!(addr, "127.0.0.1:1000".parse()?),
+            SocketAddr::V6(addr) => assert_eq!(addr, "::1:1000".parse()?),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn ip_or_host_must_resolve_ip_address() -> anyhow::Result<()> {
+        assert_eq!(
+            IpOrHost::Ip("127.0.0.1:1000".parse()?)
+                .resolve_first()
+                .ok_or(anyhow!("must resolve"))?,
+            "127.0.0.1:1000".parse()?
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn ip_or_host_should_parse_from_string() -> anyhow::Result<()> {
+        assert_eq!(
+            IpOrHost::Dns("some.dns.name.info".into(), 1234),
+            IpOrHost::from_str("some.dns.name.info:1234")?
+        );
+        assert_eq!(
+            IpOrHost::Ip("1.2.3.4:1234".parse()?),
+            IpOrHost::from_str("1.2.3.4:1234")?
+        );
+        Ok(())
     }
 }

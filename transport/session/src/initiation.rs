@@ -113,3 +113,123 @@ impl<'a, T: serde::Serialize + serde::Deserialize<'a>> StartProtocol<T> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::SessionId;
+    use hopr_internal_types::prelude::PAYLOAD_SIZE;
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn start_protocol_start_session_message_should_encode_and_decode() -> anyhow::Result<()> {
+        let msg_1 = StartProtocol::<i32>::StartSession(StartInitiation {
+            challenge: 0,
+            target: SessionTarget::TcpStream("127.0.0.1:1234".parse()?),
+            capabilities: Default::default(),
+            back_routing: Some((
+                RoutingOptions::IntermediatePath(vec![PeerId::random()].try_into()?),
+                PeerId::random(),
+            )),
+        });
+
+        let (tag, msg) = msg_1.clone().encode()?;
+        let msg_2 = StartProtocol::<i32>::decode(tag, &msg)?;
+
+        assert_eq!(msg_1, msg_2);
+        Ok(())
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn start_protocol_session_established_message_should_encode_and_decode() -> anyhow::Result<()> {
+        let msg_1 = StartProtocol::<i32>::SessionEstablished(StartEstablished {
+            orig_challenge: 0,
+            session_id: 10,
+        });
+
+        let (tag, msg) = msg_1.clone().encode()?;
+        let msg_2 = StartProtocol::<i32>::decode(tag, &msg)?;
+
+        assert_eq!(msg_1, msg_2);
+        Ok(())
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn start_protocol_session_error_message_should_encode_and_decode() -> anyhow::Result<()> {
+        let msg_1 = StartProtocol::<i32>::SessionError(StartErrorType {
+            challenge: 10,
+            reason: StartErrorReason::NoSlotsAvailable,
+        });
+
+        let (tag, msg) = msg_1.clone().encode()?;
+        let msg_2 = StartProtocol::<i32>::decode(tag, &msg)?;
+
+        assert_eq!(msg_1, msg_2);
+        Ok(())
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn start_protocol_close_session_message_should_encode_and_decode() -> anyhow::Result<()> {
+        let msg_1 = StartProtocol::<i32>::CloseSession(10);
+
+        let (tag, msg) = msg_1.clone().encode()?;
+        let msg_2 = StartProtocol::<i32>::decode(tag, &msg)?;
+
+        assert_eq!(msg_1, msg_2);
+        Ok(())
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn start_protocol_messages_must_fit_within_hopr_packet() -> anyhow::Result<()> {
+        let msg = StartProtocol::<i32>::StartSession(StartInitiation {
+            challenge: StartChallenge::MAX,
+            target: SessionTarget::TcpStream(
+                "example-of-a-very-very-long-second-level-name.on-a-very-very-long-domain-name.info:65530".parse()?,
+            ),
+            capabilities: HashSet::from_iter([Capability::Retransmission, Capability::Segmentation]),
+            back_routing: Some((
+                RoutingOptions::IntermediatePath(
+                    vec![PeerId::random(), PeerId::random(), PeerId::random()].try_into()?,
+                ),
+                PeerId::random(),
+            )),
+        });
+
+        assert!(
+            msg.encode()?.1.len() <= PAYLOAD_SIZE,
+            "StartSession must fit within {PAYLOAD_SIZE}"
+        );
+
+        let msg = StartProtocol::SessionEstablished(StartEstablished {
+            orig_challenge: StartChallenge::MAX,
+            session_id: SessionId::new(u16::MAX, PeerId::random()),
+        });
+
+        assert!(
+            msg.encode()?.1.len() <= PAYLOAD_SIZE,
+            "SessionEstablished must fit within {PAYLOAD_SIZE}"
+        );
+
+        let msg = StartProtocol::<i32>::SessionError(StartErrorType {
+            challenge: StartChallenge::MAX,
+            reason: StartErrorReason::NoSlotsAvailable,
+        });
+
+        assert!(
+            msg.encode()?.1.len() <= PAYLOAD_SIZE,
+            "SessionError must fit within {PAYLOAD_SIZE}"
+        );
+
+        let msg = StartProtocol::CloseSession(SessionId::new(u16::MAX, PeerId::random()));
+        assert!(
+            msg.encode()?.1.len() <= PAYLOAD_SIZE,
+            "CloseSession must fit within {PAYLOAD_SIZE}"
+        );
+
+        Ok(())
+    }
+}

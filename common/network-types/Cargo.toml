@@ -10,7 +10,7 @@ license = "GPL-3.0-only"
 
 [features]
 default = []
-serde = ["dep:serde", "dep:serde_bytes"]
+serde = ["dep:serde", "dep:serde_bytes", "libp2p-identity/serde"]
 runtime-async-std = ["hopr-async-runtime/runtime-async-std"]
 runtime-tokio = [
   "dep:tokio",
@@ -27,6 +27,7 @@ futures = { workspace = true }
 governor = "0.6.3"
 hex = { workspace = true }
 hickory-resolver = "0.24.1"
+libp2p-identity = { workspace = true }
 pin-project = "1.1"
 rand = { workspace = true }
 rand_distr = "0.4.3"
@@ -43,10 +44,9 @@ tracing = { workspace = true }
 hopr-platform = { workspace = true }
 hopr-primitive-types = { workspace = true }
 hopr-async-runtime = { workspace = true }
-hopr-crypto-types = { workspace = true }
 
 [dev-dependencies]
-anyhow = "1.0"
+anyhow = { workspace = true }
 async-std = { workspace = true, features = ["attributes", "unstable"] }
 async-stream = { workspace = true }
 ctor = "0.2.8"

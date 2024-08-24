@@ -50,6 +50,50 @@ impl<const B: usize> TryFrom<usize> for BoundedSize<B> {
     }
 }
 
+impl<const B: usize> TryFrom<i8> for BoundedSize<B> {
+    type Error = GeneralError;
+
+    fn try_from(value: i8) -> Result<Self, Self::Error> {
+        Self::try_from(value as isize)
+    }
+}
+
+impl<const B: usize> TryFrom<i16> for BoundedSize<B> {
+    type Error = GeneralError;
+
+    fn try_from(value: i16) -> Result<Self, Self::Error> {
+        Self::try_from(value as isize)
+    }
+}
+
+impl<const B: usize> TryFrom<i32> for BoundedSize<B> {
+    type Error = GeneralError;
+
+    fn try_from(value: i32) -> Result<Self, Self::Error> {
+        Self::try_from(value as isize)
+    }
+}
+
+impl<const B: usize> TryFrom<i64> for BoundedSize<B> {
+    type Error = GeneralError;
+
+    fn try_from(value: i64) -> Result<Self, Self::Error> {
+        Self::try_from(value as isize)
+    }
+}
+
+impl<const B: usize> TryFrom<isize> for BoundedSize<B> {
+    type Error = GeneralError;
+
+    fn try_from(value: isize) -> Result<Self, Self::Error> {
+        if value >= 0 {
+            Self::try_from(value as usize)
+        } else {
+            Err(GeneralError::InvalidInput)
+        }
+    }
+}
+
 impl<const B: usize> Display for BoundedSize<B> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
@@ -147,5 +191,29 @@ impl<T: Default + Copy, const N: usize> From<BoundedVec<T, N>> for [T; N] {
         let mut out = [T::default(); N];
         value.0.into_iter().enumerate().for_each(|(i, e)| out[i] = e);
         out
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::bounded::{BoundedSize, BoundedVec};
+
+    #[test]
+    fn bounded_size_should_not_allow_bigger_numbers() {
+        assert!(BoundedSize::<10>::try_from(5).is_ok_and(|b| u8::from(b) == 5));
+        assert!(BoundedSize::<10>::try_from(11).is_err());
+    }
+
+    #[test]
+    fn bounded_vec_should_not_fit_more_than_allowed() {
+        assert!(BoundedVec::<i32, 3>::try_from(vec![]).is_ok_and(|b| Vec::from(b).is_empty()));
+        assert!(BoundedVec::<i32, 3>::try_from(vec![1, 2]).is_ok_and(|b| Vec::from(b) == vec![1, 2]));
+        assert!(BoundedVec::<i32, 3>::try_from(vec![1, 2, 3]).is_ok_and(|b| Vec::from(b) == vec![1, 2, 3]));
+        assert!(BoundedVec::<i32, 3>::try_from(vec![1, 2, 3, 4]).is_err());
+
+        assert_eq!(
+            vec![1, 2, 3],
+            Vec::from(BoundedVec::<i32, 3>::from_iter(vec![1, 2, 3, 4]))
+        );
     }
 }

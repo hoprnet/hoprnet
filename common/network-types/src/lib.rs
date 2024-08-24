@@ -18,4 +18,6 @@ pub mod prelude {
     pub use crate::udp::*;
 
     pub use crate::types::*;
+
+    pub use libp2p_identity::PeerId;
 }

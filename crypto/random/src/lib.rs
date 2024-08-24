@@ -1,10 +1,10 @@
-//! This Rust crate contains implementation common random number generation functions.
+//! This Rust crate contains implementation of common random number generation functions.
 //! All functions and types from this crate supply cryptographically secure random numbers.
 //!
 //! Instead of relying on external crates, all HOPR crates in this monorepo should
 //! exclusively rely on randomness functions only from this crate.
-//! Besides that, the `OsRng` type exported from this crate can be used, if a type implementing
-//! random traits is needed.
+//! Besides that, the `OsRng` type exported from this crate can be used if a type implementing
+//! random traits is necessary.
 
 use generic_array::{ArrayLength, GenericArray};
 
@@ -36,36 +36,13 @@ pub fn random_integer(start: u64, end: Option<u64>) -> u64 {
     start + OsRng.gen_range(0..bound)
 }
 
-/// Generates a random unsigned integer via [`random_integer`] and increments it by one
-/// until the given `filter` is satisfied.
-/// If a satisfying number is found, it is guaranteed
-/// to be within 0 <= `start` < `end` <= `MAX_RANDOM_INTEGER`.
-pub fn random_integer_with<F>(start: u64, end: Option<u64>, filter: F) -> Option<u64>
-where
-    F: Fn(u64) -> bool,
-{
-    let real_end = end.unwrap_or(MAX_RANDOM_INTEGER);
-    let initial = random_integer(start, end);
-    let mut next = initial;
-    loop {
-        if filter(next) {
-            return Some(next);
-        } else {
-            next = ((next + 1) % real_end).max(start);
-            if initial == next {
-                return None;
-            }
-        }
-    }
-}
-
 /// Fills the specific number of bytes starting from the given offset in the given buffer.
 #[inline]
 pub fn random_fill(buffer: &mut [u8]) {
     OsRng.fill_bytes(buffer);
 }
 
-/// Allocates array of the given size and fills it with random bytes
+/// Allocates an array of the given size and fills it with random bytes
 pub fn random_bytes<const T: usize>() -> [u8; T] {
     let mut ret = [0u8; T];
     random_fill(&mut ret);
@@ -100,7 +77,7 @@ mod tests {
     #[test]
     fn test_random_fill() {
         let mut buffer = [0u8; 10];
-        // 7 bytes with indices 2,3,4,5,6,7,8 will be filled with random bytes, other stay zero
+        // 7 bytes with indices 2,3,4,5,6,7,8 will be filled with random bytes, the other stay zero
         random_fill(&mut buffer[2..9]);
         assert_eq!(0, buffer[0]);
         assert_eq!(0, buffer[1]);
