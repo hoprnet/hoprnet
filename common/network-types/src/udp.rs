@@ -2,18 +2,34 @@ use std::io::Error;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use tokio::io::ReadBuf;
-use tokio::net::{ToSocketAddrs, UdpSocket};
+use tokio::net::UdpSocket;
 
 pub struct ConnectedUdpStream {
     sock: UdpSocket,
+    counterparty: Option<std::net::SocketAddr>,
     closed: bool,
 }
 
 impl ConnectedUdpStream {
-    pub async fn bind_and_connect<A: ToSocketAddrs>(bind: A, connect: A) -> tokio::io::Result<Self> {
-        let sock = UdpSocket::bind(bind).await?;
-        sock.connect(connect).await?;
-        Ok(Self { sock, closed: false })
+    pub async fn bind<A: tokio::net::ToSocketAddrs>(bind: A) -> tokio::io::Result<Self> {
+        Ok(Self {
+            sock: UdpSocket::bind(bind).await?,
+            counterparty: None,
+            closed: false,
+        })
+    }
+
+    pub fn counterparty(&self) -> &Option<std::net::SocketAddr> {
+        &self.counterparty
+    }
+
+    pub fn with_counterparty(mut self, counterparty: std::net::SocketAddr) -> tokio::io::Result<Self> {
+        if self.counterparty.is_none() {
+            self.counterparty = Some(counterparty);
+            Ok(self)
+        } else {
+            Err(Error::other("counterparty already set"))
+        }
     }
 
     pub fn socket(&self) -> &UdpSocket {
@@ -22,15 +38,35 @@ impl ConnectedUdpStream {
 }
 
 impl tokio::io::AsyncRead for ConnectedUdpStream {
-    fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut ReadBuf<'_>) -> Poll<std::io::Result<()>> {
-        self.sock.poll_recv(cx, buf)
+    fn poll_read(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut ReadBuf<'_>) -> Poll<std::io::Result<()>> {
+        match self.sock.poll_recv_from(cx, buf) {
+            Poll::Ready(Ok(read_addr)) => match self.counterparty {
+                Some(addr) if addr == read_addr => Poll::Ready(Ok(())),
+                Some(addr) => {
+                    buf.clear();
+                    Poll::Ready(Err(Error::other(format!(
+                        "expected data from {addr}, got from {read_addr}"
+                    ))))
+                }
+                None => {
+                    self.counterparty = Some(read_addr);
+                    Poll::Ready(Ok(()))
+                }
+            },
+            Poll::Ready(Err(e)) => Poll::Ready(Err(e)),
+            Poll::Pending => Poll::Pending,
+        }
     }
 }
 
 impl tokio::io::AsyncWrite for ConnectedUdpStream {
     fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<Result<usize, Error>> {
         if !self.closed {
-            self.sock.poll_send(cx, buf)
+            if let Some(counterparty) = self.counterparty {
+                self.sock.poll_send_to(cx, buf, counterparty)
+            } else {
+                Poll::Ready(Err(Error::other("cannot send, counterparty address not set")))
+            }
         } else {
             Poll::Ready(Ok(0))
         }
@@ -72,9 +108,10 @@ mod tests {
             }
         });
 
-        let mut stream = ConnectedUdpStream::bind_and_connect("127.0.0.1:0".parse()?, listen_addr)
+        let mut stream = ConnectedUdpStream::bind(("127.0.0.1", 0))
             .await
-            .context("connection")?;
+            .context("connection")?
+            .with_counterparty(listen_addr)?;
 
         for _ in 1..10 {
             let mut w_buf = [0u8; DATA_SIZE];

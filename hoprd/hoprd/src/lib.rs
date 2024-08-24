@@ -87,6 +87,7 @@
 //! ```
 
 use hopr_lib::errors::HoprLibError;
+use std::net::ToSocketAddrs;
 
 pub mod cli;
 pub mod config;
@@ -108,19 +109,23 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
         match target {
             hopr_lib::SessionTarget::UdpStream(udp_target) => {
                 tracing::debug!("Binding socket to the UDP server {udp_target}...");
-                let bind_addr = std::net::SocketAddr::new(std::net::Ipv4Addr::new(127, 0, 0, 1).into(), 0);
-                let udp_target = udp_target
+
+                // In UDP, it is impossible to determine if the target is viable,
+                // so we just take the first resolved address.
+                let resolved_udp_target = udp_target
+                    .clone()
                     .resolve_first()
                     .ok_or(HoprLibError::GeneralError("failed to resolve DNS name".into()))?;
+                tracing::debug!("UDP target {udp_target} resolved to {resolved_udp_target}");
 
-                let mut udp_bridge =
-                    hopr_network_types::udp::ConnectedUdpStream::bind_and_connect(bind_addr, udp_target)
-                        .await
-                        .map_err(|e| {
-                            HoprLibError::GeneralError(format!(
-                                "Could not bridge the incoming session to {udp_target}: {e}"
-                            ))
-                        })?;
+                let mut udp_bridge = hopr_network_types::udp::ConnectedUdpStream::bind(("127.0.0.1", 0))
+                    .await
+                    .and_then(|s| s.with_counterparty(resolved_udp_target))
+                    .map_err(|e| {
+                        HoprLibError::GeneralError(format!(
+                            "Could not bridge the incoming session to {udp_target}: {e}"
+                        ))
+                    })?;
 
                 tracing::debug!("Bridging the session to the UDP server {udp_target} ...");
                 tokio::task::spawn(async move {
@@ -134,12 +139,22 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
             }
             hopr_lib::SessionTarget::TcpStream(tcp_target) => {
                 tracing::debug!("Creating a connection to the TCP server {tcp_target}...");
-                let tcp_target = tcp_target
-                    .resolve_first()
-                    .ok_or(HoprLibError::GeneralError("failed to resolve DNS name".into()))?;
-                let mut tcp_bridge = tokio::net::TcpStream::connect(tcp_target).await.map_err(|e| {
-                    HoprLibError::GeneralError(format!("Could not bridge the incoming session to {tcp_target}: {e}"))
-                })?;
+
+                // TCP is able to determine which of the resolved multiple addresses is viable,
+                // and therefore we can pass all of them.
+                let resolved_tcp_targets = tcp_target
+                    .to_socket_addrs()
+                    .map_err(|e| HoprLibError::GeneralError(format!("failed to resolve DNS name: {e}")))?
+                    .collect::<Vec<_>>();
+                tracing::debug!("TCP target {tcp_target} resolved to {resolved_tcp_targets:?}");
+
+                let mut tcp_bridge = tokio::net::TcpStream::connect(resolved_tcp_targets.as_slice())
+                    .await
+                    .map_err(|e| {
+                        HoprLibError::GeneralError(format!(
+                            "Could not bridge the incoming session to {tcp_target}: {e}"
+                        ))
+                    })?;
 
                 tcp_bridge.set_nodelay(true).map_err(|e| {
                     HoprLibError::GeneralError(format!(

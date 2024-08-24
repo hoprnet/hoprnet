@@ -4369,6 +4369,7 @@ dependencies = [
  "hopr-crypto-types",
  "hopr-lib",
  "hopr-metrics",
+ "hopr-network-types",
  "hopr-transport-session",
  "hoprd-inbox",
  "hyper 1.4.1",
