@@ -61,4 +61,5 @@ hopr-network-types = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 
 [dev-dependencies]
+anyhow = { workspace = true }
 hopr-transport-session = { workspace = true }

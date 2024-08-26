@@ -4,25 +4,43 @@ use std::task::{Context, Poll};
 use tokio::io::ReadBuf;
 use tokio::net::UdpSocket;
 
+/// Mimics TCP-like stream functionality on a UDP socket by restricting it to a single
+/// counterparty and implements [`tokio::io::AsyncRead`] and [`tokio::io::AsyncWrite`].
+///
+/// To set a counterparty, one of the following must happen:
+/// 1) setting it via [`with_counterparty`](ConnectedUdpStream::with_counterparty) after binding
+/// 2) receiving some data from the other side.
+///
+/// Whatever of the above happens first, sets the counterparty.
+/// Once the counterparty is set, all data sent and received will be sent or filtered by this
+/// counterparty address.
+///
+/// If data from another party is received, an error is raised, unless the object has been constructed
+/// with [`with_foreign_data_discarding`](ConnectedUdpStream::with_foreign_data_discarding) setting.
 pub struct ConnectedUdpStream {
     sock: UdpSocket,
     counterparty: Option<std::net::SocketAddr>,
     closed: bool,
+    discard_foreign: bool,
 }
 
 impl ConnectedUdpStream {
+    /// Binds the UDP socket to the given address, without an assigned counterparty.
     pub async fn bind<A: tokio::net::ToSocketAddrs>(bind: A) -> tokio::io::Result<Self> {
         Ok(Self {
             sock: UdpSocket::bind(bind).await?,
             counterparty: None,
             closed: false,
+            discard_foreign: false,
         })
     }
 
+    /// Counterparty this instance is connected to, if yet any.
     pub fn counterparty(&self) -> &Option<std::net::SocketAddr> {
         &self.counterparty
     }
 
+    /// Sets the counterparty and returns a new instance.
     pub fn with_counterparty(mut self, counterparty: std::net::SocketAddr) -> tokio::io::Result<Self> {
         if self.counterparty.is_none() {
             self.counterparty = Some(counterparty);
@@ -32,6 +50,13 @@ impl ConnectedUdpStream {
         }
     }
 
+    /// Enables discarding of data received from other counterparties and returns a new instance.
+    pub fn with_foreign_data_discarding(mut self) -> Self {
+        self.discard_foreign = true;
+        self
+    }
+
+    /// Inner UDP socket.
     pub fn socket(&self) -> &UdpSocket {
         &self.sock
     }
@@ -44,9 +69,13 @@ impl tokio::io::AsyncRead for ConnectedUdpStream {
                 Some(addr) if addr == read_addr => Poll::Ready(Ok(())),
                 Some(addr) => {
                     buf.clear();
-                    Poll::Ready(Err(Error::other(format!(
-                        "expected data from {addr}, got from {read_addr}"
-                    ))))
+                    if self.discard_foreign {
+                        Poll::Pending
+                    } else {
+                        Poll::Ready(Err(Error::other(format!(
+                            "expected data from {addr}, got from {read_addr}"
+                        ))))
+                    }
                 }
                 None => {
                     self.counterparty = Some(read_addr);

@@ -5,16 +5,16 @@ use axum::{
     http::status::StatusCode,
     response::IntoResponse,
 };
-use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, DisplayFromStr};
-
-use crate::{ApiErrorStatus, InternalState, BASE_PATH};
 use hopr_lib::errors::HoprLibError;
 use hopr_lib::{HoprSession, IpProtocol, PeerId, RoutingOptions, SessionCapability, SessionClientConfig};
 use hopr_network_types::prelude::ConnectedUdpStream;
+use serde::{Deserialize, Serialize};
+use serde_with::{serde_as, DisplayFromStr};
 use tokio::net::{TcpListener, ToSocketAddrs};
 use tokio_util::compat::FuturesAsyncReadCompatExt;
-use tracing::{error, info};
+use tracing::{debug, error, info};
+
+use crate::{ApiErrorStatus, InternalState, BASE_PATH};
 
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
@@ -122,7 +122,21 @@ pub(crate) async fn create_client(
                 )
             })?;
 
-            tokio::task::spawn(bind_session_to_connection(session, tcp_listener));
+            tokio::task::spawn(async move {
+                match tcp_listener.accept().await {
+                    Ok((stream, sock_addr)) => {
+                        debug!(
+                            session_id = tracing::field::debug(*session.id()),
+                            "accepted incoming TCP connection from {sock_addr}"
+                        );
+                        bind_session_to_stream(session, stream).await
+                    }
+                    Err(e) => error!(
+                        session_id = tracing::field::debug(*session.id()),
+                        "failed to accept connection: {e}"
+                    ),
+                }
+            });
 
             Ok::<_, (StatusCode, ApiErrorStatus)>(
                 (StatusCode::OK, Json(SessionClientResponse { port })).into_response(),
@@ -136,7 +150,7 @@ pub(crate) async fn create_client(
                 )
             })?;
 
-            tokio::task::spawn(bind_session_to_udp_stream(session, udp_socket));
+            tokio::task::spawn(bind_session_to_stream(session, udp_socket));
 
             Ok::<_, (StatusCode, ApiErrorStatus)>(
                 (StatusCode::OK, Json(SessionClientResponse { port })).into_response(),
@@ -157,24 +171,14 @@ async fn udp_bind_to<A: ToSocketAddrs>(address: A) -> std::io::Result<(u16, Conn
     Ok((udp_socket.socket().local_addr()?.port(), udp_socket))
 }
 
-async fn bind_session_to_connection(session: HoprSession, tcp_listener: TcpListener) {
-    let session_id = *session.id();
-    match tcp_listener.accept().await {
-        Ok((mut tcp_stream, _sock_addr)) => match tokio::io::copy_bidirectional_with_sizes(&mut session.compat(), &mut tcp_stream, hopr_lib::SESSION_USABLE_MTU_SIZE, hopr_lib::SESSION_USABLE_MTU_SIZE).await {
-            Ok(bound_stream_finished) => info!(
-                "Client session {session_id} ended with {bound_stream_finished:?} bytes transferred in both directions.",
-            ),
-            Err(e) => error!("Failed to bind the TCP stream to session {session_id}: {e}"),
-        },
-        Err(e) => error!("Failed to accept connection: {e}"),
-    }
-}
-
-async fn bind_session_to_udp_stream(session: HoprSession, mut udp_stream: ConnectedUdpStream) {
+async fn bind_session_to_stream<T>(session: HoprSession, mut stream: T)
+where
+    T: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
+{
     let session_id = *session.id();
     match tokio::io::copy_bidirectional_with_sizes(
         &mut session.compat(),
-        &mut udp_stream,
+        &mut stream,
         hopr_lib::SESSION_USABLE_MTU_SIZE,
         hopr_lib::SESSION_USABLE_MTU_SIZE,
     )
@@ -183,13 +187,14 @@ async fn bind_session_to_udp_stream(session: HoprSession, mut udp_stream: Connec
         Ok(bound_stream_finished) => info!(
             "Client session {session_id} ended with {bound_stream_finished:?} bytes transferred in both directions.",
         ),
-        Err(e) => error!("Failed to bind the TCP stream to session {session_id}: {e}"),
+        Err(e) => error!("Failed to bind the stream to session {session_id}: {e}"),
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use anyhow::Context;
     use futures::channel::mpsc::UnboundedSender;
     use hopr_lib::{ApplicationData, Keypair, PeerId, SendMsg};
     use hopr_transport_session::errors::TransportSessionError;
@@ -228,35 +233,83 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn hoprd_session_connection_should_create_a_working_socket_through_which_data_can_be_sent_and_received() {
+    async fn hoprd_session_connection_should_create_a_working_tcp_socket_through_which_data_can_be_sent_and_received(
+    ) -> anyhow::Result<()> {
         let (tx, rx) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
 
         let peer: hopr_lib::PeerId = hopr_lib::HoprOffchainKeypair::random().public().into();
         let session = hopr_lib::HoprSession::new(
             hopr_lib::HoprSessionId::new(4567, peer),
             peer,
-            hopr_lib::RoutingOptions::IntermediatePath(Default::default()),
+            RoutingOptions::IntermediatePath(Default::default()),
             HashSet::default(),
             Arc::new(SendMsgResender::new(tx)),
             rx,
         );
 
-        let (port, tcp_listener) = tcp_listen_on(("127.0.0.1", 0)).await.expect("listen_on succeeded");
-        tokio::task::spawn(bind_session_to_connection(session, tcp_listener));
+        let (port, tcp_listener) = tcp_listen_on(("127.0.0.1", 0)).await.context("listen_on failed")?;
+
+        tokio::task::spawn(async move {
+            match tcp_listener.accept().await {
+                Ok((stream, _)) => bind_session_to_stream(session, stream).await,
+                Err(e) => error!("failed to accept connection: {e}"),
+            }
+        });
 
         let mut tcp_stream = tokio::net::TcpStream::connect(format!("127.0.0.1:{port}"))
             .await
-            .unwrap();
+            .context("connect failed")?;
 
         let data = vec![b"hello", b"world", b"this ", b"is   ", b"    a", b" test"];
 
         for d in data.clone().into_iter() {
-            tcp_stream.write_all(d).await.unwrap();
+            tcp_stream.write_all(d).await.context("write failed")?;
         }
 
         for d in data.iter() {
             let mut buf = vec![0; d.len()];
-            tcp_stream.read_exact(&mut buf).await.unwrap();
+            tcp_stream.read_exact(&mut buf).await.context("read failed")?;
         }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn hoprd_session_connection_should_create_a_working_udp_socket_through_which_data_can_be_sent_and_received(
+    ) -> anyhow::Result<()> {
+        let (tx, rx) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
+
+        let peer: hopr_lib::PeerId = hopr_lib::HoprOffchainKeypair::random().public().into();
+        let session = hopr_lib::HoprSession::new(
+            hopr_lib::HoprSessionId::new(4567, peer),
+            peer,
+            RoutingOptions::IntermediatePath(Default::default()),
+            HashSet::default(),
+            Arc::new(SendMsgResender::new(tx)),
+            rx,
+        );
+
+        let (_, udp_listener) = udp_bind_to(("127.0.0.1", 0)).await.context("udp_bind_to failed")?;
+
+        let listen_addr = udp_listener.socket().local_addr()?;
+        tokio::task::spawn(bind_session_to_stream(session, udp_listener));
+
+        let mut tcp_stream = ConnectedUdpStream::bind(("127.0.0.1", 0))
+            .await
+            .context("bind failed")?
+            .with_counterparty(listen_addr)?;
+
+        let data = vec![b"hello", b"world", b"this ", b"is   ", b"    a", b" test"];
+
+        for d in data.clone().into_iter() {
+            tcp_stream.write_all(d).await.context("write failed")?;
+        }
+
+        for d in data.iter() {
+            let mut buf = vec![0; d.len()];
+            tcp_stream.read_exact(&mut buf).await.context("read failed")?;
+        }
+
+        Ok(())
     }
 }
