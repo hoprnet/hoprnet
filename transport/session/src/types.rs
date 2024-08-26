@@ -185,12 +185,12 @@ impl futures::AsyncWrite for Session {
         pin_mut!(inner);
         match inner.poll_close(cx) {
             Poll::Ready(res) => {
-                // Notify about closure if needed
+                // Notify about closure if desired
                 if let Some(notifier) = self.shutdown_notifier.take() {
                     if let Err(err) = notifier.unbounded_send((self.id, self.routing_options.clone())) {
                         error!(
                             session_id = tracing::field::debug(self.id),
-                            "failed to notify session closure {err}"
+                            "failed to notify session closure: {err}"
                         );
                     }
                 }

@@ -93,8 +93,6 @@ pub mod cli;
 pub mod config;
 pub mod errors;
 
-pub const LISTENING_SESSION_RETRANSMISSION_SERVER_PORT: u16 = 4677;
-
 #[derive(Debug, Clone)]
 pub struct HoprServerIpForwardingReactor;
 
@@ -108,14 +106,17 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
     ) -> hopr_lib::errors::Result<()> {
         match target {
             hopr_lib::SessionTarget::UdpStream(udp_target) => {
-                tracing::debug!("Binding socket to the UDP server {udp_target}...");
+                tracing::debug!("binding socket to the UDP server {udp_target}...");
 
                 // In UDP, it is impossible to determine if the target is viable,
                 // so we just take the first resolved address.
-                let resolved_udp_target = udp_target
-                    .clone()
-                    .resolve_first()
-                    .ok_or(HoprLibError::GeneralError("failed to resolve DNS name".into()))?;
+                let resolved_udp_target =
+                    udp_target
+                        .clone()
+                        .resolve_first()
+                        .ok_or(HoprLibError::GeneralError(format!(
+                            "failed to resolve DNS name {udp_target}"
+                        )))?;
                 tracing::debug!("UDP target {udp_target} resolved to {resolved_udp_target}");
 
                 let mut udp_bridge = hopr_network_types::udp::ConnectedUdpStream::bind(("127.0.0.1", 0))
@@ -123,28 +124,28 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                     .and_then(|s| s.with_counterparty(resolved_udp_target))
                     .map_err(|e| {
                         HoprLibError::GeneralError(format!(
-                            "Could not bridge the incoming session to {udp_target}: {e}"
+                            "could not bridge the incoming session to {udp_target}: {e}"
                         ))
                     })?;
 
                 tracing::debug!("Bridging the session to the UDP server {udp_target} ...");
                 tokio::task::spawn(async move {
                     match tokio::io::copy_bidirectional_with_sizes(&mut tokio_util::compat::FuturesAsyncReadCompatExt::compat(session), &mut udp_bridge, hopr_lib::SESSION_USABLE_MTU_SIZE, hopr_lib::SESSION_USABLE_MTU_SIZE).await {
-                        Ok(bound_stream_finished) => tracing::info!("Server bridged session through UDP {udp_target} ended with {bound_stream_finished:?} bytes transferred in both directions."),
-                        Err(e) => tracing::error!("The UDP server stream ({udp_target}) is closed: {e:?}")
+                        Ok(bound_stream_finished) => tracing::info!("server bridged session through UDP {udp_target} ended with {bound_stream_finished:?} bytes transferred in both directions."),
+                        Err(e) => tracing::error!("UDP server stream ({udp_target}) is closed: {e:?}")
                     }
                 });
 
                 Ok(())
             }
             hopr_lib::SessionTarget::TcpStream(tcp_target) => {
-                tracing::debug!("Creating a connection to the TCP server {tcp_target}...");
+                tracing::debug!("creating a connection to the TCP server {tcp_target}...");
 
                 // TCP is able to determine which of the resolved multiple addresses is viable,
                 // and therefore we can pass all of them.
                 let resolved_tcp_targets = tcp_target
                     .to_socket_addrs()
-                    .map_err(|e| HoprLibError::GeneralError(format!("failed to resolve DNS name: {e}")))?
+                    .map_err(|e| HoprLibError::GeneralError(format!("failed to resolve DNS name {tcp_target}: {e}")))?
                     .collect::<Vec<_>>();
                 tracing::debug!("TCP target {tcp_target} resolved to {resolved_tcp_targets:?}");
 
@@ -152,21 +153,21 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                     .await
                     .map_err(|e| {
                         HoprLibError::GeneralError(format!(
-                            "Could not bridge the incoming session to {tcp_target}: {e}"
+                            "could not bridge the incoming session to {tcp_target}: {e}"
                         ))
                     })?;
 
                 tcp_bridge.set_nodelay(true).map_err(|e| {
                     HoprLibError::GeneralError(format!(
-                        "Could not set the TCP_NODELAY option for the bridged session to {tcp_target}: {e}",
+                        "could not set the TCP_NODELAY option for the bridged session to {tcp_target}: {e}",
                     ))
                 })?;
 
-                tracing::debug!("Bridging the session to the TCP server {tcp_target} ...");
+                tracing::debug!("bridging the session to the TCP server {tcp_target} ...");
                 tokio::task::spawn(async move {
                     match tokio::io::copy_bidirectional_with_sizes(&mut tokio_util::compat::FuturesAsyncReadCompatExt::compat(session), &mut tcp_bridge, hopr_lib::SESSION_USABLE_MTU_SIZE, hopr_lib::SESSION_USABLE_MTU_SIZE).await {
                         Ok(bound_stream_finished) => tracing::info!("Server bridged session through TCP {tcp_target} ended with {bound_stream_finished:?} bytes transferred in both directions."),
-                        Err(e) => tracing::error!("The TCP server stream ({tcp_target}) is closed: {e:?}")
+                        Err(e) => tracing::error!("TCP server stream ({tcp_target}) is closed: {e:?}")
                     }
                 });
 

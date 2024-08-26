@@ -427,7 +427,7 @@ where
                 ),
                 Err(e) => error!(
                     session_id = tracing::field::debug(session_id),
-                    "session could not be closed: {e}"
+                    "session could not be closed on other party's request: {e}"
                 ),
             }
         }
@@ -648,7 +648,7 @@ where
                         {
                             Ok(_) => debug!(
                                 session_id = tracing::field::debug(closed_session_id),
-                                "session closed by us"
+                                "session has been closed by us"
                             ),
                             Err(e) => error!(
                                 session_id = tracing::field::debug(closed_session_id),
