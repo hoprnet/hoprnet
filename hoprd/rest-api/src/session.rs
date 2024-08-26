@@ -245,6 +245,7 @@ mod tests {
             HashSet::default(),
             Arc::new(SendMsgResender::new(tx)),
             rx,
+            None,
         );
 
         let (port, tcp_listener) = tcp_listen_on(("127.0.0.1", 0)).await.context("listen_on failed")?;
@@ -287,6 +288,7 @@ mod tests {
             HashSet::default(),
             Arc::new(SendMsgResender::new(tx)),
             rx,
+            None,
         );
 
         let (_, udp_listener) = udp_bind_to(("127.0.0.1", 0)).await.context("udp_bind_to failed")?;

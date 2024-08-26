@@ -57,7 +57,11 @@ use hopr_transport_protocol::{
         AwaitingAggregator, TicketAggregationActions, TicketAggregationInteraction, TicketAggregatorTrait,
     },
 };
-use hopr_transport_session::IpProtocol;
+use hopr_transport_session::{
+    initiation::{StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation, StartProtocol},
+    IpProtocol,
+};
+
 pub use {
     core_network::network::{Health, Network, NetworkTriggeredEvent, PeerOrigin, PeerStatus},
     hopr_crypto_types::{
@@ -83,9 +87,6 @@ use crate::{
 
 pub use crate::helpers::{IndexerTransportEvent, PeerEligibility, TicketStatistics};
 pub use hopr_network_types::prelude::RoutingOptions;
-use hopr_transport_session::initiation::{
-    StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation, StartProtocol,
-};
 pub use hopr_transport_session::types::SessionTarget;
 
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
@@ -97,6 +98,7 @@ pub enum HoprTransportProcess {
     ProtocolMsgIn,
     ProtocolMsgOut,
     SessionsManagement,
+    SessionTerminator,
     BloomFilterSave,
 }
 
@@ -197,10 +199,45 @@ where
 }
 
 // Needs to use an UnboundedSender instead of oneshot
-// because Moka cache requires the oneshot Sender to be Clone.
-// It also cannot be enclosed in an Arc, since calling `send` consumes the sender.
+// because Moka cache requires the value to be Clone, which oneshot Sender is not.
+// It also cannot be enclosed in an Arc, since calling `send` consumes the oneshot Sender.
 type SessionInitiationCache =
     moka::future::Cache<StartChallenge, UnboundedSender<Result<StartEstablished<SessionId>, StartErrorType>>>;
+
+type SessionCache = moka::future::Cache<SessionId, UnboundedSender<Box<[u8]>>>;
+
+async fn close_session_aux<T>(
+    sessions: &SessionCache,
+    msg_sender: Arc<helpers::MessageSender<T>>,
+    session_id: SessionId,
+    routing_options: Option<RoutingOptions>,
+) -> errors::Result<()>
+where
+    T: HoprDbAllOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
+{
+    if let Some(session_tx) = sessions.remove(&session_id).await {
+        // Send SessionClose if routing options were given.
+        // This is only the case when we are closing in response to the other party's request
+        if let Some(routing_options) = routing_options {
+            trace!(
+                session_id = tracing::field::debug(session_id),
+                "sending session termination"
+            );
+            msg_sender
+                .send_message(
+                    StartProtocol::CloseSession(session_id).encode_as_app_data()?,
+                    *session_id.peer(),
+                    routing_options,
+                )
+                .await?;
+        }
+
+        session_tx.close_channel();
+        Ok(())
+    } else {
+        Err(HoprTransportError::Api(format!("cannot find session {session_id}")))
+    }
+}
 
 /// Interface into the physical transport mechanism allowing all off-chain HOPR-related tasks on
 /// the transport, as well as off-chain ticket manipulation.
@@ -220,7 +257,8 @@ where
     process_ticket_aggregate:
         Arc<OnceLock<TicketAggregationActions<TicketAggregationResponseType, TicketAggregationRequestType>>>,
     session_initiations: SessionInitiationCache,
-    sessions: moka::future::Cache<SessionId, UnboundedSender<Box<[u8]>>>,
+    session_close_notifier: OnceLock<UnboundedSender<(SessionId, RoutingOptions)>>,
+    sessions: SessionCache,
 }
 
 /// Handles session initiation (the Start protocol)
@@ -229,8 +267,9 @@ async fn handle_start_protocol_message<T>(
     data: Box<[u8]>,
     me: PeerId,
     new_session_notifier: UnboundedSender<(Session, SessionTarget)>,
+    close_session_notifier: UnboundedSender<(SessionId, RoutingOptions)>,
     message_sender: Arc<helpers::MessageSender<T>>,
-    sessions: moka::future::Cache<SessionId, UnboundedSender<Box<[u8]>>>,
+    sessions: SessionCache,
     session_initiations: SessionInitiationCache,
 ) -> errors::Result<()>
 where
@@ -282,6 +321,7 @@ where
                     session_req.capabilities,
                     message_sender.clone(),
                     rx,
+                    close_session_notifier.into(),
                 );
 
                 // Notify that a new session has been created
@@ -380,17 +420,15 @@ where
                 session_id = tracing::field::debug(session_id),
                 "received session close request"
             );
-            if let Some(sender) = sessions.remove(&session_id).await {
-                sender.close_channel();
-                debug!(
+            match close_session_aux(&sessions, message_sender.clone(), session_id, None).await {
+                Ok(_) => debug!(
                     session_id = tracing::field::debug(session_id),
                     "session has been closed by the other party"
-                );
-            } else {
-                error!(
+                ),
+                Err(e) => error!(
                     session_id = tracing::field::debug(session_id),
-                    "session to be closed not found"
-                );
+                    "session could not be closed: {e}"
+                ),
             }
         }
     }
@@ -436,6 +474,7 @@ where
                 .max_capacity(u16::MAX as u64)
                 .time_to_idle(constants::SESSION_LIFETIME)
                 .build(),
+            session_close_notifier: OnceLock::new(),
         }
     }
 
@@ -445,6 +484,10 @@ where
 
     pub fn network(&self) -> Arc<Network<T>> {
         self.network.clone()
+    }
+
+    fn new_message_sender(&self) -> helpers::MessageSender<T> {
+        helpers::MessageSender::new(self.process_packet_send.clone(), self.path_planner.clone())
     }
 
     /// Execute all processes of the [`crate::HoprTransport`] object.
@@ -524,6 +567,11 @@ where
             .set(tkt_agg_writer.clone())
             .expect("must set the ticket aggregation writer only once");
 
+        let (session_close_tx, session_close_rx) = futures::channel::mpsc::unbounded();
+        self.session_close_notifier
+            .set(session_close_tx.clone())
+            .expect("must set the session closure notifier");
+
         // heartbeat
         let mut heartbeat = Heartbeat::new(
             self.cfg.heartbeat,
@@ -584,14 +632,39 @@ where
             );
         }
 
+        let message_sender = Arc::new(self.new_message_sender());
+        let sessions = self.sessions.clone();
+        let msg_sender_clone = message_sender.clone();
+
+        processes.insert(
+            HoprTransportProcess::SessionTerminator,
+            spawn(
+                session_close_rx.for_each_concurrent(Some(10), move |(closed_session_id, routing_opts)| {
+                    let sessions = sessions.clone();
+                    let msg_sender_clone = msg_sender_clone.clone();
+                    async move {
+                        match close_session_aux(&sessions, msg_sender_clone, closed_session_id, Some(routing_opts))
+                            .await
+                        {
+                            Ok(_) => debug!(
+                                session_id = tracing::field::debug(closed_session_id),
+                                "session closed by us"
+                            ),
+                            Err(e) => error!(
+                                session_id = tracing::field::debug(closed_session_id),
+                                "cannot initiate session closure: {e}"
+                            ),
+                        }
+                    }
+                }),
+            ),
+        );
+
         // initiate session handling over the msg-ack protocol stack
         let sessions = self.sessions.clone();
         let session_initiations = self.session_initiations.clone();
+        let message_sender = Arc::new(self.new_message_sender());
         let me = self.me;
-        let message_sender = Arc::new(helpers::MessageSender::new(
-            self.process_packet_send.clone(),
-            self.path_planner.clone(),
-        ));
 
         processes.insert(
             HoprTransportProcess::SessionsManagement,
@@ -602,6 +675,7 @@ where
                     let session_initiations = session_initiations.clone();
                     let message_sender = message_sender.clone();
                     let new_session_notifier = new_session_notifier.clone();
+                    let session_close_tx = session_close_tx.clone();
 
                     async move {
                         if let Some(app_tag) = data.application_tag {
@@ -612,6 +686,7 @@ where
                                         data.plain_text,
                                         me,
                                         new_session_notifier,
+                                        session_close_tx,
                                         message_sender,
                                         sessions,
                                         session_initiations,
@@ -783,11 +858,9 @@ where
                     self.me,
                     cfg.path_options,
                     cfg.capabilities.into_iter().collect(),
-                    Arc::new(helpers::MessageSender::new(
-                        self.process_packet_send.clone(),
-                        self.path_planner.clone(),
-                    )),
+                    Arc::new(self.new_message_sender()),
                     rx,
+                    self.session_close_notifier.get().cloned(),
                 ))
             }
             Either::Left((Ok(None), _)) => Err(errors::HoprTransportError::Api(
@@ -806,30 +879,6 @@ where
                 error!(challenge, "session initiation attempt timed out");
                 Err(TransportSessionError::Timeout.into())
             }
-        }
-    }
-
-    #[tracing::instrument(level = "debug", skip(self))]
-    pub async fn close_session(&self, session: Session) -> errors::Result<()> {
-        let session_id = *session.id();
-        if let Some(session_tx) = self.sessions.remove(&session_id).await {
-            let (tag, msg) = StartProtocol::CloseSession(session_id).encode()?;
-
-            trace!(
-                session_id = tracing::field::debug(session_id),
-                "sending session termination"
-            );
-            self.send_message(msg, *session_id.peer(), session.routing_options().clone(), tag.into())
-                .await?;
-            session_tx.close_channel();
-
-            info!(
-                session_id = tracing::field::debug(session_id),
-                "session has been closed"
-            );
-            Ok(())
-        } else {
-            Err(HoprTransportError::Api("cannot find session".into()))
         }
     }
 

@@ -163,6 +163,8 @@ pub enum HoprLibProcesses {
     ProtocolMsgOut,
     #[strum(to_string = "session router pairing the session streams based on the PeerId and ApplicationTag")]
     SessionsRouter,
+    #[strum(to_string = "ensures sessions are gracefully terminated on stream close")]
+    SessionsTerminator,
     #[cfg(feature = "session-server")]
     #[strum(to_string = "session server providing the exit node session stream functionality")]
     SessionServer,
@@ -202,6 +204,7 @@ impl From<HoprTransportProcess> for HoprLibProcesses {
             hopr_transport::HoprTransportProcess::ProtocolMsgOut => HoprLibProcesses::ProtocolMsgOut,
             hopr_transport::HoprTransportProcess::Heartbeat => HoprLibProcesses::Heartbeat,
             hopr_transport::HoprTransportProcess::SessionsManagement => HoprLibProcesses::SessionsRouter,
+            hopr_transport::HoprTransportProcess::SessionTerminator => HoprLibProcesses::SessionsTerminator,
             hopr_transport::HoprTransportProcess::BloomFilterSave => HoprLibProcesses::BloomFilterSave,
         }
     }
@@ -1042,13 +1045,6 @@ impl Hopr {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
         Ok(self.transport_api.new_session(cfg).await?)
-    }
-
-    #[cfg(feature = "session-client")]
-    pub async fn disconnect_from(&self, session: HoprSession) -> errors::Result<()> {
-        self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
-
-        Ok(self.transport_api.close_session(session).await?)
     }
 
     /// Send a message to another peer in the network

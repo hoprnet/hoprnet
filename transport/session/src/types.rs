@@ -80,6 +80,7 @@ pub struct Session {
     id: SessionId,
     inner: Pin<Box<dyn AsyncReadWrite>>,
     routing_options: RoutingOptions,
+    shutdown_notifier: Option<futures::channel::mpsc::UnboundedSender<(SessionId, RoutingOptions)>>,
 }
 
 impl Session {
@@ -90,6 +91,7 @@ impl Session {
         capabilities: HashSet<Capability>,
         tx: Arc<dyn SendMsg + Send + Sync>,
         rx: UnboundedReceiver<Box<[u8]>>,
+        shutdown_notifier: Option<futures::channel::mpsc::UnboundedSender<(SessionId, RoutingOptions)>>,
     ) -> Self {
         let inner_session = InnerSession::new(id, me, routing_options.clone(), tx, rx);
 
@@ -116,6 +118,7 @@ impl Session {
                 id,
                 inner: Box::pin(SessionSocket::<SESSION_USABLE_MTU_SIZE>::new(id, inner_session, cfg)),
                 routing_options,
+                shutdown_notifier,
             }
         } else {
             // Otherwise, no additional sub protocol is necessary
@@ -123,6 +126,7 @@ impl Session {
                 id,
                 inner: Box::pin(inner_session),
                 routing_options,
+                shutdown_notifier,
             }
         }
     }
@@ -179,7 +183,21 @@ impl futures::AsyncWrite for Session {
     fn poll_close(mut self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<std::io::Result<()>> {
         let inner = &mut self.inner;
         pin_mut!(inner);
-        inner.poll_flush(cx)
+        match inner.poll_close(cx) {
+            Poll::Ready(res) => {
+                // Notify about closure if needed
+                if let Some(notifier) = self.shutdown_notifier.take() {
+                    if let Err(err) = notifier.unbounded_send((self.id, self.routing_options.clone())) {
+                        error!(
+                            session_id = tracing::field::debug(self.id),
+                            "failed to notify session closure {err}"
+                        );
+                    }
+                }
+                Poll::Ready(res)
+            }
+            Poll::Pending => Poll::Pending,
+        }
     }
 }
 
