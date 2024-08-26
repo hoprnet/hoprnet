@@ -17,7 +17,10 @@ use std::{sync::Arc, time::Duration};
 use tracing::{debug, error, trace};
 use validator::Validate;
 
-use hopr_lib::{ApplicationData, AsUnixTimestamp, RoutingOptions, RESERVED_TAG_UPPER_LIMIT};
+use hopr_lib::{
+    errors::{HoprLibError, HoprStatusError},
+    ApplicationData, AsUnixTimestamp, RoutingOptions, RESERVED_TAG_UPPER_LIMIT,
+};
 
 use crate::{ApiErrorStatus, InternalState, BASE_PATH};
 
@@ -101,6 +104,7 @@ pub(crate) struct GetMessageBodyRequest {
         responses(
             (status = 202, description = "The message was sent successfully, DOES NOT imply successful delivery.", body = SendMessageResponse),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
+            (status = 412, description = "The node is not ready."),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
@@ -167,10 +171,12 @@ pub(super) async fn send_message(
 
     let timestamp = std::time::SystemTime::now().as_unix_timestamp();
 
-    if let Err(e) = hopr.send_message(msg_body, args.peer_id, options, Some(args.tag)).await {
-        (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response()
-    } else {
-        (StatusCode::ACCEPTED, Json(SendMessageResponse { timestamp })).into_response()
+    match hopr.send_message(msg_body, args.peer_id, options, Some(args.tag)).await {
+        Ok(_) => (StatusCode::ACCEPTED, Json(SendMessageResponse { timestamp })).into_response(),
+        Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(_, _))) => {
+            (StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response()
+        }
+        Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
     }
 }
 
