@@ -1,13 +1,25 @@
 use thiserror::Error;
 
+use crate::HoprState;
+
+/// Enumeration of status errors thrown from this library.
+#[derive(Error, Debug)]
+pub enum HoprStatusError {
+    #[error("HOPR status general error: '{0}'")]
+    General(String),
+
+    #[error("HOPR status error: '{0}'")]
+    NotThereYet(HoprState, String),
+}
+
 /// Enumeration of errors thrown from this library.
 #[derive(Error, Debug)]
 pub enum HoprLibError {
     #[error("HOPR lib Error: '{0}'")]
     GeneralError(String),
 
-    #[error("HOPR lib status error: '{0}'")]
-    StatusError(String),
+    #[error(transparent)]
+    StatusError(#[from] HoprStatusError),
 
     #[error(transparent)]
     DatabaseBackendError(#[from] hopr_db_sql::errors::DbSqlError),
