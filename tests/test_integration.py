@@ -944,3 +944,12 @@ async def test_session_communication_with_an_echo_server_wireguard_style_communi
     actual.sort()
     expected.sort()
     assert actual == expected
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("src,dest", random_distinct_pairs_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
+async def test_session_communication_with_an_echo_server_over_udp(
+        src: str, dest: str, swarm7: dict[str, Node]
+):
+    print("waiting...")
+    await asyncio.sleep(1800.0)

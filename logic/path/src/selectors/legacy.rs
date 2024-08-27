@@ -163,7 +163,7 @@ where
     CW: EdgeWeighting<U256>,
 {
     /// Attempts to find a path with at least `min_hops` hops and at most `max_hops` hops
-    /// that goes from `source` to `destination`. There does not need to be a
+    /// that goes from `source` to `destination`. There does not need to be
     /// a payment channel to `destination`, so the path only includes intermediate hops.
     ///
     /// Implements a randomized best-first search through the path space. The graph

@@ -644,6 +644,10 @@ where
                     let sessions = sessions.clone();
                     let msg_sender_clone = msg_sender_clone.clone();
                     async move {
+                        trace!(
+                            session_id = tracing::field::debug(closed_session_id),
+                            "notification of session closure by us"
+                        );
                         match close_session_aux(&sessions, msg_sender_clone, closed_session_id, Some(routing_opts))
                             .await
                         {
@@ -816,7 +820,7 @@ where
 
         // Prepare the session initiation message in the Start protocol
         trace!(challenge, "initiating session with config {cfg:?}");
-        let (tag, msg) = StartProtocol::<SessionId>::StartSession(StartInitiation {
+        let start_session_msg = StartProtocol::<SessionId>::StartSession(StartInitiation {
             challenge,
             target: match cfg.target_protocol {
                 IpProtocol::TCP => SessionTarget::TcpStream(cfg.target),
@@ -826,10 +830,11 @@ where
             // Back-routing currently uses the same (inverted) route as session initiation
             back_routing: Some((cfg.path_options.clone().invert(), self.me)),
         })
-        .encode()?;
+        .encode_as_app_data()?;
 
         // Send the Session initiation message
-        self.send_message(msg, cfg.peer, cfg.path_options.clone(), tag.into())
+        self.new_message_sender()
+            .send_message(start_session_msg, cfg.peer, cfg.path_options.clone())
             .await?;
 
         // Await session establishment response from the Exit node or timeout
@@ -1108,3 +1113,6 @@ where
             .collect())
     }
 }
+
+#[cfg(test)]
+mod tests {}

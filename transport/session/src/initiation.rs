@@ -63,6 +63,7 @@ pub struct StartEstablished<T> {
 /// with `T` as session identifier.
 #[derive(Debug, Clone, PartialEq, Eq, strum::EnumDiscriminants)]
 // #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] -- enforce serialization via encode/decode
+#[strum_discriminants(vis(pub(crate)))]
 #[strum_discriminants(derive(strum::FromRepr), repr(u8))]
 pub enum StartProtocol<T> {
     /// Request to initiate a new session.
@@ -80,7 +81,7 @@ impl<'a, T: serde::Serialize + serde::Deserialize<'a>> StartProtocol<T> {
     /// Serialize the message into a message tag and message data.
     /// Data is serialized using `bincode`.
     pub fn encode(self) -> crate::errors::Result<(u16, Box<[u8]>)> {
-        let disc = StartProtocolDiscriminants::from(&self) as u8;
+        let disc = StartProtocolDiscriminants::from(&self) as u8 + 1;
         let inner = match self {
             StartProtocol::StartSession(init) => bincode::serialize(&init),
             StartProtocol::SessionEstablished(est) => bincode::serialize(&est),
@@ -103,7 +104,11 @@ impl<'a, T: serde::Serialize + serde::Deserialize<'a>> StartProtocol<T> {
     /// Deserialize the message from message tag and message data.
     /// Data is deserialized using `bincode`.
     pub fn decode(tag: u16, data: &'a [u8]) -> crate::errors::Result<Self> {
-        match StartProtocolDiscriminants::from_repr(tag as u8).ok_or(TransportSessionError::PayloadSize)? {
+        if tag == 0 {
+            return Err(TransportSessionError::Tag);
+        }
+
+        match StartProtocolDiscriminants::from_repr(tag as u8 - 1).ok_or(TransportSessionError::PayloadSize)? {
             StartProtocolDiscriminants::StartSession => Ok(StartProtocol::StartSession(bincode::deserialize(data)?)),
             StartProtocolDiscriminants::SessionEstablished => {
                 Ok(StartProtocol::SessionEstablished(bincode::deserialize(data)?))
@@ -134,6 +139,8 @@ mod tests {
         });
 
         let (tag, msg) = msg_1.clone().encode()?;
+        assert_eq!(1, tag);
+
         let msg_2 = StartProtocol::<i32>::decode(tag, &msg)?;
 
         assert_eq!(msg_1, msg_2);
@@ -149,6 +156,8 @@ mod tests {
         });
 
         let (tag, msg) = msg_1.clone().encode()?;
+        assert_eq!(2, tag);
+
         let msg_2 = StartProtocol::<i32>::decode(tag, &msg)?;
 
         assert_eq!(msg_1, msg_2);
@@ -164,6 +173,8 @@ mod tests {
         });
 
         let (tag, msg) = msg_1.clone().encode()?;
+        assert_eq!(3, tag);
+
         let msg_2 = StartProtocol::<i32>::decode(tag, &msg)?;
 
         assert_eq!(msg_1, msg_2);
@@ -176,6 +187,8 @@ mod tests {
         let msg_1 = StartProtocol::<i32>::CloseSession(10);
 
         let (tag, msg) = msg_1.clone().encode()?;
+        assert_eq!(4, tag);
+
         let msg_2 = StartProtocol::<i32>::decode(tag, &msg)?;
 
         assert_eq!(msg_1, msg_2);

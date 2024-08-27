@@ -30,7 +30,9 @@ pub mod rlp {
     }
 
     pub fn decode(data: &[u8]) -> crate::errors::Result<(Box<[u8]>, Duration)> {
-        let mut list = rlp::decode_list::<Vec<u8>>(data);
+        let rlp_data = rlp::Rlp::new(data);
+        let mut list = rlp_data.as_list::<Vec<u8>>().map_err(|_| GeneralError::ParseError)?;
+
         if list.len() != 2 {
             return Err(GeneralError::ParseError);
         }

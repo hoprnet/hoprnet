@@ -101,6 +101,10 @@ where
                     .await
                     .map(|(p, _)| p)?
             }
+            RoutingOptions::Hops(hops) if u32::from(hops) == 0 => {
+                debug!(hops = 0, "Resolved zero-hop path to {destination}");
+                TransportPath::direct(destination)
+            }
             RoutingOptions::Hops(hops) => {
                 debug!(hops = tracing::field::display(hops), "Resolving a path using hop count");
 

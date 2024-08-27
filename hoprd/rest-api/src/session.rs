@@ -143,10 +143,10 @@ pub(crate) async fn create_client(
             )
         }
         IpProtocol::UDP => {
-            let (port, udp_socket) = udp_bind_to(("127.0.0.1", port)).await.map_err(|e| {
+            let (port, udp_socket) = udp_bind_to(("127.0.0.1", 0)).await.map_err(|e| {
                 (
                     StatusCode::UNPROCESSABLE_ENTITY,
-                    ApiErrorStatus::UnknownFailure(format!("Failed to start TCP listener on 127.0.0.1:{port}: {e}")),
+                    ApiErrorStatus::UnknownFailure(format!("Failed to start UDP listener on 127.0.0.1:{port}: {e}")),
                 )
             })?;
 
