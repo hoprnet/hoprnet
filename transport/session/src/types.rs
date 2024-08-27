@@ -363,7 +363,8 @@ impl futures::AsyncRead for InnerSession {
 
                 Poll::Ready(Ok(copy_len))
             }
-            Poll::Ready(None) => Poll::Ready(Err(Error::from(ErrorKind::NotConnected))),
+            Poll::Ready(None) => Poll::Ready(Ok(0)), // due to convention, Ok(0) indicates EOF
+            // Poll::Ready(None) => Poll::Ready(Err(Error::from(ErrorKind::NotConnected))),
             Poll::Pending => Poll::Pending,
         }
     }

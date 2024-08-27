@@ -232,6 +232,7 @@ where
                 .await?;
         }
 
+        // Closing the data sender on the session will cause the Session to terminate
         session_tx.close_channel();
         Ok(())
     } else {
@@ -290,7 +291,7 @@ where
             );
 
             // Construct the session
-            let (tx, rx) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
+            let (tx_session_data, rx_session_data) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
             if let Some(session_id) = insert_into_next_slot(
                 &sessions,
                 |sid| {
@@ -305,7 +306,7 @@ where
                     };
                     SessionId::new(next_tag, peer)
                 },
-                tx,
+                tx_session_data,
             )
             .await
             {
@@ -320,7 +321,7 @@ where
                     route.clone(),
                     session_req.capabilities,
                     message_sender.clone(),
-                    rx,
+                    rx_session_data,
                     close_session_notifier.into(),
                 );
 
