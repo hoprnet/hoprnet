@@ -20,19 +20,19 @@ pub mod constants;
 /// Enumerates all errors thrown from this library.
 pub mod errors;
 
-use std::{
-    collections::HashMap,
-    str::FromStr,
-    sync::{atomic::Ordering, Arc},
-    time::Duration,
-};
-
 use async_lock::RwLock;
 use futures::{
     channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender},
     Stream, StreamExt,
 };
 use futures_concurrency::stream::StreamExt as _;
+use std::fmt::{Display, Formatter};
+use std::{
+    collections::HashMap,
+    str::FromStr,
+    sync::{atomic::Ordering, Arc},
+    time::Duration,
+};
 use tracing::{debug, error, info, warn};
 
 use chain_actions::{
@@ -48,6 +48,7 @@ use chain_api::{
 use chain_types::chain_events::ChainEventType;
 use chain_types::ContractAddresses;
 use core_path::channel_graph::ChannelGraph;
+use errors::HoprStatusError;
 use hopr_async_runtime::prelude::{sleep, spawn, JoinHandle};
 use hopr_crypto_types::prelude::OffchainPublicKey;
 use hopr_db_sql::{
@@ -133,6 +134,12 @@ pub enum HoprState {
     Indexing = 2,
     Starting = 3,
     Running = 4,
+}
+
+impl Display for HoprState {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
 }
 
 pub struct OpenChannelResult {
@@ -588,7 +595,9 @@ impl Hopr {
         if self.status() == state {
             Ok(())
         } else {
-            Err(errors::HoprLibError::StatusError(error))
+            Err(errors::HoprLibError::StatusError(HoprStatusError::NotThereYet(
+                state, error,
+            )))
         }
     }
 
@@ -1302,6 +1311,8 @@ impl Hopr {
         channel_id: Hash,
         redeem_before_close: bool,
     ) -> errors::Result<CloseChannelResult> {
+        self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
+
         match self.channel_from_hash(&channel_id).await? {
             Some(channel) => match channel.orientation(&self.me_onchain()) {
                 Some((direction, counterparty)) => {
