@@ -33,6 +33,9 @@ pub(crate) struct SessionClientRequest {
     pub path: RoutingOptions,
     pub protocol: IpProtocol,
     pub target: String,
+    pub listen_port: Option<u16>,
+    #[serde_as(as = "Option<Vec<DisplayFromStr>>")]
+    pub capabilities: Option<Vec<SessionCapability>>,
 }
 
 impl TryFrom<SessionClientRequest> for SessionClientConfig {
@@ -47,12 +50,12 @@ impl TryFrom<SessionClientRequest> for SessionClientConfig {
                 .target
                 .parse()
                 .map_err(|e| HoprLibError::GeneralError(format!("target host parse error: {e}")))?,
-            // TODO: can make the capabilities more fine-grained configurable by the client
-            capabilities: if value.protocol == IpProtocol::TCP {
-                vec![SessionCapability::Retransmission, SessionCapability::Segmentation]
-            } else {
-                vec![]
-            },
+            capabilities: value.capabilities.unwrap_or_else(|| match value.protocol {
+                IpProtocol::TCP => {
+                    vec![SessionCapability::Retransmission, SessionCapability::Segmentation]
+                }
+                _ => vec![], // no default capabilities for UDP etc.
+            }),
         })
     }
 }
@@ -67,19 +70,16 @@ pub(crate) struct SessionClientResponse {
     pub port: u16,
 }
 
-/// Creates a new client session returing a dedicated session listening port.
+/// Creates a new client session returning a dedicated session listening port.
 ///
 /// Once the port is bound, it is possible to use the socket for bidirectional read and write communication.
-/// Various services require diffrent types of socket communications. This is set by the capabilities field.
-///
-/// TODO: The prototype implementation does not support UDP sockets yet and forces the usage of a TCP socket.
-/// Such a restriction is not ideal and should be removed in the future.
+/// Various services require different types of socket communications.
 #[utoipa::path(
         post,
         path = const_format::formatcp!("{BASE_PATH}/session"),
         request_body(
             content = SessionClientRequest,
-            description = "Creates a new client HOPR session that will start listening on a dedicated port. Once the port is bound, it is possible to use the socketfor bidirectional read and write communication.",
+            description = "Creates a new client HOPR session that will start listening on a dedicated port. Once the port is bound, it is possible to use the socket for bidirectional read and write communication.",
             content_type = "application/json"),
         responses(
             (status = 200, description = "Successfully created a new client session", body = SessionClientResponse),
@@ -97,6 +97,7 @@ pub(crate) async fn create_client(
     State(state): State<Arc<InternalState>>,
     Json(args): Json<SessionClientRequest>,
 ) -> Result<impl IntoResponse, impl IntoResponse> {
+    let port = args.listen_port.unwrap_or(0); // if not given, listen on random port
     let data = SessionClientConfig::try_from(args).map_err(|e| {
         (
             StatusCode::UNPROCESSABLE_ENTITY,
@@ -104,7 +105,6 @@ pub(crate) async fn create_client(
         )
     })?;
     let protocol = data.target_protocol;
-    let port = data.target.port();
 
     let session = state.hopr.clone().connect_to(data).await.map_err(|e| {
         (
@@ -143,7 +143,7 @@ pub(crate) async fn create_client(
             )
         }
         IpProtocol::UDP => {
-            let (port, udp_socket) = udp_bind_to(("127.0.0.1", 0)).await.map_err(|e| {
+            let (port, udp_socket) = udp_bind_to(("127.0.0.1", port)).await.map_err(|e| {
                 (
                     StatusCode::UNPROCESSABLE_ENTITY,
                     ApiErrorStatus::UnknownFailure(format!("Failed to start UDP listener on 127.0.0.1:{port}: {e}")),

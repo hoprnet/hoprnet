@@ -77,7 +77,7 @@ pub enum StartProtocol<T> {
 }
 
 #[cfg(feature = "serde")]
-impl<'a, T: serde::Serialize + serde::Deserialize<'a>> StartProtocol<T> {
+impl<T: serde::Serialize + for<'de> serde::Deserialize<'de>> StartProtocol<T> {
     /// Serialize the message into a message tag and message data.
     /// Data is serialized using `bincode`.
     pub fn encode(self) -> crate::errors::Result<(u16, Box<[u8]>)> {
@@ -92,18 +92,9 @@ impl<'a, T: serde::Serialize + serde::Deserialize<'a>> StartProtocol<T> {
         Ok((disc as u16, inner.into_boxed_slice()))
     }
 
-    /// Convenience method to [encode] directly into [ApplicationData].
-    pub fn encode_as_app_data(self) -> crate::errors::Result<ApplicationData> {
-        let (tag, plain_text) = self.encode()?;
-        Ok(ApplicationData {
-            application_tag: Some(tag),
-            plain_text,
-        })
-    }
-
     /// Deserialize the message from message tag and message data.
     /// Data is deserialized using `bincode`.
-    pub fn decode(tag: u16, data: &'a [u8]) -> crate::errors::Result<Self> {
+    pub fn decode(tag: u16, data: &[u8]) -> crate::errors::Result<Self> {
         if tag == 0 {
             return Err(TransportSessionError::Tag);
         }
@@ -116,6 +107,29 @@ impl<'a, T: serde::Serialize + serde::Deserialize<'a>> StartProtocol<T> {
             StartProtocolDiscriminants::SessionError => Ok(StartProtocol::SessionError(bincode::deserialize(data)?)),
             StartProtocolDiscriminants::CloseSession => Ok(StartProtocol::CloseSession(bincode::deserialize(data)?)),
         }
+    }
+}
+
+impl<T: serde::Serialize + for<'de> serde::Deserialize<'de>> TryFrom<StartProtocol<T>> for ApplicationData {
+    type Error = TransportSessionError;
+
+    fn try_from(value: StartProtocol<T>) -> Result<Self, Self::Error> {
+        let (tag, plain_text) = value.encode()?;
+        Ok(ApplicationData {
+            application_tag: Some(tag),
+            plain_text,
+        })
+    }
+}
+
+impl<T: serde::Serialize + for<'de> serde::Deserialize<'de>> TryFrom<ApplicationData> for StartProtocol<T> {
+    type Error = TransportSessionError;
+
+    fn try_from(value: ApplicationData) -> Result<Self, Self::Error> {
+        Self::decode(
+            value.application_tag.ok_or(TransportSessionError::Tag)?,
+            &value.plain_text,
+        )
     }
 }
 

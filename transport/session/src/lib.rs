@@ -20,7 +20,7 @@ pub use types::{Session, SessionId, SESSION_USABLE_MTU_SIZE};
 
 /// Capabilities of a session.
 #[repr(u8)]
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, strum::EnumIter)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, strum::EnumIter, strum::Display, strum::EnumString)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum Capability {
     /// Frame segmentation

@@ -208,6 +208,7 @@ type SessionCache = moka::future::Cache<SessionId, UnboundedSender<Box<[u8]>>>;
 
 async fn close_session_aux<T>(
     sessions: &SessionCache,
+    me: PeerId,
     msg_sender: Arc<helpers::MessageSender<T>>,
     session_id: SessionId,
     routing_options: Option<RoutingOptions>,
@@ -225,7 +226,7 @@ where
             );
             msg_sender
                 .send_message(
-                    StartProtocol::CloseSession(session_id).encode_as_app_data()?,
+                    StartProtocol::CloseSession(session_id.with_peer(me)).try_into()?,
                     *session_id.peer(),
                     routing_options,
                 )
@@ -234,10 +235,14 @@ where
 
         // Closing the data sender on the session will cause the Session to terminate
         session_tx.close_channel();
-        Ok(())
     } else {
-        Err(HoprTransportError::Api(format!("cannot find session {session_id}")))
+        // Do not treat this as an error
+        debug!(
+            session_id = tracing::field::debug(session_id),
+            "could not find session id to close, maybe the session is already closed"
+        );
     }
+    Ok(())
 }
 
 /// Interface into the physical transport mechanism allowing all off-chain HOPR-related tasks on
@@ -264,8 +269,7 @@ where
 
 /// Handles session initiation (the Start protocol)
 async fn handle_start_protocol_message<T>(
-    tag: Tag,
-    data: Box<[u8]>,
+    data: ApplicationData,
     me: PeerId,
     new_session_notifier: UnboundedSender<(Session, SessionTarget)>,
     close_session_notifier: UnboundedSender<(SessionId, RoutingOptions)>,
@@ -276,7 +280,7 @@ async fn handle_start_protocol_message<T>(
 where
     T: HoprDbAllOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
 {
-    match StartProtocol::<SessionId>::decode(tag, &data)? {
+    match StartProtocol::<SessionId>::try_from(data)? {
         StartProtocol::StartSession(session_req) => {
             trace!(challenge = session_req.challenge, "received session initiation request");
 
@@ -335,16 +339,19 @@ where
                     "session notification sent"
                 );
 
-                // Notify the sender that the session has been established
+                // Notify the sender that the session has been established.
+                // Set our peer ID in the session ID sent back to them.
                 let data = StartProtocol::SessionEstablished(StartEstablished {
                     orig_challenge: session_req.challenge,
-                    session_id,
-                })
-                .encode_as_app_data()?;
+                    session_id: session_id.with_peer(me),
+                });
 
-                message_sender.send_message(data, peer, route).await.map_err(|e| {
-                    HoprTransportError::Api(format!("failed to send session establishment message: {e}"))
-                })?;
+                message_sender
+                    .send_message(data.try_into()?, peer, route)
+                    .await
+                    .map_err(|e| {
+                        HoprTransportError::Api(format!("failed to send session establishment message: {e}"))
+                    })?;
 
                 info!(
                     session_id = tracing::field::display(session_id),
@@ -360,12 +367,14 @@ where
                 let data = StartProtocol::<SessionId>::SessionError(StartErrorType {
                     challenge: session_req.challenge,
                     reason: StartErrorReason::NoSlotsAvailable,
-                })
-                .encode_as_app_data()?;
+                });
 
-                message_sender.send_message(data, peer, route).await.map_err(|e| {
-                    HoprTransportError::Api(format!("failed to send session establishment error message: {e}"))
-                })?;
+                message_sender
+                    .send_message(data.try_into()?, peer, route)
+                    .await
+                    .map_err(|e| {
+                        HoprTransportError::Api(format!("failed to send session establishment error message: {e}"))
+                    })?;
 
                 trace!(
                     peer = tracing::field::display(peer),
@@ -421,7 +430,7 @@ where
                 session_id = tracing::field::debug(session_id),
                 "received session close request"
             );
-            match close_session_aux(&sessions, message_sender.clone(), session_id, None).await {
+            match close_session_aux(&sessions, me, message_sender.clone(), session_id, None).await {
                 Ok(_) => debug!(
                     session_id = tracing::field::debug(session_id),
                     "session has been closed by the other party"
@@ -636,6 +645,7 @@ where
         let message_sender = Arc::new(self.new_message_sender());
         let sessions = self.sessions.clone();
         let msg_sender_clone = message_sender.clone();
+        let me = self.me;
 
         processes.insert(
             HoprTransportProcess::SessionTerminator,
@@ -648,7 +658,7 @@ where
                             session_id = tracing::field::debug(closed_session_id),
                             "notification of session closure by us"
                         );
-                        match close_session_aux(&sessions, msg_sender_clone, closed_session_id, Some(routing_opts))
+                        match close_session_aux(&sessions, me, msg_sender_clone, closed_session_id, Some(routing_opts))
                             .await
                         {
                             Ok(_) => debug!(
@@ -669,7 +679,6 @@ where
         let sessions = self.sessions.clone();
         let session_initiations = self.session_initiations.clone();
         let message_sender = Arc::new(self.new_message_sender());
-        let me = self.me;
 
         processes.insert(
             HoprTransportProcess::SessionsManagement,
@@ -685,10 +694,9 @@ where
                     async move {
                         if let Some(app_tag) = data.application_tag {
                             match app_tag {
-                                tag @ 0..RESERVED_SUBPROTOCOL_TAG_UPPER_LIMIT => {
+                                0..RESERVED_SUBPROTOCOL_TAG_UPPER_LIMIT => {
                                     if let Err(e) = handle_start_protocol_message(
-                                        tag,
-                                        data.plain_text,
+                                        data,
                                         me,
                                         new_session_notifier,
                                         session_close_tx,
@@ -829,12 +837,11 @@ where
             capabilities: cfg.capabilities.iter().copied().collect(),
             // Back-routing currently uses the same (inverted) route as session initiation
             back_routing: Some((cfg.path_options.clone().invert(), self.me)),
-        })
-        .encode_as_app_data()?;
+        });
 
         // Send the Session initiation message
         self.new_message_sender()
-            .send_message(start_session_msg, cfg.peer, cfg.path_options.clone())
+            .send_message(start_session_msg.try_into()?, cfg.peer, cfg.path_options.clone())
             .await?;
 
         // Await session establishment response from the Exit node or timeout

@@ -43,6 +43,11 @@ impl SessionId {
     pub fn peer(&self) -> &PeerId {
         &self.peer
     }
+
+    pub fn with_peer(mut self, peer: PeerId) -> Self {
+        self.peer = peer;
+        self
+    }
 }
 
 impl Display for SessionId {
