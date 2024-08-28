@@ -22,7 +22,6 @@
     foundry.inputs.nixpkgs.follows = "nixpkgs";
     pre-commit.inputs.nixpkgs-stable.follows = "nixpkgs";
     pre-commit.inputs.nixpkgs.follows = "nixpkgs";
-    rust-overlay.inputs.flake-utils.follows = "flake-utils";
     rust-overlay.inputs.nixpkgs.follows = "nixpkgs";
     solc.inputs.flake-utils.follows = "flake-utils";
     solc.inputs.nixpkgs.follows = "nixpkgs";

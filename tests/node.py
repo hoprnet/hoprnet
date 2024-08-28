@@ -67,8 +67,8 @@ class Node:
         loaded_env = load_env_file(f"{self.dir}.env")
         self.safe_address = loaded_env.get('HOPRD_SAFE_ADDRESS')
         self.module_address = loaded_env.get('HOPRD_MODULE_ADDRESS')
-        assert self.safe_address is not None
-        assert self.module_address is not None
+        if self.safe_address is None or self.module_address is None:
+            raise ValueError("Critical addresses are missing in the environment file.")
 
     def create_local_safe(self, custom_env: dict):
         res = run(

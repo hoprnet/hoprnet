@@ -34,7 +34,12 @@ ANVIL_ENDPOINT = f"http://127.0.0.1:{PORT_BASE}"
 def run_cast_cmd(cmd: str, params: list[str]):
     cast_cmd = ["cast", cmd, "-r", ANVIL_ENDPOINT] + params
     logging.info("Running cast command: %s", ' '.join(cast_cmd))
-    return run(cast_cmd, check=True, capture_output=True)
+    try:
+        result = run(cast_cmd, check=True, capture_output=True)
+        return result
+    except CalledProcessError as e:
+        logging.error("Error executing cast command: %s", str(e))
+        raise
 
 def run_hopli_cmd(cmd: list[str], custom_env):
     env = os.environ | custom_env

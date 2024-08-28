@@ -73,18 +73,22 @@ jobs:
         run: |
           if [ -z "${{ github.event.inputs.test_id }}" ]; then
             echo "The workflow is triggered by other pipeline"
-            echo "NODES=${{ inputs.nodes }}" >> $GITHUB_OUTPUT
-            echo "WORKLOAD_NAME=${{ inputs.workload }}" >> $GITHUB_OUTPUT
-            echo "SCENARIO_ITERATIONS=${{ github.event.inputs.rate }}" >> $GITHUB_OUTPUT
-            echo "TESTID=${{ inputs.test_id }}" >> $GITHUB_OUTPUT
-            echo "SCENARIO_DURATION=${{ inputs.duration }}" >> $GITHUB_OUTPUT
+            {
+              echo "NODES=${{ inputs.nodes }}"
+              echo "WORKLOAD_NAME=${{ inputs.workload }}"
+              echo "SCENARIO_ITERATIONS=${{ github.event.inputs.rate }}"
+              echo "TESTID=${{ inputs.test_id }}"
+              echo "SCENARIO_DURATION=${{ inputs.duration }}"
+            } >> $GITHUB_OUTPUT
           else
             echo "The workflow is triggered manually"
-            echo "NODES=${{ github.event.inputs.nodes }}" >> $GITHUB_OUTPUT
-            echo "WORKLOAD_NAME=${{ github.event.inputs.workload }}" >> $GITHUB_OUTPUT
-            echo "SCENARIO_ITERATIONS=${{ github.event.inputs.rate }}" >> $GITHUB_OUTPUT
-            echo "TESTID=${{ github.event.inputs.test_id }}" >> $GITHUB_OUTPUT
-            echo "SCENARIO_DURATION=${{ github.event.inputs.duration }}" >> $GITHUB_OUTPUT
+            {
+              echo "NODES=${{ github.event.inputs.nodes }}"
+              echo "WORKLOAD_NAME=${{ github.event.inputs.workload }}"
+              echo "SCENARIO_ITERATIONS=${{ github.event.inputs.rate }}"
+              echo "TESTID=${{ github.event.inputs.test_id }}"
+              echo "SCENARIO_DURATION=${{ github.event.inputs.duration }}"
+            } >> $GITHUB_OUTPUT
           fi
 
       - name: Checkout hoprd-test repository
