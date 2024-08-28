@@ -446,7 +446,8 @@ async def swarm7(request):
         # START NEW LOCAL ANVIL SERVER
         logging.info("Starting and waiting for local anvil server to be up (dump state enabled)")
         run(
-            f"./run-local-anvil.sh -l {anvil_log_file(test_suite_name)} -c {anvil_cfg_file(test_suite_name)} -p {anvil_port} -ds {anvil_state_file(test_dir)}".split(),
+            f"./run-local-anvil.sh -l {anvil_log_file(test_suite_name)} -c {anvil_cfg_file(test_suite_name)} -p {anvil_port} -ds {anvil_state_file(test_dir)}"
+            .split(),
             check=True,
             capture_output=True,
             cwd=PWD.parent.joinpath("scripts"),
