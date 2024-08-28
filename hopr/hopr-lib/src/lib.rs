@@ -63,7 +63,7 @@ use hopr_db_sql::{
 use hopr_platform::file::native::{join, remove_dir_all};
 use hopr_strategy::strategy::{MultiStrategy, SingularStrategy};
 use hopr_transport::{
-    execute_on_tick, ChainKeypair, Hash, HoprTransport, HoprTransportConfig, HoprTransportProcess,
+    execute_on_tick, ChainKeypair, Hash, HoprTransport, HoprTransportConfig, HoprTransportProcess, IncomingSession,
     IndexerTransportEvent, Network, OffchainKeypair, PeerDiscovery, PeerEligibility, PeerOrigin,
 };
 pub use {
@@ -81,9 +81,9 @@ pub use {
         constants::RESERVED_TAG_UPPER_LIMIT,
         errors::{HoprTransportError, ProtocolError},
         libp2p::identity::PeerId,
-        ApplicationData, HalfKeyChallenge, Health, Keypair, Multiaddr, OffchainKeypair as HoprOffchainKeypair, SendMsg,
-        Session as HoprSession, SessionCapability, SessionClientConfig, SessionId as HoprSessionId, SessionTarget,
-        TicketStatistics, SESSION_USABLE_MTU_SIZE,
+        ApplicationData, HalfKeyChallenge, Health, IncomingSession as HoprIncomingSession, Keypair, Multiaddr,
+        OffchainKeypair as HoprOffchainKeypair, SendMsg, Session as HoprSession, SessionCapability,
+        SessionClientConfig, SessionId as HoprSessionId, SessionTarget, TicketStatistics, SESSION_USABLE_MTU_SIZE,
     },
 };
 
@@ -122,7 +122,7 @@ pub use async_trait::async_trait;
 #[async_trait::async_trait]
 pub trait HoprSessionReactor {
     /// Fully process a single HOPR session
-    async fn process(&self, session: HoprSession, target: SessionTarget) -> errors::Result<()>;
+    async fn process(&self, session: HoprIncomingSession) -> errors::Result<()>;
 }
 
 /// An enum representing the current state of the HOPR node
@@ -925,19 +925,19 @@ impl Hopr {
             }),
         );
 
-        let (session_tx, _session_rx) = unbounded::<(HoprSession, SessionTarget)>();
+        let (session_tx, _session_rx) = unbounded::<IncomingSession>();
 
         #[cfg(feature = "session-server")]
         {
             processes.insert(
                 HoprLibProcesses::SessionServer,
-                spawn(_session_rx.for_each_concurrent(None, move |(session, target)| {
+                spawn(_session_rx.for_each_concurrent(None, move |session| {
                     let serve_handler = serve_handler.clone();
                     async move {
-                        let session_id = *session.id();
-                        match serve_handler.process(session, target).await {
-                            Ok(_) => debug!("Client session {session_id} finished successfully"),
-                            Err(e) => error!("Client session {session_id} failed: {e}"),
+                        let session_id = *session.session.id();
+                        match serve_handler.process(session).await {
+                            Ok(_) => debug!("client session {session_id} processed successfully"),
+                            Err(e) => error!("client session {session_id} processing failed: {e}"),
                         }
                     }
                 })),

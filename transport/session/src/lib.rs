@@ -16,7 +16,7 @@ use {
 };
 
 pub use hopr_network_types::types::*;
-pub use types::{Session, SessionId, SESSION_USABLE_MTU_SIZE};
+pub use types::{IncomingSession, Session, SessionId, SESSION_USABLE_MTU_SIZE};
 
 /// Capabilities of a session.
 #[repr(u8)]

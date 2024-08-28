@@ -75,8 +75,8 @@ pub use {
     },
     hopr_transport_protocol::execute_on_tick,
     hopr_transport_session::{
-        errors::TransportSessionError, traits::SendMsg, Capability as SessionCapability, Session, SessionClientConfig,
-        SessionId, SESSION_USABLE_MTU_SIZE,
+        errors::TransportSessionError, traits::SendMsg, Capability as SessionCapability, IncomingSession, Session,
+        SessionClientConfig, SessionId, SESSION_USABLE_MTU_SIZE,
     },
 };
 
@@ -271,7 +271,7 @@ where
 async fn handle_start_protocol_message<T>(
     data: ApplicationData,
     me: PeerId,
-    new_session_notifier: UnboundedSender<(Session, SessionTarget)>,
+    new_session_notifier: UnboundedSender<IncomingSession>,
     close_session_notifier: UnboundedSender<(SessionId, RoutingOptions)>,
     message_sender: Arc<helpers::MessageSender<T>>,
     sessions: SessionCache,
@@ -329,8 +329,14 @@ where
                     close_session_notifier.into(),
                 );
 
-                // Notify that a new session has been created
-                if let Err(e) = new_session_notifier.unbounded_send((session, session_req.target)) {
+                // Extract useful information about the session from the Start protocol message
+                let incoming_session = IncomingSession {
+                    session,
+                    target: session_req.target,
+                };
+
+                // Notify that a new incoming session has been created
+                if let Err(e) = new_session_notifier.unbounded_send(incoming_session) {
                     warn!("failed to send session to incoming session queue: {e}");
                 }
 
@@ -517,7 +523,7 @@ where
         on_transport_output: UnboundedSender<ApplicationData>,
         on_acknowledged_ticket: UnboundedSender<AcknowledgedTicket>,
         transport_updates: UnboundedReceiver<PeerDiscovery>,
-        new_session_notifier: UnboundedSender<(Session, SessionTarget)>,
+        new_session_notifier: UnboundedSender<IncomingSession>,
     ) -> HashMap<HoprTransportProcess, JoinHandle<()>> {
         let mut processes: HashMap<HoprTransportProcess, JoinHandle<()>> = HashMap::new();
 

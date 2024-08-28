@@ -100,12 +100,8 @@ pub struct HoprServerIpForwardingReactor;
 #[hopr_lib::async_trait]
 impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
     #[tracing::instrument(level = "debug", skip(self, session))]
-    async fn process(
-        &self,
-        session: hopr_lib::HoprSession,
-        target: hopr_lib::SessionTarget,
-    ) -> hopr_lib::errors::Result<()> {
-        match target {
+    async fn process(&self, session: hopr_lib::HoprIncomingSession) -> hopr_lib::errors::Result<()> {
+        match session.target {
             hopr_lib::SessionTarget::UdpStream(udp_target) => {
                 tracing::debug!("binding socket to the UDP server {udp_target}...");
 
@@ -133,7 +129,7 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
 
                 tracing::debug!("Bridging the session to the UDP server {udp_target} ...");
                 tokio::task::spawn(async move {
-                    match tokio::io::copy_bidirectional_with_sizes(&mut tokio_util::compat::FuturesAsyncReadCompatExt::compat(session), &mut udp_bridge, hopr_lib::SESSION_USABLE_MTU_SIZE, hopr_lib::SESSION_USABLE_MTU_SIZE).await {
+                    match tokio::io::copy_bidirectional_with_sizes(&mut tokio_util::compat::FuturesAsyncReadCompatExt::compat(session.session), &mut udp_bridge, hopr_lib::SESSION_USABLE_MTU_SIZE, hopr_lib::SESSION_USABLE_MTU_SIZE).await {
                         Ok(bound_stream_finished) => tracing::info!("server bridged session through UDP {udp_target} ended with {bound_stream_finished:?} bytes transferred in both directions."),
                         Err(e) => tracing::error!("UDP server stream ({udp_target}) is closed: {e:?}")
                     }
@@ -168,7 +164,7 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
 
                 tracing::debug!("bridging the session to the TCP server {tcp_target} ...");
                 tokio::task::spawn(async move {
-                    match tokio::io::copy_bidirectional_with_sizes(&mut tokio_util::compat::FuturesAsyncReadCompatExt::compat(session), &mut tcp_bridge, hopr_lib::SESSION_USABLE_MTU_SIZE, hopr_lib::SESSION_USABLE_MTU_SIZE).await {
+                    match tokio::io::copy_bidirectional_with_sizes(&mut tokio_util::compat::FuturesAsyncReadCompatExt::compat(session.session), &mut tcp_bridge, hopr_lib::SESSION_USABLE_MTU_SIZE, hopr_lib::SESSION_USABLE_MTU_SIZE).await {
                         Ok(bound_stream_finished) => tracing::info!("Server bridged session through TCP {tcp_target} ended with {bound_stream_finished:?} bytes transferred in both directions."),
                         Err(e) => tracing::error!("TCP server stream ({tcp_target}) is closed: {e:?}")
                     }

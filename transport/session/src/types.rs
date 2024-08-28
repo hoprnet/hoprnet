@@ -80,6 +80,16 @@ pub enum SessionTarget {
     ExitNode(u32),
 }
 
+/// Wrapper for incoming [Session] along with other information
+/// extracted from the Start protocol during the session establishment.
+#[derive(Debug)]
+pub struct IncomingSession {
+    /// Actual incoming session.
+    pub session: Session,
+    /// Desired [target](SessionTarget) of the data received over the session.
+    pub target: SessionTarget,
+}
+
 // TODO: missing docs
 pub struct Session {
     id: SessionId,
