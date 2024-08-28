@@ -389,7 +389,7 @@ async def test_hopli_should_be_able_to_deregister_nodes_and_register_it(peer: st
 
     # Check if nodes are removed from the network
     run_cast_cmd("code", [network_registry_contract])
-    res_after_regsiter = run_cast_cmd(
+    res_after_register = run_cast_cmd(
         "call", [network_registry_contract, "nodeRegisterdToAccount(address)(address)", swarm7[peer].address]
     )
 

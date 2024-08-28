@@ -7,12 +7,17 @@ from .hopr import HoprdAPI
 
 def load_env_file(env_file: str) -> dict:
     env = {}
-    with open(env_file, "r") as f:
-        for line in f:
-            if line.startswith("#"):
-                continue
-            key, value = line.strip().split("=", 1)
-            env[key] = value
+    try:
+        with open(env_file, "r") as f:
+            for line in f:
+                if line.startswith("#"):
+                    continue
+                key, value = line.strip().split("=", 1)
+                env[key] = value
+    except FileNotFoundError:
+        logging.error(f"Environment file {env_file} not found.")
+    except ValueError:
+        logging.error(f"Incorrect format in environment file {env_file}.")
     return env
 
 class Node:
