@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use crate::{ApiErrorStatus, InternalState, BASE_PATH};
 use axum::{
     extract::{Json, State},
     http::status::StatusCode,
@@ -8,13 +9,12 @@ use axum::{
 use hopr_lib::errors::HoprLibError;
 use hopr_lib::{HoprSession, IpProtocol, PeerId, RoutingOptions, SessionCapability, SessionClientConfig};
 use hopr_network_types::prelude::ConnectedUdpStream;
+use hopr_network_types::udp::ForeignDataMode;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use tokio::net::{TcpListener, ToSocketAddrs};
 use tokio_util::compat::FuturesAsyncReadCompatExt;
 use tracing::{debug, error, info};
-
-use crate::{ApiErrorStatus, InternalState, BASE_PATH};
 
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
@@ -25,6 +25,8 @@ use crate::{ApiErrorStatus, InternalState, BASE_PATH};
         },
         "protocol": "TCP",
         "target": "localhost:8080",
+        "listen_port": 10000,
+        "capabilities": ["Retransmission", "Segmentation"]
     }))]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct SessionClientRequest {
@@ -54,7 +56,7 @@ impl TryFrom<SessionClientRequest> for SessionClientConfig {
                 IpProtocol::TCP => {
                     vec![SessionCapability::Retransmission, SessionCapability::Segmentation]
                 }
-                _ => vec![], // no default capabilities for UDP etc.
+                _ => vec![], // no default capabilities for UDP, etc.
             }),
         })
     }
@@ -70,10 +72,22 @@ pub(crate) struct SessionClientResponse {
     pub port: u16,
 }
 
-/// Creates a new client session returning a dedicated session listening port.
+/// Creates a new client session returning the given session listening port over TCP or UDP.
+/// If no listening port is given in the request, the socket will be bound to a random free
+/// port and returned in the response.
+/// Different capabilities can be configured for the session, such as data segmentation or
+/// retransmission.
 ///
-/// Once the port is bound, it is possible to use the socket for bidirectional read and write communication.
-/// Various services require different types of socket communications.
+/// Once the port is bound, it is possible to use the socket for bidirectional read/write
+/// communication over the selected IP protocol and HOPR network routing with the given destination.
+/// The destination HOPR node forwards all the data to the given target over the selected IP protocol.
+///
+/// Various services require different types of socket communications:
+/// - services running over UDP usually do not require data retransmission, as it is already expected
+/// that UDP does not provide these and is therefore handled at the application layer.
+/// - On the contrary, services running over TCP *almost always* expect data segmentation and
+/// retransmission capabilities, so these should be configured while creating a session that passes
+/// TCP data.
 #[utoipa::path(
         post,
         path = const_format::formatcp!("{BASE_PATH}/session"),
@@ -166,7 +180,9 @@ async fn tcp_listen_on<A: ToSocketAddrs>(address: A) -> std::io::Result<(u16, Tc
 }
 
 async fn udp_bind_to<A: ToSocketAddrs>(address: A) -> std::io::Result<(u16, ConnectedUdpStream)> {
-    let udp_socket = ConnectedUdpStream::bind(address).await?;
+    let udp_socket = ConnectedUdpStream::bind(address)
+        .await?
+        .with_foreign_data_mode(ForeignDataMode::Discard); // discard data from UDP clients other than the first one served
 
     Ok((udp_socket.socket().local_addr()?.port(), udp_socket))
 }

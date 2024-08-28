@@ -95,7 +95,7 @@ pub struct Session {
     id: SessionId,
     inner: Pin<Box<dyn AsyncReadWrite>>,
     routing_options: RoutingOptions,
-    shutdown_notifier: Option<futures::channel::mpsc::UnboundedSender<(SessionId, RoutingOptions)>>,
+    shutdown_notifier: Option<futures::channel::mpsc::UnboundedSender<SessionId>>,
 }
 
 impl Session {
@@ -106,7 +106,7 @@ impl Session {
         capabilities: HashSet<Capability>,
         tx: Arc<dyn SendMsg + Send + Sync>,
         rx: UnboundedReceiver<Box<[u8]>>,
-        shutdown_notifier: Option<futures::channel::mpsc::UnboundedSender<(SessionId, RoutingOptions)>>,
+        shutdown_notifier: Option<futures::channel::mpsc::UnboundedSender<SessionId>>,
     ) -> Self {
         let inner_session = InnerSession::new(id, me, routing_options.clone(), tx, rx);
 
@@ -202,7 +202,7 @@ impl futures::AsyncWrite for Session {
             Poll::Ready(res) => {
                 // Notify about closure if desired
                 if let Some(notifier) = self.shutdown_notifier.take() {
-                    if let Err(err) = notifier.unbounded_send((self.id, self.routing_options.clone())) {
+                    if let Err(err) = notifier.unbounded_send(self.id) {
                         error!(
                             session_id = tracing::field::debug(self.id),
                             "failed to notify session closure: {err}"

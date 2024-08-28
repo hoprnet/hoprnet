@@ -25,6 +25,7 @@ use futures::{
     future::{select, Either},
     pin_mut, FutureExt, StreamExt, TryStreamExt,
 };
+use moka::notification::RemovalCause;
 use moka::ops::compute::CompResult;
 use std::{
     collections::HashMap,
@@ -204,22 +205,21 @@ where
 type SessionInitiationCache =
     moka::future::Cache<StartChallenge, UnboundedSender<Result<StartEstablished<SessionId>, StartErrorType>>>;
 
-type SessionCache = moka::future::Cache<SessionId, UnboundedSender<Box<[u8]>>>;
+type SessionCache = moka::future::Cache<SessionId, (UnboundedSender<Box<[u8]>>, RoutingOptions)>;
 
 async fn close_session_aux<T>(
     sessions: &SessionCache,
     me: PeerId,
     msg_sender: Arc<helpers::MessageSender<T>>,
     session_id: SessionId,
-    routing_options: Option<RoutingOptions>,
+    notify_closure: bool,
 ) -> errors::Result<()>
 where
     T: HoprDbAllOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
 {
-    if let Some(session_tx) = sessions.remove(&session_id).await {
-        // Send SessionClose if routing options were given.
-        // This is only the case when we are closing in response to the other party's request
-        if let Some(routing_options) = routing_options {
+    if let Some((session_tx, routing_options)) = sessions.remove(&session_id).await {
+        // Notification is not sent only when closing in response to the other party's request
+        if notify_closure {
             trace!(
                 session_id = tracing::field::debug(session_id),
                 "sending session termination"
@@ -245,6 +245,50 @@ where
     Ok(())
 }
 
+fn close_session_after_eviction<T>(
+    msg_sender: Arc<helpers::MessageSender<T>>,
+    me: PeerId,
+    id: Arc<SessionId>,
+    (_, routing_opts): (UnboundedSender<Box<[u8]>>, RoutingOptions),
+    cause: moka::notification::RemovalCause,
+) -> moka::notification::ListenerFuture
+where
+    T: HoprDbAllOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
+{
+    // When a Session is removed from the cache, we notify the other party only
+    // if this removal was due to expiration or cache size limit.
+    match cause {
+        RemovalCause::Expired | RemovalCause::Size if msg_sender.can_send() => {
+            let session_id = *id;
+            trace!(
+                session_id = tracing::field::debug(session_id),
+                "sending session termination due to eviction from the cache"
+            );
+            let data = match ApplicationData::try_from(StartProtocol::CloseSession(session_id.with_peer(me))) {
+                Ok(data) => data,
+                Err(e) => {
+                    error!(
+                        session_id = tracing::field::debug(session_id),
+                        "failed to serialize CloseSession: {e}"
+                    );
+                    return futures::future::ready(()).boxed();
+                }
+            };
+
+            async move {
+                if let Err(err) = msg_sender.send_message(data, *session_id.peer(), routing_opts).await {
+                    error!(
+                        session_id = tracing::field::debug(session_id),
+                        "could not send notification of session closure after cache eviction: {err}"
+                    );
+                }
+            }
+            .boxed()
+        }
+        _ => futures::future::ready(()).boxed(),
+    }
+}
+
 /// Interface into the physical transport mechanism allowing all off-chain HOPR-related tasks on
 /// the transport, as well as off-chain ticket manipulation.
 pub struct HoprTransport<T>
@@ -257,13 +301,12 @@ where
     db: T,
     ping: Arc<OnceLock<Pinger<network_notifier::PingExternalInteractions<T>>>>,
     network: Arc<Network<T>>,
-    path_planner: helpers::PathPlanner<T>,
+    msg_sender: Arc<helpers::MessageSender<T>>,
     my_multiaddresses: Vec<Multiaddr>,
-    process_packet_send: Arc<OnceLock<MsgSender>>,
     process_ticket_aggregate:
         Arc<OnceLock<TicketAggregationActions<TicketAggregationResponseType, TicketAggregationRequestType>>>,
     session_initiations: SessionInitiationCache,
-    session_close_notifier: OnceLock<UnboundedSender<(SessionId, RoutingOptions)>>,
+    session_close_notifier: OnceLock<UnboundedSender<SessionId>>,
     sessions: SessionCache,
 }
 
@@ -272,7 +315,7 @@ async fn handle_start_protocol_message<T>(
     data: ApplicationData,
     me: PeerId,
     new_session_notifier: UnboundedSender<IncomingSession>,
-    close_session_notifier: UnboundedSender<(SessionId, RoutingOptions)>,
+    close_session_notifier: UnboundedSender<SessionId>,
     message_sender: Arc<helpers::MessageSender<T>>,
     sessions: SessionCache,
     session_initiations: SessionInitiationCache,
@@ -310,7 +353,7 @@ where
                     };
                     SessionId::new(next_tag, peer)
                 },
-                tx_session_data,
+                (tx_session_data, route.clone()),
             )
             .await
             {
@@ -436,7 +479,7 @@ where
                 session_id = tracing::field::debug(session_id),
                 "received session close request"
             );
-            match close_session_aux(&sessions, me, message_sender.clone(), session_id, None).await {
+            match close_session_aux(&sessions, me, message_sender.clone(), session_id, false).await {
                 Ok(_) => debug!(
                     session_id = tracing::field::debug(session_id),
                     "session has been closed by the other party"
@@ -465,11 +508,15 @@ where
         my_multiaddresses: Vec<Multiaddr>,
     ) -> Self {
         let identity: libp2p::identity::Keypair = (me).into();
+        let msg_sender = Arc::new(helpers::MessageSender::new(
+            Default::default(),
+            helpers::PathPlanner::new(db.clone(), channel_graph),
+        ));
+        let my_peer_id = PeerId::from(me);
 
         Self {
             me: identity.public().to_peer_id(),
             me_onchain: me_onchain.public().to_address(),
-            db: db.clone(),
             ping: Arc::new(OnceLock::new()),
             network: Arc::new(Network::new(
                 me.public().into(),
@@ -477,10 +524,10 @@ where
                 cfg.network.clone(),
                 db.clone(),
             )),
+            db,
             cfg,
-            path_planner: helpers::PathPlanner::new(db, channel_graph),
             my_multiaddresses,
-            process_packet_send: Arc::new(OnceLock::new()),
+            msg_sender: msg_sender.clone(),
             process_ticket_aggregate: Arc::new(OnceLock::new()),
             session_initiations: moka::future::Cache::builder()
                 .max_capacity((RESERVED_SESSION_TAG_UPPER_LIMIT - RESERVED_SUBPROTOCOL_TAG_UPPER_LIMIT + 1) as u64)
@@ -489,6 +536,10 @@ where
             sessions: moka::future::Cache::builder()
                 .max_capacity(u16::MAX as u64)
                 .time_to_idle(constants::SESSION_LIFETIME)
+                .async_eviction_listener(move |k, v, c| {
+                    let msg_sender_clone = msg_sender.clone();
+                    close_session_after_eviction(msg_sender_clone, my_peer_id, k, v, c)
+                })
                 .build(),
             session_close_notifier: OnceLock::new(),
         }
@@ -500,10 +551,6 @@ where
 
     pub fn network(&self) -> Arc<Network<T>> {
         self.network.clone()
-    }
-
-    fn new_message_sender(&self) -> helpers::MessageSender<T> {
-        helpers::MessageSender::new(self.process_packet_send.clone(), self.path_planner.clone())
     }
 
     /// Execute all processes of the [`crate::HoprTransport`] object.
@@ -546,7 +593,7 @@ where
             network_notifier::PingExternalInteractions::new(
                 network.clone(),
                 self.db.clone(),
-                self.path_planner.channel_graph(),
+                self.msg_sender.resolver.channel_graph(),
                 network_events_tx,
             ),
         );
@@ -573,7 +620,8 @@ where
         let (external_msg_send, external_msg_rx) =
             futures::channel::mpsc::unbounded::<(ApplicationData, TransportPath, PacketSendFinalizer)>();
 
-        self.process_packet_send
+        self.msg_sender
+            .process_packet_send
             .clone()
             .set(MsgSender::new(external_msg_send))
             .expect("must set the packet processing writer only once");
@@ -648,32 +696,29 @@ where
             );
         }
 
-        let message_sender = Arc::new(self.new_message_sender());
         let sessions = self.sessions.clone();
-        let msg_sender_clone = message_sender.clone();
+        let msg_sender_clone = self.msg_sender.clone();
         let me = self.me;
 
         processes.insert(
             HoprTransportProcess::SessionTerminator,
             spawn(
-                session_close_rx.for_each_concurrent(Some(10), move |(closed_session_id, routing_opts)| {
+                session_close_rx.for_each_concurrent(Some(10), move |closed_session_id| {
                     let sessions = sessions.clone();
                     let msg_sender_clone = msg_sender_clone.clone();
                     async move {
                         trace!(
                             session_id = tracing::field::debug(closed_session_id),
-                            "notification of session closure by us"
+                            "sending notification of session closure done by us"
                         );
-                        match close_session_aux(&sessions, me, msg_sender_clone, closed_session_id, Some(routing_opts))
-                            .await
-                        {
+                        match close_session_aux(&sessions, me, msg_sender_clone, closed_session_id, true).await {
                             Ok(_) => debug!(
                                 session_id = tracing::field::debug(closed_session_id),
                                 "session has been closed by us"
                             ),
                             Err(e) => error!(
                                 session_id = tracing::field::debug(closed_session_id),
-                                "cannot initiate session closure: {e}"
+                                "cannot initiate session closure notification: {e}"
                             ),
                         }
                     }
@@ -684,7 +729,7 @@ where
         // initiate session handling over the msg-ack protocol stack
         let sessions = self.sessions.clone();
         let session_initiations = self.session_initiations.clone();
-        let message_sender = Arc::new(self.new_message_sender());
+        let message_sender = self.msg_sender.clone();
 
         processes.insert(
             HoprTransportProcess::SessionsManagement,
@@ -721,7 +766,7 @@ where
                                         hopr_transport_session::types::unwrap_offchain_key(data.plain_text.clone())
                                     {
                                         let session_id = SessionId::new(app_tag, peer);
-                                        if let Some(session_data_sender) = sessions.get(&session_id).await {
+                                        if let Some((session_data_sender, _)) = sessions.get(&session_id).await {
                                             trace!(
                                                 session_id = tracing::field::debug(session_id),
                                                 "received data for a registered session"
@@ -846,7 +891,7 @@ where
         });
 
         // Send the Session initiation message
-        self.new_message_sender()
+        self.msg_sender
             .send_message(start_session_msg.try_into()?, cfg.peer, cfg.path_options.clone())
             .await?;
 
@@ -870,14 +915,14 @@ where
 
                 // Insert the Session object, forcibly overwrite any other session with the same ID
                 let (tx, rx) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
-                self.sessions.insert(session_id, tx).await;
+                self.sessions.insert(session_id, (tx, cfg.path_options.clone())).await;
 
                 Ok(Session::new(
                     session_id,
                     self.me,
                     cfg.path_options,
                     cfg.capabilities.into_iter().collect(),
-                    Arc::new(self.new_message_sender()),
+                    self.msg_sender.clone(),
                     rx,
                     self.session_close_notifier.get().cloned(),
                 ))
@@ -909,6 +954,7 @@ where
         options: RoutingOptions,
         application_tag: Option<u16>,
     ) -> errors::Result<()> {
+        // The send_message logic will be entirely removed in 3.0
         if let Some(application_tag) = application_tag {
             if application_tag < RESERVED_SESSION_TAG_UPPER_LIMIT {
                 return Err(HoprTransportError::Api(format!(
@@ -925,9 +971,10 @@ where
 
         let app_data = ApplicationData::new_from_owned(application_tag, msg)?;
 
-        let path = self.path_planner.resolve_path(destination, options).await?;
-
-        let sender = self.process_packet_send.get().ok_or_else(|| {
+        // Here we do not use msg_sender directly,
+        // since it internally follows Session-oriented logic
+        let path = self.msg_sender.resolver.resolve_path(destination, options).await?;
+        let sender = self.msg_sender.process_packet_send.get().ok_or_else(|| {
             HoprTransportError::Api("send msg: failed because message processing is not yet initialized".into())
         })?;
 

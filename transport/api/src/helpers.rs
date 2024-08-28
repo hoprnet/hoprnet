@@ -144,19 +144,23 @@ pub(crate) struct MessageSender<T>
 where
     T: HoprDbAllOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
 {
-    process_packet_send: Arc<OnceLock<MsgSender>>,
-    resolver: PathPlanner<T>,
+    pub process_packet_send: Arc<OnceLock<MsgSender>>,
+    pub resolver: PathPlanner<T>,
 }
 
 impl<T> MessageSender<T>
 where
     T: HoprDbAllOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
 {
-    pub(crate) fn new(process_packet_send: Arc<OnceLock<MsgSender>>, resolver: PathPlanner<T>) -> Self {
+    pub fn new(process_packet_send: Arc<OnceLock<MsgSender>>, resolver: PathPlanner<T>) -> Self {
         Self {
             process_packet_send,
             resolver,
         }
+    }
+
+    pub fn can_send(&self) -> bool {
+        self.process_packet_send.get().is_some()
     }
 }
 
