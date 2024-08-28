@@ -87,6 +87,7 @@
 //! ```
 
 use hopr_lib::errors::HoprLibError;
+use hopr_network_types::prelude::ForeignDataMode;
 use std::net::ToSocketAddrs;
 
 pub mod cli;
@@ -122,6 +123,8 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                 let mut udp_bridge = hopr_network_types::udp::ConnectedUdpStream::bind(("127.0.0.1", 0))
                     .await
                     .and_then(|s| s.with_counterparty(resolved_udp_target))
+                    // silently discard data from other clients than the first one served
+                    .map(|s| s.with_foreign_data_mode(ForeignDataMode::Discard))
                     .map_err(|e| {
                         HoprLibError::GeneralError(format!(
                             "could not bridge the incoming session to {udp_target}: {e}"

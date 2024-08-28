@@ -3,6 +3,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use tokio::io::ReadBuf;
 use tokio::net::UdpSocket;
+use tracing::debug;
 
 /// Mimics TCP-like stream functionality on a UDP socket by restricting it to a single
 /// counterparty and implements [`tokio::io::AsyncRead`] and [`tokio::io::AsyncWrite`].
@@ -17,11 +18,25 @@ use tokio::net::UdpSocket;
 ///
 /// If data from another party is received, an error is raised, unless the object has been constructed
 /// with [`with_foreign_data_discarding`](ConnectedUdpStream::with_foreign_data_discarding) setting.
+#[derive(Debug)]
 pub struct ConnectedUdpStream {
     sock: UdpSocket,
     counterparty: Option<std::net::SocketAddr>,
     closed: bool,
-    discard_foreign: bool,
+    foreign_data_mode: ForeignDataMode,
+}
+
+/// Defines what happens when data from another [`SocketAddr`](std::net::SocketAddr) arrives
+/// into the [`ConnectedUdpStream`] (other than the one that is considered a counterparty for that
+/// instance).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ForeignDataMode {
+    /// Foreign data are simply discarded.
+    Discard,
+    /// Foreign data are accepted as if they arrived from the set counterparty.
+    Accept,
+    /// Error is raised on the `poll_read` attempt.
+    Error,
 }
 
 impl ConnectedUdpStream {
@@ -31,7 +46,7 @@ impl ConnectedUdpStream {
             sock: UdpSocket::bind(bind).await?,
             counterparty: None,
             closed: false,
-            discard_foreign: false,
+            foreign_data_mode: ForeignDataMode::Error,
         })
     }
 
@@ -50,9 +65,10 @@ impl ConnectedUdpStream {
         }
     }
 
-    /// Enables discarding of data received from other counterparties and returns a new instance.
-    pub fn with_foreign_data_discarding(mut self) -> Self {
-        self.discard_foreign = true;
+    /// Changes the mode of behavior when foreign data (not from the counterparty) is received.
+    /// See [ForeignDataMode] for details.
+    pub fn with_foreign_data_mode(mut self, mode: ForeignDataMode) -> Self {
+        self.foreign_data_mode = mode;
         self
     }
 
@@ -67,16 +83,20 @@ impl tokio::io::AsyncRead for ConnectedUdpStream {
         match self.sock.poll_recv_from(cx, buf) {
             Poll::Ready(Ok(read_addr)) => match self.counterparty {
                 Some(addr) if addr == read_addr => Poll::Ready(Ok(())),
-                Some(addr) => {
-                    buf.clear();
-                    if self.discard_foreign {
+                Some(addr) => match self.foreign_data_mode {
+                    ForeignDataMode::Discard => {
+                        buf.clear();
+                        debug!("discarded data from foreign client {addr}");
                         Poll::Pending
-                    } else {
+                    }
+                    ForeignDataMode::Accept => Poll::Ready(Ok(())),
+                    ForeignDataMode::Error => {
+                        buf.clear();
                         Poll::Ready(Err(Error::other(format!(
                             "expected data from {addr}, got from {read_addr}"
                         ))))
                     }
-                }
+                },
                 None => {
                     self.counterparty = Some(read_addr);
                     Poll::Ready(Ok(()))
