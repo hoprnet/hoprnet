@@ -222,7 +222,7 @@ def copy_identities(dir: Path):
     logging.info(f"Copied '*.id' files to {dir}")
 
     # Copy new config files
-    for f in PWD.glob(f"*.cfg.yaml"):
+    for f in PWD.glob("*.cfg.yaml"):
         shutil.copy(f, dir.joinpath(f.name))
     logging.info(f"Copied '*.cfg.yaml' files to {dir}")
 
@@ -235,7 +235,7 @@ def snapshot_reuse(parent_dir: Path, nodes):
     shutil.copy(sdir.joinpath("anvil.state.json"), parent_dir)
 
     # copy configuration files
-    for f in sdir.glob(f"*.cfg.yaml"):
+    for f in sdir.glob("*.cfg.yaml"):
         parent_dir.joinpath(f.name).unlink(missing_ok=True)
         shutil.copy(f, parent_dir)
 
@@ -271,7 +271,7 @@ def snapshot_create(anvil_port, parent_dir: Path, nodes):
     shutil.copy(anvil_state_file(parent_dir), sdir)
 
     # copy configuration files
-    for f in parent_dir.glob(f"*.cfg.yaml"):
+    for f in parent_dir.glob("*.cfg.yaml"):
         shutil.copy(f, sdir)
 
     # copy node data and env files
