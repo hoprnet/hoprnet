@@ -341,4 +341,8 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
     pub async fn get_channel_closure_notice_period(&self) -> errors::Result<Duration> {
         Ok(self.rpc_operations.get_channel_closure_notice_period().await?)
     }
+
+    pub async fn get_eligibility_status(&self) -> errors::Result<bool> {
+        Ok(self.rpc_operations.get_eligibility_status(self.me_onchain()).await?)
+    }
 }

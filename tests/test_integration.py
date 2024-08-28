@@ -1,9 +1,11 @@
 import asyncio
+import multiprocessing
+import os
 import random
 import re
-import logging
+import socket
 import string
-from contextlib import AsyncExitStack, asynccontextmanager
+from contextlib import AsyncExitStack, asynccontextmanager, contextmanager
 
 import pytest
 import requests
@@ -27,6 +29,7 @@ PARAMETERIZED_SAMPLE_SIZE = 1  # if os.getenv("CI", default="false") == "false" 
 AGGREGATED_TICKET_PRICE = TICKET_AGGREGATION_THRESHOLD * TICKET_PRICE_PER_HOP
 MULTIHOP_MESSAGE_SEND_TIMEOUT = 30.0
 CHECK_RETRY_INTERVAL = 0.5
+APPLICATION_TAG_THRESHOLD_FOR_SESSIONS = RESERVED_TAG_UPPER_BOUND + 1
 
 
 # used by nodes to get unique port assignments
@@ -174,7 +177,11 @@ async def check_all_tickets_redeemed(src: Node):
 async def send_and_receive_packets_with_pop(
     packets, src: Node, dest: Node, path: str, timeout: int = MULTIHOP_MESSAGE_SEND_TIMEOUT
 ):
+<<<<<<< HEAD
     random_tag = gen_random_tag()
+=======
+    random_tag = random.randint(APPLICATION_TAG_THRESHOLD_FOR_SESSIONS, 65530)
+>>>>>>> origin/master
 
     for packet in packets:
         assert await src.api.send_message(dest.peer_id, packet, path, random_tag)
@@ -185,7 +192,11 @@ async def send_and_receive_packets_with_pop(
 async def send_and_receive_packets_with_peek(
     packets, src: Node, dest: Node, path: str, timeout: int = MULTIHOP_MESSAGE_SEND_TIMEOUT
 ):
+<<<<<<< HEAD
     random_tag = gen_random_tag()
+=======
+    random_tag = random.randint(APPLICATION_TAG_THRESHOLD_FOR_SESSIONS, 65530)
+>>>>>>> origin/master
 
     for packet in packets:
         assert await src.api.send_message(dest.peer_id, packet, path, random_tag)
@@ -308,7 +319,7 @@ async def test_hoprd_ping_should_work_between_nodes_in_the_same_network(src: str
 async def test_hoprd_ping_to_self_should_fail(peer: str, swarm7: dict[str, Node]):
     response = await swarm7[peer].api.ping(swarm7[peer].peer_id)
 
-    assert response is None, f"Pinging self should fail"
+    assert response is None, "Pinging self should fail"
 
 
 @pytest.mark.asyncio
@@ -366,12 +377,16 @@ async def test_hoprd_should_be_able_to_send_0_hop_messages_without_open_channels
 @pytest.mark.parametrize("src, dest", random_distinct_pairs_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
 async def test_hoprd_should_fail_sending_a_message_that_is_too_large(src: Node, dest: Node, swarm7: dict[str, Node]):
     MAXIMUM_PAYLOAD_SIZE = 500
+<<<<<<< HEAD
     random_tag = gen_random_tag()
+=======
+    random_tag = random.randint(APPLICATION_TAG_THRESHOLD_FOR_SESSIONS, 65530)
+>>>>>>> origin/master
 
     packet = "0 hop message too large: " + "".join(
         random.choices(string.ascii_uppercase + string.digits, k=MAXIMUM_PAYLOAD_SIZE)
     )
-    assert await swarm7[src].api.send_message(swarm7[dest].peer_id, packet, [], random_tag) == None
+    assert await swarm7[src].api.send_message(swarm7[dest].peer_id, packet, [], random_tag) is None
 
 
 @pytest.mark.asyncio
@@ -766,12 +781,19 @@ async def test_hoprd_strategy_UNFINISHED():
 @pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
 async def test_hoprd_check_native_withdraw(peer, swarm7: dict[str, Node]):
     amount = "9876"
+    remaining_attempts = 10
 
-    before_balance = await swarm7[peer].api.balances()
+    before_balance = int((await swarm7[peer].api.balances()).safe_native)
     await swarm7[peer].api.withdraw(amount, swarm7[peer].safe_address, "Native")
-    after_balance = await swarm7[peer].api.balances()
 
-    assert int(after_balance.safe_native) - int(before_balance.safe_native) == int(amount)
+    while remaining_attempts > 0:
+        after_balance = int((await swarm7[peer].api.balances()).safe_native)
+        if after_balance != before_balance:
+            break
+        await asyncio.sleep(0.5)
+        remaining_attempts -= 1
+
+    assert after_balance - before_balance == int(amount)
 
 
 @pytest.mark.asyncio
@@ -781,6 +803,15 @@ async def test_hoprd_check_ticket_price_is_default(peer, swarm7: dict[str, Node]
 
     assert isinstance(price, int)
     assert price > 0
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
+async def test_hoprd_check_ticket_winn_prob_is_default(peer, swarm7: dict[str, Node]):
+    price = await swarm7[peer].api.ticket_winn_prob()
+
+    assert price is not None
+    assert 0.0 <= round(price, 5) <= 1.0
 
 
 @pytest.mark.asyncio
@@ -809,7 +840,11 @@ async def test_peeking_messages_with_timestamp(src: str, dest: str, swarm7: dict
     message_count = int(TICKET_AGGREGATION_THRESHOLD / 10)
     split_index = int(message_count * 0.66)
 
+<<<<<<< HEAD
     random_tag = gen_random_tag()
+=======
+    random_tag = random.randint(APPLICATION_TAG_THRESHOLD_FOR_SESSIONS, 65530)
+>>>>>>> origin/master
 
     src_peer = swarm7[src]
     dest_peer = swarm7[dest]
@@ -847,7 +882,11 @@ async def test_peeking_messages_with_timestamp(src: str, dest: str, swarm7: dict
 @pytest.mark.parametrize("src,dest", random_distinct_pairs_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
 async def test_send_message_return_timestamp(src: str, dest: str, swarm7: dict[str, Node]):
     message_count = int(TICKET_AGGREGATION_THRESHOLD / 10)
+<<<<<<< HEAD
     random_tag = gen_random_tag()
+=======
+    random_tag = random.randint(APPLICATION_TAG_THRESHOLD_FOR_SESSIONS, 65530)
+>>>>>>> origin/master
 
     src_peer = swarm7[src]
     dest_peer = swarm7[dest]
@@ -860,3 +899,80 @@ async def test_send_message_return_timestamp(src: str, dest: str, swarm7: dict[s
 
     assert len(timestamps) == message_count
     assert timestamps == sorted(timestamps)
+
+
+SERVER_LISTENING_PORT_HARDCODED_IN_HOPRD_CODE = 4677
+HOPR_SESSION_MAX_PAYLOAD_SIZE = 462
+
+
+def run_echo_server(port: int):
+
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(("127.0.0.1", port))
+        s.listen()
+        conn, _addr = s.accept()
+        with conn:
+            while True:
+                data = conn.recv(HOPR_SESSION_MAX_PAYLOAD_SIZE)
+                conn.sendall(data)
+
+
+@contextmanager
+def echo_server(port: int):
+    process = multiprocessing.Process(target=run_echo_server, args=(port,))
+    process.start()
+    try:
+        yield port
+    finally:
+        process.terminate()
+
+
+@contextmanager
+def connect_socket(port):
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.connect(("127.0.0.1", port))
+
+    try:
+        yield s
+    finally:
+        s.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("src,dest", random_distinct_pairs_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
+async def test_session_communication_with_an_echo_server_wireguard_style_communication(
+    src: str, dest: str, swarm7: dict[str, Node]
+):
+    """
+    HOPR TCP socket buffers are set to 462 bytes to mimic the underlying MTU of the HOPR protocol.
+    """
+
+    packet_count = 1000 if os.getenv("CI", default="false") == "false" else 50
+    expected = [f"{i}".rjust(HOPR_SESSION_MAX_PAYLOAD_SIZE) for i in range(packet_count)]
+
+    assert [len(x) for x in expected] == packet_count * [HOPR_SESSION_MAX_PAYLOAD_SIZE]
+
+    src_peer = swarm7[src]
+    dest_peer = swarm7[dest]
+
+    # src_sock_port = await src_peer.api.session_client(dest_peer.peer_id, path={"Hops": 0})        # https://github.com/hoprnet/hoprnet/issues/6411
+    src_sock_port = await src_peer.api.session_client(dest_peer.peer_id, path={"IntermediatePath": []})
+
+    actual = []
+
+    with echo_server(SERVER_LISTENING_PORT_HARDCODED_IN_HOPRD_CODE):
+        # socket.listen does not actually listen immediately and needs some time to be working
+        # otherwise a `ConnectionRefusedError: [Errno 61] Connection refused` will be encountered
+        await asyncio.sleep(1.0)
+
+        with connect_socket(src_sock_port) as s:
+            s.settimeout(20)
+            for message in expected:
+                s.send(message.encode())
+
+            for message in expected:
+                actual.append(s.recv(len(message)).decode())
+
+    actual.sort()
+    expected.sort()
+    assert actual == expected

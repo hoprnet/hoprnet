@@ -170,6 +170,7 @@ function setup_node() {
       --testAnnounceLocalAddresses \
       --testPreferLocalAddresses \
       --protocolConfig ${protocol_config} \
+      --configurationFilePath "${mydir}/local-cluster-hoprd.cfg.yaml" \
       ${additional_args} \
       > "${log}" 2>&1 &
 }
@@ -383,7 +384,7 @@ for node_id in ${!id_files[@]}; do
   log "\t${node_name}"
   log "\t\tPeer Id:\t${peers[$node_id]}"
   log "\t\tAddress:\t${node_addrs[$node_id]}"
-  log "\t\tRest API:\thttp://${listen_host}:${api_port}/swagger-ui/index.html"
+  log "\t\tRest API:\thttp://${listen_host}:${api_port}/scalar"
   log "\t\tAdmin UI:\thttp://${listen_host}:3000/?apiEndpoint=http://${listen_host}:${api_port}&apiToken=${api_token}"
   log "\t\tWebSocket:\tws://${listen_host}:${api_port}/api/v3/messages/websocket?apiToken=${api_token}"
 

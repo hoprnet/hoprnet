@@ -11,6 +11,7 @@ import websockets
 
 from .conftest import TICKET_PRICE_PER_HOP, to_ws_url
 from .hopr import HoprdAPI
+from .node import Node
 from .test_integration import create_channel
 
 
@@ -56,7 +57,7 @@ class ApiWrapper:
 @pytest.mark.skipif(
     os.getenv("CI", "false") == "true", reason="stress tests fail randomly on CI due to resource constraints"
 )
-async def test_stress_relayed_flood_test_with_sources_performing_1_hop_to_self(stress_fixture):
+async def test_stress_relayed_flood_test_with_sources_performing_1_hop_to_self(stress_fixture, swarm7: dict[str, Node]):
     STRESS_1_HOP_TO_SELF_MESSAGE_COUNT = stress_fixture["request_count"]
 
     api_sources = [HoprdAPI(f'http://{d["url"]}', d["token"]) for d in stress_fixture["sources"]]
@@ -96,29 +97,20 @@ async def test_stress_relayed_flood_test_with_sources_performing_1_hop_to_self(s
                 ]
 
                 recv_packets = []
-                recv_ack_challenges = 0
-                recv_acks = 0
 
                 for packet in packets:
                     msg = {
-                        "cmd": "sendmsg",
-                        "args": {"body": packet, "peerId": self_peer_id, "path": [target_peer_id], "tag": tag},
+                        "body": packet, "peerId": self_peer_id, "path": [target_peer_id], "tag": tag,
                     }
                     await socket.send(json.dumps(msg))
 
                 packets.sort()
 
-                # receive all messages, acks and ack-challenges
-                for _ in range(len(packets) * 3):
+                # receive all messages
+                for _ in range(len(packets)):
                     try:
                         msg = await asyncio.wait_for(socket.recv(), timeout=5)
-                        msg = json.loads(msg)
-                        if msg["type"] == "message-ack":
-                            recv_acks += 1
-                        elif msg["type"] == "message-ack-challenge":
-                            recv_ack_challenges += 1
-                        elif msg["type"] == "message":
-                            recv_packets.append(msg["body"])
+                        recv_packets.append(json.loads(msg)["body"])
                     except Exception:
                         break
 
@@ -127,11 +119,9 @@ async def test_stress_relayed_flood_test_with_sources_performing_1_hop_to_self(s
                 logging.info(
                     f"The websocket stress test ran at {STRESS_1_HOP_TO_SELF_MESSAGE_COUNT/(end_time - start_time)} packets/s/node"
                 )
-
+                
                 recv_packets.sort()
                 assert recv_packets == packets
-                assert recv_acks == len(packets)
-                assert recv_ack_challenges == len(packets)
 
         await asyncio.gather(
             *[

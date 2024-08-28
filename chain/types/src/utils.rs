@@ -336,11 +336,14 @@ pub async fn approve_channel_transfer_from_safe<M: Middleware>(
     Ok(())
 }
 
-/// Deploy a safe instance and a module instance
+/// Deploy a safe instance and a module instance.
+///
 /// Notice that to complete the on-boarding process,
 /// 1) node should be included to the module
 /// 2) announcement contract should be a target in the module
-/// Notice that to be able to open channels, the deployed safe should have HOPR tokens and approve token transfer for Channels contract on the token contract
+///
+/// Notice that to be able to open channels, the deployed safe should have HOPR tokens and approve token transfer for Channels contract on the token contract.
+///
 /// Returns (module address, safe address)
 pub async fn deploy_one_safe_one_module_and_setup_for_testing<M: Middleware>(
     instances: &ContractInstances<M>,

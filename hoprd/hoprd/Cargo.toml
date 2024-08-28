@@ -13,6 +13,7 @@ build = "build.rs"
 default = [
   "runtime-tokio",
   "prometheus",
+  "telemetry",
 ] # uses tokio by default because of axum
 prometheus = [
   "dep:hopr-metrics",
@@ -28,6 +29,7 @@ runtime-async-std = [
 ]
 runtime-tokio = [
   "dep:tokio",
+  "tokio-util/compat",
   "hopr-lib/runtime-tokio",
   "hopr-async-runtime/runtime-tokio",
   "opentelemetry_sdk?/rt-tokio",
@@ -60,6 +62,7 @@ signal-hook = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, optional = true }
+tokio-util = { workspace = true, optional = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 validator = { workspace = true }
@@ -73,9 +76,13 @@ opentelemetry-otlp = { version = "0.17.0", default-features = false, features = 
   "grpc-tonic",
 ], optional = true }
 opentelemetry_sdk = { version = "0.24.0", optional = true }
-tracing-opentelemetry = { version = "0.24.0", optional = true }
+tracing-opentelemetry = { version = "0.25.0", optional = true }
 
-hopr-lib = { workspace = true, features = ["runtime-tokio"] }
+hopr-lib = { workspace = true, features = [
+  "runtime-tokio",
+  "session-client",
+  "session-server",
+] }
 hoprd-api = { workspace = true }
 hoprd-inbox = { workspace = true }
 hoprd-keypair = { workspace = true }

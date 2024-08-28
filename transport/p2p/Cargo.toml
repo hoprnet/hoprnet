@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport-p2p"
-version = "0.4.0"
+version = "0.5.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 license = "GPL-3.0-only"
@@ -29,6 +29,7 @@ libp2p = { workspace = true, features = [
   "yamux",
 ] }
 libp2p-mplex = { workspace = true }
+moka = { workspace = true }
 multiaddr = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 thiserror = { workspace = true }
@@ -36,10 +37,10 @@ tracing = { workspace = true }
 void = "1.0.2" # needed for Behavior implementations from libp2p
 
 core-network = { workspace = true }
-core-protocol = { workspace = true }
-hopr-internal-types = { workspace = true }
 hopr-crypto-types = { workspace = true }
+hopr-internal-types = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
+hopr-transport-protocol = { workspace = true }
 
 [dev-dependencies]
 async-std = { workspace = true }

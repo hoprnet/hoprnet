@@ -77,6 +77,14 @@ test: smart-contract-test ## run unit tests for all packages, or a single packag
 smoke-tests: ## run smoke tests
 	source .venv/bin/activate && python3 -m pytest tests/
 
+.PHONY: stress-test-local-swarm
+stress-test-local-swarm: ## run stress tests on a local node swarm
+	source .venv/bin/activate && \
+		python3 -m pytest tests/test_stress.py \
+		--stress-request-count=3000 \
+		--stress-sources='[{"url": "localhost:19091", "token": "e2e-API-token^^"}]' \
+		--stress-target='{"url": "localhost:19093", "token": "e2e-API-token^^"}'
+
 .PHONY: smart-contract-test
 smart-contract-test: # forge test smart contracts
 	$(MAKE) -C ethereum/contracts/ sc-test
@@ -351,11 +359,11 @@ run-docker-dev: ## start a local development Docker container
 		develop
 
 .PHONY: run-hopr-admin
-run-hopr-admin: version=07aec21b
+run-hopr-admin: version=latest
 run-hopr-admin: port=3000
 run-hopr-admin: ## launches HOPR Admin in a Docker container, supports port= and version=, use http://host.docker.internal to access the host machine
-	docker run -p $(port):3000 --add-host=host.docker.internal:host-gateway \
-		gcr.io/hoprassociation/hopr-admin:$(version)
+	docker run -p $(port):80 --name hopr-admin --platform linux/amd64 \
+		europe-west3-docker.pkg.dev/hoprassociation/docker-images/hopr-admin:$(version)
 
 .PHONY: exec-script
 exec-script: ## execute given script= with the correct PATH set

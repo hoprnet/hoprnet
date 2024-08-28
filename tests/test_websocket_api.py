@@ -147,24 +147,12 @@ async def test_websocket_send_receive_messages(src: str, dest: str, swarm7: dict
         body = f"hello msg {i} from peer {swarm7[src].peer_id} to peer {swarm7[dest].peer_id}"
 
         # we test direct messaging only
-        msg = {"cmd": "sendmsg", "args": {"body": body, "peerId": swarm7[dest].peer_id, "path": [], "tag": tag}}
+        msg = {"body": body, "peerId": swarm7[dest].peer_id, "path": [], "tag": tag}
 
         await ws_connections[src].send(json.dumps(msg))
-
-        try:
-            ack_challenge_msg = await asyncio.wait_for(ws_connections[src].recv(), timeout=5)
-        except Exception:
-            pytest.fail(f"Timeout when receiving ack-challenge of msg {i} from {src} to {dest}")
-        assert re.match(r"^.*\"message-ack-challenge\".*$", ack_challenge_msg)
 
         try:
             msg = await asyncio.wait_for(ws_connections[dest].recv(), timeout=5)
         except Exception:
             pytest.fail(f"Timeout when receiving msg {i} from {src} to {dest}")
         assert re.match(f".*{body}.*$", msg)
-
-        try:
-            ack_msg = await asyncio.wait_for(ws_connections[src].recv(), timeout=5)
-        except Exception:
-            pytest.fail(f"Timeout when receiving ack of msg {i} from {src} to {dest}")
-        assert re.match(r"^.*\"message-ack\".*$", ack_msg)

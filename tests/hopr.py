@@ -12,6 +12,7 @@ from hoprd_sdk.api import (
     NetworkApi,
     NodeApi,
     PeersApi,
+    SessionApi,
     TicketsApi,
 )
 from hoprd_sdk.models import (
@@ -20,6 +21,7 @@ from hoprd_sdk.models import (
     GetMessageBodyRequest,
     OpenChannelBodyRequest,
     SendMessageBodyRequest,
+    SessionClientRequest,
     TagQueryRequest,
     WithdrawBodyRequest,
 )
@@ -62,7 +64,7 @@ class HoprdAPI:
                 )
                 return (True, response)
         except ApiException as e:
-            log.error(
+            log.debug(
                 f"ApiException calling {api_callback.__qualname__} with kwargs: {kwargs}, args: {args}, error is: {e}"
             )
             return (False, None)
@@ -382,6 +384,24 @@ class HoprdAPI:
         """
         _, response = self.__call_api(NetworkApi, "price")
         return int(response.price) if hasattr(response, "price") else None
+
+    async def session_client(self, destination: str, path: str):
+        """
+        Returns the port of the client session.
+        :return: port: int
+        """
+        body = SessionClientRequest(destination=destination, path=path, port=0)
+
+        _, response = self.__call_api(SessionApi, "create_client", body=body)
+        return int(response.port) if hasattr(response, "port") else None
+
+    async def ticket_winn_prob(self):
+        """
+        Returns the ticket winning probability.
+        :return: probability: float
+        """
+        _, response = self.__call_api(NetworkApi, "probability")
+        return getattr(response, "probability", None)
 
     async def withdraw(self, amount: str, receipient: str, currency: str):
         """

@@ -28,14 +28,15 @@ pub mod multiaddrs;
 /// Raw swarm definition for the HOPR network.
 pub mod swarm;
 
+/// P2P behavior definitions for the transport level interactions not related to the HOPR protocol
+mod behavior;
+
 use std::fmt::Debug;
 
-use core_protocol::{
-    ack::config::AckProtocolConfig, heartbeat::config::HeartbeatProtocolConfig, msg::config::MsgProtocolConfig,
-    ticket_aggregation::config::TicketAggregationProtocolConfig,
-};
+use core_network::network::NetworkTriggeredEvent;
+use core_network::ping::PingQueryReplier;
 
-use hopr_crypto_types::types::HalfKeyChallenge;
+use futures::Stream;
 /// Re-export of the entire libp2p functionality
 ///
 /// NOTE: likely can be reduced to [libp2p::PeerId] and [libp2p::multiaddr]
@@ -56,6 +57,8 @@ use crate::constants::{
     HOPR_TICKET_AGGREGATION_PROTOCOL_V_0_1_0,
 };
 
+pub const MSG_ACK_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
+
 /// `Ping` protocol base type for the ping operation
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Ping(pub ControlMessage);
@@ -73,6 +76,9 @@ pub struct Pong(pub ControlMessage, pub String);
 #[derive(NetworkBehaviour)]
 #[behaviour(to_swarm = "HoprNetworkBehaviorEvent")]
 pub struct HoprNetworkBehavior {
+    discovery: behavior::discovery::Behaviour,
+    heartbeat_generator: behavior::heartbeat::Behaviour,
+    ticket_aggregation_behavior: behavior::ticket_aggregation::Behaviour,
     pub heartbeat: libp2p::request_response::cbor::Behaviour<Ping, Pong>,
     pub msg: libp2p::request_response::cbor::Behaviour<Box<[u8]>, ()>,
     pub ack: libp2p::request_response::cbor::Behaviour<Acknowledgement, ()>,
@@ -87,33 +93,48 @@ impl Debug for HoprNetworkBehavior {
 }
 
 impl HoprNetworkBehavior {
-    pub fn new(
-        msg_cfg: MsgProtocolConfig,
-        ack_cfg: AckProtocolConfig,
-        hb_cfg: HeartbeatProtocolConfig,
-        ticket_aggregation_cfg: TicketAggregationProtocolConfig,
-    ) -> Self {
+    #[allow(clippy::too_many_arguments)]
+    pub fn new<T, U, V, W>(
+        me: PeerId,
+        network_events: T,
+        onchain_events: U,
+        heartbeat_requests: V,
+        ticket_aggregation_processed_events: W,
+        hb_timeout: std::time::Duration,
+        ticket_aggregation_timeout: std::time::Duration,
+    ) -> Self
+    where
+        T: Stream<Item = NetworkTriggeredEvent> + Send + 'static,
+        U: Stream<Item = PeerDiscovery> + Send + 'static,
+        V: Stream<Item = (PeerId, PingQueryReplier)> + Send + 'static,
+        W: Stream<Item = behavior::ticket_aggregation::Event> + Send + 'static,
+    {
         Self {
+            discovery: behavior::discovery::Behaviour::new(me, network_events, onchain_events),
+            heartbeat_generator: behavior::heartbeat::Behaviour::new(heartbeat_requests),
+            ticket_aggregation_behavior: behavior::ticket_aggregation::Behaviour::new(
+                ticket_aggregation_processed_events,
+            ),
             heartbeat: libp2p::request_response::cbor::Behaviour::<Ping, Pong>::new(
                 [(
                     StreamProtocol::new(HOPR_HEARTBEAT_PROTOCOL_V_0_1_0),
                     libp2p::request_response::ProtocolSupport::Full,
                 )],
-                libp2p::request_response::Config::default().with_request_timeout(hb_cfg.timeout),
+                libp2p::request_response::Config::default().with_request_timeout(hb_timeout),
             ),
             msg: libp2p::request_response::cbor::Behaviour::<Box<[u8]>, ()>::new(
                 [(
                     StreamProtocol::new(HOPR_MESSAGE_PROTOCOL_V_0_1_0),
                     libp2p::request_response::ProtocolSupport::Full,
                 )],
-                libp2p::request_response::Config::default().with_request_timeout(msg_cfg.timeout),
+                libp2p::request_response::Config::default().with_request_timeout(MSG_ACK_TIMEOUT),
             ),
             ack: libp2p::request_response::cbor::Behaviour::<Acknowledgement, ()>::new(
                 [(
                     StreamProtocol::new(HOPR_ACKNOWLEDGE_PROTOCOL_V_0_1_0),
                     libp2p::request_response::ProtocolSupport::Full,
                 )],
-                libp2p::request_response::Config::default().with_request_timeout(ack_cfg.timeout),
+                libp2p::request_response::Config::default().with_request_timeout(MSG_ACK_TIMEOUT),
             ),
             ticket_aggregation: libp2p::request_response::cbor::Behaviour::<
                 Vec<legacy::AcknowledgedTicket>,
@@ -123,20 +144,9 @@ impl HoprNetworkBehavior {
                     StreamProtocol::new(HOPR_TICKET_AGGREGATION_PROTOCOL_V_0_1_0),
                     libp2p::request_response::ProtocolSupport::Full,
                 )],
-                libp2p::request_response::Config::default().with_request_timeout(ticket_aggregation_cfg.timeout),
+                libp2p::request_response::Config::default().with_request_timeout(ticket_aggregation_timeout),
             ),
         }
-    }
-}
-
-impl Default for HoprNetworkBehavior {
-    fn default() -> Self {
-        Self::new(
-            MsgProtocolConfig::default(),
-            AckProtocolConfig::default(),
-            HeartbeatProtocolConfig::default(),
-            TicketAggregationProtocolConfig::default(),
-        )
     }
 }
 
@@ -146,6 +156,9 @@ impl Default for HoprNetworkBehavior {
 /// processing in the business logic loop.
 #[derive(Debug)]
 pub enum HoprNetworkBehaviorEvent {
+    Discovery(behavior::discovery::Event),
+    HeartbeatGenerator(behavior::heartbeat::Event),
+    TicketAggregationBehavior(behavior::ticket_aggregation::Event),
     Heartbeat(libp2p::request_response::Event<Ping, Pong>),
     Message(libp2p::request_response::Event<Box<[u8]>, ()>),
     Acknowledgement(libp2p::request_response::Event<Acknowledgement, ()>),
@@ -158,6 +171,24 @@ pub enum HoprNetworkBehaviorEvent {
 impl From<void::Void> for HoprNetworkBehaviorEvent {
     fn from(event: void::Void) -> Self {
         Self::KeepAlive(event)
+    }
+}
+
+impl From<behavior::discovery::Event> for HoprNetworkBehaviorEvent {
+    fn from(event: behavior::discovery::Event) -> Self {
+        Self::Discovery(event)
+    }
+}
+
+impl From<behavior::heartbeat::Event> for HoprNetworkBehaviorEvent {
+    fn from(event: behavior::heartbeat::Event) -> Self {
+        Self::HeartbeatGenerator(event)
+    }
+}
+
+impl From<behavior::ticket_aggregation::Event> for HoprNetworkBehaviorEvent {
+    fn from(event: behavior::ticket_aggregation::Event) -> Self {
+        Self::TicketAggregationBehavior(event)
     }
 }
 
@@ -191,16 +222,9 @@ impl From<libp2p::request_response::Event<Acknowledgement, ()>> for HoprNetworkB
 
 pub use swarm::HoprSwarm;
 
-/// Composite output from the transport layer.
-#[derive(Clone)]
-pub enum TransportOutput {
-    Received(ApplicationData),
-    Sent(HalfKeyChallenge),
-}
-
 #[derive(Debug)]
 /// Processed indexer generated events.
-pub enum PeerTransportEvent {
+pub enum PeerDiscovery {
     Allow(PeerId),
     Ban(PeerId),
     Announce(PeerId, Vec<Multiaddr>),

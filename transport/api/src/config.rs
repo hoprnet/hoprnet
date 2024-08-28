@@ -1,16 +1,14 @@
 use std::fmt::{Display, Formatter};
+use std::net::ToSocketAddrs;
 use std::num::ParseIntError;
 use std::str::FromStr;
 
+use proc_macro_regex::regex;
 use serde::{Deserialize, Serialize};
 use validator::{Validate, ValidationError};
 
 pub use core_network::{config::NetworkConfig, heartbeat::HeartbeatConfig};
-pub use core_protocol::config::ProtocolConfig;
-
-use std::net::ToSocketAddrs;
-
-use proc_macro_regex::regex;
+pub use hopr_transport_protocol::config::ProtocolConfig;
 
 regex!(is_dns_address_regex "^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)*[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$");
 

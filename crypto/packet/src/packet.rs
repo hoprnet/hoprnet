@@ -153,6 +153,7 @@ impl<S: SphinxSuite> MetaPacket<S> {
         assert!(msg.len() <= PAYLOAD_SIZE, "message too long to fit into a packet");
 
         let mut payload = add_padding(msg);
+
         let routing_info = RoutingInfo::new::<S>(
             max_hops,
             path,

@@ -102,17 +102,23 @@ where
         let db = self.db.clone();
         let tx_significant_events = self.egress.clone();
 
-        let (db_latest_block, checksum) = self.db.get_last_indexed_block(None).await?;
-        info!("Loaded indexer state at block #{db_latest_block} with checksum: {checksum}");
+        let described_block = self.db.get_last_indexed_block(None).await?;
+        info!(
+            "Loaded indexer state at block #{0} with checksum: {1}",
+            described_block.latest_block_number, described_block.checksum
+        );
 
-        let next_block_to_process = if self.cfg.start_block_number < db_latest_block as u64 {
-            // If some prior indexing took place already, avoid reprocessing the `db_latest_block`
-            db_latest_block as u64 + 1
+        let next_block_to_process = if self.cfg.start_block_number < described_block.latest_block_number as u64 {
+            // If some prior indexing took place already, avoid reprocessing the `described_block.latest_block_number`
+            described_block.latest_block_number as u64 + 1
         } else {
             self.cfg.start_block_number
         };
 
-        info!("DB latest processed block: {db_latest_block}, next block to process {next_block_to_process}");
+        info!(
+            "DB latest processed block: {0}, next block to process {next_block_to_process}",
+            described_block.latest_block_number
+        );
 
         // we skip on addresses which have no topics
         let mut addresses = vec![];
@@ -211,13 +217,18 @@ where
                     // Printout indexer state, we can do this on every processed block because not
                     // every block will have events
                     match db.get_last_indexed_block(None).await {
-                        Ok((_, checksum)) => {
-                            info!("Current indexer state at block #{block_id} with checksum: {checksum}");
+                        Ok(current_described_block) => {
+                            info!(
+                                "Current indexer state at block #{block_id} with checksum: {}",
+                                current_described_block.checksum
+                            );
 
                             #[cfg(all(feature = "prometheus", not(test)))]
                             {
-                                let low_4_bytes =
-                                    hopr_primitive_types::prelude::U256::from_big_endian(checksum.as_ref()).low_u32();
+                                let low_4_bytes = hopr_primitive_types::prelude::U256::from_big_endian(
+                                    current_described_block.checksum.as_ref(),
+                                )
+                                .low_u32();
                                 METRIC_INDEXER_CHECKSUM.set(low_4_bytes.into());
                             }
                         }

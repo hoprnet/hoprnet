@@ -136,19 +136,11 @@ jobs:
 
       - name: "Restart PR deployment"
         run: |
-          base_branch="${{ github.event.pull_request.base.ref }}"
-          # Identify parameters depending on branch
-          if [[ "${base_branch}" =~ ^"release" ]]; then
-            identity_pool=hoprd-core-dufour
-          else
-            identity_pool=hoprd-core-rotsee
-          fi
-          namespace=core-team
           cluster_name=pr-${{ github.event.pull_request.number }}
-          echo "[INFO] Restarting deployments on ${namespace} from pr-${{ github.event.pull_request.number }}"
+          echo "[INFO] Restarting deployments on core-team from ${cluster_name}"
           # Get list of deployments to restart
           export deployments=($(kubectl get deployments -n core-team -o json | jq -r --arg cluster_name $cluster_name '.items[] | select(.metadata.name | test($cluster_name)).metadata.name'))
           for deployment in "${deployments[@]}"; do
-            echo "[INFO] Restarting hoprd node ${namespace}/${deployments}"
-            kubectl rollout restart deployments -n ${namespace} $deployment;
+            echo "[INFO] Restarting hoprd node core-team/${deployments}"
+            kubectl rollout restart deployments -n core-team $deployment;
           done

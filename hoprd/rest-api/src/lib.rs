@@ -9,10 +9,10 @@ mod messages;
 mod network;
 mod node;
 mod peers;
+mod preconditions;
 mod prometheus;
 mod session;
 mod tickets;
-mod token_authentication;
 
 use async_lock::RwLock;
 use axum::{
@@ -43,7 +43,7 @@ use utoipa::openapi::security::{ApiKey, ApiKeyValue, HttpAuthScheme, HttpBuilder
 use utoipa::{Modify, OpenApi};
 use utoipa_scalar::{Scalar, Servable};
 
-use hopr_lib::{errors::HoprLibError, Hopr, TransportOutput};
+use hopr_lib::{errors::HoprLibError, ApplicationData, Hopr};
 
 use crate::config::Auth;
 
@@ -63,7 +63,7 @@ pub(crate) struct InternalState {
     pub hopr: Arc<Hopr>,
     pub inbox: Arc<RwLock<hoprd_inbox::Inbox>>,
     pub aliases: Arc<RwLock<BiHashMap<String, PeerId>>>,
-    pub websocket_rx: async_broadcast::InactiveReceiver<TransportOutput>,
+    pub websocket_rx: async_broadcast::InactiveReceiver<ApplicationData>,
     pub msg_encoder: Option<MessageEncoder>,
 }
 
@@ -82,6 +82,7 @@ pub(crate) struct InternalState {
         channels::list_channels,
         channels::open_channel,
         channels::show_channel,
+        checks::eligiblez,
         checks::healthyz,
         checks::readyz,
         checks::startedz,
@@ -93,6 +94,7 @@ pub(crate) struct InternalState {
         messages::send_message,
         messages::size,
         network::price,
+        network::probability,
         node::configuration,
         node::entry_nodes,
         node::info,
@@ -119,6 +121,7 @@ pub(crate) struct InternalState {
             messages::MessagePopAllResponse,
             messages::MessagePopResponse, messages::SendMessageResponse, messages::SendMessageBodyRequest, messages::SizeResponse, messages::TagQueryRequest, messages::GetMessageBodyRequest,
             network::TicketPriceResponse,
+            network::TicketProbabilityResponse,
             node::EntryNode, node::NodeInfoResponse, node::NodePeersQueryRequest,
             node::HeartbeatInfo, node::PeerInfo, node::AnnouncedPeer, node::NodePeersResponse, node::NodeVersionResponse,
             peers::NodePeerInfoResponse, peers::PingResponse,
@@ -167,7 +170,7 @@ pub async fn serve_api(
     cfg: crate::config::Api,
     hopr: Arc<hopr_lib::Hopr>,
     inbox: Arc<RwLock<hoprd_inbox::Inbox>>,
-    websocket_rx: async_broadcast::InactiveReceiver<TransportOutput>,
+    websocket_rx: async_broadcast::InactiveReceiver<ApplicationData>,
     msg_encoder: Option<MessageEncoder>,
 ) -> Result<(), std::io::Error> {
     let router = build_api(hoprd_cfg, cfg, hopr, inbox, websocket_rx, msg_encoder).await;
@@ -179,7 +182,7 @@ async fn build_api(
     cfg: crate::config::Api,
     hopr: Arc<hopr_lib::Hopr>,
     inbox: Arc<RwLock<hoprd_inbox::Inbox>>,
-    websocket_rx: async_broadcast::InactiveReceiver<TransportOutput>,
+    websocket_rx: async_broadcast::InactiveReceiver<ApplicationData>,
     msg_encoder: Option<MessageEncoder>,
 ) -> Router {
     // Prepare alias part of the state
@@ -206,11 +209,12 @@ async fn build_api(
                 .route("/startedz", get(checks::startedz))
                 .route("/readyz", get(checks::readyz))
                 .route("/healthyz", get(checks::healthyz))
+                .route("/eligiblez", get(checks::eligiblez))
                 .with_state(state.into()),
         )
         .nest(
             BASE_PATH,
-            axum::Router::new()
+            Router::new()
                 .route("/aliases", get(alias::aliases))
                 .route("/aliases", post(alias::set_alias))
                 .route("/aliases/:alias", get(alias::get_alias))
@@ -219,13 +223,12 @@ async fn build_api(
                 .route("/account/balances", get(account::balances))
                 .route("/account/withdraw", post(account::withdraw))
                 .route("/peers/:peerId", get(peers::show_peer_info))
-                .route("/peers/:peerId/ping", post(peers::ping_peer))
                 .route("/channels", get(channels::list_channels))
                 .route("/channels", post(channels::open_channel))
                 .route("/channels/:channelId", get(channels::show_channel))
+                .route("/channels/:channelId/tickets", get(tickets::show_channel_tickets))
                 .route("/channels/:channelId", delete(channels::close_channel))
                 .route("/channels/:channelId/fund", post(channels::fund_channel))
-                .route("/channels/:channelId/tickets", get(tickets::show_channel_tickets))
                 .route(
                     "/channels/:channelId/tickets/redeem",
                     post(tickets::redeem_tickets_in_channel),
@@ -235,10 +238,10 @@ async fn build_api(
                     post(tickets::aggregate_tickets_in_channel),
                 )
                 .route("/tickets", get(tickets::show_all_tickets))
-                .route("/tickets/statistics", get(tickets::show_ticket_statistics))
                 .route("/tickets/redeem", post(tickets::redeem_all_tickets))
-                .route("/messages", post(messages::send_message))
+                .route("/tickets/statistics", get(tickets::show_ticket_statistics))
                 .route("/messages", delete(messages::delete_messages))
+                .route("/messages", post(messages::send_message))
                 .route("/messages/pop", post(messages::pop))
                 .route("/messages/pop-all", post(messages::pop_all))
                 .route("/messages/peek", post(messages::peek))
@@ -246,18 +249,17 @@ async fn build_api(
                 .route("/messages/size", get(messages::size))
                 .route("/messages/websocket", get(messages::websocket))
                 .route("/network/price", get(network::price))
+                .route("/network/probability", get(network::probability))
                 .route("/node/version", get(node::version))
                 .route("/node/configuration", get(node::configuration))
                 .route("/node/info", get(node::info))
                 .route("/node/peers", get(node::peers))
                 .route("/node/entryNodes", get(node::entry_nodes))
                 .route("/node/metrics", get(node::metrics))
+                .route("/peers/:peerId/ping", post(peers::ping_peer))
                 .route("/session", post(session::create_client))
                 .with_state(inner_state.clone().into())
-                .layer(middleware::from_fn_with_state(
-                    inner_state,
-                    token_authentication::authenticate,
-                )),
+                .layer(middleware::from_fn_with_state(inner_state, preconditions::authenticate)),
         )
         .layer(
             ServiceBuilder::new()
@@ -265,7 +267,9 @@ async fn build_api(
                 .layer(
                     CorsLayer::new()
                         .allow_methods([Method::GET, Method::POST, Method::OPTIONS, Method::DELETE])
-                        .allow_origin(Any),
+                        .allow_origin(Any)
+                        .allow_headers(Any)
+                        .max_age(std::time::Duration::from_secs(86400)),
                 )
                 .layer(middleware::from_fn(prometheus::record))
                 .layer(CompressionLayer::new())
@@ -306,6 +310,7 @@ enum ApiErrorStatus {
     Unauthorized,
     InvalidQuality,
     AliasAlreadyExists,
+    NotReady,
     #[strum(serialize = "UNKNOWN_FAILURE")]
     UnknownFailure(String),
 }

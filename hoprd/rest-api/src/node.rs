@@ -5,13 +5,13 @@ use axum::{
 };
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
+use hopr_crypto_types::prelude::Hash;
+use hopr_lib::Address;
 use hopr_lib::{AsUnixTimestamp, Health, Multiaddr};
 use libp2p_identity::PeerId;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use std::{collections::HashMap, sync::Arc};
-
-use hopr_lib::Address;
 
 use crate::{ApiError, ApiErrorStatus, InternalState, BASE_PATH};
 
@@ -270,7 +270,10 @@ pub(super) async fn metrics() -> impl IntoResponse {
         "listeningAddress": [
             "/ip4/10.0.2.100/tcp/19092"
         ],
-        "network": "anvil-localhost"
+        "network": "anvil-localhost",
+        "indexerBlock": 123456,
+        "indexerChecksum": "cfde556a7e9ff0848998aa4a9a9f2ccfde556a7e9ff0848998aa4a0cfd8863ae",
+        "indexBlockPrevChecksum": 123450,
     }))]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct NodeInfoResponse {
@@ -306,6 +309,11 @@ pub(crate) struct NodeInfoResponse {
     connectivity_status: Health,
     /// Channel closure period in seconds
     channel_closure_period: u64,
+    indexer_block: u32,
+    #[serde_as(as = "DisplayFromStr")]
+    #[schema(value_type = String)]
+    indexer_checksum: Hash,
+    index_block_prev_checksum: u32,
 }
 
 /// Get information about this HOPR Node.
@@ -329,6 +337,11 @@ pub(super) async fn info(State(state): State<Arc<InternalState>>) -> Result<impl
     let safe_config = hopr.get_safe_config();
     let network = hopr.network();
 
+    let (indexer_block, indexer_checksum, index_block_prev_checksum) = match hopr.get_indexer_state().await {
+        Ok(p) => (p.latest_block_number, p.checksum, p.block_prior_to_checksum_update),
+        Err(error) => return Ok((StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(error)).into_response()),
+    };
+
     match hopr.get_channel_closure_notice_period().await {
         Ok(channel_closure_notice_period) => {
             let body = NodeInfoResponse {
@@ -345,6 +358,9 @@ pub(super) async fn info(State(state): State<Arc<InternalState>>) -> Result<impl
                 is_eligible: hopr.is_allowed_to_access_network(&hopr.me_peer_id()).await?,
                 connectivity_status: hopr.network_health().await,
                 channel_closure_period: channel_closure_notice_period.as_secs(),
+                indexer_block,
+                indexer_checksum,
+                index_block_prev_checksum,
             };
 
             Ok((StatusCode::OK, Json(body)).into_response())

@@ -12,8 +12,8 @@ use tracing::warn;
 
 use hopr_crypto_types::types::Hash;
 use hopr_lib::{
-    errors::HoprLibError, Address, AsUnixTimestamp, Balance, BalanceType, ChainActionsError, ChannelEntry,
-    ChannelStatus, Hopr, ToHex,
+    errors::{HoprLibError, HoprStatusError},
+    Address, AsUnixTimestamp, Balance, BalanceType, ChainActionsError, ChannelEntry, ChannelStatus, Hopr, ToHex,
 };
 
 use crate::{ApiErrorStatus, InternalState, BASE_PATH};
@@ -275,6 +275,7 @@ pub(crate) struct OpenChannelResponse {
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 403, description = "Failed to open the channel because of insufficient HOPR balance or allowance.", body = ApiError),
             (status = 409, description = "Failed to open the channel because the channel between this nodes already exists.", body = ApiError),
+            (status = 412, description = "The node is not ready."),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
@@ -312,6 +313,9 @@ pub(super) async fn open_channel(
         }
         Err(HoprLibError::ChainError(ChainActionsError::ChannelAlreadyExists)) => {
             (StatusCode::CONFLICT, ApiErrorStatus::ChannelAlreadyOpen).into_response()
+        }
+        Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(_, _))) => {
+            (StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response()
         }
         Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
     }
@@ -399,6 +403,7 @@ pub(crate) struct CloseChannelResponse {
             (status = 400, description = "Invalid channel id.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "Channel not found.", body = ApiError),
+            (status = 412, description = "The node is not ready."),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
@@ -428,6 +433,9 @@ pub(super) async fn close_channel(
             }
             Err(HoprLibError::ChainError(ChainActionsError::InvalidArguments(_))) => {
                 (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::UnsupportedFeature).into_response()
+            }
+            Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(_, _))) => {
+                (StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response()
             }
             Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
         },
@@ -463,6 +471,7 @@ pub(crate) struct FundBodyRequest {
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 403, description = "Failed to fund the channel because of insufficient HOPR balance or allowance.", body = ApiError),
             (status = 404, description = "Channel not found.", body = ApiError),
+            (status = 412, description = "The node is not ready."),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
@@ -491,6 +500,9 @@ pub(super) async fn fund_channel(
             }
             Err(HoprLibError::ChainError(ChainActionsError::BalanceTooLow)) => {
                 (StatusCode::FORBIDDEN, ApiErrorStatus::NotEnoughBalance).into_response()
+            }
+            Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(_, _))) => {
+                (StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response()
             }
             Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
         },
