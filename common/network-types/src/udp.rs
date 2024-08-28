@@ -3,7 +3,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use tokio::io::ReadBuf;
 use tokio::net::UdpSocket;
-use tracing::debug;
+use tracing::warn;
 
 /// Mimics TCP-like stream functionality on a UDP socket by restricting it to a single
 /// counterparty and implements [`tokio::io::AsyncRead`] and [`tokio::io::AsyncWrite`].
@@ -86,7 +86,10 @@ impl tokio::io::AsyncRead for ConnectedUdpStream {
                 Some(addr) => match self.foreign_data_mode {
                     ForeignDataMode::Discard => {
                         buf.clear();
-                        debug!("discarded data from foreign client {addr}");
+                        warn!(
+                            udp_bound_addr = tracing::field::debug(self.sock.local_addr()),
+                            "discarded data from foreign client {read_addr} (only {addr} is allowed)"
+                        );
                         Poll::Pending
                     }
                     ForeignDataMode::Accept => Poll::Ready(Ok(())),

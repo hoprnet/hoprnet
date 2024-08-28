@@ -21,6 +21,12 @@ pub fn random_float() -> f64 {
     OsRng.gen()
 }
 
+/// Generates a random float uniformly distributed in the given range.
+#[inline]
+pub fn random_float_in_range(range: std::ops::Range<f64>) -> f64 {
+    OsRng.gen_range(range)
+}
+
 /// Generates a random unsigned integer which is at least `start` and optionally strictly less than `end`.
 /// If `end` is not given, the ` MAX_RANDOM_INTEGER ` value is used.
 /// The caller must make sure that 0 <= `start` < `end` <= `MAX_RANDOM_INTEGER`, otherwise the function will panic.

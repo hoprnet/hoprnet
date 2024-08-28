@@ -25,8 +25,6 @@ use futures::{
     future::{select, Either},
     pin_mut, FutureExt, StreamExt, TryStreamExt,
 };
-use moka::notification::RemovalCause;
-use moka::ops::compute::CompResult;
 use std::{
     collections::HashMap,
     sync::{Arc, OnceLock},
@@ -99,7 +97,8 @@ pub enum HoprTransportProcess {
     ProtocolMsgIn,
     ProtocolMsgOut,
     SessionsManagement,
-    SessionTerminator,
+    SessionsTerminator,
+    SessionsExpiration,
     BloomFilterSave,
 }
 
@@ -109,8 +108,7 @@ where
     Db: HoprDbTicketOperations + Send + Sync + Clone + std::fmt::Debug,
 {
     db: Db,
-    maybe_writer:
-        Arc<std::sync::OnceLock<TicketAggregationActions<TicketAggregationResponseType, TicketAggregationRequestType>>>,
+    maybe_writer: Arc<OnceLock<TicketAggregationActions<TicketAggregationResponseType, TicketAggregationRequestType>>>,
     agg_timeout: std::time::Duration,
 }
 
@@ -121,7 +119,7 @@ where
     pub fn new(
         db: Db,
         maybe_writer: Arc<
-            std::sync::OnceLock<TicketAggregationActions<TicketAggregationResponseType, TicketAggregationRequestType>>,
+            OnceLock<TicketAggregationActions<TicketAggregationResponseType, TicketAggregationRequestType>>,
         >,
         agg_timeout: std::time::Duration,
     ) -> Self {
@@ -187,7 +185,7 @@ where
             })
             .await;
 
-        if let Ok(CompResult::Inserted(_)) = insertion_result {
+        if let Ok(moka::ops::compute::CompResult::Inserted(_)) = insertion_result {
             return Some(next);
         }
 
@@ -207,7 +205,7 @@ type SessionInitiationCache =
 
 type SessionCache = moka::future::Cache<SessionId, (UnboundedSender<Box<[u8]>>, RoutingOptions)>;
 
-async fn close_session_aux<T>(
+async fn close_session<T>(
     sessions: &SessionCache,
     me: PeerId,
     msg_sender: Arc<helpers::MessageSender<T>>,
@@ -258,7 +256,7 @@ where
     // When a Session is removed from the cache, we notify the other party only
     // if this removal was due to expiration or cache size limit.
     match cause {
-        RemovalCause::Expired | RemovalCause::Size if msg_sender.can_send() => {
+        moka::notification::RemovalCause::Expired | moka::notification::RemovalCause::Size if msg_sender.can_send() => {
             let session_id = *id;
             trace!(
                 session_id = tracing::field::debug(session_id),
@@ -287,27 +285,6 @@ where
         }
         _ => futures::future::ready(()).boxed(),
     }
-}
-
-/// Interface into the physical transport mechanism allowing all off-chain HOPR-related tasks on
-/// the transport, as well as off-chain ticket manipulation.
-pub struct HoprTransport<T>
-where
-    T: HoprDbAllOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
-{
-    me: PeerId,
-    me_onchain: Address,
-    cfg: HoprTransportConfig,
-    db: T,
-    ping: Arc<OnceLock<Pinger<network_notifier::PingExternalInteractions<T>>>>,
-    network: Arc<Network<T>>,
-    msg_sender: Arc<helpers::MessageSender<T>>,
-    my_multiaddresses: Vec<Multiaddr>,
-    process_ticket_aggregate:
-        Arc<OnceLock<TicketAggregationActions<TicketAggregationResponseType, TicketAggregationRequestType>>>,
-    session_initiations: SessionInitiationCache,
-    session_close_notifier: OnceLock<UnboundedSender<SessionId>>,
-    sessions: SessionCache,
 }
 
 /// Handles session initiation (the Start protocol)
@@ -479,7 +456,7 @@ where
                 session_id = tracing::field::debug(session_id),
                 "received session close request"
             );
-            match close_session_aux(&sessions, me, message_sender.clone(), session_id, false).await {
+            match close_session(&sessions, me, message_sender.clone(), session_id, false).await {
                 Ok(_) => debug!(
                     session_id = tracing::field::debug(session_id),
                     "session has been closed by the other party"
@@ -493,6 +470,27 @@ where
     }
 
     Ok(())
+}
+
+/// Interface into the physical transport mechanism allowing all off-chain HOPR-related tasks on
+/// the transport, as well as off-chain ticket manipulation.
+pub struct HoprTransport<T>
+where
+    T: HoprDbAllOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
+{
+    me: PeerId,
+    me_onchain: Address,
+    cfg: HoprTransportConfig,
+    db: T,
+    ping: Arc<OnceLock<Pinger<network_notifier::PingExternalInteractions<T>>>>,
+    network: Arc<Network<T>>,
+    msg_sender: Arc<helpers::MessageSender<T>>,
+    my_multiaddresses: Vec<Multiaddr>,
+    process_ticket_aggregate:
+        Arc<OnceLock<TicketAggregationActions<TicketAggregationResponseType, TicketAggregationRequestType>>>,
+    session_initiations: SessionInitiationCache,
+    session_close_notifier: OnceLock<UnboundedSender<SessionId>>,
+    sessions: SessionCache,
 }
 
 impl<T> HoprTransport<T>
@@ -537,8 +535,8 @@ where
                 .max_capacity(u16::MAX as u64)
                 .time_to_idle(constants::SESSION_LIFETIME)
                 .async_eviction_listener(move |k, v, c| {
-                    let msg_sender_clone = msg_sender.clone();
-                    close_session_after_eviction(msg_sender_clone, my_peer_id, k, v, c)
+                    let msg_sender = msg_sender.clone();
+                    close_session_after_eviction(msg_sender, my_peer_id, k, v, c)
                 })
                 .build(),
             session_close_notifier: OnceLock::new(),
@@ -701,7 +699,7 @@ where
         let me = self.me;
 
         processes.insert(
-            HoprTransportProcess::SessionTerminator,
+            HoprTransportProcess::SessionsTerminator,
             spawn(
                 session_close_rx.for_each_concurrent(Some(10), move |closed_session_id| {
                     let sessions = sessions.clone();
@@ -711,7 +709,7 @@ where
                             session_id = tracing::field::debug(closed_session_id),
                             "sending notification of session closure done by us"
                         );
-                        match close_session_aux(&sessions, me, msg_sender_clone, closed_session_id, true).await {
+                        match close_session(&sessions, me, msg_sender_clone, closed_session_id, true).await {
                             Ok(_) => debug!(
                                 session_id = tracing::field::debug(closed_session_id),
                                 "session has been closed by us"
@@ -796,6 +794,28 @@ where
                 .map(Ok)
                 .forward(on_transport_output)
                 .await;
+            }),
+        );
+
+        // This is necessary to evict expired entries from the caches if
+        // no session-related operations happen at all.
+        // This ensures the dangling expired sessions are properly closed
+        // and their closure is timely notified to the other party.
+        let sessions = self.sessions.clone();
+        let session_initiations = self.session_initiations.clone();
+        processes.insert(
+            HoprTransportProcess::SessionsExpiration,
+            spawn(async move {
+                let jitter = hopr_crypto_random::random_float_in_range(1.0..1.2);
+                let waiting_time = constants::SESSION_INITIATION_TIMEOUT
+                    .min(constants::SESSION_LIFETIME)
+                    .mul_f64(jitter)
+                    / 2;
+                loop {
+                    sleep(waiting_time).await;
+                    trace!("executing session cache evictions");
+                    futures::join!(sessions.run_pending_tasks(), session_initiations.run_pending_tasks());
+                }
             }),
         );
 
