@@ -148,6 +148,32 @@ impl NetworkProviderArgs {
                 .nonce_manager(chain_key.public().to_address().into()),
         ))
     }
+
+    /// get the provider object without signer
+    pub async fn get_provider_without_signer(&self) -> Result<Arc<Provider<JsonRpcClient>>, HelperErrors> {
+        // Build JSON RPC client
+        let rpc_client = JsonRpcClient::new(
+            self.provider_url.as_str(),
+            DefaultHttpPostRequestor::new(chain_rpc::HttpPostRequestorConfig {
+                max_requests_per_sec: None,
+                ..Default::default()
+            }),
+            SimpleJsonRpcRetryPolicy::default(),
+        );
+
+        // Build default JSON RPC provider
+        let mut provider = Provider::new(rpc_client);
+
+        let chain_id = provider.get_chainid().await.map_err(RpcError::ProviderError)?;
+        let default_tx_polling_interval = if chain_id.eq(&ethers::types::U256::from(31337u32)) {
+            std::time::Duration::from_millis(10)
+        } else {
+            RpcOperationsConfig::default().tx_polling_interval
+        };
+        provider.set_interval(default_tx_polling_interval);
+
+        Ok(Arc::new(provider))
+    }
 }
 
 /// ensures that the network and environment_type exist
