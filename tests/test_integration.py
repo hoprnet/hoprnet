@@ -24,6 +24,7 @@ from .conftest import (
 from .hopr import HoprdAPI
 from .node import Node
 
+
 PARAMETERIZED_SAMPLE_SIZE = 1  # if os.getenv("CI", default="false") == "false" else 3
 AGGREGATED_TICKET_PRICE = TICKET_AGGREGATION_THRESHOLD * TICKET_PRICE_PER_HOP
 MULTIHOP_MESSAGE_SEND_TIMEOUT = 30.0
@@ -31,9 +32,17 @@ CHECK_RETRY_INTERVAL = 0.5
 APPLICATION_TAG_THRESHOLD_FOR_SESSIONS = RESERVED_TAG_UPPER_BOUND + 1
 
 
+# used by nodes to get unique port assignments
+PORT_BASE = 19000
+
+
 def shuffled(coll):
     random.shuffle(coll)
     return coll
+
+
+def gen_random_tag():
+    return random.randint(APPLICATION_TAG_THRESHOLD_FOR_SESSIONS, 65530)
 
 
 @asynccontextmanager
@@ -168,7 +177,7 @@ async def check_all_tickets_redeemed(src: Node):
 async def send_and_receive_packets_with_pop(
     packets, src: Node, dest: Node, path: str, timeout: int = MULTIHOP_MESSAGE_SEND_TIMEOUT
 ):
-    random_tag = random.randint(APPLICATION_TAG_THRESHOLD_FOR_SESSIONS, 65530)
+    random_tag = gen_random_tag()
 
     for packet in packets:
         assert await src.api.send_message(dest.peer_id, packet, path, random_tag)
@@ -179,7 +188,7 @@ async def send_and_receive_packets_with_pop(
 async def send_and_receive_packets_with_peek(
     packets, src: Node, dest: Node, path: str, timeout: int = MULTIHOP_MESSAGE_SEND_TIMEOUT
 ):
-    random_tag = random.randint(APPLICATION_TAG_THRESHOLD_FOR_SESSIONS, 65530)
+    random_tag = gen_random_tag()
 
     for packet in packets:
         assert await src.api.send_message(dest.peer_id, packet, path, random_tag)
@@ -360,7 +369,7 @@ async def test_hoprd_should_be_able_to_send_0_hop_messages_without_open_channels
 @pytest.mark.parametrize("src, dest", random_distinct_pairs_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
 async def test_hoprd_should_fail_sending_a_message_that_is_too_large(src: Node, dest: Node, swarm7: dict[str, Node]):
     MAXIMUM_PAYLOAD_SIZE = 500
-    random_tag = random.randint(APPLICATION_TAG_THRESHOLD_FOR_SESSIONS, 65530)
+    random_tag = gen_random_tag()
 
     packet = "0 hop message too large: " + "".join(
         random.choices(string.ascii_uppercase + string.digits, k=MAXIMUM_PAYLOAD_SIZE)
@@ -659,6 +668,7 @@ async def test_hoprd_should_be_able_to_open_and_close_channel_without_tickets(
         assert True
 
 
+# generate 1-hop route with a node using strategies in the middle
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "route",
@@ -673,37 +683,39 @@ async def test_hoprd_should_be_able_to_open_and_close_channel_without_tickets(
 )
 async def test_hoprd_default_strategy_automatic_ticket_aggregation_and_redeeming(route, swarm7: dict[str, Node]):
     ticket_count = int(TICKET_AGGREGATION_THRESHOLD)
+    src = route[0]
+    mid = route[1]
+    dest = route[-1]
+    channel_funding = ticket_count * TICKET_PRICE_PER_HOP
 
-    async with AsyncExitStack() as channels:
-        await asyncio.gather(
-            *[
-                channels.enter_async_context(
-                    create_channel(swarm7[route[i]], swarm7[route[i + 1]], funding=ticket_count * TICKET_PRICE_PER_HOP)
-                )
-                for i in range(len(route) - 1)
-            ]
-        )
+    # create channel from src to mid, mid to dest does not need a channel
+    async with create_channel(swarm7[src], swarm7[mid], funding=channel_funding) as channel:
+        statistics_before = await swarm7[mid].api.get_tickets_statistics()
+        assert statistics_before is not None
 
-        statistics_before = await swarm7[route[1]].api.get_tickets_statistics()
+        redeemed_value_at_start = balance_str_to_int(statistics_before.redeemed_value)
 
         packets = [f"Ticket aggregation test: #{i:08d}" for i in range(ticket_count)]
         await send_and_receive_packets_with_pop(
-            packets, src=swarm7[route[0]], dest=swarm7[route[-1]], path=[swarm7[route[1]].peer_id]
+            packets, src=swarm7[src], dest=swarm7[dest], path=[swarm7[mid].peer_id]
         )
 
-        async def aggregate_and_redeem_tickets(api: HoprdAPI):
+        # monitor that the node aggregates and redeems tickets until the aggregated value is reached
+        async def check_aggregate_and_redeem_tickets(api: HoprdAPI):
             while True:
-                statistics_after = await api.get_tickets_statistics()
-                redeemed_value = balance_str_to_int(statistics_after.redeemed_value) - balance_str_to_int(
-                    statistics_before.redeemed_value
-                )
+                statistics_now = await api.get_tickets_statistics()
+                assert statistics_now is not None
 
-                if redeemed_value >= AGGREGATED_TICKET_PRICE:
+                redeemed_value_now = balance_str_to_int(statistics_now.redeemed_value)
+                redeemed_value_diff = redeemed_value_now - redeemed_value_at_start
+
+                # break out of the loop if the aggregated value is reached
+                if redeemed_value_diff >= AGGREGATED_TICKET_PRICE:
                     break
                 else:
                     await asyncio.sleep(0.1)
 
-        await asyncio.wait_for(aggregate_and_redeem_tickets(swarm7[route[1]].api), 60.0)
+        await asyncio.wait_for(check_aggregate_and_redeem_tickets(swarm7[mid].api), 60.0)
 
 
 # FIXME: This test depends on side-effects and cannot be run on its own. It
@@ -816,7 +828,7 @@ async def test_peeking_messages_with_timestamp(src: str, dest: str, swarm7: dict
     message_count = int(TICKET_AGGREGATION_THRESHOLD / 10)
     split_index = int(message_count * 0.66)
 
-    random_tag = random.randint(APPLICATION_TAG_THRESHOLD_FOR_SESSIONS, 65530)
+    random_tag = gen_random_tag()
 
     src_peer = swarm7[src]
     dest_peer = swarm7[dest]
@@ -854,7 +866,7 @@ async def test_peeking_messages_with_timestamp(src: str, dest: str, swarm7: dict
 @pytest.mark.parametrize("src,dest", random_distinct_pairs_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
 async def test_send_message_return_timestamp(src: str, dest: str, swarm7: dict[str, Node]):
     message_count = int(TICKET_AGGREGATION_THRESHOLD / 10)
-    random_tag = random.randint(APPLICATION_TAG_THRESHOLD_FOR_SESSIONS, 65530)
+    random_tag = gen_random_tag()
 
     src_peer = swarm7[src]
     dest_peer = swarm7[dest]

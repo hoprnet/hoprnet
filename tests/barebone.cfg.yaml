@@ -3,4 +3,5 @@ hopr:
   strategy:
     on_fail_continue: true
     allow_recursive: false
+    execution_interval: 1
     strategies: []

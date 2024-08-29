@@ -18,6 +18,9 @@ from .test_integration import create_channel
 logging.basicConfig(format="%(asctime)s %(message)s")
 
 
+PORT_BASE = 19300
+
+
 @pytest.fixture
 async def stress_fixture(request: pytest.FixtureRequest):
     return {

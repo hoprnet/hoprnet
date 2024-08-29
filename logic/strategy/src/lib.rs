@@ -28,6 +28,7 @@
 //! strategy:
 //!   on_fail_continue: true
 //!   allow_recursive: true
+//!   execution_interval: 60
 //!   strategies:
 //!     - !Promiscuous
 //!       max_channels: 50
@@ -88,6 +89,7 @@ pub fn hopr_default_strategies() -> MultiStrategyConfig {
     MultiStrategyConfig {
         on_fail_continue: true,
         allow_recursive: false,
+        execution_interval: 60,
         strategies: vec![
             /*AutoFunding(AutoFundingStrategyConfig {
                 min_stake_threshold: Balance::new_from_str("1000000000000000000", BalanceType::HOPR),
