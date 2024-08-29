@@ -399,7 +399,7 @@ async def test_hopli_should_be_able_to_deregister_nodes_and_register_it(peer: st
     )
 
     # check the returned value is address safe
-    assert res_after_regsiter.stdout.decode("utf-8").split("\n")[0].lower() == swarm7[peer].safe_address.lower()
+    assert res_after_register.stdout.decode("utf-8").split("\n")[0].lower() == swarm7[peer].safe_address.lower()
 
 
 @pytest.mark.asyncio
