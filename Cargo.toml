@@ -94,6 +94,7 @@ rayon = "1.10.0"
 regex = "1.10.5"
 reqwest = { version = "0.12.5" }
 ringbuffer = "0.15.0"
+rpassword = "7.3"
 rust-stream-ext-concurrent = "1.0.0"
 sea-orm = { version = "0.12.15", features = [
   "sqlx-sqlite",
