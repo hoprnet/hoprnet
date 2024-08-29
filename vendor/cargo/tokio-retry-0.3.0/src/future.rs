@@ -54,7 +54,10 @@ where
     I: Iterator<Item = Duration>,
     A: Action,
 {
-    pub fn spawn<T: IntoIterator<IntoIter = I, Item = Duration>>(strategy: T, action: A) -> Retry<I, A> {
+    pub fn spawn<T: IntoIterator<IntoIter = I, Item = Duration>>(
+        strategy: T,
+        action: A,
+    ) -> Retry<I, A> {
         Retry {
             retry_if: RetryIf::spawn(strategy, action, (|_| true) as fn(&A::Error) -> bool),
         }
@@ -114,7 +117,10 @@ where
             let mut this = self.as_mut().project();
             this.action.run()
         };
-        self.as_mut().project().state.set(RetryState::Running(future));
+        self.as_mut()
+            .project()
+            .state
+            .set(RetryState::Running(future));
         self.poll(cx)
     }
 
@@ -128,7 +134,10 @@ where
             Some(duration) => {
                 let deadline = Instant::now() + duration;
                 let future = sleep_until(deadline);
-                self.as_mut().project().state.set(RetryState::Sleeping(future));
+                self.as_mut()
+                    .project()
+                    .state
+                    .set(RetryState::Sleeping(future));
                 Ok(self.poll(cx))
             }
         }
