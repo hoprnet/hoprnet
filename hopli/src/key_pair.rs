@@ -180,11 +180,19 @@ impl ArgEnvReader<ChainKeypair, String> for PrivateKeyArgs {
         let pri_key = if let Some(pk) = self.get_key() {
             info!("reading private key from cli");
             pk
-        } else {
+        } else if let Ok(env_pk) = env::var(default_env_name) {
             info!("reading private key from env {:?}", default_env_name);
-            env::var(default_env_name).map_err(HelperErrors::UnableToReadPrivateKey)?
+            env_pk
+        } else if let Ok(prompt_pk) = rpassword::prompt_password("Enter private key:") {
+            info!("reading private key from prompt");
+            prompt_pk
+        } else {
+            error!(
+                "Unable to read private key from environment variable: {:?}",
+                default_env_name
+            );
+            return Err(HelperErrors::UnableToReadPrivateKey("PRIVATE_KEY".into()));
         };
-
         // trim the 0x prefix if needed
         let priv_key_without_prefix = if pri_key.starts_with("0x") {
             pri_key[prefix.len()..].to_string()
@@ -227,11 +235,19 @@ impl ArgEnvReader<ChainKeypair, String> for ManagerPrivateKeyArgs {
         let pri_key = if let Some(pk) = self.get_key() {
             info!("reading manager private key from cli");
             pk
-        } else {
+        } else if let Ok(env_pk) = env::var(default_env_name) {
             info!("reading manager private key from env {:?}", default_env_name);
-            env::var(default_env_name).map_err(HelperErrors::UnableToReadPrivateKey)?
+            env_pk
+        } else if let Ok(prompt_pk) = rpassword::prompt_password("Enter manager private key:") {
+            info!("reading manager private key from prompt");
+            prompt_pk
+        } else {
+            error!(
+                "Unable to read private key from environment variable: {:?}",
+                default_env_name
+            );
+            return Err(HelperErrors::UnableToReadPrivateKey("MANAGER_PRIVATE_KEY".into()));
         };
-
         // trim the 0x prefix if needed
         let priv_key_without_prefix = if pri_key.starts_with("0x") {
             pri_key[prefix.len()..].to_string()
@@ -766,9 +782,8 @@ mod tests {
             panic!("cannot read private key from cli when both are provied");
         }
 
-        // when no env and no cli arg, it returns error
+        // when no env and no cli arg, it spawns an interactive CLI
         env::remove_var("PRIVATE_KEY");
-        assert!(pk_args_none.read_default().is_err());
 
         // when no env is supplied, but private key is supplied
         if let Ok(kp_3) = pk_args_some.read_default() {
@@ -778,8 +793,22 @@ mod tests {
                 "read a wrong private key from env"
             );
         } else {
-            panic!("cannot read private key from env when no cli arg is provied");
+            panic!("cannot read private key from env when no cli arg is provied nor env is set");
         }
+
+        // when no env and no cli arg, it spawns an interactive CLI and inputs
+        // "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+        // the test is commented out as there's no way to simulate the write in the interactive CLI,
+        // unless directly mocking the buffer read.
+        // if let Ok(kp_3) = pk_args_none.read_default() {
+        //     assert_eq!(
+        //         DUMMY_PRIVATE_KEY,
+        //         hex::encode(kp_3.secret().as_ref()),
+        //         "read a wrong private key from env"
+        //     );
+        // } else {
+        //     panic!("cannot read private key from env when no cli arg is provied nor env is set");
+        // }
     }
 
     #[test]
