@@ -74,4 +74,5 @@ craneLib.devShell {
     ${pre-commit-check.shellHook}
   '';
   LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [ pkgs.pkgsBuildHost.openssl ];
+  RUST_MIN_STACK = "4194304"; # 4MB required to run the tests
 }

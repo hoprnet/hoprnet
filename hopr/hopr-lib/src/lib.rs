@@ -993,10 +993,11 @@ impl Hopr {
         // the strategy would react to historical data and drain through the native
         // balance on chain operations not relevant for the present network state
         let multi_strategy = self.multistrategy.clone();
+        let strategy_interval = self.cfg.strategy.execution_interval;
         processes.insert(
             HoprLibProcesses::StrategyTick,
             spawn(async move {
-                execute_on_tick(Duration::from_secs(60), move || {
+                execute_on_tick(Duration::from_secs(strategy_interval), move || {
                     let multi_strategy = multi_strategy.clone();
 
                     async move {
