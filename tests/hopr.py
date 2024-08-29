@@ -385,12 +385,12 @@ class HoprdAPI:
         _, response = self.__call_api(NetworkApi, "price")
         return int(response.price) if hasattr(response, "price") else None
 
-    async def session_client(self, destination: str, path: str):
+    async def session_client(self, destination: str, path: str, protocol: str, target: str):
         """
         Returns the port of the client session.
         :return: port: int
         """
-        body = SessionClientRequest(destination=destination, path=path, port=0)
+        body = SessionClientRequest(destination=destination, path=path, port=0, protocol=protocol, target=target)
 
         _, response = self.__call_api(SessionApi, "create_client", body=body)
         return int(response.port) if hasattr(response, "port") else None
