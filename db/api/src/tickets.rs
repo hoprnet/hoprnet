@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::fmt::{Display, Formatter};
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
@@ -11,19 +12,45 @@ use hopr_primitive_types::prelude::*;
 
 use crate::errors::Result;
 
-/// Allows to select multiple tickets (if `index` is `None`)
-/// or a single ticket (with given `index`) in the given channel and epoch.
-///
+/// Allows selecting a range of ticket indices in [TicketSelector].
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub enum TicketIndexSelector {
+    /// Selects no ticket index specifically.
+    /// This makes the [TicketSelector] less restrictive.
+    #[default]
+    None,
+    /// Selects a single ticket with the given index.
+    Single(u64),
+    /// Selects multiple tickets with the given indices.
+    Multiple(HashSet<u64>),
+    /// Selects multiple tickets with indices strictly less than the given bound.
+    LessThan(u64),
+}
+
+impl Display for TicketIndexSelector {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match &self {
+            TicketIndexSelector::None => write!(f, ""),
+            TicketIndexSelector::Single(idx) => write!(f, "with index {idx}"),
+            TicketIndexSelector::Multiple(indices) => write!(f, "with indices {indices:?}"),
+            TicketIndexSelector::LessThan(bound) => write!(f, "with indices less than {bound}"),
+        }
+    }
+}
+
+/// Allows selecting multiple tickets (if `index` does not contain a single value)
+/// or a single ticket (with unitary `index`) in the given channel and epoch.
 /// The selection can be further restricted to select ticket only in the given `state`.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TicketSelector {
     /// Channel ID
     pub channel_id: Hash,
     /// Channel epoch
     pub epoch: U256,
-    /// If given, will select single ticket with the given index
+    /// If given, will select ticket(s) with the given indices
     /// in the given channel and epoch.
-    pub index: Option<u64>,
+    /// See [TicketIndexSelector] for possible options.
+    pub index: TicketIndexSelector,
     /// Further restriction to tickets with the given state.
     pub state: Option<AcknowledgedTicketStatus>,
     /// Further restrict to only aggregated tickets.
@@ -32,17 +59,17 @@ pub struct TicketSelector {
 
 impl Display for TicketSelector {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "ticket selector in {} epoch {}{}{}{}",
+        let out = format!(
+            "ticket selector in {} epoch {} {}{}{}",
             self.channel_id,
             self.epoch,
-            self.index.map(|idx| format!(" with index {idx}")).unwrap_or("".into()),
+            self.index,
             self.state
                 .map(|state| format!(" in state {state}"))
                 .unwrap_or("".into()),
             if self.only_aggregated { " only aggregated" } else { "" }
-        )
+        );
+        write!(f, "{}", out.trim())
     }
 }
 
@@ -52,7 +79,7 @@ impl TicketSelector {
         Self {
             channel_id,
             epoch: epoch.into(),
-            index: None,
+            index: TicketIndexSelector::None,
             state: None,
             only_aggregated: false,
         }
@@ -60,12 +87,31 @@ impl TicketSelector {
 
     /// If `false` is returned, the selector can fetch more than a single ticket.
     pub fn is_unique(&self) -> bool {
-        self.index.is_some()
+        matches!(&self.index, TicketIndexSelector::Single(_))
+            || matches!(&self.index, TicketIndexSelector::Multiple(indices) if indices.len() == 1)
     }
 
-    /// Returns this instance with ticket index set.
+    /// Returns this instance with a ticket index set.
+    /// This method can be called multiple times to select multiple tickets.
+    /// /// If [TicketSelector::with_index_lt] was previously called, it will be replaced.
     pub fn with_index(mut self, index: u64) -> Self {
-        self.index = Some(index);
+        self.index = match self.index {
+            TicketIndexSelector::None | TicketIndexSelector::LessThan(_) => TicketIndexSelector::Single(index),
+            TicketIndexSelector::Single(existing) => {
+                TicketIndexSelector::Multiple(HashSet::from_iter([existing, index]))
+            }
+            TicketIndexSelector::Multiple(mut existing) => {
+                existing.insert(index);
+                TicketIndexSelector::Multiple(existing)
+            }
+        };
+        self
+    }
+
+    /// Returns this instance with a ticket index upper bound set.
+    /// If [TicketSelector::with_index] was previously called, it will be replaced.
+    pub fn with_index_lt(mut self, index_bound: u64) -> Self {
+        self.index = TicketIndexSelector::LessThan(index_bound);
         self
     }
 
@@ -93,7 +139,7 @@ impl From<&AcknowledgedTicket> for TicketSelector {
         Self {
             channel_id: value.verified_ticket().channel_id,
             epoch: value.verified_ticket().channel_epoch.into(),
-            index: Some(value.verified_ticket().index),
+            index: TicketIndexSelector::Single(value.verified_ticket().index),
             state: Some(value.status),
             only_aggregated: value.verified_ticket().index_offset > 1,
         }
@@ -105,7 +151,7 @@ impl From<&RedeemableTicket> for TicketSelector {
         Self {
             channel_id: value.verified_ticket().channel_id,
             epoch: value.verified_ticket().channel_epoch.into(),
-            index: Some(value.verified_ticket().index),
+            index: TicketIndexSelector::Single(value.verified_ticket().index),
             state: None,
             only_aggregated: value.verified_ticket().index_offset > 1,
         }
@@ -117,7 +163,7 @@ impl From<&ChannelEntry> for TicketSelector {
         Self {
             channel_id: value.get_id(),
             epoch: value.channel_epoch,
-            index: None,
+            index: TicketIndexSelector::None,
             state: None,
             only_aggregated: false,
         }
@@ -137,8 +183,8 @@ impl From<ChannelEntry> for TicketSelector {
 pub struct AggregationPrerequisites {
     /// Minimum number of tickets in the channel.
     pub min_ticket_count: Option<usize>,
-    /// Minimum ratio of balance of unaggregated messages and channel stake.
-    /// I.e. the condition is met if sum of unaggregated ticket amounts divided by
+    /// Minimum ratio between balance of unaggregated messages and channel stake.
+    /// I.e.: the condition is met if a sum of unaggregated ticket amounts divided by
     /// the total channel stake is greater than `min_unaggregated_ratio`.
     pub min_unaggregated_ratio: Option<f64>,
 }

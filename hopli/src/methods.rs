@@ -593,6 +593,7 @@ pub async fn get_registered_safes_for_nodes_on_network_registry<M: Middleware>(
 /// - If nodes have been registered to a different safe, overwrite it (remove the old safe and regsiter with the new safe)
 /// - If ndoes have been registered to the same safe, no op
 /// - If nodes have not been registered to any safe, register it
+///
 /// After all the nodes have been added to the network registry, force-sync the eligibility of all the added safes to true
 pub async fn register_safes_and_nodes_on_network_registry<M: Middleware>(
     network_registry: HoprNetworkRegistry<M>,
@@ -1071,6 +1072,7 @@ pub async fn get_registered_safes_for_nodes_on_node_safe_registry<M: Middleware>
 /// It returns the number of removed nodes
 /// - If nodes have been registered to a safe, remove the node
 /// - If nodes have not been registered to any safe, no op
+///
 /// When deregsitering one node, also remove the node from the module
 pub async fn deregister_nodes_from_node_safe_registry_and_remove_from_module<M: Middleware>(
     node_safe_registry: HoprNodeSafeRegistry<M>,

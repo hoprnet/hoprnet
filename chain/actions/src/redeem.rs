@@ -136,7 +136,7 @@ where
             .with_aggregated_only(only_aggregated)
             .with_state(AcknowledgedTicketStatus::Untouched);
 
-        let (count_redeemable_tickets, _) = self.db.get_tickets_value(selector).await?;
+        let (count_redeemable_tickets, _) = self.db.get_tickets_value(selector.clone()).await?;
 
         info!(
             "there are {count_redeemable_tickets} acknowledged tickets in channel {channel_id} which can be redeemed"

@@ -358,11 +358,11 @@ run-docker-dev: ## start a local development Docker container
 		develop
 
 .PHONY: run-hopr-admin
-run-hopr-admin: version=07aec21b
+run-hopr-admin: version=latest
 run-hopr-admin: port=3000
 run-hopr-admin: ## launches HOPR Admin in a Docker container, supports port= and version=, use http://host.docker.internal to access the host machine
-	docker run -p $(port):3000 --add-host=host.docker.internal:host-gateway \
-		gcr.io/hoprassociation/hopr-admin:$(version)
+	docker run -p $(port):80 --name hopr-admin --platform linux/amd64 \
+		europe-west3-docker.pkg.dev/hoprassociation/docker-images/hopr-admin:$(version)
 
 .PHONY: exec-script
 exec-script: ## execute given script= with the correct PATH set
