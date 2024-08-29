@@ -9,6 +9,7 @@ use hopr_primitive_types::traits::BytesRepresentable;
 use libp2p_identity::PeerId;
 use std::collections::HashSet;
 use std::fmt::Formatter;
+use std::time::Duration;
 use std::{
     fmt::Display,
     io::{Error, ErrorKind},
@@ -17,7 +18,7 @@ use std::{
     task::Poll,
 };
 use strum::IntoEnumIterator;
-use tracing::error;
+use tracing::{debug, error};
 
 /// Unique ID of a specific session.
 ///
@@ -126,8 +127,16 @@ impl Session {
             // TODO: tweak the default Session protocol config
             let cfg = SessionConfig {
                 enabled_features,
+                acknowledged_frames_buffer: 10_000,
+                frame_expiration_age: Duration::from_secs(60),
+                rto_base_receiver: Duration::from_secs(20),
+                rto_base_sender: Duration::from_secs(30),
                 ..Default::default()
             };
+            debug!(
+                session_id = tracing::field::debug(id),
+                "opening new session socket with {cfg:?}"
+            );
 
             Self {
                 id,
@@ -341,6 +350,7 @@ impl futures::AsyncWrite for InnerSession {
     }
 
     fn poll_close(self: std::pin::Pin<&mut Self>, _cx: &mut std::task::Context<'_>) -> Poll<std::io::Result<()>> {
+        self.tx.close();
         Poll::Ready(Ok(()))
     }
 }
@@ -380,7 +390,7 @@ impl futures::AsyncRead for InnerSession {
             }
             Poll::Ready(None) => {
                 self.rx.close();
-                self.tx.close(); // disallow more writings to this session
+                //self.tx.close(); // disallow more writings to this session
                 Poll::Ready(Ok(0)) // due to convention, Ok(0) indicates EOF
             }
             //Poll::Ready(None) => Poll::Ready(Err(Error::from(ErrorKind::NotConnected))),

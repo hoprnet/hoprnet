@@ -4097,7 +4097,6 @@ dependencies = [
  "lazy_static",
  "libp2p-identity",
  "parameterized",
- "pin-project",
  "rand 0.8.5",
  "rand_distr",
  "rayon",

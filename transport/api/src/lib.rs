@@ -84,6 +84,7 @@ use crate::{
     errors::HoprTransportError,
 };
 
+use crate::helpers::PathPlanner;
 pub use crate::helpers::{IndexerTransportEvent, PeerEligibility, TicketStatistics};
 pub use hopr_network_types::prelude::RoutingOptions;
 pub use hopr_transport_session::types::SessionTarget;
@@ -210,7 +211,7 @@ type SessionCache = moka::future::Cache<SessionId, (Arc<UnboundedSender<Box<[u8]
 async fn close_session<T>(
     sessions: &SessionCache,
     me: PeerId,
-    msg_sender: Arc<helpers::MessageSender<T>>,
+    msg_sender: helpers::MessageSender<T>,
     session_id: SessionId,
     notify_closure: bool,
 ) -> errors::Result<bool>
@@ -251,7 +252,7 @@ where
 }
 
 fn close_session_after_eviction<T>(
-    msg_sender: Arc<helpers::MessageSender<T>>,
+    msg_sender: helpers::MessageSender<T>,
     me: PeerId,
     id: Arc<SessionId>,
     (session_tx, routing_opts): (Arc<UnboundedSender<Box<[u8]>>>, RoutingOptions),
@@ -306,7 +307,7 @@ async fn handle_start_protocol_message<T>(
     me: PeerId,
     new_session_notifier: UnboundedSender<IncomingSession>,
     close_session_notifier: UnboundedSender<SessionId>,
-    message_sender: Arc<helpers::MessageSender<T>>,
+    msg_sender: helpers::MessageSender<T>,
     sessions: SessionCache,
     session_initiations: SessionInitiationCache,
 ) -> errors::Result<()>
@@ -357,7 +358,7 @@ where
                     me,
                     route.clone(),
                     session_req.capabilities,
-                    message_sender.clone(),
+                    Arc::new(msg_sender.clone()),
                     rx_session_data,
                     close_session_notifier.into(),
                 );
@@ -385,7 +386,7 @@ where
                     session_id: session_id.with_peer(me),
                 });
 
-                message_sender
+                msg_sender
                     .send_message(data.try_into()?, peer, route)
                     .await
                     .map_err(|e| {
@@ -408,7 +409,7 @@ where
                     reason: StartErrorReason::NoSlotsAvailable,
                 });
 
-                message_sender
+                msg_sender
                     .send_message(data.try_into()?, peer, route)
                     .await
                     .map_err(|e| {
@@ -469,7 +470,7 @@ where
                 session_id = tracing::field::debug(session_id),
                 "received session close request"
             );
-            match close_session(&sessions, me, message_sender.clone(), session_id, false).await {
+            match close_session(&sessions, me, msg_sender, session_id, false).await {
                 Ok(closed) if closed => debug!(
                     session_id = tracing::field::debug(session_id),
                     "session has been closed by the other party"
@@ -498,7 +499,8 @@ where
     db: T,
     ping: Arc<OnceLock<Pinger<network_notifier::PingExternalInteractions<T>>>>,
     network: Arc<Network<T>>,
-    msg_sender: Arc<helpers::MessageSender<T>>,
+    process_packet_send: Arc<OnceLock<MsgSender>>,
+    path_planner: PathPlanner<T>,
     my_multiaddresses: Vec<Multiaddr>,
     process_ticket_aggregate:
         Arc<OnceLock<TicketAggregationActions<TicketAggregationResponseType, TicketAggregationRequestType>>>,
@@ -520,11 +522,12 @@ where
         my_multiaddresses: Vec<Multiaddr>,
     ) -> Self {
         let identity: libp2p::identity::Keypair = (me).into();
-        let msg_sender = Arc::new(helpers::MessageSender::new(
-            Default::default(),
-            helpers::PathPlanner::new(db.clone(), channel_graph),
-        ));
         let my_peer_id = PeerId::from(me);
+        let process_packet_send = Arc::new(OnceLock::new());
+        let msg_sender = helpers::MessageSender::new(
+            process_packet_send.clone(),
+            PathPlanner::new(db.clone(), channel_graph.clone()),
+        );
 
         Self {
             me: identity.public().to_peer_id(),
@@ -536,10 +539,11 @@ where
                 cfg.network.clone(),
                 db.clone(),
             )),
+            process_packet_send,
+            path_planner: PathPlanner::new(db.clone(), channel_graph.clone()),
             db,
             cfg,
             my_multiaddresses,
-            msg_sender: msg_sender.clone(),
             process_ticket_aggregate: Arc::new(OnceLock::new()),
             session_initiations: moka::future::Cache::builder()
                 .max_capacity((RESERVED_SESSION_TAG_UPPER_LIMIT - RESERVED_SUBPROTOCOL_TAG_UPPER_LIMIT + 1) as u64)
@@ -605,7 +609,7 @@ where
             network_notifier::PingExternalInteractions::new(
                 network.clone(),
                 self.db.clone(),
-                self.msg_sender.resolver.channel_graph(),
+                self.path_planner.channel_graph(),
                 network_events_tx,
             ),
         );
@@ -632,8 +636,7 @@ where
         let (external_msg_send, external_msg_rx) =
             futures::channel::mpsc::unbounded::<(ApplicationData, TransportPath, PacketSendFinalizer)>();
 
-        self.msg_sender
-            .process_packet_send
+        self.process_packet_send
             .clone()
             .set(MsgSender::new(external_msg_send))
             .expect("must set the packet processing writer only once");
@@ -709,20 +712,20 @@ where
         }
 
         let sessions = self.sessions.clone();
-        let msg_sender_clone = self.msg_sender.clone();
+        let msg_sender = helpers::MessageSender::new(self.process_packet_send.clone(), self.path_planner.clone());
         let me = self.me;
 
         processes.insert(
             HoprTransportProcess::SessionsTerminator,
             spawn(session_close_rx.for_each_concurrent(None, move |closed_session_id| {
                 let sessions = sessions.clone();
-                let msg_sender_clone = msg_sender_clone.clone();
+                let msg_sender = msg_sender.clone();
                 async move {
                     trace!(
                         session_id = tracing::field::debug(closed_session_id),
                         "sending notification of session closure done by us"
                     );
-                    match close_session(&sessions, me, msg_sender_clone, closed_session_id, true).await {
+                    match close_session(&sessions, me, msg_sender, closed_session_id, true).await {
                         Ok(closed) if closed => debug!(
                             session_id = tracing::field::debug(closed_session_id),
                             "session has been closed by us"
@@ -740,7 +743,8 @@ where
         // initiate session handling over the msg-ack protocol stack
         let sessions = self.sessions.clone();
         let session_initiations = self.session_initiations.clone();
-        let message_sender = self.msg_sender.clone();
+        let process_packet_send = self.process_packet_send.clone();
+        let path_planner = self.path_planner.clone();
 
         processes.insert(
             HoprTransportProcess::SessionsManagement,
@@ -749,7 +753,7 @@ where
                     let me = me;
                     let sessions = sessions.clone();
                     let session_initiations = session_initiations.clone();
-                    let message_sender = message_sender.clone();
+                    let msg_sender = helpers::MessageSender::new(process_packet_send.clone(), path_planner.clone());
                     let new_session_notifier = new_session_notifier.clone();
                     let session_close_tx = session_close_tx.clone();
 
@@ -762,7 +766,7 @@ where
                                         me,
                                         new_session_notifier,
                                         session_close_tx,
-                                        message_sender,
+                                        msg_sender,
                                         sessions,
                                         session_initiations,
                                     )
@@ -924,7 +928,9 @@ where
         });
 
         // Send the Session initiation message
-        self.msg_sender
+        trace!(challenge, "sending new session request");
+        let msg_sender = helpers::MessageSender::new(self.process_packet_send.clone(), self.path_planner.clone());
+        msg_sender
             .send_message(start_session_msg.try_into()?, cfg.peer, cfg.path_options.clone())
             .await?;
 
@@ -957,7 +963,7 @@ where
                     self.me,
                     cfg.path_options,
                     cfg.capabilities.into_iter().collect(),
-                    self.msg_sender.clone(),
+                    Arc::new(msg_sender),
                     rx,
                     self.session_close_notifier.get().cloned(),
                 ))
@@ -1008,8 +1014,8 @@ where
 
         // Here we do not use msg_sender directly,
         // since it internally follows Session-oriented logic
-        let path = self.msg_sender.resolver.resolve_path(destination, options).await?;
-        let sender = self.msg_sender.process_packet_send.get().ok_or_else(|| {
+        let path = self.path_planner.resolve_path(destination, options).await?;
+        let sender = self.process_packet_send.get().ok_or_else(|| {
             HoprTransportError::Api("send msg: failed because message processing is not yet initialized".into())
         })?;
 
