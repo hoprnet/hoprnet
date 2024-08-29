@@ -68,7 +68,7 @@ pub enum HelperErrors {
 
     /// Fail to read private key
     #[error("cannot read private key error: {0}")]
-    UnableToReadPrivateKey(#[from] std::env::VarError),
+    UnableToReadPrivateKey(String),
 
     /// Paramters are missing
     #[error("missing parameter: {0}")]
