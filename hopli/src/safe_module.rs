@@ -24,6 +24,18 @@
 //!     - add the Announcement contract as target to the module
 //!     - approve HOPR tokens of the Safe proxy to be transferred by the new Channels contract
 //!     - Use the manager wallet to add nodes and Safes to the Network Registry contract of the new network.
+//! - [SafeModuleSubcommands::Debug] goes through a series of checks to debug the setup of a node and safe.
+//! It checks the following:
+//!     - node xDAI balance
+//!     - If node has been included on Network Registry
+//!     - If node and safe are associated on Node Safe Registry
+//!     - If Safe is owned by the correct owner(s)
+//!     - Safe’s wxHOPR balance and allowance
+//!     - if the module is enabled
+//!     - if node is included in the module
+//!     - Get all the targets of the safe (then check if channel and announcement are there)
+//!     - Get the owner of the module
+//! You need to enable the INFO level of the tracing logger to see the output of the debug command.
 //!
 //! Some sample commands
 //! - Express creation of a safe and a module
@@ -68,8 +80,21 @@
 //!     --manager-private-key ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
 //!     --private-key 59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d \
 //!     --provider-url "http://localhost:8545"
+//!
+//! - Debug nodes and safe
+//! ```text
+//! hopli safe-module debug \
+//!     --network anvil-localhost2 \
+//!     --contracts-root "../ethereum/contracts" \
+//!     --identity-directory "./test" \
+//!     --password-path "./test/pwd" \
+//!     --safe-address 0x6a64fe01c3aba5bdcd04b81fef375369ca47326f \
+//!     --module-address 0x5d46d0c5279fd85ce7365e4d668f415685922839 \
+//!     --provider-url "http://localhost:8545"
+//! ```
 //! ```
 use crate::key_pair::{ArgEnvReader, ManagerPrivateKeyArgs};
+use crate::methods::{debug_node_safe_module_setup_main, debug_node_safe_module_setup_on_balance_and_registries};
 use crate::{
     environment_config::NetworkProviderArgs,
     key_pair::{IdentityFileArgs, PrivateKeyArgs},
@@ -92,7 +117,7 @@ use ethers::{
 use hopr_crypto_types::keypairs::Keypair;
 use safe_singleton::SafeSingleton;
 use std::str::FromStr;
-use tracing::info;
+use tracing::{info, warn};
 
 /// CLI arguments for `hopli safe-module`
 #[derive(Clone, Debug, Parser)]
@@ -263,6 +288,35 @@ pub enum SafeModuleSubcommands {
         /// If provided, this wallet will grant the created safe access to the network registry
         #[command(flatten, name = "manager_private_key")]
         manager_private_key: ManagerPrivateKeyArgs,
+    },
+
+    /// Debug safe and module setup
+    #[command(visible_alias = "dg")]
+    Debug {
+        /// Network name, contracts config file root, and customized provider, if available
+        #[command(flatten)]
+        network_provider: NetworkProviderArgs,
+
+        /// Arguments to locate identity file(s) of HOPR node(s)
+        #[command(flatten)]
+        local_identity: IdentityFileArgs,
+
+        /// node addresses
+        #[clap(
+             help = "Comma separated node Ethereum addresses",
+             long,
+             short = 'o',
+             default_value = None
+         )]
+        node_address: Option<String>,
+
+        /// safe address that the nodes move to
+        #[clap(help = "New managing safe to which all the nodes move", long, short = 's')]
+        safe_address: String,
+
+        /// module address that the nodes move to
+        #[clap(help = "New managing module to which all the nodes move", long, short = 'm')]
+        module_address: String,
     },
 }
 
@@ -608,6 +662,81 @@ impl SafeModuleSubcommands {
         }
         Ok(())
     }
+
+    /// Execute the command to debug the following:
+    /// 1. node xDAI balance
+    /// 2. If node has been included on Network Registry
+    /// 3. If node and safe are associated on Node Safe Registry
+    /// 4. If Safe is owned by the correct owner(s)
+    /// 5. Safe’s wxHOPR balance and allowance
+    /// 6. if node is included in the module
+    /// 7. If the channel contract is included as a target
+    /// 8. If the announce contract is included as a target
+    /// 9. If safe is the owner of the module
+    #[allow(clippy::too_many_arguments)]
+    pub async fn execute_safe_module_debugging(
+        network_provider: NetworkProviderArgs,
+        local_identity: IdentityFileArgs,
+        node_address: Option<String>,
+        safe_address: String,
+        module_address: String,
+    ) -> Result<(), HelperErrors> {
+        // read all the node addresses
+        let mut node_eth_addresses: Vec<H160> = Vec::new();
+        if let Some(addresses) = node_address {
+            node_eth_addresses.extend(addresses.split(',').map(|addr| H160::from_str(addr).unwrap()));
+        }
+        // if local identity dirs/path is provided, read addresses from identity files
+        node_eth_addresses.extend(local_identity.to_addresses().unwrap().into_iter().map(H160::from));
+
+        // parse safe and module addresses
+        let safe_addr = H160::from_str(&safe_address).unwrap();
+        let module_addr = H160::from_str(&module_address).unwrap();
+
+        // get RPC provider for the given network and environment
+        let rpc_provider = network_provider.get_provider_without_signer().await?;
+        let contract_addresses = network_provider.get_network_details_from_name()?;
+
+        let hopr_token = HoprToken::new(contract_addresses.addresses.token, rpc_provider.clone());
+        let network_registry =
+            HoprNetworkRegistry::new(contract_addresses.addresses.network_registry, rpc_provider.clone());
+        let node_safe_registry =
+            HoprNodeSafeRegistry::new(contract_addresses.addresses.node_safe_registry, rpc_provider.clone());
+
+        // loop through all the nodes and debug
+        for node in node_eth_addresses {
+            let registered_safe = debug_node_safe_module_setup_on_balance_and_registries(
+                network_registry.clone(),
+                node_safe_registry.clone(),
+                &node,
+            )
+            .await
+            .map_err(|e| {
+                HelperErrors::MulticallError(
+                    format!("failed in getting node balance their registration in network registry and node-safe registry: {:?}", e)
+                )
+            })?;
+
+            // compare the registered safe with the provided safe
+            if registered_safe != safe_addr {
+                warn!(
+                    "Node {:?} is not registered with the provided safe {:?}",
+                    node, safe_addr
+                );
+            }
+            debug_node_safe_module_setup_main(
+                hopr_token.clone(),
+                &module_addr,
+                &node,
+                &safe_addr,
+                &contract_addresses.addresses.channels.into(),
+                &contract_addresses.addresses.announcements.into(),
+            )
+            .await
+            .map_err(|e| HelperErrors::MulticallError(format!("failed in debugging safe and module: {:?}", e)))?;
+        }
+        Ok(())
+    }
 }
 
 impl Cmd for SafeModuleSubcommands {
@@ -686,6 +815,22 @@ impl Cmd for SafeModuleSubcommands {
                     allowance,
                     private_key,
                     manager_private_key,
+                )
+                .await
+            }
+            SafeModuleSubcommands::Debug {
+                network_provider,
+                local_identity,
+                node_address,
+                safe_address,
+                module_address,
+            } => {
+                SafeModuleSubcommands::execute_safe_module_debugging(
+                    network_provider,
+                    local_identity,
+                    node_address,
+                    safe_address,
+                    module_address,
                 )
                 .await
             }

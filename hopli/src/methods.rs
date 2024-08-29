@@ -27,7 +27,7 @@ use ethers::{
     },
     providers::Middleware,
     types::{Address, Bytes, Eip1559TransactionRequest, H160, H256, U256},
-    utils::{get_create2_address, keccak256},
+    utils::{format_units, get_create2_address, keccak256, parse_units},
 };
 use hex_literal::hex;
 use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
@@ -47,6 +47,15 @@ abigen!(
     function domainSeparator() public view returns (bytes32)
     function encodeTransactionData(address to, uint256 value, bytes calldata data, uint8 operation, uint256 safeTxGas, uint256 baseGas, uint256 gasPrice, address gasToken, address refundReceiver, uint256 _nonce) public view returns (bytes memory)
     function getTransactionHash(address to, uint256 value, bytes calldata data, uint8 operation, uint256 safeTxGas, uint256 baseGas, uint256 gasPrice, address gasToken, address refundReceiver, uint256 _nonce) public view returns (bytes32)
+    function isModuleEnabled(address module) public view returns (bool)
+]"
+);
+abigen!(
+    ModuleSingleton,
+    r"[
+    function isNode(address) external view returns (bool)
+    function getTargets() external view returns (uint256[] memory)
+    function owner() public view returns (address)
 ]"
 );
 
@@ -1243,6 +1252,185 @@ pub async fn migrate_nodes<M: Middleware>(
     Ok(())
 }
 
+/// Quick check if the following values are correct, for one single node:
+/// 1. node xDAI balance
+/// 2. If node has been included on Network Registry
+/// 3. If node and safe are associated on Node Safe Registry
+pub async fn debug_node_safe_module_setup_on_balance_and_registries<M: Middleware>(
+    network_registry: HoprNetworkRegistry<M>,
+    node_safe_registry: HoprNodeSafeRegistry<M>,
+    node_address: &H160,
+) -> Result<Address, MulticallError<M>> {
+    let provider = network_registry.client();
+    let mut multicall = Multicall::new(provider.clone(), Some(MULTICALL_ADDRESS))
+        .await
+        .expect("cannot create multicall");
+
+    info!("checking for node {:?}", node_address);
+    multicall
+        // 1. node xDAI balance
+        .add_get_eth_balance(*node_address, false)
+        // 2. get safe address from the Network Registry
+        .add_call(
+            network_registry
+                .method::<_, Address>("nodeRegisterdToAccount", *node_address)
+                .map_err(|e| MulticallError::ContractError(ContractError::AbiError(e)))?,
+            false,
+        )
+        // 3. get the safe address from the Node Safe Registry
+        .add_call(
+            node_safe_registry
+                .method::<_, Address>("nodeToSafe", *node_address)
+                .map_err(|e| MulticallError::ContractError(ContractError::AbiError(e)))?,
+            false,
+        );
+
+    let (node_native_balance, safe_in_network_registry, safe_in_nodesafe_registry): (U256, Address, Address) =
+        multicall.call().await?;
+
+    info!(
+        "node does{:?} have xDAI balance {:?}",
+        if node_native_balance.ge(&U256::from(parse_units(0.1, "ether").unwrap())) {
+            ""
+        } else {
+            " NOT"
+        },
+        format_units(node_native_balance, "ether").unwrap_or("Unknown balance".into())
+    );
+
+    if safe_in_network_registry.eq(&H160::zero()) {
+        info!("Please register the node to the network registry");
+    } else {
+        info!("safe in network registry {:?}", safe_in_network_registry);
+    }
+
+    if safe_in_nodesafe_registry.eq(&H160::zero()) {
+        info!("Please start the node. It will auto-register to node-safe registry");
+    } else {
+        info!("safe in node-safe registry {:?}", safe_in_nodesafe_registry);
+    }
+    info!(
+        "Safes in both registies should match: {:?}",
+        safe_in_network_registry.eq(&safe_in_nodesafe_registry)
+    );
+
+    Ok(safe_in_network_registry)
+}
+
+/// Quick check if the following values are correct, for one single node:
+/// 4. If Safe is owned by the correct owner(s)
+/// 5. Safe’s wxHOPR balance and allowance
+/// 6. if the module is enabled
+/// 7. if node is included in the module
+/// 8. Get all the targets of the safe (then check if channel and announcement are there)
+/// 9. Get the owner of the module
+pub async fn debug_node_safe_module_setup_main<M: Middleware>(
+    hopr_token: HoprToken<M>,
+    module_address: &H160,
+    node_address: &H160,
+    safe_address: &H160,
+    channel_address: &H160,
+    announce_address: &H160,
+) -> Result<(), MulticallError<M>> {
+    let provider = hopr_token.client();
+    let mut multicall = Multicall::new(provider.clone(), Some(MULTICALL_ADDRESS))
+        .await
+        .expect("cannot create multicall");
+
+    let safe = SafeSingleton::new(safe_address.to_owned(), provider.clone());
+    let module = ModuleSingleton::new(module_address.to_owned(), provider.clone());
+
+    info!("checking for safe {:?} module {:?}", safe_address, module_address);
+    multicall
+        // 4. get owners of the safe
+        .add_call(
+            safe.method::<_, Vec<Address>>("getOwners", ())
+                .map_err(|e| MulticallError::ContractError(ContractError::AbiError(e)))?,
+            false,
+        )
+        // 5.a. get the wxHOPR balance for the safe address
+        .add_call(
+            hopr_token
+                .method::<_, U256>("balanceOf", *safe_address)
+                .map_err(|e| MulticallError::ContractError(ContractError::AbiError(e)))?,
+            false,
+        )
+        // 5.b. get the wxHOPR balance for the safe address
+        .add_call(
+            hopr_token
+                .method::<_, U256>("allowance", (*safe_address, *channel_address))
+                .map_err(|e| MulticallError::ContractError(ContractError::AbiError(e)))?,
+            false,
+        )
+        // 6. if the module is enabled
+        .add_call(
+            safe.method::<_, bool>("isModuleEnabled", *module_address)
+                .map_err(|e| MulticallError::ContractError(ContractError::AbiError(e)))?,
+            false,
+        )
+        // 7. if node is included in the module
+        .add_call(
+            module
+                .method::<_, bool>("isNode", *node_address)
+                .map_err(|e| MulticallError::ContractError(ContractError::AbiError(e)))?,
+            false,
+        )
+        // 7. get targets of the safe
+        .add_call(
+            module
+                .method::<_, Vec<U256>>("getTargets", ())
+                .map_err(|e| MulticallError::ContractError(ContractError::AbiError(e)))?,
+            false,
+        )
+        // 8. get owner of the module
+        .add_call(
+            module
+                .method::<_, Address>("owner", ())
+                .map_err(|e| MulticallError::ContractError(ContractError::AbiError(e)))?,
+            false,
+        );
+
+    let (
+        safe_owners,
+        safe_wxhopr_balance,
+        safe_wxhopr_allownace,
+        is_module_enabled,
+        is_node_included,
+        module_targets,
+        module_owner,
+    ): (Vec<Address>, U256, U256, bool, bool, Vec<U256>, Address) = multicall.call().await?;
+
+    info!("safe has owners: {:?}", safe_owners);
+    info!(
+        "safe has wxHOPR balance: {:?}",
+        format_units(safe_wxhopr_balance, "ether").unwrap_or("Unknown balance".into())
+    );
+    info!(
+        "safe has wxHOPR allowance: {:?}",
+        format_units(safe_wxhopr_allownace, "ether").unwrap_or("Unknown balance".into())
+    );
+    info!("module is enabled: {:?}", is_module_enabled);
+    info!("node is included in the module: {:?}", is_node_included);
+    info!("module has targets:");
+    for target in module_targets {
+        let target_address = format!("{:#x}", target);
+        let has_channels = target_address.contains(&format!("{:#x}", channel_address));
+        let has_announcement = target_address.contains(&format!("{:#x}", announce_address));
+        // check if it contains channel and announcement
+        info!(
+            "Target {:?} has channels {:?} has announcement {:?}",
+            target_address, has_channels, has_announcement
+        );
+    }
+
+    info!(
+        "module owner: {:?} same as safe address: {:?}",
+        module_owner,
+        module_owner.eq(&safe_address)
+    );
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use std::vec;
@@ -2219,5 +2407,141 @@ mod tests {
         assert!(old_channels_inclusion.0, "old channel should still be included");
         let new_channels_inclusion = node_module.try_get_target(new_channels.address()).call().await.unwrap();
         assert!(new_channels_inclusion.0, "new channel should now be included");
+    }
+
+    #[async_std::test]
+    async fn test_debug_node_safe_module_setup_on_balance_and_registries() {
+        // set allowance for token transfer for the safe multiple times
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        let mut node_addresses: Vec<ethers::types::Address> = Vec::new();
+        for _ in 0..2 {
+            node_addresses.push(get_random_address_for_testing().into());
+        }
+
+        // launch local anvil instance
+        let anvil = chain_types::utils::create_anvil(None);
+        let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
+        let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &contract_deployer);
+        let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
+            .await
+            .expect("failed to deploy");
+        // deploy multicall contract
+        deploy_multicall3_for_testing(client.clone()).await.unwrap();
+        // deploy safe suits
+        deploy_safe_suites(client.clone()).await.unwrap();
+
+        let deployer_vec: Vec<H160> = vec![contract_deployer.public().to_address().into()];
+
+        // create a safe
+        let (safe, _) = deploy_safe_module_with_targets_and_nodes(
+            instances.stake_factory,
+            instances.token.address(),
+            instances.channels.address(),
+            instances.module_implementation.address(),
+            instances.announcements.address(),
+            U256::max_value(),
+            None,
+            deployer_vec.clone(),
+            U256::from(1),
+        )
+        .await
+        .unwrap();
+        let registered_safe_before_registration = debug_node_safe_module_setup_on_balance_and_registries(
+            instances.network_registry.clone(),
+            instances.safe_registry.clone(),
+            &node_addresses[0],
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(
+            registered_safe_before_registration,
+            H160::zero(),
+            "safe is already registered"
+        );
+
+        // register some nodes
+        let (_, _) = register_safes_and_nodes_on_network_registry(
+            instances.network_registry.clone(),
+            vec![safe.address()],
+            vec![node_addresses[0]],
+        )
+        .await
+        .unwrap();
+
+        let registered_safe_after_registration = debug_node_safe_module_setup_on_balance_and_registries(
+            instances.network_registry.clone(),
+            instances.safe_registry.clone(),
+            &node_addresses[0],
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(
+            registered_safe_after_registration,
+            safe.address(),
+            "safe is not registered"
+        );
+    }
+
+    #[async_std::test]
+    async fn test_debug_node_safe_module_setup_main() {
+        // set allowance for token transfer for the safe multiple times
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        let mut node_addresses: Vec<ethers::types::Address> = Vec::new();
+        for _ in 0..2 {
+            node_addresses.push(get_random_address_for_testing().into());
+        }
+
+        // launch local anvil instance
+        let anvil = chain_types::utils::create_anvil(None);
+        let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
+        let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &contract_deployer);
+        let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
+            .await
+            .expect("failed to deploy");
+        // deploy multicall contract
+        deploy_multicall3_for_testing(client.clone()).await.unwrap();
+        // deploy safe suits
+        deploy_safe_suites(client.clone()).await.unwrap();
+
+        let deployer_vec: Vec<H160> = vec![contract_deployer.public().to_address().into()];
+
+        // create a safe
+        let (safe, node_module) = deploy_safe_module_with_targets_and_nodes(
+            instances.stake_factory,
+            instances.token.address(),
+            instances.channels.address(),
+            instances.module_implementation.address(),
+            instances.announcements.address(),
+            U256::max_value(),
+            None,
+            deployer_vec.clone(),
+            U256::from(1),
+        )
+        .await
+        .unwrap();
+
+        // register some nodes
+        let (_, _) = register_safes_and_nodes_on_network_registry(
+            instances.network_registry.clone(),
+            vec![safe.address()],
+            vec![node_addresses[0]],
+        )
+        .await
+        .unwrap();
+
+        debug_node_safe_module_setup_main(
+            instances.token.clone(),
+            &node_module.address(),
+            &node_addresses[0],
+            &safe.address(),
+            &instances.channels.address(),
+            &instances.announcements.address(),
+        )
+        .await
+        .unwrap()
     }
 }
