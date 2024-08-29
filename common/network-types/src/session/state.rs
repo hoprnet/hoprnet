@@ -617,6 +617,7 @@ impl<const C: usize> Sink<SessionMessage<C>> for SessionState<C> {
     }
 
     fn poll_close(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.frame_reassembler.close();
         Poll::Ready(Ok(()))
     }
 }

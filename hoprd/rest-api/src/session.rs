@@ -10,6 +10,7 @@ use hopr_lib::errors::HoprLibError;
 use hopr_lib::{HoprSession, IpProtocol, PeerId, RoutingOptions, SessionCapability, SessionClientConfig};
 use hopr_network_types::prelude::ConnectedUdpStream;
 use hopr_network_types::udp::ForeignDataMode;
+use hopr_network_types::utils::copy_bidirectional_client_server;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use tokio::net::{TcpListener, ToSocketAddrs};
@@ -192,7 +193,7 @@ where
     T: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
 {
     let session_id = *session.id();
-    match tokio::io::copy_bidirectional_with_sizes(
+    match copy_bidirectional_client_server(
         &mut session.compat(),
         &mut stream,
         hopr_lib::SESSION_USABLE_MTU_SIZE,
@@ -201,9 +202,13 @@ where
     .await
     {
         Ok(bound_stream_finished) => info!(
-            "Client session {session_id} ended with {bound_stream_finished:?} bytes transferred in both directions.",
+            session_id = tracing::field::debug(session_id),
+            "client session ended with {bound_stream_finished:?} bytes transferred in both directions.",
         ),
-        Err(e) => error!("Failed to bind the stream to session {session_id}: {e}"),
+        Err(e) => error!(
+            session_id = tracing::field::debug(session_id),
+            "error during data transfer: {e}"
+        ),
     }
 }
 

@@ -10,6 +10,9 @@ pub mod udp;
 /// Contains various networking-related types
 pub mod types;
 
+/// Various network IO-related utilities
+pub mod utils;
+
 #[doc(hidden)]
 pub mod prelude {
     pub use crate::session::*;

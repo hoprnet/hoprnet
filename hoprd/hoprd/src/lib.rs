@@ -88,6 +88,7 @@
 
 use hopr_lib::errors::HoprLibError;
 use hopr_network_types::prelude::ForeignDataMode;
+use hopr_network_types::utils::copy_bidirectional_client_server;
 use std::net::ToSocketAddrs;
 
 pub mod cli;
@@ -101,9 +102,13 @@ pub struct HoprServerIpForwardingReactor;
 impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
     #[tracing::instrument(level = "debug", skip(self, session))]
     async fn process(&self, session: hopr_lib::HoprIncomingSession) -> hopr_lib::errors::Result<()> {
+        let session_id = *session.session.id();
         match session.target {
             hopr_lib::SessionTarget::UdpStream(udp_target) => {
-                tracing::debug!("binding socket to the UDP server {udp_target}...");
+                tracing::debug!(
+                    session_id = debug(session_id),
+                    "binding socket to the UDP server {udp_target}..."
+                );
 
                 // In UDP, it is impossible to determine if the target is viable,
                 // so we just take the first resolved address.
@@ -114,7 +119,10 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                         .ok_or(HoprLibError::GeneralError(format!(
                             "failed to resolve DNS name {udp_target}"
                         )))?;
-                tracing::debug!("UDP target {udp_target} resolved to {resolved_udp_target}");
+                tracing::debug!(
+                    session_id = debug(session_id),
+                    "UDP target {udp_target} resolved to {resolved_udp_target}"
+                );
 
                 let mut udp_bridge = hopr_network_types::udp::ConnectedUdpStream::bind(("127.0.0.1", 0))
                     .await
@@ -126,18 +134,29 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                         ))
                     })?;
 
-                tracing::debug!("Bridging the session to the UDP server {udp_target} ...");
+                tracing::debug!(
+                    session_id = debug(session_id),
+                    "bridging the session to the UDP server {udp_target} ..."
+                );
                 tokio::task::spawn(async move {
-                    match tokio::io::copy_bidirectional_with_sizes(&mut tokio_util::compat::FuturesAsyncReadCompatExt::compat(session.session), &mut udp_bridge, hopr_lib::SESSION_USABLE_MTU_SIZE, hopr_lib::SESSION_USABLE_MTU_SIZE).await {
-                        Ok(bound_stream_finished) => tracing::info!("server bridged session through UDP {udp_target} ended with {bound_stream_finished:?} bytes transferred in both directions."),
-                        Err(e) => tracing::error!("UDP server stream ({udp_target}) is closed: {e:?}")
+                    match copy_bidirectional_client_server(&mut tokio_util::compat::FuturesAsyncReadCompatExt::compat(session.session), &mut udp_bridge, hopr_lib::SESSION_USABLE_MTU_SIZE, hopr_lib::SESSION_USABLE_MTU_SIZE).await {
+                        Ok(bound_stream_finished) => tracing::info!(
+                            session_id = debug(session_id),
+                            "server bridged session through UDP {udp_target} ended with {bound_stream_finished:?} bytes transferred in both directions."
+                        ),
+                        Err(e) => tracing::error!(session_id = debug(session_id),
+                            "UDP server stream ({udp_target}) is closed: {e:?}"
+                        )
                     }
                 });
 
                 Ok(())
             }
             hopr_lib::SessionTarget::TcpStream(tcp_target) => {
-                tracing::debug!("creating a connection to the TCP server {tcp_target}...");
+                tracing::debug!(
+                    session_id = debug(session_id),
+                    "creating a connection to the TCP server {tcp_target}..."
+                );
 
                 // TCP is able to determine which of the resolved multiple addresses is viable,
                 // and therefore we can pass all of them.
@@ -145,7 +164,10 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                     .to_socket_addrs()
                     .map_err(|e| HoprLibError::GeneralError(format!("failed to resolve DNS name {tcp_target}: {e}")))?
                     .collect::<Vec<_>>();
-                tracing::debug!("TCP target {tcp_target} resolved to {resolved_tcp_targets:?}");
+                tracing::debug!(
+                    session_id = debug(session_id),
+                    "TCP target {tcp_target} resolved to {resolved_tcp_targets:?}"
+                );
 
                 // TODO: make TCP connection retry strategy configurable either by the server or the client
                 let strategy = tokio_retry::strategy::FixedInterval::from_millis(1500).take(15);
@@ -164,11 +186,20 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                     ))
                 })?;
 
-                tracing::debug!("bridging the session to the TCP server {tcp_target} ...");
+                tracing::debug!(
+                    session_id = debug(session_id),
+                    "bridging the session to the TCP server {tcp_target} ..."
+                );
                 tokio::task::spawn(async move {
-                    match tokio::io::copy_bidirectional_with_sizes(&mut tokio_util::compat::FuturesAsyncReadCompatExt::compat(session.session), &mut tcp_bridge, hopr_lib::SESSION_USABLE_MTU_SIZE, hopr_lib::SESSION_USABLE_MTU_SIZE).await {
-                        Ok(bound_stream_finished) => tracing::info!("Server bridged session through TCP {tcp_target} ended with {bound_stream_finished:?} bytes transferred in both directions."),
-                        Err(e) => tracing::error!("TCP server stream ({tcp_target}) is closed: {e:?}")
+                    match copy_bidirectional_client_server(&mut tokio_util::compat::FuturesAsyncReadCompatExt::compat(session.session), &mut tcp_bridge, hopr_lib::SESSION_USABLE_MTU_SIZE, hopr_lib::SESSION_USABLE_MTU_SIZE).await {
+                        Ok(bound_stream_finished) => tracing::info!(
+                            session_id = debug(session_id),
+                            "server bridged session through TCP {tcp_target} ended with {bound_stream_finished:?} bytes transferred in both directions."
+                        ),
+                        Err(e) => tracing::error!(
+                            session_id = debug(session_id),
+                            "TCP server stream ({tcp_target}) is closed: {e:?}"
+                        )
                     }
                 });
 
