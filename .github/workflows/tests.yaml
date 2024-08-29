@@ -95,11 +95,11 @@ jobs:
           USER: runner
 
       - name: Download snapshot for test_websocket_api
+        id: download-snapshot
         if: ${{ !env.ACT }}
-        uses: actions/download-artifact@v4
-        with:
-          name: snapshot-test_websocket_api
-          path: /tmp/hopr-smoke-test/test_websocket_api/snapshot
+        run: |
+          mkdir -p /tmp/hopr-smoke-test/test_websocket_api/snapshot
+          gcloud storage rsync gs://hoprnet-test-artifacts/websocket_api/snapshot /tmp/hopr-smoke-test/test_websocket_api/snapshot
         continue-on-error: true
 
       - name: Check snapshot for test_websocket_api
@@ -109,11 +109,11 @@ jobs:
         run: nix develop .#smoke-tests -c python3 -m pytest tests/test_websocket_api.py
 
       - name: Upload snapshot for test_websocket_api
-        if: ${{ !env.ACT && always() }}
-        uses: actions/upload-artifact@v4
+        uses: "google-github-actions/upload-cloud-storage@v2"
+        if: ${{ !env.ACT && always() && steps.download-snapshot.outcome != 'success' }}
         with:
-          name: snapshot-test_websocket_api
           path: /tmp/hopr-smoke-test/test_websocket_api/snapshot
+          destination: hoprnet-test-artifacts/websocket_api
 
       - name: Compress test logs
         if: ${{ !env.ACT && always() }}
@@ -121,7 +121,7 @@ jobs:
           # Copy all the logs to a directory to avoid log file changes and simplify tar command
           test_path=/tmp/test-smoke-websocket-${{ github.run_id }}-${{ github.run_number }}
           mkdir -p ${test_path}
-          cp -r /tmp/hopr-smoke-test/* ${test_path} || echo "no files to copy"
+          cp -r /tmp/hopr-smoke-test/test_websocket_api/*.log ${test_path} || echo "no files to copy"
           cd ${test_path}
           tar -czvf ${test_path}.tgz ${test_path}
         working-directory: "/tmp"
@@ -178,11 +178,11 @@ jobs:
           USER: runner
 
       - name: Download snapshot for test_${{ matrix.suite }}
+        id: download-snapshot
         if: ${{ !env.ACT }}
-        uses: actions/download-artifact@v4
-        with:
-          name: snapshot-test_${{ matrix.suite }}
-          path: /tmp/hopr-smoke-test/test_${{ matrix.suite }}/snapshot
+        run: |
+          mkdir -p /tmp/hopr-smoke-test/test_${{ matrix.suite }}/snapshot
+          gcloud storage rsync gs://hoprnet-test-artifacts/${{ matrix.suite }}/snapshot /tmp/hopr-smoke-test/test_${{ matrix.suite }}/snapshot
         continue-on-error: true
 
       - name: Check snapshot for test_${{ matrix.suite }}
@@ -192,11 +192,11 @@ jobs:
         run: nix develop .#smoke-tests -c python3 -m pytest tests/test_${{ matrix.suite }}.py
 
       - name: Upload snapshot for test_${{ matrix.suite }}
-        if: ${{ !env.ACT && always() }}
-        uses: actions/upload-artifact@v4
+        uses: "google-github-actions/upload-cloud-storage@v2"
+        if: ${{ !env.ACT && always() && steps.download-snapshot.outcome != 'success' }}
         with:
-          name: snapshot-test_${{ matrix.suite }}
           path: /tmp/hopr-smoke-test/test_${{ matrix.suite }}/snapshot
+          destination: hoprnet-test-artifacts/${{ matrix.suite }}
 
       - name: Compress test logs
         if: ${{ !env.ACT && always() }}
@@ -204,7 +204,7 @@ jobs:
           # Copy all the logs to a directory to avoid log file changes and simplify tar command
           test_path=/tmp/test-smoke-${{ matrix.suite }}-${{ github.run_id }}-${{ github.run_number }}
           mkdir -p ${test_path}
-          cp -r /tmp/hopr-smoke-test/* ${test_path} || echo "no files to copy"
+          cp -r /tmp/hopr-smoke-test/test_${{ matrix.suite }}/*.log ${test_path} || echo "no files to copy"
           cd ${test_path}
           tar -czvf ${test_path}.tgz ${test_path}
         working-directory: "/tmp"
