@@ -147,13 +147,16 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                     .collect::<Vec<_>>();
                 tracing::debug!("TCP target {tcp_target} resolved to {resolved_tcp_targets:?}");
 
-                let mut tcp_bridge = tokio::net::TcpStream::connect(resolved_tcp_targets.as_slice())
-                    .await
-                    .map_err(|e| {
-                        HoprLibError::GeneralError(format!(
-                            "could not bridge the incoming session to {tcp_target}: {e}"
-                        ))
-                    })?;
+                // TODO: make TCP connection retry strategy configurable either by the server or the client
+                let strategy = tokio_retry::strategy::FixedInterval::from_millis(1500).take(15);
+
+                let mut tcp_bridge = tokio_retry::Retry::spawn(strategy, || {
+                    tokio::net::TcpStream::connect(resolved_tcp_targets.as_slice())
+                })
+                .await
+                .map_err(|e| {
+                    HoprLibError::GeneralError(format!("could not bridge the incoming session to {tcp_target}: {e}"))
+                })?;
 
                 tcp_bridge.set_nodelay(true).map_err(|e| {
                     HoprLibError::GeneralError(format!(

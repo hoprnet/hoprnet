@@ -940,8 +940,14 @@ impl Hopr {
                     async move {
                         let session_id = *session.session.id();
                         match serve_handler.process(session).await {
-                            Ok(_) => debug!("client session {session_id} processed successfully"),
-                            Err(e) => error!("client session {session_id} processing failed: {e}"),
+                            Ok(_) => debug!(
+                                session_id = tracing::field::debug(session_id),
+                                "client session processed successfully"
+                            ),
+                            Err(e) => error!(
+                                session_id = tracing::field::debug(session_id),
+                                "client session {session_id} processing failed: {e}"
+                            ),
                         }
                     }
                 })),

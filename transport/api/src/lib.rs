@@ -203,7 +203,9 @@ where
 type SessionInitiationCache =
     moka::future::Cache<StartChallenge, UnboundedSender<Result<StartEstablished<SessionId>, StartErrorType>>>;
 
-type SessionCache = moka::future::Cache<SessionId, (UnboundedSender<Box<[u8]>>, RoutingOptions)>;
+// Sender needs to be put in Arc, so that no clones are made, and the entire channel closes
+// once the only sender is closed
+type SessionCache = moka::future::Cache<SessionId, (Arc<UnboundedSender<Box<[u8]>>>, RoutingOptions)>;
 
 async fn close_session<T>(
     sessions: &SessionCache,
@@ -211,7 +213,7 @@ async fn close_session<T>(
     msg_sender: Arc<helpers::MessageSender<T>>,
     session_id: SessionId,
     notify_closure: bool,
-) -> errors::Result<()>
+) -> errors::Result<bool>
 where
     T: HoprDbAllOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
 {
@@ -233,21 +235,26 @@ where
 
         // Closing the data sender on the session will cause the Session to terminate
         session_tx.close_channel();
+        trace!(
+            session_id = tracing::field::debug(session_id),
+            "channel closed on session"
+        );
+        Ok(true)
     } else {
         // Do not treat this as an error
         debug!(
             session_id = tracing::field::debug(session_id),
             "could not find session id to close, maybe the session is already closed"
         );
+        Ok(false)
     }
-    Ok(())
 }
 
 fn close_session_after_eviction<T>(
     msg_sender: Arc<helpers::MessageSender<T>>,
     me: PeerId,
     id: Arc<SessionId>,
-    (_, routing_opts): (UnboundedSender<Box<[u8]>>, RoutingOptions),
+    (session_tx, routing_opts): (Arc<UnboundedSender<Box<[u8]>>>, RoutingOptions),
     cause: moka::notification::RemovalCause,
 ) -> moka::notification::ListenerFuture
 where
@@ -280,6 +287,12 @@ where
                         "could not send notification of session closure after cache eviction: {err}"
                     );
                 }
+
+                session_tx.close_channel();
+                trace!(
+                    session_id = tracing::field::debug(session_id),
+                    "channel closed on session during eviction"
+                );
             }
             .boxed()
         }
@@ -330,7 +343,7 @@ where
                     };
                     SessionId::new(next_tag, peer)
                 },
-                (tx_session_data, route.clone()),
+                (Arc::new(tx_session_data), route.clone()),
             )
             .await
             {
@@ -457,7 +470,7 @@ where
                 "received session close request"
             );
             match close_session(&sessions, me, message_sender.clone(), session_id, false).await {
-                Ok(_) => debug!(
+                Ok(closed) if closed => debug!(
                     session_id = tracing::field::debug(session_id),
                     "session has been closed by the other party"
                 ),
@@ -465,6 +478,7 @@ where
                     session_id = tracing::field::debug(session_id),
                     "session could not be closed on other party's request: {e}"
                 ),
+                _ => {}
             }
         }
     }
@@ -700,28 +714,27 @@ where
 
         processes.insert(
             HoprTransportProcess::SessionsTerminator,
-            spawn(
-                session_close_rx.for_each_concurrent(Some(10), move |closed_session_id| {
-                    let sessions = sessions.clone();
-                    let msg_sender_clone = msg_sender_clone.clone();
-                    async move {
-                        trace!(
+            spawn(session_close_rx.for_each_concurrent(None, move |closed_session_id| {
+                let sessions = sessions.clone();
+                let msg_sender_clone = msg_sender_clone.clone();
+                async move {
+                    trace!(
+                        session_id = tracing::field::debug(closed_session_id),
+                        "sending notification of session closure done by us"
+                    );
+                    match close_session(&sessions, me, msg_sender_clone, closed_session_id, true).await {
+                        Ok(closed) if closed => debug!(
                             session_id = tracing::field::debug(closed_session_id),
-                            "sending notification of session closure done by us"
-                        );
-                        match close_session(&sessions, me, msg_sender_clone, closed_session_id, true).await {
-                            Ok(_) => debug!(
-                                session_id = tracing::field::debug(closed_session_id),
-                                "session has been closed by us"
-                            ),
-                            Err(e) => error!(
-                                session_id = tracing::field::debug(closed_session_id),
-                                "cannot initiate session closure notification: {e}"
-                            ),
-                        }
+                            "session has been closed by us"
+                        ),
+                        Err(e) => error!(
+                            session_id = tracing::field::debug(closed_session_id),
+                            "cannot initiate session closure notification: {e}"
+                        ),
+                        _ => {}
                     }
-                }),
-            ),
+                }
+            })),
         );
 
         // initiate session handling over the msg-ack protocol stack
@@ -806,13 +819,13 @@ where
         processes.insert(
             HoprTransportProcess::SessionsExpiration,
             spawn(async move {
-                let jitter = hopr_crypto_random::random_float_in_range(1.0..1.2);
-                let waiting_time = constants::SESSION_INITIATION_TIMEOUT
+                let jitter = hopr_crypto_random::random_float_in_range(1.0..1.5);
+                let timeout = constants::SESSION_INITIATION_TIMEOUT
                     .min(constants::SESSION_LIFETIME)
                     .mul_f64(jitter)
                     / 2;
                 loop {
-                    sleep(waiting_time).await;
+                    sleep(timeout).await;
                     trace!("executing session cache evictions");
                     futures::join!(sessions.run_pending_tasks(), session_initiations.run_pending_tasks());
                 }
@@ -935,7 +948,9 @@ where
 
                 // Insert the Session object, forcibly overwrite any other session with the same ID
                 let (tx, rx) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
-                self.sessions.insert(session_id, (tx, cfg.path_options.clone())).await;
+                self.sessions
+                    .insert(session_id, (Arc::new(tx), cfg.path_options.clone()))
+                    .await;
 
                 Ok(Session::new(
                     session_id,
