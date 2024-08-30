@@ -3,9 +3,9 @@ use async_signal::{Signal, Signals};
 use chrono::{DateTime, Utc};
 use futures::StreamExt;
 use std::collections::HashMap;
+use std::fmt::Formatter;
 use std::str::FromStr;
 use std::{sync::Arc, time::SystemTime};
-
 #[cfg(feature = "telemetry")]
 use {
     opentelemetry::trace::TracerProvider,
@@ -103,7 +103,7 @@ fn init_logger() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-#[derive(Debug, strum::Display)]
+#[derive(strum::Display)]
 enum HoprdProcesses {
     #[strum(to_string = "HoprLibProcess: {0} {1:?}")]
     HoprLib(HoprLibProcesses, JoinHandle<()>),
@@ -113,6 +113,12 @@ enum HoprdProcesses {
     ListenerSockets(ListenerJoinHandles),
     #[strum(to_string = "RestApi")]
     RestApi(JoinHandle<()>),
+}
+
+impl std::fmt::Debug for HoprdProcesses {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self)
+    }
 }
 
 #[cfg_attr(feature = "runtime-async-std", async_std::main)]
@@ -221,7 +227,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         processes.push(HoprdProcesses::ListenerSockets(session_listener_sockets.clone()));
         processes.push(HoprdProcesses::RestApi(spawn(async move {
-            serve_api(
+            if let Err(e) = serve_api(
                 api_listener,
                 node_cfg_str,
                 api_cfg,
@@ -232,7 +238,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Some(msg_encoder),
             )
             .await
-            .expect("the REST API server should start successfully")
+            {
+                error!("the REST API server could not start: {e}")
+            }
         })));
     }
 

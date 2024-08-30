@@ -2,7 +2,7 @@ use std::sync::{Arc, OnceLock};
 
 use async_lock::RwLock;
 use libp2p::{Multiaddr, PeerId};
-use tracing::{debug, trace};
+use tracing::trace;
 
 use chain_types::chain_events::NetworkRegistryStatus;
 use core_path::{
@@ -93,7 +93,7 @@ where
             RoutingOptions::IntermediatePath(path) => {
                 let complete_path = Vec::from_iter(path.into_iter().chain([destination]));
 
-                debug!(full_path = format!("{complete_path:?}"), "Resolved a specific path");
+                trace!(full_path = format!("{complete_path:?}"), "Resolved a specific path");
 
                 let cg = self.channel_graph.read().await;
 
@@ -102,11 +102,11 @@ where
                     .map(|(p, _)| p)?
             }
             RoutingOptions::Hops(hops) if u32::from(hops) == 0 => {
-                debug!(hops = 0, "Resolved zero-hop path to {destination}");
+                trace!(hops = 0, "Resolved zero-hop path to {destination}");
                 TransportPath::direct(destination)
             }
             RoutingOptions::Hops(hops) => {
-                debug!(hops = tracing::field::display(hops), "Resolving a path using hop count");
+                trace!(hops = tracing::field::display(hops), "Resolving a path using hop count");
 
                 let pk = OffchainPublicKey::try_from(destination)?;
 

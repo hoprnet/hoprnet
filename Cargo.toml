@@ -73,6 +73,7 @@ generic-array = { version = "0.14.7", features = ["zeroize"] }
 getrandom = "0.2.15"
 hex = "0.4.3"
 hex-literal = "0.4.1"
+hickory-resolver = "0.24.1"
 lazy_static = "1.4.0"
 libp2p = { version = "0.54.0" }
 libp2p-identity = { version = "0.2.9", features = [
