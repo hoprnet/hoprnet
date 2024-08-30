@@ -252,7 +252,7 @@ pub(crate) async fn create_client(
 
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 #[schema(example = json!({
-        "ip": "127.0.0.1",
+        "listeningIp": "127.0.0.1",
         "port": 5542
     }))]
 #[serde(rename_all = "camelCase")]
@@ -295,13 +295,15 @@ pub(crate) async fn close_client(
     let bound_addr = std::net::SocketAddr::from_str(&format!("{listening_ip}:{port}"))
         .map_err(|_| (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidInput).into_response())?;
 
-    state
+    let handle = state
         .open_listeners
         .write()
         .await
         .remove(&ListenerId(protocol, bound_addr))
-        .ok_or((StatusCode::NOT_FOUND, ApiErrorStatus::InvalidInput).into_response())
-        .map(|_| (StatusCode::NO_CONTENT, "").into_response())
+        .ok_or((StatusCode::NOT_FOUND, ApiErrorStatus::InvalidInput).into_response())?;
+
+    let _ = handle.cancel().await;
+    Ok((StatusCode::NO_CONTENT, "").into_response())
 }
 
 async fn tcp_listen_on<A: ToSocketAddrs>(address: A) -> std::io::Result<(std::net::SocketAddr, TcpListener)> {
