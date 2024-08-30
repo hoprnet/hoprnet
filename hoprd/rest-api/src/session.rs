@@ -293,17 +293,17 @@ pub(crate) async fn close_client(
     Json(SessionCloseClientRequest { listening_ip, port }): Json<SessionCloseClientRequest>,
 ) -> Result<impl IntoResponse, impl IntoResponse> {
     let bound_addr = std::net::SocketAddr::from_str(&format!("{listening_ip}:{port}"))
-        .map_err(|_| (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidInput).into_response())?;
+        .map_err(|_| (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidInput))?;
 
     let handle = state
         .open_listeners
         .write()
         .await
         .remove(&ListenerId(protocol, bound_addr))
-        .ok_or((StatusCode::NOT_FOUND, ApiErrorStatus::InvalidInput).into_response())?;
+        .ok_or((StatusCode::NOT_FOUND, ApiErrorStatus::InvalidInput))?;
 
     let _ = handle.cancel().await;
-    Ok((StatusCode::NO_CONTENT, "").into_response())
+    Ok::<_, (StatusCode, ApiErrorStatus)>((StatusCode::NO_CONTENT, "").into_response())
 }
 
 async fn tcp_listen_on<A: ToSocketAddrs>(address: A) -> std::io::Result<(std::net::SocketAddr, TcpListener)> {
