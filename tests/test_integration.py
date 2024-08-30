@@ -965,6 +965,8 @@ async def test_session_communication_with_a_tcp_echo_server(
     expected.sort()
     assert actual == expected
 
+    await src_peer.api.session_close_client(protocol='TCP', bound_ip='127.0.0.1', bound_port=src_sock_port) is True
+
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("src,dest", random_distinct_pairs_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
@@ -1005,7 +1007,10 @@ async def test_session_communication_with_a_udp_echo_server(
     expected.sort()
     assert actual == expected
 
+    await src_peer.api.session_close_client(protocol='UDP', bound_ip='127.0.0.1', bound_port=src_sock_port) is True
 
+
+@pytest.mark.skip(reason="skipping dummy test")
 @pytest.mark.asyncio
 @pytest.mark.parametrize("src,dest", random_distinct_pairs_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
 async def test_dummy(

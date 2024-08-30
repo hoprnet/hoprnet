@@ -103,20 +103,28 @@ fn init_logger() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-#[derive(strum::Display)]
 enum HoprdProcesses {
-    #[strum(to_string = "HoprLibProcess: {0} {1:?}")]
     HoprLib(HoprLibProcesses, JoinHandle<()>),
-    #[strum(to_string = "WebSocket")]
     WebSocket(JoinHandle<()>),
-    #[strum(to_string = "ListenerSockets")]
     ListenerSockets(ListenerJoinHandles),
-    #[strum(to_string = "RestApi")]
     RestApi(JoinHandle<()>),
+}
+
+// Manual implementation needed, since Strum does not support skipping arguments
+impl std::fmt::Display for HoprdProcesses {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            HoprdProcesses::HoprLib(p, _) => write!(f, "HoprLib process: {p}"),
+            HoprdProcesses::WebSocket(_) => write!(f, "WebSocket"),
+            HoprdProcesses::ListenerSockets(_) => write!(f, "SessionListenerSockets"),
+            HoprdProcesses::RestApi(_) => write!(f, "RestApi"),
+        }
+    }
 }
 
 impl std::fmt::Debug for HoprdProcesses {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        // Intentionally same as Display
         write!(f, "{}", self)
     }
 }
