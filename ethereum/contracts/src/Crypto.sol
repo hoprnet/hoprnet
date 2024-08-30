@@ -232,7 +232,7 @@ abstract contract HoprCrypto {
             // P == Q ?
             case true {
                 // Point double
-                toInvert := addmod(mulmod(2, pY, SECP256K1_BASE_FIELD_ORDER), a, SECP256K1_BASE_FIELD_ORDER) // 2 * p.y
+                toInvert := mulmod(2, pY, SECP256K1_BASE_FIELD_ORDER) // 2 * p.y
 
                 // compute (2 * p.y) ^ -1 using expmod precompile
                 let payload := mload(0x40)
@@ -246,10 +246,15 @@ abstract contract HoprCrypto {
                     // 0x05 == expmod precompile
                     revert(0, 0)
                 }
+                let numerator :=
+                        addmod( // 3 * p.x ^ 2 + a
+                            mulmod( // 3 * p.x ^ 2
+                                3, mulmod(pX, pX, SECP256K1_BASE_FIELD_ORDER), SECP256K1_BASE_FIELD_ORDER
+                            ), a, SECP256K1_BASE_FIELD_ORDER
+                        )
                 lambda :=
-                    mulmod( // (3 * p.x ^ 2) * (2 * p.y) ^ -1
-                        mulmod( // 3 * p.x ^ 2
-                        3, mulmod(pX, pX, SECP256K1_BASE_FIELD_ORDER), SECP256K1_BASE_FIELD_ORDER),
+                    mulmod( // (3 * p.x ^ 2 + a) * (2 * p.y) ^ -1
+                        numerator,
                         mload(payload),
                         SECP256K1_BASE_FIELD_ORDER
                     )
