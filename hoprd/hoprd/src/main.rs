@@ -1,11 +1,10 @@
-use std::collections::HashMap;
-use std::str::FromStr;
-use std::{sync::Arc, time::SystemTime};
-
 use async_lock::RwLock;
 use async_signal::{Signal, Signals};
 use chrono::{DateTime, Utc};
 use futures::StreamExt;
+use std::collections::HashMap;
+use std::str::FromStr;
+use std::{sync::Arc, time::SystemTime};
 
 #[cfg(feature = "telemetry")]
 use {
@@ -22,7 +21,7 @@ use hopr_async_runtime::prelude::{cancel_join_handle, spawn, JoinHandle};
 use hopr_lib::{ApplicationData, AsUnixTimestamp, HoprLibProcesses, ToHex};
 use hoprd::cli::CliArgs;
 use hoprd::errors::HoprdError;
-use hoprd_api::serve_api;
+use hoprd_api::{serve_api, ListenerJoinHandles};
 use hoprd_keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
 
 use hoprd::HoprServerIpForwardingReactor;
@@ -104,11 +103,16 @@ fn init_logger() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Debug, strum::Display)]
 enum HoprdProcesses {
-    HoprLib(HoprLibProcesses),
-    Socket,
-    RestApi,
+    #[strum(to_string = "HoprLibProcess: {0} {1:?}")]
+    HoprLib(HoprLibProcesses, JoinHandle<()>),
+    #[strum(to_string = "WebSocket")]
+    WebSocket(JoinHandle<()>),
+    #[strum(to_string = "ListenerSockets")]
+    ListenerSockets(ListenerJoinHandles),
+    #[strum(to_string = "RestApi")]
+    RestApi(JoinHandle<()>),
 }
 
 #[cfg_attr(feature = "runtime-async-std", async_std::main)]
@@ -191,7 +195,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let node_clone = node.clone();
 
-    let mut processes: HashMap<HoprdProcesses, JoinHandle<()>> = HashMap::new();
+    let mut processes: Vec<HoprdProcesses> = Vec::new();
 
     if cfg.api.enable {
         // TODO: remove RLP in 3.0
@@ -213,80 +217,78 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         info!("Node REST API is listening on {listen_address}");
 
-        processes.insert(
-            HoprdProcesses::RestApi,
-            spawn(async move {
-                serve_api(
-                    api_listener,
-                    node_cfg_str,
-                    api_cfg,
-                    node_clone,
-                    inbox,
-                    ws_events_rx,
-                    Some(msg_encoder),
-                )
-                .await
-                .expect("the REST API server should start successfully")
-            }),
-        );
+        let session_listener_sockets = Arc::new(RwLock::new(HashMap::new()));
+
+        processes.push(HoprdProcesses::ListenerSockets(session_listener_sockets.clone()));
+        processes.push(HoprdProcesses::RestApi(spawn(async move {
+            serve_api(
+                api_listener,
+                node_cfg_str,
+                api_cfg,
+                node_clone,
+                inbox,
+                session_listener_sockets,
+                ws_events_rx,
+                Some(msg_encoder),
+            )
+            .await
+            .expect("the REST API server should start successfully")
+        })));
     }
 
     let (hopr_socket, hopr_processes) = node.run(HoprServerIpForwardingReactor).await?;
 
     // process extracting the received data from the socket
     let mut ingress = hopr_socket.reader();
-    processes.insert(
-        HoprdProcesses::Socket,
-        spawn(async move {
-            while let Some(data) = ingress.next().await {
-                let recv_at = SystemTime::now();
+    processes.push(HoprdProcesses::WebSocket(spawn(async move {
+        while let Some(data) = ingress.next().await {
+            let recv_at = SystemTime::now();
 
-                // TODO: remove RLP in 3.0
-                match hopr_lib::rlp::decode(&data.plain_text) {
-                    Ok((msg, sent)) => {
-                        let latency = recv_at.as_unix_timestamp().saturating_sub(sent);
+            // TODO: remove RLP in 3.0
+            match hopr_lib::rlp::decode(&data.plain_text) {
+                Ok((msg, sent)) => {
+                    let latency = recv_at.as_unix_timestamp().saturating_sub(sent);
 
-                        info!(
-                            app_tag = data.application_tag.unwrap_or(0),
-                            latency_in_ms = latency.as_millis(),
-                            "## NODE RECEIVED MESSAGE [@{}] ##",
-                            DateTime::<Utc>::from(recv_at).to_rfc3339(),
-                        );
+                    info!(
+                        app_tag = data.application_tag.unwrap_or(0),
+                        latency_in_ms = latency.as_millis(),
+                        "## NODE RECEIVED MESSAGE [@{}] ##",
+                        DateTime::<Utc>::from(recv_at).to_rfc3339(),
+                    );
 
-                        #[cfg(all(feature = "prometheus", not(test)))]
-                        METRIC_MESSAGE_LATENCY.observe(latency.as_secs_f64());
+                    #[cfg(all(feature = "prometheus", not(test)))]
+                    METRIC_MESSAGE_LATENCY.observe(latency.as_secs_f64());
 
-                        if cfg.api.enable && ws_events_tx.receiver_count() > 0 {
-                            if let Err(e) = ws_events_tx.try_broadcast(ApplicationData {
-                                application_tag: data.application_tag,
-                                plain_text: msg.clone(),
-                            }) {
-                                error!("Failed to notify websockets about a new message: {e}");
-                            }
-                        }
-
-                        if !inbox_clone
-                            .write()
-                            .await
-                            .push(ApplicationData {
-                                application_tag: data.application_tag,
-                                plain_text: msg,
-                            })
-                            .await
-                        {
-                            warn!(
-                                tag = data.application_tag,
-                                "Received a message with an ignored Inbox tag",
-                            )
+                    if cfg.api.enable && ws_events_tx.receiver_count() > 0 {
+                        if let Err(e) = ws_events_tx.try_broadcast(ApplicationData {
+                            application_tag: data.application_tag,
+                            plain_text: msg.clone(),
+                        }) {
+                            error!("Failed to notify websockets about a new message: {e}");
                         }
                     }
-                    Err(e) => error!("RLP decoding failed: {e}"),
-                }
-            }
-        }),
-    );
 
-    processes.extend(hopr_processes.into_iter().map(|(k, v)| (HoprdProcesses::HoprLib(k), v)));
+                    if !inbox_clone
+                        .write()
+                        .await
+                        .push(ApplicationData {
+                            application_tag: data.application_tag,
+                            plain_text: msg,
+                        })
+                        .await
+                    {
+                        warn!(
+                            tag = data.application_tag,
+                            "Received a message with an ignored Inbox tag",
+                        )
+                    }
+                }
+                Err(e) => error!("RLP decoding failed: {e}"),
+            }
+        }
+    })));
+
+    processes.extend(hopr_processes.into_iter().map(|(k, v)| HoprdProcesses::HoprLib(k, v)));
 
     let mut signals = Signals::new([Signal::Hup, Signal::Int]).map_err(|e| HoprdError::OsError(e.to_string()))?;
     while let Some(Ok(signal)) = signals.next().await {
@@ -297,10 +299,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Signal::Int => {
                 info!("Received the INT signal... tearing down the node");
                 futures::stream::iter(processes)
-                    .for_each_concurrent(None, |(name, handle)| async move {
-                        info!("Stopping process: {name:?}");
-                        cancel_join_handle(handle).await
+                    .then(|process| async move {
+                        let mut join_handles: Vec<JoinHandle<()>> = Vec::new();
+                        info!("Stopping process: {process}");
+                        match process {
+                            HoprdProcesses::HoprLib(_, jh)
+                            | HoprdProcesses::WebSocket(jh)
+                            | HoprdProcesses::RestApi(jh) => join_handles.push(jh),
+                            HoprdProcesses::ListenerSockets(jhs) => {
+                                join_handles.extend(jhs.write().await.drain().map(|(_, jh)| jh));
+                            }
+                        }
+                        futures::stream::iter(join_handles)
                     })
+                    .flatten()
+                    .for_each_concurrent(None, cancel_join_handle)
                     .await;
 
                 info!("All processes stopped... emulating the default handler...");

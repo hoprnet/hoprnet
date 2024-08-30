@@ -40,6 +40,7 @@ smart-default = { workspace = true }
 strum = { workspace = true }
 tokio = { workspace = true }
 tokio-util = { workspace = true, features = ["compat"] }
+tokio-stream = "0.1.15"
 tower = "0.4.13"
 tower-http = { version = "0.5.2", features = [
   "validate-request",
@@ -59,6 +60,7 @@ hoprd-inbox = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-network-types = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
+hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
 
 [dev-dependencies]
 anyhow = { workspace = true }

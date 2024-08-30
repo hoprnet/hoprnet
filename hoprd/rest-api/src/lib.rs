@@ -27,6 +27,7 @@ use bimap::BiHashMap;
 use hyper::header::AUTHORIZATION;
 use libp2p_identity::PeerId;
 use serde::Serialize;
+use std::collections::HashMap;
 use std::error::Error;
 use std::iter::once;
 use std::sync::Arc;
@@ -43,9 +44,9 @@ use utoipa::openapi::security::{ApiKey, ApiKeyValue, HttpAuthScheme, HttpBuilder
 use utoipa::{Modify, OpenApi};
 use utoipa_scalar::{Scalar, Servable};
 
-use hopr_lib::{errors::HoprLibError, ApplicationData, Hopr};
-
 use crate::config::Auth;
+use hopr_lib::{errors::HoprLibError, ApplicationData, Hopr};
+use hopr_network_types::prelude::IpProtocol;
 
 pub(crate) const BASE_PATH: &str = "/api/v3";
 
@@ -56,6 +57,11 @@ pub(crate) struct AppState {
 
 pub type MessageEncoder = fn(&[u8]) -> Box<[u8]>;
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub struct ListenerId(pub IpProtocol, pub std::net::SocketAddr);
+
+pub type ListenerJoinHandles = Arc<RwLock<HashMap<ListenerId, hopr_async_runtime::prelude::JoinHandle<()>>>>;
+
 #[derive(Clone)]
 pub(crate) struct InternalState {
     pub hoprd_cfg: String,
@@ -65,6 +71,7 @@ pub(crate) struct InternalState {
     pub aliases: Arc<RwLock<BiHashMap<String, PeerId>>>,
     pub websocket_rx: async_broadcast::InactiveReceiver<ApplicationData>,
     pub msg_encoder: Option<MessageEncoder>,
+    pub open_listeners: ListenerJoinHandles,
 }
 
 #[derive(OpenApi)]
@@ -164,16 +171,27 @@ impl Modify for SecurityAddon {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn serve_api(
     listener: TcpListener,
     hoprd_cfg: String,
     cfg: crate::config::Api,
     hopr: Arc<hopr_lib::Hopr>,
     inbox: Arc<RwLock<hoprd_inbox::Inbox>>,
+    session_listener_sockets: ListenerJoinHandles,
     websocket_rx: async_broadcast::InactiveReceiver<ApplicationData>,
     msg_encoder: Option<MessageEncoder>,
 ) -> Result<(), std::io::Error> {
-    let router = build_api(hoprd_cfg, cfg, hopr, inbox, websocket_rx, msg_encoder).await;
+    let router = build_api(
+        hoprd_cfg,
+        cfg,
+        hopr,
+        inbox,
+        session_listener_sockets,
+        websocket_rx,
+        msg_encoder,
+    )
+    .await;
     axum::serve(listener, router).await
 }
 
@@ -182,6 +200,7 @@ async fn build_api(
     cfg: crate::config::Api,
     hopr: Arc<hopr_lib::Hopr>,
     inbox: Arc<RwLock<hoprd_inbox::Inbox>>,
+    open_listeners: ListenerJoinHandles,
     websocket_rx: async_broadcast::InactiveReceiver<ApplicationData>,
     msg_encoder: Option<MessageEncoder>,
 ) -> Router {
@@ -198,6 +217,7 @@ async fn build_api(
         inbox,
         websocket_rx,
         aliases,
+        open_listeners,
     };
 
     Router::new()
@@ -257,7 +277,8 @@ async fn build_api(
                 .route("/node/entryNodes", get(node::entry_nodes))
                 .route("/node/metrics", get(node::metrics))
                 .route("/peers/:peerId/ping", post(peers::ping_peer))
-                .route("/session", post(session::create_client))
+                .route("/session/:protocol", post(session::create_client))
+                .route("/session/:protocol", delete(session::close_client))
                 .with_state(inner_state.clone().into())
                 .layer(middleware::from_fn_with_state(inner_state, preconditions::authenticate)),
         )

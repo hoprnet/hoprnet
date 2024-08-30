@@ -5,8 +5,9 @@ use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 
 /// Lists some of the IP protocols.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, strum::Display)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, strum::Display, strum::EnumString)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[strum(serialize_all = "lowercase", ascii_case_insensitive)]
 pub enum IpProtocol {
     TCP,
     UDP,
