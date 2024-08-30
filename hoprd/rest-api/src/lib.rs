@@ -111,6 +111,7 @@ pub(crate) struct InternalState {
         peers::ping_peer,
         peers::show_peer_info,
         session::create_client,
+        session::close_client,
         tickets::aggregate_tickets_in_channel,
         tickets::redeem_all_tickets,
         tickets::redeem_tickets_in_channel,
@@ -132,7 +133,7 @@ pub(crate) struct InternalState {
             node::EntryNode, node::NodeInfoResponse, node::NodePeersQueryRequest,
             node::HeartbeatInfo, node::PeerInfo, node::AnnouncedPeer, node::NodePeersResponse, node::NodeVersionResponse,
             peers::NodePeerInfoResponse, peers::PingResponse,
-            session::SessionClientRequest, session::SessionClientResponse,
+            session::SessionClientRequest, session::SessionClientResponse, session::SessionCloseClientRequest,
             tickets::NodeTicketStatisticsResponse, tickets::ChannelTicket,
         )
     ),

@@ -22,6 +22,7 @@ from hoprd_sdk.models import (
     OpenChannelBodyRequest,
     SendMessageBodyRequest,
     SessionClientRequest,
+    SessionCloseClientRequest,
     TagQueryRequest,
     WithdrawBodyRequest,
 )
@@ -390,10 +391,19 @@ class HoprdAPI:
         Returns the port of the client session.
         :return: port: int
         """
-        body = SessionClientRequest(destination=destination, path=path, port=0, protocol=protocol, target=target)
+        body = SessionClientRequest(destination=destination, path=path, target=target)
 
-        _, response = self.__call_api(SessionApi, "create_client", body=body)
+        _, response = self.__call_api(SessionApi, "create_client", body=body, protocol=protocol)
         return int(response.port) if hasattr(response, "port") else None
+
+    async def session_close_client(self, protocol: str, bound_port: int, bound_ip: str = '127.0.0.1'):
+        """
+        Closes a previously opened and bound session
+        """
+        body = SessionCloseClientRequest(listening_ip = bound_ip, port = bound_port)
+
+        status, _ = self.__call_api(SessionApi, "close_client", body=body, protocol=protocol)
+        return status
 
     async def ticket_winn_prob(self):
         """

@@ -91,7 +91,7 @@ pub(crate) struct SessionClientResponse {
 /// Different capabilities can be configured for the session, such as data segmentation or
 /// retransmission.
 ///
-/// Once the host and port is bound, it is possible to use the socket for bidirectional read/write
+/// Once the host and port are bound, it is possible to use the socket for bidirectional read/write
 /// communication over the selected IP protocol and HOPR network routing with the given destination.
 /// The destination HOPR node forwards all the data to the given target over the selected IP protocol.
 ///
@@ -261,6 +261,9 @@ pub(crate) struct SessionCloseClientRequest {
     pub port: u16,
 }
 
+/// Closes an existing Session listener.
+/// The listener must've been previously created and bound for the given IP protocol.
+/// Once a listener is closed, no more socket connections can be made to it.
 #[utoipa::path(
     delete,
     path = const_format::formatcp!("{BASE_PATH}/session/{{protocol}}"),
