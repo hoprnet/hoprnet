@@ -93,9 +93,9 @@ contract HoprNetworkRegistry is AccessControlEnumerable, HoprNetworkRegistryEven
      * @param _manager address of an additional manager
      */
     constructor(address _requirementImplementation, address _newOwner, address _manager) {
-        _setupRole(DEFAULT_ADMIN_ROLE, _newOwner);
-        _setupRole(MANAGER_ROLE, _newOwner);
-        _setupRole(MANAGER_ROLE, _manager);
+        _grantRole(DEFAULT_ADMIN_ROLE, _newOwner);
+        _grantRole(MANAGER_ROLE, _newOwner);
+        _grantRole(MANAGER_ROLE, _manager);
 
         requirementImplementation = IHoprNetworkRegistryRequirement(_requirementImplementation);
         enabled = true;
