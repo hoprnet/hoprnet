@@ -58,34 +58,37 @@ on:
         default: "200"
         required: true
         description: 'Number of messages per seconds'
+
 concurrency:
   group: load-tests
   cancel-in-progress: true
 
 jobs:
-
   load-tests:
     name: Load Tests
     runs-on: self-hosted-hoprnet-small
     steps:
-
       - name: Set environment variables
         id: vars
         run: |
-          if [ -z "${{ github.event.inputs.test_id }}" ]; then 
+          if [ -z "${{ github.event.inputs.test_id }}" ]; then
             echo "The workflow is triggered by other pipeline"
-            echo "NODES=${{ inputs.nodes }}" >> $GITHUB_OUTPUT
-            echo "WORKLOAD_NAME=${{ inputs.workload }}" >> $GITHUB_OUTPUT
-            echo "SCENARIO_ITERATIONS=${{ github.event.inputs.rate }}" >> $GITHUB_OUTPUT
-            echo "TESTID=${{ inputs.test_id }}" >> $GITHUB_OUTPUT
-            echo "SCENARIO_DURATION=${{ inputs.duration }}" >> $GITHUB_OUTPUT
+            {
+              echo "NODES=${{ inputs.nodes }}"
+              echo "WORKLOAD_NAME=${{ inputs.workload }}"
+              echo "SCENARIO_ITERATIONS=${{ github.event.inputs.rate }}"
+              echo "TESTID=${{ inputs.test_id }}"
+              echo "SCENARIO_DURATION=${{ inputs.duration }}"
+            } >> $GITHUB_OUTPUT
           else
             echo "The workflow is triggered manually"
-            echo "NODES=${{ github.event.inputs.nodes }}" >> $GITHUB_OUTPUT
-            echo "WORKLOAD_NAME=${{ github.event.inputs.workload }}" >> $GITHUB_OUTPUT
-            echo "SCENARIO_ITERATIONS=${{ github.event.inputs.rate }}" >> $GITHUB_OUTPUT
-            echo "TESTID=${{ github.event.inputs.test_id }}" >> $GITHUB_OUTPUT
-            echo "SCENARIO_DURATION=${{ github.event.inputs.duration }}" >> $GITHUB_OUTPUT
+            {
+              echo "NODES=${{ github.event.inputs.nodes }}"
+              echo "WORKLOAD_NAME=${{ github.event.inputs.workload }}"
+              echo "SCENARIO_ITERATIONS=${{ github.event.inputs.rate }}"
+              echo "TESTID=${{ github.event.inputs.test_id }}"
+              echo "SCENARIO_DURATION=${{ github.event.inputs.duration }}"
+            } >> $GITHUB_OUTPUT
           fi
 
       - name: Checkout hoprd-test repository
@@ -116,7 +119,7 @@ jobs:
       - name: Setup NodeJs
         uses: actions/setup-node@v3
         with:
-          node-version: 18
+          node-version: 20
 
       - name: Get Hoprd Api token
         id: token

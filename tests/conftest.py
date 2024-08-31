@@ -52,91 +52,87 @@ TICKET_PRICE_PER_HOP = 100
 
 RESERVED_TAG_UPPER_BOUND = 1023
 
-
-FIXTURES_PREFIX = "hopr-smoke-test"
+FIXTURES_PREFIX = "hopr"
 NODE_NAME_PREFIX = f"{FIXTURES_PREFIX}-node"
 
 NETWORK1 = "anvil-localhost"
 NETWORK2 = "anvil-localhost2"
-ANVIL_ENDPOINT = "localhost:8545"
 
 API_TOKEN = "e2e-API-token^^"
 PASSWORD = "e2e-test"
 
+# the test framework uses the following folder structure:
+#
+# /tmp/hopr-smoke-test/ - parent directory for all test related files
+# /tmp/hopr-smoke-test/snapshot/ - directory for snapshot files which can be re-used
+# /tmp/hopr-smoke-test/${SUITE_NAME}/ - directory for a specific test suite
+# /tmp/hopr-smoke-test/${SUITE_NAME}/hopr-node_*.id - identity file for nodes
+# /tmp/hopr-smoke-test/${SUITE_NAME}/hopr-node_*.log - log file for nodes
+# /tmp/hopr-smoke-test/${SUITE_NAME}/anvil.cfg - anvil configuration file
+# /tmp/hopr-smoke-test/${SUITE_NAME}/anvil.log - anvil configuration file
+
 PWD = Path(__file__).parent
-FIXTURES_DIR = Path("/tmp")
 
-ANVIL_CFG_FILE = FIXTURES_DIR.joinpath(f"{FIXTURES_PREFIX}-anvil.cfg")
-ANVIL_LOG_FILE = FIXTURES_DIR.joinpath(f"{FIXTURES_PREFIX}-anvil.log")
+def fixtures_dir(name: str): return Path(f"/tmp/hopr-smoke-test/{name}")
+def anvil_cfg_file(name: str): return Path(f"{fixtures_dir(name)}/anvil.cfg")
+def anvil_log_file(name: str): return Path(f"{fixtures_dir(name)}/anvil.log")
+def protocol_config_file(name: str): return Path(f"{fixtures_dir(name)}/protocol-config.json")
+def snapshot_dir(parent_dir: Path): return parent_dir.joinpath("snapshot")
+def anvil_state_file(parent_dir: Path): return parent_dir.joinpath("anvil.state.json")
 
-PROTOCOL_CONFIG_FILE = PWD.parent.joinpath("scripts/protocol-config-anvil.json")
-TEST_PROTOCOL_CONFIG_FILE = FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}-protocol-config.json")
-DEPLOYMENTS_SUMMARY_FILE = PWD.parent.joinpath("ethereum/contracts/contracts-addresses.json")
+INPUT_PROTOCOL_CONFIG_FILE = PWD.parent.joinpath("scripts/protocol-config-anvil.json")
+INPUT_DEPLOYMENTS_SUMMARY_FILE = PWD.parent.joinpath("ethereum/contracts/contracts-addresses.json")
 PREGENERATED_IDENTITIES_DIR = PWD.joinpath("identities")
 
 NODES = {
     "1": Node(
-        19091,
-        13301,
+        1,
         API_TOKEN,
-        FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_1"),
         "localhost",
         NETWORK1,
-        FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_barebone.cfg.yaml"),
+        "barebone.cfg.yaml",
     ),
     "2": Node(
-        19092,
-        13302,
+        2,
         None,
-        FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_2"),
         LOCALHOST,
         NETWORK1,
-        FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_barebone.cfg.yaml"),
+        "barebone.cfg.yaml",
     ),
     "3": Node(
-        19093,
-        13303,
+        3,
         API_TOKEN,
-        FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_3"),
         "localhost",
         NETWORK1,
-        FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_barebone.cfg.yaml"),
+        "barebone.cfg.yaml",
     ),
     "4": Node(
-        19094,
-        13304,
+        4,
         API_TOKEN,
-        FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_4"),
         LOCALHOST,
         NETWORK1,
-        FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_barebone.cfg.yaml"),
+        "barebone.cfg.yaml",
     ),
     "5": Node(
-        19095,
-        13305,
+        5,
         API_TOKEN,
-        FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_5"),
         "localhost",
         NETWORK1,
-        FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_default.cfg.yaml"),
+        "default.cfg.yaml",
     ),
     "6": Node(
-        19096,
-        13306,
+        6,
         API_TOKEN,
-        FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_6"),
         LOCALHOST,
         NETWORK2,
-        FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_barebone.cfg.yaml"),
+        "barebone.cfg.yaml",
     ),
     "7": Node(
-        19097,
-        13307,
+        7,
         API_TOKEN,
-        FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_7"),
         "localhost",
         NETWORK1,
-        FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_barebone.cfg.yaml"),
+        "barebone.cfg.yaml",
     ),
 }
 
@@ -196,40 +192,120 @@ def mirror_contract_data(dest_file_path: Path, src_file_path: Path, src_network:
         json.dump(dest_data, file, sort_keys=True)
 
 
-def copy_identities():
-    # Remove old identities
-    for f in FIXTURES_DIR.glob(f"{FIXTURES_PREFIX}-*.id"):
-        os.remove(f)
-    logging.info(f"Removed '*.id' files in {FIXTURES_DIR}")
-
-    # Remove old logs
-    for f in FIXTURES_DIR.glob(f"{FIXTURES_PREFIX}-*.log"):
-        os.remove(f)
-    logging.info(f"Removed '*.log' files in {FIXTURES_DIR}")
-
+def cleanup_data(parent_dir: Path):
     # Remove old db
-    for f in FIXTURES_DIR.glob(f"{FIXTURES_PREFIX}-*"):
+    for f in parent_dir.glob(f"{NODE_NAME_PREFIX}_*"):
         if not f.is_dir():
             continue
+        logging.info(f"Remove db in {f}")
         shutil.rmtree(f, ignore_errors=True)
-    logging.info(f"Removed dbs in {FIXTURES_DIR}")
+    logging.info(f"Removed all dbs in {parent_dir}")
+
+def copy_identities(dir: Path):
+    # Remove old identities
+    for f in dir.glob(f"{NODE_NAME_PREFIX}*.id"):
+        os.remove(f)
+    logging.info(f"Removed '*.id' files in {dir}")
+
+    # Remove old logs
+    for f in dir.glob(f"{NODE_NAME_PREFIX}_*.log"):
+        os.remove(f)
+    logging.info(f"Removed '*.log' files in {dir}")
 
     # Copy new identity files
     for node_id in range(len(NODES)):
         f = f"{NODE_NAME_PREFIX}_{node_id+1}.id"
         shutil.copy(
             PREGENERATED_IDENTITIES_DIR.joinpath(f),
-            FIXTURES_DIR.joinpath(f),
+            dir.joinpath(f),
         )
-    logging.info(f"Copied '*.id' files to {FIXTURES_DIR}")
+    logging.info(f"Copied '*.id' files to {dir}")
 
     # Copy new config files
-    for f in PWD.glob(f"{NODE_NAME_PREFIX}_*.cfg.yaml"):
-        shutil.copy(f, FIXTURES_DIR.joinpath(f.name))
-    logging.info(f"Copied '*.cfg.yaml' files to {FIXTURES_DIR}")
+    for f in PWD.glob("*.cfg.yaml"):
+        shutil.copy(f, dir.joinpath(f.name))
+    logging.info(f"Copied '*.cfg.yaml' files to {dir}")
 
 
-def fund_nodes(private_key: str):
+def snapshot_reuse(parent_dir: Path, nodes):
+    sdir = snapshot_dir(parent_dir)
+
+    # copy anvil state
+    parent_dir.joinpath("anvil.state.json").unlink(missing_ok=True)
+    shutil.copy(sdir.joinpath("anvil.state.json"), parent_dir)
+
+    # copy configuration files
+    for f in sdir.glob("*.cfg.yaml"):
+        parent_dir.joinpath(f.name).unlink(missing_ok=True)
+        shutil.copy(f, parent_dir)
+
+    # copy node data
+    for i in range(len(nodes)):
+        node_target_dir = parent_dir.joinpath(f"{NODE_NAME_PREFIX}_{i+1}/db/")
+        node_snapshot_dir = sdir.joinpath(f"{NODE_NAME_PREFIX}_{i+1}/db/")
+
+        shutil.rmtree(node_target_dir, ignore_errors=True)
+        node_target_dir.mkdir(parents=True, exist_ok=False)
+
+        shutil.copy(node_snapshot_dir.joinpath("hopr_index.db"), node_target_dir)
+        shutil.copy(node_snapshot_dir.joinpath("hopr_index.db-shm"), node_target_dir)
+        shutil.copy(node_snapshot_dir.joinpath("hopr_index.db-wal"), node_target_dir)
+
+        parent_dir.joinpath(f"{NODE_NAME_PREFIX}_{i+1}.env").unlink(missing_ok=True)
+        shutil.copy(sdir.joinpath(f"{NODE_NAME_PREFIX}_{i+1}.env"), parent_dir)
+
+def snapshot_create(anvil_port, parent_dir: Path, nodes):
+    sdir = snapshot_dir(parent_dir)
+
+    # delete old snapshot
+    shutil.rmtree(sdir, ignore_errors=True)
+
+    # create new snapshot
+    sdir.mkdir(parents=True, exist_ok=True)
+
+    # stop anvil and nodes
+    run(["make", "kill-anvil", f"port={anvil_port}"], cwd=PWD.parent, check=True)
+    [node.clean_up() for node in nodes.values()]
+
+    # copy anvil state
+    shutil.copy(anvil_state_file(parent_dir), sdir)
+
+    # copy configuration files
+    for f in parent_dir.glob("*.cfg.yaml"):
+        shutil.copy(f, sdir)
+
+    # copy node data and env files
+    for i in range(len(nodes)):
+        node_dir = parent_dir.joinpath(f"{NODE_NAME_PREFIX}_{i+1}")
+        node_target_dir = sdir.joinpath(f"{NODE_NAME_PREFIX}_{i+1}/db/")
+        node_target_dir.mkdir(parents=True, exist_ok=True)
+
+        shutil.copy(f"{node_dir}/db/hopr_index.db", node_target_dir)
+        shutil.copy(f"{node_dir}/db/hopr_index.db-shm", node_target_dir)
+        shutil.copy(f"{node_dir}/db/hopr_index.db-wal", node_target_dir)
+        shutil.copy(f"{node_dir}.env", sdir)
+
+
+def snapshot_usable(parent_dir: Path, nodes):
+    sdir = snapshot_dir(parent_dir)
+
+    expected_files = [
+        "anvil.state.json",
+        "barebone.cfg.yaml",
+        "default.cfg.yaml",
+    ]
+    for i in range(len(nodes)):
+        node_dir = parent_dir.joinpath(f"{NODE_NAME_PREFIX}_{i+1}")
+        expected_files.append(f"{node_dir}/db/hopr_index.db")
+        expected_files.append(f"{node_dir}/db/hopr_index.db-shm")
+        expected_files.append(f"{node_dir}/db/hopr_index.db-wal")
+        expected_files.append(f"{node_dir}.env")
+
+    return all([sdir.joinpath(f).exists() for f in expected_files])
+
+def fund_nodes(test_suite_name, test_dir: Path, anvil_port):
+    private_key = load_private_key(test_suite_name)
+
     custom_env = {
         "ETHERSCAN_API_KEY": "anykey",
         "IDENTITY_PASSWORD": PASSWORD,
@@ -245,7 +321,7 @@ def fund_nodes(private_key: str):
             "--identity-prefix",
             FIXTURES_PREFIX,
             "--identity-directory",
-            FIXTURES_DIR,
+            test_dir,
             "--contracts-root",
             "./ethereum/contracts",
             "--hopr-amount",
@@ -253,77 +329,18 @@ def fund_nodes(private_key: str):
             "--native-amount",
             "10.0",
             "--provider-url",
-            ANVIL_ENDPOINT,
+            f"http://127.0.0.1:{anvil_port}",
         ],
         env=os.environ | custom_env,
         check=True,
         capture_output=True,
     )
 
-
-@pytest.fixture(scope="module")
-def event_loop():
-    policy = asyncio.get_event_loop_policy()
-    loop = policy.new_event_loop()
-    yield loop
-    loop.close()
-
-
-@pytest.fixture(scope="module")
-async def swarm7(request):
-    logging.info(f"Using the random seed: {SEED}")
-
-    # STOP OLD LOCAL ANVIL SERVER
-    logging.info("Ensure local anvil server is not running")
-    run(["make", "kill-anvil"], cwd=PWD.parent, check=True)
-
-    # START NEW LOCAL ANVIL SERVER
-    logging.info("Starting and waiting for local anvil server to be up")
-    run(
-        f"./run-local-anvil.sh -l {ANVIL_LOG_FILE} -c {ANVIL_CFG_FILE}".split(),
-        check=True,
-        capture_output=True,
-        cwd=PWD.parent.joinpath("scripts"),
-    )
-
-    # READ AUTO_GENERATED PRIVATE-KEY FROM ANVIL CONFIGURATION
-    with open(ANVIL_CFG_FILE, "r") as file:
-        data: dict = json.load(file)
-        private_key = data.get("private_keys", [""])[0]
-
-    logging.info("Mirror contract data because of anvil-deploy node only writing to localhost")
-
-    shutil.copy(PROTOCOL_CONFIG_FILE, TEST_PROTOCOL_CONFIG_FILE)
-    mirror_contract_data(TEST_PROTOCOL_CONFIG_FILE, DEPLOYMENTS_SUMMARY_FILE, NETWORK1, NETWORK1)
-    mirror_contract_data(TEST_PROTOCOL_CONFIG_FILE, DEPLOYMENTS_SUMMARY_FILE, NETWORK1, NETWORK2)
-
-    # SETUP NODES USING STORED IDENTITIES
-    logging.info("Reuse pre-generated identities and configs")
-    copy_identities()
-
-    # CREATE LOCAL SAFES AND MODULES FOR ALL THE IDS
-    logging.info("Create safe and modules for all the ids, store them in args files")
-
-    nodes: dict[str, Node] = deepcopy(NODES)
-
-    safe_custom_env: dict = {
-        "ETHERSCAN_API_KEY": "anykey",
-        "IDENTITY_PASSWORD": PASSWORD,
-        "MANAGER_PRIVATE_KEY": private_key,
-        "PRIVATE_KEY": private_key,
-        "PATH": os.environ["PATH"],
-    }
-
-    for node in nodes.values():
-        logging.info(f"Creating safe and module for {node}")
-        node.create_local_safe(safe_custom_env)
-
-    # wait before contract deployments are finalized
-    await asyncio.sleep(5)
-
+async def shared_nodes_bringup(test_suite_name: str, test_dir: Path, anvil_port,
+                               nodes, skip_funding=False):
     for node in nodes.values():
         logging.info(f"Setting up {node}")
-        node.setup(PASSWORD, TEST_PROTOCOL_CONFIG_FILE, PWD.parent)
+        node.setup(PASSWORD, protocol_config_file(test_suite_name), PWD.parent)
 
     # WAIT FOR NODES TO BE UP
     logging.info(f"Wait for {len(nodes)} nodes to start up")
@@ -333,9 +350,10 @@ async def swarm7(request):
         await asyncio.wait_for(node.api.startedz(), timeout=60)
         logging.info(f"Node {id} is up")
 
-    # FUND NODES
-    logging.info("Funding nodes")
-    fund_nodes(private_key)
+    if not skip_funding:
+      # FUND NODES
+      logging.info("Funding nodes")
+      fund_nodes(test_suite_name, test_dir, anvil_port)
 
     # WAIT FOR NODES TO BE UP
     logging.info("Node setup finished, waiting for nodes to be ready")
@@ -372,7 +390,127 @@ async def swarm7(request):
             logging.info(f"Node {node} does not have all peers connected yet, retrying")
             await asyncio.sleep(1)
 
+def load_private_key(test_suite_name, pos = 0):
+    with open(anvil_cfg_file(test_suite_name), "r") as file:
+        data: dict = json.load(file)
+        return data.get("private_keys", [""])[pos]
+
+
+@pytest.fixture(scope="module")
+def event_loop():
+    policy = asyncio.get_event_loop_policy()
+    loop = policy.new_event_loop()
+    yield loop
+    loop.close()
+
+@pytest.fixture(scope="module")
+async def paths(request):
+    test_suite = request.module
+    test_suite_name = test_suite.__name__.split('.')[-1]
+
+    paths = {
+        anvil_cfg_file: anvil_cfg_file(test_suite_name),
+    }
+
+    yield paths
+
+@pytest.fixture(scope="module")
+async def swarm7(request):
+    logging.info(f"Using the random seed: {SEED}")
+
+    # PREPARE TEST SUITE ENVIRONMENT
+    test_suite = request.module
+    test_suite_name = test_suite.__name__.split('.')[-1]
+    if test_suite.PORT_BASE is None:
+        raise ValueError("PORT_BASE must be set in the test suite")
+    test_dir = fixtures_dir(test_suite_name)
+    test_dir.mkdir(parents=True, exist_ok=True)
+    anvil_port = test_suite.PORT_BASE
+    logging.info(f"Setting test suite {test_suite_name} up: test_dir={test_dir}, anvil_port={anvil_port}")
+
+    nodes: dict[str, Node] = deepcopy(NODES)
+    for node in nodes.values():
+        node.prepare(test_suite.PORT_BASE, test_dir, NODE_NAME_PREFIX)
+
+    # STOP OLD LOCAL ANVIL SERVER
+    logging.info("Ensure local anvil server is not running")
+    run(["make", "kill-anvil", f"port={anvil_port}"], cwd=PWD.parent, check=True)
+
+    use_snapshot = snapshot_usable(test_dir, nodes)
+
+    cleanup_data(test_dir)
+
+    if not use_snapshot:
+        logging.info("Snapshot not usable")
+
+        # START NEW LOCAL ANVIL SERVER
+        logging.info("Starting and waiting for local anvil server to be up (dump state enabled)")
+        run(
+            f"./run-local-anvil.sh -l {anvil_log_file(test_suite_name)} -c {anvil_cfg_file(test_suite_name)} -p {anvil_port} -ds {anvil_state_file(test_dir)}"
+            .split(),
+            check=True,
+            capture_output=True,
+            cwd=PWD.parent.joinpath("scripts"),
+        )
+
+        logging.info("Mirror contract data because of anvil-deploy node only writing to localhost")
+
+        shutil.copy(INPUT_PROTOCOL_CONFIG_FILE, protocol_config_file(test_suite_name))
+        mirror_contract_data(protocol_config_file(test_suite_name), INPUT_DEPLOYMENTS_SUMMARY_FILE, NETWORK1, NETWORK1)
+        mirror_contract_data(protocol_config_file(test_suite_name), INPUT_DEPLOYMENTS_SUMMARY_FILE, NETWORK1, NETWORK2)
+
+        # SETUP NODES USING STORED IDENTITIES
+        logging.info("Reuse pre-generated identities and configs")
+        copy_identities(test_dir)
+
+        # CREATE LOCAL SAFES AND MODULES FOR ALL THE IDS
+        logging.info("Create safe and modules for all the ids, store them in args files")
+
+        private_key = load_private_key(test_suite_name)
+
+        safe_custom_env: dict = {
+            "ETHERSCAN_API_KEY": "anykey",
+            "IDENTITY_PASSWORD": PASSWORD,
+            "MANAGER_PRIVATE_KEY": private_key,
+            "PRIVATE_KEY": private_key,
+            "PATH": os.environ["PATH"],
+        }
+
+        for node in nodes.values():
+            logging.info(f"Creating safe and module for {node}")
+            assert node.create_local_safe(safe_custom_env)
+
+        # wait before contract deployments are finalized
+        await asyncio.sleep(5)
+
+        # BRING UP NODES (with funding)
+        await shared_nodes_bringup(test_suite_name, test_dir, anvil_port, nodes)
+
+        logging.info("Taking snapshot")
+        snapshot_create(anvil_port, test_dir, nodes)
+
+    logging.info("Re-using snapshot")
+    snapshot_reuse(test_dir, nodes)
+
+    logging.info("Starting and waiting for local anvil server to be up (load state enabled)")
+    run(
+        f"./run-local-anvil.sh -s -l {anvil_log_file(test_suite_name)} -c {anvil_cfg_file(test_suite_name)} -p {anvil_port} -ls {anvil_state_file(test_dir)}".split(),
+        check=True,
+        capture_output=True,
+        cwd=PWD.parent.joinpath("scripts"),
+    )
+
+    # SETUP NODES USING STORED IDENTITIES
+    logging.info("Reuse pre-generated identities and configs")
+    copy_identities(test_dir)
+    for node in nodes.values():
+        node.load_addresses()
+
+    # BRING UP NODES (without funding)
+    await shared_nodes_bringup(test_suite_name, test_dir, anvil_port, nodes, skip_funding=True)
+
     # YIELD NODES
+    logging.info("Nodes all ready, starting test")
     yield nodes
 
     # POST TEST CLEANUP
