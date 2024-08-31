@@ -582,6 +582,9 @@ where
             PathPlanner::new(db.clone(), channel_graph.clone()),
         );
 
+        #[cfg(all(feature = "prometheus", not(test)))]
+        METRIC_ACTIVE_SESSIONS.set(0.0);
+
         Self {
             me: identity.public().to_peer_id(),
             me_onchain: me_onchain.public().to_address(),
