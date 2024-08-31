@@ -2,8 +2,11 @@
 //! into a unified [`crate::HoprTransport`] object with the goal of isolating the transport layer
 //! and defining a fully specified transport API.
 //!
-//! As such, the transport layer components should be only those that are directly needed in
-//! order to:
+//! It also implements the Session negotiation via Start sub-protocol.
+//! See the [`hopr_transport_session::initiation`] module for details on Start sub-protocol.
+//!
+//! As such, the transport layer components should be only those that are directly necessary to:
+//!
 //! 1. send and receive a packet, acknowledgement or ticket aggregation request
 //! 2. send and receive a network telemetry request
 //! 3. automate transport level processes
@@ -88,6 +91,32 @@ use crate::helpers::PathPlanner;
 pub use crate::helpers::{IndexerTransportEvent, PeerEligibility, TicketStatistics};
 pub use hopr_network_types::prelude::RoutingOptions;
 pub use hopr_transport_session::types::SessionTarget;
+
+#[cfg(all(feature = "prometheus", not(test)))]
+lazy_static::lazy_static! {
+    static ref METRIC_ACTIVE_SESSIONS: hopr_metrics::SimpleGauge = hopr_metrics::SimpleGauge::new(
+        "hopr_session_num_active_session",
+        "Number of currently active HOPR sessions"
+    ).unwrap();
+    static ref METRIC_NUM_ESTABLISHED_SESSIONS: hopr_metrics::SimpleCounter = hopr_metrics::SimpleCounter::new(
+        "hopr_session_established_sessions",
+        "Number of sessions that were successfully established as an Exit node"
+    ).unwrap();
+    static ref METRIC_NUM_INITIATED_SESSIONS: hopr_metrics::SimpleCounter = hopr_metrics::SimpleCounter::new(
+        "hopr_session_initiated_sessions",
+        "Number of sessions that were successfully initiated as an Entry node"
+    ).unwrap();
+    static ref METRIC_RECEIVED_SESSION_ERRS: hopr_metrics::MultiCounter = hopr_metrics::MultiCounter::new(
+        "hopr_session_received_error_counts",
+        "Number of HOPR session errors received from an Exit node",
+        &["kind"]
+    ).unwrap();
+    static ref METRIC_SENT_SESSION_ERRS: hopr_metrics::MultiCounter = hopr_metrics::MultiCounter::new(
+        "hopr_session_sent_error_counts",
+        "Number of HOPR session errors sent to an Entry node",
+        &["kind"]
+    ).unwrap();
+}
 
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
 pub enum HoprTransportProcess {
@@ -186,12 +215,15 @@ where
             })
             .await;
 
+        // If we inserted successfully, break the loop and return the insertion key
         if let Ok(moka::ops::compute::CompResult::Inserted(_)) = insertion_result {
             return Some(next);
         }
 
+        // Otherwise, generate a next key
         next = gen(Some(next));
 
+        // If generated keys made it to full loop, return failure
         if next == initial {
             return None;
         }
@@ -294,10 +326,18 @@ where
                     session_id = tracing::field::debug(session_id),
                     "channel closed on session during eviction"
                 );
+
+                #[cfg(all(feature = "prometheus", not(test)))]
+                METRIC_ACTIVE_SESSIONS.decrement(1.0);
             }
             .boxed()
         }
-        _ => futures::future::ready(()).boxed(),
+        _ => {
+            #[cfg(all(feature = "prometheus", not(test)))]
+            METRIC_ACTIVE_SESSIONS.decrement(1.0);
+
+            futures::future::ready(()).boxed()
+        }
     }
 }
 
@@ -397,6 +437,12 @@ where
                     session_id = tracing::field::display(session_id),
                     "new session established"
                 );
+
+                #[cfg(all(feature = "prometheus", not(test)))]
+                {
+                    METRIC_NUM_ESTABLISHED_SESSIONS.increment();
+                    METRIC_ACTIVE_SESSIONS.increment(1.0);
+                }
             } else {
                 error!(
                     peer = tracing::field::display(peer),
@@ -404,9 +450,10 @@ where
                 );
 
                 // Notify the sender that the session could not be established
+                let reason = StartErrorReason::NoSlotsAvailable;
                 let data = StartProtocol::<SessionId>::SessionError(StartErrorType {
                     challenge: session_req.challenge,
-                    reason: StartErrorReason::NoSlotsAvailable,
+                    reason,
                 });
 
                 msg_sender
@@ -420,6 +467,9 @@ where
                     peer = tracing::field::display(peer),
                     "session establishment failure message sent"
                 );
+
+                #[cfg(all(feature = "prometheus", not(test)))]
+                METRIC_SENT_SESSION_ERRS.increment(&[&reason.to_string()])
             }
         }
         StartProtocol::SessionEstablished(est) => {
@@ -464,6 +514,9 @@ where
                     "session establishment attempt expired before error could be delivered: {}", err.reason
                 );
             }
+
+            #[cfg(all(feature = "prometheus", not(test)))]
+            METRIC_RECEIVED_SESSION_ERRS.increment(&[&err.reason.to_string()])
         }
         StartProtocol::CloseSession(session_id) => {
             trace!(
@@ -958,6 +1011,12 @@ where
                     .insert(session_id, (Arc::new(tx), cfg.path_options.clone()))
                     .await;
 
+                #[cfg(all(feature = "prometheus", not(test)))]
+                {
+                    METRIC_NUM_INITIATED_SESSIONS.increment();
+                    METRIC_ACTIVE_SESSIONS.increment(1.0);
+                }
+
                 Ok(Session::new(
                     session_id,
                     self.me,
@@ -982,6 +1041,10 @@ where
             Either::Right(_) => {
                 // Timeout waiting for a session establishment
                 error!(challenge, "session initiation attempt timed out");
+
+                #[cfg(all(feature = "prometheus", not(test)))]
+                METRIC_RECEIVED_SESSION_ERRS.increment(&[&"timeout"]);
+
                 Err(TransportSessionError::Timeout.into())
             }
         }

@@ -88,7 +88,7 @@
 
 use hopr_lib::errors::HoprLibError;
 use hopr_network_types::prelude::ForeignDataMode;
-use hopr_network_types::utils::copy_bidirectional_client_server;
+use hopr_network_types::utils::copy_duplex;
 use std::net::ToSocketAddrs;
 
 pub mod cli;
@@ -139,7 +139,7 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                     "bridging the session to the UDP server {udp_target} ..."
                 );
                 tokio::task::spawn(async move {
-                    match copy_bidirectional_client_server(&mut tokio_util::compat::FuturesAsyncReadCompatExt::compat(session.session), &mut udp_bridge, hopr_lib::SESSION_USABLE_MTU_SIZE, hopr_lib::SESSION_USABLE_MTU_SIZE).await {
+                    match copy_duplex(&mut tokio_util::compat::FuturesAsyncReadCompatExt::compat(session.session), &mut udp_bridge, hopr_lib::SESSION_USABLE_MTU_SIZE, hopr_lib::SESSION_USABLE_MTU_SIZE).await {
                         Ok(bound_stream_finished) => tracing::info!(
                             session_id = debug(session_id),
                             "server bridged session through UDP {udp_target} ended with {bound_stream_finished:?} bytes transferred in both directions."
@@ -191,7 +191,7 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                     "bridging the session to the TCP server {tcp_target} ..."
                 );
                 tokio::task::spawn(async move {
-                    match copy_bidirectional_client_server(&mut tokio_util::compat::FuturesAsyncReadCompatExt::compat(session.session), &mut tcp_bridge, hopr_lib::SESSION_USABLE_MTU_SIZE, hopr_lib::SESSION_USABLE_MTU_SIZE).await {
+                    match copy_duplex(&mut tokio_util::compat::FuturesAsyncReadCompatExt::compat(session.session), &mut tcp_bridge, hopr_lib::SESSION_USABLE_MTU_SIZE, hopr_lib::SESSION_USABLE_MTU_SIZE).await {
                         Ok(bound_stream_finished) => tracing::info!(
                             session_id = debug(session_id),
                             "server bridged session through TCP {tcp_target} ended with {bound_stream_finished:?} bytes transferred in both directions."

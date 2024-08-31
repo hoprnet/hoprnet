@@ -1,5 +1,7 @@
 #[cfg(feature = "runtime-tokio")]
-pub use tokio_utils::copy_bidirectional_client_server;
+pub use tokio_utils::copy_duplex;
+
+// TODO: consider changing this, so it is purely futures::io based and does not require tokio
 
 #[cfg(feature = "runtime-tokio")]
 mod tokio_utils {
@@ -41,44 +43,48 @@ mod tokio_utils {
         }
     }
 
-    pub async fn copy_bidirectional_client_server<T, U>(
-        client: &mut T,
-        server: &mut U,
-        client_to_server_buf: usize,
-        server_to_client_buf: usize,
+    /// This is a proper re-implementation of Tokio's [`copy_bidirectional_with_sizes`](tokio::io::copy_bidirectional_with_sizes),
+    /// which does not leave the stream in half-open-state when one side closes read or write side.
+    /// Instead, if either side encounters and empty read (EOF indication), the write-side is closed as well
+    /// and vice versa.
+    pub async fn copy_duplex<A, B>(
+        a: &mut A,
+        b: &mut B,
+        a_to_b_buffer_size: usize,
+        b_to_a_buffer_size: usize,
     ) -> std::io::Result<(u64, u64)>
     where
-        T: AsyncRead + AsyncWrite + Unpin + ?Sized,
-        U: AsyncRead + AsyncWrite + Unpin + ?Sized,
+        A: AsyncRead + AsyncWrite + Unpin + ?Sized,
+        B: AsyncRead + AsyncWrite + Unpin + ?Sized,
     {
-        let mut client_to_server = TransferState::Running(CopyBuffer::new(client_to_server_buf));
-        let mut server_to_client = TransferState::Running(CopyBuffer::new(server_to_client_buf));
+        let mut a_to_b = TransferState::Running(CopyBuffer::new(a_to_b_buffer_size));
+        let mut b_to_a = TransferState::Running(CopyBuffer::new(b_to_a_buffer_size));
 
         std::future::poll_fn(|cx| {
-            let mut client_to_server_result = transfer_one_direction(cx, &mut client_to_server, client, server)?;
-            let mut server_to_client_result = transfer_one_direction(cx, &mut server_to_client, server, client)?;
+            let mut a_to_b_result = transfer_one_direction(cx, &mut a_to_b, a, b)?;
+            let mut b_to_a_result = transfer_one_direction(cx, &mut b_to_a, b, a)?;
 
-            if let TransferState::Done(_) = server_to_client {
-                if let TransferState::Running(buf) = &client_to_server {
-                    tracing::trace!("server has completed, terminating client");
-                    client_to_server = TransferState::ShuttingDown(buf.amt);
-                    client_to_server_result = transfer_one_direction(cx, &mut client_to_server, client, server)?;
+            if let TransferState::Done(_) = b_to_a {
+                if let TransferState::Running(buf) = &a_to_b {
+                    tracing::trace!("B-side has completed, terminating A-side.");
+                    a_to_b = TransferState::ShuttingDown(buf.amt);
+                    a_to_b_result = transfer_one_direction(cx, &mut a_to_b, a, b)?;
                 }
             }
 
-            if let TransferState::Done(_) = client_to_server {
-                if let TransferState::Running(buf) = &server_to_client {
-                    tracing::trace!("server has completed, terminate client");
-                    server_to_client = TransferState::ShuttingDown(buf.amt);
-                    server_to_client_result = transfer_one_direction(cx, &mut server_to_client, server, client)?;
+            if let TransferState::Done(_) = a_to_b {
+                if let TransferState::Running(buf) = &b_to_a {
+                    tracing::trace!("A-side has completed, terminate B-side.");
+                    b_to_a = TransferState::ShuttingDown(buf.amt);
+                    b_to_a_result = transfer_one_direction(cx, &mut b_to_a, b, a)?;
                 }
             }
 
             // Not a problem if ready! returns early
-            let client_to_server = std::task::ready!(client_to_server_result);
-            let server_to_client = std::task::ready!(server_to_client_result);
+            let a_to_b_bytes_transferred = std::task::ready!(a_to_b_result);
+            let b_to_a_bytes_transferred = std::task::ready!(b_to_a_result);
 
-            Poll::Ready(Ok((client_to_server, server_to_client)))
+            Poll::Ready(Ok((a_to_b_bytes_transferred, b_to_a_bytes_transferred)))
         })
         .await
     }
@@ -170,7 +176,7 @@ mod tokio_utils {
                         }
                         Poll::Pending => {
                             // Try flushing when the reader has no progress to avoid deadlock
-                            // when the reader depends on buffered writer.
+                            // when the reader depends on a buffered writer.
                             if self.need_flush {
                                 std::task::ready!(writer.as_mut().poll_flush(cx))?;
                                 self.need_flush = false;
@@ -181,7 +187,7 @@ mod tokio_utils {
                     }
                 }
 
-                // If our buffer has some data, let's write it out!
+                // If our buffer has some data, let's write it out
                 while self.pos < self.cap {
                     let i = std::task::ready!(self.poll_write_buf(cx, reader.as_mut(), writer.as_mut()))?;
                     if i == 0 {
@@ -196,11 +202,11 @@ mod tokio_utils {
                 }
 
                 // If pos larger than cap, this loop will never stop.
-                // In particular, user's wrong poll_write implementation returning
+                // In particular, a user's wrong poll_write implementation returning
                 // incorrect written length may lead to thread blocking.
                 debug_assert!(self.pos <= self.cap, "writer returned length larger than input slice");
 
-                // If we've written all the data and we've seen EOF, flush out the
+                // If we've written all the data, and we've seen EOF, flush out the
                 // data and finish the transfer.
                 if self.pos == self.cap && self.read_done {
                     std::task::ready!(writer.as_mut().poll_flush(cx))?;
@@ -230,7 +236,7 @@ mod tests {
             server_tx.write_all(b"data").await?;
             server_tx.shutdown().await?;
 
-            let result = crate::utils::copy_bidirectional_client_server(&mut client_rx, &mut server_rx, 2, 2).await?;
+            let result = crate::utils::copy_duplex(&mut client_rx, &mut server_rx, 2, 2).await?;
 
             let (client_to_server_count, server_to_client_count) = result;
             assert_eq!(client_to_server_count, 5); // 'hello' was transferred
@@ -250,7 +256,7 @@ mod tests {
 
             client_tx.write_all(b"some longer data to transfer").await?;
 
-            let result = crate::utils::copy_bidirectional_client_server(&mut client_rx, &mut server_rx, 2, 2).await?;
+            let result = crate::utils::copy_duplex(&mut client_rx, &mut server_rx, 2, 2).await?;
 
             let (client_to_server_count, server_to_client_count) = result;
             assert_eq!(server_to_client_count, 5); // 'hello' was transferred

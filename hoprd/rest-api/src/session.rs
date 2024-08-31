@@ -14,7 +14,7 @@ use hopr_lib::errors::HoprLibError;
 use hopr_lib::{HoprSession, IpProtocol, PeerId, RoutingOptions, SessionCapability, SessionClientConfig};
 use hopr_network_types::prelude::ConnectedUdpStream;
 use hopr_network_types::udp::ForeignDataMode;
-use hopr_network_types::utils::copy_bidirectional_client_server;
+use hopr_network_types::utils::copy_duplex;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use tokio::net::{TcpListener, ToSocketAddrs};
@@ -325,7 +325,7 @@ where
     T: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
 {
     let session_id = *session.id();
-    match copy_bidirectional_client_server(
+    match copy_duplex(
         &mut session.compat(),
         &mut stream,
         hopr_lib::SESSION_USABLE_MTU_SIZE,
