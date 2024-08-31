@@ -230,6 +230,7 @@ contract HoprChannels is
     Timestamp public immutable noticePeriodChannelClosure; // in seconds
 
     /**
+     * @dev This contracts contains ERC1820 implementation logic 'ERC777TokensRecipient' only for itself.
      * @param _token HoprToken address
      * @param _noticePeriodChannelClosure seconds until a channel can be closed
      * @param _safeRegistry address of the contract that maps from accounts to deployed Gnosis Safe instances
