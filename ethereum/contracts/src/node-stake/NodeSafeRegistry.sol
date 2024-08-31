@@ -172,6 +172,8 @@ contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
     /**
      * @dev Deregisters a Hopr node from its associated Safe and emits relevant events.
      * This function can only be called by the associated Safe.
+     * @notice This function does not perform additional checks on whether the node is 
+     * registered in the active node management module.
      * @param nodeAddr The address of the Hopr node to be deregistered.
      */
     function deregisterNodeBySafe(address nodeAddr) external {
@@ -179,9 +181,6 @@ contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
         if (_nodeToSafe[nodeAddr].safeAddress != msg.sender) {
             revert NotValidSafe();
         }
-
-        // Ensure that node is a member of the module
-        ensureNodeIsSafeModuleMember(msg.sender, nodeAddr);
 
         // Update the state and emit the event
         _nodeToSafe[nodeAddr].safeAddress = address(0);
@@ -221,6 +220,8 @@ contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
 
     /**
      * @dev Internal function to store a node-safe pair and emit relevant events.
+     * @notice This function does not perform additional checks on whether the node is 
+     * registered in the active node management module.
      * @param safeAddress Address of safe
      * @param nodeChainKeyAddress Address of node
      */
@@ -244,9 +245,6 @@ contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
             revert NodeHasSafe();
         }
 
-        // ensure that node is a member of the (enabled) NodeManagementModule
-        ensureNodeIsSafeModuleMember(safeAddress, nodeChainKeyAddress);
-
         NodeSafeRecord storage record = _nodeToSafe[nodeChainKeyAddress];
 
         // update record
@@ -255,33 +253,5 @@ contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
 
         // update and emit event
         emit RegisteredNodeSafe(safeAddress, nodeChainKeyAddress);
-    }
-
-    /**
-     * @dev Ensure that the node address is a member of
-     * the enabled node management module of the safe
-     * @param safeAddress Address of safe
-     * @param nodeChainKeyAddress Address of node
-     */
-    function ensureNodeIsSafeModuleMember(address safeAddress, address nodeChainKeyAddress) internal view {
-        // nodeChainKeyAddress must be a member of the enabled node management module
-        address nextModule;
-        address[] memory modules;
-        // there may be many modules, loop through them. Stop at the end point of the linked list
-        while (nextModule != SENTINEL_MODULES) {
-            // get modules for safe
-            (modules, nextModule) = IAvatar(safeAddress).getModulesPaginated(SENTINEL_MODULES, pageSize);
-            for (uint256 i = 0; i < modules.length; i++) {
-                if (
-                    IHoprNodeManagementModule(modules[i]).isHoprNodeManagementModule()
-                        && IHoprNodeManagementModule(modules[i]).isNode(nodeChainKeyAddress)
-                ) {
-                    return;
-                }
-            }
-        }
-
-        // if nodeChainKeyAddress is not a member of a valid HoprNodeManagementModule to the safe, revert
-        revert NodeNotModuleMember();
     }
 }

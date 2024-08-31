@@ -227,9 +227,12 @@ contract HoprNodeSafeRegistryTest is Test, HoprNodeSafeRegistryEvents {
     }
 
     /**
-     * @dev node fail to register a node due to node and safe addresses are random
+     * @dev node can still be registered by the Safe although it's not a member in the module enabled by the Safe
+     * @notice this was previously not possible due to an additional check ensureNodeIsSafeModuleMember
+     * The said function is removed as it does not allow certian eligible setup, as reported in 
+     * https://github.com/hoprnet/hoprnet/issues/6466
      */
-    function testRevert_FailToRegisterSafeByNodeDueToNodeNotModuleMember(
+    function test_RegisterSafeByNodeAlthoughNodeIsNotModuleMember(
         address safeAddress,
         address nodeAddress
     )
@@ -252,7 +255,8 @@ contract HoprNodeSafeRegistryTest is Test, HoprNodeSafeRegistryEvents {
         nodeSafeRegistry._storeSafeAddress(nodeAddress, address(0));
 
         vm.prank(nodeAddress);
-        vm.expectRevert(HoprNodeSafeRegistry.NodeNotModuleMember.selector);
+        vm.expectEmit(true, true, false, false, address(nodeSafeRegistry));
+        emit RegisteredNodeSafe(safeAddress, nodeAddress);
         nodeSafeRegistry.registerSafeByNode(safeAddress);
         vm.clearMockedCalls();
     }
