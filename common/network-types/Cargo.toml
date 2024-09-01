@@ -56,5 +56,7 @@ rand = { workspace = true }
 rand_distr = "0.4.3"
 rayon = { workspace = true }
 test-log = { version = "0.2.16", features = ["trace"] }
+tokio = { workspace = true }
+tokio-util = { workspace = true }
 
 hopr-crypto-random = { workspace = true }

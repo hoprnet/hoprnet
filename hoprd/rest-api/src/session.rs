@@ -18,7 +18,7 @@ use hopr_network_types::utils::copy_duplex;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use tokio::net::{TcpListener, ToSocketAddrs};
-use tokio_util::compat::FuturesAsyncReadCompatExt;
+use tokio_util::compat::TokioAsyncReadCompatExt;
 use tracing::{debug, error, info};
 
 /// Default listening host the session listener socket binds to.
@@ -320,14 +320,14 @@ async fn udp_bind_to<A: ToSocketAddrs>(address: A) -> std::io::Result<(std::net:
     Ok((udp_socket.socket().local_addr()?, udp_socket))
 }
 
-async fn bind_session_to_stream<T>(session: HoprSession, mut stream: T)
+async fn bind_session_to_stream<T>(mut session: HoprSession, stream: T)
 where
     T: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
 {
     let session_id = *session.id();
     match copy_duplex(
-        &mut session.compat(),
-        &mut stream,
+        &mut session,
+        &mut stream.compat(),
         hopr_lib::SESSION_USABLE_MTU_SIZE,
         hopr_lib::SESSION_USABLE_MTU_SIZE,
     )

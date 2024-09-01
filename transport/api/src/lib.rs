@@ -1046,7 +1046,7 @@ where
                 error!(challenge, "session initiation attempt timed out");
 
                 #[cfg(all(feature = "prometheus", not(test)))]
-                METRIC_RECEIVED_SESSION_ERRS.increment(&[&"timeout"]);
+                METRIC_RECEIVED_SESSION_ERRS.increment(&["timeout"]);
 
                 Err(TransportSessionError::Timeout.into())
             }

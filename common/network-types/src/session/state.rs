@@ -817,7 +817,7 @@ impl<const C: usize> AsyncRead for SessionSocket<C> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::session::utils::DuplexIO;
+    use crate::utils::DuplexIO;
     use async_std::prelude::FutureExt;
     use futures::future::Either;
     use futures::io::{AsyncReadExt, AsyncWriteExt};

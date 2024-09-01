@@ -101,7 +101,7 @@ pub struct HoprServerIpForwardingReactor;
 #[hopr_lib::async_trait]
 impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
     #[tracing::instrument(level = "debug", skip(self, session))]
-    async fn process(&self, session: hopr_lib::HoprIncomingSession) -> hopr_lib::errors::Result<()> {
+    async fn process(&self, mut session: hopr_lib::HoprIncomingSession) -> hopr_lib::errors::Result<()> {
         let session_id = *session.session.id();
         match session.target {
             hopr_lib::SessionTarget::UdpStream(udp_target) => {
@@ -124,7 +124,7 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                     "UDP target {udp_target} resolved to {resolved_udp_target}"
                 );
 
-                let mut udp_bridge = hopr_network_types::udp::ConnectedUdpStream::bind(("127.0.0.1", 0))
+                let udp_bridge = hopr_network_types::udp::ConnectedUdpStream::bind(("127.0.0.1", 0))
                     .await
                     .and_then(|s| s.with_counterparty(resolved_udp_target))
                     .map(|s| s.with_foreign_data_mode(ForeignDataMode::Error))
@@ -139,7 +139,7 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                     "bridging the session to the UDP server {udp_target} ..."
                 );
                 tokio::task::spawn(async move {
-                    match copy_duplex(&mut tokio_util::compat::FuturesAsyncReadCompatExt::compat(session.session), &mut udp_bridge, hopr_lib::SESSION_USABLE_MTU_SIZE, hopr_lib::SESSION_USABLE_MTU_SIZE).await {
+                    match copy_duplex(&mut session.session, &mut tokio_util::compat::TokioAsyncReadCompatExt::compat(udp_bridge), hopr_lib::SESSION_USABLE_MTU_SIZE, hopr_lib::SESSION_USABLE_MTU_SIZE).await {
                         Ok(bound_stream_finished) => tracing::info!(
                             session_id = debug(session_id),
                             "server bridged session through UDP {udp_target} ended with {bound_stream_finished:?} bytes transferred in both directions."
@@ -172,7 +172,7 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                 // TODO: make TCP connection retry strategy configurable either by the server or the client
                 let strategy = tokio_retry::strategy::FixedInterval::from_millis(1500).take(15);
 
-                let mut tcp_bridge = tokio_retry::Retry::spawn(strategy, || {
+                let tcp_bridge = tokio_retry::Retry::spawn(strategy, || {
                     tokio::net::TcpStream::connect(resolved_tcp_targets.as_slice())
                 })
                 .await
@@ -191,7 +191,7 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                     "bridging the session to the TCP server {tcp_target} ..."
                 );
                 tokio::task::spawn(async move {
-                    match copy_duplex(&mut tokio_util::compat::FuturesAsyncReadCompatExt::compat(session.session), &mut tcp_bridge, hopr_lib::SESSION_USABLE_MTU_SIZE, hopr_lib::SESSION_USABLE_MTU_SIZE).await {
+                    match copy_duplex(&mut session.session, &mut tokio_util::compat::TokioAsyncReadCompatExt::compat(tcp_bridge), hopr_lib::SESSION_USABLE_MTU_SIZE, hopr_lib::SESSION_USABLE_MTU_SIZE).await {
                         Ok(bound_stream_finished) => tracing::info!(
                             session_id = debug(session_id),
                             "server bridged session through TCP {tcp_target} ended with {bound_stream_finished:?} bytes transferred in both directions."
