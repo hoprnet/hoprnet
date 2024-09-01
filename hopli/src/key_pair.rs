@@ -176,31 +176,30 @@ impl ArgEnvReader<ChainKeypair, String> for PrivateKeyArgs {
 
     /// Read the value from either the cli arg or env
     fn read(&self, default_env_name: &str) -> Result<ChainKeypair, HelperErrors> {
-        let prefix = "0x";
         let pri_key = if let Some(pk) = self.get_key() {
-            info!("reading private key from cli");
+            info!("Reading private key from CLI");
             pk
         } else if let Ok(env_pk) = env::var(default_env_name) {
-            info!("reading private key from env {:?}", default_env_name);
+            info!("Reading private key from environment variable {:?}", default_env_name);
             env_pk
         } else if let Ok(prompt_pk) = rpassword::prompt_password("Enter private key:") {
-            info!("reading private key from prompt");
+            info!("Reading private key from prompt");
             prompt_pk
         } else {
             error!(
                 "Unable to read private key from environment variable: {:?}",
                 default_env_name
             );
-            return Err(HelperErrors::UnableToReadPrivateKey("PRIVATE_KEY".into()));
-        };
-        // trim the 0x prefix if needed
-        let priv_key_without_prefix = if pri_key.starts_with("0x") {
-            pri_key[prefix.len()..].to_string()
-        } else {
-            pri_key
+            return Err(HelperErrors::UnableToReadPrivateKey(default_env_name.into()));
         };
 
-        Ok(ChainKeypair::from_secret(hex::decode(priv_key_without_prefix).unwrap().as_slice()).unwrap())
+        // trim the 0x prefix if needed
+        let priv_key_without_prefix = pri_key.strip_prefix("0x").unwrap_or(&pri_key).to_string();
+
+        let decoded_key = hex::decode(priv_key_without_prefix)
+            .map_err(|e| HelperErrors::UnableToReadPrivateKey(format!("Failed to decode private key: {:?}", e)))?;
+        Ok(ChainKeypair::from_secret(&decoded_key)
+            .map_err(|e| HelperErrors::UnableToReadPrivateKey(format!("Failed to create keypair: {:?}", e)))?)
     }
 
     /// Read the default private key and return an address string
@@ -231,31 +230,32 @@ impl ArgEnvReader<ChainKeypair, String> for ManagerPrivateKeyArgs {
 
     /// Read the value from either the cli arg or env
     fn read(&self, default_env_name: &str) -> Result<ChainKeypair, HelperErrors> {
-        let prefix = "0x";
         let pri_key = if let Some(pk) = self.get_key() {
-            info!("reading manager private key from cli");
+            info!("Reading manager private key from CLI");
             pk
         } else if let Ok(env_pk) = env::var(default_env_name) {
-            info!("reading manager private key from env {:?}", default_env_name);
+            info!(
+                "Reading manager private key from environment variable {:?}",
+                default_env_name
+            );
             env_pk
         } else if let Ok(prompt_pk) = rpassword::prompt_password("Enter manager private key:") {
-            info!("reading manager private key from prompt");
+            info!("Reading manager private key from prompt");
             prompt_pk
         } else {
             error!(
                 "Unable to read private key from environment variable: {:?}",
                 default_env_name
             );
-            return Err(HelperErrors::UnableToReadPrivateKey("MANAGER_PRIVATE_KEY".into()));
-        };
-        // trim the 0x prefix if needed
-        let priv_key_without_prefix = if pri_key.starts_with("0x") {
-            pri_key[prefix.len()..].to_string()
-        } else {
-            pri_key
+            return Err(HelperErrors::UnableToReadPrivateKey(default_env_name.into()));
         };
 
-        Ok(ChainKeypair::from_secret(hex::decode(priv_key_without_prefix).unwrap().as_slice()).unwrap())
+        // trim the 0x prefix if needed
+        let priv_key_without_prefix = pri_key.strip_prefix("0x").unwrap_or(&pri_key).to_string();
+        let decoded_key = hex::decode(priv_key_without_prefix)
+            .map_err(|e| HelperErrors::UnableToReadPrivateKey(format!("Failed to decode private key: {:?}", e)))?;
+        Ok(ChainKeypair::from_secret(&decoded_key)
+            .map_err(|e| HelperErrors::UnableToReadPrivateKey(format!("Failed to create keypair: {:?}", e)))?)
     }
 
     /// Read the default private key and return an address string

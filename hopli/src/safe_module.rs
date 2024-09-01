@@ -348,7 +348,13 @@ impl SafeModuleSubcommands {
             node_eth_addresses.extend(addresses.split(',').map(|addr| H160::from_str(addr).unwrap()));
         }
         // if local identity dirs/path is provided, read addresses from identity files
-        node_eth_addresses.extend(local_identity.to_addresses().unwrap().into_iter().map(H160::from));
+        node_eth_addresses.extend(
+            local_identity
+                .to_addresses()
+                .map_err(|e| HelperErrors::InvalidAddress(format!("Invalid node address: {:?}", e)))?
+                .into_iter()
+                .map(H160::from),
+        );
 
         let node_addresses = if node_eth_addresses.is_empty() {
             None
@@ -483,8 +489,11 @@ impl SafeModuleSubcommands {
         node_eth_addresses.extend(local_identity.to_addresses().unwrap().into_iter().map(H160::from));
 
         // parse safe and module addresses
-        let safe_addr = H160::from_str(&new_safe_address).unwrap();
-        let module_addr = H160::from_str(&new_module_address).unwrap();
+        let safe_addr = H160::from_str(&new_safe_address)
+            .map_err(|_| HelperErrors::InvalidAddress(format!("Cannot parse safe address {:?}", new_safe_address)))?;
+        let module_addr = H160::from_str(&new_module_address).map_err(|_| {
+            HelperErrors::InvalidAddress(format!("Cannot parse module address {:?}", new_module_address))
+        })?;
         let old_module_addr: Vec<H160> = old_module_address
             .split(',')
             .map(|addr| H160::from_str(addr).unwrap())

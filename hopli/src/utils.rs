@@ -117,6 +117,10 @@ pub enum HelperErrors {
     // encode packed error
     #[error(transparent)]
     EncodePackedError(#[from] ethers::abi::EncodePackedError),
+
+    // error of parsing addresses
+    #[error("Cannot parse address: {0}")]
+    InvalidAddress(String),
 }
 
 /// Multicall3 deployer wallet
