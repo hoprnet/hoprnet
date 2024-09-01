@@ -170,9 +170,9 @@ pub enum HoprLibProcesses {
     ProtocolMsgOut,
     #[strum(to_string = "session router pairing the session streams based on the PeerId and ApplicationTag")]
     SessionsRouter,
-    #[strum(to_string = "ensures sessions are gracefully terminated on stream close")]
+    #[strum(to_string = "graceful session on stream close")]
     SessionsTerminator,
-    #[strum(to_string = "ensures sessions are gracefully terminated upon expiration")]
+    #[strum(to_string = "gracefully session terminator upon expiration")]
     SessionsExpiration,
     #[cfg(feature = "session-server")]
     #[strum(to_string = "session server providing the exit node session stream functionality")]

@@ -31,7 +31,6 @@ pub const DEFAULT_LISTEN_HOST: &str = "127.0.0.1:0";
         "path": {
             "Hops": 1
         },
-        "protocol": "TCP",
         "target": "localhost:8080",
         "listen_host": "127.0.0.1:10000",
         "capabilities": ["Retransmission", "Segmentation"]
@@ -248,6 +247,45 @@ pub(crate) async fn create_client(
         )
             .into_response(),
     )
+}
+
+/// Lists existing Session listeners for the given IP protocol.
+#[utoipa::path(
+    get,
+    path = const_format::formatcp!("{BASE_PATH}/session/{{protocol}}"),
+    params(
+            ("protocol" = String, Path, description = "IP protocol")
+    ),
+    responses(
+            (status = 200, description = "Opened session listeners for the given IP protocol.", body = Vec<SessionClientResponse>),
+            (status = 400, description = "Invalid IP protocol.", body = ApiError),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
+            (status = 422, description = "Unknown failure", body = ApiError)
+    ),
+    security(
+            ("api_token" = []),
+            ("bearer_token" = [])
+    ),
+    tag = "Session",
+)]
+pub(crate) async fn list_clients(
+    State(state): State<Arc<InternalState>>,
+    Path(protocol): Path<IpProtocol>,
+) -> Result<impl IntoResponse, impl IntoResponse> {
+    let response = state
+        .open_listeners
+        .read()
+        .await
+        .iter()
+        .filter(|(id, _)| id.0 == protocol)
+        .map(|(id, _)| SessionClientResponse {
+            protocol,
+            ip: id.1.ip().to_string(),
+            port: id.1.port(),
+        })
+        .collect::<Vec<_>>();
+
+    Ok::<_, (StatusCode, ApiErrorStatus)>((StatusCode::OK, Json(response)).into_response())
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]

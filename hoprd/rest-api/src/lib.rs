@@ -111,6 +111,7 @@ pub(crate) struct InternalState {
         peers::ping_peer,
         peers::show_peer_info,
         session::create_client,
+        session::list_clients,
         session::close_client,
         tickets::aggregate_tickets_in_channel,
         tickets::redeem_all_tickets,
@@ -279,6 +280,7 @@ async fn build_api(
                 .route("/node/metrics", get(node::metrics))
                 .route("/peers/:peerId/ping", post(peers::ping_peer))
                 .route("/session/:protocol", post(session::create_client))
+                .route("/session/:protocol", get(session::list_clients))
                 .route("/session/:protocol", delete(session::close_client))
                 .with_state(inner_state.clone().into())
                 .layer(middleware::from_fn_with_state(inner_state, preconditions::authenticate)),
