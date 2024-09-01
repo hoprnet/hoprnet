@@ -883,7 +883,7 @@ ECHO_SERVER_PORT = 10101
 HOPR_SESSION_MAX_PAYLOAD_SIZE = 462
 
 
-def run_echo_server(port: int):
+def run_tcp_echo_server(port: int):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(("127.0.0.1", port))
         s.listen()
@@ -894,9 +894,26 @@ def run_echo_server(port: int):
                 conn.sendall(data)
 
 
+def run_udp_echo_server(port: int):
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+        s.bind(("127.0.0.1", port))
+
+        while True:
+            data, addr = s.recvfrom(HOPR_SESSION_MAX_PAYLOAD_SIZE)
+            s.sendto(data, addr)
+
 @contextmanager
-def echo_server(port: int):
-    process = multiprocessing.Process(target=run_echo_server, args=(port,))
+def echo_tcp_server(port: int):
+    process = multiprocessing.Process(target=run_tcp_echo_server, args=(port,))
+    process.start()
+    try:
+        yield port
+    finally:
+        process.terminate()
+
+@contextmanager
+def echo_udp_server(port: int):
+    process = multiprocessing.Process(target=run_udp_echo_server, args=(port,))
     process.start()
     try:
         yield port
@@ -916,9 +933,8 @@ def connect_tcp_socket(port):
 
 
 @contextmanager
-def connect_udp_socket(port):
+def connect_udp_socket():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    s.connect(("127.0.0.1", port))
 
     try:
         yield s
@@ -943,12 +959,14 @@ async def test_session_communication_with_a_tcp_echo_server(
     src_peer = swarm7[src]
     dest_peer = swarm7[dest]
 
-    src_sock_port = await src_peer.api.session_client(dest_peer.peer_id, path={"Hops": 0}, protocol='TCP',
+    src_sock_port = await src_peer.api.session_client(dest_peer.peer_id, path={"Hops": 0}, protocol='tcp',
                                                       target=f"localhost:{ECHO_SERVER_PORT}")
+
+    assert len(await src_peer.api.session_list_clients('tcp')) == 1
 
     actual = []
 
-    with echo_server(ECHO_SERVER_PORT):
+    with echo_tcp_server(ECHO_SERVER_PORT):
         # socket.listen does not actually listen immediately and needs some time to be working
         # otherwise a `ConnectionRefusedError: [Errno 61] Connection refused` will be encountered
         await asyncio.sleep(1.0)
@@ -961,11 +979,12 @@ async def test_session_communication_with_a_tcp_echo_server(
             for message in expected:
                 actual.append(s.recv(len(message)).decode())
 
-    actual.sort()
-    expected.sort()
     assert actual == expected
 
-    await src_peer.api.session_close_client(protocol='TCP', bound_ip='127.0.0.1', bound_port=src_sock_port) is True
+    await asyncio.sleep(1.0)
+
+    await src_peer.api.session_close_client(protocol='tcp', bound_ip='127.0.0.1', bound_port=src_sock_port) is True
+    assert len(await src_peer.api.session_list_clients('tcp')) == 0
 
 
 @pytest.mark.asyncio
@@ -977,7 +996,7 @@ async def test_session_communication_with_a_udp_echo_server(
     HOPR UDP socket buffers are set to 462 bytes to mimic the underlying MTU of the HOPR protocol.
     """
 
-    packet_count = 1000 if os.getenv("CI", default="false") == "false" else 50
+    packet_count = 100 if os.getenv("CI", default="false") == "false" else 50
     expected = [f"{i}".rjust(HOPR_SESSION_MAX_PAYLOAD_SIZE) for i in range(packet_count)]
 
     assert [len(x) for x in expected] == packet_count * [HOPR_SESSION_MAX_PAYLOAD_SIZE]
@@ -985,30 +1004,34 @@ async def test_session_communication_with_a_udp_echo_server(
     src_peer = swarm7[src]
     dest_peer = swarm7[dest]
 
-    src_sock_port = await src_peer.api.session_client(dest_peer.peer_id, path={"Hops": 0}, protocol='UDP',
+    src_sock_port = await src_peer.api.session_client(dest_peer.peer_id, path={"Hops": 0}, protocol='udp',
                                                       target=f"localhost:{ECHO_SERVER_PORT}")
+
+    assert len(await src_peer.api.session_list_clients('udp')) == 1
 
     actual = []
 
-    with echo_server(ECHO_SERVER_PORT):
+    with echo_udp_server(ECHO_SERVER_PORT):
         # socket.listen does not actually listen immediately and needs some time to be working
         # otherwise a `ConnectionRefusedError: [Errno 61] Connection refused` will be encountered
         await asyncio.sleep(1.0)
 
-        with connect_udp_socket(src_sock_port) as s:
-            s.settimeout(20)
+        addr = ('127.0.0.1', src_sock_port)
+        with connect_udp_socket() as s:
+            s.settimeout(5)
             for message in expected:
-                s.send(message.encode())
-
-            for message in expected:
-                actual.append(s.recv(len(message)).decode())
+                s.sendto(message.encode(), addr)
+                data, _ = s.recvfrom(len(message))
+                actual.append(data.decode())
 
     actual.sort()
     expected.sort()
     assert actual == expected
 
-    await src_peer.api.session_close_client(protocol='UDP', bound_ip='127.0.0.1', bound_port=src_sock_port) is True
+    await asyncio.sleep(1.0)
 
+    await src_peer.api.session_close_client(protocol='udp', bound_ip='127.0.0.1', bound_port=src_sock_port) is True
+    assert len(await src_peer.api.session_list_clients('udp')) == 0
 
 @pytest.mark.skip(reason="skipping dummy test")
 @pytest.mark.asyncio

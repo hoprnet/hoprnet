@@ -323,7 +323,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             | HoprdProcesses::WebSocket(jh)
                             | HoprdProcesses::RestApi(jh) => join_handles.push(jh),
                             HoprdProcesses::ListenerSockets(jhs) => {
-                                join_handles.extend(jhs.write().await.drain().map(|(_, jh)| jh));
+                                join_handles.extend(jhs.write().await.drain().map(|(_, (_, jh))| jh));
                             }
                         }
                         futures::stream::iter(join_handles)

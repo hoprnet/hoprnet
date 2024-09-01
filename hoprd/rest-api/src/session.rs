@@ -72,13 +72,16 @@ impl SessionClientRequest {
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 #[schema(example = json!({
+        "target": "example.com:80",
         "protocol": "tcp",
         "ip": "127.0.0.1",
-        "port": 5542
+        "port": 5542,
     }))]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct SessionClientResponse {
+    pub target: String,
     #[serde_as(as = "DisplayFromStr")]
+    #[schema(value_type = String)]
     pub protocol: IpProtocol,
     pub ip: String,
     pub port: u16,
@@ -103,6 +106,9 @@ pub(crate) struct SessionClientResponse {
 #[utoipa::path(
         post,
         path = const_format::formatcp!("{BASE_PATH}/session/{{protocol}}"),
+        params(
+                ("protocol" = String, Path, description = "IP protocol")
+        ),
         request_body(
             content = SessionClientRequest,
             description = "Creates a new client HOPR session that will start listening on a dedicated port. Once the port is bound, it is possible to use the socket for bidirectional read and write communication.",
@@ -147,12 +153,15 @@ pub(crate) async fn create_client(
         return Err((StatusCode::CONFLICT, ApiErrorStatus::InvalidInput));
     }
 
+    let target = args.target.clone();
     let data = args.into_protocol_session_config(protocol).map_err(|e| {
         (
             StatusCode::UNPROCESSABLE_ENTITY,
             ApiErrorStatus::UnknownFailure(e.to_string()),
         )
     })?;
+
+    // TODO: consider pooling the sessions on a listener, so that the negotiation is amortized
 
     let bound_host = match protocol {
         IpProtocol::TCP => {
@@ -166,6 +175,7 @@ pub(crate) async fn create_client(
                     )
                 }
             })?;
+            info!("TCP session listener bound to {bound_host}");
 
             let hopr = state.hopr.clone();
             let jh = hopr_async_runtime::prelude::spawn(
@@ -203,7 +213,7 @@ pub(crate) async fn create_client(
                 .open_listeners
                 .write()
                 .await
-                .insert(ListenerId(protocol, bound_host), jh);
+                .insert(ListenerId(protocol, bound_host), (target.clone(), jh));
             bound_host
         }
         IpProtocol::UDP => {
@@ -228,9 +238,14 @@ pub(crate) async fn create_client(
                 }
             })?;
 
+            info!("UDP session listener bound to {bound_host}");
+
             state.open_listeners.write().await.insert(
                 ListenerId(protocol, bound_host),
-                hopr_async_runtime::prelude::spawn(bind_session_to_stream(session, udp_socket)),
+                (
+                    target.clone(),
+                    hopr_async_runtime::prelude::spawn(bind_session_to_stream(session, udp_socket)),
+                ),
             );
             bound_host
         }
@@ -241,6 +256,7 @@ pub(crate) async fn create_client(
             StatusCode::OK,
             Json(SessionClientResponse {
                 protocol,
+                target,
                 ip: bound_host.ip().to_string(),
                 port: bound_host.port(),
             }),
@@ -278,8 +294,9 @@ pub(crate) async fn list_clients(
         .await
         .iter()
         .filter(|(id, _)| id.0 == protocol)
-        .map(|(id, _)| SessionClientResponse {
+        .map(|(id, (target, _))| SessionClientResponse {
             protocol,
+            target: target.clone(),
             ip: id.1.ip().to_string(),
             port: id.1.port(),
         })
@@ -333,7 +350,7 @@ pub(crate) async fn close_client(
     let bound_addr = std::net::SocketAddr::from_str(&format!("{listening_ip}:{port}"))
         .map_err(|_| (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidInput))?;
 
-    let handle = state
+    let (_, handle) = state
         .open_listeners
         .write()
         .await

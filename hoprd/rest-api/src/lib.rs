@@ -60,7 +60,7 @@ pub type MessageEncoder = fn(&[u8]) -> Box<[u8]>;
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct ListenerId(pub IpProtocol, pub std::net::SocketAddr);
 
-pub type ListenerJoinHandles = Arc<RwLock<HashMap<ListenerId, hopr_async_runtime::prelude::JoinHandle<()>>>>;
+pub type ListenerJoinHandles = Arc<RwLock<HashMap<ListenerId, (String, hopr_async_runtime::prelude::JoinHandle<()>)>>>;
 
 #[derive(Clone)]
 pub(crate) struct InternalState {

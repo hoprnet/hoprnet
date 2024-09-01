@@ -80,6 +80,10 @@ impl ConnectedUdpStream {
 
 impl tokio::io::AsyncRead for ConnectedUdpStream {
     fn poll_read(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut ReadBuf<'_>) -> Poll<std::io::Result<()>> {
+        if let Err(e) = std::task::ready!(self.sock.poll_recv_ready(cx)) {
+            return Poll::Ready(Err(Error::other(format!("reading readiness error {e}"))));
+        }
+
         match self.sock.poll_recv_from(cx, buf) {
             Poll::Ready(Ok(read_addr)) => match self.counterparty {
                 Some(addr) if addr == read_addr => Poll::Ready(Ok(())),
@@ -115,6 +119,9 @@ impl tokio::io::AsyncWrite for ConnectedUdpStream {
     fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<Result<usize, Error>> {
         if !self.closed {
             if let Some(counterparty) = self.counterparty {
+                if let Err(e) = std::task::ready!(self.sock.poll_send_ready(cx)) {
+                    return Poll::Ready(Err(Error::other(format!("writing readiness error {e}"))));
+                }
                 self.sock.poll_send_to(cx, buf, counterparty)
             } else {
                 Poll::Ready(Err(Error::other("cannot send, counterparty address not set")))
@@ -165,7 +172,7 @@ mod tests {
             .context("connection")?
             .with_counterparty(listen_addr)?;
 
-        for _ in 1..10 {
+        for _ in 1..1000 {
             let mut w_buf = [0u8; DATA_SIZE];
             hopr_crypto_random::random_fill(&mut w_buf);
             let written = stream.write(&w_buf).await?;
