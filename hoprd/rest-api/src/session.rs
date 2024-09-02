@@ -163,6 +163,7 @@ pub(crate) async fn create_client(
 
     // TODO: consider pooling the sessions on a listener, so that the negotiation is amortized
 
+    debug!("binding {protocol} session listening socket to {bind_host}");
     let bound_host = match protocol {
         IpProtocol::TCP => {
             let (bound_host, tcp_listener) = tcp_listen_on(bind_host).await.map_err(|e| {
