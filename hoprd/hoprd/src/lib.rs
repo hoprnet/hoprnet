@@ -124,7 +124,7 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                     "UDP target {udp_target} resolved to {resolved_udp_target}"
                 );
 
-                let udp_bridge = hopr_network_types::udp::ConnectedUdpStream::bind(("127.0.0.1", 0))
+                let udp_bridge = hopr_network_types::udp::ConnectedUdpStream::bind(("0.0.0.0", 0))
                     .await
                     .and_then(|s| s.with_counterparty(resolved_udp_target))
                     .map(|s| s.with_foreign_data_mode(ForeignDataMode::Error))
