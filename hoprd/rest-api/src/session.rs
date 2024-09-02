@@ -357,7 +357,7 @@ pub(crate) async fn close_client(
         .remove(&ListenerId(protocol, bound_addr))
         .ok_or((StatusCode::NOT_FOUND, ApiErrorStatus::InvalidInput))?;
 
-    let _ = handle.cancel().await;
+    hopr_async_runtime::prelude::cancel_join_handle(handle).await;
     Ok::<_, (StatusCode, ApiErrorStatus)>((StatusCode::NO_CONTENT, "").into_response())
 }
 
