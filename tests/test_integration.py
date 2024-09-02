@@ -951,8 +951,8 @@ async def test_session_communication_with_a_tcp_echo_server(
     HOPR TCP socket buffers are set to 462 bytes to mimic the underlying MTU of the HOPR protocol.
     """
 
-    packet_count = 100 if os.getenv("CI", default="false") == "false" else 50
-    expected = [f"{i}".rjust(HOPR_SESSION_MAX_PAYLOAD_SIZE) for i in range(packet_count)]
+    packet_count = 1000 if os.getenv("CI", default="false") == "false" else 50
+    expected = [f"{i}".ljust(HOPR_SESSION_MAX_PAYLOAD_SIZE) for i in range(packet_count)]
 
     assert [len(x) for x in expected] == packet_count * [HOPR_SESSION_MAX_PAYLOAD_SIZE]
 
@@ -964,7 +964,7 @@ async def test_session_communication_with_a_tcp_echo_server(
 
     assert len(await src_peer.api.session_list_clients('tcp')) == 1
 
-    actual = []
+    actual = ''
 
     with echo_tcp_server(ECHO_SERVER_PORT):
         # socket.listen does not actually listen immediately and needs some time to be working
@@ -973,11 +973,16 @@ async def test_session_communication_with_a_tcp_echo_server(
 
         with connect_tcp_socket(src_sock_port) as s:
             s.settimeout(20)
+            total_sent = 0
             for message in expected:
-                s.send(message.encode())
-                actual.append(s.recv(len(message)).decode())
+                total_sent = total_sent + s.send(message.encode())
 
-    assert actual == expected
+            while total_sent > 0:
+                chunk = s.recv(min(HOPR_SESSION_MAX_PAYLOAD_SIZE, total_sent))
+                total_sent = total_sent - len(chunk)
+                actual = actual + chunk.decode()
+
+    assert ''.join(expected) == actual
 
     await src_peer.api.session_close_client(protocol='tcp', bound_ip='127.0.0.1', bound_port=src_sock_port) is True
     assert len(await src_peer.api.session_list_clients('tcp')) == 0
@@ -1015,16 +1020,19 @@ async def test_session_communication_with_a_udp_echo_server(
         addr = ('127.0.0.1', src_sock_port)
         with connect_udp_socket() as s:
             s.settimeout(5)
+            total_sent = 0
             for message in expected:
-                s.sendto(message.encode(), addr)
-                data, _ = s.recvfrom(len(message))
-                actual.append(data.decode())
+                total_sent = total_sent + s.sendto(message.encode(), addr)
+                await asyncio.sleep(0.01) # UDP has no flow-control, so we must insert an artificial gap
+
+            while total_sent > 0:
+                chunk, _ = s.recvfrom(min(HOPR_SESSION_MAX_PAYLOAD_SIZE, total_sent))
+                total_sent = total_sent - len(chunk)
+                actual.append(chunk.decode())
 
     actual.sort()
     expected.sort()
     assert actual == expected
-
-    await asyncio.sleep(1.0)
 
     await src_peer.api.session_close_client(protocol='udp', bound_ip='127.0.0.1', bound_port=src_sock_port) is True
     assert len(await src_peer.api.session_list_clients('udp')) == 0

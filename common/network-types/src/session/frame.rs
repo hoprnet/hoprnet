@@ -372,7 +372,7 @@ impl Ord for FrameInfo {
 /// [`futures::SinkExt::close`] is called.
 ///
 /// As new segments are [pushed](FrameReassembler::push_segment) into the reassembler,
-/// the frames get reassembled and once they are completed, they are automatically pushed out into
+/// the frames get reassembled, and once they are completed, they are automatically pushed out into
 /// the outgoing frame stream.
 ///
 /// The reassembler can also have a `max_age` of frames that are under construction.

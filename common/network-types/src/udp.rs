@@ -3,7 +3,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use tokio::io::ReadBuf;
 use tokio::net::UdpSocket;
-use tracing::warn;
+use tracing::{trace, warn};
 
 /// Mimics TCP-like stream functionality on a UDP socket by restricting it to a single
 /// counterparty and implements [`tokio::io::AsyncRead`] and [`tokio::io::AsyncWrite`].
@@ -80,10 +80,7 @@ impl ConnectedUdpStream {
 
 impl tokio::io::AsyncRead for ConnectedUdpStream {
     fn poll_read(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut ReadBuf<'_>) -> Poll<std::io::Result<()>> {
-        if let Err(e) = std::task::ready!(self.sock.poll_recv_ready(cx)) {
-            return Poll::Ready(Err(Error::other(format!("reading readiness error {e}"))));
-        }
-
+        trace!("polling read from udp stream with {:?}", self.counterparty);
         match self.sock.poll_recv_from(cx, buf) {
             Poll::Ready(Ok(read_addr)) => match self.counterparty {
                 Some(addr) if addr == read_addr => Poll::Ready(Ok(())),
@@ -117,11 +114,9 @@ impl tokio::io::AsyncRead for ConnectedUdpStream {
 
 impl tokio::io::AsyncWrite for ConnectedUdpStream {
     fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<Result<usize, Error>> {
+        trace!("polling write to udp stream with {:?}", self.counterparty);
         if !self.closed {
             if let Some(counterparty) = self.counterparty {
-                if let Err(e) = std::task::ready!(self.sock.poll_send_ready(cx)) {
-                    return Poll::Ready(Err(Error::other(format!("writing readiness error {e}"))));
-                }
                 self.sock.poll_send_to(cx, buf, counterparty)
             } else {
                 Poll::Ready(Err(Error::other("cannot send, counterparty address not set")))
@@ -136,6 +131,7 @@ impl tokio::io::AsyncWrite for ConnectedUdpStream {
     }
 
     fn poll_shutdown(mut self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Error>> {
+        trace!("udp stream with {:?} closed", self.counterparty);
         self.closed = true;
         Poll::Ready(Ok(()))
     }

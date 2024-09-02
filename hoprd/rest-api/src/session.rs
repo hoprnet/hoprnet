@@ -506,7 +506,7 @@ mod tests {
 
         tokio::task::spawn(bind_session_to_stream(session, udp_listener));
 
-        let mut tcp_stream = ConnectedUdpStream::bind(("127.0.0.1", 0))
+        let mut udp_stream = ConnectedUdpStream::bind(("127.0.0.1", 0))
             .await
             .context("bind failed")?
             .with_counterparty(listen_addr)?;
@@ -514,12 +514,12 @@ mod tests {
         let data = vec![b"hello", b"world", b"this ", b"is   ", b"    a", b" test"];
 
         for d in data.clone().into_iter() {
-            tcp_stream.write_all(d).await.context("write failed")?;
+            udp_stream.write_all(d).await.context("write failed")?;
         }
 
         for d in data.iter() {
             let mut buf = vec![0; d.len()];
-            tcp_stream.read_exact(&mut buf).await.context("read failed")?;
+            udp_stream.read_exact(&mut buf).await.context("read failed")?;
         }
 
         Ok(())
