@@ -975,11 +975,7 @@ async def test_session_communication_with_a_tcp_echo_server(
             s.settimeout(20)
             for message in expected:
                 s.send(message.encode())
-
-            for message in expected:
                 actual.append(s.recv(len(message)).decode())
-
-            await asyncio.sleep(5.0) # prevent closing the socket before all data are sent
 
     assert actual == expected
 

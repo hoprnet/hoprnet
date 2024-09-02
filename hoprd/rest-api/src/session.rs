@@ -107,17 +107,17 @@ pub(crate) struct SessionClientResponse {
         post,
         path = const_format::formatcp!("{BASE_PATH}/session/{{protocol}}"),
         params(
-                ("protocol" = String, Path, description = "IP protocol")
+                ("protocol" = String, Path, description = "IP transport protocol")
         ),
         request_body(
             content = SessionClientRequest,
             description = "Creates a new client HOPR session that will start listening on a dedicated port. Once the port is bound, it is possible to use the socket for bidirectional read and write communication.",
             content_type = "application/json"),
         responses(
-            (status = 200, description = "Successfully created a new client session", body = SessionClientResponse),
+            (status = 200, description = "Successfully created a new client session.", body = SessionClientResponse),
             (status = 400, description = "Invalid IP protocol.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
-            (status = 409, description = "Listening address and port are already used.", body = ApiError),
+            (status = 409, description = "Listening address and port already in use.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError),
         ),
         security(
@@ -271,7 +271,7 @@ pub(crate) async fn create_client(
     get,
     path = const_format::formatcp!("{BASE_PATH}/session/{{protocol}}"),
     params(
-            ("protocol" = String, Path, description = "IP protocol")
+            ("protocol" = String, Path, description = "IP transport protocol")
     ),
     responses(
             (status = 200, description = "Opened session listeners for the given IP protocol.", body = Vec<SessionClientResponse>),
@@ -324,7 +324,7 @@ pub(crate) struct SessionCloseClientRequest {
     delete,
     path = const_format::formatcp!("{BASE_PATH}/session/{{protocol}}"),
     params(
-            ("protocol" = String, Path, description = "IP protocol")
+            ("protocol" = String, Path, description = "IP transport protocol")
     ),
     request_body(
             content = SessionCloseClientRequest,
