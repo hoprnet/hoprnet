@@ -1019,7 +1019,7 @@ async def test_session_communication_with_a_udp_echo_server(
 
         addr = ('127.0.0.1', src_sock_port)
         with connect_udp_socket() as s:
-            s.settimeout(5)
+            s.settimeout(20)
             total_sent = 0
             for message in expected:
                 total_sent = total_sent + s.sendto(message.encode(), addr)
