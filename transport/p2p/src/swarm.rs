@@ -458,7 +458,7 @@ impl HoprSwarmWithProcessors {
                                 peer, request_id, error,
                             } => {
                                 active_pings.invalidate(&request_id).await;
-                                error!(peer = %peer, request_id = %request_id, "Failed to send a Pong reply: {error}");
+                                error!(peer = %peer, request_id = %request_id, "Failed heartbeat protocol on outbound: {error}");
                             },
                             libp2p::request_response::Event::<Ping,Pong>::InboundFailure {
                                 peer, request_id, error
@@ -480,8 +480,8 @@ impl HoprSwarmWithProcessors {
                                 info!(peer = %peer, multiaddress = %multiaddress, "New record");
                                 swarm.add_peer_address(peer, multiaddress.clone());
 
-                                if let Err(e) = swarm.dial(multiaddress.clone()) {
-                                    error!(peer = %peer, address = %multiaddress,  "Failed to dial the peer: {e}");
+                                if let Err(e) = swarm.dial(peer) {
+                                    error!(peer = %peer, address = %multiaddress, "Failed to dial the peer: {e}");
                                 }
                             },
                         }
