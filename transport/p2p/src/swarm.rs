@@ -314,13 +314,13 @@ impl HoprSwarmWithProcessors {
                                     };
 
                                     if swarm.behaviour_mut().msg.send_response(channel, ()).is_err() {
-                                        error!("transport protocol - p2p - msg - failed to send a response to '{peer}'");
+                                        error!(peer = %peer, request_id = %request_id, "Failed to confirm receiving a message, likely a timeout");
                                     };
                                 },
                                 libp2p::request_response::Message::<Box<[u8]>, ()>::Response {
                                     request_id, ..
                                 } => {
-                                    error!(peer = %peer, request_id = %request_id, "Failed to confirm receiving a message, likely a timeout");
+                                    trace!(peer = %peer, request_id = %request_id, "Message reception confirmed");
                                 }
                             }
                             libp2p::request_response::Event::<Box<[u8]>, ()>::OutboundFailure {
