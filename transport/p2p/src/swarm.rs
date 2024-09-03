@@ -61,7 +61,11 @@ async fn build_p2p_network(
     #[cfg(feature = "runtime-async-std")]
     let swarm = libp2p::SwarmBuilder::with_existing_identity(me)
         .with_async_std()
-        .with_tcp(Default::default(), libp2p::noise::Config::new, move || tcp_upgrade)
+        .with_tcp(
+            libp2p::tcp::Config::default().nodelay(true),
+            libp2p::noise::Config::new,
+            move || tcp_upgrade,
+        )
         .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?
         .with_quic()
         .with_dns();
@@ -71,7 +75,11 @@ async fn build_p2p_network(
     #[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
     let swarm = libp2p::SwarmBuilder::with_existing_identity(me)
         .with_tokio()
-        .with_tcp(Default::default(), libp2p::noise::Config::new, || tcp_upgrade)
+        .with_tcp(
+            libp2p::tcp::Config::default().nodelay(true),
+            libp2p::noise::Config::new,
+            || tcp_upgrade,
+        )
         .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?
         .with_quic()
         .with_dns();
