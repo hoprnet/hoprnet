@@ -514,8 +514,9 @@ async def swarm7(request):
     yield nodes
 
     # POST TEST CLEANUP
-    logging.debug(f"Tearing down the {len(nodes)} nodes cluster")
+    logging.info(f"Tearing down the {len(nodes)} nodes cluster")
     [node.clean_up() for node in nodes.values()]
+    run(["make", "kill-anvil", f"port={anvil_port}"], cwd=PWD.parent, check=True)
 
 
 def to_ws_url(host, port):
