@@ -13,7 +13,7 @@
         "token": "0x9A676e781A523b5d0C0e43731313A708CB607508"
       },
       "environment_type": "local",
-      "indexer_start_block_number": 6
+      "indexer_start_block_number": 5
     },
     "anvil-localhost2": {
       "addresses": {
@@ -28,7 +28,7 @@
         "token": "0x9A676e781A523b5d0C0e43731313A708CB607508"
       },
       "environment_type": "local",
-      "indexer_start_block_number": 6
+      "indexer_start_block_number": 5
     },
     "rotsee": {
       "environment_type": "staging",
