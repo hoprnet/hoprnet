@@ -4079,6 +4079,7 @@ version = "0.3.0"
 dependencies = [
  "anyhow",
  "async-std",
+ "async-std-resolver",
  "async-stream",
  "bitvec",
  "crossbeam-queue",

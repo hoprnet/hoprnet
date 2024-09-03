@@ -11,14 +11,19 @@ license = "GPL-3.0-only"
 [features]
 default = []
 serde = ["dep:serde", "dep:serde_bytes", "libp2p-identity/serde"]
-runtime-async-std = ["hopr-async-runtime/runtime-async-std"]
+runtime-async-std = [
+  "dep:async-std-resolver",
+  "hopr-async-runtime/runtime-async-std",
+]
 runtime-tokio = [
   "dep:tokio",
   "dep:tokio-util",
   "hopr-async-runtime/runtime-tokio",
+  "hickory-resolver/tokio-runtime",
 ]
 
 [dependencies]
+async-std-resolver = { version = "0.24.1", optional = true }
 bitvec = "1.0.1"
 crossbeam-queue = "0.3.11"
 crossbeam-skiplist = { workspace = true }

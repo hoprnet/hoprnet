@@ -89,7 +89,6 @@
 use hopr_lib::errors::HoprLibError;
 use hopr_network_types::prelude::ForeignDataMode;
 use hopr_network_types::utils::copy_duplex;
-use std::net::ToSocketAddrs;
 
 pub mod cli;
 pub mod config;
@@ -112,13 +111,16 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
 
                 // In UDP, it is impossible to determine if the target is viable,
                 // so we just take the first resolved address.
-                let resolved_udp_target =
-                    udp_target
-                        .clone()
-                        .resolve_first()
-                        .ok_or(HoprLibError::GeneralError(format!(
-                            "failed to resolve DNS name {udp_target}"
-                        )))?;
+                let resolved_udp_target = udp_target
+                    .clone()
+                    .resolve()
+                    .await
+                    .map_err(|e| HoprLibError::GeneralError(format!("failed to resolve DNS name {udp_target}: {e}")))?
+                    .first()
+                    .ok_or(HoprLibError::GeneralError(format!(
+                        "failed to resolve DNS name {udp_target}"
+                    )))?
+                    .to_owned();
                 tracing::debug!(
                     session_id = debug(session_id),
                     "UDP target {udp_target} resolved to {resolved_udp_target}"
@@ -160,10 +162,10 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
 
                 // TCP is able to determine which of the resolved multiple addresses is viable,
                 // and therefore we can pass all of them.
-                let resolved_tcp_targets = tcp_target
-                    .to_socket_addrs()
-                    .map_err(|e| HoprLibError::GeneralError(format!("failed to resolve DNS name {tcp_target}: {e}")))?
-                    .collect::<Vec<_>>();
+                let resolved_tcp_targets =
+                    tcp_target.clone().resolve().await.map_err(|e| {
+                        HoprLibError::GeneralError(format!("failed to resolve DNS name {tcp_target}: {e}"))
+                    })?;
                 tracing::debug!(
                     session_id = debug(session_id),
                     "TCP target {tcp_target} resolved to {resolved_tcp_targets:?}"
