@@ -264,8 +264,8 @@ def snapshot_create(anvil_port, parent_dir: Path, nodes):
     sdir.mkdir(parents=True, exist_ok=True)
 
     # stop anvil and nodes
-    run(["make", "kill-anvil", f"port={anvil_port}"], cwd=PWD.parent, check=True)
     [node.clean_up() for node in nodes.values()]
+    run(["make", "kill-anvil", f"port={anvil_port}"], cwd=PWD.parent, check=True)
 
     # copy anvil state
     shutil.copy(anvil_state_file(parent_dir), sdir)
