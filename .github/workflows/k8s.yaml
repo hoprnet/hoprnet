@@ -50,7 +50,7 @@ jobs:
           python3 ./scripts/sync-deployment.py -a deploy -n ${network} -v ${docker_tag}
 
       - name: Create Deploy Pull Request
-        uses: peter-evans/create-pull-request@v6
+        uses: peter-evans/create-pull-request@v7
         with:
           token: ${{ secrets.GH_RUNNER_TOKEN }}
           path: "./hoprnet-ci"
@@ -89,7 +89,7 @@ jobs:
           pip install -r ./scripts/requirements.txt
           python3 ./scripts/sync-deployment.py -a undeploy -v ${docker_tag}
       - name: Create Undeploy Pull Request
-        uses: peter-evans/create-pull-request@v6
+        uses: peter-evans/create-pull-request@v7
         with:
           token: ${{ secrets.GH_RUNNER_TOKEN }}
           path: "./hoprnet-ci"

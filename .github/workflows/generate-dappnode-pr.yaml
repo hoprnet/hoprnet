@@ -60,7 +60,7 @@ jobs:
         working-directory: "./DAppNodePackage-Hopr"
 
       - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v6
+        uses: peter-evans/create-pull-request@v7
         with:
           token: ${{ secrets.GH_RUNNER_TOKEN }}
           commit-message: "Update to release ${{ steps.setup.outputs.current_version }}"
