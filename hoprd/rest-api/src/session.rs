@@ -24,6 +24,15 @@ use tracing::{debug, error, info};
 /// Default listening host the session listener socket binds to.
 pub const DEFAULT_LISTEN_HOST: &str = "127.0.0.1:0";
 
+#[cfg(all(feature = "prometheus", not(test)))]
+lazy_static::lazy_static! {
+    static ref METRIC_ACTIVE_CLIENTS: hopr_metrics::MultiGauge = hopr_metrics::MultiGauge::new(
+        "hopr_session_hoprd_clients",
+        "Number of clients connected at this Entry node",
+        &["type"]
+    ).unwrap();
+}
+
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 #[schema(example = json!({
@@ -202,7 +211,13 @@ pub(crate) async fn create_client(
                                         "new session for incoming TCP connection from {sock_addr}",
                                     );
 
-                                    bind_session_to_stream(session, stream).await
+                                    #[cfg(all(feature = "prometheus", not(test)))]
+                                    METRIC_ACTIVE_CLIENTS.increment(&["tcp"], 1.0);
+
+                                    bind_session_to_stream(session, stream).await;
+
+                                    #[cfg(all(feature = "prometheus", not(test)))]
+                                    METRIC_ACTIVE_CLIENTS.decrement(&["tcp"], 1.0);
                                 }
                                 Err(e) => error!("failed to accept connection: {e}"),
                             }
@@ -245,7 +260,15 @@ pub(crate) async fn create_client(
                 ListenerId(protocol, bound_host),
                 (
                     target.clone(),
-                    hopr_async_runtime::prelude::spawn(bind_session_to_stream(session, udp_socket)),
+                    hopr_async_runtime::prelude::spawn(async move {
+                        #[cfg(all(feature = "prometheus", not(test)))]
+                        METRIC_ACTIVE_CLIENTS.increment(&["udp"], 1.0);
+
+                        bind_session_to_stream(session, udp_socket).await;
+
+                        #[cfg(all(feature = "prometheus", not(test)))]
+                        METRIC_ACTIVE_CLIENTS.decrement(&["udp"], 1.0);
+                    }),
                 ),
             );
             bound_host

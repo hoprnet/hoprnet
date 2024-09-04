@@ -94,6 +94,15 @@ pub mod cli;
 pub mod config;
 pub mod errors;
 
+#[cfg(all(feature = "prometheus", not(test)))]
+lazy_static::lazy_static! {
+    static ref METRIC_ACTIVE_TARGETS: hopr_metrics::MultiGauge = hopr_metrics::MultiGauge::new(
+        "hopr_session_hoprd_target_connections",
+        "Number of currently active HOPR session target connections on this Exit node",
+        &["type"]
+    ).unwrap();
+}
+
 #[derive(Debug, Clone)]
 pub struct HoprServerIpForwardingReactor;
 
@@ -141,6 +150,9 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                     "bridging the session to the UDP server {udp_target} ..."
                 );
                 tokio::task::spawn(async move {
+                    #[cfg(all(feature = "prometheus", not(test)))]
+                    METRIC_ACTIVE_TARGETS.increment(&["tcp"], 1.0);
+
                     match copy_duplex(&mut session.session, &mut tokio_util::compat::TokioAsyncReadCompatExt::compat(udp_bridge), hopr_lib::SESSION_USABLE_MTU_SIZE, hopr_lib::SESSION_USABLE_MTU_SIZE).await {
                         Ok(bound_stream_finished) => tracing::info!(
                             session_id = debug(session_id),
@@ -150,6 +162,9 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                             "UDP server stream ({udp_target}) is closed: {e:?}"
                         )
                     }
+
+                    #[cfg(all(feature = "prometheus", not(test)))]
+                    METRIC_ACTIVE_TARGETS.decrement(&["tcp"], 1.0);
                 });
 
                 Ok(())
@@ -193,6 +208,9 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                     "bridging the session to the TCP server {tcp_target} ..."
                 );
                 tokio::task::spawn(async move {
+                    #[cfg(all(feature = "prometheus", not(test)))]
+                    METRIC_ACTIVE_TARGETS.increment(&["udp"], 1.0);
+
                     match copy_duplex(&mut session.session, &mut tokio_util::compat::TokioAsyncReadCompatExt::compat(tcp_bridge), hopr_lib::SESSION_USABLE_MTU_SIZE, hopr_lib::SESSION_USABLE_MTU_SIZE).await {
                         Ok(bound_stream_finished) => tracing::info!(
                             session_id = debug(session_id),
@@ -203,6 +221,9 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                             "TCP server stream ({tcp_target}) is closed: {e:?}"
                         )
                     }
+
+                    #[cfg(all(feature = "prometheus", not(test)))]
+                    METRIC_ACTIVE_TARGETS.decrement(&["udp"], 1.0);
                 });
 
                 Ok(())

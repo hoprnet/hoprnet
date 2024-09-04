@@ -22,10 +22,10 @@ pub(crate) const RESERVED_SESSION_TAG_UPPER_LIMIT: u16 = 1024;
 pub(crate) const RESERVED_SUBPROTOCOL_TAG_UPPER_LIMIT: u16 = 16;
 
 /// Time within Start protocol must finish session initiation.
-pub(crate) const SESSION_INITIATION_TIMEOUT: Duration = Duration::from_secs(90);
+pub(crate) const SESSION_INITIATION_TIMEOUT: Duration = Duration::from_secs(60);
 
 /// Maximum lifetime of an idle session.
-pub(crate) const SESSION_LIFETIME: Duration = Duration::from_secs(3 * 60);
+pub(crate) const SESSION_LIFETIME: Duration = Duration::from_secs(2 * 60);
 
 /// The first challenge value used in Start protocol to initiate a session.
 pub(crate) const MIN_CHALLENGE: StartChallenge = 1;

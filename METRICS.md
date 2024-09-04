@@ -74,3 +74,5 @@ scrape_configs:
 - `hopr_session_sent_error_counts`: Number of HOPR session errors sent to an Entry node, keys: `kind`
 - `hopr_session_established_sessions`: Number of sessions that were successfully established as an Exit node
 - `hopr_session_initiated_sessions`: Number of sessions that were successfully initiated as an Entry node
+- `hopr_session_hoprd_clients`: Number of clients connected at this Entry node, keys: `type`
+- `hopr_session_hoprd_target_connections`: Number of currently active HOPR session target connections from this Exit node, keys: `type`

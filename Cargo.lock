@@ -3854,7 +3854,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-crypto-random"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "generic-array",
  "rand 0.8.5",
@@ -3862,7 +3862,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-crypto-sphinx"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "aes 0.8.4",
  "blake2",
@@ -4132,7 +4132,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-primitive-types"
-version = "0.3.3"
+version = "0.4.0"
 dependencies = [
  "hex",
  "hex-literal",
