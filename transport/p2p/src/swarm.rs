@@ -62,7 +62,7 @@ async fn build_p2p_network(
     let swarm = libp2p::SwarmBuilder::with_existing_identity(me)
         .with_async_std()
         .with_tcp(
-            libp2p::tcp::Config::default(), // .nodelay(true), // Does not work with E2E tests
+            libp2p::tcp::Config::default().nodelay(true),
             libp2p::noise::Config::new,
             move || tcp_upgrade,
         )
@@ -76,7 +76,7 @@ async fn build_p2p_network(
     let swarm = libp2p::SwarmBuilder::with_existing_identity(me)
         .with_tokio()
         .with_tcp(
-            libp2p::tcp::Config::default(), // .nodelay(true), // Does not work with E2E tests
+            libp2p::tcp::Config::default().nodelay(true),
             libp2p::noise::Config::new,
             || tcp_upgrade,
         )
