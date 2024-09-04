@@ -22,6 +22,7 @@ from hoprd_sdk.models import (
     OpenChannelBodyRequest,
     SendMessageBodyRequest,
     SessionClientRequest,
+    SessionCloseClientRequest,
     TagQueryRequest,
     WithdrawBodyRequest,
 )
@@ -37,7 +38,6 @@ def getlogger():
 
 
 log = getlogger()
-
 
 MESSAGE_TAG = 1234
 
@@ -385,15 +385,32 @@ class HoprdAPI:
         _, response = self.__call_api(NetworkApi, "price")
         return int(response.price) if hasattr(response, "price") else None
 
-    async def session_client(self, destination: str, path: str):
+    async def session_client(self, destination: str, path: str, protocol: str, target: str):
         """
         Returns the port of the client session.
         :return: port: int
         """
-        body = SessionClientRequest(destination=destination, path=path, port=0)
+        body = SessionClientRequest(destination=destination, path=path, target=target)
 
-        _, response = self.__call_api(SessionApi, "create_client", body=body)
+        _, response = self.__call_api(SessionApi, "create_client", body=body, protocol=protocol)
         return int(response.port) if hasattr(response, "port") else None
+
+    async def session_list_clients(self, protocol: str):
+        """
+        Returns opened session listeners.
+        :return: sessions: dict
+        """
+        _, response = self.__call_api(SessionApi, "list_clients", protocol=protocol)
+        return response
+
+    async def session_close_client(self, protocol: str, bound_port: int, bound_ip: str = '127.0.0.1'):
+        """
+        Closes a previously opened and bound session
+        """
+        body = SessionCloseClientRequest(listening_ip=bound_ip, port=bound_port)
+
+        status, _ = self.__call_api(SessionApi, "close_client", body=body, protocol=protocol)
+        return status
 
     async def ticket_winn_prob(self):
         """

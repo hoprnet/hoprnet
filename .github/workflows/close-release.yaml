@@ -69,7 +69,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
 
       - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v6
+        uses: peter-evans/create-pull-request@v7
         with:
           token: ${{ secrets.GH_RUNNER_TOKEN }}
           commit-message: "Close release ${{ steps.template.outputs.current_version }}"

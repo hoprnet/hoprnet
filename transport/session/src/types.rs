@@ -1,3 +1,15 @@
+use crate::{errors::TransportSessionError, traits::SendMsg, Capability};
+use futures::{channel::mpsc::UnboundedReceiver, pin_mut, StreamExt};
+use hopr_crypto_types::types::OffchainPublicKey;
+use hopr_internal_types::protocol::{ApplicationData, PAYLOAD_SIZE};
+use hopr_network_types::prelude::state::SessionFeature;
+use hopr_network_types::prelude::{IpOrHost, RoutingOptions};
+use hopr_network_types::session::state::{SessionConfig, SessionSocket};
+use hopr_primitive_types::traits::BytesRepresentable;
+use libp2p_identity::PeerId;
+use std::collections::HashSet;
+use std::fmt::Formatter;
+use std::time::Duration;
 use std::{
     fmt::Display,
     io::{Error, ErrorKind},
@@ -5,17 +17,8 @@ use std::{
     sync::Arc,
     task::Poll,
 };
-
-use futures::{channel::mpsc::UnboundedReceiver, pin_mut, StreamExt};
-use hopr_network_types::session::state::{SessionConfig, SessionSocket};
-use hopr_primitive_types::traits::BytesRepresentable;
-use libp2p_identity::PeerId;
-
-use hopr_crypto_types::types::OffchainPublicKey;
-use hopr_internal_types::protocol::{ApplicationData, PAYLOAD_SIZE};
-use tracing::error;
-
-use crate::{errors::TransportSessionError, traits::SendMsg, Capability, PathOptions};
+use strum::IntoEnumIterator;
+use tracing::{debug, error};
 
 /// Unique ID of a specific session.
 ///
@@ -23,6 +26,7 @@ use crate::{errors::TransportSessionError, traits::SendMsg, Capability, PathOpti
 /// It is a simple combination of an application tag and a peer id that will in future be
 /// replaced by a more robust session id representation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SessionId {
     tag: u16,
     peer: PeerId,
@@ -39,6 +43,11 @@ impl SessionId {
 
     pub fn peer(&self) -> &PeerId {
         &self.peer
+    }
+
+    pub fn with_peer(mut self, peer: PeerId) -> Self {
+        self.peer = peer;
+        self
     }
 }
 
@@ -59,40 +68,110 @@ pub const SESSION_USABLE_MTU_SIZE: usize = PAYLOAD_SIZE
 trait AsyncReadWrite: futures::AsyncWrite + futures::AsyncRead + Send {}
 impl<T: futures::AsyncWrite + futures::AsyncRead + Send> AsyncReadWrite for T {}
 
+/// Defines what should happen with the data at the recipient where the
+/// data from the established session are supposed to be forwarded to some `target`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum SessionTarget {
+    /// Target is running over UDP with the given IP address and port.
+    UdpStream(IpOrHost),
+    /// Target is running over TCP with the given address and port.
+    TcpStream(IpOrHost),
+    /// Target is a service directly at the exit node with a given service ID.
+    ExitNode(u32),
+}
+
+/// Wrapper for incoming [Session] along with other information
+/// extracted from the Start protocol during the session establishment.
+#[derive(Debug)]
+pub struct IncomingSession {
+    /// Actual incoming session.
+    pub session: Session,
+    /// Desired [target](SessionTarget) of the data received over the session.
+    pub target: SessionTarget,
+}
+
+// TODO: missing docs
 pub struct Session {
     id: SessionId,
     inner: Pin<Box<dyn AsyncReadWrite>>,
+    routing_options: RoutingOptions,
+    shutdown_notifier: Option<futures::channel::mpsc::UnboundedSender<SessionId>>,
 }
 
 impl Session {
     pub fn new(
         id: SessionId,
         me: PeerId,
-        options: PathOptions,
-        capabilities: Vec<Capability>,
+        routing_options: RoutingOptions,
+        capabilities: HashSet<Capability>,
         tx: Arc<dyn SendMsg + Send + Sync>,
         rx: UnboundedReceiver<Box<[u8]>>,
+        shutdown_notifier: Option<futures::channel::mpsc::UnboundedSender<SessionId>>,
     ) -> Self {
-        let inner_session = InnerSession::new(id, me, options, tx, rx);
+        let inner_session = InnerSession::new(id, me, routing_options.clone(), tx, rx);
 
-        Self {
-            id,
-            inner: if capabilities.contains(&Capability::Retransmission)
-                || capabilities.contains(&Capability::Segmentation)
-            {
-                Box::pin(SessionSocket::<SESSION_USABLE_MTU_SIZE>::new(
-                    id,
-                    inner_session,
-                    SessionConfig::default(),
-                ))
-            } else {
-                Box::pin(inner_session)
-            },
+        // If we request any capability, we need to use Session protocol
+        if Capability::iter().any(|c| capabilities.contains(&c)) {
+            // In addition, if retransmission is requested,
+            // we need to enable more Session protocol features.
+            let mut enabled_features = HashSet::new();
+            if capabilities.contains(&Capability::Retransmission) {
+                enabled_features.extend([
+                    SessionFeature::AcknowledgeFrames,
+                    SessionFeature::RequestIncompleteFrames,
+                    SessionFeature::RetransmitFrames,
+                ]);
+            }
+
+            // TODO: tweak the default Session protocol config
+            let cfg = SessionConfig {
+                enabled_features,
+                acknowledged_frames_buffer: 10_000,
+                frame_expiration_age: Duration::from_secs(60),
+                rto_base_receiver: Duration::from_secs(20),
+                rto_base_sender: Duration::from_secs(30),
+                ..Default::default()
+            };
+            debug!(
+                session_id = tracing::field::debug(id),
+                "opening new session socket with {cfg:?}"
+            );
+
+            Self {
+                id,
+                inner: Box::pin(SessionSocket::<SESSION_USABLE_MTU_SIZE>::new(id, inner_session, cfg)),
+                routing_options,
+                shutdown_notifier,
+            }
+        } else {
+            // Otherwise, no additional sub protocol is necessary
+            Self {
+                id,
+                inner: Box::pin(inner_session),
+                routing_options,
+                shutdown_notifier,
+            }
         }
     }
 
+    /// ID of this Session.
     pub fn id(&self) -> &SessionId {
         &self.id
+    }
+
+    /// Routing options used to deliver data.
+    pub fn routing_options(&self) -> &RoutingOptions {
+        &self.routing_options
+    }
+}
+
+impl std::fmt::Debug for Session {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Session")
+            .field("id", &self.id)
+            .field("routing_options", &self.routing_options)
+            .finish_non_exhaustive()
     }
 }
 
@@ -128,7 +207,21 @@ impl futures::AsyncWrite for Session {
     fn poll_close(mut self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<std::io::Result<()>> {
         let inner = &mut self.inner;
         pin_mut!(inner);
-        inner.poll_flush(cx)
+        match inner.poll_close(cx) {
+            Poll::Ready(res) => {
+                // Notify about closure if desired
+                if let Some(notifier) = self.shutdown_notifier.take() {
+                    if let Err(err) = notifier.unbounded_send(self.id) {
+                        error!(
+                            session_id = tracing::field::debug(self.id),
+                            "failed to notify session closure: {err}"
+                        );
+                    }
+                }
+                Poll::Ready(res)
+            }
+            Poll::Pending => Poll::Pending,
+        }
     }
 }
 
@@ -138,7 +231,7 @@ type FuturesBuffer = futures::stream::FuturesUnordered<
 pub struct InnerSession {
     id: SessionId,
     me: PeerId,
-    options: PathOptions,
+    options: RoutingOptions,
     rx: UnboundedReceiver<Box<[u8]>>,
     tx: Arc<dyn SendMsg + Send + Sync>,
     tx_bytes: usize,
@@ -151,7 +244,7 @@ impl InnerSession {
     pub fn new(
         id: SessionId,
         me: PeerId,
-        options: PathOptions,
+        options: RoutingOptions,
         tx: Arc<dyn SendMsg + Send + Sync>,
         rx: UnboundedReceiver<Box<[u8]>>,
     ) -> Self {
@@ -257,6 +350,7 @@ impl futures::AsyncWrite for InnerSession {
     }
 
     fn poll_close(self: std::pin::Pin<&mut Self>, _cx: &mut std::task::Context<'_>) -> Poll<std::io::Result<()>> {
+        self.tx.close();
         Poll::Ready(Ok(()))
     }
 }
@@ -294,7 +388,11 @@ impl futures::AsyncRead for InnerSession {
 
                 Poll::Ready(Ok(copy_len))
             }
-            Poll::Ready(None) => Poll::Ready(Err(Error::from(ErrorKind::NotConnected))),
+            Poll::Ready(None) => {
+                self.rx.close();
+                Poll::Ready(Ok(0)) // due to convention, Ok(0) indicates EOF
+            }
+            //Poll::Ready(None) => Poll::Ready(Err(Error::from(ErrorKind::NotConnected))),
             Poll::Pending => Poll::Pending,
         }
     }
@@ -420,7 +518,13 @@ mod tests {
         let (_tx, rx) = futures::channel::mpsc::unbounded();
         let mock = MockSendMsg::new();
 
-        let session = InnerSession::new(id, PeerId::random(), PathOptions::Hops(1), Arc::new(mock), rx);
+        let session = InnerSession::new(
+            id,
+            PeerId::random(),
+            RoutingOptions::Hops(1_u32.try_into().unwrap()),
+            Arc::new(mock),
+            rx,
+        );
 
         assert_eq!(session.id(), &id);
     }
@@ -431,7 +535,13 @@ mod tests {
         let (tx, rx) = futures::channel::mpsc::unbounded();
         let mock = MockSendMsg::new();
 
-        let mut session = InnerSession::new(id, PeerId::random(), PathOptions::Hops(1), Arc::new(mock), rx);
+        let mut session = InnerSession::new(
+            id,
+            PeerId::random(),
+            RoutingOptions::Hops(1_u32.try_into().unwrap()),
+            Arc::new(mock),
+            rx,
+        );
 
         let random_data = hopr_crypto_random::random_bytes::<PAYLOAD_SIZE>()
             .as_ref()
@@ -454,7 +564,13 @@ mod tests {
         let (tx, rx) = futures::channel::mpsc::unbounded();
         let mock = MockSendMsg::new();
 
-        let mut session = InnerSession::new(id, PeerId::random(), PathOptions::Hops(1), Arc::new(mock), rx);
+        let mut session = InnerSession::new(
+            id,
+            PeerId::random(),
+            RoutingOptions::Hops(1_u32.try_into().unwrap()),
+            Arc::new(mock),
+            rx,
+        );
 
         let random_data = hopr_crypto_random::random_bytes::<PAYLOAD_SIZE>()
             .as_ref()
@@ -490,7 +606,7 @@ mod tests {
             .withf(move |data, _peer, options| {
                 let (_peer_id, data) = unwrap_offchain_key(data.plain_text.clone()).expect("Unwrapping should work");
                 assert_eq!(data, b"Hello, world!".to_vec().into_boxed_slice());
-                assert_eq!(options, &PathOptions::Hops(1));
+                assert_eq!(options, &RoutingOptions::Hops(1_u32.try_into().unwrap()));
                 true
             })
             .returning(|_, _, _| Ok(()));
@@ -498,7 +614,7 @@ mod tests {
         let mut session = InnerSession::new(
             id,
             OffchainKeypair::random().public().into(),
-            PathOptions::Hops(1),
+            RoutingOptions::Hops(1_u32.try_into().unwrap()),
             Arc::new(mock),
             rx,
         );
@@ -527,7 +643,7 @@ mod tests {
         let mut session = InnerSession::new(
             id,
             OffchainKeypair::random().public().into(),
-            PathOptions::Hops(1),
+            RoutingOptions::Hops(1_u32.try_into().unwrap()),
             Arc::new(mock),
             rx,
         );

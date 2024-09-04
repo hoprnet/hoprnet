@@ -1,6 +1,8 @@
 //! This crate contains basic types used throughout the entire HOPR codebase.
 //! Types from this crate are not necessarily specific only to HOPR.
 
+/// Contains various size-bounded types
+pub mod bounded;
 /// Enumerates all errors in this crate.
 pub mod errors;
 /// Implements the most primitive types, such as [U256](crate::primitives::U256) or [Address](crate::primitives::Address).
@@ -28,7 +30,9 @@ pub mod rlp {
     }
 
     pub fn decode(data: &[u8]) -> crate::errors::Result<(Box<[u8]>, Duration)> {
-        let mut list = rlp::decode_list::<Vec<u8>>(data);
+        let rlp_data = rlp::Rlp::new(data);
+        let mut list = rlp_data.as_list::<Vec<u8>>().map_err(|_| GeneralError::ParseError)?;
+
         if list.len() != 2 {
             return Err(GeneralError::ParseError);
         }

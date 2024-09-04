@@ -2,7 +2,7 @@ use std::sync::{Arc, OnceLock};
 
 use async_lock::RwLock;
 use libp2p::{Multiaddr, PeerId};
-use tracing::{debug, trace};
+use tracing::trace;
 
 use chain_types::chain_events::NetworkRegistryStatus;
 use core_path::{
@@ -14,8 +14,9 @@ use hopr_db_sql::HoprDbAllOperations;
 use hopr_internal_types::protocol::ApplicationData;
 use hopr_primitive_types::primitives::Address;
 use hopr_transport_protocol::msg::processor::MsgSender;
-use hopr_transport_session::{errors::TransportSessionError, traits::SendMsg, PathOptions};
+use hopr_transport_session::{errors::TransportSessionError, traits::SendMsg};
 
+use hopr_network_types::prelude::RoutingOptions;
 #[cfg(all(feature = "prometheus", not(test)))]
 use {core_path::path::Path, hopr_metrics::metrics::SimpleHistogram};
 
@@ -86,20 +87,26 @@ where
     pub(crate) async fn resolve_path(
         &self,
         destination: PeerId,
-        options: PathOptions,
+        options: RoutingOptions,
     ) -> crate::errors::Result<TransportPath> {
         let path = match options {
-            PathOptions::IntermediatePath(mut path) => {
-                path.push(destination);
+            RoutingOptions::IntermediatePath(path) => {
+                let complete_path = Vec::from_iter(path.into_iter().chain([destination]));
 
-                debug!(full_path = format!("{path:?}"), "Resolved a specific path");
+                trace!(full_path = format!("{complete_path:?}"), "Resolved a specific path");
 
                 let cg = self.channel_graph.read().await;
 
-                TransportPath::resolve(path, &self.db, &cg).await.map(|(p, _)| p)?
+                TransportPath::resolve(complete_path, &self.db, &cg)
+                    .await
+                    .map(|(p, _)| p)?
             }
-            PathOptions::Hops(hops) => {
-                debug!(hops, "Resolving a path using hop count");
+            RoutingOptions::Hops(hops) if u32::from(hops) == 0 => {
+                trace!(hops = 0, "Resolved zero-hop path to {destination}");
+                TransportPath::direct(destination)
+            }
+            RoutingOptions::Hops(hops) => {
+                trace!(hops = tracing::field::display(hops), "Resolving a path using hop count");
 
                 let pk = OffchainPublicKey::try_from(destination)?;
 
@@ -113,7 +120,7 @@ where
                     let target_chain_key: Address = chain_key.try_into()?;
                     let cp = {
                         let cg = self.channel_graph.read().await;
-                        selector.select_path(&cg, cg.my_address(), target_chain_key, hops as usize, hops as usize)?
+                        selector.select_path(&cg, cg.my_address(), target_chain_key, hops.into(), hops.into())?
                     };
 
                     cp.into_path(&self.db, target_chain_key).await?
@@ -137,19 +144,25 @@ pub(crate) struct MessageSender<T>
 where
     T: HoprDbAllOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
 {
-    process_packet_send: Arc<OnceLock<MsgSender>>,
-    resolver: PathPlanner<T>,
+    pub process_packet_send: Arc<OnceLock<MsgSender>>,
+    pub resolver: PathPlanner<T>,
+    pub closed: Arc<OnceLock<()>>,
 }
 
 impl<T> MessageSender<T>
 where
     T: HoprDbAllOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
 {
-    pub(crate) fn new(process_packet_send: Arc<OnceLock<MsgSender>>, resolver: PathPlanner<T>) -> Self {
+    pub fn new(process_packet_send: Arc<OnceLock<MsgSender>>, resolver: PathPlanner<T>) -> Self {
         Self {
             process_packet_send,
             resolver,
+            closed: Default::default(),
         }
+    }
+
+    pub fn can_send(&self) -> bool {
+        self.process_packet_send.get().is_some() && self.closed.get().is_none()
     }
 }
 
@@ -163,8 +176,12 @@ where
         &self,
         data: ApplicationData,
         destination: PeerId,
-        options: PathOptions,
+        options: RoutingOptions,
     ) -> std::result::Result<(), TransportSessionError> {
+        if self.closed.get().is_some() {
+            return Err(TransportSessionError::Closed);
+        }
+
         data.application_tag
             .is_some_and(|application_tag| application_tag < RESERVED_SESSION_TAG_UPPER_LIMIT)
             .then_some(())
@@ -190,5 +207,9 @@ where
         trace!("Packet sent to the outgoing queue");
 
         Ok(())
+    }
+
+    fn close(&self) {
+        let _ = self.closed.set(());
     }
 }

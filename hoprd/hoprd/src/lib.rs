@@ -86,47 +86,151 @@
 //!           Print version
 //! ```
 
+use hopr_lib::errors::HoprLibError;
+use hopr_network_types::prelude::ForeignDataMode;
+use hopr_network_types::utils::copy_duplex;
+
 pub mod cli;
 pub mod config;
 pub mod errors;
 
-const LISTENING_SESSION_RETRANSMISSION_SERVER_PORT: u16 = 4677;
+#[cfg(all(feature = "prometheus", not(test)))]
+lazy_static::lazy_static! {
+    static ref METRIC_ACTIVE_TARGETS: hopr_metrics::MultiGauge = hopr_metrics::MultiGauge::new(
+        "hopr_session_hoprd_target_connections",
+        "Number of currently active HOPR session target connections on this Exit node",
+        &["type"]
+    ).unwrap();
+}
 
 #[derive(Debug, Clone)]
-pub struct HoprServerReactor {}
+pub struct HoprServerIpForwardingReactor;
 
 #[hopr_lib::async_trait]
-impl hopr_lib::HoprSessionServerActionable for HoprServerReactor {
+impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
     #[tracing::instrument(level = "debug", skip(self, session))]
-    async fn process(&self, session: hopr_lib::HoprSession) -> hopr_lib::errors::Result<()> {
-        let server_port = LISTENING_SESSION_RETRANSMISSION_SERVER_PORT;
+    async fn process(&self, mut session: hopr_lib::HoprIncomingSession) -> hopr_lib::errors::Result<()> {
+        let session_id = *session.session.id();
+        match session.target {
+            hopr_lib::SessionTarget::UdpStream(udp_target) => {
+                tracing::debug!(
+                    session_id = debug(session_id),
+                    "binding socket to the UDP server {udp_target}..."
+                );
 
-        tracing::debug!("Creating a connection to the TCP server on port 127.0.0.1:{server_port}...");
-        let mut tcp_bridge = tokio::net::TcpStream::connect(std::net::SocketAddr::new(
-            std::net::IpAddr::V4(std::net::Ipv4Addr::new(127, 0, 0, 1)),
-            server_port,
-        ))
-        .await
-        .map_err(|e| {
-            hopr_lib::errors::HoprLibError::GeneralError(format!(
-                "Could not bridge the incoming session to port {server_port}: {e}"
-            ))
-        })?;
+                // In UDP, it is impossible to determine if the target is viable,
+                // so we just take the first resolved address.
+                let resolved_udp_target = udp_target
+                    .clone()
+                    .resolve()
+                    .await
+                    .map_err(|e| HoprLibError::GeneralError(format!("failed to resolve DNS name {udp_target}: {e}")))?
+                    .first()
+                    .ok_or(HoprLibError::GeneralError(format!(
+                        "failed to resolve DNS name {udp_target}"
+                    )))?
+                    .to_owned();
+                tracing::debug!(
+                    session_id = debug(session_id),
+                    "UDP target {udp_target} resolved to {resolved_udp_target}"
+                );
 
-        tcp_bridge.set_nodelay(true).map_err(|e| {
-            hopr_lib::errors::HoprLibError::GeneralError(format!(
-                "Could not set the TCP_NODELAY option for the bridged session to port {server_port}: {e}"
-            ))
-        })?;
+                let udp_bridge = hopr_network_types::udp::ConnectedUdpStream::bind(("0.0.0.0", 0))
+                    .await
+                    .and_then(|s| s.with_counterparty(resolved_udp_target))
+                    .map(|s| s.with_foreign_data_mode(ForeignDataMode::Error))
+                    .map_err(|e| {
+                        HoprLibError::GeneralError(format!(
+                            "could not bridge the incoming session to {udp_target}: {e}"
+                        ))
+                    })?;
 
-        tracing::debug!("Bridging the session to the TCP server...");
-        tokio::task::spawn(async move {
-            match tokio::io::copy_bidirectional_with_sizes(&mut tokio_util::compat::FuturesAsyncReadCompatExt::compat(session), &mut tcp_bridge, hopr_lib::SESSION_USABLE_MTU_SIZE, hopr_lib::SESSION_USABLE_MTU_SIZE).await {
-                Ok(bound_stream_finished) => tracing::info!("Server bridged session through TCP port {server_port} ended with {bound_stream_finished:?} bytes transferred in both directions."),
-                Err(e) => tracing::error!("The TCP server stream (port {server_port}) is closed: {e:?}")
+                tracing::debug!(
+                    session_id = debug(session_id),
+                    "bridging the session to the UDP server {udp_target} ..."
+                );
+                tokio::task::spawn(async move {
+                    #[cfg(all(feature = "prometheus", not(test)))]
+                    METRIC_ACTIVE_TARGETS.increment(&["tcp"], 1.0);
+
+                    match copy_duplex(&mut session.session, &mut tokio_util::compat::TokioAsyncReadCompatExt::compat(udp_bridge), hopr_lib::SESSION_USABLE_MTU_SIZE, hopr_lib::SESSION_USABLE_MTU_SIZE).await {
+                        Ok(bound_stream_finished) => tracing::info!(
+                            session_id = debug(session_id),
+                            "server bridged session through UDP {udp_target} ended with {bound_stream_finished:?} bytes transferred in both directions."
+                        ),
+                        Err(e) => tracing::error!(session_id = debug(session_id),
+                            "UDP server stream ({udp_target}) is closed: {e:?}"
+                        )
+                    }
+
+                    #[cfg(all(feature = "prometheus", not(test)))]
+                    METRIC_ACTIVE_TARGETS.decrement(&["tcp"], 1.0);
+                });
+
+                Ok(())
             }
-        });
+            hopr_lib::SessionTarget::TcpStream(tcp_target) => {
+                tracing::debug!(
+                    session_id = debug(session_id),
+                    "creating a connection to the TCP server {tcp_target}..."
+                );
 
-        Ok(())
+                // TCP is able to determine which of the resolved multiple addresses is viable,
+                // and therefore we can pass all of them.
+                let resolved_tcp_targets =
+                    tcp_target.clone().resolve().await.map_err(|e| {
+                        HoprLibError::GeneralError(format!("failed to resolve DNS name {tcp_target}: {e}"))
+                    })?;
+                tracing::debug!(
+                    session_id = debug(session_id),
+                    "TCP target {tcp_target} resolved to {resolved_tcp_targets:?}"
+                );
+
+                // TODO: make TCP connection retry strategy configurable either by the server or the client
+                let strategy = tokio_retry::strategy::FixedInterval::from_millis(1500).take(15);
+
+                let tcp_bridge = tokio_retry::Retry::spawn(strategy, || {
+                    tokio::net::TcpStream::connect(resolved_tcp_targets.as_slice())
+                })
+                .await
+                .map_err(|e| {
+                    HoprLibError::GeneralError(format!("could not bridge the incoming session to {tcp_target}: {e}"))
+                })?;
+
+                tcp_bridge.set_nodelay(true).map_err(|e| {
+                    HoprLibError::GeneralError(format!(
+                        "could not set the TCP_NODELAY option for the bridged session to {tcp_target}: {e}",
+                    ))
+                })?;
+
+                tracing::debug!(
+                    session_id = debug(session_id),
+                    "bridging the session to the TCP server {tcp_target} ..."
+                );
+                tokio::task::spawn(async move {
+                    #[cfg(all(feature = "prometheus", not(test)))]
+                    METRIC_ACTIVE_TARGETS.increment(&["udp"], 1.0);
+
+                    match copy_duplex(&mut session.session, &mut tokio_util::compat::TokioAsyncReadCompatExt::compat(tcp_bridge), hopr_lib::SESSION_USABLE_MTU_SIZE, hopr_lib::SESSION_USABLE_MTU_SIZE).await {
+                        Ok(bound_stream_finished) => tracing::info!(
+                            session_id = debug(session_id),
+                            "server bridged session through TCP {tcp_target} ended with {bound_stream_finished:?} bytes transferred in both directions."
+                        ),
+                        Err(e) => tracing::error!(
+                            session_id = debug(session_id),
+                            "TCP server stream ({tcp_target}) is closed: {e:?}"
+                        )
+                    }
+
+                    #[cfg(all(feature = "prometheus", not(test)))]
+                    METRIC_ACTIVE_TARGETS.decrement(&["udp"], 1.0);
+                });
+
+                Ok(())
+            }
+            hopr_lib::SessionTarget::ExitNode(_) => Err(HoprLibError::GeneralError(
+                "server does not support internal session processing".into(),
+            )),
+        }
     }
 }

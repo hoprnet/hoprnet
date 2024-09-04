@@ -19,7 +19,7 @@ use validator::Validate;
 
 use hopr_lib::{
     errors::{HoprLibError, HoprStatusError},
-    ApplicationData, AsUnixTimestamp, PathOptions, RESERVED_TAG_UPPER_LIMIT,
+    ApplicationData, AsUnixTimestamp, RoutingOptions, RESERVED_TAG_UPPER_LIMIT,
 };
 
 use crate::{ApiErrorStatus, InternalState, BASE_PATH};
@@ -116,16 +116,16 @@ pub(crate) struct GetMessageBodyRequest {
 pub(super) async fn send_message(
     State(state): State<Arc<InternalState>>,
     Json(args): Json<SendMessageBodyRequest>,
-) -> impl IntoResponse {
+) -> Result<impl IntoResponse, impl IntoResponse> {
     let hopr = state.hopr.clone();
 
-    if let Err(e) = args.validate() {
-        return (
+    args.validate().map_err(|e| {
+        (
             StatusCode::UNPROCESSABLE_ENTITY,
             ApiErrorStatus::UnknownFailure(e.to_string()),
         )
-            .into_response();
-    }
+            .into_response()
+    })?;
 
     // Use the message encoder, if any
     let msg_body = state
@@ -135,25 +135,43 @@ pub(super) async fn send_message(
         .unwrap_or_else(|| args.body.into_boxed_slice());
 
     let options = if let Some(intermediate_path) = args.path {
-        PathOptions::IntermediatePath(intermediate_path)
+        RoutingOptions::IntermediatePath(intermediate_path.try_into().map_err(|_| {
+            (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                ApiErrorStatus::UnknownFailure(format!(
+                    "Intermediate path cannot be longer than {}",
+                    RoutingOptions::MAX_INTERMEDIATE_HOPS
+                )),
+            )
+                .into_response()
+        })?)
     } else if let Some(hops) = args.hops {
-        PathOptions::Hops(hops)
+        RoutingOptions::Hops((hops as u8).try_into().map_err(|_| {
+            (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                ApiErrorStatus::UnknownFailure(format!(
+                    "Number of hops cannot be larger than {}",
+                    RoutingOptions::MAX_INTERMEDIATE_HOPS
+                )),
+            )
+                .into_response()
+        })?)
     } else {
-        return (
+        return Err((
             StatusCode::UNPROCESSABLE_ENTITY,
             ApiErrorStatus::UnknownFailure("One of either hops or intermediate path must be specified".to_string()),
         )
-            .into_response();
+            .into_response());
     };
 
     let timestamp = std::time::SystemTime::now().as_unix_timestamp();
 
     match hopr.send_message(msg_body, args.peer_id, options, Some(args.tag)).await {
-        Ok(_) => (StatusCode::ACCEPTED, Json(SendMessageResponse { timestamp })).into_response(),
+        Ok(_) => Ok((StatusCode::ACCEPTED, Json(SendMessageResponse { timestamp })).into_response()),
         Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(_, _))) => {
-            (StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response()
+            Err((StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response())
         }
-        Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
+        Err(e) => Err((StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response()),
     }
 }
 
@@ -291,9 +309,17 @@ async fn handle_send_message(input: &str, state: Arc<InternalState>) -> Result<(
                 .unwrap_or_else(|| msg.body.into_boxed_slice());
 
             let options = if let Some(intermediate_path) = msg.path {
-                PathOptions::IntermediatePath(intermediate_path)
+                RoutingOptions::IntermediatePath(
+                    intermediate_path
+                        .try_into()
+                        .map_err(|_| "invalid number of intermediate hops".to_string())?,
+                )
             } else if let Some(hops) = msg.hops {
-                PathOptions::Hops(hops)
+                RoutingOptions::Hops(
+                    (hops as u8)
+                        .try_into()
+                        .map_err(|_| "invalid number of intermediate hops".to_string())?,
+                )
             } else {
                 return Err("one of hops or intermediate path must be provided".to_string());
             };

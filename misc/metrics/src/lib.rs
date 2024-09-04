@@ -77,3 +77,5 @@
 
 /// Contains definitions of metric types.
 pub mod metrics;
+
+pub use crate::metrics::*;

@@ -61,7 +61,11 @@ async fn build_p2p_network(
     #[cfg(feature = "runtime-async-std")]
     let swarm = libp2p::SwarmBuilder::with_existing_identity(me)
         .with_async_std()
-        .with_tcp(Default::default(), libp2p::noise::Config::new, move || tcp_upgrade)
+        .with_tcp(
+            libp2p::tcp::Config::default().nodelay(true),
+            libp2p::noise::Config::new,
+            move || tcp_upgrade,
+        )
         .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?
         .with_quic()
         .with_dns();
@@ -71,7 +75,11 @@ async fn build_p2p_network(
     #[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
     let swarm = libp2p::SwarmBuilder::with_existing_identity(me)
         .with_tokio()
-        .with_tcp(Default::default(), libp2p::noise::Config::new, || tcp_upgrade)
+        .with_tcp(
+            libp2p::tcp::Config::default().nodelay(true),
+            libp2p::noise::Config::new,
+            || tcp_upgrade,
+        )
         .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?
         .with_quic()
         .with_dns();
@@ -306,13 +314,13 @@ impl HoprSwarmWithProcessors {
                                     };
 
                                     if swarm.behaviour_mut().msg.send_response(channel, ()).is_err() {
-                                        error!("transport protocol - p2p - msg - failed to send a response to '{peer}'");
+                                        error!(peer = %peer, request_id = %request_id, "Failed to confirm receiving a message, likely a timeout");
                                     };
                                 },
                                 libp2p::request_response::Message::<Box<[u8]>, ()>::Response {
                                     request_id, ..
                                 } => {
-                                    error!(peer = %peer, request_id = %request_id, "Failed to confirm receiving a message, likely a timeout");
+                                    trace!(peer = %peer, request_id = %request_id, "Message reception confirmed");
                                 }
                             }
                             libp2p::request_response::Event::<Box<[u8]>, ()>::OutboundFailure {
@@ -450,7 +458,7 @@ impl HoprSwarmWithProcessors {
                                 peer, request_id, error,
                             } => {
                                 active_pings.invalidate(&request_id).await;
-                                error!(peer = %peer, request_id = %request_id, "Failed to send a Pong reply: {error}");
+                                error!(peer = %peer, request_id = %request_id, "Failed heartbeat protocol on outbound: {error}");
                             },
                             libp2p::request_response::Event::<Ping,Pong>::InboundFailure {
                                 peer, request_id, error
@@ -472,8 +480,8 @@ impl HoprSwarmWithProcessors {
                                 info!(peer = %peer, multiaddress = %multiaddress, "New record");
                                 swarm.add_peer_address(peer, multiaddress.clone());
 
-                                if let Err(e) = swarm.dial(multiaddress.clone()) {
-                                    error!(peer = %peer, address = %multiaddress,  "Failed to dial the peer: {e}");
+                                if let Err(e) = swarm.dial(peer) {
+                                    error!(peer = %peer, address = %multiaddress, "Failed to dial the peer: {e}");
                                 }
                             },
                         }
