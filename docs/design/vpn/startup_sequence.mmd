@@ -1,0 +1,29 @@
+sequenceDiagram
+    participant gnosisvpn as Gnosis VPN App
+    participant wg as Wireguard Client
+    participant hoprd as HOPRd Node
+    participant ex_hoprd as HOPRd Exit Node
+    participant ex_wg as Wireguard Server
+    participant ex_gnosisvpn as Gnosis VPN Exit App
+
+    rect rgb(191, 223, 255)
+    gnosisvpn->>+ex_gnosisvpn: setup_wg_session_req[wg_client_pubkey,wg_client_ip,wg_client_port]
+    gnosisvpn->>hoprd: send request message
+    hoprd->>ex_hoprd: HOPR packet(s)
+    ex_hoprd->>ex_gnosisvpn: deliver message
+    ex_gnosisvpn->>ex_wg: configure_peer[wg_client_pubkey,wg_client_ip,wg_client_port]
+    ex_gnosisvpn->>ex_hoprd: send response message
+    ex_hoprd->>hoprd: HOPR packet(s)
+    hoprd->>gnosisvpn: deliver message
+    ex_gnosisvpn->>-gnosisvpn: setup_wg_session_resp[wg_server_pubkey,wg_server_ip,wg_server_port]
+    end
+
+    rect rgb(191, 223, 255)
+    gnosisvpn->>+hoprd: create_client[udp,wg_server_ip,wg_server_port]
+    hoprd->>ex_hoprd: START sub-protocol OPEN
+    ex_hoprd->>hoprd: START sub-protocol OK
+    hoprd->>-gnosisvpn: create_client[tunnel_ip,tunnel_port] OK
+    end
+
+    gnosisvpn->>wg: configure_peer[wg_server_pubkey,tunnel_ip,tunnel_port]
+
