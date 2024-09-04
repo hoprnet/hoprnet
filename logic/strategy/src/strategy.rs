@@ -105,6 +105,13 @@ pub struct MultiStrategyConfig {
     #[serde(default = "just_true")]
     pub allow_recursive: bool,
 
+    /// Execution interval of the configured strategies in seconds.
+    ///
+    /// Default is 60.
+    #[default = 60]
+    #[serde(default)]
+    pub execution_interval: u64,
+
     /// Configuration of individual sub-strategies.
     ///
     /// Default is empty, which makes the `MultiStrategy` behave as passive.
@@ -282,6 +289,7 @@ mod tests {
         let cfg = MultiStrategyConfig {
             on_fail_continue: true,
             allow_recursive: true,
+            execution_interval: 1,
             strategies: Vec::new(),
         };
 
@@ -308,6 +316,7 @@ mod tests {
         let cfg = MultiStrategyConfig {
             on_fail_continue: false,
             allow_recursive: true,
+            execution_interval: 1,
             strategies: Vec::new(),
         };
 

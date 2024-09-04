@@ -22,7 +22,6 @@
     foundry.inputs.nixpkgs.follows = "nixpkgs";
     pre-commit.inputs.nixpkgs-stable.follows = "nixpkgs";
     pre-commit.inputs.nixpkgs.follows = "nixpkgs";
-    rust-overlay.inputs.flake-utils.follows = "flake-utils";
     rust-overlay.inputs.nixpkgs.follows = "nixpkgs";
     solc.inputs.flake-utils.follows = "flake-utils";
     solc.inputs.nixpkgs.follows = "nixpkgs";
@@ -162,89 +161,48 @@
             CARGO_PROFILE = "dev";
           });
 
+          profileDeps = with pkgs; [
+            gdb
+            # FIXME: heaptrack would be useful, but it adds 700MB to the image size (unpacked)
+            # lldb
+            rust-bin.stable.latest.minimal
+            valgrind
+          ];
           # FIXME: the docker image built is not working on macOS arm platforms
           # and will simply lead to a non-working image. Likely, some form of
           # cross-compilation or distributed build is required.
-          hoprd-docker = pkgs.dockerTools.buildLayeredImage {
+          hoprdDockerArgs = package: deps: {
+            inherit pkgs;
             name = "hoprd";
-            tag = "latest";
-            # breaks binary reproducibility, but makes usage easier
-            created = "now";
-            contents = with pkgs; [
-              hoprd
-              iana-etc
-              cacert
-              bash
-              findutils
-              coreutils
+            extraContents = [
+              package
+            ] ++ deps;
+            Entrypoint = [
+              "/bin/hoprd"
             ];
-            config = {
-              Entrypoint = [
-                "/bin/hoprd"
-              ];
-              Env = [
-                "NO_COLOR=true" # suppress colored log output
-                # "RUST_LOG=info"   # 'info' level is set by default with some spamming components set to override
-                "RUST_BACKTRACE=full"
-              ];
-            };
           };
-          hopli-docker = pkgs.dockerTools.buildLayeredImage {
+          hoprd-docker = import ./nix/docker-builder.nix (hoprdDockerArgs hoprd [ ]);
+          hoprd-debug-docker = import ./nix/docker-builder.nix (hoprdDockerArgs hoprd-debug [ ]);
+          hoprd-profile-docker = import ./nix/docker-builder.nix (hoprdDockerArgs hoprd profileDeps);
+
+          hopliDockerArgs = package: deps: {
+            inherit pkgs;
             name = "hopli";
-            tag = "latest";
-            # breaks binary reproducibility, but makes usage easier
-            created = "now";
-            contents = with pkgs; [
-              hopli
-              iana-etc
-              cacert
-              bash
-              findutils
-              coreutils
+            extraContents = [
+              package
+            ] ++ deps;
+            Entrypoint = [
+              "/bin/hopli"
             ];
-            config = {
-              Entrypoint = [
-                "/bin/hopli"
-              ];
-              Env = [
-                # "RUST_LOG=info"   # 'info' level is set by default with some spamming components set to override
-                "RUST_BACKTRACE=full"
-                "NO_COLOR=true" # suppress colored log output
-                "ETHERSCAN_API_KEY=placeholder"
-                "HOPLI_CONTRACTS_ROOT=${hopli}/ethereum/contracts"
-              ];
-            };
-          };
-          hoprd-debug-docker = pkgs.dockerTools.buildLayeredImage {
-            name = "hoprd-debug";
-            tag = "latest";
-            # breaks binary reproducibility, but makes usage easier
-            created = "now";
-            # size ends up being ca. 450MB packed, 1.3GB unpacked
-            contents = with pkgs; [
-              cacert
-              gdb
-              # FIXME: would be useful, but 700MB larger image size (unpacked)
-              # heaptrack
-              hoprd
-              iana-etc
-              bash
-              # FIXME: would be useful, but 1300MB larger image size (unpacked)
-              # lldb
-              rust-bin.stable.latest.minimal
-              valgrind
+            env = [
+              "ETHERSCAN_API_KEY=placeholder"
+              "HOPLI_CONTRACTS_ROOT=${package}/ethereum/contracts"
             ];
-            config = {
-              Entrypoint = [
-                "/bin/hoprd"
-              ];
-              Env = [
-                "NO_COLOR=true" # suppress colored log output
-                "RUST_LOG=debug,libp2p_mplex=info,multistream_select=info,isahc::handler=error,isahc::client=error"
-                "RUST_BACKTRACE=full"
-              ];
-            };
           };
+          hopli-docker = import ./nix/docker-builder.nix (hopliDockerArgs hopli [ ]);
+          hopli-debug-docker = import ./nix/docker-builder.nix (hopliDockerArgs hopli-debug [ ]);
+          hopli-profile-docker = import ./nix/docker-builder.nix (hopliDockerArgs hopli profileDeps);
+
           anvilSrc = fs.toSource {
             root = ./.;
             fileset = fs.unions [
@@ -292,8 +250,17 @@
           hoprd-debug-docker-build-and-upload = flake-utils.lib.mkApp {
             drv = dockerImageUploadScript hoprd-debug-docker;
           };
+          hoprd-profile-docker-build-and-upload = flake-utils.lib.mkApp {
+            drv = dockerImageUploadScript hoprd-profile-docker;
+          };
           hopli-docker-build-and-upload = flake-utils.lib.mkApp {
             drv = dockerImageUploadScript hopli-docker;
+          };
+          hopli-debug-docker-build-and-upload = flake-utils.lib.mkApp {
+            drv = dockerImageUploadScript hopli-debug-docker;
+          };
+          hopli-profile-docker-build-and-upload = flake-utils.lib.mkApp {
+            drv = dockerImageUploadScript hopli-profile-docker;
           };
           docs = rust-builder-local-nightly.callPackage ./nix/rust-package.nix (hoprdBuildArgs // {
             buildDocs = true;
@@ -314,8 +281,8 @@
             buildInputs = with pkgs; [
               foundry-bin
               solcDefault
-              hopli
-              hoprd
+              hopli-debug
+              hoprd-debug
               python39
             ];
             buildPhase = ''
@@ -347,7 +314,7 @@
             tools = pkgs;
           };
           defaultDevShell = import ./nix/shell.nix { inherit pkgs config crane pre-commit-check solcDefault; };
-          smoketestsDevShell = import ./nix/shell.nix { inherit pkgs config crane pre-commit-check solcDefault; extraPackages = [ hoprd hopli ]; };
+          smoketestsDevShell = import ./nix/shell.nix { inherit pkgs config crane pre-commit-check solcDefault; extraPackages = [ hoprd-debug hopli-debug ]; };
           docsDevShell = import ./nix/shell.nix { inherit pkgs config crane pre-commit-check solcDefault; extraPackages = with pkgs; [ html-tidy pandoc ]; useRustNightly = true; };
           run-check = flake-utils.lib.mkApp {
             drv = pkgs.writeShellScriptBin "run-check" ''
@@ -433,14 +400,17 @@
           apps = {
             inherit hoprd-docker-build-and-upload;
             inherit hoprd-debug-docker-build-and-upload;
+            inherit hoprd-profile-docker-build-and-upload;
             inherit hopli-docker-build-and-upload;
+            inherit hopli-debug-docker-build-and-upload;
+            inherit hopli-profile-docker-build-and-upload;
             inherit update-github-labels;
             check = run-check;
           };
 
           packages = {
-            inherit hoprd hoprd-debug hoprd-test hoprd-docker hoprd-debug-docker;
-            inherit hopli hopli-debug hopli-test hopli-docker;
+            inherit hoprd hoprd-debug hoprd-test hoprd-docker hoprd-debug-docker hoprd-profile-docker;
+            inherit hopli hopli-debug hopli-test hopli-docker hopli-debug-docker hopli-profile-docker;
             inherit anvil-docker;
             inherit smoke-tests docs;
             inherit pre-commit-check;
