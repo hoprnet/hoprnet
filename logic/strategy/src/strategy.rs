@@ -112,7 +112,7 @@ pub struct MultiStrategyConfig {
 
     /// Execution interval of the configured strategies in seconds.
     ///
-    /// Default is 60.
+    /// Default is 60, minimum is 5.
     #[default = 60]
     #[serde(default = "sixty")]
     #[validate(range(min = 5))]
