@@ -25,6 +25,7 @@
 //!     - approve HOPR tokens of the Safe proxy to be transferred by the new Channels contract
 //!     - Use the manager wallet to add nodes and Safes to the Network Registry contract of the new network.
 //! - [SafeModuleSubcommands::Debug] goes through a series of checks to debug the setup of a node and safe.
+//!
 //! It checks the following:
 //!     - node xDAI balance
 //!     - If node has been included on Network Registry
@@ -35,6 +36,7 @@
 //!     - if node is included in the module
 //!     - Get all the targets of the safe (then check if channel and announcement are there)
 //!     - Get the owner of the module
+//!
 //! You need to enable the INFO level of the tracing logger to see the output of the debug command.
 //!
 //! Some sample commands
@@ -612,8 +614,10 @@ impl SafeModuleSubcommands {
         };
 
         // parse safe and module addresses
-        let safe_addr = H160::from_str(&safe_address).unwrap();
-        let module_addr = H160::from_str(&module_address).unwrap();
+        let safe_addr = H160::from_str(&safe_address)
+            .map_err(|_| HelperErrors::InvalidAddress(format!("Cannot parse safe address {:?}", safe_address)))?;
+        let module_addr = H160::from_str(&module_address)
+            .map_err(|_| HelperErrors::InvalidAddress(format!("Cannot parse module address {:?}", module_address)))?;
 
         // read private key
         let signer_private_key = private_key.read_default()?;
@@ -699,8 +703,10 @@ impl SafeModuleSubcommands {
         node_eth_addresses.extend(local_identity.to_addresses().unwrap().into_iter().map(H160::from));
 
         // parse safe and module addresses
-        let safe_addr = H160::from_str(&safe_address).unwrap();
-        let module_addr = H160::from_str(&module_address).unwrap();
+        let safe_addr = H160::from_str(&safe_address)
+            .map_err(|_| HelperErrors::InvalidAddress(format!("Cannot parse safe address {:?}", safe_address)))?;
+        let module_addr = H160::from_str(&module_address)
+            .map_err(|_| HelperErrors::InvalidAddress(format!("Cannot parse module address {:?}", module_address)))?;
 
         // get RPC provider for the given network and environment
         let rpc_provider = network_provider.get_provider_without_signer().await?;

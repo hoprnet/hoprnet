@@ -198,8 +198,8 @@ impl ArgEnvReader<ChainKeypair, String> for PrivateKeyArgs {
 
         let decoded_key = hex::decode(priv_key_without_prefix)
             .map_err(|e| HelperErrors::UnableToReadPrivateKey(format!("Failed to decode private key: {:?}", e)))?;
-        Ok(ChainKeypair::from_secret(&decoded_key)
-            .map_err(|e| HelperErrors::UnableToReadPrivateKey(format!("Failed to create keypair: {:?}", e)))?)
+        ChainKeypair::from_secret(&decoded_key)
+            .map_err(|e| HelperErrors::UnableToReadPrivateKey(format!("Failed to create keypair: {:?}", e)))
     }
 
     /// Read the default private key and return an address string
@@ -254,8 +254,8 @@ impl ArgEnvReader<ChainKeypair, String> for ManagerPrivateKeyArgs {
         let priv_key_without_prefix = pri_key.strip_prefix("0x").unwrap_or(&pri_key).to_string();
         let decoded_key = hex::decode(priv_key_without_prefix)
             .map_err(|e| HelperErrors::UnableToReadPrivateKey(format!("Failed to decode private key: {:?}", e)))?;
-        Ok(ChainKeypair::from_secret(&decoded_key)
-            .map_err(|e| HelperErrors::UnableToReadPrivateKey(format!("Failed to create keypair: {:?}", e)))?)
+        ChainKeypair::from_secret(&decoded_key)
+            .map_err(|e| HelperErrors::UnableToReadPrivateKey(format!("Failed to create keypair: {:?}", e)))
     }
 
     /// Read the default private key and return an address string

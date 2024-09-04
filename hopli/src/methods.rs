@@ -1428,7 +1428,7 @@ pub async fn debug_node_safe_module_setup_main<M: Middleware>(
     info!(
         "module owner: {:?} same as safe address: {:?}",
         module_owner,
-        module_owner.eq(&safe_address)
+        module_owner.eq(safe_address)
     );
     Ok(())
 }

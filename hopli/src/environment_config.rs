@@ -94,12 +94,12 @@ impl NetworkProviderArgs {
     /// Get the NetworkDetail (contract addresses, environment type) from network names
     pub fn get_network_details_from_name(&self) -> Result<NetworkDetail, HelperErrors> {
         // read `contracts-addresses.json` at make_root_dir_path
-        let contract_environment_config_path = self
+        let contract_root = self
             .contracts_root
-            .as_ref()
-            .map_or_else(|| std::env::current_dir().unwrap(), |p| PathBuf::from(OsStr::new(&p)))
             .to_owned()
-            .join("contracts-addresses.json");
+            .unwrap_or(NetworkProviderArgs::default().contracts_root.unwrap());
+        let contract_environment_config_path =
+            PathBuf::from(OsStr::new(&contract_root)).join("contracts-addresses.json");
 
         let file_read =
             std::fs::read_to_string(contract_environment_config_path).map_err(HelperErrors::UnableToReadFromPath)?;
@@ -310,6 +310,28 @@ mod tests {
 
         let provider = network_provider_args
             .get_provider_with_signer(&chain_key)
+            .await
+            .unwrap();
+
+        let chain_id = provider.get_chainid().await.unwrap();
+        assert_eq!(chain_id, anvil.chain_id().into());
+    }
+
+    async fn test_default_contracts_root() {
+        // create an identity
+        let chain_key = ChainKeypair::random();
+
+        // launch local anvil instance
+        let anvil = create_anvil_at_port(false);
+
+        let network_provider_args = NetworkProviderArgs {
+            network: "anvil-localhost".into(),
+            contracts_root: None,
+            provider_url: anvil.endpoint().into(),
+        };
+
+        let provider = network_provider_args
+            .get_network_details_from_name(&chain_key)
             .await
             .unwrap();
 
