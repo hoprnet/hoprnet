@@ -1,4 +1,4 @@
-use futures::{AsyncRead, AsyncWrite, Stream};
+use futures::{AsyncRead, Stream};
 use rand::prelude::{thread_rng, Distribution};
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -84,40 +84,6 @@ impl<R: AsyncRead + Unpin, const S: usize> Stream for AsyncReadStreamer<R, S> {
             },
             Poll::Pending => Poll::Pending,
         }
-    }
-}
-
-pub(crate) struct DuplexIO<R, W>(pub R, pub W);
-
-impl<R, W> AsyncRead for DuplexIO<R, W>
-where
-    R: AsyncRead + Unpin,
-    W: AsyncWrite + Unpin,
-{
-    fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<std::io::Result<usize>> {
-        let this = self.get_mut();
-        Pin::new(&mut this.0).poll_read(cx, buf)
-    }
-}
-
-impl<R, W> AsyncWrite for DuplexIO<R, W>
-where
-    R: AsyncRead + Unpin,
-    W: AsyncWrite + Unpin,
-{
-    fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
-        let this = self.get_mut();
-        Pin::new(&mut this.1).poll_write(cx, buf)
-    }
-
-    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
-        let this = self.get_mut();
-        Pin::new(&mut this.1).poll_flush(cx)
-    }
-
-    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
-        let this = self.get_mut();
-        Pin::new(&mut this.1).poll_close(cx)
     }
 }
 

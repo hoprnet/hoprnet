@@ -1,19 +1,37 @@
+use std::io::ErrorKind;
+use std::str::FromStr;
 use std::sync::Arc;
 
+use crate::{ApiErrorStatus, InternalState, ListenerId, BASE_PATH};
+use axum::extract::Path;
 use axum::{
     extract::{Json, State},
     http::status::StatusCode,
     response::IntoResponse,
 };
+use futures::{StreamExt, TryStreamExt};
+use hopr_lib::errors::HoprLibError;
+use hopr_lib::{HoprSession, IpProtocol, PeerId, RoutingOptions, SessionCapability, SessionClientConfig};
+use hopr_network_types::prelude::ConnectedUdpStream;
+use hopr_network_types::udp::ForeignDataMode;
+use hopr_network_types::utils::copy_duplex;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
+use tokio::net::{TcpListener, ToSocketAddrs};
+use tokio_util::compat::TokioAsyncReadCompatExt;
+use tracing::{debug, error, info};
 
-use hopr_lib::{HoprSession, PathOptions, PeerId, SessionClientConfig};
-use tokio::net::TcpListener;
-use tokio_util::compat::FuturesAsyncReadCompatExt;
-use tracing::{error, info};
+/// Default listening host the session listener socket binds to.
+pub const DEFAULT_LISTEN_HOST: &str = "127.0.0.1:0";
 
-use crate::{ApiErrorStatus, InternalState, BASE_PATH};
+#[cfg(all(feature = "prometheus", not(test)))]
+lazy_static::lazy_static! {
+    static ref METRIC_ACTIVE_CLIENTS: hopr_metrics::MultiGauge = hopr_metrics::MultiGauge::new(
+        "hopr_session_hoprd_clients",
+        "Number of clients connected at this Entry node",
+        &["type"]
+    ).unwrap();
+}
 
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
@@ -22,56 +40,94 @@ use crate::{ApiErrorStatus, InternalState, BASE_PATH};
         "path": {
             "Hops": 1
         },
-        "port": 0
+        "target": "localhost:8080",
+        "listen_host": "127.0.0.1:10000",
+        "capabilities": ["Retransmission", "Segmentation"]
     }))]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct SessionClientRequest {
     #[serde_as(as = "DisplayFromStr")]
     pub destination: PeerId,
-    pub path: PathOptions,
-    #[serde(default)]
-    pub port: u16,
+    pub path: RoutingOptions,
+    pub target: String,
+    pub listen_host: Option<String>,
+    #[serde_as(as = "Option<Vec<DisplayFromStr>>")]
+    pub capabilities: Option<Vec<SessionCapability>>,
 }
 
-impl From<SessionClientRequest> for SessionClientConfig {
-    fn from(value: SessionClientRequest) -> Self {
-        Self {
-            peer: value.destination,
-            path_options: value.path,
-            capabilities: vec![],
-        }
+impl SessionClientRequest {
+    pub(crate) fn into_protocol_session_config(
+        self,
+        target_protocol: IpProtocol,
+    ) -> Result<SessionClientConfig, HoprLibError> {
+        Ok(SessionClientConfig {
+            peer: self.destination,
+            path_options: self.path,
+            target_protocol,
+            target: self
+                .target
+                .parse()
+                .map_err(|e| HoprLibError::GeneralError(format!("target host parse error: {e}")))?,
+            capabilities: self.capabilities.unwrap_or_else(|| match target_protocol {
+                IpProtocol::TCP => {
+                    vec![SessionCapability::Retransmission, SessionCapability::Segmentation]
+                }
+                _ => vec![], // no default capabilities for UDP, etc.
+            }),
+        })
     }
 }
 
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 #[schema(example = json!({
+        "target": "example.com:80",
+        "protocol": "tcp",
+        "ip": "127.0.0.1",
         "port": 5542,
     }))]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct SessionClientResponse {
+    pub target: String,
+    #[serde_as(as = "DisplayFromStr")]
+    #[schema(value_type = String)]
+    pub protocol: IpProtocol,
+    pub ip: String,
     pub port: u16,
 }
 
-/// Creates a new client session returing a dedicated session listening port.
+/// Creates a new client session returning the given session listening host & port over TCP or UDP.
+/// If no listening port is given in the request, the socket will be bound to a random free
+/// port and returned in the response.
+/// Different capabilities can be configured for the session, such as data segmentation or
+/// retransmission.
 ///
-/// Once the port is bound, it is possible to use the socket for bidirectional read and write communication.
-/// Various services require diffrent types of socket communications. This is set by the capabilities field.
+/// Once the host and port are bound, it is possible to use the socket for bidirectional read/write
+/// communication over the selected IP protocol and HOPR network routing with the given destination.
+/// The destination HOPR node forwards all the data to the given target over the selected IP protocol.
 ///
-/// TODO: The prototype implementation does not support UDP sockets yet and forces the usage of a TCP socket.
-/// Such a restriction is not ideal and should be removed in the future.
+/// Various services require different types of socket communications:
+/// - services running over UDP usually do not require data retransmission, as it is already expected
+/// that UDP does not provide these and is therefore handled at the application layer.
+/// - On the contrary, services running over TCP *almost always* expect data segmentation and
+/// retransmission capabilities, so these should be configured while creating a session that passes
+/// TCP data.
 #[utoipa::path(
         post,
-        path = const_format::formatcp!("{BASE_PATH}/session"),
+        path = const_format::formatcp!("{BASE_PATH}/session/{{protocol}}"),
+        params(
+                ("protocol" = String, Path, description = "IP transport protocol")
+        ),
         request_body(
             content = SessionClientRequest,
-            description = "Creates a new client HOPR session that will start listening on a dedicated port. Once the port is bound, it is possible to use the socketfor bidirectional read and write communication.",
+            description = "Creates a new client HOPR session that will start listening on a dedicated port. Once the port is bound, it is possible to use the socket for bidirectional read and write communication.",
             content_type = "application/json"),
         responses(
-            (status = 200, description = "Successfully created a new client session", body = SessionClientResponse),
+            (status = 200, description = "Successfully created a new client session.", body = SessionClientResponse),
+            (status = 400, description = "Invalid IP protocol.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
+            (status = 409, description = "Listening address and port already in use.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError),
-            (status = 501, description = "Feature not implemented", body = ApiError)
         ),
         security(
             ("api_token" = []),
@@ -81,69 +137,302 @@ pub(crate) struct SessionClientResponse {
     )]
 pub(crate) async fn create_client(
     State(state): State<Arc<InternalState>>,
+    Path(protocol): Path<IpProtocol>,
     Json(args): Json<SessionClientRequest>,
 ) -> Result<impl IntoResponse, impl IntoResponse> {
-    let port = args.port;
-    let data: SessionClientConfig = args.into();
-    // let is_tcp_like = data.capabilities.contains(&SessionCapability::Retransmission)
-    //     || data.capabilities.contains(&SessionCapability::Segmentation);
-
-    let is_tcp_like = true;
-
-    if is_tcp_like {
-        let session = state.hopr.clone().connect_to(data).await.map_err(|e| {
+    let bind_host: std::net::SocketAddr = args
+        .listen_host
+        .clone()
+        .unwrap_or(DEFAULT_LISTEN_HOST.to_string())
+        .parse()
+        .map_err(|_| {
             (
                 StatusCode::UNPROCESSABLE_ENTITY,
-                ApiErrorStatus::UnknownFailure(e.to_string()),
+                ApiErrorStatus::UnknownFailure("invalid listening host".into()),
             )
         })?;
 
-        let (port, tcp_listener) = listen_on(format!("127.0.0.1:{port}")).await.map_err(|e| {
-            (
-                StatusCode::UNPROCESSABLE_ENTITY,
-                ApiErrorStatus::UnknownFailure(format!("Failed to bind on 127.0.0.1:{port}: {e}")),
-            )
-        })?;
-
-        tokio::task::spawn(bind_session_to_connection(session, tcp_listener));
-
-        Ok((StatusCode::OK, Json(SessionClientResponse { port })).into_response())
-    } else {
-        // let s = UdpSocket::bind("0.0.0.0:{port}").await?.connect().await;
-        Err((
-            StatusCode::NOT_IMPLEMENTED,
-            ApiErrorStatus::UnknownFailure("No UDP socket support yet".to_string()),
-        ))
+    if bind_host.port() > 0
+        && state
+            .open_listeners
+            .read()
+            .await
+            .contains_key(&ListenerId(protocol, bind_host))
+    {
+        return Err((StatusCode::CONFLICT, ApiErrorStatus::InvalidInput));
     }
+
+    let target = args.target.clone();
+    let data = args.into_protocol_session_config(protocol).map_err(|e| {
+        (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            ApiErrorStatus::UnknownFailure(e.to_string()),
+        )
+    })?;
+
+    // TODO: consider pooling the sessions on a listener, so that the negotiation is amortized
+
+    debug!("binding {protocol} session listening socket to {bind_host}");
+    let bound_host = match protocol {
+        IpProtocol::TCP => {
+            let (bound_host, tcp_listener) = tcp_listen_on(bind_host).await.map_err(|e| {
+                if e.kind() == ErrorKind::AddrInUse {
+                    (StatusCode::CONFLICT, ApiErrorStatus::InvalidInput)
+                } else {
+                    (
+                        StatusCode::UNPROCESSABLE_ENTITY,
+                        ApiErrorStatus::UnknownFailure(format!("failed to start TCP listener on {bind_host}: {e}")),
+                    )
+                }
+            })?;
+            info!("TCP session listener bound to {bound_host}");
+
+            let hopr = state.hopr.clone();
+            let jh = hopr_async_runtime::prelude::spawn(
+                tokio_stream::wrappers::TcpListenerStream::new(tcp_listener)
+                    .and_then(|sock| async { Ok((sock.peer_addr()?, sock)) })
+                    .for_each_concurrent(None, move |accepted_client| {
+                        let data = data.clone();
+                        let hopr = hopr.clone();
+                        async move {
+                            match accepted_client {
+                                Ok((sock_addr, stream)) => {
+                                    debug!("incoming TCP connection {sock_addr}");
+                                    let session = match hopr.connect_to(data).await {
+                                        Ok(s) => s,
+                                        Err(e) => {
+                                            error!("failed to establish session: {e}");
+                                            return;
+                                        }
+                                    };
+
+                                    debug!(
+                                        session_id = tracing::field::debug(*session.id()),
+                                        "new session for incoming TCP connection from {sock_addr}",
+                                    );
+
+                                    #[cfg(all(feature = "prometheus", not(test)))]
+                                    METRIC_ACTIVE_CLIENTS.increment(&["tcp"], 1.0);
+
+                                    bind_session_to_stream(session, stream).await;
+
+                                    #[cfg(all(feature = "prometheus", not(test)))]
+                                    METRIC_ACTIVE_CLIENTS.decrement(&["tcp"], 1.0);
+                                }
+                                Err(e) => error!("failed to accept connection: {e}"),
+                            }
+                        }
+                    }),
+            );
+
+            state
+                .open_listeners
+                .write()
+                .await
+                .insert(ListenerId(protocol, bound_host), (target.clone(), jh));
+            bound_host
+        }
+        IpProtocol::UDP => {
+            let session = state.hopr.clone().connect_to(data).await.map_err(|e| {
+                (
+                    StatusCode::UNPROCESSABLE_ENTITY,
+                    ApiErrorStatus::UnknownFailure(e.to_string()),
+                )
+            })?;
+
+            let (bound_host, udp_socket) = udp_bind_to(bind_host).await.map_err(|e| {
+                if e.kind() == ErrorKind::AddrInUse {
+                    (
+                        StatusCode::CONFLICT,
+                        ApiErrorStatus::UnknownFailure(format!("cannot bind to: {bind_host}: {e}")),
+                    )
+                } else {
+                    (
+                        StatusCode::UNPROCESSABLE_ENTITY,
+                        ApiErrorStatus::UnknownFailure(format!("failed to start UDP listener on {bind_host}: {e}")),
+                    )
+                }
+            })?;
+
+            info!("UDP session listener bound to {bound_host}");
+
+            state.open_listeners.write().await.insert(
+                ListenerId(protocol, bound_host),
+                (
+                    target.clone(),
+                    hopr_async_runtime::prelude::spawn(async move {
+                        #[cfg(all(feature = "prometheus", not(test)))]
+                        METRIC_ACTIVE_CLIENTS.increment(&["udp"], 1.0);
+
+                        bind_session_to_stream(session, udp_socket).await;
+
+                        #[cfg(all(feature = "prometheus", not(test)))]
+                        METRIC_ACTIVE_CLIENTS.decrement(&["udp"], 1.0);
+                    }),
+                ),
+            );
+            bound_host
+        }
+    };
+
+    Ok::<_, (StatusCode, ApiErrorStatus)>(
+        (
+            StatusCode::OK,
+            Json(SessionClientResponse {
+                protocol,
+                target,
+                ip: bound_host.ip().to_string(),
+                port: bound_host.port(),
+            }),
+        )
+            .into_response(),
+    )
 }
 
-async fn listen_on(address: String) -> std::io::Result<(u16, TcpListener)> {
+/// Lists existing Session listeners for the given IP protocol.
+#[utoipa::path(
+    get,
+    path = const_format::formatcp!("{BASE_PATH}/session/{{protocol}}"),
+    params(
+            ("protocol" = String, Path, description = "IP transport protocol")
+    ),
+    responses(
+            (status = 200, description = "Opened session listeners for the given IP protocol.", body = Vec<SessionClientResponse>),
+            (status = 400, description = "Invalid IP protocol.", body = ApiError),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
+            (status = 422, description = "Unknown failure", body = ApiError)
+    ),
+    security(
+            ("api_token" = []),
+            ("bearer_token" = [])
+    ),
+    tag = "Session",
+)]
+pub(crate) async fn list_clients(
+    State(state): State<Arc<InternalState>>,
+    Path(protocol): Path<IpProtocol>,
+) -> Result<impl IntoResponse, impl IntoResponse> {
+    let response = state
+        .open_listeners
+        .read()
+        .await
+        .iter()
+        .filter(|(id, _)| id.0 == protocol)
+        .map(|(id, (target, _))| SessionClientResponse {
+            protocol,
+            target: target.clone(),
+            ip: id.1.ip().to_string(),
+            port: id.1.port(),
+        })
+        .collect::<Vec<_>>();
+
+    Ok::<_, (StatusCode, ApiErrorStatus)>((StatusCode::OK, Json(response)).into_response())
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+#[schema(example = json!({
+        "listeningIp": "127.0.0.1",
+        "port": 5542
+    }))]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct SessionCloseClientRequest {
+    pub listening_ip: String,
+    pub port: u16,
+}
+
+/// Closes an existing Session listener.
+/// The listener must've been previously created and bound for the given IP protocol.
+/// Once a listener is closed, no more socket connections can be made to it.
+#[utoipa::path(
+    delete,
+    path = const_format::formatcp!("{BASE_PATH}/session/{{protocol}}"),
+    params(
+            ("protocol" = String, Path, description = "IP transport protocol")
+    ),
+    request_body(
+            content = SessionCloseClientRequest,
+            description = "Closes the listener on the given bound IP address and port.",
+            content_type = "application/json"),
+    responses(
+            (status = 204, description = "Listener closed successfully"),
+            (status = 400, description = "Invalid IP protocol or port.", body = ApiError),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
+            (status = 404, description = "Listener not found.", body = ApiError),
+            (status = 422, description = "Unknown failure", body = ApiError)
+    ),
+    security(
+            ("api_token" = []),
+            ("bearer_token" = [])
+    ),
+    tag = "Session",
+)]
+pub(crate) async fn close_client(
+    State(state): State<Arc<InternalState>>,
+    Path(protocol): Path<IpProtocol>,
+    Json(SessionCloseClientRequest { listening_ip, port }): Json<SessionCloseClientRequest>,
+) -> Result<impl IntoResponse, impl IntoResponse> {
+    let bound_addr = std::net::SocketAddr::from_str(&format!("{listening_ip}:{port}"))
+        .map_err(|_| (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidInput))?;
+
+    let (_, handle) = state
+        .open_listeners
+        .write()
+        .await
+        .remove(&ListenerId(protocol, bound_addr))
+        .ok_or((StatusCode::NOT_FOUND, ApiErrorStatus::InvalidInput))?;
+
+    hopr_async_runtime::prelude::cancel_join_handle(handle).await;
+    Ok::<_, (StatusCode, ApiErrorStatus)>((StatusCode::NO_CONTENT, "").into_response())
+}
+
+async fn tcp_listen_on<A: ToSocketAddrs>(address: A) -> std::io::Result<(std::net::SocketAddr, TcpListener)> {
     let tcp_listener = TcpListener::bind(address).await?;
 
-    Ok((tcp_listener.local_addr()?.port(), tcp_listener))
+    Ok((tcp_listener.local_addr()?, tcp_listener))
 }
 
-async fn bind_session_to_connection(session: HoprSession, tcp_listener: TcpListener) {
+async fn udp_bind_to<A: ToSocketAddrs>(address: A) -> std::io::Result<(std::net::SocketAddr, ConnectedUdpStream)> {
+    let udp_socket = ConnectedUdpStream::bind(address)
+        .await?
+        .with_foreign_data_mode(ForeignDataMode::Discard); // discard data from UDP clients other than the first one served
+
+    Ok((udp_socket.socket().local_addr()?, udp_socket))
+}
+
+async fn bind_session_to_stream<T>(mut session: HoprSession, stream: T)
+where
+    T: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
+{
     let session_id = *session.id();
-    match tcp_listener.accept().await {
-        Ok((mut tcp_stream, _sock_addr)) => match tokio::io::copy_bidirectional_with_sizes(&mut session.compat(), &mut tcp_stream, hopr_lib::SESSION_USABLE_MTU_SIZE, hopr_lib::SESSION_USABLE_MTU_SIZE).await {
-            Ok(bound_stream_finished) => info!(
-                "Client session {session_id} ended with {bound_stream_finished:?} bytes transferred in both directions.",
-            ),
-            Err(e) => error!("Failed to bind the TCP stream to session {session_id}: {e}"),
-        },
-        Err(e) => error!("Failed to accept connection: {e}"),
+    match copy_duplex(
+        &mut session,
+        &mut stream.compat(),
+        hopr_lib::SESSION_USABLE_MTU_SIZE,
+        hopr_lib::SESSION_USABLE_MTU_SIZE,
+    )
+    .await
+    {
+        Ok(bound_stream_finished) => info!(
+            session_id = tracing::field::debug(session_id),
+            "client session ended with {bound_stream_finished:?} bytes transferred in both directions.",
+        ),
+        Err(e) => error!(
+            session_id = tracing::field::debug(session_id),
+            "error during data transfer: {e}"
+        ),
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use futures::channel::mpsc::UnboundedSender;
-    use hopr_lib::{ApplicationData, Keypair, PathOptions, PeerId, SendMsg};
-    use hopr_transport_session::errors::TransportSessionError;
-    use tokio::io::{AsyncReadExt, AsyncWriteExt};
-
     use super::*;
+    use anyhow::Context;
+    use futures::channel::mpsc::UnboundedSender;
+    use hopr_lib::{ApplicationData, Keypair, PeerId, SendMsg};
+    use hopr_transport_session::errors::TransportSessionError;
+    use hopr_transport_session::RoutingOptions;
+    use std::collections::HashSet;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
     pub struct SendMsgResender {
         tx: UnboundedSender<Box<[u8]>>,
@@ -162,7 +451,7 @@ mod tests {
             &self,
             data: ApplicationData,
             _destination: PeerId,
-            _options: PathOptions,
+            _options: RoutingOptions,
         ) -> std::result::Result<(), TransportSessionError> {
             let (_peer, data) = hopr_transport_session::types::unwrap_offchain_key(data.plain_text)?;
 
@@ -173,38 +462,89 @@ mod tests {
 
             Ok(())
         }
+
+        fn close(&self) {}
     }
 
     #[tokio::test]
-    async fn hoprd_session_connection_should_create_a_working_socket_through_which_data_can_be_sent_and_received() {
+    async fn hoprd_session_connection_should_create_a_working_tcp_socket_through_which_data_can_be_sent_and_received(
+    ) -> anyhow::Result<()> {
         let (tx, rx) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
 
         let peer: hopr_lib::PeerId = hopr_lib::HoprOffchainKeypair::random().public().into();
         let session = hopr_lib::HoprSession::new(
             hopr_lib::HoprSessionId::new(4567, peer),
             peer,
-            hopr_lib::PathOptions::IntermediatePath(vec![]),
-            vec![],
+            RoutingOptions::IntermediatePath(Default::default()),
+            HashSet::default(),
             Arc::new(SendMsgResender::new(tx)),
             rx,
+            None,
         );
 
-        let (port, tcp_listener) = listen_on(format!("127.0.0.1:0")).await.expect("listen_on succeeded");
-        tokio::task::spawn(bind_session_to_connection(session, tcp_listener));
+        let (bound_addr, tcp_listener) = tcp_listen_on(("127.0.0.1", 0)).await.context("listen_on failed")?;
 
-        let mut tcp_stream = tokio::net::TcpStream::connect(format!("127.0.0.1:{port}"))
+        tokio::task::spawn(async move {
+            match tcp_listener.accept().await {
+                Ok((stream, _)) => bind_session_to_stream(session, stream).await,
+                Err(e) => error!("failed to accept connection: {e}"),
+            }
+        });
+
+        let mut tcp_stream = tokio::net::TcpStream::connect(bound_addr)
             .await
-            .unwrap();
+            .context("connect failed")?;
 
         let data = vec![b"hello", b"world", b"this ", b"is   ", b"    a", b" test"];
 
         for d in data.clone().into_iter() {
-            tcp_stream.write_all(d).await.unwrap();
+            tcp_stream.write_all(d).await.context("write failed")?;
         }
 
         for d in data.iter() {
             let mut buf = vec![0; d.len()];
-            tcp_stream.read_exact(&mut buf).await.unwrap();
+            tcp_stream.read_exact(&mut buf).await.context("read failed")?;
         }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn hoprd_session_connection_should_create_a_working_udp_socket_through_which_data_can_be_sent_and_received(
+    ) -> anyhow::Result<()> {
+        let (tx, rx) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
+
+        let peer: hopr_lib::PeerId = hopr_lib::HoprOffchainKeypair::random().public().into();
+        let session = hopr_lib::HoprSession::new(
+            hopr_lib::HoprSessionId::new(4567, peer),
+            peer,
+            RoutingOptions::IntermediatePath(Default::default()),
+            HashSet::default(),
+            Arc::new(SendMsgResender::new(tx)),
+            rx,
+            None,
+        );
+
+        let (listen_addr, udp_listener) = udp_bind_to(("127.0.0.1", 0)).await.context("udp_bind_to failed")?;
+
+        tokio::task::spawn(bind_session_to_stream(session, udp_listener));
+
+        let mut udp_stream = ConnectedUdpStream::bind(("127.0.0.1", 0))
+            .await
+            .context("bind failed")?
+            .with_counterparty(listen_addr)?;
+
+        let data = vec![b"hello", b"world", b"this ", b"is   ", b"    a", b" test"];
+
+        for d in data.clone().into_iter() {
+            udp_stream.write_all(d).await.context("write failed")?;
+        }
+
+        for d in data.iter() {
+            let mut buf = vec![0; d.len()];
+            udp_stream.read_exact(&mut buf).await.context("read failed")?;
+        }
+
+        Ok(())
     }
 }

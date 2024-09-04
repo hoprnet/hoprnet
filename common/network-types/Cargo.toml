@@ -1,6 +1,6 @@
 [package]
 name = "hopr-network-types"
-version = "0.2.2"
+version = "0.3.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Contains types used for networking over the HOPR protocol"
 edition = "2021"
@@ -10,11 +10,20 @@ license = "GPL-3.0-only"
 
 [features]
 default = []
-serde = ["dep:serde", "dep:serde_bytes"]
-runtime-async-std = ["hopr-async-runtime/runtime-async-std"]
-runtime-tokio = ["hopr-async-runtime/runtime-tokio"]
+serde = ["dep:serde", "dep:serde_bytes", "libp2p-identity/serde"]
+runtime-async-std = [
+  "dep:async-std-resolver",
+  "hopr-async-runtime/runtime-async-std",
+]
+runtime-tokio = [
+  "dep:tokio",
+  "dep:tokio-util",
+  "hopr-async-runtime/runtime-tokio",
+  "hickory-resolver/tokio-runtime",
+]
 
 [dependencies]
+async-std-resolver = { version = "0.24.1", optional = true }
 bitvec = "1.0.1"
 crossbeam-queue = "0.3.11"
 crossbeam-skiplist = { workspace = true }
@@ -22,22 +31,26 @@ dashmap = { workspace = true }
 futures = { workspace = true }
 governor = "0.6.3"
 hex = { workspace = true }
-pin-project = "1.1"
+hickory-resolver = { workspace = true }
+libp2p-identity = { workspace = true }
 rand = { workspace = true }
 rand_distr = "0.4.3"
 serde = { workspace = true, optional = true }
+serde_with = { workspace = true, optional = true }
 serde_bytes = { workspace = true, optional = true }
 smart-default = { workspace = true }
 strum = { workspace = true }
-tracing = { workspace = true }
 thiserror = { workspace = true }
+tokio = { workspace = true, optional = true }
+tokio-util = { workspace = true, optional = true, features = ["net"] }
+tracing = { workspace = true }
 
 hopr-platform = { workspace = true }
 hopr-primitive-types = { workspace = true }
 hopr-async-runtime = { workspace = true }
 
 [dev-dependencies]
-anyhow = "1.0"
+anyhow = { workspace = true }
 async-std = { workspace = true, features = ["attributes", "unstable"] }
 async-stream = { workspace = true }
 ctor = "0.2.8"
@@ -48,5 +61,7 @@ rand = { workspace = true }
 rand_distr = "0.4.3"
 rayon = { workspace = true }
 test-log = { version = "0.2.16", features = ["trace"] }
+tokio = { workspace = true }
+tokio-util = { workspace = true }
 
 hopr-crypto-random = { workspace = true }

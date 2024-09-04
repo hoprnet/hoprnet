@@ -1,6 +1,6 @@
 [package]
 name = "hoprd-api"
-version = "3.2.1"
+version = "3.3.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "This Rest API enables developers to interact with a hoprd node programatically through HTTP."
@@ -40,6 +40,7 @@ smart-default = { workspace = true }
 strum = { workspace = true }
 tokio = { workspace = true }
 tokio-util = { workspace = true, features = ["compat"] }
+tokio-stream = "0.1.15"
 tower = "0.4.13"
 tower-http = { version = "0.5.2", features = [
   "validate-request",
@@ -57,7 +58,10 @@ validator = { workspace = true }
 hopr-lib = { workspace = true, features = ["runtime-tokio", "session-client"] }
 hoprd-inbox = { workspace = true }
 hopr-crypto-types = { workspace = true }
+hopr-network-types = { workspace = true, features = ["runtime-tokio"] }
 hopr-metrics = { workspace = true, optional = true }
+hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
 
 [dev-dependencies]
+anyhow = { workspace = true }
 hopr-transport-session = { workspace = true }

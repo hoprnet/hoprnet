@@ -24,13 +24,16 @@ prometheus = [
 runtime-async-std = [
   "dep:async-std",
   "hopr-lib/runtime-async-std",
+  "hopr-network-types/runtime-async-std",
   "hopr-async-runtime/runtime-async-std",
   "opentelemetry_sdk?/rt-async-std",
 ]
 runtime-tokio = [
   "dep:tokio",
+  "dep:tokio-retry",
   "tokio-util/compat",
   "hopr-lib/runtime-tokio",
+  "hopr-network-types/runtime-tokio",
   "hopr-async-runtime/runtime-tokio",
   "opentelemetry_sdk?/rt-tokio",
 ]
@@ -49,8 +52,9 @@ async-std = { workspace = true, features = [
   "attributes",
   "tokio1",
 ], optional = true }
-clap = { workspace = true }
 chrono = { workspace = true }
+clap = { workspace = true }
+const_format = { workspace = true }
 futures = { workspace = true }
 home = "0.5.9"
 lazy_static = { workspace = true, optional = true }
@@ -62,6 +66,7 @@ signal-hook = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, optional = true }
+tokio-retry = { version = "0.3.0", optional = true }
 tokio-util = { workspace = true, optional = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
@@ -88,6 +93,7 @@ hoprd-inbox = { workspace = true }
 hoprd-keypair = { workspace = true }
 hopr-platform = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
+hopr-network-types = { workspace = true }
 hopr-async-runtime = { workspace = true }
 
 [dev-dependencies]

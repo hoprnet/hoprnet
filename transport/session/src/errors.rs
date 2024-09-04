@@ -1,19 +1,31 @@
+use crate::initiation::StartErrorReason;
 use thiserror::Error;
 
 /// Enumeration of errors thrown from this library.
-#[derive(Error, Debug, PartialEq)]
+#[derive(Error, Debug)]
 pub enum TransportSessionError {
-    #[error("Connection timed out")]
+    #[error("connection timed out")]
     Timeout,
-    #[error("Application tag from unallowed range")]
+
+    #[error("application tag from disallowed range")]
     Tag,
-    #[error("Incorrect data size")]
+
+    #[error("incorrect data size")]
     PayloadSize,
-    #[error("Invalid peer id")]
+
+    #[error("serializer error: {0}")]
+    Serializer(#[from] bincode::Error),
+
+    #[error("invalid peer id")]
     PeerId,
-    #[error("Impossible transport path")]
+
+    #[error("impossible transport path")]
     Path,
-    #[error("Session is closed")]
+
+    #[error("the other party rejected session initiation with error: {0}")]
+    Rejected(StartErrorReason),
+
+    #[error("session is closed")]
     Closed,
 }
 

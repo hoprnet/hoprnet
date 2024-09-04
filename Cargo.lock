@@ -3854,7 +3854,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-crypto-random"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "generic-array",
  "rand 0.8.5",
@@ -3862,7 +3862,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-crypto-sphinx"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "aes 0.8.4",
  "blake2",
@@ -4075,10 +4075,11 @@ dependencies = [
 
 [[package]]
 name = "hopr-network-types"
-version = "0.2.2"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "async-std",
+ "async-std-resolver",
  "async-stream",
  "bitvec",
  "crossbeam-queue",
@@ -4089,22 +4090,26 @@ dependencies = [
  "governor",
  "hex",
  "hex-literal",
+ "hickory-resolver",
  "hopr-async-runtime",
  "hopr-crypto-random",
  "hopr-platform",
  "hopr-primitive-types",
  "lazy_static",
+ "libp2p-identity",
  "parameterized",
- "pin-project",
  "rand 0.8.5",
  "rand_distr",
  "rayon",
  "serde",
  "serde_bytes",
+ "serde_with",
  "smart-default",
  "strum 0.26.3",
  "test-log",
  "thiserror",
+ "tokio",
+ "tokio-util",
  "tracing",
 ]
 
@@ -4127,7 +4132,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-primitive-types"
-version = "0.3.3"
+version = "0.4.0"
 dependencies = [
  "hex",
  "hex-literal",
@@ -4191,7 +4196,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.6.1"
+version = "0.7.0"
 dependencies = [
  "async-lock 3.4.0",
  "async-std",
@@ -4207,6 +4212,7 @@ dependencies = [
  "hopr-db-sql",
  "hopr-internal-types",
  "hopr-metrics",
+ "hopr-network-types",
  "hopr-platform",
  "hopr-primitive-types",
  "hopr-transport-p2p",
@@ -4285,10 +4291,12 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-session"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
+ "anyhow",
  "async-std",
  "async-trait",
+ "bincode",
  "futures",
  "hopr-crypto-random",
  "hopr-crypto-types",
@@ -4300,6 +4308,7 @@ dependencies = [
  "ringbuffer",
  "serde",
  "serde_with",
+ "strum 0.26.3",
  "thiserror",
  "tracing",
 ]
@@ -4315,11 +4324,13 @@ dependencies = [
  "async-std",
  "chrono",
  "clap",
+ "const_format",
  "futures",
  "home",
  "hopr-async-runtime",
  "hopr-lib",
  "hopr-metrics",
+ "hopr-network-types",
  "hopr-platform",
  "hoprd-api",
  "hoprd-inbox",
@@ -4337,6 +4348,7 @@ dependencies = [
  "tempfile",
  "thiserror",
  "tokio",
+ "tokio-retry",
  "tokio-util",
  "tracing",
  "tracing-opentelemetry",
@@ -4347,8 +4359,9 @@ dependencies = [
 
 [[package]]
 name = "hoprd-api"
-version = "3.2.1"
+version = "3.3.0"
 dependencies = [
+ "anyhow",
  "async-broadcast",
  "async-lock 3.4.0",
  "axum",
@@ -4356,9 +4369,11 @@ dependencies = [
  "const_format",
  "futures",
  "futures-concurrency",
+ "hopr-async-runtime",
  "hopr-crypto-types",
  "hopr-lib",
  "hopr-metrics",
+ "hopr-network-types",
  "hopr-transport-session",
  "hoprd-inbox",
  "hyper 1.4.1",
@@ -4371,6 +4386,7 @@ dependencies = [
  "smart-default",
  "strum 0.26.3",
  "tokio",
+ "tokio-stream",
  "tokio-util",
  "tower",
  "tower-http",
@@ -8925,6 +8941,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bbae76ab933c85776efabc971569dd6119c580d8f5d448769dec1764bf796ef2"
 dependencies = [
  "native-tls",
+ "tokio",
+]
+
+[[package]]
+name = "tokio-retry"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7f57eb36ecbe0fc510036adff84824dd3c24bb781e21bfa67b69d556aa85214f"
+dependencies = [
+ "pin-project",
+ "rand 0.8.5",
  "tokio",
 ]
 
