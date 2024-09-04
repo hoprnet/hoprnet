@@ -92,10 +92,10 @@ async def check_channel_status(src: Node, dest: Node, status: str):
         channel = await get_channel(src, dest, include_closed)
         channel_seen_from_dst = await get_channel_seen_from_dst(src, dest, include_closed)
         if (
-                channel is not None
-                and channel.status == status
-                and channel_seen_from_dst is not None
-                and channel_seen_from_dst.status == status
+            channel is not None
+            and channel.status == status
+            and channel_seen_from_dst is not None
+            and channel_seen_from_dst.status == status
         ):
             break
         else:
@@ -173,7 +173,7 @@ async def check_all_tickets_redeemed(src: Node):
 
 
 async def send_and_receive_packets_with_pop(
-        packets, src: Node, dest: Node, path: str, timeout: int = MULTIHOP_MESSAGE_SEND_TIMEOUT
+    packets, src: Node, dest: Node, path: str, timeout: int = MULTIHOP_MESSAGE_SEND_TIMEOUT
 ):
     random_tag = gen_random_tag()
 
@@ -184,7 +184,7 @@ async def send_and_receive_packets_with_pop(
 
 
 async def send_and_receive_packets_with_peek(
-        packets, src: Node, dest: Node, path: str, timeout: int = MULTIHOP_MESSAGE_SEND_TIMEOUT
+    packets, src: Node, dest: Node, path: str, timeout: int = MULTIHOP_MESSAGE_SEND_TIMEOUT
 ):
     random_tag = gen_random_tag()
 
@@ -330,7 +330,7 @@ async def test_hoprd_ping_should_not_be_able_to_ping_nodes_in_other_network_UNFI
 
 @pytest.mark.asyncio
 async def test_hoprd_ping_should_not_be_able_to_ping_nodes_not_present_in_the_registry_UNFINISHED(
-        swarm7: dict[str, Node],
+    swarm7: dict[str, Node],
 ):
     """
     # log "Node 7 should not be able to talk to Node 1 (Node 7 is not in the register)"
@@ -355,7 +355,7 @@ async def test_hoprd_should_not_have_unredeemed_tickets_without_sending_messages
 @pytest.mark.asyncio
 @pytest.mark.parametrize("src, dest", random_distinct_pairs_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
 async def test_hoprd_should_be_able_to_send_0_hop_messages_without_open_channels(
-        src: Node, dest: Node, swarm7: dict[str, Node]
+    src: Node, dest: Node, swarm7: dict[str, Node]
 ):
     message_count = int(TICKET_AGGREGATION_THRESHOLD / 10)
 
@@ -378,7 +378,7 @@ async def test_hoprd_should_fail_sending_a_message_that_is_too_large(src: Node, 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("src,dest", [tuple(shuffled(barebone_nodes())[:2]) for _ in range(PARAMETERIZED_SAMPLE_SIZE)])
 async def test_hoprd_api_channel_should_register_fund_increase_using_fund_endpoint(
-        src: str, dest: str, swarm7: dict[str, Node]
+    src: str, dest: str, swarm7: dict[str, Node]
 ):
     hopr_amount = f"{OPEN_CHANNEL_FUNDING_VALUE_HOPR * 1e18:.0f}"  # convert HOPR to weiHOPR
 
@@ -415,12 +415,12 @@ async def test_hoprd_api_channel_should_register_fund_increase_using_fund_endpoi
 @pytest.mark.asyncio
 @pytest.mark.parametrize("src,dest", [tuple(shuffled(barebone_nodes())[:2]) for _ in range(PARAMETERIZED_SAMPLE_SIZE)])
 async def test_hoprd_api_should_redeem_tickets_in_channel_using_redeem_endpoint(
-        src: Node, dest: Node, swarm7: dict[str, Node]
+    src: Node, dest: Node, swarm7: dict[str, Node]
 ):
     message_count = 2
 
     async with create_channel(
-            swarm7[src], swarm7[dest], funding=message_count * TICKET_PRICE_PER_HOP, close_from_dest=False
+        swarm7[src], swarm7[dest], funding=message_count * TICKET_PRICE_PER_HOP, close_from_dest=False
     ) as channel:
         packets = [f"Channel redeem on 1-hop: {src} - {dest} - {src} #{i:08d}" for i in range(message_count)]
 
@@ -445,7 +445,7 @@ async def test_hoprd_api_should_redeem_tickets_in_channel_using_redeem_endpoint(
 @pytest.mark.asyncio
 @pytest.mark.parametrize("src,dest", [tuple(shuffled(barebone_nodes())[:2]) for _ in range(PARAMETERIZED_SAMPLE_SIZE)])
 async def test_hoprd_should_fail_sending_a_message_when_the_channel_is_out_of_funding(
-        src: str, dest: Node, swarm7: dict[str, Node]
+    src: str, dest: Node, swarm7: dict[str, Node]
 ):
     """
     # FIXME: The following part can be enabled once incoming channel closure is
@@ -518,13 +518,13 @@ async def test_hoprd_should_fail_sending_a_message_when_the_channel_is_out_of_fu
 @pytest.mark.asyncio
 @pytest.mark.parametrize("src,dest", [tuple(shuffled(barebone_nodes())[:2]) for _ in range(PARAMETERIZED_SAMPLE_SIZE)])
 async def test_hoprd_should_create_redeemable_tickets_on_routing_in_1_hop_to_self_scenario(
-        src: str, dest: str, swarm7: dict[str, Node]
+    src: str, dest: str, swarm7: dict[str, Node]
 ):
     # send 90% of messages before ticket aggregation would kick in
     message_count = int(TICKET_AGGREGATION_THRESHOLD / 10 * 9)
 
     async with create_channel(
-            swarm7[src], swarm7[dest], funding=message_count * TICKET_PRICE_PER_HOP, close_from_dest=False
+        swarm7[src], swarm7[dest], funding=message_count * TICKET_PRICE_PER_HOP, close_from_dest=False
     ) as channel_id:
         # ensure ticket stats are what we expect before starting
         statistics_before = await swarm7[dest].api.get_tickets_statistics()
@@ -557,16 +557,16 @@ async def test_hoprd_should_create_redeemable_tickets_on_routing_in_1_hop_to_sel
         # ensure ticket stats are updated after redemption
         statistics_after_redemption = await swarm7[dest].api.get_tickets_statistics()
         assert (
-                       balance_str_to_int(statistics_after_redemption.redeemed_value)
-                       - balance_str_to_int(statistics_after.redeemed_value)
-               ) == (len(packets) * TICKET_PRICE_PER_HOP)
+            balance_str_to_int(statistics_after_redemption.redeemed_value)
+            - balance_str_to_int(statistics_after.redeemed_value)
+        ) == (len(packets) * TICKET_PRICE_PER_HOP)
         assert balance_str_to_int(statistics_after_redemption.unredeemed_value) == 0
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("src,dest", [tuple(shuffled(barebone_nodes())[:2]) for _ in range(PARAMETERIZED_SAMPLE_SIZE)])
 async def test_hoprd_should_aggregate_and_redeem_tickets_in_channel_on_api_request(
-        src: str, dest: str, swarm7: dict[str, Node]
+    src: str, dest: str, swarm7: dict[str, Node]
 ):
     message_count = 2
 
@@ -659,7 +659,7 @@ async def test_hoprd_should_be_able_to_close_open_channels_with_unredeemed_ticke
 @pytest.mark.asyncio
 @pytest.mark.parametrize("src,dest", random_distinct_pairs_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
 async def test_hoprd_should_be_able_to_open_and_close_channel_without_tickets(
-        src: str, dest: str, swarm7: dict[str, Node]
+    src: str, dest: str, swarm7: dict[str, Node]
 ):
     async with create_channel(swarm7[src], swarm7[dest], OPEN_CHANNEL_FUNDING_VALUE_HOPR):
         # the context manager handles opening and closing of the channel with verification
@@ -902,6 +902,7 @@ def run_udp_echo_server(port: int):
             data, addr = s.recvfrom(HOPR_SESSION_MAX_PAYLOAD_SIZE)
             s.sendto(data, addr)
 
+
 @contextmanager
 def echo_tcp_server(port: int):
     process = multiprocessing.Process(target=run_tcp_echo_server, args=(port,))
@@ -910,6 +911,7 @@ def echo_tcp_server(port: int):
         yield port
     finally:
         process.terminate()
+
 
 @contextmanager
 def echo_udp_server(port: int):
