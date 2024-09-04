@@ -199,7 +199,7 @@ where
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use crate::inbox::InboxBackend;
     use crate::ring::RingBufferInboxBackend;
     use std::ops::Add;

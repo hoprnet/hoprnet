@@ -986,7 +986,7 @@ impl From<RedeemableTicket> for TransferableWinningTicket {
 }
 
 #[cfg(test)]
-pub mod test {
+pub mod tests {
     use super::*;
     use crate::tickets::AcknowledgedTicket;
     use hex_literal::hex;

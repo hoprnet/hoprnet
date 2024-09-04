@@ -260,7 +260,7 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use crate::rpc::{RpcOperations, RpcOperationsConfig};
     use crate::{HoprRpcOperations, PendingTransaction};
     use chain_types::{ContractAddresses, ContractInstances};

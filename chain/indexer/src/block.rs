@@ -271,7 +271,7 @@ where
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use std::collections::BTreeSet;
     use std::pin::Pin;
 

@@ -40,7 +40,8 @@ lazy_static::lazy_static! {
     .unwrap();
 }
 
-/// Implements execution of transactions underlying each `Action`
+/// Implements execution of transactions underlying each `Action`.
+///
 /// Each operation returns a transaction hash and may time out.
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]

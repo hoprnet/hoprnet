@@ -210,7 +210,7 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use async_std::prelude::FutureExt;
     use ethers::contract::EthEvent;
     use futures::StreamExt;

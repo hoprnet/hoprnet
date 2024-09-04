@@ -1236,7 +1236,7 @@ impl ToChecksum for Address {
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use crate::utils::random_group_element;
     use crate::{
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},

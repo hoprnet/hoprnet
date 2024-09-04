@@ -591,7 +591,7 @@ pub fn convert_acknowledged_ticket(off_chain: &RedeemableTicket) -> Result<OnCha
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use chain_rpc::client::create_rpc_client_to_anvil;
     use chain_rpc::client::surf_client::SurfRequestor;
     use chain_types::ContractInstances;

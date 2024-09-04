@@ -243,7 +243,7 @@ impl ChannelChange {
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use crate::channels::{generate_channel_id, ChannelEntry, ChannelStatus};
     use hex_literal::hex;
     use hopr_crypto_types::prelude::*;

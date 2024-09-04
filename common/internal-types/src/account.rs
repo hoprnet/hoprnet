@@ -92,7 +92,7 @@ impl AccountEntry {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use crate::account::{
         AccountEntry,
         AccountType::{Announced, NotAnnounced},

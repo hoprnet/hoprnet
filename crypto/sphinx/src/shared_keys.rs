@@ -169,7 +169,7 @@ pub trait SphinxSuite {
 }
 
 #[cfg(test)]
-pub mod tests {
+pub(crate) mod tests {
     use super::*;
     use subtle::ConstantTimeEq;
 

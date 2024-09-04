@@ -224,7 +224,7 @@ pub fn derive_vrf_parameters<T: AsRef<[u8]>>(
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
     use crate::types::Hash;
     use hex_literal::hex;

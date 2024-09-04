@@ -629,7 +629,7 @@ pub fn create_rpc_client_to_anvil<R: HttpPostRequestor + Debug>(
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use ethers::providers::JsonRpcClient;
     use serde_json::json;
     use std::fmt::Debug;

@@ -805,7 +805,7 @@ where
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use std::sync::atomic::Ordering;
     use std::sync::Arc;
     use std::time::SystemTime;
