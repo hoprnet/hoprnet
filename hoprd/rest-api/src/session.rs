@@ -24,6 +24,9 @@ use tracing::{debug, error, info};
 /// Default listening host the session listener socket binds to.
 pub const DEFAULT_LISTEN_HOST: &str = "127.0.0.1:0";
 
+/// Size of the TCP buffer for forwarding data
+pub const HOPR_TCP_BUFFER_SIZE: usize = 2048;
+
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
     static ref METRIC_ACTIVE_CLIENTS: hopr_metrics::MultiGauge = hopr_metrics::MultiGauge::new(
@@ -214,7 +217,7 @@ pub(crate) async fn create_client(
                                     #[cfg(all(feature = "prometheus", not(test)))]
                                     METRIC_ACTIVE_CLIENTS.increment(&["tcp"], 1.0);
 
-                                    bind_session_to_stream(session, stream).await;
+                                    bind_session_to_stream(session, stream, HOPR_TCP_BUFFER_SIZE).await;
 
                                     #[cfg(all(feature = "prometheus", not(test)))]
                                     METRIC_ACTIVE_CLIENTS.decrement(&["tcp"], 1.0);
@@ -264,7 +267,7 @@ pub(crate) async fn create_client(
                         #[cfg(all(feature = "prometheus", not(test)))]
                         METRIC_ACTIVE_CLIENTS.increment(&["udp"], 1.0);
 
-                        bind_session_to_stream(session, udp_socket).await;
+                        bind_session_to_stream(session, udp_socket, hopr_lib::SESSION_USABLE_MTU_SIZE).await;
 
                         #[cfg(all(feature = "prometheus", not(test)))]
                         METRIC_ACTIVE_CLIENTS.decrement(&["udp"], 1.0);
@@ -399,19 +402,12 @@ async fn udp_bind_to<A: ToSocketAddrs>(address: A) -> std::io::Result<(std::net:
     Ok((udp_socket.socket().local_addr()?, udp_socket))
 }
 
-async fn bind_session_to_stream<T>(mut session: HoprSession, stream: T)
+async fn bind_session_to_stream<T>(mut session: HoprSession, stream: T, buffer_size: usize)
 where
     T: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
 {
     let session_id = *session.id();
-    match copy_duplex(
-        &mut session,
-        &mut stream.compat(),
-        hopr_lib::SESSION_USABLE_MTU_SIZE,
-        hopr_lib::SESSION_USABLE_MTU_SIZE,
-    )
-    .await
-    {
+    match copy_duplex(&mut session, &mut stream.compat(), buffer_size, buffer_size).await {
         Ok(bound_stream_finished) => info!(
             session_id = tracing::field::debug(session_id),
             "client session ended with {bound_stream_finished:?} bytes transferred in both directions.",
@@ -430,7 +426,6 @@ mod tests {
     use futures::channel::mpsc::UnboundedSender;
     use hopr_lib::{ApplicationData, Keypair, PeerId, SendMsg};
     use hopr_transport_session::errors::TransportSessionError;
-    use hopr_transport_session::RoutingOptions;
     use std::collections::HashSet;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
@@ -486,7 +481,7 @@ mod tests {
 
         tokio::task::spawn(async move {
             match tcp_listener.accept().await {
-                Ok((stream, _)) => bind_session_to_stream(session, stream).await,
+                Ok((stream, _)) => bind_session_to_stream(session, stream, HOPR_TCP_BUFFER_SIZE).await,
                 Err(e) => error!("failed to accept connection: {e}"),
             }
         });
@@ -527,7 +522,11 @@ mod tests {
 
         let (listen_addr, udp_listener) = udp_bind_to(("127.0.0.1", 0)).await.context("udp_bind_to failed")?;
 
-        tokio::task::spawn(bind_session_to_stream(session, udp_listener));
+        tokio::task::spawn(bind_session_to_stream(
+            session,
+            udp_listener,
+            hopr_lib::SESSION_USABLE_MTU_SIZE,
+        ));
 
         let mut udp_stream = ConnectedUdpStream::bind(("127.0.0.1", 0))
             .await

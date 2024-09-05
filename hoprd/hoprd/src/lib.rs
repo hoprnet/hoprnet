@@ -89,6 +89,7 @@
 use hopr_lib::errors::HoprLibError;
 use hopr_network_types::prelude::ForeignDataMode;
 use hopr_network_types::utils::copy_duplex;
+use hoprd_api::HOPR_TCP_BUFFER_SIZE;
 
 pub mod cli;
 pub mod config;
@@ -211,7 +212,7 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                     #[cfg(all(feature = "prometheus", not(test)))]
                     METRIC_ACTIVE_TARGETS.increment(&["udp"], 1.0);
 
-                    match copy_duplex(&mut session.session, &mut tokio_util::compat::TokioAsyncReadCompatExt::compat(tcp_bridge), hopr_lib::SESSION_USABLE_MTU_SIZE, hopr_lib::SESSION_USABLE_MTU_SIZE).await {
+                    match copy_duplex(&mut session.session, &mut tokio_util::compat::TokioAsyncReadCompatExt::compat(tcp_bridge), HOPR_TCP_BUFFER_SIZE, HOPR_TCP_BUFFER_SIZE).await {
                         Ok(bound_stream_finished) => tracing::info!(
                             session_id = debug(session_id),
                             "server bridged session through TCP {tcp_target} ended with {bound_stream_finished:?} bytes transferred in both directions."

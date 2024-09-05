@@ -88,6 +88,7 @@ use crossbeam_skiplist::SkipMap;
 use dashmap::mapref::entry::Entry;
 use dashmap::DashMap;
 use futures::channel::mpsc::UnboundedSender;
+use futures::future::BoxFuture;
 use futures::{
     pin_mut, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, FutureExt, Sink, SinkExt, StreamExt, TryStreamExt,
 };
@@ -104,7 +105,7 @@ use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
 use tracing::{debug, error, trace, warn};
 
-use hopr_async_runtime::prelude::{sleep, spawn};
+use hopr_async_runtime::prelude::spawn;
 
 use crate::errors::NetworkTypeError;
 use crate::session::errors::SessionError;
@@ -218,6 +219,18 @@ pub struct SessionState<const C: usize> {
     frame_reassembler: Arc<FrameReassembler>,
     cfg: SessionConfig,
     segment_egress_send: UnboundedSender<SessionMessage<C>>,
+}
+
+fn maybe_fused_future<'a, F>(condition: bool, future: F) -> futures::future::Fuse<BoxFuture<'a, ()>>
+where
+    F: Future<Output = ()> + Send + Sync + 'a,
+{
+    if condition {
+        future.boxed()
+    } else {
+        futures::future::pending().boxed()
+    }
+    .fuse()
 }
 
 impl<const C: usize> SessionState<C> {
@@ -566,27 +579,72 @@ impl<const C: usize> SessionState<C> {
     /// - [`SessionState::request_missing_segments`]
     /// - [`SessionState::retransmit_unacknowledged_frames`]
     ///
-    async fn advance(&mut self) -> crate::errors::Result<()> {
-        if self.segment_egress_send.is_closed() {
-            return Err(SessionError::SessionClosed.into());
+    async fn state_loop(&mut self) -> crate::errors::Result<()> {
+        // Rate limiter for reassembler evictions
+        let eviction_limiter =
+            governor::RateLimiter::direct(Quota::with_period(self.cfg.frame_expiration_age / 10).ok_or(
+                NetworkTypeError::Other("rate limiter frame_expiration_age invalid".into()),
+            )?);
+
+        // Rate limiter for acknowledgements
+        let ack_rate_limiter = governor::RateLimiter::direct(
+            Quota::with_period(self.cfg.rto_base_sender.min(self.cfg.rto_base_receiver) / 3)
+                .ok_or(NetworkTypeError::Other("rate limiter ack rate invalid".into()))?,
+        );
+
+        // Rate limiter for retransmissions by the sender
+        let sender_retransmit = governor::RateLimiter::direct(
+            Quota::with_period(self.cfg.rto_base_sender)
+                .ok_or(NetworkTypeError::Other("rate limiter rto sender invalid".into()))?,
+        );
+
+        // Rate limiter for retransmissions by the receiver
+        let receiver_retransmit = governor::RateLimiter::direct(
+            Quota::with_period(self.cfg.rto_base_receiver)
+                .ok_or(NetworkTypeError::Other("rate limiter rto receiver invalid".into()))?,
+        );
+
+        loop {
+            let mut evict_fut = eviction_limiter.until_ready().boxed().fuse();
+            let mut ack_fut = maybe_fused_future(
+                self.cfg.enabled_features.contains(&SessionFeature::AcknowledgeFrames),
+                ack_rate_limiter.until_ready(),
+            );
+            let mut r_snd_fut = maybe_fused_future(
+                self.cfg.enabled_features.contains(&SessionFeature::RetransmitFrames),
+                sender_retransmit.until_ready(),
+            );
+            let mut r_rcv_fut = maybe_fused_future(
+                self.cfg
+                    .enabled_features
+                    .contains(&SessionFeature::RequestIncompleteFrames),
+                receiver_retransmit.until_ready(),
+            );
+            let mut is_done = maybe_fused_future(self.segment_egress_send.is_closed(), futures::future::ready(()));
+
+            // Futures in select_biased! are ordered from the least often happening first
+            if let Err(e) = futures::select_biased! {
+                _ = is_done => {
+                    Err(NetworkTypeError::Other("session writer has been closed".into()))
+                },
+                _ = r_rcv_fut => {
+                    self.request_missing_segments().await
+                },
+                _ = r_snd_fut => {
+                    self.retransmit_unacknowledged_frames().await
+                },
+                _ = ack_fut => {
+                    self.acknowledge_segments().await
+                },
+                 _ = evict_fut => {
+                    self.frame_reassembler.evict().map_err(NetworkTypeError::from)
+                },
+            } {
+                debug!(session_id = self.session_id, "session is closing: {e}");
+                break;
+            }
         }
 
-        let num_evicted = self.frame_reassembler.evict()?;
-        trace!(session_id = self.session_id, "evicted {num_evicted} frames");
-
-        if self.cfg.enabled_features.contains(&SessionFeature::AcknowledgeFrames) {
-            self.acknowledge_segments().await?;
-        }
-        if self
-            .cfg
-            .enabled_features
-            .contains(&SessionFeature::RequestIncompleteFrames)
-        {
-            self.request_missing_segments().await?;
-        }
-        if self.cfg.enabled_features.contains(&SessionFeature::RetransmitFrames) {
-            self.retransmit_unacknowledged_frames().await?;
-        }
         Ok(())
     }
 
@@ -737,20 +795,11 @@ impl<const C: usize> SessionSocket<C> {
         // Advance the state until the socket is closed
         let mut state_clone = state.clone();
         spawn(async move {
-            let timeout = cfg
-                .rto_base_receiver
-                .min(cfg.rto_base_sender)
-                .min(cfg.frame_expiration_age / 3);
-
-            loop {
-                match state_clone.advance().await {
-                    Ok(_) => sleep(timeout).await,
-                    Err(e) => {
-                        debug!(session_id = state_clone.session_id(), "session is closing: {e}");
-                        break;
-                    }
-                }
-            }
+            let loop_done = state_clone.state_loop().await;
+            debug!(
+                session_id = state_clone.session_id,
+                "FINISHED: state loop {loop_done:?}"
+            );
         });
 
         Self { state, frame_egress }

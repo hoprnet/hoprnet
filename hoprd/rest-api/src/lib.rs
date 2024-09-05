@@ -14,6 +14,8 @@ mod prometheus;
 mod session;
 mod tickets;
 
+pub use session::HOPR_TCP_BUFFER_SIZE;
+
 use async_lock::RwLock;
 use axum::{
     extract::Json,
