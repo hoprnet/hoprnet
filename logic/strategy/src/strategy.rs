@@ -79,6 +79,11 @@ fn just_true() -> bool {
 }
 
 #[inline]
+fn sixty() -> u64 {
+    60
+}
+
+#[inline]
 fn empty_vector() -> Vec<Strategy> {
     vec![]
 }
@@ -107,9 +112,10 @@ pub struct MultiStrategyConfig {
 
     /// Execution interval of the configured strategies in seconds.
     ///
-    /// Default is 60.
+    /// Default is 60, minimum is 1.
     #[default = 60]
-    #[serde(default)]
+    #[serde(default = "sixty")]
+    #[validate(range(min = 1))]
     pub execution_interval: u64,
 
     /// Configuration of individual sub-strategies.
