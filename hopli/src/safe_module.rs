@@ -374,7 +374,10 @@ impl SafeModuleSubcommands {
 
         // get allowance
         let token_allowance = match allowance {
-            Some(allw) => U256::from(parse_units(allw, "ether").unwrap()),
+            Some(allw) => U256::from(
+                parse_units(allw, "ether")
+                    .map_err(|_| HelperErrors::ParseError("Failed to parse allowance units".into()))?,
+            ),
             None => U256::max_value(),
         };
 
@@ -645,7 +648,10 @@ impl SafeModuleSubcommands {
 
         // get allowance
         let token_allowance = match allowance {
-            Some(allw) => U256::from(parse_units(allw, "ether").unwrap()),
+            Some(allw) => U256::from(
+                parse_units(allw, "ether")
+                    .map_err(|_| HelperErrors::ParseError("Failed to parse allowance units".into()))?,
+            ),
             None => U256::max_value(),
         };
 

@@ -121,6 +121,10 @@ pub enum HelperErrors {
     // error of parsing addresses
     #[error("Cannot parse address: {0}")]
     InvalidAddress(String),
+
+    // general error of parsing
+    #[error("Cannot parse: {0}")]
+    ParseError(String),
 }
 
 /// Multicall3 deployer wallet
