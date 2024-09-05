@@ -426,7 +426,11 @@ impl SafeModuleSubcommands {
         // direct transfer of some HOPR tokens to the safe
         if let Some(hopr_amount_for_safe) = hopr_amount {
             let hopr_token = HoprToken::new(contract_addresses.addresses.token, rpc_provider.clone());
-            let hopr_to_be_transferred = U256::from(parse_units(hopr_amount_for_safe, "ether").unwrap());
+            let hopr_to_be_transferred = U256::from(
+                parse_units(hopr_amount_for_safe, "ether")
+                    .map_err(|_| HelperErrors::ParseError("Failed to parse HOPR amount units".into()))?,
+            );
+
             transfer_or_mint_tokens(hopr_token, vec![safe.address()], vec![hopr_to_be_transferred]).await?;
             info!(
                 "safe {:?} has received {:?} HOPR tokens",
@@ -437,7 +441,10 @@ impl SafeModuleSubcommands {
 
         // distribute some native tokens to the nodes
         if let Some(native_amount_for_node) = native_amount {
-            let native_to_be_transferred = U256::from(parse_units(native_amount_for_node, "ether").unwrap());
+            let native_to_be_transferred = U256::from(
+                parse_units(native_amount_for_node, "ether")
+                    .map_err(|_| HelperErrors::ParseError("Failed to parse HOPR amount units".into()))?,
+            );
             let native_amounts = vec![native_to_be_transferred; node_eth_addresses.len()];
             transfer_native_tokens(rpc_provider.clone(), node_eth_addresses.clone(), native_amounts).await?;
             info!(
