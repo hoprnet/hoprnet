@@ -97,7 +97,7 @@ where
                 }
             },
             Ok(None) => debug!("No update necessary"),
-            Err(e) => error!("Encountered error on on updating the collected ping data: {e}"),
+            Err(e) => error!("Encountered error on updating the collected ping data: {e}"),
         }
     }
 }

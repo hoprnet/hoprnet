@@ -72,7 +72,7 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
 
     /**
      * @dev Set stake contract address, transfer ownership, and set the maximum registrations per
-     * special NFT to the default value: upperbound of of uint256.
+     * special NFT to the default value: upperbound of uint256.
      */
     constructor(address _stakeContract, address _newOwner, uint256 _minStake) {
         _updateStakeContract(_stakeContract);
