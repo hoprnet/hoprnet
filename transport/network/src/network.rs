@@ -308,7 +308,7 @@ where
     pub async fn find_peers_to_ping(&self, threshold: SystemTime) -> crate::errors::Result<Vec<PeerId>> {
         let stream = self
             .db
-            .get_network_peers(PeerSelector::default().with_last_seen_lte(threshold), false)
+            .get_network_peers(PeerSelector::default().with_last_seen_lte(threshold), true)
             .await?;
         futures::pin_mut!(stream);
         let mut data: Vec<PeerStatus> = stream
