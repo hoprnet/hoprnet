@@ -781,6 +781,8 @@ impl SafeModuleSubcommands {
 
         // loop through all the nodes and debug
         for node in node_eth_addresses {
+            info!("Starting debug checks for node: {:?}", node);
+            info!("Checking node registration with network registry...");
             let registered_safe = debug_node_safe_module_setup_on_balance_and_registries(
                 network_registry.clone(),
                 node_safe_registry.clone(),
@@ -800,6 +802,7 @@ impl SafeModuleSubcommands {
                     node, safe_addr
                 );
             }
+            info!("Checking node and safe association in node-safe registry...");
             debug_node_safe_module_setup_main(
                 hopr_token.clone(),
                 &module_addr,
