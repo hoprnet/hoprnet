@@ -206,6 +206,14 @@ impl HoprDb {
             })
             .await?)
     }
+
+    pub async fn reset_ticket_statistics(&self) -> Result<()> {
+        #[cfg(all(feature = "prometheus", not(test)))]
+        {
+            METRIC_HOPR_TICKETS_INCOMING_STATISTICS.reset();
+        }
+        Ok(())
+    }
 }
 
 #[async_trait]

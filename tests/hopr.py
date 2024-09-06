@@ -320,6 +320,14 @@ class HoprdAPI:
         _, response = self.__call_api(TicketsApi, "show_ticket_statistics")
         return response
 
+    async def reset_tickets_statistics(self):
+        """
+        Resets the ticket statistics of the node.
+        :return: bool
+        """
+        status, _ = self.__call_api(TicketsApi, "reset_ticket_statistics")
+        return status
+
     async def send_message(self, destination: str, message: str, hops: list[str], tag: int = MESSAGE_TAG) -> bool:
         """
         Sends a message to the given destination.
@@ -403,7 +411,7 @@ class HoprdAPI:
         _, response = self.__call_api(SessionApi, "list_clients", protocol=protocol)
         return response
 
-    async def session_close_client(self, protocol: str, bound_port: int, bound_ip: str = '127.0.0.1'):
+    async def session_close_client(self, protocol: str, bound_port: int, bound_ip: str = "127.0.0.1"):
         """
         Closes a previously opened and bound session
         """
@@ -431,6 +439,9 @@ class HoprdAPI:
         body = WithdrawBodyRequest(receipient, amount, currency)
         status, response = self.__call_api(AccountApi, "withdraw", body=body)
         return status, response
+
+    async def metrics(self):
+        return ""
 
     async def startedz(self):
         """

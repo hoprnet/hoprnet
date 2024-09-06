@@ -248,6 +248,11 @@ impl MultiGauge {
     pub fn labels(&self) -> Vec<&str> {
         self.labels.iter().map(String::as_str).collect()
     }
+
+    /// Reset gauge
+    pub fn reset(&self) {
+        self.ctr.reset();
+    }
 }
 
 #[cfg(any(not(feature = "js"), test))]
