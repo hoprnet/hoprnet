@@ -417,8 +417,7 @@ impl SafeModuleSubcommands {
             admin_eth_addresses,
             U256::from(threshold),
         )
-        .await
-        .unwrap();
+        .await?;
 
         println!("safe {:?}", safe.address());
         println!("node_module {:?}", node_module.address());
@@ -689,8 +688,7 @@ impl SafeModuleSubcommands {
             token_allowance,
             signer_private_key,
         )
-        .await
-        .unwrap();
+        .await?;
         info!("a new network has been included due to the migration");
 
         // action around network registry
