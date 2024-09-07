@@ -21,7 +21,7 @@ use hopr_async_runtime::prelude::{cancel_join_handle, spawn, JoinHandle};
 use hopr_lib::{ApplicationData, AsUnixTimestamp, HoprLibProcesses, ToHex};
 use hoprd::cli::CliArgs;
 use hoprd::errors::HoprdError;
-use hoprd_api::{serve_api, ListenerJoinHandles};
+use hoprd_api::{serve_api, ListenerJoinHandles, RestApiParameters};
 use hoprd_keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
 
 use hoprd::HoprServerIpForwardingReactor;
@@ -235,16 +235,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         processes.push(HoprdProcesses::ListenerSockets(session_listener_sockets.clone()));
         processes.push(HoprdProcesses::RestApi(spawn(async move {
-            if let Err(e) = serve_api(
-                api_listener,
-                node_cfg_str,
-                api_cfg,
-                node_clone,
+            if let Err(e) = serve_api(RestApiParameters {
+                listener: api_listener,
+                hoprd_cfg: node_cfg_str,
+                cfg: api_cfg,
+                hopr: node_clone,
                 inbox,
                 session_listener_sockets,
-                ws_events_rx,
-                Some(msg_encoder),
-            )
+                websocket_rx: ws_events_rx,
+                msg_encoder: Some(msg_encoder),
+            })
             .await
             {
                 error!("the REST API server could not start: {e}")

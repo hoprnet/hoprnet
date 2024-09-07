@@ -64,7 +64,7 @@ use hopr_platform::file::native::{join, remove_dir_all};
 use hopr_strategy::strategy::{MultiStrategy, SingularStrategy};
 use hopr_transport::{
     execute_on_tick, ChainKeypair, Hash, HoprTransport, HoprTransportConfig, HoprTransportProcess, IncomingSession,
-    IndexerTransportEvent, Network, OffchainKeypair, PeerDiscovery, PeerEligibility, PeerOrigin,
+    IndexerTransportEvent, Network, OffchainKeypair, PeerDiscovery, PeerEligibility, PeerOrigin, PeerStatus,
 };
 pub use {
     chain_actions::errors::ChainActionsError,
@@ -79,7 +79,7 @@ pub use {
     hopr_transport::{
         config::{looks_like_domain, HostConfig, HostType},
         constants::RESERVED_TAG_UPPER_LIMIT,
-        errors::{HoprTransportError, ProtocolError},
+        errors::{HoprTransportError, NetworkingError, ProtocolError},
         libp2p::identity::PeerId,
         ApplicationData, HalfKeyChallenge, Health, IncomingSession as HoprIncomingSession, Keypair, Multiaddr,
         OffchainKeypair as HoprOffchainKeypair, SendMsg, Session as HoprSession, SessionCapability,
@@ -1054,7 +1054,7 @@ impl Hopr {
     }
 
     /// Ping another node in the network based on the PeerId
-    pub async fn ping(&self, peer: &PeerId) -> errors::Result<Option<std::time::Duration>> {
+    pub async fn ping(&self, peer: &PeerId) -> errors::Result<(std::time::Duration, PeerStatus)> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
         Ok(self.transport_api.ping(peer).await?)

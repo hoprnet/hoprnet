@@ -910,7 +910,7 @@ where
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
-    pub async fn ping(&self, peer: &PeerId) -> errors::Result<Option<std::time::Duration>> {
+    pub async fn ping(&self, peer: &PeerId) -> errors::Result<(std::time::Duration, PeerStatus)> {
         if !self.is_allowed_to_access_network(peer).await? {
             return Err(HoprTransportError::Api(format!(
                 "ping to '{peer}' not allowed due to network registry"
@@ -945,11 +945,14 @@ where
             Either::Right(_) => info!("Manual ping succeeded"),
         };
 
-        Ok(self
-            .network
-            .get(peer)
-            .await?
-            .map(|status| status.last_seen.as_unix_timestamp().saturating_sub(start)))
+        let peer_status = self.network.get(peer).await?.ok_or(HoprTransportError::NetworkError(
+            errors::NetworkingError::NonExistingPeer,
+        ))?;
+
+        Ok((
+            peer_status.last_seen.as_unix_timestamp().saturating_sub(start),
+            peer_status,
+        ))
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
