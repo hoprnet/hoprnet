@@ -1,10 +1,11 @@
 use crate::{errors::TransportSessionError, traits::SendMsg, Capability};
-use futures::{channel::mpsc::UnboundedReceiver, pin_mut, StreamExt};
+use futures::{channel::mpsc::UnboundedReceiver, pin_mut, AsyncRead, AsyncWrite, StreamExt};
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_internal_types::protocol::{ApplicationData, PAYLOAD_SIZE};
 use hopr_network_types::prelude::state::SessionFeature;
 use hopr_network_types::prelude::{IpOrHost, RoutingOptions};
 use hopr_network_types::session::state::{SessionConfig, SessionSocket};
+use hopr_network_types::utils::copy_duplex;
 use hopr_primitive_types::traits::BytesRepresentable;
 use libp2p_identity::PeerId;
 use std::collections::HashSet;
@@ -96,6 +97,7 @@ pub struct Session {
     id: SessionId,
     inner: Pin<Box<dyn AsyncReadWrite>>,
     routing_options: RoutingOptions,
+    capabilities: HashSet<Capability>,
     shutdown_notifier: Option<futures::channel::mpsc::UnboundedSender<SessionId>>,
 }
 
@@ -142,6 +144,7 @@ impl Session {
                 id,
                 inner: Box::pin(SessionSocket::<SESSION_USABLE_MTU_SIZE>::new(id, inner_session, cfg)),
                 routing_options,
+                capabilities,
                 shutdown_notifier,
             }
         } else {
@@ -150,6 +153,7 @@ impl Session {
                 id,
                 inner: Box::pin(inner_session),
                 routing_options,
+                capabilities,
                 shutdown_notifier,
             }
         }
@@ -163,6 +167,11 @@ impl Session {
     /// Routing options used to deliver data.
     pub fn routing_options(&self) -> &RoutingOptions {
         &self.routing_options
+    }
+
+    /// Capabilities of this Session.
+    pub fn capabilities(&self) -> &HashSet<Capability> {
+        &self.capabilities
     }
 }
 
@@ -425,6 +434,37 @@ pub fn unwrap_offchain_key(payload: Box<[u8]>) -> crate::errors::Result<(PeerId,
     let opk = OffchainPublicKey::try_from(payload.as_slice()).map_err(|_e| TransportSessionError::PeerId)?;
 
     Ok((opk.into(), data))
+}
+
+/// Convenience function to copy data in both directions between a [Session] and arbitrary
+/// async IO stream.
+///
+/// The function takes the capabilities of the given `session` into account:
+/// It transfers either `max_buffer` size from the `stream` into the Session, if segmentation is
+/// supported.
+/// Otherwise, it transfers the [`SESSION_USABLE_MTU_SIZE`].
+/// In the opposite direction, transfers from the `session` into the `stream` will always
+/// use `max_buffer` regardless of the Session's capabilities.
+pub async fn transfer_session<S>(
+    session: &mut Session,
+    stream: &mut S,
+    max_buffer: usize,
+) -> std::io::Result<(usize, usize)>
+where
+    S: AsyncRead + AsyncWrite + Unpin,
+{
+    let into_session_len = if session.capabilities().contains(&Capability::Segmentation) {
+        max_buffer
+    } else {
+        SESSION_USABLE_MTU_SIZE
+    };
+
+    // We can always read as much as possible from the Session and then write it to the Stream.
+    // However, if no segmentation is taking place in the Session, we can only read up
+    // to the maximum of MTU bytes from the Stream and then write it into the Session.
+    copy_duplex(session, stream, max_buffer, into_session_len)
+        .await
+        .map(|(a, b)| (a as usize, b as usize))
 }
 
 #[cfg(test)]

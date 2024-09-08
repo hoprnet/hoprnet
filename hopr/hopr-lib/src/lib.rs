@@ -81,8 +81,8 @@ pub use {
         constants::RESERVED_TAG_UPPER_LIMIT,
         errors::{HoprTransportError, ProtocolError},
         libp2p::identity::PeerId,
-        ApplicationData, HalfKeyChallenge, Health, IncomingSession as HoprIncomingSession, Keypair, Multiaddr,
-        OffchainKeypair as HoprOffchainKeypair, SendMsg, Session as HoprSession, SessionCapability,
+        transfer_session, ApplicationData, HalfKeyChallenge, Health, IncomingSession as HoprIncomingSession, Keypair,
+        Multiaddr, OffchainKeypair as HoprOffchainKeypair, SendMsg, Session as HoprSession, SessionCapability,
         SessionClientConfig, SessionId as HoprSessionId, SessionTarget, TicketStatistics, SESSION_USABLE_MTU_SIZE,
     },
 };

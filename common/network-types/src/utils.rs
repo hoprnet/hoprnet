@@ -38,7 +38,7 @@ where
 
 /// This is a proper re-implementation of Tokio's [`copy_bidirectional_with_sizes`](tokio::io::copy_bidirectional_with_sizes),
 /// which only uses [`futures::io`] types and does not leave the stream in half-open-state when one side closes read or write side.
-/// Instead, if either side encounters and empty read (EOF indication), the write-side is closed as well
+/// Instead, if either side encounters an empty read (EOF indication), the write-side is closed as well
 /// and vice versa.
 pub async fn copy_duplex<A, B>(
     a: &mut A,
@@ -253,6 +253,30 @@ mod tests {
     #[tokio::test]
     async fn test_copy_duplex() -> anyhow::Result<()> {
         const DATA_LEN: usize = 2000;
+
+        let alice_tx = hopr_crypto_random::random_bytes::<DATA_LEN>();
+        let mut alice_rx = [0u8; DATA_LEN];
+
+        let bob_tx = hopr_crypto_random::random_bytes::<DATA_LEN>();
+        let mut bob_rx = [0u8; DATA_LEN];
+
+        let mut alice = DuplexIO(alice_tx.as_ref(), futures::io::Cursor::new(alice_rx.as_mut()));
+        let mut bob = DuplexIO(bob_tx.as_ref(), futures::io::Cursor::new(bob_rx.as_mut()));
+
+        let (a_to_b, b_to_a) = copy_duplex(&mut alice, &mut bob, 128, 128).await?;
+
+        assert_eq!(DATA_LEN, a_to_b as usize);
+        assert_eq!(DATA_LEN, b_to_a as usize);
+
+        assert_eq!(alice_tx, bob_rx);
+        assert_eq!(bob_tx, alice_rx);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_copy_duplex_small() -> anyhow::Result<()> {
+        const DATA_LEN: usize = 100;
 
         let alice_tx = hopr_crypto_random::random_bytes::<DATA_LEN>();
         let mut alice_rx = [0u8; DATA_LEN];

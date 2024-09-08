@@ -11,10 +11,10 @@ use axum::{
 };
 use futures::{StreamExt, TryStreamExt};
 use hopr_lib::errors::HoprLibError;
+use hopr_lib::transfer_session;
 use hopr_lib::{HoprSession, IpProtocol, PeerId, RoutingOptions, SessionCapability, SessionClientConfig};
 use hopr_network_types::prelude::ConnectedUdpStream;
 use hopr_network_types::udp::ForeignDataMode;
-use hopr_network_types::utils::copy_duplex;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use tokio::net::{TcpListener, ToSocketAddrs};
@@ -24,8 +24,11 @@ use tracing::{debug, error, info};
 /// Default listening host the session listener socket binds to.
 pub const DEFAULT_LISTEN_HOST: &str = "127.0.0.1:0";
 
-/// Size of the TCP buffer for forwarding data
+/// Size of the buffer for forwarding data to/from a TCP stream.
 pub const HOPR_TCP_BUFFER_SIZE: usize = 2048;
+
+/// Size of the buffer for forwarding data to/from a UDP stream.
+pub const HOPR_UDP_BUFFER_SIZE: usize = 2048;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -267,7 +270,7 @@ pub(crate) async fn create_client(
                         #[cfg(all(feature = "prometheus", not(test)))]
                         METRIC_ACTIVE_CLIENTS.increment(&["udp"], 1.0);
 
-                        bind_session_to_stream(session, udp_socket, hopr_lib::SESSION_USABLE_MTU_SIZE).await;
+                        bind_session_to_stream(session, udp_socket, HOPR_UDP_BUFFER_SIZE).await;
 
                         #[cfg(all(feature = "prometheus", not(test)))]
                         METRIC_ACTIVE_CLIENTS.decrement(&["udp"], 1.0);
@@ -402,12 +405,12 @@ async fn udp_bind_to<A: ToSocketAddrs>(address: A) -> std::io::Result<(std::net:
     Ok((udp_socket.socket().local_addr()?, udp_socket))
 }
 
-async fn bind_session_to_stream<T>(mut session: HoprSession, stream: T, buffer_size: usize)
+async fn bind_session_to_stream<T>(mut session: HoprSession, stream: T, max_buf: usize)
 where
     T: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
 {
     let session_id = *session.id();
-    match copy_duplex(&mut session, &mut stream.compat(), buffer_size, buffer_size).await {
+    match transfer_session(&mut session, &mut stream.compat(), max_buf).await {
         Ok(bound_stream_finished) => info!(
             session_id = tracing::field::debug(session_id),
             "client session ended with {bound_stream_finished:?} bytes transferred in both directions.",
