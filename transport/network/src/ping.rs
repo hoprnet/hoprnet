@@ -125,7 +125,7 @@ impl PingQueryReplier {
 }
 
 /// Timeout-based future that will resolve to the result of the ping operation.
-#[tracing::instrument(level = "trace")]
+#[tracing::instrument(level = "debug", skip(sender, timeout))]
 pub fn to_active_ping(
     peer: PeerId,
     sender: HeartbeatSendPingTx,
@@ -199,7 +199,7 @@ where
     /// # Arguments
     ///
     /// * `peers` - A vector of PeerId objects referencing the peers to be pinged
-    #[tracing::instrument(level = "info", skip(self))]
+    #[tracing::instrument(level = "info", skip(self, peers))]
     async fn ping(&self, peers: Vec<PeerId>) {
         let start_all_peers = current_time();
         let mut peers = peers;
