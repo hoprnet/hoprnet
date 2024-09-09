@@ -242,9 +242,9 @@ where
                 entry.backoff = self.cfg.backoff_max.max(entry.backoff.powf(self.cfg.backoff_exponent));
                 entry.update_quality(0.0_f64.max(entry.get_quality() - self.cfg.quality_step));
 
-                if entry.get_quality() < (self.cfg.quality_step / 2.0) {
-                    entry.ignored = Some(current_time());
-                } else if entry.get_quality() < self.cfg.quality_bad_threshold {
+                let q = entry.get_quality();
+
+                if q < (self.cfg.quality_step / 2.0) || q < self.cfg.quality_bad_threshold {
                     entry.ignored = Some(current_time());
                 }
             }
@@ -315,6 +315,10 @@ where
         futures::pin_mut!(stream);
         let mut data: Vec<PeerStatus> = stream
             .filter_map(|v| async move {
+                if v.id.1 == self.me {
+                    return None;
+                }
+
                 if let Some(ignore_start) = v.ignored {
                     let should_be_ignored = ignore_start
                         .checked_add(self.cfg.ignore_timeframe)
@@ -324,9 +328,7 @@ where
                         return None;
                     }
                 }
-                if v.id.1 == self.me {
-                    return None;
-                }
+
                 let backoff = v.backoff.powf(self.cfg.backoff_exponent);
                 let delay = std::cmp::min(self.cfg.min_delay * (backoff as u32), self.cfg.max_delay);
 
