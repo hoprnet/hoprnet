@@ -1,4 +1,5 @@
 use std::collections::hash_set::HashSet;
+use std::ops::Add;
 use std::time::{Duration, SystemTime};
 
 use futures::StreamExt;
@@ -313,6 +314,17 @@ where
         futures::pin_mut!(stream);
         let mut data: Vec<PeerStatus> = stream
             .filter_map(|v| async move {
+                if let Some(ignore_start) = v.ignored {
+                    let should_be_ignored = ignore_start
+                        .checked_add(self.cfg.ignore_timeframe)
+                        .map(|v| v > threshold)
+                        .unwrap_or_default();
+
+                    if should_be_ignored {
+                        return None;
+                    }
+                }
+
                 if v.id.1 == self.me {
                     return None;
                 }
