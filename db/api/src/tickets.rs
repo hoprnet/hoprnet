@@ -235,6 +235,9 @@ pub trait HoprDbTicketOperations {
     /// If no channel is given, it retrieves aggregate ticket statistics for all channels.
     async fn get_ticket_statistics(&self, channel_id: Option<Hash>) -> Result<ChannelTicketStatistics>;
 
+    /// Resets the ticket statistics about neglected, rejected, and redeemed tickets.
+    async fn reset_ticket_statistics(&self) -> Result<()>;
+
     /// Counts the tickets matching the given `selector` and their total value.
     ///
     /// The optional transaction `tx` must be in the database.

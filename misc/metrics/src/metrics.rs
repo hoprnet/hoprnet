@@ -1,5 +1,4 @@
 use prometheus::core::Collector;
-use prometheus::proto::MetricFamily;
 use prometheus::{
     Gauge, GaugeVec, Histogram, HistogramOpts, HistogramTimer, HistogramVec, IntCounter, IntCounterVec, Opts,
     TextEncoder,
@@ -204,11 +203,6 @@ impl MultiGauge {
     pub fn name(&self) -> String {
         self.name.clone()
     }
-
-    // /// Returns the metric families of the gauge vector.
-    // pub fn families(&self) -> Vec<MetricFamily> {
-    //     self.ctr.collect()
-    // }
 }
 
 impl MultiGauge {
@@ -253,11 +247,6 @@ impl MultiGauge {
     /// Returns the labels of the counters given at construction.
     pub fn labels(&self) -> Vec<&str> {
         self.labels.iter().map(String::as_str).collect()
-    }
-
-    /// Reset gauge
-    pub fn reset(&self) {
-        self.ctr.reset();
     }
 }
 

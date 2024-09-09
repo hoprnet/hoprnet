@@ -206,46 +206,6 @@ impl HoprDb {
             })
             .await?)
     }
-
-    pub async fn reset_ticket_statistics(&self) -> Result<()> {
-        #[cfg(all(feature = "prometheus", not(test)))]
-        {
-            METRIC_HOPR_TICKETS_INCOMING_STATISTICS.reset();
-
-            // let target_statistics = ["neglected", "redeemed", "rejected"];
-
-            // // Get the current metrics from the collector
-            // let metric_families = METRIC_HOPR_TICKETS_INCOMING_STATISTICS.families();
-
-            // // Iterate through the metric families to access the labels and values
-            // for family in metric_families {
-            //     for metric in family.get_metric() {
-            //         let labels = metric.get_label();
-            //         let mut channel_value = None;
-            //         let mut statistic_value = None;
-
-            //         // Extract channel and statistic label values
-            //         for label in labels {
-            //             match label.get_name() {
-            //                 "channel" => channel_value = Some(label.get_value().to_string()),
-            //                 "statistic" => statistic_value = Some(label.get_value().to_string()),
-            //                 _ => (),
-            //             }
-            //         }
-
-            //         // Reset the metric if the statistic matches the target
-            //         if let (Some(channel), Some(statistic)) = (channel_value, statistic_value) {
-            //             if target_statistics.contains(&statistic.as_str()) {
-            //                 METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(&[&channel, &statistic], 0_f64);
-            //             }
-            //         }
-            //     }
-            // }
-        }
-
-        // reload metrics from database
-        Ok(())
-    }
 }
 
 #[async_trait]
@@ -627,6 +587,21 @@ impl HoprDbTicketOperations for HoprDb {
             }
         };
         Ok(res?)
+    }
+
+    async fn reset_ticket_statistics(&self) -> Result<()> {
+        // Remove all tickets that are not unredeemed
+        self.ticket_manager
+            .with_write_locked_db(|tx| {
+                Box::pin(async move {
+                    let deleted = ticket_statistics::Entity::delete_many().exec(tx.as_ref()).await?;
+                    Ok::<_, DbSqlError>(deleted.rows_affected as usize)
+                })
+            })
+            .await?;
+
+        self.get_ticket_statistics(None).await?;
+        Ok(())
     }
 
     async fn get_tickets_value(&self, selector: TicketSelector) -> Result<(usize, Balance)> {
@@ -3183,5 +3158,20 @@ mod tests {
         db.aggregate_tickets(*ALICE_OFFCHAIN.public(), tickets.clone(), &BOB)
             .await
             .expect_err("should not aggregate non-winning tickets");
+    }
+
+    #[async_std::test]
+    async fn test_set_ticket_statistics_when_tickets_are_in_db() {
+        let db = HoprDb::new_in_memory(ALICE.clone()).await;
+
+        let ticket = init_db_with_tickets(&db, 1).await.1.pop().unwrap();
+
+        db.mark_tickets_redeemed((&ticket).into()).await.expect("must not fail");
+
+        let stats = db.get_ticket_statistics(None).await.expect("must not fail");
+        assert_ne!(stats.redeemed_value, BalanceType::HOPR.zero());
+
+        db.reset_ticket_statistics().await.expect("must not fail");
+        assert_eq!(stats.redeemed_value, BalanceType::HOPR.zero());
     }
 }
