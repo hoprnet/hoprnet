@@ -2,7 +2,7 @@
 hopr:
   host:
     address: !IPv4 127.0.0.1 # NOTE: adapt this to reflect your public IP
-    port: 9091
+    port: 9091 # NOTE: adapt this to reflect your public PORT
   db:
     data: /app/hoprd/
   strategy:
@@ -19,7 +19,7 @@ hopr:
       - !ClosureFinalizer
         max_closure_overdue: 60
   chain:
-    network: dufour # NOTE: fill in value
+    network: dufour
     provider: # NOTE: fill in value
     announce: true
     check_unrealized_balance: true
