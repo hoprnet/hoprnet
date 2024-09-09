@@ -28,6 +28,7 @@ bitvec = "1.0.1"
 crossbeam-queue = "0.3.11"
 crossbeam-skiplist = { workspace = true }
 dashmap = { workspace = true }
+flume = "0.11.0"
 futures = { workspace = true }
 governor = "0.6.3"
 hex = { workspace = true }
@@ -39,10 +40,11 @@ serde = { workspace = true, optional = true }
 serde_with = { workspace = true, optional = true }
 serde_bytes = { workspace = true, optional = true }
 smart-default = { workspace = true }
+socket2 = "0.5.7"
 strum = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, optional = true }
-tokio-util = { workspace = true, optional = true, features = ["net"] }
+tokio-util = { workspace = true, optional = true, features = ["net", "io"] }
 tracing = { workspace = true }
 
 hopr-platform = { workspace = true }
