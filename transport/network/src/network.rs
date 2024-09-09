@@ -1,5 +1,4 @@
 use std::collections::hash_set::HashSet;
-use std::ops::Add;
 use std::time::{Duration, SystemTime};
 
 use futures::StreamExt;
@@ -244,13 +243,14 @@ where
                 entry.update_quality(0.0_f64.max(entry.get_quality() - self.cfg.quality_step));
 
                 if entry.get_quality() < (self.cfg.quality_step / 2.0) {
-                    return Ok(Some(NetworkTriggeredEvent::CloseConnection(entry.id.1)));
+                    entry.ignored = Some(current_time());
                 } else if entry.get_quality() < self.cfg.quality_bad_threshold {
                     entry.ignored = Some(current_time());
                 }
             }
 
-            self.db.update_network_peer(entry.clone()).await?;
+            let (peer_id, quality) = (entry.id.1, entry.get_quality());
+            self.db.update_network_peer(entry).await?;
 
             #[cfg(all(feature = "prometheus", not(test)))]
             {
@@ -258,10 +258,11 @@ where
                 self.refresh_metrics(&stats)
             }
 
-            Ok(Some(NetworkTriggeredEvent::UpdateQuality(
-                entry.id.1,
-                entry.get_quality(),
-            )))
+            if quality < (self.cfg.quality_step / 2.0) {
+                Ok(Some(NetworkTriggeredEvent::CloseConnection(peer_id)))
+            } else {
+                Ok(Some(NetworkTriggeredEvent::UpdateQuality(peer_id, quality)))
+            }
         } else {
             debug!("Ignoring update request for unknown peer {}", peer);
             Ok(None)

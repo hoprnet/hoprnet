@@ -125,7 +125,7 @@ impl PingQueryReplier {
 }
 
 /// Timeout-based future that will resolve to the result of the ping operation.
-#[tracing::instrument(level = "debug", skip(sender, timeout))]
+#[tracing::instrument(level = "trace", skip(sender, timeout))]
 pub fn to_active_ping(
     peer: PeerId,
     sender: HeartbeatSendPingTx,
