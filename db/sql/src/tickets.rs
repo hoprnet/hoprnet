@@ -211,7 +211,39 @@ impl HoprDb {
         #[cfg(all(feature = "prometheus", not(test)))]
         {
             METRIC_HOPR_TICKETS_INCOMING_STATISTICS.reset();
+
+            // let target_statistics = ["neglected", "redeemed", "rejected"];
+
+            // // Get the current metrics from the collector
+            // let metric_families = METRIC_HOPR_TICKETS_INCOMING_STATISTICS.families();
+
+            // // Iterate through the metric families to access the labels and values
+            // for family in metric_families {
+            //     for metric in family.get_metric() {
+            //         let labels = metric.get_label();
+            //         let mut channel_value = None;
+            //         let mut statistic_value = None;
+
+            //         // Extract channel and statistic label values
+            //         for label in labels {
+            //             match label.get_name() {
+            //                 "channel" => channel_value = Some(label.get_value().to_string()),
+            //                 "statistic" => statistic_value = Some(label.get_value().to_string()),
+            //                 _ => (),
+            //             }
+            //         }
+
+            //         // Reset the metric if the statistic matches the target
+            //         if let (Some(channel), Some(statistic)) = (channel_value, statistic_value) {
+            //             if target_statistics.contains(&statistic.as_str()) {
+            //                 METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(&[&channel, &statistic], 0_f64);
+            //             }
+            //         }
+            //     }
+            // }
         }
+
+        // reload metrics from database
         Ok(())
     }
 }

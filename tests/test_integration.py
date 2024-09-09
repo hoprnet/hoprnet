@@ -146,6 +146,8 @@ async def check_received_packets_with_peek(receiver: Node, expected_packets: lis
 
     assert received == expected_packets, f"Expected: {expected_packets}, got: {received}"
 
+    return received
+
 
 async def check_rejected_tickets_value(src: Node, value: int):
     while balance_str_to_int((await src.api.get_tickets_statistics()).rejected_value) < value:
@@ -173,7 +175,7 @@ async def check_all_tickets_redeemed(src: Node):
 
 
 async def send_and_receive_packets_with_pop(
-    packets, src: Node, dest: Node, path: str, timeout: int = MULTIHOP_MESSAGE_SEND_TIMEOUT
+    packets, src: Node, dest: Node, path: list[str], timeout: int = MULTIHOP_MESSAGE_SEND_TIMEOUT
 ):
     random_tag = gen_random_tag()
 
@@ -416,20 +418,21 @@ async def test_hoprd_api_channel_should_register_fund_increase_using_fund_endpoi
 @pytest.mark.parametrize("src,dest", [tuple(shuffled(barebone_nodes())[:2]) for _ in range(PARAMETERIZED_SAMPLE_SIZE)])
 async def test_reset_ticket_statistics_from_metrics(src: Node, dest: Node, swarm7: dict[str, Node]):
     def count_metrics(metrics: str):
-        return sum([1 for line in metrics.split("\n") if line.startswith("hopr_tickets_incoming_statistics")])
+        count = 0
+        for line in metrics.split("\\n"):
+            count += line.startswith("hopr_tickets_incoming_statistics")
+        return count
 
-    await swarm7[src].api.send_message(swarm7[src].peer_id, "foo message", [swarm7[dest].peer_id])
+    async with create_channel(swarm7[src], swarm7[dest], funding=TICKET_PRICE_PER_HOP, close_from_dest=False):
+        await send_and_receive_packets_with_pop(
+            ["1 hop message to self"], src=swarm7[src], dest=swarm7[src], path=[swarm7[dest].peer_id]
+        )
 
-    message = await swarm7[src].api.messages_pop()
-    ticket_line_count = count_metrics(await swarm7[dest].api.metrics())
-
-    assert message.body == "foo message"
-    assert ticket_line_count != 0
+    assert count_metrics(await swarm7[dest].api.metrics()) != 0
 
     await swarm7[dest].api.reset_tickets_statistics()
 
-    ticket_line_count = count_metrics(await swarm7[dest].api.metrics())
-    assert ticket_line_count == 0
+    assert count_metrics(await swarm7[dest].api.metrics()) == 0
 
 
 @pytest.mark.asyncio
@@ -437,6 +440,13 @@ async def test_reset_ticket_statistics_from_metrics(src: Node, dest: Node, swarm
 async def test_hoprd_api_should_redeem_tickets_in_channel_using_redeem_endpoint(
     src: Node, dest: Node, swarm7: dict[str, Node]
 ):
+    async def channel_redeem_tickets(api: HoprdAPI, channel: str):
+        while True:
+            if await api.channel_redeem_tickets(channel):
+                break
+            else:
+                await asyncio.sleep(0.5)
+
     message_count = 2
 
     async with create_channel(
@@ -447,13 +457,6 @@ async def test_hoprd_api_should_redeem_tickets_in_channel_using_redeem_endpoint(
         await send_and_receive_packets_with_pop(packets, src=swarm7[src], dest=swarm7[src], path=[swarm7[dest].peer_id])
 
         await asyncio.wait_for(check_unredeemed_tickets_value(swarm7[dest], message_count * TICKET_PRICE_PER_HOP), 30.0)
-
-        async def channel_redeem_tickets(api: HoprdAPI, channel: str):
-            while True:
-                if await api.channel_redeem_tickets(channel):
-                    break
-                else:
-                    await asyncio.sleep(0.5)
 
         await asyncio.wait_for(channel_redeem_tickets(swarm7[dest].api, channel), 20.0)
 
@@ -707,7 +710,7 @@ async def test_hoprd_default_strategy_automatic_ticket_aggregation_and_redeeming
     channel_funding = ticket_count * TICKET_PRICE_PER_HOP
 
     # create channel from src to mid, mid to dest does not need a channel
-    async with create_channel(swarm7[src], swarm7[mid], funding=channel_funding) as channel:
+    async with create_channel(swarm7[src], swarm7[mid], funding=channel_funding):
         statistics_before = await swarm7[mid].api.get_tickets_statistics()
         assert statistics_before is not None
 

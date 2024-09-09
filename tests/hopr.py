@@ -441,36 +441,35 @@ class HoprdAPI:
         return status, response
 
     async def metrics(self):
-        return ""
+        _, response = self.__call_api(NodeApi, "metrics")
+        return response
 
-    async def startedz(self):
+    async def startedz(self, timeout: int = 20):
         """
         Checks if the node is started.
         """
-        return await is_url_returning_200(f"{self.configuration.host}/startedz")
+        return await is_url_returning_200(f"{self.configuration.host}/startedz", timeout)
 
-    async def readyz(self):
+    async def readyz(self, timeout: int = 20):
         """
         Checks if the node is ready to accept connections.
         """
-        return await is_url_returning_200(f"{self.configuration.host}/readyz")
+        return await is_url_returning_200(f"{self.configuration.host}/readyz", timeout)
 
 
-def query_url(url):
-    return requests.get(url, timeout=0.3)
-
-
-async def is_url_returning_200(url, timeout=20):
+async def is_url_returning_200(url, timeout):
     async def check_url():
-        while True:
+        ready = False
+
+        while not ready:
             try:
-                query_url(url)
-                break
+                ready = requests.get(url, timeout=0.3).status_code == 200
             except Exception:
                 await asyncio.sleep(0.2)
 
+        return ready
+
     try:
-        await asyncio.wait_for(check_url(), timeout=timeout)
-        return query_url(url).status_code == 200
+        return await asyncio.wait_for(check_url(), timeout=timeout)
     except Exception:
         return False
