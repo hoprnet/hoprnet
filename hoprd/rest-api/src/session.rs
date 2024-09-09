@@ -17,7 +17,7 @@ use hopr_network_types::prelude::ConnectedUdpStream;
 use hopr_network_types::udp::ForeignDataMode;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
-use tokio::net::{TcpListener, ToSocketAddrs};
+use tokio::net::TcpListener;
 use tokio_util::compat::TokioAsyncReadCompatExt;
 use tracing::{debug, error, info};
 
@@ -391,18 +391,25 @@ pub(crate) async fn close_client(
     Ok::<_, (StatusCode, ApiErrorStatus)>((StatusCode::NO_CONTENT, "").into_response())
 }
 
-async fn tcp_listen_on<A: ToSocketAddrs>(address: A) -> std::io::Result<(std::net::SocketAddr, TcpListener)> {
-    let tcp_listener = TcpListener::bind(address).await?;
+async fn tcp_listen_on<A: std::net::ToSocketAddrs>(address: A) -> std::io::Result<(std::net::SocketAddr, TcpListener)> {
+    let tcp_listener = TcpListener::bind(address.to_socket_addrs()?.collect::<Vec<_>>().as_slice()).await?;
 
     Ok((tcp_listener.local_addr()?, tcp_listener))
 }
 
-async fn udp_bind_to<A: ToSocketAddrs>(address: A) -> std::io::Result<(std::net::SocketAddr, ConnectedUdpStream)> {
-    let udp_socket = ConnectedUdpStream::bind(address)
-        .await?
-        .with_foreign_data_mode(ForeignDataMode::Discard); // discard data from UDP clients other than the first one served
+async fn udp_bind_to<A: std::net::ToSocketAddrs>(
+    address: A,
+) -> std::io::Result<(std::net::SocketAddr, ConnectedUdpStream)> {
+    // discard data from UDP clients other than the first one served
+    let udp_socket = ConnectedUdpStream::bind(
+        address,
+        hopr_lib::SESSION_USABLE_MTU_SIZE,
+        None,
+        ForeignDataMode::Discard,
+        None,
+    )?;
 
-    Ok((udp_socket.socket().local_addr()?, udp_socket))
+    Ok((*udp_socket.bound_address(), udp_socket))
 }
 
 async fn bind_session_to_stream<T>(mut session: HoprSession, stream: T, max_buf: usize)
@@ -531,10 +538,16 @@ mod tests {
             hopr_lib::SESSION_USABLE_MTU_SIZE,
         ));
 
-        let mut udp_stream = ConnectedUdpStream::bind(("127.0.0.1", 0))
-            .await
-            .context("bind failed")?
-            .with_counterparty(listen_addr)?;
+        let mut udp_stream = ConnectedUdpStream::bind(
+            ("127.0.0.1", 0),
+            hopr_lib::SESSION_USABLE_MTU_SIZE,
+            None,
+            ForeignDataMode::Error,
+            None,
+        )
+        .await
+        .context("bind failed")?
+        .with_counterparty(listen_addr)?;
 
         let data = vec![b"hello", b"world", b"this ", b"is   ", b"    a", b" test"];
 

@@ -69,10 +69,13 @@ impl IpOrHost {
     pub async fn resolve(self) -> std::io::Result<Vec<SocketAddr>> {
         match self {
             IpOrHost::Dns(name, port) => {
-                #[cfg(all(feature = "runtime-tokio", not(test)))]
+                #[cfg(any(feature = "runtime-tokio", any(test, feature = "runtime-tokio")))]
                 let resolver = hickory_resolver::AsyncResolver::tokio_from_system_conf()?;
 
-                #[cfg(any(all(feature = "runtime-async-std", not(feature = "runtime-tokio")), test))]
+                #[cfg(any(
+                    all(feature = "runtime-async-std", not(feature = "runtime-tokio")),
+                    all(test, feature = "runtime-async-std")
+                ))]
                 let resolver = async_std_resolver::resolver_from_system_conf().await?;
 
                 Ok(resolver

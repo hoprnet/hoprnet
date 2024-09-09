@@ -25,9 +25,10 @@ use tracing::{error, trace, warn};
 //#[derive(Debug)]
 pub struct ConnectedUdpStream {
     socket_handles: Vec<(tokio::task::JoinHandle<()>, tokio::task::JoinHandle<()>)>,
-    ingress_rx: Box<dyn AsyncRead + Unpin>,
-    egress_tx: Option<Box<dyn Sink<Box<[u8]>, Error = flume::SendError<Box<[u8]>>> + Unpin>>,
+    ingress_rx: Box<dyn AsyncRead + Send + Unpin>,
+    egress_tx: Option<Box<dyn Sink<Box<[u8]>, Error = flume::SendError<Box<[u8]>>> + Send + Unpin>>,
     counterparty: Arc<OnceLock<std::net::SocketAddr>>,
+    bound_to: std::net::SocketAddr,
 }
 
 /// Defines what happens when data from another [`SocketAddr`](std::net::SocketAddr) arrives
@@ -60,6 +61,7 @@ impl ConnectedUdpStream {
                 // Read data from the socket
                 let out_res = match sock_rx.recv_from(&mut buffer).await {
                     Ok((read, read_addr)) if read > 0 => {
+                        trace!("got {read} bytes of data data from {read_addr}");
                         let addr = counterparty_rx.get_or_init(|| read_addr);
 
                         // If the data is from a counterparty, or we accept anything, pass it
@@ -183,6 +185,7 @@ impl ConnectedUdpStream {
         let (egress_tx, egress_rx) = flume::unbounded();
 
         let first_bind_addr = bind.to_socket_addrs()?.next().ok_or(ErrorKind::AddrNotAvailable)?;
+        let mut bound_addr: Option<std::net::SocketAddr> = None;
 
         let socket_handles = (0..num_socks)
             .map(|_| {
@@ -191,6 +194,18 @@ impl ConnectedUdpStream {
                 sock.set_reuse_port(true)?;
                 sock.set_nonblocking(true)?;
                 sock.bind(&first_bind_addr.into())?;
+
+                let socket_bound_addr = sock
+                    .local_addr()?
+                    .as_socket()
+                    .ok_or(Error::other("invalid socket type"))?;
+                match bound_addr {
+                    None => bound_addr = Some(socket_bound_addr),
+                    Some(addr) if addr != socket_bound_addr => {
+                        return Err(Error::other("inconsistent binding address"))
+                    }
+                    _ => {}
+                }
 
                 Ok(Arc::new(UdpSocket::from_std(sock.into())?))
             })
@@ -219,7 +234,12 @@ impl ConnectedUdpStream {
             egress_tx: Some(Box::new(egress_tx.into_sink())),
             socket_handles,
             counterparty,
+            bound_to: bound_addr.ok_or(ErrorKind::AddrNotAvailable)?,
         })
+    }
+
+    pub fn bound_address(&self) -> &std::net::SocketAddr {
+        &self.bound_to
     }
 }
 
@@ -250,13 +270,14 @@ impl tokio::io::AsyncWrite for ConnectedUdpStream {
             match sender.poll_ready_unpin(cx) {
                 Poll::Ready(Ok(_)) => {
                     pin_mut!(sender);
-                    let len = buf.len();
+                    let len = buf.len(); // We always send the entire buffer at once
                     Poll::Ready(
                         sender
                             .start_send(Box::from(buf))
                             .map(|_| len)
                             .map_err(|e| Error::other(e)),
                     )
+                    // TODO: should we also flush here with every write?
                 }
                 Poll::Ready(Err(e)) => Poll::Ready(Err(Error::other(e.to_string()))),
                 Poll::Pending => Poll::Pending,
@@ -277,7 +298,7 @@ impl tokio::io::AsyncWrite for ConnectedUdpStream {
     }
 
     fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Error>> {
-        trace!("udp stream with {:?} closing", self.counterparty);
+        trace!("polling close on udp stream with {:?}", self.counterparty.get());
         // Take the sender to make sure it gets dropped
         let mut taken_sender = self.egress_tx.take();
         if let Some(sender) = &mut taken_sender {
@@ -296,7 +317,8 @@ mod tests {
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::net::UdpSocket;
 
-    #[tokio::test]
+    #[test_log::test(tokio::test)]
+    //#[tokio::test]
     async fn basic_udp_stream_tests() -> anyhow::Result<()> {
         const DATA_SIZE: usize = 128;
 
@@ -323,6 +345,7 @@ mod tests {
             let mut w_buf = [0u8; DATA_SIZE];
             hopr_crypto_random::random_fill(&mut w_buf);
             let written = stream.write(&w_buf).await?;
+            stream.flush().await?;
             assert_eq!(written, DATA_SIZE);
 
             let mut r_buf = [0u8; DATA_SIZE];

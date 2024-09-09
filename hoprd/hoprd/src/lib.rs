@@ -136,15 +136,16 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                     "UDP target {udp_target} resolved to {resolved_udp_target}"
                 );
 
-                let udp_bridge = hopr_network_types::udp::ConnectedUdpStream::bind(("0.0.0.0", 0))
-                    .await
-                    .and_then(|s| s.with_counterparty(resolved_udp_target))
-                    .map(|s| s.with_foreign_data_mode(ForeignDataMode::Error))
-                    .map_err(|e| {
-                        HoprLibError::GeneralError(format!(
-                            "could not bridge the incoming session to {udp_target}: {e}"
-                        ))
-                    })?;
+                let udp_bridge = hopr_network_types::udp::ConnectedUdpStream::bind(
+                    ("0.0.0.0", 0),
+                    HOPR_UDP_BUFFER_SIZE,
+                    Some(resolved_udp_target),
+                    ForeignDataMode::Error,
+                    None,
+                )
+                .map_err(|e| {
+                    HoprLibError::GeneralError(format!("could not bridge the incoming session to {udp_target}: {e}"))
+                })?;
 
                 tracing::debug!(
                     session_id = debug(session_id),
