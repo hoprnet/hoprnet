@@ -14,7 +14,7 @@ use {
 };
 
 use signal_hook::low_level;
-use tracing::{error, info, warn};
+use tracing::{error, info, trace, warn};
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 
 use hopr_async_runtime::prelude::{cancel_join_handle, spawn, JoinHandle};
@@ -138,7 +138,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cfg = hoprd::config::HoprdConfig::from_cli_args(args, false)?;
 
     let git_hash = option_env!("VERGEN_GIT_SHA").unwrap_or("unknown");
-    info!("This is HOPRd {} ({})", hopr_lib::constants::APP_VERSION, git_hash);
+    info!(
+        version = hopr_lib::constants::APP_VERSION,
+        hash = git_hash,
+        cfg = cfg.as_redacted_string()?,
+        "Starting HOPR daemon"
+    );
 
     if std::env::var("DAPPNODE")
         .map(|v| v.to_lowercase() == "true")
@@ -146,8 +151,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     {
         info!("The HOPRd node appears to run on DappNode");
     }
-
-    info!("Node configuration: {}", cfg.as_redacted_string()?);
 
     if let hopr_lib::HostType::IPv4(address) = &cfg.hopr.host.address {
         let ipv4 = std::net::Ipv4Addr::from_str(address).map_err(|e| HoprdError::ConfigError(e.to_string()))?;
@@ -170,9 +173,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .try_into()?;
 
     info!(
-        "This node has packet key '{}' and uses a blockchain address '{}'",
-        hopr_lib::Keypair::public(&hopr_keys.packet_key).to_peerid_str(),
-        hopr_lib::Keypair::public(&hopr_keys.chain_key).to_address().to_hex()
+        packet_key = hopr_lib::Keypair::public(&hopr_keys.packet_key).to_peerid_str(),
+        blockchain_address = hopr_lib::Keypair::public(&hopr_keys.chain_key).to_address().to_hex(),
+        "Node public identifiers"
     );
 
     // TODO: the following check can be removed once [PR](https://github.com/hoprnet/hoprnet/pull/5665) is merged
@@ -185,10 +188,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create the node instance
     info!("Creating the HOPRd node instance from hopr-lib");
-    let hoprlib_cfg: hopr_lib::config::HoprLibConfig = cfg.clone().into();
-
     let node = Arc::new(hopr_lib::Hopr::new(
-        hoprlib_cfg.clone(),
+        cfg.clone().into(),
         &hopr_keys.packet_key,
         &hopr_keys.chain_key,
     ));
@@ -225,11 +226,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         };
 
-        let api_listener = tokio::net::TcpListener::bind(&listen_address)
-            .await
-            .unwrap_or_else(|e| panic!("REST API bind failed for {listen_address}: {e}"));
+        let api_listener = tokio::net::TcpListener::bind(&listen_address).await.map_err(|e| {
+            hopr_lib::errors::HoprLibError::GeneralError(format!("REST API bind failed for {listen_address}: {e}"))
+        })?;
 
-        info!("Node REST API is listening on {listen_address}");
+        info!(listen_address, "Running a REST API");
 
         let session_listener_sockets = Arc::new(RwLock::new(HashMap::new()));
 
@@ -265,7 +266,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Ok((msg, sent)) => {
                     let latency = recv_at.as_unix_timestamp().saturating_sub(sent);
 
-                    info!(
+                    trace!(
                         app_tag = data.application_tag.unwrap_or(0),
                         latency_in_ms = latency.as_millis(),
                         "## NODE RECEIVED MESSAGE [@{}] ##",
@@ -317,7 +318,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 futures::stream::iter(processes)
                     .then(|process| async move {
                         let mut join_handles: Vec<JoinHandle<()>> = Vec::new();
-                        info!("Stopping process: {process}");
+                        info!("Stopping process '{process}'");
                         match process {
                             HoprdProcesses::HoprLib(_, jh)
                             | HoprdProcesses::WebSocket(jh)

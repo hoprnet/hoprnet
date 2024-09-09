@@ -122,7 +122,7 @@ use crate::errors::HoprdError;
 impl HoprdConfig {
     pub fn from_cli_args(cli_args: crate::cli::CliArgs, skip_validation: bool) -> crate::errors::Result<HoprdConfig> {
         let mut cfg: HoprdConfig = if let Some(cfg_path) = cli_args.configuration_file_path {
-            debug!("fetching configuration from file {cfg_path}");
+            debug!(cfg_path, "fetching configuration from file");
             let yaml_configuration =
                 read_to_string(cfg_path.as_str()).map_err(|e| crate::errors::HoprdError::ConfigError(e.to_string()))?;
             serde_yaml::from_str(&yaml_configuration)

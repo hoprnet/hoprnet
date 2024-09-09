@@ -247,11 +247,9 @@ impl HoprKeys {
                             }
                             Ok(keys)
                         }
-                        Err(e) => {
-                            error!("{}", e.to_string());
-
-                            Err(KeyPairError::GeneralError(format!("An identity file is present at {} but the provided password <REDACTED> is not sufficient to decrypt it", id_path)))
-                        }
+                        Err(e) => Err(KeyPairError::GeneralError(
+                            format!("An identity file is present at {id_path} but the provided password <REDACTED> is not sufficient to decrypt it {e}"),
+                        )),
                     }
                 } else {
                     let keys = HoprKeys::random();

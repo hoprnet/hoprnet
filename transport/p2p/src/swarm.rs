@@ -149,14 +149,18 @@ impl HoprSwarm {
             match resolve_dns_if_any(multiaddress) {
                 Ok(ma) => {
                     if let Err(e) = swarm.listen_on(ma.clone()) {
-                        error!("Failed to listen_on using '{multiaddress}': {e}");
+                        warn!("Failed to listen_on using '{multiaddress}': {e}");
 
                         match replace_transport_with_unspecified(&ma) {
                             Ok(ma) => {
                                 if let Err(e) = swarm.listen_on(ma.clone()) {
-                                    error!("Failed to listen_on also using the unspecified multiaddress '{ma}': {e}",);
+                                    warn!("Failed to listen_on also using the unspecified multiaddress '{ma}': {e}",);
                                 } else {
-                                    info!("Successfully started listening on {ma} (from {multiaddress})");
+                                    info!(
+                                        listen_on = tracing::field::debug(ma),
+                                        multiaddress = tracing::field::debug(multiaddress),
+                                        "Listening for p2p connections)"
+                                    );
                                     swarm.add_external_address(multiaddress.clone());
                                 }
                             }
@@ -165,14 +169,19 @@ impl HoprSwarm {
                             }
                         }
                     } else {
-                        info!("Successfully started listening on {ma} (from {multiaddress})");
+                        info!(
+                            listen_on = tracing::field::debug(ma),
+                            multiaddress = tracing::field::debug(multiaddress),
+                            "Listening for p2p connections)"
+                        );
                         swarm.add_external_address(multiaddress.clone());
                     }
                 }
-                Err(_) => error!("Failed to transform the multiaddress '{multiaddress}' - skipping"),
+                Err(e) => error!("Failed to transform the multiaddress '{multiaddress}' - skipping: {e}"),
             }
         }
 
+        // TODO: perform this check
         // NOTE: This would be a valid check but is not immediate
         // assert!(
         //     swarm.listeners().count() > 0,
