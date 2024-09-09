@@ -16,7 +16,7 @@ use serde::{ser::SerializeStruct, Serialize, Serializer};
 use serde_json::{from_str as from_json_string, to_string as to_json_string};
 use sha3::{digest::Update, Digest, Keccak256};
 use std::fmt::Debug;
-use tracing::{error, info, warn};
+use tracing::{info, warn};
 use typenum::Unsigned;
 use uuid::Uuid;
 
