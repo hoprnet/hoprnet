@@ -185,7 +185,7 @@ impl HoprDbPeersOperations for HoprDb {
     ) -> Result<BoxStream<'a, PeerStatus>> {
         let selector: WrappedPeerSelector = selector.into();
         let mut sub_stream = hopr_db_entity::network_peer::Entity::find()
-            // .filter(hopr_db_entity::network_peer::Column::Ignored.is_not_null())
+            .filter(hopr_db_entity::network_peer::Column::Ignored.is_not_null())
             .filter(selector)
             .order_by(
                 network_peer::Column::LastSeen,
