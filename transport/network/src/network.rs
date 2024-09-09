@@ -318,14 +318,12 @@ where
                 if let Some(ignore_start) = v.ignored {
                     let should_be_ignored = ignore_start
                         .checked_add(self.cfg.ignore_timeframe)
-                        .map(|v| v > threshold)
-                        .unwrap_or_default();
+                        .map_or(false, |v| v > threshold);
 
                     if should_be_ignored {
                         return None;
                     }
                 }
-
                 if v.id.1 == self.me {
                     return None;
                 }
