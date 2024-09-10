@@ -188,6 +188,7 @@ impl<T: Pinging, API: HeartbeatExternalApi> Heartbeat<T, API> {
         match select(timeout, ping).await {
             Either::Left(_) => debug!("Heartbeat round interrupted by timeout"),
             Either::Right(_) => {
+                // We intentionally ignore any ping errors here
                 let this_round_actual_duration = current_time().saturating_sub(start);
                 let time_to_wait_for_next_round =
                     this_round_planned_duration.saturating_sub(this_round_actual_duration);
@@ -239,8 +240,9 @@ mod tests {
 
     #[async_trait]
     impl Pinging for DelayingPinger {
-        async fn ping(&self, _peers: Vec<PeerId>) {
+        async fn ping(&self, _peers: Vec<PeerId>) -> crate::errors::Result<()> {
             sleep(self.delay).await;
+            Ok(())
         }
     }
 

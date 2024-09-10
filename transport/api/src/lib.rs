@@ -942,7 +942,12 @@ where
                 warn!(peer = peer.to_string(), "Manual ping to peer timed out");
                 return Err(ProtocolError::Timeout.into());
             }
-            Either::Right(_) => info!("Manual ping succeeded"),
+            Either::Right((Ok(_), _)) => info!("Manual ping succeeded"),
+            Either::Right((Err(e), _)) => {
+                // Ping errors need to be forwarded here
+                error!("Manual ping failed: {e}");
+                return Err(e.into());
+            }
         };
 
         let peer_status = self.network.get(peer).await?.ok_or(HoprTransportError::NetworkError(
