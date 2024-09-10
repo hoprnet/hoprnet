@@ -22,7 +22,7 @@ use hopr_lib::{
     ApplicationData, AsUnixTimestamp, RoutingOptions, RESERVED_TAG_UPPER_LIMIT,
 };
 
-use crate::{ApiErrorStatus, InternalState, BASE_PATH};
+use crate::{types::UnifiedPeerType, ApiErrorStatus, InternalState, BASE_PATH};
 
 #[derive(Debug, Default, Clone, Deserialize, utoipa::ToSchema, utoipa::IntoParams)]
 #[into_params(parameter_in = Query)]
@@ -57,11 +57,11 @@ pub(crate) struct SendMessageBodyRequest {
     /// The recipient HOPR PeerId
     #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String)]
-    peer_id: PeerId,
+    destination: UnifiedPeerType,
     #[serde_as(as = "Option<Vec<DisplayFromStr>>")]
     #[validate(length(min = 0, max = 3))]
     #[schema(value_type = Option<Vec<String>>)]
-    path: Option<Vec<PeerId>>,
+    path: Option<Vec<PeerId>>, // TODO (jean): should be a new type
     #[validate(range(min = 0, max = 3))]
     hops: Option<u16>,
 }
@@ -166,7 +166,10 @@ pub(super) async fn send_message(
 
     let timestamp = std::time::SystemTime::now().as_unix_timestamp();
 
-    match hopr.send_message(msg_body, args.peer_id, options, Some(args.tag)).await {
+    match hopr
+        .send_message(msg_body, args.destination.peer_id, options, Some(args.tag))
+        .await
+    {
         Ok(_) => Ok((StatusCode::ACCEPTED, Json(SendMessageResponse { timestamp })).into_response()),
         Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(_, _))) => {
             Err((StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response())
@@ -324,7 +327,10 @@ async fn handle_send_message(input: &str, state: Arc<InternalState>) -> Result<(
                 return Err("one of hops or intermediate path must be provided".to_string());
             };
 
-            if let Err(e) = hopr.send_message(msg_body, msg.peer_id, options, Some(msg.tag)).await {
+            if let Err(e) = hopr
+                .send_message(msg_body, msg.destination.peer_id, options, Some(msg.tag))
+                .await
+            {
                 return Err(e.to_string());
             }
 
@@ -638,19 +644,19 @@ mod tests {
 
     #[test]
     fn send_message_accepts_bytes_in_body() {
-        let peer = PeerId::random();
+        let destination = UnifiedPeerType::from(PeerId::random());
         let test_sequence = b"wow, this actually works";
 
         let json_value = json!({
             "tag": 5,
             "body": test_sequence.to_vec(),
-            "peerId": peer.to_string()
+            "destination": destination
         });
 
         let expected = SendMessageBodyRequest {
             tag: 5,
             body: test_sequence.to_vec(),
-            peer_id: peer,
+            destination: destination,
             path: None,
             hops: None,
         };
@@ -662,19 +668,19 @@ mod tests {
 
     #[test]
     fn send_message_accepts_utf8_string_in_body() {
-        let peer = PeerId::random();
+        let destination = UnifiedPeerType::from(PeerId::random());
         let test_sequence = b"wow, this actually works";
 
         let json_value = json!({
             "tag": 5,
             "body": String::from_utf8(test_sequence.to_vec()).expect("should be a utf-8 string"),
-            "peerId": peer.to_string()
+            "destination": destination
         });
 
         let expected = SendMessageBodyRequest {
             tag: 5,
             body: test_sequence.to_vec(),
-            peer_id: peer,
+            destination: destination,
             path: None,
             hops: None,
         };

@@ -33,7 +33,7 @@ pub(crate) struct AliasPeerIdBodyRequest {
     pub alias: String,
     #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String)]
-    pub peer_id: PeerId,
+    pub peer_id: PeerId, // TODO (jean): should be a new type
 }
 
 /// Get each previously set alias and its corresponding PeerId.

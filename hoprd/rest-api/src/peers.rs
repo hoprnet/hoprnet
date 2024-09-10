@@ -4,14 +4,13 @@ use axum::{
     response::IntoResponse,
 };
 use hopr_lib::{errors::HoprStatusError, HoprTransportError, Multiaddr};
-use libp2p_identity::PeerId;
 use serde::Deserialize;
 use serde_with::{serde_as, DisplayFromStr, DurationMilliSeconds};
-use std::{str::FromStr, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 
 use hopr_lib::errors::HoprLibError;
 
-use crate::{ApiError, ApiErrorStatus, InternalState, BASE_PATH};
+use crate::{types::UnifiedPeerType, ApiError, ApiErrorStatus, InternalState, BASE_PATH};
 
 #[serde_as]
 #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
@@ -35,7 +34,7 @@ pub(crate) struct NodePeerInfoResponse {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct PeerIdParams {
-    peer_id: String,
+    destination: UnifiedPeerType,
 }
 
 /// Returns transport-related information about the given peer.
@@ -61,21 +60,17 @@ pub(crate) struct PeerIdParams {
     tag = "Peers",
 )]
 pub(super) async fn show_peer_info(
-    Path(PeerIdParams { peer_id }): Path<PeerIdParams>,
+    Path(PeerIdParams { destination }): Path<PeerIdParams>,
     State(state): State<Arc<InternalState>>,
 ) -> impl IntoResponse {
     let hopr = state.hopr.clone();
-    match PeerId::from_str(peer_id.as_str()) {
-        Ok(peer) => (
-            StatusCode::OK,
-            Json(NodePeerInfoResponse {
-                announced: hopr.multiaddresses_announced_on_chain(&peer).await,
-                observed: hopr.network_observed_multiaddresses(&peer).await,
-            }),
-        )
-            .into_response(),
-        Err(_) => (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidPeerId).into_response(),
-    }
+    (
+        StatusCode::OK,
+        Json(NodePeerInfoResponse {
+            announced: hopr.multiaddresses_announced_on_chain(&destination.peer_id).await,
+            observed: hopr.network_observed_multiaddresses(&destination.peer_id).await,
+        }),
+    )
 }
 
 #[serde_as]
@@ -113,28 +108,26 @@ pub(crate) struct PingResponse {
     tag = "Peers",
 )]
 pub(super) async fn ping_peer(
-    Path(PeerIdParams { peer_id }): Path<PeerIdParams>,
+    Path(PeerIdParams { destination }): Path<PeerIdParams>,
     State(state): State<Arc<InternalState>>,
 ) -> Result<impl IntoResponse, ApiError> {
     let hopr = state.hopr.clone();
-    match PeerId::from_str(peer_id.as_str()) {
-        Ok(peer) => match hopr.ping(&peer).await {
-            Ok(latency) => {
-                let info = hopr.network_peer_info(&peer).await?;
-                let resp = Json(PingResponse {
-                    latency: latency.unwrap_or(Duration::ZERO), // TODO: what should be the correct default ?
-                    reported_version: info.and_then(|p| p.peer_version).unwrap_or("unknown".into()),
-                });
-                Ok((StatusCode::OK, resp).into_response())
-            }
-            Err(HoprLibError::TransportError(HoprTransportError::Protocol(hopr_lib::ProtocolError::Timeout))) => {
-                Ok((StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::Timeout).into_response())
-            }
-            Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(_, _))) => {
-                Ok((StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response())
-            }
-            Err(e) => Ok((StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response()),
-        },
-        Err(_) => Ok((StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidPeerId).into_response()),
+
+    match hopr.ping(&destination.peer_id).await {
+        Ok(latency) => {
+            let info = hopr.network_peer_info(&destination.peer_id).await?;
+            let resp = Json(PingResponse {
+                latency: latency.unwrap_or(Duration::ZERO), // TODO: what should be the correct default ?
+                reported_version: info.and_then(|p| p.peer_version).unwrap_or("unknown".into()),
+            });
+            Ok((StatusCode::OK, resp).into_response())
+        }
+        Err(HoprLibError::TransportError(HoprTransportError::Protocol(hopr_lib::ProtocolError::Timeout))) => {
+            Ok((StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::Timeout).into_response())
+        }
+        Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(_, _))) => {
+            Ok((StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response())
+        }
+        Err(e) => Ok((StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response()),
     }
 }

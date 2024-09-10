@@ -2,6 +2,7 @@ use std::io::ErrorKind;
 use std::str::FromStr;
 use std::sync::Arc;
 
+use crate::types::UnifiedPeerType;
 use crate::{ApiErrorStatus, InternalState, ListenerId, BASE_PATH};
 use axum::extract::Path;
 use axum::{
@@ -11,7 +12,7 @@ use axum::{
 };
 use futures::{StreamExt, TryStreamExt};
 use hopr_lib::errors::HoprLibError;
-use hopr_lib::{HoprSession, IpProtocol, PeerId, RoutingOptions, SessionCapability, SessionClientConfig};
+use hopr_lib::{HoprSession, IpProtocol, RoutingOptions, SessionCapability, SessionClientConfig};
 use hopr_network_types::prelude::ConnectedUdpStream;
 use hopr_network_types::udp::ForeignDataMode;
 use hopr_network_types::utils::copy_duplex;
@@ -47,7 +48,7 @@ lazy_static::lazy_static! {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct SessionClientRequest {
     #[serde_as(as = "DisplayFromStr")]
-    pub destination: PeerId,
+    pub destination: UnifiedPeerType,
     pub path: RoutingOptions,
     pub target: String,
     pub listen_host: Option<String>,
@@ -61,7 +62,7 @@ impl SessionClientRequest {
         target_protocol: IpProtocol,
     ) -> Result<SessionClientConfig, HoprLibError> {
         Ok(SessionClientConfig {
-            peer: self.destination,
+            peer: self.destination.peer_id,
             path_options: self.path,
             target_protocol,
             target: self

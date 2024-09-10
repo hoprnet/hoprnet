@@ -13,6 +13,7 @@ mod preconditions;
 mod prometheus;
 mod session;
 mod tickets;
+mod types;
 
 use async_lock::RwLock;
 use axum::{
@@ -223,7 +224,6 @@ async fn build_api(
     };
 
     Router::new()
-        // FIXME: Remove API UIs which are not going to be used.
         .nest("/", Router::new().merge(Scalar::with_url("/scalar", ApiDoc::openapi())))
         .nest(
             "/",
@@ -322,7 +322,6 @@ enum ApiErrorStatus {
     /// An invalid application tag from the reserved range was provided.
     InvalidApplicationTag,
     InvalidChannelId,
-    InvalidPeerId,
     ChannelNotFound,
     TicketsNotFound,
     NotEnoughBalance,
