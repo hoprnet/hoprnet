@@ -80,7 +80,7 @@ impl IpOrHost {
     /// If this enum is already an IP address and port, it will simply return it.
     ///
     /// Uses `tokio` resolver.
-    #[cfg(feature = "runtime-async-std")]
+    #[cfg(feature = "runtime-tokio")]
     pub async fn resolve_tokio(self) -> std::io::Result<Vec<SocketAddr>> {
         let resolver = hickory_resolver::AsyncResolver::tokio_from_system_conf()?;
         self.resolve(resolver).await
@@ -180,6 +180,7 @@ mod tests {
     use anyhow::anyhow;
     use std::net::SocketAddr;
 
+    #[cfg(feature = "runtime-async-std")]
     #[async_std::test]
     async fn ip_or_host_must_resolve_dns_name() -> anyhow::Result<()> {
         match IpOrHost::Dns("localhost".to_string(), 1000)
@@ -194,11 +195,41 @@ mod tests {
         Ok(())
     }
 
+    #[cfg(feature = "runtime-async-std")]
     #[async_std::test]
     async fn ip_or_host_must_resolve_ip_address() -> anyhow::Result<()> {
         assert_eq!(
             *IpOrHost::Ip("127.0.0.1:1000".parse()?)
                 .resolve_async_std()
+                .await?
+                .first()
+                .ok_or(anyhow!("must resolve"))?,
+            "127.0.0.1:1000".parse()?
+        );
+        Ok(())
+    }
+
+    #[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
+    #[tokio::test]
+    async fn ip_or_host_must_resolve_dns_name() -> anyhow::Result<()> {
+        match IpOrHost::Dns("localhost".to_string(), 1000)
+            .resolve_tokio()
+            .await?
+            .first()
+            .ok_or(anyhow!("must resolve"))?
+        {
+            SocketAddr::V4(addr) => assert_eq!(*addr, "127.0.0.1:1000".parse()?),
+            SocketAddr::V6(addr) => assert_eq!(*addr, "::1:1000".parse()?),
+        }
+        Ok(())
+    }
+
+    #[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
+    #[tokio::test]
+    async fn ip_or_host_must_resolve_ip_address() -> anyhow::Result<()> {
+        assert_eq!(
+            *IpOrHost::Ip("127.0.0.1:1000".parse()?)
+                .resolve_tokio()
                 .await?
                 .first()
                 .ok_or(anyhow!("must resolve"))?,

@@ -402,6 +402,7 @@ async fn udp_bind_to<A: std::net::ToSocketAddrs>(
 ) -> std::io::Result<(std::net::SocketAddr, ConnectedUdpStream)> {
     let udp_socket = ConnectedUdpStream::builder()
         .with_buffer_size(HOPR_UDP_BUFFER_SIZE)
+        .with_queue_size(1024)
         .with_foreign_data_mode(ForeignDataMode::Discard) // discard data from UDP clients other than the first one served
         //.with_parallelism(Some(0))
         .build(address)?;
@@ -537,6 +538,7 @@ mod tests {
 
         let mut udp_stream = ConnectedUdpStream::builder()
             .with_buffer_size(hopr_lib::SESSION_USABLE_MTU_SIZE)
+            .with_queue_size(1024)
             .with_counterparty(listen_addr)
             .build(("127.0.0.1", 0))
             .context("bind failed")?;

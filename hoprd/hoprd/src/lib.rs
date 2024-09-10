@@ -140,6 +140,7 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                     .with_buffer_size(HOPR_UDP_BUFFER_SIZE)
                     .with_counterparty(resolved_udp_target)
                     .with_foreign_data_mode(ForeignDataMode::Error)
+                    .with_queue_size(1024)
                     //.with_parallelism(Some(0))
                     .build(("0.0.0.0", 0))
                     .map_err(|e| {
