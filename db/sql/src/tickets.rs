@@ -595,6 +595,7 @@ impl HoprDbTicketOperations for HoprDb {
             .with_write_locked_db(|tx| {
                 Box::pin(async move {
                     let deleted = ticket_statistics::Entity::delete_many().exec(tx.as_ref()).await?;
+
                     Ok::<_, DbSqlError>(deleted.rows_affected as usize)
                 })
             })
@@ -1244,6 +1245,7 @@ mod tests {
     use std::ops::Add;
     use std::sync::atomic::Ordering;
     use std::time::{Duration, SystemTime};
+    use tracing::debug;
 
     lazy_static::lazy_static! {
         static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).unwrap();
@@ -3172,6 +3174,8 @@ mod tests {
         assert_ne!(stats.redeemed_value, BalanceType::HOPR.zero());
 
         db.reset_ticket_statistics().await.expect("must not fail");
+
+        let stats = db.get_ticket_statistics(None).await.expect("must not fail");
         assert_eq!(stats.redeemed_value, BalanceType::HOPR.zero());
     }
 }
