@@ -598,7 +598,7 @@ impl HoprDbTicketOperations for HoprDb {
                     #[cfg(all(feature = "prometheus", not(test)))]
                     {
                         for row in ticket_statistics::Entity::find().all(tx.as_ref()).await? {
-                            METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(&[&row.channel_id, "unredeemed"], 0.0_f64);
+                            METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(&[&row.channel_id, "neglected"], 0.0_f64);
 
                             METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(&[&row.channel_id, "redeemed"], 0.0_f64);
 

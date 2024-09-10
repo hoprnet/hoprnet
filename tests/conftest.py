@@ -500,7 +500,7 @@ async def swarm7(request):
         mirror_contract_data(protocol_config_file(test_suite_name), INPUT_DEPLOYMENTS_SUMMARY_FILE, NETWORK1, NETWORK2)
 
         # SETUP NODES USING STORED IDENTITIES
-        logging.info("Reuse pre-generated identities and configs")
+        logging.info("Using pre-generated identities and configs")
         copy_identities(test_dir)
 
         # CREATE LOCAL SAFES AND MODULES FOR ALL THE IDS
@@ -547,7 +547,7 @@ async def swarm7(request):
     )
 
     # SETUP NODES USING STORED IDENTITIES
-    logging.info("Reuse pre-generated identities and configs")
+    logging.info("Using pre-generated identities and configs")
     copy_identities(test_dir)
     for node in nodes.values():
         node.load_addresses()

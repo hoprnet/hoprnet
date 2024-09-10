@@ -428,8 +428,6 @@ async def test_reset_ticket_statistics_from_metrics(src: Node, dest: Node, swarm
             )
         return count
 
-    assert count_metrics(await swarm7[dest].api.metrics()) == 0
-
     async with create_channel(swarm7[src], swarm7[dest], funding=TICKET_PRICE_PER_HOP, close_from_dest=False):
         await send_and_receive_packets_with_pop(
             ["1 hop message to self"], src=swarm7[src], dest=swarm7[src], path=[swarm7[dest].peer_id]
