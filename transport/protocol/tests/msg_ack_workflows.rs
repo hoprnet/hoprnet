@@ -105,7 +105,7 @@ async fn create_minimal_topology(dbs: &mut Vec<HoprDb>) -> anyhow::Result<()> {
                         public_key: node_key.clone(),
                         chain_addr: chain_key.to_address(),
                         entry_type: AccountType::Announced {
-                            multiaddr: Multiaddr::from_str("/ip4/127.0.0.1/tcp/4444").unwrap(),
+                            multiaddr: Multiaddr::from_str("/ip4/127.0.0.1/tcp/4444")?,
                             updated_block: 1,
                         },
                     },
@@ -309,7 +309,12 @@ async fn resolve_mock_path(me: Address, peers_offchain: Vec<PeerId>, peers_oncha
     let peers_addrs = peers_offchain
         .iter()
         .zip(peers_onchain)
-        .map(|(peer_id, addr)| (OffchainPublicKey::try_from(peer_id).unwrap(), addr))
+        .map(|(peer_id, addr)| {
+            (
+                OffchainPublicKey::try_from(peer_id).expect("should be valid PeerId"),
+                addr,
+            )
+        })
         .collect::<Vec<_>>();
 
     let mut cg = ChannelGraph::new(me);

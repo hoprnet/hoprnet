@@ -1257,6 +1257,7 @@ dependencies = [
 name = "chain-rpc"
 version = "0.2.4"
 dependencies = [
+ "anyhow",
  "async-std",
  "async-stream",
  "async-trait",
@@ -4038,6 +4039,7 @@ dependencies = [
 name = "hopr-internal-types"
 version = "0.5.0"
 dependencies = [
+ "anyhow",
  "aquamarine",
  "async-std",
  "bincode",
@@ -4108,6 +4110,7 @@ dependencies = [
 name = "hopr-metrics"
 version = "1.2.0"
 dependencies = [
+ "anyhow",
  "prometheus",
 ]
 

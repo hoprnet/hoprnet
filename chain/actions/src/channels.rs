@@ -308,8 +308,7 @@ mod tests {
 
         let tx_res = actions
             .open_channel(*BOB, stake)
-            .await
-            .unwrap()
+            .await?
             .await
             .expect("must resolve confirmation");
 
@@ -335,8 +334,7 @@ mod tests {
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
         let db_clone = db.clone();
         db.begin_transaction()
-            .await
-            .unwrap()
+            .await?
             .perform(|tx| {
                 Box::pin(async move {
                     db_clone
@@ -366,7 +364,11 @@ mod tests {
 
         assert!(
             matches!(
-                actions.open_channel(*BOB, stake).await.err().unwrap(),
+                actions
+                    .open_channel(*BOB, stake)
+                    .await
+                    .err()
+                    .expect("should be an error"),
                 ChainActionsError::ChannelAlreadyExists
             ),
             "should fail when channel exists"
@@ -382,8 +384,7 @@ mod tests {
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
         let db_clone = db.clone();
         db.begin_transaction()
-            .await
-            .unwrap()
+            .await?
             .perform(|tx| {
                 Box::pin(async move {
                     db_clone
@@ -412,7 +413,11 @@ mod tests {
 
         assert!(
             matches!(
-                actions.open_channel(*ALICE, stake).await.err().unwrap(),
+                actions
+                    .open_channel(*ALICE, stake)
+                    .await
+                    .err()
+                    .expect("should be an error"),
                 ChainActionsError::InvalidArguments(_)
             ),
             "should not create channel to self"
@@ -425,8 +430,7 @@ mod tests {
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
         let db_clone = db.clone();
         db.begin_transaction()
-            .await
-            .unwrap()
+            .await?
             .perform(|tx| {
                 Box::pin(async move {
                     db_clone
@@ -455,7 +459,11 @@ mod tests {
         let stake = Balance::new(10_u32, BalanceType::Native);
         assert!(
             matches!(
-                actions.open_channel(*BOB, stake).await.err().unwrap(),
+                actions
+                    .open_channel(*BOB, stake)
+                    .await
+                    .err()
+                    .expect("should be an error"),
                 ChainActionsError::InvalidArguments(_)
             ),
             "should not allow invalid balance"
@@ -465,7 +473,11 @@ mod tests {
 
         assert!(
             matches!(
-                actions.open_channel(*BOB, stake).await.err().unwrap(),
+                actions
+                    .open_channel(*BOB, stake)
+                    .await
+                    .err()
+                    .expect("should be an error"),
                 ChainActionsError::InvalidArguments(_)
             ),
             "should not allow invalid balance"
@@ -480,8 +492,7 @@ mod tests {
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
         let db_clone = db.clone();
         db.begin_transaction()
-            .await
-            .unwrap()
+            .await?
             .perform(|tx| {
                 Box::pin(async move {
                     db_clone
@@ -510,7 +521,11 @@ mod tests {
 
         assert!(
             matches!(
-                actions.open_channel(*BOB, stake).await.err().unwrap(),
+                actions
+                    .open_channel(*BOB, stake)
+                    .await
+                    .err()
+                    .expect("should be an error"),
                 ChainActionsError::NotEnoughAllowance
             ),
             "should fail when not enough allowance"
@@ -525,8 +540,7 @@ mod tests {
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
         let db_clone = db.clone();
         db.begin_transaction()
-            .await
-            .unwrap()
+            .await?
             .perform(|tx| {
                 Box::pin(async move {
                     db_clone
@@ -555,7 +569,11 @@ mod tests {
 
         assert!(
             matches!(
-                actions.open_channel(*BOB, stake).await.err().unwrap(),
+                actions
+                    .open_channel(*BOB, stake)
+                    .await
+                    .err()
+                    .expect("should be an error"),
                 ChainActionsError::BalanceTooLow
             ),
             "should fail when not enough token balance"
@@ -572,8 +590,7 @@ mod tests {
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
         let db_clone = db.clone();
         db.begin_transaction()
-            .await
-            .unwrap()
+            .await?
             .perform(|tx| {
                 Box::pin(async move {
                     db_clone
@@ -621,8 +638,7 @@ mod tests {
 
         let tx_res = actions
             .fund_channel(channel.get_id(), stake)
-            .await
-            .unwrap()
+            .await?
             .await
             .expect("must resolve confirmation");
 
@@ -645,8 +661,7 @@ mod tests {
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
         let db_clone = db.clone();
         db.begin_transaction()
-            .await
-            .unwrap()
+            .await?
             .perform(|tx| {
                 Box::pin(async move {
                     db_clone
@@ -675,7 +690,11 @@ mod tests {
         let stake = Balance::new(10_u32, BalanceType::HOPR);
         assert!(
             matches!(
-                actions.fund_channel(channel_id, stake).await.err().unwrap(),
+                actions
+                    .fund_channel(channel_id, stake)
+                    .await
+                    .err()
+                    .expect("should be an error"),
                 ChainActionsError::ChannelDoesNotExist
             ),
             "should fail when channel does not exist"
@@ -690,8 +709,7 @@ mod tests {
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
         let db_clone = db.clone();
         db.begin_transaction()
-            .await
-            .unwrap()
+            .await?
             .perform(|tx| {
                 Box::pin(async move {
                     db_clone
@@ -720,7 +738,11 @@ mod tests {
         let stake = Balance::new(10_u32, BalanceType::Native);
         assert!(
             matches!(
-                actions.open_channel(*BOB, stake).await.err().unwrap(),
+                actions
+                    .open_channel(*BOB, stake)
+                    .await
+                    .err()
+                    .expect("should be an error"),
                 ChainActionsError::InvalidArguments(_)
             ),
             "should not allow invalid balance"
@@ -729,7 +751,11 @@ mod tests {
         let stake = Balance::new(0_u32, BalanceType::HOPR);
         assert!(
             matches!(
-                actions.fund_channel(channel_id, stake).await.err().unwrap(),
+                actions
+                    .fund_channel(channel_id, stake)
+                    .await
+                    .err()
+                    .expect("should be an error"),
                 ChainActionsError::InvalidArguments(_)
             ),
             "should not allow invalid balance"
@@ -744,8 +770,7 @@ mod tests {
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
         let db_clone = db.clone();
         db.begin_transaction()
-            .await
-            .unwrap()
+            .await?
             .perform(|tx| {
                 Box::pin(async move {
                     db_clone
@@ -774,7 +799,11 @@ mod tests {
         let stake = Balance::new(10_000_u32, BalanceType::HOPR);
         assert!(
             matches!(
-                actions.fund_channel(channel_id, stake).await.err().unwrap(),
+                actions
+                    .fund_channel(channel_id, stake)
+                    .await
+                    .err()
+                    .expect("should be an error"),
                 ChainActionsError::NotEnoughAllowance
             ),
             "should fail when not enough allowance"
@@ -789,8 +818,7 @@ mod tests {
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
         let db_clone = db.clone();
         db.begin_transaction()
-            .await
-            .unwrap()
+            .await?
             .perform(|tx| {
                 Box::pin(async move {
                     db_clone
@@ -819,7 +847,11 @@ mod tests {
         let stake = Balance::new(10_000_u32, BalanceType::HOPR);
         assert!(
             matches!(
-                actions.fund_channel(channel_id, stake).await.err().unwrap(),
+                actions
+                    .fund_channel(channel_id, stake)
+                    .await
+                    .err()
+                    .expect("should be an error"),
                 ChainActionsError::BalanceTooLow
             ),
             "should fail when not enough balance"
@@ -837,8 +869,7 @@ mod tests {
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
         let db_clone = db.clone();
         db.begin_transaction()
-            .await
-            .unwrap()
+            .await?
             .perform(|tx| {
                 Box::pin(async move {
                     db_clone
@@ -909,8 +940,7 @@ mod tests {
 
         let tx_res = actions
             .close_channel(*BOB, ChannelDirection::Outgoing, false)
-            .await
-            .unwrap()
+            .await?
             .await
             .expect("must resolve confirmation");
 
@@ -927,12 +957,11 @@ mod tests {
         // Transition the channel to the PendingToClose state with the closure time already elapsed
         channel.status = ChannelStatus::PendingToClose(SystemTime::now().sub(Duration::from_secs(10)));
 
-        db.upsert_channel(None, channel).await.unwrap();
+        db.upsert_channel(None, channel).await?;
 
         let tx_res = actions
             .close_channel(*BOB, ChannelDirection::Outgoing, false)
-            .await
-            .unwrap()
+            .await?
             .await
             .expect("must resolve confirmation");
 
@@ -958,8 +987,7 @@ mod tests {
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
         let db_clone = db.clone();
         db.begin_transaction()
-            .await
-            .unwrap()
+            .await?
             .perform(|tx| {
                 Box::pin(async move {
                     db_clone
@@ -1008,8 +1036,7 @@ mod tests {
 
         let tx_res = actions
             .close_channel(*BOB, ChannelDirection::Incoming, false)
-            .await
-            .unwrap()
+            .await?
             .await
             .expect("must resolve confirmation");
 
@@ -1041,8 +1068,7 @@ mod tests {
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
         let db_clone = db.clone();
         db.begin_transaction()
-            .await
-            .unwrap()
+            .await?
             .perform(|tx| {
                 Box::pin(async move {
                     db_clone
@@ -1076,7 +1102,7 @@ mod tests {
                     .close_channel(*BOB, ChannelDirection::Outgoing, false)
                     .await
                     .err()
-                    .unwrap(),
+                    .expect("should be an error"),
                 ChainActionsError::ClosureTimeHasNotElapsed(_)
             ),
             "should fail when the channel closure period did not elapse"
@@ -1089,8 +1115,7 @@ mod tests {
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
         let db_clone = db.clone();
         db.begin_transaction()
-            .await
-            .unwrap()
+            .await?
             .perform(|tx| {
                 Box::pin(async move {
                     db_clone
@@ -1122,7 +1147,7 @@ mod tests {
                     .close_channel(*BOB, ChannelDirection::Outgoing, false)
                     .await
                     .err()
-                    .unwrap(),
+                    .expect("should be an error"),
                 ChainActionsError::ChannelDoesNotExist
             ),
             "should fail when channel does not exist"
@@ -1138,8 +1163,7 @@ mod tests {
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
         let db_clone = db.clone();
         db.begin_transaction()
-            .await
-            .unwrap()
+            .await?
             .perform(|tx| {
                 Box::pin(async move {
                     db_clone
@@ -1173,7 +1197,7 @@ mod tests {
                     .close_channel(*BOB, ChannelDirection::Outgoing, false)
                     .await
                     .err()
-                    .unwrap(),
+                    .expect("should be an error"),
                 ChainActionsError::ChannelAlreadyClosed
             ),
             "should fail when channel is already closed"

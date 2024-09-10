@@ -1021,32 +1021,36 @@ pub mod tests {
     }
 
     #[test]
-    pub fn test_f64_to_win_prob() {
+    pub fn test_f64_to_win_prob() -> anyhow::Result<()> {
         let mut test_bit_string = [0xffu8; 7];
 
-        assert_eq!([0u8; 7], super::f64_to_win_prob(0.0f64).unwrap());
+        assert_eq!([0u8; 7], super::f64_to_win_prob(0.0f64)?);
 
-        assert_eq!(test_bit_string, super::f64_to_win_prob(1.0f64).unwrap());
+        assert_eq!(test_bit_string, super::f64_to_win_prob(1.0f64)?);
 
         test_bit_string[0] = 0x7f;
-        assert_eq!(test_bit_string, super::f64_to_win_prob(0.5f64).unwrap());
+        assert_eq!(test_bit_string, super::f64_to_win_prob(0.5f64)?);
 
         test_bit_string[0] = 0x3f;
-        assert_eq!(test_bit_string, super::f64_to_win_prob(0.25f64).unwrap());
+        assert_eq!(test_bit_string, super::f64_to_win_prob(0.25f64)?);
 
         test_bit_string[0] = 0x1f;
-        assert_eq!(test_bit_string, super::f64_to_win_prob(0.125f64).unwrap());
+        assert_eq!(test_bit_string, super::f64_to_win_prob(0.125f64)?);
+
+        Ok(())
     }
 
     #[test]
-    pub fn test_win_prob_back_and_forth() {
+    pub fn test_win_prob_back_and_forth() -> anyhow::Result<()> {
         for float in [0.1f64, 0.002f64, 0.00001f64, 0.7311111f64, 1.0f64, 0.0f64] {
-            assert!((float - super::win_prob_to_f64(&super::f64_to_win_prob(float).unwrap())).abs() < f64::EPSILON);
+            assert!((float - super::win_prob_to_f64(&super::f64_to_win_prob(float)?)).abs() < f64::EPSILON);
         }
+
+        Ok(())
     }
 
     #[test]
-    pub fn test_ticket_builder_zero_hop() {
+    pub fn test_ticket_builder_zero_hop() -> anyhow::Result<()> {
         let ticket = TicketBuilder::zero_hop()
             .direction(&ALICE.public().to_address(), &BOB.public().to_address())
             .challenge(Default::default())
@@ -1059,10 +1063,11 @@ pub mod tests {
             generate_channel_id(&ALICE.public().to_address(), &BOB.public().to_address()),
             ticket.channel_id
         );
+        Ok(())
     }
 
     #[test]
-    pub fn test_ticket_serialize_deserialize() {
+    pub fn test_ticket_serialize_deserialize() -> anyhow::Result<()> {
         let initial_ticket = TicketBuilder::default()
             .direction(&ALICE.public().to_address(), &BOB.public().to_address())
             .balance(BalanceType::HOPR.one())
@@ -1079,12 +1084,13 @@ pub mod tests {
         let ticket_bytes: [u8; Ticket::SIZE] = initial_ticket.verified_ticket().clone().into();
         assert_eq!(
             initial_ticket.verified_ticket(),
-            &Ticket::try_from(ticket_bytes.as_ref()).unwrap()
+            &Ticket::try_from(ticket_bytes.as_ref())?
         );
+        Ok(())
     }
 
     #[test]
-    pub fn test_ticket_serialize_deserialize_serde() {
+    pub fn test_ticket_serialize_deserialize_serde() -> anyhow::Result<()> {
         let initial_ticket = TicketBuilder::default()
             .direction(&ALICE.public().to_address(), &BOB.public().to_address())
             .balance(BalanceType::HOPR.one())
@@ -1098,12 +1104,13 @@ pub mod tests {
 
         assert_eq!(
             initial_ticket,
-            bincode::deserialize(&bincode::serialize(&initial_ticket).unwrap()).unwrap()
+            bincode::deserialize(&bincode::serialize(&initial_ticket)?)?
         );
+        Ok(())
     }
 
     #[test]
-    pub fn test_ticket_sign_verify() {
+    pub fn test_ticket_sign_verify() -> anyhow::Result<()> {
         let initial_ticket = TicketBuilder::default()
             .direction(&ALICE.public().to_address(), &BOB.public().to_address())
             .balance(BalanceType::HOPR.one())
@@ -1119,10 +1126,11 @@ pub mod tests {
 
         let ticket = initial_ticket.leak();
         assert!(ticket.verify(&ALICE.public().to_address(), &Default::default()).is_ok());
+        Ok(())
     }
 
     #[test]
-    pub fn test_path_position() {
+    pub fn test_path_position() -> anyhow::Result<()> {
         let builder = TicketBuilder::default()
             .direction(&ALICE.public().to_address(), &BOB.public().to_address())
             .balance(BalanceType::HOPR.one())
@@ -1137,7 +1145,7 @@ pub mod tests {
             .build_signed(&ALICE, &Default::default())
             .expect("should build ticket");
 
-        assert_eq!(1u8, ticket.get_path_position(1_u32.into()).unwrap());
+        assert_eq!(1u8, ticket.get_path_position(1_u32.into())?);
 
         let ticket = builder
             .clone()
@@ -1145,7 +1153,7 @@ pub mod tests {
             .build_signed(&ALICE, &Default::default())
             .expect("should build ticket");
 
-        assert_eq!(2u8, ticket.get_path_position(17_u64.into()).unwrap());
+        assert_eq!(2u8, ticket.get_path_position(17_u64.into())?);
 
         let ticket = builder
             .clone()
@@ -1154,11 +1162,12 @@ pub mod tests {
             .build_signed(&ALICE, &Default::default())
             .expect("should build ticket");
 
-        assert_eq!(2u8, ticket.get_path_position(3_u64.into()).unwrap());
+        assert_eq!(2u8, ticket.get_path_position(3_u64.into())?);
+        Ok(())
     }
 
     #[test]
-    pub fn test_path_position_mismatch() {
+    pub fn test_path_position_mismatch() -> anyhow::Result<()> {
         let ticket = TicketBuilder::default()
             .direction(&ALICE.public().to_address(), &BOB.public().to_address())
             .amount(256)
@@ -1171,10 +1180,11 @@ pub mod tests {
             .expect("should build ticket");
 
         assert!(ticket.get_path_position(1_u64.into()).is_err());
+        Ok(())
     }
 
     #[test]
-    pub fn test_zero_hop() {
+    pub fn test_zero_hop() -> anyhow::Result<()> {
         let ticket = TicketBuilder::zero_hop()
             .direction(&ALICE.public().to_address(), &BOB.public().to_address())
             .challenge(Default::default())
@@ -1185,6 +1195,7 @@ pub mod tests {
             .leak()
             .verify(&ALICE.public().to_address(), &Hash::default())
             .is_ok());
+        Ok(())
     }
 
     fn mock_ticket(
@@ -1192,33 +1203,30 @@ pub mod tests {
         counterparty: &Address,
         domain_separator: Option<Hash>,
         challenge: Option<EthereumChallenge>,
-    ) -> VerifiedTicket {
+    ) -> anyhow::Result<VerifiedTicket> {
         let win_prob = 1.0f64; // 100 %
         let price_per_packet: U256 = 10000000000000000u128.into(); // 0.01 HOPR
         let path_pos = 5u64;
 
-        TicketBuilder::default()
+        Ok(TicketBuilder::default()
             .direction(&pk.public().to_address(), counterparty)
-            .amount(price_per_packet.div_f64(win_prob).unwrap() * U256::from(path_pos))
+            .amount(price_per_packet.div_f64(win_prob)? * U256::from(path_pos))
             .index(0)
             .index_offset(1)
             .win_prob(1.0)
             .channel_epoch(4)
             .challenge(challenge.unwrap_or_default())
-            .build_signed(pk, &domain_separator.unwrap_or_default())
-            .expect("should build ticket")
+            .build_signed(pk, &domain_separator.unwrap_or_default())?)
     }
 
     #[test]
-    fn test_unacknowledged_ticket_challenge_response() {
-        let hk1 = HalfKey::try_from(hex!("3477d7de923ba3a7d5d72a7d6c43fd78395453532d03b2a1e2b9a7cc9b61bafa").as_ref())
-            .unwrap();
+    fn test_unacknowledged_ticket_challenge_response() -> anyhow::Result<()> {
+        let hk1 = HalfKey::try_from(hex!("3477d7de923ba3a7d5d72a7d6c43fd78395453532d03b2a1e2b9a7cc9b61bafa").as_ref())?;
 
-        let hk2 = HalfKey::try_from(hex!("4471496ef88d9a7d86a92b7676f3c8871a60792a37fae6fc3abc347c3aa3b16b").as_ref())
-            .unwrap();
+        let hk2 = HalfKey::try_from(hex!("4471496ef88d9a7d86a92b7676f3c8871a60792a37fae6fc3abc347c3aa3b16b").as_ref())?;
 
-        let cp1: CurvePoint = hk1.to_challenge().try_into().unwrap();
-        let cp2: CurvePoint = hk2.to_challenge().try_into().unwrap();
+        let cp1: CurvePoint = hk1.to_challenge().try_into()?;
+        let cp2: CurvePoint = hk2.to_challenge().try_into()?;
         let cp_sum = CurvePoint::combine(&[&cp1, &cp2]);
 
         let dst = Hash::default();
@@ -1227,19 +1235,19 @@ pub mod tests {
             &BOB.public().to_address(),
             Some(dst),
             Some(Challenge::from(cp_sum).to_ethereum_challenge()),
-        )
+        )?
         .into_unacknowledged(hk1)
         .acknowledge(&hk2)
         .expect("must be able to acknowledge ticket");
 
         assert!(ack.is_winning(&BOB, &dst), "ticket must be winning");
+        Ok(())
     }
 
     #[test]
-    fn test_acknowledged_ticket() {
+    fn test_acknowledged_ticket() -> anyhow::Result<()> {
         let response =
-            Response::try_from(hex!("876a41ee5fb2d27ac14d8e8d552692149627c2f52330ba066f9e549aef762f73").as_ref())
-                .unwrap();
+            Response::try_from(hex!("876a41ee5fb2d27ac14d8e8d552692149627c2f52330ba066f9e549aef762f73").as_ref())?;
 
         let dst = Hash::default();
 
@@ -1248,12 +1256,11 @@ pub mod tests {
             &BOB.public().to_address(),
             Some(dst),
             Some(response.to_challenge().into()),
-        );
+        )?;
 
         let acked_ticket = ticket.into_acknowledged(response);
 
-        let mut deserialized_ticket =
-            bincode::deserialize::<AcknowledgedTicket>(&bincode::serialize(&acked_ticket).unwrap()).unwrap();
+        let mut deserialized_ticket = bincode::deserialize::<AcknowledgedTicket>(&bincode::serialize(&acked_ticket)?)?;
         assert_eq!(acked_ticket, deserialized_ticket);
 
         assert!(deserialized_ticket.is_winning(&BOB, &dst));
@@ -1262,15 +1269,16 @@ pub mod tests {
 
         assert_eq!(
             deserialized_ticket,
-            bincode::deserialize(&bincode::serialize(&deserialized_ticket).unwrap()).unwrap()
+            bincode::deserialize(&bincode::serialize(&deserialized_ticket)?)?
         );
+        Ok(())
     }
 
     #[test]
-    fn test_ticket_entire_ticket_transfer_flow() {
+    fn test_ticket_entire_ticket_transfer_flow() -> anyhow::Result<()> {
         let hk1 = HalfKey::random();
         let hk2 = HalfKey::random();
-        let resp = Response::from_half_keys(&hk1, &hk2).unwrap();
+        let resp = Response::from_half_keys(&hk1, &hk2)?;
 
         let verified = TicketBuilder::default()
             .direction(&ALICE.public().to_address(), &BOB.public().to_address())
@@ -1301,5 +1309,6 @@ pub mod tests {
 
         assert_eq!(redeemable_1, redeemable_2);
         assert_eq!(redeemable_1.vrf_params.v, redeemable_2.vrf_params.v);
+        Ok(())
     }
 }

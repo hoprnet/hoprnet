@@ -239,7 +239,7 @@ pub fn create_anvil(block_time: Option<std::time::Duration>) -> ethers::utils::A
         .arg("--workspace")
         .arg("--message-format=plain")
         .output()
-        .unwrap()
+        .expect("should succeed")
         .stdout;
     let cargo_path = std::path::Path::new(std::str::from_utf8(&output).unwrap().trim());
     let workspace_dir = cargo_path.parent().unwrap().to_path_buf();

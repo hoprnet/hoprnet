@@ -162,7 +162,10 @@ impl RetryPolicy<JsonRpcProviderClientError> for SimpleJsonRpcRetryPolicy {
         retry_queue_size: u32,
     ) -> RetryAction {
         if self.max_retries.is_some_and(|max| num_retries > max) {
-            warn!("max number of retries {} has been reached", self.max_retries.unwrap());
+            warn!(
+                "max number of retries {} has been reached",
+                self.max_retries.expect("max_retries must be set")
+            );
             return NoRetry;
         }
 
@@ -648,22 +651,22 @@ mod tests {
     use crate::errors::JsonRpcProviderClientError;
     use crate::{HttpPostRequestor, ZeroRetryPolicy};
 
-    async fn deploy_contracts<R: HttpPostRequestor + Debug>(req: R) -> ContractAddresses {
+    async fn deploy_contracts<R: HttpPostRequestor + Debug>(req: R) -> anyhow::Result<ContractAddresses> {
         let anvil = create_anvil(None);
-        let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
+        let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
 
         let client = create_rpc_client_to_anvil(req, &anvil, &chain_key_0);
 
-        ContractAddresses::from(
+        Ok(ContractAddresses::from(
             &ContractInstances::deploy_for_testing(client.clone(), &chain_key_0)
                 .await
                 .expect("failed to deploy"),
-        )
+        ))
     }
 
     #[async_std::test]
-    async fn test_client_should_deploy_contracts_via_surf() {
-        let contract_addrs = deploy_contracts(SurfRequestor::default()).await;
+    async fn test_client_should_deploy_contracts_via_surf() -> anyhow::Result<()> {
+        let contract_addrs = deploy_contracts(SurfRequestor::default()).await?;
 
         assert_ne!(contract_addrs.token, Address::default());
         assert_ne!(contract_addrs.channels, Address::default());
@@ -671,11 +674,13 @@ mod tests {
         assert_ne!(contract_addrs.network_registry, Address::default());
         assert_ne!(contract_addrs.safe_registry, Address::default());
         assert_ne!(contract_addrs.price_oracle, Address::default());
+
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_client_should_deploy_contracts_via_reqwest() {
-        let contract_addrs = deploy_contracts(ReqwestRequestor::default()).await;
+    async fn test_client_should_deploy_contracts_via_reqwest() -> anyhow::Result<()> {
+        let contract_addrs = deploy_contracts(ReqwestRequestor::default()).await?;
 
         assert_ne!(contract_addrs.token, Address::default());
         assert_ne!(contract_addrs.channels, Address::default());
@@ -683,6 +688,8 @@ mod tests {
         assert_ne!(contract_addrs.network_registry, Address::default());
         assert_ne!(contract_addrs.safe_registry, Address::default());
         assert_ne!(contract_addrs.price_oracle, Address::default());
+
+        Ok(())
     }
 
     #[async_std::test]
