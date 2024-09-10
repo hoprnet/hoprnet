@@ -742,6 +742,7 @@ impl SafeModuleSubcommands {
         module_address: String,
     ) -> Result<(), HelperErrors> {
         // read all the node addresses
+        info!("Reading all the node addresses...");
         let mut node_eth_addresses: Vec<H160> = Vec::new();
         if let Some(addresses) = node_address {
             node_eth_addresses.extend(

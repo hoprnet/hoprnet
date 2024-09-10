@@ -118,7 +118,7 @@ impl MultisendTransaction {
             fixed_length_values,                                    // 2 * 32 bytes
             ethers::abi::Token::Bytes(self.encoded_data.to_vec()),  // bytes
         ])
-        .unwrap()
+        .unwrap_or_else(|_| panic!("failed to encode_packed a multisig transaction"))
     }
 
     /// build a multisend transaction data payload
@@ -136,9 +136,11 @@ impl MultisendTransaction {
 /// contract_address should be safe address
 fn get_domain_separator(chain_id: U256, contract_address: Address) -> [u8; 32] {
     keccak256(ethers::abi::encode(&[
-        ethers::abi::Token::FixedBytes(hex::decode(DOMAIN_SEPARATOR_TYPEHASH).unwrap()), // DOMAIN_SEPARATOR_TYPEHASH
-        ethers::abi::Token::Uint(chain_id),                                              // getChainId
-        ethers::abi::Token::Address(contract_address),                                   // this
+        ethers::abi::Token::FixedBytes(
+            hex::decode(DOMAIN_SEPARATOR_TYPEHASH).unwrap_or_else(|_| panic!("decode the DOMAIN_SEPARATOR_TYPEHASH")),
+        ), // DOMAIN_SEPARATOR_TYPEHASH
+        ethers::abi::Token::Uint(chain_id),            // getChainId
+        ethers::abi::Token::Address(contract_address), // this
     ]))
 }
 
@@ -157,17 +159,19 @@ fn get_safe_transaction_hash(
     let data_hash = keccak256(data);
 
     let encoded = ethers::abi::encode(&[
-        ethers::abi::Token::FixedBytes(hex::decode(SAFE_TX_TYPEHASH).unwrap()), // SAFE_TX_TYPEHASH
-        ethers::abi::Token::Address(to),                                        // to
-        ethers::abi::Token::Uint(value),                                        // value
-        ethers::abi::Token::FixedBytes(data_hash.into()),                       // keccak256
-        ethers::abi::Token::Uint(U256::from(operation as u8)),                  // operation
-        ethers::abi::Token::Uint(U256::zero()),                                 // safeTxGas
-        ethers::abi::Token::Uint(U256::zero()),                                 // baseGas
-        ethers::abi::Token::Uint(U256::zero()),                                 // gasPrice
-        ethers::abi::Token::Address(Address::zero()),                           // gasToken
-        ethers::abi::Token::Address(refund_address),                            // refundReceiver
-        ethers::abi::Token::Uint(nonce),                                        // _nonce
+        ethers::abi::Token::FixedBytes(
+            hex::decode(SAFE_TX_TYPEHASH).unwrap_or_else(|_| panic!("failed to decode the SAFE_TX_TYPEHASH")),
+        ), // SAFE_TX_TYPEHASH
+        ethers::abi::Token::Address(to),                       // to
+        ethers::abi::Token::Uint(value),                       // value
+        ethers::abi::Token::FixedBytes(data_hash.into()),      // keccak256
+        ethers::abi::Token::Uint(U256::from(operation as u8)), // operation
+        ethers::abi::Token::Uint(U256::zero()),                // safeTxGas
+        ethers::abi::Token::Uint(U256::zero()),                // baseGas
+        ethers::abi::Token::Uint(U256::zero()),                // gasPrice
+        ethers::abi::Token::Address(Address::zero()),          // gasToken
+        ethers::abi::Token::Address(refund_address),           // refundReceiver
+        ethers::abi::Token::Uint(nonce),                       // _nonce
     ]);
 
     let safe_hash = keccak256(encoded);
@@ -177,7 +181,7 @@ fn get_safe_transaction_hash(
         ethers::abi::Token::FixedBytes(domain_separator.into()),
         ethers::abi::Token::FixedBytes(safe_hash.into()),
     ])
-    .unwrap();
+    .unwrap_or_else(|_| panic!("failed to encode_packed a transaction with ethereum prefix"));
 
     let transaction_hash = keccak256(encoded_transaction_data);
     debug!("transaction_hash {:?}", hex::encode(transaction_hash));
@@ -230,7 +234,9 @@ pub async fn send_multisend_safe_transaction_with_threshold_one<M: Middleware>(
     );
 
     // sign the transaction
-    let signature = wallet.sign_hash(transaction_hash.into()).unwrap();
+    let signature = wallet
+        .sign_hash(transaction_hash.into())
+        .unwrap_or_else(|_| panic!("failed to sign a transaction hash"));
     debug!("signature {:?}", hex::encode(signature.to_vec()));
 
     // execute the transaction
@@ -249,14 +255,19 @@ pub async fn send_multisend_safe_transaction_with_threshold_one<M: Middleware>(
         )
         .send()
         .await
-        .unwrap()
+        .unwrap_or_else(|_| panic!("failed to exeute a pending transaction"))
         .await
-        .unwrap()
+        .unwrap_or_else(|_| panic!("failed to resolve a transaction receipt"))
         .ok_or(HelperErrors::MultiSendError)?;
 
     tx.logs
         .iter()
-        .find(|log| log.topics[0].eq(&SAFE_EXECUTION_SUCCESS.parse::<H256>().unwrap()))
+        .find(|log| {
+            log.topics[0].eq(&SAFE_EXECUTION_SUCCESS
+                .parse::<H256>()
+                .map_err(|_| HelperErrors::ParseError("Failed to parse SAFE_EXECUTION_SUCCESS".into()))
+                .unwrap())
+        })
         .ok_or(HelperErrors::MultiSendError)?;
 
     Ok(())
@@ -313,9 +324,9 @@ pub async fn send_safe_transaction_with_threshold_one<M: Middleware>(
         )
         .send()
         .await
-        .unwrap()
+        .unwrap_or_else(|_| panic!("failed to exeute a pending transaction"))
         .await
-        .unwrap()
+        .unwrap_or_else(|_| panic!("failed to resolve a transaction receipt"))
         .ok_or(HelperErrors::MultiSendError)?;
 
     tx.logs
@@ -469,9 +480,9 @@ pub async fn transfer_or_mint_tokens<M: Middleware>(
                 .mint(caller, total, Bytes::default(), Bytes::default())
                 .send()
                 .await
-                .unwrap()
+                .unwrap_or_else(|_| panic!("failed to exeute a pending transaction"))
                 .await
-                .unwrap();
+                .unwrap_or_else(|_| panic!("failed to resolve a transaction receipt"));
         } else {
             return Err(HelperErrors::NotAMinter);
         }
@@ -484,9 +495,9 @@ pub async fn transfer_or_mint_tokens<M: Middleware>(
             .transfer(addresses[0], amounts[0])
             .send()
             .await
-            .unwrap()
+            .unwrap_or_else(|_| panic!("failed to exeute a pending transaction"))
             .await
-            .unwrap();
+            .unwrap_or_else(|_| panic!("failed to resolve a transaction receipt"));
     } else {
         // use multicall
         // TODO: introduce a new ERC777Recipient contract and batch the following separated steps into one, to mitigate the attack vector
@@ -495,9 +506,9 @@ pub async fn transfer_or_mint_tokens<M: Middleware>(
             .approve(MULTICALL_ADDRESS, total)
             .send()
             .await
-            .unwrap()
+            .unwrap_or_else(|_| panic!("failed to exeute a pending transaction"))
             .await
-            .unwrap();
+            .unwrap_or_else(|_| panic!("failed to resolve a transaction receipt"));
 
         // transfer token to multicall contract and transfer to multiple recipients
         for (i, address) in addresses.iter().enumerate() {
@@ -512,7 +523,12 @@ pub async fn transfer_or_mint_tokens<M: Middleware>(
             }
         }
 
-        multicall.send().await.unwrap().await.unwrap();
+        multicall
+            .send()
+            .await
+            .unwrap_or_else(|_| panic!("failed to exeute a pending transaction"))
+            .await
+            .unwrap_or_else(|_| panic!("failed to resolve a transaction receipt"));
     }
 
     Ok(total)
@@ -646,18 +662,18 @@ pub async fn register_safes_and_nodes_on_network_registry<M: Middleware>(
         .manager_register(safes_to_add.clone(), nodes_to_add.clone())
         .send()
         .await
-        .unwrap()
+        .unwrap_or_else(|_| panic!("failed to exeute a pending transaction"))
         .await
-        .unwrap();
+        .unwrap_or_else(|_| panic!("failed to resolve a transaction receipt"));
 
     // force sync their eligibility
     network_registry
         .manager_force_sync(safes_to_add.clone(), vec![true; safes_to_add.len()])
         .send()
         .await
-        .unwrap()
+        .unwrap_or_else(|_| panic!("failed to exeute a pending transaction"))
         .await
-        .unwrap();
+        .unwrap_or_else(|_| panic!("failed to resolve a transaction receipt"));
 
     Ok((nodes_to_remove.len(), nodes_to_add.len()))
 }
@@ -691,9 +707,9 @@ pub async fn deregister_nodes_from_network_registry<M: Middleware>(
             .manager_deregister(nodes_to_remove.clone())
             .send()
             .await
-            .unwrap()
+            .unwrap_or_else(|_| panic!("failed to exeute a pending transaction"))
             .await
-            .unwrap();
+            .unwrap_or_else(|_| panic!("failed to resolve a transaction receipt"));
     }
     Ok(nodes_to_remove.len())
 }
@@ -715,9 +731,9 @@ pub async fn force_sync_safes_on_network_registry<M: Middleware>(
         .manager_force_sync(safe_addresses, eligibilities)
         .send()
         .await
-        .unwrap()
+        .unwrap_or_else(|_| panic!("failed to exeute a pending transaction"))
         .await
-        .unwrap();
+        .unwrap_or_else(|_| panic!("failed to resolve a transaction receipt"));
 
     Ok(())
 }
@@ -2240,7 +2256,7 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn test_include_nodes_to_module() {
+    async fn test_include_nodes_to_module() -> anyhow::Result<()> {
         // set allowance for token transfer for the safe multiple times
         let _ = env_logger::builder().is_test(true).try_init();
 
@@ -2275,32 +2291,30 @@ mod tests {
             deployer_vec.clone(),
             U256::from(1),
         )
-        .await
-        .unwrap();
+        .await?;
 
         // check ndoes are not included
         for node_addr in node_addresses.clone() {
             // node is removed
-            let node_is_not_included = node_module.is_node(node_addr).call().await.unwrap();
+            let node_is_not_included = node_module.is_node(node_addr).call().await?;
             assert!(!node_is_not_included, "node should not be included");
         }
 
         // include nodes to safe
-        include_nodes_to_module(safe, node_addresses.clone(), node_module.address(), contract_deployer)
-            .await
-            .unwrap();
+        include_nodes_to_module(safe, node_addresses.clone(), node_module.address(), contract_deployer).await?;
 
         // check ndoes are included
         // check ndoes are not included
         for node_addr in node_addresses {
             // node is removed
-            let node_is_included = node_module.is_node(node_addr).call().await.unwrap();
+            let node_is_included = node_module.is_node(node_addr).call().await?;
             assert!(node_is_included, "node should be included");
         }
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_migrate_nodes_to_new_network() {
+    async fn test_migrate_nodes_to_new_network() -> anyhow::Result<()> {
         // set allowance for token transfer for the safe multiple times
         let _ = env_logger::builder().is_test(true).try_init();
 
@@ -2311,24 +2325,20 @@ mod tests {
 
         // launch local anvil instance
         let anvil = chain_types::utils::create_anvil(None);
-        let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
+        let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
         let self_address: H160 = contract_deployer.public().to_address().into();
         let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &contract_deployer);
         let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
             .await
             .expect("failed to deploy");
         // deploy multicall contract
-        deploy_multicall3_for_testing(client.clone()).await.unwrap();
+        deploy_multicall3_for_testing(client.clone()).await?;
         // deploy safe suits
-        deploy_safe_suites(client.clone()).await.unwrap();
+        deploy_safe_suites(client.clone()).await?;
 
         // deploy some new contracts for the new network
-        let new_safe_registry = HoprNodeSafeRegistry::deploy(client.clone(), ())
-            .unwrap()
-            .send()
-            .await
-            .unwrap();
-        let new_token = HoprToken::deploy(client.clone(), ()).unwrap().send().await.unwrap();
+        let new_safe_registry = HoprNodeSafeRegistry::deploy(client.clone(), ())?.send().await?;
+        let new_token = HoprToken::deploy(client.clone(), ())?.send().await?;
         let new_channels = HoprChannels::deploy(
             client.clone(),
             ethers::abi::Token::Tuple(vec![
@@ -2336,17 +2346,13 @@ mod tests {
                 ethers::abi::Token::Uint(1_u32.into()),
                 ethers::abi::Token::Address(new_safe_registry.address()),
             ]),
-        )
-        .unwrap()
+        )?
         .send()
-        .await
-        .unwrap();
+        .await?;
         let new_announcements =
-            HoprAnnouncements::deploy(client.clone(), ethers::abi::Token::Address(new_safe_registry.address()))
-                .unwrap()
+            HoprAnnouncements::deploy(client.clone(), ethers::abi::Token::Address(new_safe_registry.address()))?
                 .send()
-                .await
-                .unwrap();
+                .await?;
         let _new_network_registry = HoprNetworkRegistry::deploy(
             client.clone(),
             (
@@ -2354,11 +2360,9 @@ mod tests {
                 self_address,
                 self_address,
             ),
-        )
-        .unwrap()
+        )?
         .send()
-        .await
-        .unwrap();
+        .await?;
 
         let deployer_vec: Vec<H160> = vec![self_address];
 
@@ -2374,17 +2378,12 @@ mod tests {
             deployer_vec.clone(),
             U256::from(1),
         )
-        .await
-        .unwrap();
+        .await?;
 
         // check new network is not included
-        let old_channels_inclusion = node_module
-            .try_get_target(instances.channels.address())
-            .call()
-            .await
-            .unwrap();
+        let old_channels_inclusion = node_module.try_get_target(instances.channels.address()).call().await?;
         assert!(old_channels_inclusion.0, "old channel should be included");
-        let new_channels_inclusion = node_module.try_get_target(new_channels.address()).call().await.unwrap();
+        let new_channels_inclusion = node_module.try_get_target(new_channels.address()).call().await?;
         assert!(!new_channels_inclusion.0, "new channel should not be included");
 
         // migrate nodes
@@ -2397,22 +2396,18 @@ mod tests {
             U256::max_value(),
             contract_deployer,
         )
-        .await
-        .unwrap();
+        .await?;
 
         // check new network is included
-        let old_channels_inclusion = node_module
-            .try_get_target(instances.channels.address())
-            .call()
-            .await
-            .unwrap();
+        let old_channels_inclusion = node_module.try_get_target(instances.channels.address()).call().await?;
         assert!(old_channels_inclusion.0, "old channel should still be included");
-        let new_channels_inclusion = node_module.try_get_target(new_channels.address()).call().await.unwrap();
+        let new_channels_inclusion = node_module.try_get_target(new_channels.address()).call().await?;
         assert!(new_channels_inclusion.0, "new channel should now be included");
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_debug_node_safe_module_setup_on_balance_and_registries() {
+    async fn test_debug_node_safe_module_setup_on_balance_and_registries() -> anyhow::Result<()> {
         // set allowance for token transfer for the safe multiple times
         let _ = env_logger::builder().is_test(true).try_init();
 
@@ -2423,15 +2418,15 @@ mod tests {
 
         // launch local anvil instance
         let anvil = chain_types::utils::create_anvil(None);
-        let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
+        let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
         let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &contract_deployer);
         let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
             .await
             .expect("failed to deploy");
         // deploy multicall contract
-        deploy_multicall3_for_testing(client.clone()).await.unwrap();
+        deploy_multicall3_for_testing(client.clone()).await?;
         // deploy safe suits
-        deploy_safe_suites(client.clone()).await.unwrap();
+        deploy_safe_suites(client.clone()).await?;
 
         let deployer_vec: Vec<H160> = vec![contract_deployer.public().to_address().into()];
 
@@ -2447,15 +2442,13 @@ mod tests {
             deployer_vec.clone(),
             U256::from(1),
         )
-        .await
-        .unwrap();
+        .await?;
         let registered_safe_before_registration = debug_node_safe_module_setup_on_balance_and_registries(
             instances.network_registry.clone(),
             instances.safe_registry.clone(),
             &node_addresses[0],
         )
-        .await
-        .unwrap();
+        .await?;
 
         assert_eq!(
             registered_safe_before_registration,
@@ -2469,26 +2462,25 @@ mod tests {
             vec![safe.address()],
             vec![node_addresses[0]],
         )
-        .await
-        .unwrap();
+        .await?;
 
         let registered_safe_after_registration = debug_node_safe_module_setup_on_balance_and_registries(
             instances.network_registry.clone(),
             instances.safe_registry.clone(),
             &node_addresses[0],
         )
-        .await
-        .unwrap();
+        .await?;
 
         assert_eq!(
             registered_safe_after_registration,
             safe.address(),
             "safe is not registered"
         );
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_debug_node_safe_module_setup_main() {
+    async fn test_debug_node_safe_module_setup_main() -> anyhow::Result<()> {
         // set allowance for token transfer for the safe multiple times
         let _ = env_logger::builder().is_test(true).try_init();
 
@@ -2499,15 +2491,15 @@ mod tests {
 
         // launch local anvil instance
         let anvil = chain_types::utils::create_anvil(None);
-        let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
+        let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
         let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &contract_deployer);
         let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
             .await
             .expect("failed to deploy");
         // deploy multicall contract
-        deploy_multicall3_for_testing(client.clone()).await.unwrap();
+        deploy_multicall3_for_testing(client.clone()).await?;
         // deploy safe suits
-        deploy_safe_suites(client.clone()).await.unwrap();
+        deploy_safe_suites(client.clone()).await?;
 
         let deployer_vec: Vec<H160> = vec![contract_deployer.public().to_address().into()];
 
@@ -2523,8 +2515,7 @@ mod tests {
             deployer_vec.clone(),
             U256::from(1),
         )
-        .await
-        .unwrap();
+        .await?;
 
         // register some nodes
         let (_, _) = register_safes_and_nodes_on_network_registry(
@@ -2532,8 +2523,7 @@ mod tests {
             vec![safe.address()],
             vec![node_addresses[0]],
         )
-        .await
-        .unwrap();
+        .await?;
 
         debug_node_safe_module_setup_main(
             instances.token.clone(),
@@ -2543,7 +2533,7 @@ mod tests {
             &instances.channels.address(),
             &instances.announcements.address(),
         )
-        .await
-        .unwrap()
+        .await?;
+        Ok(())
     }
 }

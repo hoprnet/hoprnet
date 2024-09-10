@@ -100,10 +100,17 @@ impl FaucetArgs {
         // Include provided address
         let mut eth_addresses_all: Vec<H160> = Vec::new();
         if let Some(addresses) = address {
-            eth_addresses_all.extend(addresses.split(',').map(|addr| H160::from_str(addr).unwrap()));
+            eth_addresses_all.extend(addresses.split(',').map(|addr| {
+                H160::from_str(addr).unwrap_or_else(|e| {
+                    panic!(
+                        "{}",
+                        format!("Cannot parse address {:?} for eth_addresses_all, due to {:?}", addr, e)
+                    )
+                })
+            }));
         }
         // if local identity dirs/path is provided, read addresses from identity files
-        eth_addresses_all.extend(local_identity.to_addresses().unwrap().into_iter().map(H160::from));
+        eth_addresses_all.extend(local_identity.to_addresses()?.into_iter().map(H160::from));
         info!("All the addresses: {:?}", eth_addresses_all);
 
         // `PRIVATE_KEY` - Private key is required to send on-chain transactions
