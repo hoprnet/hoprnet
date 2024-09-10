@@ -1,19 +1,22 @@
 use futures::future::BoxFuture;
-use futures::{pin_mut, FutureExt, Sink, SinkExt};
-use std::io::{Error, ErrorKind};
+use futures::{pin_mut, ready, FutureExt, Sink, SinkExt};
+use std::io::ErrorKind;
 use std::pin::Pin;
 use std::sync::{Arc, OnceLock};
 use std::task::{Context, Poll};
 use tokio::io::{AsyncRead, ReadBuf};
 use tokio::net::UdpSocket;
 use tokio_util::io::StreamReader;
-use tracing::{error, trace, warn};
+use tracing::{debug, error, trace, warn};
+
+type BoxIoSink<T> = Box<dyn Sink<T, Error = std::io::Error> + Send + Unpin>;
 
 /// Mimics TCP-like stream functionality on a UDP socket by restricting it to a single
 /// counterparty and implements [`tokio::io::AsyncRead`] and [`tokio::io::AsyncWrite`].
+/// The instance is always constructed using a [`UdpStreamBuilder`].
 ///
 /// To set a counterparty, one of the following must happen:
-/// 1) setting it during binding via [`bind`](ConnectedUdpStream::bind)
+/// 1) setting it during build via [`UdpStreamBuilder::with_counterparty`]
 /// 2) receiving some data from the other side.
 ///
 /// Whatever of the above happens first, sets the counterparty.
@@ -22,11 +25,16 @@ use tracing::{error, trace, warn};
 ///
 /// If data from another party is received, an error is raised, unless the object has been constructed
 /// with [`ForeignDataMode::Discard`] or [`ForeignDataMode::Accept`] setting.
-//#[derive(Debug)]
+///
+/// This object is also capable of parallel processing on a UDP socket.
+/// If [parallelism](UdpStreamBuilder::with_parallelism) is set, the instance will create
+/// multiple sockets with `SO_REUSEADDR` and spin parallel tasks that will coordinate data and
+/// transmission retrieval using these sockets. This is driven by RX/TX MPMC queues, which are
+/// per-default unbounded (see [queue size](UdpStreamBuilder::with_queue_size) for details).
 pub struct ConnectedUdpStream {
     socket_handles: Vec<(tokio::task::JoinHandle<()>, tokio::task::JoinHandle<()>)>,
     ingress_rx: Box<dyn AsyncRead + Send + Unpin>,
-    egress_tx: Option<Box<dyn Sink<Box<[u8]>, Error = flume::SendError<Box<[u8]>>> + Send + Unpin>>,
+    egress_tx: Option<BoxIoSink<Box<[u8]>>>,
     counterparty: Arc<OnceLock<std::net::SocketAddr>>,
     bound_to: std::net::SocketAddr,
 }
@@ -34,25 +42,207 @@ pub struct ConnectedUdpStream {
 /// Defines what happens when data from another [`SocketAddr`](std::net::SocketAddr) arrives
 /// into the [`ConnectedUdpStream`] (other than the one that is considered a counterparty for that
 /// instance).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum ForeignDataMode {
     /// Foreign data are simply discarded.
     Discard,
     /// Foreign data are accepted as if they arrived from the set counterparty.
     Accept,
     /// Error is raised on the `poll_read` attempt.
+    #[default]
     Error,
 }
 
+/// Builder object for the [`ConnectedUdpStream`].
+///
+/// If you wish to use defaults, do `UdpStreamBuilder::default().build(addr)`.
+#[derive(Debug, Default)]
+pub struct UdpStreamBuilder {
+    foreign_data_mode: Option<ForeignDataMode>,
+    buffer_size: Option<usize>,
+    queue_size: Option<usize>,
+    parallelism: Option<usize>,
+    counterparty: Option<std::net::SocketAddr>,
+}
+
+/// The default size of the UDP receive buffer in bytes.
+///
+/// See [`UdpStreamBuilder::with_buffer_size`] for details.
+pub const DEFAULT_UDP_RECEIVER_BUFFER_SIZE: usize = 2048;
+
+impl UdpStreamBuilder {
+    /// Defines the behavior when data from an unexpected source arrive into the socket.
+    /// See [`ForeignDataMode`] for details.
+    ///
+    /// Default is [`ForeignDataMode::Error`].
+    pub fn with_foreign_data_mode(mut self, mode: ForeignDataMode) -> Self {
+        self.foreign_data_mode = Some(mode);
+        self
+    }
+
+    /// The size of the UDP receive buffer.
+    ///
+    /// This size must be at least the size of the MTU, otherwise the unread UDP data that
+    /// does not fit this buffer will be discarded.
+    ///
+    /// Default is [`DEFAULT_UDP_RECEIVER_BUFFER_SIZE`].
+    pub fn with_buffer_size(mut self, buffer_size: usize) -> Self {
+        self.buffer_size = Some(buffer_size);
+        self
+    }
+
+    /// Size of the TX/RX queue that dispatches data of reads from/writings to
+    /// the sockets.
+    ///
+    /// This an important back-pressure mechanism when dispatching received data from
+    /// fast senders.
+    /// Reduces the memory consumed by the object.
+    ///
+    /// Default is unbounded.
+    pub fn with_queue_size(mut self, queue_size: usize) -> Self {
+        self.queue_size = Some(queue_size);
+        self
+    }
+
+    /// Sets how many parallel readers/writer sockets should be bound.
+    ///
+    /// Each UDP socket is bound with `SO_REUSEADDR` to facilitate parallel processing
+    /// of read and write operations.
+    ///
+    /// - If some value `n` > 0 is given, the stream will bind `n` sockets.
+    /// - If 0 is given, the number of sockets is determined by [`std::thread::available_parallelism`].
+    /// - If none is given, only a single socket will be created (no parallelism).
+    ///
+    /// Default is none.
+    pub fn with_parallelism(mut self, parallelism: usize) -> Self {
+        self.parallelism = Some(parallelism);
+        self
+    }
+
+    /// Sets the expected counterparty for data sent/received by the UDP sockets.
+    ///
+    /// If not specified, the counterparty is determined from the first packet received.
+    /// However, no data can be sent up until this point.
+    /// Therefore, the value must be set if data are sent first rather than received.
+    /// If data is expected to be received first, the value does not need to be set.
+    ///
+    /// See [`ConnectedUdpStream`] and [`ForeignDataMode`] for details.
+    ///
+    /// Default is none.
+    pub fn with_counterparty(mut self, counterparty: std::net::SocketAddr) -> Self {
+        self.counterparty = Some(counterparty);
+        self
+    }
+
+    /// Builds the [`ConnectedUdpStream`] with UDP socket(s) bound to `bind_addr`.
+    ///
+    /// The number of sockets bound is determined by [parallelism](UdpStreamBuilder::with_parallelism).
+    /// The returned instance is always ready to receive data.
+    /// It is also ready to send data
+    /// if the [counterparty](UdpStreamBuilder::with_counterparty) has been set.
+    pub fn build<A: std::net::ToSocketAddrs>(self, bind_addr: A) -> std::io::Result<ConnectedUdpStream> {
+        let avail_parallelism = std::thread::available_parallelism()
+            .map(usize::from)
+            .unwrap_or_else(|e| {
+                error!("failed to determine available parallelism, defaulting to 1: {e}");
+                1
+            });
+        let num_socks = self
+            .parallelism
+            .map(|n| {
+                if n > 0 {
+                    n.max(avail_parallelism)
+                } else {
+                    avail_parallelism
+                }
+            })
+            .unwrap_or(1);
+
+        let counterparty = Arc::new(self.counterparty.map(OnceLock::from).unwrap_or_default());
+        let ((ingress_tx, ingress_rx), (egress_tx, egress_rx)) = if let Some(q) = self.queue_size {
+            (flume::bounded(q), flume::bounded(q))
+        } else {
+            (flume::unbounded(), flume::unbounded())
+        };
+
+        let first_bind_addr = bind_addr.to_socket_addrs()?.next().ok_or(ErrorKind::AddrNotAvailable)?;
+        debug!("UDP stream is going to bind {num_socks} sockets to {first_bind_addr}");
+
+        let mut bound_addr: Option<std::net::SocketAddr> = None;
+
+        let socket_handles = (0..num_socks)
+            .map(|id| {
+                // Bind a new non-blocking UDP socket with SO_REUSEADDR
+                let sock = socket2::Socket::new(socket2::Domain::IPV4, socket2::Type::DGRAM, None)?;
+                sock.set_reuse_address(true)?;
+                sock.set_nonblocking(true)?;
+                sock.bind(&bound_addr.unwrap_or(first_bind_addr).into())?;
+
+                // Determine the address we bound this socket to, so we can also bind the others
+                let socket_bound_addr = sock
+                    .local_addr()?
+                    .as_socket()
+                    .ok_or(std::io::Error::other("invalid socket type"))?;
+
+                match bound_addr {
+                    None => bound_addr = Some(socket_bound_addr),
+                    Some(addr) if addr != socket_bound_addr => {
+                        return Err(std::io::Error::other(format!(
+                            "inconsistent binding address {addr} != {socket_bound_addr} on socket id {id}"
+                        )))
+                    }
+                    _ => {}
+                }
+
+                debug!(socket_id = id, "bound UDP socket to {socket_bound_addr}");
+                Ok((id, Arc::new(UdpSocket::from_std(sock.into())?)))
+            })
+            .map(|sock| {
+                sock.and_then(|(sock_id, sock)| {
+                    Ok((
+                        tokio::task::spawn(ConnectedUdpStream::setup_tx_queue(
+                            sock_id,
+                            sock.clone(),
+                            egress_rx.clone(),
+                            counterparty.clone(),
+                        )?),
+                        tokio::task::spawn(ConnectedUdpStream::setup_rx_queue(
+                            sock_id,
+                            sock.clone(),
+                            ingress_tx.clone(),
+                            counterparty.clone(),
+                            self.foreign_data_mode.unwrap_or_default(),
+                            self.buffer_size.unwrap_or(DEFAULT_UDP_RECEIVER_BUFFER_SIZE),
+                        )?),
+                    ))
+                })
+            })
+            .collect::<std::io::Result<Vec<_>>>()?;
+
+        Ok(ConnectedUdpStream {
+            ingress_rx: Box::new(StreamReader::new(ingress_rx.into_stream())),
+            egress_tx: Some(Box::new(
+                egress_tx
+                    .into_sink()
+                    .sink_map_err(|e| std::io::Error::other(e.to_string())),
+            )),
+            socket_handles,
+            counterparty,
+            bound_to: bound_addr.ok_or(ErrorKind::AddrNotAvailable)?,
+        })
+    }
+}
+
 impl ConnectedUdpStream {
-    fn bind_socket_rx(
+    /// Creates a receiver queue for the UDP stream.
+    fn setup_rx_queue(
+        socket_id: usize,
         sock_rx: Arc<UdpSocket>,
         ingress_tx: flume::Sender<std::io::Result<tokio_util::bytes::Bytes>>,
         counterparty: Arc<OnceLock<std::net::SocketAddr>>,
         foreign_data_mode: ForeignDataMode,
         buf_size: usize,
     ) -> std::io::Result<BoxFuture<'static, ()>> {
-        // Create an RX task for the socket
         let counterparty_rx = counterparty.clone();
         Ok(async move {
             let mut buffer = vec![0u8; buf_size];
@@ -61,7 +251,11 @@ impl ConnectedUdpStream {
                 // Read data from the socket
                 let out_res = match sock_rx.recv_from(&mut buffer).await {
                     Ok((read, read_addr)) if read > 0 => {
-                        trace!("got {read} bytes of data data from {read_addr}");
+                        trace!(
+                            socket_id,
+                            udp_bound_addr = tracing::field::debug(sock_rx.local_addr()),
+                            "got {read} bytes of data from {read_addr}"
+                        );
                         let addr = counterparty_rx.get_or_init(|| read_addr);
 
                         // If the data is from a counterparty, or we accept anything, pass it
@@ -73,6 +267,7 @@ impl ConnectedUdpStream {
                                 ForeignDataMode::Discard => {
                                     // Don't even bother sending an error about discarded stuff
                                     warn!(
+                                        socket_id,
                                         udp_bound_addr = tracing::field::debug(sock_rx.local_addr()),
                                         "discarded data from {read_addr}, which didn't come from {addr}"
                                     );
@@ -81,7 +276,7 @@ impl ConnectedUdpStream {
                                 ForeignDataMode::Error => {
                                     // Terminate here, the ingress_tx gets dropped
                                     done = true;
-                                    Some(Err(Error::new(
+                                    Some(Err(std::io::Error::new(
                                         ErrorKind::ConnectionRefused,
                                         "data from foreign client not allowed",
                                     )))
@@ -94,6 +289,7 @@ impl ConnectedUdpStream {
                     Ok(_) => {
                         // Read EOF, terminate here, the ingress_tx gets dropped
                         trace!(
+                            socket_id,
                             udp_bound_addr = tracing::field::debug(sock_rx.local_addr()),
                             "read EOF on socket"
                         );
@@ -102,15 +298,22 @@ impl ConnectedUdpStream {
                     }
                     Err(e) => {
                         // Forward the error
+                        debug!(
+                            socket_id,
+                            udp_bound_addr = tracing::field::debug(sock_rx.local_addr()),
+                            "forwarded error {e}"
+                        );
                         done = true;
                         Some(Err(e))
                     }
                 };
 
-                // Dispatch the received data to the queue
+                // Dispatch the received data to the queue.
+                // If the underlying queue is bounded, it will wait until there is space.
                 if let Some(out_res) = out_res {
                     if let Err(err) = ingress_tx.send_async(out_res).await {
                         error!(
+                            socket_id,
                             udp_bound_addr = tracing::field::debug(sock_rx.local_addr()),
                             "failed to dispatch received data: {err}"
                         );
@@ -119,6 +322,11 @@ impl ConnectedUdpStream {
                 }
 
                 if done {
+                    trace!(
+                        socket_id,
+                        udp_bound_addr = tracing::field::debug(sock_rx.local_addr()),
+                        "rx queue done"
+                    );
                     break;
                 }
             }
@@ -126,7 +334,9 @@ impl ConnectedUdpStream {
         .boxed())
     }
 
-    fn bind_socket_tx(
+    /// Creates a transmission queue for the UDP stream.
+    fn setup_tx_queue(
+        socket_id: usize,
         sock_tx: Arc<UdpSocket>,
         egress_rx: flume::Receiver<Box<[u8]>>,
         counterparty: Arc<OnceLock<std::net::SocketAddr>>,
@@ -139,12 +349,15 @@ impl ConnectedUdpStream {
                         if let Some(target) = counterparty_tx.get() {
                             if let Err(e) = sock_tx.send_to(&data, target).await {
                                 error!(
+                                    socket_id,
                                     udp_bound_addr = tracing::field::debug(sock_tx.local_addr()),
                                     "failed to send data to {target}: {e}"
                                 );
                             }
+                            trace!(socket_id, "sent {} bytes of data to {target}", data.len());
                         } else {
                             error!(
+                                socket_id,
                                 udp_bound_addr = tracing::field::debug(sock_tx.local_addr()),
                                 "cannot send data, counterparty not set"
                             );
@@ -153,6 +366,7 @@ impl ConnectedUdpStream {
                     }
                     Err(e) => {
                         error!(
+                            socket_id,
                             udp_bound_addr = tracing::field::debug(sock_tx.local_addr()),
                             "cannot receive more data from egress channel: {e}"
                         );
@@ -164,82 +378,14 @@ impl ConnectedUdpStream {
         .boxed())
     }
 
-    /// Binds the UDP socket to the given address.
-    pub fn bind<A: std::net::ToSocketAddrs>(
-        bind: A,
-        buf_size: usize,
-        counterparty: Option<std::net::SocketAddr>,
-        foreign_data_mode: ForeignDataMode,
-        parallelism: Option<usize>,
-    ) -> tokio::io::Result<Self> {
-        let num_socks = parallelism
-            .and_then(|i| {
-                (i > 0)
-                    .then_some(i)
-                    .or(std::thread::available_parallelism().ok().map(usize::from))
-            })
-            .unwrap_or(1);
-
-        let counterparty = Arc::new(counterparty.map(OnceLock::from).unwrap_or_default());
-        let (ingress_tx, ingress_rx) = flume::unbounded();
-        let (egress_tx, egress_rx) = flume::unbounded();
-
-        let first_bind_addr = bind.to_socket_addrs()?.next().ok_or(ErrorKind::AddrNotAvailable)?;
-        let mut bound_addr: Option<std::net::SocketAddr> = None;
-
-        let socket_handles = (0..num_socks)
-            .map(|_| {
-                // Bind a new non-blocking UDP socket with SO_REUSEADDR
-                let sock = socket2::Socket::new(socket2::Domain::IPV4, socket2::Type::DGRAM, None)?;
-                sock.set_reuse_port(true)?;
-                sock.set_nonblocking(true)?;
-                sock.bind(&first_bind_addr.into())?;
-
-                let socket_bound_addr = sock
-                    .local_addr()?
-                    .as_socket()
-                    .ok_or(Error::other("invalid socket type"))?;
-                match bound_addr {
-                    None => bound_addr = Some(socket_bound_addr),
-                    Some(addr) if addr != socket_bound_addr => {
-                        return Err(Error::other("inconsistent binding address"))
-                    }
-                    _ => {}
-                }
-
-                Ok(Arc::new(UdpSocket::from_std(sock.into())?))
-            })
-            .map(|sock| {
-                sock.and_then(|sock| {
-                    Ok((
-                        tokio::task::spawn(Self::bind_socket_tx(
-                            sock.clone(),
-                            egress_rx.clone(),
-                            counterparty.clone(),
-                        )?),
-                        tokio::task::spawn(Self::bind_socket_rx(
-                            sock.clone(),
-                            ingress_tx.clone(),
-                            counterparty.clone(),
-                            foreign_data_mode,
-                            buf_size,
-                        )?),
-                    ))
-                })
-            })
-            .collect::<std::io::Result<Vec<_>>>()?;
-
-        Ok(Self {
-            ingress_rx: Box::new(StreamReader::new(ingress_rx.into_stream())),
-            egress_tx: Some(Box::new(egress_tx.into_sink())),
-            socket_handles,
-            counterparty,
-            bound_to: bound_addr.ok_or(ErrorKind::AddrNotAvailable)?,
-        })
-    }
-
+    /// Local address that all UDP sockets in this instance are bound to.
     pub fn bound_address(&self) -> &std::net::SocketAddr {
         &self.bound_to
+    }
+
+    /// Creates a new [builder](UdpStreamBuilder).
+    pub fn builder() -> UdpStreamBuilder {
+        UdpStreamBuilder::default()
     }
 }
 
@@ -254,9 +400,17 @@ impl Drop for ConnectedUdpStream {
 
 impl tokio::io::AsyncRead for ConnectedUdpStream {
     fn poll_read(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut ReadBuf<'_>) -> Poll<std::io::Result<()>> {
-        trace!("polling read from udp stream with {:?}", self.counterparty.get());
+        trace!(
+            "polling read of {} from udp stream with {:?}",
+            buf.remaining(),
+            self.counterparty.get()
+        );
         match Pin::new(&mut self.ingress_rx).poll_read(cx, buf) {
-            Poll::Ready(Ok(())) => Poll::Ready(Ok(())),
+            Poll::Ready(Ok(())) => {
+                let read = buf.filled().len();
+                trace!("read {read} bytes");
+                Poll::Ready(Ok(()))
+            }
             Poll::Ready(Err(err)) => Poll::Ready(Err(err)),
             Poll::Pending => Poll::Pending,
         }
@@ -264,48 +418,62 @@ impl tokio::io::AsyncRead for ConnectedUdpStream {
 }
 
 impl tokio::io::AsyncWrite for ConnectedUdpStream {
-    fn poll_write(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<Result<usize, Error>> {
-        trace!("polling write to udp stream with {:?}", self.counterparty.get());
+    fn poll_write(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
+        trace!(
+            "polling write of {} bytes to udp stream with {:?}",
+            buf.len(),
+            self.counterparty.get()
+        );
         if let Some(sender) = &mut self.egress_tx {
-            match sender.poll_ready_unpin(cx) {
-                Poll::Ready(Ok(_)) => {
-                    pin_mut!(sender);
-                    let len = buf.len(); // We always send the entire buffer at once
-                    Poll::Ready(
-                        sender
-                            .start_send(Box::from(buf))
-                            .map(|_| len)
-                            .map_err(|e| Error::other(e)),
-                    )
-                    // TODO: should we also flush here with every write?
-                }
-                Poll::Ready(Err(e)) => Poll::Ready(Err(Error::other(e.to_string()))),
-                Poll::Pending => Poll::Pending,
+            if let Err(e) = ready!(sender.poll_ready_unpin(cx)) {
+                return Poll::Ready(Err(e));
             }
+
+            let len = buf.iter().len();
+            if let Err(e) = sender.start_send_unpin(Box::from(buf)) {
+                return Poll::Ready(Err(e));
+            }
+
+            // Explicitly flush after each data sent
+            pin_mut!(sender);
+            sender.poll_flush(cx).map_ok(|_| len)
         } else {
-            Poll::Ready(Err(Error::new(ErrorKind::NotConnected, "udp stream is closed")))
+            Poll::Ready(Err(std::io::Error::new(
+                ErrorKind::NotConnected,
+                "udp stream is closed",
+            )))
         }
     }
 
-    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Error>> {
+    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
         trace!("polling flush to udp stream {:?}", self.counterparty.get());
         if let Some(sender) = &mut self.egress_tx {
             pin_mut!(sender);
-            sender.poll_flush(cx).map_err(|err| Error::other(err.to_string()))
+            sender
+                .poll_flush(cx)
+                .map_err(|err| std::io::Error::other(err.to_string()))
         } else {
-            Poll::Ready(Err(Error::new(ErrorKind::NotConnected, "udp stream is closed")))
+            Poll::Ready(Err(std::io::Error::new(
+                ErrorKind::NotConnected,
+                "udp stream is closed",
+            )))
         }
     }
 
-    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Error>> {
+    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
         trace!("polling close on udp stream with {:?}", self.counterparty.get());
         // Take the sender to make sure it gets dropped
         let mut taken_sender = self.egress_tx.take();
         if let Some(sender) = &mut taken_sender {
             pin_mut!(sender);
-            sender.poll_close(cx).map_err(|err| Error::other(err.to_string()))
+            sender
+                .poll_close(cx)
+                .map_err(|err| std::io::Error::other(err.to_string()))
         } else {
-            Poll::Ready(Err(Error::new(ErrorKind::NotConnected, "udp stream is closed")))
+            Poll::Ready(Err(std::io::Error::new(
+                ErrorKind::NotConnected,
+                "udp stream is closed",
+            )))
         }
     }
 }
@@ -314,13 +482,15 @@ impl tokio::io::AsyncWrite for ConnectedUdpStream {
 mod tests {
     use super::*;
     use anyhow::Context;
+    use parameterized::parameterized;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::net::UdpSocket;
 
-    #[test_log::test(tokio::test)]
-    //#[tokio::test]
-    async fn basic_udp_stream_tests() -> anyhow::Result<()> {
-        const DATA_SIZE: usize = 128;
+    #[parameterized(parallelism = {None, Some(2), Some(0)})]
+    #[parameterized_macro(tokio::test)]
+    //#[parameterized_macro(test_log::test(tokio::test))]
+    async fn basic_udp_stream_tests(parallelism: Option<usize>) -> anyhow::Result<()> {
+        const DATA_SIZE: usize = 200;
 
         let listener = UdpSocket::bind("127.0.0.1:0").await.context("bind listener")?;
         let listen_addr = listener.local_addr()?;
@@ -337,15 +507,20 @@ mod tests {
             }
         });
 
-        let mut stream =
-            ConnectedUdpStream::bind(("127.0.0.1", 0), 128, Some(listen_addr), ForeignDataMode::Error, None)
-                .context("connection")?;
+        let mut builder = ConnectedUdpStream::builder()
+            .with_buffer_size(1024)
+            .with_counterparty(listen_addr);
+
+        if let Some(parallelism) = parallelism {
+            builder = builder.with_parallelism(parallelism);
+        }
+
+        let mut stream = builder.build(("127.0.0.1", 0)).context("connection")?;
 
         for _ in 1..1000 {
             let mut w_buf = [0u8; DATA_SIZE];
             hopr_crypto_random::random_fill(&mut w_buf);
             let written = stream.write(&w_buf).await?;
-            stream.flush().await?;
             assert_eq!(written, DATA_SIZE);
 
             let mut r_buf = [0u8; DATA_SIZE];

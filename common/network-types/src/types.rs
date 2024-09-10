@@ -1,4 +1,6 @@
 use crate::errors::NetworkTypeError;
+use hickory_resolver::name_server::ConnectionProvider;
+use hickory_resolver::AsyncResolver;
 use hopr_primitive_types::bounded::{BoundedSize, BoundedVec};
 use libp2p_identity::PeerId;
 use std::fmt::{Display, Formatter};
@@ -66,25 +68,34 @@ impl From<std::net::SocketAddr> for IpOrHost {
 impl IpOrHost {
     /// Tries to resolve the DNS name and returns all IP addresses found.
     /// If this enum is already an IP address and port, it will simply return it.
-    pub async fn resolve(self) -> std::io::Result<Vec<SocketAddr>> {
+    ///
+    /// Uses `async-std` resolver.
+    #[cfg(feature = "runtime-async-std")]
+    pub async fn resolve_async_std(self) -> std::io::Result<Vec<SocketAddr>> {
+        let resolver = async_std_resolver::resolver_from_system_conf().await?;
+        self.resolve(resolver).await
+    }
+
+    /// Tries to resolve the DNS name and returns all IP addresses found.
+    /// If this enum is already an IP address and port, it will simply return it.
+    ///
+    /// Uses `tokio` resolver.
+    #[cfg(feature = "runtime-async-std")]
+    pub async fn resolve_tokio(self) -> std::io::Result<Vec<SocketAddr>> {
+        let resolver = hickory_resolver::AsyncResolver::tokio_from_system_conf()?;
+        self.resolve(resolver).await
+    }
+
+    /// Tries to resolve the DNS name and returns all IP addresses found.
+    /// If this enum is already an IP address and port, it will simply return it.
+    pub async fn resolve<P: ConnectionProvider>(self, resolver: AsyncResolver<P>) -> std::io::Result<Vec<SocketAddr>> {
         match self {
-            IpOrHost::Dns(name, port) => {
-                #[cfg(any(feature = "runtime-tokio", any(test, feature = "runtime-tokio")))]
-                let resolver = hickory_resolver::AsyncResolver::tokio_from_system_conf()?;
-
-                #[cfg(any(
-                    all(feature = "runtime-async-std", not(feature = "runtime-tokio")),
-                    all(test, feature = "runtime-async-std")
-                ))]
-                let resolver = async_std_resolver::resolver_from_system_conf().await?;
-
-                Ok(resolver
-                    .lookup_ip(name)
-                    .await?
-                    .into_iter()
-                    .map(|ip| SocketAddr::new(ip, port))
-                    .collect())
-            }
+            IpOrHost::Dns(name, port) => Ok(resolver
+                .lookup_ip(name)
+                .await?
+                .into_iter()
+                .map(|ip| SocketAddr::new(ip, port))
+                .collect()),
             IpOrHost::Ip(addr) => Ok(vec![addr]),
         }
     }
@@ -172,7 +183,7 @@ mod tests {
     #[async_std::test]
     async fn ip_or_host_must_resolve_dns_name() -> anyhow::Result<()> {
         match IpOrHost::Dns("localhost".to_string(), 1000)
-            .resolve()
+            .resolve_async_std()
             .await?
             .first()
             .ok_or(anyhow!("must resolve"))?
@@ -187,7 +198,7 @@ mod tests {
     async fn ip_or_host_must_resolve_ip_address() -> anyhow::Result<()> {
         assert_eq!(
             *IpOrHost::Ip("127.0.0.1:1000".parse()?)
-                .resolve()
+                .resolve_async_std()
                 .await?
                 .first()
                 .ok_or(anyhow!("must resolve"))?,

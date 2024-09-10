@@ -123,7 +123,7 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                 // so we just take the first resolved address.
                 let resolved_udp_target = udp_target
                     .clone()
-                    .resolve()
+                    .resolve_tokio()
                     .await
                     .map_err(|e| HoprLibError::GeneralError(format!("failed to resolve DNS name {udp_target}: {e}")))?
                     .first()
@@ -136,16 +136,17 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                     "UDP target {udp_target} resolved to {resolved_udp_target}"
                 );
 
-                let udp_bridge = hopr_network_types::udp::ConnectedUdpStream::bind(
-                    ("0.0.0.0", 0),
-                    HOPR_UDP_BUFFER_SIZE,
-                    Some(resolved_udp_target),
-                    ForeignDataMode::Error,
-                    None,
-                )
-                .map_err(|e| {
-                    HoprLibError::GeneralError(format!("could not bridge the incoming session to {udp_target}: {e}"))
-                })?;
+                let udp_bridge = hopr_network_types::udp::ConnectedUdpStream::builder()
+                    .with_buffer_size(HOPR_UDP_BUFFER_SIZE)
+                    .with_counterparty(resolved_udp_target)
+                    .with_foreign_data_mode(ForeignDataMode::Error)
+                    //.with_parallelism(Some(0))
+                    .build(("0.0.0.0", 0))
+                    .map_err(|e| {
+                        HoprLibError::GeneralError(format!(
+                            "could not bridge the incoming session to {udp_target}: {e}"
+                        ))
+                    })?;
 
                 tracing::debug!(
                     session_id = debug(session_id),
@@ -180,7 +181,7 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                 // TCP is able to determine which of the resolved multiple addresses is viable,
                 // and therefore we can pass all of them.
                 let resolved_tcp_targets =
-                    tcp_target.clone().resolve().await.map_err(|e| {
+                    tcp_target.clone().resolve_tokio().await.map_err(|e| {
                         HoprLibError::GeneralError(format!("failed to resolve DNS name {tcp_target}: {e}"))
                     })?;
                 tracing::debug!(

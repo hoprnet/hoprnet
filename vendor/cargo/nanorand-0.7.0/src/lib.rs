@@ -1,11 +1,11 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![forbid(missing_docs)]
 #![warn(
-    clippy::perf,
-    clippy::complexity,
-    clippy::style,
-    clippy::correctness,
-    clippy::missing_const_for_fn
+	clippy::perf,
+	clippy::complexity,
+	clippy::style,
+	clippy::correctness,
+	clippy::missing_const_for_fn
 )]
 
 //! A library meant for fast, random number generation with quick compile time, and minimal dependencies.

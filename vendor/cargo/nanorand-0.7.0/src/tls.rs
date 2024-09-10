@@ -2,7 +2,7 @@ use crate::rand::{wyrand::WyRand, Rng, SeedableRng};
 use std::{cell::RefCell, rc::Rc};
 
 thread_local! {
-    static WYRAND: Rc<RefCell<WyRand>> = Rc::new(RefCell::new(WyRand::new()));
+	static WYRAND: Rc<RefCell<WyRand>> = Rc::new(RefCell::new(WyRand::new()));
 }
 
 #[derive(Clone)]
@@ -10,15 +10,15 @@ thread_local! {
 pub struct TlsWyRand(Rc<RefCell<WyRand>>);
 
 impl Rng<8> for TlsWyRand {
-    fn rand(&mut self) -> [u8; 8] {
-        self.0.borrow_mut().rand()
-    }
+	fn rand(&mut self) -> [u8; 8] {
+		self.0.borrow_mut().rand()
+	}
 }
 
 impl SeedableRng<8, 8> for TlsWyRand {
-    fn reseed(&mut self, seed: [u8; 8]) {
-        self.0.borrow_mut().reseed(seed);
-    }
+	fn reseed(&mut self, seed: [u8; 8]) {
+		self.0.borrow_mut().reseed(seed);
+	}
 }
 
 /// Fetch a thread-local [`WyRand`]
@@ -38,5 +38,5 @@ impl SeedableRng<8, 8> for TlsWyRand {
 /// });
 /// ```
 pub fn tls_rng() -> TlsWyRand {
-    WYRAND.with(|tls| TlsWyRand(tls.clone()))
+	WYRAND.with(|tls| TlsWyRand(tls.clone()))
 }

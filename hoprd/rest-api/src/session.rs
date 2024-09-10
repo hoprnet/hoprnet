@@ -400,14 +400,11 @@ async fn tcp_listen_on<A: std::net::ToSocketAddrs>(address: A) -> std::io::Resul
 async fn udp_bind_to<A: std::net::ToSocketAddrs>(
     address: A,
 ) -> std::io::Result<(std::net::SocketAddr, ConnectedUdpStream)> {
-    // discard data from UDP clients other than the first one served
-    let udp_socket = ConnectedUdpStream::bind(
-        address,
-        hopr_lib::SESSION_USABLE_MTU_SIZE,
-        None,
-        ForeignDataMode::Discard,
-        None,
-    )?;
+    let udp_socket = ConnectedUdpStream::builder()
+        .with_buffer_size(HOPR_UDP_BUFFER_SIZE)
+        .with_foreign_data_mode(ForeignDataMode::Discard) // discard data from UDP clients other than the first one served
+        //.with_parallelism(Some(0))
+        .build(address)?;
 
     Ok((*udp_socket.bound_address(), udp_socket))
 }
@@ -538,16 +535,11 @@ mod tests {
             hopr_lib::SESSION_USABLE_MTU_SIZE,
         ));
 
-        let mut udp_stream = ConnectedUdpStream::bind(
-            ("127.0.0.1", 0),
-            hopr_lib::SESSION_USABLE_MTU_SIZE,
-            None,
-            ForeignDataMode::Error,
-            None,
-        )
-        .await
-        .context("bind failed")?
-        .with_counterparty(listen_addr)?;
+        let mut udp_stream = ConnectedUdpStream::builder()
+            .with_buffer_size(hopr_lib::SESSION_USABLE_MTU_SIZE)
+            .with_counterparty(listen_addr)
+            .build(("127.0.0.1", 0))
+            .context("bind failed")?;
 
         let data = vec![b"hello", b"world", b"this ", b"is   ", b"    a", b" test"];
 
