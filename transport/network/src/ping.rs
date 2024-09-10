@@ -261,7 +261,8 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn ping_query_replier_should_return_ok_result_when_the_pong_is_correct_for_the_challenge() {
+    async fn ping_query_replier_should_return_ok_result_when_the_pong_is_correct_for_the_challenge(
+    ) -> anyhow::Result<()> {
         let (tx, rx) = futures::channel::oneshot::channel::<PingQueryResult>();
 
         let replier = PingQueryReplier::new(tx);
@@ -272,11 +273,14 @@ mod tests {
             "version".to_owned(),
         );
 
-        assert!(rx.await.unwrap().is_ok());
+        assert!(rx.await?.is_ok());
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn ping_query_replier_should_return_err_result_when_the_pong_is_incorrect_for_the_challenge() {
+    async fn ping_query_replier_should_return_err_result_when_the_pong_is_incorrect_for_the_challenge(
+    ) -> anyhow::Result<()> {
         let (tx, rx) = futures::channel::oneshot::channel::<PingQueryResult>();
 
         let replier = PingQueryReplier::new(tx);
@@ -287,11 +291,13 @@ mod tests {
             "version".to_owned(),
         );
 
-        assert!(rx.await.unwrap().is_err());
+        assert!(rx.await?.is_err());
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn ping_query_replier_should_return_the_unidirectional_latency() {
+    async fn ping_query_replier_should_return_the_unidirectional_latency() -> anyhow::Result<()> {
         let (tx, rx) = futures::channel::oneshot::channel::<PingQueryResult>();
 
         let replier = PingQueryReplier::new(tx);
@@ -305,9 +311,11 @@ mod tests {
             "version".to_owned(),
         );
 
-        let actual_latency = rx.await.unwrap().expect("should contain a result value").0;
+        let actual_latency = rx.await?.expect("should contain a result value").0;
         assert!(actual_latency > delay / 2);
         assert!(actual_latency < delay);
+
+        Ok(())
     }
 
     #[async_std::test]

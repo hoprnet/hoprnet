@@ -43,4 +43,5 @@ hopr-metrics = { workspace = true, optional = true }
 hopr-transport-protocol = { workspace = true }
 
 [dev-dependencies]
+anyhow = { workspace = true }
 async-std = { workspace = true }

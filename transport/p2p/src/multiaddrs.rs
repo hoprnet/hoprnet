@@ -109,36 +109,40 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_private_multiaddresses_are_shown_as_private() {
-        assert!(!is_private(
-            &Multiaddr::from_str("/ip4/33.42.112.22/udp/9090/quic").unwrap()
-        ));
+    fn test_private_multiaddresses_are_shown_as_private() -> anyhow::Result<()> {
+        assert!(!is_private(&Multiaddr::from_str("/ip4/33.42.112.22/udp/9090/quic")?));
 
-        assert!(is_private(
-            &Multiaddr::from_str("/ip4/192.168.1.23/udp/9090/quic").unwrap()
-        ));
+        assert!(is_private(&Multiaddr::from_str("/ip4/192.168.1.23/udp/9090/quic")?));
+
+        Ok(())
     }
 
     #[test]
-    fn test_domain_dns4_multiaddresses_should_be_supported() {
-        assert!(is_supported(&Multiaddr::from_str("/dns4/localhost/tcp/5543").unwrap()));
+    fn test_domain_dns4_multiaddresses_should_be_supported() -> anyhow::Result<()> {
+        assert!(is_supported(&Multiaddr::from_str("/dns4/localhost/tcp/5543")?));
+
+        Ok(())
     }
 
     #[test]
-    fn multiaddrs_modification_specific_ipv4_transport_should_be_replacable_with_unspecified() {
+    fn multiaddrs_modification_specific_ipv4_transport_should_be_replacable_with_unspecified() -> anyhow::Result<()> {
         assert_eq!(
-            replace_transport_with_unspecified(&Multiaddr::from_str("/ip4/33.42.112.22/udp/9090/quic").unwrap()),
-            Ok(Multiaddr::from_str("/ip4/0.0.0.0/udp/9090/quic").unwrap())
+            replace_transport_with_unspecified(&Multiaddr::from_str("/ip4/33.42.112.22/udp/9090/quic")?),
+            Ok(Multiaddr::from_str("/ip4/0.0.0.0/udp/9090/quic")?)
         );
+
+        Ok(())
     }
 
     #[test]
-    fn multiaddrs_modification_specific_ipv6_transport_should_be_replacable_with_unspecified() {
+    fn multiaddrs_modification_specific_ipv6_transport_should_be_replacable_with_unspecified() -> anyhow::Result<()> {
         assert_eq!(
-            replace_transport_with_unspecified(
-                &Multiaddr::from_str("/ip6/82b0:a523:d8c0:1cba:365f:85f6:af3b:e369/udp/9090/quic").unwrap()
-            ),
-            Ok(Multiaddr::from_str("/ip6/0:0:0:0:0:0:0:0/udp/9090/quic").unwrap())
+            replace_transport_with_unspecified(&Multiaddr::from_str(
+                "/ip6/82b0:a523:d8c0:1cba:365f:85f6:af3b:e369/udp/9090/quic"
+            )?),
+            Ok(Multiaddr::from_str("/ip6/0:0:0:0:0:0:0:0/udp/9090/quic")?)
         );
+
+        Ok(())
     }
 }

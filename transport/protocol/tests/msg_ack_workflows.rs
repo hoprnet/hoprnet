@@ -333,7 +333,7 @@ async fn resolve_mock_path(me: Address, peers_offchain: Vec<PeerId>, peers_oncha
     }
     TransportPath::resolve(peers_offchain, &TestResolver(peers_addrs), &cg)
         .await
-        .unwrap()
+        .expect("should produce a valid path")
         .0
 }
 

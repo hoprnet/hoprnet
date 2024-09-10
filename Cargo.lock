@@ -4276,6 +4276,7 @@ dependencies = [
 name = "hopr-transport-p2p"
 version = "0.5.0"
 dependencies = [
+ "anyhow",
  "async-std",
  "core-network",
  "futures",

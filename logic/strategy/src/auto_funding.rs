@@ -156,7 +156,7 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn test_auto_funding_strategy() {
+    async fn test_auto_funding_strategy() -> anyhow::Result<()> {
         let stake_limit = Balance::new(7_u32, BalanceType::HOPR);
         let fund_amount = Balance::new(5_u32, BalanceType::HOPR);
 
@@ -209,8 +209,7 @@ mod tests {
                 right: c1.balance,
             },
         )
-        .await
-        .unwrap();
+        .await?;
 
         afs.on_own_channel_changed(
             &c2,
@@ -220,8 +219,7 @@ mod tests {
                 right: c2.balance,
             },
         )
-        .await
-        .unwrap();
+        .await?;
 
         afs.on_own_channel_changed(
             &c3,
@@ -231,7 +229,8 @@ mod tests {
                 right: c3.balance,
             },
         )
-        .await
-        .unwrap();
+        .await?;
+
+        Ok(())
     }
 }

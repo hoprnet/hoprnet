@@ -17,7 +17,9 @@ where
 
     match cli.command {
         Commands::Generate { command } => {
-            run_generate_command(command, true).await.unwrap();
+            run_generate_command(command, true)
+                .await
+                .expect("should run the generated sea-orm-cli command");
         }
         Commands::Migrate {
             database_schema,
@@ -25,7 +27,7 @@ where
             command,
             ..
         } => {
-            let connect_options = ConnectOptions::new(database_url.unwrap())
+            let connect_options = ConnectOptions::new(database_url.unwrap_or("/tmp/sea_orm_cli.db".into()))
                 .set_schema_search_path(database_schema.unwrap_or_else(|| "public".to_owned()))
                 .to_owned();
             let db = &Database::connect(connect_options)
