@@ -376,6 +376,11 @@ impl ConnectedUdpStream {
                         break;
                     }
                 }
+                trace!(
+                    socket_id,
+                    udp_bound_addr = tracing::field::debug(sock_tx.local_addr()),
+                    "tx queue done"
+                );
             }
         }
         .boxed())
