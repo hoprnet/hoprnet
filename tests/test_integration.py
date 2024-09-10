@@ -418,10 +418,17 @@ async def test_hoprd_api_channel_should_register_fund_increase_using_fund_endpoi
 @pytest.mark.parametrize("src,dest", [tuple(shuffled(barebone_nodes())[:2]) for _ in range(PARAMETERIZED_SAMPLE_SIZE)])
 async def test_reset_ticket_statistics_from_metrics(src: Node, dest: Node, swarm7: dict[str, Node]):
     def count_metrics(metrics: str):
+        types = ["neglected", "redeemed", "rejected"]
         count = 0
         for line in metrics.split("\\n"):
-            count += line.startswith("hopr_tickets_incoming_statistics")
+            count += (
+                line.startswith("hopr_tickets_incoming_statistics")
+                and any(t in line for t in types)
+                and line.split(" ")[-1] != "0"
+            )
         return count
+
+    assert count_metrics(await swarm7[dest].api.metrics()) == 0
 
     async with create_channel(swarm7[src], swarm7[dest], funding=TICKET_PRICE_PER_HOP, close_from_dest=False):
         await send_and_receive_packets_with_pop(

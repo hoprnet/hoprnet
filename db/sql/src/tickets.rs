@@ -590,19 +590,33 @@ impl HoprDbTicketOperations for HoprDb {
     }
 
     async fn reset_ticket_statistics(&self) -> Result<()> {
-        // Remove all tickets that are not unredeemed
-        self.ticket_manager
-            .with_write_locked_db(|tx| {
+        let res = self
+            .nest_transaction_in_db(None, TargetDb::Tickets)
+            .await?
+            .perform(|tx| {
                 Box::pin(async move {
+                    #[cfg(all(feature = "prometheus", not(test)))]
+                    {
+                        for row in ticket_statistics::Entity::find().all(tx.as_ref()).await? {
+                            METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(&[&row.channel_id, "unredeemed"], 0.0_f64);
+
+                            METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(&[&row.channel_id, "redeemed"], 0.0_f64);
+
+                            METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(&[&row.channel_id, "rejected"], 0.0_f64);
+                        }
+                    }
+
                     let deleted = ticket_statistics::Entity::delete_many().exec(tx.as_ref()).await?;
 
-                    Ok::<_, DbSqlError>(deleted.rows_affected as usize)
+                    if deleted.rows_affected > 0 {
+                        debug!("reset ticket statistics for {:} channels", deleted.rows_affected);
+                    }
+                    Ok::<_, DbSqlError>(())
                 })
             })
-            .await?;
+            .await;
 
-        self.get_ticket_statistics(None).await?;
-        Ok(())
+        Ok(res?)
     }
 
     async fn get_tickets_value(&self, selector: TicketSelector) -> Result<(usize, Balance)> {
@@ -1245,7 +1259,6 @@ mod tests {
     use std::ops::Add;
     use std::sync::atomic::Ordering;
     use std::time::{Duration, SystemTime};
-    use tracing::debug;
 
     lazy_static::lazy_static! {
         static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).unwrap();
