@@ -253,15 +253,14 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn test_open_channel() {
+    async fn test_open_channel() -> anyhow::Result<()> {
         let stake = Balance::new(10_u32, BalanceType::HOPR);
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
 
-        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
+        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
         let db_clone = db.clone();
         db.begin_transaction()
-            .await
-            .unwrap()
+            .await?
             .perform(|tx| {
                 Box::pin(async move {
                     db_clone
@@ -323,15 +322,17 @@ mod tests {
             matches!(tx_res.event, Some(ChainEventType::ChannelOpened(_))),
             "must correspond to open channel chain event"
         );
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_should_not_open_channel_again() {
+    async fn test_should_not_open_channel_again() -> anyhow::Result<()> {
         let stake = Balance::new(10_u32, BalanceType::HOPR);
 
         let channel = ChannelEntry::new(*ALICE, *BOB, stake, U256::zero(), ChannelStatus::Open, U256::zero());
 
-        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
+        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
         let db_clone = db.clone();
         db.begin_transaction()
             .await
@@ -370,13 +371,15 @@ mod tests {
             ),
             "should fail when channel exists"
         );
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_should_not_open_channel_to_self() {
+    async fn test_should_not_open_channel_to_self() -> anyhow::Result<()> {
         let stake = Balance::new(10_u32, BalanceType::HOPR);
 
-        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
+        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
         let db_clone = db.clone();
         db.begin_transaction()
             .await
@@ -414,11 +417,12 @@ mod tests {
             ),
             "should not create channel to self"
         );
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_open_should_not_allow_invalid_balance() {
-        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
+    async fn test_open_should_not_allow_invalid_balance() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
         let db_clone = db.clone();
         db.begin_transaction()
             .await
@@ -466,13 +470,14 @@ mod tests {
             ),
             "should not allow invalid balance"
         );
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_should_not_open_if_not_enough_allowance() {
+    async fn test_should_not_open_if_not_enough_allowance() -> anyhow::Result<()> {
         let stake = Balance::new(10_000_u32, BalanceType::HOPR);
 
-        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
+        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
         let db_clone = db.clone();
         db.begin_transaction()
             .await
@@ -510,13 +515,14 @@ mod tests {
             ),
             "should fail when not enough allowance"
         );
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_should_not_open_if_not_enough_token_balance() {
+    async fn test_should_not_open_if_not_enough_token_balance() -> anyhow::Result<()> {
         let stake = Balance::new(10_000_u32, BalanceType::HOPR);
 
-        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
+        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
         let db_clone = db.clone();
         db.begin_transaction()
             .await
@@ -554,15 +560,16 @@ mod tests {
             ),
             "should fail when not enough token balance"
         );
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_fund_channel() {
+    async fn test_fund_channel() -> anyhow::Result<()> {
         let stake = Balance::new(10_u32, BalanceType::HOPR);
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
         let channel = ChannelEntry::new(*ALICE, *BOB, stake, U256::zero(), ChannelStatus::Open, U256::zero());
 
-        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
+        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
         let db_clone = db.clone();
         db.begin_transaction()
             .await
@@ -628,13 +635,14 @@ mod tests {
             matches!(tx_res.event, Some(ChainEventType::ChannelBalanceIncreased(_, _))),
             "must correspond to channel chain event"
         );
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_should_not_fund_nonexistent_channel() {
+    async fn test_should_not_fund_nonexistent_channel() -> anyhow::Result<()> {
         let channel_id = generate_channel_id(&*ALICE, &*BOB);
 
-        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
+        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
         let db_clone = db.clone();
         db.begin_transaction()
             .await
@@ -672,13 +680,14 @@ mod tests {
             ),
             "should fail when channel does not exist"
         );
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_fund_should_not_allow_invalid_balance() {
+    async fn test_fund_should_not_allow_invalid_balance() -> anyhow::Result<()> {
         let channel_id = generate_channel_id(&*ALICE, &*BOB);
 
-        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
+        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
         let db_clone = db.clone();
         db.begin_transaction()
             .await
@@ -725,13 +734,14 @@ mod tests {
             ),
             "should not allow invalid balance"
         );
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_should_not_fund_if_not_enough_allowance() {
+    async fn test_should_not_fund_if_not_enough_allowance() -> anyhow::Result<()> {
         let channel_id = generate_channel_id(&*ALICE, &*BOB);
 
-        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
+        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
         let db_clone = db.clone();
         db.begin_transaction()
             .await
@@ -769,13 +779,14 @@ mod tests {
             ),
             "should fail when not enough allowance"
         );
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_should_not_fund_if_not_enough_balance() {
+    async fn test_should_not_fund_if_not_enough_balance() -> anyhow::Result<()> {
         let channel_id = generate_channel_id(&*ALICE, &*BOB);
 
-        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
+        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
         let db_clone = db.clone();
         db.begin_transaction()
             .await
@@ -813,16 +824,17 @@ mod tests {
             ),
             "should fail when not enough balance"
         );
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_close_channel_outgoing() {
+    async fn test_close_channel_outgoing() -> anyhow::Result<()> {
         let stake = Balance::new(10_u32, BalanceType::HOPR);
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
 
         let mut channel = ChannelEntry::new(*ALICE, *BOB, stake, U256::zero(), ChannelStatus::Open, U256::zero());
 
-        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
+        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
         let db_clone = db.clone();
         db.begin_transaction()
             .await
@@ -933,16 +945,17 @@ mod tests {
             matches!(tx_res.event, Some(ChainEventType::ChannelClosed(_))),
             "must correspond to channel chain event"
         );
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_close_channel_incoming() {
+    async fn test_close_channel_incoming() -> anyhow::Result<()> {
         let stake = Balance::new(10_u32, BalanceType::HOPR);
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
 
         let channel = ChannelEntry::new(*BOB, *ALICE, stake, U256::zero(), ChannelStatus::Open, U256::zero());
 
-        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
+        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
         let db_clone = db.clone();
         db.begin_transaction()
             .await
@@ -1009,10 +1022,11 @@ mod tests {
             matches!(tx_res.event, Some(ChainEventType::ChannelClosed(_))),
             "must correspond to channel chain event"
         );
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_should_not_close_when_closure_time_did_not_elapse() {
+    async fn test_should_not_close_when_closure_time_did_not_elapse() -> anyhow::Result<()> {
         let stake = Balance::new(10_u32, BalanceType::HOPR);
 
         let channel = ChannelEntry::new(
@@ -1024,7 +1038,7 @@ mod tests {
             U256::zero(),
         );
 
-        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
+        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
         let db_clone = db.clone();
         db.begin_transaction()
             .await
@@ -1067,11 +1081,12 @@ mod tests {
             ),
             "should fail when the channel closure period did not elapse"
         );
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_should_not_close_nonexistent_channel() {
-        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
+    async fn test_should_not_close_nonexistent_channel() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
         let db_clone = db.clone();
         db.begin_transaction()
             .await
@@ -1112,14 +1127,15 @@ mod tests {
             ),
             "should fail when channel does not exist"
         );
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_should_not_close_closed_channel() {
+    async fn test_should_not_close_closed_channel() -> anyhow::Result<()> {
         let stake = Balance::new(10_u32, BalanceType::HOPR);
         let channel = ChannelEntry::new(*ALICE, *BOB, stake, U256::zero(), ChannelStatus::Closed, U256::zero());
 
-        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
+        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
         let db_clone = db.clone();
         db.begin_transaction()
             .await
@@ -1162,5 +1178,6 @@ mod tests {
             ),
             "should fail when channel is already closed"
         );
+        Ok(())
     }
 }

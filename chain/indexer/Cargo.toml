@@ -51,6 +51,7 @@ hopr-primitive-types = { workspace = true }
 hopr-async-runtime = { workspace = true }
 
 [dev-dependencies]
+anyhow = { workspace = true }
 async-std = { workspace = true }
 hopr-db-sql = { workspace = true, features = ["runtime-async-std"] }
 hex-literal = { workspace = true }

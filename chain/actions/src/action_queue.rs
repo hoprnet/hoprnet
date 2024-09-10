@@ -365,7 +365,7 @@ where
                 .await
                 .map_err(ChainActionsError::from)
                 .and_then(|data| data.channels_dst.ok_or(InvalidState("missing channels dst".into())))
-                .unwrap();
+                .expect("Channel domain separator is not yet populated in the DB");
 
             // NOTE: the process is "daemonized" and not awaited, so it will run in the background
             spawn(async move {

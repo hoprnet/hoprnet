@@ -1264,15 +1264,15 @@ mod tests {
         dst: &ChainKeypair,
         index: u64,
         index_offset: Option<u32>,
-    ) -> AcknowledgedTicket {
+    ) -> anyhow::Result<AcknowledgedTicket> {
         let hk1 = HalfKey::random();
         let hk2 = HalfKey::random();
 
-        let cp1: CurvePoint = hk1.to_challenge().try_into().unwrap();
-        let cp2: CurvePoint = hk2.to_challenge().try_into().unwrap();
+        let cp1: CurvePoint = hk1.to_challenge().try_into()?;
+        let cp2: CurvePoint = hk2.to_challenge().try_into()?;
         let cp_sum = CurvePoint::combine(&[&cp1, &cp2]);
 
-        TicketBuilder::default()
+        Ok(TicketBuilder::default()
             .addresses(src, dst)
             .amount(TICKET_VALUE)
             .index(index)
@@ -1282,10 +1282,13 @@ mod tests {
             .challenge(Challenge::from(cp_sum).to_ethereum_challenge())
             .build_signed(src, &Hash::default())
             .expect("should sign a ticket")
-            .into_acknowledged(Response::from_half_keys(&hk1, &hk2).unwrap())
+            .into_acknowledged(Response::from_half_keys(&hk1, &hk2)?))
     }
 
-    async fn init_db_with_tickets(db: &HoprDb, count_tickets: u64) -> (ChannelEntry, Vec<AcknowledgedTicket>) {
+    async fn init_db_with_tickets(
+        db: &HoprDb,
+        count_tickets: u64,
+    ) -> anyhow::Result<(ChannelEntry, Vec<AcknowledgedTicket>)> {
         let channel = ChannelEntry::new(
             BOB.public().to_address(),
             ALICE.public().to_address(),
@@ -1295,18 +1298,17 @@ mod tests {
             4_u32.into(),
         );
 
-        db.upsert_channel(None, channel).await.unwrap();
+        db.upsert_channel(None, channel).await?;
 
-        let tickets = (0..count_tickets)
+        let tickets: Vec<AcknowledgedTicket> = (0..count_tickets)
             .into_iter()
             .map(|i| generate_random_ack_ticket(&BOB, &ALICE, i, None))
-            .collect::<Vec<_>>();
+            .collect::<anyhow::Result<Vec<AcknowledgedTicket>>>()?;
 
         let db_clone = db.clone();
         let tickets_clone = tickets.clone();
         db.begin_transaction_in_db(TargetDb::Tickets)
-            .await
-            .unwrap()
+            .await?
             .perform(|tx| {
                 Box::pin(async move {
                     for t in tickets_clone {
@@ -1315,20 +1317,18 @@ mod tests {
                     Ok::<(), DbSqlError>(())
                 })
             })
-            .await
-            .expect("tx should succeed");
+            .await?;
 
-        (channel, tickets)
+        Ok((channel, tickets))
     }
 
     #[async_std::test]
-    async fn test_insert_get_ticket() {
-        let db = HoprDb::new_in_memory(ALICE.clone()).await;
+    async fn test_insert_get_ticket() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ALICE.clone()).await?;
         db.set_domain_separator(None, DomainSeparator::Channel, Hash::default())
-            .await
-            .unwrap();
+            .await?;
 
-        let (channel, mut tickets) = init_db_with_tickets(&db, 1).await;
+        let (channel, mut tickets) = init_db_with_tickets(&db, 1).await?;
         let ack_ticket = tickets.pop().unwrap();
 
         assert_eq!(
@@ -1351,16 +1351,18 @@ mod tests {
             .expect("ticket should exist");
 
         assert_eq!(ack_ticket, db_ticket, "tickets must be equal");
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_mark_redeemed() {
-        let db = HoprDb::new_in_memory(ALICE.clone()).await;
+    async fn test_mark_redeemed() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ALICE.clone()).await?;
         const COUNT_TICKETS: u64 = 10;
 
-        let (_, tickets) = init_db_with_tickets(&db, COUNT_TICKETS).await;
+        let (_, tickets) = init_db_with_tickets(&db, COUNT_TICKETS).await?;
 
-        let stats = db.get_ticket_statistics(None).await.unwrap();
+        let stats = db.get_ticket_statistics(None).await?;
         assert_eq!(
             BalanceType::HOPR.balance(TICKET_VALUE * COUNT_TICKETS),
             stats.unredeemed_value,
@@ -1374,15 +1376,14 @@ mod tests {
 
         assert_eq!(
             stats,
-            db.get_ticket_statistics(Some(*CHANNEL_ID)).await.unwrap(),
+            db.get_ticket_statistics(Some(*CHANNEL_ID)).await?,
             "per channel stats must be same"
         );
 
         const TO_REDEEM: u64 = 2;
         let db_clone = db.clone();
         db.begin_transaction_in_db(TargetDb::Tickets)
-            .await
-            .unwrap()
+            .await?
             .perform(|_tx| {
                 Box::pin(async move {
                     for i in 0..TO_REDEEM as usize {
@@ -1395,7 +1396,7 @@ mod tests {
             .await
             .expect("tx must not fail");
 
-        let stats = db.get_ticket_statistics(None).await.unwrap();
+        let stats = db.get_ticket_statistics(None).await?;
         assert_eq!(
             BalanceType::HOPR.balance(TICKET_VALUE * (COUNT_TICKETS - TO_REDEEM)),
             stats.unredeemed_value,
@@ -1409,46 +1410,50 @@ mod tests {
 
         assert_eq!(
             stats,
-            db.get_ticket_statistics(Some(*CHANNEL_ID)).await.unwrap(),
+            db.get_ticket_statistics(Some(*CHANNEL_ID)).await?,
             "per channel stats must be same"
         );
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_mark_redeem_should_not_mark_redeem_twice() {
-        let db = HoprDb::new_in_memory(ALICE.clone()).await;
+    async fn test_mark_redeem_should_not_mark_redeem_twice() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ALICE.clone()).await?;
 
-        let ticket = init_db_with_tickets(&db, 1).await.1.pop().unwrap();
+        let ticket = init_db_with_tickets(&db, 1)
+            .await?
+            .1
+            .pop()
+            .expect("should contain a ticket");
 
-        db.mark_tickets_redeemed((&ticket).into()).await.expect("must not fail");
-        assert_eq!(
-            0,
-            db.mark_tickets_redeemed((&ticket).into()).await.expect("must not fail")
-        );
+        db.mark_tickets_redeemed((&ticket).into()).await?;
+        assert_eq!(0, db.mark_tickets_redeemed((&ticket).into()).await?);
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_mark_redeem_should_redeem_all_tickets() {
-        let db = HoprDb::new_in_memory(ALICE.clone()).await;
+    async fn test_mark_redeem_should_redeem_all_tickets() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ALICE.clone()).await?;
 
         let count_tickets = 10;
-        let channel = init_db_with_tickets(&db, count_tickets).await.0;
+        let channel = init_db_with_tickets(&db, count_tickets).await?.0;
 
-        let count_marked = db
-            .mark_tickets_redeemed((&channel).into())
-            .await
-            .expect("must not fail");
+        let count_marked = db.mark_tickets_redeemed((&channel).into()).await?;
         assert_eq!(count_tickets, count_marked as u64, "must mark all tickets in channel");
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_mark_tickets_neglected() {
-        let db = HoprDb::new_in_memory(ALICE.clone()).await;
+    async fn test_mark_tickets_neglected() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ALICE.clone()).await?;
         const COUNT_TICKETS: u64 = 10;
 
-        let (channel, _) = init_db_with_tickets(&db, COUNT_TICKETS).await;
+        let (channel, _) = init_db_with_tickets(&db, COUNT_TICKETS).await?;
 
-        let stats = db.get_ticket_statistics(None).await.unwrap();
+        let stats = db.get_ticket_statistics(None).await?;
         assert_eq!(
             BalanceType::HOPR.balance(TICKET_VALUE * COUNT_TICKETS),
             stats.unredeemed_value,
@@ -1462,15 +1467,13 @@ mod tests {
 
         assert_eq!(
             stats,
-            db.get_ticket_statistics(Some(*CHANNEL_ID)).await.unwrap(),
+            db.get_ticket_statistics(Some(*CHANNEL_ID)).await?,
             "per channel stats must be same"
         );
 
-        db.mark_tickets_neglected((&channel).into())
-            .await
-            .expect("should mark as neglected");
+        db.mark_tickets_neglected((&channel).into()).await?;
 
-        let stats = db.get_ticket_statistics(None).await.unwrap();
+        let stats = db.get_ticket_statistics(None).await?;
         assert_eq!(
             BalanceType::HOPR.zero(),
             stats.unredeemed_value,
@@ -1484,59 +1487,61 @@ mod tests {
 
         assert_eq!(
             stats,
-            db.get_ticket_statistics(Some(*CHANNEL_ID)).await.unwrap(),
+            db.get_ticket_statistics(Some(*CHANNEL_ID)).await?,
             "per channel stats must be same"
         );
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_mark_ticket_rejected() {
-        let db = HoprDb::new_in_memory(ALICE.clone()).await;
+    async fn test_mark_ticket_rejected() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ALICE.clone()).await?;
 
-        let (_, mut ticket) = init_db_with_tickets(&db, 1).await;
+        let (_, mut ticket) = init_db_with_tickets(&db, 1).await?;
         let ticket = ticket.pop().unwrap().ticket;
 
-        let stats = db.get_ticket_statistics(None).await.unwrap();
+        let stats = db.get_ticket_statistics(None).await?;
         assert_eq!(BalanceType::HOPR.zero(), stats.rejected_value);
         assert_eq!(
             stats,
-            db.get_ticket_statistics(Some(*CHANNEL_ID)).await.unwrap(),
+            db.get_ticket_statistics(Some(*CHANNEL_ID)).await?,
             "per channel stats must be same"
         );
 
-        db.mark_ticket_rejected(ticket.verified_ticket()).await.unwrap();
+        db.mark_ticket_rejected(ticket.verified_ticket()).await?;
 
-        let stats = db.get_ticket_statistics(None).await.unwrap();
+        let stats = db.get_ticket_statistics(None).await?;
         assert_eq!(ticket.verified_ticket().amount, stats.rejected_value);
         assert_eq!(
             stats,
-            db.get_ticket_statistics(Some(*CHANNEL_ID)).await.unwrap(),
+            db.get_ticket_statistics(Some(*CHANNEL_ID)).await?,
             "per channel stats must be same"
         );
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_update_tickets_states_and_fetch() {
-        let db = HoprDb::new_in_memory(ALICE.clone()).await;
+    async fn test_update_tickets_states_and_fetch() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ALICE.clone()).await?;
         db.set_domain_separator(None, DomainSeparator::Channel, Default::default())
-            .await
-            .unwrap();
+            .await?;
 
-        let channel = init_db_with_tickets(&db, 10).await.0;
+        let channel = init_db_with_tickets(&db, 10).await?.0;
 
         let selector = TicketSelector::from(&channel).with_index(5);
 
         let v: Vec<AcknowledgedTicket> = db
             .update_ticket_states_and_fetch(selector, AcknowledgedTicketStatus::BeingRedeemed)
-            .await
-            .expect("must create stream")
+            .await?
             .collect()
             .await;
 
         assert_eq!(1, v.len(), "single ticket must be updated");
         assert_eq!(
             AcknowledgedTicketStatus::BeingRedeemed,
-            v.first().unwrap().status,
+            v.first().expect("should contain a ticket").status,
             "status must be set"
         );
 
@@ -1544,8 +1549,7 @@ mod tests {
 
         let v: Vec<AcknowledgedTicket> = db
             .update_ticket_states_and_fetch(selector, AcknowledgedTicketStatus::BeingRedeemed)
-            .await
-            .expect("must create stream")
+            .await?
             .collect()
             .await;
 
@@ -1558,21 +1562,21 @@ mod tests {
             v.iter().all(|t| t.status == AcknowledgedTicketStatus::BeingRedeemed),
             "tickets must have updated state"
         );
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_update_tickets_states() {
-        let db = HoprDb::new_in_memory(ALICE.clone()).await;
+    async fn test_update_tickets_states() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ALICE.clone()).await?;
         db.set_domain_separator(None, DomainSeparator::Channel, Default::default())
-            .await
-            .unwrap();
+            .await?;
 
-        let channel = init_db_with_tickets(&db, 10).await.0;
+        let channel = init_db_with_tickets(&db, 10).await?.0;
         let selector = TicketSelector::from(&channel).with_state(AcknowledgedTicketStatus::Untouched);
 
         db.update_ticket_states(selector.clone(), AcknowledgedTicketStatus::BeingRedeemed)
-            .await
-            .unwrap();
+            .await?;
 
         let v: Vec<AcknowledgedTicket> = db
             .update_ticket_states_and_fetch(selector, AcknowledgedTicketStatus::BeingRedeemed)
@@ -1582,39 +1586,44 @@ mod tests {
             .await;
 
         assert!(v.is_empty(), "must not update if already updated");
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_ticket_index_should_be_zero_if_not_yet_present() {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
+    async fn test_ticket_index_should_be_zero_if_not_yet_present() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
         let hash = Hash::default();
 
-        let idx = db.get_outgoing_ticket_index(hash).await.unwrap();
+        let idx = db.get_outgoing_ticket_index(hash).await?;
         assert_eq!(0, idx.load(Ordering::SeqCst), "initial index must be zero");
 
         let r = hopr_db_entity::outgoing_ticket_index::Entity::find()
             .filter(hopr_db_entity::outgoing_ticket_index::Column::ChannelId.eq(hash.to_hex()))
             .one(&db.tickets_db)
-            .await
-            .unwrap()
+            .await?
             .expect("index must exist");
 
         assert_eq!(0, U256::from_be_bytes(r.index).as_u64(), "index must be zero");
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_ticket_stats_must_fail_for_non_existing_channel() {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
+    async fn test_ticket_stats_must_fail_for_non_existing_channel() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
         db.get_ticket_statistics(Some(*CHANNEL_ID))
             .await
             .expect_err("must fail for non-existing channel");
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_ticket_stats_must_be_zero_when_no_tickets() {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
+    async fn test_ticket_stats_must_be_zero_when_no_tickets() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
         let channel = ChannelEntry::new(
             BOB.public().to_address(),
@@ -1625,9 +1634,9 @@ mod tests {
             4_u32.into(),
         );
 
-        db.upsert_channel(None, channel).await.unwrap();
+        db.upsert_channel(None, channel).await?;
 
-        let stats = db.get_ticket_statistics(Some(*CHANNEL_ID)).await.unwrap();
+        let stats = db.get_ticket_statistics(Some(*CHANNEL_ID)).await?;
 
         assert_eq!(
             ChannelTicketStatistics::default(),
@@ -1637,14 +1646,16 @@ mod tests {
 
         assert_eq!(
             stats,
-            db.get_ticket_statistics(None).await.unwrap(),
+            db.get_ticket_statistics(None).await?,
             "per-channel stats must be the same as global stats"
-        )
+        );
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_ticket_stats_must_be_different_per_channel() {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
+    async fn test_ticket_stats_must_be_different_per_channel() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
         let channel_1 = ChannelEntry::new(
             BOB.public().to_address(),
@@ -1655,7 +1666,7 @@ mod tests {
             4_u32.into(),
         );
 
-        db.upsert_channel(None, channel_1).await.unwrap();
+        db.upsert_channel(None, channel_1).await?;
 
         let channel_2 = ChannelEntry::new(
             ALICE.public().to_address(),
@@ -1666,31 +1677,29 @@ mod tests {
             4_u32.into(),
         );
 
-        db.upsert_channel(None, channel_2).await.unwrap();
+        db.upsert_channel(None, channel_2).await?;
 
-        let t1 = generate_random_ack_ticket(&BOB, &ALICE, 1, None);
-        let t2 = generate_random_ack_ticket(&ALICE, &BOB, 1, None);
+        let t1 = generate_random_ack_ticket(&BOB, &ALICE, 1, None)?;
+        let t2 = generate_random_ack_ticket(&ALICE, &BOB, 1, None)?;
 
         let value = t1.verified_ticket().amount;
 
-        db.upsert_ticket(None, t1).await.unwrap();
-        db.upsert_ticket(None, t2).await.unwrap();
+        db.upsert_ticket(None, t1).await?;
+        db.upsert_ticket(None, t2).await?;
 
         let stats_1 = db
             .get_ticket_statistics(Some(generate_channel_id(
                 &BOB.public().to_address(),
                 &ALICE.public().to_address(),
             )))
-            .await
-            .unwrap();
+            .await?;
 
         let stats_2 = db
             .get_ticket_statistics(Some(generate_channel_id(
                 &ALICE.public().to_address(),
                 &BOB.public().to_address(),
             )))
-            .await
-            .unwrap();
+            .await?;
 
         assert_eq!(value, stats_1.unredeemed_value);
         assert_eq!(value, stats_2.unredeemed_value);
@@ -1700,110 +1709,114 @@ mod tests {
 
         assert_eq!(stats_1, stats_2);
 
-        db.mark_tickets_neglected(channel_1.into()).await.unwrap();
+        db.mark_tickets_neglected(channel_1.into()).await?;
 
         let stats_1 = db
             .get_ticket_statistics(Some(generate_channel_id(
                 &BOB.public().to_address(),
                 &ALICE.public().to_address(),
             )))
-            .await
-            .unwrap();
+            .await?;
 
         let stats_2 = db
             .get_ticket_statistics(Some(generate_channel_id(
                 &ALICE.public().to_address(),
                 &BOB.public().to_address(),
             )))
-            .await
-            .unwrap();
+            .await?;
 
         assert_eq!(BalanceType::HOPR.zero(), stats_1.unredeemed_value);
         assert_eq!(value, stats_1.neglected_value);
 
         assert_eq!(BalanceType::HOPR.zero(), stats_2.neglected_value);
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_ticket_index_compare_and_set_and_increment() {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
+    async fn test_ticket_index_compare_and_set_and_increment() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
         let hash = Hash::default();
 
-        let old_idx = db.compare_and_set_outgoing_ticket_index(hash, 1).await.unwrap();
+        let old_idx = db.compare_and_set_outgoing_ticket_index(hash, 1).await?;
         assert_eq!(0, old_idx, "old value must be 0");
 
-        let new_idx = db.get_outgoing_ticket_index(hash).await.unwrap().load(Ordering::SeqCst);
+        let new_idx = db.get_outgoing_ticket_index(hash).await?.load(Ordering::SeqCst);
         assert_eq!(1, new_idx, "new value must be 1");
 
-        let old_idx = db.increment_outgoing_ticket_index(hash).await.unwrap();
+        let old_idx = db.increment_outgoing_ticket_index(hash).await?;
         assert_eq!(1, old_idx, "old value must be 1");
 
-        let new_idx = db.get_outgoing_ticket_index(hash).await.unwrap().load(Ordering::SeqCst);
+        let new_idx = db.get_outgoing_ticket_index(hash).await?.load(Ordering::SeqCst);
         assert_eq!(2, new_idx, "new value must be 2");
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_ticket_index_compare_and_set_must_not_decrease() {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
+    async fn test_ticket_index_compare_and_set_must_not_decrease() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
         let hash = Hash::default();
 
-        let new_idx = db.get_outgoing_ticket_index(hash).await.unwrap().load(Ordering::SeqCst);
+        let new_idx = db.get_outgoing_ticket_index(hash).await?.load(Ordering::SeqCst);
         assert_eq!(0, new_idx, "value must be 0");
 
-        db.compare_and_set_outgoing_ticket_index(hash, 1).await.unwrap();
+        db.compare_and_set_outgoing_ticket_index(hash, 1).await?;
 
-        let new_idx = db.get_outgoing_ticket_index(hash).await.unwrap().load(Ordering::SeqCst);
+        let new_idx = db.get_outgoing_ticket_index(hash).await?.load(Ordering::SeqCst);
         assert_eq!(1, new_idx, "new value must be 1");
 
-        let old_idx = db.compare_and_set_outgoing_ticket_index(hash, 0).await.unwrap();
+        let old_idx = db.compare_and_set_outgoing_ticket_index(hash, 0).await?;
         assert_eq!(1, old_idx, "old value must be 1");
         assert_eq!(1, new_idx, "new value must be 1");
 
-        let old_idx = db.compare_and_set_outgoing_ticket_index(hash, 1).await.unwrap();
+        let old_idx = db.compare_and_set_outgoing_ticket_index(hash, 1).await?;
         assert_eq!(1, old_idx, "old value must be 1");
         assert_eq!(1, new_idx, "new value must be 1");
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_ticket_index_reset() {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
+    async fn test_ticket_index_reset() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
         let hash = Hash::default();
 
-        let new_idx = db.get_outgoing_ticket_index(hash).await.unwrap().load(Ordering::SeqCst);
+        let new_idx = db.get_outgoing_ticket_index(hash).await?.load(Ordering::SeqCst);
         assert_eq!(0, new_idx, "value must be 0");
 
-        db.compare_and_set_outgoing_ticket_index(hash, 1).await.unwrap();
+        db.compare_and_set_outgoing_ticket_index(hash, 1).await?;
 
-        let new_idx = db.get_outgoing_ticket_index(hash).await.unwrap().load(Ordering::SeqCst);
+        let new_idx = db.get_outgoing_ticket_index(hash).await?.load(Ordering::SeqCst);
         assert_eq!(1, new_idx, "new value must be 1");
 
-        let old_idx = db.reset_outgoing_ticket_index(hash).await.unwrap();
+        let old_idx = db.reset_outgoing_ticket_index(hash).await?;
         assert_eq!(1, old_idx, "old value must be 1");
 
-        let new_idx = db.get_outgoing_ticket_index(hash).await.unwrap().load(Ordering::SeqCst);
+        let new_idx = db.get_outgoing_ticket_index(hash).await?.load(Ordering::SeqCst);
         assert_eq!(0, new_idx, "new value must be 0");
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_persist_ticket_indices() {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
+    async fn test_persist_ticket_indices() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
         let hash_1 = Hash::default();
         let hash_2 = Hash::from(hopr_crypto_random::random_bytes());
 
-        db.get_outgoing_ticket_index(hash_1).await.unwrap();
-        db.compare_and_set_outgoing_ticket_index(hash_2, 10).await.unwrap();
+        db.get_outgoing_ticket_index(hash_1).await?;
+        db.compare_and_set_outgoing_ticket_index(hash_2, 10).await?;
 
-        let persisted = db.persist_outgoing_ticket_indices().await.unwrap();
+        let persisted = db.persist_outgoing_ticket_indices().await?;
         assert_eq!(1, persisted);
 
         let indices = hopr_db_entity::outgoing_ticket_index::Entity::find()
             .all(&db.tickets_db)
-            .await
-            .unwrap();
+            .await?;
         let idx_1 = indices
             .iter()
             .find(|idx| idx.channel_id == hash_1.to_hex())
@@ -1815,16 +1828,15 @@ mod tests {
         assert_eq!(0, U256::from_be_bytes(&idx_1.index).as_u64(), "index must be 0");
         assert_eq!(10, U256::from_be_bytes(&idx_2.index).as_u64(), "index must be 10");
 
-        db.compare_and_set_outgoing_ticket_index(hash_1, 3).await.unwrap();
-        db.increment_outgoing_ticket_index(hash_2).await.unwrap();
+        db.compare_and_set_outgoing_ticket_index(hash_1, 3).await?;
+        db.increment_outgoing_ticket_index(hash_2).await?;
 
-        let persisted = db.persist_outgoing_ticket_indices().await.unwrap();
+        let persisted = db.persist_outgoing_ticket_indices().await?;
         assert_eq!(2, persisted);
 
         let indices = hopr_db_entity::outgoing_ticket_index::Entity::find()
             .all(&db.tickets_db)
-            .await
-            .unwrap();
+            .await?;
         let idx_1 = indices
             .iter()
             .find(|idx| idx.channel_id == hash_1.to_hex())
@@ -1835,10 +1847,11 @@ mod tests {
             .expect("must contain index 2");
         assert_eq!(3, U256::from_be_bytes(&idx_1.index).as_u64(), "index must be 3");
         assert_eq!(11, U256::from_be_bytes(&idx_2.index).as_u64(), "index must be 11");
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_cache_can_be_cloned_but_referencing_the_original_cache_storage() {
+    async fn test_cache_can_be_cloned_but_referencing_the_original_cache_storage() -> anyhow::Result<()> {
         let cache: moka::future::Cache<i64, i64> = moka::future::Cache::new(5);
 
         assert_eq!(cache.weighted_size(), 0);
@@ -1853,6 +1866,7 @@ mod tests {
 
         assert_eq!(cache.get(&1).await, None);
         assert_eq!(cache.get(&1).await, clone.get(&1).await);
+        Ok(())
     }
 
     fn dummy_ticket_model(channel_id: Hash, idx: u64, idx_offset: u32, amount: u32) -> ticket::Model {
@@ -1872,7 +1886,7 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn test_aggregation_prerequisites_default_filter_no_tickets() {
+    async fn test_aggregation_prerequisites_default_filter_no_tickets() -> anyhow::Result<()> {
         let prerequisites = AggregationPrerequisites::default();
         assert_eq!(None, prerequisites.min_unaggregated_ratio);
         assert_eq!(None, prerequisites.min_ticket_count);
@@ -1895,10 +1909,11 @@ mod tests {
             dummy_tickets, filtered_tickets,
             "empty prerequisites must not filter anything"
         );
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_aggregation_prerequisites_must_trim_tickets_exceeding_channel_balance() {
+    async fn test_aggregation_prerequisites_must_trim_tickets_exceeding_channel_balance() -> anyhow::Result<()> {
         const TICKET_COUNT: usize = 110;
 
         let prerequisites = AggregationPrerequisites::default();
@@ -1935,10 +1950,12 @@ mod tests {
                 <= channel.balance.amount().as_u64(),
             "filtered tickets must not exceed channel balance"
         );
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_aggregation_prerequisites_must_return_empty_when_minimum_ticket_count_not_met() {
+    async fn test_aggregation_prerequisites_must_return_empty_when_minimum_ticket_count_not_met() -> anyhow::Result<()>
+    {
         const TICKET_COUNT: usize = 10;
 
         let prerequisites = AggregationPrerequisites {
@@ -1966,11 +1983,14 @@ mod tests {
         assert!(
             filtered_tickets.is_empty(),
             "must return empty when min_ticket_count is not met"
-        )
+        );
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_aggregation_prerequisites_must_return_empty_when_minimum_unaggregated_ratio_is_not_met() {
+    async fn test_aggregation_prerequisites_must_return_empty_when_minimum_unaggregated_ratio_is_not_met(
+    ) -> anyhow::Result<()> {
         const TICKET_COUNT: usize = 10;
 
         let prerequisites = AggregationPrerequisites {
@@ -1998,11 +2018,13 @@ mod tests {
         assert!(
             filtered_tickets.is_empty(),
             "must return empty when min_unaggregated_ratio is not met"
-        )
+        );
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_aggregation_prerequisites_must_return_all_when_minimum_ticket_count_is_met() {
+    async fn test_aggregation_prerequisites_must_return_all_when_minimum_ticket_count_is_met() -> anyhow::Result<()> {
         const TICKET_COUNT: usize = 10;
 
         let prerequisites = AggregationPrerequisites {
@@ -2029,10 +2051,12 @@ mod tests {
 
         assert!(!filtered_tickets.is_empty(), "must not return empty");
         assert_eq!(dummy_tickets, filtered_tickets, "return all tickets");
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_aggregation_prerequisites_must_return_all_when_minimum_ticket_count_is_met_regardless_ratio() {
+    async fn test_aggregation_prerequisites_must_return_all_when_minimum_ticket_count_is_met_regardless_ratio(
+    ) -> anyhow::Result<()> {
         const TICKET_COUNT: usize = 10;
 
         let prerequisites = AggregationPrerequisites {
@@ -2059,10 +2083,12 @@ mod tests {
 
         assert!(!filtered_tickets.is_empty(), "must not return empty");
         assert_eq!(dummy_tickets, filtered_tickets, "return all tickets");
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_aggregation_prerequisites_must_return_all_when_minimum_unaggregated_ratio_is_met() {
+    async fn test_aggregation_prerequisites_must_return_all_when_minimum_unaggregated_ratio_is_met(
+    ) -> anyhow::Result<()> {
         const TICKET_COUNT: usize = 90;
 
         let prerequisites = AggregationPrerequisites {
@@ -2089,10 +2115,12 @@ mod tests {
 
         assert!(!filtered_tickets.is_empty(), "must not return empty");
         assert_eq!(dummy_tickets, filtered_tickets, "return all tickets");
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_aggregation_prerequisites_must_return_all_when_minimum_unaggregated_ratio_is_met_regardless_count() {
+    async fn test_aggregation_prerequisites_must_return_all_when_minimum_unaggregated_ratio_is_met_regardless_count(
+    ) -> anyhow::Result<()> {
         const TICKET_COUNT: usize = 90;
 
         let prerequisites = AggregationPrerequisites {
@@ -2119,10 +2147,12 @@ mod tests {
 
         assert!(!filtered_tickets.is_empty(), "must not return empty");
         assert_eq!(dummy_tickets, filtered_tickets, "return all tickets");
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_aggregation_prerequisites_must_return_empty_when_minimum_only_aggregated_ratio_is_met() {
+    async fn test_aggregation_prerequisites_must_return_empty_when_minimum_only_aggregated_ratio_is_met(
+    ) -> anyhow::Result<()> {
         const TICKET_COUNT: usize = 90;
 
         let prerequisites = AggregationPrerequisites {
@@ -2149,11 +2179,12 @@ mod tests {
             .expect("must filter tickets");
 
         assert!(filtered_tickets.is_empty(), "must return empty");
+        Ok(())
     }
 
     #[async_std::test]
     async fn test_aggregation_prerequisites_must_return_empty_when_minimum_only_unaggregated_ratio_is_met_in_single_ticket_only(
-    ) {
+    ) -> anyhow::Result<()> {
         let prerequisites = AggregationPrerequisites {
             min_ticket_count: None,
             min_unaggregated_ratio: Some(0.9),
@@ -2175,12 +2206,13 @@ mod tests {
             .expect("must filter tickets");
 
         assert!(filtered_tickets.is_empty(), "must return empty");
+        Ok(())
     }
 
     async fn create_alice_db_with_tickets_from_bob(
         ticket_count: usize,
-    ) -> crate::errors::Result<(HoprDb, ChannelEntry, Vec<AcknowledgedTicket>)> {
-        let db = HoprDb::new_in_memory(ALICE.clone()).await;
+    ) -> anyhow::Result<(HoprDb, ChannelEntry, Vec<AcknowledgedTicket>)> {
+        let db = HoprDb::new_in_memory(ALICE.clone()).await?;
 
         db.set_domain_separator(None, DomainSeparator::Channel, Default::default())
             .await?;
@@ -2194,14 +2226,14 @@ mod tests {
         )
         .await?;
 
-        let (channel, tickets) = init_db_with_tickets(&db, ticket_count as u64).await;
+        let (channel, tickets) = init_db_with_tickets(&db, ticket_count as u64).await?;
 
         Ok((db, channel, tickets))
     }
 
     #[async_std::test]
     async fn test_ticket_aggregation_should_fail_if_any_ticket_is_being_aggregated_in_that_channel(
-    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    ) -> anyhow::Result<()> {
         const COUNT_TICKETS: usize = 5;
 
         let (db, channel, tickets) = create_alice_db_with_tickets_from_bob(COUNT_TICKETS).await?;
@@ -2214,7 +2246,7 @@ mod tests {
         let mut ticket = hopr_db_entity::ticket::Entity::find()
             .one(&db.tickets_db)
             .await?
-            .unwrap()
+            .expect("should have an active model")
             .into_active_model();
         ticket.state = Set(AcknowledgedTicketStatus::BeingAggregated as u8 as i32);
         ticket.save(&db.tickets_db).await?;
@@ -2228,8 +2260,7 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn test_ticket_aggregation_prepare_request_with_0_tickets_should_return_empty_result(
-    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    async fn test_ticket_aggregation_prepare_request_with_0_tickets_should_return_empty_result() -> anyhow::Result<()> {
         const COUNT_TICKETS: usize = 0;
 
         let (db, channel, tickets) = create_alice_db_with_tickets_from_bob(COUNT_TICKETS).await?;
@@ -2249,14 +2280,14 @@ mod tests {
 
     #[async_std::test]
     async fn test_ticket_aggregation_prepare_request_with_multiple_tickets_should_return_that_ticket(
-    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    ) -> anyhow::Result<()> {
         const COUNT_TICKETS: usize = 2;
 
         let (db, channel, tickets) = create_alice_db_with_tickets_from_bob(COUNT_TICKETS).await?;
-        let tickets = tickets
+        let tickets: Vec<TransferableWinningTicket> = tickets
             .into_iter()
-            .map(|t| t.into_transferable(&ALICE, &Hash::default()).unwrap())
-            .collect::<Vec<_>>();
+            .map(|t| t.into_transferable(&ALICE, &Hash::default()))
+            .collect::<hopr_internal_types::errors::Result<Vec<TransferableWinningTicket>>>()?;
 
         assert_eq!(tickets.len(), COUNT_TICKETS);
 
@@ -2283,14 +2314,16 @@ mod tests {
 
     #[async_std::test]
     async fn test_ticket_aggregation_prepare_request_with_duplicate_tickets_should_return_dedup_aggregated_ticket(
-    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    ) -> anyhow::Result<()> {
         let (db, channel, _) = create_alice_db_with_tickets_from_bob(0).await?;
         let tickets = vec![
             generate_random_ack_ticket(&BOB, &ALICE, 1, None),
             generate_random_ack_ticket(&BOB, &ALICE, 0, Some(2)),
             generate_random_ack_ticket(&BOB, &ALICE, 2, None),
             generate_random_ack_ticket(&BOB, &ALICE, 3, None),
-        ];
+        ]
+        .into_iter()
+        .collect::<anyhow::Result<Vec<AcknowledgedTicket>>>()?;
 
         let tickets_clone = tickets.clone();
         let db_clone = db.clone();
@@ -2316,8 +2349,8 @@ mod tests {
 
         let mut tickets = tickets
             .into_iter()
-            .map(|t| t.into_transferable(&ALICE, &Hash::default()).unwrap())
-            .collect::<Vec<_>>();
+            .map(|t| t.into_transferable(&ALICE, &Hash::default()))
+            .collect::<hopr_internal_types::errors::Result<Vec<_>>>()?;
 
         // We expect the first ticket to be removed
         tickets.remove(0);
@@ -2338,7 +2371,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_ticket_aggregation_prepare_request_with_a_being_redeemed_ticket_should_aggregate_only_the_tickets_following_it(
-    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    ) -> anyhow::Result<()> {
         const COUNT_TICKETS: usize = 5;
 
         let (db, channel, tickets) = create_alice_db_with_tickets_from_bob(COUNT_TICKETS).await?;
@@ -2355,7 +2388,7 @@ mod tests {
         let mut ticket = hopr_db_entity::ticket::Entity::find()
             .one(&db.tickets_db)
             .await?
-            .unwrap()
+            .expect("should have 1 active model")
             .into_active_model();
         ticket.state = Set(AcknowledgedTicketStatus::BeingRedeemed as u8 as i32);
         ticket.save(&db.tickets_db).await?;
@@ -2382,7 +2415,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_ticket_aggregation_prepare_request_with_some_requirements_should_return_when_ticket_threshold_is_met(
-    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    ) -> anyhow::Result<()> {
         const COUNT_TICKETS: usize = 5;
 
         let (db, channel, tickets) = create_alice_db_with_tickets_from_bob(COUNT_TICKETS).await?;
@@ -2420,7 +2453,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_ticket_aggregation_prepare_request_with_some_requirements_should_not_return_when_ticket_threshold_is_not_met(
-    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    ) -> anyhow::Result<()> {
         const COUNT_TICKETS: usize = 2;
 
         let (db, channel, tickets) = create_alice_db_with_tickets_from_bob(COUNT_TICKETS).await?;
@@ -2451,7 +2484,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_ticket_aggregation_prepare_request_with_no_aggregatable_tickets_should_return_nothing(
-    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    ) -> anyhow::Result<()> {
         const COUNT_TICKETS: usize = 3;
 
         let (db, channel, tickets) = create_alice_db_with_tickets_from_bob(COUNT_TICKETS).await?;
@@ -2489,7 +2522,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_ticket_aggregation_rollback_should_rollback_all_the_being_aggregated_tickets_but_nothing_else(
-    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    ) -> anyhow::Result<()> {
         const COUNT_TICKETS: usize = 5;
 
         let (db, channel, tickets) = create_alice_db_with_tickets_from_bob(COUNT_TICKETS).await?;
@@ -2502,7 +2535,7 @@ mod tests {
         let mut ticket = hopr_db_entity::ticket::Entity::find()
             .one(&db.tickets_db)
             .await?
-            .unwrap()
+            .expect("should have one active model")
             .into_active_model();
         ticket.state = Set(AcknowledgedTicketStatus::BeingRedeemed as u8 as i32);
         ticket.save(&db.tickets_db).await?;
@@ -2536,7 +2569,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_ticket_aggregation_should_replace_the_tickets_with_a_correctly_aggregated_ticket(
-    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    ) -> anyhow::Result<()> {
         const COUNT_TICKETS: usize = 5;
 
         let (db, channel, tickets) = create_alice_db_with_tickets_from_bob(COUNT_TICKETS).await?;
@@ -2560,8 +2593,7 @@ mod tests {
             .win_prob(1.0)
             .channel_epoch(first_ticket.channel_epoch)
             .challenge(first_ticket.challenge)
-            .build_signed(&BOB, &Hash::default())
-            .unwrap();
+            .build_signed(&BOB, &Hash::default())?;
 
         assert_eq!(tickets.len(), COUNT_TICKETS);
 
@@ -2592,7 +2624,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_ticket_aggregation_should_fail_if_the_aggregated_ticket_value_is_lower_than_the_stored_one(
-    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    ) -> anyhow::Result<()> {
         const COUNT_TICKETS: usize = 5;
 
         let (db, channel, tickets) = create_alice_db_with_tickets_from_bob(COUNT_TICKETS).await?;
@@ -2612,8 +2644,7 @@ mod tests {
             .win_prob(1.0)
             .channel_epoch(first_ticket.channel_epoch)
             .challenge(first_ticket.challenge)
-            .build_signed(&BOB, &Hash::default())
-            .unwrap();
+            .build_signed(&BOB, &Hash::default())?;
 
         assert_eq!(tickets.len(), COUNT_TICKETS);
 
@@ -2638,7 +2669,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_ticket_aggregation_should_fail_if_the_aggregated_ticket_win_probability_is_not_equal_to_1(
-    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    ) -> anyhow::Result<()> {
         const COUNT_TICKETS: usize = 5;
 
         let (db, channel, tickets) = create_alice_db_with_tickets_from_bob(COUNT_TICKETS).await?;
@@ -2658,8 +2689,7 @@ mod tests {
             .win_prob(0.5) // 50% winning prob
             .channel_epoch(first_ticket.channel_epoch)
             .challenge(first_ticket.challenge)
-            .build_signed(&BOB, &Hash::default())
-            .unwrap();
+            .build_signed(&BOB, &Hash::default())?;
 
         assert_eq!(tickets.len(), COUNT_TICKETS);
 
@@ -2682,12 +2712,11 @@ mod tests {
         Ok(())
     }
 
-    async fn init_db_with_channel(channel: ChannelEntry) -> HoprDb {
-        let db = HoprDb::new_in_memory(BOB.clone()).await;
+    async fn init_db_with_channel(channel: ChannelEntry) -> anyhow::Result<HoprDb> {
+        let db = HoprDb::new_in_memory(BOB.clone()).await?;
 
         db.set_domain_separator(None, DomainSeparator::Channel, Default::default())
-            .await
-            .unwrap();
+            .await?;
 
         add_peer_mappings(
             &db,
@@ -2696,16 +2725,15 @@ mod tests {
                 (BOB_OFFCHAIN.clone(), BOB.clone()),
             ],
         )
-        .await
-        .unwrap();
+        .await?;
 
-        db.upsert_channel(None, channel).await.unwrap();
+        db.upsert_channel(None, channel).await?;
 
-        db
+        Ok(db)
     }
 
     #[async_std::test]
-    async fn test_aggregate_ticket_should_aggregate() {
+    async fn test_aggregate_ticket_should_aggregate() -> anyhow::Result<()> {
         const COUNT_TICKETS: usize = 5;
 
         let channel = ChannelEntry::new(
@@ -2717,16 +2745,15 @@ mod tests {
             4_u32.into(),
         );
 
-        let db = init_db_with_channel(channel).await;
+        let db = init_db_with_channel(channel).await?;
 
         let tickets = (0..COUNT_TICKETS)
             .into_iter()
             .map(|i| {
                 generate_random_ack_ticket(&BOB, &ALICE, i as u64, None)
-                    .into_transferable(&ALICE, &Hash::default())
-                    .unwrap()
+                    .and_then(|v| Ok(v.into_transferable(&ALICE, &Hash::default())?))
             })
-            .collect::<Vec<_>>();
+            .collect::<anyhow::Result<Vec<_>>>()?;
 
         let sum_value = tickets
             .iter()
@@ -2734,10 +2761,7 @@ mod tests {
         let min_idx = tickets.iter().map(|t| t.ticket.index).min().unwrap();
         let max_idx = tickets.iter().map(|t| t.ticket.index).max().unwrap();
 
-        let aggregated = db
-            .aggregate_tickets(*ALICE_OFFCHAIN.public(), tickets, &BOB)
-            .await
-            .expect("should aggregate");
+        let aggregated = db.aggregate_tickets(*ALICE_OFFCHAIN.public(), tickets, &BOB).await?;
 
         assert_eq!(
             &BOB.public().to_address(),
@@ -2781,14 +2805,15 @@ mod tests {
         assert_eq!(
             max_idx + 1,
             db.get_outgoing_ticket_index(channel.get_id())
-                .await
-                .unwrap()
+                .await?
                 .load(Ordering::SeqCst)
         );
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_aggregate_ticket_should_aggregate_including_aggregated() {
+    async fn test_aggregate_ticket_should_aggregate_including_aggregated() -> anyhow::Result<()> {
         const COUNT_TICKETS: usize = 5;
 
         let channel = ChannelEntry::new(
@@ -2800,7 +2825,7 @@ mod tests {
             4_u32.into(),
         );
 
-        let db = init_db_with_channel(channel).await;
+        let db = init_db_with_channel(channel).await?;
 
         let offset = 10_usize;
 
@@ -2808,16 +2833,14 @@ mod tests {
             .into_iter()
             .map(|i| {
                 generate_random_ack_ticket(&BOB, &ALICE, (i + offset) as u64, None)
-                    .into_transferable(&ALICE, &Hash::default())
-                    .unwrap()
+                    .and_then(|v| Ok(v.into_transferable(&ALICE, &Hash::default())?))
             })
-            .collect::<Vec<_>>();
+            .collect::<anyhow::Result<Vec<_>>>()?;
 
         // Add an aggregated ticket to the set too
         tickets.push(
             generate_random_ack_ticket(&BOB, &ALICE, 0, Some(offset as u32))
-                .into_transferable(&ALICE, &Hash::default())
-                .unwrap(),
+                .and_then(|v| Ok(v.into_transferable(&ALICE, &Hash::default())?))?,
         );
 
         let sum_value = tickets
@@ -2826,10 +2849,7 @@ mod tests {
         let min_idx = tickets.iter().map(|t| t.ticket.index).min().unwrap();
         let max_idx = tickets.iter().map(|t| t.ticket.index).max().unwrap();
 
-        let aggregated = db
-            .aggregate_tickets(*ALICE_OFFCHAIN.public(), tickets, &BOB)
-            .await
-            .expect("should aggregate");
+        let aggregated = db.aggregate_tickets(*ALICE_OFFCHAIN.public(), tickets, &BOB).await?;
 
         assert_eq!(
             &BOB.public().to_address(),
@@ -2873,23 +2893,26 @@ mod tests {
         assert_eq!(
             max_idx + 1,
             db.get_outgoing_ticket_index(channel.get_id())
-                .await
-                .unwrap()
+                .await?
                 .load(Ordering::SeqCst)
         );
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_aggregate_ticket_should_not_aggregate_zero_tickets() {
-        let db = HoprDb::new_in_memory(BOB.clone()).await;
+    async fn test_aggregate_ticket_should_not_aggregate_zero_tickets() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(BOB.clone()).await?;
 
         db.aggregate_tickets(*ALICE_OFFCHAIN.public(), vec![], &BOB)
             .await
             .expect_err("should not aggregate empty ticket list");
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_aggregate_ticket_should_aggregate_single_ticket_to_itself() {
+    async fn test_aggregate_ticket_should_aggregate_single_ticket_to_itself() -> anyhow::Result<()> {
         const COUNT_TICKETS: usize = 1;
 
         let channel = ChannelEntry::new(
@@ -2901,16 +2924,15 @@ mod tests {
             4_u32.into(),
         );
 
-        let db = init_db_with_channel(channel).await;
+        let db = init_db_with_channel(channel).await?;
 
         let mut tickets = (0..COUNT_TICKETS)
             .into_iter()
             .map(|i| {
                 generate_random_ack_ticket(&BOB, &ALICE, i as u64, None)
-                    .into_transferable(&ALICE, &Hash::default())
-                    .unwrap()
+                    .and_then(|v| Ok(v.into_transferable(&ALICE, &Hash::default())?))
             })
-            .collect::<Vec<_>>();
+            .collect::<anyhow::Result<Vec<_>>>()?;
 
         let aggregated = db
             .aggregate_tickets(*ALICE_OFFCHAIN.public(), tickets.clone(), &BOB)
@@ -2918,10 +2940,12 @@ mod tests {
             .expect("should aggregate");
 
         assert_eq!(&tickets.pop().unwrap().ticket, aggregated.verified_ticket());
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_aggregate_ticket_should_not_aggregate_on_closed_channel() {
+    async fn test_aggregate_ticket_should_not_aggregate_on_closed_channel() -> anyhow::Result<()> {
         const COUNT_TICKETS: usize = 3;
 
         let channel = ChannelEntry::new(
@@ -2933,24 +2957,25 @@ mod tests {
             4_u32.into(),
         );
 
-        let db = init_db_with_channel(channel).await;
+        let db = init_db_with_channel(channel).await?;
 
         let tickets = (0..COUNT_TICKETS)
             .into_iter()
             .map(|i| {
                 generate_random_ack_ticket(&BOB, &ALICE, i as u64, None)
-                    .into_transferable(&ALICE, &Hash::default())
-                    .unwrap()
+                    .and_then(|v| Ok(v.into_transferable(&ALICE, &Hash::default())?))
             })
-            .collect::<Vec<_>>();
+            .collect::<anyhow::Result<Vec<_>>>()?;
 
         db.aggregate_tickets(*ALICE_OFFCHAIN.public(), tickets.clone(), &BOB)
             .await
             .expect_err("should not aggregate on closed channel");
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_aggregate_ticket_should_not_aggregate_on_incoming_channel() {
+    async fn test_aggregate_ticket_should_not_aggregate_on_incoming_channel() -> anyhow::Result<()> {
         const COUNT_TICKETS: usize = 3;
 
         let channel = ChannelEntry::new(
@@ -2962,24 +2987,25 @@ mod tests {
             4_u32.into(),
         );
 
-        let db = init_db_with_channel(channel).await;
+        let db = init_db_with_channel(channel).await?;
 
         let tickets = (0..COUNT_TICKETS)
             .into_iter()
             .map(|i| {
                 generate_random_ack_ticket(&BOB, &ALICE, i as u64, None)
-                    .into_transferable(&ALICE, &Hash::default())
-                    .unwrap()
+                    .and_then(|v| Ok(v.into_transferable(&ALICE, &Hash::default())?))
             })
-            .collect::<Vec<_>>();
+            .collect::<anyhow::Result<Vec<_>>>()?;
 
         db.aggregate_tickets(*ALICE_OFFCHAIN.public(), tickets.clone(), &BOB)
             .await
             .expect_err("should not aggregate on incoming channel");
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_aggregate_ticket_should_not_aggregate_if_mismatching_channel_ids() {
+    async fn test_aggregate_ticket_should_not_aggregate_if_mismatching_channel_ids() -> anyhow::Result<()> {
         const COUNT_TICKETS: usize = 3;
 
         let channel = ChannelEntry::new(
@@ -2991,28 +3017,28 @@ mod tests {
             4_u32.into(),
         );
 
-        let db = init_db_with_channel(channel).await;
+        let db = init_db_with_channel(channel).await?;
 
         let mut tickets = (0..COUNT_TICKETS)
             .into_iter()
             .map(|i| {
                 generate_random_ack_ticket(&BOB, &ALICE, i as u64, None)
-                    .into_transferable(&ALICE, &Hash::default())
-                    .unwrap()
+                    .and_then(|v| Ok(v.into_transferable(&ALICE, &Hash::default())?))
             })
-            .collect::<Vec<_>>();
+            .collect::<anyhow::Result<Vec<_>>>()?;
 
         tickets[2] = generate_random_ack_ticket(&BOB, &ChainKeypair::random(), 2, None)
-            .into_transferable(&ALICE, &Hash::default())
-            .unwrap();
+            .and_then(|v| Ok(v.into_transferable(&ALICE, &Hash::default())?))?;
 
         db.aggregate_tickets(*ALICE_OFFCHAIN.public(), tickets.clone(), &BOB)
             .await
             .expect_err("should not aggregate on mismatching channel ids");
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_aggregate_ticket_should_not_aggregate_if_mismatching_channel_epoch() {
+    async fn test_aggregate_ticket_should_not_aggregate_if_mismatching_channel_epoch() -> anyhow::Result<()> {
         const COUNT_TICKETS: usize = 3;
 
         let channel = ChannelEntry::new(
@@ -3024,24 +3050,25 @@ mod tests {
             3_u32.into(),
         );
 
-        let db = init_db_with_channel(channel).await;
+        let db = init_db_with_channel(channel).await?;
 
         let tickets = (0..COUNT_TICKETS)
             .into_iter()
             .map(|i| {
                 generate_random_ack_ticket(&BOB, &ALICE, i as u64, None)
-                    .into_transferable(&ALICE, &Hash::default())
-                    .unwrap()
+                    .and_then(|v| Ok(v.into_transferable(&ALICE, &Hash::default())?))
             })
-            .collect::<Vec<_>>();
+            .collect::<anyhow::Result<Vec<_>>>()?;
 
         db.aggregate_tickets(*ALICE_OFFCHAIN.public(), tickets.clone(), &BOB)
             .await
             .expect_err("should not aggregate on mismatching channel epoch");
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_aggregate_ticket_should_not_aggregate_if_ticket_indices_overlap() {
+    async fn test_aggregate_ticket_should_not_aggregate_if_ticket_indices_overlap() -> anyhow::Result<()> {
         const COUNT_TICKETS: usize = 3;
 
         let channel = ChannelEntry::new(
@@ -3053,28 +3080,27 @@ mod tests {
             3_u32.into(),
         );
 
-        let db = init_db_with_channel(channel).await;
+        let db = init_db_with_channel(channel).await?;
 
         let mut tickets = (0..COUNT_TICKETS)
             .into_iter()
             .map(|i| {
                 generate_random_ack_ticket(&BOB, &ALICE, i as u64, None)
-                    .into_transferable(&ALICE, &Hash::default())
-                    .unwrap()
+                    .and_then(|v| Ok(v.into_transferable(&ALICE, &Hash::default())?))
             })
-            .collect::<Vec<_>>();
+            .collect::<anyhow::Result<Vec<_>>>()?;
 
         tickets[1] = generate_random_ack_ticket(&BOB, &ALICE, 1, Some(2))
-            .into_transferable(&ALICE, &Hash::default())
-            .unwrap();
+            .and_then(|v| Ok(v.into_transferable(&ALICE, &Hash::default())?))?;
 
         db.aggregate_tickets(*ALICE_OFFCHAIN.public(), tickets.clone(), &BOB)
             .await
             .expect_err("should not aggregate on overlapping ticket indices");
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_aggregate_ticket_should_not_aggregate_if_ticket_is_not_valid() {
+    async fn test_aggregate_ticket_should_not_aggregate_if_ticket_is_not_valid() -> anyhow::Result<()> {
         const COUNT_TICKETS: usize = 3;
 
         let channel = ChannelEntry::new(
@@ -3086,16 +3112,15 @@ mod tests {
             3_u32.into(),
         );
 
-        let db = init_db_with_channel(channel).await;
+        let db = init_db_with_channel(channel).await?;
 
         let mut tickets = (0..COUNT_TICKETS)
             .into_iter()
             .map(|i| {
                 generate_random_ack_ticket(&BOB, &ALICE, i as u64, None)
-                    .into_transferable(&ALICE, &Hash::default())
-                    .unwrap()
+                    .and_then(|v| Ok(v.into_transferable(&ALICE, &Hash::default())?))
             })
-            .collect::<Vec<_>>();
+            .collect::<anyhow::Result<Vec<_>>>()?;
 
         // Modify the ticket and do not sign it
         tickets[1].ticket.amount = Balance::new(TICKET_VALUE - 10, BalanceType::HOPR);
@@ -3103,10 +3128,12 @@ mod tests {
         db.aggregate_tickets(*ALICE_OFFCHAIN.public(), tickets.clone(), &BOB)
             .await
             .expect_err("should not aggregate on invalid tickets");
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_aggregate_ticket_should_not_aggregate_if_ticket_is_not_winning() {
+    async fn test_aggregate_ticket_should_not_aggregate_if_ticket_is_not_winning() -> anyhow::Result<()> {
         const COUNT_TICKETS: usize = 3;
 
         let channel = ChannelEntry::new(
@@ -3118,30 +3145,29 @@ mod tests {
             3_u32.into(),
         );
 
-        let db = init_db_with_channel(channel).await;
+        let db = init_db_with_channel(channel).await?;
 
         let mut tickets = (0..COUNT_TICKETS)
             .into_iter()
             .map(|i| {
                 generate_random_ack_ticket(&BOB, &ALICE, i as u64, None)
-                    .into_transferable(&ALICE, &Hash::default())
-                    .unwrap()
+                    .and_then(|v| Ok(v.into_transferable(&ALICE, &Hash::default())?))
             })
-            .collect::<Vec<_>>();
+            .collect::<anyhow::Result<Vec<_>>>()?;
 
         // Set winning probability to zero and sign the ticket again
-        let resp = Response::from_half_keys(&HalfKey::random(), &HalfKey::random()).unwrap();
+        let resp = Response::from_half_keys(&HalfKey::random(), &HalfKey::random())?;
         tickets[1] = TicketBuilder::from(tickets[1].ticket.clone())
             .win_prob(0.0)
             .challenge(resp.to_challenge().into())
-            .build_signed(&BOB, &Hash::default())
-            .unwrap()
+            .build_signed(&BOB, &Hash::default())?
             .into_acknowledged(resp)
-            .into_transferable(&ALICE, &Hash::default())
-            .unwrap();
+            .into_transferable(&ALICE, &Hash::default())?;
 
         db.aggregate_tickets(*ALICE_OFFCHAIN.public(), tickets.clone(), &BOB)
             .await
             .expect_err("should not aggregate non-winning tickets");
+
+        Ok(())
     }
 }

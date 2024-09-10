@@ -367,15 +367,15 @@ mod tests {
         Ok(assert_eq!(parsed, Health::Orange))
     }
 
-    async fn basic_network(my_id: &PeerId) -> Network<hopr_db_sql::db::HoprDb> {
+    async fn basic_network(my_id: &PeerId) -> anyhow::Result<Network<hopr_db_sql::db::HoprDb>> {
         let mut cfg = NetworkConfig::default();
         cfg.quality_offline_threshold = 0.6;
-        Network::new(
+        Ok(Network::new(
             *my_id,
             vec![],
             cfg,
-            hopr_db_sql::db::HoprDb::new_in_memory(ChainKeypair::random()).await,
-        )
+            hopr_db_sql::db::HoprDb::new_in_memory(ChainKeypair::random()).await?,
+        ))
     }
 
     #[test]
@@ -388,10 +388,10 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn test_network_should_not_be_able_to_add_self_reference() {
+    async fn test_network_should_not_be_able_to_add_self_reference() -> anyhow::Result<()> {
         let me = PeerId::random();
 
-        let peers = basic_network(&me).await;
+        let peers = basic_network(&me).await?;
 
         assert!(peers.add(&me, PeerOrigin::IncomingConnection, vec![]).await.is_err());
 
@@ -403,15 +403,17 @@ mod tests {
                 .unwrap_or(vec![])
                 .len()
         );
-        assert!(peers.has(&me).await)
+        assert!(peers.has(&me).await);
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_network_should_contain_a_registered_peer() {
+    async fn test_network_should_contain_a_registered_peer() -> anyhow::Result<()> {
         let expected: PeerId = OffchainKeypair::random().public().into();
         let me: PeerId = OffchainKeypair::random().public().into();
 
-        let peers = basic_network(&me).await;
+        let peers = basic_network(&me).await?;
 
         peers
             .add(&expected, PeerOrigin::IncomingConnection, vec![])
@@ -426,15 +428,17 @@ mod tests {
                 .unwrap_or(vec![])
                 .len()
         );
-        assert!(peers.has(&expected).await)
+        assert!(peers.has(&expected).await);
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_network_should_remove_a_peer_on_unregistration() {
+    async fn test_network_should_remove_a_peer_on_unregistration() -> anyhow::Result<()> {
         let peer: PeerId = OffchainKeypair::random().public().into();
         let me: PeerId = OffchainKeypair::random().public().into();
 
-        let peers = basic_network(&me).await;
+        let peers = basic_network(&me).await?;
 
         peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await.unwrap();
 
@@ -448,15 +452,17 @@ mod tests {
                 .unwrap_or(vec![])
                 .len()
         );
-        assert!(!peers.has(&peer).await)
+        assert!(!peers.has(&peer).await);
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_network_should_ingore_heartbeat_updates_for_peers_that_were_not_registered() {
+    async fn test_network_should_ingore_heartbeat_updates_for_peers_that_were_not_registered() -> anyhow::Result<()> {
         let peer: PeerId = OffchainKeypair::random().public().into();
         let me: PeerId = OffchainKeypair::random().public().into();
 
-        let peers = basic_network(&me).await;
+        let peers = basic_network(&me).await?;
 
         peers
             .update(&peer, Ok(current_time().as_unix_timestamp()), None)
@@ -471,15 +477,17 @@ mod tests {
                 .unwrap_or(vec![])
                 .len()
         );
-        assert!(!peers.has(&peer).await)
+        assert!(!peers.has(&peer).await);
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_network_should_be_able_to_register_a_succeeded_heartbeat_result() {
+    async fn test_network_should_be_able_to_register_a_succeeded_heartbeat_result() -> anyhow::Result<()> {
         let peer: PeerId = OffchainKeypair::random().public().into();
         let me: PeerId = OffchainKeypair::random().public().into();
 
-        let peers = basic_network(&me).await;
+        let peers = basic_network(&me).await?;
 
         peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await.unwrap();
 
@@ -495,14 +503,16 @@ mod tests {
         assert_eq!(actual.heartbeats_sent, 1);
         assert_eq!(actual.heartbeats_succeeded, 1);
         assert_eq!(actual.last_seen_latency, std::time::Duration::from_millis(latency));
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_network_update_should_merge_metadata() {
+    async fn test_network_update_should_merge_metadata() -> anyhow::Result<()> {
         let peer: PeerId = OffchainKeypair::random().public().into();
         let me: PeerId = OffchainKeypair::random().public().into();
 
-        let peers = basic_network(&me).await;
+        let peers = basic_network(&me).await?;
 
         let expected_version = Some("1.2.4".to_string());
 
@@ -539,14 +549,17 @@ mod tests {
 
             assert_eq!(status.peer_version, expected_version);
         }
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_network_should_ignore_a_peer_that_has_reached_lower_thresholds_a_specified_amount_of_time() {
+    async fn test_network_should_ignore_a_peer_that_has_reached_lower_thresholds_a_specified_amount_of_time(
+    ) -> anyhow::Result<()> {
         let peer: PeerId = OffchainKeypair::random().public().into();
         let me: PeerId = OffchainKeypair::random().public().into();
 
-        let peers = basic_network(&me).await;
+        let peers = basic_network(&me).await?;
 
         peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await.unwrap();
 
@@ -567,15 +580,17 @@ mod tests {
         // peer should remain ignored and not be added
         peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await.unwrap();
 
-        assert!(!peers.has(&peer).await)
+        assert!(!peers.has(&peer).await);
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_network_should_be_able_to_register_a_failed_heartbeat_result() {
+    async fn test_network_should_be_able_to_register_a_failed_heartbeat_result() -> anyhow::Result<()> {
         let peer: PeerId = OffchainKeypair::random().public().into();
         let me: PeerId = OffchainKeypair::random().public().into();
 
-        let peers = basic_network(&me).await;
+        let peers = basic_network(&me).await?;
 
         peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await.unwrap();
 
@@ -604,15 +619,18 @@ mod tests {
 
         assert_eq!(actual.heartbeats_succeeded, 3);
         assert_eq!(actual.backoff, 300f64);
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_network_peer_should_be_listed_for_the_ping_if_last_recorded_later_than_reference() {
+    async fn test_network_peer_should_be_listed_for_the_ping_if_last_recorded_later_than_reference(
+    ) -> anyhow::Result<()> {
         let first: PeerId = OffchainKeypair::random().public().into();
         let second: PeerId = OffchainKeypair::random().public().into();
         let me: PeerId = OffchainKeypair::random().public().into();
 
-        let peers = basic_network(&me).await;
+        let peers = basic_network(&me).await?;
 
         peers.add(&first, PeerOrigin::IncomingConnection, vec![]).await.unwrap();
         peers
@@ -650,46 +668,54 @@ mod tests {
         actual.sort();
 
         assert_eq!(actual, expected);
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_network_should_have_red_health_without_any_registered_peers() {
+    async fn test_network_should_have_red_health_without_any_registered_peers() -> anyhow::Result<()> {
         let me: PeerId = OffchainKeypair::random().public().into();
 
-        let peers = basic_network(&me).await;
+        let peers = basic_network(&me).await?;
 
         assert_eq!(peers.health().await, Health::Red);
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_network_should_be_unhealthy_without_any_heartbeat_updates() {
+    async fn test_network_should_be_unhealthy_without_any_heartbeat_updates() -> anyhow::Result<()> {
         let peer: PeerId = OffchainKeypair::random().public().into();
         let me: PeerId = OffchainKeypair::random().public().into();
 
-        let peers = basic_network(&me).await;
+        let peers = basic_network(&me).await?;
 
         peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await.unwrap();
 
         // all peers are public
         assert_eq!(peers.health().await, Health::Orange);
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_network_should_be_unhealthy_without_any_peers_once_the_health_was_known() {
+    async fn test_network_should_be_unhealthy_without_any_peers_once_the_health_was_known() -> anyhow::Result<()> {
         let peer: PeerId = OffchainKeypair::random().public().into();
         let me: PeerId = OffchainKeypair::random().public().into();
 
-        let peers = basic_network(&me).await;
+        let peers = basic_network(&me).await?;
 
         peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await.unwrap();
         let _ = peers.health();
         peers.remove(&peer).await.expect("should not fail on DB remove");
 
         assert_eq!(peers.health().await, Health::Red);
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_network_should_be_healthy_when_a_public_peer_is_pingable_with_low_quality() {
+    async fn test_network_should_be_healthy_when_a_public_peer_is_pingable_with_low_quality() -> anyhow::Result<()> {
         let peer: PeerId = OffchainKeypair::random().public().into();
         let me: PeerId = OffchainKeypair::random().public().into();
 
@@ -700,7 +726,7 @@ mod tests {
             me,
             vec![],
             cfg,
-            hopr_db_sql::db::HoprDb::new_in_memory(ChainKeypair::random()).await,
+            hopr_db_sql::db::HoprDb::new_in_memory(ChainKeypair::random()).await?,
         );
 
         peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await.unwrap();
@@ -711,10 +737,13 @@ mod tests {
             .expect("no error should occur");
 
         assert_eq!(peers.health().await, Health::Orange);
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_network_should_close_connection_to_peer_once_it_reaches_the_lowest_possible_quality() {
+    async fn test_network_should_close_connection_to_peer_once_it_reaches_the_lowest_possible_quality(
+    ) -> anyhow::Result<()> {
         let peer: PeerId = OffchainKeypair::random().public().into();
         let public = peer;
         let me: PeerId = OffchainKeypair::random().public().into();
@@ -726,7 +755,7 @@ mod tests {
             me,
             vec![],
             cfg,
-            hopr_db_sql::db::HoprDb::new_in_memory(ChainKeypair::random()).await,
+            hopr_db_sql::db::HoprDb::new_in_memory(ChainKeypair::random()).await?,
         );
 
         peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await.unwrap();
@@ -744,10 +773,13 @@ mod tests {
         );
 
         assert!(peers.has(&public).await);
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_network_should_be_healthy_when_a_public_peer_is_pingable_with_high_quality_and_i_am_public() {
+    async fn test_network_should_be_healthy_when_a_public_peer_is_pingable_with_high_quality_and_i_am_public(
+    ) -> anyhow::Result<()> {
         let me: PeerId = OffchainKeypair::random().public().into();
         let peer: PeerId = OffchainKeypair::random().public().into();
 
@@ -758,7 +790,7 @@ mod tests {
             me,
             vec![],
             cfg,
-            hopr_db_sql::db::HoprDb::new_in_memory(ChainKeypair::random()).await,
+            hopr_db_sql::db::HoprDb::new_in_memory(ChainKeypair::random()).await?,
         );
 
         peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await.unwrap();
@@ -771,11 +803,13 @@ mod tests {
         }
 
         assert_eq!(peers.health().await, Health::Green);
+
+        Ok(())
     }
 
     #[async_std::test]
     async fn test_network_should_be_healthy_when_a_public_peer_is_pingable_with_high_quality_and_another_high_quality_non_public(
-    ) {
+    ) -> anyhow::Result<()> {
         let peer: PeerId = OffchainKeypair::random().public().into();
         let peer2: PeerId = OffchainKeypair::random().public().into();
 
@@ -786,7 +820,7 @@ mod tests {
             OffchainKeypair::random().public().into(),
             vec![],
             cfg,
-            hopr_db_sql::db::HoprDb::new_in_memory(ChainKeypair::random()).await,
+            hopr_db_sql::db::HoprDb::new_in_memory(ChainKeypair::random()).await?,
         );
 
         peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await.unwrap();
@@ -804,5 +838,7 @@ mod tests {
         }
 
         assert_eq!(peers.health().await, Health::Green);
+
+        Ok(())
     }
 }

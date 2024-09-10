@@ -432,21 +432,21 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn test_channel_graph_sync() {
+    async fn test_channel_graph_sync() -> anyhow::Result<()> {
         let mut last_addr = ADDRESSES[0];
-        let db = hopr_db_sql::db::HoprDb::new_in_memory(ChainKeypair::random()).await;
+        let db = hopr_db_sql::db::HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
         for current_addr in ADDRESSES.iter().skip(1) {
             // Open channel from last node to us
             let channel = dummy_channel(last_addr, *current_addr, ChannelStatus::Open);
-            db.upsert_channel(None, channel).await.unwrap();
+            db.upsert_channel(None, channel).await?;
 
             last_addr = *current_addr;
         }
 
         // Add a pending to close channel between 4 -> 0
         let channel = dummy_channel(ADDRESSES[4], ADDRESSES[0], ChannelStatus::Closed);
-        db.upsert_channel(None, channel).await.unwrap();
+        db.upsert_channel(None, channel).await?;
 
         let mut cg = ChannelGraph::new(ADDRESSES[0]);
         cg.sync_channels(db.get_all_channels(None).await.expect("channels should be present"))
@@ -459,12 +459,13 @@ mod tests {
         );
         assert!(
             db.get_all_channels(None)
-                .await
-                .unwrap()
+                .await?
                 .into_iter()
                 .filter(|c| c.status != ChannelStatus::Closed)
                 .all(|c| cg.contains_channel(&c)),
             "must contain all non-closed channels"
         );
+
+        Ok(())
     }
 }

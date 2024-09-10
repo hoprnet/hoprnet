@@ -116,14 +116,13 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn test_announce() {
+    async fn test_announce() -> anyhow::Result<()> {
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
-        let announce_multiaddr = Multiaddr::from_str("/ip4/1.2.3.4/tcp/9009").unwrap();
+        let announce_multiaddr = Multiaddr::from_str("/ip4/1.2.3.4/tcp/9009")?;
 
-        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
+        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
         db.set_domain_separator(None, DomainSeparator::Channel, Default::default())
-            .await
-            .unwrap();
+            .await?;
 
         let ma = announce_multiaddr.clone();
         let pubkey_clone = ALICE_OFFCHAIN.public().clone();
@@ -132,7 +131,7 @@ mod tests {
             .expect_announce()
             .once()
             .withf(move |ad| {
-                let kb = ad.key_binding.clone().unwrap();
+                let kb = ad.key_binding.clone().expect("key binding must be present");
                 ma.eq(ad.multiaddress()) && kb.packet_key == pubkey_clone && kb.chain_key == *ALICE
             })
             .returning(move |_| Ok(random_hash));
@@ -162,12 +161,7 @@ mod tests {
         });
 
         let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_sender.clone());
-        let tx_res = actions
-            .announce(&[announce_multiaddr], &ALICE_OFFCHAIN)
-            .await
-            .expect("announcement call should not fail")
-            .await
-            .expect("announcement should be confirmed");
+        let tx_res = actions.announce(&[announce_multiaddr], &ALICE_OFFCHAIN).await?.await?;
 
         assert_eq!(tx_res.tx_hash, random_hash, "tx hashes must be equal");
         assert!(matches!(tx_res.action, Action::Announce(_)), "must be announce action");
@@ -175,16 +169,17 @@ mod tests {
             matches!(tx_res.event, Some(ChainEventType::Announcement { .. })),
             "must correspond to announcement chain event"
         );
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_announce_should_not_allow_reannouncing_with_same_multiaddress() {
-        let announce_multiaddr = Multiaddr::from_str("/ip4/1.2.3.4/tcp/9009").unwrap();
+    async fn test_announce_should_not_allow_reannouncing_with_same_multiaddress() -> anyhow::Result<()> {
+        let announce_multiaddr = Multiaddr::from_str("/ip4/1.2.3.4/tcp/9009")?;
 
-        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
+        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
         db.set_domain_separator(None, DomainSeparator::Channel, Default::default())
-            .await
-            .unwrap();
+            .await?;
 
         db.insert_account(
             None,
@@ -197,8 +192,7 @@ mod tests {
                 },
             ),
         )
-        .await
-        .unwrap();
+        .await?;
 
         let tx_queue = ActionQueue::new(
             db.clone(),
@@ -215,17 +209,18 @@ mod tests {
             matches!(res, Err(ChainActionsError::AlreadyAnnounced)),
             "must not be able to re-announce with same address"
         );
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_withdraw() {
+    async fn test_withdraw() -> anyhow::Result<()> {
         let stake = Balance::new(10_u32, BalanceType::HOPR);
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
 
-        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
+        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
         db.set_domain_separator(None, DomainSeparator::Channel, Default::default())
-            .await
-            .unwrap();
+            .await?;
 
         let mut tx_exec = MockTransactionExecutor::new();
         tx_exec
@@ -245,12 +240,7 @@ mod tests {
 
         let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_sender.clone());
 
-        let tx_res = actions
-            .withdraw(*BOB, stake)
-            .await
-            .unwrap()
-            .await
-            .expect("must resolve confirmation");
+        let tx_res = actions.withdraw(*BOB, stake).await?.await?;
 
         assert_eq!(tx_res.tx_hash, random_hash, "tx hashes must be equal");
         assert!(
@@ -261,14 +251,15 @@ mod tests {
             tx_res.event.is_none(),
             "withdraw tx must not connect to any chain event"
         );
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_should_not_withdraw_zero_amount() {
-        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
+    async fn test_should_not_withdraw_zero_amount() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
         db.set_domain_separator(None, DomainSeparator::Channel, Default::default())
-            .await
-            .unwrap();
+            .await?;
 
         let tx_queue = ActionQueue::new(
             db.clone(),
@@ -284,10 +275,12 @@ mod tests {
                     .withdraw(*BOB, Balance::zero(BalanceType::HOPR))
                     .await
                     .err()
-                    .unwrap(),
+                    .expect("must be error"),
                 ChainActionsError::InvalidArguments(_)
             ),
             "should not allow to withdraw 0"
         );
+
+        Ok(())
     }
 }

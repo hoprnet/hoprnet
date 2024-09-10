@@ -1163,6 +1163,7 @@ dependencies = [
 name = "chain-actions"
 version = "0.7.1"
 dependencies = [
+ "anyhow",
  "async-channel 2.3.1",
  "async-lock 3.4.0",
  "async-std",
@@ -1224,6 +1225,7 @@ dependencies = [
 name = "chain-indexer"
 version = "0.3.1"
 dependencies = [
+ "anyhow",
  "async-channel 2.3.1",
  "async-std",
  "async-trait",
@@ -1550,6 +1552,7 @@ checksum = "773648b94d0e5d620f64f280777445740e61fe701025087ec8b57f45c791888b"
 name = "core-network"
 version = "0.6.1"
 dependencies = [
+ "anyhow",
  "async-std",
  "async-trait",
  "futures",
@@ -1580,6 +1583,7 @@ dependencies = [
 name = "core-path"
 version = "0.3.0"
 dependencies = [
+ "anyhow",
  "async-std",
  "async-trait",
  "futures",
@@ -3994,6 +3998,7 @@ dependencies = [
 name = "hopr-db-sql"
 version = "0.4.0"
 dependencies = [
+ "anyhow",
  "async-lock 3.4.0",
  "async-std",
  "async-stream",
@@ -4062,6 +4067,7 @@ dependencies = [
 name = "hopr-lib"
 version = "2.2.0-rc.1"
 dependencies = [
+ "anyhow",
  "async-channel 2.3.1",
  "async-lock 3.4.0",
  "async-std",
@@ -4196,6 +4202,7 @@ dependencies = [
 name = "hopr-strategy"
 version = "0.11.2"
 dependencies = [
+ "anyhow",
  "async-lock 3.4.0",
  "async-std",
  "async-trait",
@@ -4289,6 +4296,7 @@ dependencies = [
 name = "hopr-transport-protocol"
 version = "0.3.0"
 dependencies = [
+ "anyhow",
  "async-lock 3.4.0",
  "async-std",
  "async-trait",

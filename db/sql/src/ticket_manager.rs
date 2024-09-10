@@ -242,12 +242,12 @@ mod tests {
         Ok(())
     }
 
-    fn generate_random_ack_ticket(index: u32) -> AcknowledgedTicket {
+    fn generate_random_ack_ticket(index: u32) -> anyhow::Result<AcknowledgedTicket> {
         let hk1 = HalfKey::random();
         let hk2 = HalfKey::random();
 
-        let cp1: CurvePoint = hk1.to_challenge().try_into().unwrap();
-        let cp2: CurvePoint = hk2.to_challenge().try_into().unwrap();
+        let cp1: CurvePoint = hk1.to_challenge().try_into()?;
+        let cp2: CurvePoint = hk2.to_challenge().try_into()?;
         let cp_sum = CurvePoint::combine(&[&cp1, &cp2]);
 
         let ticket = TicketBuilder::default()
@@ -256,16 +256,15 @@ mod tests {
             .index(index as u64)
             .channel_epoch(4)
             .challenge(Challenge::from(cp_sum).to_ethereum_challenge())
-            .build_signed(&BOB, &Hash::default())
-            .unwrap();
+            .build_signed(&BOB, &Hash::default())?;
 
-        ticket.into_acknowledged(Response::from_half_keys(&hk1, &hk2).unwrap())
+        Ok(ticket.into_acknowledged(Response::from_half_keys(&hk1, &hk2)?))
     }
 
     #[async_std::test]
     async fn test_insert_ticket_properly_resolves_the_cached_value(
     ) -> std::result::Result<(), Box<dyn std::error::Error>> {
-        let db = HoprDb::new_in_memory(ALICE.clone()).await;
+        let db = HoprDb::new_in_memory(ALICE.clone()).await?;
         db.set_domain_separator(None, DomainSeparator::Channel, Hash::default())
             .await?;
         add_peer_mappings(
@@ -293,7 +292,7 @@ mod tests {
             db.ticket_manager.unrealized_value((&channel).into()).await?
         );
 
-        let ticket = generate_random_ack_ticket(1);
+        let ticket = generate_random_ack_ticket(1)?;
         let ticket_value = ticket.verified_ticket().amount;
 
         db.ticket_manager.insert_ticket(ticket).await?;

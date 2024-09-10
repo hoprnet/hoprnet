@@ -310,10 +310,6 @@ mod tests {
         };
     }
 
-    async fn create_stub_db() -> HoprDb {
-        HoprDb::new_in_memory(ChainKeypair::random()).await
-    }
-
     fn build_announcement_logs(address: Address, size: usize, block_number: u64, log_index: U256) -> Vec<Log> {
         let mut logs: Vec<Log> = vec![];
 
@@ -353,10 +349,11 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn test_indexer_should_check_the_db_for_last_processed_block_and_supply_none_if_none_is_found() {
+    async fn test_indexer_should_check_the_db_for_last_processed_block_and_supply_none_if_none_is_found(
+    ) -> anyhow::Result<()> {
         let mut handlers = MockChainLogHandler::new();
         let mut rpc = MockHoprIndexerOps::new();
-        let db = create_stub_db().await;
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
         handlers.expect_contract_addresses().return_const(vec![]);
 
@@ -379,14 +376,17 @@ mod tests {
             async_std::task::sleep(std::time::Duration::from_millis(200)).await;
             tx.close_channel()
         });
-        assert!(indexing.is_err()) // terminated by the close channel
+        assert!(indexing.is_err()); // terminated by the close channel
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_indexer_should_check_the_db_for_last_processed_block_and_supply_it_when_found() {
+    async fn test_indexer_should_check_the_db_for_last_processed_block_and_supply_it_when_found() -> anyhow::Result<()>
+    {
         let mut handlers = MockChainLogHandler::new();
         let mut rpc = MockHoprIndexerOps::new();
-        let db = create_stub_db().await;
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
         handlers.expect_contract_addresses().return_const(vec![]);
 
@@ -413,14 +413,16 @@ mod tests {
             async_std::task::sleep(std::time::Duration::from_millis(200)).await;
             tx.close_channel()
         });
-        assert!(indexing.is_err()) // terminated by the close channel
+        assert!(indexing.is_err()); // terminated by the close channel
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_indexer_should_pass_blocks_that_are_finalized() {
+    async fn test_indexer_should_pass_blocks_that_are_finalized() -> anyhow::Result<()> {
         let mut handlers = MockChainLogHandler::new();
         let mut rpc = MockHoprIndexerOps::new();
-        let db = create_stub_db().await;
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
         let cfg = IndexerConfig::default();
 
@@ -458,13 +460,15 @@ mod tests {
             async_std::task::sleep(std::time::Duration::from_millis(200)).await;
             tx.close_channel()
         });
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_indexer_should_yield_back_once_the_past_events_are_indexed() {
+    async fn test_indexer_should_yield_back_once_the_past_events_are_indexed() -> anyhow::Result<()> {
         let mut handlers = MockChainLogHandler::new();
         let mut rpc = MockHoprIndexerOps::new();
-        let db = create_stub_db().await;
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
         let cfg = IndexerConfig::default();
 
@@ -527,14 +531,17 @@ mod tests {
         .await;
 
         assert!(received.is_ok());
-        assert_eq!(received.unwrap().len(), 1)
+        assert_eq!(received.unwrap().len(), 1);
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_indexer_should_not_reprocess_last_processed_block() {
+    async fn test_indexer_should_not_reprocess_last_processed_block() -> anyhow::Result<()> {
         let last_processed_block = 100_u64;
 
-        let db = create_stub_db().await;
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
+
         db.set_last_indexed_block(None, last_processed_block as u32, Some(Hash::default()))
             .await
             .unwrap();
@@ -569,5 +576,7 @@ mod tests {
         let (tx_events, _) = async_channel::unbounded();
         let mut indexer = Indexer::new(rpc, handlers, db.clone(), IndexerConfig::default(), tx_events);
         indexer.start().await.expect("indexer should run");
+
+        Ok(())
     }
 }

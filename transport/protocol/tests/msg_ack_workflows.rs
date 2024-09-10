@@ -72,23 +72,27 @@ fn create_dummy_channel(from: Address, to: Address) -> ChannelEntry {
     )
 }
 
-async fn create_dbs(amount: usize) -> Vec<HoprDb> {
-    futures::future::join_all((0..amount).map(|i| HoprDb::new_in_memory(PEERS_CHAIN[i].clone()))).await
+async fn create_dbs(amount: usize) -> anyhow::Result<Vec<HoprDb>> {
+    Ok(
+        futures::future::join_all((0..amount).map(|i| HoprDb::new_in_memory(PEERS_CHAIN[i].clone())))
+            .await
+            .into_iter()
+            .map(|v| v.map_err(|e| anyhow::anyhow!(e.to_string())))
+            .collect::<anyhow::Result<Vec<HoprDb>>>()?,
+    )
 }
 
-async fn create_minimal_topology(dbs: &mut Vec<HoprDb>) -> hopr_transport_protocol::errors::Result<()> {
+async fn create_minimal_topology(dbs: &mut Vec<HoprDb>) -> anyhow::Result<()> {
     let mut previous_channel: Option<ChannelEntry> = None;
 
     for index in 0..dbs.len() {
         dbs[index]
             .set_domain_separator(None, DomainSeparator::Channel, Hash::default())
-            .await
-            .map_err(|e| hopr_transport_protocol::errors::ProtocolError::Logic(e.to_string()))?;
+            .await?;
 
         dbs[index]
             .update_ticket_price(None, Balance::new(100u128, BalanceType::HOPR))
-            .await
-            .map_err(|e| hopr_transport_protocol::errors::ProtocolError::Logic(e.to_string()))?;
+            .await?;
 
         // Link all the node keys and chain keys from the simulated announcements
         for i in 0..PEERS.len() {
@@ -156,12 +160,12 @@ type LogicalChannels = (
 
 type TicketChannel = futures::channel::mpsc::UnboundedReceiver<AcknowledgedTicket>;
 
-async fn peer_setup_for(count: usize) -> (Vec<WireChannels>, Vec<LogicalChannels>, Vec<TicketChannel>) {
+async fn peer_setup_for(count: usize) -> anyhow::Result<(Vec<WireChannels>, Vec<LogicalChannels>, Vec<TicketChannel>)> {
     let peer_count = count;
 
     assert!(peer_count <= PEERS.len());
     assert!(peer_count >= 3);
-    let mut dbs = create_dbs(peer_count).await;
+    let mut dbs = create_dbs(peer_count).await?;
 
     create_minimal_topology(&mut dbs)
         .await
@@ -230,7 +234,7 @@ async fn peer_setup_for(count: usize) -> (Vec<WireChannels>, Vec<LogicalChannels
         ticket_channels.push(received_ack_tickets_rx)
     }
 
-    (wire_channels, logical_channels, ticket_channels)
+    Ok((wire_channels, logical_channels, ticket_channels))
 }
 
 #[tracing::instrument(level = "debug", skip(components))]
@@ -328,7 +332,7 @@ async fn resolve_mock_path(me: Address, peers_offchain: Vec<PeerId>, peers_oncha
         .0
 }
 
-async fn packet_relayer_workflow_n_peers(peer_count: usize, pending_packets: usize) {
+async fn packet_relayer_workflow_n_peers(peer_count: usize, pending_packets: usize) -> anyhow::Result<()> {
     assert!(peer_count >= 3, "invalid peer count given");
     assert!(pending_packets >= 1, "at least one packet must be given");
 
@@ -341,7 +345,7 @@ async fn packet_relayer_workflow_n_peers(peer_count: usize, pending_packets: usi
         })
         .collect::<Vec<_>>();
 
-    let (wire_apis, mut apis, ticket_channels) = peer_setup_for(peer_count).await;
+    let (wire_apis, mut apis, ticket_channels) = peer_setup_for(peer_count).await?;
 
     // Peer 1: start sending out packets
     let packet_path = resolve_mock_path(
@@ -423,18 +427,20 @@ async fn packet_relayer_workflow_n_peers(peer_count: usize, pending_packets: usi
             i,
         );
     }
+
+    Ok(())
 }
 
 #[serial]
 #[async_std::test]
 // #[tracing_test::traced_test]
-async fn test_packet_relayer_workflow_3_peers() {
-    packet_relayer_workflow_n_peers(3, 5).await;
+async fn test_packet_relayer_workflow_3_peers() -> anyhow::Result<()> {
+    packet_relayer_workflow_n_peers(3, 5).await
 }
 
 #[serial]
 #[async_std::test]
 // #[tracing_test::traced_test]
-async fn test_packet_relayer_workflow_5_peers() {
-    packet_relayer_workflow_n_peers(5, 5).await;
+async fn test_packet_relayer_workflow_5_peers() -> anyhow::Result<()> {
+    packet_relayer_workflow_n_peers(5, 5).await
 }

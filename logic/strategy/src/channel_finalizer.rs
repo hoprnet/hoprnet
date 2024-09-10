@@ -179,8 +179,8 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn test_should_close_only_non_overdue_pending_to_close_channels_with_elapsed_closure() {
-        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
+    async fn test_should_close_only_non_overdue_pending_to_close_channels_with_elapsed_closure() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
 
         let max_closure_overdue = Duration::from_secs(600);
 
@@ -226,8 +226,7 @@ mod tests {
 
         let db_clone = db.clone();
         db.begin_transaction()
-            .await
-            .unwrap()
+            .await?
             .perform(|tx| {
                 Box::pin(async move {
                     db_clone.upsert_channel(Some(tx), c_open).await?;
@@ -236,8 +235,7 @@ mod tests {
                     db_clone.upsert_channel(Some(tx), c_pending_overdue).await
                 })
             })
-            .await
-            .unwrap();
+            .await?;
 
         let mut actions = MockChannelAct::new();
         actions
@@ -249,6 +247,8 @@ mod tests {
         let cfg = ClosureFinalizerStrategyConfig { max_closure_overdue };
 
         let strat = ClosureFinalizerStrategy::new(cfg, db.clone(), actions);
-        strat.on_tick().await.expect("tick must not fail")
+        strat.on_tick().await?;
+
+        Ok(())
     }
 }

@@ -864,10 +864,6 @@ mod tests {
         static ref TICKET_PRICE_ORACLE_ADDR: Address = "11db4391bf45ef31a10ea4a1b5cb90f46cc72c7e".parse().unwrap(); // just a dummy
     }
 
-    async fn create_db() -> HoprDb {
-        HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await
-    }
-
     fn init_handlers<Db: HoprDbAllOperations + Clone>(db: Db) -> ContractEventHandlers<Db> {
         ContractEventHandlers {
             addresses: Arc::new(ContractAddresses {
@@ -904,8 +900,8 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn announce_keybinding() {
-        let db = create_db().await;
+    async fn announce_keybinding() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
         let handlers = init_handlers(db.clone());
 
@@ -929,34 +925,32 @@ mod tests {
 
         let event_type = db
             .begin_transaction()
-            .await
-            .unwrap()
+            .await?
             .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, keybinding_log.into()).await }))
-            .await
-            .unwrap();
+            .await?;
 
         assert!(event_type.is_none(), "keybinding does not have a chain event type");
 
         assert_eq!(
             db.get_account(None, ChainOrPacketKey::ChainKey(*SELF_CHAIN_ADDRESS))
-                .await
-                .unwrap()
+                .await?
                 .unwrap(),
             account_entry
         );
+        Ok(())
     }
 
     #[async_std::test]
-    async fn announce_address_announcement() {
-        let db = create_db().await;
+    async fn announce_address_announcement() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
         let handlers = init_handlers(db.clone());
 
         // Assume that there is a keybinding
         let account_entry = AccountEntry::new(*SELF_PRIV_KEY.public(), *SELF_CHAIN_ADDRESS, AccountType::NotAnnounced);
-        db.insert_account(None, account_entry.clone()).await.unwrap();
+        db.insert_account(None, account_entry.clone()).await?;
 
-        let test_multiaddr_empty: Multiaddr = "".parse().unwrap();
+        let test_multiaddr_empty: Multiaddr = "".parse()?;
 
         let address_announcement_empty_log = ethers::prelude::Log {
             address: handlers.addresses.announcements.into(),
@@ -972,8 +966,7 @@ mod tests {
         let handlers_clone = handlers.clone();
         let event_type = db
             .begin_transaction()
-            .await
-            .unwrap()
+            .await?
             .perform(|tx| {
                 Box::pin(async move {
                     handlers_clone
@@ -981,8 +974,7 @@ mod tests {
                         .await
                 })
             })
-            .await
-            .unwrap();
+            .await?;
 
         assert!(
             event_type.is_none(),
@@ -991,13 +983,12 @@ mod tests {
 
         assert_eq!(
             db.get_account(None, ChainOrPacketKey::ChainKey(*SELF_CHAIN_ADDRESS))
-                .await
-                .unwrap()
+                .await?
                 .unwrap(),
             account_entry
         );
 
-        let test_multiaddr: Multiaddr = "/ip4/1.2.3.4/tcp/56".parse().unwrap();
+        let test_multiaddr: Multiaddr = "/ip4/1.2.3.4/tcp/56".parse()?;
 
         let address_announcement_log = ethers::prelude::Log {
             address: handlers.addresses.announcements.into(),
@@ -1023,8 +1014,7 @@ mod tests {
         let handlers_clone = handlers.clone();
         let event_type = db
             .begin_transaction()
-            .await
-            .unwrap()
+            .await?
             .perform(|tx| {
                 Box::pin(async move {
                     handlers_clone
@@ -1032,8 +1022,7 @@ mod tests {
                         .await
                 })
             })
-            .await
-            .unwrap();
+            .await?;
 
         assert!(
             matches!(event_type, Some(ChainEventType::Announcement { multiaddresses,.. }) if multiaddresses == vec![test_multiaddr]),
@@ -1042,25 +1031,24 @@ mod tests {
 
         assert_eq!(
             db.get_account(None, ChainOrPacketKey::ChainKey(*SELF_CHAIN_ADDRESS))
-                .await
-                .unwrap()
+                .await?
                 .unwrap(),
             announced_account_entry
         );
 
         assert_eq!(
             Some(*SELF_CHAIN_ADDRESS),
-            db.resolve_chain_key(SELF_PRIV_KEY.public()).await.unwrap(),
+            db.resolve_chain_key(SELF_PRIV_KEY.public()).await?,
             "must resolve correct chain key"
         );
 
         assert_eq!(
             Some(*SELF_PRIV_KEY.public()),
-            db.resolve_packet_key(&SELF_CHAIN_ADDRESS).await.unwrap(),
+            db.resolve_packet_key(&SELF_CHAIN_ADDRESS).await?,
             "must resolve correct packet key"
         );
 
-        let test_multiaddr_dns: Multiaddr = "/dns4/useful.domain/tcp/56".parse().unwrap();
+        let test_multiaddr_dns: Multiaddr = "/dns4/useful.domain/tcp/56".parse()?;
 
         let address_announcement_dns_log = ethers::prelude::Log {
             address: handlers.addresses.announcements.into(),
@@ -1085,8 +1073,7 @@ mod tests {
 
         let event_type = db
             .begin_transaction()
-            .await
-            .unwrap()
+            .await?
             .perform(|tx| {
                 Box::pin(async move {
                     handlers
@@ -1094,8 +1081,7 @@ mod tests {
                         .await
                 })
             })
-            .await
-            .unwrap();
+            .await?;
 
         assert!(
             matches!(event_type, Some(ChainEventType::Announcement { multiaddresses,.. }) if multiaddresses == vec![test_multiaddr_dns]),
@@ -1104,31 +1090,31 @@ mod tests {
 
         assert_eq!(
             db.get_account(None, ChainOrPacketKey::ChainKey(*SELF_CHAIN_ADDRESS))
-                .await
-                .unwrap()
+                .await?
                 .unwrap(),
             announced_dns_account_entry
         );
 
         assert_eq!(
             Some(*SELF_CHAIN_ADDRESS),
-            db.resolve_chain_key(SELF_PRIV_KEY.public()).await.unwrap(),
+            db.resolve_chain_key(SELF_PRIV_KEY.public()).await?,
             "must resolve correct chain key"
         );
 
         assert_eq!(
             Some(*SELF_PRIV_KEY.public()),
-            db.resolve_packet_key(&SELF_CHAIN_ADDRESS).await.unwrap(),
+            db.resolve_packet_key(&SELF_CHAIN_ADDRESS).await?,
             "must resolve correct packet key"
         );
+        Ok(())
     }
 
     #[async_std::test]
-    async fn announce_revoke() {
-        let db = create_db().await;
+    async fn announce_revoke() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
         let handlers = init_handlers(db.clone());
 
-        let test_multiaddr: Multiaddr = "/ip4/1.2.3.4/tcp/56".parse().unwrap();
+        let test_multiaddr: Multiaddr = "/ip4/1.2.3.4/tcp/56".parse()?;
 
         // Assume that there is a keybinding and an address announcement
         let announced_account_entry = AccountEntry::new(
@@ -1139,7 +1125,7 @@ mod tests {
                 updated_block: 0,
             },
         );
-        db.insert_account(None, announced_account_entry).await.unwrap();
+        db.insert_account(None, announced_account_entry).await?;
 
         let revoke_announcement_log = ethers::prelude::Log {
             address: handlers.addresses.announcements.into(),
@@ -1155,11 +1141,9 @@ mod tests {
 
         let event_type = db
             .begin_transaction()
-            .await
-            .unwrap()
+            .await?
             .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, revoke_announcement_log.into()).await }))
-            .await
-            .unwrap();
+            .await?;
 
         assert!(
             event_type.is_none(),
@@ -1168,16 +1152,16 @@ mod tests {
 
         assert_eq!(
             db.get_account(None, ChainOrPacketKey::ChainKey(*SELF_CHAIN_ADDRESS))
-                .await
-                .unwrap()
+                .await?
                 .unwrap(),
             account_entry
         );
+        Ok(())
     }
 
     #[async_std::test]
-    async fn on_token_transfer_to() {
-        let db = create_db().await;
+    async fn on_token_transfer_to() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
         let handlers = init_handlers(db.clone());
 
@@ -1196,31 +1180,29 @@ mod tests {
 
         let event_type = db
             .begin_transaction()
-            .await
-            .unwrap()
+            .await?
             .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, transferred_log.into()).await }))
-            .await
-            .unwrap();
+            .await?;
 
         assert!(event_type.is_none(), "token transfer does not have chain event type");
 
         assert_eq!(
-            db.get_safe_hopr_balance(None).await.unwrap(),
+            db.get_safe_hopr_balance(None).await?,
             Balance::new(value, BalanceType::HOPR)
-        )
+        );
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn on_token_transfer_from() {
-        let db = create_db().await;
+    async fn on_token_transfer_from() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
         let handlers = init_handlers(db.clone());
 
         let value = U256::max_value();
 
-        db.set_safe_hopr_balance(None, BalanceType::HOPR.balance(value))
-            .await
-            .unwrap();
+        db.set_safe_hopr_balance(None, BalanceType::HOPR.balance(value)).await?;
 
         let transferred_log = ethers::prelude::Log {
             address: handlers.addresses.token.into(),
@@ -1235,20 +1217,20 @@ mod tests {
 
         let event_type = db
             .begin_transaction()
-            .await
-            .unwrap()
+            .await?
             .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, transferred_log.into()).await }))
-            .await
-            .unwrap();
+            .await?;
 
         assert!(event_type.is_none(), "token transfer does not have chain event type");
 
-        assert_eq!(db.get_safe_hopr_balance(None).await.unwrap(), BalanceType::HOPR.zero())
+        assert_eq!(db.get_safe_hopr_balance(None).await?, BalanceType::HOPR.zero());
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn on_token_approval_correct() {
-        let db = create_db().await;
+    async fn on_token_approval_correct() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
         let handlers = init_handlers(db.clone());
 
@@ -1264,7 +1246,7 @@ mod tests {
         };
 
         assert_eq!(
-            db.get_safe_hopr_allowance(None).await.unwrap(),
+            db.get_safe_hopr_allowance(None).await?,
             Balance::new(U256::from(0u64), BalanceType::HOPR)
         );
 
@@ -1272,18 +1254,16 @@ mod tests {
         let handlers_clone = handlers.clone();
         let event_type = db
             .begin_transaction()
-            .await
-            .unwrap()
+            .await?
             .perform(|tx| {
                 Box::pin(async move { handlers_clone.process_log_event(tx, approval_log_clone.into()).await })
             })
-            .await
-            .unwrap();
+            .await?;
 
         assert!(event_type.is_none(), "token approval does not have chain event type");
 
         assert_eq!(
-            db.get_safe_hopr_allowance(None).await.unwrap(),
+            db.get_safe_hopr_allowance(None).await?,
             Balance::new(U256::from(1000u64), BalanceType::HOPR)
         );
 
@@ -1292,30 +1272,29 @@ mod tests {
             .set_safe_hopr_allowance(None, Balance::new(U256::from(10u64), BalanceType::HOPR))
             .await;
         assert_eq!(
-            db.get_safe_hopr_allowance(None).await.unwrap(),
+            db.get_safe_hopr_allowance(None).await?,
             Balance::new(U256::from(10u64), BalanceType::HOPR)
         );
 
         let handlers_clone = handlers.clone();
         let event_type = db
             .begin_transaction()
-            .await
-            .unwrap()
+            .await?
             .perform(|tx| Box::pin(async move { handlers_clone.process_log_event(tx, approval_log.into()).await }))
-            .await
-            .unwrap();
+            .await?;
 
         assert!(event_type.is_none(), "token approval does not have chain event type");
 
         assert_eq!(
-            db.get_safe_hopr_allowance(None).await.unwrap(),
+            db.get_safe_hopr_allowance(None).await?,
             Balance::new(U256::from(1000u64), BalanceType::HOPR)
         );
+        Ok(())
     }
 
     #[async_std::test]
-    async fn on_network_registry_event_registered() {
-        let db = create_db().await;
+    async fn on_network_registry_event_registered() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
         let handlers = init_handlers(db.clone());
 
@@ -1330,18 +1309,13 @@ mod tests {
             ..test_log()
         };
 
-        assert!(!db
-            .is_allowed_in_network_registry(None, *SELF_CHAIN_ADDRESS)
-            .await
-            .unwrap());
+        assert!(!db.is_allowed_in_network_registry(None, *SELF_CHAIN_ADDRESS).await?);
 
         let event_type = db
             .begin_transaction()
-            .await
-            .unwrap()
+            .await?
             .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, registered_log.into()).await }))
-            .await
-            .unwrap();
+            .await?;
 
         assert!(
             matches!(event_type, Some(ChainEventType::NetworkRegistryUpdate(a, s)) if a == *SELF_CHAIN_ADDRESS && s == NetworkRegistryStatus::Allowed),
@@ -1349,16 +1323,15 @@ mod tests {
         );
 
         assert!(
-            db.is_allowed_in_network_registry(None, *SELF_CHAIN_ADDRESS)
-                .await
-                .unwrap(),
+            db.is_allowed_in_network_registry(None, *SELF_CHAIN_ADDRESS).await?,
             "must be allowed in NR"
         );
+        Ok(())
     }
 
     #[async_std::test]
-    async fn on_network_registry_event_registered_by_manager() {
-        let db = create_db().await;
+    async fn on_network_registry_event_registered_by_manager() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
         let handlers = init_handlers(db.clone());
 
@@ -1373,18 +1346,13 @@ mod tests {
             ..test_log()
         };
 
-        assert!(!db
-            .is_allowed_in_network_registry(None, *SELF_CHAIN_ADDRESS)
-            .await
-            .unwrap());
+        assert!(!db.is_allowed_in_network_registry(None, *SELF_CHAIN_ADDRESS).await?);
 
         let event_type = db
             .begin_transaction()
-            .await
-            .unwrap()
+            .await?
             .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, registered_log.into()).await }))
-            .await
-            .unwrap();
+            .await?;
 
         assert!(
             matches!(event_type, Some(ChainEventType::NetworkRegistryUpdate(a, s)) if a == *SELF_CHAIN_ADDRESS && s == NetworkRegistryStatus::Allowed),
@@ -1392,22 +1360,20 @@ mod tests {
         );
 
         assert!(
-            db.is_allowed_in_network_registry(None, *SELF_CHAIN_ADDRESS)
-                .await
-                .unwrap(),
+            db.is_allowed_in_network_registry(None, *SELF_CHAIN_ADDRESS).await?,
             "must be allowed in NR"
         );
+        Ok(())
     }
 
     #[async_std::test]
-    async fn on_network_registry_event_deregistered() {
-        let db = create_db().await;
+    async fn on_network_registry_event_deregistered() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
         let handlers = init_handlers(db.clone());
 
         db.set_access_in_network_registry(None, *SELF_CHAIN_ADDRESS, true)
-            .await
-            .unwrap();
+            .await?;
 
         let registered_log = ethers::prelude::Log {
             address: handlers.addresses.network_registry.into(),
@@ -1420,18 +1386,13 @@ mod tests {
             ..test_log()
         };
 
-        assert!(db
-            .is_allowed_in_network_registry(None, *SELF_CHAIN_ADDRESS)
-            .await
-            .unwrap());
+        assert!(db.is_allowed_in_network_registry(None, *SELF_CHAIN_ADDRESS).await?);
 
         let event_type = db
             .begin_transaction()
-            .await
-            .unwrap()
+            .await?
             .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, registered_log.into()).await }))
-            .await
-            .unwrap();
+            .await?;
 
         assert!(
             matches!(event_type, Some(ChainEventType::NetworkRegistryUpdate(a, s)) if a == *SELF_CHAIN_ADDRESS && s == NetworkRegistryStatus::Denied),
@@ -1439,22 +1400,20 @@ mod tests {
         );
 
         assert!(
-            !db.is_allowed_in_network_registry(None, *SELF_CHAIN_ADDRESS)
-                .await
-                .unwrap(),
+            !db.is_allowed_in_network_registry(None, *SELF_CHAIN_ADDRESS).await?,
             "must not be allowed in NR"
         );
+        Ok(())
     }
 
     #[async_std::test]
-    async fn on_network_registry_event_deregistered_by_manager() {
-        let db = create_db().await;
+    async fn on_network_registry_event_deregistered_by_manager() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
         let handlers = init_handlers(db.clone());
 
         db.set_access_in_network_registry(None, *SELF_CHAIN_ADDRESS, true)
-            .await
-            .unwrap();
+            .await?;
 
         let registered_log = ethers::prelude::Log {
             address: handlers.addresses.network_registry.into(),
@@ -1467,18 +1426,13 @@ mod tests {
             ..test_log()
         };
 
-        assert!(db
-            .is_allowed_in_network_registry(None, *SELF_CHAIN_ADDRESS)
-            .await
-            .unwrap());
+        assert!(db.is_allowed_in_network_registry(None, *SELF_CHAIN_ADDRESS).await?);
 
         let event_type = db
             .begin_transaction()
-            .await
-            .unwrap()
+            .await?
             .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, registered_log.into()).await }))
-            .await
-            .unwrap();
+            .await?;
 
         assert!(
             matches!(event_type, Some(ChainEventType::NetworkRegistryUpdate(a, s)) if a == *SELF_CHAIN_ADDRESS && s == NetworkRegistryStatus::Denied),
@@ -1486,16 +1440,15 @@ mod tests {
         );
 
         assert!(
-            !db.is_allowed_in_network_registry(None, *SELF_CHAIN_ADDRESS)
-                .await
-                .unwrap(),
+            !db.is_allowed_in_network_registry(None, *SELF_CHAIN_ADDRESS).await?,
             "must not be allowed in NR"
         );
+        Ok(())
     }
 
     #[async_std::test]
-    async fn on_network_registry_event_enabled() {
-        let db = create_db().await;
+    async fn on_network_registry_event_enabled() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
         let handlers = init_handlers(db.clone());
 
@@ -1511,24 +1464,23 @@ mod tests {
 
         let event_type = db
             .begin_transaction()
-            .await
-            .unwrap()
+            .await?
             .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, nr_enabled.into()).await }))
-            .await
-            .unwrap();
+            .await?;
 
         assert!(event_type.is_none(), "there's no chain event type for nr disable");
 
-        assert!(db.get_indexer_data(None).await.unwrap().nr_enabled);
+        assert!(db.get_indexer_data(None).await?.nr_enabled);
+        Ok(())
     }
 
     #[async_std::test]
-    async fn on_network_registry_event_disabled() {
-        let db = create_db().await;
+    async fn on_network_registry_event_disabled() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
         let handlers = init_handlers(db.clone());
 
-        db.set_network_registry_enabled(None, true).await.unwrap();
+        db.set_network_registry_enabled(None, true).await?;
 
         let nr_disabled = ethers::prelude::Log {
             address: handlers.addresses.network_registry.into(),
@@ -1542,20 +1494,19 @@ mod tests {
 
         let event_type = db
             .begin_transaction()
-            .await
-            .unwrap()
+            .await?
             .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, nr_disabled.into()).await }))
-            .await
-            .unwrap();
+            .await?;
 
         assert!(event_type.is_none(), "there's no chain event type for nr enable");
 
-        assert!(!db.get_indexer_data(None).await.unwrap().nr_enabled);
+        assert!(!db.get_indexer_data(None).await?.nr_enabled);
+        Ok(())
     }
 
     #[async_std::test]
-    async fn on_network_registry_set_eligible() {
-        let db = create_db().await;
+    async fn on_network_registry_set_eligible() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
         let handlers = init_handlers(db.clone());
 
@@ -1572,27 +1523,27 @@ mod tests {
 
         let event_type = db
             .begin_transaction()
-            .await
-            .unwrap()
+            .await?
             .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, set_eligible.into()).await }))
-            .await
-            .unwrap();
+            .await?;
 
         assert!(
             event_type.is_none(),
             "there's no chain event type for setting nr eligibility"
         );
 
-        assert!(db.is_safe_eligible(None, *STAKE_ADDRESS).await.unwrap())
+        assert!(db.is_safe_eligible(None, *STAKE_ADDRESS).await?);
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn on_network_registry_set_not_eligible() {
-        let db = create_db().await;
+    async fn on_network_registry_set_not_eligible() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
         let handlers = init_handlers(db.clone());
 
-        db.set_safe_eligibility(None, *STAKE_ADDRESS, false).await.unwrap();
+        db.set_safe_eligibility(None, *STAKE_ADDRESS, false).await?;
 
         let set_eligible = ethers::prelude::Log {
             address: handlers.addresses.network_registry.into(),
@@ -1607,23 +1558,23 @@ mod tests {
 
         let event_type = db
             .begin_transaction()
-            .await
-            .unwrap()
+            .await?
             .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, set_eligible.into()).await }))
-            .await
-            .unwrap();
+            .await?;
 
         assert!(
             event_type.is_none(),
             "there's no chain event type for unsetting nr eligibility"
         );
 
-        assert!(!db.is_safe_eligible(None, *STAKE_ADDRESS).await.unwrap())
+        assert!(!db.is_safe_eligible(None, *STAKE_ADDRESS).await?);
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn on_channel_event_balance_increased() {
-        let db = create_db().await;
+    async fn on_channel_event_balance_increased() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
         let handlers = init_handlers(db.clone());
 
@@ -1636,7 +1587,7 @@ mod tests {
             U256::one(),
         );
 
-        db.upsert_channel(None, channel).await.unwrap();
+        db.upsert_channel(None, channel).await?;
 
         let solidity_balance = BalanceType::HOPR.balance(U256::from((1u128 << 96) - 1));
         let diff = solidity_balance - channel.balance;
@@ -1653,13 +1604,11 @@ mod tests {
 
         let event_type = db
             .begin_transaction()
-            .await
-            .unwrap()
+            .await?
             .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, balance_increased_log.into()).await }))
-            .await
-            .unwrap();
+            .await?;
 
-        let channel = db.get_channel_by_id(None, &channel.get_id()).await.unwrap().unwrap();
+        let channel = db.get_channel_by_id(None, &channel.get_id()).await?.unwrap();
 
         assert!(
             matches!(event_type, Some(ChainEventType::ChannelBalanceIncreased(c, b)) if c == channel && b == diff),
@@ -1667,11 +1616,12 @@ mod tests {
         );
 
         assert_eq!(solidity_balance, channel.balance, "balance must be updated");
+        Ok(())
     }
 
     #[async_std::test]
-    async fn on_channel_event_domain_separator_updated() {
-        let db = create_db().await;
+    async fn on_channel_event_domain_separator_updated() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
         let handlers = init_handlers(db.clone());
 
@@ -1687,15 +1637,13 @@ mod tests {
             ..test_log()
         };
 
-        assert!(db.get_indexer_data(None).await.unwrap().channels_dst.is_none());
+        assert!(db.get_indexer_data(None).await?.channels_dst.is_none());
 
         let event_type = db
             .begin_transaction()
-            .await
-            .unwrap()
+            .await?
             .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, channels_dst_updated.into()).await }))
-            .await
-            .unwrap();
+            .await?;
 
         assert!(
             event_type.is_none(),
@@ -1704,14 +1652,15 @@ mod tests {
 
         assert_eq!(
             separator,
-            db.get_indexer_data(None).await.unwrap().channels_dst.unwrap(),
+            db.get_indexer_data(None).await?.channels_dst.unwrap(),
             "separator must be updated"
         );
+        Ok(())
     }
 
     #[async_std::test]
-    async fn on_channel_event_balance_decreased() {
-        let db = create_db().await;
+    async fn on_channel_event_balance_decreased() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
         let handlers = init_handlers(db.clone());
 
@@ -1724,7 +1673,7 @@ mod tests {
             U256::one(),
         );
 
-        db.upsert_channel(None, channel).await.unwrap();
+        db.upsert_channel(None, channel).await?;
 
         let solidity_balance = U256::from((1u128 << 96) - 2);
         let diff = channel.balance - solidity_balance;
@@ -1741,13 +1690,11 @@ mod tests {
 
         let event_type = db
             .begin_transaction()
-            .await
-            .unwrap()
+            .await?
             .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, balance_decreased_log.into()).await }))
-            .await
-            .unwrap();
+            .await?;
 
-        let channel = db.get_channel_by_id(None, &channel.get_id()).await.unwrap().unwrap();
+        let channel = db.get_channel_by_id(None, &channel.get_id()).await?.unwrap();
 
         assert!(
             matches!(event_type, Some(ChainEventType::ChannelBalanceDecreased(c, b)) if c == channel && b == diff),
@@ -1755,11 +1702,12 @@ mod tests {
         );
 
         assert_eq!(solidity_balance, channel.balance.amount(), "balance must be updated");
+        Ok(())
     }
 
     #[async_std::test]
-    async fn on_channel_closed() {
-        let db = create_db().await;
+    async fn on_channel_closed() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
         let handlers = init_handlers(db.clone());
 
@@ -1774,7 +1722,7 @@ mod tests {
             U256::one(),
         );
 
-        db.upsert_channel(None, channel).await.unwrap();
+        db.upsert_channel(None, channel).await?;
 
         let channel_closed_log = ethers::prelude::Log {
             address: handlers.addresses.channels.into(),
@@ -1788,13 +1736,11 @@ mod tests {
 
         let event_type = db
             .begin_transaction()
-            .await
-            .unwrap()
+            .await?
             .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, channel_closed_log.into()).await }))
-            .await
-            .unwrap();
+            .await?;
 
-        let closed_channel = db.get_channel_by_id(None, &channel.get_id()).await.unwrap().unwrap();
+        let closed_channel = db.get_channel_by_id(None, &channel.get_id()).await?.unwrap();
 
         assert!(
             matches!(event_type, Some(ChainEventType::ChannelClosed(c)) if c == closed_channel),
@@ -1806,17 +1752,17 @@ mod tests {
         assert_eq!(
             0,
             db.get_outgoing_ticket_index(closed_channel.get_id())
-                .await
-                .unwrap()
+                .await?
                 .load(Ordering::Relaxed)
         );
 
         assert!(closed_channel.balance.amount().eq(&U256::zero()));
+        Ok(())
     }
 
     #[async_std::test]
-    async fn on_channel_opened() {
-        let db = create_db().await;
+    async fn on_channel_opened() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
         let handlers = init_handlers(db.clone());
 
@@ -1835,13 +1781,11 @@ mod tests {
 
         let event_type = db
             .begin_transaction()
-            .await
-            .unwrap()
+            .await?
             .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, channel_opened_log.into()).await }))
-            .await
-            .unwrap();
+            .await?;
 
-        let channel = db.get_channel_by_id(None, &channel_id).await.unwrap().unwrap();
+        let channel = db.get_channel_by_id(None, &channel_id).await?.unwrap();
 
         assert!(
             matches!(event_type, Some(ChainEventType::ChannelOpened(c)) if c == channel),
@@ -1854,15 +1798,15 @@ mod tests {
         assert_eq!(
             0,
             db.get_outgoing_ticket_index(channel.get_id())
-                .await
-                .unwrap()
+                .await?
                 .load(Ordering::Relaxed)
         );
+        Ok(())
     }
 
     #[async_std::test]
-    async fn on_channel_reopened() {
-        let db = create_db().await;
+    async fn on_channel_reopened() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
         let handlers = init_handlers(db.clone());
 
@@ -1875,7 +1819,7 @@ mod tests {
             3.into(),
         );
 
-        db.upsert_channel(None, channel).await.unwrap();
+        db.upsert_channel(None, channel).await?;
 
         let channel_opened_log = ethers::prelude::Log {
             address: handlers.addresses.channels.into(),
@@ -1890,13 +1834,11 @@ mod tests {
 
         let event_type = db
             .begin_transaction()
-            .await
-            .unwrap()
+            .await?
             .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, channel_opened_log.into()).await }))
-            .await
-            .unwrap();
+            .await?;
 
-        let channel = db.get_channel_by_id(None, &channel.get_id()).await.unwrap().unwrap();
+        let channel = db.get_channel_by_id(None, &channel.get_id()).await?.unwrap();
 
         assert!(
             matches!(event_type, Some(ChainEventType::ChannelOpened(c)) if c == channel),
@@ -1910,15 +1852,15 @@ mod tests {
         assert_eq!(
             0,
             db.get_outgoing_ticket_index(channel.get_id())
-                .await
-                .unwrap()
+                .await?
                 .load(Ordering::Relaxed)
         );
+        Ok(())
     }
 
     #[async_std::test]
-    async fn on_channel_should_not_reopen_when_not_closed() {
-        let db = create_db().await;
+    async fn on_channel_should_not_reopen_when_not_closed() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
         let handlers = init_handlers(db.clone());
 
@@ -1931,7 +1873,7 @@ mod tests {
             3.into(),
         );
 
-        db.upsert_channel(None, channel).await.unwrap();
+        db.upsert_channel(None, channel).await?;
 
         let channel_opened_log = ethers::prelude::Log {
             address: handlers.addresses.channels.into(),
@@ -1945,14 +1887,18 @@ mod tests {
         };
 
         db.begin_transaction()
-            .await
-            .unwrap()
+            .await?
             .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, channel_opened_log.into()).await }))
             .await
             .expect_err("should not re-open channel that is not Closed");
+        Ok(())
     }
 
-    fn mock_acknowledged_ticket(signer: &ChainKeypair, destination: &ChainKeypair, index: u64) -> AcknowledgedTicket {
+    fn mock_acknowledged_ticket(
+        signer: &ChainKeypair,
+        destination: &ChainKeypair,
+        index: u64,
+    ) -> anyhow::Result<AcknowledgedTicket> {
         let price_per_packet: U256 = 20_u32.into();
         let ticket_win_prob = 1.0f64;
 
@@ -1963,28 +1909,25 @@ mod tests {
 
         let response = Response::try_from(
             Hash::create(&[channel_id.as_ref(), &channel_epoch.to_be_bytes(), &index.to_be_bytes()]).as_ref(),
-        )
-        .unwrap();
+        )?;
 
-        TicketBuilder::default()
+        Ok(TicketBuilder::default()
             .direction(&signer.into(), &destination.into())
-            .amount(price_per_packet.div_f64(ticket_win_prob).unwrap())
+            .amount(price_per_packet.div_f64(ticket_win_prob)?)
             .index(index)
             .index_offset(1)
             .win_prob(ticket_win_prob)
             .channel_epoch(1)
             .challenge(response.to_challenge().into())
-            .build_signed(signer, &domain_separator)
-            .unwrap()
-            .into_acknowledged(response)
+            .build_signed(signer, &domain_separator)?
+            .into_acknowledged(response))
     }
 
     #[async_std::test]
-    async fn on_channel_ticket_redeemed_incoming_channel() {
-        let db = create_db().await;
+    async fn on_channel_ticket_redeemed_incoming_channel() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
         db.set_domain_separator(None, DomainSeparator::Channel, Hash::default())
-            .await
-            .unwrap();
+            .await?;
 
         let handlers = init_handlers(db.clone());
 
@@ -2000,13 +1943,13 @@ mod tests {
         let ticket_index = U256::from((1u128 << 48) - 1);
         let next_ticket_index = ticket_index + 1;
 
-        let mut ticket = mock_acknowledged_ticket(&COUNTERPARTY_CHAIN_KEY, &SELF_CHAIN_KEY, ticket_index.as_u64());
+        let mut ticket = mock_acknowledged_ticket(&COUNTERPARTY_CHAIN_KEY, &SELF_CHAIN_KEY, ticket_index.as_u64())?;
         ticket.status = AcknowledgedTicketStatus::BeingRedeemed;
 
         let ticket_value = ticket.verified_ticket().amount;
 
-        db.upsert_channel(None, channel).await.unwrap();
-        db.upsert_ticket(None, ticket.clone()).await.unwrap();
+        db.upsert_channel(None, channel).await?;
+        db.upsert_ticket(None, ticket.clone()).await?;
 
         let ticket_redeemed_log = ethers::prelude::Log {
             address: handlers.addresses.channels.into(),
@@ -2024,7 +1967,7 @@ mod tests {
             .expect("must get ticket index")
             .load(Ordering::Relaxed);
 
-        let stats = db.get_ticket_statistics(Some(channel.get_id())).await.unwrap();
+        let stats = db.get_ticket_statistics(Some(channel.get_id())).await?;
         assert_eq!(
             BalanceType::HOPR.zero(),
             stats.redeemed_value,
@@ -2038,13 +1981,11 @@ mod tests {
 
         let event_type = db
             .begin_transaction()
-            .await
-            .unwrap()
+            .await?
             .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, ticket_redeemed_log.into()).await }))
-            .await
-            .unwrap();
+            .await?;
 
-        let channel = db.get_channel_by_id(None, &channel.get_id()).await.unwrap().unwrap();
+        let channel = db.get_channel_by_id(None, &channel.get_id()).await?.unwrap();
 
         assert!(
             matches!(event_type, Some(ChainEventType::TicketRedeemed(c, t)) if channel == c && t == Some(ticket)),
@@ -2067,10 +2008,10 @@ mod tests {
             "outgoing ticket index must not change"
         );
 
-        let tickets = db.get_tickets((&channel).into()).await.unwrap();
+        let tickets = db.get_tickets((&channel).into()).await?;
         assert!(tickets.is_empty(), "there should not be any tickets left");
 
-        let stats = db.get_ticket_statistics(Some(channel.get_id())).await.unwrap();
+        let stats = db.get_ticket_statistics(Some(channel.get_id())).await?;
         assert_eq!(
             ticket_value, stats.redeemed_value,
             "there should be redeemed value worth 1 ticket"
@@ -2080,14 +2021,14 @@ mod tests {
             stats.neglected_value,
             "there should not be any neglected ticket"
         );
+        Ok(())
     }
 
     #[async_std::test]
-    async fn on_channel_ticket_redeemed_incoming_channel_neglect_left_over_tickets() {
-        let db = create_db().await;
+    async fn on_channel_ticket_redeemed_incoming_channel_neglect_left_over_tickets() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
         db.set_domain_separator(None, DomainSeparator::Channel, Hash::default())
-            .await
-            .unwrap();
+            .await?;
 
         let handlers = init_handlers(db.clone());
 
@@ -2103,16 +2044,16 @@ mod tests {
         let ticket_index = U256::from((1u128 << 48) - 1);
         let next_ticket_index = ticket_index + 1;
 
-        let mut ticket = mock_acknowledged_ticket(&COUNTERPARTY_CHAIN_KEY, &SELF_CHAIN_KEY, ticket_index.as_u64());
+        let mut ticket = mock_acknowledged_ticket(&COUNTERPARTY_CHAIN_KEY, &SELF_CHAIN_KEY, ticket_index.as_u64())?;
         ticket.status = AcknowledgedTicketStatus::BeingRedeemed;
 
         let ticket_value = ticket.verified_ticket().amount;
 
-        db.upsert_channel(None, channel).await.unwrap();
-        db.upsert_ticket(None, ticket.clone()).await.unwrap();
+        db.upsert_channel(None, channel).await?;
+        db.upsert_ticket(None, ticket.clone()).await?;
 
-        let old_ticket = mock_acknowledged_ticket(&COUNTERPARTY_CHAIN_KEY, &SELF_CHAIN_KEY, ticket_index.as_u64() - 1);
-        db.upsert_ticket(None, old_ticket.clone()).await.unwrap();
+        let old_ticket = mock_acknowledged_ticket(&COUNTERPARTY_CHAIN_KEY, &SELF_CHAIN_KEY, ticket_index.as_u64() - 1)?;
+        db.upsert_ticket(None, old_ticket.clone()).await?;
 
         let ticket_redeemed_log = ethers::prelude::Log {
             address: handlers.addresses.channels.into(),
@@ -2130,7 +2071,7 @@ mod tests {
             .expect("must get ticket index")
             .load(Ordering::Relaxed);
 
-        let stats = db.get_ticket_statistics(Some(channel.get_id())).await.unwrap();
+        let stats = db.get_ticket_statistics(Some(channel.get_id())).await?;
         assert_eq!(
             BalanceType::HOPR.zero(),
             stats.redeemed_value,
@@ -2144,13 +2085,11 @@ mod tests {
 
         let event_type = db
             .begin_transaction()
-            .await
-            .unwrap()
+            .await?
             .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, ticket_redeemed_log.into()).await }))
-            .await
-            .unwrap();
+            .await?;
 
-        let channel = db.get_channel_by_id(None, &channel.get_id()).await.unwrap().unwrap();
+        let channel = db.get_channel_by_id(None, &channel.get_id()).await?.unwrap();
 
         assert!(
             matches!(event_type, Some(ChainEventType::TicketRedeemed(c, t)) if channel == c && t == Some(ticket)),
@@ -2173,10 +2112,10 @@ mod tests {
             "outgoing ticket index must not change"
         );
 
-        let tickets = db.get_tickets((&channel).into()).await.unwrap();
+        let tickets = db.get_tickets((&channel).into()).await?;
         assert!(tickets.is_empty(), "there should not be any tickets left");
 
-        let stats = db.get_ticket_statistics(Some(channel.get_id())).await.unwrap();
+        let stats = db.get_ticket_statistics(Some(channel.get_id())).await?;
         assert_eq!(
             ticket_value, stats.redeemed_value,
             "there should be redeemed value worth 1 ticket"
@@ -2185,14 +2124,14 @@ mod tests {
             ticket_value, stats.neglected_value,
             "there should neglected value worth 1 ticket"
         );
+        Ok(())
     }
 
     #[async_std::test]
-    async fn on_channel_ticket_redeemed_outgoing_channel() {
-        let db = create_db().await;
+    async fn on_channel_ticket_redeemed_outgoing_channel() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
         db.set_domain_separator(None, DomainSeparator::Channel, Hash::default())
-            .await
-            .unwrap();
+            .await?;
 
         let handlers = init_handlers(db.clone());
 
@@ -2208,7 +2147,7 @@ mod tests {
         let ticket_index = U256::from((1u128 << 48) - 1);
         let next_ticket_index = ticket_index + 1;
 
-        db.upsert_channel(None, channel).await.unwrap();
+        db.upsert_channel(None, channel).await?;
 
         let ticket_redeemed_log = ethers::prelude::Log {
             address: handlers.addresses.channels.into(),
@@ -2222,13 +2161,11 @@ mod tests {
 
         let event_type = db
             .begin_transaction()
-            .await
-            .unwrap()
+            .await?
             .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, ticket_redeemed_log.into()).await }))
-            .await
-            .unwrap();
+            .await?;
 
-        let channel = db.get_channel_by_id(None, &channel.get_id()).await.unwrap().unwrap();
+        let channel = db.get_channel_by_id(None, &channel.get_id()).await?.unwrap();
 
         assert!(
             matches!(event_type, Some(ChainEventType::TicketRedeemed(c, None)) if channel == c),
@@ -2255,14 +2192,15 @@ mod tests {
             next_ticket_index.as_u64(),
             "outgoing ticket index must be equal to next ticket index"
         );
+        Ok(())
     }
 
     #[async_std::test]
-    async fn on_channel_ticket_redeemed_on_incoming_channel_with_non_existent_ticket_should_pass() {
-        let db = create_db().await;
+    async fn on_channel_ticket_redeemed_on_incoming_channel_with_non_existent_ticket_should_pass() -> anyhow::Result<()>
+    {
+        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
         db.set_domain_separator(None, DomainSeparator::Channel, Hash::default())
-            .await
-            .unwrap();
+            .await?;
 
         let handlers = init_handlers(db.clone());
 
@@ -2275,7 +2213,7 @@ mod tests {
             U256::one(),
         );
 
-        db.upsert_channel(None, channel).await.unwrap();
+        db.upsert_channel(None, channel).await?;
 
         let next_ticket_index = U256::from((1u128 << 48) - 1);
 
@@ -2291,13 +2229,11 @@ mod tests {
 
         let event_type = db
             .begin_transaction()
-            .await
-            .unwrap()
+            .await?
             .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, ticket_redeemed_log.into()).await }))
-            .await
-            .unwrap();
+            .await?;
 
-        let channel = db.get_channel_by_id(None, &channel.get_id()).await.unwrap().unwrap();
+        let channel = db.get_channel_by_id(None, &channel.get_id()).await?.unwrap();
 
         assert!(
             matches!(event_type, Some(ChainEventType::TicketRedeemed(c, None)) if c == channel),
@@ -2308,11 +2244,12 @@ mod tests {
             channel.ticket_index, next_ticket_index,
             "channel entry must contain next ticket index"
         );
+        Ok(())
     }
 
     #[async_std::test]
-    async fn on_channel_ticket_redeemed_on_foreign_channel_should_pass() {
-        let db = create_db().await;
+    async fn on_channel_ticket_redeemed_on_foreign_channel_should_pass() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
         let handlers = init_handlers(db.clone());
 
@@ -2325,7 +2262,7 @@ mod tests {
             U256::one(),
         );
 
-        db.upsert_channel(None, channel).await.unwrap();
+        db.upsert_channel(None, channel).await?;
 
         let next_ticket_index = U256::from((1u128 << 48) - 1);
 
@@ -2341,13 +2278,11 @@ mod tests {
 
         let event_type = db
             .begin_transaction()
-            .await
-            .unwrap()
+            .await?
             .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, ticket_redeemed_log.into()).await }))
-            .await
-            .unwrap();
+            .await?;
 
-        let channel = db.get_channel_by_id(None, &channel.get_id()).await.unwrap().unwrap();
+        let channel = db.get_channel_by_id(None, &channel.get_id()).await?.unwrap();
 
         assert!(
             matches!(event_type, Some(ChainEventType::TicketRedeemed(c, None)) if c == channel),
@@ -2358,11 +2293,12 @@ mod tests {
             channel.ticket_index, next_ticket_index,
             "channel entry must contain next ticket index"
         );
+        Ok(())
     }
 
     #[async_std::test]
-    async fn on_channel_closure_initiated() {
-        let db = create_db().await;
+    async fn on_channel_closure_initiated() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
         let handlers = init_handlers(db.clone());
 
@@ -2375,7 +2311,7 @@ mod tests {
             U256::one(),
         );
 
-        db.upsert_channel(None, channel).await.unwrap();
+        db.upsert_channel(None, channel).await?;
 
         let timestamp = SystemTime::now();
 
@@ -2391,13 +2327,11 @@ mod tests {
 
         let event_type = db
             .begin_transaction()
-            .await
-            .unwrap()
+            .await?
             .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, closure_initiated_log.into()).await }))
-            .await
-            .unwrap();
+            .await?;
 
-        let channel = db.get_channel_by_id(None, &channel.get_id()).await.unwrap().unwrap();
+        let channel = db.get_channel_by_id(None, &channel.get_id()).await?.unwrap();
 
         assert!(
             matches!(event_type, Some(ChainEventType::ChannelClosureInitiated(c)) if c == channel),
@@ -2409,11 +2343,12 @@ mod tests {
             ChannelStatus::PendingToClose(timestamp),
             "channel status must match"
         );
+        Ok(())
     }
 
     #[async_std::test]
-    async fn on_node_safe_registry_registered() {
-        let db = create_db().await;
+    async fn on_node_safe_registry_registered() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
         let handlers = init_handlers(db.clone());
 
@@ -2430,20 +2365,19 @@ mod tests {
 
         let event_type = db
             .begin_transaction()
-            .await
-            .unwrap()
+            .await?
             .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, safe_registered_log.into()).await }))
-            .await
-            .unwrap();
+            .await?;
 
         assert!(matches!(event_type, Some(ChainEventType::NodeSafeRegistered(addr)) if addr == *SAFE_INSTANCE_ADDR));
 
         // Nothing to check in the DB here, since we do not track this
+        Ok(())
     }
 
     #[async_std::test]
-    async fn on_node_safe_registry_deregistered() {
-        let db = create_db().await;
+    async fn on_node_safe_registry_deregistered() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
         let handlers = init_handlers(db.clone());
 
@@ -2462,11 +2396,9 @@ mod tests {
 
         let event_type = db
             .begin_transaction()
-            .await
-            .unwrap()
+            .await?
             .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, safe_registered_log.into()).await }))
-            .await
-            .unwrap();
+            .await?;
 
         assert!(
             event_type.is_none(),
@@ -2474,11 +2406,12 @@ mod tests {
         );
 
         // Nothing to check in the DB here, since we do not track this
+        Ok(())
     }
 
     #[async_std::test]
-    async fn ticket_price_update() {
-        let db = create_db().await;
+    async fn ticket_price_update() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
         let handlers = init_handlers(db.clone());
 
@@ -2489,15 +2422,13 @@ mod tests {
             ..test_log()
         };
 
-        assert_eq!(db.get_indexer_data(None).await.unwrap().ticket_price, None);
+        assert_eq!(db.get_indexer_data(None).await?.ticket_price, None);
 
         let event_type = db
             .begin_transaction()
-            .await
-            .unwrap()
+            .await?
             .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, price_change_log.into()).await }))
-            .await
-            .unwrap();
+            .await?;
 
         assert!(
             event_type.is_none(),
@@ -2505,12 +2436,9 @@ mod tests {
         );
 
         assert_eq!(
-            db.get_indexer_data(None)
-                .await
-                .unwrap()
-                .ticket_price
-                .map(|p| p.amount()),
+            db.get_indexer_data(None).await?.ticket_price.map(|p| p.amount()),
             Some(U256::from(123u64))
         );
+        Ok(())
     }
 }

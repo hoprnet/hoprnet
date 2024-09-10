@@ -192,7 +192,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         cfg.clone().into(),
         &hopr_keys.packet_key,
         &hopr_keys.chain_key,
-    ));
+    )?);
 
     // Create the message inbox
     let inbox: Arc<RwLock<hoprd_inbox::Inbox>> = Arc::new(RwLock::new(
