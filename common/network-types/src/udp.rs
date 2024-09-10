@@ -1,13 +1,10 @@
-use futures::future::BoxFuture;
 use futures::{pin_mut, ready, FutureExt, Sink, SinkExt};
 use std::io::ErrorKind;
-use std::net::SocketAddr;
 use std::pin::Pin;
 use std::sync::{Arc, OnceLock};
 use std::task::{Context, Poll};
 use tokio::io::{AsyncRead, ReadBuf};
 use tokio::net::UdpSocket;
-use tokio_util::io::StreamReader;
 use tracing::{debug, error, trace, warn};
 
 type BoxIoSink<T> = Box<dyn Sink<T, Error = std::io::Error> + Send + Unpin>;
@@ -174,8 +171,8 @@ impl UdpStreamBuilder {
         let socket_handles = (0..num_socks)
             .map(|id| {
                 let domain = match &first_bind_addr {
-                    SocketAddr::V4(_) => socket2::Domain::IPV4,
-                    SocketAddr::V6(_) => socket2::Domain::IPV6,
+                    std::net::SocketAddr::V4(_) => socket2::Domain::IPV4,
+                    std::net::SocketAddr::V6(_) => socket2::Domain::IPV6,
                 };
 
                 // Bind a new non-blocking UDP socket with SO_REUSEADDR
@@ -226,7 +223,7 @@ impl UdpStreamBuilder {
             .collect::<std::io::Result<Vec<_>>>()?;
 
         Ok(ConnectedUdpStream {
-            ingress_rx: Box::new(StreamReader::new(ingress_rx.into_stream())),
+            ingress_rx: Box::new(tokio_util::io::StreamReader::new(ingress_rx.into_stream())),
             egress_tx: Some(Box::new(
                 egress_tx
                     .into_sink()
@@ -248,7 +245,7 @@ impl ConnectedUdpStream {
         counterparty: Arc<OnceLock<std::net::SocketAddr>>,
         foreign_data_mode: ForeignDataMode,
         buf_size: usize,
-    ) -> std::io::Result<BoxFuture<'static, ()>> {
+    ) -> std::io::Result<futures::future::BoxFuture<'static, ()>> {
         let counterparty_rx = counterparty.clone();
         Ok(async move {
             let mut buffer = vec![0u8; buf_size];
@@ -346,7 +343,7 @@ impl ConnectedUdpStream {
         sock_tx: Arc<UdpSocket>,
         egress_rx: flume::Receiver<Box<[u8]>>,
         counterparty: Arc<OnceLock<std::net::SocketAddr>>,
-    ) -> std::io::Result<BoxFuture<'static, ()>> {
+    ) -> std::io::Result<futures::future::BoxFuture<'static, ()>> {
         let counterparty_tx = counterparty.clone();
         Ok(async move {
             loop {
