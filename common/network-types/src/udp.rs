@@ -1,6 +1,7 @@
 use futures::future::BoxFuture;
 use futures::{pin_mut, ready, FutureExt, Sink, SinkExt};
 use std::io::ErrorKind;
+use std::net::SocketAddr;
 use std::pin::Pin;
 use std::sync::{Arc, OnceLock};
 use std::task::{Context, Poll};
@@ -172,8 +173,13 @@ impl UdpStreamBuilder {
 
         let socket_handles = (0..num_socks)
             .map(|id| {
+                let domain = match &first_bind_addr {
+                    SocketAddr::V4(_) => socket2::Domain::IPV4,
+                    SocketAddr::V6(_) => socket2::Domain::IPV6,
+                };
+
                 // Bind a new non-blocking UDP socket with SO_REUSEADDR
-                let sock = socket2::Socket::new(socket2::Domain::IPV4, socket2::Type::DGRAM, None)?;
+                let sock = socket2::Socket::new(domain, socket2::Type::DGRAM, None)?;
                 sock.set_reuse_address(true)?;
                 sock.set_nonblocking(true)?;
                 sock.bind(&bound_addr.unwrap_or(first_bind_addr).into())?;
