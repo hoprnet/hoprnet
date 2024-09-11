@@ -243,11 +243,11 @@ mod tests {
         static ref ALICE_KP: ChainKeypair = ChainKeypair::from_secret(&hex!(
             "492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775"
         ))
-        .unwrap();
+        .expect("lazy static keypair should be constructible");
         static ref BOB_KP: ChainKeypair = ChainKeypair::from_secret(&hex!(
             "48680484c6fc31bc881a0083e6e32b6dc789f9eaba0f8b981429fd346c697f8c"
         ))
-        .unwrap();
+        .expect("lazy static keypair should be constructible");
         static ref ALICE: Address = ALICE_KP.public().to_address();
         static ref BOB: Address = BOB_KP.public().to_address();
     }

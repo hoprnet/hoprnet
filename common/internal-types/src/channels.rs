@@ -253,11 +253,11 @@ mod tests {
     use std::time::{Duration, SystemTime};
 
     lazy_static::lazy_static! {
-        static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).unwrap();
-        static ref BOB: ChainKeypair = ChainKeypair::from_secret(&hex!("48680484c6fc31bc881a0083e6e32b6dc789f9eaba0f8b981429fd346c697f8c")).unwrap();
+        static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).expect("lazy static keypair should be constructible");
+        static ref BOB: ChainKeypair = ChainKeypair::from_secret(&hex!("48680484c6fc31bc881a0083e6e32b6dc789f9eaba0f8b981429fd346c697f8c")).expect("lazy static keypair should be constructible");
 
-        static ref ADDRESS_1: Address = "3829b806aea42200c623c4d6b9311670577480ed".parse().unwrap();
-        static ref ADDRESS_2: Address = "1a34729c69e95d6e11c3a9b9be3ea0c62c6dc5b1".parse().unwrap();
+        static ref ADDRESS_1: Address = "3829b806aea42200c623c4d6b9311670577480ed".parse().expect("lazy static address should be constructible");
+        static ref ADDRESS_2: Address = "1a34729c69e95d6e11c3a9b9be3ea0c62c6dc5b1".parse().expect("lazy static address should be constructible");
     }
 
     #[test]

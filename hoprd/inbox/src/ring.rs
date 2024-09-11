@@ -211,7 +211,7 @@ mod tests {
             || {
                 std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap()
+                    .expect("Time went backwards")
                     .add(Duration::from_millis(1))
             }, // for testing, ensure the timestamps are at least 5ms apart
         )

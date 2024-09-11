@@ -513,7 +513,7 @@ mod tests {
     }
 
     #[test]
-    fn session_should_identify_with_its_own_id() {
+    fn session_should_identify_with_its_own_id() -> anyhow::Result<()> {
         let id = SessionId::new(1, PeerId::random());
         let (_tx, rx) = futures::channel::mpsc::unbounded();
         let mock = MockSendMsg::new();
@@ -521,16 +521,18 @@ mod tests {
         let session = InnerSession::new(
             id,
             PeerId::random(),
-            RoutingOptions::Hops(1_u32.try_into().unwrap()),
+            RoutingOptions::Hops(1_u32.try_into()?),
             Arc::new(mock),
             rx,
         );
 
         assert_eq!(session.id(), &id);
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn session_should_read_data_in_one_swoop_if_the_buffer_is_sufficiently_large() {
+    async fn session_should_read_data_in_one_swoop_if_the_buffer_is_sufficiently_large() -> anyhow::Result<()> {
         let id = SessionId::new(1, PeerId::random());
         let (tx, rx) = futures::channel::mpsc::unbounded();
         let mock = MockSendMsg::new();
@@ -538,7 +540,7 @@ mod tests {
         let mut session = InnerSession::new(
             id,
             PeerId::random(),
-            RoutingOptions::Hops(1_u32.try_into().unwrap()),
+            RoutingOptions::Hops(1_u32.try_into()?),
             Arc::new(mock),
             rx,
         );
@@ -556,10 +558,13 @@ mod tests {
 
         assert_eq!(bytes_read, random_data.len());
         assert_eq!(&buffer[..bytes_read], random_data.as_ref());
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn session_should_read_data_in_multiple_rounds_if_the_buffer_is_not_sufficiently_large() {
+    async fn session_should_read_data_in_multiple_rounds_if_the_buffer_is_not_sufficiently_large() -> anyhow::Result<()>
+    {
         let id = SessionId::new(1, PeerId::random());
         let (tx, rx) = futures::channel::mpsc::unbounded();
         let mock = MockSendMsg::new();
@@ -567,7 +572,7 @@ mod tests {
         let mut session = InnerSession::new(
             id,
             PeerId::random(),
-            RoutingOptions::Hops(1_u32.try_into().unwrap()),
+            RoutingOptions::Hops(1_u32.try_into()?),
             Arc::new(mock),
             rx,
         );
@@ -591,10 +596,12 @@ mod tests {
 
         assert_eq!(bytes_read, PAYLOAD_SIZE - BUFFER_SIZE);
         assert_eq!(&buffer[..bytes_read], &random_data[BUFFER_SIZE..]);
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn session_should_write_data() {
+    async fn session_should_write_data() -> anyhow::Result<()> {
         let id = SessionId::new(1, OffchainKeypair::random().public().into());
         let (_tx, rx) = futures::channel::mpsc::unbounded();
         let mut mock = MockSendMsg::new();
@@ -606,7 +613,10 @@ mod tests {
             .withf(move |data, _peer, options| {
                 let (_peer_id, data) = unwrap_offchain_key(data.plain_text.clone()).expect("Unwrapping should work");
                 assert_eq!(data, b"Hello, world!".to_vec().into_boxed_slice());
-                assert_eq!(options, &RoutingOptions::Hops(1_u32.try_into().unwrap()));
+                assert_eq!(
+                    options,
+                    &RoutingOptions::Hops(1_u32.try_into().expect("must be convertible"))
+                );
                 true
             })
             .returning(|_, _, _| Ok(()));
@@ -614,7 +624,7 @@ mod tests {
         let mut session = InnerSession::new(
             id,
             OffchainKeypair::random().public().into(),
-            RoutingOptions::Hops(1_u32.try_into().unwrap()),
+            RoutingOptions::Hops(1_u32.try_into()?),
             Arc::new(mock),
             rx,
         );
@@ -622,11 +632,13 @@ mod tests {
         let bytes_written = session.write(&data).await.expect("Write should work #1");
 
         assert_eq!(bytes_written, data.len());
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn session_should_chunk_the_data_if_without_segmentation_the_write_size_is_greater_than_the_usable_mtu_size()
-    {
+    async fn session_should_chunk_the_data_if_without_segmentation_the_write_size_is_greater_than_the_usable_mtu_size(
+    ) -> anyhow::Result<()> {
         const TO_SEND: usize = SESSION_USABLE_MTU_SIZE * 2 + 10;
 
         let id = SessionId::new(1, OffchainKeypair::random().public().into());
@@ -643,7 +655,7 @@ mod tests {
         let mut session = InnerSession::new(
             id,
             OffchainKeypair::random().public().into(),
-            RoutingOptions::Hops(1_u32.try_into().unwrap()),
+            RoutingOptions::Hops(1_u32.try_into()?),
             Arc::new(mock),
             rx,
         );
@@ -651,5 +663,7 @@ mod tests {
         let bytes_written = session.write(&data).await.expect("Write should work #1");
 
         assert_eq!(bytes_written, TO_SEND);
+
+        Ok(())
     }
 }

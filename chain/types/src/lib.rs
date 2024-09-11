@@ -142,7 +142,7 @@ impl<M: Middleware> ContractInstances<M> {
         {
             // Fund 1820 deployer and deploy ERC1820Registry
             let mut tx = Eip1559TransactionRequest::new();
-            tx = tx.to(H160::from_str(crate::utils::ERC_1820_DEPLOYER).unwrap());
+            tx = tx.to(H160::from_str(crate::utils::ERC_1820_DEPLOYER).expect("deployer address should be valid"));
             tx = tx.value(crate::utils::ETH_VALUE_FOR_ERC1820_DEPLOYER);
 
             provider

@@ -146,7 +146,7 @@ mod tests {
         static ref ALICE_KP: ChainKeypair = ChainKeypair::from_secret(&hex!(
             "492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775"
         ))
-        .unwrap();
+        .expect("lazy static keypair should be valid");
         static ref ALICE: Address = ALICE_KP.public().to_address();
         static ref BOB: Address = hex!("3798fa65d6326d3813a0d33489ac35377f4496ef").into();
         static ref CHARLIE: Address = hex!("250eefb2586ab0873befe90b905126810960ee7c").into();

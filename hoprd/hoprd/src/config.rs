@@ -413,8 +413,10 @@ mod tests {
 
         let safe_module = hopr_lib::config::SafeModule {
             safe_transaction_service_provider: "https:://provider.com/".to_owned(),
-            safe_address: Address::from_str("0x0000000000000000000000000000000000000000").unwrap(),
-            module_address: Address::from_str("0x0000000000000000000000000000000000000000").unwrap(),
+            safe_address: Address::from_str("0x0000000000000000000000000000000000000000")
+                .expect("address should be valid"),
+            module_address: Address::from_str("0x0000000000000000000000000000000000000000")
+                .expect("address should be valid"),
         };
 
         let identity = Identity {
@@ -499,7 +501,7 @@ mod tests {
 
         assert!(cfg.is_ok());
 
-        let cfg = cfg.unwrap();
+        let cfg = cfg?;
 
         assert_eq!(cfg.hopr.chain.provider, Some(pwnd.to_owned()));
 

@@ -206,8 +206,8 @@ mod tests {
         let random_tmp_file = format!("/tmp/{random_filename}.sqlite");
 
         let peer_id: PeerId = OffchainKeypair::random().public().into();
-        let ma_1: Multiaddr = format!("/ip4/127.0.0.1/tcp/10000/p2p/{peer_id}").parse().unwrap();
-        let ma_2: Multiaddr = format!("/ip4/127.0.0.1/tcp/10002/p2p/{peer_id}").parse().unwrap();
+        let ma_1: Multiaddr = format!("/ip4/127.0.0.1/tcp/10000/p2p/{peer_id}").parse()?;
+        let ma_2: Multiaddr = format!("/ip4/127.0.0.1/tcp/10002/p2p/{peer_id}").parse()?;
 
         let path = std::path::Path::new(&random_tmp_file);
 

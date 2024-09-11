@@ -281,10 +281,10 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn test_should_get_block_number() {
+    async fn test_should_get_block_number() -> anyhow::Result<()> {
         let expected_block_time = Duration::from_secs(1);
         let anvil = chain_types::utils::create_anvil(Some(expected_block_time));
-        let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
+        let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
 
         let client = JsonRpcProviderClient::new(
             &anvil.endpoint(),
@@ -310,17 +310,19 @@ mod tests {
         let b2 = rpc.block_number().await.expect("should get block number");
 
         assert!(b2 > b1, "block number should increase");
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_try_stream_logs_should_contain_all_logs_when_opening_channel() {
+    async fn test_try_stream_logs_should_contain_all_logs_when_opening_channel() -> anyhow::Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
 
         let expected_block_time = Duration::from_secs(1);
 
         let anvil = chain_types::utils::create_anvil(Some(expected_block_time));
-        let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
-        let chain_key_1 = ChainKeypair::from_secret(anvil.keys()[1].to_bytes().as_ref()).unwrap();
+        let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
+        let chain_key_1 = ChainKeypair::from_secret(anvil.keys()[1].to_bytes().as_ref())?;
 
         // Deploy contracts
         let contract_instances = {
@@ -420,17 +422,20 @@ mod tests {
                     && log.topics.contains(&TransferFilter::signature().0.into())),
             "must contain token transfer"
         );
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_try_stream_logs_should_contain_only_channel_logs_when_filtered_on_funding_channel() {
+    async fn test_try_stream_logs_should_contain_only_channel_logs_when_filtered_on_funding_channel(
+    ) -> anyhow::Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
 
         let expected_block_time = Duration::from_secs(1);
 
         let anvil = chain_types::utils::create_anvil(Some(expected_block_time));
-        let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
-        let chain_key_1 = ChainKeypair::from_secret(anvil.keys()[1].to_bytes().as_ref()).unwrap();
+        let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
+        let chain_key_1 = ChainKeypair::from_secret(anvil.keys()[1].to_bytes().as_ref())?;
 
         // Deploy contracts
         let contract_instances = {
@@ -515,5 +520,7 @@ mod tests {
                     .contains(&ChannelBalanceIncreasedFilter::signature().0.into())),
             "must contain channel balance increase"
         );
+
+        Ok(())
     }
 }

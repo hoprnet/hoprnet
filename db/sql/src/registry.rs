@@ -147,8 +147,12 @@ mod tests {
     use lazy_static::lazy_static;
 
     lazy_static! {
-        static ref ADDR_1: Address = "4331eaa9542b6b034c43090d9ec1c2198758dbc3".parse().unwrap();
-        static ref ADDR_2: Address = "47d1677e018e79dcdd8a9c554466cb1556fa5007".parse().unwrap();
+        static ref ADDR_1: Address = "4331eaa9542b6b034c43090d9ec1c2198758dbc3"
+            .parse()
+            .expect("lazy static address should be valid");
+        static ref ADDR_2: Address = "47d1677e018e79dcdd8a9c554466cb1556fa5007"
+            .parse()
+            .expect("lazy static address should be valid");
     }
 
     #[async_std::test]

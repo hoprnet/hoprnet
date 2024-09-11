@@ -70,7 +70,7 @@ where
         Self::new_with_time(cfg, || {
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
+                .expect("Time went backwards")
         })
     }
 

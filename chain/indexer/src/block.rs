@@ -298,23 +298,28 @@ mod tests {
     use super::*;
 
     lazy_static::lazy_static! {
-        static ref ALICE_KP: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).unwrap();
+        static ref ALICE_KP: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).expect("lazy static keypair should be constructible");
         static ref ALICE: Address = ALICE_KP.public().to_address();
         static ref BOB: Address = hex!("3798fa65d6326d3813a0d33489ac35377f4496ef").into();
         static ref CHRIS: Address = hex!("250eefb2586ab0873befe90b905126810960ee7c").into();
 
         static ref RANDOM_ANNOUNCEMENT_CHAIN_EVENT: ChainEventType = ChainEventType::Announcement {
-            peer: (*OffchainKeypair::from_secret(&hex!("14d2d952715a51aadbd4cc6bfac9aa9927182040da7b336d37d5bb7247aa7566")).unwrap().public()).into(),
+            peer: (*OffchainKeypair::from_secret(&hex!("14d2d952715a51aadbd4cc6bfac9aa9927182040da7b336d37d5bb7247aa7566")).expect("lazy static keypair should be constructible").public()).into(),
             address: hex!("2f4b7662a192b8125bbf51cfbf1bf5cc00b2c8e5").into(),
             multiaddresses: vec![Multiaddr::empty()],
         };
     }
 
-    fn build_announcement_logs(address: Address, size: usize, block_number: u64, log_index: U256) -> Vec<Log> {
+    fn build_announcement_logs(
+        address: Address,
+        size: usize,
+        block_number: u64,
+        log_index: U256,
+    ) -> anyhow::Result<Vec<Log>> {
         let mut logs: Vec<Log> = vec![];
 
         for i in 0..size {
-            let test_multiaddr: Multiaddr = format!("/ip4/1.2.3.4/tcp/{}", 1000 + i).parse().unwrap();
+            let test_multiaddr: Multiaddr = format!("/ip4/1.2.3.4/tcp/{}", 1000 + i).parse()?;
             logs.push(Log {
                 address,
                 topics: vec![AddressAnnouncementFilter::signature().into()],
@@ -330,7 +335,7 @@ mod tests {
             });
         }
 
-        logs
+        Ok(logs)
     }
 
     mock! {
@@ -393,8 +398,7 @@ mod tests {
         let head_block = 1000;
         let latest_block = 15u64;
         db.set_last_indexed_block(None, latest_block as u32, Some(Hash::default()))
-            .await
-            .unwrap();
+            .await?;
         rpc.expect_block_number().return_once(move || Ok(head_block));
 
         let (tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
@@ -440,7 +444,7 @@ mod tests {
 
         let finalized_block = BlockWithLogs {
             block_id: head_block - 1,
-            logs: BTreeSet::from_iter(build_announcement_logs(*BOB, 4, head_block - 1, U256::from(23u8))),
+            logs: BTreeSet::from_iter(build_announcement_logs(*BOB, 4, head_block - 1, U256::from(23u8))?),
         };
         let head_allowing_finalization = BlockWithLogs {
             block_id: head_block,
@@ -486,17 +490,17 @@ mod tests {
             // head - 1 sync block
             BlockWithLogs {
                 block_id: head_block - 1,
-                logs: BTreeSet::from_iter(build_announcement_logs(*ALICE, 1, head_block - 1, U256::from(23u8))),
+                logs: BTreeSet::from_iter(build_announcement_logs(*ALICE, 1, head_block - 1, U256::from(23u8))?),
             },
             // head sync block
             BlockWithLogs {
                 block_id: head_block,
-                logs: BTreeSet::from_iter(build_announcement_logs(*BOB, 1, head_block, U256::from(23u8))),
+                logs: BTreeSet::from_iter(build_announcement_logs(*BOB, 1, head_block, U256::from(23u8))?),
             },
             // post-sync block
             BlockWithLogs {
                 block_id: head_block,
-                logs: BTreeSet::from_iter(build_announcement_logs(*CHRIS, 1, head_block, U256::from(23u8))),
+                logs: BTreeSet::from_iter(build_announcement_logs(*CHRIS, 1, head_block, U256::from(23u8))?),
             },
         ];
 
@@ -531,7 +535,7 @@ mod tests {
         .await;
 
         assert!(received.is_ok());
-        assert_eq!(received.unwrap().len(), 1);
+        assert_eq!(received?.len(), 1);
 
         Ok(())
     }
@@ -543,8 +547,7 @@ mod tests {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
         db.set_last_indexed_block(None, last_processed_block as u32, Some(Hash::default()))
-            .await
-            .unwrap();
+            .await?;
 
         let (mut tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
 
@@ -565,10 +568,10 @@ mod tests {
                 1,
                 last_processed_block + 1,
                 U256::from(23u8),
-            )),
+            )?),
         };
 
-        tx.start_send(block).unwrap();
+        tx.start_send(block)?;
 
         let mut handlers = MockChainLogHandler::new();
         handlers.expect_contract_addresses().return_const(vec![]);

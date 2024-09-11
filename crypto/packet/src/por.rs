@@ -176,7 +176,7 @@ mod tests {
     use hopr_primitive_types::traits::BytesEncodable;
 
     #[test]
-    fn test_por_preverify_validate() {
+    fn test_por_preverify_validate() -> anyhow::Result<()> {
         const AMOUNT: usize = 4;
 
         let secrets = (0..AMOUNT).map(|_| SharedSecret::random()).collect::<Vec<_>>();
@@ -199,7 +199,7 @@ mod tests {
         assert_eq!(expected_hkc, first_result.ack_challenge);
 
         // Simulates the transformation done by the first relayer
-        let expected_pors = ProofOfRelayString::try_from(first_por_string.as_ref()).unwrap();
+        let expected_pors = ProofOfRelayString::try_from(first_por_string.as_ref())?;
         assert_eq!(
             expected_pors.next_ticket_challenge, first_result.next_ticket_challenge,
             "Forward logic must extract correct challenge for the next downstream node"
@@ -243,10 +243,12 @@ mod tests {
             ),
             "Second acknowledgement must solve the challenge"
         );
+
+        Ok(())
     }
 
     #[test]
-    fn test_challenge_and_response_solving() {
+    fn test_challenge_and_response_solving() -> anyhow::Result<()> {
         const AMOUNT: usize = 2;
         let secrets = (0..AMOUNT).map(|_| SharedSecret::random()).collect::<Vec<_>>();
 
@@ -265,9 +267,11 @@ mod tests {
         assert!(
             validate_por_response(
                 &first_challenge.ticket_challenge.to_ethereum_challenge(),
-                &Response::from_half_keys(&first_challenge.own_key, &ack).unwrap()
+                &Response::from_half_keys(&first_challenge.own_key, &ack)?
             ),
             "Returned response must solve the challenge"
         );
+
+        Ok(())
     }
 }

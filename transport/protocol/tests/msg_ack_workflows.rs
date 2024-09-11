@@ -41,7 +41,7 @@ lazy_static! {
         hex!("0726a9704d56a013980a9077d195520a61b5aed28f92d89c50bca6e0e0c48cfc")
     ]
     .iter()
-    .map(|private| OffchainKeypair::from_secret(private).unwrap())
+    .map(|private| OffchainKeypair::from_secret(private).expect("lazy static keypair should be valid"))
     .collect();
 }
 
@@ -54,7 +54,7 @@ lazy_static! {
         hex!("40ed717eb285dea3921a8346155d988b7ed5bf751bc4eee3cd3a64f4c692396f")
     ]
     .iter()
-    .map(|private| ChainKeypair::from_secret(private).unwrap())
+    .map(|private| ChainKeypair::from_secret(private).expect("lazy static keypair should be valid"))
     .collect();
 }
 

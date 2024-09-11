@@ -482,7 +482,7 @@ mod tests {
         static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!(
             "492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775"
         ))
-        .unwrap();
+        .expect("lazy static keypair should be valid");
         static ref PEERS: [(Address, PeerId); 10] = [
             (
                 ALICE.public().to_address().into(),
@@ -527,7 +527,10 @@ mod tests {
         ]
         .map(|(addr, privkey)| (
             addr.into(),
-            OffchainKeypair::from_secret(&privkey).unwrap().public().into()
+            OffchainKeypair::from_secret(&privkey)
+                .expect("lazy static keypair should be valid")
+                .public()
+                .into()
         ));
     }
 

@@ -3868,6 +3868,7 @@ dependencies = [
 name = "hopr-crypto-packet"
 version = "0.7.1"
 dependencies = [
+ "anyhow",
  "async-std",
  "async-trait",
  "core-path",
@@ -3902,6 +3903,7 @@ name = "hopr-crypto-sphinx"
 version = "0.6.1"
 dependencies = [
  "aes 0.8.4",
+ "anyhow",
  "blake2",
  "ctr 0.9.2",
  "curve25519-dalek",
@@ -3925,6 +3927,7 @@ dependencies = [
 name = "hopr-crypto-types"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "blake2",
  "chacha20",
  "curve25519-dalek",
@@ -4175,6 +4178,7 @@ dependencies = [
 name = "hopr-primitive-types"
 version = "0.4.0"
 dependencies = [
+ "anyhow",
  "hex",
  "hex-literal",
  "hopr-crypto-random",
@@ -4463,6 +4467,7 @@ name = "hoprd-keypair"
 version = "0.4.0"
 dependencies = [
  "aes 0.8.4",
+ "anyhow",
  "ctr 0.9.2",
  "hex",
  "hopr-crypto-random",

@@ -198,11 +198,11 @@ mod tests {
         static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!(
             "14d2d952715a51aadbd4cc6bfac9aa9927182040da7b336d37d5bb7247aa7566"
         ))
-        .unwrap();
+        .expect("lazy static keypair should be constructible");
         static ref BOB: ChainKeypair = ChainKeypair::from_secret(&hex!(
             "48680484c6fc31bc881a0083e6e32b6dc789f9eaba0f8b981429fd346c697f8c"
         ))
-        .unwrap();
+        .expect("lazy static keypair should be constructible");
         static ref DESTINATION: [u8; 20] = hex!("345ae204774ff2b3e8d4cac884dad3d1603b5917");
         static ref CHANNEL_DST: [u8; 32] = hex!("57dc754bb522f2fe7799e471fd6efd0b6139a2120198f15b92f4a78cb882af35");
         static ref ETHEREUM_CHALLENGE: [u8; 20] = hex!("4162339a4204a1cedf43c92049875a19cb09dd20");

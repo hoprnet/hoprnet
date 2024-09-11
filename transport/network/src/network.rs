@@ -415,10 +415,7 @@ mod tests {
 
         let peers = basic_network(&me).await?;
 
-        peers
-            .add(&expected, PeerOrigin::IncomingConnection, vec![])
-            .await
-            .unwrap();
+        peers.add(&expected, PeerOrigin::IncomingConnection, vec![]).await?;
 
         assert_eq!(
             1,
@@ -440,9 +437,9 @@ mod tests {
 
         let peers = basic_network(&me).await?;
 
-        peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await.unwrap();
+        peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await?;
 
-        peers.remove(&peer).await.expect("should not fail on DB remove");
+        peers.remove(&peer).await?;
 
         assert_eq!(
             0,
@@ -489,16 +486,15 @@ mod tests {
 
         let peers = basic_network(&me).await?;
 
-        peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await.unwrap();
+        peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await?;
 
         let latency = 123u64;
 
         peers
             .update(&peer, Ok(std::time::Duration::from_millis(latency)), None)
-            .await
-            .expect("no error should occur");
+            .await?;
 
-        let actual = peers.get(&peer).await.expect("peer record should be present").unwrap();
+        let actual = peers.get(&peer).await?.expect("peer record should be present");
 
         assert_eq!(actual.heartbeats_sent, 1);
         assert_eq!(actual.heartbeats_succeeded, 1);
@@ -561,24 +557,22 @@ mod tests {
 
         let peers = basic_network(&me).await?;
 
-        peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await.unwrap();
+        peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await?;
 
         peers
             .update(&peer, Ok(current_time().as_unix_timestamp()), None)
-            .await
-            .expect("no error should occur");
+            .await?;
         peers
             .update(&peer, Ok(current_time().as_unix_timestamp()), None)
-            .await
-            .expect("no error should occur");
-        peers.update(&peer, Err(()), None).await.expect("no error should occur"); // should drop to ignored
+            .await?;
+        peers.update(&peer, Err(()), None).await?; // should drop to ignored
 
         // peers.update(&peer, Err(()), None).await.expect("no error should occur");    // should drop from network
 
         assert!(!peers.has(&peer).await);
 
         // peer should remain ignored and not be added
-        peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await.unwrap();
+        peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await?;
 
         assert!(!peers.has(&peer).await);
 
@@ -592,30 +586,23 @@ mod tests {
 
         let peers = basic_network(&me).await?;
 
-        peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await.unwrap();
+        peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await?;
 
         // Needs to do 3 pings, so we get over the ignore threshold limit
         // when doing the 4th failed ping
         peers
             .update(&peer, Ok(std::time::Duration::from_millis(123_u64)), None)
-            .await
-            .expect("no error should occur");
+            .await?;
         peers
             .update(&peer, Ok(std::time::Duration::from_millis(200_u64)), None)
-            .await
-            .expect("no error should occur");
+            .await?;
         peers
             .update(&peer, Ok(std::time::Duration::from_millis(200_u64)), None)
-            .await
-            .expect("no error should occur");
+            .await?;
 
-        peers.update(&peer, Err(()), None).await.expect("no error should occur");
+        peers.update(&peer, Err(()), None).await?;
 
-        let actual = peers
-            .get(&peer)
-            .await
-            .unwrap()
-            .expect("the peer record should be present");
+        let actual = peers.get(&peer).await?.expect("the peer record should be present");
 
         assert_eq!(actual.heartbeats_succeeded, 3);
         assert_eq!(actual.backoff, 300f64);
@@ -632,11 +619,8 @@ mod tests {
 
         let peers = basic_network(&me).await?;
 
-        peers.add(&first, PeerOrigin::IncomingConnection, vec![]).await.unwrap();
-        peers
-            .add(&second, PeerOrigin::IncomingConnection, vec![])
-            .await
-            .unwrap();
+        peers.add(&first, PeerOrigin::IncomingConnection, vec![]).await?;
+        peers.add(&second, PeerOrigin::IncomingConnection, vec![]).await?;
 
         let latency = 77_u64;
 
@@ -645,12 +629,10 @@ mod tests {
 
         peers
             .update(&first, Ok(std::time::Duration::from_millis(latency)), None)
-            .await
-            .expect("no error should occur");
+            .await?;
         peers
             .update(&second, Ok(std::time::Duration::from_millis(latency)), None)
-            .await
-            .expect("no error should occur");
+            .await?;
 
         // assert_eq!(
         //     format!(
@@ -663,8 +645,7 @@ mod tests {
 
         let mut actual = peers
             .find_peers_to_ping(current_time().add(Duration::from_secs(2u64)))
-            .await
-            .unwrap();
+            .await?;
         actual.sort();
 
         assert_eq!(actual, expected);
@@ -690,7 +671,7 @@ mod tests {
 
         let peers = basic_network(&me).await?;
 
-        peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await.unwrap();
+        peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await?;
 
         // all peers are public
         assert_eq!(peers.health().await, Health::Orange);
@@ -705,9 +686,9 @@ mod tests {
 
         let peers = basic_network(&me).await?;
 
-        peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await.unwrap();
+        peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await?;
         let _ = peers.health();
-        peers.remove(&peer).await.expect("should not fail on DB remove");
+        peers.remove(&peer).await?;
 
         assert_eq!(peers.health().await, Health::Red);
 
@@ -729,12 +710,11 @@ mod tests {
             hopr_db_sql::db::HoprDb::new_in_memory(ChainKeypair::random()).await?,
         );
 
-        peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await.unwrap();
+        peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await?;
 
         peers
             .update(&peer, Ok(current_time().as_unix_timestamp()), None)
-            .await
-            .expect("no error should occur");
+            .await?;
 
         assert_eq!(peers.health().await, Health::Orange);
 
@@ -758,17 +738,16 @@ mod tests {
             hopr_db_sql::db::HoprDb::new_in_memory(ChainKeypair::random()).await?,
         );
 
-        peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await.unwrap();
+        peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await?;
 
         assert_eq!(
             peers
                 .update(&peer, Ok(std::time::Duration::from_millis(13u64)), None)
-                .await
-                .expect("no error should occur"),
+                .await?,
             Some(NetworkTriggeredEvent::UpdateQuality(peer.clone(), 0.1))
         );
         assert_eq!(
-            peers.update(&peer, Err(()), None).await.expect("no error should occur"),
+            peers.update(&peer, Err(()), None).await?,
             Some(NetworkTriggeredEvent::CloseConnection(peer))
         );
 
@@ -793,13 +772,12 @@ mod tests {
             hopr_db_sql::db::HoprDb::new_in_memory(ChainKeypair::random()).await?,
         );
 
-        peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await.unwrap();
+        peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await?;
 
         for _ in 0..3 {
             peers
                 .update(&peer, Ok(current_time().as_unix_timestamp()), None)
-                .await
-                .expect("no error should occur");
+                .await?;
         }
 
         assert_eq!(peers.health().await, Health::Green);
@@ -823,18 +801,16 @@ mod tests {
             hopr_db_sql::db::HoprDb::new_in_memory(ChainKeypair::random()).await?,
         );
 
-        peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await.unwrap();
-        peers.add(&peer2, PeerOrigin::IncomingConnection, vec![]).await.unwrap();
+        peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await?;
+        peers.add(&peer2, PeerOrigin::IncomingConnection, vec![]).await?;
 
         for _ in 0..3 {
             peers
                 .update(&peer2, Ok(current_time().as_unix_timestamp()), None)
-                .await
-                .expect("no error should occur");
+                .await?;
             peers
                 .update(&peer, Ok(current_time().as_unix_timestamp()), None)
-                .await
-                .expect("no error should occur");
+                .await?;
         }
 
         assert_eq!(peers.health().await, Health::Green);

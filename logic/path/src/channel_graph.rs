@@ -241,12 +241,18 @@ mod tests {
 
     lazy_static! {
         static ref ADDRESSES: [Address; 6] = [
-            Address::from_str("0xafe8c178cf70d966be0a798e666ce2782c7b2288").unwrap(),
-            Address::from_str("0x1223d5786d9e6799b3297da1ad55605b91e2c882").unwrap(),
-            Address::from_str("0x0e3e60ddced1e33c9647a71f4fc2cf4ed33e4a9d").unwrap(),
-            Address::from_str("0x27644105095c8c10f804109b4d1199a9ac40ed46").unwrap(),
-            Address::from_str("0x4701a288c38fa8a0f4b79127747257af4a03a623").unwrap(),
-            Address::from_str("0xfddd2f462ec709cf181bbe44a7e952487bd4591d").unwrap(),
+            Address::from_str("0xafe8c178cf70d966be0a798e666ce2782c7b2288")
+                .expect("lazy static address should be valid"),
+            Address::from_str("0x1223d5786d9e6799b3297da1ad55605b91e2c882")
+                .expect("lazy static address should be valid"),
+            Address::from_str("0x0e3e60ddced1e33c9647a71f4fc2cf4ed33e4a9d")
+                .expect("lazy static address should be valid"),
+            Address::from_str("0x27644105095c8c10f804109b4d1199a9ac40ed46")
+                .expect("lazy static address should be valid"),
+            Address::from_str("0x4701a288c38fa8a0f4b79127747257af4a03a623")
+                .expect("lazy static address should be valid"),
+            Address::from_str("0xfddd2f462ec709cf181bbe44a7e952487bd4591d")
+                .expect("lazy static address should be valid"),
         ];
     }
 

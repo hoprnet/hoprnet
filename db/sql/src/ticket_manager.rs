@@ -215,8 +215,8 @@ mod tests {
     use crate::info::HoprDbInfoOperations;
 
     lazy_static::lazy_static! {
-        static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).unwrap();
-        static ref BOB: ChainKeypair = ChainKeypair::from_secret(&hex!("48680484c6fc31bc881a0083e6e32b6dc789f9eaba0f8b981429fd346c697f8c")).unwrap();
+        static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).expect("lazy static keypair should be valid");
+        static ref BOB: ChainKeypair = ChainKeypair::from_secret(&hex!("48680484c6fc31bc881a0083e6e32b6dc789f9eaba0f8b981429fd346c697f8c")).expect("lazy static keypair should be valid");
     }
 
     lazy_static::lazy_static! {
@@ -262,8 +262,7 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn test_insert_ticket_properly_resolves_the_cached_value(
-    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    async fn test_insert_ticket_properly_resolves_the_cached_value() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ALICE.clone()).await?;
         db.set_domain_separator(None, DomainSeparator::Channel, Hash::default())
             .await?;
@@ -285,7 +284,7 @@ mod tests {
             4_u32.into(),
         );
 
-        db.upsert_channel(None, channel.clone()).await.unwrap();
+        db.upsert_channel(None, channel.clone()).await?;
 
         assert_eq!(
             Balance::zero(BalanceType::HOPR),
