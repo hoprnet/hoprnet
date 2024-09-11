@@ -1,12 +1,13 @@
-from typing import Callable
-
 import asyncio
 import multiprocessing
 import os
-import socket
-from contextlib import contextmanager
-
 import pytest
+import socket
+
+from enum import Enum
+from contextlib import contextmanager
+from typing import Callable
+
 
 from .conftest import random_distinct_pairs_from, barebone_nodes
 from .node import Node
@@ -44,21 +45,19 @@ def run_server(server_func: Callable[..., object], port: int):
     finally:
         process.terminate()
 
+class SocketType(Enum):
+    TCP = 1
+    UDP = 2
 
 @contextmanager
-def connect_tcp_socket(port):
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.connect(("127.0.0.1", port))
-
-    try:
-        yield s
-    finally:
-        s.close()
-
-
-@contextmanager
-def connect_udp_socket():
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+def connect_socket(sock_type: SocketType, port):
+    if sock_type is SocketType.TCP:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.connect(("127.0.0.1", port))
+    elif sock_type is SocketType.UDP:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    else:
+        raise ValueError("Invalid socket type")
 
     try:
         yield s
@@ -95,7 +94,7 @@ async def test_session_communication_with_a_tcp_echo_server(
         # otherwise a `ConnectionRefusedError: [Errno 61] Connection refused` will be encountered
         await asyncio.sleep(1.0)
 
-        with connect_tcp_socket(src_sock_port) as s:
+        with connect_socket(SocketType.TCP, src_sock_port) as s:
             s.settimeout(20)
             total_sent = 0
             for message in expected:
@@ -140,7 +139,7 @@ async def test_session_communication_with_a_udp_echo_server(
         await asyncio.sleep(1.0)
 
         addr = ('127.0.0.1', src_sock_port)
-        with connect_udp_socket() as s:
+        with connect_socket(SocketType.UDP, None) as s:
             s.settimeout(20)
             total_sent = 0
             for message in expected:
