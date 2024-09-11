@@ -127,44 +127,52 @@ impl FaucetArgs {
         let (native_balances, token_balances) =
             get_native_and_token_balances(hopr_token.clone(), eth_addresses_all.clone())
                 .await
-                .unwrap();
+                .map_err(|_| HelperErrors::MulticallError("cannot get native and token balances".into()))?;
         // Get the amount of HOPR tokens that addresses need to receive to reach the desired amount
-        let hopr_token_amounts: Vec<U256> =
-            vec![U256::from(parse_units(hopr_amount, "ether").unwrap()); eth_addresses_all.len()]
-                .into_iter()
-                .enumerate()
-                .map(|(i, h)| {
-                    if h.gt(&token_balances[i]) {
-                        let diff = h.sub(token_balances[i]);
-                        info!(
-                            "{:?} hopr-token to be transferred to {:?} to top up {:?}",
-                            diff, eth_addresses_all[i], &token_balances[i]
-                        );
-                        diff
-                    } else {
-                        U256::zero()
-                    }
-                })
-                .collect();
+        let hopr_token_amounts: Vec<U256> = vec![
+            U256::from(parse_units(hopr_amount, "ether").map_err(|_| {
+                HelperErrors::ParseError("Failed to parse hopr_amount units".into())
+            })?);
+            eth_addresses_all.len()
+        ]
+        .into_iter()
+        .enumerate()
+        .map(|(i, h)| {
+            if h.gt(&token_balances[i]) {
+                let diff = h.sub(token_balances[i]);
+                info!(
+                    "{:?} hopr-token to be transferred to {:?} to top up {:?}",
+                    diff, eth_addresses_all[i], &token_balances[i]
+                );
+                diff
+            } else {
+                U256::zero()
+            }
+        })
+        .collect();
 
         // Get the amount of native tokens that addresses need to receive to reach the desired amount
-        let native_token_amounts: Vec<U256> =
-            vec![U256::from(parse_units(native_amount, "ether").unwrap()); eth_addresses_all.len()]
-                .into_iter()
-                .enumerate()
-                .map(|(i, n)| {
-                    if n.gt(&native_balances[i]) {
-                        let diff = n.sub(native_balances[i]);
-                        info!(
-                            "{:?} native-token to be transferred to {:?}, to top up {:?}",
-                            diff, eth_addresses_all[i], &native_balances[i]
-                        );
-                        diff
-                    } else {
-                        U256::zero()
-                    }
-                })
-                .collect();
+        let native_token_amounts: Vec<U256> = vec![
+            U256::from(parse_units(native_amount, "ether").map_err(|_| {
+                HelperErrors::ParseError("Failed to parse native_amount units".into())
+            })?);
+            eth_addresses_all.len()
+        ]
+        .into_iter()
+        .enumerate()
+        .map(|(i, n)| {
+            if n.gt(&native_balances[i]) {
+                let diff = n.sub(native_balances[i]);
+                info!(
+                    "{:?} native-token to be transferred to {:?}, to top up {:?}",
+                    diff, eth_addresses_all[i], &native_balances[i]
+                );
+                diff
+            } else {
+                U256::zero()
+            }
+        })
+        .collect();
 
         // transfer of mint HOPR tokens
         let total_transferred_hopr_token =

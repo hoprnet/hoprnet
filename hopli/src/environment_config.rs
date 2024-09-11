@@ -222,9 +222,8 @@ pub fn get_network_details_from_name(make_root_dir_path: &Path, network: &str) -
 
 #[cfg(test)]
 mod tests {
-    use anyhow::Context;
-
     use super::*;
+    use anyhow::Context;
 
     fn create_anvil_at_port(default: bool) -> ethers::utils::AnvilInstance {
         let mut anvil = ethers::utils::Anvil::new();
@@ -262,13 +261,12 @@ mod tests {
     }
 
     #[test]
-    fn read_anvil_localhost_at_wrong_path() {
-        let wrong_dir = &std::env::current_dir().unwrap();
+    fn read_anvil_localhost_at_wrong_path() -> anyhow::Result<()> {
+        let wrong_dir = &std::env::current_dir().context("Current dir failed")?;
         let network = "anvil-localhost";
         let environment_type = "local";
-        let result =
-            std::panic::catch_unwind(|| ensure_environment_and_network_are_set(wrong_dir, network, environment_type));
-        assert!(result.unwrap().is_err());
+        assert!(ensure_environment_and_network_are_set(wrong_dir, network, environment_type).is_err());
+        Ok(())
     }
 
     #[test]
@@ -280,10 +278,7 @@ mod tests {
             .join("ethereum")
             .join("contracts");
 
-        let result = std::panic::catch_unwind(|| {
-            ensure_environment_and_network_are_set(correct_dir, "non-existing", "development")
-        });
-        assert!(result.unwrap().is_err());
+        assert!(ensure_environment_and_network_are_set(correct_dir, "non-existing", "development").is_err());
         Ok(())
     }
 

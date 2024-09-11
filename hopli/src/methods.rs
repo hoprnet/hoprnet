@@ -262,12 +262,7 @@ pub async fn send_multisend_safe_transaction_with_threshold_one<M: Middleware>(
 
     tx.logs
         .iter()
-        .find(|log| {
-            log.topics[0].eq(&SAFE_EXECUTION_SUCCESS
-                .parse::<H256>()
-                .map_err(|_| HelperErrors::ParseError("Failed to parse SAFE_EXECUTION_SUCCESS".into()))
-                .unwrap())
-        })
+        .find(|log| log.topics[0].eq(&SAFE_EXECUTION_SUCCESS.parse::<H256>().unwrap()))
         .ok_or(HelperErrors::MultiSendError)?;
 
     Ok(())
@@ -575,7 +570,7 @@ pub async fn transfer_native_tokens<M: Middleware>(
         .await
         .map_err(|e| HelperErrors::MiddlewareError(e.to_string()))?
         .await
-        .unwrap();
+        .map_err(|e| HelperErrors::MiddlewareError(e.to_string()))?;
 
     Ok(total)
 }
@@ -744,28 +739,24 @@ pub fn predict_module_address(
     nonce: [u8; 32],
     factory_address: Address,
     implementation_address: Address,
-) -> Address {
-    let module_salt = keccak256(
-        ethers::abi::encode_packed(&[
-            ethers::abi::Token::Address(caller),
-            ethers::abi::Token::Uint(nonce.into()),
-        ])
-        .unwrap(),
-    );
+) -> Result<Address, HelperErrors> {
+    let module_salt = keccak256(ethers::abi::encode_packed(&[
+        ethers::abi::Token::Address(caller),
+        ethers::abi::Token::Uint(nonce.into()),
+    ])?);
     debug!("module_salt {:?}", module_salt);
 
     let module_creation_code = ethers::abi::encode_packed(&[
         ethers::abi::Token::Bytes(hex!("3d602d80600a3d3981f3363d3d373d3d3d363d73").to_vec()),
         ethers::abi::Token::Address(implementation_address),
         ethers::abi::Token::Bytes(hex!("5af43d82803e903d91602b57fd5bf3").to_vec()),
-    ])
-    .unwrap();
+    ])?;
     debug!("module_creation_code {:?}", module_creation_code);
 
     let predict_module_addr = get_create2_address(factory_address, module_salt, module_creation_code);
     debug!("predict_module_addr {:?}", predict_module_addr);
 
-    predict_module_addr
+    Ok(predict_module_addr)
 }
 
 /// Helper function to predict safe address
@@ -776,7 +767,7 @@ pub fn predict_safe_address(
     safe_fallback: Address,
     safe_singleton: Address,
     safe_factory: Address,
-) -> Address {
+) -> Result<Address, HelperErrors> {
     let mut temp_admins = admins.clone();
     temp_admins[0] = stake_factory;
 
@@ -792,42 +783,38 @@ pub fn predict_safe_address(
     )
     .encode();
 
-    let safe_salt = get_salt_from_salt_nonce(initializer, U256::from(nonce));
+    let safe_salt = get_salt_from_salt_nonce(initializer, U256::from(nonce))?;
     debug!("safe_salt {:?}", hex::encode(safe_salt));
 
-    let predict_safe_addr = deploy_proxy(safe_singleton, safe_salt, safe_factory);
+    let predict_safe_addr = deploy_proxy(safe_singleton, safe_salt, safe_factory)?;
     debug!("predict_safe_addr {:?}", hex::encode(predict_safe_addr));
 
-    predict_safe_addr
+    Ok(predict_safe_addr)
 }
 
 /// helper function to get salt nonce
-fn get_salt_from_salt_nonce(initializer: Vec<u8>, salt_nonce: U256) -> [u8; 32] {
+fn get_salt_from_salt_nonce(initializer: Vec<u8>, salt_nonce: U256) -> Result<[u8; 32], HelperErrors> {
     let hashed_initializer = keccak256(initializer);
 
-    keccak256(
-        ethers::abi::encode_packed(&[
-            ethers::abi::Token::Bytes(hashed_initializer.into()),
-            ethers::abi::Token::Uint(salt_nonce),
-        ])
-        .unwrap(),
-    )
+    Ok(keccak256(ethers::abi::encode_packed(&[
+        ethers::abi::Token::Bytes(hashed_initializer.into()),
+        ethers::abi::Token::Uint(salt_nonce),
+    ])?))
 }
 
 /// helper function to compute create2 safe proxy address
-fn deploy_proxy(safe_singleton: Address, safe_salt: [u8; 32], safe_factory: Address) -> Address {
+fn deploy_proxy(safe_singleton: Address, safe_salt: [u8; 32], safe_factory: Address) -> Result<Address, HelperErrors> {
     let safe_creation_code = ethers::abi::encode_packed(&[
         ethers::abi::Token::Bytes(hex!("608060405234801561001057600080fd5b506040516101e63803806101e68339818101604052602081101561003357600080fd5b8101908080519060200190929190505050600073ffffffffffffffffffffffffffffffffffffffff168173ffffffffffffffffffffffffffffffffffffffff1614156100ca576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260228152602001806101c46022913960400191505060405180910390fd5b806000806101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff1602179055505060ab806101196000396000f3fe608060405273ffffffffffffffffffffffffffffffffffffffff600054167fa619486e0000000000000000000000000000000000000000000000000000000060003514156050578060005260206000f35b3660008037600080366000845af43d6000803e60008114156070573d6000fd5b3d6000f3fea264697066735822122003d1488ee65e08fa41e58e888a9865554c535f2c77126a82cb4c0f917f31441364736f6c63430007060033496e76616c69642073696e676c65746f6e20616464726573732070726f7669646564").to_vec()),
         ethers::abi::Token::Bytes(hex!("000000000000000000000000").to_vec()),    // pad address to bytes32
         ethers::abi::Token::Address(safe_singleton),
-    ])
-    .unwrap();
+    ])?;
     debug!("safe_creation_code {:?}", hex::encode(safe_creation_code.clone()));
 
     let predict_safe_addr = get_create2_address(safe_factory, safe_salt, safe_creation_code);
     debug!("predict_safe_addr {:?}", hex::encode(predict_safe_addr));
 
-    predict_safe_addr
+    Ok(predict_safe_addr)
 }
 
 /// Wrap a transaction into a safe transaction payload
@@ -931,7 +918,7 @@ pub async fn deploy_safe_module_with_targets_and_nodes<M: Middleware>(
     let curr_nonce = provider
         .get_transaction_count(caller, Some(ethers::types::BlockNumber::Pending.into()))
         .await
-        .unwrap();
+        .map_err(|e| HelperErrors::MiddlewareError(e.to_string()))?;
     let nonce = keccak256(ethers::abi::encode_packed(&[
         ethers::abi::Token::Address(caller),
         ethers::abi::Token::Uint(curr_nonce),
@@ -943,7 +930,7 @@ pub async fn deploy_safe_module_with_targets_and_nodes<M: Middleware>(
         nonce,
         hopr_node_stake_factory.address(),
         hopr_module_implementation_address,
-    );
+    )?;
     info!("predicted module address {:?}", module_address);
 
     let safe_address = predict_safe_address(
@@ -953,7 +940,7 @@ pub async fn deploy_safe_module_with_targets_and_nodes<M: Middleware>(
         Address::from_str(SAFE_COMPATIBILITYFALLBACKHANDLER_ADDRESS).unwrap(),
         Address::from_str(SAFE_SAFE_ADDRESS).unwrap(),
         Address::from_str(SAFE_SAFEPROXYFACTORY_ADDRESS).unwrap(),
-    );
+    )?;
     info!("predicted safe address {:?}", safe_address);
 
     let deployed_module = HoprNodeManagementModule::new(module_address, provider.clone());
@@ -1308,7 +1295,9 @@ pub async fn debug_node_safe_module_setup_on_balance_and_registries<M: Middlewar
 
     info!(
         "node does{:?} have xDAI balance {:?}",
-        if node_native_balance.ge(&U256::from(parse_units(0.1, "ether").unwrap())) {
+        if node_native_balance.ge(&U256::from(
+            parse_units(0.1, "ether").unwrap_or_else(|_| panic!("cannot parse node_native_balance"))
+        )) {
             ""
         } else {
             " NOT"
@@ -1480,7 +1469,7 @@ mod tests {
                 None,
             )
             .await
-            .unwrap();
+            .map_err(|e| ContractError::MiddlewareError { e })?;
 
         // only deploy contracts when needed
         if code.len() == 0 {
@@ -1563,35 +1552,35 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn test_native_and_token_balances_in_anvil_with_multicall() {
+    async fn test_native_and_token_balances_in_anvil_with_multicall() -> anyhow::Result<()> {
         // create a keypair
         let kp = ChainKeypair::random();
         let kp_address = Address::from(&kp);
 
         // launch local anvil instance
         let anvil = chain_types::utils::create_anvil(None);
-        let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
+        let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
         let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &contract_deployer);
         // deploy hopr contracts
         let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
             .await
             .expect("failed to deploy");
         // deploy multicall contract
-        deploy_multicall3_for_testing(client.clone()).await.unwrap();
+        deploy_multicall3_for_testing(client.clone()).await?;
 
         // get native and token balances
-        let (native_balance, token_balance) = get_native_and_token_balances(instances.token, vec![kp_address.into()])
-            .await
-            .unwrap();
+        let (native_balance, token_balance) =
+            get_native_and_token_balances(instances.token, vec![kp_address.into()]).await?;
         assert_eq!(native_balance.len(), 1, "invalid native balance lens");
         assert_eq!(token_balance.len(), 1, "invalid token balance lens");
         assert_eq!(native_balance[0].as_u64(), 0u64, "wrong native balance");
         assert_eq!(token_balance[0].as_u64(), 0u64, "wrong token balance");
         drop(anvil);
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_transfer_or_mint_tokens_in_anvil_with_multicall() {
+    async fn test_transfer_or_mint_tokens_in_anvil_with_multicall() -> anyhow::Result<()> {
         let mut addresses: Vec<ethers::types::Address> = Vec::new();
         for _ in 0..4 {
             addresses.push(get_random_address_for_testing().into());
@@ -1600,7 +1589,7 @@ mod tests {
 
         // launch local anvil instance
         let anvil = chain_types::utils::create_anvil(None);
-        let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
+        let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
         let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &contract_deployer);
         // deploy hopr contracts
         let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
@@ -1608,7 +1597,7 @@ mod tests {
             .expect("failed to deploy");
 
         // deploy multicall contract
-        deploy_multicall3_for_testing(client.clone()).await.unwrap();
+        deploy_multicall3_for_testing(client.clone()).await?;
         // grant deployer token minter role
         let encoded_minter_role: [u8; 32] = keccak256(b"MINTER_ROLE");
         instances
@@ -1618,10 +1607,8 @@ mod tests {
                 contract_deployer.public().to_address().into(),
             )
             .send()
-            .await
-            .unwrap()
-            .await
-            .unwrap();
+            .await?
+            .await?;
 
         // test the deployer has minter role now
         let check_minter_role = instances
@@ -1631,20 +1618,16 @@ mod tests {
                 contract_deployer.public().to_address().into(),
             )
             .call()
-            .await
-            .unwrap();
+            .await?;
         assert!(check_minter_role, "deployer does not have minter role yet");
 
         // transfer or mint tokens to addresses
         let total_transferred_amount =
-            transfer_or_mint_tokens(instances.token.clone(), addresses.clone(), desired_amount.clone())
-                .await
-                .unwrap();
+            transfer_or_mint_tokens(instances.token.clone(), addresses.clone(), desired_amount.clone()).await?;
 
         // get native and token balances
-        let (native_balance, token_balance) = get_native_and_token_balances(instances.token, addresses.clone().into())
-            .await
-            .unwrap();
+        let (native_balance, token_balance) =
+            get_native_and_token_balances(instances.token, addresses.clone().into()).await?;
         assert_eq!(native_balance.len(), 4, "invalid native balance lens");
         assert_eq!(token_balance.len(), 4, "invalid token balance lens");
         for (i, amount) in desired_amount.iter().enumerate() {
@@ -1656,16 +1639,17 @@ mod tests {
             U256::from(10),
             "amount transferred does not equal to the desired amount"
         );
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_transfer_or_mint_tokens_in_anvil_with_one_recipient() {
+    async fn test_transfer_or_mint_tokens_in_anvil_with_one_recipient() -> anyhow::Result<()> {
         let addresses: Vec<ethers::types::Address> = vec![get_random_address_for_testing().into()];
         let desired_amount = vec![U256::from(42)];
 
         // launch local anvil instance
         let anvil = chain_types::utils::create_anvil(None);
-        let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
+        let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
         let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &contract_deployer);
         // deploy hopr contracts
         let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
@@ -1673,7 +1657,7 @@ mod tests {
             .expect("failed to deploy");
 
         // deploy multicall contract
-        deploy_multicall3_for_testing(client.clone()).await.unwrap();
+        deploy_multicall3_for_testing(client.clone()).await?;
         // grant deployer token minter role
         let encoded_minter_role: [u8; 32] = keccak256(b"MINTER_ROLE");
         instances
@@ -1683,10 +1667,8 @@ mod tests {
                 contract_deployer.public().to_address().into(),
             )
             .send()
-            .await
-            .unwrap()
-            .await
-            .unwrap();
+            .await?
+            .await?;
 
         // test the deployer has minter role now
         let check_minter_role = instances
@@ -1696,20 +1678,16 @@ mod tests {
                 contract_deployer.public().to_address().into(),
             )
             .call()
-            .await
-            .unwrap();
+            .await?;
         assert!(check_minter_role, "deployer does not have minter role yet");
 
         // transfer or mint tokens to addresses
         let total_transferred_amount =
-            transfer_or_mint_tokens(instances.token.clone(), addresses.clone(), desired_amount.clone())
-                .await
-                .unwrap();
+            transfer_or_mint_tokens(instances.token.clone(), addresses.clone(), desired_amount.clone()).await?;
 
         // get native and token balances
-        let (native_balance, token_balance) = get_native_and_token_balances(instances.token, addresses.clone().into())
-            .await
-            .unwrap();
+        let (native_balance, token_balance) =
+            get_native_and_token_balances(instances.token, addresses.clone().into()).await?;
         assert_eq!(native_balance.len(), 1, "invalid native balance lens");
         assert_eq!(token_balance.len(), 1, "invalid token balance lens");
         for (i, amount) in desired_amount.iter().enumerate() {
@@ -1720,16 +1698,17 @@ mod tests {
             total_transferred_amount, desired_amount[0],
             "amount transferred does not equal to the desired amount"
         );
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_transfer_or_mint_tokens_in_anvil_without_recipient() {
+    async fn test_transfer_or_mint_tokens_in_anvil_without_recipient() -> anyhow::Result<()> {
         let addresses: Vec<ethers::types::Address> = Vec::new();
         let desired_amount: Vec<U256> = Vec::new();
 
         // launch local anvil instance
         let anvil = chain_types::utils::create_anvil(None);
-        let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
+        let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
         let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &contract_deployer);
         // deploy hopr contracts
         let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
@@ -1737,18 +1716,15 @@ mod tests {
             .expect("failed to deploy");
 
         // deploy multicall contract
-        deploy_multicall3_for_testing(client.clone()).await.unwrap();
+        deploy_multicall3_for_testing(client.clone()).await?;
 
         // transfer or mint tokens to addresses
         let total_transferred_amount =
-            transfer_or_mint_tokens(instances.token.clone(), addresses.clone(), desired_amount.clone())
-                .await
-                .unwrap();
+            transfer_or_mint_tokens(instances.token.clone(), addresses.clone(), desired_amount.clone()).await?;
 
         // get native and token balances
-        let (native_balance, token_balance) = get_native_and_token_balances(instances.token, addresses.clone().into())
-            .await
-            .unwrap();
+        let (native_balance, token_balance) =
+            get_native_and_token_balances(instances.token, addresses.clone().into()).await?;
         assert_eq!(native_balance.len(), 0, "invalid native balance lens");
         assert_eq!(token_balance.len(), 0, "invalid token balance lens");
         // for (i, amount) in desired_amount.iter().enumerate() {
@@ -1760,10 +1736,11 @@ mod tests {
             U256::from(0),
             "amount transferred does not equal to the desired amount"
         );
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_transfer_native_tokens_in_anvil_with_multicall() {
+    async fn test_transfer_native_tokens_in_anvil_with_multicall() -> anyhow::Result<()> {
         let mut addresses: Vec<ethers::types::Address> = Vec::new();
         for _ in 0..4 {
             addresses.push(get_random_address_for_testing().into());
@@ -1772,25 +1749,22 @@ mod tests {
 
         // launch local anvil instance
         let anvil = chain_types::utils::create_anvil(None);
-        let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
+        let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
         let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &contract_deployer);
         let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
             .await
             .expect("failed to deploy");
 
         // deploy multicall contract
-        deploy_multicall3_for_testing(client.clone()).await.unwrap();
+        deploy_multicall3_for_testing(client.clone()).await?;
 
         // transfer native tokens to addresses
         let total_transferred_amount =
-            transfer_native_tokens(client.clone(), addresses.clone(), desired_amount.clone())
-                .await
-                .unwrap();
+            transfer_native_tokens(client.clone(), addresses.clone(), desired_amount.clone()).await?;
 
         // get native and token balances
-        let (native_balance, token_balance) = get_native_and_token_balances(instances.token, addresses.clone().into())
-            .await
-            .unwrap();
+        let (native_balance, token_balance) =
+            get_native_and_token_balances(instances.token, addresses.clone().into()).await?;
         assert_eq!(native_balance.len(), 4, "invalid native balance lens");
         assert_eq!(token_balance.len(), 4, "invalid token balance lens");
         for (i, amount) in desired_amount.iter().enumerate() {
@@ -1802,10 +1776,11 @@ mod tests {
             U256::from(10),
             "amount transferred does not equal to the desired amount"
         );
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_register_safes_and_nodes_then_deregister_nodes_in_anvil_with_multicall() {
+    async fn test_register_safes_and_nodes_then_deregister_nodes_in_anvil_with_multicall() -> anyhow::Result<()> {
         let mut safe_addresses: Vec<ethers::types::Address> = Vec::new();
         let mut node_addresses: Vec<ethers::types::Address> = Vec::new();
         for _ in 0..4 {
@@ -1815,13 +1790,13 @@ mod tests {
 
         // launch local anvil instance
         let anvil = chain_types::utils::create_anvil(None);
-        let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
+        let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
         let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &contract_deployer);
         let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
             .await
             .expect("failed to deploy");
         // deploy multicall contract
-        deploy_multicall3_for_testing(client.clone()).await.unwrap();
+        deploy_multicall3_for_testing(client.clone()).await?;
 
         // register some nodes
         let (removed_amt, added_amt) = register_safes_and_nodes_on_network_registry(
@@ -1829,8 +1804,7 @@ mod tests {
             safe_addresses.clone(),
             node_addresses.clone(),
         )
-        .await
-        .unwrap();
+        .await?;
 
         assert_eq!(removed_amt, 0, "should not remove any safe");
         assert_eq!(added_amt, 4, "there should be 4 additions");
@@ -1840,8 +1814,7 @@ mod tests {
             instances.network_registry.clone(),
             node_addresses.clone(),
         )
-        .await
-        .unwrap();
+        .await?;
 
         assert_eq!(safe_addresses.len(), registered_safes.len(), "returned length unmatch");
         for (i, safe_addr) in safe_addresses.iter().enumerate() {
@@ -1853,8 +1826,7 @@ mod tests {
             instances.network_registry.clone(),
             node_addresses.split_at(3).0.to_vec(),
         )
-        .await
-        .unwrap();
+        .await?;
         assert_eq!(deregisterd_nodes, 3, "cannot deregister all the nodes");
 
         // re-register 4 of them
@@ -1863,43 +1835,45 @@ mod tests {
             safe_addresses.clone(),
             node_addresses.clone(),
         )
-        .await
-        .unwrap();
+        .await?;
 
         assert_eq!(removed_amt_2, 0, "should not remove any safe");
         assert_eq!(added_amt_2, 3, "there should be 3 additions");
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_deploy_proxy() {
+    async fn test_deploy_proxy() -> anyhow::Result<()> {
         let prediction = deploy_proxy(
-            H160::from_str("41675c099f32341bf84bfc5382af534df5c7461a").unwrap(),
+            H160::from_str("41675c099f32341bf84bfc5382af534df5c7461a")?,
             hex!("09e458584ce79e57b65cb303dc136c5d53e17b676599b9b7bc03815e0eef5172").into(),
-            H160::from_str(SAFE_SAFEPROXYFACTORY_ADDRESS).unwrap(),
-        );
+            H160::from_str(SAFE_SAFEPROXYFACTORY_ADDRESS)?,
+        )?;
 
         assert_eq!(
             prediction,
-            H160::from_str("ec5c8d045dfa1f93785125c26e187e9439f67105").unwrap(),
+            H160::from_str("ec5c8d045dfa1f93785125c26e187e9439f67105")?,
             "cannot reproduce proxy"
-        )
+        );
+        Ok(())
     }
     #[async_std::test]
-    async fn test_get_salt_from_salt_nonce() {
+    async fn test_get_salt_from_salt_nonce() -> anyhow::Result<()> {
         let salt = get_salt_from_salt_nonce(
             hex!("b63e800d00000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001400000000000000000000000002a15de4410d4c8af0a7b6c12803120f43c42b8200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000098b275485c406573d042848d66eb9d63fca311c00000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000").into(),
-            U256::from_dec_str("103994836888229670573364883831672511342967953907147914065931589108526220754063").unwrap(),
-        );
+            U256::from_dec_str("103994836888229670573364883831672511342967953907147914065931589108526220754063")?,
+        )?;
 
         assert_eq!(
             salt.to_vec(),
-            Bytes::from_str("09e458584ce79e57b65cb303dc136c5d53e17b676599b9b7bc03815e0eef5172").unwrap(),
+            Bytes::from_str("09e458584ce79e57b65cb303dc136c5d53e17b676599b9b7bc03815e0eef5172")?,
             "cannot reproduce salt"
-        )
+        );
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_safe_and_module_address_prediction() {
+    async fn test_safe_and_module_address_prediction() -> anyhow::Result<()> {
         // testing value extracted from https://dashboard.tenderly.co/tx/xdai/0x510e3ac3dc7939cae2525a0b0f096ad709b23d94169e0fbf2e1154fdd6911c49?trace=0
         let _ = env_logger::builder().is_test(true).try_init();
 
@@ -1911,15 +1885,15 @@ mod tests {
 
         // launch local anvil instance
         let anvil = chain_types::utils::create_anvil(None);
-        let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
+        let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
         let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &contract_deployer);
         let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
             .await
             .expect("failed to deploy");
         // deploy multicall contract
-        deploy_multicall3_for_testing(client.clone()).await.unwrap();
+        deploy_multicall3_for_testing(client.clone()).await?;
         // deploy safe suits
-        deploy_safe_suites(client.clone()).await.unwrap();
+        deploy_safe_suites(client.clone()).await?;
 
         let caller = client.default_sender().expect("client must have a sender");
 
@@ -1929,32 +1903,28 @@ mod tests {
         // salt nonce
         let curr_nonce = client
             .get_transaction_count(caller, Some(ethers::types::BlockNumber::Pending.into()))
-            .await
-            .unwrap();
-        let nonce = keccak256(
-            ethers::abi::encode_packed(&[
-                ethers::abi::Token::Address(caller),
-                ethers::abi::Token::Uint(curr_nonce),
-            ])
-            .unwrap(),
-        );
+            .await?;
+        let nonce = keccak256(ethers::abi::encode_packed(&[
+            ethers::abi::Token::Address(caller),
+            ethers::abi::Token::Uint(curr_nonce),
+        ])?);
 
         let module_address = predict_module_address(
             caller,
             nonce,
             instances.stake_factory.address(),
             instances.module_implementation.address(),
-        );
+        )?;
         debug!("predict_module_addr {:?}", module_address);
 
         let safe_address = predict_safe_address(
             instances.stake_factory.address(),
-            vec![H160::from_str("9062a96b9e947b2b57283e705c97b871f5eb6561").unwrap()],
+            vec![H160::from_str("9062a96b9e947b2b57283e705c97b871f5eb6561")?],
             nonce,
-            H160::from_str(SAFE_COMPATIBILITYFALLBACKHANDLER_ADDRESS).unwrap(),
-            H160::from_str(SAFE_SAFE_ADDRESS).unwrap(),
-            H160::from_str(SAFE_SAFEPROXYFACTORY_ADDRESS).unwrap(),
-        );
+            H160::from_str(SAFE_COMPATIBILITYFALLBACKHANDLER_ADDRESS)?,
+            H160::from_str(SAFE_SAFE_ADDRESS)?,
+            H160::from_str(SAFE_SAFEPROXYFACTORY_ADDRESS)?,
+        )?;
 
         debug!("predict_safe_address {:?}", safe_address);
 
@@ -1965,13 +1935,11 @@ mod tests {
                 instances.module_implementation.address(),
                 vec![caller],
                 nonce.into(),
-                U256::from_str(&default_target).unwrap().into(),
+                U256::from_str(&default_target)?.into(),
             )
             .send()
-            .await
-            .unwrap()
-            .await
-            .unwrap()
+            .await?
+            .await?
             .unwrap();
         debug!("deployment_receipt {:?}", deployment_receipt);
         // parse the safe and module addresses
@@ -1979,29 +1947,28 @@ mod tests {
             .logs
             .iter()
             .find(|log| log.topics[0].eq(&NEW_HOPR_NODE_STAKE_MODULE_TOPIC.parse::<H256>().unwrap()))
-            .ok_or(HelperErrors::ContractNotDeployed("module".into()))
-            .unwrap(); // "NewHoprNodeStakeModule(address,address)
+            .ok_or(HelperErrors::ContractNotDeployed("module".into()))?; // "NewHoprNodeStakeModule(address,address)
 
         debug!("module_log {:?}", module_log);
         let safe_log = deployment_receipt
             .logs
             .iter()
             .find(|log| log.topics[0].eq(&NEW_HOPR_NODE_STAKE_SAFE_TOPIC.parse::<H256>().unwrap()))
-            .ok_or(HelperErrors::ContractNotDeployed("safe".into()))
-            .unwrap(); // "NewHoprNodeStakeSafe(address)"
+            .ok_or(HelperErrors::ContractNotDeployed("safe".into()))?; // "NewHoprNodeStakeSafe(address)"
         debug!("safe_log {:?}", safe_log);
-        let module_addr = H160::decode(module_log.data.clone()).unwrap();
+        let module_addr = H160::decode(module_log.data.clone())?;
         debug!("module_addr {:?}", module_addr);
 
-        let safe_addr = H160::decode(safe_log.data.clone()).unwrap();
+        let safe_addr = H160::decode(safe_log.data.clone())?;
         debug!("safe_addr {:?}", safe_addr);
 
         assert_eq!(module_addr, module_address, "module prediction does not match");
         assert_eq!(safe_addr, safe_address, "safe prediction does not match");
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_deploy_safe_and_module() {
+    async fn test_deploy_safe_and_module() -> anyhow::Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
 
         // prepare some input data
@@ -2016,15 +1983,15 @@ mod tests {
 
         // launch local anvil instance
         let anvil = chain_types::utils::create_anvil(None);
-        let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
+        let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
         let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &contract_deployer);
         let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
             .await
             .expect("failed to deploy");
         // deploy multicall contract
-        deploy_multicall3_for_testing(client.clone()).await.unwrap();
+        deploy_multicall3_for_testing(client.clone()).await?;
         // deploy safe suits
-        deploy_safe_suites(client.clone()).await.unwrap();
+        deploy_safe_suites(client.clone()).await?;
 
         // register some nodes
         let (safe, node_module) = deploy_safe_module_with_targets_and_nodes(
@@ -2038,15 +2005,13 @@ mod tests {
             admin_addresses.clone(),
             U256::from(2),
         )
-        .await
-        .unwrap();
+        .await?;
 
         // check announcement is a target
         let try_get_announcement_target = node_module
             .try_get_target(instances.announcements.address())
             .call()
-            .await
-            .unwrap();
+            .await?;
 
         assert!(try_get_announcement_target.0, "announcement is not a target");
 
@@ -2054,30 +2019,30 @@ mod tests {
         let allowance = instances
             .token
             .allowance(safe.address(), instances.channels.address())
-            .await
-            .unwrap();
+            .await?;
 
         assert_eq!(allowance, U256::max_value(), "allowance is not set");
 
         // check nodes have been included in the module
         for node_address in node_addresses {
-            let is_node_included = node_module.is_node(node_address).call().await.unwrap();
+            let is_node_included = node_module.is_node(node_address).call().await?;
             assert!(is_node_included, "failed to include a node");
         }
 
         // check owners are provided admins
-        let owners = safe.get_owners().call().await.unwrap();
-        let thresold = safe.get_threshold().call().await.unwrap();
+        let owners = safe.get_owners().call().await?;
+        let thresold = safe.get_threshold().call().await?;
 
         assert_eq!(owners.len(), 2, "should have 2 owners");
         for (i, owner) in owners.iter().enumerate() {
             assert_eq!(owner, &admin_addresses[i], "admin is wrong");
         }
         assert_eq!(thresold, U256::from(2), "threshold should be two");
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_safe_tx_via_multisend() {
+    async fn test_safe_tx_via_multisend() -> anyhow::Result<()> {
         // set allowance for token transfer for the safe multiple times
         let _ = env_logger::builder().is_test(true).try_init();
 
@@ -2086,15 +2051,15 @@ mod tests {
 
         // launch local anvil instance
         let anvil = chain_types::utils::create_anvil(None);
-        let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
+        let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
         let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &contract_deployer);
         let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
             .await
             .expect("failed to deploy");
         // deploy multicall contract
-        deploy_multicall3_for_testing(client.clone()).await.unwrap();
+        deploy_multicall3_for_testing(client.clone()).await?;
         // deploy safe suits
-        deploy_safe_suites(client.clone()).await.unwrap();
+        deploy_safe_suites(client.clone()).await?;
 
         // create a safe
         let (safe, _node_module) = deploy_safe_module_with_targets_and_nodes(
@@ -2108,11 +2073,10 @@ mod tests {
             vec![contract_deployer.public().to_address().into()],
             U256::from(1),
         )
-        .await
-        .unwrap();
+        .await?;
 
         // check owner of safe
-        let is_owner = safe.get_owners().call().await.unwrap();
+        let is_owner = safe.get_owners().call().await?;
         assert_eq!(is_owner.len(), 1, "safe has too many owners");
         assert_eq!(
             is_owner[0],
@@ -2124,8 +2088,7 @@ mod tests {
         let allowance = instances
             .token
             .allowance(safe.address(), instances.channels.address())
-            .await
-            .unwrap();
+            .await?;
 
         assert_eq!(allowance, U256::max_value(), "allowance initiation is wrong");
 
@@ -2146,8 +2109,8 @@ mod tests {
         }
 
         // get chain_id and safe_nonce
-        let chain_id = client.get_chainid().await.unwrap();
-        let safe_nonce = safe.nonce().await.unwrap();
+        let chain_id = client.get_chainid().await?;
+        let safe_nonce = safe.nonce().await?;
         debug!("safe address {:?}", safe.address());
         debug!("chain_id {:?}", chain_id);
         debug!("safe_nonce {:?}", safe_nonce);
@@ -2156,40 +2119,39 @@ mod tests {
         send_multisend_safe_transaction_with_threshold_one(
             safe.clone(),
             contract_deployer,
-            H160::from_str(SAFE_MULTISEND_ADDRESS).unwrap(),
+            H160::from_str(SAFE_MULTISEND_ADDRESS)?,
             multisend_txns,
             chain_id,
             safe_nonce,
         )
-        .await
-        .unwrap();
+        .await?;
 
         // check allowance for channel contract is 4
         let new_allowance = instances
             .token
             .allowance(safe.address(), instances.channels.address())
-            .await
-            .unwrap();
+            .await?;
 
         assert_eq!(new_allowance, U256::from(4), "final allowance is not desired");
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_register_nodes_to_node_safe_registry() {
+    async fn test_register_nodes_to_node_safe_registry() -> anyhow::Result<()> {
         // set allowance for token transfer for the safe multiple times
         let _ = env_logger::builder().is_test(true).try_init();
 
         // launch local anvil instance
         let anvil = chain_types::utils::create_anvil(None);
-        let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
+        let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
         let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &contract_deployer);
         let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
             .await
             .expect("failed to deploy");
         // deploy multicall contract
-        deploy_multicall3_for_testing(client.clone()).await.unwrap();
+        deploy_multicall3_for_testing(client.clone()).await?;
         // deploy safe suits
-        deploy_safe_suites(client.clone()).await.unwrap();
+        deploy_safe_suites(client.clone()).await?;
 
         let deployer_vec: Vec<H160> = vec![contract_deployer.public().to_address().into()];
 
@@ -2205,24 +2167,20 @@ mod tests {
             deployer_vec.clone(),
             U256::from(1),
         )
-        .await
-        .unwrap();
+        .await?;
 
         // register one node to safe
         instances
             .safe_registry
             .register_safe_by_node(safe.address())
             .send()
-            .await
-            .unwrap()
-            .await
-            .unwrap();
+            .await?
+            .await?;
 
         // get registration info
         let get_registered_safe =
             get_registered_safes_for_nodes_on_node_safe_registry(instances.safe_registry.clone(), deployer_vec.clone())
-                .await
-                .unwrap();
+                .await?;
 
         assert_eq!(get_registered_safe.len(), 1, "cannot read registered safe");
         assert_eq!(get_registered_safe[0], safe.address(), "registered safe is wrong");
@@ -2234,14 +2192,12 @@ mod tests {
             vec![node_module.address()],
             contract_deployer.clone(),
         )
-        .await
-        .unwrap();
+        .await?;
 
         // get registration info (updated)
         let get_registered_safe =
             get_registered_safes_for_nodes_on_node_safe_registry(instances.safe_registry.clone(), deployer_vec.clone())
-                .await
-                .unwrap();
+                .await?;
 
         assert_eq!(get_registered_safe.len(), 1, "cannot read registered safe");
         assert_eq!(get_registered_safe[0], H160::zero(), "node is still registered");
@@ -2250,9 +2206,9 @@ mod tests {
         let is_removed = node_module
             .is_node(contract_deployer.public().to_address().into())
             .call()
-            .await
-            .unwrap();
+            .await?;
         assert!(!is_removed, "node is not removed");
+        Ok(())
     }
 
     #[async_std::test]
@@ -2267,15 +2223,15 @@ mod tests {
 
         // launch local anvil instance
         let anvil = chain_types::utils::create_anvil(None);
-        let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
+        let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
         let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &contract_deployer);
         let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
             .await
             .expect("failed to deploy");
         // deploy multicall contract
-        deploy_multicall3_for_testing(client.clone()).await.unwrap();
+        deploy_multicall3_for_testing(client.clone()).await?;
         // deploy safe suits
-        deploy_safe_suites(client.clone()).await.unwrap();
+        deploy_safe_suites(client.clone()).await?;
 
         let deployer_vec: Vec<H160> = vec![contract_deployer.public().to_address().into()];
 
