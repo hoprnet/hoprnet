@@ -1,0 +1,58 @@
+sequenceDiagram
+    autonumber
+
+    box Client
+        participant gnosisvpn as Gnosis VPN App
+        participant wg as Wireguard Client
+        participant hoprd as HOPRd Node
+    end
+    box Exit
+        participant ex_hoprd as HOPRd Exit Node
+        participant ex_wg as Wireguard Server
+        participant ex_gnosisvpn as Gnosis VPN Exit App
+    end
+
+    Note over gnosisvpn,ex_gnosisvpn: Tear down Wireguard bi-directional session
+    Note over gnosisvpn,wg: Assumption: gvpn_exit_app_ip == wg_server_ip
+
+    Note over wg,ex_wg: Step 1: Active VPN connection
+    activate wg
+    activate hoprd
+    activate ex_wg
+    activate ex_hoprd
+    wg->>ex_wg: send packet
+    ex_wg->>wg: receive packet
+
+    Note over gnosisvpn,ex_hoprd: Step 2: Stop WG client connection
+    gnosisvpn->>wg: deconfigure_and_deactivate_peer[wg_server_pubkey,wg_server_psk,tunnel_ip,tunnel_port]
+    deactivate wg
+    gnosisvpn->>hoprd: stop_client[UDP,tunnel_ip,tunnel_port]
+    hoprd->>ex_hoprd: SESSION sub-protocol CLOSE
+    ex_hoprd->>hoprd: SESSION sub-protocol OK
+    deactivate ex_hoprd
+    deactivate hoprd
+    hoprd->>gnosisvpn: stop_client[] OK
+
+    Note over gnosisvpn,ex_gnosisvpn: Step 3: Set up TCP tunnel for HTTP call to Gnosis VPN Exit App
+    gnosisvpn->>hoprd: create_client[TCP,gvpn_exit_app_ip,gvpn_exit_app_port,ex_hoprd_peer_id]
+    activate hoprd
+    hoprd->>ex_hoprd: START sub-protocol OPEN
+    activate ex_hoprd
+    ex_hoprd->>hoprd: START sub-protocol OK
+    hoprd->>gnosisvpn: create_client[TCP,tunnel_ip,tunnel_port] OK
+
+    Note over gnosisvpn,ex_gnosisvpn: Step 4: HTTP call to Gnosis VPN Exit App to deconfigure WG server
+    gnosisvpn->>ex_gnosisvpn: stop_wg_session_req[wg_client_pubkey]
+    gnosisvpn->>hoprd: send TCP packets
+    hoprd->>ex_hoprd: HOPR session packet(s)
+    ex_hoprd->>ex_gnosisvpn: relay TCP packets
+    ex_gnosisvpn->>ex_wg: deconfigure_peer[wg_client_pubkey]
+    deactivate ex_wg
+    ex_gnosisvpn->>ex_hoprd: send TCP response packets
+    ex_hoprd->>hoprd: HOPR session packet(s)
+    hoprd->>gnosisvpn: return TCP response packets
+    hoprd->>ex_hoprd: START sub-protocol CLOSE
+    ex_gnosisvpn->>gnosisvpn: stop_wg_session_resp[] OK
+
+    deactivate hoprd
+    deactivate ex_hoprd
