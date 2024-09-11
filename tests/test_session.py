@@ -8,13 +8,15 @@ from enum import Enum
 from contextlib import contextmanager
 from typing import Callable
 
-
 from .conftest import random_distinct_pairs_from, barebone_nodes
 from .node import Node
 
 PARAMETERIZED_SAMPLE_SIZE = 1  # if os.getenv("CI", default="false") == "false" else 3
 ECHO_SERVER_PORT = 10101
 HOPR_SESSION_MAX_PAYLOAD_SIZE = 462
+
+# used by nodes to get unique port assignments
+PORT_BASE = 19000
 
 def tcp_echo_server_func(port: int):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:

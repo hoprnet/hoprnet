@@ -1,5 +1,5 @@
 use std::io::ErrorKind;
-use std::str::FromStr;
+use std::net::IpAddr;
 use std::sync::Arc;
 
 use crate::{ApiErrorStatus, InternalState, ListenerId, BASE_PATH};
@@ -349,6 +349,8 @@ pub(crate) struct SessionCloseClientRequest {
 /// Closes an existing Session listener.
 /// The listener must've been previously created and bound for the given IP protocol.
 /// Once a listener is closed, no more socket connections can be made to it.
+/// If the passed port number is 0, listeners on all ports of the given listening IP and protocol
+/// will be closed.
 #[utoipa::path(
     delete,
     path = const_format::formatcp!("{BASE_PATH}/session/{{protocol}}"),
@@ -377,17 +379,36 @@ pub(crate) async fn close_client(
     Path(protocol): Path<IpProtocol>,
     Json(SessionCloseClientRequest { listening_ip, port }): Json<SessionCloseClientRequest>,
 ) -> Result<impl IntoResponse, impl IntoResponse> {
-    let bound_addr = std::net::SocketAddr::from_str(&format!("{listening_ip}:{port}"))
+    let listening_ip: IpAddr = listening_ip
+        .parse()
         .map_err(|_| (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidInput))?;
 
-    let (_, handle) = state
-        .open_listeners
-        .write()
-        .await
-        .remove(&ListenerId(protocol, bound_addr))
-        .ok_or((StatusCode::NOT_FOUND, ApiErrorStatus::InvalidInput))?;
+    {
+        let mut open_listeners = state.open_listeners.write().await;
 
-    hopr_async_runtime::prelude::cancel_join_handle(handle).await;
+        let mut to_remove = Vec::new();
+
+        // Find all listeners with protocol, listening IP and optionally port number (if > 0)
+        open_listeners
+            .iter()
+            .filter(|(ListenerId(proto, addr), _)| {
+                protocol == *proto && addr.ip() == listening_ip && (addr.port() == port || port == 0)
+            })
+            .for_each(|(id, _)| to_remove.push(*id));
+
+        if to_remove.is_empty() {
+            return Err((StatusCode::NOT_FOUND, ApiErrorStatus::InvalidInput));
+        }
+
+        for bound_addr in to_remove {
+            let (_, handle) = open_listeners
+                .remove(&bound_addr)
+                .ok_or((StatusCode::NOT_FOUND, ApiErrorStatus::InvalidInput))?;
+
+            hopr_async_runtime::prelude::cancel_join_handle(handle).await;
+        }
+    }
+
     Ok::<_, (StatusCode, ApiErrorStatus)>((StatusCode::NO_CONTENT, "").into_response())
 }
 
