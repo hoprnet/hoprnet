@@ -70,19 +70,6 @@ def connect_socket(sock_type: SocketType, port):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("src,relay,dest", [("1", "2", "3")])
-async def test_session_manual(
-        src: str, relay: str, dest: str, swarm7: dict[str, Node]
-):
-    assert await swarm7[src].api.ping(swarm7[relay].peer_id) is not None
-    assert await swarm7[relay].api.ping(swarm7[dest].peer_id) is not None
-
-    async with create_channel(swarm7[src], swarm7[relay], funding=10_000_000 * TICKET_PRICE_PER_HOP):
-        async with create_channel(swarm7[dest], swarm7[relay], funding=10_000_000 * TICKET_PRICE_PER_HOP):
-            await asyncio.sleep(1800)
-
-
-@pytest.mark.asyncio
 @pytest.mark.parametrize("src,dest", random_distinct_pairs_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
 async def test_session_communication_with_a_tcp_echo_server(
         src: str, dest: str, swarm7: dict[str, Node]
