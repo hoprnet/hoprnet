@@ -4031,6 +4031,7 @@ dependencies = [
 name = "hopr-lib"
 version = "2.2.0-rc.1"
 dependencies = [
+ "anyhow",
  "async-channel 2.3.1",
  "async-lock 3.4.0",
  "async-std",
@@ -4056,13 +4057,17 @@ dependencies = [
  "hopr-primitive-types",
  "hopr-strategy",
  "hopr-transport",
+ "hopr-transport-session",
  "lazy_static",
  "serde",
  "serde_with",
  "serde_yaml",
  "smart-default",
  "strum 0.26.3",
+ "test-log",
  "thiserror",
+ "tokio",
+ "tokio-util",
  "tracing",
  "validator",
 ]
@@ -4313,6 +4318,8 @@ dependencies = [
  "serde_with",
  "strum 0.26.3",
  "thiserror",
+ "tokio",
+ "tokio-util",
  "tracing",
 ]
 

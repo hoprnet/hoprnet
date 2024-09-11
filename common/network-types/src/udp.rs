@@ -94,7 +94,9 @@ impl UdpStreamBuilder {
     ///
     /// This an important back-pressure mechanism when dispatching received data from
     /// fast senders.
-    /// Reduces the memory consumed by the object.
+    /// Reduces the maximum memory consumed by the object, which is given by:
+    /// [`buffer_size`](UdpStreamBuilder::with_buffer_size) *
+    /// [`queue_size`](UdpStreamBuilder::with_queue_size)
     ///
     /// Default is unbounded.
     pub fn with_queue_size(mut self, queue_size: usize) -> Self {
@@ -144,7 +146,8 @@ impl UdpStreamBuilder {
             .unwrap_or_else(|e| {
                 error!("failed to determine available parallelism, defaulting to 1: {e}");
                 1
-            });
+            })
+            / 2; // Each socket gets one RX and one TX task
         let num_socks = self
             .parallelism
             .map(|n| {
@@ -490,6 +493,7 @@ impl tokio::io::AsyncWrite for ConnectedUdpStream {
 mod tests {
     use super::*;
     use anyhow::Context;
+    use futures::future::Either;
     use parameterized::parameterized;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::net::UdpSocket;
@@ -542,5 +546,54 @@ mod tests {
         stream.shutdown().await?;
 
         Ok(())
+    }
+
+    #[tokio::test]
+    async fn udp_stream_should_process_sequential_writes() -> anyhow::Result<()> {
+        const BUF_SIZE: usize = 1024;
+        const EXPECTED_DATA_LEN: usize = BUF_SIZE + 500;
+
+        let mut listener = ConnectedUdpStream::builder()
+            .with_buffer_size(BUF_SIZE)
+            .with_queue_size(512)
+            .build(("127.0.0.1", 0))
+            .context("bind listener")?;
+
+        let bound_addr = *listener.bound_address();
+
+        let jh = tokio::task::spawn(async move {
+            let mut buf = [0u8; BUF_SIZE / 4];
+            let mut vec = Vec::<u8>::new();
+            loop {
+                let sz = listener.read(&mut buf).await.unwrap();
+                if sz > 0 {
+                    vec.extend_from_slice(&buf[..sz]);
+                    if vec.len() >= EXPECTED_DATA_LEN {
+                        return vec;
+                    }
+                } else {
+                    return vec;
+                }
+            }
+        });
+
+        let msg = [1u8; EXPECTED_DATA_LEN];
+        let sender = UdpSocket::bind(("127.0.0.1", 0)).await.context("bind")?;
+
+        sender.send_to(&msg[..BUF_SIZE], bound_addr).await?;
+        sender.send_to(&msg[BUF_SIZE..], bound_addr).await?;
+
+        let timeout = tokio::time::sleep(std::time::Duration::from_millis(1000));
+        pin_mut!(timeout);
+        pin_mut!(jh);
+
+        match futures::future::select(jh, timeout).await {
+            Either::Left((Ok(v), _)) => {
+                assert_eq!(v.len(), EXPECTED_DATA_LEN);
+                assert_eq!(v.as_slice(), &msg);
+                Ok(())
+            }
+            _ => Err(anyhow::anyhow!("timeout or invalid data")),
+        }
     }
 }

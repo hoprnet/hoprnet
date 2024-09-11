@@ -1,5 +1,4 @@
-use crate::{errors::TransportSessionError, traits::SendMsg, Capability};
-use futures::{channel::mpsc::UnboundedReceiver, pin_mut, AsyncRead, AsyncWrite, StreamExt};
+use futures::{channel::mpsc::UnboundedReceiver, pin_mut, StreamExt};
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_internal_types::protocol::{ApplicationData, PAYLOAD_SIZE};
 use hopr_network_types::prelude::state::SessionFeature;
@@ -20,6 +19,8 @@ use std::{
 };
 use strum::IntoEnumIterator;
 use tracing::{debug, error};
+
+use crate::{errors::TransportSessionError, traits::SendMsg, Capability};
 
 /// Unique ID of a specific session.
 ///
@@ -445,26 +446,33 @@ pub fn unwrap_offchain_key(payload: Box<[u8]>) -> crate::errors::Result<(PeerId,
 /// Otherwise, it transfers the [`SESSION_USABLE_MTU_SIZE`].
 /// In the opposite direction, transfers from the `session` into the `stream` will always
 /// use `max_buffer` regardless of the Session's capabilities.
+///
+/// This function is only available with Tokio.
+#[cfg(feature = "runtime-tokio")]
 pub async fn transfer_session<S>(
     session: &mut Session,
     stream: &mut S,
     max_buffer: usize,
 ) -> std::io::Result<(usize, usize)>
 where
-    S: AsyncRead + AsyncWrite + Unpin,
+    S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
 {
-    let into_session_len = if session.capabilities().contains(&Capability::Segmentation) {
-        max_buffer
-    } else {
-        SESSION_USABLE_MTU_SIZE
-    };
+    let into_session_len = max_buffer;
+    debug!(
+        session_id = tracing::field::debug(session.id()),
+        "session egress buffer: {max_buffer}, session ingress buffer: {into_session_len}"
+    );
 
     // We can always read as much as possible from the Session and then write it to the Stream.
-    // However, if no segmentation is taking place in the Session, we can only read up
-    // to the maximum of MTU bytes from the Stream and then write it into the Session.
-    copy_duplex(session, stream, max_buffer, into_session_len)
-        .await
-        .map(|(a, b)| (a as usize, b as usize))
+    // Session also implements chunking, so data can be written with arbitrary sizes also in the other direction
+    copy_duplex(
+        &mut tokio_util::compat::FuturesAsyncReadCompatExt::compat(session),
+        stream,
+        max_buffer,
+        into_session_len,
+    )
+    .await
+    .map(|(a, b)| (a as usize, b as usize))
 }
 
 #[cfg(test)]

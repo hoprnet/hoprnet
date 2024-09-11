@@ -77,8 +77,13 @@ hopr-network-types = { workspace = true }
 hopr-async-runtime = { workspace = true }
 
 [dev-dependencies]
+anyhow = { workspace = true }
 async-std = { workspace = true }
 ethers = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-db-sql = { workspace = true, features = ["runtime-async-std"] }
+hopr-transport-session = { workspace = true, features = ["runtime-tokio"] }
 serde_yaml = { workspace = true }
+test-log = "0.2.16"
+tokio = { workspace = true }
+tokio-util = { workspace = true }

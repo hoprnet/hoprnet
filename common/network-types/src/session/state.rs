@@ -818,7 +818,7 @@ impl<const C: usize> SessionSocket<C> {
 
 impl<const C: usize> AsyncWrite for SessionSocket<C> {
     fn poll_write(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
-        tracing::debug!(
+        tracing::trace!(
             session_id = self.state.session_id(),
             "polling write on socket reader inside session"
         );
@@ -831,7 +831,7 @@ impl<const C: usize> AsyncWrite for SessionSocket<C> {
     }
 
     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
-        tracing::debug!(
+        tracing::trace!(
             session_id = self.state.session_id(),
             "polling flush on socket reader inside session"
         );
@@ -841,7 +841,7 @@ impl<const C: usize> AsyncWrite for SessionSocket<C> {
     }
 
     fn poll_close(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
-        tracing::debug!(
+        tracing::trace!(
             session_id = self.state.session_id(),
             "polling close on socket reader inside session"
         );
@@ -853,7 +853,7 @@ impl<const C: usize> AsyncWrite for SessionSocket<C> {
 
 impl<const C: usize> AsyncRead for SessionSocket<C> {
     fn poll_read(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<std::io::Result<usize>> {
-        tracing::debug!(
+        tracing::trace!(
             session_id = self.state.session_id(),
             "polling read on socket reader inside session"
         );

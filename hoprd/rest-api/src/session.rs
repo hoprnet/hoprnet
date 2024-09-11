@@ -18,7 +18,6 @@ use hopr_network_types::udp::ForeignDataMode;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use tokio::net::TcpListener;
-use tokio_util::compat::TokioAsyncReadCompatExt;
 use tracing::{debug, error, info};
 
 /// Default listening host the session listener socket binds to.
@@ -28,7 +27,7 @@ pub const DEFAULT_LISTEN_HOST: &str = "127.0.0.1:0";
 pub const HOPR_TCP_BUFFER_SIZE: usize = 2048;
 
 /// Size of the buffer for forwarding data to/from a UDP stream.
-pub const HOPR_UDP_BUFFER_SIZE: usize = 2048;
+pub const HOPR_UDP_BUFFER_SIZE: usize = 16384;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -423,23 +422,23 @@ async fn udp_bind_to<A: std::net::ToSocketAddrs>(
 ) -> std::io::Result<(std::net::SocketAddr, ConnectedUdpStream)> {
     let udp_socket = ConnectedUdpStream::builder()
         .with_buffer_size(HOPR_UDP_BUFFER_SIZE)
-        .with_queue_size(1024)
+        .with_queue_size(2048)
         .with_foreign_data_mode(ForeignDataMode::Discard) // discard data from UDP clients other than the first one served
-        //.with_parallelism(Some(0))
+        .with_parallelism(0) // Automatic per available parallelism
         .build(address)?;
 
     Ok((*udp_socket.bound_address(), udp_socket))
 }
 
-async fn bind_session_to_stream<T>(mut session: HoprSession, stream: T, max_buf: usize)
+async fn bind_session_to_stream<T>(mut session: HoprSession, mut stream: T, max_buf: usize)
 where
     T: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
 {
     let session_id = *session.id();
-    match transfer_session(&mut session, &mut stream.compat(), max_buf).await {
-        Ok(bound_stream_finished) => info!(
+    match transfer_session(&mut session, &mut stream, max_buf).await {
+        Ok((session_to_stream, stream_to_session)) => info!(
             session_id = tracing::field::debug(session_id),
-            "client session ended with {bound_stream_finished:?} bytes transferred in both directions.",
+            "client session ended - ingress: {stream_to_session} bytes, egress: {session_to_stream} bytes",
         ),
         Err(e) => error!(
             session_id = tracing::field::debug(session_id),

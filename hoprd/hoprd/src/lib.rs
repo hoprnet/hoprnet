@@ -136,12 +136,12 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                     "UDP target {udp_target} resolved to {resolved_udp_target}"
                 );
 
-                let udp_bridge = hopr_network_types::udp::ConnectedUdpStream::builder()
+                let mut udp_bridge = hopr_network_types::udp::ConnectedUdpStream::builder()
                     .with_buffer_size(HOPR_UDP_BUFFER_SIZE)
                     .with_counterparty(resolved_udp_target)
                     .with_foreign_data_mode(ForeignDataMode::Error)
-                    .with_queue_size(1024)
-                    //.with_parallelism(Some(0))
+                    .with_queue_size(2048)
+                    .with_parallelism(0)
                     .build(("0.0.0.0", 0))
                     .map_err(|e| {
                         HoprLibError::GeneralError(format!(
@@ -157,10 +157,10 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                     #[cfg(all(feature = "prometheus", not(test)))]
                     METRIC_ACTIVE_TARGETS.increment(&["tcp"], 1.0);
 
-                    match transfer_session(&mut session.session, &mut tokio_util::compat::TokioAsyncReadCompatExt::compat(udp_bridge), HOPR_UDP_BUFFER_SIZE).await {
-                        Ok(bound_stream_finished) => tracing::info!(
+                    match transfer_session(&mut session.session, &mut udp_bridge, HOPR_UDP_BUFFER_SIZE).await {
+                        Ok((session_to_stream, stream_to_session)) => tracing::info!(
                             session_id = debug(session_id),
-                            "server bridged session through UDP {udp_target} ended with {bound_stream_finished:?} bytes transferred in both directions."
+                            "server bridged session to UDP {udp_target} ended - egress: {session_to_stream} bytes, ingress: {stream_to_session} bytes"
                         ),
                         Err(e) => tracing::error!(session_id = debug(session_id),
                             "UDP server stream ({udp_target}) is closed: {e:?}"
@@ -193,7 +193,7 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                 // TODO: make TCP connection retry strategy configurable either by the server or the client
                 let strategy = tokio_retry::strategy::FixedInterval::from_millis(1500).take(15);
 
-                let tcp_bridge = tokio_retry::Retry::spawn(strategy, || {
+                let mut tcp_bridge = tokio_retry::Retry::spawn(strategy, || {
                     tokio::net::TcpStream::connect(resolved_tcp_targets.as_slice())
                 })
                 .await
@@ -215,10 +215,10 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                     #[cfg(all(feature = "prometheus", not(test)))]
                     METRIC_ACTIVE_TARGETS.increment(&["udp"], 1.0);
 
-                    match transfer_session(&mut session.session, &mut tokio_util::compat::TokioAsyncReadCompatExt::compat(tcp_bridge), HOPR_TCP_BUFFER_SIZE).await {
-                        Ok(bound_stream_finished) => tracing::info!(
+                    match transfer_session(&mut session.session, &mut tcp_bridge, HOPR_TCP_BUFFER_SIZE).await {
+                        Ok((session_to_stream, stream_to_session)) => tracing::info!(
                             session_id = debug(session_id),
-                            "server bridged session through TCP {tcp_target} ended with {bound_stream_finished:?} bytes transferred in both directions."
+                            "server bridged session to TCP {tcp_target} ended - egress: {session_to_stream} bytes, ingress: {stream_to_session} bytes"
                         ),
                         Err(e) => tracing::error!(
                             session_id = debug(session_id),
