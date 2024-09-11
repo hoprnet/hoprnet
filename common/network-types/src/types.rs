@@ -172,6 +172,15 @@ impl RoutingOptions {
             _ => self,
         }
     }
+
+    /// Returns the number of hops this instance represents.
+    /// This value is guaranteed to be between 0 and [`RoutingOptions::MAX_INTERMEDIATE_HOPS`].
+    pub fn count_hops(&self) -> usize {
+        match &self {
+            RoutingOptions::IntermediatePath(v) => v.as_ref().len(),
+            RoutingOptions::Hops(h) => (*h).into(),
+        }
+    }
 }
 
 #[cfg(test)]
