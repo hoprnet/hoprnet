@@ -174,7 +174,7 @@ pub(super) async fn show_ticket_statistics(State(state): State<Arc<InternalState
         delete,
         path = const_format::formatcp!("{BASE_PATH}/tickets/statistics"),
         responses(
-            (status = 204, description = "Ticket statistics reset successfully."),
+            (status = 200, description = "Ticket statistics reset successfully."),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),

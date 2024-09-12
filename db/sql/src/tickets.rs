@@ -595,21 +595,20 @@ impl HoprDbTicketOperations for HoprDb {
             .await?
             .perform(|tx| {
                 Box::pin(async move {
-                    #[cfg(all(feature = "prometheus", not(test)))]
-                    {
-                        for row in ticket_statistics::Entity::find().all(tx.as_ref()).await? {
-                            METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(&[&row.channel_id, "neglected"], 0.0_f64);
-
-                            METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(&[&row.channel_id, "redeemed"], 0.0_f64);
-
-                            METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(&[&row.channel_id, "rejected"], 0.0_f64);
-                        }
-                    }
-
                     let deleted = ticket_statistics::Entity::delete_many().exec(tx.as_ref()).await?;
 
                     if deleted.rows_affected > 0 {
                         debug!("reset ticket statistics for {:} channels", deleted.rows_affected);
+                        #[cfg(all(feature = "prometheus", not(test)))]
+                        {
+                            for row in ticket_statistics::Entity::find().all(tx.as_ref()).await? {
+                                METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(&[&row.channel_id, "neglected"], 0.0_f64);
+
+                                METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(&[&row.channel_id, "redeemed"], 0.0_f64);
+
+                                METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(&[&row.channel_id, "rejected"], 0.0_f64);
+                            }
+                        }
                     }
                     Ok::<_, DbSqlError>(())
                 })
