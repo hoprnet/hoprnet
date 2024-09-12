@@ -142,11 +142,9 @@ impl IdentitySubcommands {
                 info!("Identities: {:?}", node_identities);
                 Ok(())
             }
-            None => {
-                return Err(HelperErrors::MissingParameter(
-                    "Missing identity_from_directory when creating identites".into(),
-                ))
-            }
+            None => Err(HelperErrors::MissingParameter(
+                "Missing identity_from_directory when creating identites".into(),
+            )),
         }
     }
 
