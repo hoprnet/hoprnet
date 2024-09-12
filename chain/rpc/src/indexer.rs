@@ -13,7 +13,7 @@ use ethers::providers::{JsonRpcClient, Middleware};
 use futures::stream::BoxStream;
 use futures::{Stream, StreamExt, TryStreamExt};
 use std::pin::Pin;
-use tracing::{debug, info, warn};
+use tracing::{debug, warn};
 use tracing::{error, trace};
 
 use crate::errors::{Result, RpcError, RpcError::FilterIsEmpty};

@@ -1006,9 +1006,9 @@ impl Hopr {
                     let multi_strategy = multi_strategy.clone();
 
                     async move {
-                        info!("doing strategy tick");
+                        debug!(state = "started", "strategy tick");
                         let _ = multi_strategy.on_tick().await;
-                        info!("strategy tick done");
+                        debug!(state = "finished", "strategy tick");
                     }
                 })
                 .await;

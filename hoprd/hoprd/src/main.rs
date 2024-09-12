@@ -44,12 +44,16 @@ fn init_logger() -> Result<(), Box<dyn std::error::Error>> {
     let env_filter = match tracing_subscriber::EnvFilter::try_from_default_env() {
         Ok(filter) => filter,
         Err(_) => tracing_subscriber::filter::EnvFilter::new("info")
-            .add_directive("libp2p_mplex=info".parse()?)
             .add_directive("libp2p_swarm=info".parse()?)
+            .add_directive("libp2p_mplex=info".parse()?)
+            .add_directive("libp2p_tcp=info".parse()?)
+            .add_directive("libp2p_dns=info".parse()?)
             .add_directive("multistream_select=info".parse()?)
-            .add_directive("isahc::handler=error".parse()?)
-            .add_directive("isahc::client=error".parse()?)
-            .add_directive("surf::middleware::logger::native=error".parse()?),
+            .add_directive("isahc=error".parse()?)
+            .add_directive("surf::middleware::logger::native=error".parse()?)
+            .add_directive("sea_orm=warn".parse()?)
+            .add_directive("sqlx=warn".parse()?)
+            .add_directive("hyper_util=warn".parse()?),
     };
 
     let format = tracing_subscriber::fmt::layer()

@@ -157,7 +157,7 @@ where
                     let is_synced = is_synced.clone();
 
                     async move {
-                        info!("Processed block number: {}", block_with_logs.block_id);
+                        trace!("Processed block number: {}", block_with_logs.block_id);
 
                         let current_block = block_with_logs.block_id;
                         #[cfg(all(feature = "prometheus", not(test)))]
@@ -187,7 +187,7 @@ where
                                 (current_block - next_block_to_process) as f64 / block_difference as f64
                             };
 
-                            info!("Sync progress {:.2}% @ block {}", progress * 100_f64, current_block);
+                            info!(progress = progress * 100_f64, block = current_block, "Sync progress");
 
                             #[cfg(all(feature = "prometheus", not(test)))]
                             METRIC_INDEXER_SYNC_PROGRESS.set(progress);
@@ -209,7 +209,7 @@ where
                     let block_id = block_with_logs.to_string();
                     let outgoing_events = match db_processor.collect_block_events(block_with_logs).await {
                         Ok(events) => {
-                            info!("retrieved {} significant chain events from {block_id}", events.len());
+                            trace!("retrieved {} significant chain events from {block_id}", events.len());
                             Some(events)
                         }
                         Err(e) => {
@@ -223,8 +223,9 @@ where
                     match db.get_last_indexed_block(None).await {
                         Ok(current_described_block) => {
                             info!(
-                                "Current indexer state at block #{block_id} with checksum: {}",
-                                current_described_block.checksum
+                                block_id,
+                                checksum = %current_described_block.checksum,
+                                "Indexer state update",
                             );
 
                             #[cfg(all(feature = "prometheus", not(test)))]

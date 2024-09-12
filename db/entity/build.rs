@@ -33,7 +33,7 @@ where
         }
     };
 
-    Ok(result.map_err(|e| anyhow::anyhow!(e.to_string()))?)
+    result.map_err(|e| anyhow::anyhow!(e.to_string()))
 }
 
 fn main() -> anyhow::Result<()> {
