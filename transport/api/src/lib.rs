@@ -271,7 +271,7 @@ where
         session_tx.close_channel();
         trace!(
             session_id = tracing::field::debug(session_id),
-            "channel closed on session"
+            "data tx channel closed on session"
         );
         Ok(true)
     } else {

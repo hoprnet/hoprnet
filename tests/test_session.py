@@ -144,6 +144,7 @@ async def test_session_communication_over_n_hop_with_a_tcp_echo_server(
         ]
 
         await asyncio.gather(*(channels_to + channels_back))
+        await asyncio.sleep(2) # wait until the channels are opened
 
         src_sock_port = await src_peer.api.session_client(dest_peer.peer_id, path={"IntermediatePath": path}, protocol='tcp',
                                                           target=f"localhost:{ECHO_SERVER_PORT}")
@@ -255,6 +256,7 @@ async def test_session_communication_over_n_hop_with_a_udp_echo_server(
         ]
 
         await asyncio.gather(*(channels_to + channels_back))
+        await asyncio.sleep(2) # wait until the channels are opened
 
         src_sock_port = await src_peer.api.session_client(dest_peer.peer_id, path={"IntermediatePath": path}, protocol='udp',
                                                           target=f"localhost:{ECHO_SERVER_PORT}")

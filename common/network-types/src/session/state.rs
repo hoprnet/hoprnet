@@ -165,8 +165,10 @@ pub struct SessionConfig {
     ///
     /// Requests will be sent until `frame_expiration_age` is reached.
     ///
-    /// NOTE that this value should be offset from `rto_base_sender`, so that the receiver's
+    /// NOTE: this value should be offset from `rto_base_sender`, so that the receiver's
     /// retransmission requests are interleaved with the sender's retransmissions.
+    ///
+    /// In *most* cases, you want to 0 < `rto_base_receiver` < `rto_base_sender` < `frame_expiration_age`.
     #[default(Duration::from_millis(1000))]
     pub rto_base_receiver: Duration,
 
@@ -175,8 +177,10 @@ pub struct SessionConfig {
     ///
     /// Frames will be retransmitted until `frame_expiration_age` is reached.
     ///
-    /// NOTE that this value should be offset from `rto_base_receiver`, so that the receiver's
+    /// NOTE: this value should be offset from `rto_base_receiver`, so that the receiver's
     /// retransmission requests are interleaved with the sender's retransmissions.
+    ///
+    /// In *most* cases, you want to 0 < `rto_base_receiver` < `rto_base_sender` < `frame_expiration_age`.
     #[default(Duration::from_millis(1500))]
     pub rto_base_sender: Duration,
 
@@ -580,15 +584,18 @@ impl<const C: usize> SessionState<C> {
     /// - [`SessionState::retransmit_unacknowledged_frames`]
     ///
     async fn state_loop(&mut self) -> crate::errors::Result<()> {
-        // Rate limiter for reassembler evictions
+        // Rate limiter for reassembler evictions:
+        // tries to evict 10 times before a frame expires
         let eviction_limiter =
             governor::RateLimiter::direct(Quota::with_period(self.cfg.frame_expiration_age / 10).ok_or(
                 NetworkTypeError::Other("rate limiter frame_expiration_age invalid".into()),
             )?);
 
-        // Rate limiter for acknowledgements
+        // Rate limiter for acknowledgements:
+        // sends acknowledgements 4 times more often
+        // than the other side can retransmit them, or we ask for retransmissions.
         let ack_rate_limiter = governor::RateLimiter::direct(
-            Quota::with_period(self.cfg.rto_base_sender.min(self.cfg.rto_base_receiver) / 3)
+            Quota::with_period(self.cfg.rto_base_sender.min(self.cfg.rto_base_receiver) / 4)
                 .ok_or(NetworkTypeError::Other("rate limiter ack rate invalid".into()))?,
         );
 
