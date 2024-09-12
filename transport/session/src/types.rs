@@ -4,7 +4,6 @@ use hopr_internal_types::protocol::{ApplicationData, PAYLOAD_SIZE};
 use hopr_network_types::prelude::state::SessionFeature;
 use hopr_network_types::prelude::{IpOrHost, RoutingOptions};
 use hopr_network_types::session::state::{SessionConfig, SessionSocket};
-use hopr_network_types::utils::copy_duplex;
 use hopr_primitive_types::traits::BytesRepresentable;
 use libp2p_identity::PeerId;
 use std::collections::HashSet;
@@ -468,7 +467,7 @@ where
 
     // We can always read as much as possible from the Session and then write it to the Stream.
     // Session also implements chunking, so data can be written with arbitrary sizes also in the other direction
-    copy_duplex(
+    hopr_network_types::utils::copy_duplex(
         &mut tokio_util::compat::FuturesAsyncReadCompatExt::compat(session),
         stream,
         max_buffer,
