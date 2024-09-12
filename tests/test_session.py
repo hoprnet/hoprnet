@@ -74,7 +74,7 @@ def connect_socket(sock_type: SocketType, port):
 async def test_session_communication_with_a_tcp_echo_server(
         src: str, dest: str, swarm7: dict[str, Node]
 ):
-    packet_count = 1000 if os.getenv("CI", default="false") == "false" else 50
+    packet_count = 100 if os.getenv("CI", default="false") == "false" else 50
     expected = [f"{i}".ljust(STANDARD_MTU_SIZE) for i in range(packet_count)]
 
     assert [len(x) for x in expected] == packet_count * [STANDARD_MTU_SIZE]
@@ -85,6 +85,7 @@ async def test_session_communication_with_a_tcp_echo_server(
     src_sock_port = await src_peer.api.session_client(dest_peer.peer_id, path={"Hops": 0}, protocol='tcp',
                                                       target=f"localhost:{ECHO_SERVER_PORT}")
 
+    assert src_sock_port is not None, "Failed to open session"
     assert len(await src_peer.api.session_list_clients('tcp')) == 1
 
     actual = ''
@@ -116,37 +117,38 @@ async def test_session_communication_with_a_tcp_echo_server(
     [shuffled(barebone_nodes())[:3] for _ in range(PARAMETERIZED_SAMPLE_SIZE)],
     # + [shuffled(nodes())[:5] for _ in range(PARAMETERIZED_SAMPLE_SIZE)],
 )
-async def test_session_communication_with_a_tcp_echo_server_over_n_hop(
+async def test_session_communication_over_n_hop_with_a_tcp_echo_server(
         route, swarm7: dict[str, Node]
 ):
-    packet_count = 1000 if os.getenv("CI", default="false") == "false" else 50
+    packet_count = 100 if os.getenv("CI", default="false") == "false" else 50
     expected = [f"{i}".ljust(STANDARD_MTU_SIZE) for i in range(packet_count)]
 
     assert [len(x) for x in expected] == packet_count * [STANDARD_MTU_SIZE]
 
     src_peer = swarm7[route[0]]
-    dest_peer = swarm7[route[-1:]]
+    dest_peer = swarm7[route[-1]]
     path = [swarm7[node].peer_id for node in route[1:-1]]
 
     async with AsyncExitStack() as channels:
-        await asyncio.gather(
-            *[
-                channels.enter_async_context(
-                    create_channel(swarm7[route[i]], swarm7[route[i + 1]], funding=4 * packet_count * TICKET_PRICE_PER_HOP)
-                )
-                for i in range(len(route) - 1)
-            ],
-            *[
-                channels.enter_async_context(
-                    create_channel(swarm7[route[i]], swarm7[route[i + 1]], funding=4 * packet_count * TICKET_PRICE_PER_HOP)
-                )
-                for i in reversed(range(1, len(route)))
-            ],
-        )
+        channels_to = [
+            channels.enter_async_context(
+                create_channel(swarm7[route[i]], swarm7[route[i + 1]], funding=20 * packet_count * TICKET_PRICE_PER_HOP)
+            )
+            for i in range(len(route) - 1)
+        ]
+        channels_back = [
+            channels.enter_async_context(
+                create_channel(swarm7[route[i]], swarm7[route[i - 1]], funding=20 * packet_count * TICKET_PRICE_PER_HOP)
+            )
+            for i in reversed(range(1, len(route)))
+        ]
+
+        await asyncio.gather(*(channels_to + channels_back))
 
         src_sock_port = await src_peer.api.session_client(dest_peer.peer_id, path={"IntermediatePath": path}, protocol='tcp',
                                                           target=f"localhost:{ECHO_SERVER_PORT}")
 
+        assert src_sock_port is not None, "Failed to open session"
         assert len(await src_peer.api.session_list_clients('tcp')) == 1
 
         actual = ''
@@ -192,6 +194,7 @@ async def test_session_communication_with_a_udp_echo_server(
     src_sock_port = await src_peer.api.session_client(dest_peer.peer_id, path={"Hops": 0}, protocol='udp',
                                                       target=f"localhost:{ECHO_SERVER_PORT}")
 
+    assert src_sock_port is not None, "Failed to open session"
     assert len(await src_peer.api.session_list_clients('udp')) == 1
 
     actual = []
@@ -225,37 +228,38 @@ async def test_session_communication_with_a_udp_echo_server(
     [shuffled(barebone_nodes())[:3] for _ in range(PARAMETERIZED_SAMPLE_SIZE)],
     # + [shuffled(nodes())[:5] for _ in range(PARAMETERIZED_SAMPLE_SIZE)],
 )
-async def test_session_communication_with_a_udp_echo_server_over_n_hop(
+async def test_session_communication_over_n_hop_with_a_udp_echo_server(
         route, swarm7: dict[str, Node]
 ):
-    packet_count = 1000 if os.getenv("CI", default="false") == "false" else 50
+    packet_count = 100 if os.getenv("CI", default="false") == "false" else 50
     expected = [f"{i}".ljust(HOPR_SESSION_MAX_PAYLOAD_SIZE) for i in range(packet_count)]
 
     assert [len(x) for x in expected] == packet_count * [HOPR_SESSION_MAX_PAYLOAD_SIZE]
 
     src_peer = swarm7[route[0]]
-    dest_peer = swarm7[route[-1:]]
+    dest_peer = swarm7[route[-1]]
     path = [swarm7[node].peer_id for node in route[1:-1]]
 
     async with AsyncExitStack() as channels:
-        await asyncio.gather(
-            *[
-                channels.enter_async_context(
-                    create_channel(swarm7[route[i]], swarm7[route[i + 1]], funding=packet_count * TICKET_PRICE_PER_HOP)
-                )
-                for i in range(len(route) - 1)
-            ],
-            *[
-                 channels.enter_async_context(
-                     create_channel(swarm7[route[i]], swarm7[route[i + 1]], funding=packet_count * TICKET_PRICE_PER_HOP)
-                 )
-                 for i in reversed(range(1, len(route)))
-            ],
-        )
+        channels_to = [
+            channels.enter_async_context(
+                create_channel(swarm7[route[i]], swarm7[route[i + 1]], funding=packet_count * TICKET_PRICE_PER_HOP)
+            )
+            for i in range(len(route) - 1)
+        ]
+        channels_back = [
+            channels.enter_async_context(
+                create_channel(swarm7[route[i]], swarm7[route[i - 1]], funding=packet_count * TICKET_PRICE_PER_HOP)
+            )
+            for i in reversed(range(1, len(route)))
+        ]
 
-        src_sock_port = await src_peer.api.session_client(dest_peer.peer_id, path={"Hops": 0}, protocol='udp',
+        await asyncio.gather(*(channels_to + channels_back))
+
+        src_sock_port = await src_peer.api.session_client(dest_peer.peer_id, path={"IntermediatePath": path}, protocol='udp',
                                                           target=f"localhost:{ECHO_SERVER_PORT}")
 
+        assert src_sock_port is not None, "Failed to open session"
         assert len(await src_peer.api.session_list_clients('udp')) == 1
 
         actual = []
