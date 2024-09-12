@@ -247,17 +247,15 @@ abstract contract HoprCrypto {
                     revert(0, 0)
                 }
                 let numerator :=
-                        addmod( // 3 * p.x ^ 2 + a
-                            mulmod( // 3 * p.x ^ 2
-                                3, mulmod(pX, pX, SECP256K1_BASE_FIELD_ORDER), SECP256K1_BASE_FIELD_ORDER
-                            ), a, SECP256K1_BASE_FIELD_ORDER
-                        )
-                lambda :=
-                    mulmod( // (3 * p.x ^ 2 + a) * (2 * p.y) ^ -1
-                        numerator,
-                        mload(payload),
+                    addmod( // 3 * p.x ^ 2 + a
+                        mulmod( // 3 * p.x ^ 2
+                        3, mulmod(pX, pX, SECP256K1_BASE_FIELD_ORDER), SECP256K1_BASE_FIELD_ORDER),
+                        a,
                         SECP256K1_BASE_FIELD_ORDER
                     )
+                lambda :=
+                    mulmod( // (3 * p.x ^ 2 + a) * (2 * p.y) ^ -1
+                    numerator, mload(payload), SECP256K1_BASE_FIELD_ORDER)
             }
             case false {
                 // Point addition

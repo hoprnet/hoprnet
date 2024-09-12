@@ -217,8 +217,8 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
 
     /**
      * @dev Revokes the target address from the scope
-     * @notice After removing a target, if the target contains some custom permissions, 
-     * the customized granular permissions are not automatically removed. 
+     * @notice After removing a target, if the target contains some custom permissions,
+     * the customized granular permissions are not automatically removed.
      * When the target gets added again to the module, all the previously added custom permissions are retained.
      * @param targetAddress The address of the target to be revoked.
      */

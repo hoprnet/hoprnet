@@ -229,15 +229,10 @@ contract HoprNodeSafeRegistryTest is Test, HoprNodeSafeRegistryEvents {
     /**
      * @dev node can still be registered by the Safe although it's not a member in the module enabled by the Safe
      * @notice this was previously not possible due to an additional check ensureNodeIsSafeModuleMember
-     * The said function is removed as it does not allow certian eligible setup, as reported in 
+     * The said function is removed as it does not allow certian eligible setup, as reported in
      * https://github.com/hoprnet/hoprnet/issues/6466
      */
-    function test_RegisterSafeByNodeAlthoughNodeIsNotModuleMember(
-        address safeAddress,
-        address nodeAddress
-    )
-        public
-    {
+    function test_RegisterSafeByNodeAlthoughNodeIsNotModuleMember(address safeAddress, address nodeAddress) public {
         vm.assume(
             !PrecompileUtils.isPrecompileAddress(safeAddress) && !Address.isContract(safeAddress)
                 && !Address.isContract(safeAddress) && safeAddress != address(0) && safeAddress != address(this)

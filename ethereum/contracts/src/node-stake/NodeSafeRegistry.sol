@@ -172,7 +172,7 @@ contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
     /**
      * @dev Deregisters a Hopr node from its associated Safe and emits relevant events.
      * This function can only be called by the associated Safe.
-     * @notice This function does not perform additional checks on whether the node is 
+     * @notice This function does not perform additional checks on whether the node is
      * registered in the active node management module.
      * @param nodeAddr The address of the Hopr node to be deregistered.
      */
@@ -220,7 +220,7 @@ contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
 
     /**
      * @dev Internal function to store a node-safe pair and emit relevant events.
-     * @notice This function does not perform additional checks on whether the node is 
+     * @notice This function does not perform additional checks on whether the node is
      * registered in the active node management module.
      * @param safeAddress Address of safe
      * @param nodeChainKeyAddress Address of node
