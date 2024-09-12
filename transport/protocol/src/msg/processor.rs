@@ -72,7 +72,7 @@ where
 {
     type Input = ApplicationData;
 
-    #[tracing::instrument(level = "debug", skip(self, data))]
+    #[tracing::instrument(level = "trace", skip(self, data))]
     async fn send(&self, data: ApplicationData, path: TransportPath) -> Result<(PeerId, Box<[u8]>)> {
         let path: std::result::Result<Vec<OffchainPublicKey>, hopr_primitive_types::errors::GeneralError> =
             path.hops().iter().map(OffchainPublicKey::try_from).collect();
@@ -98,7 +98,7 @@ where
 {
     type Packet = RecvOperation;
 
-    #[tracing::instrument(level = "debug", skip(self, data))]
+    #[tracing::instrument(level = "trace", skip(self, data))]
     async fn recv(&self, peer: &PeerId, data: Box<[u8]>) -> Result<RecvOperation> {
         let previous_hop = OffchainPublicKey::try_from(peer)
             .map_err(|e| PacketError::LogicError(format!("failed to convert '{peer}' into the public key: {e}")))?;
@@ -256,7 +256,7 @@ impl MsgSender {
     }
 
     /// Pushes a new packet into processing.
-    #[tracing::instrument(level = "debug", skip(self, data))]
+    #[tracing::instrument(level = "trace", skip(self, data))]
     pub async fn send_packet(&self, data: ApplicationData, path: TransportPath) -> Result<PacketSendAwaiter> {
         let (tx, rx) = futures::channel::oneshot::channel::<std::result::Result<(), PacketError>>();
 

@@ -511,8 +511,9 @@ impl Hopr {
 
         let contract_addresses = ContractAddresses::from(&resolved_environment);
         info!(
-            "Resolved contract addresses for myself as '{}': {contract_addresses:?}",
-            me_onchain.public().to_hex(),
+            myself = me_onchain.public().to_hex(),
+            contract_addresses = tracing::field::debug(contract_addresses),
+            "Resolved contract addresses",
         );
 
         let my_multiaddresses = vec![multiaddress];
@@ -564,7 +565,10 @@ impl Hopr {
             hopr_chain_api.actions_ref().clone(),
             hopr_transport_api.ticket_aggregator(),
         ));
-        debug!("Initialized strategies: {multi_strategy:?}");
+        debug!(
+            strategies = tracing::field::debug(&multi_strategy),
+            "Initialized strategies"
+        );
 
         #[cfg(all(feature = "prometheus", not(test)))]
         {

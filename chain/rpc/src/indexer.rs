@@ -63,7 +63,7 @@ impl<P: JsonRpcClient + 'static> RpcOperations<P> {
     fn stream_logs(&self, filter: LogFilter, from_block: u64, to_block: u64) -> BoxStream<Result<Log>> {
         let fetch_ranges = split_range(filter, from_block, to_block, self.cfg.max_block_range_fetch_size);
 
-        info!(
+        debug!(
             "polling logs from blocks #{from_block} - #{to_block} (via {:?} chunks)",
             (to_block - from_block) / self.cfg.max_block_range_fetch_size + 1
         );

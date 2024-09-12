@@ -287,7 +287,7 @@ impl<Req: HttpPostRequestor, R: RetryPolicy<JsonRpcProviderClientError>> JsonRpc
         let body = self.requestor.http_post(self.url.as_ref(), payload).await?;
         let req_duration = start.elapsed();
 
-        debug!("rpc {method} request took {}ms", req_duration.as_millis());
+        trace!("rpc {method} request took {}ms", req_duration.as_millis());
 
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_RPC_CALLS_TIMING.observe(&[method], req_duration.as_secs_f64());
@@ -415,8 +415,8 @@ where
                         METRIC_RETRIES_PER_RPC_CALL.observe(&[method], num_retries as f64);
 
                         debug!(
-                            "successful request {method} spent {}ms in the retry queue",
-                            start.elapsed().as_millis()
+                            elapsed_in_ms = start.elapsed().as_millis(),
+                            "request {method} succeeded",
                         );
                         return Ok(ret);
                     }
