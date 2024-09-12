@@ -6,9 +6,9 @@ use std::collections::HashSet;
 use std::sync::Arc;
 use tokio::net::UdpSocket;
 
-use hopr_lib::{transfer_session, SendMsg};
+use hopr_lib::SendMsg;
 use hopr_transport::{Session, SessionId, TransportSessionError};
-use hopr_transport_session::types::unwrap_offchain_key;
+use hopr_transport_session::types::{transfer_session, unwrap_offchain_key};
 
 #[derive(Default)]
 struct BufferingMsgSender {
@@ -59,9 +59,7 @@ async fn udp_session_bridging() -> anyhow::Result<()> {
 
     let addr = *listener.bound_address();
 
-    tokio::task::spawn(async move {
-        transfer_session(&mut session, &mut listener, BUF_LEN).await.unwrap();
-    });
+    tokio::task::spawn(async move { transfer_session(&mut session, &mut listener, BUF_LEN).await });
 
     let msg = [1u8; 9183];
     let sender = UdpSocket::bind(("127.0.0.1", 0)).await?;

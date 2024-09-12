@@ -81,11 +81,14 @@ pub use {
         constants::RESERVED_TAG_UPPER_LIMIT,
         errors::{HoprTransportError, ProtocolError},
         libp2p::identity::PeerId,
-        transfer_session, ApplicationData, HalfKeyChallenge, Health, IncomingSession as HoprIncomingSession, Keypair,
-        Multiaddr, OffchainKeypair as HoprOffchainKeypair, SendMsg, Session as HoprSession, SessionCapability,
+        ApplicationData, HalfKeyChallenge, Health, IncomingSession as HoprIncomingSession, Keypair, Multiaddr,
+        OffchainKeypair as HoprOffchainKeypair, SendMsg, Session as HoprSession, SessionCapability,
         SessionClientConfig, SessionId as HoprSessionId, SessionTarget, TicketStatistics, SESSION_USABLE_MTU_SIZE,
     },
 };
+
+#[cfg(feature = "runtime-tokio")]
+pub use hopr_transport::transfer_session;
 
 use crate::constants::{MIN_NATIVE_BALANCE, ONBOARDING_INFORMATION_INTERVAL, SUGGESTED_NATIVE_BALANCE};
 use crate::{config::SafeModule, errors::HoprLibError};

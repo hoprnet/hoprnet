@@ -84,10 +84,13 @@ pub use {
     },
     hopr_transport_protocol::execute_on_tick,
     hopr_transport_session::{
-        errors::TransportSessionError, traits::SendMsg, types::transfer_session, Capability as SessionCapability,
-        IncomingSession, Session, SessionClientConfig, SessionId, SESSION_USABLE_MTU_SIZE,
+        errors::TransportSessionError, traits::SendMsg, Capability as SessionCapability, IncomingSession, Session,
+        SessionClientConfig, SessionId, SESSION_USABLE_MTU_SIZE,
     },
 };
+
+#[cfg(feature = "runtime-tokio")]
+pub use hopr_transport_session::types::transfer_session;
 
 pub use crate::helpers::{IndexerTransportEvent, PeerEligibility, TicketStatistics};
 pub use hopr_network_types::prelude::RoutingOptions;

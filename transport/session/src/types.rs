@@ -441,15 +441,8 @@ pub fn unwrap_offchain_key(payload: Box<[u8]>) -> crate::errors::Result<(PeerId,
 
 /// Convenience function to copy data in both directions between a [Session] and arbitrary
 /// async IO stream.
-///
-/// The function takes the capabilities of the given `session` into account:
-/// It transfers either `max_buffer` size from the `stream` into the Session, if segmentation is
-/// supported.
-/// Otherwise, it transfers the [`SESSION_USABLE_MTU_SIZE`].
-/// In the opposite direction, transfers from the `session` into the `stream` will always
-/// use `max_buffer` regardless of the Session's capabilities.
-///
 /// This function is only available with Tokio and will panic with other runtimes.
+#[cfg(feature = "runtime-tokio")]
 pub async fn transfer_session<S>(
     session: &mut Session,
     stream: &mut S,
@@ -458,9 +451,6 @@ pub async fn transfer_session<S>(
 where
     S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
 {
-    #[cfg(not(feature = "runtime-tokio"))]
-    unimplemented!("Sessions are currently not supported on other runtimes than Tokio");
-
     let into_session_len = max_buffer;
     debug!(
         session_id = tracing::field::debug(session.id()),
@@ -469,7 +459,6 @@ where
 
     // We can always read as much as possible from the Session and then write it to the Stream.
     // Session also implements chunking, so data can be written with arbitrary sizes also in the other direction
-    #[cfg(feature = "runtime-tokio")]
     hopr_network_types::utils::copy_duplex(
         &mut tokio_util::compat::FuturesAsyncReadCompatExt::compat(session),
         stream,
