@@ -9,6 +9,9 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum DbSqlError {
+    #[error("failed to construct the database, {0}")]
+    Construction(String),
+
     #[error("account entry for announcement not found")]
     MissingAccount,
 

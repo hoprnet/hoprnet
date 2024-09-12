@@ -301,7 +301,7 @@ impl FromStr for Balance {
     type Err = GeneralError;
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        let regex = Regex::new(r"^\s*(\d+)\s*([A-z]+)\s*$").unwrap();
+        let regex = Regex::new(r"^\s*(\d+)\s*([A-z]+)\s*$").expect("should use valid regex pattern");
         let cap = regex.captures(s).ok_or(ParseError)?;
 
         if cap.len() == 3 {
@@ -416,22 +416,18 @@ mod tests {
     use std::str::FromStr;
 
     #[test]
-    fn address_tests() {
-        let addr_1 = Address::try_from(hex!("Cf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9")).unwrap();
-        let addr_2 = Address::try_from(addr_1.as_ref()).unwrap();
+    fn address_tests() -> anyhow::Result<()> {
+        let addr_1 = Address::try_from(hex!("Cf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"))?;
+        let addr_2 = Address::try_from(addr_1.as_ref())?;
 
         assert_eq!(addr_1, addr_2, "deserialized address does not match");
-        assert_eq!(
-            addr_1,
-            Address::from_str("Cf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9").unwrap()
-        );
+        assert_eq!(addr_1, Address::from_str("Cf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9")?);
 
-        assert_eq!(
-            addr_1,
-            Address::from_str("0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9").unwrap()
-        );
+        assert_eq!(addr_1, Address::from_str("0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9")?);
 
-        assert_eq!(addr_1, Address::from_str(&addr_1.to_hex()).unwrap());
+        assert_eq!(addr_1, Address::from_str(&addr_1.to_hex())?);
+
+        Ok(())
     }
 
     #[test]
@@ -512,33 +508,39 @@ mod tests {
     }
 
     #[test]
-    fn eth_challenge_tests() {
+    fn eth_challenge_tests() -> anyhow::Result<()> {
         let e_1 = EthereumChallenge::default();
-        let e_2 = EthereumChallenge::try_from(e_1.as_ref()).unwrap();
+        let e_2 = EthereumChallenge::try_from(e_1.as_ref())?;
 
         assert_eq!(e_1, e_2);
+
+        Ok(())
     }
 
     #[test]
-    fn u256_float_multiply() {
-        assert_eq!(U256::one(), U256::one().mul_f64(1.0f64).unwrap());
-        assert_eq!(U256::one(), U256::from(10u64).mul_f64(0.1f64).unwrap());
+    fn u256_float_multiply() -> anyhow::Result<()> {
+        assert_eq!(U256::one(), U256::one().mul_f64(1.0f64)?);
+        assert_eq!(U256::one(), U256::from(10u64).mul_f64(0.1f64)?);
 
         // bad examples
         assert!(U256::one().mul_f64(-1.0).is_err());
         assert!(U256::one().mul_f64(1.1).is_err());
+
+        Ok(())
     }
 
     #[test]
-    fn u256_float_divide() {
-        assert_eq!(U256::one(), U256::one().div_f64(1.0f64).unwrap());
+    fn u256_float_divide() -> anyhow::Result<()> {
+        assert_eq!(U256::one(), U256::one().div_f64(1.0f64)?);
 
-        assert_eq!(U256::from(2u64), U256::one().div_f64(0.5f64).unwrap());
-        assert_eq!(U256::from(10000u64), U256::one().div_f64(0.0001f64).unwrap());
+        assert_eq!(U256::from(2u64), U256::one().div_f64(0.5f64)?);
+        assert_eq!(U256::from(10000u64), U256::one().div_f64(0.0001f64)?);
 
         // bad examples
         assert!(U256::one().div_f64(0.0).is_err());
         assert!(U256::one().div_f64(1.1).is_err());
+
+        Ok(())
     }
 
     #[test]

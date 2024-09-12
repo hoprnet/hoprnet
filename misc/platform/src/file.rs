@@ -34,10 +34,8 @@ pub mod native {
         }
     }
 
-    pub fn remove_dir_all(path: &str) -> Result<()> {
-        fs::remove_dir_all(Path::new(path)).map_err(|e| PlatformError::GeneralError(e.to_string()))?;
-
-        Ok(())
+    pub fn remove_dir_all(path: &std::path::Path) -> Result<()> {
+        fs::remove_dir_all(path).map_err(|e| PlatformError::GeneralError(e.to_string()))
     }
 
     pub fn write<R>(path: &str, contents: R) -> Result<()>

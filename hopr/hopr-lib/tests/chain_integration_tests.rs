@@ -29,20 +29,20 @@ use hopr_primitive_types::prelude::*;
 use hopr_transport::{ChainKeypair, Hash, Keypair, Multiaddr, OffchainKeypair};
 
 // Helper function to generate the first acked ticket (channel_epoch 1, index 0, offset 0) of win prob 100%
-async fn generate_the_first_ack_ticket<M: Middleware>(
+async fn generate_the_first_ack_ticket<M: Middleware + 'static>(
     myself: &ChainNode,
     counterparty: &ChainKeypair,
     price: Balance,
     instances: &ContractInstances<M>,
-) {
+) -> anyhow::Result<()> {
     let hk1 = HalfKey::random();
     let hk2 = HalfKey::random();
 
-    let cp1: CurvePoint = hk1.to_challenge().try_into().unwrap();
-    let cp2: CurvePoint = hk2.to_challenge().try_into().unwrap();
+    let cp1: CurvePoint = hk1.to_challenge().try_into()?;
+    let cp2: CurvePoint = hk2.to_challenge().try_into()?;
     let cp_sum = CurvePoint::combine(&[&cp1, &cp2]);
 
-    let domain_separator: Hash = instances.channels.domain_separator().call().await.unwrap().into();
+    let domain_separator: Hash = instances.channels.domain_separator().call().await?.into();
 
     let ack_ticket = TicketBuilder::default()
         .addresses(counterparty, &myself.chain_key)
@@ -52,22 +52,19 @@ async fn generate_the_first_ack_ticket<M: Middleware>(
         .win_prob(1.0)
         .channel_epoch(1)
         .challenge(Challenge::from(cp_sum).into())
-        .build_signed(counterparty, &domain_separator)
-        .unwrap()
-        .into_acknowledged(Response::from_half_keys(&hk1, &hk2).unwrap());
+        .build_signed(counterparty, &domain_separator)?
+        .into_acknowledged(Response::from_half_keys(&hk1, &hk2)?);
 
-    myself
-        .db
-        .upsert_ticket(None, ack_ticket)
-        .await
-        .expect("should store ack key");
+    myself.db.upsert_ticket(None, ack_ticket).await?;
+
+    Ok(())
 }
 
-async fn onboard_node<M: Middleware>(
+async fn onboard_node<M: Middleware + 'static>(
     instances: &ContractInstances<M>,
     contract_deployer: &ChainKeypair,
     node_chain_key: &ChainKeypair,
-) -> (Address, Address) {
+) -> anyhow::Result<(Address, Address)> {
     let client = instances.token.client();
 
     // Deploy Safe and Module for node
@@ -76,8 +73,7 @@ async fn onboard_node<M: Middleware>(
         client.clone(),
         contract_deployer,
     )
-    .await
-    .expect("could not deploy safe and module");
+    .await?;
 
     // ----------------
     // Onboarding:
@@ -94,8 +90,7 @@ async fn onboard_node<M: Middleware>(
         node_chain_key.public().to_address(),
         contract_deployer,
     )
-    .await
-    .expect("could not include node to module");
+    .await?;
 
     // Add announcement as target into the module
     add_announcement_as_target(
@@ -105,8 +100,7 @@ async fn onboard_node<M: Middleware>(
         instances.announcements.address().into(),
         contract_deployer,
     )
-    .await
-    .expect("could not add announcement to module");
+    .await?;
 
     // Fund the node's Safe with 10 native token and 10 000 * 1e-18 HOPR token
     chain_types::utils::fund_node(safe, 10_u128.into(), 10_000_u128.into(), instances.token.clone()).await;
@@ -128,10 +122,9 @@ async fn onboard_node<M: Middleware>(
         instances.channels.address().into(),
         contract_deployer,
     )
-    .await
-    .expect("could not approve channels to be a spender for safe");
+    .await?;
 
-    (module, safe)
+    Ok((module, safe))
 }
 
 type TestRpc = RpcOperations<JsonRpcProviderClient<SurfRequestor, SimpleJsonRpcRetryPolicy>>;
@@ -156,15 +149,14 @@ async fn start_node_chain_logic(
     rpc_cfg: RpcOperationsConfig,
     actions_cfg: ActionQueueConfig,
     indexer_cfg: IndexerConfig,
-) -> ChainNode {
+) -> anyhow::Result<ChainNode> {
     // DB
-    let db = HoprDb::new_in_memory(chain_key.clone()).await;
+    let db = HoprDb::new_in_memory(chain_key.clone()).await?;
     let self_db = db.clone();
     let ock = offchain_key.public().clone();
     let ckp = chain_key.public().to_address().clone();
     db.begin_transaction()
-        .await
-        .unwrap()
+        .await?
         .perform(|tx| {
             Box::pin(async move {
                 self_db
@@ -175,8 +167,7 @@ async fn start_node_chain_logic(
                     .await
             })
         })
-        .await
-        .unwrap();
+        .await?;
 
     // RPC
     let json_rpc_client = JsonRpcProviderClient::new(
@@ -185,7 +176,7 @@ async fn start_node_chain_logic(
         SimpleJsonRpcRetryPolicy::default(),
     );
 
-    let rpc_ops = RpcOperations::new(json_rpc_client, chain_key, rpc_cfg).expect("failed to create RpcOperations");
+    let rpc_ops = RpcOperations::new(json_rpc_client, chain_key, rpc_cfg)?;
 
     // Transaction executor
     let eth_client = RpcEthereumClient::new(rpc_ops.clone(), RpcEthereumClientConfig::default());
@@ -221,27 +212,27 @@ async fn start_node_chain_logic(
     let chain_log_handler = ContractEventHandlers::new(contract_addrs, safe_addr, chain_key.clone(), db.clone());
 
     let mut indexer = Indexer::new(rpc_ops.clone(), chain_log_handler, db.clone(), indexer_cfg, sce_tx);
-    indexer.start().await.expect("indexer should sync");
+    indexer.start().await?;
 
-    ChainNode {
+    Ok(ChainNode {
         offchain_key: offchain_key.clone(),
         chain_key: chain_key.clone(),
         db,
         actions,
         _indexer: indexer,
         node_tasks,
-    }
+    })
 }
 
 #[cfg_attr(feature = "runtime-async-std", async_std::test)]
 #[cfg_attr(all(feature = "runtime-tokio", not(feature = "runtime-async-std")), tokio::test)]
-async fn integration_test_indexer() {
+async fn integration_test_indexer() -> anyhow::Result<()> {
     let block_time = Duration::from_secs(1);
     let anvil = create_anvil(Some(block_time));
-    let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
+    let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
 
-    let alice_chain_key = ChainKeypair::from_secret(anvil.keys()[1].to_bytes().as_ref()).unwrap();
-    let bob_chain_key = ChainKeypair::from_secret(anvil.keys()[2].to_bytes().as_ref()).unwrap();
+    let alice_chain_key = ChainKeypair::from_secret(anvil.keys()[1].to_bytes().as_ref())?;
+    let bob_chain_key = ChainKeypair::from_secret(anvil.keys()[2].to_bytes().as_ref())?;
 
     let alice_offchain_key = OffchainKeypair::random();
     let bob_offchain_key = OffchainKeypair::random();
@@ -280,7 +271,7 @@ async fn integration_test_indexer() {
 
     // Setup ALICE
     info!("Setting up ALICE");
-    let (alice_module_addr, alice_safe_addr) = onboard_node(&instances, &contract_deployer, &alice_chain_key).await;
+    let (alice_module_addr, alice_safe_addr) = onboard_node(&instances, &contract_deployer, &alice_chain_key).await?;
 
     rpc_cfg.module_address = alice_module_addr;
 
@@ -295,11 +286,11 @@ async fn integration_test_indexer() {
         actions_cfg,
         indexer_cfg,
     )
-    .await;
+    .await?;
 
     // Setup BOB
     info!("Setting up BOB");
-    let (bob_module_addr, bob_safe_addr) = onboard_node(&instances, &contract_deployer, &bob_chain_key).await;
+    let (bob_module_addr, bob_safe_addr) = onboard_node(&instances, &contract_deployer, &bob_chain_key).await?;
 
     rpc_cfg.module_address = bob_module_addr;
 
@@ -314,7 +305,7 @@ async fn integration_test_indexer() {
         actions_cfg,
         indexer_cfg,
     )
-    .await;
+    .await?;
 
     info!("======== STARTING TEST ========");
 
@@ -359,7 +350,7 @@ async fn integration_test_indexer() {
     info!("--> Bob's Safe has been registered");
 
     // Announce the node by Alice
-    let maddr: Multiaddr = "/ip4/127.0.0.1/tcp/10000".parse().unwrap();
+    let maddr: Multiaddr = "/ip4/127.0.0.1/tcp/10000".parse()?;
     let confirmation = alice_node
         .actions
         .announce(&[maddr.clone()], &alice_node.offchain_key)
@@ -383,7 +374,7 @@ async fn integration_test_indexer() {
     );
 
     // Announce the node by Bob
-    let maddr: Multiaddr = "/ip4/127.0.0.1/tcp/20000".parse().unwrap();
+    let maddr: Multiaddr = "/ip4/127.0.0.1/tcp/20000".parse()?;
     let confirmation = bob_node
         .actions
         .announce(&[maddr.clone()], &bob_node.offchain_key)
@@ -410,11 +401,7 @@ async fn integration_test_indexer() {
 
     assert_eq!(
         Some(alice_node.chain_key.public().to_address()),
-        bob_node
-            .db
-            .resolve_chain_key(alice_node.offchain_key.public())
-            .await
-            .expect("resolve should not fail"),
+        bob_node.db.resolve_chain_key(alice_node.offchain_key.public()).await?,
         "bob must resolve alice's chain key correctly"
     );
 
@@ -423,18 +410,13 @@ async fn integration_test_indexer() {
         bob_node
             .db
             .resolve_packet_key(&alice_node.chain_key.public().to_address())
-            .await
-            .expect("resolve should not fail"),
+            .await?,
         "bob must resolve alice's offchain key correctly"
     );
 
     assert_eq!(
         Some(bob_node.chain_key.public().to_address()),
-        alice_node
-            .db
-            .resolve_chain_key(bob_node.offchain_key.public())
-            .await
-            .expect("resolve should not fail"),
+        alice_node.db.resolve_chain_key(bob_node.offchain_key.public()).await?,
         "alice must resolve bob's chain key correctly"
     );
 
@@ -443,8 +425,7 @@ async fn integration_test_indexer() {
         alice_node
             .db
             .resolve_packet_key(&bob_node.chain_key.public().to_address())
-            .await
-            .expect("resolve should not fail"),
+            .await?,
         "alice must resolve bob's offchain key correctly"
     );
 
@@ -599,7 +580,7 @@ async fn integration_test_indexer() {
     let ticket_price = Balance::new(1, BalanceType::HOPR);
 
     // Create ticket from Alice in Bob's DB
-    generate_the_first_ack_ticket(&bob_node, &alice_chain_key, ticket_price, &instances).await;
+    generate_the_first_ack_ticket(&bob_node, &alice_chain_key, ticket_price, &instances).await?;
 
     let bob_ack_tickets = bob_node
         .db
@@ -628,14 +609,12 @@ async fn integration_test_indexer() {
         .channels
         .channels(channel_bob_alice.get_id().into())
         .call()
-        .await
-        .unwrap();
+        .await?;
     let (on_chain_channel_alice_bob_balance, _, _, _, _) = instances
         .channels
         .channels(channel_alice_bob.get_id().into())
         .call()
-        .await
-        .unwrap();
+        .await?;
 
     assert_eq!(
         channel_alice_bob.balance.amount(),
@@ -730,15 +709,13 @@ async fn integration_test_indexer() {
         .channels
         .channels(channel_bob_alice.get_id().into())
         .call()
-        .await
-        .unwrap();
+        .await?;
 
     let (on_chain_channel_alice_bob_balance, _, _, _, _) = instances
         .channels
         .channels(channel_alice_bob.get_id().into())
         .call()
-        .await
-        .unwrap();
+        .await?;
 
     assert_eq!(
         channel_alice_bob.balance.amount(),
@@ -816,8 +793,8 @@ async fn integration_test_indexer() {
 
     info!("--> successfully initiated channel closure for Alice -> Bob");
 
-    let alice_checksum = alice_node.db.get_last_indexed_block(None).await.unwrap();
-    let bob_checksum = bob_node.db.get_last_indexed_block(None).await.unwrap();
+    let alice_checksum = alice_node.db.get_last_indexed_block(None).await?;
+    let bob_checksum = bob_node.db.get_last_indexed_block(None).await?;
     info!("alice completed at {:?}", alice_checksum);
     info!("bob completed at {:?}", bob_checksum);
 
@@ -827,4 +804,6 @@ async fn integration_test_indexer() {
     );
 
     futures::future::join_all(alice_node.node_tasks.into_iter().map(|t| cancel_join_handle(t))).await;
+
+    Ok(())
 }
