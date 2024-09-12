@@ -1217,6 +1217,7 @@ mod tests {
         filter_satisfying_ticket_models, AggregationPrerequisites, HoprDbTicketOperations, TicketSelector,
     };
     use crate::{HoprDbGeneralModelOperations, TargetDb};
+    use anyhow::Context;
     use futures::StreamExt;
     use hex_literal::hex;
     use hopr_crypto_types::prelude::*;
@@ -1280,8 +1281,7 @@ mod tests {
             .win_prob(1.0)
             .channel_epoch(4)
             .challenge(Challenge::from(cp_sum).to_ethereum_challenge())
-            .build_signed(src, &Hash::default())
-            .expect("should sign a ticket")
+            .build_signed(src, &Hash::default())?
             .into_acknowledged(Response::from_half_keys(&hk1, &hk2)?))
     }
 
@@ -1329,7 +1329,7 @@ mod tests {
             .await?;
 
         let (channel, mut tickets) = init_db_with_tickets(&db, 1).await?;
-        let ack_ticket = tickets.pop().unwrap();
+        let ack_ticket = tickets.pop().context("ticket should be present")?;
 
         assert_eq!(
             channel.get_id(),
@@ -1344,11 +1344,10 @@ mod tests {
 
         let db_ticket = db
             .get_tickets((&ack_ticket).into())
-            .await
-            .expect("should get ticket")
+            .await?
             .first()
             .cloned()
-            .expect("ticket should exist");
+            .context("ticket should exist")?;
 
         assert_eq!(ack_ticket, db_ticket, "tickets must be equal");
 
@@ -1393,8 +1392,7 @@ mod tests {
                     Ok::<(), DbSqlError>(())
                 })
             })
-            .await
-            .expect("tx must not fail");
+            .await?;
 
         let stats = db.get_ticket_statistics(None).await?;
         assert_eq!(
@@ -1425,7 +1423,7 @@ mod tests {
             .await?
             .1
             .pop()
-            .expect("should contain a ticket");
+            .context("should contain a ticket")?;
 
         db.mark_tickets_redeemed((&ticket).into()).await?;
         assert_eq!(0, db.mark_tickets_redeemed((&ticket).into()).await?);
@@ -1499,7 +1497,7 @@ mod tests {
         let db = HoprDb::new_in_memory(ALICE.clone()).await?;
 
         let (_, mut ticket) = init_db_with_tickets(&db, 1).await?;
-        let ticket = ticket.pop().unwrap().ticket;
+        let ticket = ticket.pop().context("ticket should be present")?.ticket;
 
         let stats = db.get_ticket_statistics(None).await?;
         assert_eq!(BalanceType::HOPR.zero(), stats.rejected_value);
@@ -1541,7 +1539,7 @@ mod tests {
         assert_eq!(1, v.len(), "single ticket must be updated");
         assert_eq!(
             AcknowledgedTicketStatus::BeingRedeemed,
-            v.first().expect("should contain a ticket").status,
+            v.first().context("should contain a ticket")?.status,
             "status must be set"
         );
 
@@ -1580,8 +1578,7 @@ mod tests {
 
         let v: Vec<AcknowledgedTicket> = db
             .update_ticket_states_and_fetch(selector, AcknowledgedTicketStatus::BeingRedeemed)
-            .await
-            .expect("must create stream")
+            .await?
             .collect()
             .await;
 
@@ -1603,7 +1600,7 @@ mod tests {
             .filter(hopr_db_entity::outgoing_ticket_index::Column::ChannelId.eq(hash.to_hex()))
             .one(&db.tickets_db)
             .await?
-            .expect("index must exist");
+            .context("index must exist")?;
 
         assert_eq!(0, U256::from_be_bytes(r.index).as_u64(), "index must be zero");
 
@@ -1820,11 +1817,11 @@ mod tests {
         let idx_1 = indices
             .iter()
             .find(|idx| idx.channel_id == hash_1.to_hex())
-            .expect("must contain index 1");
+            .context("must contain index 1")?;
         let idx_2 = indices
             .iter()
             .find(|idx| idx.channel_id == hash_2.to_hex())
-            .expect("must contain index 2");
+            .context("must contain index 2")?;
         assert_eq!(0, U256::from_be_bytes(&idx_1.index).as_u64(), "index must be 0");
         assert_eq!(10, U256::from_be_bytes(&idx_2.index).as_u64(), "index must be 10");
 
@@ -1840,11 +1837,11 @@ mod tests {
         let idx_1 = indices
             .iter()
             .find(|idx| idx.channel_id == hash_1.to_hex())
-            .expect("must contain index 1");
+            .context("must contain index 1")?;
         let idx_2 = indices
             .iter()
             .find(|idx| idx.channel_id == hash_2.to_hex())
-            .expect("must contain index 2");
+            .context("must contain index 2")?;
         assert_eq!(3, U256::from_be_bytes(&idx_1.index).as_u64(), "index must be 3");
         assert_eq!(11, U256::from_be_bytes(&idx_2.index).as_u64(), "index must be 11");
         Ok(())
@@ -1902,8 +1899,7 @@ mod tests {
 
         let dummy_tickets = vec![dummy_ticket_model(channel.get_id(), 1, 1, 1)];
 
-        let filtered_tickets = filter_satisfying_ticket_models(prerequisites, dummy_tickets.clone(), &channel)
-            .expect("must filter tickets");
+        let filtered_tickets = filter_satisfying_ticket_models(prerequisites, dummy_tickets.clone(), &channel)?;
 
         assert_eq!(
             dummy_tickets, filtered_tickets,
@@ -1934,8 +1930,7 @@ mod tests {
             .map(|i| dummy_ticket_model(channel.get_id(), i as u64, 1, 1))
             .collect();
 
-        let filtered_tickets = filter_satisfying_ticket_models(prerequisites, dummy_tickets.clone(), &channel)
-            .expect("must filter tickets");
+        let filtered_tickets = filter_satisfying_ticket_models(prerequisites, dummy_tickets.clone(), &channel)?;
 
         assert_eq!(
             100,
@@ -1977,8 +1972,7 @@ mod tests {
             .map(|i| dummy_ticket_model(channel.get_id(), i as u64, 1, 1))
             .collect();
 
-        let filtered_tickets = filter_satisfying_ticket_models(prerequisites, dummy_tickets.clone(), &channel)
-            .expect("must filter tickets");
+        let filtered_tickets = filter_satisfying_ticket_models(prerequisites, dummy_tickets.clone(), &channel)?;
 
         assert!(
             filtered_tickets.is_empty(),
@@ -2012,8 +2006,7 @@ mod tests {
             .map(|i| dummy_ticket_model(channel.get_id(), i as u64, 1, 1))
             .collect();
 
-        let filtered_tickets = filter_satisfying_ticket_models(prerequisites, dummy_tickets.clone(), &channel)
-            .expect("must filter tickets");
+        let filtered_tickets = filter_satisfying_ticket_models(prerequisites, dummy_tickets.clone(), &channel)?;
 
         assert!(
             filtered_tickets.is_empty(),
@@ -2046,8 +2039,7 @@ mod tests {
             .map(|i| dummy_ticket_model(channel.get_id(), i as u64, 1, 1))
             .collect();
 
-        let filtered_tickets = filter_satisfying_ticket_models(prerequisites, dummy_tickets.clone(), &channel)
-            .expect("must filter tickets");
+        let filtered_tickets = filter_satisfying_ticket_models(prerequisites, dummy_tickets.clone(), &channel)?;
 
         assert!(!filtered_tickets.is_empty(), "must not return empty");
         assert_eq!(dummy_tickets, filtered_tickets, "return all tickets");
@@ -2078,8 +2070,7 @@ mod tests {
             .map(|i| dummy_ticket_model(channel.get_id(), i as u64, 1, 1))
             .collect();
 
-        let filtered_tickets = filter_satisfying_ticket_models(prerequisites, dummy_tickets.clone(), &channel)
-            .expect("must filter tickets");
+        let filtered_tickets = filter_satisfying_ticket_models(prerequisites, dummy_tickets.clone(), &channel)?;
 
         assert!(!filtered_tickets.is_empty(), "must not return empty");
         assert_eq!(dummy_tickets, filtered_tickets, "return all tickets");
@@ -2110,8 +2101,7 @@ mod tests {
             .map(|i| dummy_ticket_model(channel.get_id(), i as u64, 1, 1))
             .collect();
 
-        let filtered_tickets = filter_satisfying_ticket_models(prerequisites, dummy_tickets.clone(), &channel)
-            .expect("must filter tickets");
+        let filtered_tickets = filter_satisfying_ticket_models(prerequisites, dummy_tickets.clone(), &channel)?;
 
         assert!(!filtered_tickets.is_empty(), "must not return empty");
         assert_eq!(dummy_tickets, filtered_tickets, "return all tickets");
@@ -2142,8 +2132,7 @@ mod tests {
             .map(|i| dummy_ticket_model(channel.get_id(), i as u64, 1, 1))
             .collect();
 
-        let filtered_tickets = filter_satisfying_ticket_models(prerequisites, dummy_tickets.clone(), &channel)
-            .expect("must filter tickets");
+        let filtered_tickets = filter_satisfying_ticket_models(prerequisites, dummy_tickets.clone(), &channel)?;
 
         assert!(!filtered_tickets.is_empty(), "must not return empty");
         assert_eq!(dummy_tickets, filtered_tickets, "return all tickets");
@@ -2175,8 +2164,7 @@ mod tests {
             .collect();
         dummy_tickets[0].index_offset = 2; // Make this ticket aggregated
 
-        let filtered_tickets = filter_satisfying_ticket_models(prerequisites, dummy_tickets.clone(), &channel)
-            .expect("must filter tickets");
+        let filtered_tickets = filter_satisfying_ticket_models(prerequisites, dummy_tickets.clone(), &channel)?;
 
         assert!(filtered_tickets.is_empty(), "must return empty");
         Ok(())
@@ -2202,8 +2190,7 @@ mod tests {
         // Single aggregated ticket exceeding the min_unaggregated_ratio
         let dummy_tickets = vec![dummy_ticket_model(channel.get_id(), 1, 2, 110)];
 
-        let filtered_tickets = filter_satisfying_ticket_models(prerequisites, dummy_tickets.clone(), &channel)
-            .expect("must filter tickets");
+        let filtered_tickets = filter_satisfying_ticket_models(prerequisites, dummy_tickets.clone(), &channel)?;
 
         assert!(filtered_tickets.is_empty(), "must return empty");
         Ok(())
@@ -2246,7 +2233,7 @@ mod tests {
         let mut ticket = hopr_db_entity::ticket::Entity::find()
             .one(&db.tickets_db)
             .await?
-            .expect("should have an active model")
+            .context("should have an active model")?
             .into_active_model();
         ticket.state = Set(AcknowledgedTicketStatus::BeingAggregated as u8 as i32);
         ticket.save(&db.tickets_db).await?;
@@ -2388,7 +2375,7 @@ mod tests {
         let mut ticket = hopr_db_entity::ticket::Entity::find()
             .one(&db.tickets_db)
             .await?
-            .expect("should have 1 active model")
+            .context("should have 1 active model")?
             .into_active_model();
         ticket.state = Set(AcknowledgedTicketStatus::BeingRedeemed as u8 as i32);
         ticket.save(&db.tickets_db).await?;
@@ -2535,7 +2522,7 @@ mod tests {
         let mut ticket = hopr_db_entity::ticket::Entity::find()
             .one(&db.tickets_db)
             .await?
-            .expect("should have one active model")
+            .context("should have one active model")?
             .into_active_model();
         ticket.state = Set(AcknowledgedTicketStatus::BeingRedeemed as u8 as i32);
         ticket.save(&db.tickets_db).await?;
@@ -2578,7 +2565,7 @@ mod tests {
             .map(|t| t.into_transferable(&ALICE, &Hash::default()).unwrap())
             .collect::<Vec<_>>();
 
-        let first_ticket = tickets.first().expect("should contain tickets").ticket.clone();
+        let first_ticket = tickets.first().context("should contain tickets")?.ticket.clone();
         let aggregated_ticket = TicketBuilder::default()
             .addresses(&*BOB, &*ALICE)
             .amount(
@@ -2588,7 +2575,7 @@ mod tests {
             )
             .index(first_ticket.index)
             .index_offset(
-                tickets.last().expect("should contain tickets").ticket.index as u32 - first_ticket.index as u32 + 1,
+                tickets.last().context("should contain tickets")?.ticket.index as u32 - first_ticket.index as u32 + 1,
             )
             .win_prob(1.0)
             .channel_epoch(first_ticket.channel_epoch)
@@ -2633,13 +2620,13 @@ mod tests {
             .map(|t| t.into_transferable(&ALICE, &Hash::default()).unwrap())
             .collect::<Vec<_>>();
 
-        let first_ticket = tickets.first().expect("should contain tickets").ticket.clone();
+        let first_ticket = tickets.first().context("should contain tickets")?.ticket.clone();
         let aggregated_ticket = TicketBuilder::default()
             .addresses(&*BOB, &*ALICE)
             .amount(0)
             .index(first_ticket.index)
             .index_offset(
-                tickets.last().expect("should contain tickets").ticket.index as u32 - first_ticket.index as u32 + 1,
+                tickets.last().context("should contain tickets")?.ticket.index as u32 - first_ticket.index as u32 + 1,
             )
             .win_prob(1.0)
             .channel_epoch(first_ticket.channel_epoch)
@@ -2678,13 +2665,13 @@ mod tests {
             .map(|t| t.into_transferable(&ALICE, &Hash::default()).unwrap())
             .collect::<Vec<_>>();
 
-        let first_ticket = tickets.first().expect("should contain tickets").ticket.clone();
+        let first_ticket = tickets.first().context("should contain tickets")?.ticket.clone();
         let aggregated_ticket = TicketBuilder::default()
             .addresses(&*BOB, &*ALICE)
             .amount(0)
             .index(first_ticket.index)
             .index_offset(
-                tickets.last().expect("should contain tickets").ticket.index as u32 - first_ticket.index as u32 + 1,
+                tickets.last().context("should contain tickets")?.ticket.index as u32 - first_ticket.index as u32 + 1,
             )
             .win_prob(0.5) // 50% winning prob
             .channel_epoch(first_ticket.channel_epoch)
@@ -2758,8 +2745,16 @@ mod tests {
         let sum_value = tickets
             .iter()
             .fold(BalanceType::HOPR.zero(), |acc, x| acc + x.ticket.amount);
-        let min_idx = tickets.iter().map(|t| t.ticket.index).min().unwrap();
-        let max_idx = tickets.iter().map(|t| t.ticket.index).max().unwrap();
+        let min_idx = tickets
+            .iter()
+            .map(|t| t.ticket.index)
+            .min()
+            .context("min index should be present")?;
+        let max_idx = tickets
+            .iter()
+            .map(|t| t.ticket.index)
+            .max()
+            .context("max index should be present")?;
 
         let aggregated = db.aggregate_tickets(*ALICE_OFFCHAIN.public(), tickets, &BOB).await?;
 
@@ -2846,8 +2841,16 @@ mod tests {
         let sum_value = tickets
             .iter()
             .fold(BalanceType::HOPR.zero(), |acc, x| acc + x.ticket.amount);
-        let min_idx = tickets.iter().map(|t| t.ticket.index).min().unwrap();
-        let max_idx = tickets.iter().map(|t| t.ticket.index).max().unwrap();
+        let min_idx = tickets
+            .iter()
+            .map(|t| t.ticket.index)
+            .min()
+            .context("min index should be present")?;
+        let max_idx = tickets
+            .iter()
+            .map(|t| t.ticket.index)
+            .max()
+            .context("max index should be present")?;
 
         let aggregated = db.aggregate_tickets(*ALICE_OFFCHAIN.public(), tickets, &BOB).await?;
 
@@ -2936,10 +2939,12 @@ mod tests {
 
         let aggregated = db
             .aggregate_tickets(*ALICE_OFFCHAIN.public(), tickets.clone(), &BOB)
-            .await
-            .expect("should aggregate");
+            .await?;
 
-        assert_eq!(&tickets.pop().unwrap().ticket, aggregated.verified_ticket());
+        assert_eq!(
+            &tickets.pop().context("ticket should be present")?.ticket,
+            aggregated.verified_ticket()
+        );
 
         Ok(())
     }

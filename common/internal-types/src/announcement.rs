@@ -154,8 +154,7 @@ mod tests {
     #[test]
     fn test_key_binding() -> anyhow::Result<()> {
         let kb_1 = KeyBinding::new(*CHAIN_ADDR, &KEY_PAIR);
-        let kb_2 = KeyBinding::from_parts(kb_1.chain_key, kb_1.packet_key, kb_1.signature.clone())
-            .expect("should verify correctly");
+        let kb_2 = KeyBinding::from_parts(kb_1.chain_key, kb_1.packet_key, kb_1.signature.clone())?;
 
         assert_eq!(kb_1, kb_2, "must be equal");
 
@@ -191,8 +190,7 @@ mod tests {
         ] {
             let maddr: Multiaddr = ma_str.parse()?;
 
-            let ad = AnnouncementData::new(maddr, Some(key_binding.clone()))
-                .expect("construction of announcement data should work");
+            let ad = AnnouncementData::new(maddr, Some(key_binding.clone()))?;
             assert_eq!(decapsulated_ma_str, ad.multiaddress().to_string());
             assert_eq!(Some(key_binding.clone()), ad.key_binding);
         }
@@ -204,7 +202,7 @@ mod tests {
     fn test_announcement_no_keybinding() -> anyhow::Result<()> {
         let maddr: Multiaddr = "/ip4/127.0.0.1/tcp/10000".to_string().parse()?;
 
-        let ad = AnnouncementData::new(maddr, None).expect("construction of announcement data should work");
+        let ad = AnnouncementData::new(maddr, None)?;
 
         assert_eq!(None, ad.key_binding);
 
@@ -216,8 +214,7 @@ mod tests {
         let key_binding = KeyBinding::new(*CHAIN_ADDR, &KEY_PAIR);
         let maddr: Multiaddr = "/ip4/127.0.0.1/tcp/10000".to_string().parse()?;
 
-        let ad = AnnouncementData::new(maddr, Some(key_binding.clone()))
-            .expect("construction of announcement data should work");
+        let ad = AnnouncementData::new(maddr, Some(key_binding.clone()))?;
         assert_eq!("/ip4/127.0.0.1/tcp/10000", ad.multiaddress().to_string());
         assert_eq!(Some(key_binding), ad.key_binding);
 

@@ -291,6 +291,7 @@ mod tests {
     use crate::channels::HoprDbChannelOperations;
     use crate::db::HoprDb;
     use crate::HoprDbGeneralModelOperations;
+    use anyhow::Context;
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::keypairs::ChainKeypair;
     use hopr_crypto_types::prelude::Keypair;
@@ -338,11 +339,11 @@ mod tests {
             0_u32.into(),
         );
 
-        db.upsert_channel(None, ce).await.expect("must insert channel");
+        db.upsert_channel(None, ce).await?;
         let from_db = db
             .get_channel_by_parties(None, &a, &b, false)
             .await?
-            .expect("channel must be present");
+            .context("channel must be present")?;
 
         assert_eq!(ce, from_db, "channels must be equal");
 
@@ -379,11 +380,10 @@ mod tests {
             0_u32.into(),
         );
 
-        db.upsert_channel(None, ce).await.expect("must insert channel");
+        db.upsert_channel(None, ce).await?;
         let from_db = db
             .get_channels_via(None, ChannelDirection::Incoming, &Address::default())
-            .await
-            .expect("db should not fail")
+            .await?
             .first()
             .cloned();
 

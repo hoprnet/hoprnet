@@ -358,17 +358,17 @@ impl HoprDbInfoOperations for HoprDb {
                         .one(tx.as_ref())
                         .await?
                         .ok_or(DbSqlError::MissingFixedTableEntry("chain_info".into()))
-                        .map(|m| {
+                        .and_then(|m| {
                             let chain_checksum = if let Some(b) = m.chain_checksum {
-                                Hash::try_from(b.as_slice()).expect("invalid chain checksum in the db")
+                                Hash::try_from(b.as_slice()).map_err(|_| DbSqlError::DecodingError)?
                             } else {
                                 Hash::default()
                             };
-                            DescribedBlock {
+                            Ok(DescribedBlock {
                                 latest_block_number: m.last_indexed_block as u32,
                                 checksum: chain_checksum,
                                 block_prior_to_checksum_update: m.previous_indexed_block_prio_to_checksum_update as u32,
-                            }
+                            })
                         })
                 })
             })

@@ -313,7 +313,7 @@ mod tests {
                     let mut input_tickets = Vec::new();
                     for i in 0..ticket_count {
                         let ack_ticket = generate_random_ack_ticket(i as u64, &ckp, channel_epoch)
-                            .expect("valid ack ticket is generated");
+                            .map_err(|e| hopr_db_sql::errors::DbSqlError::LogicalError(e.to_string()))?;
                         db.upsert_ticket(Some(tx), ack_ticket.clone()).await?;
                         input_tickets.push(ack_ticket);
                     }
@@ -397,15 +397,7 @@ mod tests {
 
         let actions = ChainActions::new(&ALICE, db.clone(), tx_sender.clone());
 
-        let confirmations = futures::future::try_join_all(
-            actions
-                .redeem_all_tickets(false)
-                .await
-                .expect("redeem_all_tickets should succeed")
-                .into_iter(),
-        )
-        .await
-        .expect("must resolve confirmations");
+        let confirmations = futures::future::try_join_all(actions.redeem_all_tickets(false).await?.into_iter()).await?;
 
         assert_eq!(2 * ticket_count, confirmations.len(), "must have all confirmations");
         assert!(
@@ -483,12 +475,10 @@ mod tests {
         let confirmations = futures::future::try_join_all(
             actions
                 .redeem_tickets_with_counterparty(&BOB.public().to_address(), false)
-                .await
-                .expect("redeem_tickets_with_counterparty should succeed")
+                .await?
                 .into_iter(),
         )
-        .await
-        .expect("must resolve all confirmations");
+        .await?;
 
         assert_eq!(ticket_count, confirmations.len(), "must have all confirmations");
         assert!(
@@ -573,12 +563,10 @@ mod tests {
         let confirmations = futures::future::try_join_all(
             actions
                 .redeem_tickets_in_channel(&channel_from_bob, false)
-                .await
-                .expect("redeem_tickets_in_channel should succeed")
+                .await?
                 .into_iter(),
         )
-        .await
-        .expect("must resolve all confirmations");
+        .await?;
 
         assert_eq!(
             ticket_count - 2,
@@ -656,8 +644,7 @@ mod tests {
         futures::future::join_all(
             actions
                 .redeem_tickets_in_channel(&channel_from_bob, false)
-                .await
-                .expect("redeem_tickets_in_channel should succeed")
+                .await?
                 .into_iter(),
         )
         .await;
@@ -726,8 +713,7 @@ mod tests {
         futures::future::join_all(
             actions
                 .redeem_tickets_in_channel(&channel_from_bob, false)
-                .await
-                .expect("redeem_tickets_in_channel should succeed")
+                .await?
                 .into_iter(),
         )
         .await;

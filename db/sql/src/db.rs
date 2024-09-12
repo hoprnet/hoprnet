@@ -152,8 +152,7 @@ impl HoprDb {
                 Expr::value(AcknowledgedTicketStatus::Untouched as u8),
             )
             .exec(&tickets_db)
-            .await
-            .expect("must reset ticket state on init");
+            .await?;
 
         let caches = Arc::new(HoprDbCaches::default());
         caches.invalidate_all();
@@ -226,10 +225,7 @@ mod tests {
         {
             let db = HoprDb::new(&path, ChainKeypair::random(), crate::db::HoprDbConfig::default()).await?;
 
-            let not_found_peer = db
-                .get_network_peer(&peer_id)
-                .await
-                .expect("should not encounter a DB issue");
+            let not_found_peer = db.get_network_peer(&peer_id).await?;
 
             assert_eq!(not_found_peer, None);
         }

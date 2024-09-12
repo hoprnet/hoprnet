@@ -230,6 +230,7 @@ impl ChannelGraph {
 #[cfg(test)]
 mod tests {
     use crate::channel_graph::ChannelGraph;
+    use anyhow::Context;
     use hopr_crypto_types::prelude::{ChainKeypair, Keypair};
     use hopr_db_sql::channels::HoprDbChannelOperations;
     use hopr_internal_types::channels::{ChannelChange, ChannelEntry, ChannelStatus};
@@ -289,7 +290,7 @@ mod tests {
     }
 
     #[test]
-    fn test_channel_graph_update_quality() {
+    fn test_channel_graph_update_quality() -> anyhow::Result<()> {
         let mut cg = ChannelGraph::new(ADDRESSES[0]);
 
         let c = dummy_channel(ADDRESSES[0], ADDRESSES[1], ChannelStatus::Open);
@@ -305,8 +306,10 @@ mod tests {
 
         let q = cg
             .get_channel_quality(ADDRESSES[0], ADDRESSES[1])
-            .expect("must have quality when set");
+            .context("must have quality when set")?;
         assert_eq!(0.5_f64, q, "quality must be equal");
+
+        Ok(())
     }
 
     #[test]
@@ -323,7 +326,7 @@ mod tests {
     }
 
     #[test]
-    fn test_channel_graph_update_changes() {
+    fn test_channel_graph_update_changes() -> anyhow::Result<()> {
         let mut cg = ChannelGraph::new(ADDRESSES[0]);
 
         let mut c = dummy_channel(ADDRESSES[0], ADDRESSES[1], ChannelStatus::Open);
@@ -333,13 +336,13 @@ mod tests {
 
         let cr = cg
             .get_channel(ADDRESSES[0], ADDRESSES[1])
-            .expect("must contain channel");
+            .context("must contain channel")?;
         assert!(c.eq(cr), "channels must be equal");
 
         let ts = SystemTime::now().add(Duration::from_secs(10));
         c.balance = Balance::zero(BalanceType::HOPR);
         c.status = ChannelStatus::PendingToClose(ts);
-        let changes = cg.update_channel(c).expect("must contain changes");
+        let changes = cg.update_channel(c).context("should contain channel changes")?;
         assert_eq!(2, changes.len(), "must contain 2 changes");
 
         for change in changes {
@@ -362,12 +365,14 @@ mod tests {
 
         let cr = cg
             .get_channel(ADDRESSES[0], ADDRESSES[1])
-            .expect("must contain channel");
+            .context("must contain channel")?;
         assert!(c.eq(cr), "channels must be equal");
+
+        Ok(())
     }
 
     #[test]
-    fn test_channel_graph_update_changes_on_close() {
+    fn test_channel_graph_update_changes_on_close() -> anyhow::Result<()> {
         let mut cg = ChannelGraph::new(ADDRESSES[0]);
 
         let ts = SystemTime::now().add(Duration::from_secs(10));
@@ -378,12 +383,12 @@ mod tests {
 
         let cr = cg
             .get_channel(ADDRESSES[0], ADDRESSES[1])
-            .expect("must contain channel");
+            .context("must contain channel")?;
         assert!(c.eq(cr), "channels must be equal");
 
         c.balance = Balance::zero(BalanceType::HOPR);
         c.status = ChannelStatus::Closed;
-        let changes = cg.update_channel(c).expect("must contain changes");
+        let changes = cg.update_channel(c).context("must contain changes")?;
         assert_eq!(2, changes.len(), "must contain 2 changes");
 
         for change in changes {
@@ -410,6 +415,8 @@ mod tests {
 
         let cr = cg.get_channel(ADDRESSES[0], ADDRESSES[1]);
         assert!(cr.is_none(), "must not contain channel after closing");
+
+        Ok(())
     }
 
     #[test]
@@ -423,7 +430,7 @@ mod tests {
     }
 
     #[test]
-    fn test_channel_graph_update_should_allow_pending_to_close_channels() {
+    fn test_channel_graph_update_should_allow_pending_to_close_channels() -> anyhow::Result<()> {
         let mut cg = ChannelGraph::new(ADDRESSES[0]);
         let ts = SystemTime::now().add(Duration::from_secs(10));
         let changes = cg.update_channel(dummy_channel(
@@ -434,7 +441,9 @@ mod tests {
         assert!(changes.is_none(), "must not produce changes for a closed channel");
 
         cg.get_channel(ADDRESSES[0], ADDRESSES[1])
-            .expect("must allow PendingToClose channels");
+            .context("must allow PendingToClose channels")?;
+
+        Ok(())
     }
 
     #[async_std::test]
@@ -455,8 +464,7 @@ mod tests {
         db.upsert_channel(None, channel).await?;
 
         let mut cg = ChannelGraph::new(ADDRESSES[0]);
-        cg.sync_channels(db.get_all_channels(None).await.expect("channels should be present"))
-            .expect("should sync graph");
+        cg.sync_channels(db.get_all_channels(None).await?)?;
 
         assert!(cg.has_path(ADDRESSES[0], ADDRESSES[4]), "must have path from 0 -> 4");
         assert!(

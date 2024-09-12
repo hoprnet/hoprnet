@@ -444,19 +444,21 @@ mod tests {
     }
 
     #[test]
-    fn wrapping_and_unwrapping_with_offchain_key_should_be_an_identity() {
+    fn wrapping_and_unwrapping_with_offchain_key_should_be_an_identity() -> anyhow::Result<()> {
         let peer: PeerId = OffchainKeypair::random().public().into();
         let data = hopr_crypto_random::random_bytes::<SESSION_USABLE_MTU_SIZE>()
             .as_ref()
             .to_vec()
             .into_boxed_slice();
 
-        let wrapped = wrap_with_offchain_key(&peer, data.clone()).expect("Wrapping should work");
+        let wrapped = wrap_with_offchain_key(&peer, data.clone())?;
 
-        let (peer_id, unwrapped) = unwrap_offchain_key(wrapped.into_boxed_slice()).expect("Unwrapping should work");
+        let (peer_id, unwrapped) = unwrap_offchain_key(wrapped.into_boxed_slice())?;
 
         assert_eq!(peer, peer_id);
         assert_eq!(data, unwrapped);
+
+        Ok(())
     }
 
     #[test]
@@ -554,7 +556,7 @@ mod tests {
 
         let mut buffer = vec![0; PAYLOAD_SIZE * 2];
 
-        let bytes_read = session.read(&mut buffer[..]).await.expect("Read should work");
+        let bytes_read = session.read(&mut buffer[..]).await?;
 
         assert_eq!(bytes_read, random_data.len());
         assert_eq!(&buffer[..bytes_read], random_data.as_ref());
@@ -587,12 +589,12 @@ mod tests {
         const BUFFER_SIZE: usize = PAYLOAD_SIZE - 1;
         let mut buffer = vec![0; BUFFER_SIZE];
 
-        let bytes_read = session.read(&mut buffer[..]).await.expect("Read should work #1");
+        let bytes_read = session.read(&mut buffer[..]).await?;
 
         assert_eq!(bytes_read, BUFFER_SIZE);
         assert_eq!(&buffer[..bytes_read], &random_data[..BUFFER_SIZE]);
 
-        let bytes_read = session.read(&mut buffer[..]).await.expect("Read should work #1");
+        let bytes_read = session.read(&mut buffer[..]).await?;
 
         assert_eq!(bytes_read, PAYLOAD_SIZE - BUFFER_SIZE);
         assert_eq!(&buffer[..bytes_read], &random_data[BUFFER_SIZE..]);
@@ -629,7 +631,7 @@ mod tests {
             rx,
         );
 
-        let bytes_written = session.write(&data).await.expect("Write should work #1");
+        let bytes_written = session.write(&data).await?;
 
         assert_eq!(bytes_written, data.len());
 
@@ -660,7 +662,7 @@ mod tests {
             rx,
         );
 
-        let bytes_written = session.write(&data).await.expect("Write should work #1");
+        let bytes_written = session.write(&data).await?;
 
         assert_eq!(bytes_written, TO_SEND);
 

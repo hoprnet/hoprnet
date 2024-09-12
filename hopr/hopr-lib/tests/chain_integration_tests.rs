@@ -42,13 +42,7 @@ async fn generate_the_first_ack_ticket<M: Middleware + 'static>(
     let cp2: CurvePoint = hk2.to_challenge().try_into()?;
     let cp_sum = CurvePoint::combine(&[&cp1, &cp2]);
 
-    let domain_separator: Hash = instances
-        .channels
-        .domain_separator()
-        .call()
-        .await
-        .expect("shoudl not fail")
-        .into();
+    let domain_separator: Hash = instances.channels.domain_separator().call().await?.into();
 
     let ack_ticket = TicketBuilder::default()
         .addresses(counterparty, &myself.chain_key)
@@ -61,11 +55,7 @@ async fn generate_the_first_ack_ticket<M: Middleware + 'static>(
         .build_signed(counterparty, &domain_separator)?
         .into_acknowledged(Response::from_half_keys(&hk1, &hk2)?);
 
-    myself
-        .db
-        .upsert_ticket(None, ack_ticket)
-        .await
-        .expect("should store ack key");
+    myself.db.upsert_ticket(None, ack_ticket).await?;
 
     Ok(())
 }
@@ -222,7 +212,7 @@ async fn start_node_chain_logic(
     let chain_log_handler = ContractEventHandlers::new(contract_addrs, safe_addr, chain_key.clone(), db.clone());
 
     let mut indexer = Indexer::new(rpc_ops.clone(), chain_log_handler, db.clone(), indexer_cfg, sce_tx);
-    indexer.start().await.expect("indexer should sync");
+    indexer.start().await?;
 
     Ok(ChainNode {
         offchain_key: offchain_key.clone(),
@@ -411,11 +401,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
 
     assert_eq!(
         Some(alice_node.chain_key.public().to_address()),
-        bob_node
-            .db
-            .resolve_chain_key(alice_node.offchain_key.public())
-            .await
-            .expect("resolve should not fail"),
+        bob_node.db.resolve_chain_key(alice_node.offchain_key.public()).await?,
         "bob must resolve alice's chain key correctly"
     );
 
@@ -424,18 +410,13 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
         bob_node
             .db
             .resolve_packet_key(&alice_node.chain_key.public().to_address())
-            .await
-            .expect("resolve should not fail"),
+            .await?,
         "bob must resolve alice's offchain key correctly"
     );
 
     assert_eq!(
         Some(bob_node.chain_key.public().to_address()),
-        alice_node
-            .db
-            .resolve_chain_key(bob_node.offchain_key.public())
-            .await
-            .expect("resolve should not fail"),
+        alice_node.db.resolve_chain_key(bob_node.offchain_key.public()).await?,
         "alice must resolve bob's chain key correctly"
     );
 
@@ -444,8 +425,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
         alice_node
             .db
             .resolve_packet_key(&bob_node.chain_key.public().to_address())
-            .await
-            .expect("resolve should not fail"),
+            .await?,
         "alice must resolve bob's offchain key correctly"
     );
 

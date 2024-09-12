@@ -698,8 +698,7 @@ impl Hopr {
             Duration::from_secs(200),
             self.chain_api.rpc(),
         )
-        .await
-        .expect("failed to wait for funds");
+        .await?;
 
         info!("Starting hopr node...");
 

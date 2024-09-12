@@ -275,8 +275,7 @@ mod tests {
                     db_clone.set_network_registry_enabled(Some(tx), false).await
                 })
             })
-            .await
-            .expect("must initialize db");
+            .await?;
 
         let mut tx_exec = MockTransactionExecutor::new();
         tx_exec
@@ -306,11 +305,7 @@ mod tests {
 
         let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_sender.clone());
 
-        let tx_res = actions
-            .open_channel(*BOB, stake)
-            .await?
-            .await
-            .expect("must resolve confirmation");
+        let tx_res = actions.open_channel(*BOB, stake).await?.await?;
 
         assert_eq!(tx_res.tx_hash, random_hash, "tx hashes must be equal");
         assert!(
@@ -350,8 +345,7 @@ mod tests {
                     db_clone.upsert_channel(Some(tx), channel).await
                 })
             })
-            .await
-            .expect("must initialize db");
+            .await?;
 
         let tx_queue = ActionQueue::new(
             db.clone(),
@@ -399,8 +393,7 @@ mod tests {
                         .await
                 })
             })
-            .await
-            .expect("must initialize db");
+            .await?;
 
         let tx_queue = ActionQueue::new(
             db.clone(),
@@ -445,8 +438,7 @@ mod tests {
                         .await
                 })
             })
-            .await
-            .expect("must initialize db");
+            .await?;
 
         let tx_queue = ActionQueue::new(
             db.clone(),
@@ -507,8 +499,7 @@ mod tests {
                         .await
                 })
             })
-            .await
-            .expect("must initialize db");
+            .await?;
 
         let tx_queue = ActionQueue::new(
             db.clone(),
@@ -555,8 +546,7 @@ mod tests {
                         .await
                 })
             })
-            .await
-            .expect("must initialize db");
+            .await?;
 
         let tx_queue = ActionQueue::new(
             db.clone(),
@@ -606,8 +596,7 @@ mod tests {
                     db_clone.upsert_channel(Some(tx), channel).await
                 })
             })
-            .await
-            .expect("must initialize db");
+            .await?;
 
         let mut tx_exec = MockTransactionExecutor::new();
         tx_exec
@@ -636,11 +625,7 @@ mod tests {
 
         let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_sender.clone());
 
-        let tx_res = actions
-            .fund_channel(channel.get_id(), stake)
-            .await?
-            .await
-            .expect("must resolve confirmation");
+        let tx_res = actions.fund_channel(channel.get_id(), stake).await?.await?;
 
         assert_eq!(tx_res.tx_hash, random_hash, "tx hashes must be equal");
         assert!(
@@ -676,8 +661,7 @@ mod tests {
                         .await
                 })
             })
-            .await
-            .expect("must initialize db");
+            .await?;
 
         let tx_queue = ActionQueue::new(
             db.clone(),
@@ -724,8 +708,7 @@ mod tests {
                         .await
                 })
             })
-            .await
-            .expect("must initialize db");
+            .await?;
 
         let tx_queue = ActionQueue::new(
             db.clone(),
@@ -785,8 +768,7 @@ mod tests {
                         .await
                 })
             })
-            .await
-            .expect("must initialize db");
+            .await?;
 
         let tx_queue = ActionQueue::new(
             db.clone(),
@@ -833,8 +815,7 @@ mod tests {
                         .await
                 })
             })
-            .await
-            .expect("must initialize db");
+            .await?;
 
         let tx_queue = ActionQueue::new(
             db.clone(),
@@ -885,8 +866,7 @@ mod tests {
                     db_clone.upsert_channel(Some(tx), channel).await
                 })
             })
-            .await
-            .expect("must initialize db");
+            .await?;
 
         let mut tx_exec = MockTransactionExecutor::new();
         let mut seq = Sequence::new();
@@ -941,8 +921,7 @@ mod tests {
         let tx_res = actions
             .close_channel(*BOB, ChannelDirection::Outgoing, false)
             .await?
-            .await
-            .expect("must resolve confirmation");
+            .await?;
 
         assert_eq!(tx_res.tx_hash, random_hash, "tx hashes must be equal");
         assert!(
@@ -962,8 +941,7 @@ mod tests {
         let tx_res = actions
             .close_channel(*BOB, ChannelDirection::Outgoing, false)
             .await?
-            .await
-            .expect("must resolve confirmation");
+            .await?;
 
         assert_eq!(tx_res.tx_hash, random_hash, "tx hashes must be equal");
         assert!(
@@ -1003,8 +981,7 @@ mod tests {
                     db_clone.upsert_channel(Some(tx), channel).await
                 })
             })
-            .await
-            .expect("must initialize db");
+            .await?;
 
         let mut tx_exec = MockTransactionExecutor::new();
         let mut seq = Sequence::new();
@@ -1037,8 +1014,7 @@ mod tests {
         let tx_res = actions
             .close_channel(*BOB, ChannelDirection::Incoming, false)
             .await?
-            .await
-            .expect("must resolve confirmation");
+            .await?;
 
         assert_eq!(tx_res.tx_hash, random_hash, "tx hashes must be equal");
         assert!(
@@ -1084,8 +1060,7 @@ mod tests {
                     db_clone.upsert_channel(Some(tx), channel).await
                 })
             })
-            .await
-            .expect("must initialize db");
+            .await?;
 
         let tx_queue = ActionQueue::new(
             db.clone(),
@@ -1130,8 +1105,7 @@ mod tests {
                         .await
                 })
             })
-            .await
-            .expect("must initialize db");
+            .await?;
 
         let tx_queue = ActionQueue::new(
             db.clone(),
@@ -1179,8 +1153,7 @@ mod tests {
                     db_clone.upsert_channel(Some(tx), channel).await
                 })
             })
-            .await
-            .expect("must initialize db");
+            .await?;
 
         let tx_queue = ActionQueue::new(
             db.clone(),

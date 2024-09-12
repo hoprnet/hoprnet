@@ -592,6 +592,7 @@ pub fn convert_acknowledged_ticket(off_chain: &RedeemableTicket) -> Result<OnCha
 
 #[cfg(test)]
 mod tests {
+    use anyhow::Context;
     use chain_rpc::client::create_rpc_client_to_anvil;
     use chain_rpc::client::surf_client::SurfRequestor;
     use chain_types::ContractInstances;
@@ -618,7 +619,7 @@ mod tests {
         // Deploy contracts
         let contract_instances = ContractInstances::deploy_for_testing(client.clone(), &chain_key_0)
             .await
-            .expect("could not deploy contracts");
+            .context("could not deploy contracts")?;
 
         let generator = BasicPayloadGenerator::new((&chain_key_0).into(), (&contract_instances).into());
 
@@ -630,14 +631,14 @@ mod tests {
             )),
         )?;
 
-        let tx = generator.announce(ad).expect("should generate tx");
+        let tx = generator.announce(ad)?;
 
         assert!(client.send_transaction(tx, None).await?.await?.is_some());
 
         let test_multiaddr_reannounce = Multiaddr::from_str("/ip4/5.6.7.8/tcp/99")?;
 
         let ad_reannounce = AnnouncementData::new(test_multiaddr_reannounce, None)?;
-        let reannounce_tx = generator.announce(ad_reannounce).expect("should generate tx");
+        let reannounce_tx = generator.announce(ad_reannounce)?;
 
         assert!(client.send_transaction(reannounce_tx, None).await?.await?.is_some());
 
@@ -652,9 +653,7 @@ mod tests {
         let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &chain_key_alice);
 
         // Deploy contracts
-        let contract_instances = ContractInstances::deploy_for_testing(client.clone(), &chain_key_alice)
-            .await
-            .expect("could not deploy contracts");
+        let contract_instances = ContractInstances::deploy_for_testing(client.clone(), &chain_key_alice).await?;
 
         // Mint 1000 HOPR to Alice
         chain_types::utils::mint_tokens(contract_instances.token.clone(), 1000_u128.into()).await;
@@ -695,12 +694,11 @@ mod tests {
         // Bob acknowledges the ticket using the HalfKey from the Response
         let acked_ticket = ticket
             .into_acknowledged(response)
-            .into_redeemable(&chain_key_bob, &domain_separator)
-            .expect("should create a redeemable ticket");
+            .into_redeemable(&chain_key_bob, &domain_separator)?;
 
         // Bob redeems the ticket
         let generator = BasicPayloadGenerator::new((&chain_key_bob).into(), (&contract_instances).into());
-        let redeem_ticket_tx = generator.redeem_ticket(acked_ticket).expect("should create tx");
+        let redeem_ticket_tx = generator.redeem_ticket(acked_ticket)?;
         let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &chain_key_bob);
         println!("{:?}", client.send_transaction(redeem_ticket_tx, None).await?.await);
 

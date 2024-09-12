@@ -364,16 +364,12 @@ mod tests {
         let ma_1: Multiaddr = format!("/ip4/127.0.0.1/tcp/10000/p2p/{peer_id}").parse()?;
 
         db.add_network_peer(&peer_id, PeerOrigin::IncomingConnection, vec![ma_1.clone()], 0.0, 25)
-            .await
-            .expect("should add peer");
-        assert!(
-            db.get_network_peer(&peer_id).await.expect("should get peer").is_some(),
-            "must have peer entry"
-        );
+            .await?;
+        assert!(db.get_network_peer(&peer_id).await?.is_some(), "must have peer entry");
 
-        db.remove_network_peer(&peer_id).await.expect("must remove peer");
+        db.remove_network_peer(&peer_id).await?;
         assert!(
-            db.get_network_peer(&peer_id).await.expect("should get peer").is_none(),
+            db.get_network_peer(&peer_id).await?.is_none(),
             "peer entry must be gone"
         );
 
@@ -415,10 +411,7 @@ mod tests {
 
         let peer_id: PeerId = OffchainKeypair::random().public().into();
 
-        assert!(
-            db.get_network_peer(&peer_id).await.expect("should succeed").is_none(),
-            "should return none"
-        );
+        assert!(db.get_network_peer(&peer_id).await?.is_none(), "should return none");
         Ok(())
     }
 
@@ -594,7 +587,7 @@ mod tests {
         db.add_network_peer(&peer_id_2, PeerOrigin::IncomingConnection, vec![ma_2], 0.0, 25)
             .await?;
 
-        let stats = db.network_peer_stats(0.2).await.expect("must get stats");
+        let stats = db.network_peer_stats(0.2).await?;
         assert_eq!(
             Stats {
                 good_quality_public: 0,

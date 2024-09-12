@@ -10,7 +10,11 @@ use hopr_crypto_types::types::Hash;
 use hopr_db_sql::info::HoprDbInfoOperations;
 use hopr_db_sql::HoprDbGeneralModelOperations;
 
-use crate::{errors::CoreEthereumIndexerError, traits::ChainLogHandler, IndexerConfig};
+use crate::{
+    errors::{CoreEthereumIndexerError, Result},
+    traits::ChainLogHandler,
+    IndexerConfig,
+};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleGauge;
@@ -83,7 +87,7 @@ where
         }
     }
 
-    pub async fn start(&mut self) -> crate::errors::Result<JoinHandle<()>>
+    pub async fn start(&mut self) -> Result<JoinHandle<()>>
     where
         T: HoprIndexerRpcOperations + 'static,
         U: ChainLogHandler + 'static,
@@ -524,7 +528,7 @@ mod tests {
 
         let (tx_events, rx_events) = async_channel::unbounded();
         let mut indexer = Indexer::new(rpc, handlers, db.clone(), cfg, tx_events);
-        indexer.start().await.expect("indexer should run");
+        indexer.start().await?;
 
         // tx.close_channel();
 
@@ -578,7 +582,7 @@ mod tests {
 
         let (tx_events, _) = async_channel::unbounded();
         let mut indexer = Indexer::new(rpc, handlers, db.clone(), IndexerConfig::default(), tx_events);
-        indexer.start().await.expect("indexer should run");
+        indexer.start().await?;
 
         Ok(())
     }

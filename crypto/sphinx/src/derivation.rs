@@ -135,8 +135,6 @@ pub fn derive_ack_key_share(secret: &SecretKey) -> HalfKey {
 
 #[cfg(test)]
 mod tests {
-    use std::any;
-
     use super::*;
     use elliptic_curve::{sec1::ToEncodedPoint, ProjectivePoint, ScalarPrimitive};
     use hex_literal::hex;

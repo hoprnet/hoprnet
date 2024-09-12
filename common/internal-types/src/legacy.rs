@@ -275,29 +275,23 @@ mod tests {
             .win_prob(1.0)
             .channel_epoch(2)
             .challenge(Challenge::from(cp_sum).to_ethereum_challenge())
-            .build_signed(&ALICE, &domain_separator)
-            .expect("should build ticket");
+            .build_signed(&ALICE, &domain_separator)?;
 
         let unack = ticket.into_unacknowledged(hk1);
-        let acked = unack.acknowledge(&hk2).expect("should acknowledge");
+        let acked = unack.acknowledge(&hk2)?;
 
-        let transferable = acked
-            .into_transferable(&BOB, &domain_separator)
-            .expect("should convert to transferable");
+        let transferable = acked.into_transferable(&BOB, &domain_separator)?;
 
         transferable
             .clone()
-            .into_redeemable(&ALICE.public().to_address(), &domain_separator)
-            .expect("should be transformable to redeemable");
+            .into_redeemable(&ALICE.public().to_address(), &domain_separator)?;
 
         let serialized =
             crate::legacy::AcknowledgedTicket::new(transferable, &BOB.public().to_address(), &domain_separator);
 
         let deserialized = TransferableWinningTicket::from(serialized);
 
-        deserialized
-            .into_redeemable(&ALICE.public().to_address(), &domain_separator)
-            .expect("should be transformable to redeemable");
+        deserialized.into_redeemable(&ALICE.public().to_address(), &domain_separator)?;
 
         Ok(())
     }

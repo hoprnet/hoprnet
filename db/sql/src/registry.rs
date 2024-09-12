@@ -159,66 +159,28 @@ mod tests {
     async fn test_network_registry_db() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
-        assert!(!db
-            .is_allowed_in_network_registry(None, *ADDR_1)
-            .await
-            .expect("should not fail"));
-        assert!(!db
-            .is_allowed_in_network_registry(None, *ADDR_2)
-            .await
-            .expect("should not fail"));
+        assert!(!db.is_allowed_in_network_registry(None, *ADDR_1).await?);
+        assert!(!db.is_allowed_in_network_registry(None, *ADDR_2).await?);
 
-        db.set_access_in_network_registry(None, *ADDR_1, true)
-            .await
-            .expect("should not fail to allow in nr");
+        db.set_access_in_network_registry(None, *ADDR_1, true).await?;
 
-        assert!(db
-            .is_allowed_in_network_registry(None, *ADDR_1)
-            .await
-            .expect("should not fail"));
-        assert!(!db
-            .is_allowed_in_network_registry(None, *ADDR_2)
-            .await
-            .expect("should not fail"));
+        assert!(db.is_allowed_in_network_registry(None, *ADDR_1).await?);
+        assert!(!db.is_allowed_in_network_registry(None, *ADDR_2).await?);
 
-        db.set_access_in_network_registry(None, *ADDR_1, true)
-            .await
-            .expect("should not fail to allow in nr when allowed");
+        db.set_access_in_network_registry(None, *ADDR_1, true).await?;
 
-        assert!(db
-            .is_allowed_in_network_registry(None, *ADDR_1)
-            .await
-            .expect("should not fail"));
-        assert!(!db
-            .is_allowed_in_network_registry(None, *ADDR_2)
-            .await
-            .expect("should not fail"));
+        assert!(db.is_allowed_in_network_registry(None, *ADDR_1).await?);
+        assert!(!db.is_allowed_in_network_registry(None, *ADDR_2).await?);
 
-        db.set_access_in_network_registry(None, *ADDR_1, false)
-            .await
-            .expect("should fail to deny in nr");
+        db.set_access_in_network_registry(None, *ADDR_1, false).await?;
 
-        assert!(!db
-            .is_allowed_in_network_registry(None, *ADDR_1)
-            .await
-            .expect("should not fail"));
-        assert!(!db
-            .is_allowed_in_network_registry(None, *ADDR_2)
-            .await
-            .expect("should not fail"));
+        assert!(!db.is_allowed_in_network_registry(None, *ADDR_1).await?);
+        assert!(!db.is_allowed_in_network_registry(None, *ADDR_2).await?);
 
-        db.set_access_in_network_registry(None, *ADDR_1, false)
-            .await
-            .expect("should fail to deny in nr when denied");
+        db.set_access_in_network_registry(None, *ADDR_1, false).await?;
 
-        assert!(!db
-            .is_allowed_in_network_registry(None, *ADDR_1)
-            .await
-            .expect("should not fail"));
-        assert!(!db
-            .is_allowed_in_network_registry(None, *ADDR_2)
-            .await
-            .expect("should not fail"));
+        assert!(!db.is_allowed_in_network_registry(None, *ADDR_1).await?);
+        assert!(!db.is_allowed_in_network_registry(None, *ADDR_2).await?);
         Ok(())
     }
 
@@ -226,36 +188,28 @@ mod tests {
     async fn test_network_eligiblity_db() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
-        assert!(!db.is_safe_eligible(None, *ADDR_1).await.expect("should not fail"));
-        assert!(!db.is_safe_eligible(None, *ADDR_2).await.expect("should not fail"));
+        assert!(!db.is_safe_eligible(None, *ADDR_1).await?);
+        assert!(!db.is_safe_eligible(None, *ADDR_2).await?);
 
-        db.set_safe_eligibility(None, *ADDR_1, true)
-            .await
-            .expect("should not fail to allow in nr");
+        db.set_safe_eligibility(None, *ADDR_1, true).await?;
 
-        assert!(db.is_safe_eligible(None, *ADDR_1).await.expect("should not fail"));
-        assert!(!db.is_safe_eligible(None, *ADDR_2).await.expect("should not fail"));
+        assert!(db.is_safe_eligible(None, *ADDR_1).await?);
+        assert!(!db.is_safe_eligible(None, *ADDR_2).await?);
 
-        db.set_safe_eligibility(None, *ADDR_1, true)
-            .await
-            .expect("should not fail to allow in nr when allowed");
+        db.set_safe_eligibility(None, *ADDR_1, true).await?;
 
-        assert!(db.is_safe_eligible(None, *ADDR_1).await.expect("should not fail"));
-        assert!(!db.is_safe_eligible(None, *ADDR_2).await.expect("should not fail"));
+        assert!(db.is_safe_eligible(None, *ADDR_1).await?);
+        assert!(!db.is_safe_eligible(None, *ADDR_2).await?);
 
-        db.set_safe_eligibility(None, *ADDR_1, false)
-            .await
-            .expect("should fail to deny in nr");
+        db.set_safe_eligibility(None, *ADDR_1, false).await?;
 
-        assert!(!db.is_safe_eligible(None, *ADDR_1).await.expect("should not fail"));
-        assert!(!db.is_safe_eligible(None, *ADDR_2).await.expect("should not fail"));
+        assert!(!db.is_safe_eligible(None, *ADDR_1).await?);
+        assert!(!db.is_safe_eligible(None, *ADDR_2).await?);
 
-        db.set_safe_eligibility(None, *ADDR_1, false)
-            .await
-            .expect("should fail to deny in nr when denied");
+        db.set_safe_eligibility(None, *ADDR_1, false).await?;
 
-        assert!(!db.is_safe_eligible(None, *ADDR_1).await.expect("should not fail"));
-        assert!(!db.is_safe_eligible(None, *ADDR_2).await.expect("should not fail"));
+        assert!(!db.is_safe_eligible(None, *ADDR_1).await?);
+        assert!(!db.is_safe_eligible(None, *ADDR_2).await?);
         Ok(())
     }
 }

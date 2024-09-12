@@ -811,6 +811,7 @@ mod tests {
     use std::time::SystemTime;
 
     use super::ContractEventHandlers;
+    use anyhow::Context;
     use bindings::{
         hopr_announcements::{AddressAnnouncementFilter, KeyBindingFilter, RevokeAnnouncementFilter},
         hopr_channels::{
@@ -934,7 +935,7 @@ mod tests {
         assert_eq!(
             db.get_account(None, ChainOrPacketKey::ChainKey(*SELF_CHAIN_ADDRESS))
                 .await?
-                .unwrap(),
+                .context("a value should be present")?,
             account_entry
         );
         Ok(())
@@ -984,7 +985,7 @@ mod tests {
         assert_eq!(
             db.get_account(None, ChainOrPacketKey::ChainKey(*SELF_CHAIN_ADDRESS))
                 .await?
-                .unwrap(),
+                .context("a value should be present")?,
             account_entry
         );
 
@@ -1032,7 +1033,7 @@ mod tests {
         assert_eq!(
             db.get_account(None, ChainOrPacketKey::ChainKey(*SELF_CHAIN_ADDRESS))
                 .await?
-                .unwrap(),
+                .context("a value should be present")?,
             announced_account_entry
         );
 
@@ -1091,7 +1092,7 @@ mod tests {
         assert_eq!(
             db.get_account(None, ChainOrPacketKey::ChainKey(*SELF_CHAIN_ADDRESS))
                 .await?
-                .unwrap(),
+                .context("a value should be present")?,
             announced_dns_account_entry
         );
 
@@ -1153,7 +1154,7 @@ mod tests {
         assert_eq!(
             db.get_account(None, ChainOrPacketKey::ChainKey(*SELF_CHAIN_ADDRESS))
                 .await?
-                .unwrap(),
+                .context("a value should be present")?,
             account_entry
         );
         Ok(())
@@ -1608,7 +1609,10 @@ mod tests {
             .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, balance_increased_log.into()).await }))
             .await?;
 
-        let channel = db.get_channel_by_id(None, &channel.get_id()).await?.unwrap();
+        let channel = db
+            .get_channel_by_id(None, &channel.get_id())
+            .await?
+            .context("a value should be present")?;
 
         assert!(
             matches!(event_type, Some(ChainEventType::ChannelBalanceIncreased(c, b)) if c == channel && b == diff),
@@ -1652,7 +1656,10 @@ mod tests {
 
         assert_eq!(
             separator,
-            db.get_indexer_data(None).await?.channels_dst.unwrap(),
+            db.get_indexer_data(None)
+                .await?
+                .channels_dst
+                .context("a value should be present")?,
             "separator must be updated"
         );
         Ok(())
@@ -1694,7 +1701,10 @@ mod tests {
             .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, balance_decreased_log.into()).await }))
             .await?;
 
-        let channel = db.get_channel_by_id(None, &channel.get_id()).await?.unwrap();
+        let channel = db
+            .get_channel_by_id(None, &channel.get_id())
+            .await?
+            .context("a value should be present")?;
 
         assert!(
             matches!(event_type, Some(ChainEventType::ChannelBalanceDecreased(c, b)) if c == channel && b == diff),
@@ -1740,7 +1750,10 @@ mod tests {
             .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, channel_closed_log.into()).await }))
             .await?;
 
-        let closed_channel = db.get_channel_by_id(None, &channel.get_id()).await?.unwrap();
+        let closed_channel = db
+            .get_channel_by_id(None, &channel.get_id())
+            .await?
+            .context("a value should be present")?;
 
         assert!(
             matches!(event_type, Some(ChainEventType::ChannelClosed(c)) if c == closed_channel),
@@ -1785,7 +1798,10 @@ mod tests {
             .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, channel_opened_log.into()).await }))
             .await?;
 
-        let channel = db.get_channel_by_id(None, &channel_id).await?.unwrap();
+        let channel = db
+            .get_channel_by_id(None, &channel_id)
+            .await?
+            .context("a value should be present")?;
 
         assert!(
             matches!(event_type, Some(ChainEventType::ChannelOpened(c)) if c == channel),
@@ -1838,7 +1854,10 @@ mod tests {
             .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, channel_opened_log.into()).await }))
             .await?;
 
-        let channel = db.get_channel_by_id(None, &channel.get_id()).await?.unwrap();
+        let channel = db
+            .get_channel_by_id(None, &channel.get_id())
+            .await?
+            .context("a value should be present")?;
 
         assert!(
             matches!(event_type, Some(ChainEventType::ChannelOpened(c)) if c == channel),
@@ -1963,8 +1982,7 @@ mod tests {
 
         let outgoing_ticket_index_before = db
             .get_outgoing_ticket_index(channel.get_id())
-            .await
-            .expect("must get ticket index")
+            .await?
             .load(Ordering::Relaxed);
 
         let stats = db.get_ticket_statistics(Some(channel.get_id())).await?;
@@ -1985,7 +2003,10 @@ mod tests {
             .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, ticket_redeemed_log.into()).await }))
             .await?;
 
-        let channel = db.get_channel_by_id(None, &channel.get_id()).await?.unwrap();
+        let channel = db
+            .get_channel_by_id(None, &channel.get_id())
+            .await?
+            .context("a value should be present")?;
 
         assert!(
             matches!(event_type, Some(ChainEventType::TicketRedeemed(c, t)) if channel == c && t == Some(ticket)),
@@ -1999,8 +2020,7 @@ mod tests {
 
         let outgoing_ticket_index_after = db
             .get_outgoing_ticket_index(channel.get_id())
-            .await
-            .expect("must get ticket index")
+            .await?
             .load(Ordering::Relaxed);
 
         assert_eq!(
@@ -2067,8 +2087,7 @@ mod tests {
 
         let outgoing_ticket_index_before = db
             .get_outgoing_ticket_index(channel.get_id())
-            .await
-            .expect("must get ticket index")
+            .await?
             .load(Ordering::Relaxed);
 
         let stats = db.get_ticket_statistics(Some(channel.get_id())).await?;
@@ -2089,7 +2108,10 @@ mod tests {
             .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, ticket_redeemed_log.into()).await }))
             .await?;
 
-        let channel = db.get_channel_by_id(None, &channel.get_id()).await?.unwrap();
+        let channel = db
+            .get_channel_by_id(None, &channel.get_id())
+            .await?
+            .context("a value should be present")?;
 
         assert!(
             matches!(event_type, Some(ChainEventType::TicketRedeemed(c, t)) if channel == c && t == Some(ticket)),
@@ -2103,8 +2125,7 @@ mod tests {
 
         let outgoing_ticket_index_after = db
             .get_outgoing_ticket_index(channel.get_id())
-            .await
-            .expect("must get ticket index")
+            .await?
             .load(Ordering::Relaxed);
 
         assert_eq!(
@@ -2165,7 +2186,10 @@ mod tests {
             .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, ticket_redeemed_log.into()).await }))
             .await?;
 
-        let channel = db.get_channel_by_id(None, &channel.get_id()).await?.unwrap();
+        let channel = db
+            .get_channel_by_id(None, &channel.get_id())
+            .await?
+            .context("a value should be present")?;
 
         assert!(
             matches!(event_type, Some(ChainEventType::TicketRedeemed(c, None)) if channel == c),
@@ -2179,8 +2203,7 @@ mod tests {
 
         let outgoing_ticket_index = db
             .get_outgoing_ticket_index(channel.get_id())
-            .await
-            .expect("must get ticket index")
+            .await?
             .load(Ordering::Relaxed);
 
         assert!(
@@ -2233,7 +2256,10 @@ mod tests {
             .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, ticket_redeemed_log.into()).await }))
             .await?;
 
-        let channel = db.get_channel_by_id(None, &channel.get_id()).await?.unwrap();
+        let channel = db
+            .get_channel_by_id(None, &channel.get_id())
+            .await?
+            .context("a value should be present")?;
 
         assert!(
             matches!(event_type, Some(ChainEventType::TicketRedeemed(c, None)) if c == channel),
@@ -2282,7 +2308,10 @@ mod tests {
             .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, ticket_redeemed_log.into()).await }))
             .await?;
 
-        let channel = db.get_channel_by_id(None, &channel.get_id()).await?.unwrap();
+        let channel = db
+            .get_channel_by_id(None, &channel.get_id())
+            .await?
+            .context("a value should be present")?;
 
         assert!(
             matches!(event_type, Some(ChainEventType::TicketRedeemed(c, None)) if c == channel),
@@ -2331,7 +2360,10 @@ mod tests {
             .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, closure_initiated_log.into()).await }))
             .await?;
 
-        let channel = db.get_channel_by_id(None, &channel.get_id()).await?.unwrap();
+        let channel = db
+            .get_channel_by_id(None, &channel.get_id())
+            .await?
+            .context("a value should be present")?;
 
         assert!(
             matches!(event_type, Some(ChainEventType::ChannelClosureInitiated(c)) if c == channel),

@@ -657,11 +657,11 @@ mod tests {
 
         let client = create_rpc_client_to_anvil(req, &anvil, &chain_key_0);
 
-        Ok(ContractAddresses::from(
-            &ContractInstances::deploy_for_testing(client.clone(), &chain_key_0)
-                .await
-                .expect("failed to deploy"),
-        ))
+        let contracts = ContractInstances::deploy_for_testing(client.clone(), &chain_key_0)
+            .await
+            .expect("deploy failed");
+
+        Ok(ContractAddresses::from(&contracts))
     }
 
     #[async_std::test]
@@ -693,7 +693,7 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn test_client_should_get_block_number() {
+    async fn test_client_should_get_block_number() -> anyhow::Result<()> {
         let block_time = Duration::from_secs(1);
 
         let anvil = create_anvil(Some(block_time));
@@ -708,10 +708,7 @@ mod tests {
         for _ in 0..3 {
             sleep(block_time).await;
 
-            let number: ethers::types::U64 = client
-                .request("eth_blockNumber", ())
-                .await
-                .expect("should get block number");
+            let number: ethers::types::U64 = client.request("eth_blockNumber", ()).await?;
 
             assert!(number.as_u64() > last_number, "next block number must be greater");
             last_number = number.as_u64();
@@ -722,6 +719,8 @@ mod tests {
             client.requests_enqueued.load(Ordering::SeqCst),
             "retry queue should be zero on successful requests"
         );
+
+        Ok(())
     }
 
     #[async_std::test]

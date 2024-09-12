@@ -1,5 +1,6 @@
 use std::str::FromStr;
 
+use anyhow::Context;
 use async_std::prelude::FutureExt;
 use async_trait::async_trait;
 use futures::{SinkExt, StreamExt};
@@ -124,14 +125,14 @@ async fn create_minimal_topology(dbs: &mut Vec<HoprDb>) -> anyhow::Result<()> {
             ));
 
             dbs[index]
-                .upsert_channel(None, channel.unwrap())
+                .upsert_channel(None, channel.context("channel should be present")?)
                 .await
                 .map_err(|e| hopr_transport_protocol::errors::ProtocolError::Logic(e.to_string()))?;
         }
 
         if index > 0 {
             dbs[index]
-                .upsert_channel(None, previous_channel.unwrap())
+                .upsert_channel(None, previous_channel.context("channel should be present")?)
                 .await
                 .map_err(|e| hopr_transport_protocol::errors::ProtocolError::Logic(e.to_string()))?;
         }
@@ -167,9 +168,7 @@ async fn peer_setup_for(count: usize) -> anyhow::Result<(Vec<WireChannels>, Vec<
     assert!(peer_count >= 3);
     let mut dbs = create_dbs(peer_count).await?;
 
-    create_minimal_topology(&mut dbs)
-        .await
-        .expect("failed to create minimal channel topology");
+    create_minimal_topology(&mut dbs).await?;
 
     // Begin tests
     for i in 0..peer_count {
@@ -370,10 +369,7 @@ async fn packet_relayer_workflow_n_peers(peer_count: usize, pending_packets: usi
     for i in 0..pending_packets {
         let sender = MsgSender::new(apis[0].0.clone());
 
-        let awaiter = sender
-            .send_packet(test_msgs[i].clone(), packet_path.clone())
-            .await
-            .expect("Packet should be sent successfully");
+        let awaiter = sender.send_packet(test_msgs[i].clone(), packet_path.clone()).await?;
 
         if awaiter
             .consume_and_wait(std::time::Duration::from_millis(500))
@@ -426,7 +422,7 @@ async fn packet_relayer_workflow_n_peers(peer_count: usize, pending_packets: usi
                 .count()
                 .timeout(std::time::Duration::from_secs(1))
                 .await
-                .expect(format!("peer {i} should be able to extract {expected_tickets}").as_str()),
+                .context("peer should be able to extract expected tickets")?,
             expected_tickets,
             "peer {} did not receive the expected amount of tickets",
             i,

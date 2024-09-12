@@ -444,6 +444,7 @@ mod tests {
     use crate::errors::DbSqlError;
     use crate::errors::DbSqlError::DecodingError;
     use crate::HoprDbGeneralModelOperations;
+    use anyhow::Context;
     use hopr_crypto_types::prelude::{ChainKeypair, Keypair, OffchainKeypair};
     use hopr_internal_types::prelude::AccountType::NotAnnounced;
 
@@ -464,21 +465,15 @@ mod tests {
         let maddr: Multiaddr = "/ip4/1.2.3.4/tcp/8000".parse()?;
         let block = 100;
 
-        let db_acc = db
-            .insert_announcement(None, chain_1, maddr.clone(), block)
-            .await
-            .expect("should insert announcement");
+        let db_acc = db.insert_announcement(None, chain_1, maddr.clone(), block).await?;
 
-        let acc = db.get_account(None, chain_1).await?.expect("should contain account");
+        let acc = db.get_account(None, chain_1).await?.context("should contain account")?;
         assert_eq!(Some(maddr.clone()), acc.get_multiaddr(), "multiaddress must match");
         assert_eq!(Some(block), acc.updated_at());
         assert_eq!(acc, db_acc);
 
         let block = 200;
-        let db_acc = db
-            .insert_announcement(None, chain_1, maddr.clone(), block)
-            .await
-            .expect("should insert duplicate announcement");
+        let db_acc = db.insert_announcement(None, chain_1, maddr.clone(), block).await?;
 
         let acc = db.get_account(None, chain_1).await?.expect("should contain account");
         assert_eq!(Some(maddr), acc.get_multiaddr(), "multiaddress must match");
@@ -487,10 +482,7 @@ mod tests {
 
         let maddr: Multiaddr = "/dns4/useful.domain/tcp/56".parse()?;
         let block = 300;
-        let db_acc = db
-            .insert_announcement(None, chain_1, maddr.clone(), block)
-            .await
-            .expect("should insert updated announcement");
+        let db_acc = db.insert_announcement(None, chain_1, maddr.clone(), block).await?;
 
         let acc = db.get_account(None, chain_1).await?.expect("should contain account");
         assert_eq!(Some(maddr), acc.get_multiaddr(), "multiaddress must match");
@@ -570,14 +562,8 @@ mod tests {
         let maddr: Multiaddr = "/ip4/1.2.3.4/tcp/8000".parse()?;
         let block = 100;
 
-        let db_acc_1 = db
-            .insert_announcement(None, chain_1, maddr.clone(), block)
-            .await
-            .expect("should insert announcement");
-        let db_acc_2 = db
-            .insert_announcement(None, chain_2, maddr.clone(), block)
-            .await
-            .expect("should insert announcement");
+        let db_acc_1 = db.insert_announcement(None, chain_1, maddr.clone(), block).await?;
+        let db_acc_2 = db.insert_announcement(None, chain_2, maddr.clone(), block).await?;
 
         let acc = db.get_account(None, chain_1).await?.expect("should contain account");
         assert_eq!(Some(maddr.clone()), acc.get_multiaddr(), "multiaddress must match");
@@ -612,9 +598,7 @@ mod tests {
 
         assert!(db.get_account(None, chain_1).await?.is_some());
 
-        db.delete_account(None, chain_1)
-            .await
-            .expect("should not fail to delete");
+        db.delete_account(None, chain_1).await?;
 
         assert!(db.get_account(None, chain_1).await?.is_none());
 
@@ -647,8 +631,7 @@ mod tests {
             .await?;
 
         db.insert_account(None, AccountEntry::new(packet_1, chain_1, AccountType::NotAnnounced))
-            .await
-            .expect("should not fail the second time");
+            .await?;
 
         Ok(())
     }
@@ -725,24 +708,19 @@ mod tests {
                     Ok::<(), DbSqlError>(())
                 })
             })
-            .await
-            .expect("tx should not fail");
+            .await?;
 
         let a: Address = db
             .translate_key(None, packet_1)
-            .await
-            .expect("must translate")
-            .expect("must contain key")
-            .try_into()
-            .expect("must be chain key");
+            .await?
+            .context("must contain key")?
+            .try_into()?;
 
         let b: OffchainPublicKey = db
             .translate_key(None, chain_2)
-            .await
-            .expect("must translate")
-            .expect("must contain key")
-            .try_into()
-            .expect("must be chain key");
+            .await?
+            .context("must contain key")?
+            .try_into()?;
 
         assert_eq!(chain_1, a, "chain keys must match");
         assert_eq!(packet_2, b, "chain keys must match");
@@ -780,26 +758,21 @@ mod tests {
                     Ok::<(), DbSqlError>(())
                 })
             })
-            .await
-            .expect("tx should not fail");
+            .await?;
 
         db.caches.invalidate_all();
 
         let a: Address = db
             .translate_key(None, packet_1)
-            .await
-            .expect("must translate")
-            .expect("must contain key")
-            .try_into()
-            .expect("must be chain key");
+            .await?
+            .context("must contain key")?
+            .try_into()?;
 
         let b: OffchainPublicKey = db
             .translate_key(None, chain_2)
-            .await
-            .expect("must translate")
-            .expect("must contain key")
-            .try_into()
-            .expect("must be chain key");
+            .await?
+            .context("must contain key")?
+            .try_into()?;
 
         assert_eq!(chain_1, a, "chain keys must match");
         assert_eq!(packet_2, b, "chain keys must match");
@@ -850,7 +823,7 @@ mod tests {
                         .insert_announcement(
                             Some(tx),
                             chain_3,
-                            "/ip4/1.2.3.4/tcp/1234".parse().expect("should be parsable"),
+                            "/ip4/1.2.3.4/tcp/1234".parse().map_err(|_| DecodingError)?,
                             12,
                         )
                         .await?;
@@ -858,7 +831,7 @@ mod tests {
                         .insert_announcement(
                             Some(tx),
                             chain_3,
-                            "/ip4/8.8.1.1/tcp/1234".parse().expect("should be parsable"),
+                            "/ip4/8.8.1.1/tcp/1234".parse().map_err(|_| DecodingError)?,
                             15,
                         )
                         .await?;
@@ -866,17 +839,16 @@ mod tests {
                         .insert_announcement(
                             Some(tx),
                             chain_3,
-                            "/ip4/1.2.3.0/tcp/234".parse().expect("should be parsable"),
+                            "/ip4/1.2.3.0/tcp/234".parse().map_err(|_| DecodingError)?,
                             14,
                         )
                         .await
                 })
             })
-            .await
-            .expect("must insert announcements");
+            .await?;
 
-        let all_accounts = db.get_accounts(None, false).await.expect("must get all");
-        let public_only = db.get_accounts(None, true).await.expect("must get public");
+        let all_accounts = db.get_accounts(None, false).await?;
+        let public_only = db.get_accounts(None, true).await?;
 
         assert_eq!(3, all_accounts.len());
 

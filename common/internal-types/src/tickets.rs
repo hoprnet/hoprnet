@@ -1054,8 +1054,7 @@ pub mod tests {
         let ticket = TicketBuilder::zero_hop()
             .direction(&ALICE.public().to_address(), &BOB.public().to_address())
             .challenge(Default::default())
-            .build()
-            .expect("should build ticket");
+            .build()?;
         assert_eq!(0, ticket.index);
         assert_eq!(0.0, ticket.win_prob());
         assert_eq!(0, ticket.channel_epoch);
@@ -1076,8 +1075,7 @@ pub mod tests {
             .win_prob(1.0)
             .channel_epoch(1)
             .challenge(Default::default())
-            .build_signed(&ALICE, &Default::default())
-            .expect("should build ticket");
+            .build_signed(&ALICE, &Default::default())?;
 
         assert_ne!(initial_ticket.verified_hash().as_ref(), [0u8; Hash::SIZE]);
 
@@ -1099,8 +1097,7 @@ pub mod tests {
             .win_prob(1.0)
             .channel_epoch(1)
             .challenge(Default::default())
-            .build_signed(&ALICE, &Default::default())
-            .expect("should build ticket");
+            .build_signed(&ALICE, &Default::default())?;
 
         assert_eq!(
             initial_ticket,
@@ -1119,8 +1116,7 @@ pub mod tests {
             .win_prob(1.0)
             .channel_epoch(1)
             .challenge(Default::default())
-            .build_signed(&ALICE, &Default::default())
-            .expect("should build ticket");
+            .build_signed(&ALICE, &Default::default())?;
 
         assert_ne!(initial_ticket.verified_hash().as_ref(), [0u8; Hash::SIZE]);
 
@@ -1140,18 +1136,14 @@ pub mod tests {
             .channel_epoch(1)
             .challenge(Default::default());
 
-        let ticket = builder
-            .clone()
-            .build_signed(&ALICE, &Default::default())
-            .expect("should build ticket");
+        let ticket = builder.clone().build_signed(&ALICE, &Default::default())?;
 
         assert_eq!(1u8, ticket.get_path_position(1_u32.into())?);
 
         let ticket = builder
             .clone()
             .amount(34_u64)
-            .build_signed(&ALICE, &Default::default())
-            .expect("should build ticket");
+            .build_signed(&ALICE, &Default::default())?;
 
         assert_eq!(2u8, ticket.get_path_position(17_u64.into())?);
 
@@ -1159,8 +1151,7 @@ pub mod tests {
             .clone()
             .amount(30_u64)
             .win_prob(0.2)
-            .build_signed(&ALICE, &Default::default())
-            .expect("should build ticket");
+            .build_signed(&ALICE, &Default::default())?;
 
         assert_eq!(2u8, ticket.get_path_position(3_u64.into())?);
         Ok(())
@@ -1176,8 +1167,7 @@ pub mod tests {
             .win_prob(1.0)
             .channel_epoch(1)
             .challenge(Default::default())
-            .build_signed(&ALICE, &Default::default())
-            .expect("should build ticket");
+            .build_signed(&ALICE, &Default::default())?;
 
         assert!(ticket.get_path_position(1_u64.into()).is_err());
         Ok(())
@@ -1188,8 +1178,7 @@ pub mod tests {
         let ticket = TicketBuilder::zero_hop()
             .direction(&ALICE.public().to_address(), &BOB.public().to_address())
             .challenge(Default::default())
-            .build_signed(&ALICE, &Default::default())
-            .expect("should build ticket");
+            .build_signed(&ALICE, &Default::default())?;
 
         assert!(ticket
             .leak()
@@ -1237,8 +1226,7 @@ pub mod tests {
             Some(Challenge::from(cp_sum).to_ethereum_challenge()),
         )?
         .into_unacknowledged(hk1)
-        .acknowledge(&hk2)
-        .expect("must be able to acknowledge ticket");
+        .acknowledge(&hk2)?;
 
         assert!(ack.is_winning(&BOB, &dst), "ticket must be winning");
         Ok(())
@@ -1288,24 +1276,16 @@ pub mod tests {
             .win_prob(1.0)
             .channel_epoch(1)
             .challenge(resp.to_challenge().to_ethereum_challenge())
-            .build_signed(&ALICE, &Default::default())
-            .expect("should build ticket");
+            .build_signed(&ALICE, &Default::default())?;
 
         let unack = verified.into_unacknowledged(hk1);
         let acknowledged = unack.acknowledge(&hk2).expect("should acknowledge");
 
-        let redeemable_1 = acknowledged
-            .clone()
-            .into_redeemable(&BOB, &Hash::default())
-            .expect("should convert to redeemable");
+        let redeemable_1 = acknowledged.clone().into_redeemable(&BOB, &Hash::default())?;
 
-        let transferable = acknowledged
-            .into_transferable(&BOB, &Hash::default())
-            .expect("should convert to transferable");
+        let transferable = acknowledged.into_transferable(&BOB, &Hash::default())?;
 
-        let redeemable_2 = transferable
-            .into_redeemable(&ALICE.public().to_address(), &Hash::default())
-            .expect("should convert to redeemable from transferable");
+        let redeemable_2 = transferable.into_redeemable(&ALICE.public().to_address(), &Hash::default())?;
 
         assert_eq!(redeemable_1, redeemable_2);
         assert_eq!(redeemable_1.vrf_params.v, redeemable_2.vrf_params.v);

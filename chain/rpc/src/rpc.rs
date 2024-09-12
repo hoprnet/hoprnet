@@ -311,7 +311,7 @@ mod tests {
         // Wait until contracts deployments are final
         sleep((1 + cfg.finality) * expected_block_time).await;
 
-        let rpc = RpcOperations::new(client, &chain_key_0, cfg).expect("failed to construct rpc");
+        let rpc = RpcOperations::new(client, &chain_key_0, cfg)?;
 
         let balance_1 = rpc.get_balance((&chain_key_0).into(), BalanceType::Native).await?;
         assert!(balance_1.amount().gt(&0.into()), "balance must be greater than 0");
@@ -319,8 +319,7 @@ mod tests {
         // Send 1 ETH to some random address
         let tx_hash = rpc
             .send_transaction(chain_types::utils::create_native_transfer(*RANDY, 1000000_u32.into()))
-            .await
-            .expect("failed to send tx");
+            .await?;
 
         wait_until_tx(tx_hash, Duration::from_secs(8)).await;
 
@@ -352,7 +351,7 @@ mod tests {
         // Wait until contracts deployments are final
         sleep((1 + cfg.finality) * expected_block_time).await;
 
-        let rpc = RpcOperations::new(client, &chain_key_0, cfg).expect("failed to construct rpc");
+        let rpc = RpcOperations::new(client, &chain_key_0, cfg)?;
 
         let balance_1 = rpc.get_balance((&chain_key_0).into(), BalanceType::Native).await?;
         assert!(balance_1.amount().gt(&0.into()), "balance must be greater than 0");
@@ -405,7 +404,7 @@ mod tests {
         // Wait until contracts deployments are final
         sleep((1 + cfg.finality) * expected_block_time).await;
 
-        let rpc = RpcOperations::new(client, &chain_key_0, cfg).expect("failed to construct rpc");
+        let rpc = RpcOperations::new(client, &chain_key_0, cfg)?;
 
         let balance_1 = rpc.get_balance((&chain_key_0).into(), BalanceType::Native).await?;
         assert!(balance_1.amount().gt(&0.into()), "balance must be greater than 0");
@@ -413,8 +412,7 @@ mod tests {
         // Send 1 ETH to some random address
         let tx_hash = rpc
             .send_transaction(chain_types::utils::create_native_transfer(*RANDY, 1_u32.into()))
-            .await
-            .expect("failed to send tx");
+            .await?;
 
         wait_until_tx(tx_hash, Duration::from_secs(8)).await;
 
@@ -435,9 +433,7 @@ mod tests {
         // Deploy contracts
         let contract_instances = {
             let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &chain_key_0);
-            ContractInstances::deploy_for_testing(client, &chain_key_0)
-                .await
-                .expect("could not deploy contracts")
+            ContractInstances::deploy_for_testing(client, &chain_key_0).await?
         };
 
         let cfg = RpcOperationsConfig {
@@ -461,7 +457,7 @@ mod tests {
         // Wait until contracts deployments are final
         sleep((1 + cfg.finality) * expected_block_time).await;
 
-        let rpc = RpcOperations::new(client, &chain_key_0, cfg).expect("failed to construct rpc");
+        let rpc = RpcOperations::new(client, &chain_key_0, cfg)?;
 
         let balance = rpc.get_balance((&chain_key_0).into(), BalanceType::HOPR).await?;
         assert_eq!(amount, balance.amount().as_u64(), "invalid balance");

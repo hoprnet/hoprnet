@@ -859,6 +859,7 @@ dependencies = [
 name = "bindings"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "ethers",
  "serde",
 ]
@@ -3974,6 +3975,7 @@ dependencies = [
 name = "hopr-db-entity"
 version = "0.2.0"
 dependencies = [
+ "anyhow",
  "async-std",
  "chrono",
  "clap",
@@ -4449,6 +4451,7 @@ dependencies = [
 name = "hoprd-inbox"
 version = "0.2.0"
 dependencies = [
+ "anyhow",
  "async-lock 3.4.0",
  "async-std",
  "async-trait",

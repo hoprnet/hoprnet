@@ -461,6 +461,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use anyhow::Context;
     use chain_actions::action_queue::{ActionConfirmation, PendingAction};
     use chain_types::actions::Action;
     use chain_types::chain_events::ChainEventType;
@@ -637,7 +638,7 @@ mod tests {
     #[test]
     fn test_semver() -> anyhow::Result<()> {
         // See https://github.com/dtolnay/semver/issues/315
-        let ver: semver::Version = "2.1.0-rc.3+commit.f75bc6c8".parse().expect("should be valid version");
+        let ver: semver::Version = "2.1.0-rc.3+commit.f75bc6c8".parse()?;
         let stripped = semver::Version::new(ver.major, ver.minor, ver.patch);
         let req = semver::VersionReq::from_str(">=2.0.0")?;
 
@@ -662,12 +663,18 @@ mod tests {
         let for_closing = mock_channel(db.clone(), PEERS[5].0, balance).await?;
 
         // Peer 3 has an accepted pre-release version
-        let mut status_3 = db.get_network_peer(&PEERS[3].1).await?.unwrap();
+        let mut status_3 = db
+            .get_network_peer(&PEERS[3].1)
+            .await?
+            .context("peer should be present")?;
         status_3.peer_version = Some("2.1.0-rc.3+commit.f75bc6c8".into());
         db.update_network_peer(status_3).await?;
 
         // Peer 10 has an old node version
-        let mut status_10 = db.get_network_peer(&PEERS[9].1).await?.unwrap();
+        let mut status_10 = db
+            .get_network_peer(&PEERS[9].1)
+            .await?
+            .context("peer should be present")?;
         status_10.peer_version = Some("1.92.0".into());
         db.update_network_peer(status_10).await?;
 
@@ -708,7 +715,7 @@ mod tests {
                 .expect_err("on tick should fail when criteria are not met");
         }
 
-        strat.on_tick().await.expect("on tick should not fail");
+        strat.on_tick().await?;
 
         Ok(())
     }

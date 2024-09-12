@@ -456,6 +456,8 @@ impl MultiHistogram {
 
 #[cfg(test)]
 mod tests {
+    use anyhow::Context;
+
     use super::*;
 
     #[test]
@@ -485,10 +487,10 @@ mod tests {
         counter.increment_by(&["1.89.20"], 1);
         counter.increment_by(&["1.90.1"], 15);
 
-        assert_eq!(25, counter.get(&["1.90.1"]).expect("should be preent"));
-        assert_eq!(1, counter.get(&["1.89.20"]).expect("should be preent"));
+        assert_eq!(25, counter.get(&["1.90.1"]).context("should be present")?);
+        assert_eq!(1, counter.get(&["1.89.20"]).context("should be present")?);
 
-        let metrics = gather_all_metrics().expect("should be preent");
+        let metrics = gather_all_metrics()?;
         assert!(metrics.contains("my_mctr{version=\"1.90.1\"} 25"));
         assert!(metrics.contains("my_mctr{version=\"1.89.20\"} 1"));
 
@@ -530,8 +532,8 @@ mod tests {
         gauge.increment(&["1.90.1"], 15.0);
         gauge.decrement(&["1.89.20"], 2.0);
 
-        assert_eq!(25.0, gauge.get(&["1.90.1"]).expect("should be preent"));
-        assert_eq!(3.0, gauge.get(&["1.89.20"]).expect("should be preent"));
+        assert_eq!(25.0, gauge.get(&["1.90.1"]).context("should be present")?);
+        assert_eq!(3.0, gauge.get(&["1.89.20"]).context("should be present")?);
 
         let metrics = gather_all_metrics()?;
         assert!(metrics.contains("my_mgauge{version=\"1.90.1\"} 25"));
@@ -585,11 +587,20 @@ mod tests {
         histogram.observe(&["1.90.0"], 5.0);
         histogram.observe(&["1.89.20"], 10.0);
 
-        assert_eq!(1, histogram.get_sample_count(&["1.89.20"]).expect("should be preent"));
-        assert_eq!(10.0, histogram.get_sample_sum(&["1.89.20"]).expect("should be preent"));
+        assert_eq!(
+            1,
+            histogram.get_sample_count(&["1.89.20"]).context("should be present")?
+        );
+        assert_eq!(
+            10.0,
+            histogram.get_sample_sum(&["1.89.20"]).context("should be present")?
+        );
 
-        assert_eq!(4, histogram.get_sample_count(&["1.90.0"]).expect("should be preent"));
-        assert_eq!(10.0, histogram.get_sample_sum(&["1.90.0"]).expect("should be preent"));
+        assert_eq!(4, histogram.get_sample_count(&["1.90.0"]).context("should be present")?);
+        assert_eq!(
+            10.0,
+            histogram.get_sample_sum(&["1.90.0"]).context("should be present")?
+        );
 
         let metrics = gather_all_metrics()?;
         assert!(metrics.contains("my_mhistogram_bucket{version=\"1.90.0\",le=\"1\"} 1"));

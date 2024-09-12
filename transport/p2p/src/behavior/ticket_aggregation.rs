@@ -88,11 +88,16 @@ impl NetworkBehaviour for Behaviour {
         };
 
         match self.events.poll_next_unpin(cx) {
-            std::task::Poll::Ready(Some(ticket_agg_event)) => {
-                self.pending_events.push_back(ToSwarm::GenerateEvent(ticket_agg_event));
-                std::task::Poll::Ready(self.pending_events.pop_front().unwrap())
+            Poll::Ready(Some(ticket_agg_event)) => {
+                if let Some(value) = self.pending_events.pop_front() {
+                    self.pending_events.push_back(ToSwarm::GenerateEvent(ticket_agg_event));
+
+                    Poll::Ready(value)
+                } else {
+                    Poll::Ready(ToSwarm::GenerateEvent(ticket_agg_event))
+                }
             }
-            std::task::Poll::Ready(None) | std::task::Poll::Pending => std::task::Poll::Pending,
+            Poll::Ready(None) | Poll::Pending => Poll::Pending,
         }
     }
 }

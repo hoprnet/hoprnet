@@ -261,11 +261,13 @@ mod tests {
     }
 
     #[test]
-    pub fn test_generate_id() {
-        let from = Address::from_str("0xa460f2e47c641b64535f5f4beeb9ac6f36f9d27c").expect("should succeed");
-        let to = Address::from_str("0xb8b75fef7efdf4530cf1688c933d94e4e519ccd1").expect("should succeed");
+    pub fn test_generate_id() -> anyhow::Result<()> {
+        let from = Address::from_str("0xa460f2e47c641b64535f5f4beeb9ac6f36f9d27c")?;
+        let to = Address::from_str("0xb8b75fef7efdf4530cf1688c933d94e4e519ccd1")?;
         let id = generate_channel_id(&from, &to).to_string();
         assert_eq!("0x1a410210ce7265f3070bf0e8885705dce452efcfbd90a5467525d136fcefc64a", id);
+
+        Ok(())
     }
 
     #[test]

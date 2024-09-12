@@ -128,7 +128,9 @@ where
                 .collect::<Vec<_>>();
 
             if ack_ticket_in_db.len() == 1 {
-                let ack = ack_ticket_in_db.pop().unwrap();
+                let ack = ack_ticket_in_db
+                    .pop()
+                    .expect("should be unwrappable due to previous check");
                 info!("redeeming single {ack} worth {}", ack.verified_ticket().amount);
 
                 #[cfg(all(feature = "prometheus", not(test)))]
@@ -253,13 +255,12 @@ mod tests {
         let ack_clone_2 = ack_ticket.clone();
 
         let mut actions = MockTicketRedeemAct::new();
+        let mock_confirm = mock_action_confirmation(ack_clone_2)?;
         actions
             .expect_redeem_ticket()
             .once()
             .withf(move |ack| ack_clone.ticket.eq(&ack.ticket))
-            .return_once(|_| {
-                Ok(ok(mock_action_confirmation(ack_clone_2).expect("should produce confirmation")).boxed())
-            });
+            .return_once(move |_| Ok(ok(mock_confirm).boxed()));
 
         let cfg = AutoRedeemingStrategyConfig {
             redeem_only_aggregated: false,
@@ -284,13 +285,12 @@ mod tests {
         let ack_clone_agg = ack_ticket_agg.clone();
         let ack_clone_agg_2 = ack_ticket_agg.clone();
         let mut actions = MockTicketRedeemAct::new();
+        let mock_confirm = mock_action_confirmation(ack_clone_agg_2)?;
         actions
             .expect_redeem_ticket()
             .once()
             .withf(move |ack| ack_clone_agg.ticket.eq(&ack.ticket))
-            .return_once(|_| {
-                Ok(ok(mock_action_confirmation(ack_clone_agg_2).expect("should produce confirmation")).boxed())
-            });
+            .return_once(|_| Ok(ok(mock_confirm).boxed()));
 
         let cfg = AutoRedeemingStrategyConfig {
             redeem_only_aggregated: true,
@@ -298,12 +298,8 @@ mod tests {
         };
 
         let ars = AutoRedeemingStrategy::new(cfg, db, actions);
-        ars.on_acknowledged_winning_ticket(&ack_ticket_unagg)
-            .await
-            .expect_err("non-agg ticket should not satisfy");
-        ars.on_acknowledged_winning_ticket(&ack_ticket_agg)
-            .await
-            .expect("agg ticket should satisfy");
+        ars.on_acknowledged_winning_ticket(&ack_ticket_unagg).await?;
+        ars.on_acknowledged_winning_ticket(&ack_ticket_agg).await?;
         Ok(())
     }
 
@@ -332,13 +328,12 @@ mod tests {
         let ack_clone_2 = ack_ticket.clone();
 
         let mut actions = MockTicketRedeemAct::new();
+        let mock_confirm = mock_action_confirmation(ack_clone_2)?;
         actions
             .expect_redeem_ticket()
             .once()
             .withf(move |ack| ack_clone.ticket.eq(&ack.ticket))
-            .return_once(|_| {
-                Ok(ok(mock_action_confirmation(ack_clone_2).expect("should produce confirmation")).boxed())
-            });
+            .return_once(move |_| Ok(ok(mock_confirm).boxed()));
 
         let cfg = AutoRedeemingStrategyConfig {
             redeem_only_aggregated: true,
@@ -354,8 +349,8 @@ mod tests {
                 right: channel.status,
             },
         )
-        .await
-        .expect("event should be satisfied");
+        .await?;
+
         Ok(())
     }
 
@@ -421,15 +416,15 @@ mod tests {
         db.upsert_channel(None, channel).await?;
 
         let db_clone = db.clone();
+        let ack_ticket_1 = generate_random_ack_ticket(1, 1, 5)?;
+        let ack_ticket_2 = generate_random_ack_ticket(2, 1, 5)?;
+
         db.begin_transaction_in_db(TargetDb::Tickets)
             .await?
-            .perform(|tx| {
+            .perform(move |tx| {
                 Box::pin(async move {
-                    let ack_ticket = generate_random_ack_ticket(1, 1, 5).expect("should generate ack ticket");
-                    db_clone.upsert_ticket(Some(tx), ack_ticket).await?;
-
-                    let ack_ticket = generate_random_ack_ticket(2, 1, 5).expect("should generate ack ticket");
-                    db_clone.upsert_ticket(Some(tx), ack_ticket).await
+                    db_clone.upsert_ticket(Some(tx), ack_ticket_1).await?;
+                    db_clone.upsert_ticket(Some(tx), ack_ticket_2).await
                 })
             })
             .await?;

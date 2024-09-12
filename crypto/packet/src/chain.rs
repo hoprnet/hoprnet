@@ -356,8 +356,7 @@ mod tests {
             .collect::<hopr_primitive_types::errors::Result<Vec<_>>>()?;
 
         let mut packet =
-            ChainPacketComponents::into_outgoing(test_message, &path, &own_channel_kp, ticket, &Hash::default())
-                .expect("failed to construct packet");
+            ChainPacketComponents::into_outgoing(test_message, &path, &own_channel_kp, ticket, &Hash::default())?;
 
         match &packet {
             ChainPacketComponents::Outgoing { .. } => {}

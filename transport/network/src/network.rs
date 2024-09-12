@@ -349,6 +349,7 @@ where
 #[cfg(test)]
 mod tests {
     use crate::network::{Health, Network, NetworkConfig, NetworkTriggeredEvent, PeerOrigin};
+    use anyhow::Context;
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
     use hopr_platform::time::native::current_time;
     use hopr_primitive_types::prelude::AsUnixTimestamp;
@@ -463,8 +464,7 @@ mod tests {
 
         peers
             .update(&peer, Ok(current_time().as_unix_timestamp()), None)
-            .await
-            .expect("no error should occur");
+            .await?;
 
         assert_eq!(
             0,
@@ -513,16 +513,12 @@ mod tests {
         let expected_version = Some("1.2.4".to_string());
 
         {
-            peers
-                .add(&peer, PeerOrigin::IncomingConnection, vec![])
-                .await
-                .expect("should not fail on DB add");
+            peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await?;
             peers
                 .update(&peer, Ok(current_time().as_unix_timestamp()), expected_version.clone())
-                .await
-                .expect("no error should occur");
+                .await?;
 
-            let status = peers.get(&peer).await.unwrap().unwrap();
+            let status = peers.get(&peer).await?.context("peer should be present")?;
 
             assert_eq!(status.peer_version, expected_version);
         }
@@ -532,16 +528,9 @@ mod tests {
         {
             let expected_version = Some("2.0.0".to_string());
 
-            peers
-                .update(&peer, Ok(ts), expected_version.clone())
-                .await
-                .expect("no error should occur");
+            peers.update(&peer, Ok(ts), expected_version.clone()).await?;
 
-            let status = peers
-                .get(&peer)
-                .await
-                .expect("the peer status should be preent")
-                .unwrap();
+            let status = peers.get(&peer).await?.context("peer should be present")?;
 
             assert_eq!(status.peer_version, expected_version);
         }

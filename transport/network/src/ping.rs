@@ -269,7 +269,7 @@ mod tests {
         let challenge = replier.challenge.clone();
 
         replier.notify(
-            ControlMessage::generate_pong_response(&challenge.1).expect("valid challenge reply"),
+            ControlMessage::generate_pong_response(&challenge.1)?,
             "version".to_owned(),
         );
 
@@ -286,8 +286,7 @@ mod tests {
         let replier = PingQueryReplier::new(tx);
 
         replier.notify(
-            ControlMessage::generate_pong_response(&ControlMessage::generate_ping_request())
-                .expect("valid challenge reply"),
+            ControlMessage::generate_pong_response(&ControlMessage::generate_ping_request())?,
             "version".to_owned(),
         );
 
@@ -307,11 +306,14 @@ mod tests {
 
         async_std::task::sleep(delay).await;
         replier.notify(
-            ControlMessage::generate_pong_response(&challenge.1).expect("valid challenge reply"),
+            ControlMessage::generate_pong_response(&challenge.1)?,
             "version".to_owned(),
         );
 
-        let actual_latency = rx.await?.expect("should contain a result value").0;
+        let actual_latency = rx
+            .await?
+            .map_err(|_e| anyhow::anyhow!("should contain a result value"))?
+            .0;
         assert!(actual_latency > delay / 2);
         assert!(actual_latency < delay);
 

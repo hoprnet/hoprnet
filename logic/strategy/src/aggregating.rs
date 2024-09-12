@@ -281,6 +281,7 @@ where
 #[cfg(test)]
 mod tests {
     use crate::strategy::SingularStrategy;
+    use anyhow::Context;
     use async_std::prelude::FutureExt as AsyncStdFutureExt;
     use futures::{FutureExt, StreamExt};
     use hex_literal::hex;
@@ -366,7 +367,7 @@ mod tests {
 
                     for i in 0..amount {
                         let acked_ticket = mock_acknowledged_ticket(&PEERS_CHAIN[0], &PEERS_CHAIN[1], i as u64, 1)
-                            .expect("should create mocked ticket");
+                            .expect("should be able to create an ack ticket");
                         debug!("inserting {acked_ticket}");
 
                         db_clone.upsert_ticket(Some(tx), acked_ticket.clone()).await?;
@@ -431,10 +432,10 @@ mod tests {
         db_bob: HoprDb,
         key_alice: &ChainKeypair,
         key_bob: &ChainKeypair,
-    ) -> (
+    ) -> anyhow::Result<(
         AwaitingAggregator<(), (), HoprDb>,
         futures::channel::oneshot::Receiver<()>,
-    ) {
+    )> {
         let mut alice = TicketAggregationInteraction::<(), ()>::new(db_alice, key_alice);
         let mut bob = TicketAggregationInteraction::<(), ()>::new(db_bob.clone(), key_bob);
 
@@ -479,14 +480,14 @@ mod tests {
                 _ => panic!("unexpected action happened"),
             };
 
-            finalizer.unwrap().finalize();
+            finalizer.expect("should have a value present").finalize();
             let _ = tx.send(());
         });
 
-        (
+        Ok((
             AwaitingAggregator::new(db_bob, bob_aggregator, Duration::from_secs(5)),
             awaiter,
-        )
+        ))
     }
 
     #[async_std::test]
@@ -505,7 +506,7 @@ mod tests {
         db_bob.upsert_channel(None, channel).await?;
 
         let (bob_aggregator, awaiter) =
-            spawn_aggregation_interaction(db_alice.clone(), db_bob.clone(), &PEERS_CHAIN[0], &PEERS_CHAIN[1]);
+            spawn_aggregation_interaction(db_alice.clone(), db_bob.clone(), &PEERS_CHAIN[0], &PEERS_CHAIN[1])?;
 
         let cfg = super::AggregatingStrategyConfig {
             aggregation_threshold: Some(5),
@@ -516,10 +517,7 @@ mod tests {
         let aggregation_strategy = super::AggregatingStrategy::new(cfg, db_bob.clone(), Arc::new(bob_aggregator));
 
         //let threshold_ticket = acked_tickets.last().unwrap();
-        aggregation_strategy
-            .on_tick()
-            .await
-            .expect("strategy call should succeed");
+        aggregation_strategy.on_tick().await?;
 
         // Wait until aggregation has finished
         let f1 = pin!(awaiter);
@@ -548,7 +546,7 @@ mod tests {
         db_bob.upsert_channel(None, channel).await?;
 
         let (bob_aggregator, awaiter) =
-            spawn_aggregation_interaction(db_alice.clone(), db_bob.clone(), &PEERS_CHAIN[0], &PEERS_CHAIN[1]);
+            spawn_aggregation_interaction(db_alice.clone(), db_bob.clone(), &PEERS_CHAIN[0], &PEERS_CHAIN[1])?;
 
         let cfg = super::AggregatingStrategyConfig {
             aggregation_threshold: None,
@@ -559,10 +557,7 @@ mod tests {
         let aggregation_strategy = super::AggregatingStrategy::new(cfg, db_bob.clone(), Arc::new(bob_aggregator));
 
         //let threshold_ticket = acked_tickets.last().unwrap();
-        aggregation_strategy
-            .on_tick()
-            .await
-            .expect("strategy call should succeed");
+        aggregation_strategy.on_tick().await?;
 
         // Wait until aggregation has finished
         let f1 = pin!(awaiter);
@@ -590,7 +585,7 @@ mod tests {
         let (mut acked_tickets, mut channel) = populate_db_with_ack_tickets(db_bob.clone(), NUM_TICKETS).await?;
 
         let (bob_aggregator, awaiter) =
-            spawn_aggregation_interaction(db_alice.clone(), db_bob.clone(), &PEERS_CHAIN[0], &PEERS_CHAIN[1]);
+            spawn_aggregation_interaction(db_alice.clone(), db_bob.clone(), &PEERS_CHAIN[0], &PEERS_CHAIN[1])?;
 
         // Make this ticket aggregated
         acked_tickets[0] = mock_acknowledged_ticket(&PEERS_CHAIN[0], &PEERS_CHAIN[1], 0, 2)?;
@@ -615,10 +610,7 @@ mod tests {
         let aggregation_strategy = super::AggregatingStrategy::new(cfg, db_bob.clone(), Arc::new(bob_aggregator));
 
         //let threshold_ticket = acked_tickets.last().unwrap();
-        aggregation_strategy
-            .on_tick()
-            .await
-            .expect("strategy call should succeed");
+        aggregation_strategy.on_tick().await?;
 
         let tickets = db_bob.get_tickets((&channel).into()).await?;
         assert_eq!(tickets.len(), NUM_TICKETS, "nothing should be aggregated");
@@ -651,7 +643,7 @@ mod tests {
         db_bob.upsert_channel(None, channel).await?;
 
         let (bob_aggregator, awaiter) =
-            spawn_aggregation_interaction(db_alice.clone(), db_bob.clone(), &PEERS_CHAIN[0], &PEERS_CHAIN[1]);
+            spawn_aggregation_interaction(db_alice.clone(), db_bob.clone(), &PEERS_CHAIN[0], &PEERS_CHAIN[1])?;
 
         let aggregation_strategy = super::AggregatingStrategy::new(cfg, db_alice.clone(), Arc::new(bob_aggregator));
 
@@ -664,14 +656,10 @@ mod tests {
                     right: ChannelStatus::PendingToClose(std::time::SystemTime::now()),
                 },
             )
-            .await
-            .expect("strategy call should not fail");
+            .await?;
 
         // Wait until aggregation has finished
-        awaiter
-            .timeout(Duration::from_secs(5))
-            .await
-            .expect("should not timeout")?;
+        awaiter.timeout(Duration::from_secs(5)).await.context("Timeout")??;
 
         let tickets = db_bob.get_tickets((&channel).into()).await?;
         assert_eq!(tickets.len(), 1, "there should be a single aggregated ticket");
@@ -693,7 +681,7 @@ mod tests {
         let (_, channel) = populate_db_with_ack_tickets(db_bob.clone(), NUM_TICKETS).await?;
 
         let (bob_aggregator, awaiter) =
-            spawn_aggregation_interaction(db_alice.clone(), db_bob.clone(), &PEERS_CHAIN[0], &PEERS_CHAIN[1]);
+            spawn_aggregation_interaction(db_alice.clone(), db_bob.clone(), &PEERS_CHAIN[0], &PEERS_CHAIN[1])?;
 
         let tickets = db_bob.get_tickets((&channel).into()).await?;
         assert_eq!(tickets.len(), NUM_TICKETS, "should have a single ticket");
@@ -718,8 +706,7 @@ mod tests {
                     right: ChannelStatus::PendingToClose(std::time::SystemTime::now()),
                 },
             )
-            .await
-            .expect("strategy call should not fail");
+            .await?;
 
         awaiter
             .timeout(Duration::from_millis(500))

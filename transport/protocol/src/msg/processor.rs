@@ -294,6 +294,7 @@ impl PacketInteractionConfig {
 
 #[cfg(test)]
 mod tests {
+    use anyhow::Context;
     use async_std::future::timeout;
     use futures::StreamExt;
 
@@ -315,12 +316,12 @@ mod tests {
     }
 
     #[async_std::test]
-    pub async fn message_sender_operation_reacts_on_finalizer_closure() {
+    pub async fn message_sender_operation_reacts_on_finalizer_closure() -> anyhow::Result<()> {
         let (tx, mut rx) = futures::channel::mpsc::unbounded::<SendMsgInput>();
 
         let sender = MsgSender::new(tx);
 
-        let expected_data = ApplicationData::from_bytes(&[0x01, 0x02, 0x03]).expect("Data must be constructible");
+        let expected_data = ApplicationData::from_bytes(&[0x01, 0x02, 0x03])?;
         let expected_path = TransportPath::direct(PeerId::random());
 
         let result = sender.send_packet(expected_data.clone(), expected_path.clone()).await;
@@ -329,8 +330,8 @@ mod tests {
         let received = rx.next();
         let (data, path, finalizer) = timeout(Duration::from_millis(20), received)
             .await
-            .expect("Timeout")
-            .unwrap();
+            .context("Timeout")?
+            .context("value should be present")?;
 
         assert_eq!(data, expected_data);
         assert_eq!(path, expected_path);
@@ -341,9 +342,11 @@ mod tests {
         });
 
         assert!(result
-            .expect("Awaiter must be present")
+            .context("Awaiter must be present")?
             .consume_and_wait(Duration::from_millis(10))
             .await
-            .is_ok())
+            .is_ok());
+
+        Ok(())
     }
 }
