@@ -1,0 +1,57 @@
+sequenceDiagram
+    autonumber
+
+    box Client
+        participant gnosisvpn as Gnosis VPN App
+        participant wg as Wireguard Client
+        participant hoprd as HOPRd Node
+    end
+    box Exit
+        participant ex_hoprd as HOPRd Exit Node
+        participant ex_wg as Wireguard Server
+        participant ex_gnosisvpn as Gnosis VPN Exit App
+    end
+
+    Note over gnosisvpn,ex_gnosisvpn: Set up Wireguard bi-directional session
+    Note over gnosisvpn,wg: Assumption: gvpn_exit_app_ip == wg_server_ip
+
+    Note over gnosisvpn,ex_hoprd: Step 1: Set up TCP tunnel for HTTP call to Gnosis VPN Exit App
+    gnosisvpn->>hoprd: create_client[TCP,gvpn_exit_app_ip,gvpn_exit_app_port,ex_hoprd_peer_id]
+    activate hoprd
+    hoprd->>ex_hoprd: START sub-protocol OPEN
+    activate ex_hoprd
+    ex_hoprd->>hoprd: START sub-protocol OK
+    hoprd->>gnosisvpn: create_client[TCP,tunnel_ip,tunnel_port] OK
+
+    Note over gnosisvpn,ex_gnosisvpn: Step 2: HTTP call to Gnosis VPN Exit App to get WG credentials
+    gnosisvpn->>ex_gnosisvpn: setup_wg_session_req[wg_client_pubkey]
+    gnosisvpn->>hoprd: send TCP packets
+    hoprd->>ex_hoprd: HOPR session packet(s)
+    ex_hoprd->>ex_gnosisvpn: relay TCP packets
+    ex_gnosisvpn->>ex_wg: configure_peer[wg_client_pubkey,ex_hoprd_ip,wg_server_psk]
+    activate ex_wg
+    ex_gnosisvpn->>ex_hoprd: send TCP response packets
+    ex_hoprd->>hoprd: HOPR session packet(s)
+    hoprd->>gnosisvpn: return TCP response packets
+    ex_gnosisvpn->>gnosisvpn: setup_wg_session_resp[wg_server_pubkey,wg_server_psk,wg_server_port] OK
+    hoprd->>ex_hoprd: START sub-protocol CLOSE
+    deactivate hoprd
+    deactivate ex_hoprd
+
+    Note over gnosisvpn,wg: Step 3: Set up WG client connection
+    gnosisvpn->>hoprd: create_client[UDP,gvpn_exit_app_ip,wg_server_port]
+    activate hoprd
+    hoprd->>ex_hoprd: START sub-protocol OPEN
+    activate ex_hoprd
+    ex_hoprd->>hoprd: START sub-protocol OK
+    hoprd->>gnosisvpn: create_client[UDP,tunnel_ip,tunnel_port] OK
+    gnosisvpn->>wg: configure_and_activate_peer[wg_server_pubkey,wg_server_psk,tunnel_ip,tunnel_port]
+    activate wg
+    Note over wg,ex_wg: Step 4: Active VPN connection
+    wg->>ex_wg: send packet
+    ex_wg->>wg: receive packet
+
+    deactivate wg
+    deactivate hoprd
+    deactivate ex_wg
+    deactivate ex_hoprd
