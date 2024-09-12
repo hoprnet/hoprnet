@@ -257,6 +257,7 @@ impl Display for TransportPath {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use anyhow::Context;
     use async_trait::async_trait;
     use hex_literal::hex;
     use hopr_crypto_types::prelude::*;
@@ -310,84 +311,91 @@ mod tests {
     }
 
     #[test]
-    fn test_channel_path_zero_hop_should_fail() {
+    fn test_channel_path_zero_hop_should_fail() -> anyhow::Result<()> {
         let me = PublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap().to_address();
         let (cg, _) = create_graph_and_resolver_entries(me);
 
         ChannelPath::new(vec![], &cg).expect_err("path must not be constructible");
+
+        Ok(())
     }
 
     #[test]
-    fn test_channel_path_one_hop() {
+    fn test_channel_path_one_hop() -> anyhow::Result<()> {
         let me = PublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap().to_address();
         let (cg, peer_addrs) = create_graph_and_resolver_entries(me);
         let (_, addrs): (Vec<OffchainPublicKey>, Vec<Address>) = peer_addrs.into_iter().unzip();
 
         // path: 0 -> 1
-        let cp = ChannelPath::new(vec![addrs[1]], &cg).expect("path must be constructible");
+        let cp = ChannelPath::new(vec![addrs[1]], &cg)?;
         assert_eq!(1, cp.length(), "must be one hop");
         assert!(!cp.contains_cycle(), "must not be cyclic");
+        Ok(())
     }
 
     #[test]
-    fn test_channel_path_two_hop() {
+    fn test_channel_path_two_hop() -> anyhow::Result<()> {
         let me = PublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap().to_address();
         let (cg, peer_addrs) = create_graph_and_resolver_entries(me);
         let (_, addrs): (Vec<OffchainPublicKey>, Vec<Address>) = peer_addrs.into_iter().unzip();
 
         // path: 0 -> 1 -> 2
-        let cp = ChannelPath::new(vec![addrs[1], addrs[2]], &cg).expect("path must be constructible");
+        let cp = ChannelPath::new(vec![addrs[1], addrs[2]], &cg)?;
         assert_eq!(2, cp.length(), "must be two hop");
         assert!(!cp.contains_cycle(), "must not be cyclic");
+        Ok(())
     }
 
     #[test]
-    fn test_channel_path_three_hop() {
+    fn test_channel_path_three_hop() -> anyhow::Result<()> {
         let me = PublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap().to_address();
         let (cg, peer_addrs) = create_graph_and_resolver_entries(me);
         let (_, addrs): (Vec<OffchainPublicKey>, Vec<Address>) = peer_addrs.into_iter().unzip();
 
         // path: 0 -> 1 -> 2 -> 3
-        let cp = ChannelPath::new(vec![addrs[1], addrs[2], addrs[3]], &cg).expect("path must be constructible");
+        let cp = ChannelPath::new(vec![addrs[1], addrs[2], addrs[3]], &cg)?;
         assert_eq!(3, cp.length(), "must be three hop");
         assert!(!cp.contains_cycle(), "must not be cyclic");
+        Ok(())
     }
 
     #[test]
-    fn test_channel_path_must_allow_cyclic() {
+    fn test_channel_path_must_allow_cyclic() -> anyhow::Result<()> {
         let me = PublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap().to_address();
         let (cg, peer_addrs) = create_graph_and_resolver_entries(me);
         let (_, addrs): (Vec<OffchainPublicKey>, Vec<Address>) = peer_addrs.into_iter().unzip();
 
         // path: 0 -> 1 -> 2 -> 3 -> 1
-        let cp =
-            ChannelPath::new(vec![addrs[1], addrs[2], addrs[3], addrs[1]], &cg).expect("path must be constructible");
+        let cp = ChannelPath::new(vec![addrs[1], addrs[2], addrs[3], addrs[1]], &cg)?;
         assert_eq!(4, cp.length(), "must be four hop");
         assert!(cp.contains_cycle(), "must not be cyclic");
+        Ok(())
     }
 
     #[test]
-    fn test_channel_path_should_fail_for_non_open_channel() {
+    fn test_channel_path_should_fail_for_non_open_channel() -> anyhow::Result<()> {
         let me = PublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap().to_address();
         let (cg, peer_addrs) = create_graph_and_resolver_entries(me);
         let (_, addrs): (Vec<OffchainPublicKey>, Vec<Address>) = peer_addrs.into_iter().unzip();
 
         // path: 0 -> 4 -> 0 (channel 4 -> 0 is PendingToClose)
         ChannelPath::new(vec![addrs[4], addrs[0]], &cg).expect_err("path must not be constructible");
+        Ok(())
     }
 
     #[test]
-    fn test_channel_path_should_fail_for_non_open_channel_from_self() {
+    fn test_channel_path_should_fail_for_non_open_channel_from_self() -> anyhow::Result<()> {
         let me = PublicKey::from_privkey(&PEERS_PRIVS[4]).unwrap().to_address();
         let (cg, peer_addrs) = create_graph_and_resolver_entries(me);
         let (_, addrs): (Vec<OffchainPublicKey>, Vec<Address>) = peer_addrs.into_iter().unzip();
 
         // path: 4 -> 0
         ChannelPath::new(vec![addrs[4], addrs[0]], &cg).expect_err("path must not be constructible");
+        Ok(())
     }
 
     #[test]
-    fn test_channel_path_should_fail_for_non_existing_channel() {
+    fn test_channel_path_should_fail_for_non_existing_channel() -> anyhow::Result<()> {
         let me = PublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap().to_address();
         let (cg, peer_addrs) = create_graph_and_resolver_entries(me);
         let (_, addrs): (Vec<OffchainPublicKey>, Vec<Address>) = peer_addrs.into_iter().unzip();
@@ -397,16 +405,18 @@ mod tests {
 
         // path: 0 -> 1 -> 2 -> 4 (channel 2 -> 4 does not exist)
         ChannelPath::new(vec![addrs[1], addrs[2], addrs[4]], &cg).expect_err("path 2 must not be constructible");
+        Ok(())
     }
 
     #[test]
-    fn test_channel_path_should_not_allow_loops() {
+    fn test_channel_path_should_not_allow_loops() -> anyhow::Result<()> {
         let me = PublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap().to_address();
         let (cg, peer_addrs) = create_graph_and_resolver_entries(me);
         let (_, addrs): (Vec<OffchainPublicKey>, Vec<Address>) = peer_addrs.into_iter().unzip();
 
         // path: 0 -> 1 -> 1 -> 2
         ChannelPath::new(vec![addrs[1], addrs[1], addrs[0]], &cg).expect_err("path must not be constructible");
+        Ok(())
     }
 
     struct TestResolver(Vec<(OffchainPublicKey, Address)>);
@@ -429,7 +439,7 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn test_transport_path_empty_should_fail() {
+    async fn test_transport_path_empty_should_fail() -> anyhow::Result<()> {
         let me = PublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap().to_address();
         let (cg, peer_addrs) = create_graph_and_resolver_entries(me);
         let resolver = TestResolver(peer_addrs.clone());
@@ -437,6 +447,7 @@ mod tests {
         TransportPath::resolve(vec![], &resolver, &cg)
             .await
             .expect_err("should not resolve path");
+        Ok(())
     }
 
     fn make_address_pairs(peer_addrs: Vec<(OffchainPublicKey, Address)>) -> (Vec<PeerId>, Vec<Address>) {
@@ -444,160 +455,153 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn test_transport_path_resolve_direct() {
+    async fn test_transport_path_resolve_direct() -> anyhow::Result<()> {
         let me = PublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap().to_address();
         let (cg, peer_addrs) = create_graph_and_resolver_entries(me);
         let resolver = TestResolver(peer_addrs.clone());
         let (peers, _) = make_address_pairs(peer_addrs);
 
         // path 0 -> 1
-        let (p, cp) = TransportPath::resolve(vec![peers[1]], &resolver, &cg)
-            .await
-            .expect("should resolve path");
+        let (p, cp) = TransportPath::resolve(vec![peers[1]], &resolver, &cg).await?;
         assert_eq!(1, p.length(), "must contain destination");
-        assert!(cp.is_none(), "no channel path for direct message")
+        assert!(cp.is_none(), "no channel path for direct message");
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_transport_path_resolve_direct_to_self() {
+    async fn test_transport_path_resolve_direct_to_self() -> anyhow::Result<()> {
         let me = PublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap().to_address();
         let (cg, peer_addrs) = create_graph_and_resolver_entries(me);
         let resolver = TestResolver(peer_addrs.clone());
         let (peers, _) = make_address_pairs(peer_addrs);
 
         // path 0 -> 0
-        let (p, cp) = TransportPath::resolve(vec![peers[0]], &resolver, &cg)
-            .await
-            .expect("should resolve path");
+        let (p, cp) = TransportPath::resolve(vec![peers[0]], &resolver, &cg).await?;
         assert_eq!(1, p.length(), "must contain destination");
-        assert!(cp.is_none(), "no channel path for direct message")
+        assert!(cp.is_none(), "no channel path for direct message");
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_transport_path_resolve_direct_is_allowed_without_channel_to_destination() {
+    async fn test_transport_path_resolve_direct_is_allowed_without_channel_to_destination() -> anyhow::Result<()> {
         let me = PublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap().to_address();
         let (cg, peer_addrs) = create_graph_and_resolver_entries(me);
         let resolver = TestResolver(peer_addrs.clone());
         let (peers, _) = make_address_pairs(peer_addrs);
 
         // path 0 -> 3
-        let (p, cp) = TransportPath::resolve(vec![peers[3]], &resolver, &cg)
-            .await
-            .expect("should resolve path");
+        let (p, cp) = TransportPath::resolve(vec![peers[3]], &resolver, &cg).await?;
         assert_eq!(1, p.length(), "must contain destination");
         assert!(cp.is_none(), "no channel path for direct message");
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_transport_path_resolve_direct_is_allowed_with_closed_channel_to_destination() {
+    async fn test_transport_path_resolve_direct_is_allowed_with_closed_channel_to_destination() -> anyhow::Result<()> {
         let me = PublicKey::from_privkey(&PEERS_PRIVS[4]).unwrap().to_address();
         let (cg, peer_addrs) = create_graph_and_resolver_entries(me);
         let resolver = TestResolver(peer_addrs.clone());
         let (peers, _) = make_address_pairs(peer_addrs);
 
         // path 4 -> 0
-        let (p, cp) = TransportPath::resolve(vec![peers[0]], &resolver, &cg)
-            .await
-            .expect("should resolve path");
+        let (p, cp) = TransportPath::resolve(vec![peers[0]], &resolver, &cg).await?;
         assert_eq!(1, p.length(), "must contain destination");
-        assert!(cp.is_none(), "no channel path for direct message")
+        assert!(cp.is_none(), "no channel path for direct message");
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_transport_path_resolve_one_hop() {
+    async fn test_transport_path_resolve_one_hop() -> anyhow::Result<()> {
         let me = PublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap().to_address();
         let (cg, peer_addrs) = create_graph_and_resolver_entries(me);
         let resolver = TestResolver(peer_addrs.clone());
         let (peers, addrs) = make_address_pairs(peer_addrs);
 
         // path 0 -> 1 -> 2
-        let (p, cp) = TransportPath::resolve(vec![peers[1], peers[2]], &resolver, &cg)
-            .await
-            .expect("should resolve path");
+        let (p, cp) = TransportPath::resolve(vec![peers[1], peers[2]], &resolver, &cg).await?;
         assert_eq!(2, p.length(), "must be two hop");
         assert!(!p.contains_cycle(), "transport path must not contain a cycle");
 
-        let cp = cp.expect("must have channel path");
+        let cp = cp.context("must have channel path")?;
         assert_eq!(1, cp.length(), "channel path must be one hop");
         assert_eq!(vec![addrs[1]], cp.hops(), "channel path address must match");
         assert!(!cp.contains_cycle(), "channel path must not contain a cycle");
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_transport_path_resolve_one_hop_without_channel_to_destination() {
+    async fn test_transport_path_resolve_one_hop_without_channel_to_destination() -> anyhow::Result<()> {
         let me = PublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap().to_address();
         let (cg, peer_addrs) = create_graph_and_resolver_entries(me);
         let resolver = TestResolver(peer_addrs.clone());
         let (peers, addrs) = make_address_pairs(peer_addrs);
 
         // path 0 -> 1 -> 4
-        let (p, cp) = TransportPath::resolve(vec![peers[1], peers[4]], &resolver, &cg)
-            .await
-            .expect("should resolve path");
+        let (p, cp) = TransportPath::resolve(vec![peers[1], peers[4]], &resolver, &cg).await?;
         assert_eq!(2, p.length(), "must be two hop");
         assert!(!p.contains_cycle(), "transport path must not contain a cycle");
 
-        let cp = cp.expect("must have channel path");
+        let cp = cp.context("must have channel path")?;
         assert_eq!(1, cp.length(), "channel path must be one hop");
         assert_eq!(vec![addrs[1]], cp.hops(), "channel path address must match");
         assert!(!cp.contains_cycle(), "channel path must not contain a cycle");
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_transport_path_resolve_two_hop() {
+    async fn test_transport_path_resolve_two_hop() -> anyhow::Result<()> {
         let me = PublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap().to_address();
         let (cg, peer_addrs) = create_graph_and_resolver_entries(me);
         let resolver = TestResolver(peer_addrs.clone());
         let (peers, addrs) = make_address_pairs(peer_addrs);
 
         // path 0 -> 1 -> 2 -> 3
-        let (p, cp) = TransportPath::resolve(vec![peers[1], peers[2], peers[3]], &resolver, &cg)
-            .await
-            .expect("should resolve path");
+        let (p, cp) = TransportPath::resolve(vec![peers[1], peers[2], peers[3]], &resolver, &cg).await?;
         assert_eq!(3, p.length(), "must be three hop");
         assert!(!p.contains_cycle(), "transport path must not contain a cycle");
 
-        let cp = cp.expect("must have channel path");
+        let cp = cp.context("must have channel path")?;
         assert_eq!(2, cp.length(), "channel path must be two hop");
         assert_eq!(vec![addrs[1], addrs[2]], cp.hops(), "channel path address must match");
         assert!(!cp.contains_cycle(), "channel path must not contain a cycle");
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_transport_path_resolve_two_hop_without_channel_to_destination() {
+    async fn test_transport_path_resolve_two_hop_without_channel_to_destination() -> anyhow::Result<()> {
         let me = PublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap().to_address();
         let (cg, peer_addrs) = create_graph_and_resolver_entries(me);
         let resolver = TestResolver(peer_addrs.clone());
         let (peers, addrs) = make_address_pairs(peer_addrs);
 
         // path 0 -> 1 -> 2 -> 4
-        let (p, cp) = TransportPath::resolve(vec![peers[1], peers[2], peers[4]], &resolver, &cg)
-            .await
-            .expect("should resolve path");
+        let (p, cp) = TransportPath::resolve(vec![peers[1], peers[2], peers[4]], &resolver, &cg).await?;
         assert_eq!(3, p.length(), "must be three hop");
         assert!(!p.contains_cycle(), "transport path must not contain a cycle");
 
-        let cp = cp.expect("must have channel path");
+        let cp = cp.context("must have channel path")?;
         assert_eq!(2, cp.length(), "channel path must be two hop");
         assert_eq!(vec![addrs[1], addrs[2]], cp.hops(), "channel path address must match");
         assert!(!cp.contains_cycle(), "channel path must not contain a cycle");
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_transport_path_resolve_three_hop() {
+    async fn test_transport_path_resolve_three_hop() -> anyhow::Result<()> {
         let me = PublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap().to_address();
         let (cg, peer_addrs) = create_graph_and_resolver_entries(me);
         let resolver = TestResolver(peer_addrs.clone());
         let (peers, addrs) = make_address_pairs(peer_addrs);
 
         // path 0 -> 1 -> 2 -> 3 -> 4
-        let (p, cp) = TransportPath::resolve(vec![peers[1], peers[2], peers[3], peers[4]], &resolver, &cg)
-            .await
-            .expect("should resolve path");
+        let (p, cp) = TransportPath::resolve(vec![peers[1], peers[2], peers[3], peers[4]], &resolver, &cg).await?;
         assert_eq!(4, p.length(), "must have 4 entries");
         assert!(!p.contains_cycle(), "transport path must not contain a cycle");
 
-        let cp = cp.expect("must have channel path");
+        let cp = cp.context("must have channel path")?;
         assert_eq!(3, cp.length(), "channel path must be two hop");
         assert_eq!(
             vec![addrs[1], addrs[2], addrs[3]],
@@ -605,23 +609,22 @@ mod tests {
             "channel path address must match"
         );
         assert!(!cp.contains_cycle(), "channel path must not contain a cycle");
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_transport_path_resolve_with_cycle() {
+    async fn test_transport_path_resolve_with_cycle() -> anyhow::Result<()> {
         let me = PublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap().to_address();
         let (cg, peer_addrs) = create_graph_and_resolver_entries(me);
         let resolver = TestResolver(peer_addrs.clone());
         let (peers, addrs) = make_address_pairs(peer_addrs);
 
         // path 0 -> 1 -> 2 -> 3 -> 1
-        let (p, cp) = TransportPath::resolve(vec![peers[1], peers[2], peers[3], peers[1]], &resolver, &cg)
-            .await
-            .expect("should resolve path");
+        let (p, cp) = TransportPath::resolve(vec![peers[1], peers[2], peers[3], peers[1]], &resolver, &cg).await?;
         assert_eq!(4, p.length(), "must have 4 entries");
         assert!(p.contains_cycle(), "transport path must contain a cycle");
 
-        let cp = cp.expect("must have channel path");
+        let cp = cp.context("must have channel path")?;
         assert_eq!(3, cp.length(), "channel path must be 3 hop");
         assert_eq!(
             vec![addrs[1], addrs[2], addrs[3]],
@@ -629,23 +632,23 @@ mod tests {
             "channel path address must match"
         );
         assert!(!cp.contains_cycle(), "channel path must not contain a cycle");
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_transport_path_resolve_with_channel_cycle() {
+    async fn test_transport_path_resolve_with_channel_cycle() -> anyhow::Result<()> {
         let me = PublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap().to_address();
         let (cg, peer_addrs) = create_graph_and_resolver_entries(me);
         let resolver = TestResolver(peer_addrs.clone());
         let (peers, addrs) = make_address_pairs(peer_addrs);
 
         // path 0 -> 1 -> 2 -> 3 -> 1 -> 2
-        let (p, cp) = TransportPath::resolve(vec![peers[1], peers[2], peers[3], peers[1], peers[2]], &resolver, &cg)
-            .await
-            .expect("should resolve path");
+        let (p, cp) =
+            TransportPath::resolve(vec![peers[1], peers[2], peers[3], peers[1], peers[2]], &resolver, &cg).await?;
         assert_eq!(5, p.length(), "must be 5 hop");
         assert!(p.contains_cycle(), "transport path must contain a cycle");
 
-        let cp = cp.expect("must have channel path");
+        let cp = cp.context("must have channel path")?;
         assert_eq!(4, cp.length(), "channel path must be 4 hop");
         assert_eq!(
             vec![addrs[1], addrs[2], addrs[3], addrs[1]],
@@ -653,10 +656,11 @@ mod tests {
             "channel path address must match"
         );
         assert!(cp.contains_cycle(), "channel path must not contain a cycle");
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_transport_path_should_not_resolve_for_non_existing_intermediate_channel() {
+    async fn test_transport_path_should_not_resolve_for_non_existing_intermediate_channel() -> anyhow::Result<()> {
         let me = PublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap().to_address();
         let (cg, peer_addrs) = create_graph_and_resolver_entries(me);
         let resolver = TestResolver(peer_addrs.clone());
@@ -671,10 +675,11 @@ mod tests {
         TransportPath::resolve(vec![peers[1], peers[3], peers[1]], &resolver, &cg)
             .await
             .expect_err("should not resolve path 2");
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_transport_path_should_not_resolve_for_non_open_intermediate_channel() {
+    async fn test_transport_path_should_not_resolve_for_non_open_intermediate_channel() -> anyhow::Result<()> {
         let me = PublicKey::from_privkey(&PEERS_PRIVS[2]).unwrap().to_address();
         let (cg, peer_addrs) = create_graph_and_resolver_entries(me);
         let resolver = TestResolver(peer_addrs.clone());
@@ -684,24 +689,21 @@ mod tests {
         TransportPath::resolve(vec![peers[3], peers[4], peers[0], peers[1]], &resolver, &cg)
             .await
             .expect_err("should not resolve path");
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_channel_path_to_transport_path() {
+    async fn test_channel_path_to_transport_path() -> anyhow::Result<()> {
         let me = PublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap().to_address();
         let (cg, peer_addrs) = create_graph_and_resolver_entries(me);
         let resolver = TestResolver(peer_addrs.clone());
         let (peers, addrs) = make_address_pairs(peer_addrs);
 
         // path: 0 -> 1 -> 2 -> 3
-        let cp = ChannelPath::new(vec![addrs[1], addrs[2], addrs[3]], &cg).expect("path must be constructible");
+        let cp = ChannelPath::new(vec![addrs[1], addrs[2], addrs[3]], &cg)?;
 
         // path: 0 -> 1 -> 2 -> 3 -> 4
-        let tp = cp
-            .clone()
-            .into_path(&resolver, addrs[4])
-            .await
-            .expect("should convert to transport path");
+        let tp = cp.clone().into_path(&resolver, addrs[4]).await?;
         assert_eq!(
             tp.length(),
             cp.length() + 1,
@@ -712,5 +714,6 @@ mod tests {
             tp.hops(),
             "must contain all peer ids"
         );
+        Ok(())
     }
 }

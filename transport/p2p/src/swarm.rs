@@ -149,14 +149,18 @@ impl HoprSwarm {
             match resolve_dns_if_any(multiaddress) {
                 Ok(ma) => {
                     if let Err(e) = swarm.listen_on(ma.clone()) {
-                        error!("Failed to listen_on using '{multiaddress}': {e}");
+                        warn!("Failed to listen_on using '{multiaddress}': {e}");
 
                         match replace_transport_with_unspecified(&ma) {
                             Ok(ma) => {
                                 if let Err(e) = swarm.listen_on(ma.clone()) {
-                                    error!("Failed to listen_on also using the unspecified multiaddress '{ma}': {e}",);
+                                    warn!("Failed to listen_on also using the unspecified multiaddress '{ma}': {e}",);
                                 } else {
-                                    info!("Successfully started listening on {ma} (from {multiaddress})");
+                                    info!(
+                                        listen_on = tracing::field::debug(ma),
+                                        multiaddress = tracing::field::debug(multiaddress),
+                                        "Listening for p2p connections)"
+                                    );
                                     swarm.add_external_address(multiaddress.clone());
                                 }
                             }
@@ -165,14 +169,19 @@ impl HoprSwarm {
                             }
                         }
                     } else {
-                        info!("Successfully started listening on {ma} (from {multiaddress})");
+                        info!(
+                            listen_on = tracing::field::debug(ma),
+                            multiaddress = tracing::field::debug(multiaddress),
+                            "Listening for p2p connections)"
+                        );
                         swarm.add_external_address(multiaddress.clone());
                     }
                 }
-                Err(_) => error!("Failed to transform the multiaddress '{multiaddress}' - skipping"),
+                Err(e) => error!("Failed to transform the multiaddress '{multiaddress}' - skipping: {e}"),
             }
         }
 
+        // TODO: perform this check
         // NOTE: This would be a valid check but is not immediate
         // assert!(
         //     swarm.listeners().count() > 0,
@@ -298,7 +307,7 @@ impl HoprSwarmWithProcessors {
                 },
                 event = swarm.select_next_some() => match event {
                     SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Message(event)) => {
-                        let _debug_span = tracing::span!(tracing::Level::DEBUG, "swarm protocol ACK", version = "0.1.0");
+                        let _span = tracing::span!(tracing::Level::DEBUG, "swarm protocol ACK", version = "0.1.0");
                             match event {
                             libp2p::request_response::Event::<Box<[u8]>, ()>::Message {
                                 peer,
@@ -337,7 +346,7 @@ impl HoprSwarmWithProcessors {
                         }
                     }
                     SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Acknowledgement(event)) => {
-                        let _debug_span = tracing::span!(tracing::Level::DEBUG, "swarm protocol ACK", version = "0.1.0");
+                        let _span = tracing::span!(tracing::Level::DEBUG, "swarm protocol ACK", version = "0.1.0");
                         match event {
                             libp2p::request_response::Event::<Acknowledgement,()>::Message {
                                 peer,
@@ -376,7 +385,7 @@ impl HoprSwarmWithProcessors {
                         }
                     }
                     SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::TicketAggregation(event)) => {
-                        let _debug_span = tracing::span!(tracing::Level::DEBUG, "swarm protocol TICKET_AGG", version = "0.1.0");
+                        let _span = tracing::span!(tracing::Level::DEBUG, "swarm protocol TICKET_AGG", version = "0.1.0");
                         match event {
                             libp2p::request_response::Event::<Vec<legacy::AcknowledgedTicket>, std::result::Result<Ticket,String>>::Message {
                                 peer,
@@ -418,7 +427,7 @@ impl HoprSwarmWithProcessors {
                         }
                     }
                     SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Heartbeat(event)) => {
-                        let _debug_span = tracing::span!(tracing::Level::DEBUG, "swarm protocol HEARTBEAT", version = "0.1.0");
+                        let _span = tracing::span!(tracing::Level::DEBUG, "swarm protocol HEARTBEAT", version = "0.1.0");
                         match event {
                             libp2p::request_response::Event::<Ping,Pong>::Message {
                                 peer,
@@ -472,7 +481,7 @@ impl HoprSwarmWithProcessors {
                     }
                     SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::KeepAlive(_)) => {}
                     SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Discovery(event)) => {
-                        let _debug_span = tracing::span!(tracing::Level::DEBUG, "swarm behavior 'discovery'");
+                        let _span = tracing::span!(tracing::Level::DEBUG, "swarm behavior 'discovery'");
 
                         trace!(event = tracing::field::debug(&event), "Received a discovery event");
                         match event {
@@ -487,7 +496,7 @@ impl HoprSwarmWithProcessors {
                         }
                     }
                     SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::TicketAggregationBehavior(event)) => {
-                        let _debug_span = tracing::span!(tracing::Level::DEBUG, "swarm behavior 'ticket aggregation'");
+                        let _span = tracing::span!(tracing::Level::DEBUG, "swarm behavior 'ticket aggregation'");
 
                         trace!(event = tracing::field::debug(&event), "Received a discovery event");
                         match event {
@@ -525,7 +534,7 @@ impl HoprSwarmWithProcessors {
                         }
                     }
                     SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::HeartbeatGenerator(event)) => {
-                        let _debug_span = tracing::span!(tracing::Level::DEBUG, "swarm behavior 'heartbeat generator'");
+                        let _span = tracing::span!(tracing::Level::DEBUG, "swarm behavior 'heartbeat generator'");
 
                         trace!(event = tracing::field::debug(&event), "Received a heartbeat event");
                         match event {
