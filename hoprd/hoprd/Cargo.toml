@@ -45,6 +45,7 @@ telemetry = [
 ]
 
 [dependencies]
+anyhow = { workspace = true }
 async-broadcast = { workspace = true }
 async-lock = { workspace = true }
 async-signal = { workspace = true }

@@ -70,7 +70,7 @@ where
         Self::new_with_time(cfg, || {
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
+                .expect("Time went backwards")
         })
     }
 
@@ -191,11 +191,12 @@ where
 mod tests {
     use crate::inbox::{MessageInbox, MessageInboxConfiguration};
     use crate::ring::RingBufferInboxBackend;
+    use anyhow::Context;
     use hopr_internal_types::prelude::*;
     use std::time::Duration;
 
     #[async_std::test]
-    async fn test_basic_flow() {
+    async fn test_basic_flow() -> anyhow::Result<()> {
         let cfg = MessageInboxConfiguration {
             capacity: 4,
             max_age: std::time::Duration::from_secs(2),
@@ -236,10 +237,10 @@ mod tests {
         assert_eq!(2, mi.size(Some(1)).await);
         assert_eq!(0, mi.size(Some(2)).await);
 
-        let ad = mi.pop(None).await.unwrap();
+        let ad = mi.pop(None).await.context("message should be present")?;
         assert_eq!(b"test msg 0", ad.0.plain_text.as_ref());
 
-        let ad = mi.pop(Some(1)).await.unwrap();
+        let ad = mi.pop(Some(1)).await.context("message should be present")?;
         assert_eq!(b"test msg 1", ad.0.plain_text.as_ref());
         assert_eq!(1, mi.size(Some(1)).await);
 
@@ -248,5 +249,7 @@ mod tests {
         async_std::task::sleep(Duration::from_millis(2500)).await;
 
         assert_eq!(0, mi.size(None).await);
+
+        Ok(())
     }
 }

@@ -9,8 +9,7 @@ async fn socks_client(bind_address: String, auth: AuthMode) -> Result<Client, Er
     let proxy = Proxy::all(match auth {
         AuthMode::NoAuth => format!("socks5://{}", bind_address),
         AuthMode::Password { username, password } => format!("socks5://{}:{}@{}", username, password, bind_address),
-    })
-    .unwrap();
+    })?;
 
     return Client::builder().proxy(proxy).build();
 }

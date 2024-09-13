@@ -176,10 +176,6 @@ impl ApplicationData {
             Err(PayloadSizeExceeded)
         }
     }
-
-    pub fn new_fixed(application_tag: Option<Tag>, plain_text: [u8; PAYLOAD_SIZE - Self::SIZE]) -> Self {
-        Self::new(application_tag, &plain_text).unwrap()
-    }
 }
 
 impl Display for ApplicationData {
@@ -229,22 +225,24 @@ mod tests {
     use hopr_crypto_random::random_bytes;
 
     #[test]
-    fn test_application_data() {
-        let ad_1 = ApplicationData::new(Some(10), &[0_u8, 1_u8]).unwrap();
-        let ad_2 = ApplicationData::from_bytes(&ad_1.to_bytes()).unwrap();
+    fn test_application_data() -> anyhow::Result<()> {
+        let ad_1 = ApplicationData::new(Some(10), &[0_u8, 1_u8])?;
+        let ad_2 = ApplicationData::from_bytes(&ad_1.to_bytes())?;
         assert_eq!(ad_1, ad_2);
 
-        let ad_1 = ApplicationData::new(None, &[]).unwrap();
-        let ad_2 = ApplicationData::from_bytes(&ad_1.to_bytes()).unwrap();
+        let ad_1 = ApplicationData::new(None, &[])?;
+        let ad_2 = ApplicationData::from_bytes(&ad_1.to_bytes())?;
         assert_eq!(ad_1, ad_2);
 
-        let ad_1 = ApplicationData::new(Some(10), &[0_u8, 1_u8]).unwrap();
-        let ad_2 = ApplicationData::from_bytes(&ad_1.to_bytes()).unwrap();
+        let ad_1 = ApplicationData::new(Some(10), &[0_u8, 1_u8])?;
+        let ad_2 = ApplicationData::from_bytes(&ad_1.to_bytes())?;
         assert_eq!(ad_1, ad_2);
+
+        Ok(())
     }
 
     #[test]
-    fn test_packet_tag_bloom_filter() {
+    fn test_packet_tag_bloom_filter() -> anyhow::Result<()> {
         let mut filter1 = TagBloomFilter::default();
 
         let items = (0..10_000)
@@ -265,7 +263,7 @@ mod tests {
         // Count number of items in the BF (incl. false positives)
         let match_count_1 = items.iter().filter(|item| filter1.check(item)).count();
 
-        let filter2 = TagBloomFilter::from_bytes(&filter1.to_bytes()).unwrap();
+        let filter2 = TagBloomFilter::from_bytes(&filter1.to_bytes())?;
 
         // Count number of items in the BF (incl. false positives)
         let match_count_2 = items.iter().filter(|item| filter2.check(item)).count();
@@ -285,5 +283,7 @@ mod tests {
             !filter2.check(&[0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8]),
             "bf 2 must not contain zero tag"
         );
+
+        Ok(())
     }
 }

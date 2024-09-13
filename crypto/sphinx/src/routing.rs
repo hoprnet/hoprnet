@@ -267,7 +267,7 @@ pub fn forward_header<S: SphinxSuite>(
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use super::*;
     use hopr_crypto_types::keypairs::OffchainKeypair;
     use parameterized::parameterized;

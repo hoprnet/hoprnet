@@ -193,8 +193,8 @@ impl<T: Pinging, API: HeartbeatExternalApi> Heartbeat<T, API> {
                     this_round_planned_duration.saturating_sub(this_round_actual_duration);
 
                 info!(
-                    round_duration = tracing::field::debug(this_round_actual_duration.as_millis()),
-                    time_til_next_round = tracing::field::debug(time_to_wait_for_next_round.as_millis()),
+                    round_duration_ms = tracing::field::debug(this_round_actual_duration.as_millis()),
+                    time_til_next_round_ms = tracing::field::debug(time_to_wait_for_next_round.as_millis()),
                     "Heartbeat round finished for all peers"
                 );
 
