@@ -13,7 +13,7 @@ use ethers::providers::{JsonRpcClient, Middleware};
 use futures::stream::BoxStream;
 use futures::{Stream, StreamExt, TryStreamExt};
 use std::pin::Pin;
-use tracing::{debug, info, warn};
+use tracing::{debug, warn};
 use tracing::{error, trace};
 
 use crate::errors::{Result, RpcError, RpcError::FilterIsEmpty};
@@ -63,7 +63,7 @@ impl<P: JsonRpcClient + 'static> RpcOperations<P> {
     fn stream_logs(&self, filter: LogFilter, from_block: u64, to_block: u64) -> BoxStream<Result<Log>> {
         let fetch_ranges = split_range(filter, from_block, to_block, self.cfg.max_block_range_fetch_size);
 
-        info!(
+        debug!(
             "polling logs from blocks #{from_block} - #{to_block} (via {:?} chunks)",
             (to_block - from_block) / self.cfg.max_block_range_fetch_size + 1
         );
@@ -210,7 +210,8 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
+    use anyhow::Context;
     use async_std::prelude::FutureExt;
     use ethers::contract::EthEvent;
     use futures::StreamExt;
@@ -229,62 +230,64 @@ mod test {
     use crate::rpc::{RpcOperations, RpcOperationsConfig};
     use crate::{BlockWithLogs, HoprIndexerRpcOperations, LogFilter};
 
-    fn filter_bounds(filter: &ethers::types::Filter) -> (u64, u64) {
-        (
+    fn filter_bounds(filter: &ethers::types::Filter) -> anyhow::Result<(u64, u64)> {
+        Ok((
             filter
                 .block_option
                 .get_from_block()
-                .unwrap()
+                .context("a value should be present")?
                 .as_number()
-                .unwrap()
+                .context("a value should be convertible")?
                 .as_u64(),
             filter
                 .block_option
                 .get_to_block()
-                .unwrap()
+                .context("a value should be present")?
                 .as_number()
-                .unwrap()
+                .context("a value should be convertible")?
                 .as_u64(),
-        )
+        ))
     }
 
     #[async_std::test]
-    async fn test_split_range() {
+    async fn test_split_range() -> anyhow::Result<()> {
         let ranges = split_range(LogFilter::default(), 0, 10, 2).collect::<Vec<_>>().await;
 
         assert_eq!(6, ranges.len());
-        assert_eq!((0, 1), filter_bounds(&ranges[0]));
-        assert_eq!((2, 3), filter_bounds(&ranges[1]));
-        assert_eq!((4, 5), filter_bounds(&ranges[2]));
-        assert_eq!((6, 7), filter_bounds(&ranges[3]));
-        assert_eq!((8, 9), filter_bounds(&ranges[4]));
-        assert_eq!((10, 10), filter_bounds(&ranges[5]));
+        assert_eq!((0, 1), filter_bounds(&ranges[0])?);
+        assert_eq!((2, 3), filter_bounds(&ranges[1])?);
+        assert_eq!((4, 5), filter_bounds(&ranges[2])?);
+        assert_eq!((6, 7), filter_bounds(&ranges[3])?);
+        assert_eq!((8, 9), filter_bounds(&ranges[4])?);
+        assert_eq!((10, 10), filter_bounds(&ranges[5])?);
 
         let ranges = split_range(LogFilter::default(), 0, 0, 2).collect::<Vec<_>>().await;
         assert_eq!(1, ranges.len());
-        assert_eq!((0, 0), filter_bounds(&ranges[0]));
+        assert_eq!((0, 0), filter_bounds(&ranges[0])?);
 
         let ranges = split_range(LogFilter::default(), 0, 0, 1).collect::<Vec<_>>().await;
         assert_eq!(1, ranges.len());
-        assert_eq!((0, 0), filter_bounds(&ranges[0]));
+        assert_eq!((0, 0), filter_bounds(&ranges[0])?);
 
         let ranges = split_range(LogFilter::default(), 0, 3, 1).collect::<Vec<_>>().await;
         assert_eq!(4, ranges.len());
-        assert_eq!((0, 0), filter_bounds(&ranges[0]));
-        assert_eq!((1, 1), filter_bounds(&ranges[1]));
-        assert_eq!((2, 2), filter_bounds(&ranges[2]));
-        assert_eq!((3, 3), filter_bounds(&ranges[3]));
+        assert_eq!((0, 0), filter_bounds(&ranges[0])?);
+        assert_eq!((1, 1), filter_bounds(&ranges[1])?);
+        assert_eq!((2, 2), filter_bounds(&ranges[2])?);
+        assert_eq!((3, 3), filter_bounds(&ranges[3])?);
 
         let ranges = split_range(LogFilter::default(), 0, 3, 10).collect::<Vec<_>>().await;
         assert_eq!(1, ranges.len());
-        assert_eq!((0, 3), filter_bounds(&ranges[0]));
+        assert_eq!((0, 3), filter_bounds(&ranges[0])?);
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_should_get_block_number() {
+    async fn test_should_get_block_number() -> anyhow::Result<()> {
         let expected_block_time = Duration::from_secs(1);
         let anvil = chain_types::utils::create_anvil(Some(expected_block_time));
-        let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
+        let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
 
         let client = JsonRpcProviderClient::new(
             &anvil.endpoint(),
@@ -301,33 +304,33 @@ mod test {
         // Wait until contracts deployments are final
         sleep((1 + cfg.finality) * expected_block_time).await;
 
-        let rpc = RpcOperations::new(client, &chain_key_0, cfg).expect("failed to construct rpc");
+        let rpc = RpcOperations::new(client, &chain_key_0, cfg)?;
 
-        let b1 = rpc.block_number().await.expect("should get block number");
+        let b1 = rpc.block_number().await?;
 
         sleep(expected_block_time * 2).await;
 
-        let b2 = rpc.block_number().await.expect("should get block number");
+        let b2 = rpc.block_number().await?;
 
         assert!(b2 > b1, "block number should increase");
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_try_stream_logs_should_contain_all_logs_when_opening_channel() {
+    async fn test_try_stream_logs_should_contain_all_logs_when_opening_channel() -> anyhow::Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
 
         let expected_block_time = Duration::from_secs(1);
 
         let anvil = chain_types::utils::create_anvil(Some(expected_block_time));
-        let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
-        let chain_key_1 = ChainKeypair::from_secret(anvil.keys()[1].to_bytes().as_ref()).unwrap();
+        let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
+        let chain_key_1 = ChainKeypair::from_secret(anvil.keys()[1].to_bytes().as_ref())?;
 
         // Deploy contracts
         let contract_instances = {
             let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &chain_key_0);
-            ContractInstances::deploy_for_testing(client, &chain_key_0)
-                .await
-                .expect("could not deploy contracts")
+            ContractInstances::deploy_for_testing(client, &chain_key_0).await?
         };
 
         let tokens_minted_at =
@@ -352,7 +355,7 @@ mod test {
         // Wait until contracts deployments are final
         sleep((1 + cfg.finality) * expected_block_time).await;
 
-        let rpc = RpcOperations::new(client, &chain_key_0, cfg).expect("failed to construct rpc");
+        let rpc = RpcOperations::new(client, &chain_key_0, cfg)?;
 
         let log_filter = LogFilter {
             address: vec![contract_addrs.token, contract_addrs.channels],
@@ -382,17 +385,16 @@ mod test {
         // Spawn stream
         let count_filtered_topics = log_filter.topics.len();
         let retrieved_logs = rpc
-            .try_stream_logs(1, log_filter)
-            .expect("must create stream")
+            .try_stream_logs(1, log_filter)?
             .skip_while(|b| futures::future::ready(b.len() != count_filtered_topics))
             .take(1)
             .collect::<Vec<BlockWithLogs>>()
             .timeout(Duration::from_secs(30))
             .await
-            .expect("timeout"); // Everything must complete within 30 seconds
+            .context("timeout")?; // Everything must complete within 30 seconds
 
         // The last block must contain all 4 events
-        let last_block_logs = retrieved_logs.last().unwrap().clone().logs;
+        let last_block_logs = retrieved_logs.last().context("a log should be present")?.clone().logs;
 
         assert!(
             last_block_logs.iter().any(|log| log.address == contract_addrs.channels
@@ -420,24 +422,25 @@ mod test {
                     && log.topics.contains(&TransferFilter::signature().0.into())),
             "must contain token transfer"
         );
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_try_stream_logs_should_contain_only_channel_logs_when_filtered_on_funding_channel() {
+    async fn test_try_stream_logs_should_contain_only_channel_logs_when_filtered_on_funding_channel(
+    ) -> anyhow::Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
 
         let expected_block_time = Duration::from_secs(1);
 
         let anvil = chain_types::utils::create_anvil(Some(expected_block_time));
-        let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
-        let chain_key_1 = ChainKeypair::from_secret(anvil.keys()[1].to_bytes().as_ref()).unwrap();
+        let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
+        let chain_key_1 = ChainKeypair::from_secret(anvil.keys()[1].to_bytes().as_ref())?;
 
         // Deploy contracts
         let contract_instances = {
             let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &chain_key_0);
-            ContractInstances::deploy_for_testing(client, &chain_key_0)
-                .await
-                .expect("could not deploy contracts")
+            ContractInstances::deploy_for_testing(client, &chain_key_0).await?
         };
 
         let tokens_minted_at =
@@ -463,7 +466,7 @@ mod test {
         // Wait until contracts deployments are final
         sleep((1 + cfg.finality) * expected_block_time).await;
 
-        let rpc = RpcOperations::new(client, &chain_key_0, cfg).expect("failed to construct rpc");
+        let rpc = RpcOperations::new(client, &chain_key_0, cfg)?;
 
         let log_filter = LogFilter {
             address: vec![contract_addrs.channels],
@@ -491,17 +494,20 @@ mod test {
         // Spawn stream
         let count_filtered_topics = log_filter.topics.len();
         let retrieved_logs = rpc
-            .try_stream_logs(1, log_filter)
-            .expect("must create stream")
+            .try_stream_logs(1, log_filter)?
             .skip_while(|b| futures::future::ready(b.len() != count_filtered_topics))
             .take(1)
             .collect::<Vec<BlockWithLogs>>()
             .timeout(Duration::from_secs(30))
             .await
-            .expect("timeout"); // Everything must complete within 30 seconds
+            .context("timeout")?; // Everything must complete within 30 seconds
 
         // The last block must contain all 2 events
-        let last_block_logs = retrieved_logs.first().unwrap().clone().logs;
+        let last_block_logs = retrieved_logs
+            .first()
+            .context("a value should be present")?
+            .clone()
+            .logs;
 
         assert!(
             last_block_logs.iter().any(|log| log.address == contract_addrs.channels
@@ -515,5 +521,7 @@ mod test {
                     .contains(&ChannelBalanceIncreasedFilter::signature().0.into())),
             "must contain channel balance increase"
         );
+
+        Ok(())
     }
 }

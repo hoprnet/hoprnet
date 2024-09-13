@@ -414,7 +414,7 @@ mod tests {
 
         let msg_1 = SessionMessage::<MTU>::Segment(segments.pop().unwrap());
         let data = Vec::from(msg_1.clone());
-        let msg_2 = SessionMessage::try_from(&data[..]).unwrap();
+        let msg_2 = SessionMessage::try_from(&data[..])?;
 
         assert_eq!(msg_1, msg_2);
 
@@ -422,7 +422,7 @@ mod tests {
     }
 
     #[test]
-    fn session_message_segment_request_should_serialize_and_deserialize() {
+    fn session_message_segment_request_should_serialize_and_deserialize() -> anyhow::Result<()> {
         let frame_info = FrameInfo {
             frame_id: 10,
             total_segments: 255,
@@ -432,7 +432,7 @@ mod tests {
 
         let msg_1 = SessionMessage::<466>::Request(SegmentRequest::from_iter(vec![frame_info]));
         let data = Vec::from(msg_1.clone());
-        let msg_2 = SessionMessage::try_from(&data[..]).unwrap();
+        let msg_2 = SessionMessage::try_from(&data[..])?;
 
         assert_eq!(msg_1, msg_2);
 
@@ -444,18 +444,22 @@ mod tests {
             }
             _ => panic!("invalid type"),
         }
+
+        Ok(())
     }
 
     #[test]
-    fn session_message_ack_should_serialize_and_deserialize() {
+    fn session_message_ack_should_serialize_and_deserialize() -> anyhow::Result<()> {
         let mut rng = thread_rng();
         let frame_ids: Vec<u32> = (0..500).map(|_| rng.gen()).collect();
 
         let msg_1 = SessionMessage::<466>::Acknowledge(frame_ids.into());
         let data = Vec::from(msg_1.clone());
-        let msg_2 = SessionMessage::try_from(&data[..]).unwrap();
+        let msg_2 = SessionMessage::try_from(&data[..])?;
 
         assert_eq!(msg_1, msg_2);
+
+        Ok(())
     }
 
     #[test]

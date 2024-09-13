@@ -24,6 +24,7 @@ runtime-tokio = [
 sqlite = []
 
 [build-dependencies]
+anyhow = { workspace = true }
 async-std = { workspace = true, optional = true }
 clap = { workspace = true }
 futures = { workspace = true }

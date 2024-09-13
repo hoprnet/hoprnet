@@ -291,6 +291,7 @@ mod tests {
     use crate::channels::HoprDbChannelOperations;
     use crate::db::HoprDb;
     use crate::HoprDbGeneralModelOperations;
+    use anyhow::Context;
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::keypairs::ChainKeypair;
     use hopr_crypto_types::prelude::Keypair;
@@ -299,8 +300,8 @@ mod tests {
     use hopr_primitive_types::prelude::{Address, BalanceType};
 
     #[async_std::test]
-    async fn test_insert_get_by_id() {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
+    async fn test_insert_get_by_id() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
         let ce = ChannelEntry::new(
             Address::default(),
@@ -311,19 +312,20 @@ mod tests {
             0_u32.into(),
         );
 
-        db.upsert_channel(None, ce).await.expect("must insert channel");
+        db.upsert_channel(None, ce).await?;
         let from_db = db
             .get_channel_by_id(None, &ce.get_id())
-            .await
-            .expect("must get channel")
+            .await?
             .expect("channel must be present");
 
         assert_eq!(ce, from_db, "channels must be equal");
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_insert_get_by_parties() {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
+    async fn test_insert_get_by_parties() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
         let a = Address::from(random_bytes());
         let b = Address::from(random_bytes());
@@ -337,33 +339,35 @@ mod tests {
             0_u32.into(),
         );
 
-        db.upsert_channel(None, ce).await.expect("must insert channel");
+        db.upsert_channel(None, ce).await?;
         let from_db = db
             .get_channel_by_parties(None, &a, &b, false)
-            .await
-            .expect("must get channel")
-            .expect("channel must be present");
+            .await?
+            .context("channel must be present")?;
 
         assert_eq!(ce, from_db, "channels must be equal");
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_channel_get_for_destination_that_does_not_exist_returns_none() {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
+    async fn test_channel_get_for_destination_that_does_not_exist_returns_none() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
         let from_db = db
             .get_channels_via(None, ChannelDirection::Incoming, &Address::default())
-            .await
-            .expect("db should not fail")
+            .await?
             .first()
             .cloned();
 
         assert_eq!(None, from_db, "should return None");
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_channel_get_for_destination_that_exists_should_be_returned() {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
+    async fn test_channel_get_for_destination_that_exists_should_be_returned() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
         let expected_destination = Address::default();
 
@@ -376,24 +380,25 @@ mod tests {
             0_u32.into(),
         );
 
-        db.upsert_channel(None, ce).await.expect("must insert channel");
+        db.upsert_channel(None, ce).await?;
         let from_db = db
             .get_channels_via(None, ChannelDirection::Incoming, &Address::default())
-            .await
-            .expect("db should not fail")
+            .await?
             .first()
             .cloned();
 
         assert_eq!(Some(ce), from_db, "should return a valid channel");
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_incoming_outgoing_channels() {
+    async fn test_incoming_outgoing_channels() -> anyhow::Result<()> {
         let ckp = ChainKeypair::random();
         let addr_1 = ckp.public().to_address();
         let addr_2 = ChainKeypair::random().public().to_address();
 
-        let db = HoprDb::new_in_memory(ckp).await;
+        let db = HoprDb::new_in_memory(ckp).await?;
 
         let ce_1 = ChannelEntry::new(
             addr_1,
@@ -415,28 +420,18 @@ mod tests {
 
         let db_clone = db.clone();
         db.begin_transaction()
-            .await
-            .unwrap()
+            .await?
             .perform(|tx| {
                 Box::pin(async move {
                     db_clone.upsert_channel(Some(tx), ce_1).await?;
                     db_clone.upsert_channel(Some(tx), ce_2).await
                 })
             })
-            .await
-            .unwrap();
+            .await?;
 
-        let incoming = db
-            .get_incoming_channels(None)
-            .await
-            .expect("should get incoming channels");
+        assert_eq!(vec![ce_2], db.get_incoming_channels(None).await?);
+        assert_eq!(vec![ce_1], db.get_outgoing_channels(None).await?);
 
-        let outgoing = db
-            .get_outgoing_channels(None)
-            .await
-            .expect("should get outgoing channels");
-
-        assert_eq!(vec![ce_2], incoming);
-        assert_eq!(vec![ce_1], outgoing);
+        Ok(())
     }
 }

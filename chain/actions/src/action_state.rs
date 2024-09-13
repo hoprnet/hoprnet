@@ -165,6 +165,7 @@ impl ActionState for IndexerActionTracker {
 mod tests {
     use crate::action_state::{ActionState, IndexerActionTracker, IndexerExpectation};
     use crate::errors::ChainActionsError;
+    use anyhow::Context;
     use async_std::prelude::FutureExt;
     use chain_types::chain_events::{ChainEventType, NetworkRegistryStatus, SignificantChainEvent};
     use hex_literal::hex;
@@ -180,7 +181,7 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn test_expectation_should_resolve() {
+    async fn test_expectation_should_resolve() -> anyhow::Result<()> {
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
         let sample_event = SignificantChainEvent {
             tx_hash: random_hash,
@@ -206,18 +207,18 @@ mod tests {
             .register_expectation(IndexerExpectation::new(random_hash, move |e| {
                 matches!(e, ChainEventType::NodeSafeRegistered(_))
             }))
-            .await
-            .expect("should register")
+            .await?
             .timeout(Duration::from_secs(5))
-            .await
-            .expect("should not timeout")
-            .expect("resolver must not be cancelled");
+            .await?
+            .context("resolver must not be cancelled")?;
 
         assert_eq!(sample_event, resolution, "resolving event must be equal");
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_expectation_should_error_when_unregistered() {
+    async fn test_expectation_should_error_when_unregistered() -> anyhow::Result<()> {
         let sample_event = SignificantChainEvent {
             tx_hash: Hash::from(random_bytes::<{ Hash::SIZE }>()),
             event_type: ChainEventType::NodeSafeRegistered(*RANDY),
@@ -238,21 +239,21 @@ mod tests {
             .register_expectation(IndexerExpectation::new(sample_event.tx_hash, move |e| {
                 matches!(e, ChainEventType::NodeSafeRegistered(_))
             }))
-            .await
-            .expect("should register")
+            .await?
             .timeout(Duration::from_secs(5))
-            .await
-            .expect("should not timeout")
+            .await?
             .expect_err("should return with error");
 
         assert!(
             matches!(err, ChainActionsError::ExpectationUnregistered),
             "should notify on unregistration"
         );
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_expectation_should_resolve_and_filter() {
+    async fn test_expectation_should_resolve_and_filter() -> anyhow::Result<()> {
         let tx_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
         let sample_events = vec![
             SignificantChainEvent {
@@ -289,18 +290,18 @@ mod tests {
                     ChainEventType::NetworkRegistryUpdate(_, NetworkRegistryStatus::Allowed)
                 )
             }))
-            .await
-            .expect("should register")
+            .await?
             .timeout(Duration::from_secs(5))
-            .await
-            .expect("should not timeout")
-            .expect("resolver must not be cancelled");
+            .await?
+            .context("resolver must not be cancelled")?;
 
         assert_eq!(sample_events[2], resolution, "resolving event must be equal");
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_expectation_should_resolve_multiple_expectations() {
+    async fn test_expectation_should_resolve_multiple_expectations() -> anyhow::Result<()> {
         let sample_events = vec![
             SignificantChainEvent {
                 tx_hash: Hash::from(random_bytes::<{ Hash::SIZE }>()),
@@ -337,21 +338,22 @@ mod tests {
                 )
             }))
             .await
-            .expect("should register 1"),
+            .context("should register 1")?,
             exp.register_expectation(IndexerExpectation::new(sample_events[0].tx_hash, move |e| {
                 matches!(e, ChainEventType::NodeSafeRegistered(_))
             }))
             .await
-            .expect("should register 2"),
+            .context("should register 2")?,
         ];
 
         let resolutions = futures::future::try_join_all(registered_exps)
             .timeout(Duration::from_secs(5))
-            .await
-            .expect("should not timeout")
-            .expect("no resolver can cancel");
+            .await?
+            .context("no resolver can cancel")?;
 
         assert_eq!(sample_events[2], resolutions[0], "resolving event 1 must be equal");
         assert_eq!(sample_events[0], resolutions[1], "resolving event 2 must be equal");
+
+        Ok(())
     }
 }

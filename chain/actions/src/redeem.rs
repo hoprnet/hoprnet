@@ -242,32 +242,35 @@ mod tests {
     use crate::action_state::MockActionState;
 
     lazy_static::lazy_static! {
-        static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).unwrap();
-        static ref BOB: ChainKeypair = ChainKeypair::from_secret(&hex!("48680484c6fc31bc881a0083e6e32b6dc789f9eaba0f8b981429fd346c697f8c")).unwrap();
-        static ref CHARLIE: ChainKeypair = ChainKeypair::from_secret(&hex!("d39a926980d6fa96a9eba8f8058b2beb774bc11866a386e9ddf9dc1152557c26")).unwrap();
+        static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).expect("lazy static keypair should be constructible");
+        static ref BOB: ChainKeypair = ChainKeypair::from_secret(&hex!("48680484c6fc31bc881a0083e6e32b6dc789f9eaba0f8b981429fd346c697f8c")).expect("lazy static keypair should be constructible");
+        static ref CHARLIE: ChainKeypair = ChainKeypair::from_secret(&hex!("d39a926980d6fa96a9eba8f8058b2beb774bc11866a386e9ddf9dc1152557c26")).expect("lazy static keypair should be constructible");
     }
 
-    fn generate_random_ack_ticket(idx: u64, counterparty: &ChainKeypair, channel_epoch: u32) -> AcknowledgedTicket {
+    fn generate_random_ack_ticket(
+        idx: u64,
+        counterparty: &ChainKeypair,
+        channel_epoch: u32,
+    ) -> anyhow::Result<AcknowledgedTicket> {
         let hk1 = HalfKey::random();
         let hk2 = HalfKey::random();
 
-        let cp1: CurvePoint = hk1.to_challenge().try_into().unwrap();
-        let cp2: CurvePoint = hk2.to_challenge().try_into().unwrap();
+        let cp1: CurvePoint = hk1.to_challenge().try_into()?;
+        let cp2: CurvePoint = hk2.to_challenge().try_into()?;
         let cp_sum = CurvePoint::combine(&[&cp1, &cp2]);
 
         let price_per_packet: U256 = 10000000000000000u128.into(); // 0.01 HOPR
 
-        TicketBuilder::default()
+        Ok(TicketBuilder::default()
             .addresses(counterparty, &ALICE)
-            .amount(price_per_packet.div_f64(1.0f64).unwrap() * 5u32)
+            .amount(price_per_packet.div_f64(1.0f64)? * 5u32)
             .index(idx)
             .index_offset(1)
             .win_prob(1.0)
             .channel_epoch(channel_epoch)
             .challenge(Challenge::from(cp_sum).to_ethereum_challenge())
-            .build_signed(counterparty, &Hash::default())
-            .unwrap()
-            .into_acknowledged(Response::from_half_keys(&hk1, &hk2).unwrap())
+            .build_signed(counterparty, &Hash::default())?
+            .into_acknowledged(Response::from_half_keys(&hk1, &hk2)?))
     }
 
     async fn create_channel_with_ack_tickets(
@@ -275,13 +278,12 @@ mod tests {
         ticket_count: usize,
         counterparty: &ChainKeypair,
         channel_epoch: u32,
-    ) -> (ChannelEntry, Vec<AcknowledgedTicket>) {
+    ) -> anyhow::Result<(ChannelEntry, Vec<AcknowledgedTicket>)> {
         let ckp = counterparty.clone();
         let db_clone = db.clone();
         let channel = db
             .begin_transaction()
-            .await
-            .unwrap()
+            .await?
             .perform(|tx| {
                 Box::pin(async move {
                     db_clone
@@ -300,43 +302,41 @@ mod tests {
                     Ok::<_, DbSqlError>(channel)
                 })
             })
-            .await
-            .unwrap();
+            .await?;
 
         let ckp = counterparty.clone();
         let input_tickets = db
             .begin_transaction_in_db(TargetDb::Tickets)
-            .await
-            .unwrap()
+            .await?
             .perform(|tx| {
                 Box::pin(async move {
                     let mut input_tickets = Vec::new();
                     for i in 0..ticket_count {
-                        let ack_ticket = generate_random_ack_ticket(i as u64, &ckp, channel_epoch);
+                        let ack_ticket = generate_random_ack_ticket(i as u64, &ckp, channel_epoch)
+                            .map_err(|e| hopr_db_sql::errors::DbSqlError::LogicalError(e.to_string()))?;
                         db.upsert_ticket(Some(tx), ack_ticket.clone()).await?;
                         input_tickets.push(ack_ticket);
                     }
                     Ok::<_, DbSqlError>(input_tickets)
                 })
             })
-            .await
-            .unwrap();
+            .await?;
 
-        (channel, input_tickets)
+        Ok((channel, input_tickets))
     }
 
     #[async_std::test]
-    async fn test_ticket_redeem_flow() {
+    async fn test_ticket_redeem_flow() -> anyhow::Result<()> {
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
 
         let ticket_count = 5;
-        let db = HoprDb::new_in_memory(ALICE.clone()).await;
+        let db = HoprDb::new_in_memory(ALICE.clone()).await?;
 
         // all the tickets can be redeemed, coz they are issued with the same epoch as channel
         let (channel_from_bob, bob_tickets) =
-            create_channel_with_ack_tickets(db.clone(), ticket_count, &BOB, 4u32).await;
+            create_channel_with_ack_tickets(db.clone(), ticket_count, &BOB, 4u32).await?;
         let (channel_from_charlie, charlie_tickets) =
-            create_channel_with_ack_tickets(db.clone(), ticket_count, &CHARLIE, 4u32).await;
+            create_channel_with_ack_tickets(db.clone(), ticket_count, &CHARLIE, 4u32).await?;
 
         let mut indexer_action_tracker = MockActionState::new();
         let mut seq2 = mockall::Sequence::new();
@@ -397,15 +397,7 @@ mod tests {
 
         let actions = ChainActions::new(&ALICE, db.clone(), tx_sender.clone());
 
-        let confirmations = futures::future::try_join_all(
-            actions
-                .redeem_all_tickets(false)
-                .await
-                .expect("redeem_all_tickets should succeed")
-                .into_iter(),
-        )
-        .await
-        .expect("must resolve confirmations");
+        let confirmations = futures::future::try_join_all(actions.redeem_all_tickets(false).await?.into_iter()).await?;
 
         assert_eq!(2 * ticket_count, confirmations.len(), "must have all confirmations");
         assert!(
@@ -413,9 +405,9 @@ mod tests {
             "tx hashes must be equal"
         );
 
-        let db_acks_bob = db.get_tickets((&channel_from_bob).into()).await.unwrap();
+        let db_acks_bob = db.get_tickets((&channel_from_bob).into()).await?;
 
-        let db_acks_charlie = db.get_tickets((&channel_from_charlie).into()).await.unwrap();
+        let db_acks_charlie = db.get_tickets((&channel_from_charlie).into()).await?;
 
         assert!(
             db_acks_bob
@@ -429,19 +421,22 @@ mod tests {
                 .all(|tkt| tkt.status == AcknowledgedTicketStatus::BeingRedeemed),
             "all charlie's tickets must be in BeingRedeemed state"
         );
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_ticket_redeem_in_channel() {
+    async fn test_ticket_redeem_in_channel() -> anyhow::Result<()> {
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
 
         let ticket_count = 5;
-        let db = HoprDb::new_in_memory(ALICE.clone()).await;
+        let db = HoprDb::new_in_memory(ALICE.clone()).await?;
 
         // all the tickets can be redeemed, coz they are issued with the same epoch as channel
         let (channel_from_bob, bob_tickets) =
-            create_channel_with_ack_tickets(db.clone(), ticket_count, &BOB, 4u32).await;
-        let (channel_from_charlie, _) = create_channel_with_ack_tickets(db.clone(), ticket_count, &CHARLIE, 4u32).await;
+            create_channel_with_ack_tickets(db.clone(), ticket_count, &BOB, 4u32).await?;
+        let (channel_from_charlie, _) =
+            create_channel_with_ack_tickets(db.clone(), ticket_count, &CHARLIE, 4u32).await?;
 
         let mut indexer_action_tracker = MockActionState::new();
         let mut seq2 = mockall::Sequence::new();
@@ -480,12 +475,10 @@ mod tests {
         let confirmations = futures::future::try_join_all(
             actions
                 .redeem_tickets_with_counterparty(&BOB.public().to_address(), false)
-                .await
-                .expect("redeem_tickets_with_counterparty should succeed")
+                .await?
                 .into_iter(),
         )
-        .await
-        .expect("must resolve all confirmations");
+        .await?;
 
         assert_eq!(ticket_count, confirmations.len(), "must have all confirmations");
         assert!(
@@ -493,9 +486,9 @@ mod tests {
             "tx hashes must be equal"
         );
 
-        let db_acks_bob = db.get_tickets((&channel_from_bob).into()).await.unwrap();
+        let db_acks_bob = db.get_tickets((&channel_from_bob).into()).await?;
 
-        let db_acks_charlie = db.get_tickets((&channel_from_charlie).into()).await.unwrap();
+        let db_acks_charlie = db.get_tickets((&channel_from_charlie).into()).await?;
 
         assert!(
             db_acks_bob
@@ -509,31 +502,31 @@ mod tests {
                 .all(|tkt| tkt.status == AcknowledgedTicketStatus::Untouched),
             "all charlie's tickets must be in Untouched state"
         );
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_redeem_must_not_work_for_tickets_being_aggregated_and_being_redeemed() {
+    async fn test_redeem_must_not_work_for_tickets_being_aggregated_and_being_redeemed() -> anyhow::Result<()> {
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
 
         let ticket_count = 3;
-        let db = HoprDb::new_in_memory(ALICE.clone()).await;
+        let db = HoprDb::new_in_memory(ALICE.clone()).await?;
 
         let (channel_from_bob, mut tickets) =
-            create_channel_with_ack_tickets(db.clone(), ticket_count, &BOB, 4u32).await;
+            create_channel_with_ack_tickets(db.clone(), ticket_count, &BOB, 4u32).await?;
 
         // Make the first ticket unredeemable
         tickets[0].status = AcknowledgedTicketStatus::BeingAggregated;
         let selector = TicketSelector::from(&tickets[0]).with_no_state();
         db.update_ticket_states(selector, AcknowledgedTicketStatus::BeingAggregated)
-            .await
-            .unwrap();
+            .await?;
 
         // Make the second ticket unredeemable
         tickets[1].status = AcknowledgedTicketStatus::BeingRedeemed;
         let selector = TicketSelector::from(&tickets[1]).with_no_state();
         db.update_ticket_states(selector, AcknowledgedTicketStatus::BeingRedeemed)
-            .await
-            .unwrap();
+            .await?;
 
         // Expect only the redeemable tickets get redeemed
         let tickets_clone = tickets.clone();
@@ -570,12 +563,10 @@ mod tests {
         let confirmations = futures::future::try_join_all(
             actions
                 .redeem_tickets_in_channel(&channel_from_bob, false)
-                .await
-                .expect("redeem_tickets_in_channel should succeed")
+                .await?
                 .into_iter(),
         )
-        .await
-        .expect("must resolve all confirmations");
+        .await?;
 
         assert_eq!(
             ticket_count - 2,
@@ -592,25 +583,28 @@ mod tests {
             actions.redeem_ticket(tickets[1].clone()).await.is_err(),
             "cannot redeem a ticket that's being redeemed"
         );
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_redeem_must_not_work_for_tickets_of_previous_epoch_being_aggregated_and_being_redeemed() {
+    async fn test_redeem_must_not_work_for_tickets_of_previous_epoch_being_aggregated_and_being_redeemed(
+    ) -> anyhow::Result<()> {
         let ticket_count = 3;
         let ticket_from_previous_epoch_count = 1;
-        let db = HoprDb::new_in_memory(ALICE.clone()).await;
+        let db = HoprDb::new_in_memory(ALICE.clone()).await?;
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
 
         // Create 4 tickets in Epoch
         let (channel_from_bob, mut tickets) =
-            create_channel_with_ack_tickets(db.clone(), ticket_count, &BOB, 4u32).await;
+            create_channel_with_ack_tickets(db.clone(), ticket_count, &BOB, 4u32).await?;
 
         // Update the first 2 tickets to be in Epoch 3
-        tickets[0] = generate_random_ack_ticket(0, &BOB, 3);
-        db.upsert_ticket(None, tickets[0].clone()).await.unwrap();
+        tickets[0] = generate_random_ack_ticket(0, &BOB, 3)?;
+        db.upsert_ticket(None, tickets[0].clone()).await?;
 
-        tickets[1] = generate_random_ack_ticket(1, &BOB, 3);
-        db.upsert_ticket(None, tickets[1].clone()).await.unwrap();
+        tickets[1] = generate_random_ack_ticket(1, &BOB, 3)?;
+        db.upsert_ticket(None, tickets[1].clone()).await?;
 
         let tickets_clone = tickets.clone();
         let mut tx_exec = MockTransactionExecutor::new();
@@ -650,8 +644,7 @@ mod tests {
         futures::future::join_all(
             actions
                 .redeem_tickets_in_channel(&channel_from_bob, false)
-                .await
-                .expect("redeem_tickets_in_channel should succeed")
+                .await?
                 .into_iter(),
         )
         .await;
@@ -660,25 +653,27 @@ mod tests {
             actions.redeem_ticket(tickets[0].clone()).await.is_err(),
             "cannot redeem a ticket that's from the previous epoch"
         );
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_redeem_must_not_work_for_tickets_of_next_epoch_being_redeemed() {
+    async fn test_redeem_must_not_work_for_tickets_of_next_epoch_being_redeemed() -> anyhow::Result<()> {
         let ticket_count = 4;
         let ticket_from_next_epoch_count = 2;
-        let db = HoprDb::new_in_memory(ALICE.clone()).await;
+        let db = HoprDb::new_in_memory(ALICE.clone()).await?;
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
 
         // Create 4 tickets in Epoch
         let (channel_from_bob, mut tickets) =
-            create_channel_with_ack_tickets(db.clone(), ticket_count, &BOB, 4u32).await;
+            create_channel_with_ack_tickets(db.clone(), ticket_count, &BOB, 4u32).await?;
 
         // Update the first 2 to be in Epoch 5
-        tickets[0] = generate_random_ack_ticket(0, &BOB, 4);
-        db.upsert_ticket(None, tickets[0].clone()).await.unwrap();
+        tickets[0] = generate_random_ack_ticket(0, &BOB, 4)?;
+        db.upsert_ticket(None, tickets[0].clone()).await?;
 
-        tickets[1] = generate_random_ack_ticket(1, &BOB, 4);
-        db.upsert_ticket(None, tickets[1].clone()).await.unwrap();
+        tickets[1] = generate_random_ack_ticket(1, &BOB, 4)?;
+        db.upsert_ticket(None, tickets[1].clone()).await?;
 
         let tickets_clone = tickets.clone();
         let mut tx_exec = MockTransactionExecutor::new();
@@ -718,8 +713,7 @@ mod tests {
         futures::future::join_all(
             actions
                 .redeem_tickets_in_channel(&channel_from_bob, false)
-                .await
-                .expect("redeem_tickets_in_channel should succeed")
+                .await?
                 .into_iter(),
         )
         .await;
@@ -733,5 +727,7 @@ mod tests {
                 "cannot redeem a ticket that's from the next epoch"
             );
         }
+
+        Ok(())
     }
 }

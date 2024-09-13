@@ -456,11 +456,13 @@ impl MultiHistogram {
 
 #[cfg(test)]
 mod tests {
+    use anyhow::Context;
+
     use super::*;
 
     #[test]
-    fn test_counter() {
-        let counter = SimpleCounter::new("my_ctr", "test counter").unwrap();
+    fn test_counter() -> anyhow::Result<()> {
+        let counter = SimpleCounter::new("my_ctr", "test counter")?;
 
         assert_eq!("my_ctr", counter.name());
 
@@ -468,13 +470,15 @@ mod tests {
 
         assert_eq!(1, counter.get());
 
-        let metrics = gather_all_metrics().unwrap();
+        let metrics = gather_all_metrics()?;
         assert!(metrics.contains("my_ctr 1"));
+
+        Ok(())
     }
 
     #[test]
-    fn test_multi_counter() {
-        let counter = MultiCounter::new("my_mctr", "test multicounter", &["version"]).unwrap();
+    fn test_multi_counter() -> anyhow::Result<()> {
+        let counter = MultiCounter::new("my_mctr", "test multicounter", &["version"])?;
 
         assert_eq!("my_mctr", counter.name());
         assert!(counter.labels().contains(&"version"));
@@ -483,17 +487,19 @@ mod tests {
         counter.increment_by(&["1.89.20"], 1);
         counter.increment_by(&["1.90.1"], 15);
 
-        assert_eq!(25, counter.get(&["1.90.1"]).unwrap());
-        assert_eq!(1, counter.get(&["1.89.20"]).unwrap());
+        assert_eq!(25, counter.get(&["1.90.1"]).context("should be present")?);
+        assert_eq!(1, counter.get(&["1.89.20"]).context("should be present")?);
 
-        let metrics = gather_all_metrics().unwrap();
+        let metrics = gather_all_metrics()?;
         assert!(metrics.contains("my_mctr{version=\"1.90.1\"} 25"));
         assert!(metrics.contains("my_mctr{version=\"1.89.20\"} 1"));
+
+        Ok(())
     }
 
     #[test]
-    fn test_gauge() {
-        let gauge = SimpleGauge::new("my_gauge", "test gauge").unwrap();
+    fn test_gauge() -> anyhow::Result<()> {
+        let gauge = SimpleGauge::new("my_gauge", "test gauge")?;
 
         assert_eq!("my_gauge", gauge.name());
 
@@ -501,20 +507,22 @@ mod tests {
 
         assert_eq!(10.0, gauge.get());
 
-        let metrics = gather_all_metrics().unwrap();
+        let metrics = gather_all_metrics()?;
         assert!(metrics.contains("my_gauge 10"));
 
         gauge.decrement(5.1);
 
         assert_eq!(4.9, gauge.get());
 
-        let metrics2 = gather_all_metrics().unwrap();
+        let metrics2 = gather_all_metrics()?;
         assert!(metrics2.contains("my_gauge 4.9"));
+
+        Ok(())
     }
 
     #[test]
-    fn test_multi_gauge() {
-        let gauge = MultiGauge::new("my_mgauge", "test multicounter", &["version"]).unwrap();
+    fn test_multi_gauge() -> anyhow::Result<()> {
+        let gauge = MultiGauge::new("my_mgauge", "test multicounter", &["version"])?;
 
         assert_eq!("my_mgauge", gauge.name());
         assert!(gauge.labels().contains(&"version"));
@@ -524,17 +532,19 @@ mod tests {
         gauge.increment(&["1.90.1"], 15.0);
         gauge.decrement(&["1.89.20"], 2.0);
 
-        assert_eq!(25.0, gauge.get(&["1.90.1"]).unwrap());
-        assert_eq!(3.0, gauge.get(&["1.89.20"]).unwrap());
+        assert_eq!(25.0, gauge.get(&["1.90.1"]).context("should be present")?);
+        assert_eq!(3.0, gauge.get(&["1.89.20"]).context("should be present")?);
 
-        let metrics = gather_all_metrics().unwrap();
+        let metrics = gather_all_metrics()?;
         assert!(metrics.contains("my_mgauge{version=\"1.90.1\"} 25"));
         assert!(metrics.contains("my_mgauge{version=\"1.89.20\"} 3"));
+
+        Ok(())
     }
 
     #[test]
-    fn test_histogram() {
-        let histogram = SimpleHistogram::new("my_histogram", "test histogram", vec![1.0, 2.0, 3.0, 4.0, 5.0]).unwrap();
+    fn test_histogram() -> anyhow::Result<()> {
+        let histogram = SimpleHistogram::new("my_histogram", "test histogram", vec![1.0, 2.0, 3.0, 4.0, 5.0])?;
 
         assert_eq!("my_histogram", histogram.name());
 
@@ -546,7 +556,7 @@ mod tests {
         assert_eq!(4, histogram.get_sample_count());
         assert_eq!(10.0, histogram.get_sample_sum());
 
-        let metrics = gather_all_metrics().unwrap();
+        let metrics = gather_all_metrics()?;
         assert!(metrics.contains("my_histogram_bucket{le=\"1\"} 1"));
         assert!(metrics.contains("my_histogram_bucket{le=\"2\"} 3"));
         assert!(metrics.contains("my_histogram_bucket{le=\"3\"} 3"));
@@ -555,17 +565,18 @@ mod tests {
 
         let timer = histogram_start_measure!(histogram);
         histogram.cancel_measure(timer);
+
+        Ok(())
     }
 
     #[test]
-    fn test_multi_histogram() {
+    fn test_multi_histogram() -> anyhow::Result<()> {
         let histogram = MultiHistogram::new(
             "my_mhistogram",
             "test histogram",
             vec![1.0, 2.0, 3.0, 4.0, 5.0],
             &["version"],
-        )
-        .unwrap();
+        )?;
 
         assert_eq!("my_mhistogram", histogram.name());
         assert!(histogram.labels().contains(&"version"));
@@ -576,13 +587,22 @@ mod tests {
         histogram.observe(&["1.90.0"], 5.0);
         histogram.observe(&["1.89.20"], 10.0);
 
-        assert_eq!(1, histogram.get_sample_count(&["1.89.20"]).unwrap());
-        assert_eq!(10.0, histogram.get_sample_sum(&["1.89.20"]).unwrap());
+        assert_eq!(
+            1,
+            histogram.get_sample_count(&["1.89.20"]).context("should be present")?
+        );
+        assert_eq!(
+            10.0,
+            histogram.get_sample_sum(&["1.89.20"]).context("should be present")?
+        );
 
-        assert_eq!(4, histogram.get_sample_count(&["1.90.0"]).unwrap());
-        assert_eq!(10.0, histogram.get_sample_sum(&["1.90.0"]).unwrap());
+        assert_eq!(4, histogram.get_sample_count(&["1.90.0"]).context("should be present")?);
+        assert_eq!(
+            10.0,
+            histogram.get_sample_sum(&["1.90.0"]).context("should be present")?
+        );
 
-        let metrics = gather_all_metrics().unwrap();
+        let metrics = gather_all_metrics()?;
         assert!(metrics.contains("my_mhistogram_bucket{version=\"1.90.0\",le=\"1\"} 1"));
         assert!(metrics.contains("my_mhistogram_bucket{version=\"1.90.0\",le=\"2\"} 3"));
         assert!(metrics.contains("my_mhistogram_bucket{version=\"1.90.0\",le=\"3\"} 3"));
@@ -591,7 +611,9 @@ mod tests {
 
         assert!(metrics.contains("my_mhistogram_bucket{version=\"1.89.20\",le=\"+Inf\"} 1"));
 
-        let timer = histogram_start_measure!(histogram, &["1.90.0"]).unwrap();
+        let timer = histogram_start_measure!(histogram, &["1.90.0"])?;
         histogram.cancel_measure(timer);
+
+        Ok(())
     }
 }
