@@ -1,4 +1,3 @@
-use anyhow::anyhow;
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_network_types::prelude::*;

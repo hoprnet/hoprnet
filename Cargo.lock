@@ -1285,6 +1285,7 @@ dependencies = [
  "smart-default",
  "surf",
  "surf-governor",
+ "test-log",
  "thiserror",
  "tokio",
  "tracing",

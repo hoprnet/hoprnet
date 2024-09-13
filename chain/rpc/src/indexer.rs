@@ -226,6 +226,7 @@ mod tests {
 
     use crate::client::surf_client::SurfRequestor;
     use crate::client::{create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy};
+    use crate::errors::RpcError;
     use crate::indexer::split_range;
     use crate::rpc::{RpcOperations, RpcOperationsConfig};
     use crate::{BlockWithLogs, HoprIndexerRpcOperations, LogFilter};
@@ -370,28 +371,30 @@ mod tests {
         debug!("{:#?}", contract_addrs);
         debug!("{:#?}", log_filter);
 
-        // Spawn channel funding
-        spawn(async move {
-            chain_types::utils::fund_channel(
-                chain_key_1.public().to_address(),
-                contract_instances.token,
-                contract_instances.channels,
-                1_u128.into(),
-            )
-            .delay(expected_block_time * 2)
-            .await;
-        });
-
         // Spawn stream
         let count_filtered_topics = log_filter.topics.len();
-        let retrieved_logs = rpc
-            .try_stream_logs(1, log_filter)?
-            .skip_while(|b| futures::future::ready(b.len() != count_filtered_topics))
-            .take(1)
-            .collect::<Vec<BlockWithLogs>>()
-            .timeout(Duration::from_secs(30))
-            .await
-            .context("timeout")?; // Everything must complete within 30 seconds
+        let retrieved_logs = spawn(async move {
+            Ok::<_, RpcError>(
+                rpc.try_stream_logs(1, log_filter)?
+                    .skip_while(|b| futures::future::ready(b.len() != count_filtered_topics))
+                    .take(1)
+                    .collect::<Vec<BlockWithLogs>>()
+                    .await,
+            )
+        });
+
+        // Spawn channel funding
+        chain_types::utils::fund_channel(
+            chain_key_1.public().to_address(),
+            contract_instances.token,
+            contract_instances.channels,
+            1_u128.into(),
+        )
+        .await;
+
+        let retrieved_logs = retrieved_logs
+            .timeout(Duration::from_secs(30)) // Give up after 30 seconds
+            .await??;
 
         // The last block must contain all 4 events
         let last_block_logs = retrieved_logs.last().context("a log should be present")?.clone().logs;
@@ -479,28 +482,30 @@ mod tests {
         debug!("{:#?}", contract_addrs);
         debug!("{:#?}", log_filter);
 
-        // Spawn channel funding
-        spawn(async move {
-            chain_types::utils::fund_channel(
-                chain_key_1.public().to_address(),
-                contract_instances.token,
-                contract_instances.channels,
-                1_u128.into(),
-            )
-            .delay(expected_block_time * 2)
-            .await;
-        });
-
         // Spawn stream
         let count_filtered_topics = log_filter.topics.len();
-        let retrieved_logs = rpc
-            .try_stream_logs(1, log_filter)?
-            .skip_while(|b| futures::future::ready(b.len() != count_filtered_topics))
-            .take(1)
-            .collect::<Vec<BlockWithLogs>>()
-            .timeout(Duration::from_secs(30))
-            .await
-            .context("timeout")?; // Everything must complete within 30 seconds
+        let retrieved_logs = spawn(async move {
+            Ok::<_, RpcError>(
+                rpc.try_stream_logs(1, log_filter)?
+                    .skip_while(|b| futures::future::ready(b.len() != count_filtered_topics))
+                    .take(1)
+                    .collect::<Vec<BlockWithLogs>>()
+                    .await,
+            )
+        });
+
+        // Spawn channel funding
+        chain_types::utils::fund_channel(
+            chain_key_1.public().to_address(),
+            contract_instances.token,
+            contract_instances.channels,
+            1_u128.into(),
+        )
+        .await;
+
+        let retrieved_logs = retrieved_logs
+            .timeout(Duration::from_secs(30)) // Give up after 30 seconds
+            .await??;
 
         // The last block must contain all 2 events
         let last_block_logs = retrieved_logs
