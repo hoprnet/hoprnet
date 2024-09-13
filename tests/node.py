@@ -129,8 +129,13 @@ class Node:
                     "libp2p_swarm=info",
                     "libp2p_mplex=info",
                     "multistream_select=info",
-                    "isahc::handler=error",
+                    "isahc=error",
                     "isahc::client=error",
+                    "sea_orm=warn",
+                    "sqlx=warn",
+                    "hyper_util=warn",
+                    "libp2p_tcp=info",
+                    "libp2p_dns=info"
                 ]
             ),
             "RUST_BACKTRACE": "full",

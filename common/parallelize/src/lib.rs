@@ -39,7 +39,7 @@ pub mod cpu {
                 .unwrap_or_else(|_| unreachable!())
         });
         rx.await
-            .unwrap()
+            .expect("spawned blocking process should be awaitable")
             .unwrap_or_else(|caught_panic| std::panic::resume_unwind(caught_panic))
     }
 
@@ -54,7 +54,7 @@ pub mod cpu {
                 .unwrap_or_else(|_| unreachable!())
         });
         rx.await
-            .unwrap()
+            .expect("spawned fifo blocking process should be awaitable")
             .unwrap_or_else(|caught_panic| std::panic::resume_unwind(caught_panic))
     }
 }

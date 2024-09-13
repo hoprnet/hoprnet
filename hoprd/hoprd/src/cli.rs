@@ -32,8 +32,8 @@ fn parse_api_token(mut s: &str) -> Result<String, String> {
 
     match (s.starts_with('\''), s.ends_with('\'')) {
         (true, true) => {
-            s = s.strip_prefix('\'').unwrap();
-            s = s.strip_suffix('\'').unwrap();
+            s = s.strip_prefix('\'').ok_or("failed to parse strip prefix part")?;
+            s = s.strip_suffix('\'').ok_or("failed to parse strip suffix part")?;
 
             Ok(s.into())
         }

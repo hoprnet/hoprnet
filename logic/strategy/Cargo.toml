@@ -59,6 +59,7 @@ hopr-primitive-types = { workspace = true }
 hopr-transport-protocol = { workspace = true }
 
 [dev-dependencies]
+anyhow = { workspace = true }
 async-std = { workspace = true }
 hopr-db-sql = { workspace = true, features = ["runtime-async-std"] }
 chain-types = { workspace = true }

@@ -591,7 +591,8 @@ pub fn convert_acknowledged_ticket(off_chain: &RedeemableTicket) -> Result<OnCha
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
+    use anyhow::Context;
     use chain_rpc::client::create_rpc_client_to_anvil;
     use chain_rpc::client::surf_client::SurfRequestor;
     use chain_types::ContractInstances;
@@ -608,17 +609,17 @@ pub mod tests {
     const RESPONSE_TO_CHALLENGE: [u8; 32] = hex!("b58f99c83ae0e7dd6a69f755305b38c7610c7687d2931ff3f70103f8f92b90bb");
 
     #[async_std::test]
-    async fn test_announce() {
-        let test_multiaddr = Multiaddr::from_str("/ip4/1.2.3.4/tcp/56").unwrap();
+    async fn test_announce() -> anyhow::Result<()> {
+        let test_multiaddr = Multiaddr::from_str("/ip4/1.2.3.4/tcp/56")?;
 
         let anvil = chain_types::utils::create_anvil(None);
-        let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
+        let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
         let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &chain_key_0);
 
         // Deploy contracts
         let contract_instances = ContractInstances::deploy_for_testing(client.clone(), &chain_key_0)
             .await
-            .expect("could not deploy contracts");
+            .context("could not deploy contracts")?;
 
         let generator = BasicPayloadGenerator::new((&chain_key_0).into(), (&contract_instances).into());
 
@@ -626,57 +627,38 @@ pub mod tests {
             test_multiaddr,
             Some(KeyBinding::new(
                 (&chain_key_0).into(),
-                &OffchainKeypair::from_secret(&PRIVATE_KEY).unwrap(),
+                &OffchainKeypair::from_secret(&PRIVATE_KEY)?,
             )),
-        )
-        .unwrap();
+        )?;
 
-        let tx = generator.announce(ad).expect("should generate tx");
+        let tx = generator.announce(ad)?;
 
-        assert!(client
-            .send_transaction(tx, None)
-            .await
-            .unwrap()
-            .await
-            .unwrap()
-            .is_some());
+        assert!(client.send_transaction(tx, None).await?.await?.is_some());
 
-        let test_multiaddr_reannounce = Multiaddr::from_str("/ip4/5.6.7.8/tcp/99").unwrap();
+        let test_multiaddr_reannounce = Multiaddr::from_str("/ip4/5.6.7.8/tcp/99")?;
 
-        let ad_reannounce = AnnouncementData::new(test_multiaddr_reannounce, None).unwrap();
-        let reannounce_tx = generator.announce(ad_reannounce).expect("should generate tx");
+        let ad_reannounce = AnnouncementData::new(test_multiaddr_reannounce, None)?;
+        let reannounce_tx = generator.announce(ad_reannounce)?;
 
-        assert!(client
-            .send_transaction(reannounce_tx, None)
-            .await
-            .unwrap()
-            .await
-            .unwrap()
-            .is_some());
+        assert!(client.send_transaction(reannounce_tx, None).await?.await?.is_some());
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn redeem_ticket() {
+    async fn redeem_ticket() -> anyhow::Result<()> {
         let anvil = chain_types::utils::create_anvil(None);
-        let chain_key_alice = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
-        let chain_key_bob = ChainKeypair::from_secret(anvil.keys()[1].to_bytes().as_ref()).unwrap();
+        let chain_key_alice = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
+        let chain_key_bob = ChainKeypair::from_secret(anvil.keys()[1].to_bytes().as_ref())?;
         let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &chain_key_alice);
 
         // Deploy contracts
-        let contract_instances = ContractInstances::deploy_for_testing(client.clone(), &chain_key_alice)
-            .await
-            .expect("could not deploy contracts");
+        let contract_instances = ContractInstances::deploy_for_testing(client.clone(), &chain_key_alice).await?;
 
         // Mint 1000 HOPR to Alice
         chain_types::utils::mint_tokens(contract_instances.token.clone(), 1000_u128.into()).await;
 
-        let domain_separator: Hash = contract_instances
-            .channels
-            .domain_separator()
-            .call()
-            .await
-            .unwrap()
-            .into();
+        let domain_separator: Hash = contract_instances.channels.domain_separator().call().await?.into();
 
         // Open channel Alice -> Bob
         chain_types::utils::fund_channel(
@@ -696,7 +678,7 @@ pub mod tests {
         )
         .await;
 
-        let response = Response::try_from(RESPONSE_TO_CHALLENGE.as_ref()).unwrap();
+        let response = Response::try_from(RESPONSE_TO_CHALLENGE.as_ref())?;
 
         // Alice issues a ticket to Bob
         let ticket = TicketBuilder::default()
@@ -707,22 +689,19 @@ pub mod tests {
             .win_prob(1.0)
             .channel_epoch(1)
             .challenge(response.to_challenge().into())
-            .build_signed(&chain_key_alice, &domain_separator)
-            .unwrap();
+            .build_signed(&chain_key_alice, &domain_separator)?;
 
         // Bob acknowledges the ticket using the HalfKey from the Response
         let acked_ticket = ticket
             .into_acknowledged(response)
-            .into_redeemable(&chain_key_bob, &domain_separator)
-            .expect("should create a redeemable ticket");
+            .into_redeemable(&chain_key_bob, &domain_separator)?;
 
         // Bob redeems the ticket
         let generator = BasicPayloadGenerator::new((&chain_key_bob).into(), (&contract_instances).into());
-        let redeem_ticket_tx = generator.redeem_ticket(acked_ticket).expect("should create tx");
+        let redeem_ticket_tx = generator.redeem_ticket(acked_ticket)?;
         let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &chain_key_bob);
-        println!(
-            "{:?}",
-            client.send_transaction(redeem_ticket_tx, None).await.unwrap().await
-        );
+        println!("{:?}", client.send_transaction(redeem_ticket_tx, None).await?.await);
+
+        Ok(())
     }
 }

@@ -294,13 +294,13 @@ mod test {
     fn test_version_is_satisfied_should_work_on_ranges() {
         let actual = satisfies("1.90.0", ">=1.89, <1.93");
         assert!(actual.is_ok());
-        assert!(actual.unwrap())
+        assert!(actual.expect("should be contained"))
     }
 
     #[test]
     fn test_version_is_satisfied_should_work_for_glob() {
         let actual = satisfies("1.2.3", "*");
         assert!(actual.is_ok());
-        assert!(actual.unwrap())
+        assert!(actual.expect("should be contained"))
     }
 }

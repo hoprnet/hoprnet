@@ -33,6 +33,7 @@ tracing = { workspace = true }
 hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
+anyhow = { workspace = true }
 async-std = { workspace = true }
 bincode = { workspace = true }
 cbor4ii = { version = "0.3.2", features = ["serde1", "use_std"] }

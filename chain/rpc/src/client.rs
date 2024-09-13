@@ -162,7 +162,10 @@ impl RetryPolicy<JsonRpcProviderClientError> for SimpleJsonRpcRetryPolicy {
         retry_queue_size: u32,
     ) -> RetryAction {
         if self.max_retries.is_some_and(|max| num_retries > max) {
-            warn!("max number of retries {} has been reached", self.max_retries.unwrap());
+            warn!(
+                "max number of retries {} has been reached",
+                self.max_retries.expect("max_retries must be set")
+            );
             return NoRetry;
         }
 
@@ -284,7 +287,7 @@ impl<Req: HttpPostRequestor, R: RetryPolicy<JsonRpcProviderClientError>> JsonRpc
         let body = self.requestor.http_post(self.url.as_ref(), payload).await?;
         let req_duration = start.elapsed();
 
-        debug!("rpc {method} request took {}ms", req_duration.as_millis());
+        trace!("rpc {method} request took {}ms", req_duration.as_millis());
 
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_RPC_CALLS_TIMING.observe(&[method], req_duration.as_secs_f64());
@@ -412,8 +415,8 @@ where
                         METRIC_RETRIES_PER_RPC_CALL.observe(&[method], num_retries as f64);
 
                         debug!(
-                            "successful request {method} spent {}ms in the retry queue",
-                            start.elapsed().as_millis()
+                            elapsed_in_ms = start.elapsed().as_millis(),
+                            "request {method} succeeded",
                         );
                         return Ok(ret);
                     }
@@ -629,7 +632,7 @@ pub fn create_rpc_client_to_anvil<R: HttpPostRequestor + Debug>(
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use ethers::providers::JsonRpcClient;
     use serde_json::json;
     use std::fmt::Debug;
@@ -648,22 +651,22 @@ pub mod tests {
     use crate::errors::JsonRpcProviderClientError;
     use crate::{HttpPostRequestor, ZeroRetryPolicy};
 
-    async fn deploy_contracts<R: HttpPostRequestor + Debug>(req: R) -> ContractAddresses {
+    async fn deploy_contracts<R: HttpPostRequestor + Debug>(req: R) -> anyhow::Result<ContractAddresses> {
         let anvil = create_anvil(None);
-        let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
+        let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
 
         let client = create_rpc_client_to_anvil(req, &anvil, &chain_key_0);
 
-        ContractAddresses::from(
-            &ContractInstances::deploy_for_testing(client.clone(), &chain_key_0)
-                .await
-                .expect("failed to deploy"),
-        )
+        let contracts = ContractInstances::deploy_for_testing(client.clone(), &chain_key_0)
+            .await
+            .expect("deploy failed");
+
+        Ok(ContractAddresses::from(&contracts))
     }
 
     #[async_std::test]
-    async fn test_client_should_deploy_contracts_via_surf() {
-        let contract_addrs = deploy_contracts(SurfRequestor::default()).await;
+    async fn test_client_should_deploy_contracts_via_surf() -> anyhow::Result<()> {
+        let contract_addrs = deploy_contracts(SurfRequestor::default()).await?;
 
         assert_ne!(contract_addrs.token, Address::default());
         assert_ne!(contract_addrs.channels, Address::default());
@@ -671,11 +674,13 @@ pub mod tests {
         assert_ne!(contract_addrs.network_registry, Address::default());
         assert_ne!(contract_addrs.safe_registry, Address::default());
         assert_ne!(contract_addrs.price_oracle, Address::default());
+
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_client_should_deploy_contracts_via_reqwest() {
-        let contract_addrs = deploy_contracts(ReqwestRequestor::default()).await;
+    async fn test_client_should_deploy_contracts_via_reqwest() -> anyhow::Result<()> {
+        let contract_addrs = deploy_contracts(ReqwestRequestor::default()).await?;
 
         assert_ne!(contract_addrs.token, Address::default());
         assert_ne!(contract_addrs.channels, Address::default());
@@ -683,10 +688,12 @@ pub mod tests {
         assert_ne!(contract_addrs.network_registry, Address::default());
         assert_ne!(contract_addrs.safe_registry, Address::default());
         assert_ne!(contract_addrs.price_oracle, Address::default());
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_client_should_get_block_number() {
+    async fn test_client_should_get_block_number() -> anyhow::Result<()> {
         let block_time = Duration::from_secs(1);
 
         let anvil = create_anvil(Some(block_time));
@@ -701,10 +708,7 @@ pub mod tests {
         for _ in 0..3 {
             sleep(block_time).await;
 
-            let number: ethers::types::U64 = client
-                .request("eth_blockNumber", ())
-                .await
-                .expect("should get block number");
+            let number: ethers::types::U64 = client.request("eth_blockNumber", ()).await?;
 
             assert!(number.as_u64() > last_number, "next block number must be greater");
             last_number = number.as_u64();
@@ -715,6 +719,8 @@ pub mod tests {
             client.requests_enqueued.load(Ordering::SeqCst),
             "retry queue should be zero on successful requests"
         );
+
+        Ok(())
     }
 
     #[async_std::test]

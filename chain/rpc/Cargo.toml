@@ -58,6 +58,7 @@ hopr-primitive-types = { workspace = true }
 hopr-async-runtime = { workspace = true }
 
 [dev-dependencies]
+anyhow = { workspace = true }
 async-std = { workspace = true, features = ["attributes", "unstable"] }
 tokio = { workspace = true }
 reqwest = { workspace = true }

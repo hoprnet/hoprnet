@@ -23,6 +23,7 @@ thiserror = { workspace = true }
 hopr-crypto-random = { workspace = true }
 
 [dev-dependencies]
+anyhow = { workspace = true }
 hex-literal = { workspace = true }
 
 [features]

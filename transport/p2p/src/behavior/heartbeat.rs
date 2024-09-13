@@ -91,9 +91,13 @@ impl NetworkBehaviour for Behaviour {
 
         match self.events.poll_next_unpin(cx) {
             Poll::Ready(Some((peer_id, replier))) => {
-                self.pending_events
-                    .push_back(ToSwarm::GenerateEvent(Event::ToProbe((peer_id, replier))));
-                Poll::Ready(self.pending_events.pop_front().unwrap())
+                if let Some(value) = self.pending_events.pop_front() {
+                    self.pending_events
+                        .push_back(ToSwarm::GenerateEvent(Event::ToProbe((peer_id, replier))));
+                    Poll::Ready(value)
+                } else {
+                    Poll::Ready(ToSwarm::GenerateEvent(Event::ToProbe((peer_id, replier))))
+                }
             }
             Poll::Ready(None) | Poll::Pending => Poll::Pending,
         }
