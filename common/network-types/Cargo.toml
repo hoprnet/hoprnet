@@ -21,6 +21,7 @@ runtime-tokio = [
   "hopr-async-runtime/runtime-tokio",
   "hickory-resolver/tokio-runtime",
 ]
+prometheus = ["dep:lazy_static", "dep:hopr-metrics"]
 
 [dependencies]
 async-std-resolver = { version = "0.24.1", optional = true }
@@ -28,11 +29,12 @@ bitvec = "1.0.1"
 crossbeam-queue = "0.3.11"
 crossbeam-skiplist = { workspace = true }
 dashmap = { workspace = true }
-flume = "0.11.0"
+flume = { workspace = true }
 futures = { workspace = true }
 governor = "0.6.3"
 hex = { workspace = true }
 hickory-resolver = { workspace = true }
+lazy_static = { workspace = true, optional = true }
 libp2p-identity = { workspace = true }
 rand = { workspace = true }
 rand_distr = "0.4.3"
@@ -50,6 +52,7 @@ tracing = { workspace = true }
 hopr-platform = { workspace = true }
 hopr-primitive-types = { workspace = true }
 hopr-async-runtime = { workspace = true }
+hopr-metrics = { workspace = true, optional = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }

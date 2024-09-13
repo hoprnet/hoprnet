@@ -113,6 +113,17 @@ use crate::session::frame::{segment, FrameId, FrameReassembler, Segment, Segment
 use crate::session::protocol::{FrameAcknowledgements, SegmentRequest, SessionMessage};
 use crate::session::utils::{AsyncReadStreamer, RetryResult, RetryToken};
 
+#[cfg(all(feature = "prometheus", not(test)))]
+lazy_static::lazy_static! {
+    static ref METRIC_TIME_TO_ACK: hopr_metrics::MultiHistogram =
+        hopr_metrics::MultiHistogram::new(
+            "hopr_session_time_to_ack",
+            "Time in seconds until a complete frame gets acknowledged by the recipient",
+            vec![0.5, 1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0, 128.0, 256.0],
+            &["session_id"]
+    ).unwrap();
+}
+
 /// Represents individual Session protocol features that can be enabled.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SessionFeature {
@@ -246,8 +257,9 @@ impl<const C: usize> SessionState<C> {
                 trace!(session_id = self.session_id, "RECEIVED: segment {id:?}");
                 match self.incoming_frame_retries.entry(id.0) {
                     Entry::Occupied(e) => {
-                        // Restart the retry token for this frame
-                        e.replace_entry(RetryToken::new(Instant::now(), self.cfg.backoff_base));
+                        // Receiving a frame segment restarts the retry token for this frame
+                        let rt = *e.get();
+                        e.replace_entry(rt.replenish(Instant::now(), self.cfg.backoff_base));
                     }
                     Entry::Vacant(v) => {
                         // Create the retry token for this frame
@@ -310,7 +322,17 @@ impl<const C: usize> SessionState<C> {
 
         for frame_id in acked {
             // Frame acknowledged, we won't need to resend it
-            self.outgoing_frame_resends.remove(&frame_id);
+            if let Some((_, rt)) = self.outgoing_frame_resends.remove(&frame_id) {
+                let to_ack = rt.time_since_creation();
+                trace!(
+                    session_id = self.session_id,
+                    "frame {frame_id} took {to_ack:?} to acknowledge"
+                );
+
+                #[cfg(all(feature = "prometheus", not(test)))]
+                METRIC_TIME_TO_ACK.observe(&[self.session_id()], to_ack.as_secs_f64())
+            }
+
             for seg in self.lookbehind.iter().filter(|s| frame_id == s.key().0) {
                 seg.remove();
             }

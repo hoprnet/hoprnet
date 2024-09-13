@@ -20,6 +20,7 @@ prometheus = [
   "dep:lazy_static",
   "hopr-lib/prometheus",
   "hoprd-api/prometheus",
+  "hopr-network-types/prometheus",
 ]
 runtime-async-std = [
   "dep:async-std",

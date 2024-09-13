@@ -158,13 +158,16 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                     METRIC_ACTIVE_TARGETS.increment(&["tcp"], 1.0);
 
                     match transfer_session(&mut session.session, &mut udp_bridge, HOPR_UDP_BUFFER_SIZE).await {
-                        Ok((session_to_stream, stream_to_session)) => tracing::info!(
+                        Ok((session_to_stream_bytes, stream_to_session_bytes)) => tracing::info!(
                             session_id = debug(session_id),
-                            "server bridged session to UDP {udp_target} ended - egress: {session_to_stream} bytes, ingress: {stream_to_session} bytes"
+                            session_to_stream_bytes,
+                            stream_to_session_bytes,
+                            "server bridged session to UDP {udp_target} ended"
                         ),
-                        Err(e) => tracing::error!(session_id = debug(session_id),
+                        Err(e) => tracing::error!(
+                            session_id = debug(session_id),
                             "UDP server stream ({udp_target}) is closed: {e:?}"
-                        )
+                        ),
                     }
 
                     #[cfg(all(feature = "prometheus", not(test)))]
@@ -216,14 +219,16 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                     METRIC_ACTIVE_TARGETS.increment(&["udp"], 1.0);
 
                     match transfer_session(&mut session.session, &mut tcp_bridge, HOPR_TCP_BUFFER_SIZE).await {
-                        Ok((session_to_stream, stream_to_session)) => tracing::info!(
+                        Ok((session_to_stream_bytes, stream_to_session_bytes)) => tracing::info!(
                             session_id = debug(session_id),
-                            "server bridged session to TCP {tcp_target} ended - egress: {session_to_stream} bytes, ingress: {stream_to_session} bytes"
+                            session_to_stream_bytes,
+                            stream_to_session_bytes,
+                            "server bridged session to TCP {tcp_target} ended"
                         ),
                         Err(e) => tracing::error!(
                             session_id = debug(session_id),
                             "TCP server stream ({tcp_target}) is closed: {e:?}"
-                        )
+                        ),
                     }
 
                     #[cfg(all(feature = "prometheus", not(test)))]

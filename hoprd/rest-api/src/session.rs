@@ -436,9 +436,9 @@ where
 {
     let session_id = *session.id();
     match transfer_session(&mut session, &mut stream, max_buf).await {
-        Ok((session_to_stream, stream_to_session)) => info!(
+        Ok((session_to_stream_bytes, stream_to_session_bytes)) => info!(
             session_id = tracing::field::debug(session_id),
-            "client session ended - ingress: {stream_to_session} bytes, egress: {session_to_stream} bytes",
+            session_to_stream_bytes, stream_to_session_bytes, "client session ended",
         ),
         Err(e) => error!(
             session_id = tracing::field::debug(session_id),

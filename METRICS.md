@@ -76,3 +76,6 @@ scrape_configs:
 - `hopr_session_initiated_sessions`: Number of sessions that were successfully initiated as an Entry node
 - `hopr_session_hoprd_clients`: Number of clients connected at this Entry node, keys: `type`
 - `hopr_session_hoprd_target_connections`: Number of currently active HOPR session target connections from this Exit node, keys: `type`
+- `hopr_session_time_to_ack`: Time in seconds until a complete frame gets acknowledged by the recipient, buckets: 0.5, 1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0, 128.0, 256.0
+- `hopr_udp_ingress_packet_len`: UDP packet lengths on ingress per counterparty, keys: `counterparty`, buckets: 20.0, 40.0, 80.0, 160.0, 320.0, 640.0, 1280.0, 2560.0, 5120.0
+- `hopr_udp_egress_packet_len`: UDP packet lengths on egress per counterparty, keys: `counterparty`, buckets: 20.0, 40.0, 80.0, 160.0, 320.0, 640.0, 1280.0, 2560.0, 5120.0

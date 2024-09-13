@@ -82,5 +82,5 @@ async fn udp_session_bridging() -> anyhow::Result<()> {
         }
     }
 
-    Err(anyhow!("timeout"))
+    anyhow::bail!("timeout")
 }

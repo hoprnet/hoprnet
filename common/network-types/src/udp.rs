@@ -9,6 +9,24 @@ use tracing::{debug, error, trace, warn};
 
 type BoxIoSink<T> = Box<dyn Sink<T, Error = std::io::Error> + Send + Unpin>;
 
+#[cfg(all(feature = "prometheus", not(test)))]
+lazy_static::lazy_static! {
+    static ref METRIC_UDP_INGRESS_LEN: hopr_metrics::MultiHistogram =
+        hopr_metrics::MultiHistogram::new(
+            "hopr_udp_ingress_packet_len",
+            "UDP packet lengths on ingress per counterparty",
+            vec![20.0, 40.0, 80.0, 160.0, 320.0, 640.0, 1280.0, 2560.0, 5120.0],
+            &["counterparty"]
+    ).unwrap();
+    static ref METRIC_UDP_EGRESS_LEN: hopr_metrics::MultiHistogram =
+        hopr_metrics::MultiHistogram::new(
+            "hopr_udp_egress_packet_len",
+            "UDP packet lengths on egress per counterparty",
+            vec![20.0, 40.0, 80.0, 160.0, 320.0, 640.0, 1280.0, 2560.0, 5120.0],
+            &["counterparty"]
+    ).unwrap();
+}
+
 /// Mimics TCP-like stream functionality on a UDP socket by restricting it to a single
 /// counterparty and implements [`tokio::io::AsyncRead`] and [`tokio::io::AsyncWrite`].
 /// The instance is always constructed using a [`UdpStreamBuilder`].
@@ -54,19 +72,26 @@ pub enum ForeignDataMode {
 /// Builder object for the [`ConnectedUdpStream`].
 ///
 /// If you wish to use defaults, do `UdpStreamBuilder::default().build(addr)`.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct UdpStreamBuilder {
-    foreign_data_mode: Option<ForeignDataMode>,
-    buffer_size: Option<usize>,
+    foreign_data_mode: ForeignDataMode,
+    buffer_size: usize,
     queue_size: Option<usize>,
     parallelism: Option<usize>,
     counterparty: Option<std::net::SocketAddr>,
 }
 
-/// The default size of the UDP receive buffer in bytes.
-///
-/// See [`UdpStreamBuilder::with_buffer_size`] for details.
-pub const DEFAULT_UDP_RECEIVER_BUFFER_SIZE: usize = 2048;
+impl Default for UdpStreamBuilder {
+    fn default() -> Self {
+        Self {
+            buffer_size: 2048,
+            foreign_data_mode: Default::default(),
+            queue_size: None,
+            parallelism: None,
+            counterparty: None,
+        }
+    }
+}
 
 impl UdpStreamBuilder {
     /// Defines the behavior when data from an unexpected source arrive into the socket.
@@ -74,7 +99,7 @@ impl UdpStreamBuilder {
     ///
     /// Default is [`ForeignDataMode::Error`].
     pub fn with_foreign_data_mode(mut self, mode: ForeignDataMode) -> Self {
-        self.foreign_data_mode = Some(mode);
+        self.foreign_data_mode = mode;
         self
     }
 
@@ -83,9 +108,9 @@ impl UdpStreamBuilder {
     /// This size must be at least the size of the MTU, otherwise the unread UDP data that
     /// does not fit this buffer will be discarded.
     ///
-    /// Default is [`DEFAULT_UDP_RECEIVER_BUFFER_SIZE`].
+    /// Default is 2048.
     pub fn with_buffer_size(mut self, buffer_size: usize) -> Self {
-        self.buffer_size = Some(buffer_size);
+        self.buffer_size = buffer_size;
         self
     }
 
@@ -144,20 +169,15 @@ impl UdpStreamBuilder {
         let avail_parallelism = std::thread::available_parallelism()
             .map(usize::from)
             .unwrap_or_else(|e| {
-                error!("failed to determine available parallelism, defaulting to 1: {e}");
+                warn!("failed to determine available parallelism, defaulting to 1: {e}");
                 1
             })
             / 2; // Each socket gets one RX and one TX task
         let num_socks = self
             .parallelism
-            .map(|n| {
-                if n > 0 {
-                    n.max(avail_parallelism)
-                } else {
-                    avail_parallelism
-                }
-            })
-            .unwrap_or(1);
+            .map(|n| if n == 0 { avail_parallelism } else { n })
+            .unwrap_or(1)
+            .max(avail_parallelism);
 
         let counterparty = Arc::new(self.counterparty.map(OnceLock::from).unwrap_or_default());
         let ((ingress_tx, ingress_rx), (egress_tx, egress_rx)) = if let Some(q) = self.queue_size {
@@ -217,8 +237,8 @@ impl UdpStreamBuilder {
                             sock.clone(),
                             ingress_tx.clone(),
                             counterparty.clone(),
-                            self.foreign_data_mode.unwrap_or_default(),
-                            self.buffer_size.unwrap_or(DEFAULT_UDP_RECEIVER_BUFFER_SIZE),
+                            self.foreign_data_mode,
+                            self.buffer_size,
                         )?),
                     ))
                 })
@@ -262,6 +282,9 @@ impl ConnectedUdpStream {
                             udp_bound_addr = tracing::field::debug(sock_rx.local_addr()),
                             "got {read} bytes of data from {read_addr}"
                         );
+                        #[cfg(all(feature = "prometheus", not(test)))]
+                        METRIC_UDP_INGRESS_LEN.observe(&[&read.to_string()], read as f64);
+
                         let addr = counterparty_rx.get_or_init(|| read_addr);
 
                         // If the data is from a counterparty, or we accept anything, pass it
@@ -361,6 +384,9 @@ impl ConnectedUdpStream {
                                 );
                             }
                             trace!(socket_id, "sent {} bytes of data to {target}", data.len());
+
+                            #[cfg(all(feature = "prometheus", not(test)))]
+                            METRIC_UDP_EGRESS_LEN.observe(&[&target.to_string()], data.len() as f64);
                         } else {
                             error!(
                                 socket_id,
