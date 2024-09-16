@@ -28,6 +28,7 @@ use futures::{
     future::{select, Either},
     pin_mut, FutureExt, StreamExt, TryStreamExt,
 };
+use std::time::Duration;
 use std::{
     collections::HashMap,
     sync::{Arc, OnceLock},
@@ -926,8 +927,8 @@ where
             .get()
             .ok_or_else(|| HoprTransportError::Api("ping processing is not yet initialized".into()))?;
 
-        let timeout = sleep(std::time::Duration::from_secs(30)).fuse();
-        let ping = (*pinger).ping(vec![*peer]).fuse();
+        let timeout = sleep(Duration::from_secs(30)).fuse();
+        let ping = (*pinger).ping(vec![*peer]);
 
         pin_mut!(timeout, ping);
 
@@ -937,16 +938,23 @@ where
 
         let start = current_time().as_unix_timestamp();
 
-        match select(timeout, ping).await {
+        match select(timeout, ping.next().fuse()).await {
             Either::Left(_) => {
                 warn!(peer = peer.to_string(), "Manual ping to peer timed out");
                 return Err(ProtocolError::Timeout.into());
             }
-            Either::Right((Ok(_), _)) => info!("Manual ping succeeded"),
-            Either::Right((Err(e), _)) => {
-                // Ping errors need to be forwarded here
-                error!("Manual ping failed: {e}");
-                return Err(e.into());
+            Either::Right((v, _)) => {
+                match v
+                    .into_iter()
+                    .map(|r| r.map_err(HoprTransportError::NetworkError))
+                    .collect::<errors::Result<Vec<Duration>>>()
+                {
+                    Ok(d) => info!(peer = peer.to_string(), "Manual ping succeeded: {d:?}"),
+                    Err(e) => {
+                        error!(peer = peer.to_string(), "Manual ping failed: {e}");
+                        return Err(e);
+                    }
+                }
             }
         };
 
