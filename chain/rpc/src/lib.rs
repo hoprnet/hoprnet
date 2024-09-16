@@ -51,10 +51,14 @@ pub struct Log {
     pub tx_index: u64,
     /// Corresponding block number
     pub block_number: u64,
+    /// Corresponding block hash
+    pub block_hash: Hash,
     /// Corresponding transaction hash
     pub tx_hash: Hash,
     /// Log index
     pub log_index: U256,
+    /// Removed flag
+    pub removed: bool,
 }
 
 impl From<ethers::types::Log> for Log {
@@ -65,8 +69,10 @@ impl From<ethers::types::Log> for Log {
             data: Box::from(value.data.as_ref()),
             tx_index: value.transaction_index.expect("tx index must be present").as_u64(),
             block_number: value.block_number.expect("block id must be present").as_u64(),
+            block_hash: value.block_hash.expect("block hash must be present").into(),
             log_index: value.log_index.expect("log index must be present"),
             tx_hash: value.transaction_hash.expect("tx hash must be present").into(),
+            removed: value.removed.expect("removed flag must be present"),
         }
     }
 }
@@ -80,11 +86,49 @@ impl From<Log> for ethers::abi::RawLog {
     }
 }
 
+impl From<SerializableLog> for Log {
+    fn from(value: SerializableLog) -> Self {
+        Log {
+            address: Address::from_hex(value.address.as_str()).expect("invalid address"),
+            topics: value
+                .topics
+                .into_iter()
+                .map(|t| Hash::from_hex(t.as_str()).expect("invalid topic"))
+                .collect(),
+            data: Box::from(value.data.as_ref()),
+            tx_index: value.tx_index,
+            block_number: value.block_number,
+            block_hash: Hash::from_hex(value.block_hash.as_str()).expect("invalid block hash"),
+            log_index: value.log_index.into(),
+            tx_hash: Hash::from_hex(value.tx_hash.as_str()).expect("invalid tx hash"),
+            removed: value.removed,
+        }
+    }
+}
+
+impl From<Log> for SerializableLog {
+    fn from(value: Log) -> Self {
+        SerializableLog {
+            address: value.address.to_string(),
+            topics: value.topics.into_iter().map(|t| t.to_string()).collect(),
+            data: value.data.into_vec(),
+            tx_index: value.tx_index,
+            block_number: value.block_number,
+            block_hash: value.block_hash.to_string(),
+            tx_hash: value.tx_hash.to_string(),
+            log_index: value.log_index.as_u64(),
+            removed: value.removed,
+        }
+    }
+}
+
 impl Display for Log {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "log in block #{} of {} with {} topics",
+            "log #{} in tx #{} in block #{} of address {} with {} topics",
+            self.log_index,
+            self.tx_index,
             self.block_number,
             self.address,
             self.topics.len()

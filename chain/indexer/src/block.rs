@@ -8,7 +8,9 @@ use chain_types::chain_events::SignificantChainEvent;
 use hopr_async_runtime::prelude::{spawn, JoinHandle};
 use hopr_crypto_types::types::Hash;
 use hopr_db_sql::info::HoprDbInfoOperations;
+use hopr_db_sql::logs::HoprDbLogOperations;
 use hopr_db_sql::HoprDbGeneralModelOperations;
+use hopr_primitive_types::prelude::SerializableLog;
 
 use crate::{
     errors::{CoreEthereumIndexerError, Result},
@@ -91,11 +93,11 @@ where
     where
         T: HoprIndexerRpcOperations + 'static,
         U: ChainLogHandler + 'static,
-        Db: HoprDbGeneralModelOperations + HoprDbInfoOperations + 'static,
+        Db: HoprDbGeneralModelOperations + HoprDbInfoOperations + HoprDbLogOperations + 'static,
     {
         if self.rpc.is_none() || self.db_processor.is_none() {
             return Err(CoreEthereumIndexerError::ProcessError(
-                "indexer is already started".into(),
+                "indexer cannot start, missing components".into(),
             ));
         }
 
@@ -206,11 +208,16 @@ where
                     }
                 })
                 .filter_map(|block_with_logs| async {
+                    debug!("store logs in {block_with_logs} ...");
+                    let block_id = block_with_logs.block_id;
+
+                    // store logs in the database, keep going on errors for now
+                    let logs = block_with_logs.logs.clone().into_iter().map(SerializableLog::from).collect();
+                    let _ = db.store_logs(None, logs).await;
+
                     debug!("processing events in {block_with_logs} ...");
                     let block_description = block_with_logs.to_string();
-                    let block_id = block_with_logs.block_id;
                     let log_count = block_with_logs.logs.len();
-
                     let outgoing_events = match db_processor.collect_block_events(block_with_logs).await {
                         Ok(events) => {
                             trace!("retrieved {} significant chain events from {block_description}", events.len());

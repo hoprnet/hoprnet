@@ -406,6 +406,67 @@ impl UnitaryFloatOps for U256 {
     }
 }
 
+/// A type containing selected fields from  the `eth_getLogs` RPC calls.
+///
+/// This is further restricted to already mined blocks.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SerializableLog {
+    /// Contract address
+    pub address: String,
+    /// Topics
+    pub topics: Vec<String>,
+    /// Raw log data
+    pub data: Vec<u8>,
+    /// Transaction index
+    pub tx_index: u64,
+    /// Corresponding block number
+    pub block_number: u64,
+    /// Corresponding block hash
+    pub block_hash: String,
+    /// Corresponding transaction hash
+    pub tx_hash: String,
+    /// Log index
+    pub log_index: u64,
+    /// Removed flag
+    pub removed: bool,
+}
+
+impl Display for SerializableLog {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "log #{} in tx #{} in block #{} of address {} with {} topics",
+            self.log_index,
+            self.tx_index,
+            self.block_number,
+            self.address,
+            self.topics.len()
+        )
+    }
+}
+
+impl Ord for SerializableLog {
+    fn cmp(&self, other: &Self) -> Ordering {
+        let block_number_order = self.block_number.cmp(&other.block_number);
+        if block_number_order == Ordering::Equal {
+            let tx_index_order = self.tx_index.cmp(&other.tx_index);
+            if tx_index_order == Ordering::Equal {
+                self.log_index.cmp(&other.log_index)
+            } else {
+                tx_index_order
+            }
+        } else {
+            block_number_order
+        }
+    }
+}
+
+impl PartialOrd<Self> for SerializableLog {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
 /// Unit tests of pure Rust code
 #[cfg(test)]
 mod tests {

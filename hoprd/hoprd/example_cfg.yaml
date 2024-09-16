@@ -271,6 +271,12 @@ hopr:
     # when validating acknowledged tickets.
     # Strongly recommended to leave this enabled.
     check_unrealized_balance: true
+    # Configures whether the node will keep RPC logs after they were processed.
+    # By default (disabled), the node will clean such logs. If enabled, the node
+    # will keep logs which will require more disk space, however, it will allow
+    # the node to reconcile the state of the chain with the state of the node
+    # in future versions.
+    keep_logs: false
 # HOPRd Message Inbox configuration
 inbox:
   # Capacity of messages in the Inbox, per message tag.

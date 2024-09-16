@@ -33,6 +33,11 @@ fn just_true() -> bool {
     true
 }
 
+#[inline]
+fn just_false() -> bool {
+    false
+}
+
 #[derive(Debug, Clone, PartialEq, smart_default::SmartDefault, Serialize, Deserialize, Validate)]
 #[serde(deny_unknown_fields)]
 pub struct Chain {
@@ -52,6 +57,9 @@ pub struct Chain {
     #[serde(default = "just_true")]
     #[default = true]
     pub check_unrealized_balance: bool,
+    #[serde(default = "just_false")]
+    #[default = false]
+    pub keep_logs: bool,
 }
 
 #[inline]
