@@ -298,8 +298,11 @@ mod tests {
         };
 
         let ars = AutoRedeemingStrategy::new(cfg, db, actions);
-        ars.on_acknowledged_winning_ticket(&ack_ticket_unagg).await?;
+        ars.on_acknowledged_winning_ticket(&ack_ticket_unagg)
+            .await
+            .expect_err("non-agg ticket should not satisfy");
         ars.on_acknowledged_winning_ticket(&ack_ticket_agg).await?;
+
         Ok(())
     }
 
