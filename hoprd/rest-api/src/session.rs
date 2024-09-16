@@ -24,10 +24,13 @@ use tracing::{debug, error, info};
 pub const DEFAULT_LISTEN_HOST: &str = "127.0.0.1:0";
 
 /// Size of the buffer for forwarding data to/from a TCP stream.
-pub const HOPR_TCP_BUFFER_SIZE: usize = 2048;
+pub const HOPR_TCP_BUFFER_SIZE: usize = 4096;
 
 /// Size of the buffer for forwarding data to/from a UDP stream.
 pub const HOPR_UDP_BUFFER_SIZE: usize = 16384;
+
+/// Size of the queue (back-pressure) for data incoming from a UDP stream.
+pub const HOPR_UDP_QUEUE_SIZE: usize = 8192;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -422,7 +425,7 @@ async fn udp_bind_to<A: std::net::ToSocketAddrs>(
 ) -> std::io::Result<(std::net::SocketAddr, ConnectedUdpStream)> {
     let udp_socket = ConnectedUdpStream::builder()
         .with_buffer_size(HOPR_UDP_BUFFER_SIZE)
-        .with_queue_size(2048)
+        .with_queue_size(HOPR_UDP_QUEUE_SIZE)
         .with_foreign_data_mode(ForeignDataMode::Discard) // discard data from UDP clients other than the first one served
         .with_parallelism(0) // Automatic per available parallelism
         .build(address)?;
@@ -558,7 +561,7 @@ mod tests {
 
         let mut udp_stream = ConnectedUdpStream::builder()
             .with_buffer_size(hopr_lib::SESSION_USABLE_MTU_SIZE)
-            .with_queue_size(1024)
+            .with_queue_size(HOPR_UDP_QUEUE_SIZE)
             .with_counterparty(listen_addr)
             .build(("127.0.0.1", 0))
             .context("bind failed")?;

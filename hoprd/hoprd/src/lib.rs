@@ -89,7 +89,7 @@
 use hopr_lib::errors::HoprLibError;
 use hopr_lib::transfer_session;
 use hopr_network_types::prelude::ForeignDataMode;
-use hoprd_api::{HOPR_TCP_BUFFER_SIZE, HOPR_UDP_BUFFER_SIZE};
+use hoprd_api::{HOPR_TCP_BUFFER_SIZE, HOPR_UDP_BUFFER_SIZE, HOPR_UDP_QUEUE_SIZE};
 
 pub mod cli;
 pub mod config;
@@ -140,7 +140,7 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                     .with_buffer_size(HOPR_UDP_BUFFER_SIZE)
                     .with_counterparty(resolved_udp_target)
                     .with_foreign_data_mode(ForeignDataMode::Error)
-                    .with_queue_size(2048)
+                    .with_queue_size(HOPR_UDP_QUEUE_SIZE)
                     .with_parallelism(0)
                     .build(("0.0.0.0", 0))
                     .map_err(|e| {
