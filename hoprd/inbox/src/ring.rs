@@ -199,7 +199,7 @@ where
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use crate::inbox::InboxBackend;
     use crate::ring::RingBufferInboxBackend;
     use std::ops::Add;
@@ -211,7 +211,7 @@ mod test {
             || {
                 std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap()
+                    .expect("Time went backwards")
                     .add(Duration::from_millis(1))
             }, // for testing, ensure the timestamps are at least 5ms apart
         )

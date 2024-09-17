@@ -458,7 +458,7 @@ mod tests {
             self.tx
                 .clone()
                 .unbounded_send(data)
-                .expect("send message: failed to send data");
+                .map_err(|_| TransportSessionError::Closed)?;
 
             Ok(())
         }

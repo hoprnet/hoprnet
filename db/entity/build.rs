@@ -3,9 +3,10 @@
 use std::env::{self, temp_dir};
 use std::path::Path;
 
+use anyhow::Context;
 use clap::Parser;
 
-async fn execute_sea_orm_cli_command<I, T>(itr: I)
+async fn execute_sea_orm_cli_command<I, T>(itr: I) -> anyhow::Result<()>
 where
     I: IntoIterator<Item = T>,
     T: Into<std::ffi::OsString> + Clone,
@@ -13,35 +14,34 @@ where
     use sea_orm::{ConnectOptions, Database};
     use sea_orm_cli::*;
 
-    let cli = sea_orm_cli::Cli::try_parse_from(itr).expect("should be able to parse a sea-orm-cli command");
+    let cli = sea_orm_cli::Cli::try_parse_from(itr).context("should be able to parse a sea-orm-cli command")?;
 
-    match cli.command {
-        Commands::Generate { command } => {
-            run_generate_command(command, true).await.unwrap();
-        }
+    let result = match cli.command {
+        Commands::Generate { command } => run_generate_command(command, true).await,
         Commands::Migrate {
             database_schema,
             database_url,
             command,
             ..
         } => {
-            let connect_options = ConnectOptions::new(database_url.unwrap())
+            let connect_options = ConnectOptions::new(database_url.unwrap_or("/tmp/sea_orm_cli.db".into()))
                 .set_schema_search_path(database_schema.unwrap_or_else(|| "public".to_owned()))
                 .to_owned();
-            let db = &Database::connect(connect_options)
-                .await
-                .expect("Fail to acquire database connection");
+            let db = &Database::connect(connect_options).await?;
 
-            sea_orm_migration::cli::run_migrate(migration::Migrator {}, db, command, cli.verbose)
-                .await
-                .unwrap_or_else(handle_error);
+            sea_orm_migration::cli::run_migrate(migration::Migrator {}, db, command, cli.verbose).await
         }
-    }
+    };
+
+    result.map_err(|e| anyhow::anyhow!(e.to_string()))
 }
 
-fn main() {
-    let cargo_manifest_dir = &env::var("CARGO_MANIFEST_DIR").expect("Points to a valid manifest dir");
-    let db_migration_package_path = Path::new(&cargo_manifest_dir).parent().unwrap().join("migration");
+fn main() -> anyhow::Result<()> {
+    let cargo_manifest_dir = &env::var("CARGO_MANIFEST_DIR").context("should point to a valid manifest dir")?;
+    let db_migration_package_path = Path::new(&cargo_manifest_dir)
+        .parent()
+        .context("should have a parent dir")?
+        .join("migration");
 
     println!(
         "cargo:rerun-if-changed={}",
@@ -56,7 +56,7 @@ fn main() {
         .join("src/codegen/sqlite")
         .into_os_string()
         .into_string()
-        .expect("should contain valid temporary db path");
+        .map_err(|e| anyhow::anyhow!(e.to_str().unwrap_or("illegible error").to_string()))?;
 
     let tmp_db = temp_dir().join("tmp_migration.db");
 
@@ -65,7 +65,7 @@ fn main() {
             .clone()
             .into_os_string()
             .into_string()
-            .expect("should contain valid temporary db path")
+            .map_err(|e| anyhow::anyhow!(e.to_str().unwrap_or("illegible error").to_string()))?
             .as_str(),
     );
 
@@ -80,7 +80,7 @@ fn main() {
                 .clone()
                 .into_os_string()
                 .into_string()
-                .expect("should contain valid temporary db path")
+                .map_err(|e| anyhow::anyhow!(e.to_str().unwrap_or("illegible error").to_string()))?
         )
         .as_str(),
         "-d",
@@ -88,9 +88,9 @@ fn main() {
             .clone()
             .into_os_string()
             .into_string()
-            .expect("should contain valid db migration path")
+            .map_err(|e| anyhow::anyhow!(e.to_str().unwrap_or("illegible error").to_string()))?
             .as_str(),
-    ]));
+    ]))?;
 
     futures::executor::block_on(execute_sea_orm_cli_command([
         "sea-orm-cli",
@@ -104,8 +104,10 @@ fn main() {
             tmp_db
                 .into_os_string()
                 .into_string()
-                .expect("should contain valid temporary db path")
+                .map_err(|e| anyhow::anyhow!(e.to_str().unwrap_or("illegible error").to_string()))?
         )
         .as_str(),
-    ]));
+    ]))?;
+
+    Ok(())
 }

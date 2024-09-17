@@ -151,7 +151,7 @@ pub struct PromiscuousStrategyConfig {
     ///
     /// Default is ">=2.0.0"
     #[serde_as(as = "DisplayFromStr")]
-    #[default(">=2.0.0".parse().unwrap())]
+    #[default(">=2.0.0".parse().expect("should be valid default version"))]
     pub minimum_peer_version: semver::VersionReq,
 }
 
@@ -344,7 +344,8 @@ where
             // This way, we'll prefer candidates with higher quality, when we don't have enough node balance.
             // Shuffle first, so the equal candidates are randomized and then use unstable sorting for that purpose.
             new_channel_candidates.shuffle(&mut OsRng);
-            new_channel_candidates.sort_unstable_by(|(_, q1), (_, q2)| q1.partial_cmp(q2).unwrap().reverse());
+            new_channel_candidates
+                .sort_unstable_by(|(_, q1), (_, q2)| q1.partial_cmp(q2).expect("should be comparable").reverse());
             new_channel_candidates.truncate(max_auto_channels - occupied);
             debug!("got {} new channel candidates", new_channel_candidates.len());
 
@@ -460,6 +461,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use anyhow::Context;
     use chain_actions::action_queue::{ActionConfirmation, PendingAction};
     use chain_types::actions::Action;
     use chain_types::chain_events::ChainEventType;
@@ -481,7 +483,7 @@ mod tests {
         static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!(
             "492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775"
         ))
-        .unwrap();
+        .expect("lazy static keypair should be valid");
         static ref PEERS: [(Address, PeerId); 10] = [
             (
                 ALICE.public().to_address().into(),
@@ -526,7 +528,10 @@ mod tests {
         ]
         .map(|(addr, privkey)| (
             addr.into(),
-            OffchainKeypair::from_secret(&privkey).unwrap().public().into()
+            OffchainKeypair::from_secret(&privkey)
+                .expect("lazy static keypair should be valid")
+                .public()
+                .into()
         ));
     }
 
@@ -545,7 +550,7 @@ mod tests {
         }
     }
 
-    async fn mock_channel(db: HoprDb, dst: Address, balance: Balance) -> ChannelEntry {
+    async fn mock_channel(db: HoprDb, dst: Address, balance: Balance) -> anyhow::Result<ChannelEntry> {
         let channel = ChannelEntry::new(
             PEERS[0].0,
             dst,
@@ -554,34 +559,34 @@ mod tests {
             ChannelStatus::Open,
             U256::zero(),
         );
-        db.upsert_channel(None, channel).await.unwrap();
+        db.upsert_channel(None, channel).await?;
 
-        channel
+        Ok(channel)
     }
 
-    async fn prepare_network(db: HoprDb, qualities: Vec<f64>) {
+    async fn prepare_network(db: HoprDb, qualities: Vec<f64>) -> anyhow::Result<()> {
         assert_eq!(qualities.len(), PEERS.len() - 1, "invalid network setup");
 
         for (i, quality) in qualities.into_iter().enumerate() {
             let peer = &PEERS[i + 1].1;
 
             db.add_network_peer(peer, PeerOrigin::Initialization, vec![], 0.0, 10)
-                .await
-                .unwrap();
+                .await?;
 
-            let mut status = db.get_network_peer(peer).await.unwrap().unwrap();
+            let mut status = db.get_network_peer(peer).await?.expect("should be present");
             status.peer_version = Some("2.0.0".into());
             while status.get_average_quality() < quality {
                 status.update_quality(quality);
             }
-            db.update_network_peer(status).await.unwrap();
+            db.update_network_peer(status).await?;
         }
+
+        Ok(())
     }
 
-    async fn init_db(db: HoprDb, node_balance: Balance) {
+    async fn init_db(db: HoprDb, node_balance: Balance) -> anyhow::Result<()> {
         db.begin_transaction()
-            .await
-            .unwrap()
+            .await?
             .perform(|tx| {
                 Box::pin(async move {
                     db.set_safe_hopr_balance(Some(tx), node_balance).await?;
@@ -590,7 +595,7 @@ mod tests {
                         db.insert_account(
                             Some(tx),
                             AccountEntry::new(
-                                OffchainPublicKey::try_from(*peer_id).unwrap(),
+                                OffchainPublicKey::try_from(*peer_id).expect("should be valid PeerId"),
                                 *chain_key,
                                 AccountType::NotAnnounced,
                             ),
@@ -600,8 +605,9 @@ mod tests {
                     Ok::<_, DbSqlError>(())
                 })
             })
-            .await
-            .unwrap();
+            .await?;
+
+        Ok(())
     }
 
     fn mock_action_confirmation_closure(channel: ChannelEntry) -> ActionConfirmation {
@@ -630,38 +636,47 @@ mod tests {
     }
 
     #[test]
-    fn test_semver() {
+    fn test_semver() -> anyhow::Result<()> {
         // See https://github.com/dtolnay/semver/issues/315
-        let ver: semver::Version = "2.1.0-rc.3+commit.f75bc6c8".parse().expect("should be valid version");
+        let ver: semver::Version = "2.1.0-rc.3+commit.f75bc6c8".parse()?;
         let stripped = semver::Version::new(ver.major, ver.minor, ver.patch);
-        let req = semver::VersionReq::from_str(">=2.0.0").unwrap();
+        let req = semver::VersionReq::from_str(">=2.0.0")?;
+
         assert!(req.matches(&stripped), "constraint must match");
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_promiscuous_strategy_tick_decisions() {
-        let db = HoprDb::new_in_memory(ALICE.clone()).await;
+    async fn test_promiscuous_strategy_tick_decisions() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ALICE.clone()).await?;
 
         let qualities_that_alice_sees = vec![0.7, 0.9, 0.8, 0.98, 0.1, 0.3, 0.1, 0.2, 1.0];
 
         let balance = Balance::new_from_str("100000000000000000000", BalanceType::HOPR);
 
-        init_db(db.clone(), balance).await;
-        prepare_network(db.clone(), qualities_that_alice_sees).await;
+        init_db(db.clone(), balance).await?;
+        prepare_network(db.clone(), qualities_that_alice_sees).await?;
 
-        mock_channel(db.clone(), PEERS[1].0, balance).await;
-        mock_channel(db.clone(), PEERS[2].0, balance).await;
-        let for_closing = mock_channel(db.clone(), PEERS[5].0, balance).await;
+        mock_channel(db.clone(), PEERS[1].0, balance).await?;
+        mock_channel(db.clone(), PEERS[2].0, balance).await?;
+        let for_closing = mock_channel(db.clone(), PEERS[5].0, balance).await?;
 
         // Peer 3 has an accepted pre-release version
-        let mut status_3 = db.get_network_peer(&PEERS[3].1).await.unwrap().unwrap();
+        let mut status_3 = db
+            .get_network_peer(&PEERS[3].1)
+            .await?
+            .context("peer should be present")?;
         status_3.peer_version = Some("2.1.0-rc.3+commit.f75bc6c8".into());
-        db.update_network_peer(status_3).await.unwrap();
+        db.update_network_peer(status_3).await?;
 
         // Peer 10 has an old node version
-        let mut status_10 = db.get_network_peer(&PEERS[9].1).await.unwrap().unwrap();
+        let mut status_10 = db
+            .get_network_peer(&PEERS[9].1)
+            .await?
+            .context("peer should be present")?;
         status_10.peer_version = Some("1.92.0".into());
-        db.update_network_peer(status_10).await.unwrap();
+        db.update_network_peer(status_10).await?;
 
         let mut strat_cfg = PromiscuousStrategyConfig::default();
         strat_cfg.max_channels = Some(3); // Allow max 3 channels
@@ -700,6 +715,8 @@ mod tests {
                 .expect_err("on tick should fail when criteria are not met");
         }
 
-        strat.on_tick().await.expect("on tick should not fail");
+        strat.on_tick().await?;
+
+        Ok(())
     }
 }

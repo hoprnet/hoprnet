@@ -128,7 +128,9 @@ where
                 .collect::<Vec<_>>();
 
             if ack_ticket_in_db.len() == 1 {
-                let ack = ack_ticket_in_db.pop().unwrap();
+                let ack = ack_ticket_in_db
+                    .pop()
+                    .expect("should be unwrappable due to previous check");
                 info!("redeeming single {ack} worth {}", ack.verified_ticket().amount);
 
                 #[cfg(all(feature = "prometheus", not(test)))]
@@ -175,30 +177,33 @@ mod tests {
     use std::time::{Duration, SystemTime};
 
     lazy_static::lazy_static! {
-        static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).unwrap();
-        static ref BOB: ChainKeypair = ChainKeypair::from_secret(&hex!("48680484c6fc31bc881a0083e6e32b6dc789f9eaba0f8b981429fd346c697f8c")).unwrap();
+        static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).expect("lazy static keypair should be valid");
+        static ref BOB: ChainKeypair = ChainKeypair::from_secret(&hex!("48680484c6fc31bc881a0083e6e32b6dc789f9eaba0f8b981429fd346c697f8c")).expect("lazy static keypair should be valid");
         static ref PRICE_PER_PACKET: U256 = 10000000000000000_u128.into(); // 0.01 HOPR
     }
 
-    fn generate_random_ack_ticket(index: u64, idx_offset: u32, worth_packets: u32) -> AcknowledgedTicket {
+    fn generate_random_ack_ticket(
+        index: u64,
+        idx_offset: u32,
+        worth_packets: u32,
+    ) -> anyhow::Result<AcknowledgedTicket> {
         let hk1 = HalfKey::random();
         let hk2 = HalfKey::random();
 
-        let cp1: CurvePoint = hk1.to_challenge().try_into().unwrap();
-        let cp2: CurvePoint = hk2.to_challenge().try_into().unwrap();
+        let cp1: CurvePoint = hk1.to_challenge().try_into()?;
+        let cp2: CurvePoint = hk2.to_challenge().try_into()?;
         let cp_sum = CurvePoint::combine(&[&cp1, &cp2]);
 
-        TicketBuilder::default()
+        Ok(TicketBuilder::default()
             .addresses(&*BOB, &*ALICE)
-            .amount(PRICE_PER_PACKET.div_f64(1.0f64).unwrap() * worth_packets)
+            .amount(PRICE_PER_PACKET.div_f64(1.0f64)? * worth_packets)
             .index(index)
             .index_offset(idx_offset)
             .win_prob(1.0)
             .channel_epoch(4)
             .challenge(Challenge::from(cp_sum).into())
-            .build_signed(&BOB, &Hash::default())
-            .unwrap()
-            .into_acknowledged(Response::from_half_keys(&hk1, &hk2).unwrap())
+            .build_signed(&BOB, &Hash::default())?
+            .into_acknowledged(Response::from_half_keys(&hk1, &hk2)?))
     }
 
     mock! {
@@ -220,9 +225,9 @@ mod tests {
         }
     }
 
-    fn mock_action_confirmation(ack: AcknowledgedTicket) -> ActionConfirmation {
+    fn mock_action_confirmation(ack: AcknowledgedTicket) -> anyhow::Result<ActionConfirmation> {
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
-        ActionConfirmation {
+        Ok(ActionConfirmation {
             tx_hash: random_hash,
             event: Some(ChainEventType::TicketRedeemed(
                 ChannelEntry::new(
@@ -235,27 +240,27 @@ mod tests {
                 ),
                 Some(ack.clone()),
             )),
-            action: Action::RedeemTicket(ack.into_redeemable(&ALICE, &Hash::default()).unwrap()),
-        }
+            action: Action::RedeemTicket(ack.into_redeemable(&ALICE, &Hash::default())?),
+        })
     }
 
     #[async_std::test]
-    async fn test_auto_redeeming_strategy_redeem() {
-        let db = HoprDb::new_in_memory(ALICE.clone()).await;
+    async fn test_auto_redeeming_strategy_redeem() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ALICE.clone()).await?;
         db.set_domain_separator(None, DomainSeparator::Channel, Default::default())
-            .await
-            .unwrap();
+            .await?;
 
-        let ack_ticket = generate_random_ack_ticket(0, 1, 5);
+        let ack_ticket = generate_random_ack_ticket(0, 1, 5)?;
         let ack_clone = ack_ticket.clone();
         let ack_clone_2 = ack_ticket.clone();
 
         let mut actions = MockTicketRedeemAct::new();
+        let mock_confirm = mock_action_confirmation(ack_clone_2)?;
         actions
             .expect_redeem_ticket()
             .once()
             .withf(move |ack| ack_clone.ticket.eq(&ack.ticket))
-            .return_once(|_| Ok(ok(mock_action_confirmation(ack_clone_2)).boxed()));
+            .return_once(move |_| Ok(ok(mock_confirm).boxed()));
 
         let cfg = AutoRedeemingStrategyConfig {
             redeem_only_aggregated: false,
@@ -263,27 +268,29 @@ mod tests {
         };
 
         let ars = AutoRedeemingStrategy::new(cfg, db, actions);
-        ars.on_acknowledged_winning_ticket(&ack_ticket).await.unwrap();
+        ars.on_acknowledged_winning_ticket(&ack_ticket).await?;
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_auto_redeeming_strategy_redeem_agg_only() {
-        let db = HoprDb::new_in_memory(ALICE.clone()).await;
+    async fn test_auto_redeeming_strategy_redeem_agg_only() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ALICE.clone()).await?;
         db.set_domain_separator(None, DomainSeparator::Channel, Default::default())
-            .await
-            .unwrap();
+            .await?;
 
-        let ack_ticket_unagg = generate_random_ack_ticket(0, 1, 5);
-        let ack_ticket_agg = generate_random_ack_ticket(0, 3, 5);
+        let ack_ticket_unagg = generate_random_ack_ticket(0, 1, 5)?;
+        let ack_ticket_agg = generate_random_ack_ticket(0, 3, 5)?;
 
         let ack_clone_agg = ack_ticket_agg.clone();
         let ack_clone_agg_2 = ack_ticket_agg.clone();
         let mut actions = MockTicketRedeemAct::new();
+        let mock_confirm = mock_action_confirmation(ack_clone_agg_2)?;
         actions
             .expect_redeem_ticket()
             .once()
             .withf(move |ack| ack_clone_agg.ticket.eq(&ack.ticket))
-            .return_once(|_| Ok(ok(mock_action_confirmation(ack_clone_agg_2)).boxed()));
+            .return_once(|_| Ok(ok(mock_confirm).boxed()));
 
         let cfg = AutoRedeemingStrategyConfig {
             redeem_only_aggregated: true,
@@ -294,17 +301,16 @@ mod tests {
         ars.on_acknowledged_winning_ticket(&ack_ticket_unagg)
             .await
             .expect_err("non-agg ticket should not satisfy");
-        ars.on_acknowledged_winning_ticket(&ack_ticket_agg)
-            .await
-            .expect("agg ticket should satisfy");
+        ars.on_acknowledged_winning_ticket(&ack_ticket_agg).await?;
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_auto_redeeming_strategy_should_redeem_singular_ticket_on_close() {
-        let db = HoprDb::new_in_memory(ALICE.clone()).await;
+    async fn test_auto_redeeming_strategy_should_redeem_singular_ticket_on_close() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ALICE.clone()).await?;
         db.set_domain_separator(None, DomainSeparator::Channel, Default::default())
-            .await
-            .unwrap();
+            .await?;
 
         let channel = ChannelEntry::new(
             BOB.public().to_address(),
@@ -316,20 +322,21 @@ mod tests {
         );
 
         // Make ticket worth exactly the threshold
-        let ack_ticket = generate_random_ack_ticket(0, 1, 5);
+        let ack_ticket = generate_random_ack_ticket(0, 1, 5)?;
 
-        db.upsert_channel(None, channel).await.unwrap();
-        db.upsert_ticket(None, ack_ticket.clone()).await.unwrap();
+        db.upsert_channel(None, channel).await?;
+        db.upsert_ticket(None, ack_ticket.clone()).await?;
 
         let ack_clone = ack_ticket.clone();
         let ack_clone_2 = ack_ticket.clone();
 
         let mut actions = MockTicketRedeemAct::new();
+        let mock_confirm = mock_action_confirmation(ack_clone_2)?;
         actions
             .expect_redeem_ticket()
             .once()
             .withf(move |ack| ack_clone.ticket.eq(&ack.ticket))
-            .return_once(|_| Ok(ok(mock_action_confirmation(ack_clone_2)).boxed()));
+            .return_once(move |_| Ok(ok(mock_confirm).boxed()));
 
         let cfg = AutoRedeemingStrategyConfig {
             redeem_only_aggregated: true,
@@ -345,16 +352,17 @@ mod tests {
                 right: channel.status,
             },
         )
-        .await
-        .expect("event should be satisfied");
+        .await?;
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_auto_redeeming_strategy_should_not_redeem_singular_ticket_worth_less_on_close() {
-        let db = HoprDb::new_in_memory(ALICE.clone()).await;
+    async fn test_auto_redeeming_strategy_should_not_redeem_singular_ticket_worth_less_on_close() -> anyhow::Result<()>
+    {
+        let db = HoprDb::new_in_memory(ALICE.clone()).await?;
         db.set_domain_separator(None, DomainSeparator::Channel, Default::default())
-            .await
-            .unwrap();
+            .await?;
 
         let channel = ChannelEntry::new(
             BOB.public().to_address(),
@@ -366,10 +374,10 @@ mod tests {
         );
 
         // Make this ticket worth less than the threshold
-        let ack_ticket = generate_random_ack_ticket(0, 1, 3);
+        let ack_ticket = generate_random_ack_ticket(0, 1, 3)?;
 
-        db.upsert_channel(None, channel).await.unwrap();
-        db.upsert_ticket(None, ack_ticket).await.unwrap();
+        db.upsert_channel(None, channel).await?;
+        db.upsert_ticket(None, ack_ticket).await?;
 
         let mut actions = MockTicketRedeemAct::new();
         actions.expect_redeem_ticket().never();
@@ -390,14 +398,14 @@ mod tests {
         )
         .await
         .expect_err("event should not satisfy criteria");
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_auto_redeeming_strategy_should_not_redeem_non_singular_tickets_on_close() {
-        let db = HoprDb::new_in_memory(ALICE.clone()).await;
+    async fn test_auto_redeeming_strategy_should_not_redeem_non_singular_tickets_on_close() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ALICE.clone()).await?;
         db.set_domain_separator(None, DomainSeparator::Channel, Default::default())
-            .await
-            .unwrap();
+            .await?;
 
         let channel = ChannelEntry::new(
             BOB.public().to_address(),
@@ -408,23 +416,21 @@ mod tests {
             0.into(),
         );
 
-        db.upsert_channel(None, channel).await.unwrap();
+        db.upsert_channel(None, channel).await?;
 
         let db_clone = db.clone();
-        db.begin_transaction_in_db(TargetDb::Tickets)
-            .await
-            .unwrap()
-            .perform(|tx| {
-                Box::pin(async move {
-                    let ack_ticket = generate_random_ack_ticket(1, 1, 5);
-                    db_clone.upsert_ticket(Some(tx), ack_ticket).await?;
+        let ack_ticket_1 = generate_random_ack_ticket(1, 1, 5)?;
+        let ack_ticket_2 = generate_random_ack_ticket(2, 1, 5)?;
 
-                    let ack_ticket = generate_random_ack_ticket(2, 1, 5);
-                    db_clone.upsert_ticket(Some(tx), ack_ticket).await
+        db.begin_transaction_in_db(TargetDb::Tickets)
+            .await?
+            .perform(move |tx| {
+                Box::pin(async move {
+                    db_clone.upsert_ticket(Some(tx), ack_ticket_1).await?;
+                    db_clone.upsert_ticket(Some(tx), ack_ticket_2).await
                 })
             })
-            .await
-            .unwrap();
+            .await?;
 
         let mut actions = MockTicketRedeemAct::new();
         actions.expect_redeem_ticket().never();
@@ -445,5 +451,6 @@ mod tests {
         )
         .await
         .expect_err("event should not satisfy criteria");
+        Ok(())
     }
 }

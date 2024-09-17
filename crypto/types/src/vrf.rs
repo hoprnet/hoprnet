@@ -224,13 +224,13 @@ pub fn derive_vrf_parameters<T: AsRef<[u8]>>(
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
     use crate::types::Hash;
     use hex_literal::hex;
 
     lazy_static::lazy_static! {
-        static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("e17fe86ce6e99f4806715b0c9412f8dad89334bf07f72d5834207a9d8f19d7f8")).unwrap();
+        static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("e17fe86ce6e99f4806715b0c9412f8dad89334bf07f72d5834207a9d8f19d7f8")).expect("lazy static keypair should be valid");
         static ref ALICE_ADDR: Address = ALICE.public().to_address();
 
         static ref TEST_MSG: [u8; 32] = hex!("8248a966b9215e154c8f673cb154da030916be3fb31af3b1220419a1c98eeaed");
@@ -242,10 +242,10 @@ mod test {
     }
 
     #[test]
-    fn vrf_values_serialize_deserialize() {
-        let vrf_values = derive_vrf_parameters(&*TEST_MSG, &*ALICE, Hash::default().as_ref()).unwrap();
+    fn vrf_values_serialize_deserialize() -> anyhow::Result<()> {
+        let vrf_values = derive_vrf_parameters(&*TEST_MSG, &*ALICE, Hash::default().as_ref())?;
 
-        let deserialized = VrfParameters::try_from(ALICE_VRF_OUTPUT.as_ref()).unwrap();
+        let deserialized = VrfParameters::try_from(ALICE_VRF_OUTPUT.as_ref())?;
 
         // check for regressions
         assert_eq!(vrf_values.v, deserialized.v);
@@ -255,8 +255,10 @@ mod test {
 
         // PartialEq is intentionally not implemented for VrfParameters
         let vrf: [u8; VrfParameters::SIZE] = vrf_values.clone().into();
-        let other = VrfParameters::try_from(vrf.as_ref()).unwrap();
+        let other = VrfParameters::try_from(vrf.as_ref())?;
         assert!(vrf_values.s == other.s && vrf_values.v == other.v && vrf_values.h == other.h);
+
+        Ok(())
     }
 
     #[test]
@@ -269,11 +271,13 @@ mod test {
     }
 
     #[test]
-    fn vrf_values_crypto() {
-        let vrf_values = derive_vrf_parameters(&*TEST_MSG, &*ALICE, Hash::default().as_ref()).unwrap();
+    fn vrf_values_crypto() -> anyhow::Result<()> {
+        let vrf_values = derive_vrf_parameters(&*TEST_MSG, &*ALICE, Hash::default().as_ref())?;
 
         assert!(vrf_values
             .verify(&ALICE_ADDR, &*TEST_MSG, Hash::default().as_ref())
             .is_ok());
+
+        Ok(())
     }
 }

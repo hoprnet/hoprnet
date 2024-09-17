@@ -1,5 +1,7 @@
-pub use hopr_transport_protocol::errors::ProtocolError;
 use thiserror::Error;
+
+pub use core_network::errors::NetworkingError;
+pub use hopr_transport_protocol::errors::ProtocolError;
 
 /// Errors produced by the crate.
 #[derive(Error, Debug)]

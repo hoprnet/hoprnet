@@ -339,10 +339,10 @@ mod tests {
         assert_eq!(data, &unpadded.unwrap());
     }
 
-    fn generic_test_meta_packet<S: SphinxSuite>(keypairs: Vec<S::P>) {
+    fn generic_test_meta_packet<S: SphinxSuite>(keypairs: Vec<S::P>) -> anyhow::Result<()> {
         let pubkeys = keypairs.iter().map(|kp| kp.public().clone()).collect::<Vec<_>>();
 
-        let shared_keys = S::new_shared_keys(&pubkeys).unwrap();
+        let shared_keys = S::new_shared_keys(&pubkeys)?;
         let por_strings = ProofOfRelayString::from_shared_secrets(&shared_keys.secrets);
 
         assert_eq!(shared_keys.secrets.len() - 1, por_strings.len());
@@ -381,20 +381,22 @@ mod tests {
                 }
             }
         }
+
+        Ok(())
     }
 
     #[parameterized(amount = { 4, 3, 2 })]
-    fn test_x25519_meta_packet(amount: usize) {
+    fn test_x25519_meta_packet(amount: usize) -> anyhow::Result<()> {
         generic_test_meta_packet::<X25519Suite>((0..amount).map(|_| OffchainKeypair::random()).collect())
     }
 
     #[parameterized(amount = { 4, 3, 2 })]
-    fn test_ed25519_meta_packet(amount: usize) {
-        generic_test_meta_packet::<Ed25519Suite>((0..amount).map(|_| OffchainKeypair::random()).collect());
+    fn test_ed25519_meta_packet(amount: usize) -> anyhow::Result<()> {
+        generic_test_meta_packet::<Ed25519Suite>((0..amount).map(|_| OffchainKeypair::random()).collect())
     }
 
     #[parameterized(amount = { 4, 3, 2 })]
-    fn test_secp256k1_meta_packet(amount: usize) {
+    fn test_secp256k1_meta_packet(amount: usize) -> anyhow::Result<()> {
         generic_test_meta_packet::<Secp256k1Suite>((0..amount).map(|_| ChainKeypair::random()).collect())
     }
 }

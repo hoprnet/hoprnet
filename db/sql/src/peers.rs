@@ -329,12 +329,12 @@ mod tests {
     use std::time::{Duration, SystemTime};
 
     #[async_std::test]
-    async fn test_add_get() {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
+    async fn test_add_get() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
         let peer_id: PeerId = OffchainKeypair::random().public().into();
-        let ma_1: Multiaddr = format!("/ip4/127.0.0.1/tcp/10000/p2p/{peer_id}").parse().unwrap();
-        let ma_2: Multiaddr = format!("/ip4/127.0.0.1/tcp/10002/p2p/{peer_id}").parse().unwrap();
+        let ma_1: Multiaddr = format!("/ip4/127.0.0.1/tcp/10000/p2p/{peer_id}").parse()?;
+        let ma_2: Multiaddr = format!("/ip4/127.0.0.1/tcp/10002/p2p/{peer_id}").parse()?;
 
         db.add_network_peer(
             &peer_id,
@@ -343,14 +343,9 @@ mod tests {
             0.0,
             25,
         )
-        .await
-        .expect("should add peer");
+        .await?;
 
-        let peer_from_db = db
-            .get_network_peer(&peer_id)
-            .await
-            .expect("should be able to get a peer")
-            .expect("peer must exist in the db");
+        let peer_from_db = db.get_network_peer(&peer_id).await?.expect("peer must exist in the db");
 
         let mut expected_peer = PeerStatus::new(peer_id, PeerOrigin::IncomingConnection, 0.0, 25);
         expected_peer.last_seen = SystemTime::UNIX_EPOCH;
@@ -358,76 +353,76 @@ mod tests {
         expected_peer.multiaddresses = vec![ma_1, ma_2];
 
         assert_eq!(expected_peer, peer_from_db, "peer states must match");
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_should_remove_peer() {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
+    async fn test_should_remove_peer() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
         let peer_id: PeerId = OffchainKeypair::random().public().into();
-        let ma_1: Multiaddr = format!("/ip4/127.0.0.1/tcp/10000/p2p/{peer_id}").parse().unwrap();
+        let ma_1: Multiaddr = format!("/ip4/127.0.0.1/tcp/10000/p2p/{peer_id}").parse()?;
 
         db.add_network_peer(&peer_id, PeerOrigin::IncomingConnection, vec![ma_1.clone()], 0.0, 25)
-            .await
-            .expect("should add peer");
-        assert!(
-            db.get_network_peer(&peer_id).await.expect("should get peer").is_some(),
-            "must have peer entry"
-        );
+            .await?;
+        assert!(db.get_network_peer(&peer_id).await?.is_some(), "must have peer entry");
 
-        db.remove_network_peer(&peer_id).await.expect("must remove peer");
+        db.remove_network_peer(&peer_id).await?;
         assert!(
-            db.get_network_peer(&peer_id).await.expect("should get peer").is_none(),
+            db.get_network_peer(&peer_id).await?.is_none(),
             "peer entry must be gone"
         );
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_should_not_remove_non_existing_peer() {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
+    async fn test_should_not_remove_non_existing_peer() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
         let peer_id: PeerId = OffchainKeypair::random().public().into();
 
         db.remove_network_peer(&peer_id)
             .await
             .expect_err("must not delete non-existent peer");
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_should_not_add_duplicate_peers() {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
+    async fn test_should_not_add_duplicate_peers() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
         let peer_id: PeerId = OffchainKeypair::random().public().into();
-        let ma_1: Multiaddr = format!("/ip4/127.0.0.1/tcp/10000/p2p/{peer_id}").parse().unwrap();
+        let ma_1: Multiaddr = format!("/ip4/127.0.0.1/tcp/10000/p2p/{peer_id}").parse()?;
 
         db.add_network_peer(&peer_id, PeerOrigin::IncomingConnection, vec![ma_1.clone()], 0.0, 25)
-            .await
-            .expect("should add peer");
+            .await?;
         db.add_network_peer(&peer_id, PeerOrigin::IncomingConnection, vec![], 0.0, 25)
             .await
             .expect_err("should fail adding second time");
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_should_return_none_on_non_existing_peer() {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
+    async fn test_should_return_none_on_non_existing_peer() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
         let peer_id: PeerId = OffchainKeypair::random().public().into();
 
-        assert!(
-            db.get_network_peer(&peer_id).await.expect("should succeed").is_none(),
-            "should return none"
-        );
+        assert!(db.get_network_peer(&peer_id).await?.is_none(), "should return none");
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_update() {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
+    async fn test_update() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
         let peer_id: PeerId = OffchainKeypair::random().public().into();
 
-        let ma_1: Multiaddr = format!("/ip4/127.0.0.1/tcp/10000/p2p/{peer_id}").parse().unwrap();
-        let ma_2: Multiaddr = format!("/ip4/127.0.0.1/tcp/10002/p2p/{peer_id}").parse().unwrap();
+        let ma_1: Multiaddr = format!("/ip4/127.0.0.1/tcp/10000/p2p/{peer_id}").parse()?;
+        let ma_2: Multiaddr = format!("/ip4/127.0.0.1/tcp/10002/p2p/{peer_id}").parse()?;
 
         db.add_network_peer(
             &peer_id,
@@ -436,8 +431,7 @@ mod tests {
             0.0,
             25,
         )
-        .await
-        .expect("should add peer");
+        .await?;
 
         let mut peer_status = PeerStatus::new(peer_id, PeerOrigin::IncomingConnection, 0.2, 25);
         peer_status.last_seen = SystemTime::UNIX_EPOCH;
@@ -450,30 +444,22 @@ mod tests {
             peer_status.update_quality(i);
         }
 
-        let peer_status_from_db = db
-            .get_network_peer(&peer_id)
-            .await
-            .expect("get should succeed")
-            .expect("entry should exist");
+        let peer_status_from_db = db.get_network_peer(&peer_id).await?.expect("entry should exist");
 
         assert_ne!(peer_status, peer_status_from_db, "entries must not be equal");
 
-        db.update_network_peer(peer_status.clone())
-            .await
-            .expect("update should succeed");
+        db.update_network_peer(peer_status.clone()).await?;
 
-        let peer_status_from_db = db
-            .get_network_peer(&peer_id)
-            .await
-            .expect("get should succeed")
-            .expect("entry should exist");
+        let peer_status_from_db = db.get_network_peer(&peer_id).await?.expect("entry should exist");
 
         assert_eq!(peer_status, peer_status_from_db, "entries must be equal");
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_should_fail_to_update_non_existing_peer() {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
+    async fn test_should_fail_to_update_non_existing_peer() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
         let peer_id: PeerId = OffchainKeypair::random().public().into();
 
@@ -491,11 +477,12 @@ mod tests {
         db.update_network_peer(peer_status)
             .await
             .expect_err("should fail updating non-existing peer");
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_get_multiple_should_return_all_peers() {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
+    async fn test_get_multiple_should_return_all_peers() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
         let peers = (0..10)
             .map(|_| {
@@ -506,25 +493,25 @@ mod tests {
 
         for peer in &peers {
             db.add_network_peer(peer, PeerOrigin::Initialization, vec![], 0.0, 25)
-                .await
-                .expect("should not fail adding peers");
+                .await?;
         }
 
         let peers_from_db: Vec<PeerId> = db
             .get_network_peers(Default::default(), false)
-            .await
-            .expect("should get stream")
+            .await?
             .map(|s| s.id.1)
             .collect()
             .await;
 
         assert_eq!(peers.len(), peers_from_db.len(), "lengths must match");
         assert_eq!(peers, peers_from_db, "peer ids must match");
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_get_multiple_should_return_filtered_peers() {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
+    async fn test_get_multiple_should_return_filtered_peers() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
         let peer_count = 10;
         let peers = (0..peer_count)
@@ -536,8 +523,7 @@ mod tests {
 
         for (i, peer) in peers.iter().enumerate() {
             db.add_network_peer(peer, PeerOrigin::Initialization, vec![], 0.2, 25)
-                .await
-                .expect("should not fail adding peers");
+                .await?;
             if i >= peer_count / 2 {
                 let mut peer_status = PeerStatus::new(*peer, PeerOrigin::IncomingConnection, 0.2, 25);
                 peer_status.last_seen = SystemTime::UNIX_EPOCH.add(Duration::from_secs(i as u64));
@@ -552,16 +538,13 @@ mod tests {
                     peer_status.update_quality(i);
                 }
 
-                db.update_network_peer(peer_status)
-                    .await
-                    .expect("must update peer status");
+                db.update_network_peer(peer_status).await?;
             }
         }
 
         let peers_from_db: Vec<PeerId> = db
             .get_network_peers(PeerSelector::default().with_quality_gte(0.501_f64), false)
-            .await
-            .expect("should get stream")
+            .await?
             .map(|s| s.id.1)
             .collect()
             .await;
@@ -572,23 +555,24 @@ mod tests {
             peers_from_db,
             "peer ids must match"
         );
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_should_update_stats_when_updating_peers() {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
+    async fn test_should_update_stats_when_updating_peers() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
         let peer_id_1: PeerId = OffchainKeypair::random().public().into();
         let peer_id_2: PeerId = OffchainKeypair::random().public().into();
 
-        let ma_1: Multiaddr = format!("/ip4/127.0.0.1/tcp/10000/p2p/{peer_id_1}").parse().unwrap();
-        let ma_2: Multiaddr = format!("/ip4/127.0.0.1/tcp/10002/p2p/{peer_id_2}").parse().unwrap();
+        let ma_1: Multiaddr = format!("/ip4/127.0.0.1/tcp/10000/p2p/{peer_id_1}").parse()?;
+        let ma_2: Multiaddr = format!("/ip4/127.0.0.1/tcp/10002/p2p/{peer_id_2}").parse()?;
 
         db.add_network_peer(&peer_id_1, PeerOrigin::IncomingConnection, vec![ma_1], 0.0, 25)
-            .await
-            .expect("should add peer");
+            .await?;
 
-        let stats = db.network_peer_stats(0.2).await.expect("must get stats");
+        let stats = db.network_peer_stats(0.2).await?;
         assert_eq!(
             Stats {
                 good_quality_public: 0,
@@ -601,10 +585,9 @@ mod tests {
         );
 
         db.add_network_peer(&peer_id_2, PeerOrigin::IncomingConnection, vec![ma_2], 0.0, 25)
-            .await
-            .expect("should add peer");
+            .await?;
 
-        let stats = db.network_peer_stats(0.2).await.expect("must get stats");
+        let stats = db.network_peer_stats(0.2).await?;
         assert_eq!(
             Stats {
                 good_quality_public: 0,
@@ -629,11 +612,9 @@ mod tests {
             peer_status.update_quality(i);
         }
 
-        db.update_network_peer(peer_status)
-            .await
-            .expect("must be able to update peer");
+        db.update_network_peer(peer_status).await?;
 
-        let stats = db.network_peer_stats(0.2).await.expect("must get stats");
+        let stats = db.network_peer_stats(0.2).await?;
         assert_eq!(
             Stats {
                 good_quality_public: 1,
@@ -656,11 +637,9 @@ mod tests {
         peer_status.ignored = None;
         peer_status.peer_version = Some("1.2.3".into());
 
-        db.update_network_peer(peer_status)
-            .await
-            .expect("must be able to update peer");
+        db.update_network_peer(peer_status).await?;
 
-        let stats = db.network_peer_stats(0.2).await.expect("must get stats");
+        let stats = db.network_peer_stats(0.2).await?;
         assert_eq!(
             Stats {
                 good_quality_public: 1,
@@ -672,9 +651,9 @@ mod tests {
             "stats must be equal"
         );
 
-        db.remove_network_peer(&peer_id_1).await.expect("should remove peer");
+        db.remove_network_peer(&peer_id_1).await?;
 
-        let stats = db.network_peer_stats(0.2).await.expect("must get stats");
+        let stats = db.network_peer_stats(0.2).await?;
         assert_eq!(
             Stats {
                 good_quality_public: 0,
@@ -685,5 +664,7 @@ mod tests {
             stats,
             "stats must be equal"
         );
+
+        Ok(())
     }
 }

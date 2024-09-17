@@ -120,26 +120,27 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn test_async_read_streamer_complete_more_chunks_with_incomplete() {
+    async fn test_async_read_streamer_complete_more_chunks_with_incomplete() -> anyhow::Result<()> {
         let data = b"Hello, World and do it twice, ...";
         let streamer = AsyncReadStreamer::<_, 14>::new(&data[..]);
 
-        let results = streamer.try_collect::<Vec<_>>().await.expect("should get chunks");
+        let results = streamer.try_collect::<Vec<_>>().await?;
 
         let (data1, rest) = data.split_at(14);
         let (data2, data3) = rest.split_at(14);
         assert_eq!(results, vec![Box::from(data1), Box::from(data2), Box::from(data3)]);
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_async_read_streamer_incomplete_chunk() {
+    async fn test_async_read_streamer_incomplete_chunk() -> anyhow::Result<()> {
         let data = b"Hello, World!!";
         let reader = &data[0..8]; // An incomplete chunk
         let mut streamer = AsyncReadStreamer::<_, 14>::new(reader);
 
-        assert_eq!(
-            Some(Box::from(reader)),
-            streamer.try_next().await.expect("should get chunk")
-        );
+        assert_eq!(Some(Box::from(reader)), streamer.try_next().await?);
+
+        Ok(())
     }
 }
