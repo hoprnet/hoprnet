@@ -21,6 +21,16 @@ use crate::{HoprDbGeneralModelOperations, OptTx};
 
 use hopr_parallelize::cpu::spawn_fifo_blocking;
 
+#[cfg(all(feature = "prometheus", not(test)))]
+lazy_static::lazy_static! {
+    static ref METRIC_INCOMING_WIN_PROB: hopr_metrics::SimpleHistogram =
+        hopr_metrics::SimpleHistogram::new(
+            "hopr_tickets_incoming_win_probability",
+            "Observes the winning probabilities on incoming tickets",
+            vec![0.0, 0.0001, 0.001, 0.01, 0.05, 0.1, 0.15, 0.25, 0.3, 0.5],
+        ).unwrap();
+}
+
 #[async_trait]
 impl HoprDbProtocolOperations for HoprDb {
     #[instrument(level = "trace", skip(self, ack, me), ret)]
@@ -314,6 +324,9 @@ impl HoprDbProtocolOperations for HoprDb {
                             let ticket_price = chain_data
                                 .ticket_price
                                 .ok_or_else(|| DbSqlError::LogicalError("failed to fetch the ticket price".into()))?;
+
+                            #[cfg(all(feature = "prometheus", not(test)))]
+                            METRIC_INCOMING_WIN_PROB.observe(ticket.win_prob());
 
                             // Here also the signature on the ticket gets validated,
                             // so afterward we are sure the source of the `channel`

@@ -51,7 +51,7 @@ impl Acknowledgement {
 
     /// Generates random, but still a valid acknowledgement.
     pub fn random(offchain_keypair: &OffchainKeypair) -> Self {
-        Self::new(HalfKey::random(), &offchain_keypair)
+        Self::new(HalfKey::random(), offchain_keypair)
     }
 
     /// Validates the acknowledgement.

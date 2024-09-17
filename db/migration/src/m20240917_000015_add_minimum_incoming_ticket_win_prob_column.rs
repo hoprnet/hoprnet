@@ -15,7 +15,7 @@ impl MigrationTrait for Migration {
                         ColumnDef::new(ChainInfo::MinIncomingTicketWinProb)
                             .float()
                             .not_null()
-                            .default(hopr_internal_types::protocol::DEFAULT_OUTGOING_TICKET_WIN_PROB),
+                            .default(hopr_internal_types::protocol::DEFAULT_MINIMUM_INCOMING_TICKET_WIN_PROB),
                     )
                     .to_owned(),
             )
