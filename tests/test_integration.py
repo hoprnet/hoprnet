@@ -666,7 +666,7 @@ async def test_hoprd_should_be_able_to_open_and_close_channel_without_tickets(
         assert True
 
 
-# generate 1-hop route with a node using strategies in the middle
+# generate a 1-hop route with a node using strategies in the middle
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "route",
@@ -805,7 +805,7 @@ async def test_hoprd_check_ticket_winn_prob_is_default(peer, swarm7: dict[str, N
 async def test_send_message_with_reserved_application_tag_should_fail(tag: int, swarm7: dict[str, Node]):
     src, dest = random_distinct_pairs_from(barebone_nodes(), count=1)[0]
 
-    await swarm7[src].api.send_message(
+    assert await swarm7[src].api.send_message(
         swarm7[dest].peer_id, "This message should fail due to reserved tag", [], tag
     ) is None
 
@@ -815,9 +815,9 @@ async def test_send_message_with_reserved_application_tag_should_fail(tag: int, 
 async def test_inbox_operations_with_reserved_application_tag_should_fail(tag: int, swarm7: dict[str, Node]):
     id = random.choice(barebone_nodes())
 
-    await swarm7[id].api.messages_pop(tag) is None
-    await swarm7[id].api.messages_peek(tag) is None
-    await swarm7[id].api.messages_peek(tag) is None
+    assert await swarm7[id].api.messages_pop(tag) is None
+    assert await swarm7[id].api.messages_peek(tag) is None
+    assert await swarm7[id].api.messages_peek(tag) is None
 
 
 @pytest.mark.asyncio
@@ -986,7 +986,7 @@ async def test_session_communication_with_a_tcp_echo_server(
 
     assert ''.join(expected) == actual
 
-    await src_peer.api.session_close_client(protocol='tcp', bound_ip='127.0.0.1', bound_port=src_sock_port) is True
+    assert await src_peer.api.session_close_client(protocol='tcp', bound_ip='127.0.0.1', bound_port=src_sock_port) is True
     assert len(await src_peer.api.session_list_clients('tcp')) == 0
 
 
@@ -1036,6 +1036,6 @@ async def test_session_communication_with_a_udp_echo_server(
     expected.sort()
     assert actual == expected
 
-    await src_peer.api.session_close_client(protocol='udp', bound_ip='127.0.0.1', bound_port=src_sock_port) is True
+    assert await src_peer.api.session_close_client(protocol='udp', bound_ip='127.0.0.1', bound_port=src_sock_port) is True
     assert len(await src_peer.api.session_list_clients('udp')) == 0
 
