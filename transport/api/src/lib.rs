@@ -745,6 +745,7 @@ where
         for (k, v) in hopr_transport_protocol::run_msg_ack_protocol(
             packet_cfg,
             self.db.clone(),
+            me,
             me_onchain,
             Some(tbf_path),
             on_acknowledged_ticket,

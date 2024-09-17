@@ -42,9 +42,14 @@ impl Acknowledgement {
         }
     }
 
+    /// Generates random, but still a valid acknowledgement.
+    pub fn random(offchain_keypair: &OffchainKeypair) -> Self {
+        Self::new(HalfKey::random(), &offchain_keypair)
+    }
+
     /// Validates the acknowledgement.
     ///
-    /// Must be called immediately after deserialization or otherwise
+    /// Must be called immediately after deserialization, or otherwise
     /// any operations with the deserialized acknowledgement will panic.
     #[tracing::instrument(level = "debug", skip(self, sender_node_key))]
     pub fn validate(&mut self, sender_node_key: &OffchainPublicKey) -> bool {
