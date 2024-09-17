@@ -231,7 +231,8 @@ where
                         }
                     }
 
-                    yield result.map_err(|_| crate::errors::NetworkingError::PingerError(peer, "n/a".into()));
+                    // TODO: we can make the error more specific if we allow to propagate the transport error upwards
+                    yield result.map_err(|_| crate::errors::NetworkingError::PingerError(peer, "ping error".into()));
 
                     if active_pings.is_empty() && waiting.is_empty() {
                         break;
@@ -341,7 +342,7 @@ mod tests {
 
         let pinger = Pinger::new(simple_ping_config(), tx, mock);
 
-        assert!(pinger.ping(vec![]).try_collect::<Vec<_>>().await.is_err());
+        assert!(pinger.ping(vec![]).try_collect::<Vec<_>>().await?.is_empty());
 
         ideal_channel.cancel().await;
 
@@ -410,7 +411,7 @@ mod tests {
             .return_const(());
 
         let pinger = Pinger::new(simple_ping_config(), tx, mock);
-        pinger.ping(vec![peer]).try_collect::<Vec<_>>().await?;
+        assert!(pinger.ping(vec![peer]).try_collect::<Vec<_>>().await.is_err());
 
         failing_channel.cancel().await;
 
@@ -418,7 +419,7 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn test_ping_peer_times_out_on_the_pong() -> anyhow::Result<()> {
+    async fn test_ping_peer_returns_error_on_the_pong() -> anyhow::Result<()> {
         let (tx, mut rx) = futures::channel::mpsc::unbounded::<(PeerId, PingQueryReplier)>();
 
         let delay = std::time::Duration::from_millis(10);
@@ -451,7 +452,7 @@ mod tests {
             .return_const(());
 
         let pinger = Pinger::new(ping_config, tx, mock);
-        pinger.ping(vec![peer]).try_collect::<Vec<_>>().await?;
+        assert!(pinger.ping(vec![peer]).try_collect::<Vec<_>>().await.is_err());
 
         delaying_channel.cancel().await;
 
