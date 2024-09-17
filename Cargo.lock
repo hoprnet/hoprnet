@@ -3996,6 +3996,7 @@ name = "hopr-db-migration"
 version = "0.1.0"
 dependencies = [
  "async-std",
+ "hopr-internal-types",
  "hopr-primitive-types",
  "sea-orm-migration",
 ]

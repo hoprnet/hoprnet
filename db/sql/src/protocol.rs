@@ -142,6 +142,7 @@ impl HoprDbProtocolOperations for HoprDb {
         data: Box<[u8]>,
         me: ChainKeypair,
         path: Vec<OffchainPublicKey>,
+        outgoing_ticket_win_prob: f64,
     ) -> Result<TransportPacketWithChainData> {
         let myself = self.clone();
         let next_peer = myself.resolve_chain_key(&path[0]).await?.ok_or_else(|| {
@@ -166,7 +167,13 @@ impl HoprDbProtocolOperations for HoprDb {
                             TicketBuilder::zero_hop().direction(&myself.me_onchain, &next_peer)
                         } else {
                             myself
-                                .create_multihop_ticket(Some(tx), me.public().to_address(), next_peer, path.len() as u8)
+                                .create_multihop_ticket(
+                                    Some(tx),
+                                    me.public().to_address(),
+                                    next_peer,
+                                    path.len() as u8,
+                                    outgoing_ticket_win_prob,
+                                )
                                 .await?
                         };
 
@@ -225,6 +232,7 @@ impl HoprDbProtocolOperations for HoprDb {
         me: ChainKeypair,
         pkt_keypair: &OffchainKeypair,
         sender: OffchainPublicKey,
+        outgoing_ticket_win_prob: f64,
     ) -> Result<TransportPacketWithChainData> {
         let offchain_keypair = pkt_keypair.clone();
 
@@ -316,7 +324,7 @@ impl HoprDbProtocolOperations for HoprDb {
                                     ticket,
                                     &channel,
                                     ticket_price,
-                                    TICKET_WIN_PROB,
+                                    chain_data.minimum_incoming_ticket_winning_prob,
                                     remaining_balance,
                                     &domain_separator,
                                 )
@@ -348,8 +356,17 @@ impl HoprDbProtocolOperations for HoprDb {
                             let ticket_builder = if ticket_path_pos == 1 {
                                 TicketBuilder::zero_hop().direction(&myself.me_onchain, &next_hop_addr)
                             } else {
+                                // We currently take maximum of the win prob on the ticket
+                                // and the one configured on this node.
+                                // Therefore, the winning probability can only increase on the path.
                                 myself
-                                    .create_multihop_ticket(Some(tx), myself.me_onchain, next_hop_addr, ticket_path_pos)
+                                    .create_multihop_ticket(
+                                        Some(tx),
+                                        myself.me_onchain,
+                                        next_hop_addr,
+                                        ticket_path_pos,
+                                        outgoing_ticket_win_prob.max(ticket.win_prob()),
+                                    )
                                     .await?
                             };
 
@@ -421,6 +438,7 @@ impl HoprDb {
         me_onchain: Address,
         destination: Address,
         path_pos: u8,
+        winning_prob: f64,
     ) -> crate::errors::Result<TicketBuilder> {
         let myself = self.clone();
         let (channel, ticket_price): (ChannelEntry, U256) = self
@@ -453,7 +471,7 @@ impl HoprDb {
             )))?;
 
         let amount = Balance::new(
-            ticket_price.div_f64(TICKET_WIN_PROB).map_err(|e| {
+            ticket_price.div_f64(winning_prob).map_err(|e| {
                 DbSqlError::LogicalError(format!(
                     "winning probability outside of the allowed interval (0.0, 1.0]: {e}"
                 ))
@@ -474,7 +492,7 @@ impl HoprDb {
             .balance(amount)
             .index(self.increment_outgoing_ticket_index(channel.get_id()).await?)
             .index_offset(1) // unaggregated always have index_offset == 1
-            .win_prob(TICKET_WIN_PROB)
+            .win_prob(winning_prob)
             .channel_epoch(channel.channel_epoch.as_u32());
 
         Ok(ticket_builder)
