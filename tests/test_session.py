@@ -1,3 +1,5 @@
+import logging
+
 import asyncio
 import multiprocessing
 import os
@@ -20,38 +22,59 @@ STANDARD_MTU_SIZE = 1500
 # used by nodes to get unique port assignments
 PORT_BASE = 19000
 
-def tcp_echo_server_func(port: int):
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(("127.0.0.1", port))
-        s.listen()
-        conn, _addr = s.accept()
-        with conn:
-            while True:
-                data = conn.recv(HOPR_SESSION_MAX_PAYLOAD_SIZE)
-                conn.sendall(data)
-
-
-def udp_echo_server_func(port: int):
-    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-        s.bind(("127.0.0.1", port))
-
-        while True:
-            data, addr = s.recvfrom(HOPR_SESSION_MAX_PAYLOAD_SIZE)
-            s.sendto(data, addr)
-
-
-@contextmanager
-def run_server(server_func: Callable[..., object], port: int):
-    process = multiprocessing.Process(target=server_func, args=(port,))
-    process.start()
-    try:
-        yield port
-    finally:
-        process.terminate()
-
 class SocketType(Enum):
     TCP = 1
     UDP = 2
+
+class EchoServer:
+    def __init__(self, server_type: SocketType, recv_buf_len: int):
+        self.server_type = server_type
+        self.port = None
+        self.process = None
+        self.socket = None
+        self.recv_buf_len = recv_buf_len
+
+    def __enter__(self):
+        if self.server_type is SocketType.TCP:
+            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        else:
+            self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+        self.socket.bind(("127.0.0.1", 0))
+        self.port = self.socket.getsockname()[1]
+
+        if self.server_type is SocketType.TCP:
+            self.socket.listen()
+            self.process = multiprocessing.Process(target=tcp_echo_server_func, args=(self.socket,self.recv_buf_len))
+        else:
+            self.process = multiprocessing.Process(target=udp_echo_server_func, args=(self.socket,self.recv_buf_len))
+        self.process.start()
+
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.process.terminate()
+        self.socket.close()
+        self.socket = None
+        self.process = None
+        self.port = None
+        return True
+
+def tcp_echo_server_func(s,buf_len):
+        conn, _addr = s.accept()
+        with conn:
+            while True:
+                data = conn.recv(buf_len)
+                conn.sendall(data)
+                #logging.info(f"tcp server relayed {len(data)}")
+
+
+def udp_echo_server_func(s,buf_len):
+        while True:
+            data, addr = s.recvfrom(buf_len)
+            s.sendto(data, addr)
+            #logging.info(f"udp server relayed {len(data)}")
+
 
 @contextmanager
 def connect_socket(sock_type: SocketType, port):
@@ -82,18 +105,19 @@ async def test_session_communication_with_a_tcp_echo_server(
     src_peer = swarm7[src]
     dest_peer = swarm7[dest]
 
-    src_sock_port = await src_peer.api.session_client(dest_peer.peer_id, path={"Hops": 0}, protocol='tcp',
-                                                      target=f"localhost:{ECHO_SERVER_PORT}")
-
-    assert src_sock_port is not None, "Failed to open session"
-    assert len(await src_peer.api.session_list_clients('tcp')) == 1
-
     actual = ''
-
-    with run_server(tcp_echo_server_func, ECHO_SERVER_PORT):
+    with EchoServer(SocketType.TCP, STANDARD_MTU_SIZE) as server:
         # socket.listen does not listen immediately and needs some time to be working
         # otherwise a `ConnectionRefusedError: [Errno 61] Connection refused` will be encountered
         await asyncio.sleep(1.0)
+
+        dst_sock_port = server.port
+        src_sock_port = await src_peer.api.session_client(dest_peer.peer_id, path={"Hops": 0}, protocol='tcp',
+                                                          target=f"localhost:{dst_sock_port}")
+
+        assert src_sock_port is not None, "Failed to open session"
+        assert len(await src_peer.api.session_list_clients('tcp')) == 1
+        #logging.info(f"session to {dst_sock_port} opened successfully")
 
         with connect_socket(SocketType.TCP, src_sock_port) as s:
             s.settimeout(20)
@@ -144,20 +168,20 @@ async def test_session_communication_over_n_hop_with_a_tcp_echo_server(
         ]
 
         await asyncio.gather(*(channels_to + channels_back))
-        await asyncio.sleep(2) # wait until the channels are opened
-
-        src_sock_port = await src_peer.api.session_client(dest_peer.peer_id, path={"IntermediatePath": path}, protocol='tcp',
-                                                          target=f"localhost:{ECHO_SERVER_PORT}")
-
-        assert src_sock_port is not None, "Failed to open session"
-        assert len(await src_peer.api.session_list_clients('tcp')) == 1
 
         actual = ''
-
-        with run_server(tcp_echo_server_func, ECHO_SERVER_PORT):
+        with EchoServer(SocketType.TCP, STANDARD_MTU_SIZE) as server:
             # socket.listen does not listen immediately and needs some time to be working
             # otherwise a `ConnectionRefusedError: [Errno 61] Connection refused` will be encountered
             await asyncio.sleep(1.0)
+
+            dst_sock_port = server.port
+            src_sock_port = await src_peer.api.session_client(dest_peer.peer_id, path={"IntermediatePath": path}, protocol='tcp',
+                                                              target=f"localhost:{dst_sock_port}")
+
+            assert src_sock_port is not None, "Failed to open session"
+            assert len(await src_peer.api.session_list_clients('tcp')) == 1
+            #logging.info(f"session to {dst_sock_port} opened successfully")
 
             with connect_socket(SocketType.TCP, src_sock_port) as s:
                 s.settimeout(20)
@@ -192,16 +216,17 @@ async def test_session_communication_with_a_udp_echo_server(
     src_peer = swarm7[src]
     dest_peer = swarm7[dest]
 
-    src_sock_port = await src_peer.api.session_client(dest_peer.peer_id, path={"Hops": 0}, protocol='udp',
-                                                      target=f"localhost:{ECHO_SERVER_PORT}")
-
-    assert src_sock_port is not None, "Failed to open session"
-    assert len(await src_peer.api.session_list_clients('udp')) == 1
-
     actual = []
-
-    with run_server(udp_echo_server_func, ECHO_SERVER_PORT):
+    with EchoServer(SocketType.UDP, HOPR_SESSION_MAX_PAYLOAD_SIZE) as server:
         await asyncio.sleep(1.0)
+
+        dst_sock_port = server.port
+        src_sock_port = await src_peer.api.session_client(dest_peer.peer_id, path={"Hops": 0}, protocol='udp',
+                                                          target=f"localhost:{dst_sock_port}")
+
+        assert src_sock_port is not None, "Failed to open session"
+        assert len(await src_peer.api.session_list_clients('udp')) == 1
+        #logging.info(f"session to {dst_sock_port} opened successfully")
 
         addr = ('127.0.0.1', src_sock_port)
         with connect_socket(SocketType.UDP, None) as s:
@@ -256,18 +281,18 @@ async def test_session_communication_over_n_hop_with_a_udp_echo_server(
         ]
 
         await asyncio.gather(*(channels_to + channels_back))
-        await asyncio.sleep(2) # wait until the channels are opened
-
-        src_sock_port = await src_peer.api.session_client(dest_peer.peer_id, path={"IntermediatePath": path}, protocol='udp',
-                                                          target=f"localhost:{ECHO_SERVER_PORT}")
-
-        assert src_sock_port is not None, "Failed to open session"
-        assert len(await src_peer.api.session_list_clients('udp')) == 1
 
         actual = []
-
-        with run_server(udp_echo_server_func, ECHO_SERVER_PORT):
+        with EchoServer(SocketType.UDP, HOPR_SESSION_MAX_PAYLOAD_SIZE) as server:
             await asyncio.sleep(1.0)
+
+            dst_sock_port = server.port
+            src_sock_port = await src_peer.api.session_client(dest_peer.peer_id, path={"IntermediatePath": path}, protocol='udp',
+                                                              target=f"localhost:{dst_sock_port}")
+
+            assert src_sock_port is not None, "Failed to open session"
+            assert len(await src_peer.api.session_list_clients('udp')) == 1
+            #logging.info(f"session to {dst_sock_port} opened successfully")
 
             addr = ('127.0.0.1', src_sock_port)
             with connect_socket(SocketType.UDP, None) as s:
