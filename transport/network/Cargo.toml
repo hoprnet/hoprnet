@@ -17,6 +17,7 @@ runtime-tokio = ["hopr-async-runtime/runtime-tokio"]
 
 [dependencies]
 async-trait = { workspace = true }
+async-stream = { workspace = true }
 futures = { workspace = true }
 lazy_static = { workspace = true }
 libp2p-identity = { workspace = true }

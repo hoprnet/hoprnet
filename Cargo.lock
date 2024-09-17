@@ -1556,6 +1556,7 @@ version = "0.6.1"
 dependencies = [
  "anyhow",
  "async-std",
+ "async-stream",
  "async-trait",
  "futures",
  "hopr-async-runtime",
