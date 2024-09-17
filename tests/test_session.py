@@ -1,5 +1,3 @@
-import logging
-
 import asyncio
 import multiprocessing
 import os
@@ -8,7 +6,6 @@ import socket
 
 from enum import Enum
 from contextlib import contextmanager, AsyncExitStack
-from typing import Callable
 
 from .conftest import random_distinct_pairs_from, barebone_nodes, TICKET_PRICE_PER_HOP
 from .node import Node

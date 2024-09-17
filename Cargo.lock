@@ -4448,6 +4448,7 @@ dependencies = [
  "smart-default",
  "strum 0.26.3",
  "tokio",
+ "tokio-retry",
  "tokio-stream",
  "tokio-util",
  "tower",

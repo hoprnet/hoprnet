@@ -178,6 +178,9 @@ pub(crate) async fn create_client(
         )
     })?;
 
+    // TODO: make this retry strategy configurable
+    let session_init_retry_strategy = tokio_retry::strategy::ExponentialBackoff::from_millis(2000).take(5);
+
     // TODO: consider pooling the sessions on a listener, so that the negotiation is amortized
 
     debug!("binding {protocol} session listening socket to {bind_host}");
@@ -202,11 +205,21 @@ pub(crate) async fn create_client(
                     .for_each_concurrent(None, move |accepted_client| {
                         let data = data.clone();
                         let hopr = hopr.clone();
+                        let session_init_retry_strategy = session_init_retry_strategy.clone();
                         async move {
                             match accepted_client {
                                 Ok((sock_addr, stream)) => {
                                     debug!("incoming TCP connection {sock_addr}");
-                                    let session = match hopr.connect_to(data).await {
+                                    let session_init =
+                                        tokio_retry::Retry::spawn(session_init_retry_strategy, move || {
+                                            let hopr = hopr.clone();
+                                            let data = data.clone();
+                                            async move {
+                                                debug!("trying tcp session establishment");
+                                                hopr.connect_to(data).await
+                                            }
+                                        });
+                                    let session = match session_init.await {
                                         Ok(s) => s,
                                         Err(e) => {
                                             error!("failed to establish session: {e}");
@@ -241,7 +254,16 @@ pub(crate) async fn create_client(
             bound_host
         }
         IpProtocol::UDP => {
-            let session = state.hopr.clone().connect_to(data).await.map_err(|e| {
+            let hopr = state.hopr.clone();
+            let session_init = tokio_retry::Retry::spawn(session_init_retry_strategy.clone(), move || {
+                let hopr = hopr.clone();
+                let data = data.clone();
+                async move {
+                    debug!("trying udp session establishment");
+                    hopr.connect_to(data).await
+                }
+            });
+            let session = session_init.await.map_err(|e| {
                 (
                     StatusCode::UNPROCESSABLE_ENTITY,
                     ApiErrorStatus::UnknownFailure(e.to_string()),
