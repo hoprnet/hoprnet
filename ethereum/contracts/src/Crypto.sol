@@ -232,7 +232,7 @@ abstract contract HoprCrypto {
             // P == Q ?
             case true {
                 // Point double
-                toInvert := addmod(mulmod(2, pY, SECP256K1_BASE_FIELD_ORDER), a, SECP256K1_BASE_FIELD_ORDER) // 2 * p.y
+                toInvert := mulmod(2, pY, SECP256K1_BASE_FIELD_ORDER) // 2 * p.y
 
                 // compute (2 * p.y) ^ -1 using expmod precompile
                 let payload := mload(0x40)
@@ -240,19 +240,22 @@ abstract contract HoprCrypto {
                 mstore(add(payload, 0x20), 0x20) // Length of Exponent
                 mstore(add(payload, 0x40), 0x20) // Length of Modulus
                 mstore(add(payload, 0x60), toInvert) // Base
-                mstore(add(payload, 0x80), 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2D) // p - 1
+                mstore(add(payload, 0x80), 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2D) // p - 2
                 mstore(add(payload, 0xa0), SECP256K1_BASE_FIELD_ORDER) // Modulus
                 if iszero(staticcall(not(0), 0x05, payload, 0xC0, payload, 0x20)) {
                     // 0x05 == expmod precompile
                     revert(0, 0)
                 }
-                lambda :=
-                    mulmod( // (3 * p.x ^ 2) * (2 * p.y) ^ -1
+                let numerator :=
+                    addmod( // 3 * p.x ^ 2 + a
                         mulmod( // 3 * p.x ^ 2
                         3, mulmod(pX, pX, SECP256K1_BASE_FIELD_ORDER), SECP256K1_BASE_FIELD_ORDER),
-                        mload(payload),
+                        a,
                         SECP256K1_BASE_FIELD_ORDER
                     )
+                lambda :=
+                    mulmod( // (3 * p.x ^ 2 + a) * (2 * p.y) ^ -1
+                    numerator, mload(payload), SECP256K1_BASE_FIELD_ORDER)
             }
             case false {
                 // Point addition
@@ -269,7 +272,7 @@ abstract contract HoprCrypto {
                 mstore(add(payload, 0x20), 0x20) // Length of Exponent
                 mstore(add(payload, 0x40), 0x20) // Length of Modulus
                 mstore(add(payload, 0x60), toInvert) // Base
-                mstore(add(payload, 0x80), 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2D) // p - 1
+                mstore(add(payload, 0x80), 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2D) // p - 2
                 mstore(add(payload, 0xa0), SECP256K1_BASE_FIELD_ORDER) // Modulus
                 if iszero(staticcall(not(0), 0x05, payload, 0xC0, payload, 0x20)) {
                     // 0x05 == expmod precompile
@@ -390,7 +393,7 @@ abstract contract HoprCrypto {
             mstore(add(payload, 0x20), 0x20) // Length of Exponent
             mstore(add(payload, 0x40), 0x20) // Length of Modulus
             mstore(add(payload, 0x60), xDen) // Base
-            mstore(add(payload, 0x80), 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2D) // p - 1
+            mstore(add(payload, 0x80), 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2D) // p - 2
             mstore(add(payload, 0xa0), SECP256K1_BASE_FIELD_ORDER) // Modulus
             if iszero(staticcall(not(0), 0x05, payload, 0xC0, payload, 0x20)) {
                 // 0x05 == expmod precompile
@@ -428,7 +431,7 @@ abstract contract HoprCrypto {
             mstore(add(payload, 0x20), 0x20) // Length of Exponent
             mstore(add(payload, 0x40), 0x20) // Length of Modulus
             mstore(add(payload, 0x60), y_den) // Base
-            mstore(add(payload, 0x80), 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2D) // p - 1
+            mstore(add(payload, 0x80), 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2D) // p - 2
             mstore(add(payload, 0xa0), SECP256K1_BASE_FIELD_ORDER) // p
             if iszero(staticcall(not(0), 0x05, payload, 0xC0, payload, 0x20)) {
                 // 0x05 == expmod precompile
