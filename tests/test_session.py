@@ -1,18 +1,19 @@
 import asyncio
+import logging
 import multiprocessing
 import os
 import pytest
 import socket
+import subprocess
 
 from enum import Enum
 from contextlib import contextmanager, AsyncExitStack
 
-from .conftest import random_distinct_pairs_from, barebone_nodes, TICKET_PRICE_PER_HOP
+from .conftest import random_distinct_pairs_from, barebone_nodes, TICKET_PRICE_PER_HOP, fixtures_dir
 from .node import Node
 from .test_integration import create_channel, shuffled
 
 PARAMETERIZED_SAMPLE_SIZE = 1  # if os.getenv("CI", default="false") == "false" else 3
-ECHO_SERVER_PORT = 10101
 HOPR_SESSION_MAX_PAYLOAD_SIZE = 462
 STANDARD_MTU_SIZE = 1500
 
@@ -24,10 +25,12 @@ class SocketType(Enum):
     UDP = 2
 
 class EchoServer:
-    def __init__(self, server_type: SocketType, recv_buf_len: int):
+    def __init__(self, server_type: SocketType, recv_buf_len: int, with_tcpdump: bool = False):
         self.server_type = server_type
         self.port = None
         self.process = None
+        self.with_tcpdump = with_tcpdump
+        self.tcp_dump_process = None
         self.socket = None
         self.recv_buf_len = recv_buf_len
 
@@ -47,6 +50,11 @@ class EchoServer:
             self.process = multiprocessing.Process(target=udp_echo_server_func, args=(self.socket,self.recv_buf_len))
         self.process.start()
 
+        if self.with_tcpdump:
+            pcap_file = fixtures_dir('test_session').joinpath(f'echo_server_{self.port}.pcap')
+            self.tcp_dump_process = subprocess.Popen(['tcpdump', '-i', 'lo0', '-w', f"{pcap_file}.log"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            logging.info(f"running tcpdump, saving to {pcap_file}.log")
+
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -55,6 +63,11 @@ class EchoServer:
         self.socket = None
         self.process = None
         self.port = None
+
+        if self.with_tcpdump:
+            self.tcp_dump_process.terminate()
+            self.tcp_dump_process = None
+            logging.info("terminated tcpdump")
         return True
 
 def tcp_echo_server_func(s,buf_len):
@@ -280,7 +293,7 @@ async def test_session_communication_over_n_hop_with_a_udp_echo_server(
         await asyncio.gather(*(channels_to + channels_back))
 
         actual = []
-        with EchoServer(SocketType.UDP, HOPR_SESSION_MAX_PAYLOAD_SIZE) as server:
+        with EchoServer(SocketType.UDP, HOPR_SESSION_MAX_PAYLOAD_SIZE, True) as server:
             await asyncio.sleep(1.0)
 
             dst_sock_port = server.port
