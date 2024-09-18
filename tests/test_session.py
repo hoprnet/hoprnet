@@ -52,7 +52,7 @@ class EchoServer:
 
         if self.with_tcpdump:
             pcap_file = fixtures_dir('test_session').joinpath(f'echo_server_{self.port}.pcap')
-            self.tcp_dump_process = subprocess.Popen(['tcpdump', '-i', 'lo', '-w', f"{pcap_file}.log"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            self.tcp_dump_process = subprocess.Popen(['sudo', 'tcpdump', '-i', 'lo', '-w', f"{pcap_file}.log"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             logging.info(f"running tcpdump, saving to {pcap_file}.log")
 
         return self
