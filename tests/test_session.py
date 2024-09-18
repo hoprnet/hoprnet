@@ -65,8 +65,9 @@ class EchoServer:
         self.port = None
 
         if self.with_tcpdump:
+            logging.info("killing tcp dump")
             stdout, stderr = self.tcp_dump_process.communicate()
-            self.tcp_dump_process.terminate()
+            self.tcp_dump_process.kill()
             self.tcp_dump_process = None
             logging.info(f"terminated tcpdump: {stdout}, {stderr}")
         return True
@@ -269,7 +270,7 @@ async def test_session_communication_over_n_hop_with_a_udp_echo_server(
         route, swarm7: dict[str, Node]
 ):
     packet_count = 100 if os.getenv("CI", default="false") == "false" else 50
-    expected = [f"{i}".ljust(HOPR_SESSION_MAX_PAYLOAD_SIZE) for i in range(packet_count)]
+    expected = [f"{i}".rjust(HOPR_SESSION_MAX_PAYLOAD_SIZE) for i in range(packet_count)]
 
     assert [len(x) for x in expected] == packet_count * [HOPR_SESSION_MAX_PAYLOAD_SIZE]
 
@@ -294,7 +295,7 @@ async def test_session_communication_over_n_hop_with_a_udp_echo_server(
         await asyncio.gather(*(channels_to + channels_back))
 
         actual = []
-        with EchoServer(SocketType.UDP, HOPR_SESSION_MAX_PAYLOAD_SIZE, True) as server:
+        with EchoServer(SocketType.UDP, HOPR_SESSION_MAX_PAYLOAD_SIZE) as server:
             await asyncio.sleep(1.0)
 
             dst_sock_port = server.port
