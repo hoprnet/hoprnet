@@ -12,6 +12,15 @@ pub enum DbSqlError {
     #[error("failed to construct the database, {0}")]
     Construction(String),
 
+    #[error("log status not found")]
+    MissingLogStatus,
+
+    #[error("log not found")]
+    MissingLog,
+
+    #[error("list of logs is empty")]
+    EmptyLogsList,
+
     #[error("account entry for announcement not found")]
     MissingAccount,
 

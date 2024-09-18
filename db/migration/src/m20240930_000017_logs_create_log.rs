@@ -8,17 +8,56 @@ impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         // Log and LogStatus tables are kept separate to allow for easier export of the logs
         // themselves.
+
+        manager
+            .create_table(
+                Table::create()
+                    .table(LogStatus::Table)
+                    .if_not_exists()
+                    .primary_key(
+                        Index::create()
+                            .name("pk_log_status")
+                            .table(LogStatus::Table)
+                            .col(LogStatus::BlockNumber)
+                            .col(LogStatus::TransactionIndex)
+                            .col(LogStatus::LogIndex),
+                    )
+                    .col(
+                        ColumnDef::new(LogStatus::TransactionIndex)
+                            .not_null()
+                            .binary_len(8)
+                            .default(vec![0u8; 8]),
+                    )
+                    .col(
+                        ColumnDef::new(LogStatus::LogIndex)
+                            .not_null()
+                            .binary_len(8)
+                            .default(vec![0u8; 8]),
+                    )
+                    .col(
+                        ColumnDef::new(LogStatus::BlockNumber)
+                            .not_null()
+                            .binary_len(8)
+                            .default(vec![0u8; 8]),
+                    )
+                    .col(ColumnDef::new(LogStatus::Processed).boolean().not_null().default(false))
+                    .col(ColumnDef::new(LogStatus::ProcessedAt).date_time())
+                    .to_owned(),
+            )
+            .await?;
+
         manager
             .create_table(
                 Table::create()
                     .table(Log::Table)
                     .if_not_exists()
-                    .col(
-                        ColumnDef::new(Log::Id)
-                            .integer()
-                            .not_null()
-                            .auto_increment()
-                            .primary_key(),
+                    .primary_key(
+                        Index::create()
+                            .name("pk_log_status")
+                            .table(LogStatus::Table)
+                            .col(LogStatus::BlockNumber)
+                            .col(LogStatus::TransactionIndex)
+                            .col(LogStatus::LogIndex),
                     )
                     .col(
                         ColumnDef::new(Log::TransactionIndex)
@@ -41,90 +80,27 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(Log::BlockHash).string_len(64).not_null())
                     .col(ColumnDef::new(Log::TransactionHash).string_len(64).not_null())
                     .col(ColumnDef::new(Log::Address).string_len(40).not_null())
-                    .col(ColumnDef::new(Log::Topics).json().not_null())
+                    .col(ColumnDef::new(Log::Topics).string().not_null())
                     .col(ColumnDef::new(Log::Data).binary().not_null())
                     .col(ColumnDef::new(Log::Removed).boolean().not_null().default(false))
-                    .to_owned(),
-            )
-            .await?;
-
-        manager
-            .create_index(
-                Index::create()
-                    .name("idx_log_unique")
-                    .if_not_exists()
-                    .unique()
-                    .table(Log::Table)
-                    // We use the number columns to keep the index small.
-                    // Full hashes would blow up the size.
-                    .col(Log::BlockNumber)
-                    .col(Log::LogIndex)
-                    .col(Log::TransactionIndex)
-                    .to_owned(),
-            )
-            .await?;
-
-        manager
-            .create_table(
-                Table::create()
-                    .table(LogStatus::Table)
-                    .if_not_exists()
-                    .col(
-                        ColumnDef::new(LogStatus::Id)
-                            .integer()
-                            .not_null()
-                            .auto_increment()
-                            .primary_key(),
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("fk_log_status_log")
+                            .from(Log::Table, (Log::BlockNumber, Log::TransactionIndex, Log::LogIndex))
+                            .to(
+                                LogStatus::Table,
+                                (LogStatus::BlockNumber, LogStatus::TransactionIndex, LogStatus::LogIndex),
+                            )
+                            .on_delete(ForeignKeyAction::Cascade)
+                            .on_update(ForeignKeyAction::Cascade),
                     )
-                    .col(
-                        ColumnDef::new(LogStatus::TransactionIndex)
-                            .not_null()
-                            .binary_len(8)
-                            .default(vec![0u8; 8]),
-                    )
-                    .col(
-                        ColumnDef::new(LogStatus::LogIndex)
-                            .not_null()
-                            .binary_len(8)
-                            .default(vec![0u8; 8]),
-                    )
-                    .col(
-                        ColumnDef::new(LogStatus::BlockNumber)
-                            .not_null()
-                            .binary_len(8)
-                            .default(vec![0u8; 8]),
-                    )
-                    .col(ColumnDef::new(LogStatus::Processed).boolean().not_null().default(false))
-                    .col(ColumnDef::new(LogStatus::ProcessedAt).timestamp())
-                    .to_owned(),
-            )
-            .await?;
-
-        manager
-            .create_index(
-                Index::create()
-                    .name("idx_log_status_unique")
-                    .if_not_exists()
-                    .unique()
-                    .table(LogStatus::Table)
-                    // We use the number columns to keep the index small.
-                    // Full hashes would blow up the size.
-                    .col(Log::BlockNumber)
-                    .col(Log::LogIndex)
-                    .col(Log::TransactionIndex)
                     .to_owned(),
             )
             .await
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        manager
-            .drop_index(Index::drop().name("idx_log_unique").to_owned())
-            .await?;
         manager.drop_table(Table::drop().table(Log::Table).to_owned()).await?;
-        manager
-            .drop_index(Index::drop().name("idx_log_status_unique").to_owned())
-            .await?;
         manager
             .drop_table(Table::drop().table(LogStatus::Table).to_owned())
             .await
@@ -135,8 +111,6 @@ impl MigrationTrait for Migration {
 #[derive(DeriveIden)]
 enum Log {
     Table,
-    // Primary key, auto-incremented.
-    Id,
     // address from which this log originated.
     Address,
     // Array of 0 to 4 32 Bytes DATA of indexed log arguments. The first topic is the
@@ -162,8 +136,6 @@ enum Log {
 #[derive(DeriveIden)]
 enum LogStatus {
     Table,
-    // Primary key, auto-incremented.
-    Id,
     // Values to identify the log.
     BlockNumber,
     TransactionIndex,

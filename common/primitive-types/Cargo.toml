@@ -19,6 +19,7 @@ regex = { workspace = true }
 strum = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
+chrono = { workspace = true }
 
 hopr-crypto-random = { workspace = true }
 

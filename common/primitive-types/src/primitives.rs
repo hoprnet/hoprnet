@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
@@ -409,7 +410,7 @@ impl UnitaryFloatOps for U256 {
 /// A type containing selected fields from  the `eth_getLogs` RPC calls.
 ///
 /// This is further restricted to already mined blocks.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SerializableLog {
     /// Contract address
     pub address: String,
@@ -429,6 +430,10 @@ pub struct SerializableLog {
     pub log_index: u64,
     /// Removed flag
     pub removed: bool,
+    /// Processed flag
+    pub processed: Option<bool>,
+    /// Processed time
+    pub processed_at: Option<DateTime<Utc>>,
 }
 
 impl Display for SerializableLog {

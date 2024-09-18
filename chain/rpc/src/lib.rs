@@ -118,6 +118,7 @@ impl From<Log> for SerializableLog {
             tx_hash: value.tx_hash.to_string(),
             log_index: value.log_index.as_u64(),
             removed: value.removed,
+            ..Default::default()
         }
     }
 }

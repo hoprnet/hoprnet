@@ -198,7 +198,7 @@ mod tests {
     use hopr_crypto_types::prelude::Keypair;
     use hopr_db_api::peers::{HoprDbPeersOperations, PeerOrigin};
     use libp2p_identity::PeerId;
-    use migration::{MigratorIndex, MigratorPeers, MigratorTickets, MigratorTrait};
+    use migration::{MigratorChainLogs, MigratorIndex, MigratorPeers, MigratorTickets, MigratorTrait};
     use multiaddr::Multiaddr;
     use rand::{distributions::Alphanumeric, Rng}; // 0.8
 
@@ -210,6 +210,7 @@ mod tests {
         MigratorIndex::status(db.conn(TargetDb::Index)).await?;
         MigratorTickets::status(db.conn(TargetDb::Tickets)).await?;
         MigratorPeers::status(db.conn(TargetDb::Peers)).await?;
+        MigratorChainLogs::status(db.conn(TargetDb::Logs)).await?;
 
         Ok(())
     }

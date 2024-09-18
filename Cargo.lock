@@ -4194,6 +4194,7 @@ name = "hopr-primitive-types"
 version = "0.4.0"
 dependencies = [
  "anyhow",
+ "chrono",
  "hex",
  "hex-literal",
  "hopr-crypto-random",
