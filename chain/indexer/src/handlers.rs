@@ -668,7 +668,7 @@ where
                 );
 
                 self.db
-                    .set_minimum_incoming_ticket_win_prob(Some(tx), update.1)
+                    .set_minimum_incoming_ticket_win_prob(Some(tx), win_prob_to_f64(update.1))
                     .await?;
 
                 info!("minimum ticket winning probability has been set to {}", update.1);
