@@ -650,6 +650,36 @@ where
         Ok(None)
     }
 
+    // TODO: uncomment this once ticket winning probability oracle is implemented
+    /*async fn on_ticket_winning_probability_oracle_event(
+        &self,
+        tx: &OpenTransaction,
+        event: HoprTicketWinningProbabilityOracleEvents,
+    ) -> Result<Option<ChainEventType>> {
+        #[cfg(all(feature = "prometheus", not(test)))]
+        METRIC_INDEXER_LOG_COUNTERS.increment(&["win_prob_oracle"]);
+
+        match event {
+            HoprTicketWinningProbabilityOracleEvents::TicketMinWinningProbability(update) => {
+                trace!(
+                    "on_ticket_minimum_win_prob_updated - old: {:?} - new: {:?}",
+                    update.0.to_string(),
+                    update.1.to_string()
+                );
+
+                self.db
+                    .set_minimum_incoming_ticket_win_prob(Some(tx), win_prob_to_f64(update.1))
+                    .await?;
+
+                info!("minimum ticket winning probability has been set to {}", update.1);
+            }
+            _ => {
+                // ignore other events
+            }
+        }
+        Ok(None)
+    }*/
+
     async fn on_ticket_price_oracle_event(
         &self,
         tx: &OpenTransaction,
@@ -705,6 +735,10 @@ where
         } else if log.address.eq(&self.addresses.price_oracle) {
             let event = HoprTicketPriceOracleEvents::decode_log(&log.into())?;
             self.on_ticket_price_oracle_event(tx, event).await
+        // TODO: uncomment this once ticket win prob oracle is implemented
+        /*} else if log.address.eq(&self.addresses.ticket_win_prob_oracle) {
+        let event = HoprTicketWinningProbabilityOracleEvents::decode_log(&log.into())?;
+        self.on_ticket_winning_probability_oracle_event(tx, event).await*/
         } else {
             #[cfg(all(feature = "prometheus", not(test)))]
             METRIC_INDEXER_LOG_COUNTERS.increment(&["unknown"]);

@@ -749,12 +749,13 @@ where
         );
 
         // initiate the msg-ack protocol stack over the wire transport
-        let packet_cfg = PacketInteractionConfig::new(me, me_onchain);
+        let packet_cfg = PacketInteractionConfig::new(me, me_onchain, self.cfg.protocol.outgoing_ticket_winning_prob);
 
         let (tx_from_protocol, rx_from_protocol) = futures::channel::mpsc::unbounded::<ApplicationData>();
         for (k, v) in hopr_transport_protocol::run_msg_ack_protocol(
             packet_cfg,
             self.db.clone(),
+            me,
             me_onchain,
             Some(tbf_path),
             on_acknowledged_ticket,
