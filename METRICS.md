@@ -76,3 +76,4 @@ scrape_configs:
 - `hopr_session_initiated_sessions`: Number of sessions that were successfully initiated as an Entry node
 - `hopr_session_hoprd_clients`: Number of clients connected at this Entry node, keys: `type`
 - `hopr_session_hoprd_target_connections`: Number of currently active HOPR session target connections from this Exit node, keys: `type`
+- `hopr_tickets_incoming_win_probability`: Observes the winning probabilities on incoming tickets, buckets: 0.0, 0.0001, 0.001, 0.01, 0.05, 0.1, 0.15, 0.25, 0.3, 0.5

@@ -3956,7 +3956,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-api"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "futures",
@@ -3997,13 +3997,14 @@ name = "hopr-db-migration"
 version = "0.1.0"
 dependencies = [
  "async-std",
+ "hopr-internal-types",
  "hopr-primitive-types",
  "sea-orm-migration",
 ]
 
 [[package]]
 name = "hopr-db-sql"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "async-lock 3.4.0",
@@ -4245,7 +4246,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "async-lock 3.4.0",
  "async-std",

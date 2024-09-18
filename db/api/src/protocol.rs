@@ -24,6 +24,7 @@ pub trait HoprDbProtocolOperations {
         data: Box<[u8]>,
         me: ChainKeypair,
         path: Vec<OffchainPublicKey>,
+        outgoing_ticket_win_prob: f64,
     ) -> Result<TransportPacketWithChainData, DbError>;
 
     /// Process the incoming packet into data
@@ -34,6 +35,7 @@ pub trait HoprDbProtocolOperations {
         me: ChainKeypair,
         pkt_keypair: &OffchainKeypair,
         sender: OffchainPublicKey,
+        outgoing_ticket_win_prob: f64,
     ) -> crate::errors::Result<TransportPacketWithChainData>;
 }
 
