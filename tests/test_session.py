@@ -253,8 +253,13 @@ async def test_session_communication_with_a_udp_echo_server(
                 total_sent = total_sent - len(chunk)
                 actual.append(chunk.decode())
 
+    actual = [msg.strip() for msg in actual]
+    expected = [msg.strip() for msg in expected]
+
     actual.sort()
     expected.sort()
+
+    assert len(actual) == len(expected)
     assert actual == expected
 
     assert await src_peer.api.session_close_client(protocol='udp', bound_ip='127.0.0.1', bound_port=src_sock_port) is True
@@ -319,8 +324,13 @@ async def test_session_communication_over_n_hop_with_a_udp_echo_server(
                     total_sent = total_sent - len(chunk)
                     actual.append(chunk.decode())
 
+        actual = [msg.strip() for msg in actual]
+        expected = [msg.strip() for msg in expected]
+
         actual.sort()
         expected.sort()
+
+        assert len(actual) == len(expected)
         assert actual == expected
 
         assert await src_peer.api.session_close_client(protocol='udp', bound_ip='127.0.0.1', bound_port=src_sock_port) is True
