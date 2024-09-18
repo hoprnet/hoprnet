@@ -1,8 +1,8 @@
 use async_trait::async_trait;
+use sea_orm::sea_query::{Expr, OnConflict, Value};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DbErr, EntityTrait, IntoActiveModel, ModelTrait, QueryFilter, QueryOrder, Related,
 };
-use sea_query::OnConflict;
 use std::str::FromStr;
 use tracing::error;
 
@@ -32,6 +32,8 @@ pub trait HoprDbLogOperations {
     ) -> Result<SerializableLog>;
 
     async fn get_all_logs<'a>(&'a self, tx: OptTx<'a>) -> Result<Vec<SerializableLog>>;
+
+    async fn set_log_processed<'a>(&'a self, tx: OptTx<'a>, log: SerializableLog) -> Result<()>;
 }
 
 #[async_trait]
@@ -147,6 +149,28 @@ impl HoprDbLogOperations for HoprDb {
                             }
                         })
                         .collect()
+                })
+            })
+            .await
+    }
+
+    async fn set_log_processed<'a>(&'a self, tx: OptTx<'a>, mut log: SerializableLog) -> Result<()> {
+        self.nest_transaction_in_db(tx, TargetDb::Logs)
+            .await?
+            .perform(|tx| {
+                Box::pin(async move {
+                    log.processed = Some(true);
+                    log.processed_at = Some(Utc::now());
+                    let log_status = log_status::ActiveModel::from(log);
+
+                    match log_status::Entity::update(log_status).exec(tx.as_ref()).await {
+                        Ok(_) => Ok(()),
+                        Err(DbErr::RecordNotInserted) => {
+                            error!("Failed to update log status in db");
+                            Err(DbErr::RecordNotUpdated.into())
+                        }
+                        Err(e) => return Err(e.into()),
+                    }
                 })
             })
             .await
@@ -296,5 +320,43 @@ mod tests {
         let logs = db.get_all_logs(None).await.unwrap();
 
         assert_eq!(logs.len(), 0);
+    }
+
+    #[async_std::test]
+    async fn test_set_log_processed() {
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
+
+        let log = SerializableLog {
+            address: Hash::create(&[b"my address"]).to_hex(),
+            topics: [Hash::create(&[b"my topic"]).to_hex()].into(),
+            data: [1, 2, 3, 4].into(),
+            tx_index: 1u64,
+            block_number: 1u64,
+            block_hash: Hash::create(&[b"my block hash"]).to_hex(),
+            tx_hash: Hash::create(&[b"my tx hash"]).to_hex(),
+            log_index: 1u64,
+            removed: false,
+            ..Default::default()
+        };
+
+        db.store_logs(None, [log.clone()].into()).await.unwrap();
+
+        let log_db = db
+            .get_log(None, log.block_number, log.tx_index, log.log_index)
+            .await
+            .unwrap();
+
+        assert_eq!(log_db.processed, Some(false));
+        assert_eq!(log_db.processed_at, None);
+
+        db.set_log_processed(None, log.clone()).await.unwrap();
+
+        let log_db_updated = db
+            .get_log(None, log.block_number, log.tx_index, log.log_index)
+            .await
+            .unwrap();
+
+        assert_eq!(log_db_updated.processed, Some(true));
+        assert_eq!(log_db_updated.processed_at.is_some(), true);
     }
 }
