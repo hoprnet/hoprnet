@@ -1,6 +1,6 @@
 [package]
 name = "hopli"
-version = "0.5.0"
+version = "0.6.0"
 edition = "2021"
 license = "GPL-3.0-only"
 
@@ -28,8 +28,10 @@ chain-types = { workspace = true }
 async-std = { workspace = true, features = ["attributes"] }
 hex-literal = { workspace = true }
 bindings = { workspace = true }
+rpassword = { workspace = true }
 
 [dev-dependencies]
+anyhow = { workspace = true }
 tempfile = { workspace = true }
 hopr-crypto-random = { workspace = true }
 env_logger = { workspace = true }
