@@ -79,7 +79,10 @@ let
   };
 
   sharedArgs =
-    if runTests then sharedArgsBase // { doCheck = true; }
+    if runTests then sharedArgsBase // {
+      cargoTestExtraArgs = "--workspace";
+      doCheck = true;
+    }
     else if runClippy then sharedArgsBase // { cargoClippyExtraArgs = "-- -Dwarnings"; }
     else sharedArgsBase;
 

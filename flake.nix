@@ -131,7 +131,10 @@
           # CAVEAT: must be built from a darwin system
           hoprd-aarch64-darwin = rust-builder-aarch64-darwin.callPackage ./nix/rust-package.nix hoprdBuildArgs;
 
-          hoprd-test = rust-builder-local.callPackage ./nix/rust-package.nix (hoprdBuildArgs // { runTests = true; });
+          hopr-test = rust-builder-local.callPackage ./nix/rust-package.nix (hoprdBuildArgs // {
+            runTests = true;
+          });
+
           hoprd-clippy = rust-builder-local.callPackage ./nix/rust-package.nix (hoprdBuildArgs // { runClippy = true; });
           hoprd-debug = rust-builder-local.callPackage ./nix/rust-package.nix (hoprdBuildArgs // {
             CARGO_PROFILE = "dev";
@@ -155,7 +158,6 @@
           # CAVEAT: must be built from a darwin system
           hopli-aarch64-darwin = rust-builder-aarch64-darwin.callPackage ./nix/rust-package.nix hopliBuildArgs;
 
-          hopli-test = rust-builder-local.callPackage ./nix/rust-package.nix (hopliBuildArgs // { runTests = true; });
           hopli-clippy = rust-builder-local.callPackage ./nix/rust-package.nix (hopliBuildArgs // { runClippy = true; });
           hopli-debug = rust-builder-local.callPackage ./nix/rust-package.nix (hopliBuildArgs // {
             CARGO_PROFILE = "dev";
@@ -409,8 +411,9 @@
           };
 
           packages = {
-            inherit hoprd hoprd-debug hoprd-test hoprd-docker hoprd-debug-docker hoprd-profile-docker;
-            inherit hopli hopli-debug hopli-test hopli-docker hopli-debug-docker hopli-profile-docker;
+            inherit hoprd hoprd-debug hoprd-docker hoprd-debug-docker hoprd-profile-docker;
+            inherit hopli hopli-debug hopli-docker hopli-debug-docker hopli-profile-docker;
+            inherit hopr-test;
             inherit anvil-docker;
             inherit smoke-tests docs;
             inherit pre-commit-check;
