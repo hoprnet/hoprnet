@@ -64,13 +64,14 @@ pub struct NetworkProviderArgs {
     #[clap(help = "Network name. E.g. monte_rosa", long, short)]
     network: String,
 
-    /// Path to the root of foundry project (etehereum/contracts), where all the contracts and `contracts-addresses.json` are stored
+    /// Path to the root of foundry project (ethereum/contracts), where all the contracts and `contracts-addresses.json` are stored
+    /// Default to "./ethereum/contracts", which is the path to the `contracts` folder from the root of monorepo
     #[clap(
         env = "HOPLI_CONTRACTS_ROOT",
         help = "Specify path pointing to the contracts root",
         long,
         short,
-        default_value = None
+        default_value = "./ethereum/contracts"
     )]
     contracts_root: Option<String>,
 
@@ -83,7 +84,7 @@ impl Default for NetworkProviderArgs {
     fn default() -> Self {
         Self {
             network: "anvil-localhost".into(),
-            contracts_root: None,
+            contracts_root: Some("./ethereum/contracts".into()),
             provider_url: "http://127.0.0.1:8545".into(),
         }
     }
@@ -93,12 +94,13 @@ impl NetworkProviderArgs {
     /// Get the NetworkDetail (contract addresses, environment type) from network names
     pub fn get_network_details_from_name(&self) -> Result<NetworkDetail, HelperErrors> {
         // read `contracts-addresses.json` at make_root_dir_path
-        let contract_environment_config_path = self
-            .contracts_root
-            .as_ref()
-            .map_or_else(|| std::env::current_dir().unwrap(), |p| PathBuf::from(OsStr::new(&p)))
-            .to_owned()
-            .join("contracts-addresses.json");
+        let contract_root = self.contracts_root.to_owned().unwrap_or(
+            NetworkProviderArgs::default()
+                .contracts_root
+                .ok_or(HelperErrors::UnableToSetFoundryRoot)?,
+        );
+        let contract_environment_config_path =
+            PathBuf::from(OsStr::new(&contract_root)).join("contracts-addresses.json");
 
         let file_read =
             std::fs::read_to_string(contract_environment_config_path).map_err(HelperErrors::UnableToReadFromPath)?;
@@ -146,6 +148,32 @@ impl NetworkProviderArgs {
                 .with_signer(wallet)
                 .nonce_manager(chain_key.public().to_address().into()),
         ))
+    }
+
+    /// get the provider object without signer
+    pub async fn get_provider_without_signer(&self) -> Result<Arc<Provider<JsonRpcClient>>, HelperErrors> {
+        // Build JSON RPC client
+        let rpc_client = JsonRpcClient::new(
+            self.provider_url.as_str(),
+            DefaultHttpPostRequestor::new(chain_rpc::HttpPostRequestorConfig {
+                max_requests_per_sec: None,
+                ..Default::default()
+            }),
+            SimpleJsonRpcRetryPolicy::default(),
+        );
+
+        // Build default JSON RPC provider
+        let mut provider = Provider::new(rpc_client);
+
+        let chain_id = provider.get_chainid().await.map_err(RpcError::ProviderError)?;
+        let default_tx_polling_interval = if chain_id.eq(&ethers::types::U256::from(31337u32)) {
+            std::time::Duration::from_millis(10)
+        } else {
+            RpcOperationsConfig::default().tx_polling_interval
+        };
+        provider.set_interval(default_tx_polling_interval);
+
+        Ok(Arc::new(provider))
     }
 }
 
@@ -195,13 +223,18 @@ pub fn get_network_details_from_name(make_root_dir_path: &Path, network: &str) -
 #[cfg(test)]
 mod tests {
     use super::*;
+    use anyhow::Context;
 
     fn create_anvil_at_port(default: bool) -> ethers::utils::AnvilInstance {
         let mut anvil = ethers::utils::Anvil::new();
 
         if !default {
-            let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-            let random_port = listener.local_addr().unwrap().port();
+            let listener =
+                std::net::TcpListener::bind("127.0.0.1:0").unwrap_or_else(|_| panic!("Failed to bind localhost"));
+            let random_port = listener
+                .local_addr()
+                .unwrap_or_else(|_| panic!("Failed to get local address"))
+                .port();
             anvil = anvil.port(random_port);
             anvil = anvil.chain_id(random_port);
         } else {
@@ -211,11 +244,11 @@ mod tests {
     }
 
     #[test]
-    fn read_anvil_localhost_at_right_path() {
+    fn read_anvil_localhost_at_right_path() -> anyhow::Result<()> {
         let correct_dir = &std::env::current_dir()
-            .unwrap()
+            .context("Current dir failed")?
             .parent()
-            .unwrap()
+            .context("Parent dir failed")?
             .join("ethereum")
             .join("contracts");
         let network = "anvil-localhost";
@@ -224,39 +257,37 @@ mod tests {
             Ok(result) => assert!(result),
             _ => assert!(false),
         }
+        Ok(())
     }
 
     #[test]
-    fn read_anvil_localhost_at_wrong_path() {
-        let wrong_dir = &std::env::current_dir().unwrap();
+    fn read_anvil_localhost_at_wrong_path() -> anyhow::Result<()> {
+        let wrong_dir = &std::env::current_dir().context("Current dir failed")?;
         let network = "anvil-localhost";
         let environment_type = "local";
-        let result =
-            std::panic::catch_unwind(|| ensure_environment_and_network_are_set(wrong_dir, network, environment_type));
-        assert!(result.unwrap().is_err());
+        assert!(ensure_environment_and_network_are_set(wrong_dir, network, environment_type).is_err());
+        Ok(())
     }
 
     #[test]
-    fn read_non_existing_environment_at_right_path() {
+    fn read_non_existing_environment_at_right_path() -> anyhow::Result<()> {
         let correct_dir = &std::env::current_dir()
-            .unwrap()
+            .context("Current dir failed")?
             .parent()
-            .unwrap()
+            .context("Parent dir failed")?
             .join("ethereum")
             .join("contracts");
 
-        let result = std::panic::catch_unwind(|| {
-            ensure_environment_and_network_are_set(correct_dir, "non-existing", "development")
-        });
-        assert!(result.unwrap().is_err());
+        assert!(ensure_environment_and_network_are_set(correct_dir, "non-existing", "development").is_err());
+        Ok(())
     }
 
     #[test]
-    fn read_wrong_type_at_right_path() {
+    fn read_wrong_type_at_right_path() -> anyhow::Result<()> {
         let correct_dir = &std::env::current_dir()
-            .unwrap()
+            .context("Current dir failed")?
             .parent()
-            .unwrap()
+            .context("Parent dir failed")?
             .join("ethereum")
             .join("contracts");
         let network = "anvil-localhost";
@@ -265,10 +296,11 @@ mod tests {
             Ok(result) => assert!(!result),
             _ => assert!(false),
         }
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_network_provider_with_signer() {
+    async fn test_network_provider_with_signer() -> anyhow::Result<()> {
         // create an identity
         let chain_key = ChainKeypair::random();
 
@@ -281,12 +313,31 @@ mod tests {
             provider_url: anvil.endpoint().into(),
         };
 
-        let provider = network_provider_args
-            .get_provider_with_signer(&chain_key)
-            .await
-            .unwrap();
+        let provider = network_provider_args.get_provider_with_signer(&chain_key).await?;
 
-        let chain_id = provider.get_chainid().await.unwrap();
+        let chain_id = provider.get_chainid().await?;
         assert_eq!(chain_id, anvil.chain_id().into());
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn test_default_contracts_root() -> anyhow::Result<()> {
+        // create an identity
+        let chain_key = ChainKeypair::random();
+
+        // launch local anvil instance
+        let anvil = create_anvil_at_port(false);
+
+        let network_provider_args = NetworkProviderArgs {
+            network: "anvil-localhost".into(),
+            contracts_root: None,
+            provider_url: anvil.endpoint().into(),
+        };
+
+        let provider = network_provider_args.get_provider_with_signer(&chain_key).await?;
+
+        let chain_id = provider.get_chainid().await?;
+        assert_eq!(chain_id, anvil.chain_id().into());
+        Ok(())
     }
 }

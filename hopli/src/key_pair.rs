@@ -23,16 +23,25 @@ use uuid::Uuid;
 pub fn read_identity(file: &Path, password: &str) -> Result<(String, HoprKeys), HelperErrors> {
     let file_str = file
         .to_str()
-        .ok_or(HelperErrors::IncorrectFilename(file.to_string_lossy().to_string()))
-        .unwrap();
+        .ok_or(HelperErrors::IncorrectFilename(file.to_string_lossy().to_string()))?;
 
     match HoprKeys::read_eth_keystore(file_str, password) {
         Ok((keys, needs_migration)) => {
             if needs_migration {
-                keys.write_eth_keystore(file_str, password).unwrap();
+                keys.write_eth_keystore(file_str, password)
+                    .map_err(HelperErrors::KeyStoreError)?;
             }
-            let file_key = file.file_name().unwrap();
-            Ok((String::from(file_key.to_str().unwrap()), keys))
+            let file_key = file
+                .file_name()
+                .ok_or(HelperErrors::ParseError("Failed to extract file name".into()))?;
+            Ok((
+                String::from(
+                    file_key
+                        .to_str()
+                        .ok_or(HelperErrors::ParseError("Failed to extract file key".into()))?,
+                ),
+                keys,
+            ))
         }
         Err(e) => {
             error!("Could not decrypt keystore file at {}. {}", file_str, e.to_string());
@@ -176,23 +185,30 @@ impl ArgEnvReader<ChainKeypair, String> for PrivateKeyArgs {
 
     /// Read the value from either the cli arg or env
     fn read(&self, default_env_name: &str) -> Result<ChainKeypair, HelperErrors> {
-        let prefix = "0x";
         let pri_key = if let Some(pk) = self.get_key() {
-            info!("reading private key from cli");
+            info!("Reading private key from CLI");
             pk
+        } else if let Ok(env_pk) = env::var(default_env_name) {
+            info!("Reading private key from environment variable {:?}", default_env_name);
+            env_pk
+        } else if let Ok(prompt_pk) = rpassword::prompt_password("Enter private key:") {
+            info!("Reading private key from prompt");
+            prompt_pk
         } else {
-            info!("reading private key from env {:?}", default_env_name);
-            env::var(default_env_name).map_err(HelperErrors::UnableToReadPrivateKey)?
+            error!(
+                "Unable to read private key from environment variable: {:?}",
+                default_env_name
+            );
+            return Err(HelperErrors::UnableToReadPrivateKey(default_env_name.into()));
         };
 
         // trim the 0x prefix if needed
-        let priv_key_without_prefix = if pri_key.starts_with("0x") {
-            pri_key[prefix.len()..].to_string()
-        } else {
-            pri_key
-        };
+        let priv_key_without_prefix = pri_key.strip_prefix("0x").unwrap_or(&pri_key).to_string();
 
-        Ok(ChainKeypair::from_secret(hex::decode(priv_key_without_prefix).unwrap().as_slice()).unwrap())
+        let decoded_key = hex::decode(priv_key_without_prefix)
+            .map_err(|e| HelperErrors::UnableToReadPrivateKey(format!("Failed to decode private key: {:?}", e)))?;
+        ChainKeypair::from_secret(&decoded_key)
+            .map_err(|e| HelperErrors::UnableToReadPrivateKey(format!("Failed to create keypair: {:?}", e)))
     }
 
     /// Read the default private key and return an address string
@@ -223,23 +239,32 @@ impl ArgEnvReader<ChainKeypair, String> for ManagerPrivateKeyArgs {
 
     /// Read the value from either the cli arg or env
     fn read(&self, default_env_name: &str) -> Result<ChainKeypair, HelperErrors> {
-        let prefix = "0x";
         let pri_key = if let Some(pk) = self.get_key() {
-            info!("reading manager private key from cli");
+            info!("Reading manager private key from CLI");
             pk
+        } else if let Ok(env_pk) = env::var(default_env_name) {
+            info!(
+                "Reading manager private key from environment variable {:?}",
+                default_env_name
+            );
+            env_pk
+        } else if let Ok(prompt_pk) = rpassword::prompt_password("Enter manager private key:") {
+            info!("Reading manager private key from prompt");
+            prompt_pk
         } else {
-            info!("reading manager private key from env {:?}", default_env_name);
-            env::var(default_env_name).map_err(HelperErrors::UnableToReadPrivateKey)?
+            error!(
+                "Unable to read private key from environment variable: {:?}",
+                default_env_name
+            );
+            return Err(HelperErrors::UnableToReadPrivateKey(default_env_name.into()));
         };
 
         // trim the 0x prefix if needed
-        let priv_key_without_prefix = if pri_key.starts_with("0x") {
-            pri_key[prefix.len()..].to_string()
-        } else {
-            pri_key
-        };
-
-        Ok(ChainKeypair::from_secret(hex::decode(priv_key_without_prefix).unwrap().as_slice()).unwrap())
+        let priv_key_without_prefix = pri_key.strip_prefix("0x").unwrap_or(&pri_key).to_string();
+        let decoded_key = hex::decode(priv_key_without_prefix)
+            .map_err(|e| HelperErrors::UnableToReadPrivateKey(format!("Failed to decode private key: {:?}", e)))?;
+        ChainKeypair::from_secret(&decoded_key)
+            .map_err(|e| HelperErrors::UnableToReadPrivateKey(format!("Failed to create keypair: {:?}", e)))
     }
 
     /// Read the default private key and return an address string
@@ -367,7 +392,7 @@ impl IdentityFromDirectoryArgs {
             identity_directory,
             identity_prefix,
         } = self;
-        let id_dir = identity_directory.unwrap();
+        let id_dir = identity_directory.ok_or(HelperErrors::MissingIdentityDirectory)?;
         debug!(target: "identity_reader_from_directory", "Reading dir {}", &id_dir);
 
         // early return if failed in reading identity directory
@@ -414,7 +439,7 @@ pub struct IdentityFileArgs {
 
 impl IdentityFileArgs {
     /// read identity files from given directory or file path
-    pub fn get_files(self) -> Vec<PathBuf> {
+    pub fn get_files(self) -> Result<Vec<PathBuf>, HelperErrors> {
         let IdentityFileArgs {
             identity_from_directory,
             identity_from_path,
@@ -424,7 +449,7 @@ impl IdentityFileArgs {
 
         let mut files: Vec<PathBuf> = Vec::new();
         if let Some(id_dir_args) = identity_from_directory {
-            files = id_dir_args.get_files_from_directory().unwrap();
+            files = id_dir_args.get_files_from_directory()?;
         };
         if let Some(id_path) = identity_from_path {
             debug!(target: "identity_location_reader", "Reading path {}", &id_path.as_path().display().to_string());
@@ -435,12 +460,12 @@ impl IdentityFileArgs {
                 error!(target: "identity_location_reader",  "Path {} does not exist.", &id_path.as_path().display().to_string());
             }
         }
-        files
+        Ok(files)
     }
 
     /// read identity files and return their Ethereum addresses
     pub fn to_addresses(self) -> Result<Vec<Address>, HelperErrors> {
-        let files = self.clone().get_files();
+        let files = self.clone().get_files()?;
 
         // get Ethereum addresses from identity files
         if !files.is_empty() {
@@ -468,26 +493,27 @@ mod tests {
     const SPECIAL_ENV_KEY: &str = "59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d";
 
     #[test]
-    fn read_pk_with_0x() {
+    fn read_pk_with_0x() -> anyhow::Result<()> {
         let private_key_args = PrivateKeyArgs {
             private_key: Some("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80".to_string()),
         };
-        let key = private_key_args.read_default().unwrap();
+        let key = private_key_args.read_default()?;
 
-        let ref_decoded_value = hex::decode(&DUMMY_PRIVATE_KEY).unwrap();
+        let ref_decoded_value = hex::decode(&DUMMY_PRIVATE_KEY)?;
         println!("ref_decoded_value {:?}", ref_decoded_value);
 
         assert_eq!(
             key.public().to_address().to_checksum(),
             "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
             "cannot read private key with 0x prefix"
-        )
+        );
+        Ok(())
     }
 
     #[test]
-    fn create_identities_from_directory_with_id_files() {
+    fn create_identities_from_directory_with_id_files() -> anyhow::Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
-        let tmp = tempdir().unwrap();
+        let tmp = tempdir()?;
 
         let path = tmp.path().to_str().unwrap();
         let pwd = "password_create";
@@ -495,36 +521,38 @@ mod tests {
             Ok(_) => assert!(true),
             _ => assert!(false),
         }
+        Ok(())
     }
 
     #[test]
-    fn read_identity_from_path() {
+    fn read_identity_from_path() -> anyhow::Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
-        let tmp = tempdir().unwrap();
+        let tmp = tempdir()?;
 
         let path = tmp.path().to_str().unwrap();
         let pwd = "password";
-        let (_, created_id) = create_identity(path, pwd, &None).unwrap();
+        let (_, created_id) = create_identity(path, pwd, &None)?;
 
         // created and the read id is identical
         let files = get_files(path, &None);
         assert_eq!(files.len(), 1, "must have one identity file");
 
-        let read_id = read_identity(files[0].as_path(), &pwd).unwrap();
+        let read_id = read_identity(files[0].as_path(), &pwd)?;
         assert_eq!(
             read_id.1.chain_key.public().0.to_address(),
             created_id.chain_key.public().0.to_address()
         );
+        Ok(())
     }
 
     #[test]
-    fn update_identity_password_at_path() {
+    fn update_identity_password_at_path() -> anyhow::Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
-        let tmp = tempdir().unwrap();
+        let tmp = tempdir()?;
 
         let path = tmp.path().to_str().unwrap();
         let pwd = "password";
-        let (_, created_id) = create_identity(path, pwd, &None).unwrap();
+        let (_, created_id) = create_identity(path, pwd, &None)?;
 
         // created and the read id is identical
         let files = get_files(path, &None);
@@ -532,7 +560,7 @@ mod tests {
         let address = created_id.chain_key.public().0.to_address();
 
         let new_pwd = "supersecured";
-        let (_, returned_key) = update_identity_password(created_id, &files[0].as_path(), new_pwd).unwrap();
+        let (_, returned_key) = update_identity_password(created_id, &files[0].as_path(), new_pwd)?;
 
         // check the returned value
         assert_eq!(
@@ -542,26 +570,27 @@ mod tests {
         );
 
         // check the read value
-        let (_, read_id) = read_identity(files[0].as_path(), &new_pwd).unwrap();
+        let (_, read_id) = read_identity(files[0].as_path(), &new_pwd)?;
         assert_eq!(
             read_id.chain_key.public().0.to_address(),
             address,
             "cannot use the new password to read files"
         );
+        Ok(())
     }
 
     #[test]
-    fn read_identities_from_directory_with_id_files() {
+    fn read_identities_from_directory_with_id_files() -> anyhow::Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
-        let tmp = tempdir().unwrap();
+        let tmp = tempdir()?;
 
         let path = tmp.path().to_str().unwrap();
         let pwd = "password";
-        let (_, created_id) = create_identity(path, pwd, &None).unwrap();
+        let (_, created_id) = create_identity(path, pwd, &None)?;
 
         // created and the read id is identical
         let files = get_files(path, &None);
-        let read_id = read_identities(files, &pwd.to_string()).unwrap();
+        let read_id = read_identities(files, &pwd.to_string())?;
         assert_eq!(read_id.len(), 1);
         assert_eq!(
             read_id.values().next().unwrap().chain_key.public().0.to_address(),
@@ -571,27 +600,29 @@ mod tests {
         // print the read id
         debug!("Debug {:#?}", read_id);
         debug!("Display {}", read_id.values().next().unwrap());
+        Ok(())
     }
 
     #[test]
-    fn read_identities_from_directory_with_id_files_but_wrong_password() {
+    fn read_identities_from_directory_with_id_files_but_wrong_password() -> anyhow::Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
-        let tmp = tempdir().unwrap();
+        let tmp = tempdir()?;
 
         let path = tmp.path().to_str().unwrap();
         let pwd = "password";
         let wrong_pwd = "wrong_password";
-        create_identity(path, pwd, &None).unwrap();
+        create_identity(path, pwd, &None)?;
         let files = get_files(path, &None);
         match read_identities(files, &wrong_pwd.to_string()) {
             Ok(val) => assert_eq!(val.len(), 0),
             _ => assert!(false),
         }
+        Ok(())
     }
 
     #[test]
-    fn read_identities_from_directory_without_id_files() {
-        let tmp = tempdir().unwrap();
+    fn read_identities_from_directory_without_id_files() -> anyhow::Result<()> {
+        let tmp = tempdir()?;
 
         let path = tmp.path().to_str().unwrap();
         let files = get_files(path, &None);
@@ -599,73 +630,78 @@ mod tests {
             Ok(val) => assert_eq!(val.len(), 0),
             _ => assert!(false),
         }
+        Ok(())
     }
 
     #[test]
-    fn read_identities_from_tmp_folder() {
+    fn read_identities_from_tmp_folder() -> anyhow::Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
-        let tmp = tempdir().unwrap();
+        let tmp = tempdir()?;
 
         let path = tmp.path().to_str().unwrap();
         let pwd = "local";
-        create_identity(path, pwd, &Some("local-alice".into())).unwrap();
+        create_identity(path, pwd, &Some("local-alice".into()))?;
         let files = get_files(path, &None);
         match read_identities(files, &pwd.to_string()) {
             Ok(val) => assert_eq!(val.len(), 1),
             _ => assert!(false),
         }
+        Ok(())
     }
 
     #[test]
-    fn read_identities_from_tmp_folder_with_prefix() {
+    fn read_identities_from_tmp_folder_with_prefix() -> anyhow::Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
-        let tmp = tempdir().unwrap();
+        let tmp = tempdir()?;
 
         let path = tmp.path().to_str().unwrap();
         let pwd = "local";
-        create_identity(path, pwd, &Some("local-alice".into())).unwrap();
+        create_identity(path, pwd, &Some("local-alice".into()))?;
         let files = get_files(path, &Some("local".to_string()));
         match read_identities(files, &pwd.to_string()) {
             Ok(val) => assert_eq!(val.len(), 1),
             _ => assert!(false),
         }
+        Ok(())
     }
 
     #[test]
-    fn read_identities_from_tmp_folder_no_match() {
+    fn read_identities_from_tmp_folder_no_match() -> anyhow::Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
-        let tmp = tempdir().unwrap();
+        let tmp = tempdir()?;
 
         let path = tmp.path().to_str().unwrap();
         let pwd = "local";
-        create_identity(path, pwd, &Some("local-alice".into())).unwrap();
+        create_identity(path, pwd, &Some("local-alice".into()))?;
         let files = get_files(path, &Some("npm-".to_string()));
         match read_identities(files, &pwd.to_string()) {
             Ok(val) => assert_eq!(val.len(), 0),
             _ => assert!(false),
         }
+        Ok(())
     }
 
     #[test]
-    fn read_identities_from_tmp_folder_with_wrong_prefix() {
+    fn read_identities_from_tmp_folder_with_wrong_prefix() -> anyhow::Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
-        let tmp = tempdir().unwrap();
+        let tmp = tempdir()?;
 
         let path = tmp.path().to_str().unwrap();
         let pwd = "local";
-        create_identity(path, pwd, &Some("local-alice".into())).unwrap();
+        create_identity(path, pwd, &Some("local-alice".into()))?;
 
         let files = get_files(path, &Some("alice".to_string()));
         match read_identities(files, &pwd.to_string()) {
             Ok(val) => assert_eq!(val.len(), 0),
             _ => assert!(false),
         }
+        Ok(())
     }
 
     #[test]
-    fn read_complete_identities_from_tmp_folder() {
+    fn read_complete_identities_from_tmp_folder() -> anyhow::Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
-        let tmp = tempdir().unwrap();
+        let tmp = tempdir()?;
 
         let path = tmp.path().to_str().unwrap();
         let name = "alice.id";
@@ -676,12 +712,12 @@ mod tests {
         let alice_address = "0x838d3c1d2ff5c576d7b270aaaaaa67e619217aac";
 
         // create dir if not exist.
-        fs::create_dir_all(path).unwrap();
+        fs::create_dir_all(path)?;
         // save the keystore as file
-        fs::write(PathBuf::from(path).join(name), weak_crypto_alice_keystore.as_bytes()).unwrap();
+        fs::write(PathBuf::from(path).join(name), weak_crypto_alice_keystore.as_bytes())?;
 
         let files = get_files(path, &None);
-        let val = read_identities(files, &pwd.to_string()).unwrap();
+        let val = read_identities(files, &pwd.to_string())?;
         assert_eq!(val.len(), 1);
         assert_eq!(
             val.values()
@@ -694,11 +730,13 @@ mod tests {
                 .to_string(),
             alice_address
         );
+        Ok(())
     }
 
     fn get_files(identity_directory: &str, identity_prefix: &Option<String>) -> Vec<PathBuf> {
         // early return if failed in reading identity directory
-        let directory = fs::read_dir(Path::new(identity_directory)).unwrap();
+        let directory = fs::read_dir(Path::new(identity_directory))
+            .unwrap_or_else(|_| panic!("cannot read directory {}", identity_directory));
 
         // read all the files from the directory that contains
         // 1) "id" in its name
@@ -766,9 +804,8 @@ mod tests {
             panic!("cannot read private key from cli when both are provied");
         }
 
-        // when no env and no cli arg, it returns error
+        // when no env and no cli arg, it spawns an interactive CLI
         env::remove_var("PRIVATE_KEY");
-        assert!(pk_args_none.read_default().is_err());
 
         // when no env is supplied, but private key is supplied
         if let Ok(kp_3) = pk_args_some.read_default() {
@@ -778,15 +815,29 @@ mod tests {
                 "read a wrong private key from env"
             );
         } else {
-            panic!("cannot read private key from env when no cli arg is provied");
+            panic!("cannot read private key from env when no cli arg is provied nor env is set");
         }
+
+        // when no env and no cli arg, it spawns an interactive CLI and inputs
+        // "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+        // the test is commented out as there's no way to simulate the write in the interactive CLI,
+        // unless directly mocking the buffer read.
+        // if let Ok(kp_3) = pk_args_none.read_default() {
+        //     assert_eq!(
+        //         DUMMY_PRIVATE_KEY,
+        //         hex::encode(kp_3.secret().as_ref()),
+        //         "read a wrong private key from env"
+        //     );
+        // } else {
+        //     panic!("cannot read private key from env when no cli arg is provied nor env is set");
+        // }
     }
 
     #[test]
-    fn password_args_can_read_env_or_cli_args_in_different_scenarios() {
-        let tmp = tempdir().unwrap();
+    fn password_args_can_read_env_or_cli_args_in_different_scenarios() -> anyhow::Result<()> {
+        let tmp = tempdir()?;
         let path = tmp.path().to_str().unwrap();
-        create_file(path, None, 2);
+        create_file(path, None, 2)?;
 
         // possible password args
         let pwd_args_some = PasswordArgs {
@@ -800,7 +851,7 @@ mod tests {
             new_password_path: None,
         };
         // let file_path = PathBuf::from(path).join("fileid2");
-        fs::write(&PathBuf::from(path).join("fileid2"), "supersound").unwrap();
+        fs::write(&PathBuf::from(path).join("fileid2"), "supersound")?;
 
         // test new_password_path
         env::set_var("NEW_IDENTITY_PASSWORD", "ultraviolet");
@@ -847,6 +898,7 @@ mod tests {
         } else {
             panic!("cannot read password from path when no env is provied");
         }
+        Ok(())
     }
 
     #[test]
@@ -862,10 +914,10 @@ mod tests {
     }
 
     #[test]
-    fn pass_get_empty_dir_from_existing_dir() {
-        let tmp = tempdir().unwrap();
+    fn pass_get_empty_dir_from_existing_dir() -> anyhow::Result<()> {
+        let tmp = tempdir()?;
         let path = tmp.path().to_str().unwrap();
-        create_file(path, None, 0);
+        create_file(path, None, 0)?;
 
         let dir_args = IdentityFromDirectoryArgs {
             identity_directory: Some(path.to_string()),
@@ -877,13 +929,14 @@ mod tests {
         } else {
             panic!("failed to revert when the path contains no file")
         }
+        Ok(())
     }
 
     #[test]
-    fn pass_get_dir_from_existing_dir() {
-        let tmp = tempdir().unwrap();
+    fn pass_get_dir_from_existing_dir() -> anyhow::Result<()> {
+        let tmp = tempdir()?;
         let path = tmp.path().to_str().unwrap();
-        create_file(path, None, 4);
+        create_file(path, None, 4)?;
 
         let dir_args = IdentityFromDirectoryArgs {
             identity_directory: Some(path.to_string()),
@@ -895,13 +948,14 @@ mod tests {
         } else {
             panic!("failed to get files")
         }
+        Ok(())
     }
 
     #[test]
-    fn pass_get_path_from_existing_path() {
-        let tmp = tempdir().unwrap();
+    fn pass_get_path_from_existing_path() -> anyhow::Result<()> {
+        let tmp = tempdir()?;
         let path = tmp.path().to_str().unwrap();
-        create_file(path, None, 4);
+        create_file(path, None, 4)?;
 
         let id_path = PathBuf::from(format!("{path}/fileid1"));
         let path_args: IdentityFileArgs = IdentityFileArgs {
@@ -910,22 +964,23 @@ mod tests {
             password: PasswordArgs { password_path: None },
         };
 
-        let vp = path_args.get_files();
+        let vp = path_args.get_files()?;
         assert_eq!(1, vp.len());
+        Ok(())
     }
 
     #[test]
-    fn pass_get_files_from_directory_and_path() {
+    fn pass_get_files_from_directory_and_path() -> anyhow::Result<()> {
         // an path to file
-        let tmp_file = tempdir().unwrap();
+        let tmp_file = tempdir()?;
         let path_file = tmp_file.path().to_str().unwrap();
-        create_file(path_file, None, 4);
+        create_file(path_file, None, 4)?;
         let id_path = PathBuf::from(format!("{path_file}/fileid1"));
 
         // a dir for files
-        let tmp = tempdir().unwrap();
+        let tmp = tempdir()?;
         let path = tmp.path().to_str().unwrap();
-        create_file(path, None, 4);
+        create_file(path, None, 4)?;
 
         let dir_args = IdentityFromDirectoryArgs {
             identity_directory: Some(path.to_string()),
@@ -938,13 +993,15 @@ mod tests {
             password: PasswordArgs { password_path: None },
         };
 
-        let vp = path_args.get_files();
+        let vp = path_args.get_files()?;
         assert_eq!(5, vp.len());
+
+        Ok(())
     }
 
-    fn create_file(dir_name: &str, prefix: Option<String>, num: u32) {
+    fn create_file(dir_name: &str, prefix: Option<String>, num: u32) -> anyhow::Result<()> {
         // create dir if not exist
-        fs::create_dir_all(dir_name).unwrap();
+        fs::create_dir_all(dir_name)?;
 
         if num > 0 {
             for _n in 1..=num {
@@ -954,8 +1011,9 @@ mod tests {
                 };
 
                 let file_path = PathBuf::from(dir_name).join(file_name);
-                fs::write(&file_path, "Hello").unwrap();
+                fs::write(&file_path, "Hello")?;
             }
         }
+        Ok(())
     }
 }
