@@ -67,3 +67,4 @@ env_logger = { workspace = true }
 mockall = { workspace = true }
 mockito = { workspace = true }
 hex-literal = { workspace = true }
+test-log = "0.2.16"

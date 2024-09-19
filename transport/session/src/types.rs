@@ -1,4 +1,3 @@
-use crate::{errors::TransportSessionError, traits::SendMsg, Capability};
 use futures::{channel::mpsc::UnboundedReceiver, pin_mut, StreamExt};
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_internal_types::protocol::{ApplicationData, PAYLOAD_SIZE};
@@ -19,6 +18,8 @@ use std::{
 };
 use strum::IntoEnumIterator;
 use tracing::{debug, error};
+
+use crate::{errors::TransportSessionError, traits::SendMsg, Capability};
 
 /// Unique ID of a specific session.
 ///
@@ -58,7 +59,8 @@ impl Display for SessionId {
 }
 
 const PADDING_HEADER_SIZE: usize = 4;
-// Inner MTU size of what the HOPR payload can take (payload - peer_id - application_tag)
+
+/// Inner MTU size of what the HOPR payload can take (payload - peer_id - application_tag)
 pub const SESSION_USABLE_MTU_SIZE: usize = PAYLOAD_SIZE
     - OffchainPublicKey::SIZE
     - std::mem::size_of::<hopr_internal_types::protocol::Tag>()
@@ -96,6 +98,7 @@ pub struct Session {
     id: SessionId,
     inner: Pin<Box<dyn AsyncReadWrite>>,
     routing_options: RoutingOptions,
+    capabilities: HashSet<Capability>,
     shutdown_notifier: Option<futures::channel::mpsc::UnboundedSender<SessionId>>,
 }
 
@@ -124,13 +127,16 @@ impl Session {
                 ]);
             }
 
+            // This is a very coarse assumption, that it takes max 2 seconds for each hop one way.
+            let rto_base = 2 * Duration::from_secs(2) * (routing_options.count_hops() + 1) as u32;
+
             // TODO: tweak the default Session protocol config
             let cfg = SessionConfig {
                 enabled_features,
-                acknowledged_frames_buffer: 10_000,
-                frame_expiration_age: Duration::from_secs(60),
-                rto_base_receiver: Duration::from_secs(20),
-                rto_base_sender: Duration::from_secs(30),
+                acknowledged_frames_buffer: 100_000, // Can hold frames for > 40 sec at 2000 frames/sec
+                frame_expiration_age: rto_base * 10,
+                rto_base_receiver: rto_base, // Ask for segment resend, if not yet complete after this period
+                rto_base_sender: rto_base * 2, // Resend frame if not acknowledged after this period
                 ..Default::default()
             };
             debug!(
@@ -142,6 +148,7 @@ impl Session {
                 id,
                 inner: Box::pin(SessionSocket::<SESSION_USABLE_MTU_SIZE>::new(id, inner_session, cfg)),
                 routing_options,
+                capabilities,
                 shutdown_notifier,
             }
         } else {
@@ -150,6 +157,7 @@ impl Session {
                 id,
                 inner: Box::pin(inner_session),
                 routing_options,
+                capabilities,
                 shutdown_notifier,
             }
         }
@@ -163,6 +171,11 @@ impl Session {
     /// Routing options used to deliver data.
     pub fn routing_options(&self) -> &RoutingOptions {
         &self.routing_options
+    }
+
+    /// Capabilities of this Session.
+    pub fn capabilities(&self) -> &HashSet<Capability> {
+        &self.capabilities
     }
 }
 
@@ -425,6 +438,45 @@ pub fn unwrap_offchain_key(payload: Box<[u8]>) -> crate::errors::Result<(PeerId,
     let opk = OffchainPublicKey::try_from(payload.as_slice()).map_err(|_e| TransportSessionError::PeerId)?;
 
     Ok((opk.into(), data))
+}
+
+/// Convenience function to copy data in both directions between a [Session] and arbitrary
+/// async IO stream.
+/// This function is only available with Tokio and will panic with other runtimes.
+#[cfg(feature = "runtime-tokio")]
+pub async fn transfer_session<S>(
+    session: &mut Session,
+    stream: &mut S,
+    max_buffer: usize,
+) -> std::io::Result<(usize, usize)>
+where
+    S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
+{
+    // We can always read as much as possible from the Session and then write it to the Stream.
+    // There are two possibilities for the opposite direction:
+    // 1) If Session protocol is used for segmentation,
+    //    we need to buffer up data at MAX_WRITE_SIZE.
+    // 2) Otherwise, the bare session implements chunking therefore,
+    //    data can be written with arbitrary sizes.
+    let into_session_len = if session.capabilities().contains(&Capability::Segmentation) {
+        max_buffer.min(SessionSocket::<SESSION_USABLE_MTU_SIZE>::MAX_WRITE_SIZE)
+    } else {
+        max_buffer
+    };
+
+    debug!(
+        session_id = tracing::field::debug(session.id()),
+        "session egress buffer: {max_buffer}, session ingress buffer: {into_session_len}"
+    );
+
+    hopr_network_types::utils::copy_duplex(
+        &mut tokio_util::compat::FuturesAsyncReadCompatExt::compat(session),
+        stream,
+        max_buffer,
+        into_session_len,
+    )
+    .await
+    .map(|(a, b)| (a as usize, b as usize))
 }
 
 #[cfg(test)]

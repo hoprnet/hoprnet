@@ -89,6 +89,9 @@ pub use {
     },
 };
 
+#[cfg(feature = "runtime-tokio")]
+pub use hopr_transport::transfer_session;
+
 use crate::constants::{MIN_NATIVE_BALANCE, ONBOARDING_INFORMATION_INTERVAL, SUGGESTED_NATIVE_BALANCE};
 use crate::{config::SafeModule, errors::HoprLibError};
 
