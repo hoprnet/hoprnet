@@ -11,6 +11,8 @@ import ssl
 import string
 import subprocess
 import urllib3
+import threading
+import time
 
 from enum import Enum
 from functools import partial
@@ -171,6 +173,7 @@ class CustomHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
         self.send_header('Content-type', 'text/plain')
         self.end_headers()
         self.wfile.write(self.content.encode('utf-8'))
+        time.sleep(1) # add an artificial delay
 
 @contextmanager
 def run_https_server(served_text_content):
@@ -186,16 +189,24 @@ def run_https_server(served_text_content):
 
     # Set up the HTTP server with a random port and SSL context
     httpd = http.server.HTTPServer(('localhost', 0), handler_class)
-    httpd.socket = ssl.wrap_socket(httpd.socket, keyfile=cert_file, certfile=cert_file, server_side=True)
+    ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    ssl_context.load_cert_chain(certfile=cert_file, keyfile=cert_file)
+    httpd.socket = ssl_context.wrap_socket(httpd.socket, server_side=True)
 
     # Get the random port assigned to the server
     port = httpd.server_address[1]
+    server_thread = threading.Thread(target=httpd.serve_forever)
     try:
+        server_thread.start()
         logging.debug(f"serving on https://localhost:{port}")
-        yield httpd, port
+        yield port
     finally:
         logging.debug("shutting down the HTTP server...")
+        httpd.shutdown()
         httpd.server_close()
+        server_thread.join()
+        if os.path.exists(cert_file):
+            os.remove(cert_file)
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("src,dest", random_distinct_pairs_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
@@ -439,7 +450,7 @@ async def test_session_communication_with_an_https_server(
     # Generate random text content to be served
     expected = ''.join(random.choices(string.ascii_letters + string.digits, k=file_len))
 
-    with run_https_server(expected) as (server, dst_sock_port):
+    with run_https_server(expected) as dst_sock_port:
         src_sock_port = await src_peer.api.session_client(dest_peer.peer_id, path={"Hops": 0}, protocol='tcp',
                                                           target=f"localhost:{dst_sock_port}")
         assert src_sock_port is not None, "Failed to open session"
@@ -487,7 +498,7 @@ async def test_session_communication_over_n_hop_with_an_https_server(
         # Generate random text content to be served
         expected = ''.join(random.choices(string.ascii_letters + string.digits, k=file_len))
 
-        with run_https_server(expected) as (server, dst_sock_port):
+        with run_https_server(expected) as dst_sock_port:
             src_sock_port = await src_peer.api.session_client(dest_peer.peer_id, path={"IntermediatePath": path}, protocol='tcp',
                                                               target=f"localhost:{dst_sock_port}")
             assert src_sock_port is not None, "Failed to open session"
