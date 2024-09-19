@@ -20,6 +20,7 @@ prometheus = [
   "dep:lazy_static",
   "hopr-lib/prometheus",
   "hoprd-api/prometheus",
+  "hopr-network-types/prometheus",
 ]
 runtime-async-std = [
   "dep:async-std",
@@ -67,7 +68,7 @@ signal-hook = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, optional = true }
-tokio-retry = { version = "0.3.0", optional = true }
+tokio-retry = { workspace = true, optional = true }
 tokio-util = { workspace = true, optional = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }

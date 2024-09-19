@@ -65,6 +65,13 @@ use hopr_transport_session::{
     IpProtocol,
 };
 
+use crate::{
+    constants::{RESERVED_SESSION_TAG_UPPER_LIMIT, RESERVED_SUBPROTOCOL_TAG_UPPER_LIMIT},
+    errors::HoprTransportError,
+};
+
+use crate::helpers::PathPlanner;
+
 pub use {
     core_network::network::{Health, Network, NetworkTriggeredEvent, PeerOrigin, PeerStatus},
     hopr_crypto_types::{
@@ -83,12 +90,9 @@ pub use {
     },
 };
 
-use crate::{
-    constants::{RESERVED_SESSION_TAG_UPPER_LIMIT, RESERVED_SUBPROTOCOL_TAG_UPPER_LIMIT},
-    errors::HoprTransportError,
-};
+#[cfg(feature = "runtime-tokio")]
+pub use hopr_transport_session::types::transfer_session;
 
-use crate::helpers::PathPlanner;
 pub use crate::helpers::{IndexerTransportEvent, PeerEligibility, TicketStatistics};
 pub use hopr_network_types::prelude::RoutingOptions;
 pub use hopr_transport_session::types::SessionTarget;
@@ -271,7 +275,7 @@ where
         session_tx.close_channel();
         trace!(
             session_id = tracing::field::debug(session_id),
-            "channel closed on session"
+            "data tx channel closed on session"
         );
         Ok(true)
     } else {
@@ -563,6 +567,11 @@ where
     sessions: SessionCache,
 }
 
+// Needs lazy-static, since Duration multiplication by a constant is yet not a const-operation.
+lazy_static::lazy_static! {
+    static ref SESSION_INITIATION_TIMEOUT_MAX: std::time::Duration = 2 * constants::SESSION_INITIATION_TIMEOUT_BASE * RoutingOptions::MAX_INTERMEDIATE_HOPS as u32;
+}
+
 impl<T> HoprTransport<T>
 where
     T: HoprDbAllOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
@@ -604,7 +613,7 @@ where
             process_ticket_aggregate: Arc::new(OnceLock::new()),
             session_initiations: moka::future::Cache::builder()
                 .max_capacity((RESERVED_SESSION_TAG_UPPER_LIMIT - RESERVED_SUBPROTOCOL_TAG_UPPER_LIMIT + 1) as u64)
-                .time_to_live(constants::SESSION_INITIATION_TIMEOUT)
+                .time_to_live(*SESSION_INITIATION_TIMEOUT_MAX)
                 .build(),
             sessions: moka::future::Cache::builder()
                 .max_capacity(u16::MAX as u64)
@@ -882,7 +891,7 @@ where
             HoprTransportProcess::SessionsExpiration,
             spawn(async move {
                 let jitter = hopr_crypto_random::random_float_in_range(1.0..1.5);
-                let timeout = constants::SESSION_INITIATION_TIMEOUT
+                let timeout = SESSION_INITIATION_TIMEOUT_MAX
                     .min(constants::SESSION_LIFETIME)
                     .mul_f64(jitter)
                     / 2;
@@ -1011,7 +1020,9 @@ where
         pin_mut!(rx_initiation_done);
         let initiation_done = TryStreamExt::try_next(&mut rx_initiation_done);
 
-        let timeout = hopr_async_runtime::prelude::sleep(constants::SESSION_INITIATION_TIMEOUT);
+        // The timeout is given by the number of hops requested
+        let timeout =
+            sleep(2 * constants::SESSION_INITIATION_TIMEOUT_BASE * (cfg.path_options.count_hops() + 1) as u32);
         pin_mut!(timeout);
 
         trace!(challenge, "awaiting session establishment");

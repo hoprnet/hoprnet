@@ -30,20 +30,20 @@ runtime-tokio = [
   "hopr-network-types/runtime-tokio",
 ]
 prometheus = [
-  "dep:lazy_static",
   "dep:hopr-metrics",
   "core-network/prometheus",
   "core-path/prometheus",
   "hopr-db-sql/prometheus",
   "hopr-transport-p2p/prometheus",
   "hopr-transport-protocol/prometheus",
+  "hopr-network-types/prometheus",
 ]
 
 [dependencies]
 async-trait = { workspace = true }
 async-lock = { workspace = true }
 futures = { workspace = true }
-lazy_static = { workspace = true, optional = true }
+lazy_static = { workspace = true }
 libp2p = { workspace = true, features = ["request-response"] }
 moka = { workspace = true }
 proc-macro-regex = "~1.1.0"
