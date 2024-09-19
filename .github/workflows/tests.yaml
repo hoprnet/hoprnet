@@ -149,6 +149,7 @@ jobs:
       matrix:
         suite:
           - integration
+          - session
           - hopli
     if: github.event.pull_request.draft == false
     steps:

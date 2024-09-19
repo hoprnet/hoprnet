@@ -20,7 +20,11 @@ serde = [
   "hopr-network-types/serde",
 ]
 runtime-async-std = ["hopr-network-types/runtime-async-std"]
-runtime-tokio = ["hopr-network-types/runtime-tokio"]
+runtime-tokio = [
+  "hopr-network-types/runtime-tokio",
+  "dep:tokio",
+  "dep:tokio-util",
+]
 
 [dependencies]
 async-trait = { workspace = true }
@@ -33,6 +37,8 @@ serde_with = { workspace = true, optional = true }
 strum = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
+tokio = { workspace = true, optional = true }
+tokio-util = { workspace = true, optional = true }
 
 hopr-network-types = { workspace = true }
 hopr-crypto-random = { workspace = true }
