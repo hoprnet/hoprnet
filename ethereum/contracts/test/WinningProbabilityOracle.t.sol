@@ -44,7 +44,6 @@ contract TicketWinningProbabilityOracleTest is Test, HoprWinningProbablityOracle
     }
 
     function testFuzz_setWinProb(WinProb newWinProb) public {
-        // vm.assume(newWinProb != oracle.currentWinProb());
         if (newWinProb == oracle.currentWinProb()) {
             // the new winning probability must not be the same as the current one
             vm.expectRevert(HoprWinningProbablityOracle.WinProbMustNotBeSame.selector);

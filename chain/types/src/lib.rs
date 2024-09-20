@@ -49,6 +49,8 @@ pub struct ContractAddresses {
     pub safe_registry: Address,
     /// Price oracle contract
     pub price_oracle: Address,
+    /// Min ticket win prob contract,
+    pub win_prob_oracle: Address,
     /// Stake factory contract
     pub stake_factory: Address,
     /// Node management module contract (can be zero if safe is not used)
