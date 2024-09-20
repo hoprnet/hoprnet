@@ -68,7 +68,7 @@ pub enum HelperErrors {
 
     /// Fail to read private key
     #[error("cannot read private key error: {0}")]
-    UnableToReadPrivateKey(#[from] std::env::VarError),
+    UnableToReadPrivateKey(String),
 
     /// Paramters are missing
     #[error("missing parameter: {0}")]
@@ -117,6 +117,14 @@ pub enum HelperErrors {
     // encode packed error
     #[error(transparent)]
     EncodePackedError(#[from] ethers::abi::EncodePackedError),
+
+    // error of parsing addresses
+    #[error("Cannot parse address: {0}")]
+    InvalidAddress(String),
+
+    // general error of parsing
+    #[error("Cannot parse: {0}")]
+    ParseError(String),
 }
 
 /// Multicall3 deployer wallet

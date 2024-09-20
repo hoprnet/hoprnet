@@ -167,10 +167,24 @@ impl NetworkRegistrySubcommands {
         // read all the node addresses
         let mut node_eth_addresses: Vec<H160> = Vec::new();
         if let Some(addresses) = node_address {
-            node_eth_addresses.extend(addresses.split(',').map(|addr| H160::from_str(addr).unwrap()));
+            node_eth_addresses.extend(
+                addresses
+                    .split(',')
+                    .map(|addr| {
+                        H160::from_str(addr)
+                            .map_err(|e| HelperErrors::InvalidAddress(format!("Invalid node address: {:?}", e)))
+                    })
+                    .collect::<Result<Vec<_>, _>>()?,
+            );
         }
         // if local identity dirs/path is provided, read addresses from identity files
-        node_eth_addresses.extend(local_identity.to_addresses().unwrap().into_iter().map(H160::from));
+        node_eth_addresses.extend(
+            local_identity
+                .to_addresses()
+                .map_err(|e| HelperErrors::InvalidAddress(format!("Invalid node address: {:?}", e)))?
+                .into_iter()
+                .map(H160::from),
+        );
 
         // read all the safe addresses
         let mut safe_eth_addresses: Vec<H160> = Vec::new();
@@ -216,10 +230,24 @@ impl NetworkRegistrySubcommands {
         // read all the node addresses
         let mut node_eth_addresses: Vec<H160> = Vec::new();
         if let Some(addresses) = node_address {
-            node_eth_addresses.extend(addresses.split(',').map(|addr| H160::from_str(addr).unwrap()));
+            node_eth_addresses.extend(
+                addresses
+                    .split(',')
+                    .map(|addr| {
+                        H160::from_str(addr)
+                            .map_err(|e| HelperErrors::InvalidAddress(format!("Invalid node address: {:?}", e)))
+                    })
+                    .collect::<Result<Vec<_>, _>>()?,
+            );
         }
         // if local identity dirs/path is provided, read addresses from identity files
-        node_eth_addresses.extend(local_identity.to_addresses().unwrap().into_iter().map(H160::from));
+        node_eth_addresses.extend(
+            local_identity
+                .to_addresses()
+                .map_err(|e| HelperErrors::InvalidAddress(format!("Invalid node address: {:?}", e)))?
+                .into_iter()
+                .map(H160::from),
+        );
         info!(
             "Will deregister {:?} nodes from the network registry",
             node_eth_addresses.len()

@@ -122,26 +122,30 @@ impl IdentitySubcommands {
 
         let mut node_identities: HashMap<String, HoprKeys> = HashMap::new();
 
-        let local_id = local_identity
-            .identity_from_directory
-            .ok_or(HelperErrors::MissingIdentityDirectory)
-            .unwrap();
+        match local_identity.identity_from_directory {
+            Some(local_id) => {
+                let id_dir = local_id
+                    .identity_directory
+                    .ok_or(HelperErrors::MissingIdentityDirectory)?;
+                for index in 0..=number - 1 {
+                    // build file name
+                    let file_prefix = local_id
+                        .identity_prefix
+                        .as_ref()
+                        .map(|provided_name| provided_name.to_owned() + &index.to_string());
 
-        let id_dir = local_id.identity_directory.unwrap();
-        for index in 0..=number - 1 {
-            // build file name
-            let file_prefix = local_id
-                .identity_prefix
-                .as_ref()
-                .map(|provided_name| provided_name.to_owned() + &index.to_string());
+                    let (id_filename, identity) = create_identity(&id_dir, &pwd, &file_prefix)
+                        .map_err(|_| HelperErrors::UnableToCreateIdentity)?;
+                    node_identities.insert(id_filename, identity);
+                }
 
-            let (id_filename, identity) =
-                create_identity(&id_dir, &pwd, &file_prefix).map_err(|_| HelperErrors::UnableToCreateIdentity)?;
-            node_identities.insert(id_filename, identity);
+                info!("Identities: {:?}", node_identities);
+                Ok(())
+            }
+            None => Err(HelperErrors::MissingParameter(
+                "Missing identity_from_directory when creating identites".into(),
+            )),
         }
-
-        info!("Identities: {:?}", node_identities);
-        Ok(())
     }
 
     /// Execute the command to read identities
@@ -150,7 +154,7 @@ impl IdentitySubcommands {
         let pwd = local_identity.clone().password.read_default()?;
 
         // read ids
-        let files = local_identity.get_files();
+        let files = local_identity.get_files()?;
         debug!("Identities read {:?}", files.len());
 
         let node_identities: HashMap<String, HoprKeys> =
@@ -183,7 +187,7 @@ impl IdentitySubcommands {
         let new_pwd = new_password.read_default()?;
 
         // read ids
-        let files = local_identity.get_files();
+        let files = local_identity.get_files()?;
         debug!("Identities read {:?}", files.len());
 
         let _ = files
