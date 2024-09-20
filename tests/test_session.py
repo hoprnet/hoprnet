@@ -5,6 +5,7 @@ import multiprocessing
 import os
 import pytest
 import random
+import re
 import requests
 import socket
 import ssl
@@ -115,11 +116,10 @@ def connect_socket(sock_type: SocketType, port):
         s.close()
 
 
-def fetch_random_local_text_file(port: int):
+def fetch_data(url: str):
     # Suppress only the single InsecureRequestWarning from urllib3 needed for self-signed certs
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-    url = f'https://localhost:{port}/random.txt'
     response = requests.get(url, verify=False)  # set verify=False for self-signed certs
     return response
 
@@ -353,9 +353,8 @@ async def test_session_communication_with_a_udp_echo_server(
             while total_sent > 0:
                 chunk, _ = s.recvfrom(min(HOPR_SESSION_MAX_PAYLOAD_SIZE, total_sent))
                 total_sent = total_sent - len(chunk)
-                actual.append(chunk.decode())
+                actual.extend([m for m in re.split(r'\s+', chunk.decode().strip()) if len(m) > 0])
 
-    actual = [msg.strip() for msg in actual if len(msg.strip()) > 0]
     expected = [msg.strip() for msg in expected]
 
     actual.sort()
@@ -424,9 +423,8 @@ async def test_session_communication_over_n_hop_with_a_udp_echo_server(
                 while total_sent > 0:
                     chunk, _ = s.recvfrom(min(HOPR_SESSION_MAX_PAYLOAD_SIZE, total_sent))
                     total_sent = total_sent - len(chunk)
-                    actual.append(chunk.decode())
+                    actual.extend([m for m in re.split(r'\s+', chunk.decode().strip()) if len(m) > 0])
 
-        actual = [msg.strip() for msg in actual if len(msg.strip()) > 0]
         expected = [msg.strip() for msg in expected]
 
         actual.sort()
@@ -443,7 +441,7 @@ async def test_session_communication_over_n_hop_with_a_udp_echo_server(
 async def test_session_communication_with_an_https_server(
         src: str, dest: str, swarm7: dict[str, Node]
 ):
-    file_len = 500
+    file_len = 50000
     src_peer = swarm7[src]
     dest_peer = swarm7[dest]
 
@@ -456,8 +454,7 @@ async def test_session_communication_with_an_https_server(
         assert src_sock_port is not None, "Failed to open session"
         assert len(await src_peer.api.session_list_clients('tcp')) == 1
 
-        # Fetch the random file contents via the HOPR tunnel
-        response = fetch_random_local_text_file(src_sock_port)
+        response = fetch_data(f'https://localhost:{src_sock_port}/random.txt')
         assert response.status_code == 200
         assert response.text == expected
 
@@ -473,7 +470,7 @@ async def test_session_communication_with_an_https_server(
 async def test_session_communication_over_n_hop_with_an_https_server(
         route, swarm7: dict[str, Node]
 ):
-    file_len=500
+    file_len=50000
 
     src_peer = swarm7[route[0]]
     dest_peer = swarm7[route[-1]]
@@ -504,7 +501,7 @@ async def test_session_communication_over_n_hop_with_an_https_server(
             assert src_sock_port is not None, "Failed to open session"
             assert len(await src_peer.api.session_list_clients('tcp')) == 1
 
-            response = fetch_random_local_text_file(src_sock_port)
+            response = fetch_data(f'https://localhost:{src_sock_port}/random.txt')
             assert response.status_code == 200
             assert response.text == expected
 
