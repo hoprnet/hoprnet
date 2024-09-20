@@ -353,6 +353,7 @@ async def test_session_communication_with_a_udp_echo_server(
             while total_sent > 0:
                 chunk, _ = s.recvfrom(min(HOPR_SESSION_MAX_PAYLOAD_SIZE, total_sent))
                 total_sent = total_sent - len(chunk)
+                # Adapt for situations when data arrive completely unordered (also within the buffer)
                 actual.extend([m for m in re.split(r'\s+', chunk.decode().strip()) if len(m) > 0])
 
     expected = [msg.strip() for msg in expected]
@@ -423,6 +424,7 @@ async def test_session_communication_over_n_hop_with_a_udp_echo_server(
                 while total_sent > 0:
                     chunk, _ = s.recvfrom(min(HOPR_SESSION_MAX_PAYLOAD_SIZE, total_sent))
                     total_sent = total_sent - len(chunk)
+                    # Adapt for situations when data arrive completely unordered (also within the buffer)
                     actual.extend([m for m in re.split(r'\s+', chunk.decode().strip()) if len(m) > 0])
 
         expected = [msg.strip() for msg in expected]
