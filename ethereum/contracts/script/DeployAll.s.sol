@@ -8,6 +8,7 @@ import "../test/utils/ERC1820Registry.sol";
 import "../test/utils/PermittableToken.sol";
 import "./utils/NetworkConfig.s.sol";
 import "./utils/BoostUtilsLib.sol";
+import { WinProb } from "../src/WinningProbabilityOracle.sol";
 
 /**
  * @title Deploy all the required contracts in development, staging and production environment
@@ -87,6 +88,10 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
         // 3.8. TicketPriceOracle
         _deployHoprTicketPriceOracle(deployerAddress, 100);
 
+        // 3.9. WinningProbabilityOracle, with a default value of 1.0
+        _deployHoprWinningProbabilityOracle(deployerAddress, WinProb.wrap(type(uint56).max));
+
+        // 3.10. Announcements
         _deployHoprAnnouncements();
 
         // 4. update indexerStartBlockNumber
@@ -275,6 +280,20 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
             // deploy contract
             currentNetworkDetail.addresses.ticketPriceOracleContractAddress =
                 deployCode("TicketPriceOracle.sol:HoprTicketPriceOracle", abi.encode(deployerAddress, price));
+        }
+    }
+
+    /**
+     * @dev deploy winning probability oracle
+     */
+    function _deployHoprWinningProbabilityOracle(address deployerAddress, WinProb winProb) internal {
+        if (
+            currentEnvironmentType == EnvironmentType.LOCAL
+                || !isValidAddress(currentNetworkDetail.addresses.winningProbabilityContractAddress)
+        ) {
+            // deploy contract
+            currentNetworkDetail.addresses.winningProbabilityContractAddress =
+                deployCode("WinningProbabilityOracle.sol:HoprWinningProbablityOracle", abi.encode(deployerAddress, winProb));
         }
     }
 
