@@ -210,11 +210,13 @@ async fn peer_setup_for(count: usize) -> anyhow::Result<(Vec<WireChannels>, Vec<
             packet_keypair: opk.clone(),
             chain_keypair: ock.clone(),
             mixer: MixerConfig::default(), // TODO: unnecessary, can be removed
+            outgoing_ticket_win_prob: 1.0,
         };
 
         hopr_transport_protocol::run_msg_ack_protocol(
             cfg,
             db,
+            &PEERS[i],
             &PEERS_CHAIN[i],
             None,
             received_ack_tickets_tx,

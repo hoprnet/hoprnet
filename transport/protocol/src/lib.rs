@@ -63,10 +63,7 @@ pub mod ticket_aggregation;
 pub mod timer;
 use ack::processor::AckResult;
 use core_path::path::TransportPath;
-use hopr_crypto_types::{
-    keypairs::{ChainKeypair, Keypair, OffchainKeypair},
-    types::HalfKey,
-};
+use hopr_crypto_types::keypairs::{ChainKeypair, OffchainKeypair};
 pub use timer::execute_on_tick;
 
 use futures::{SinkExt, StreamExt};
@@ -128,15 +125,6 @@ lazy_static::lazy_static! {
     .unwrap();
 }
 
-lazy_static::lazy_static! {
-    static ref GIBBERISH_HALF_KEY_CHALLENGE: HalfKey = HalfKey::random();
-    static ref GIBBERISH_OFFCHAIN_KEYPAIR: OffchainKeypair = OffchainKeypair::random();
-    static ref GIBBERISH_ACK: Acknowledgement = Acknowledgement::new(
-        *GIBBERISH_HALF_KEY_CHALLENGE,
-        &GIBBERISH_OFFCHAIN_KEYPAIR,
-    );
-}
-
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum ProtocolProcesses {
     AckIn,
@@ -150,6 +138,7 @@ pub enum ProtocolProcesses {
 pub async fn run_msg_ack_protocol<Db>(
     cfg: msg::processor::PacketInteractionConfig,
     db: Db,
+    me: &OffchainKeypair,
     me_onchain: &ChainKeypair,
     bloom_filter_persistent_path: Option<String>,
     on_ack_ticket: impl futures::Sink<AcknowledgedTicket> + Send + Sync + 'static,
@@ -324,6 +313,7 @@ where
         }),
     );
 
+    let me = me.clone();
     processes.insert(
         ProtocolProcesses::MsgIn,
         spawn(async move {
@@ -337,6 +327,7 @@ where
                 .filter_map(move |v| {
                     let mut internal_ack_send = internal_ack_send.clone();
                     let mut msg_to_send_tx = msg_to_send_tx.clone();
+                    let me = me.clone();
 
                     async move {
                         match v {
@@ -382,11 +373,11 @@ where
                                 }
 
                                 error!(peer = %peer, "Failed to process received message: {e}");
-                                // send gibberish ack in order to give feedback to the sender
+                                // send random signed acknowledgement to give feedback to the sender
                                 internal_ack_send
                                     .send((
                                         peer,
-                                        GIBBERISH_ACK.clone(),
+                                        Acknowledgement::random(&me),
                                     ))
                                     .await
                                     .unwrap_or_else(|e| {

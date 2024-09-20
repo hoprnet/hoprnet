@@ -79,7 +79,12 @@ where
 
         let packet = self
             .db
-            .to_send(data.to_bytes(), self.cfg.chain_keypair.clone(), path?)
+            .to_send(
+                data.to_bytes(),
+                self.cfg.chain_keypair.clone(),
+                path?,
+                self.cfg.outgoing_ticket_win_prob,
+            )
             .await
             .map_err(|e| PacketError::PacketConstructionError(e.to_string()))?;
 
@@ -110,6 +115,7 @@ where
                 self.cfg.chain_keypair.clone(),
                 &self.cfg.packet_keypair,
                 previous_hop,
+                self.cfg.outgoing_ticket_win_prob,
             )
             .await
             .map_err(|e| match e {
@@ -279,15 +285,17 @@ pub struct PacketInteractionConfig {
     pub packet_keypair: OffchainKeypair,
     pub chain_keypair: ChainKeypair,
     pub mixer: MixerConfig,
+    pub outgoing_ticket_win_prob: f64,
 }
 
 impl PacketInteractionConfig {
-    pub fn new(packet_keypair: &OffchainKeypair, chain_keypair: &ChainKeypair) -> Self {
+    pub fn new(packet_keypair: &OffchainKeypair, chain_keypair: &ChainKeypair, outgoing_ticket_win_prob: f64) -> Self {
         Self {
             packet_keypair: packet_keypair.clone(),
             chain_keypair: chain_keypair.clone(),
             check_unrealized_balance: true,
             mixer: MixerConfig::default(),
+            outgoing_ticket_win_prob,
         }
     }
 }

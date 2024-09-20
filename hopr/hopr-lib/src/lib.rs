@@ -89,6 +89,9 @@ pub use {
     },
 };
 
+#[cfg(feature = "runtime-tokio")]
+pub use hopr_transport::transfer_session;
+
 use crate::constants::{MIN_NATIVE_BALANCE, ONBOARDING_INFORMATION_INTERVAL, SUGGESTED_NATIVE_BALANCE};
 use crate::{config::SafeModule, errors::HoprLibError};
 
@@ -692,7 +695,7 @@ impl Hopr {
         info!(
             "Node is not started, please fund this node {} with at least {}",
             self.me_onchain(),
-            Balance::new_from_str(SUGGESTED_NATIVE_BALANCE, BalanceType::HOPR).to_formatted_string()
+            Balance::new_from_str(SUGGESTED_NATIVE_BALANCE, BalanceType::Native).to_formatted_string()
         );
 
         let mut processes: HashMap<HoprLibProcesses, JoinHandle<()>> = HashMap::new();
