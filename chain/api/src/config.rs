@@ -233,7 +233,7 @@ impl From<&ChainNetworkConfig> for ContractAddresses {
             network_registry_proxy: network.network_registry_proxy,
             safe_registry: network.node_safe_registry,
             price_oracle: network.ticket_price_oracle,
-            winning_probability_oracle: network.winning_probability_oracle,
+            win_prob_oracle: network.winning_probability_oracle,
             stake_factory: network.node_stake_v2_factory,
             module_implementation: network.module_implementation,
         }
