@@ -9,6 +9,7 @@ pub(crate) struct RetryToken {
     pub num_retry: usize,
     pub started_at: Instant,
     backoff_base: f64,
+    created_at: Instant,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -23,6 +24,16 @@ impl RetryToken {
         Self {
             num_retry: 0,
             started_at: now,
+            created_at: Instant::now(),
+            backoff_base,
+        }
+    }
+
+    pub fn replenish(self, now: Instant, backoff_base: f64) -> Self {
+        Self {
+            num_retry: 0,
+            started_at: now,
+            created_at: self.created_at,
             backoff_base,
         }
     }
@@ -51,8 +62,13 @@ impl RetryToken {
                 num_retry: self.num_retry + 1,
                 started_at: self.started_at,
                 backoff_base: self.backoff_base,
+                created_at: self.created_at,
             }),
         }
+    }
+
+    pub fn time_since_creation(&self) -> Duration {
+        self.created_at.elapsed()
     }
 }
 

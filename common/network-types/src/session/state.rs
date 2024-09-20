@@ -88,6 +88,7 @@ use crossbeam_skiplist::SkipMap;
 use dashmap::mapref::entry::Entry;
 use dashmap::DashMap;
 use futures::channel::mpsc::UnboundedSender;
+use futures::future::BoxFuture;
 use futures::{
     pin_mut, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, FutureExt, Sink, SinkExt, StreamExt, TryStreamExt,
 };
@@ -104,13 +105,24 @@ use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
 use tracing::{debug, error, trace, warn};
 
-use hopr_async_runtime::prelude::{sleep, spawn};
+use hopr_async_runtime::prelude::spawn;
 
 use crate::errors::NetworkTypeError;
 use crate::session::errors::SessionError;
 use crate::session::frame::{segment, FrameId, FrameReassembler, Segment, SegmentId};
 use crate::session::protocol::{FrameAcknowledgements, SegmentRequest, SessionMessage};
 use crate::session::utils::{AsyncReadStreamer, RetryResult, RetryToken};
+
+#[cfg(all(feature = "prometheus", not(test)))]
+lazy_static::lazy_static! {
+    static ref METRIC_TIME_TO_ACK: hopr_metrics::MultiHistogram =
+        hopr_metrics::MultiHistogram::new(
+            "hopr_session_time_to_ack",
+            "Time in seconds until a complete frame gets acknowledged by the recipient",
+            vec![0.5, 1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0, 128.0, 256.0],
+            &["session_id"]
+    ).unwrap();
+}
 
 /// Represents individual Session protocol features that can be enabled.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -164,8 +176,10 @@ pub struct SessionConfig {
     ///
     /// Requests will be sent until `frame_expiration_age` is reached.
     ///
-    /// NOTE that this value should be offset from `rto_base_sender`, so that the receiver's
+    /// NOTE: this value should be offset from `rto_base_sender`, so that the receiver's
     /// retransmission requests are interleaved with the sender's retransmissions.
+    ///
+    /// In *most* cases, you want to 0 < `rto_base_receiver` < `rto_base_sender` < `frame_expiration_age`.
     #[default(Duration::from_millis(1000))]
     pub rto_base_receiver: Duration,
 
@@ -174,8 +188,10 @@ pub struct SessionConfig {
     ///
     /// Frames will be retransmitted until `frame_expiration_age` is reached.
     ///
-    /// NOTE that this value should be offset from `rto_base_receiver`, so that the receiver's
+    /// NOTE: this value should be offset from `rto_base_receiver`, so that the receiver's
     /// retransmission requests are interleaved with the sender's retransmissions.
+    ///
+    /// In *most* cases, you want to 0 < `rto_base_receiver` < `rto_base_sender` < `frame_expiration_age`.
     #[default(Duration::from_millis(1500))]
     pub rto_base_sender: Duration,
 
@@ -220,6 +236,18 @@ pub struct SessionState<const C: usize> {
     segment_egress_send: UnboundedSender<SessionMessage<C>>,
 }
 
+fn maybe_fused_future<'a, F>(condition: bool, future: F) -> futures::future::Fuse<BoxFuture<'a, ()>>
+where
+    F: Future<Output = ()> + Send + Sync + 'a,
+{
+    if condition {
+        future.boxed()
+    } else {
+        futures::future::pending().boxed()
+    }
+    .fuse()
+}
+
 impl<const C: usize> SessionState<C> {
     fn consume_segment(&mut self, segment: Segment) -> crate::errors::Result<()> {
         let id = segment.id();
@@ -229,8 +257,9 @@ impl<const C: usize> SessionState<C> {
                 trace!(session_id = self.session_id, "RECEIVED: segment {id:?}");
                 match self.incoming_frame_retries.entry(id.0) {
                     Entry::Occupied(e) => {
-                        // Restart the retry token for this frame
-                        e.replace_entry(RetryToken::new(Instant::now(), self.cfg.backoff_base));
+                        // Receiving a frame segment restarts the retry token for this frame
+                        let rt = *e.get();
+                        e.replace_entry(rt.replenish(Instant::now(), self.cfg.backoff_base));
                     }
                     Entry::Vacant(v) => {
                         // Create the retry token for this frame
@@ -293,7 +322,17 @@ impl<const C: usize> SessionState<C> {
 
         for frame_id in acked {
             // Frame acknowledged, we won't need to resend it
-            self.outgoing_frame_resends.remove(&frame_id);
+            if let Some((_, rt)) = self.outgoing_frame_resends.remove(&frame_id) {
+                let to_ack = rt.time_since_creation();
+                trace!(
+                    session_id = self.session_id,
+                    "frame {frame_id} took {to_ack:?} to acknowledge"
+                );
+
+                #[cfg(all(feature = "prometheus", not(test)))]
+                METRIC_TIME_TO_ACK.observe(&[self.session_id()], to_ack.as_secs_f64())
+            }
+
             for seg in self.lookbehind.iter().filter(|s| frame_id == s.key().0) {
                 seg.remove();
             }
@@ -511,6 +550,10 @@ impl<const C: usize> SessionState<C> {
         Ok(count)
     }
 
+    const PAYLOAD_CAPACITY: usize = C - SessionMessage::<C>::HEADER_SIZE - Segment::HEADER_SIZE;
+
+    const MAX_WRITE_SIZE: usize = SessionMessage::<C>::MAX_SEGMENTS_PER_FRAME * Self::PAYLOAD_CAPACITY;
+
     /// Segments the `data` and sends them as (possibly multiple) [`SessionMessage::Segment`].
     /// Therefore, this method sends as many messages as needed after the data was segmented.
     /// Each segment is inserted into the lookbehind ring buffer for possible retransmissions.
@@ -520,14 +563,12 @@ impl<const C: usize> SessionState<C> {
     /// is the expected underlying transport bandwidth (segment/sec) to guarantee the retransmission
     /// can still happen within some time window.
     pub async fn send_frame_data(&mut self, data: &[u8]) -> crate::errors::Result<()> {
-        // Real space for payload is MTU minus sizes of the headers
-        let real_payload_len = C - SessionMessage::<C>::HEADER_SIZE - Segment::HEADER_SIZE;
-        if data.is_empty() || data.len() > SessionMessage::<C>::MAX_SEGMENTS_PER_FRAME * real_payload_len {
+        if data.is_empty() || data.len() > Self::MAX_WRITE_SIZE {
             return Err(SessionError::IncorrectMessageLength.into());
         }
 
         let frame_id = self.outgoing_frame_id.fetch_add(1, Ordering::SeqCst);
-        let segments = segment(data, real_payload_len, frame_id)?;
+        let segments = segment(data, Self::PAYLOAD_CAPACITY, frame_id)?;
         let count = segments.len();
 
         for segment in segments {
@@ -566,27 +607,75 @@ impl<const C: usize> SessionState<C> {
     /// - [`SessionState::request_missing_segments`]
     /// - [`SessionState::retransmit_unacknowledged_frames`]
     ///
-    async fn advance(&mut self) -> crate::errors::Result<()> {
-        if self.segment_egress_send.is_closed() {
-            return Err(SessionError::SessionClosed.into());
+    async fn state_loop(&mut self) -> crate::errors::Result<()> {
+        // Rate limiter for reassembler evictions:
+        // tries to evict 10 times before a frame expires
+        let eviction_limiter =
+            governor::RateLimiter::direct(Quota::with_period(self.cfg.frame_expiration_age / 10).ok_or(
+                NetworkTypeError::Other("rate limiter frame_expiration_age invalid".into()),
+            )?);
+
+        // Rate limiter for acknowledgements:
+        // sends acknowledgements 4 times more often
+        // than the other side can retransmit them, or we ask for retransmissions.
+        let ack_rate_limiter = governor::RateLimiter::direct(
+            Quota::with_period(self.cfg.rto_base_sender.min(self.cfg.rto_base_receiver) / 4)
+                .ok_or(NetworkTypeError::Other("rate limiter ack rate invalid".into()))?,
+        );
+
+        // Rate limiter for retransmissions by the sender
+        let sender_retransmit = governor::RateLimiter::direct(
+            Quota::with_period(self.cfg.rto_base_sender)
+                .ok_or(NetworkTypeError::Other("rate limiter rto sender invalid".into()))?,
+        );
+
+        // Rate limiter for retransmissions by the receiver
+        let receiver_retransmit = governor::RateLimiter::direct(
+            Quota::with_period(self.cfg.rto_base_receiver)
+                .ok_or(NetworkTypeError::Other("rate limiter rto receiver invalid".into()))?,
+        );
+
+        loop {
+            let mut evict_fut = eviction_limiter.until_ready().boxed().fuse();
+            let mut ack_fut = maybe_fused_future(
+                self.cfg.enabled_features.contains(&SessionFeature::AcknowledgeFrames),
+                ack_rate_limiter.until_ready(),
+            );
+            let mut r_snd_fut = maybe_fused_future(
+                self.cfg.enabled_features.contains(&SessionFeature::RetransmitFrames),
+                sender_retransmit.until_ready(),
+            );
+            let mut r_rcv_fut = maybe_fused_future(
+                self.cfg
+                    .enabled_features
+                    .contains(&SessionFeature::RequestIncompleteFrames),
+                receiver_retransmit.until_ready(),
+            );
+            let mut is_done = maybe_fused_future(self.segment_egress_send.is_closed(), futures::future::ready(()));
+
+            // Futures in select_biased! are ordered from the least often happening first
+            if let Err(e) = futures::select_biased! {
+                _ = is_done => {
+                    Err(NetworkTypeError::Other("session writer has been closed".into()))
+                },
+                _ = r_rcv_fut => {
+                    self.request_missing_segments().await
+                },
+                _ = r_snd_fut => {
+                    self.retransmit_unacknowledged_frames().await
+                },
+                _ = ack_fut => {
+                    self.acknowledge_segments().await
+                },
+                 _ = evict_fut => {
+                    self.frame_reassembler.evict().map_err(NetworkTypeError::from)
+                },
+            } {
+                debug!(session_id = self.session_id, "session is closing: {e}");
+                break;
+            }
         }
 
-        let num_evicted = self.frame_reassembler.evict()?;
-        trace!(session_id = self.session_id, "evicted {num_evicted} frames");
-
-        if self.cfg.enabled_features.contains(&SessionFeature::AcknowledgeFrames) {
-            self.acknowledge_segments().await?;
-        }
-        if self
-            .cfg
-            .enabled_features
-            .contains(&SessionFeature::RequestIncompleteFrames)
-        {
-            self.request_missing_segments().await?;
-        }
-        if self.cfg.enabled_features.contains(&SessionFeature::RetransmitFrames) {
-            self.retransmit_unacknowledged_frames().await?;
-        }
         Ok(())
     }
 
@@ -633,6 +722,12 @@ pub struct SessionSocket<const C: usize> {
 }
 
 impl<const C: usize> SessionSocket<C> {
+    /// Payload capacity is MTU minus the sizes of the Session protocol headers.
+    pub const PAYLOAD_CAPACITY: usize = SessionState::<C>::PAYLOAD_CAPACITY;
+
+    /// Maximum number of bytes that can be written in a single `poll_write` to the Session.
+    pub const MAX_WRITE_SIZE: usize = SessionState::<C>::MAX_WRITE_SIZE;
+
     /// Create a new socket over the given underlying `transport` that binds the communicating parties.
     /// A human-readable session `id` also must be supplied.
     pub fn new<T, I>(id: I, transport: T, cfg: SessionConfig) -> Self
@@ -737,20 +832,11 @@ impl<const C: usize> SessionSocket<C> {
         // Advance the state until the socket is closed
         let mut state_clone = state.clone();
         spawn(async move {
-            let timeout = cfg
-                .rto_base_receiver
-                .min(cfg.rto_base_sender)
-                .min(cfg.frame_expiration_age / 3);
-
-            loop {
-                match state_clone.advance().await {
-                    Ok(_) => sleep(timeout).await,
-                    Err(e) => {
-                        debug!(session_id = state_clone.session_id(), "session is closing: {e}");
-                        break;
-                    }
-                }
-            }
+            let loop_done = state_clone.state_loop().await;
+            debug!(
+                session_id = state_clone.session_id,
+                "FINISHED: state loop {loop_done:?}"
+            );
         });
 
         Self { state, frame_egress }
@@ -769,9 +855,10 @@ impl<const C: usize> SessionSocket<C> {
 
 impl<const C: usize> AsyncWrite for SessionSocket<C> {
     fn poll_write(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
-        tracing::debug!(
+        tracing::trace!(
             session_id = self.state.session_id(),
-            "polling write on socket reader inside session"
+            "polling write of {} bytes on socket reader inside session",
+            buf.len()
         );
         let mut socket_future = self.state.send_frame_data(buf).boxed();
         match Pin::new(&mut socket_future).poll(cx) {
@@ -782,7 +869,7 @@ impl<const C: usize> AsyncWrite for SessionSocket<C> {
     }
 
     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
-        tracing::debug!(
+        tracing::trace!(
             session_id = self.state.session_id(),
             "polling flush on socket reader inside session"
         );
@@ -792,7 +879,7 @@ impl<const C: usize> AsyncWrite for SessionSocket<C> {
     }
 
     fn poll_close(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
-        tracing::debug!(
+        tracing::trace!(
             session_id = self.state.session_id(),
             "polling close on socket reader inside session"
         );
@@ -804,7 +891,7 @@ impl<const C: usize> AsyncWrite for SessionSocket<C> {
 
 impl<const C: usize> AsyncRead for SessionSocket<C> {
     fn poll_read(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<std::io::Result<usize>> {
-        tracing::debug!(
+        tracing::trace!(
             session_id = self.state.session_id(),
             "polling read on socket reader inside session"
         );
