@@ -1,7 +1,12 @@
 use async_trait::async_trait;
+use futures::stream::BoxStream;
+use futures::StreamExt;
+use futures::TryStreamExt;
+use sea_orm::query::QueryTrait;
 use sea_orm::sea_query::{Expr, OnConflict, Value};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DbErr, EntityTrait, IntoActiveModel, ModelTrait, QueryFilter, QueryOrder, Related,
+    StreamTrait,
 };
 use std::str::FromStr;
 use tracing::error;
@@ -31,7 +36,12 @@ pub trait HoprDbLogOperations {
         log_index: u64,
     ) -> Result<SerializableLog>;
 
-    async fn get_all_logs<'a>(&'a self, tx: OptTx<'a>) -> Result<Vec<SerializableLog>>;
+    async fn get_logs<'a>(
+        &'a self,
+        tx: OptTx<'a>,
+        block_number: Option<u64>,
+        block_offset: Option<u64>,
+    ) -> Result<BoxStream<'a, SerializableLog>>;
 
     async fn set_log_processed<'a>(&'a self, tx: OptTx<'a>, log: SerializableLog) -> Result<()>;
 }
@@ -131,24 +141,39 @@ impl HoprDbLogOperations for HoprDb {
             .await
     }
 
-    async fn get_all_logs<'a>(&'a self, tx: OptTx<'a>) -> Result<Vec<SerializableLog>> {
+    async fn get_logs<'a>(
+        &'a self,
+        tx: OptTx<'a>,
+        block_number: Option<u64>,
+        block_offset: Option<u64>,
+    ) -> Result<BoxStream<SerializableLog>> {
+        let min_block_number = block_number.unwrap_or(0);
+
         self.nest_transaction_in_db(tx, TargetDb::Logs)
             .await?
             .perform(|tx| {
                 Box::pin(async move {
                     Log::find()
                         .find_also_related(LogStatus)
-                        .all(tx.as_ref())
-                        .await?
-                        .into_iter()
-                        .map(|(log, log_status)| {
-                            if let Some(status) = log_status {
-                                create_log(log, status)
-                            } else {
-                                Err(DbSqlError::MissingLog)
-                            }
+                        .filter(log::Column::BlockNumber.gte(min_block_number.to_be_bytes().to_vec()))
+                        .apply_if(block_offset, |mut q, v| {
+                            q.filter(log::Column::BlockNumber.lt((min_block_number + v).to_be_bytes().to_vec()))
                         })
-                        .collect()
+                        .order_by_asc(log::Column::BlockNumber)
+                        .order_by_asc(log::Column::TransactionIndex)
+                        .order_by_asc(log::Column::LogIndex)
+                        .stream(tx.as_ref())
+                        .await?
+                        .boxed()
+                        .map(|res| match res {
+                            Ok((log, Some(log_status))) => create_log(log, log_status),
+                            Ok((log, None)) => {
+                                error!("Missing log status for log in db: {:?}", log);
+                                Ok(SerializableLog::from(log))
+                            }
+                            Err(e) => Err(DbSqlError::from(e)),
+                        })
+                        .as_ref()
                 })
             })
             .await
@@ -225,7 +250,7 @@ mod tests {
 
         db.store_logs(None, [log.clone()].into()).await.unwrap();
 
-        let logs = db.get_all_logs(None).await.unwrap();
+        let logs = db.get_logs(None).await.unwrap().try_collect().await.unwrap();
 
         assert_eq!(logs.len(), 1);
         assert_eq!(logs[0], log);
@@ -267,7 +292,7 @@ mod tests {
             .await
             .unwrap();
 
-        let logs = db.get_all_logs(None).await.unwrap();
+        let logs = db.get_logs(None).await.unwrap().try_collect().await.unwrap();
 
         assert_eq!(logs.len(), 2);
         assert_eq!(logs[0], log_1);
@@ -304,7 +329,7 @@ mod tests {
             .await
             .expect_err("should not store duplicate log");
 
-        let logs = db.get_all_logs(None).await.unwrap();
+        let logs = db.get_logs(None).await.unwrap().try_collect().await.unwrap();
 
         assert_eq!(logs.len(), 1);
     }
@@ -317,7 +342,7 @@ mod tests {
             .await
             .expect_err("should fail due to empty list");
 
-        let logs = db.get_all_logs(None).await.unwrap();
+        let logs = db.get_logs(None).await.unwrap().try_collect().await.unwrap();
 
         assert_eq!(logs.len(), 0);
     }
@@ -358,5 +383,70 @@ mod tests {
 
         assert_eq!(log_db_updated.processed, Some(true));
         assert_eq!(log_db_updated.processed_at.is_some(), true);
+    }
+
+    #[async_std::test]
+    async fn test_list_logs_ordered() {
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
+
+        let logs_per_tx = 5;
+        let tx_per_block = 10;
+        let blocks = 10000;
+        let start_block = 32183412;
+
+        let logs = (0..blocks)
+            .flat_map(|block_offset| {
+                (0..tx_per_block).flat_map(move |tx_index| {
+                    (0..logs_per_tx).map(move |log_index| SerializableLog {
+                        address: Hash::create(&[b"my address"]).to_hex(),
+                        topics: [Hash::create(&[b"my topic"]).to_hex()].into(),
+                        data: [1, 2, 3, 4].into(),
+                        tx_index,
+                        block_number: start_block + block_offset,
+                        block_hash: Hash::create(&[b"my block hash"]).to_hex(),
+                        tx_hash: Hash::create(&[b"my tx hash"]).to_hex(),
+                        log_index,
+                        removed: false,
+                        ..Default::default()
+                    })
+                })
+            })
+            .collect::<Vec<_>>();
+
+        db.store_logs(None, logs.clone().into()).await.unwrap();
+
+        let block_fetch_interval = 842;
+        let mut block_fetch_sets = vec![];
+        let mut set_start = start_block;
+        loop {
+            if set_start > start_block + blocks {
+                break;
+            }
+            block_fetch_sets.push(set_start);
+            set_start = set_start + block_fetch_interval;
+        }
+
+        block_fetch_sets
+            .iter()
+            .map(|b| db.get_logs(None, *b, block_fetch_interval))
+            .for_each(|block| async {
+                let ordered_logs = db.get_logs(None, block.clone(), block_fetch_interval).await.unwrap();
+                ordered_logs.iter().reduce(|prev_log, curr_log| {
+                    assert!(prev_log.block_number >= block);
+                    assert!(prev_log.block_number < (block + block_fetch_interval));
+                    assert!(curr_log.block_number >= block);
+                    assert!(curr_log.block_number < (block + block_fetch_interval));
+                    if prev_log.block_number == curr_log.block_number {
+                        if prev_log.tx_index == curr_log.tx_index {
+                            assert!(prev_log.log_index < curr_log.log_index);
+                        } else {
+                            assert!(prev_log.tx_index < curr_log.tx_index);
+                        }
+                    } else {
+                        assert!(prev_log.block_number < curr_log.block_number);
+                    }
+                });
+            })
+            .await?;
     }
 }

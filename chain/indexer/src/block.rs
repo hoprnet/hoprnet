@@ -142,6 +142,10 @@ where
             topics: topics.into_iter().map(Hash::from).collect(),
         };
 
+        info!("Start fast sync from block: {next_block_to_process}");
+
+        panic!("STOP AFTER THIS POINT");
+
         info!("Building indexer background process");
         let (tx, mut rx) = futures::channel::mpsc::channel::<()>(1);
 
