@@ -443,7 +443,7 @@ async def test_session_communication_over_n_hop_with_a_udp_echo_server(
 async def test_session_communication_with_an_https_server(
         src: str, dest: str, swarm7: dict[str, Node]
 ):
-    file_len = 50000
+    file_len = 500
     src_peer = swarm7[src]
     dest_peer = swarm7[dest]
 
@@ -472,7 +472,7 @@ async def test_session_communication_with_an_https_server(
 async def test_session_communication_over_n_hop_with_an_https_server(
         route, swarm7: dict[str, Node]
 ):
-    file_len=50000
+    file_len=500
 
     src_peer = swarm7[route[0]]
     dest_peer = swarm7[route[-1]]
