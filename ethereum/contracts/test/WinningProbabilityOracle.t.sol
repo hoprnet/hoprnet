@@ -3,24 +3,24 @@ pragma solidity >=0.6.0 <0.9.0;
 
 import { Test } from "forge-std/Test.sol";
 import { Ownable2Step } from "openzeppelin-contracts/access/Ownable2Step.sol";
-import { WinProb, HoprWinningProbablityOracle, HoprWinningProbablityOracleEvents } from "../src/WinningProbabilityOracle.sol";
+import { WinProb, HoprWinningProbabilityOracle, HoprWinningProbabilityOracleEvents } from "../src/WinningProbabilityOracle.sol";
 
 contract Ownable2StepEvents {
     event OwnershipTransferStarted(address indexed previousOwner, address indexed newOwner);
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
 }
 
-contract TicketWinningProbabilityOracleTest is Test, HoprWinningProbablityOracleEvents, Ownable2StepEvents{
-    HoprWinningProbablityOracle public oracle;
+contract TicketWinningProbabilityOracleTest is Test, HoprWinningProbabilityOracleEvents, Ownable2StepEvents{
+    HoprWinningProbabilityOracle public oracle;
     address public owner;
 
     function setUp() public {
         owner = vm.addr(101); // make address(101) new owner
-        oracle = new HoprWinningProbablityOracle(owner, WinProb.wrap(0xffffffffffffff));
+        oracle = new HoprWinningProbabilityOracle(owner, WinProb.wrap(0xffffffffffffff));
     }
 
     function test_setUpWithZero() public {
-        HoprWinningProbablityOracle newOracle = new HoprWinningProbablityOracle(owner, WinProb.wrap(0));
+        HoprWinningProbabilityOracle newOracle = new HoprWinningProbabilityOracle(owner, WinProb.wrap(0));
         assertEq(address(oracle).code, address(newOracle).code);
     }
 
@@ -33,7 +33,7 @@ contract TicketWinningProbabilityOracleTest is Test, HoprWinningProbablityOracle
 
     function testRevert_setSameFails() public {
         vm.prank(owner);
-        vm.expectRevert(HoprWinningProbablityOracle.WinProbMustNotBeSame.selector);
+        vm.expectRevert(HoprWinningProbabilityOracle.WinProbMustNotBeSame.selector);
         oracle.setWinProb(WinProb.wrap(0xffffffffffffff));
     }
 
@@ -46,7 +46,7 @@ contract TicketWinningProbabilityOracleTest is Test, HoprWinningProbablityOracle
     function testFuzz_setWinProb(WinProb newWinProb) public {
         if (newWinProb == oracle.currentWinProb()) {
             // the new winning probability must not be the same as the current one
-            vm.expectRevert(HoprWinningProbablityOracle.WinProbMustNotBeSame.selector);
+            vm.expectRevert(HoprWinningProbabilityOracle.WinProbMustNotBeSame.selector);
         } else {
             vm.expectEmit(true, false, false, false, address(oracle));
             emit WinProbUpdated(oracle.currentWinProb(), newWinProb);

@@ -10,7 +10,7 @@ use bindings::hopr_node_stake_factory::HoprNodeStakeFactory;
 use bindings::hopr_safe_proxy_for_network_registry::HoprSafeProxyForNetworkRegistry;
 use bindings::hopr_ticket_price_oracle::HoprTicketPriceOracle;
 use bindings::hopr_token::HoprToken;
-use bindings::hopr_winning_probablity_oracle::HoprWinningProbablityOracle;
+use bindings::hopr_winning_probablity_oracle::HoprWinningProbabilityOracle;
 use ethers::abi::Token;
 use ethers::prelude::*;
 use hex_literal::hex;
@@ -83,7 +83,7 @@ pub struct ContractInstances<M: Middleware> {
     pub network_registry_proxy: NetworkRegistryProxy<M>,
     pub safe_registry: HoprNodeSafeRegistry<M>,
     pub price_oracle: HoprTicketPriceOracle<M>,
-    pub win_prob_oracle: HoprWinningProbablityOracle<M>,
+    pub win_prob_oracle: HoprWinningProbabilityOracle<M>,
     pub stake_factory: HoprNodeStakeFactory<M>,
     pub module_implementation: HoprNodeManagementModule<M>,
 }
@@ -107,7 +107,7 @@ impl<M: Middleware> Clone for ContractInstances<M> {
             },
             safe_registry: HoprNodeSafeRegistry::new(self.safe_registry.address(), client.clone()),
             price_oracle: HoprTicketPriceOracle::new(self.price_oracle.address(), client.clone()),
-            win_prob_oracle: HoprWinningProbablityOracle::new(self.win_prob_oracle.address(), client.clone()),
+            win_prob_oracle: HoprWinningProbabilityOracle::new(self.win_prob_oracle.address(), client.clone()),
             stake_factory: HoprNodeStakeFactory::new(self.stake_factory.address(), client.clone()),
             module_implementation: HoprNodeManagementModule::new(self.module_implementation.address(), client.clone()),
         }
@@ -134,7 +134,7 @@ impl<M: Middleware> ContractInstances<M> {
             },
             safe_registry: HoprNodeSafeRegistry::new(contract_addresses.safe_registry, provider.clone()),
             price_oracle: HoprTicketPriceOracle::new(contract_addresses.price_oracle, provider.clone()),
-            win_prob_oracle: HoprWinningProbablityOracle::new(contract_addresses.win_prob_oracle, provider.clone()),
+            win_prob_oracle: HoprWinningProbabilityOracle::new(contract_addresses.win_prob_oracle, provider.clone()),
             stake_factory: HoprNodeStakeFactory::new(contract_addresses.stake_factory, provider.clone()),
             module_implementation: HoprNodeManagementModule::new(
                 contract_addresses.module_implementation,
@@ -174,7 +174,7 @@ impl<M: Middleware> ContractInstances<M> {
         )?
         .send()
         .await?;
-        let win_prob_oracle = HoprWinningProbablityOracle::deploy(
+        let win_prob_oracle = HoprWinningProbabilityOracle::deploy(
             provider.clone(),
             (self_address, ethers::types::U256::from(72057594037927935_u128)), // 0xFFFFFFFFFFFFFF
         )?

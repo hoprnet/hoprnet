@@ -10,7 +10,7 @@ function equal(WinProb a, WinProb b) pure returns (bool) {
     return WinProb.unwrap(a) == WinProb.unwrap(b);
 }
 
-abstract contract HoprWinningProbablityOracleEvents {
+abstract contract HoprWinningProbabilityOracleEvents {
     // emitted when winning probability was updated
     event WinProbUpdated(WinProb, WinProb);
 }
@@ -30,7 +30,7 @@ abstract contract HoprWinningProbablityOracleEvents {
  *                                          %%%%
  *                                          %%%%
  *
- * @title HoprWinningProbablityOracle
+ * @title HoprWinningProbabilityOracle
  * @dev Oracle which defines the current minimum winning probability used in a HOPR network.
  * Exposes a single function to set a new global minimum winning probablity set by the contract owner.
  *
@@ -41,7 +41,7 @@ abstract contract HoprWinningProbablityOracleEvents {
  * An update of the winning probablility triggers an event `WinProbUpdated`.
  * The winning probablity `WinProb` is stored in uint56, the same as in the HoprChannels contract.
  */
-contract HoprWinningProbablityOracle is Ownable2Step, HoprWinningProbablityOracleEvents {
+contract HoprWinningProbabilityOracle is Ownable2Step, HoprWinningProbabilityOracleEvents {
     WinProb public currentWinProb;
 
     // when new winning probability is equal to old winning probability
