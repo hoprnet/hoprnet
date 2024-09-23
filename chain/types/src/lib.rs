@@ -50,7 +50,7 @@ pub struct ContractAddresses {
     pub safe_registry: Address,
     /// Price oracle contract
     pub price_oracle: Address,
-    /// Min ticket win prob contract,
+    /// Mininum ticket winning probability contract,
     pub win_prob_oracle: Address,
     /// Stake factory contract
     pub stake_factory: Address,
