@@ -13,7 +13,7 @@ function equal(WinProb a, WinProb b) pure returns (bool) {
 
 abstract contract HoprWinningProbabilityOracleEvents {
     // emitted when winning probability was updated
-    event WinProbUpdated(WinProb, WinProb);
+    event WinProbUpdated(WinProb oldWinProb, WinProb newWinProb);
 }
 
 /**
@@ -50,7 +50,7 @@ contract HoprWinningProbabilityOracle is Ownable2Step, HoprWinningProbabilityOra
 
     /**
      * @param _newOwner Address of the new owner.
-     * @param _initialWinProb Initially set the numerator of winning probability.
+     * @param _initialWinProb Initial winning probability to set.
      */
     constructor(address _newOwner, WinProb _initialWinProb) {
         _transferOwnership(_newOwner);
@@ -59,7 +59,7 @@ contract HoprWinningProbabilityOracle is Ownable2Step, HoprWinningProbabilityOra
 
     /**
      * @dev Owner can set a new winning probability.
-     * @param _newWinProb new winning probability, must not the same as what is already set
+     * @param _newWinProb new winning probability, must not be the same as what is already set
      */
     function setWinProb(WinProb _newWinProb) external onlyOwner {
         if (_newWinProb == currentWinProb) {
@@ -70,7 +70,7 @@ contract HoprWinningProbabilityOracle is Ownable2Step, HoprWinningProbabilityOra
 
     /**
      * @dev Set a new winning probability.
-     * @param _newWinProb new winning probability, must not the same as what is already set
+     * @param _newWinProb new winning probability, must not be the same as what is already set
      */
     function _setWinProb(WinProb _newWinProb) internal {
         WinProb oldWinProb = currentWinProb;

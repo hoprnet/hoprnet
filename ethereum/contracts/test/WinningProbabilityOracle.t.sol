@@ -26,6 +26,7 @@ contract TicketWinningProbabilityOracleTest is Test, HoprWinningProbabilityOracl
     function test_setUpWithZero() public {
         HoprWinningProbabilityOracle newOracle = new HoprWinningProbabilityOracle(owner, WinProb.wrap(0));
         assertEq(address(oracle).code, address(newOracle).code);
+        assertEq(WinProb.unwrap(newOracle.currentWinProb()), 0);
     }
 
     function test_setZero() public {
@@ -85,5 +86,18 @@ contract TicketWinningProbabilityOracleTest is Test, HoprWinningProbabilityOracl
         emit OwnershipTransferred(owner, newOwner);
         oracle.acceptOwnership();
         assertEq(oracle.owner(), newOwner);
+    }
+
+    function testRevert_acceptOwnershipByNonPendingOwner() public {
+        address newOwner = vm.addr(103);
+
+        // Initiate the ownership transfer
+        vm.prank(owner);
+        oracle.transferOwnership(newOwner);
+
+        // Attempt to accept ownership by an unauthorized address
+        vm.prank(vm.addr(104));
+        vm.expectRevert("Ownable2Step: caller is not the new owner");
+        oracle.acceptOwnership();
     }
 }
