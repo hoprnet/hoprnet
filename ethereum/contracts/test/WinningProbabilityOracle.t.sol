@@ -3,7 +3,11 @@ pragma solidity >=0.6.0 <0.9.0;
 
 import { Test } from "forge-std/Test.sol";
 import { Ownable2Step } from "openzeppelin-contracts/access/Ownable2Step.sol";
-import { WinProb, HoprWinningProbabilityOracle, HoprWinningProbabilityOracleEvents } from "../src/WinningProbabilityOracle.sol";
+import {
+    WinProb,
+    HoprWinningProbabilityOracle,
+    HoprWinningProbabilityOracleEvents
+} from "../src/WinningProbabilityOracle.sol";
 
 contract Ownable2StepEvents {
     event OwnershipTransferStarted(address indexed previousOwner, address indexed newOwner);

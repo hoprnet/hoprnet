@@ -4,7 +4,8 @@ pragma solidity 0.8.19;
 import { Ownable2Step } from "openzeppelin-contracts/access/Ownable2Step.sol";
 
 type WinProb is uint56;
-using {equal as ==} for WinProb global;
+
+using { equal as == } for WinProb global;
 
 function equal(WinProb a, WinProb b) pure returns (bool) {
     return WinProb.unwrap(a) == WinProb.unwrap(b);

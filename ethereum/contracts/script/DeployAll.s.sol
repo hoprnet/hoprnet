@@ -292,8 +292,9 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
                 || !isValidAddress(currentNetworkDetail.addresses.winningProbabilityContractAddress)
         ) {
             // deploy contract
-            currentNetworkDetail.addresses.winningProbabilityContractAddress =
-                deployCode("WinningProbabilityOracle.sol:HoprWinningProbabilityOracle", abi.encode(deployerAddress, winProb));
+            currentNetworkDetail.addresses.winningProbabilityContractAddress = deployCode(
+                "WinningProbabilityOracle.sol:HoprWinningProbabilityOracle", abi.encode(deployerAddress, winProb)
+            );
         }
     }
 
