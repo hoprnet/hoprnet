@@ -124,7 +124,7 @@ impl PingQueryReplier {
 }
 
 /// Timeout-based future that will resolve to the result of the ping operation.
-#[tracing::instrument(level = "trace")]
+#[tracing::instrument(level = "trace", skip(sender, timeout))]
 pub fn to_active_ping(
     peer: PeerId,
     sender: HeartbeatSendPingTx,
@@ -197,7 +197,7 @@ where
     /// # Arguments
     ///
     /// * `peers` - A vector of PeerId objects referencing the peers to be pinged
-    #[tracing::instrument(level = "info", skip(self))]
+    #[tracing::instrument(level = "info", skip(self, peers))]
     fn ping(&self, mut peers: Vec<PeerId>) -> impl Stream<Item = crate::errors::Result<std::time::Duration>> {
         let start_all_peers = current_time();
 
