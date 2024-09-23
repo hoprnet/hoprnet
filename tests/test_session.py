@@ -16,6 +16,7 @@ import threading
 import time
 
 from enum import Enum
+from exceptiongroup import catch
 from functools import partial
 from contextlib import contextmanager, AsyncExitStack
 from cryptography import x509
@@ -120,8 +121,14 @@ def fetch_data(url: str):
     # Suppress only the single InsecureRequestWarning from urllib3 needed for self-signed certs
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-    response = requests.get(url, verify=False)  # set verify=False for self-signed certs
-    return response
+    try:
+        response = requests.get(url, verify=False)  # set verify=False for self-signed certs
+        response.raise_for_status()
+        return response
+    except requests.exceptions.RequestException as e:
+        logging.error(f"HTTP request failed: {e}")
+        return None
+
 
 def generate_self_signed_cert(cert_file_with_key):
     key = rsa.generate_private_key(
@@ -457,7 +464,7 @@ async def test_session_communication_with_an_https_server(
         assert len(await src_peer.api.session_list_clients('tcp')) == 1
 
         response = fetch_data(f'https://localhost:{src_sock_port}/random.txt')
-        assert response.status_code == 200
+        assert response is not None
         assert response.text == expected
 
         assert await src_peer.api.session_close_client(protocol='tcp', bound_ip='127.0.0.1', bound_port=src_sock_port) is True
@@ -504,7 +511,7 @@ async def test_session_communication_over_n_hop_with_an_https_server(
             assert len(await src_peer.api.session_list_clients('tcp')) == 1
 
             response = fetch_data(f'https://localhost:{src_sock_port}/random.txt')
-            assert response.status_code == 200
+            assert response is not None
             assert response.text == expected
 
             assert await src_peer.api.session_close_client(protocol='tcp', bound_ip='127.0.0.1', bound_port=src_sock_port) is True
