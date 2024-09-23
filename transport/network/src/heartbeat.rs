@@ -176,6 +176,7 @@ impl<T: Pinging, API: HeartbeatExternalApi> Heartbeat<T, API> {
             )
         });
 
+        debug!(peers = tracing::field::debug(&peers), "Heartbeat round start");
         let timeout = (self.sleep_fn)(this_round_planned_duration).fuse();
         let ping_stream = self.pinger.ping(peers);
 

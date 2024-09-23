@@ -242,14 +242,15 @@ where
                 entry.backoff = self.cfg.backoff_max.max(entry.backoff.powf(self.cfg.backoff_exponent));
                 entry.update_quality(0.0_f64.max(entry.get_quality() - self.cfg.quality_step));
 
-                if entry.get_quality() < (self.cfg.quality_step / 2.0) {
-                    return Ok(Some(NetworkTriggeredEvent::CloseConnection(entry.id.1)));
-                } else if entry.get_quality() < self.cfg.quality_bad_threshold {
+                let q = entry.get_quality();
+
+                if q < (self.cfg.quality_step / 2.0) || q < self.cfg.quality_bad_threshold {
                     entry.ignored = Some(current_time());
                 }
             }
 
-            self.db.update_network_peer(entry.clone()).await?;
+            let (peer_id, quality) = (entry.id.1, entry.get_quality());
+            self.db.update_network_peer(entry).await?;
 
             #[cfg(all(feature = "prometheus", not(test)))]
             {
@@ -257,10 +258,11 @@ where
                 self.refresh_metrics(&stats)
             }
 
-            Ok(Some(NetworkTriggeredEvent::UpdateQuality(
-                entry.id.1,
-                entry.get_quality(),
-            )))
+            if quality < (self.cfg.quality_step / 2.0) {
+                Ok(Some(NetworkTriggeredEvent::CloseConnection(peer_id)))
+            } else {
+                Ok(Some(NetworkTriggeredEvent::UpdateQuality(peer_id, quality)))
+            }
         } else {
             debug!("Ignoring update request for unknown peer {}", peer);
             Ok(None)
@@ -316,6 +318,17 @@ where
                 if v.id.1 == self.me {
                     return None;
                 }
+
+                if let Some(ignore_start) = v.ignored {
+                    let should_be_ignored = ignore_start
+                        .checked_add(self.cfg.ignore_timeframe)
+                        .map_or(false, |v| v > threshold);
+
+                    if should_be_ignored {
+                        return None;
+                    }
+                }
+
                 let backoff = v.backoff.powf(self.cfg.backoff_exponent);
                 let delay = std::cmp::min(self.cfg.min_delay * (backoff as u32), self.cfg.max_delay);
 
