@@ -33,14 +33,14 @@ abstract contract HoprWinningProbabilityOracleEvents {
  *
  * @title HoprWinningProbabilityOracle
  * @dev Oracle which defines the current minimum winning probability used in a HOPR network.
- * Exposes a single function to set a new global minimum winning probablity set by the contract owner.
+ * Exposes a single function to set a new global minimum winning probability set by the contract owner.
  *
- * The winning probablity is written as IEEE 754 double precision floating point number.
+ * The winning probability is written as IEEE 754 double precision floating point number.
  *
- * The current winning probablity can be read via `currentWinProb()`.
+ * The current winning probability can be read via `currentWinProb()`.
  *
  * An update of the winning probablility triggers an event `WinProbUpdated`.
- * The winning probablity `WinProb` is stored in uint56, the same as in the HoprChannels contract.
+ * The winning probability `WinProb` is stored in uint56, the same as in the HoprChannels contract.
  */
 contract HoprWinningProbabilityOracle is Ownable2Step, HoprWinningProbabilityOracleEvents {
     WinProb public currentWinProb;
@@ -50,7 +50,7 @@ contract HoprWinningProbabilityOracle is Ownable2Step, HoprWinningProbabilityOra
 
     /**
      * @param _newOwner Address of the new owner.
-     * @param _initialWinProb Initially set the numerator of winning probablity.
+     * @param _initialWinProb Initially set the numerator of winning probability.
      */
     constructor(address _newOwner, WinProb _initialWinProb) {
         _transferOwnership(_newOwner);

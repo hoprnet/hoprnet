@@ -10,7 +10,7 @@ use bindings::hopr_node_stake_factory::HoprNodeStakeFactory;
 use bindings::hopr_safe_proxy_for_network_registry::HoprSafeProxyForNetworkRegistry;
 use bindings::hopr_ticket_price_oracle::HoprTicketPriceOracle;
 use bindings::hopr_token::HoprToken;
-use bindings::hopr_winning_probablity_oracle::HoprWinningProbabilityOracle;
+use bindings::hopr_winning_probability_oracle::HoprWinningProbabilityOracle;
 use ethers::abi::Token;
 use ethers::prelude::*;
 use hex_literal::hex;
