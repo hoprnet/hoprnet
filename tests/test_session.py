@@ -16,7 +16,6 @@ import threading
 import time
 
 from enum import Enum
-from exceptiongroup import catch
 from functools import partial
 from contextlib import contextmanager, AsyncExitStack
 from cryptography import x509
