@@ -10,7 +10,7 @@ contract Ownable2StepEvents {
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
 }
 
-contract TicketWinningProbabilityOracleTest is Test, HoprWinningProbabilityOracleEvents, Ownable2StepEvents{
+contract TicketWinningProbabilityOracleTest is Test, HoprWinningProbabilityOracleEvents, Ownable2StepEvents {
     HoprWinningProbabilityOracle public oracle;
     address public owner;
 
@@ -63,7 +63,7 @@ contract TicketWinningProbabilityOracleTest is Test, HoprWinningProbabilityOracl
 
         // fail to use a low-level call to set a large value
         bytes memory payload = abi.encodePacked(oracle.setWinProb.selector, largeValue);
-        (bool success, ) = address(oracle).call(payload);
+        (bool success,) = address(oracle).call(payload);
         assertFalse(success);
     }
 
@@ -80,7 +80,6 @@ contract TicketWinningProbabilityOracleTest is Test, HoprWinningProbabilityOracl
         vm.expectEmit(true, true, true, false, address(oracle));
         emit OwnershipTransferred(owner, newOwner);
         oracle.acceptOwnership();
-    
         assertEq(oracle.owner(), newOwner);
     }
 }
