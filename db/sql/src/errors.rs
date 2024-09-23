@@ -21,6 +21,9 @@ pub enum DbSqlError {
     #[error("list of logs is empty")]
     EmptyLogsList,
 
+    #[error("log status could not be updated")]
+    UpdateLogStatusError,
+
     #[error("account entry for announcement not found")]
     MissingAccount,
 

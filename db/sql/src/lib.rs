@@ -22,7 +22,6 @@ pub use sea_orm::DatabaseTransaction;
 
 use crate::accounts::HoprDbAccountOperations;
 use crate::channels::HoprDbChannelOperations;
-use crate::logs::HoprDbLogOperations;
 use async_trait::async_trait;
 use futures::future::BoxFuture;
 use sea_orm::TransactionTrait;
@@ -31,6 +30,7 @@ use crate::db::HoprDb;
 use crate::errors::{DbSqlError, Result};
 use crate::info::HoprDbInfoOperations;
 use crate::registry::HoprDbRegistryOperations;
+use hopr_db_api::logs::HoprDbLogOperations;
 use hopr_db_api::peers::HoprDbPeersOperations;
 use hopr_db_api::protocol::HoprDbProtocolOperations;
 use hopr_db_api::resolver::HoprDbResolverOperations;
@@ -210,8 +210,8 @@ pub mod prelude {
     pub use crate::db::*;
     pub use crate::errors::*;
     pub use crate::info::*;
-    pub use crate::logs::*;
     pub use crate::registry::*;
+    pub use hopr_db_api::logs::*;
     pub use hopr_db_api::peers::*;
     pub use hopr_db_api::protocol::*;
     pub use hopr_db_api::resolver::*;

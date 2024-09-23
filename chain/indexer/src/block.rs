@@ -7,8 +7,8 @@ use chain_rpc::{HoprIndexerRpcOperations, LogFilter};
 use chain_types::chain_events::SignificantChainEvent;
 use hopr_async_runtime::prelude::{spawn, JoinHandle};
 use hopr_crypto_types::types::Hash;
+use hopr_db_api::logs::HoprDbLogOperations;
 use hopr_db_sql::info::HoprDbInfoOperations;
-use hopr_db_sql::logs::HoprDbLogOperations;
 use hopr_db_sql::HoprDbGeneralModelOperations;
 use hopr_primitive_types::prelude::SerializableLog;
 
@@ -217,7 +217,7 @@ where
 
                     // store logs in the database, keep going on errors for now
                     let logs = block_with_logs.logs.clone().into_iter().map(SerializableLog::from).collect();
-                    let _ = db.store_logs(None, logs).await;
+                    let _ = db.store_logs(logs).await;
 
                     debug!("processing events in {block_with_logs} ...");
                     let block_description = block_with_logs.to_string();

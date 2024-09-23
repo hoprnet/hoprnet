@@ -7,6 +7,12 @@ pub enum DbError {
     #[error("DB general error: {0}")]
     General(String),
 
+    #[error("log status not found")]
+    MissingLogStatus,
+
+    #[error("log not found")]
+    MissingLog,
+
     #[error("account entry for announcement not found")]
     MissingAccount,
 

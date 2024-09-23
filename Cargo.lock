@@ -1242,6 +1242,7 @@ dependencies = [
  "hopr-async-runtime",
  "hopr-crypto-random",
  "hopr-crypto-types",
+ "hopr-db-api",
  "hopr-db-entity",
  "hopr-db-sql",
  "hopr-internal-types",
