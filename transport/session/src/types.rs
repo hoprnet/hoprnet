@@ -483,14 +483,15 @@ where
         "session egress buffer: {max_buffer}, session ingress buffer: {into_session_len}"
     );
 
-    hopr_network_types::utils::copy_duplex(
-        &mut tokio_util::compat::FuturesAsyncReadCompatExt::compat(session),
-        stream,
-        max_buffer,
+    // Buffer all writes into the session with at least Session MTU size
+    let mut session = tokio::io::BufWriter::with_capacity(
         into_session_len,
-    )
-    .await
-    .map(|(a, b)| (a as usize, b as usize))
+        tokio_util::compat::FuturesAsyncReadCompatExt::compat(session),
+    );
+
+    hopr_network_types::utils::copy_duplex(&mut session, stream, max_buffer, into_session_len)
+        .await
+        .map(|(a, b)| (a as usize, b as usize))
 }
 
 #[cfg(test)]
