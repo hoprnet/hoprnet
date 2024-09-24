@@ -857,7 +857,7 @@ dependencies = [
 
 [[package]]
 name = "bindings"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "ethers",
@@ -3833,7 +3833,7 @@ dependencies = [
 
 [[package]]
 name = "hopli"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "async-std",
@@ -3848,6 +3848,7 @@ dependencies = [
  "hex-literal",
  "hopr-crypto-random",
  "hopr-crypto-types",
+ "hopr-internal-types",
  "hopr-lib",
  "hopr-primitive-types",
  "hoprd-keypair",
