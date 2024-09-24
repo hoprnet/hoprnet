@@ -445,12 +445,16 @@ async fn tcp_listen_on<A: std::net::ToSocketAddrs>(address: A) -> std::io::Resul
 async fn udp_bind_to<A: std::net::ToSocketAddrs>(
     address: A,
 ) -> std::io::Result<(std::net::SocketAddr, ConnectedUdpStream)> {
-    let udp_socket = ConnectedUdpStream::builder()
+    let udp_socket_builder = ConnectedUdpStream::builder()
         .with_buffer_size(HOPR_UDP_BUFFER_SIZE)
-        .with_queue_size(HOPR_UDP_QUEUE_SIZE)
         .with_foreign_data_mode(ForeignDataMode::Discard) // discard data from UDP clients other than the first one served
-        .with_parallelism(0) // Automatic per available parallelism
-        .build(address)?;
+        .with_queue_size(HOPR_UDP_QUEUE_SIZE);
+
+    // TODO: MacOS behaves differently with parallelization than the desired Linux outcome
+    #[cfg(target_os = "linux")]
+    let udp_socket_builder = udp_socket_builder.with_parallelism(0);
+
+    let udp_socket = udp_socket_builder.build(address)?;
 
     Ok((*udp_socket.bound_address(), udp_socket))
 }

@@ -174,17 +174,7 @@ impl UdpStreamBuilder {
             })
             .max(1);
 
-        let num_socks = self
-            .parallelism
-            .map(|n| {
-                if n == 0 {
-                    avail_parallelism
-                } else {
-                    // use the given n or available parallelism, whatever is lower
-                    n.min(avail_parallelism)
-                }
-            })
-            .unwrap_or(1);
+        let num_socks = self.parallelism.map(|n| n.max(avail_parallelism)).unwrap_or(1);
 
         let counterparty = Arc::new(self.counterparty.map(OnceLock::from).unwrap_or_default());
         let ((ingress_tx, ingress_rx), (egress_tx, egress_rx)) = if let Some(q) = self.queue_size {
