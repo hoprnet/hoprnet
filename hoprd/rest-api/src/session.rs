@@ -179,7 +179,7 @@ pub(crate) async fn create_client(
     })?;
 
     // TODO: make this retry strategy configurable
-    let session_init_retry_strategy = tokio_retry::strategy::ExponentialBackoff::from_millis(2000).take(5);
+    let session_init_retry_strategy = tokio_retry::strategy::ExponentialBackoff::from_millis(1000).take(3);
 
     // TODO: consider pooling the sessions on a listener, so that the negotiation is amortized
 
