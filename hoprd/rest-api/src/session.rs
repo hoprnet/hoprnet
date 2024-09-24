@@ -49,7 +49,7 @@ lazy_static::lazy_static! {
             "Hops": 1
         },
         "target": "localhost:8080",
-        "listen_host": "127.0.0.1:10000",
+        "listenHost": "127.0.0.1:10000",
         "capabilities": ["Retransmission", "Segmentation"]
     }))]
 #[serde(rename_all = "camelCase")]
