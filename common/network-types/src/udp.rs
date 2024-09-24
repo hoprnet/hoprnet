@@ -131,16 +131,21 @@ impl UdpStreamBuilder {
 
     /// Sets how many parallel readers/writer sockets should be bound.
     ///
-    /// Each UDP socket is bound with `SO_REUSEADDR` to facilitate parallel processing
+    /// Each UDP socket is bound with `SO_REUSEADDR` and `SO_REUSEPORT` to facilitate parallel processing
     /// of read and write operations.
+    ///
+    /// **NOTE**: This is a Linux-specific optimization, and it will have no effect on other systems.
     ///
     /// - If some value `n` > 0 is given, the stream will bind `n` sockets.
     /// - If 0 is given, the number of sockets is determined by [`std::thread::available_parallelism`].
     /// - If none is given, only a single socket will be created (no parallelism).
     ///
-    /// Default is none.
+    /// Default is none. This will always be the case for non-Linux systems.
     pub fn with_parallelism(mut self, parallelism: usize) -> Self {
-        self.parallelism = Some(parallelism);
+        #[cfg(target_os = "linux")]
+        {
+            self.parallelism = Some(parallelism);
+        }
         self
     }
 
@@ -205,9 +210,12 @@ impl UdpStreamBuilder {
                     std::net::SocketAddr::V6(_) => socket2::Domain::IPV6,
                 };
 
-                // Bind a new non-blocking UDP socket with SO_REUSEADDR
+                // Bind a new non-blocking UDP socket
                 let sock = socket2::Socket::new(domain, socket2::Type::DGRAM, None)?;
-                sock.set_reuse_address(true)?;
+                if num_socks > 1 {
+                    sock.set_reuse_address(true)?; // Needed for every next socket with non-wildcard IP
+                    sock.set_reuse_port(true)?; // Needed on Linux to evenly distribute datagrams
+                }
                 sock.set_nonblocking(true)?;
                 sock.bind(&bound_addr.unwrap_or(first_bind_addr).into())?;
 
