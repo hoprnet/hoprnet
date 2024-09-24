@@ -136,18 +136,19 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                     "UDP target {udp_target} resolved to {resolved_udp_target}"
                 );
 
-                let mut udp_bridge = hopr_network_types::udp::ConnectedUdpStream::builder()
+                let udp_bridge_builder = hopr_network_types::udp::ConnectedUdpStream::builder()
                     .with_buffer_size(HOPR_UDP_BUFFER_SIZE)
                     .with_counterparty(resolved_udp_target)
                     .with_foreign_data_mode(ForeignDataMode::Error)
-                    .with_queue_size(HOPR_UDP_QUEUE_SIZE)
-                    .with_parallelism(0)
-                    .build(("0.0.0.0", 0))
-                    .map_err(|e| {
-                        HoprLibError::GeneralError(format!(
-                            "could not bridge the incoming session to {udp_target}: {e}"
-                        ))
-                    })?;
+                    .with_queue_size(HOPR_UDP_QUEUE_SIZE);
+
+                // TODO: MacOS behaves differently with parallelization than the desired Linux outcome
+                #[cfg(target_os = "linux")]
+                let udp_bridge_builder = udp_bridge_builder.with_parallelism(0);
+
+                let mut udp_bridge = udp_bridge_builder.build(("0.0.0.0", 0)).map_err(|e| {
+                    HoprLibError::GeneralError(format!("could not bridge the incoming session to {udp_target}: {e}"))
+                })?;
 
                 tracing::debug!(
                     session_id = debug(session_id),
