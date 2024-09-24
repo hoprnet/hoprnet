@@ -14,6 +14,7 @@ mod m20240301_000011_tickets_create_ticket_stats;
 mod m20240301_000012_tickets_create_outgoing_ticket_index;
 mod m20240404_000013_tickets_recreate_ticket;
 mod m20240810_000014_index_extend_chain_info_with_pre_checksum_block;
+mod m20240917_000015_add_minimum_incoming_ticket_win_prob_column;
 
 #[derive(PartialEq)]
 pub enum BackendType {
@@ -49,6 +50,7 @@ impl MigratorTrait for Migrator {
                 BackendType::Postgres,
             )),
             Box::new(m20240810_000014_index_extend_chain_info_with_pre_checksum_block::Migration),
+            Box::new(m20240917_000015_add_minimum_incoming_ticket_win_prob_column::Migration),
         ]
     }
 }
@@ -73,6 +75,7 @@ impl MigratorTrait for MigratorIndex {
             Box::new(m20240226_000008_node_create_settings::Migration),
             Box::new(m20240226_000007_index_initial_seed::Migration),
             Box::new(m20240810_000014_index_extend_chain_info_with_pre_checksum_block::Migration),
+            Box::new(m20240917_000015_add_minimum_incoming_ticket_win_prob_column::Migration),
         ]
     }
 }

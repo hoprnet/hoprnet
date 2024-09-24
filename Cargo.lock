@@ -1285,6 +1285,7 @@ dependencies = [
  "smart-default",
  "surf",
  "surf-governor",
+ "test-log",
  "thiserror",
  "tokio",
  "tracing",
@@ -2718,6 +2719,7 @@ checksum = "55ac459de2512911e4b674ce33cf20befaba382d05b62b008afc1c8b57cbf181"
 dependencies = [
  "futures-core",
  "futures-sink",
+ "nanorand",
  "spin 0.9.8",
 ]
 
@@ -3831,8 +3833,9 @@ dependencies = [
 
 [[package]]
 name = "hopli"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
+ "anyhow",
  "async-std",
  "bindings",
  "chain-api",
@@ -3848,6 +3851,7 @@ dependencies = [
  "hopr-lib",
  "hopr-primitive-types",
  "hoprd-keypair",
+ "rpassword",
  "serde",
  "serde_json",
  "serde_with",
@@ -3997,6 +4001,7 @@ name = "hopr-db-migration"
 version = "0.1.0"
 dependencies = [
  "async-std",
+ "hopr-internal-types",
  "hopr-primitive-types",
  "sea-orm-migration",
 ]
@@ -4101,13 +4106,17 @@ dependencies = [
  "hopr-primitive-types",
  "hopr-strategy",
  "hopr-transport",
+ "hopr-transport-session",
  "lazy_static",
  "serde",
  "serde_with",
  "serde_yaml",
  "smart-default",
  "strum 0.26.3",
+ "test-log",
  "thiserror",
+ "tokio",
+ "tokio-util",
  "tracing",
  "validator",
 ]
@@ -4122,7 +4131,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-network-types"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "async-std",
@@ -4133,6 +4142,7 @@ dependencies = [
  "crossbeam-skiplist",
  "ctor",
  "dashmap 6.1.0",
+ "flume 0.11.0",
  "futures",
  "governor",
  "hex",
@@ -4140,6 +4150,7 @@ dependencies = [
  "hickory-resolver",
  "hopr-async-runtime",
  "hopr-crypto-random",
+ "hopr-metrics",
  "hopr-platform",
  "hopr-primitive-types",
  "lazy_static",
@@ -4152,6 +4163,7 @@ dependencies = [
  "serde_bytes",
  "serde_with",
  "smart-default",
+ "socket2 0.5.7",
  "strum 0.26.3",
  "test-log",
  "thiserror",
@@ -4245,7 +4257,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "async-lock 3.4.0",
  "async-std",
@@ -4361,6 +4373,8 @@ dependencies = [
  "serde_with",
  "strum 0.26.3",
  "thiserror",
+ "tokio",
+ "tokio-util",
  "tracing",
 ]
 
@@ -4437,6 +4451,7 @@ dependencies = [
  "smart-default",
  "strum 0.26.3",
  "tokio",
+ "tokio-retry",
  "tokio-stream",
  "tokio-util",
  "tower",
@@ -5778,6 +5793,15 @@ dependencies = [
  "pin-project",
  "smallvec",
  "unsigned-varint 0.7.2",
+]
+
+[[package]]
+name = "nanorand"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6a51313c5820b0b02bd422f4b44776fbf47961755c74ce64afc73bfad10226c3"
+dependencies = [
+ "getrandom 0.2.15",
 ]
 
 [[package]]
@@ -7247,6 +7271,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "rpassword"
+version = "7.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "80472be3c897911d0137b2d2b9055faf6eeac5b14e324073d83bc17b191d7e3f"
+dependencies = [
+ "libc",
+ "rtoolbox",
+ "windows-sys 0.48.0",
+]
+
+[[package]]
 name = "rsa"
 version = "0.9.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7280,6 +7315,16 @@ dependencies = [
  "nix",
  "thiserror",
  "tokio",
+]
+
+[[package]]
+name = "rtoolbox"
+version = "0.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c247d24e63230cdb56463ae328478bd5eac8b8faa8c69461a77e8e323afac90e"
+dependencies = [
+ "libc",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]
