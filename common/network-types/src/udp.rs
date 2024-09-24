@@ -167,19 +167,21 @@ impl UdpStreamBuilder {
     /// if the [counterparty](UdpStreamBuilder::with_counterparty) has been set.
     pub fn build<A: std::net::ToSocketAddrs>(self, bind_addr: A) -> std::io::Result<ConnectedUdpStream> {
         let avail_parallelism = std::thread::available_parallelism()
-            .map(usize::from)
+            .map(|v| usize::from(v) / 2) // Each socket gets one RX and one TX task
             .unwrap_or_else(|e| {
                 warn!("failed to determine available parallelism, defaulting to 1: {e}");
                 1
             })
-            / 2; // Each socket gets one RX and one TX task
+            .max(1);
+
         let num_socks = self
             .parallelism
             .map(|n| {
                 if n == 0 {
                     avail_parallelism
                 } else {
-                    n.max(avail_parallelism)
+                    // use the given n or available parallelism, whatever is lower
+                    n.min(avail_parallelism)
                 }
             })
             .unwrap_or(1);
