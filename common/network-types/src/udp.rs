@@ -141,6 +141,7 @@ impl UdpStreamBuilder {
     /// - If none is given, only a single socket will be created (no parallelism).
     ///
     /// Default is none. This will always be the case for non-Linux systems.
+    #[allow(unused_variables, unused_mut)]
     pub fn with_parallelism(mut self, parallelism: usize) -> Self {
         #[cfg(target_os = "linux")]
         {
