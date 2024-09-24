@@ -101,20 +101,21 @@ contract NetworkConfig is Script {
         string memory obj = string(abi.encodePacked("obj-", networkName));
         string memory addresses = string(abi.encodePacked("addresses-", networkName));
 
-        addresses.serialize("token", networkDetail.addresses.tokenContractAddress);
-        addresses.serialize("channels", networkDetail.addresses.channelsContractAddress);
-        addresses.serialize("node_stake_v2_factory", networkDetail.addresses.nodeStakeV2FactoryAddress);
-        addresses.serialize("module_implementation", networkDetail.addresses.moduleImplementationAddress);
-        addresses.serialize("node_safe_registry", networkDetail.addresses.nodeSafeRegistryAddress);
-        addresses.serialize("network_registry_proxy", networkDetail.addresses.networkRegistryProxyContractAddress);
-        addresses.serialize("ticket_price_oracle", networkDetail.addresses.ticketPriceOracleContractAddress);
-        addresses.serialize("winning_probability_oracle", networkDetail.addresses.winningProbabilityContractAddress);
         addresses.serialize("announcements", networkDetail.addresses.announcements);
-        addresses = addresses.serialize("network_registry", networkDetail.addresses.networkRegistryContractAddress);
+        addresses.serialize("channels", networkDetail.addresses.channelsContractAddress);
+        addresses.serialize("module_implementation", networkDetail.addresses.moduleImplementationAddress);
+        addresses.serialize("network_registry", networkDetail.addresses.networkRegistryContractAddress);
+        addresses.serialize("network_registry_proxy", networkDetail.addresses.networkRegistryProxyContractAddress);
+        addresses.serialize("node_safe_registry", networkDetail.addresses.nodeSafeRegistryAddress);
+        addresses.serialize("node_stake_v2_factory", networkDetail.addresses.nodeStakeV2FactoryAddress);
+        addresses.serialize("ticket_price_oracle", networkDetail.addresses.ticketPriceOracleContractAddress);
+        addresses.serialize("token", networkDetail.addresses.tokenContractAddress);
+        addresses =
+            addresses.serialize("winning_probability_oracle", networkDetail.addresses.winningProbabilityContractAddress);
 
+        obj.serialize("addresses", addresses);
         obj.serialize("environment_type", parseEnvironmentTypeToString(networkDetail.environmentType));
-        obj.serialize("indexer_start_block_number", networkDetail.indexerStartBlockNumber);
-        obj = obj.serialize("addresses", addresses);
+        obj = obj.serialize("indexer_start_block_number", networkDetail.indexerStartBlockNumber);
 
         vm.writeJson(obj, pathToDeploymentFile, configKey);
     }
