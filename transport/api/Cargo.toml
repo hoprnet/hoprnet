@@ -37,6 +37,7 @@ prometheus = [
   "hopr-transport-p2p/prometheus",
   "hopr-transport-protocol/prometheus",
   "hopr-network-types/prometheus",
+  "hopr-transport-session/prometheus",
 ]
 
 [dependencies]

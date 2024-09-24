@@ -21,6 +21,17 @@ use tracing::{debug, error};
 
 use crate::{errors::TransportSessionError, traits::SendMsg, Capability};
 
+#[cfg(all(feature = "prometheus", not(test)))]
+lazy_static::lazy_static! {
+    static ref METRIC_SESSION_INNER_SIZES: hopr_metrics::MultiHistogram =
+        hopr_metrics::MultiHistogram::new(
+            "hopr_session_inner_sizes",
+            "Sizes of data chunks fed from inner session to HOPR protocol",
+            vec![20.0, 40.0, 80.0, 160.0, 320.0, 640.0, 1280.0],
+            &["session_id"]
+    ).unwrap();
+}
+
 /// Unique ID of a specific session.
 ///
 /// Simple wrapper around the maximum range of the port like session unique identifier.
@@ -285,6 +296,9 @@ impl futures::AsyncWrite for InnerSession {
         cx: &mut std::task::Context<'_>,
         buf: &[u8],
     ) -> Poll<std::io::Result<usize>> {
+        #[cfg(all(feature = "prometheus", not(test)))]
+        METRIC_SESSION_INNER_SIZES.observe(&[&self.id.to_string()], buf.len() as f64);
+
         if !self.tx_buffer.is_empty() {
             loop {
                 match self.tx_buffer.poll_next_unpin(cx) {
