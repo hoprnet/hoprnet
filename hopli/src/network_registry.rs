@@ -192,7 +192,7 @@ impl NetworkRegistrySubcommands {
             safe_eth_addresses.extend(addresses.split(',').map(|addr| H160::from_str(addr).unwrap()));
         }
 
-        // Read the private key from arguments or the "PRIVATE_KEY" environment variable
+        // Read the private key from arguments or the "MANAGER_PRIVATE_KEY" environment variable
         let signer_private_key = private_key.read("MANAGER_PRIVATE_KEY")?;
 
         // get RPC provider for the given network and environment

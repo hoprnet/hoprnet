@@ -94,9 +94,9 @@ impl WinProbSubcommands {
             .set_win_prob(win_prob_param)
             .send()
             .await
-            .map_err(|e| HelperErrors::ParseError(format!("Failed in broadcasting transactions {:?}", e)))?
+            .map_err(|e| HelperErrors::MiddlewareError(format!("Failed in broadcasting transactions {:?}", e)))?
             .await
-            .map_err(|e| HelperErrors::ParseError(format!("Failed in getting receipt {:?}", e)))?;
+            .map_err(|e| HelperErrors::MiddlewareError(format!("Failed in getting receipt {:?}", e)))?;
         Ok(())
     }
 
@@ -117,7 +117,6 @@ impl WinProbSubcommands {
             .map_err(|e| HelperErrors::MiddlewareError(format!("Failed to get current winning probability: {}", e)))?;
 
         // convert into f64
-        // let mut tmp = [0u8; 8];
         let mut tmp = [0u8; 7];
         tmp.copy_from_slice(&current_win_prob.to_be_bytes()[1..]);
         let current_win_prob_f64 = win_prob_to_f64(&tmp);
