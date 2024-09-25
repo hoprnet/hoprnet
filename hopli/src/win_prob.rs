@@ -15,7 +15,6 @@
 //! hopli win-prob get \
 //!     --network anvil-localhost \
 //!     --contracts-root "../ethereum/contracts" \
-//!     --private-key ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
 //!     --provider-url "http://localhost:8545"
 //! ```
 use crate::key_pair::ArgEnvReader;
@@ -32,7 +31,7 @@ use tracing::{debug, info};
 /// CLI arguments for `hopli win-prob`
 #[derive(Clone, Debug, Parser)]
 pub enum WinProbSubcommands {
-    // Set the global minimum ticket winning probability as an owner
+    /// Set the global minimum ticket winning probability as an owner
     #[command(visible_alias = "s")]
     Set {
         /// Network name, contracts config file root, and customized provider, if available
