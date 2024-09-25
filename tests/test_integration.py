@@ -1,8 +1,9 @@
 import asyncio
+import os
 import random
 import re
 import string
-from contextlib import AsyncExitStack, asynccontextmanager, contextmanager
+from contextlib import AsyncExitStack, asynccontextmanager
 
 import pytest
 import requests
@@ -16,7 +17,7 @@ from .conftest import (
     barebone_nodes,
     default_nodes,
     nodes_with_auth,
-    random_distinct_pairs_from, nodes_with_lower_outgoing_win_prob,
+    random_distinct_pairs_from, nodes_with_lower_outgoing_win_prob, run_hopli_cmd, load_private_key, PASSWORD, NETWORK1,
 )
 from .hopr import HoprdAPI
 from .node import Node
@@ -30,6 +31,7 @@ APPLICATION_TAG_THRESHOLD_FOR_SESSIONS = RESERVED_TAG_UPPER_BOUND + 1
 # used by nodes to get unique port assignments
 PORT_BASE = 19000
 
+ANVIL_ENDPOINT = f"http://127.0.0.1:{PORT_BASE}"
 
 def shuffled(coll):
     random.shuffle(coll)
@@ -170,7 +172,7 @@ async def check_all_tickets_redeemed(src: Node):
 
 
 async def send_and_receive_packets_with_pop(
-    packets, src: Node, dest: Node, path: str, timeout: int = MULTIHOP_MESSAGE_SEND_TIMEOUT
+    packets, src: Node, dest: Node, path: list[str], timeout: float = MULTIHOP_MESSAGE_SEND_TIMEOUT
 ):
     random_tag = gen_random_tag()
 
@@ -181,7 +183,7 @@ async def send_and_receive_packets_with_pop(
 
 
 async def send_and_receive_packets_with_peek(
-    packets, src: Node, dest: Node, path: str, timeout: int = MULTIHOP_MESSAGE_SEND_TIMEOUT
+    packets, src: Node, dest: Node, path: list[str], timeout: float = MULTIHOP_MESSAGE_SEND_TIMEOUT
 ):
     random_tag = gen_random_tag()
 
@@ -196,6 +198,28 @@ async def send_and_receive_packets_with_peek(
 def balance_str_to_int(balance: str):
     return int(balance.split(" ", 1)[0])
 
+
+def set_minimum_winning_probability_in_network(private_key: str, win_prob: float):
+    custom_env = {
+        "ETHERSCAN_API_KEY": "anykey",
+        "IDENTITY_PASSWORD": PASSWORD,
+        "PRIVATE_KEY": private_key,
+        "PATH": os.environ["PATH"],
+    }
+    cmd = [
+        "hopli",
+        "win-prob",
+        "set",
+        "--network",
+        NETWORK1,
+        "--contracts-root",
+        "./ethereum/contracts",
+        "--winning-probability",
+        str(win_prob),
+        "--provider-url",
+        ANVIL_ENDPOINT,
+    ]
+    run_hopli_cmd(cmd, custom_env)
 
 # NOTE: this test is first, ensuring that all tests following it have ensured connectivity and
 # correct ticket price from api
@@ -347,11 +371,11 @@ async def test_hoprd_should_be_able_to_send_0_hop_messages_without_open_channels
 @pytest.mark.asyncio
 @pytest.mark.parametrize("src, dest", random_distinct_pairs_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
 async def test_hoprd_should_fail_sending_a_message_that_is_too_large(src: Node, dest: Node, swarm7: dict[str, Node]):
-    MAXIMUM_PAYLOAD_SIZE = 500
+    maximum_payload_size = 500
     random_tag = gen_random_tag()
 
     packet = "0 hop message too large: " + "".join(
-        random.choices(string.ascii_uppercase + string.digits, k=MAXIMUM_PAYLOAD_SIZE)
+        random.choices(string.ascii_uppercase + string.digits, k=maximum_payload_size)
     )
     assert await swarm7[src].api.send_message(swarm7[dest].peer_id, packet, [], random_tag) is None
 
@@ -753,6 +777,7 @@ async def test_hoprd_check_native_withdraw(peer, swarm7: dict[str, Node]):
     before_balance = int((await swarm7[peer].api.balances()).safe_native)
     await swarm7[peer].api.withdraw(amount, swarm7[peer].safe_address, "Native")
 
+    after_balance = before_balance
     while remaining_attempts > 0:
         after_balance = int((await swarm7[peer].api.balances()).safe_native)
         if after_balance != before_balance:
@@ -872,8 +897,56 @@ async def test_send_message_return_timestamp(src: str, dest: str, swarm7: dict[s
     ],
 )
 async def test_hoprd_should_relay_packets_with_lower_win_prob_then_agg_and_redeem_them(route, swarm7: dict[str, Node]):
-    # TODO
-    assert True
+    ticket_count = 100
+    win_prob = 0.1
+    num_tickets_tolerated = 2
+    expected_ticket_value_max = win_prob * ticket_count * TICKET_PRICE_PER_HOP + num_tickets_tolerated * TICKET_PRICE_PER_HOP
+
+    src = route[0]
+    relay = route[1]
+    dest = route[-1]
+
+    test_suite_name = __name__.split('.')[-1]
+    private_key = load_private_key(test_suite_name)
+    set_minimum_winning_probability_in_network(private_key, win_prob)
+    try:
+        async with create_channel(swarm7[src], swarm7[relay], funding=ticket_count * TICKET_PRICE_PER_HOP) as channel:
+
+            # ensure ticket stats are what we expect before starting
+            statistics_before = await swarm7[relay].api.get_tickets_statistics()
+            assert balance_str_to_int(statistics_before.unredeemed_value) == 0
+            assert balance_str_to_int(statistics_before.rejected_value) == 0
+
+            # the destination should receive all the packets
+            packets = [f"Lower ticket win probability check: #{i:08d}" for i in range(ticket_count)]
+            await send_and_receive_packets_with_pop(
+                packets, src=swarm7[src], dest=swarm7[dest], path=[swarm7[relay].peer_id]
+            )
+
+            # the value of redeemable tickets on the relay should not go above the given threshold
+            # and certainly there must be rejected tickets
+            ticket_statistics = await swarm7[relay].api.get_tickets_statistics()
+            unredeemed_value = balance_str_to_int(ticket_statistics.unredeemed_value)
+            rejected_value = balance_str_to_int(ticket_statistics.rejected_value)
+            assert unredeemed_value <= expected_ticket_value_max
+            assert rejected_value > 0
+
+            await asyncio.wait_for(swarm7[relay].api.channels_aggregate_tickets(channel), 20.0)
+
+            # aggregating the tickets indeed does not change the redeemable value
+            ticket_statistics = await swarm7[relay].api.get_tickets_statistics()
+            assert balance_str_to_int(ticket_statistics.unredeemed_value) == unredeemed_value
+
+            assert await swarm7[relay].api.channel_redeem_tickets(channel)
+            await asyncio.wait_for(check_all_tickets_redeemed(swarm7[relay]), 120.0)
+
+            # The tickets can get successfully redeemed
+            ticket_statistics = await swarm7[relay].api.get_tickets_statistics()
+            assert balance_str_to_int(ticket_statistics.unredeemed_value) == 0
+            assert balance_str_to_int(ticket_statistics.redeemed_value) == unredeemed_value
+    finally:
+        # Always return winning probability to 1.0 even if the test failed
+        set_minimum_winning_probability_in_network(private_key, 1.0)
 
 
 @pytest.mark.asyncio
@@ -887,9 +960,42 @@ async def test_hoprd_should_relay_packets_with_lower_win_prob_then_agg_and_redee
         for _ in range(PARAMETERIZED_SAMPLE_SIZE)
     ],
 )
-async def test_hoprd_should_relay_packets_with_higher_than_min_win_prob_then_agg_and_redeem_them(route, swarm7: dict[str, Node]):
-    # TODO
-    assert True
+async def test_hoprd_should_relay_packets_with_higher_than_min_win_prob(route, swarm7: dict[str, Node]):
+    ticket_count = 10
+    win_prob = 0.1
+
+    src = route[0]
+    relay = route[1]
+    dest = route[-1]
+
+    test_suite_name = __name__.split('.')[-1]
+    private_key = load_private_key(test_suite_name)
+    set_minimum_winning_probability_in_network(private_key, win_prob)
+    try:
+        async with create_channel(swarm7[src], swarm7[relay], funding=ticket_count * TICKET_PRICE_PER_HOP) as channel:
+
+            # ensure ticket stats are what we expect before starting
+            statistics_before = await swarm7[relay].api.get_tickets_statistics()
+            assert balance_str_to_int(statistics_before.unredeemed_value) == 0
+            assert balance_str_to_int(statistics_before.rejected_value) == 0
+
+            # the destination should receive all the packets
+            packets = [f"Standard ticket win probability check: #{i:08d}" for i in range(ticket_count)]
+            await send_and_receive_packets_with_pop(
+                packets, src=swarm7[src], dest=swarm7[dest], path=[swarm7[relay].peer_id]
+            )
+
+            # in this case, the relay has tickets for all the packets, because the source sends them with win prob = 1
+            ticket_statistics = await swarm7[relay].api.get_tickets_statistics()
+            unredeemed_value = balance_str_to_int(ticket_statistics.unredeemed_value)
+            rejected_value = balance_str_to_int(ticket_statistics.rejected_value)
+            assert unredeemed_value == TICKET_PRICE_PER_HOP * ticket_count
+            assert rejected_value == 0
+
+            # at this point the tickets become neglected, since the channel will be closed
+    finally:
+        # Always return winning probability to 1.0 even if the test failed
+        set_minimum_winning_probability_in_network(private_key, 1.0)
 
 
 @pytest.mark.asyncio
@@ -905,5 +1011,34 @@ async def test_hoprd_should_relay_packets_with_higher_than_min_win_prob_then_agg
     ],
 )
 async def test_hoprd_should_not_accept_tickets_with_lower_than_min_win_prob(route, swarm7: dict[str, Node]):
-    # TODO
-    assert True
+    ticket_count = 10
+
+    src = route[0]
+    relay = route[1]
+    dest = route[-1]
+
+    async with create_channel(swarm7[src], swarm7[relay], funding=ticket_count * TICKET_PRICE_PER_HOP) as channel:
+        # ensure ticket stats are what we expect before starting
+        statistics_before = await swarm7[relay].api.get_tickets_statistics()
+        assert balance_str_to_int(statistics_before.unredeemed_value) == 0
+        assert balance_str_to_int(statistics_before.rejected_value) == 0
+
+        # sent out all packets at from source
+        packets = [f"Rejected ticket win probability check: #{i:08d}" for i in range(ticket_count)]
+        random_tag = gen_random_tag()
+
+        for packet in packets:
+            assert await swarm7[src].api.send_message(dest.peer_id, packet, [swarm7[relay].peer_id], random_tag)
+
+        # in this case, the destination receives nothing, because the relayer will not relay packets
+        # with win prob lower than 1
+        # TODO: how long do we need to wait before we can safely conclude that destination has received nothing?
+        await asyncio.sleep(10)
+        assert await swarm7[dest].api.messages_peek_all(random_tag) is None
+
+        # the relay simply rejected all the tickets
+        ticket_statistics = await swarm7[relay].api.get_tickets_statistics()
+        unredeemed_value = balance_str_to_int(ticket_statistics.unredeemed_value)
+        rejected_value = balance_str_to_int(ticket_statistics.rejected_value)
+        assert unredeemed_value == 0
+        assert rejected_value == ticket_count * TICKET_PRICE_PER_HOP
