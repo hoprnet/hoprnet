@@ -14,7 +14,7 @@
 //! Some sample commands:
 //! - Manager registers nodes:
 //! ```text
-//! hopli -- network-registry manager-register \
+//! hopli network-registry manager-register \
 //!     --network anvil-localhost \
 //!     --contracts-root "../ethereum/contracts" \
 //!     --identity-directory "./test" --password-path "./test/pwd" \
@@ -26,7 +26,7 @@
 //!
 //! - Manager deregisters nodes:
 //! ```text
-//! hopli -- network-registry manager-deregister \
+//! hopli network-registry manager-deregister \
 //!     --network anvil-localhost \
 //!     --contracts-root "../ethereum/contracts" \
 //!     --node-address 0x9e820e68f8c024779ebcb6cd2edda1885e1dbe1f,0xb3724772badf4d8fffa186a5ca0bea87693a6c2a \
@@ -36,7 +36,7 @@
 //!
 //! - Manager syncs the eligibility of safes
 //! ```text
-//! hopli -- network-registry manager-force-sync \
+//! hopli network-registry manager-force-sync \
 //!     --network anvil-localhost \
 //!     --contracts-root "../ethereum/contracts" \
 //!     --safe-address 0x9e820e68f8c024779ebcb6cd2edda1885e1dbe1f,0xb3724772badf4d8fffa186a5ca0bea87693a6c2a \

@@ -31,6 +31,7 @@ use ethers::{
 };
 use hex_literal::hex;
 use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
+use serde::de;
 use std::sync::Arc;
 use std::{ops::Add, str::FromStr};
 use tracing::{debug, info};
@@ -923,6 +924,17 @@ pub async fn deploy_safe_module_with_targets_and_nodes<M: Middleware>(
         ethers::abi::Token::Address(caller),
         ethers::abi::Token::Uint(curr_nonce),
     ])?);
+
+    debug!("curr_nonce {:?}", curr_nonce);
+    debug!("nonce {:?}", nonce);
+    debug!(
+        "hopr_module_implementation_address {:?}",
+        hopr_module_implementation_address
+    );
+    debug!(
+        "hopr_node_stake_factory_address {:?}",
+        hopr_node_stake_factory.address()
+    );
 
     // predict module and safe address
     let module_address = predict_module_address(

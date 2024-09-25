@@ -225,7 +225,7 @@ contract NetworkConfig is Script {
             filePath,
             string(
                 abi.encodePacked(
-                    '"winning_probability_oracle": "',
+                    '"winning_probability_oracle_contract_address": "',
                     vm.toString(networkDetail.addresses.winningProbabilityContractAddress),
                     '",'
                 )

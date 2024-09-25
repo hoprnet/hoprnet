@@ -1,3 +1,23 @@
+//! This module contains arguments and functions to interact with the Winning Probability contract for a previledged account.
+//! It can set the global minimum winning probability and read the current global minimum winning probability.
+//! Some sample commands:
+//! - Set winning probability:
+//! ```text
+//! hopli win-prob-modul set \
+//!     --network anvil-localhost \
+//!     --contracts-root "../ethereum/contracts" \
+//!     --winning-probability 0.5 \
+//!     --private-key ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+//!     --provider-url "http://localhost:8545"
+//! ```
+//! - Get winning probability:
+//! ```text
+//! hopli win-prob-modul get \
+//!     --network anvil-localhost \
+//!     --contracts-root "../ethereum/contracts" \
+//!     --private-key ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+//!     --provider-url "http://localhost:8545"
+//! ```
 use crate::key_pair::ArgEnvReader;
 use crate::{
     environment_config::NetworkProviderArgs,
@@ -60,7 +80,7 @@ impl WinProbSubcommands {
             HelperErrors::ParseError("Failed to convert winning probability to the required format".into())
         })?;
 
-        // conver the new winning probability
+        // convert the new winning probability
         let mut win_prob_param = [0u8; 8];
         win_prob_param[1..].copy_from_slice(&winning_probability);
         let win_prob_param = u64::from_be_bytes(win_prob_param);
@@ -91,7 +111,10 @@ impl WinProbSubcommands {
         );
 
         // get winning probability from the contract
-        let current_win_prob = hopr_win_prob.current_win_prob().await.unwrap();
+        let current_win_prob = hopr_win_prob
+            .current_win_prob()
+            .await
+            .map_err(|e| HelperErrors::MiddlewareError(format!("Failed to get current winning probability: {}", e)))?;
 
         // convert into f64
         // let mut tmp = [0u8; 8];
