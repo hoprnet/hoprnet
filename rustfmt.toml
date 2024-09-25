@@ -3,3 +3,4 @@ reorder_imports = true
 fn_params_layout = "Tall"
 # group_imports = "StdExternalCrate"
 max_width = 120
+ignore = ["db/entity/src/codegen", "ethereum/bindings/src/codegen"]
