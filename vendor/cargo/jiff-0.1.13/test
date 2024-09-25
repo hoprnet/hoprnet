@@ -1,0 +1,31 @@
+#!/bin/bash
+
+set -e
+
+# cd to the directory containing this crate's Cargo.toml so that we don't need
+# to pass --manifest-path to every `cargo` command.
+cd "$(dirname "$0")"
+
+# This is a convenience script for running a broad swath of tests across
+# features. We don't test the complete space, since the complete space is quite
+# large.
+echo "===== DEFAULT FEATURES ====="
+cargo test
+
+features=(
+    "std"
+    "alloc"
+    "alloc tzdb-bundle-always"
+    "std tzdb-bundle-platform tzdb-bundle-always"
+    "std tzdb-bundle-platform tzdb-bundle-always tzdb-zoneinfo"
+    "std tzdb-bundle-platform tzdb-zoneinfo"
+    "std tzdb-bundle-always tzdb-zoneinfo"
+    "std tzdb-bundle-always logging"
+    "std tzdb-bundle-always serde"
+)
+for f in "${features[@]}"; do
+    echo "===== FEATURE: $f ====="
+    cargo build --no-default-features --features "$f"
+    cargo test --lib --no-default-features --features "$f"
+    cargo test --test integration --no-default-features --features "$f"
+done
