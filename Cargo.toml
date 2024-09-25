@@ -128,6 +128,11 @@ sea-orm-migration = { version = "1.0.1", features = [
   "with-chrono",
 ] }
 sea-query = { version = "0.31.0" }
+sea-query-binder = { version = "0.5.0", default-features = false, features = [
+  "with-chrono",
+  "sqlx-sqlite",
+  "runtime-async-std-rustls",
+] }
 semver = "1.0.23"
 serde = { version = "1.0.210", features = ["derive"] }
 serde_bytes = "0.11.14"
