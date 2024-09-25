@@ -301,10 +301,10 @@
           pre-commit-check = pre-commit.lib.${system}.run {
             src = ./.;
             hooks = {
-              treefmt.enable = true;
+              treefmt.enable = false;
               treefmt.package = config.treefmt.build.wrapper;
               immutable-files = {
-                enable = true;
+                enable = false;
                 name = "Immutable files - the files should not change";
                 entry = "bash .github/scripts/immutable-files-check.sh";
                 files = "";

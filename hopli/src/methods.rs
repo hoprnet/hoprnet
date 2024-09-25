@@ -31,7 +31,6 @@ use ethers::{
 };
 use hex_literal::hex;
 use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
-use serde::de;
 use std::sync::Arc;
 use std::{ops::Add, str::FromStr};
 use tracing::{debug, info};
@@ -743,7 +742,7 @@ pub fn predict_module_address(
 ) -> Result<Address, HelperErrors> {
     let module_salt = keccak256(ethers::abi::encode_packed(&[
         ethers::abi::Token::Address(caller),
-        ethers::abi::Token::Uint(nonce.into()),
+        ethers::abi::Token::Bytes(nonce.into()),
     ])?);
     debug!("module_salt {:?}", module_salt);
 
@@ -784,7 +783,7 @@ pub fn predict_safe_address(
     )
     .encode();
 
-    let safe_salt = get_salt_from_salt_nonce(initializer, U256::from(nonce))?;
+    let safe_salt = get_salt_from_salt_nonce(initializer, nonce)?;
     debug!("safe_salt {:?}", hex::encode(safe_salt));
 
     let predict_safe_addr = deploy_proxy(safe_singleton, safe_salt, safe_factory)?;
@@ -794,12 +793,12 @@ pub fn predict_safe_address(
 }
 
 /// helper function to get salt nonce
-fn get_salt_from_salt_nonce(initializer: Vec<u8>, salt_nonce: U256) -> Result<[u8; 32], HelperErrors> {
+fn get_salt_from_salt_nonce(initializer: Vec<u8>, salt_nonce: [u8; 32]) -> Result<[u8; 32], HelperErrors> {
     let hashed_initializer = keccak256(initializer);
 
     Ok(keccak256(ethers::abi::encode_packed(&[
         ethers::abi::Token::Bytes(hashed_initializer.into()),
-        ethers::abi::Token::Uint(salt_nonce),
+        ethers::abi::Token::Bytes(salt_nonce.into()),
     ])?))
 }
 
@@ -925,8 +924,8 @@ pub async fn deploy_safe_module_with_targets_and_nodes<M: Middleware>(
         ethers::abi::Token::Uint(curr_nonce),
     ])?);
 
-    debug!("curr_nonce {:?}", curr_nonce);
-    debug!("nonce {:?}", nonce);
+    debug!("curr_nonce {}", curr_nonce);
+    debug!("nonce {:#?}", nonce);
     debug!(
         "hopr_module_implementation_address {:?}",
         hopr_module_implementation_address
@@ -944,6 +943,38 @@ pub async fn deploy_safe_module_with_targets_and_nodes<M: Middleware>(
         hopr_module_implementation_address,
     )?;
     info!("predicted module address {:?}", module_address);
+
+    // FIXME: DEBUG!
+    for i in 0..5 {
+        let experience_nonce_sub = keccak256(ethers::abi::encode_packed(&[
+            ethers::abi::Token::Address(caller),
+            ethers::abi::Token::Uint(curr_nonce.saturating_sub(U256::from(i))),
+        ])?);
+        let experience_module_address_sub = predict_module_address(
+            MULTICALL_ADDRESS,
+            experience_nonce_sub,
+            hopr_node_stake_factory.address(),
+            hopr_module_implementation_address,
+        )?;
+        info!(
+            "predicted module address at {:?} sub {:?} {:?}",
+            curr_nonce, i, experience_module_address_sub
+        );
+        let experience_nonce_add = keccak256(ethers::abi::encode_packed(&[
+            ethers::abi::Token::Address(caller),
+            ethers::abi::Token::Uint(curr_nonce.add(U256::from(i))),
+        ])?);
+        let experience_module_address_add = predict_module_address(
+            MULTICALL_ADDRESS,
+            experience_nonce_add,
+            hopr_node_stake_factory.address(),
+            hopr_module_implementation_address,
+        )?;
+        info!(
+            "predicted module address at {:?} add {:?} {:?}",
+            curr_nonce, i, experience_module_address_add
+        );
+    }
 
     let safe_address = predict_safe_address(
         hopr_node_stake_factory.address(),
