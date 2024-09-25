@@ -130,7 +130,7 @@ impl HoprDbPeersOperations for HoprDb {
             peer_data.version = sea_orm::ActiveValue::Set(new_status.peer_version);
             peer_data.last_seen = sea_orm::ActiveValue::Set(DateTime::<Utc>::from(new_status.last_seen));
             peer_data.last_seen_latency = sea_orm::ActiveValue::Set(new_status.last_seen_latency.as_millis() as i32);
-            peer_data.ignored = sea_orm::ActiveValue::Set(new_status.ignored.map(|v| DateTime::<Utc>::from(v)));
+            peer_data.ignored = sea_orm::ActiveValue::Set(new_status.ignored.map(DateTime::<Utc>::from));
             peer_data.public = sea_orm::ActiveValue::Set(new_status.is_public);
             peer_data.quality = sea_orm::ActiveValue::Set(new_status.quality as f32);
             peer_data.quality_sma = sea_orm::ActiveValue::Set(Some(
@@ -282,11 +282,7 @@ impl TryFrom<hopr_db_entity::network_peer::Model> for WrappedPeerStatus {
             heartbeats_sent: value.heartbeats_sent.unwrap_or_default() as u64,
             heartbeats_succeeded: value.heartbeats_successful.unwrap_or_default() as u64,
             backoff: value.backoff.map_or(1.0f64, |v| v as f64),
-            ignored: if let Some(v) = value.ignored {
-                Some(v.into())
-            } else {
-                None
-            },
+            ignored: value.ignored.map(|v| v.into()),
             peer_version: value.version,
             multiaddresses: {
                 if let sea_orm::query::JsonValue::Array(mas) = value.multi_addresses {
