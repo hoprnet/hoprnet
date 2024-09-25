@@ -277,6 +277,7 @@ hopr:
     # the node to reconcile the state of the chain with the state of the node
     # in future versions.
     keep_logs: false
+    fast_sync: false
 # HOPRd Message Inbox configuration
 inbox:
   # Capacity of messages in the Inbox, per message tag.

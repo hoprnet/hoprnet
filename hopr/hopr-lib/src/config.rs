@@ -60,6 +60,9 @@ pub struct Chain {
     #[serde(default = "just_false")]
     #[default = false]
     pub keep_logs: bool,
+    #[serde(default = "just_false")]
+    #[default = false]
+    pub fast_sync: bool,
 }
 
 #[inline]

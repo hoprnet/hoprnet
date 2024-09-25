@@ -16,6 +16,8 @@ use std::pin::Pin;
 use tracing::{debug, warn};
 use tracing::{error, trace};
 
+use hopr_primitive_types::prelude::SerializableLog;
+
 use crate::errors::{Result, RpcError, RpcError::FilterIsEmpty};
 use crate::rpc::RpcOperations;
 use crate::{BlockWithLogs, HoprIndexerRpcOperations, Log, LogFilter};
@@ -166,7 +168,8 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                                     }
 
                                     debug!("retrieved {log}");
-                                    current_block_log.logs.insert(log);
+                                    let slog = SerializableLog::from(log);
+                                    current_block_log.logs.insert(slog);
                                 },
                                 Ok(None) => {
                                     trace!("done processing batch #{from_block} - #{latest_block}");
@@ -185,8 +188,8 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                                     } else {
                                         panic!("!!! Cannot advance the chain indexing due to unrecoverable RPC errors.
 
-                                        The RPC provider does not seem to be working correctly. 
-                                        
+                                        The RPC provider does not seem to be working correctly.
+
                                         The last encountered error was: {e}");
                                     }
                                 }
@@ -216,13 +219,14 @@ mod tests {
     use ethers::contract::EthEvent;
     use futures::StreamExt;
     use std::time::Duration;
+    use tracing::debug;
 
     use bindings::hopr_channels::*;
     use bindings::hopr_token::{ApprovalFilter, TransferFilter};
     use chain_types::{ContractAddresses, ContractInstances};
     use hopr_async_runtime::prelude::{sleep, spawn};
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
-    use tracing::debug;
+    use hopr_primitive_types::prelude::*;
 
     use crate::client::surf_client::SurfRequestor;
     use crate::client::{create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy};
@@ -398,31 +402,34 @@ mod tests {
 
         // The last block must contain all 4 events
         let last_block_logs = retrieved_logs.last().context("a log should be present")?.clone().logs;
+        let channels_address = contract_addrs.channels.to_hex();
+        let channel_open_filter = format!("{:#x}", ChannelOpenedFilter::signature());
+        let channel_balance_filter = format!("{:#x}", ChannelBalanceIncreasedFilter::signature());
+        let approval_filter = format!("{:#x}", ApprovalFilter::signature());
+        let transfer_filter = format!("{:#x}", TransferFilter::signature());
 
         assert!(
-            last_block_logs.iter().any(|log| log.address == contract_addrs.channels
-                && log.topics.contains(&ChannelOpenedFilter::signature().0.into())),
+            last_block_logs
+                .iter()
+                .any(|log| log.address == channels_address && log.topics.contains(&channel_open_filter)),
             "must contain channel open"
         );
         assert!(
-            last_block_logs.iter().any(|log| log.address == contract_addrs.channels
-                && log
-                    .topics
-                    .contains(&ChannelBalanceIncreasedFilter::signature().0.into())),
+            last_block_logs
+                .iter()
+                .any(|log| log.address == channels_address && log.topics.contains(&channel_balance_filter)),
             "must contain channel balance increase"
         );
         assert!(
             last_block_logs
                 .iter()
-                .any(|log| log.address == contract_addrs.token
-                    && log.topics.contains(&ApprovalFilter::signature().0.into())),
+                .any(|log| log.address == channels_address && log.topics.contains(&approval_filter)),
             "must contain token approval"
         );
         assert!(
             last_block_logs
                 .iter()
-                .any(|log| log.address == contract_addrs.token
-                    && log.topics.contains(&TransferFilter::signature().0.into())),
+                .any(|log| log.address == channels_address && log.topics.contains(&transfer_filter)),
             "must contain token transfer"
         );
 
@@ -513,17 +520,20 @@ mod tests {
             .context("a value should be present")?
             .clone()
             .logs;
+        let channels_address = contract_addrs.channels.to_hex();
+        let channel_open_filter = format!("{:#x}", ChannelOpenedFilter::signature());
+        let channel_balance_filter = format!("{:#x}", ChannelBalanceIncreasedFilter::signature());
 
         assert!(
-            last_block_logs.iter().any(|log| log.address == contract_addrs.channels
-                && log.topics.contains(&ChannelOpenedFilter::signature().0.into())),
+            last_block_logs
+                .iter()
+                .any(|log| log.address == channels_address && log.topics.contains(&channel_open_filter)),
             "must contain channel open"
         );
         assert!(
-            last_block_logs.iter().any(|log| log.address == contract_addrs.channels
-                && log
-                    .topics
-                    .contains(&ChannelBalanceIncreasedFilter::signature().0.into())),
+            last_block_logs
+                .iter()
+                .any(|log| log.address == channels_address && log.topics.contains(&channel_balance_filter)),
             "must contain channel balance increase"
         );
 

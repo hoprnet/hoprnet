@@ -1,9 +1,9 @@
-use std::sync::Arc;
-
 use futures::{stream, StreamExt};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::Arc;
 use tracing::{debug, error, info, trace};
 
-use chain_rpc::{HoprIndexerRpcOperations, LogFilter};
+use chain_rpc::{BlockWithLogs, HoprIndexerRpcOperations, LogFilter};
 use chain_types::chain_events::SignificantChainEvent;
 use hopr_async_runtime::prelude::{spawn, JoinHandle};
 use hopr_crypto_types::types::Hash;
@@ -142,83 +142,59 @@ where
             topics: topics.into_iter().map(Hash::from).collect(),
         };
 
-        info!("Start fast sync from block: {next_block_to_process}");
+        // First check whether fast sync is enabled and can be performed.
+        // If so:
+        //   1. delete the existing indexed data
+        //   2. reset the fast sync progress
+        //   3. run the fast sync process until completion
+        //   4. finally starting the rpc indexer.
+        if self.cfg.fast_sync && self.db.index_is_empty().await? {
+            info!("Fast sync is enabled, starting the fast sync process...");
+            self.db.set_logs_unprocessed().await?;
+            self.db.set_last_indexed_block(None, 0, None).await?;
+            self.fast_sync(
+                rpc,
+                db_processor,
+                db,
+                log_filter,
+                next_block_to_process,
+                tx_significant_events,
+            )
+            .await
+        }
 
-        panic!("STOP AFTER THIS POINT");
+        self.rpc_indexer(
+            rpc,
+            db_processor,
+            db,
+            log_filter,
+            next_block_to_process,
+            tx_significant_events,
+        )
+        .await;
 
-        info!("Building indexer background process");
+        info!("Building rpc indexer background process");
         let (tx, mut rx) = futures::channel::mpsc::channel::<()>(1);
 
-        let indexing_proc =
-            spawn(async move {
-                let is_synced = Arc::new(std::sync::atomic::AtomicBool::new(false));
-                let chain_head = Arc::new(std::sync::atomic::AtomicU64::new(0));
+        let indexing_proc = spawn(async move {
+            let is_synced = Arc::new(AtomicBool::new(false));
+            let chain_head = Arc::new(AtomicU64::new(0));
 
-                let event_stream = rpc
+            let event_stream = rpc
                 .try_stream_logs(next_block_to_process, log_filter)
                 .expect("block stream should be constructible")
                 .then(|block_with_logs| {
-                    let rpc = &rpc;
-                    let mut tx = tx.clone();
-                    let chain_head = chain_head.clone();
-                    let is_synced = is_synced.clone();
-
-                    async move {
-                        trace!("Processed block number: {}", block_with_logs.block_id);
-
-                        let current_block = block_with_logs.block_id;
-                        #[cfg(all(feature = "prometheus", not(test)))]
-                        {
-                            METRIC_INDEXER_CURRENT_BLOCK.set(block_with_logs.block_id as f64);
-                        }
-
-                        match rpc.block_number().await {
-                            Ok(current_chain_block_number) => {
-                                chain_head.store(current_chain_block_number, std::sync::atomic::Ordering::Relaxed)
-                            }
-                            Err(error) => {
-                                error!(
-                                    "Failed to fetch block number from RPC, cannot continue indexing due to {error}"
-                                );
-                                panic!("Failed to fetch block number from RPC, cannot continue indexing due to {error}")
-                            }
-                        };
-
-                        let head = chain_head.load(std::sync::atomic::Ordering::Relaxed);
-
-                        if !is_synced.load(std::sync::atomic::Ordering::Relaxed) {
-                            let block_difference = head - next_block_to_process;
-                            let progress = if block_difference == 0 {
-                                1_f64
-                            } else {
-                                (current_block - next_block_to_process) as f64 / block_difference as f64
-                            };
-
-                            info!(progress = progress * 100_f64, block = current_block, "Sync progress");
-
-                            #[cfg(all(feature = "prometheus", not(test)))]
-                            METRIC_INDEXER_SYNC_PROGRESS.set(progress);
-
-                            if current_block >= head {
-                                info!("Indexer sync successfully completed");
-                                is_synced.store(true, std::sync::atomic::Ordering::Relaxed);
-                                if let Err(e) = tx.try_send(()) {
-                                    error!("failed to notify about achieving index synchronization: {e}")
-                                }
-                            }
-                        }
-
-                        block_with_logs
-                    }
+                    self.calculate_sync_process(
+                        "rpc",
+                        block_with_logs,
+                        &rpc,
+                        chain_head.clone(),
+                        is_synced.clone(),
+                        next_block_to_process,
+                        tx.clone(),
+                    )
                 })
                 .filter_map(|block_with_logs| async {
-                    debug!("store logs in {block_with_logs} ...");
-                    let block_id = block_with_logs.block_id;
-
-                    // store logs in the database, keep going on errors for now
-                    let logs = block_with_logs.logs.clone().into_iter().map(SerializableLog::from).collect();
-                    let _ = db.store_logs(logs).await;
-
                     debug!("processing events in {block_with_logs} ...");
                     let block_description = block_with_logs.to_string();
                     let log_count = block_with_logs.logs.len();
@@ -260,23 +236,23 @@ where
                 })
                 .flat_map(stream::iter);
 
-                futures::pin_mut!(event_stream);
-                while let Some(event) = event_stream.next().await {
-                    trace!("Processing an onchain event: {event:?}");
-                    // Pass the events further only once we're fully synced
-                    if is_synced.load(std::sync::atomic::Ordering::Relaxed) {
-                        if let Err(e) = tx_significant_events.try_send(event) {
-                            error!("failed to pass a significant chain event further: {e}");
-                        }
+            futures::pin_mut!(event_stream);
+            while let Some(event) = event_stream.next().await {
+                trace!("Processing an onchain event: {event:?}");
+                // Pass the events further only once we're fully synced
+                if is_synced.load(Ordering::Relaxed) {
+                    if let Err(e) = tx_significant_events.try_send(event) {
+                        error!("failed to pass a significant chain event further: {e}");
                     }
                 }
+            }
 
-                panic!(
-                    "Indexer event stream has been terminated, cannot proceed further!\n\
+            panic!(
+                "Indexer event stream has been terminated, cannot proceed further!\n\
                 This error indicates that an issue has occurred at the RPC provider!\n\
                 The node cannot function without a good RPC connection."
-                );
-            });
+            );
+        });
 
         if std::future::poll_fn(|cx| futures::Stream::poll_next(std::pin::Pin::new(&mut rx), cx))
             .await
@@ -289,30 +265,144 @@ where
             ))
         }
     }
+
+    async fn process_block(&self, block_id: u64) -> crate::errors::Result<()>
+    where
+        U: ChainLogHandler + 'static,
+        Db: HoprDbLogOperations + 'static,
+    {
+        debug!("Processing events from block {block_id}");
+        let mut log_stream = self.db.get_logs(Some(block_id), Some(0)).await?;
+        let mut block_with_logs = BlockWithLogs {
+            block_id,
+            ..Default::default()
+        };
+
+        while let Some(log) = log_stream.next().await {
+            if log.block_number == block_id {
+                block_with_logs.logs.insert(log);
+            } else {
+                error!(
+                    "block number mismatch in logs stream, expected {block_id} but got {}",
+                    log.block_number
+                )
+            }
+        }
+
+        let events = match self.db_processor.take().collect_block_events(block_with_logs).await {
+            Ok(events) => {
+                info!(
+                    "Processed {} significant chain events from block #{}",
+                    events.len(),
+                    block_with_logs.block_id
+                );
+            }
+            Err(e) => {
+                error!(
+                    "Failed to process logs from block #{} into events: {e}",
+                    block_with_logs.block_id
+                );
+            }
+        };
+
+        Ok(events)
+    }
+
+    async fn store_block_logs(&self, block_with_logs: BlockWithLogs) -> crate::errors::Result<u64> {
+        debug!("Storing logs from {block_with_logs}");
+        for log in block_with_logs.logs.into_iter().map(SerializableLog::from) {
+            self.db.store_log(log).await?;
+        }
+
+        Ok(block_with_logs.block_id)
+    }
+
+    async fn calculate_sync_process(
+        &self,
+        prefix: &str,
+        block_with_logs: BlockWithLogs,
+        rpc: &T,
+        chain_head: Arc<AtomicU64>,
+        is_synced: Arc<AtomicBool>,
+        next_block_to_process: u64,
+        mut tx: futures::channel::mpsc::Sender<()>,
+    ) -> BlockWithLogs
+    where
+        T: HoprIndexerRpcOperations + 'static,
+    {
+        info!("Processing block number: {}", block_with_logs.block_id);
+
+        let current_block = block_with_logs.block_id;
+        #[cfg(all(feature = "prometheus", not(test)))]
+        {
+            METRIC_INDEXER_CURRENT_BLOCK.set(current_block as f64);
+        }
+
+        match rpc.block_number().await {
+            Ok(current_chain_block_number) => chain_head.store(current_chain_block_number, Ordering::Relaxed),
+            Err(error) => {
+                error!("Failed to fetch block number from RPC, cannot continue indexing due to {error}");
+                panic!("Failed to fetch block number from RPC, cannot continue indexing due to {error}")
+            }
+        };
+
+        let head = chain_head.load(Ordering::Relaxed);
+
+        if !is_synced.load(Ordering::Relaxed) {
+            let block_difference = head - next_block_to_process;
+            let progress = if block_difference == 0 {
+                1_f64
+            } else {
+                (current_block - next_block_to_process) as f64 / block_difference as f64
+            };
+
+            info!(indexer = prefix, progress = progress * 100_f64, block = current_block, "Sync progress");
+
+            #[cfg(all(feature = "prometheus", not(test)))]
+            METRIC_INDEXER_SYNC_PROGRESS.set(progress);
+
+            if current_block >= head {
+                info!("indexer {prefix} sync successfully completed");
+                is_synced.store(true, Ordering::Relaxed);
+                if let Err(e) = tx.try_send(()) {
+                    error!("failed to notify about achieving indexer {prefix} synchronization: {e}")
+                }
+            }
+        }
+
+        block_with_logs
+    }
 }
 
 #[cfg(test)]
+<<<<<<< HEAD
 mod tests {
     use std::collections::BTreeSet;
     use std::pin::Pin;
 
+=======
+pub mod tests {
+>>>>>>> 304869e2d7 (fast-sync: WIP integration into startup)
     use async_trait::async_trait;
-    use bindings::hopr_announcements::AddressAnnouncementFilter;
-    use chain_rpc::{BlockWithLogs, Log};
-    use chain_types::chain_events::ChainEventType;
     use ethers::{
         abi::{encode, Token},
         contract::EthEvent,
     };
     use futures::{join, Stream};
     use hex_literal::hex;
+    use mockall::mock;
+    use multiaddr::Multiaddr;
+    use std::collections::BTreeSet;
+    use std::pin::Pin;
+
+    use bindings::hopr_announcements::AddressAnnouncementFilter;
+    use chain_rpc::BlockWithLogs;
+    use chain_types::chain_events::ChainEventType;
     use hopr_crypto_types::keypairs::{Keypair, OffchainKeypair};
     use hopr_crypto_types::prelude::ChainKeypair;
     use hopr_db_sql::db::HoprDb;
     use hopr_db_sql::info::HoprDbInfoOperations;
     use hopr_primitive_types::prelude::*;
-    use mockall::mock;
-    use multiaddr::Multiaddr;
 
     use crate::traits::MockChainLogHandler;
 
@@ -331,11 +421,19 @@ mod tests {
         };
     }
 
+<<<<<<< HEAD
+=======
+    async fn create_stub_db() -> HoprDb {
+        HoprDb::new_in_memory(ChainKeypair::random()).await
+    }
+
+>>>>>>> 304869e2d7 (fast-sync: WIP integration into startup)
     fn build_announcement_logs(
         address: Address,
         size: usize,
         block_number: u64,
         log_index: U256,
+<<<<<<< HEAD
     ) -> anyhow::Result<Vec<Log>> {
         let mut logs: Vec<Log> = vec![];
 
@@ -344,6 +442,16 @@ mod tests {
             logs.push(Log {
                 address,
                 topics: vec![AddressAnnouncementFilter::signature().into()],
+=======
+    ) -> Vec<SerializableLog> {
+        let mut logs: Vec<SerializableLog> = vec![];
+
+        for i in 0..size {
+            let test_multiaddr: Multiaddr = format!("/ip4/1.2.3.4/tcp/{}", 1000 + i).parse().unwrap();
+            logs.push(SerializableLog {
+                address: address.to_hex(),
+                topics: vec![format!("{:#x}", AddressAnnouncementFilter::signature())],
+>>>>>>> 304869e2d7 (fast-sync: WIP integration into startup)
                 data: encode(&[
                     Token::Address(ethers::abi::Address::from_slice(address.as_ref())),
                     Token::String(test_multiaddr.to_string()),
@@ -352,7 +460,8 @@ mod tests {
                 tx_hash: Default::default(),
                 tx_index: 0,
                 block_number,
-                log_index,
+                log_index: log_index.as_u64(),
+                ..Default::default()
             });
         }
 

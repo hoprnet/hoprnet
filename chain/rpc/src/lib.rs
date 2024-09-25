@@ -377,7 +377,7 @@ pub struct BlockWithLogs {
     /// Block number
     pub block_id: u64,
     /// Filtered logs belonging to this block.
-    pub logs: BTreeSet<Log>,
+    pub logs: BTreeSet<SerializableLog>,
 }
 
 impl Display for BlockWithLogs {
