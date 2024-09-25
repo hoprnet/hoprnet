@@ -358,7 +358,7 @@
             settings.formatter.prettier.excludes = [ "./vendor/*" "./ethereum/contracts/broadcast/*" "*.yml" "*.yaml" ];
 
             programs.rustfmt.enable = true;
-            settings.formatter.rustfmt.excludes = [ "./vendor/*" ];
+            settings.formatter.rustfmt.excludes = [ "./vendor/*" "./db/entity/src/codegen/*" "./ethereum/bindings/src/codegen/*" ];
 
             programs.nixpkgs-fmt.enable = true;
             settings.formatter.nixpkgs-fmt.excludes = [ "./vendor/*" ];
