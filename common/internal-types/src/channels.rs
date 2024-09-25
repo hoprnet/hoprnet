@@ -20,7 +20,7 @@ pub enum ChannelStatus {
 }
 
 // Cannot use #[repr(u8)] due to PendingToClose
-impl From<ChannelStatus> for u8 {
+impl From<ChannelStatus> for i8 {
     fn from(value: ChannelStatus) -> Self {
         match value {
             ChannelStatus::Closed => 0,

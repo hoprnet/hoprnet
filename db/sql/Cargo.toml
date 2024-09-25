@@ -36,7 +36,7 @@ libp2p-identity = { workspace = true }
 moka = { workspace = true }
 multiaddr = { workspace = true }
 sea-orm = { workspace = true }
-sea-query = { version = "0.30.7", default-features = false, features = [
+sea-query = { workspace = true, default-features = false, features = [
   "with-chrono",
   "derive",
   "backend-sqlite",
