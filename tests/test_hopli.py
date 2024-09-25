@@ -1,9 +1,8 @@
 import random
 import json
 import logging
-import re
 import os
-from subprocess import run, Popen, PIPE, STDOUT, CalledProcessError
+from subprocess import run, CalledProcessError
 
 import pytest
 
@@ -11,14 +10,10 @@ from .conftest import (
     FIXTURES_PREFIX,
     INPUT_DEPLOYMENTS_SUMMARY_FILE,
     NETWORK1,
-    NETWORK2,
     PASSWORD,
-    PWD,
-    anvil_log_file,
-    anvil_cfg_file,
     barebone_nodes,
     fixtures_dir,
-    load_private_key,
+    load_private_key, run_hopli_cmd,
 )
 from .test_integration import (
     balance_str_to_int,
@@ -40,18 +35,6 @@ def run_cast_cmd(cmd: str, params: list[str]):
     except CalledProcessError as e:
         logging.error("Error executing cast command: %s", str(e))
         raise
-
-def run_hopli_cmd(cmd: list[str], custom_env):
-    env = os.environ | custom_env
-    proc = Popen(cmd, env=env, stdout=PIPE, stderr=STDOUT, bufsize=0)
-    # filter out ansi color codes
-    color_regex = re.compile(r"\x1b\[\d{,3}m")
-    with proc.stdout:
-        for line in iter(proc.stdout.readline, b""):
-            logging.info("[Hopli] %r", color_regex.sub("", line.decode("utf-8")[:-1]))
-    retcode = proc.wait()
-    if retcode:
-        raise CalledProcessError(retcode, cmd)
 
 
 def faucet(private_key: str, hopr_amount: str, native_amount: str):
@@ -85,7 +68,7 @@ def faucet(private_key: str, hopr_amount: str, native_amount: str):
     run_hopli_cmd(cmd, custom_env)
 
 
-def manager_deregsiter(private_key: str, node_addr: str):
+def manager_deregister(private_key: str, node_addr: str):
     custom_env = {
         "ETHERSCAN_API_KEY": "anykey",
         "IDENTITY_PASSWORD": PASSWORD,
@@ -375,7 +358,7 @@ async def test_hopli_should_be_able_to_deregister_nodes_and_register_it(peer: st
     assert res_before.stdout.decode("utf-8").split("\n")[0].lower() == swarm7[peer].safe_address.lower()
 
     # remove node from the network registry
-    manager_deregsiter(private_key, swarm7[peer].address)
+    manager_deregister(private_key, swarm7[peer].address)
 
     # Check if nodes are removed from the network
     run_cast_cmd("code", [network_registry_contract])

@@ -16,7 +16,7 @@ from .conftest import (
     barebone_nodes,
     default_nodes,
     nodes_with_auth,
-    random_distinct_pairs_from,
+    random_distinct_pairs_from, nodes_with_lower_outgoing_win_prob,
 )
 from .hopr import HoprdAPI
 from .node import Node
@@ -307,22 +307,6 @@ async def test_hoprd_ping_to_self_should_fail(peer: str, swarm7: dict[str, Node]
     response = await swarm7[peer].api.ping(swarm7[peer].peer_id)
 
     assert response is None, "Pinging self should fail"
-
-
-@pytest.mark.asyncio
-async def test_hoprd_ping_should_not_be_able_to_ping_nodes_in_other_network_UNFINISHED(swarm7: dict[str, Node]):
-    """
-    # FIXME: re-enable when network check works
-    # log "Node 1 should not be able to talk to Node 6 (different network id)"
-    # result=$(api_ping "${api6}" ${addr1} "TIMEOUT")
-    # log "-- ${result}"
-
-    # FIXME: re-enable when network check works
-    # log "Node 6 should not be able to talk to Node 1 (different network id)"
-    # result=$(api_ping "${api6}" ${addr1} "TIMEOUT")
-    # log "-- ${result}"
-    """
-    assert True
 
 
 @pytest.mark.asyncio
@@ -876,3 +860,50 @@ async def test_send_message_return_timestamp(src: str, dest: str, swarm7: dict[s
     assert timestamps == sorted(timestamps)
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "route",
+    [
+        [
+            *random.sample(nodes_with_lower_outgoing_win_prob(), 2),
+            *random.sample(barebone_nodes(), 1),
+        ]
+        for _ in range(PARAMETERIZED_SAMPLE_SIZE)
+    ],
+)
+async def test_hoprd_should_relay_packets_with_lower_win_prob_then_agg_and_redeem_them(route, swarm7: dict[str, Node]):
+    # TODO
+    assert True
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "route",
+    [
+        [
+            *random.sample(barebone_nodes(), 1),
+            *random.sample(nodes_with_lower_outgoing_win_prob(), 2),
+        ]
+        for _ in range(PARAMETERIZED_SAMPLE_SIZE)
+    ],
+)
+async def test_hoprd_should_relay_packets_with_higher_than_min_win_prob_then_agg_and_redeem_them(route, swarm7: dict[str, Node]):
+    # TODO
+    assert True
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "route",
+    [
+        [
+            *random.sample(nodes_with_lower_outgoing_win_prob(), 1),
+            *random.sample(barebone_nodes(), 1),
+            *random.sample(nodes_with_lower_outgoing_win_prob(), 1)
+        ]
+        for _ in range(PARAMETERIZED_SAMPLE_SIZE)
+    ],
+)
+async def test_hoprd_should_not_accept_tickets_with_lower_than_min_win_prob(route, swarm7: dict[str, Node]):
+    # TODO
+    assert True

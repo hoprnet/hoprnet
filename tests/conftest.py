@@ -4,11 +4,12 @@ import json
 import logging
 import os
 import random
+import re
 import shutil
 import socket
 from copy import deepcopy
 from pathlib import Path
-from subprocess import run
+from subprocess import run, Popen, PIPE, STDOUT, CalledProcessError
 
 import pytest
 
@@ -56,7 +57,7 @@ FIXTURES_PREFIX = "hopr"
 NODE_NAME_PREFIX = f"{FIXTURES_PREFIX}-node"
 
 NETWORK1 = "anvil-localhost"
-NETWORK2 = "anvil-localhost2"
+# NETWORK2 = "anvil-localhost2" # Not used currently for non-interoperability tests on different networks
 
 API_TOKEN = "e2e-API-token^^"
 PASSWORD = "e2e-test"
@@ -124,15 +125,15 @@ NODES = {
         6,
         API_TOKEN,
         LOCALHOST,
-        NETWORK2,
-        "barebone.cfg.yaml",
+        NETWORK1,
+        "barebone-lower-win-prob.cfg.yaml",
     ),
     "7": Node(
         7,
         API_TOKEN,
         "localhost",
         NETWORK1,
-        "barebone.cfg.yaml",
+        "barebone-lower-win-prob.cfg.yaml",
     ),
 }
 
@@ -152,24 +153,13 @@ def default_nodes():
     return ["5"]
 
 
-def nodes_with_different_network():
-    """Nodes with different network"""
+def nodes_with_lower_outgoing_win_prob():
+    """Nodes with outgoing ticket winning probability"""
     return ["6", "7"]
 
 
 def random_distinct_pairs_from(values: list, count: int):
     return random.sample([(left, right) for left, right in itertools.product(values, repeat=2) if left != right], count)
-
-
-def check_socket(address: str, port: str):
-    s = socket.socket()
-    try:
-        s.connect((address, port))
-        return True
-    except Exception:
-        return False
-    finally:
-        s.close()
 
 
 def mirror_contract_data(dest_file_path: Path, src_file_path: Path, src_network: str, dest_network: str):
@@ -521,3 +511,16 @@ async def swarm7(request):
 
 def to_ws_url(host, port):
     return f"ws://{host}:{port}/api/v3/messages/websocket"
+
+
+def run_hopli_cmd(cmd: list[str], custom_env):
+    env = os.environ | custom_env
+    proc = Popen(cmd, env=env, stdout=PIPE, stderr=STDOUT, bufsize=0)
+    # filter out ansi color codes
+    color_regex = re.compile(r"\x1b\[\d{,3}m")
+    with proc.stdout:
+        for line in iter(proc.stdout.readline, b""):
+            logging.info("[Hopli] %r", color_regex.sub("", line.decode("utf-8")[:-1]))
+    retcode = proc.wait()
+    if retcode:
+        raise CalledProcessError(retcode, cmd)
