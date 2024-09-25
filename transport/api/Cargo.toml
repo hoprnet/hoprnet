@@ -46,7 +46,7 @@ futures = { workspace = true }
 lazy_static = { workspace = true }
 libp2p = { workspace = true, features = ["request-response"] }
 moka = { workspace = true }
-proc-macro-regex = "~1.1.0"
+proc-macro-regex = { workspace = true }
 rust-stream-ext-concurrent = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
