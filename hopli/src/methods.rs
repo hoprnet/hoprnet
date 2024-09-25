@@ -924,16 +924,7 @@ pub async fn deploy_safe_module_with_targets_and_nodes<M: Middleware>(
         ethers::abi::Token::Uint(curr_nonce),
     ])?);
 
-    debug!("curr_nonce {}", curr_nonce);
-    debug!("nonce {:#?}", nonce);
-    debug!(
-        "hopr_module_implementation_address {:?}",
-        hopr_module_implementation_address
-    );
-    debug!(
-        "hopr_node_stake_factory_address {:?}",
-        hopr_node_stake_factory.address()
-    );
+    debug!("curr_nonce {} and nonce {:?}", curr_nonce, nonce);
 
     // predict module and safe address
     let module_address = predict_module_address(
@@ -943,38 +934,6 @@ pub async fn deploy_safe_module_with_targets_and_nodes<M: Middleware>(
         hopr_module_implementation_address,
     )?;
     info!("predicted module address {:?}", module_address);
-
-    // FIXME: DEBUG!
-    for i in 0..5 {
-        let experience_nonce_sub = keccak256(ethers::abi::encode_packed(&[
-            ethers::abi::Token::Address(caller),
-            ethers::abi::Token::Uint(curr_nonce.saturating_sub(U256::from(i))),
-        ])?);
-        let experience_module_address_sub = predict_module_address(
-            MULTICALL_ADDRESS,
-            experience_nonce_sub,
-            hopr_node_stake_factory.address(),
-            hopr_module_implementation_address,
-        )?;
-        info!(
-            "predicted module address at {:?} sub {:?} {:?}",
-            curr_nonce, i, experience_module_address_sub
-        );
-        let experience_nonce_add = keccak256(ethers::abi::encode_packed(&[
-            ethers::abi::Token::Address(caller),
-            ethers::abi::Token::Uint(curr_nonce.add(U256::from(i))),
-        ])?);
-        let experience_module_address_add = predict_module_address(
-            MULTICALL_ADDRESS,
-            experience_nonce_add,
-            hopr_node_stake_factory.address(),
-            hopr_module_implementation_address,
-        )?;
-        info!(
-            "predicted module address at {:?} add {:?} {:?}",
-            curr_nonce, i, experience_module_address_add
-        );
-    }
 
     let safe_address = predict_safe_address(
         hopr_node_stake_factory.address(),

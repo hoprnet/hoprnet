@@ -1,4 +1,4 @@
-//! This module contains arguments and functions to interact with the Network Registry contract for a previledged account.
+//! This module contains arguments and functions to interact with the Network Registry contract for a privileged account.
 //! To participate in the HOPR network, a node must be included in the network registry contract.
 //! Nodes and the staking account (Safe) that manages them should be registered as a pair in the Network registry contrat.
 //! Nodes and safes can be registered by either a manager or by the staking account itself.
@@ -192,7 +192,7 @@ impl NetworkRegistrySubcommands {
             safe_eth_addresses.extend(addresses.split(',').map(|addr| H160::from_str(addr).unwrap()));
         }
 
-        // read private key. The provided env
+        // Read the private key from arguments or the "PRIVATE_KEY" environment variable
         let signer_private_key = private_key.read("MANAGER_PRIVATE_KEY")?;
 
         // get RPC provider for the given network and environment

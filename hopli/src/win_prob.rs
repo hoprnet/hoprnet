@@ -1,9 +1,9 @@
-//! This module contains arguments and functions to interact with the Winning Probability contract for a previledged account.
+//! This module contains arguments and functions to interact with the Winning Probability contract for a privileged account.
 //! It can set the global minimum winning probability and read the current global minimum winning probability.
 //! Some sample commands:
 //! - Set winning probability:
 //! ```text
-//! hopli win-prob-modul set \
+//! hopli win-prob set \
 //!     --network anvil-localhost \
 //!     --contracts-root "../ethereum/contracts" \
 //!     --winning-probability 0.5 \
@@ -12,7 +12,7 @@
 //! ```
 //! - Get winning probability:
 //! ```text
-//! hopli win-prob-modul get \
+//! hopli win-prob get \
 //!     --network anvil-localhost \
 //!     --contracts-root "../ethereum/contracts" \
 //!     --private-key ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
@@ -27,7 +27,7 @@ use crate::{
 use bindings::hopr_winning_probability_oracle::HoprWinningProbabilityOracle;
 use clap::Parser;
 use hopr_lib::{f64_to_win_prob, win_prob_to_f64};
-use tracing::info;
+use tracing::{debug, info};
 
 /// CLI arguments for `hopli win-prob`
 #[derive(Clone, Debug, Parser)]
@@ -63,7 +63,7 @@ impl WinProbSubcommands {
         winning_probability: f64,
         private_key: PrivateKeyArgs,
     ) -> Result<(), HelperErrors> {
-        // read private key. The provided env
+        // Read the private key from arguments or the "PRIVATE_KEY" environment variable
         let signer_private_key = private_key.read("PRIVATE_KEY")?;
 
         // get RPC provider for the given network and environment
@@ -94,9 +94,9 @@ impl WinProbSubcommands {
             .set_win_prob(win_prob_param)
             .send()
             .await
-            .map_err(|_| HelperErrors::ParseError("Failed in broadcasting transactions".into()))?
+            .map_err(|e| HelperErrors::ParseError(format!("Failed in broadcasting transactions {:?}", e)))?
             .await
-            .map_err(|_| HelperErrors::ParseError("Failed in getting receipt".into()))?;
+            .map_err(|e| HelperErrors::ParseError(format!("Failed in getting receipt {:?}", e)))?;
         Ok(())
     }
 
@@ -146,7 +146,8 @@ impl Cmd for WinProbSubcommands {
                 WinProbSubcommands::execute_set_win_prob(network_provider, winning_probability, private_key).await?;
             }
             WinProbSubcommands::Get { network_provider } => {
-                let _win_prob = WinProbSubcommands::execute_get_win_prob(network_provider).await?;
+                let win_prob = WinProbSubcommands::execute_get_win_prob(network_provider).await?;
+                debug!("Current global minimum winning probability is: {}", win_prob);
             }
         }
         Ok(())
