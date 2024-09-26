@@ -279,6 +279,8 @@ def migrate_safe_module(private_key: str, manager_private_key: str, safe: str, m
     test_suite_name = __name__.split('.')[-1]
     test_dir = fixtures_dir(test_suite_name)
 
+    new_network = "anvil-localhost2"
+
     custom_env = {
         "ETHERSCAN_API_KEY": "anykey",
         "IDENTITY_PASSWORD": PASSWORD,
@@ -292,7 +294,7 @@ def migrate_safe_module(private_key: str, manager_private_key: str, safe: str, m
             "safe-module",
             "migrate",
             "--network",
-            NETWORK2,
+            new_network,
             "--identity-prefix",
             FIXTURES_PREFIX_NEW,
             "--identity-directory",
@@ -309,6 +311,49 @@ def migrate_safe_module(private_key: str, manager_private_key: str, safe: str, m
         custom_env,
     )
 
+
+def manager_set_win_prob(private_key: str, win_prob: str):
+    custom_env = {
+        "ETHERSCAN_API_KEY": "anykey",
+        "PRIVATE_KEY": private_key,
+        "PATH": os.environ["PATH"],
+    }
+    run_hopli_cmd(
+        [
+            "hopli",
+            "win-prob",
+            "set",
+            "--network",
+            NETWORK1,
+            "--winning-probability",
+            win_prob,
+            "--contracts-root",
+            "./ethereum/contracts",
+            "--provider-url",
+            ANVIL_ENDPOINT,
+        ],
+        custom_env,
+    )
+
+
+def get_win_prob():
+    custom_env = {
+        "PATH": os.environ["PATH"],
+    }
+    run_hopli_cmd(
+        [
+            "hopli",
+            "win-prob",
+            "get",
+            "--network",
+            NETWORK1,
+            "--contracts-root",
+            "./ethereum/contracts",
+            "--provider-url",
+            ANVIL_ENDPOINT,
+        ],
+        custom_env,
+    )
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
@@ -455,3 +500,32 @@ async def test_hopli_should_be_able_to_create_safe_module(swarm7: dict[str, Node
 
     # Remove the created identity
     run(["rm", "-f", test_dir.joinpath(f"{FIXTURES_PREFIX_NEW}{extra_prefix}0.id")], check=True, capture_output=True)
+
+@pytest.mark.asyncio
+async def test_hopli_should_be_able_to_set_and_read_win_prob():
+    test_suite_name = __name__.split('.')[-1]
+
+    # READ CONTRACT ADDRESS
+    with open(INPUT_DEPLOYMENTS_SUMMARY_FILE, "r") as file:
+        address_data: dict = json.load(file)
+        win_prob_oracle = address_data["networks"][NETWORK1]["addresses"]["winning_probability_oracle"]
+
+    # get current win prob
+    get_win_prob()
+    old_win_prob = run_cast_cmd(
+        "call", [win_prob_oracle, "currentWinProb()()"]
+    )
+    logging.info("old_win_prob %s", old_win_prob.stdout.decode("utf-8").split("is")[0].split("\n")[0].lower())
+    assert old_win_prob.stdout.decode("utf-8").split("is")[0].split("\n")[0].lower() == "0x00000000000000000000000000000000000000000000000000ffffffffffffff"
+
+    # set new win prob
+    private_key = load_private_key(test_suite_name)
+    manager_set_win_prob(private_key, "0.5")
+
+    # get new win prob
+    get_win_prob()
+    new_win_prob = run_cast_cmd(
+        "call", [win_prob_oracle, "currentWinProb()()"]
+    )
+    logging.info("new_win_prob %s", new_win_prob.stdout.decode("utf-8").split("is")[0].split("\n")[0].lower())
+    assert new_win_prob.stdout.decode("utf-8").split("is")[0].split("\n")[0].lower() == "0x000000000000000000000000000000000000000000000000007fffffffffffff"
