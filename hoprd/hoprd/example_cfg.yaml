@@ -246,6 +246,7 @@ hopr:
             module_implementation: 0xa51c1fc2f0d1a1b8494ed1fe312d7c3a78ed91c0
             node_safe_registry: 0x0dcd1bf9a1b36ce34237eeafef220932846bcd82
             ticket_price_oracle: 0x7a2088a1bfc9d81c55368ae168c2c02570cb814f
+            winning_probability_oracle: 0x959922bE3CAee4b8Cd9a407cc3ac1C251C2007B1
             announcements: 0x09635f643e140090a9a8dcd712ed6285858cebef
             node_stake_v2_factory: 0xb7f8bc63bbcad18155201308c8f3540b07f84f5e
           confirmations: 2
