@@ -99,7 +99,7 @@ use std::collections::{BTreeSet, HashSet};
 use std::fmt::{Debug, Display};
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicU32, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
@@ -234,6 +234,7 @@ pub struct SessionState<const C: usize> {
     frame_reassembler: Arc<FrameReassembler>,
     cfg: SessionConfig,
     segment_egress_send: UnboundedSender<SessionMessage<C>>,
+    segment_egress_send_bytes: Arc<AtomicUsize>,
 }
 
 fn maybe_fused_future<'a, F>(condition: bool, future: F) -> futures::future::Fuse<BoxFuture<'a, ()>>
@@ -788,6 +789,7 @@ impl<const C: usize> SessionSocket<C> {
             incoming_frame_retries,
             segment_egress_send,
             cfg: cfg.clone(),
+            segment_egress_send_bytes: Arc::new(AtomicUsize::new(0)),
         };
 
         let (downstream_read, downstream_write) = transport.split();
