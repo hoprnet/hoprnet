@@ -764,6 +764,7 @@ where
             self.addresses.module_implementation,
             self.addresses.network_registry,
             self.addresses.price_oracle,
+            self.addresses.win_prob_oracle,
             self.addresses.safe_registry,
             self.addresses.token,
         ]
@@ -780,6 +781,8 @@ where
             crate::constants::topics::network_registry()
         } else if contract.eq(&self.addresses.price_oracle) {
             crate::constants::topics::ticket_price_oracle()
+        } else if contract.eq(&self.addresses.win_prob_oracle) {
+            crate::constants::topics::winning_prob_oracle()
         } else if contract.eq(&self.addresses.safe_registry) {
             crate::constants::topics::node_safe_registry()
         } else if contract.eq(&self.addresses.token) {
@@ -897,6 +900,7 @@ mod tests {
         static ref SAFE_MANAGEMENT_MODULE_ADDR: Address = "9b91245a65ad469163a86e32b2281af7a25f38ce".parse().expect("lazy static address should be constructible"); // just a dummy
         static ref SAFE_INSTANCE_ADDR: Address = "b93d7fdd605fb64fdcc87f21590f950170719d47".parse().expect("lazy static address should be constructible"); // just a dummy
         static ref TICKET_PRICE_ORACLE_ADDR: Address = "11db4391bf45ef31a10ea4a1b5cb90f46cc72c7e".parse().expect("lazy static address should be constructible"); // just a dummy
+        static ref WIN_PROB_ORACLE_ADDR: Address = "00db4391bf45ef31a10ea4a1b5cb90f46cc64c7e".parse().expect("lazy static address should be constructible"); // just a dummy
     }
 
     fn init_handlers<Db: HoprDbAllOperations + Clone>(db: Db) -> ContractEventHandlers<Db> {
@@ -910,6 +914,7 @@ mod tests {
                 announcements: *ANNOUNCEMENTS_ADDR,
                 module_implementation: *SAFE_MANAGEMENT_MODULE_ADDR,
                 price_oracle: *TICKET_PRICE_ORACLE_ADDR,
+                win_prob_oracle: *WIN_PROB_ORACLE_ADDR,
                 stake_factory: Default::default(),
             }),
             chain_key: SELF_CHAIN_KEY.clone(),
