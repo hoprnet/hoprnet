@@ -742,7 +742,7 @@ pub fn predict_module_address(
 ) -> Result<Address, HelperErrors> {
     let module_salt = keccak256(ethers::abi::encode_packed(&[
         ethers::abi::Token::Address(caller),
-        ethers::abi::Token::Uint(nonce.into()),
+        ethers::abi::Token::Bytes(nonce.into()),
     ])?);
     debug!("module_salt {:?}", module_salt);
 
@@ -783,7 +783,7 @@ pub fn predict_safe_address(
     )
     .encode();
 
-    let safe_salt = get_salt_from_salt_nonce(initializer, U256::from(nonce))?;
+    let safe_salt = get_salt_from_salt_nonce(initializer, nonce)?;
     debug!("safe_salt {:?}", hex::encode(safe_salt));
 
     let predict_safe_addr = deploy_proxy(safe_singleton, safe_salt, safe_factory)?;
@@ -793,12 +793,12 @@ pub fn predict_safe_address(
 }
 
 /// helper function to get salt nonce
-fn get_salt_from_salt_nonce(initializer: Vec<u8>, salt_nonce: U256) -> Result<[u8; 32], HelperErrors> {
+fn get_salt_from_salt_nonce(initializer: Vec<u8>, salt_nonce: [u8; 32]) -> Result<[u8; 32], HelperErrors> {
     let hashed_initializer = keccak256(initializer);
 
     Ok(keccak256(ethers::abi::encode_packed(&[
         ethers::abi::Token::Bytes(hashed_initializer.into()),
-        ethers::abi::Token::Uint(salt_nonce),
+        ethers::abi::Token::Bytes(salt_nonce.into()),
     ])?))
 }
 
@@ -923,6 +923,8 @@ pub async fn deploy_safe_module_with_targets_and_nodes<M: Middleware>(
         ethers::abi::Token::Address(caller),
         ethers::abi::Token::Uint(curr_nonce),
     ])?);
+
+    debug!("curr_nonce {} and nonce {:?}", curr_nonce, nonce);
 
     // predict module and safe address
     let module_address = predict_module_address(
@@ -1861,7 +1863,7 @@ mod tests {
     async fn test_get_salt_from_salt_nonce() -> anyhow::Result<()> {
         let salt = get_salt_from_salt_nonce(
             hex!("b63e800d00000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001400000000000000000000000002a15de4410d4c8af0a7b6c12803120f43c42b8200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000098b275485c406573d042848d66eb9d63fca311c00000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000").into(),
-            U256::from_dec_str("103994836888229670573364883831672511342967953907147914065931589108526220754063")?,
+            U256::from_dec_str("103994836888229670573364883831672511342967953907147914065931589108526220754063")?.into(),
         )?;
 
         assert_eq!(
