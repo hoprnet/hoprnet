@@ -98,6 +98,9 @@ pub struct Addresses {
     /// address of contract that allows Hopr Association to dictate price per packet in Hopr
     #[serde_as(as = "DisplayFromStr")]
     pub ticket_price_oracle: Address,
+    /// address of contract that allows Hopr Association to dictate the minimum ticket winning probability in Hopr
+    #[serde_as(as = "DisplayFromStr")]
+    pub winning_probability_oracle: Address,
     /// address of contract that manages transport announcements in the hopr network
     #[serde_as(as = "DisplayFromStr")]
     pub announcements: Address,
@@ -136,6 +139,9 @@ pub struct ChainNetworkConfig {
     /// address of contract that allows Hopr Association to dictate price per packet in Hopr
     #[serde_as(as = "DisplayFromStr")]
     pub ticket_price_oracle: Address,
+    /// address of contract that allows Hopr Association to dictate the minimum ticket winning probability in Hopr
+    #[serde_as(as = "DisplayFromStr")]
+    pub winning_probability_oracle: Address,
     /// address of contract that manages transport announcements in the hopr network
     #[serde_as(as = "DisplayFromStr")]
     pub announcements: Address,
@@ -202,6 +208,7 @@ impl ChainNetworkConfig {
                 node_safe_registry: network.addresses.node_safe_registry.to_owned(),
                 node_stake_v2_factory: network.addresses.node_stake_v2_factory.to_owned(),
                 ticket_price_oracle: network.addresses.ticket_price_oracle.to_owned(),
+                winning_probability_oracle: network.addresses.winning_probability_oracle.to_owned(),
                 token: network.addresses.token.to_owned(),
                 tx_polling_interval: network.tx_polling_interval,
                 max_block_range: network.max_block_range,
@@ -226,6 +233,7 @@ impl From<&ChainNetworkConfig> for ContractAddresses {
             network_registry_proxy: network.network_registry_proxy,
             safe_registry: network.node_safe_registry,
             price_oracle: network.ticket_price_oracle,
+            win_prob_oracle: network.winning_probability_oracle,
             stake_factory: network.node_stake_v2_factory,
             module_implementation: network.module_implementation,
         }

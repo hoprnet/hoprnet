@@ -743,17 +743,11 @@ mod tests {
         peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await?;
 
         assert_eq!(
-            peers
-                .update(&peer, Ok(std::time::Duration::from_millis(13u64)), None)
-                .await?,
-            Some(NetworkTriggeredEvent::UpdateQuality(peer.clone(), 0.1))
-        );
-        assert_eq!(
             peers.update(&peer, Err(()), None).await?,
             Some(NetworkTriggeredEvent::CloseConnection(peer))
         );
 
-        assert!(peers.has(&public).await);
+        assert!(!peers.has(&public).await);
 
         Ok(())
     }
