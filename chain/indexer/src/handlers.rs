@@ -4,7 +4,7 @@ use bindings::{
     hopr_announcements::HoprAnnouncementsEvents, hopr_channels::HoprChannelsEvents,
     hopr_network_registry::HoprNetworkRegistryEvents, hopr_node_management_module::HoprNodeManagementModuleEvents,
     hopr_node_safe_registry::HoprNodeSafeRegistryEvents, hopr_ticket_price_oracle::HoprTicketPriceOracleEvents,
-    hopr_token::HoprTokenEvents,
+    hopr_token::HoprTokenEvents, hopr_winning_probability_oracle::HoprWinningProbabilityOracleEvents,
 };
 use chain_rpc::{BlockWithLogs, Log};
 use chain_types::chain_events::{ChainEventType, NetworkRegistryStatus, SignificantChainEvent};
@@ -650,35 +650,59 @@ where
         Ok(None)
     }
 
-    // TODO: uncomment this once ticket winning probability oracle is implemented
-    /*async fn on_ticket_winning_probability_oracle_event(
+    async fn on_ticket_winning_probability_oracle_event(
         &self,
         tx: &OpenTransaction,
-        event: HoprTicketWinningProbabilityOracleEvents,
+        event: HoprWinningProbabilityOracleEvents,
     ) -> Result<Option<ChainEventType>> {
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_INDEXER_LOG_COUNTERS.increment(&["win_prob_oracle"]);
 
         match event {
-            HoprTicketWinningProbabilityOracleEvents::TicketMinWinningProbability(update) => {
+            HoprWinningProbabilityOracleEvents::WinProbUpdatedFilter(update) => {
+                let mut encoded_old: EncodedWinProb = Default::default();
+                encoded_old.copy_from_slice(&update.old_win_prob.to_be_bytes()[1..]);
+                let old_minimum_win_prob = win_prob_to_f64(&encoded_old);
+
+                let mut encoded_new: EncodedWinProb = Default::default();
+                encoded_new.copy_from_slice(&update.new_win_prob.to_be_bytes()[1..]);
+                let new_minimum_win_prob = win_prob_to_f64(&encoded_new);
+
                 trace!(
-                    "on_ticket_minimum_win_prob_updated - old: {:?} - new: {:?}",
-                    update.0.to_string(),
-                    update.1.to_string()
+                    "on_ticket_minimum_win_prob_updated - old: {old_minimum_win_prob} - new: {new_minimum_win_prob}",
                 );
 
                 self.db
-                    .set_minimum_incoming_ticket_win_prob(Some(tx), win_prob_to_f64(update.1))
+                    .set_minimum_incoming_ticket_win_prob(Some(tx), new_minimum_win_prob)
                     .await?;
 
-                info!("minimum ticket winning probability has been set to {}", update.1);
+                info!("minimum ticket winning probability has been updated {old_minimum_win_prob} -> {new_minimum_win_prob}");
+
+                // If the old minimum was less strict, we need to mark of all the
+                // tickets below the new higher minimum as rejected
+                if old_minimum_win_prob < new_minimum_win_prob {
+                    let mut selector: Option<TicketSelector> = None;
+                    for channel in self.db.get_incoming_channels(tx.into()).await? {
+                        selector = selector
+                            .map(|s| s.also_on_channel(channel.get_id(), channel.channel_epoch))
+                            .or_else(|| Some(TicketSelector::from(channel)));
+                    }
+                    // Reject unredeemed tickets on all the channels with win prob lower than the new one
+                    if let Some(selector) = selector {
+                        let num_rejected = self
+                            .db
+                            .mark_tickets_rejected(selector.with_winning_probability_lt(encoded_new))
+                            .await?;
+                        info!("{num_rejected} unredeemed tickets were rejected because the minimum winning probability has been increased");
+                    }
+                }
             }
             _ => {
-                // ignore other events
+                // Ignore other events
             }
         }
         Ok(None)
-    }*/
+    }
 
     async fn on_ticket_price_oracle_event(
         &self,
@@ -735,10 +759,9 @@ where
         } else if log.address.eq(&self.addresses.price_oracle) {
             let event = HoprTicketPriceOracleEvents::decode_log(&log.into())?;
             self.on_ticket_price_oracle_event(tx, event).await
-        // TODO: uncomment this once ticket win prob oracle is implemented
-        /*} else if log.address.eq(&self.addresses.ticket_win_prob_oracle) {
-        let event = HoprTicketWinningProbabilityOracleEvents::decode_log(&log.into())?;
-        self.on_ticket_winning_probability_oracle_event(tx, event).await*/
+        } else if log.address.eq(&self.addresses.win_prob_oracle) {
+            let event = HoprWinningProbabilityOracleEvents::decode_log(&log.into())?;
+            self.on_ticket_winning_probability_oracle_event(tx, event).await
         } else {
             #[cfg(all(feature = "prometheus", not(test)))]
             METRIC_INDEXER_LOG_COUNTERS.increment(&["unknown"]);
@@ -764,6 +787,7 @@ where
             self.addresses.module_implementation,
             self.addresses.network_registry,
             self.addresses.price_oracle,
+            self.addresses.win_prob_oracle,
             self.addresses.safe_registry,
             self.addresses.token,
         ]
@@ -780,6 +804,8 @@ where
             crate::constants::topics::network_registry()
         } else if contract.eq(&self.addresses.price_oracle) {
             crate::constants::topics::ticket_price_oracle()
+        } else if contract.eq(&self.addresses.win_prob_oracle) {
+            crate::constants::topics::winning_prob_oracle()
         } else if contract.eq(&self.addresses.safe_registry) {
             crate::constants::topics::node_safe_registry()
         } else if contract.eq(&self.addresses.token) {
@@ -897,6 +923,7 @@ mod tests {
         static ref SAFE_MANAGEMENT_MODULE_ADDR: Address = "9b91245a65ad469163a86e32b2281af7a25f38ce".parse().expect("lazy static address should be constructible"); // just a dummy
         static ref SAFE_INSTANCE_ADDR: Address = "b93d7fdd605fb64fdcc87f21590f950170719d47".parse().expect("lazy static address should be constructible"); // just a dummy
         static ref TICKET_PRICE_ORACLE_ADDR: Address = "11db4391bf45ef31a10ea4a1b5cb90f46cc72c7e".parse().expect("lazy static address should be constructible"); // just a dummy
+        static ref WIN_PROB_ORACLE_ADDR: Address = "00db4391bf45ef31a10ea4a1b5cb90f46cc64c7e".parse().expect("lazy static address should be constructible"); // just a dummy
     }
 
     fn init_handlers<Db: HoprDbAllOperations + Clone>(db: Db) -> ContractEventHandlers<Db> {
@@ -910,6 +937,7 @@ mod tests {
                 announcements: *ANNOUNCEMENTS_ADDR,
                 module_implementation: *SAFE_MANAGEMENT_MODULE_ADDR,
                 price_oracle: *TICKET_PRICE_ORACLE_ADDR,
+                win_prob_oracle: *WIN_PROB_ORACLE_ADDR,
                 stake_factory: Default::default(),
             }),
             chain_key: SELF_CHAIN_KEY.clone(),

@@ -55,9 +55,10 @@ jobs:
 
       - name: Run unit tests
         run: |
+          # run sc tests
           nix develop -c make -j smart-contract-test
-          nix build .#hoprd-test
-          nix build .#hopli-test
+          # run rust unit tests for entire workspace
+          nix build -L .#hopr-test
         env:
           HOPR_NETWORK: anvil-localhost
 
