@@ -72,7 +72,7 @@ impl HoprDbPeersOperations for HoprDb {
                 mas.into_iter().map(|m| m.to_string()).collect::<Vec<String>>().into(),
             ),
             origin: sea_orm::ActiveValue::Set(origin as i8),
-            backoff: sea_orm::ActiveValue::Set(Some(backoff as f32)),
+            backoff: sea_orm::ActiveValue::Set(Some(backoff)),
             quality_sma: sea_orm::ActiveValue::Set(Some(
                 bincode::serialize(&SingleSumSMA::<f64>::new(quality_window as usize))
                     .map_err(|_| crate::errors::DbSqlError::DecodingError)?,
@@ -132,12 +132,12 @@ impl HoprDbPeersOperations for HoprDb {
             peer_data.last_seen_latency = sea_orm::ActiveValue::Set(new_status.last_seen_latency.as_millis() as i32);
             peer_data.ignored = sea_orm::ActiveValue::Set(new_status.ignored.map(DateTime::<Utc>::from));
             peer_data.public = sea_orm::ActiveValue::Set(new_status.is_public);
-            peer_data.quality = sea_orm::ActiveValue::Set(new_status.quality as f32);
+            peer_data.quality = sea_orm::ActiveValue::Set(new_status.quality);
             peer_data.quality_sma = sea_orm::ActiveValue::Set(Some(
                 bincode::serialize(&new_status.quality_avg)
                     .map_err(|e| crate::errors::DbSqlError::LogicalError(format!("cannot serialize sma: {e}")))?,
             ));
-            peer_data.backoff = sea_orm::ActiveValue::Set(Some(new_status.backoff as f32));
+            peer_data.backoff = sea_orm::ActiveValue::Set(Some(new_status.backoff));
             peer_data.heartbeats_sent = sea_orm::ActiveValue::Set(Some(new_status.heartbeats_sent as i32));
             peer_data.heartbeats_successful = sea_orm::ActiveValue::Set(Some(new_status.heartbeats_succeeded as i32));
 
@@ -281,7 +281,7 @@ impl TryFrom<hopr_db_entity::network_peer::Model> for WrappedPeerStatus {
             last_seen_latency: Duration::from_millis(value.last_seen_latency as u64),
             heartbeats_sent: value.heartbeats_sent.unwrap_or_default() as u64,
             heartbeats_succeeded: value.heartbeats_successful.unwrap_or_default() as u64,
-            backoff: value.backoff.map_or(1.0f64, |v| v as f64),
+            backoff: value.backoff.unwrap_or(1.0f64),
             ignored: value.ignored.map(|v| v.into()),
             peer_version: value.version,
             multiaddresses: {
@@ -302,7 +302,7 @@ impl TryFrom<hopr_db_entity::network_peer::Model> for WrappedPeerStatus {
                     Err(Self::Error::DecodingError)
                 }?
             },
-            quality: value.quality as f64,
+            quality: value.quality,
             quality_avg: bincode::deserialize(
                 value
                     .quality_sma
@@ -440,6 +440,7 @@ mod tests {
         for i in [0.1_f64, 0.4_64, 0.6_f64].into_iter() {
             peer_status.update_quality(i);
         }
+        peer_status.quality = peer_status.quality as f32 as f64;
 
         let peer_status_from_db = db.get_network_peer(&peer_id).await?.expect("entry should exist");
 
