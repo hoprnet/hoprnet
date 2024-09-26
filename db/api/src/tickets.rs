@@ -98,6 +98,14 @@ impl TicketSelector {
         ret
     }
 
+    /// Sets the selector to match only tickets on the given `channel_id` and `epoch`.
+    /// This nullifies any prior calls to [`TicketSelector::also_on_channel`].
+    pub fn just_on_channel<T: Into<U256>>(self, channel_id: Hash, epoch: T) -> Self {
+        let mut ret = self.clone();
+        ret.channel_identifiers = vec![(channel_id.clone(), epoch.into())];
+        ret
+    }
+
     /// Checks if this selector operates only on a single channel.
     ///
     /// This will return `false` if [`TicketSelector::also_on_channel`] was called, and neither
@@ -214,6 +222,16 @@ impl From<ChannelEntry> for TicketSelector {
     }
 }
 
+/// Different markers for unredeemed tickets.
+/// See [`HoprDbTicketOperations::mark_tickets_as`] for usage.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, strum::Display)]
+#[strum(serialize_all = "lowercase")]
+pub enum TicketMarker {
+    Redeemed,
+    Rejected,
+    Neglected,
+}
+
 /// Prerequisites for the ticket aggregator.
 /// The prerequisites are **independent** of each other.
 /// If none of the prerequisites are given, they are considered satisfied.
@@ -239,23 +257,17 @@ pub trait HoprDbTicketOperations {
     /// The optional transaction `tx` must be in the database.
     async fn get_tickets(&self, selector: TicketSelector) -> Result<Vec<AcknowledgedTicket>>;
 
-    /// Marks tickets as redeemed (removing them from the DB) and updating the statistics.
-    /// Returns the number of tickets that were redeemed.
-    async fn mark_tickets_redeemed(&self, selector: TicketSelector) -> Result<usize>;
-
-    /// Marks tickets as redeemed (removing them from the DB) and updating the statistics.
+    /// Marks tickets as the given [`TicketMarker`], removing them from the DB and updating the
+    /// ticket statistics for each ticket's channel.
     ///
-    /// Returns the number of tickets that were neglected.
-    async fn mark_tickets_neglected(&self, selector: TicketSelector) -> Result<usize>;
-
-    /// Marks tickets as rejected (removing them from the DB) and updating the statistics.
-    ///
-    /// Returns the number of tickets that were rejected.
-    async fn mark_tickets_rejected(&self, selector: TicketSelector) -> Result<usize>;
+    /// Returns the number of marked tickets.
+    async fn mark_tickets_as(&self, selector: TicketSelector, mark_as: TicketMarker) -> Result<usize>;
 
     /// Updates the ticket statistics according to the fact that the given ticket has
-    /// been rejected by the packet processing pipeline. This ticket is not yet stored in
-    /// the ticket DB.
+    /// been rejected by the packet processing pipeline.
+    ///
+    /// This ticket is not yet stored in the ticket DB,
+    /// so only the statistics in the corresponding channel are updated.
     async fn mark_unsaved_ticket_rejected(&self, ticket: &Ticket) -> Result<()>;
 
     /// Updates [state](AcknowledgedTicketStatus) of the tickets matching the given `selector`.

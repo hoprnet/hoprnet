@@ -1224,7 +1224,7 @@ dependencies = [
 
 [[package]]
 name = "chain-indexer"
-version = "0.3.1"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "async-channel 2.3.1",
@@ -1250,6 +1250,7 @@ dependencies = [
  "primitive-types",
  "sea-orm",
  "smart-default",
+ "test-log",
  "thiserror",
  "tracing",
 ]
@@ -3935,7 +3936,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-api"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "futures",
@@ -3983,7 +3984,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-sql"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "async-lock 3.4.0",

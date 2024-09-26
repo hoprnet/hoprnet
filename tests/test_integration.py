@@ -890,8 +890,8 @@ async def test_send_message_return_timestamp(src: str, dest: str, swarm7: dict[s
     "route",
     [
         [
-            *random.sample(nodes_with_lower_outgoing_win_prob(), 2),
-            *random.sample(barebone_nodes(), 1),
+            *random.sample(nodes_with_lower_outgoing_win_prob(), 1),
+            *random.sample(barebone_nodes(), 2),
         ]
         for _ in range(PARAMETERIZED_SAMPLE_SIZE)
     ],
@@ -954,6 +954,130 @@ async def test_hoprd_should_relay_packets_with_lower_win_prob_then_agg_and_redee
     "route",
     [
         [
+            *random.sample(nodes_with_lower_outgoing_win_prob(), 1),
+            *random.sample(barebone_nodes(), 2),
+        ]
+        for _ in range(PARAMETERIZED_SAMPLE_SIZE)
+    ],
+)
+async def test_hoprd_should_reject_unredeemed_tickets_with_lower_win_prob_when_min_bound_increases(route, swarm7: dict[str, Node]):
+    ticket_count = 100
+    win_prob = 0.1
+    num_tickets_tolerated = 2
+    expected_ticket_value_max = win_prob * ticket_count * TICKET_PRICE_PER_HOP + num_tickets_tolerated * TICKET_PRICE_PER_HOP
+
+    src = route[0]
+    relay = route[1]
+    dest = route[-1]
+
+    test_suite_name = __name__.split('.')[-1]
+    private_key = load_private_key(test_suite_name)
+    set_minimum_winning_probability_in_network(private_key, win_prob)
+    try:
+        async with create_channel(swarm7[src], swarm7[relay], funding=ticket_count * TICKET_PRICE_PER_HOP):
+
+            # ensure ticket stats are what we expect before starting
+            statistics_before = await swarm7[relay].api.get_tickets_statistics()
+            assert balance_str_to_int(statistics_before.unredeemed_value) == 0
+            assert balance_str_to_int(statistics_before.rejected_value) == 0
+
+            # the destination should receive all the packets
+            packets = [f"Lowering ticket win probability check: #{i:08d}" for i in range(ticket_count)]
+            await send_and_receive_packets_with_pop(
+                packets, src=swarm7[src], dest=swarm7[dest], path=[swarm7[relay].peer_id]
+            )
+
+            # the value of redeemable tickets on the relay should not go above the given threshold
+            # and certainly there must be rejected tickets
+            ticket_statistics = await swarm7[relay].api.get_tickets_statistics()
+            unredeemed_value = balance_str_to_int(ticket_statistics.unredeemed_value)
+            rejected_value_1 = balance_str_to_int(ticket_statistics.rejected_value)
+            assert unredeemed_value <= expected_ticket_value_max
+            assert rejected_value_1 > 0
+
+            # Now if we increase the minimum winning probability, the relayer should
+            # reject all the unredeemed tickets
+            set_minimum_winning_probability_in_network(private_key, win_prob * 2)
+            await asyncio.sleep(5)
+
+            ticket_statistics = await swarm7[relay].api.get_tickets_statistics()
+            unredeemed_value = balance_str_to_int(ticket_statistics.unredeemed_value)
+            rejected_value_2 = balance_str_to_int(ticket_statistics.rejected_value)
+            assert unredeemed_value == 0
+            assert rejected_value_2 > rejected_value_1
+
+    finally:
+        # Always return winning probability to 1.0 even if the test failed
+        set_minimum_winning_probability_in_network(private_key, 1.0)
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "route",
+    [
+        [
+            *random.sample(nodes_with_lower_outgoing_win_prob(), 1),
+            *random.sample(barebone_nodes(), 3),
+        ]
+        for _ in range(PARAMETERIZED_SAMPLE_SIZE)
+    ],
+)
+async def test_hoprd_should_relay_with_increased_win_prob(route, swarm7: dict[str, Node]):
+    ticket_count = 100
+    win_prob = 0.1
+    num_tickets_tolerated = 2
+    expected_ticket_value_max = win_prob * ticket_count * TICKET_PRICE_PER_HOP + num_tickets_tolerated * TICKET_PRICE_PER_HOP
+
+    src = route[0]
+    relay_1 = route[1]
+    relay_2 = route[2]
+    dest = route[-1]
+
+    test_suite_name = __name__.split('.')[-1]
+    private_key = load_private_key(test_suite_name)
+    set_minimum_winning_probability_in_network(private_key, win_prob)
+    try:
+        async with create_channel(swarm7[src], swarm7[relay_1], funding=ticket_count * TICKET_PRICE_PER_HOP):
+            async with create_channel(swarm7[relay_1], swarm7[relay_2], funding=ticket_count * TICKET_PRICE_PER_HOP):
+
+                # ensure ticket stats are what we expect before starting
+                statistics_before = await swarm7[relay_1].api.get_tickets_statistics()
+                assert balance_str_to_int(statistics_before.unredeemed_value) == 0
+                assert balance_str_to_int(statistics_before.rejected_value) == 0
+
+                statistics_before = await swarm7[relay_2].api.get_tickets_statistics()
+                assert balance_str_to_int(statistics_before.unredeemed_value) == 0
+                assert balance_str_to_int(statistics_before.rejected_value) == 0
+
+                # the destination should receive all the packets
+                packets = [f"Relaying ticket win probability check: #{i:08d}" for i in range(ticket_count)]
+                await send_and_receive_packets_with_pop(
+                    packets, src=swarm7[src], dest=swarm7[dest], path=[swarm7[relay_1].peer_id, swarm7[relay_2].peer_id]
+                )
+
+                # the value of redeemable tickets on the first relay should not go above the given threshold
+                # and certainly there must be rejected tickets
+                ticket_statistics = await swarm7[relay_1].api.get_tickets_statistics()
+                unredeemed_value_1 = balance_str_to_int(ticket_statistics.unredeemed_value)
+                rejected_value_1 = balance_str_to_int(ticket_statistics.rejected_value)
+                assert unredeemed_value_1 <= expected_ticket_value_max
+                assert rejected_value_1 > 0
+
+                # however, since the first relay sends tickets with win probability = 1,
+                # the second relay must get the same amount of winning tickets as the first one and no rejected tickets
+                ticket_statistics = await swarm7[relay_2].api.get_tickets_statistics()
+                unredeemed_value_2 = balance_str_to_int(ticket_statistics.unredeemed_value)
+                rejected_value_2 = balance_str_to_int(ticket_statistics.rejected_value)
+                assert unredeemed_value_2 == unredeemed_value_1
+                assert rejected_value_2 == 0
+    finally:
+        # Always return winning probability to 1.0 even if the test failed
+        set_minimum_winning_probability_in_network(private_key, 1.0)
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "route",
+    [
+        [
             *random.sample(barebone_nodes(), 1),
             *random.sample(nodes_with_lower_outgoing_win_prob(), 2),
         ]
@@ -972,7 +1096,7 @@ async def test_hoprd_should_relay_packets_with_higher_than_min_win_prob(route, s
     private_key = load_private_key(test_suite_name)
     set_minimum_winning_probability_in_network(private_key, win_prob)
     try:
-        async with create_channel(swarm7[src], swarm7[relay], funding=ticket_count * TICKET_PRICE_PER_HOP) as channel:
+        async with create_channel(swarm7[src], swarm7[relay], funding=ticket_count * TICKET_PRICE_PER_HOP):
 
             # ensure ticket stats are what we expect before starting
             statistics_before = await swarm7[relay].api.get_tickets_statistics()
@@ -1003,9 +1127,8 @@ async def test_hoprd_should_relay_packets_with_higher_than_min_win_prob(route, s
     "route",
     [
         [
-            *random.sample(nodes_with_lower_outgoing_win_prob(), 1),
+            *random.sample(nodes_with_lower_outgoing_win_prob(), 2),
             *random.sample(barebone_nodes(), 1),
-            *random.sample(nodes_with_lower_outgoing_win_prob(), 1)
         ]
         for _ in range(PARAMETERIZED_SAMPLE_SIZE)
     ],
@@ -1017,7 +1140,7 @@ async def test_hoprd_should_not_accept_tickets_with_lower_than_min_win_prob(rout
     relay = route[1]
     dest = route[-1]
 
-    async with create_channel(swarm7[src], swarm7[relay], funding=ticket_count * TICKET_PRICE_PER_HOP) as channel:
+    async with create_channel(swarm7[src], swarm7[relay], funding=ticket_count * TICKET_PRICE_PER_HOP):
         # ensure ticket stats are what we expect before starting
         statistics_before = await swarm7[relay].api.get_tickets_statistics()
         assert balance_str_to_int(statistics_before.unredeemed_value) == 0
