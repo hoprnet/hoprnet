@@ -86,6 +86,8 @@ impl IpOrHost {
         self.resolve(resolver).await
     }
 
+    // This resolver setup is used in our tests because these are executed in a sandbox environment
+    // which prevents IO access to system-level files.
     #[cfg(all(test, feature = "runtime-async-std"))]
     pub async fn resolve_async_std(self) -> std::io::Result<Vec<SocketAddr>> {
         let config = async_std_resolver::config::ResolverConfig::new();
