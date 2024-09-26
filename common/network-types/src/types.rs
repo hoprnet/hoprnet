@@ -70,7 +70,7 @@ impl IpOrHost {
     /// If this enum is already an IP address and port, it will simply return it.
     ///
     /// Uses `async-std` resolver.
-    #[cfg(feature = "runtime-async-std")]
+    #[cfg(all(not(test), feature = "runtime-async-std"))]
     pub async fn resolve_async_std(self) -> std::io::Result<Vec<SocketAddr>> {
         let resolver = async_std_resolver::resolver_from_system_conf().await?;
         self.resolve(resolver).await
@@ -83,6 +83,16 @@ impl IpOrHost {
     #[cfg(feature = "runtime-tokio")]
     pub async fn resolve_tokio(self) -> std::io::Result<Vec<SocketAddr>> {
         let resolver = hickory_resolver::AsyncResolver::tokio_from_system_conf()?;
+        self.resolve(resolver).await
+    }
+
+    // This resolver setup is used in our tests because these are executed in a sandbox environment
+    // which prevents IO access to system-level files.
+    #[cfg(all(test, feature = "runtime-async-std"))]
+    pub async fn resolve_async_std(self) -> std::io::Result<Vec<SocketAddr>> {
+        let config = async_std_resolver::config::ResolverConfig::new();
+        let opts = async_std_resolver::config::ResolverOpts::default();
+        let resolver = async_std_resolver::resolver(config, opts).await;
         self.resolve(resolver).await
     }
 
