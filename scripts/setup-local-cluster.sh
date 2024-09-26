@@ -89,8 +89,8 @@ node_prefix="local"
 password="local"
 anvil_rpc_log="${tmp_dir}/hopr-local-anvil-rpc.log"
 env_file="${tmp_dir}/local-cluster.env"
-node_api_base_port=13301
-node_p2p_base_port=19091
+node_api_base_port=19091
+node_p2p_base_port=13301
 cluster_size=5
 
 function cleanup {
