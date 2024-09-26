@@ -10,7 +10,7 @@ use async_trait::async_trait;
 use futures::stream::BoxStream;
 use futures::TryStreamExt;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder, Set};
-use sea_query::{Condition, Expr, IntoCondition};
+use sea_query::{Condition, Expr, IntoCondition, SimpleExpr};
 use tracing::{debug, error, info, trace, warn};
 
 use hopr_crypto_types::prelude::*;
@@ -64,12 +64,22 @@ impl AsRef<TicketSelector> for WrappedTicketSelector {
 
 impl IntoCondition for WrappedTicketSelector {
     fn into_condition(self) -> Condition {
-        let mut expr = ticket::Column::ChannelId
-            .eq(self.0.channel_id.to_hex())
-            .and(ticket::Column::ChannelEpoch.eq(self.0.epoch.to_be_bytes().to_vec()));
+        let mut expr = self
+            .0
+            .channel_identifiers
+            .into_iter()
+            .map(|(channel_id, epoch)| {
+                ticket::Column::ChannelId
+                    .eq(channel_id.to_hex())
+                    .and(ticket::Column::ChannelEpoch.eq(epoch.to_be_bytes().to_vec()))
+            })
+            .reduce(SimpleExpr::or)
+            .expect("impossible to have an empty channel identifier vector");
 
         match self.0.index {
-            TicketIndexSelector::None => {}
+            TicketIndexSelector::None => {
+                // This will always be the case if there were multiple channel identifiers
+            }
             TicketIndexSelector::Single(idx) => expr = expr.and(ticket::Column::Index.eq(idx.to_be_bytes().to_vec())),
             TicketIndexSelector::Multiple(idxs) => {
                 expr = expr.and(ticket::Column::Index.is_in(idxs.into_iter().map(|i| i.to_be_bytes().to_vec())));
@@ -82,8 +92,13 @@ impl IntoCondition for WrappedTicketSelector {
         if let Some(state) = self.0.state {
             expr = expr.and(ticket::Column::State.eq(state as u8))
         }
+
         if self.0.only_aggregated {
             expr = expr.and(ticket::Column::IndexOffset.gt(1));
+        }
+
+        if let Some(prob) = self.0.win_prob_lt {
+            expr = expr.and(ticket::Column::WinningProbability.lt(prob.to_vec()));
         }
         expr.into_condition()
     }
@@ -251,9 +266,6 @@ impl HoprDbTicketOperations for HoprDb {
     }
 
     async fn mark_tickets_redeemed(&self, selector: TicketSelector) -> Result<usize> {
-        let selector: WrappedTicketSelector = selector.into();
-        let channel_id = selector.as_ref().channel_id;
-
         let myself = self.clone();
         Ok(self
             .ticket_manager
@@ -261,48 +273,50 @@ impl HoprDbTicketOperations for HoprDb {
                 Box::pin(async move {
                     // Get the number of redeemed tickets and their value
                     let (redeemed_count, redeemed_value) =
-                        myself.get_tickets_value_int(Some(tx), selector.0.clone()).await?;
+                        myself.get_tickets_value_int(Some(tx), selector.clone()).await?;
 
                     if redeemed_count > 0 {
                         // Delete the redeemed tickets first
                         let deleted = ticket::Entity::delete_many()
-                            .filter(selector.clone())
+                            .filter(WrappedTicketSelector::from(selector.clone()))
                             .exec(tx.as_ref())
                             .await?;
 
                         // Update the stats if successful
                         if deleted.rows_affected == redeemed_count as u64 {
-                            let current_stats = find_stats_for_channel(tx, &channel_id).await?;
+                            for channel_id in selector.channel_identifiers.iter().map(|(id, _)| id) {
+                                let current_stats = find_stats_for_channel(tx, channel_id).await?;
 
-                            let current_redeemed_value = U256::from_be_bytes(current_stats.redeemed_value.clone());
+                                let current_redeemed_value = U256::from_be_bytes(current_stats.redeemed_value.clone());
 
-                            let mut new_stats = current_stats.into_active_model();
-                            new_stats.redeemed_value =
-                                Set((current_redeemed_value + redeemed_value.amount()).to_be_bytes().into());
-                            new_stats.save(tx.as_ref()).await?;
+                                let mut new_stats = current_stats.into_active_model();
+                                new_stats.redeemed_value =
+                                    Set((current_redeemed_value + redeemed_value.amount()).to_be_bytes().into());
+                                new_stats.save(tx.as_ref()).await?;
 
-                            #[cfg(all(feature = "prometheus", not(test)))]
-                            {
-                                let channel = channel_id.to_string();
-                                METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(
-                                    &[&channel, "redeemed"],
-                                    (current_redeemed_value + redeemed_value.amount()).as_u128() as f64,
-                                );
+                                #[cfg(all(feature = "prometheus", not(test)))]
+                                {
+                                    let channel = channel_id.to_string();
+                                    METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(
+                                        &[&channel, "redeemed"],
+                                        (current_redeemed_value + redeemed_value.amount()).as_u128() as f64,
+                                    );
 
-                                let unredeemed_value = myself
-                                    .caches
-                                    .unrealized_value
-                                    .get(&channel_id)
-                                    .await
-                                    .unwrap_or(Balance::zero(BalanceType::HOPR));
+                                    let unredeemed_value = myself
+                                        .caches
+                                        .unrealized_value
+                                        .get(channel_id)
+                                        .await
+                                        .unwrap_or(Balance::zero(BalanceType::HOPR));
 
-                                METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(
-                                    &[&channel, "unredeemed"],
-                                    (unredeemed_value - redeemed_value.amount()).amount().as_u128() as f64,
-                                );
+                                    METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(
+                                        &[&channel, "unredeemed"],
+                                        (unredeemed_value - redeemed_value.amount()).amount().as_u128() as f64,
+                                    );
+                                }
+
+                                myself.caches.unrealized_value.invalidate(channel_id).await;
                             }
-
-                            myself.caches.unrealized_value.invalidate(&channel_id).await;
                         } else {
                             return Err(DbSqlError::LogicalError(format!(
                                 "could not mark {redeemed_count} ticket as redeemed"
@@ -310,7 +324,10 @@ impl HoprDbTicketOperations for HoprDb {
                         }
                     }
 
-                    info!("removed {redeemed_count} of redeemed tickets from channel {channel_id}");
+                    info!(
+                        "removed {redeemed_count} of redeemed tickets from {} channels",
+                        selector.channel_identifiers.len()
+                    );
                     Ok(redeemed_count)
                 })
             })
@@ -337,39 +354,42 @@ impl HoprDbTicketOperations for HoprDb {
 
                         // Update the stats if successful
                         if deleted.rows_affected == neglectable_count as u64 {
-                            let current_status = find_stats_for_channel(tx, &selector.channel_id).await?;
+                            for channel_id in selector.channel_identifiers.iter().map(|(id, _)| id) {
+                                let current_status = find_stats_for_channel(tx, channel_id).await?;
 
-                            let current_neglected_value = U256::from_be_bytes(current_status.neglected_value.clone());
+                                let current_neglected_value =
+                                    U256::from_be_bytes(current_status.neglected_value.clone());
 
-                            let mut new_stats = current_status.into_active_model();
-                            new_stats.neglected_value = Set((current_neglected_value + neglectable_value.amount())
-                                .to_be_bytes()
-                                .into());
-                            new_stats.save(tx.as_ref()).await?;
+                                let mut new_stats = current_status.into_active_model();
+                                new_stats.neglected_value = Set((current_neglected_value + neglectable_value.amount())
+                                    .to_be_bytes()
+                                    .into());
+                                new_stats.save(tx.as_ref()).await?;
 
-                            #[cfg(all(feature = "prometheus", not(test)))]
-                            {
-                                let channel = selector.channel_id.to_string();
-                                METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(
-                                    &[&channel, "neglected"],
-                                    (current_neglected_value + neglectable_value.amount()).as_u128() as f64,
-                                );
+                                #[cfg(all(feature = "prometheus", not(test)))]
+                                {
+                                    let channel = channel_id.to_string();
+                                    METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(
+                                        &[&channel, "neglected"],
+                                        (current_neglected_value + neglectable_value.amount()).as_u128() as f64,
+                                    );
 
-                                let unredeemed_value = myself
-                                    .caches
-                                    .unrealized_value
-                                    .get(&selector.channel_id)
-                                    .await
-                                    .unwrap_or(Balance::zero(BalanceType::HOPR));
+                                    let unredeemed_value = myself
+                                        .caches
+                                        .unrealized_value
+                                        .get(channel_id)
+                                        .await
+                                        .unwrap_or(Balance::zero(BalanceType::HOPR));
 
-                                METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(
-                                    &[&channel, "unredeemed"],
-                                    (unredeemed_value - neglectable_value.amount()).amount().as_u128() as f64,
-                                );
+                                    METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(
+                                        &[&channel, "unredeemed"],
+                                        (unredeemed_value - neglectable_value.amount()).amount().as_u128() as f64,
+                                    );
+                                }
+
+                                // invalidating unrealized balance for the channel
+                                myself.caches.unrealized_value.invalidate(channel_id).await;
                             }
-
-                            // invalidating unrealized balance for the channel
-                            myself.caches.unrealized_value.invalidate(&selector.channel_id).await;
                         } else {
                             return Err(DbSqlError::LogicalError(format!(
                                 "could not mark {neglectable_count} ticket as neglected"
@@ -378,8 +398,8 @@ impl HoprDbTicketOperations for HoprDb {
                     }
 
                     info!(
-                        "removed {neglectable_count} of neglected tickets from channel {}",
-                        selector.channel_id
+                        "removed {neglectable_count} of neglected tickets from {} channels",
+                        selector.channel_identifiers.len()
                     );
                     Ok(neglectable_count)
                 })
@@ -387,7 +407,79 @@ impl HoprDbTicketOperations for HoprDb {
             .await?)
     }
 
-    async fn mark_ticket_rejected(&self, ticket: &Ticket) -> Result<()> {
+    async fn mark_tickets_rejected(&self, selector: TicketSelector) -> Result<usize> {
+        let myself = self.clone();
+
+        Ok(self
+            .ticket_manager
+            .with_write_locked_db(|tx| {
+                Box::pin(async move {
+                    // Get the number of rejected tickets and their value
+                    let (rejectable_count, rejectable_value) =
+                        myself.get_tickets_value_int(Some(tx), selector.clone()).await?;
+
+                    if rejectable_count > 0 {
+                        // Delete the rejectable tickets first
+                        let deleted = ticket::Entity::delete_many()
+                            .filter(WrappedTicketSelector::from(selector.clone()))
+                            .exec(tx.as_ref())
+                            .await?;
+
+                        // Update the stats if successful
+                        if deleted.rows_affected == rejectable_count as u64 {
+                            for channel_id in selector.channel_identifiers.iter().map(|(id, _)| id) {
+                                let current_status = find_stats_for_channel(tx, channel_id).await?;
+
+                                let current_rejected_value = U256::from_be_bytes(current_status.rejected_value.clone());
+
+                                let mut new_stats = current_status.into_active_model();
+                                new_stats.rejected_value = Set((current_rejected_value + rejectable_value.amount())
+                                    .to_be_bytes()
+                                    .into());
+                                new_stats.save(tx.as_ref()).await?;
+
+                                #[cfg(all(feature = "prometheus", not(test)))]
+                                {
+                                    let channel = channel_id.to_string();
+                                    METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(
+                                        &[&channel, "rejected"],
+                                        (current_rejected_value + rejectable_value.amount()).as_u128() as f64,
+                                    );
+
+                                    let unredeemed_value = myself
+                                        .caches
+                                        .unrealized_value
+                                        .get(&channel_id)
+                                        .await
+                                        .unwrap_or(Balance::zero(BalanceType::HOPR));
+
+                                    METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(
+                                        &[&channel, "unredeemed"],
+                                        (unredeemed_value - rejectable_value.amount()).amount().as_u128() as f64,
+                                    );
+                                }
+
+                                // invalidating unrealized balance for the channel
+                                myself.caches.unrealized_value.invalidate(&channel_id).await;
+                            }
+                        } else {
+                            return Err(DbSqlError::LogicalError(format!(
+                                "could not mark {rejectable_count} ticket as rejected"
+                            )));
+                        }
+                    }
+
+                    info!(
+                        "removed {rejectable_count} of rejected tickets from {} channels",
+                        selector.channel_identifiers.len()
+                    );
+                    Ok(rejectable_count)
+                })
+            })
+            .await?)
+    }
+
+    async fn mark_unsaved_ticket_rejected(&self, ticket: &Ticket) -> Result<()> {
         let channel_id = ticket.channel_id;
         let amount = ticket.amount;
         Ok(self
@@ -1507,7 +1599,7 @@ mod tests {
             "per channel stats must be same"
         );
 
-        db.mark_ticket_rejected(ticket.verified_ticket()).await?;
+        db.mark_unsaved_ticket_rejected(ticket.verified_ticket()).await?;
 
         let stats = db.get_ticket_statistics(None).await?;
         assert_eq!(ticket.verified_ticket().amount, stats.rejected_value);
