@@ -143,11 +143,12 @@ where
         info!("Building indexer background process");
         let (tx, mut rx) = futures::channel::mpsc::channel::<()>(1);
 
-        let indexing_proc = spawn(async move {
-            let is_synced = Arc::new(std::sync::atomic::AtomicBool::new(false));
-            let chain_head = Arc::new(std::sync::atomic::AtomicU64::new(0));
+        let indexing_proc =
+            spawn(async move {
+                let is_synced = Arc::new(std::sync::atomic::AtomicBool::new(false));
+                let chain_head = Arc::new(std::sync::atomic::AtomicU64::new(0));
 
-            let event_stream = rpc
+                let event_stream = rpc
                 .try_stream_logs(next_block_to_process, log_filter)
                 .expect("block stream should be constructible")
                 .then(|block_with_logs| {
@@ -206,14 +207,17 @@ where
                 })
                 .filter_map(|block_with_logs| async {
                     debug!("processing events in {block_with_logs} ...");
-                    let block_id = block_with_logs.to_string();
+                    let block_description = block_with_logs.to_string();
+                    let block_id = block_with_logs.block_id;
+                    let log_count = block_with_logs.logs.len();
+
                     let outgoing_events = match db_processor.collect_block_events(block_with_logs).await {
                         Ok(events) => {
-                            trace!("retrieved {} significant chain events from {block_id}", events.len());
+                            trace!("retrieved {} significant chain events from {block_description}", events.len());
                             Some(events)
                         }
                         Err(e) => {
-                            error!("failed to process logs in {block_id} into events: {e}");
+                            error!("failed to process logs in {block_description} into events: {e}");
                             None
                         }
                     };
@@ -224,6 +228,7 @@ where
                         Ok(current_described_block) => {
                             info!(
                                 block_id,
+                                log_count,
                                 checksum = %current_described_block.checksum,
                                 "Indexer state update",
                             );
@@ -244,23 +249,23 @@ where
                 })
                 .flat_map(stream::iter);
 
-            futures::pin_mut!(event_stream);
-            while let Some(event) = event_stream.next().await {
-                trace!("Processing an onchain event: {event:?}");
-                // Pass the events further only once we're fully synced
-                if is_synced.load(std::sync::atomic::Ordering::Relaxed) {
-                    if let Err(e) = tx_significant_events.try_send(event) {
-                        error!("failed to pass a significant chain event further: {e}");
+                futures::pin_mut!(event_stream);
+                while let Some(event) = event_stream.next().await {
+                    trace!("Processing an onchain event: {event:?}");
+                    // Pass the events further only once we're fully synced
+                    if is_synced.load(std::sync::atomic::Ordering::Relaxed) {
+                        if let Err(e) = tx_significant_events.try_send(event) {
+                            error!("failed to pass a significant chain event further: {e}");
+                        }
                     }
                 }
-            }
 
-            panic!(
-                "Indexer event stream has been terminated, cannot proceed further!\n\
+                panic!(
+                    "Indexer event stream has been terminated, cannot proceed further!\n\
                 This error indicates that an issue has occurred at the RPC provider!\n\
                 The node cannot function without a good RPC connection."
-            );
-        });
+                );
+            });
 
         if std::future::poll_fn(|cx| futures::Stream::poll_next(std::pin::Pin::new(&mut rx), cx))
             .await
