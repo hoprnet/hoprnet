@@ -117,17 +117,23 @@ reqwest = { version = "0.12.7" }
 ringbuffer = "0.15.0"
 rpassword = "7.3"
 rust-stream-ext-concurrent = "1.0.0"
-sea-orm = { version = "0.12.15", features = [
+scrypt = { version = "0.11.0", default-features = false }
+sea-orm = { version = "1.0.1", features = [
   "sqlx-sqlite",
   "with-chrono",
   "debug-print",
 ] }
-sea-orm-cli = { version = "0.12.15", features = ["codegen"] }
-sea-orm-migration = { version = "0.12.15", features = [
+sea-orm-cli = { version = "1.0.1", features = ["codegen"] }
+sea-orm-migration = { version = "1.0.1", features = [
   "sqlx-sqlite",
   "with-chrono",
 ] }
-scrypt = { version = "0.11.0", default-features = false }
+sea-query = { version = "0.31.0", default-features = false }
+sea-query-binder = { version = "0.5.0", default-features = false, features = [
+  "with-chrono",
+  "sqlx-sqlite",
+  "runtime-async-std-rustls",
+] }
 semver = "1.0.23"
 serde = { version = "1.0.210", features = ["derive"] }
 serde_bytes = "0.11.14"
@@ -140,11 +146,11 @@ sha3 = "0.10"
 signal-hook = "0.3.17"
 smart-default = "0.7.1"
 socket2 = "0.5.7"
-sqlx = { version = "0.7.4", default-features = false, features = [
+sqlx = { version = "0.7", default-features = false, features = [
   "sqlite",
   "macros",
   "migrate",
-] }
+] } # sqlx version needed by the sea-orm crates
 strum = { version = "0.26.3", features = ["derive"] }
 surf = { version = "2.3.2" }
 surf-governor = { version = "0.2.0" }
