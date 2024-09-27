@@ -8,7 +8,7 @@ contract HoprToken is AccessControlEnumerable, ERC777Snapshot {
   bytes32 public constant MINTER_ROLE = keccak256('MINTER_ROLE');
 
   constructor() ERC777('HOPR Token', 'mHOPR', new address[](0)) {
-    _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
+    _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
   }
 
   /**
