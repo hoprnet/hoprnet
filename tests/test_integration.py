@@ -875,4 +875,3 @@ async def test_send_message_return_timestamp(src: str, dest: str, swarm7: dict[s
     assert len(timestamps) == message_count
     assert timestamps == sorted(timestamps)
 
-

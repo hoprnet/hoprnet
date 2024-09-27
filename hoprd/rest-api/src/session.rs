@@ -49,7 +49,7 @@ lazy_static::lazy_static! {
             "Hops": 1
         },
         "target": "localhost:8080",
-        "listen_host": "127.0.0.1:10000",
+        "listenHost": "127.0.0.1:10000",
         "capabilities": ["Retransmission", "Segmentation"]
     }))]
 #[serde(rename_all = "camelCase")]
@@ -179,7 +179,7 @@ pub(crate) async fn create_client(
     })?;
 
     // TODO: make this retry strategy configurable
-    let session_init_retry_strategy = tokio_retry::strategy::ExponentialBackoff::from_millis(2000).take(5);
+    let session_init_retry_strategy = tokio_retry::strategy::ExponentialBackoff::from_millis(1000).take(3);
 
     // TODO: consider pooling the sessions on a listener, so that the negotiation is amortized
 
@@ -447,9 +447,9 @@ async fn udp_bind_to<A: std::net::ToSocketAddrs>(
 ) -> std::io::Result<(std::net::SocketAddr, ConnectedUdpStream)> {
     let udp_socket = ConnectedUdpStream::builder()
         .with_buffer_size(HOPR_UDP_BUFFER_SIZE)
-        .with_queue_size(HOPR_UDP_QUEUE_SIZE)
         .with_foreign_data_mode(ForeignDataMode::Discard) // discard data from UDP clients other than the first one served
-        .with_parallelism(0) // Automatic per available parallelism
+        .with_queue_size(HOPR_UDP_QUEUE_SIZE)
+        .with_parallelism(0)
         .build(address)?;
 
     Ok((*udp_socket.bound_address(), udp_socket))

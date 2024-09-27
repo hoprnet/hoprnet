@@ -24,6 +24,7 @@ runtime-tokio = [
 prometheus = ["dep:lazy_static", "dep:hopr-metrics"]
 
 [dependencies]
+arrayvec = { workspace = true }
 async-std-resolver = { workspace = true, optional = true }
 bitvec = { workspace = true }
 crossbeam-queue = { workspace = true }
