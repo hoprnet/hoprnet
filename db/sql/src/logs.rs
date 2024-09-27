@@ -164,6 +164,23 @@ impl HoprDbLogOperations for HoprDb {
             })
             .await
     }
+
+    async fn set_logs_unprocessed(&self, block_number: Option<u64>, block_offset: Option<u64>) -> Result<()> {
+        let min_block_number = block_number.unwrap_or(0);
+
+        let query = LogStatus::update_many()
+            .col_expr(log_status::Column::Processed, Expr::value(Value::Bool(Some(false))))
+            .col_expr(log_status::Column::ProcessedAt, Expr::value(Value::String(None)))
+            .filter(log::Column::BlockNumber.gte(min_block_number.to_be_bytes().to_vec()))
+            .apply_if(block_offset, |q, v| {
+                q.filter(log::Column::BlockNumber.lt((min_block_number + v).to_be_bytes().to_vec()))
+            });
+
+        match query.exec(self.conn(TargetDb::Logs)).await {
+            Ok(_) => Ok(()),
+            Err(e) => Err(DbError::from(DbSqlError::from(e))),
+        }
+    }
 }
 
 fn create_log(raw_log: log::Model, status: log_status::Model) -> SerializableLog {

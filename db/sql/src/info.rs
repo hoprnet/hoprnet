@@ -1,18 +1,22 @@
 use async_trait::async_trait;
-use futures::TryFutureExt;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set};
+use futures::{FutureExt, TryFutureExt};
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, QuerySelect, Select, Set};
+
 use tracing::trace;
 
 use hopr_crypto_types::prelude::Hash;
 use hopr_db_api::info::*;
-use hopr_db_entity::{chain_info, global_settings, node_info};
+use hopr_db_entity::prelude::{
+    Account, Announcement, ChainInfo, Channel, NetworkEligibility, NetworkRegistry, NodeInfo,
+};
+use hopr_db_entity::{chain_info, global_settings, network_registry, node_info};
 use hopr_primitive_types::prelude::*;
 
 use crate::cache::{CachedValue, CachedValueDiscriminants};
 use crate::db::HoprDb;
 use crate::errors::DbSqlError::MissingFixedTableEntry;
 use crate::errors::{DbSqlError, Result};
-use crate::{HoprDbGeneralModelOperations, OptTx, SINGULAR_TABLE_FIXED_ID};
+use crate::{HoprDbGeneralModelOperations, OptTx, TargetDb, SINGULAR_TABLE_FIXED_ID};
 
 /// Enumerates different domain separators
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -40,6 +44,12 @@ pub struct DescribedBlock {
 ///
 #[async_trait]
 pub trait HoprDbInfoOperations {
+    /// Checks if the index is empty.
+    async fn index_is_empty<'a>(&'a self) -> Result<bool>;
+
+    /// Remove all data from all tables in the index database.
+    async fn clear_index_db<'a>(&'a self) -> Result<()>;
+
     /// Gets node's Safe balance of HOPR tokens.
     async fn get_safe_hopr_balance<'a>(&'a self, tx: OptTx<'a>) -> Result<Balance>;
 
@@ -108,6 +118,49 @@ pub trait HoprDbInfoOperations {
 
 #[async_trait]
 impl HoprDbInfoOperations for HoprDb {
+    async fn index_is_empty<'a>(&'a self) -> Result<bool> {
+        let c = self.conn(TargetDb::Index);
+
+        if Account::find().limit(1).one(c).await?.is_some() {
+            return Ok(false);
+        }
+
+        if Announcement::find().limit(1).one(c).await?.is_some() {
+            return Ok(false);
+        }
+
+        if Channel::find().limit(1).one(c).await?.is_some() {
+            return Ok(false);
+        }
+
+        if NetworkEligibility::find().limit(1).one(c).await?.is_some() {
+            return Ok(false);
+        }
+
+        if NetworkRegistry::find().limit(1).one(c).await?.is_some() {
+            return Ok(false);
+        }
+
+        Ok(true)
+    }
+
+    async fn clear_index_db<'a>(&'a self) -> Result<()> {
+        [
+            Account,
+            Announcement,
+            Channel,
+            NetworkEligibility,
+            NetworkRegistry,
+            ChainInfo,
+            NodeInfo,
+        ]
+        .iter()
+        .try_for_each(|table| async {
+            table.delete_many().exec(self.conn(TargetDb::Index)).await?;
+            Ok(())
+        })?
+    }
+
     async fn get_safe_hopr_balance<'a>(&'a self, tx: OptTx<'a>) -> Result<Balance> {
         self.nest_transaction(tx)
             .await?

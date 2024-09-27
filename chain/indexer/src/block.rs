@@ -148,10 +148,18 @@ where
         //   2. reset the fast sync progress
         //   3. run the fast sync process until completion
         //   4. finally starting the rpc indexer.
-        if self.cfg.fast_sync && self.db.index_is_empty().await? {
+        let fast_sync_configured = self.cfg.fast_sync;
+        let index_empty = self.db.index_is_empty().await?;
+        if fast_sync_configured && !index_empty {
+            info!("Fast sync is enabled, but the index database is not empty. In order to use fast-sync again you must stop this node and remove the index database manually.");
+        } else {
             info!("Fast sync is enabled, starting the fast sync process...");
+            // To ensure a proper state, we reset any auxiliary data in the database
+            self.db.clear_index_db().await?;
             self.db.set_logs_unprocessed().await?;
             self.db.set_last_indexed_block(None, 0, None).await?;
+
+            // Now fast-sync can start
             self.fast_sync(
                 rpc,
                 db_processor,
@@ -200,7 +208,10 @@ where
                     let log_count = block_with_logs.logs.len();
                     let outgoing_events = match db_processor.collect_block_events(block_with_logs).await {
                         Ok(events) => {
-                            trace!("retrieved {} significant chain events from {block_description}", events.len());
+                            trace!(
+                                "retrieved {} significant chain events from {block_description}",
+                                events.len()
+                            );
                             Some(events)
                         }
                         Err(e) => {
@@ -356,7 +367,12 @@ where
                 (current_block - next_block_to_process) as f64 / block_difference as f64
             };
 
-            info!(indexer = prefix, progress = progress * 100_f64, block = current_block, "Sync progress");
+            info!(
+                indexer = prefix,
+                progress = progress * 100_f64,
+                block = current_block,
+                "Sync progress"
+            );
 
             #[cfg(all(feature = "prometheus", not(test)))]
             METRIC_INDEXER_SYNC_PROGRESS.set(progress);
@@ -375,14 +391,7 @@ where
 }
 
 #[cfg(test)]
-<<<<<<< HEAD
 mod tests {
-    use std::collections::BTreeSet;
-    use std::pin::Pin;
-
-=======
-pub mod tests {
->>>>>>> 304869e2d7 (fast-sync: WIP integration into startup)
     use async_trait::async_trait;
     use ethers::{
         abi::{encode, Token},
@@ -421,37 +430,19 @@ pub mod tests {
         };
     }
 
-<<<<<<< HEAD
-=======
-    async fn create_stub_db() -> HoprDb {
-        HoprDb::new_in_memory(ChainKeypair::random()).await
-    }
-
->>>>>>> 304869e2d7 (fast-sync: WIP integration into startup)
     fn build_announcement_logs(
         address: Address,
         size: usize,
         block_number: u64,
         log_index: U256,
-<<<<<<< HEAD
-    ) -> anyhow::Result<Vec<Log>> {
-        let mut logs: Vec<Log> = vec![];
-
-        for i in 0..size {
-            let test_multiaddr: Multiaddr = format!("/ip4/1.2.3.4/tcp/{}", 1000 + i).parse()?;
-            logs.push(Log {
-                address,
-                topics: vec![AddressAnnouncementFilter::signature().into()],
-=======
-    ) -> Vec<SerializableLog> {
+    ) -> anyhow::Result<Vec<SerializableLog>> {
         let mut logs: Vec<SerializableLog> = vec![];
 
         for i in 0..size {
-            let test_multiaddr: Multiaddr = format!("/ip4/1.2.3.4/tcp/{}", 1000 + i).parse().unwrap();
+            let test_multiaddr: Multiaddr = format!("/ip4/1.2.3.4/tcp/{}", 1000 + i).parse()?;
             logs.push(SerializableLog {
                 address: address.to_hex(),
                 topics: vec![format!("{:#x}", AddressAnnouncementFilter::signature())],
->>>>>>> 304869e2d7 (fast-sync: WIP integration into startup)
                 data: encode(&[
                     Token::Address(ethers::abi::Address::from_slice(address.as_ref())),
                     Token::String(test_multiaddr.to_string()),

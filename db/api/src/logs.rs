@@ -21,4 +21,6 @@ pub trait HoprDbLogOperations {
     ) -> Result<BoxStream<'a, SerializableLog>>;
 
     async fn set_log_processed(&self, log: SerializableLog) -> Result<()>;
+
+    async fn set_logs_unprocessed(&self, block_number: Option<u64>, block_offset: Option<u64>) -> Result<()>;
 }
