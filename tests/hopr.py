@@ -396,9 +396,9 @@ class HoprdAPI:
         :param capabilities: Optional list of capabilities for the session (default: None)
         """
         if capabilities is None:
-            capabilities = []
-
-        body = SessionClientRequest(destination=destination, path=path, target=target, listen_host=listen_on, capabilities=capabilities)
+            body = SessionClientRequest(destination=destination, path=path, target=target, listen_host=listen_on)
+        else:
+            body = SessionClientRequest(destination=destination, path=path, target=target, listen_host=listen_on, capabilities=capabilities)
 
         _, response = self.__call_api(SessionApi, "create_client", body=body, protocol=protocol)
         return int(response.port) if hasattr(response, "port") else None
