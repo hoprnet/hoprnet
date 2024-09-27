@@ -431,7 +431,7 @@ impl HoprDbTicketOperations for HoprDb {
                     while let Ok(Some(ticket)) = stream.try_next().await {
                         let active_ticket = ticket::ActiveModel {
                             id: Set(ticket.id),
-                            state: Set(new_state as u8 as i32),
+                            state: Set(new_state as i8),
                             ..Default::default()
                         };
 
@@ -844,7 +844,7 @@ impl HoprDbTicketOperations for HoprDb {
                             .filter(ticket::Column::State.ne(AcknowledgedTicketStatus::BeingAggregated as u8))
                             .col_expr(
                                 ticket::Column::State,
-                                Expr::value(AcknowledgedTicketStatus::BeingAggregated as u8 as i32),
+                                Expr::value(AcknowledgedTicketStatus::BeingAggregated as i8),
                             )
                             .exec(tx.as_ref())
                             .await?;
@@ -2235,7 +2235,7 @@ mod tests {
             .await?
             .context("should have an active model")?
             .into_active_model();
-        ticket.state = Set(AcknowledgedTicketStatus::BeingAggregated as u8 as i32);
+        ticket.state = Set(AcknowledgedTicketStatus::BeingAggregated as i8);
         ticket.save(&db.tickets_db).await?;
 
         assert!(db
@@ -2377,7 +2377,7 @@ mod tests {
             .await?
             .context("should have 1 active model")?
             .into_active_model();
-        ticket.state = Set(AcknowledgedTicketStatus::BeingRedeemed as u8 as i32);
+        ticket.state = Set(AcknowledgedTicketStatus::BeingRedeemed as i8);
         ticket.save(&db.tickets_db).await?;
 
         let actual = db
@@ -2487,7 +2487,7 @@ mod tests {
             .into_iter()
         {
             let mut ticket = ticket.into_active_model();
-            ticket.state = Set(AcknowledgedTicketStatus::BeingRedeemed as u8 as i32);
+            ticket.state = Set(AcknowledgedTicketStatus::BeingRedeemed as i8);
             ticket.save(&db.tickets_db).await?;
         }
 
@@ -2524,7 +2524,7 @@ mod tests {
             .await?
             .context("should have one active model")?
             .into_active_model();
-        ticket.state = Set(AcknowledgedTicketStatus::BeingRedeemed as u8 as i32);
+        ticket.state = Set(AcknowledgedTicketStatus::BeingRedeemed as i8);
         ticket.save(&db.tickets_db).await?;
 
         assert!(db
