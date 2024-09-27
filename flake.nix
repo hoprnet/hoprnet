@@ -9,7 +9,7 @@
     # using a fork with an added source filter
     crane.url = github:hoprnet/crane/tb/20240117-find-filter;
     # pin it to a version which we are compatible with
-    foundry.url = github:shazow/foundry.nix/3e97c75236857cb84841e8131a4ad5ed38833b4f;
+    foundry.url = github:shazow/foundry.nix/16b952aa115c455a942eab42bbbf8b8cc69948ee;
     # use change to add solc 0.8.24
     solc.url = github:hoprnet/solc.nix/tb/20240129-solc-0.8.24;
     pre-commit.url = github:cachix/pre-commit-hooks.nix;
