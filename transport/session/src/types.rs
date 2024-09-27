@@ -33,7 +33,8 @@ lazy_static::lazy_static! {
     ).unwrap();
 }
 
-const MAX_SESSION_ID_STR_LEN: usize = 100;
+// Enough to fit Ed25519 peer IDs and 2-byte tag number
+const MAX_SESSION_ID_STR_LEN: usize = 64;
 
 /// Unique ID of a specific session.
 ///
@@ -72,9 +73,8 @@ impl SessionId {
         &self.peer
     }
 
-    pub fn with_peer(mut self, peer: PeerId) -> Self {
-        self.peer = peer;
-        self
+    pub fn with_peer(self, peer: PeerId) -> Self {
+        Self::new(self.tag, peer)
     }
 
     pub fn as_str(&self) -> &str {

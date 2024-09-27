@@ -519,7 +519,7 @@ async def test_session_communication_over_n_hop_with_an_https_server(
 
 @pytest.mark.skipif(
     os.environ.get("HOPR_TEST_RUNNING_WIREGUARD_TUNNEL") is None,
-    reason=f"Wireguard tunnel with for hoprnet running"
+    reason="Wireguard tunnel with for hoprnet running"
 )
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
