@@ -52,7 +52,7 @@ impl SessionId {
         Self {
             tag,
             peer,
-            cached: (&format!("{}:{}", peer, tag)).parse().expect("session id too long"),
+            cached: format!("{peer}:{tag}").parse().expect("session id too long"),
         }
     }
 
