@@ -388,7 +388,12 @@ class HoprdAPI:
     async def session_client(self, destination: str, path: str, protocol: str, target: str, listen_on: str = "127.0.0.1:0", capabilities=None):
         """
         Returns the port of the client session.
-        :return: port: int
+        :param destination: Peer ID of the session exit node.
+        :param path: Routing options for the session.
+        :param protocol: Transport protocol for the session (TCP/UDP).
+        :param target: Destination for the session packets.
+        :param listen_on: The host to listen on for input packets (default: "127.0.0.1:0")
+        :param capabilities: Optional list of capabilities for the session (default: None)
         """
         if capabilities is None:
             capabilities = []

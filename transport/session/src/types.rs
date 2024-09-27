@@ -32,6 +32,8 @@ lazy_static::lazy_static! {
     ).unwrap();
 }
 
+const MAX_SESSION_ID_STR_LEN: usize = 100;
+
 /// Unique ID of a specific session.
 ///
 /// Simple wrapper around the maximum range of the port like session unique identifier.
@@ -42,11 +44,16 @@ lazy_static::lazy_static! {
 pub struct SessionId {
     tag: u16,
     peer: PeerId,
+    cached: arrayvec::ArrayString<MAX_SESSION_ID_STR_LEN>, // Allows the SessionId to be Copy
 }
 
 impl SessionId {
     pub fn new(tag: u16, peer: PeerId) -> Self {
-        Self { tag, peer }
+        Self {
+            tag,
+            peer,
+            cached: (&format!("{}:{}", peer, tag)).parse().expect("session id too long"),
+        }
     }
 
     pub fn tag(&self) -> u16 {
@@ -61,11 +68,15 @@ impl SessionId {
         self.peer = peer;
         self
     }
+
+    pub fn as_str(&self) -> &str {
+        &self.cached
+    }
 }
 
 impl Display for SessionId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}:{}", self.peer, self.tag)
+        write!(f, "{}", self.cached)
     }
 }
 
@@ -297,7 +308,7 @@ impl futures::AsyncWrite for InnerSession {
         buf: &[u8],
     ) -> Poll<std::io::Result<usize>> {
         #[cfg(all(feature = "prometheus", not(test)))]
-        METRIC_SESSION_INNER_SIZES.observe(&[&self.id.to_string()], buf.len() as f64);
+        METRIC_SESSION_INNER_SIZES.observe(&[self.id.as_str()], buf.len() as f64);
 
         if !self.tx_buffer.is_empty() {
             loop {

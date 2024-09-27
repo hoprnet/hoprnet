@@ -28,6 +28,7 @@ runtime-tokio = [
 prometheus = ["dep:hopr-metrics", "dep:lazy_static"]
 
 [dependencies]
+arrayvec = { workspace = true }
 async-trait = { workspace = true }
 bincode = { workspace = true, optional = true }
 futures = { workspace = true }

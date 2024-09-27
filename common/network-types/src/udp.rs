@@ -297,8 +297,9 @@ impl ConnectedUdpStream {
                             udp_bound_addr = tracing::field::debug(sock_rx.local_addr()),
                             "got {read} bytes of data from {read_addr}"
                         );
+                        // TODO: get rid of the to_string() allocation on the metric update
                         #[cfg(all(feature = "prometheus", not(test)))]
-                        METRIC_UDP_INGRESS_LEN.observe(&[&read.to_string()], read as f64);
+                        METRIC_UDP_INGRESS_LEN.observe(&[&read_addr.to_string()], read as f64);
 
                         let addr = counterparty_rx.get_or_init(|| read_addr);
 
@@ -400,6 +401,7 @@ impl ConnectedUdpStream {
                             }
                             trace!(socket_id, "sent {} bytes of data to {target}", data.len());
 
+                            // TODO: get rid of the to_string() allocation on the metric update
                             #[cfg(all(feature = "prometheus", not(test)))]
                             METRIC_UDP_EGRESS_LEN.observe(&[&target.to_string()], data.len() as f64);
                         } else {
