@@ -549,6 +549,7 @@ impl Hopr {
                 channels: resolved_environment.channels,
                 token: resolved_environment.token,
                 price_oracle: resolved_environment.ticket_price_oracle,
+                win_prob_oracle: resolved_environment.winning_probability_oracle,
                 network_registry: resolved_environment.network_registry,
                 network_registry_proxy: resolved_environment.network_registry_proxy,
                 stake_factory: resolved_environment.node_stake_v2_factory,

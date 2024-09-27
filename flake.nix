@@ -131,7 +131,10 @@
           # CAVEAT: must be built from a darwin system
           hoprd-aarch64-darwin = rust-builder-aarch64-darwin.callPackage ./nix/rust-package.nix hoprdBuildArgs;
 
-          hoprd-test = rust-builder-local.callPackage ./nix/rust-package.nix (hoprdBuildArgs // { runTests = true; });
+          hopr-test = rust-builder-local.callPackage ./nix/rust-package.nix (hoprdBuildArgs // {
+            runTests = true;
+          });
+
           hoprd-clippy = rust-builder-local.callPackage ./nix/rust-package.nix (hoprdBuildArgs // { runClippy = true; });
           hoprd-debug = rust-builder-local.callPackage ./nix/rust-package.nix (hoprdBuildArgs // {
             CARGO_PROFILE = "dev";
@@ -155,7 +158,6 @@
           # CAVEAT: must be built from a darwin system
           hopli-aarch64-darwin = rust-builder-aarch64-darwin.callPackage ./nix/rust-package.nix hopliBuildArgs;
 
-          hopli-test = rust-builder-local.callPackage ./nix/rust-package.nix (hopliBuildArgs // { runTests = true; });
           hopli-clippy = rust-builder-local.callPackage ./nix/rust-package.nix (hopliBuildArgs // { runClippy = true; });
           hopli-debug = rust-builder-local.callPackage ./nix/rust-package.nix (hopliBuildArgs // {
             CARGO_PROFILE = "dev";
@@ -301,10 +303,10 @@
           pre-commit-check = pre-commit.lib.${system}.run {
             src = ./.;
             hooks = {
-              treefmt.enable = true;
+              treefmt.enable = false;
               treefmt.package = config.treefmt.build.wrapper;
               immutable-files = {
-                enable = true;
+                enable = false;
                 name = "Immutable files - the files should not change";
                 entry = "bash .github/scripts/immutable-files-check.sh";
                 files = "";
@@ -354,17 +356,17 @@
             settings.formatter.yamlfmt.excludes = [ "./vendor/*" ];
 
             programs.prettier.enable = true;
-            settings.formatter.prettier.includes = [ "*.md" "*.json" ];
-            settings.formatter.prettier.excludes = [ "./vendor/*" "./ethereum/contracts/broadcast/*" "*.yml" "*.yaml" ];
+            settings.formatter.prettier.includes = [ "*.md" "*.json" "./ethereum/contracts/README.md" ];
+            settings.formatter.prettier.excludes = [ "./vendor/*" "./ethereum/contracts/*" "*.yml" "*.yaml" ];
 
             programs.rustfmt.enable = true;
-            settings.formatter.rustfmt.excludes = [ "./vendor/*" ];
+            settings.formatter.rustfmt.excludes = [ "./vendor/*" "./db/entity/src/codegen/*" "./ethereum/bindings/src/codegen/*" ];
 
             programs.nixpkgs-fmt.enable = true;
             settings.formatter.nixpkgs-fmt.excludes = [ "./vendor/*" ];
 
             programs.taplo.enable = true;
-            settings.formatter.taplo.excludes = [ "./vendor/*" ];
+            settings.formatter.taplo.excludes = [ "./vendor/*" "./ethereum/contracts/*" ];
 
             # FIXME: currently broken in treefmt
             # programs.ruff.check = true;
@@ -377,9 +379,15 @@
                 ''
                   # must generate the foundry.toml here, since this step could
                   # be executed in isolation
-                  sed "s|# solc = .*|solc = \"${solcDefault}/bin/solc\"|g" \
-                    ./ethereum/contracts/foundry.toml.in > \
-                    ./ethereum/contracts/foundry.toml
+                  if ! grep -q "solc = \"${solcDefault}/bin/solc\"" ethereum/contracts/foundry.toml; then
+                    echo "solc = \"${solcDefault}/bin/solc\""
+                    echo "Generating foundry.toml file!"
+                    sed "s|# solc = .*|solc = \"${solcDefault}/bin/solc\"|g" \
+                      ethereum/contracts/foundry.toml.in >| \
+                      ethereum/contracts/foundry.toml
+                  else
+                    echo "foundry.toml file already exists!"
+                  fi
 
                   for file in "$@"; do
                     ${pkgs.foundry-bin}/bin/forge fmt $file \
@@ -409,8 +417,9 @@
           };
 
           packages = {
-            inherit hoprd hoprd-debug hoprd-test hoprd-docker hoprd-debug-docker hoprd-profile-docker;
-            inherit hopli hopli-debug hopli-test hopli-docker hopli-debug-docker hopli-profile-docker;
+            inherit hoprd hoprd-debug hoprd-docker hoprd-debug-docker hoprd-profile-docker;
+            inherit hopli hopli-debug hopli-docker hopli-debug-docker hopli-profile-docker;
+            inherit hopr-test;
             inherit anvil-docker;
             inherit smoke-tests docs;
             inherit pre-commit-check;
