@@ -735,10 +735,10 @@ where
         } else if log.address.eq(&self.addresses.price_oracle) {
             let event = HoprTicketPriceOracleEvents::decode_log(&log.into())?;
             self.on_ticket_price_oracle_event(tx, event).await
-        // TODO: uncomment this once ticket win prob oracle is implemented
-        /*} else if log.address.eq(&self.addresses.ticket_win_prob_oracle) {
-        let event = HoprTicketWinningProbabilityOracleEvents::decode_log(&log.into())?;
-        self.on_ticket_winning_probability_oracle_event(tx, event).await*/
+        } else if log.address.eq(&self.addresses.win_prob_oracle) {
+            // TODO: add win prob oracle implementation
+            warn!("winning probability oracle not yet implemented");
+            Ok(None)
         } else {
             #[cfg(all(feature = "prometheus", not(test)))]
             METRIC_INDEXER_LOG_COUNTERS.increment(&["unknown"]);
