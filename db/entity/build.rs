@@ -5,6 +5,8 @@ use std::path::Path;
 
 use anyhow::Context;
 use clap::Parser;
+use migration::MigrationTrait;
+// use sea_orm::sqlx::migrate::Migration;
 
 async fn execute_sea_orm_cli_command<I, T>(itr: I) -> anyhow::Result<()>
 where
@@ -16,24 +18,46 @@ where
 
     let cli = sea_orm_cli::Cli::try_parse_from(itr).context("should be able to parse a sea-orm-cli command")?;
 
-    let result = match cli.command {
-        Commands::Generate { command } => run_generate_command(command, true).await,
+    match cli.command {
+        Commands::Generate { command } => run_generate_command(command, true)
+            .await
+            .map_err(|e| anyhow::anyhow!(e.to_string())),
         Commands::Migrate {
             database_schema,
             database_url,
             command,
             ..
         } => {
-            let connect_options = ConnectOptions::new(database_url.unwrap_or("/tmp/sea_orm_cli.db".into()))
-                .set_schema_search_path(database_schema.unwrap_or_else(|| "public".to_owned()))
-                .to_owned();
+            let connect_options: ConnectOptions =
+                ConnectOptions::new(database_url.unwrap_or("/tmp/sea_orm_cli.db".into()))
+                    .set_schema_search_path(database_schema.unwrap_or_else(|| "public".to_owned()))
+                    .to_owned();
+            let is_sqlite = connect_options.get_url().starts_with("sqlite");
             let db = &Database::connect(connect_options).await?;
 
-            sea_orm_migration::cli::run_migrate(migration::Migrator {}, db, command, cli.verbose).await
-        }
-    };
+            if is_sqlite {
+                struct TempMigrator;
 
-    result.map_err(|e| anyhow::anyhow!(e.to_string()))
+                impl migration::MigratorTrait for TempMigrator {
+                    fn migrations() -> Vec<Box<dyn MigrationTrait>> {
+                        let mut migrations = migration::MigratorIndex::migrations();
+                        migrations.extend(migration::MigratorPeers::migrations());
+                        migrations.extend(migration::MigratorTickets::migrations());
+
+                        migrations
+                    }
+                }
+
+                sea_orm_migration::cli::run_migrate(TempMigrator {}, db, command, cli.verbose)
+                    .await
+                    .map_err(|e| anyhow::anyhow!(e.to_string()))
+            } else {
+                sea_orm_migration::cli::run_migrate(migration::Migrator {}, db, command, cli.verbose)
+                    .await
+                    .map_err(|e| anyhow::anyhow!(e.to_string()))
+            }
+        }
+    }
 }
 
 fn main() -> anyhow::Result<()> {
