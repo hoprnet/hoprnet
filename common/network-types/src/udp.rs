@@ -1,4 +1,6 @@
+use crate::utils::SocketAddrStr;
 use futures::{pin_mut, ready, FutureExt, Sink, SinkExt};
+use std::fmt::Debug;
 use std::io::ErrorKind;
 use std::pin::Pin;
 use std::sync::{Arc, OnceLock};
@@ -51,7 +53,7 @@ pub struct ConnectedUdpStream {
     socket_handles: Vec<(tokio::task::JoinHandle<()>, tokio::task::JoinHandle<()>)>,
     ingress_rx: Box<dyn AsyncRead + Send + Unpin>,
     egress_tx: Option<BoxIoSink<Box<[u8]>>>,
-    counterparty: Arc<OnceLock<std::net::SocketAddr>>,
+    counterparty: Arc<OnceLock<SocketAddrStr>>,
     bound_to: std::net::SocketAddr,
 }
 
@@ -191,7 +193,11 @@ impl UdpStreamBuilder {
             })
             .unwrap_or(1);
 
-        let counterparty = Arc::new(self.counterparty.map(OnceLock::from).unwrap_or_default());
+        let counterparty = Arc::new(
+            self.counterparty
+                .map(|s| OnceLock::from(SocketAddrStr::from(s)))
+                .unwrap_or_default(),
+        );
         let ((ingress_tx, ingress_rx), (egress_tx, egress_rx)) = if let Some(q) = self.queue_size {
             (flume::bounded(q), flume::bounded(q))
         } else {
@@ -280,7 +286,7 @@ impl ConnectedUdpStream {
         socket_id: usize,
         sock_rx: Arc<UdpSocket>,
         ingress_tx: flume::Sender<std::io::Result<tokio_util::bytes::Bytes>>,
-        counterparty: Arc<OnceLock<std::net::SocketAddr>>,
+        counterparty: Arc<OnceLock<SocketAddrStr>>,
         foreign_data_mode: ForeignDataMode,
         buf_size: usize,
     ) -> std::io::Result<futures::future::BoxFuture<'static, ()>> {
@@ -297,11 +303,11 @@ impl ConnectedUdpStream {
                             udp_bound_addr = tracing::field::debug(sock_rx.local_addr()),
                             "got {read} bytes of data from {read_addr}"
                         );
-                        // TODO: get rid of the to_string() allocation on the metric update
-                        #[cfg(all(feature = "prometheus", not(test)))]
-                        METRIC_UDP_INGRESS_LEN.observe(&[&read_addr.to_string()], read as f64);
 
-                        let addr = counterparty_rx.get_or_init(|| read_addr);
+                        let addr = counterparty_rx.get_or_init(|| read_addr.into());
+
+                        #[cfg(all(feature = "prometheus", not(test)))]
+                        METRIC_UDP_INGRESS_LEN.observe(&[addr.as_str()], read as f64);
 
                         // If the data is from a counterparty, or we accept anything, pass it
                         if read_addr.eq(addr) || foreign_data_mode == ForeignDataMode::Accept {
@@ -384,7 +390,7 @@ impl ConnectedUdpStream {
         socket_id: usize,
         sock_tx: Arc<UdpSocket>,
         egress_rx: flume::Receiver<Box<[u8]>>,
-        counterparty: Arc<OnceLock<std::net::SocketAddr>>,
+        counterparty: Arc<OnceLock<SocketAddrStr>>,
     ) -> std::io::Result<futures::future::BoxFuture<'static, ()>> {
         let counterparty_tx = counterparty.clone();
         Ok(async move {
@@ -392,7 +398,7 @@ impl ConnectedUdpStream {
                 match egress_rx.recv_async().await {
                     Ok(data) => {
                         if let Some(target) = counterparty_tx.get() {
-                            if let Err(e) = sock_tx.send_to(&data, target).await {
+                            if let Err(e) = sock_tx.send_to(&data, target.as_ref()).await {
                                 error!(
                                     socket_id,
                                     udp_bound_addr = tracing::field::debug(sock_tx.local_addr()),
@@ -401,9 +407,8 @@ impl ConnectedUdpStream {
                             }
                             trace!(socket_id, "sent {} bytes of data to {target}", data.len());
 
-                            // TODO: get rid of the to_string() allocation on the metric update
                             #[cfg(all(feature = "prometheus", not(test)))]
-                            METRIC_UDP_EGRESS_LEN.observe(&[&target.to_string()], data.len() as f64);
+                            METRIC_UDP_EGRESS_LEN.observe(&[target.as_str()], data.len() as f64);
                         } else {
                             error!(
                                 socket_id,

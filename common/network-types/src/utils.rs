@@ -1,4 +1,7 @@
 use futures::io::{AsyncRead, AsyncWrite};
+use std::fmt::{Debug, Display, Formatter};
+use std::hash::{Hash, Hasher};
+use std::net::SocketAddr;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
@@ -33,6 +36,66 @@ where
     fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
         let this = self.get_mut();
         Pin::new(&mut this.1).poll_close(cx)
+    }
+}
+
+// IPv6 + ':' + 65535 = 45 + 1 + 5
+const SOCKET_ADDRESS_MAX_LEN: usize = 52;
+
+/// Caches the string representation of a SocketAddr for fast conversion to `&str`
+#[derive(Copy, Clone)]
+pub(crate) struct SocketAddrStr(SocketAddr, arrayvec::ArrayString<SOCKET_ADDRESS_MAX_LEN>);
+
+impl SocketAddrStr {
+    #[allow(dead_code)]
+    pub fn as_str(&self) -> &str {
+        self.1.as_str()
+    }
+}
+
+impl AsRef<SocketAddr> for SocketAddrStr {
+    fn as_ref(&self) -> &SocketAddr {
+        &self.0
+    }
+}
+
+impl From<SocketAddr> for SocketAddrStr {
+    fn from(value: SocketAddr) -> Self {
+        let mut cached = value.to_string();
+        cached.truncate(SOCKET_ADDRESS_MAX_LEN);
+        Self(value, cached.parse().expect("cannot fail due to truncation"))
+    }
+}
+
+impl PartialEq for SocketAddrStr {
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
+    }
+}
+
+impl Eq for SocketAddrStr {}
+
+impl Debug for SocketAddrStr {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.1)
+    }
+}
+
+impl Display for SocketAddrStr {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.1)
+    }
+}
+
+impl PartialEq<SocketAddrStr> for SocketAddr {
+    fn eq(&self, other: &SocketAddrStr) -> bool {
+        self.eq(&other.0)
+    }
+}
+
+impl Hash for SocketAddrStr {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.0.hash(state);
     }
 }
 

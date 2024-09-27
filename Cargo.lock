@@ -4112,6 +4112,7 @@ name = "hopr-network-types"
 version = "0.4.0"
 dependencies = [
  "anyhow",
+ "arrayvec",
  "async-std",
  "async-std-resolver",
  "async-stream",
