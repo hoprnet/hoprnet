@@ -346,7 +346,7 @@ impl HoprDbTicketOperations for HoprDb {
                     }
 
                     info!(
-                        "removed {total_marked_count} of {mark_as} tickets in {}",
+                        "removed {total_marked_count} of {mark_as} tickets in {} channels",
                         selector.channel_identifiers.len()
                     );
                     Ok(total_marked_count)
@@ -918,7 +918,7 @@ impl HoprDbTicketOperations for HoprDb {
             })?;
 
         // Aggregated tickets always have 100% winning probability
-        if aggregated_ticket.win_prob() != 1.0f64 {
+        if !f64_approx_eq(aggregated_ticket.win_prob(), 1.0, LOWEST_POSSIBLE_WINNING_PROB) {
             return Err(DbSqlError::LogicalError("Aggregated tickets must have 100% win probability".into()).into());
         }
 
@@ -1119,7 +1119,12 @@ impl HoprDbTicketOperations for HoprDb {
                 return Err(DbSqlError::LogicalError("tickets with overlapping index intervals".into()).into());
             }
 
-            if acked_ticket.verified_ticket().win_prob() < min_win_prob {
+            if !f64_approx_eq(
+                acked_ticket.verified_ticket().win_prob(),
+                min_win_prob,
+                LOWEST_POSSIBLE_WINNING_PROB,
+            ) && acked_ticket.verified_ticket().win_prob() < min_win_prob
+            {
                 return Err(DbSqlError::LogicalError(
                     "cannot aggregate ticket with lower than minimum winning probability in network".into(),
                 )
