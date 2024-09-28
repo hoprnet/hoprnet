@@ -4048,7 +4048,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-internal-types"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "aquamarine",
@@ -4428,7 +4428,7 @@ dependencies = [
 
 [[package]]
 name = "hoprd-api"
-version = "3.3.0"
+version = "3.3.1"
 dependencies = [
  "anyhow",
  "async-broadcast",
