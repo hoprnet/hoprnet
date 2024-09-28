@@ -56,7 +56,7 @@ pub(crate) struct TicketProbabilityResponse {
     probability: f64,
 }
 
-/// Gets the current minimum incoming ticket winning probability set by the network.
+/// Gets the current minimum incoming ticket winning probability defined by the network.
 #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/network/probability"),

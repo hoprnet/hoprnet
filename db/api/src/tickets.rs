@@ -50,7 +50,7 @@ pub struct TicketSelector {
     /// See [TicketIndexSelector] for possible options.
     pub index: TicketIndexSelector,
     /// If given, the tickets are further restricted to the ones with a winning probability
-    /// less that this value.
+    /// less than this value.
     pub win_prob_lt: Option<EncodedWinProb>,
     /// Further restriction to tickets with the given state.
     pub state: Option<AcknowledgedTicketStatus>,
@@ -77,7 +77,7 @@ impl TicketSelector {
     /// Create a new ticket selector given the `channel_id` and `epoch`.
     pub fn new<T: Into<U256>>(channel_id: Hash, epoch: T) -> Self {
         Self {
-            channel_identifiers: vec![(channel_id.clone(), epoch.into())],
+            channel_identifiers: vec![(channel_id, epoch.into())],
             index: TicketIndexSelector::None,
             win_prob_lt: None,
             state: None,
@@ -94,7 +94,7 @@ impl TicketSelector {
     pub fn also_on_channel<T: Into<U256>>(self, channel_id: Hash, epoch: T) -> Self {
         let mut ret = self.clone();
         ret.index = TicketIndexSelector::None;
-        ret.channel_identifiers.push((channel_id.clone(), epoch.into()));
+        ret.channel_identifiers.push((channel_id, epoch.into()));
         ret
     }
 
@@ -102,7 +102,7 @@ impl TicketSelector {
     /// This nullifies any prior calls to [`TicketSelector::also_on_channel`].
     pub fn just_on_channel<T: Into<U256>>(self, channel_id: Hash, epoch: T) -> Self {
         let mut ret = self.clone();
-        ret.channel_identifiers = vec![(channel_id.clone(), epoch.into())];
+        ret.channel_identifiers = vec![(channel_id, epoch.into())];
         ret
     }
 
@@ -266,8 +266,8 @@ pub trait HoprDbTicketOperations {
     /// Updates the ticket statistics according to the fact that the given ticket has
     /// been rejected by the packet processing pipeline.
     ///
-    /// This ticket is not yet stored in the ticket DB,
-    /// so only the statistics in the corresponding channel are updated.
+    /// This ticket is not yet stored in the ticket DB;
+    /// therefore, only the statistics in the corresponding channel are updated.
     async fn mark_unsaved_ticket_rejected(&self, ticket: &Ticket) -> Result<()>;
 
     /// Updates [state](AcknowledgedTicketStatus) of the tickets matching the given `selector`.
@@ -360,7 +360,7 @@ pub trait HoprDbTicketOperations {
     ) -> Result<VerifiedTicket>;
 }
 
-/// Can contain ticket statistics for a channel or aggregate ticket statistics for all channels.
+/// Can contain ticket statistics for a channel or aggregated ticket statistics for all channels.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct ChannelTicketStatistics {
     pub winning_tickets: u128,

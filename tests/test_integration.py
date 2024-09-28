@@ -926,7 +926,7 @@ async def test_hoprd_should_relay_packets_with_lower_win_prob_then_agg_and_redee
     await asyncio.wait_for(check_min_incoming_win_prob_eq(swarm7[relay], win_prob), 10.0)
 
     try:
-        async with create_channel(swarm7[src], swarm7[relay], funding=ticket_count * TICKET_PRICE_PER_HOP / win_prob) as channel:
+        async with create_channel(swarm7[src], swarm7[relay], funding=2 * ticket_count * TICKET_PRICE_PER_HOP / win_prob) as channel:
 
             # ensure ticket stats are what we expect before starting
             statistics_before = await swarm7[relay].api.get_tickets_statistics()
@@ -991,7 +991,7 @@ async def test_hoprd_should_reject_unredeemed_tickets_with_lower_win_prob_when_m
     await asyncio.wait_for(check_min_incoming_win_prob_eq(swarm7[relay], win_prob), 10.0)
 
     try:
-        async with create_channel(swarm7[src], swarm7[relay], funding=ticket_count * TICKET_PRICE_PER_HOP / win_prob):
+        async with create_channel(swarm7[src], swarm7[relay], funding=2 * ticket_count * TICKET_PRICE_PER_HOP / win_prob):
 
             # ensure ticket stats are what we expect before starting
             statistics_before = await swarm7[relay].api.get_tickets_statistics()
@@ -1056,8 +1056,8 @@ async def test_hoprd_should_relay_with_increased_win_prob(route, swarm7: dict[st
     await asyncio.wait_for(check_min_incoming_win_prob_eq(swarm7[relay_1], win_prob), 10.0)
 
     try:
-        async with create_channel(swarm7[src], swarm7[relay_1], funding=ticket_count * TICKET_PRICE_PER_HOP / win_prob):
-            async with create_channel(swarm7[relay_1], swarm7[relay_2], funding=ticket_count * TICKET_PRICE_PER_HOP / win_prob):
+        async with create_channel(swarm7[src], swarm7[relay_1], funding=2 * ticket_count * TICKET_PRICE_PER_HOP / win_prob):
+            async with create_channel(swarm7[relay_1], swarm7[relay_2], funding=2 * ticket_count * TICKET_PRICE_PER_HOP / win_prob):
 
                 # ensure ticket stats are what we expect before starting
                 statistics_before = await swarm7[relay_1].api.get_tickets_statistics()
@@ -1098,7 +1098,8 @@ async def test_hoprd_should_relay_with_increased_win_prob(route, swarm7: dict[st
     [
         [
             *random.sample(barebone_nodes(), 1),
-            *random.sample(nodes_with_lower_outgoing_win_prob(), 2),
+            *random.sample(nodes_with_lower_outgoing_win_prob(), 1),
+            *random.sample(barebone_nodes(), 1),
         ]
         for _ in range(PARAMETERIZED_SAMPLE_SIZE)
     ],
@@ -1118,7 +1119,7 @@ async def test_hoprd_should_relay_packets_with_higher_than_min_win_prob(route, s
     await asyncio.wait_for(check_min_incoming_win_prob_eq(swarm7[relay], win_prob), 10.0)
 
     try:
-        async with create_channel(swarm7[src], swarm7[relay], funding=ticket_count * TICKET_PRICE_PER_HOP / win_prob):
+        async with create_channel(swarm7[src], swarm7[relay], funding=2 * ticket_count * TICKET_PRICE_PER_HOP / win_prob):
 
             # ensure ticket stats are what we expect before starting
             statistics_before = await swarm7[relay].api.get_tickets_statistics()
@@ -1150,8 +1151,8 @@ async def test_hoprd_should_relay_packets_with_higher_than_min_win_prob(route, s
     "route",
     [
         [
-            *random.sample(nodes_with_lower_outgoing_win_prob(), 2),
-            *random.sample(barebone_nodes(), 1),
+            *random.sample(nodes_with_lower_outgoing_win_prob(), 1),
+            *random.sample(barebone_nodes(), 2),
         ]
         for _ in range(PARAMETERIZED_SAMPLE_SIZE)
     ],

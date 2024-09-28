@@ -20,8 +20,6 @@ use hopr_db_sql::errors::DbSqlError;
 use hopr_db_sql::prelude::TicketMarker;
 use hopr_db_sql::{HoprDbAllOperations, OpenTransaction};
 use hopr_internal_types::prelude::*;
-#[cfg(all(feature = "prometheus", not(test)))]
-use hopr_metrics::metrics::MultiCounter;
 use hopr_primitive_types::prelude::*;
 use std::cmp::Ordering;
 use std::fmt::Formatter;
@@ -32,18 +30,18 @@ use tracing::{debug, error, info, trace, warn};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_INDEXER_LOG_COUNTERS: MultiCounter =
-        MultiCounter::new(
+    static ref METRIC_INDEXER_LOG_COUNTERS: hopr_metrics::MultiCounter =
+        hopr_metrics::MultiCounter::new(
             "hopr_indexer_contract_log_counters",
             "Counts of different HOPR contract logs processed by the Indexer",
             &["contract"]
     ).unwrap();
 }
 
-/// Event handling object for on-chain operations
+/// Event handling an object for on-chain operations
 ///
 /// Once an on-chain operation is recorded by the [crate::block::Indexer], it is pre-processed
-/// and passed on to this object that handles event specific actions for each on-chain operation.
+/// and passed on to this object that handles event-specific actions for each on-chain operation.
 ///
 #[derive(Clone)]
 pub struct ContractEventHandlers<Db: Clone> {
