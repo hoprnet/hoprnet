@@ -165,6 +165,9 @@ async def check_native_balance_below(src: Node, value: int):
     while balance_str_to_int((await src.api.balances()).native) >= value:
         await asyncio.sleep(CHECK_RETRY_INTERVAL)
 
+async def check_min_incoming_win_prob_eq(src: Node, value: float):
+    while round(await src.api.ticket_min_win_prob(), 5) != value:
+        await asyncio.sleep(CHECK_RETRY_INTERVAL)
 
 async def check_all_tickets_redeemed(src: Node):
     while balance_str_to_int((await src.api.get_tickets_statistics()).unredeemed_value) > 0:
@@ -799,12 +802,23 @@ async def test_hoprd_check_ticket_price_is_default(peer, swarm7: dict[str, Node]
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
-async def test_hoprd_check_ticket_winn_prob_is_default(peer, swarm7: dict[str, Node]):
-    price = await swarm7[peer].api.ticket_winn_prob()
+async def test_hoprd_check_min_incoming_ticket_win_prob_is_default(peer, swarm7: dict[str, Node]):
+    win_prob = await swarm7[peer].api.ticket_min_win_prob()
 
-    assert price is not None
-    assert 0.0 <= round(price, 5) <= 1.0
+    assert win_prob is not None
+    assert 0.0 <= round(win_prob, 5) <= 1.0
 
+    test_suite_name = __name__.split('.')[-1]
+    private_key = load_private_key(test_suite_name)
+
+    new_win_prob = win_prob / 2
+    set_minimum_winning_probability_in_network(private_key, new_win_prob)
+
+    try:
+        await asyncio.wait_for(check_min_incoming_win_prob_eq(swarm7[peer], new_win_prob), timeout=10.0)
+    finally:
+        # Restore the winning probability regardless the outcome
+        set_minimum_winning_probability_in_network(private_key, win_prob)
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("tag", [random.randint(0, RESERVED_TAG_UPPER_BOUND) for _ in range(5)])
@@ -908,7 +922,10 @@ async def test_hoprd_should_relay_packets_with_lower_win_prob_then_agg_and_redee
 
     test_suite_name = __name__.split('.')[-1]
     private_key = load_private_key(test_suite_name)
+
     set_minimum_winning_probability_in_network(private_key, win_prob)
+    await asyncio.wait_for(check_min_incoming_win_prob_eq(relay, win_prob), 10.0)
+
     try:
         async with create_channel(swarm7[src], swarm7[relay], funding=ticket_count * TICKET_PRICE_PER_HOP) as channel:
 
@@ -972,7 +989,10 @@ async def test_hoprd_should_reject_unredeemed_tickets_with_lower_win_prob_when_m
 
     test_suite_name = __name__.split('.')[-1]
     private_key = load_private_key(test_suite_name)
+
     set_minimum_winning_probability_in_network(private_key, win_prob)
+    await asyncio.wait_for(check_min_incoming_win_prob_eq(relay, win_prob), 10.0)
+
     try:
         async with create_channel(swarm7[src], swarm7[relay], funding=ticket_count * TICKET_PRICE_PER_HOP):
 
@@ -998,7 +1018,7 @@ async def test_hoprd_should_reject_unredeemed_tickets_with_lower_win_prob_when_m
             # Now if we increase the minimum winning probability, the relayer should
             # reject all the unredeemed tickets
             set_minimum_winning_probability_in_network(private_key, win_prob * 2)
-            await asyncio.sleep(5)
+            await asyncio.wait_for(check_min_incoming_win_prob_eq(relay, win_prob), 10.0)
 
             ticket_statistics = await swarm7[relay].api.get_tickets_statistics()
             unredeemed_value = balance_str_to_int(ticket_statistics.unredeemed_value)
@@ -1034,7 +1054,10 @@ async def test_hoprd_should_relay_with_increased_win_prob(route, swarm7: dict[st
 
     test_suite_name = __name__.split('.')[-1]
     private_key = load_private_key(test_suite_name)
+
     set_minimum_winning_probability_in_network(private_key, win_prob)
+    await asyncio.wait_for(check_min_incoming_win_prob_eq(relay_1, win_prob), 10.0)
+
     try:
         async with create_channel(swarm7[src], swarm7[relay_1], funding=ticket_count * TICKET_PRICE_PER_HOP):
             async with create_channel(swarm7[relay_1], swarm7[relay_2], funding=ticket_count * TICKET_PRICE_PER_HOP):
@@ -1094,7 +1117,10 @@ async def test_hoprd_should_relay_packets_with_higher_than_min_win_prob(route, s
 
     test_suite_name = __name__.split('.')[-1]
     private_key = load_private_key(test_suite_name)
+
     set_minimum_winning_probability_in_network(private_key, win_prob)
+    await asyncio.wait_for(check_min_incoming_win_prob_eq(relay, win_prob), 10.0)
+
     try:
         async with create_channel(swarm7[src], swarm7[relay], funding=ticket_count * TICKET_PRICE_PER_HOP):
 
@@ -1156,7 +1182,7 @@ async def test_hoprd_should_not_accept_tickets_with_lower_than_min_win_prob(rout
         # in this case, the destination receives nothing, because the relayer will not relay packets
         # with win prob lower than 1
         # TODO: how long do we need to wait before we can safely conclude that destination has received nothing?
-        await asyncio.sleep(10)
+        await asyncio.sleep(5.0)
         assert await swarm7[dest].api.messages_peek_all(random_tag) is None
 
         # the relay simply rejected all the tickets

@@ -17,7 +17,7 @@ pub const INTERMEDIATE_HOPS: usize = 3;
 pub const PAYLOAD_SIZE: usize = 500;
 
 /// Default required minimum incoming ticket winning probability
-pub const DEFAULT_MINIMUM_INCOMING_TICKET_WIN_PROB: f64 = 1.0; // TODO: change this to load from SC
+pub const DEFAULT_MINIMUM_INCOMING_TICKET_WIN_PROB: f64 = 1.0;
 
 /// Default maximum incoming ticket winning probability, above which tickets will not be accepted
 /// due to privacy.
