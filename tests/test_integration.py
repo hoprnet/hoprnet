@@ -173,6 +173,9 @@ async def check_all_tickets_redeemed(src: Node):
     while balance_str_to_int((await src.api.get_tickets_statistics()).unredeemed_value) > 0:
         await asyncio.sleep(CHECK_RETRY_INTERVAL)
 
+async def check_tickets_rejected(src: Node, total_amount: int):
+    while balance_str_to_int((await src.api.get_tickets_statistics()).rejected_value) >= total_amount:
+        await asyncio.sleep(CHECK_RETRY_INTERVAL)
 
 async def send_and_receive_packets_with_pop(
     packets, src: Node, dest: Node, path: list[str], timeout: float = MULTIHOP_MESSAGE_SEND_TIMEOUT
@@ -936,11 +939,8 @@ async def test_hoprd_should_relay_packets_with_lower_win_prob_then_agg_and_redee
 
     try:
         async with create_channel(swarm7[src], swarm7[relay], funding=2 * ticket_count * TICKET_PRICE_PER_HOP / win_prob) as channel:
-
             # ensure ticket stats are what we expect before starting
             statistics_before = await swarm7[relay].api.get_tickets_statistics()
-            unredeemed_value_before = balance_str_to_int(statistics_before.unredeemed_value)
-            redeemed_value_before = balance_str_to_int(statistics_before.redeemed_value)
 
             # the destination should receive all the packets
             await swarm7[dest].api.messages_pop_all(None)
@@ -951,9 +951,9 @@ async def test_hoprd_should_relay_packets_with_lower_win_prob_then_agg_and_redee
 
             # the value of redeemable tickets on the relay should not go above the given threshold
             ticket_statistics = await swarm7[relay].api.get_tickets_statistics()
-            unredeemed_value = balance_str_to_int(ticket_statistics.unredeemed_value)
+            new_tickets_value = balance_str_to_int(ticket_statistics.unredeemed_value) - balance_str_to_int(statistics_before.unredeemed_value)
             winning_count = ticket_statistics.winning_count - statistics_before.winning_count
-            assert unredeemed_value - unredeemed_value_before > 0
+            assert new_tickets_value > 0
             assert abs(winning_count - ticket_count * win_prob) <= win_ticket_tolerance * ticket_count
 
             await asyncio.wait_for(swarm7[relay].api.channels_aggregate_tickets(channel), 20.0)
@@ -963,9 +963,9 @@ async def test_hoprd_should_relay_packets_with_lower_win_prob_then_agg_and_redee
 
             # The tickets can get successfully redeemed on that channel
             ticket_statistics = await swarm7[relay].api.get_tickets_statistics()
-            redeemed_value = balance_str_to_int(statistics_before.redeemed_value)
+            redeemed_value = balance_str_to_int(ticket_statistics.redeemed_value)
             assert balance_str_to_int(ticket_statistics.unredeemed_value) == 0
-            assert redeemed_value - redeemed_value_before == unredeemed_value - unredeemed_value_before
+            assert redeemed_value - balance_str_to_int(statistics_before.redeemed_value) == new_tickets_value
     finally:
         # Always return winning probability to 1.0 even if the test failed
         set_minimum_winning_probability_in_network(private_key, 1.0)
@@ -1176,6 +1176,7 @@ async def test_hoprd_should_not_accept_tickets_with_lower_than_min_win_prob(rout
         # ensure ticket stats are what we expect before starting
         statistics_before = await swarm7[relay].api.get_tickets_statistics()
         unredeemed_value_before = balance_str_to_int(statistics_before.unredeemed_value)
+        rejected_value_before = balance_str_to_int(statistics_before.rejected_value)
 
         # sent out all packets at from source
         await swarm7[dest].api.messages_pop_all(None)
@@ -1185,16 +1186,17 @@ async def test_hoprd_should_not_accept_tickets_with_lower_than_min_win_prob(rout
         for packet in packets:
             assert await swarm7[src].api.send_message(swarm7[dest].peer_id, packet, [swarm7[relay].peer_id], random_tag)
 
+        # wait until the relay rejects all the tickets
+        await asyncio.wait_for(check_tickets_rejected(swarm7[relay], rejected_value_before + ticket_count * TICKET_PRICE_PER_HOP), 30.0)
+
+        # unredeemed value should not change on the relay
+        ticket_statistics = await swarm7[relay].api.get_tickets_statistics()
+        assert balance_str_to_int(ticket_statistics.unredeemed_value) == unredeemed_value_before
+        assert ticket_statistics.winning_count == statistics_before.winning_count
+
         # in this case, the destination receives nothing, because the relayer will not relay packets
         # with win prob lower than 1
-        # TODO: how long do we need to wait before we can safely conclude that destination has received nothing?
-        await asyncio.sleep(5.0)
         response = await swarm7[dest].api.messages_peek_all(random_tag)
         assert response is not None
         assert len(response.messages) == 0
 
-        # the relay simply rejected all the tickets
-        ticket_statistics = await swarm7[relay].api.get_tickets_statistics()
-        unredeemed_value = balance_str_to_int(ticket_statistics.unredeemed_value)
-        assert unredeemed_value - unredeemed_value_before == 0
-        assert ticket_statistics.winning_count == statistics_before.winning_count

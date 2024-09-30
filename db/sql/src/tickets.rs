@@ -77,7 +77,7 @@ impl IntoCondition for WrappedTicketSelector {
 
         // This cannot happen, but instead of panicking, return an impossible condition object
         if expr.is_none() {
-            return Condition::any().not()
+            return Condition::any().not();
         }
 
         let mut expr = expr.unwrap();
