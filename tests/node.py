@@ -179,6 +179,9 @@ class Node:
 
         return self.proc is not None
 
+    def __eq__(self, other):
+        return self.peer_id == other.peer_id
+
     def clean_up(self):
         self.proc.kill()
 

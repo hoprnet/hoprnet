@@ -352,6 +352,17 @@ class HoprdAPI:
         _, response = self.__call_api(MessagesApi, "pop", body=body)
         return response
 
+    async def messages_pop_all(self, tag: int = MESSAGE_TAG) -> dict:
+        """
+        Pop all messages from the inbox
+        :param: tag = 0x0320
+        :return: dict
+        """
+        body = GetMessageBodyRequest(tag=tag)
+
+        _, response = self.__call_api(MessagesApi, "pop_all", body=body)
+        return response
+
     async def messages_peek(self, tag: int = MESSAGE_TAG) -> dict:
         """
         Peek next message from the inbox

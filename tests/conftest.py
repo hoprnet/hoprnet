@@ -375,13 +375,17 @@ async def shared_nodes_bringup(
         node.setup(PASSWORD, protocol_config_file(test_suite_name), PWD.parent)
 
     # WAIT FOR NODES TO BE UP
-    logging.info("Waiting for nodes to start up")
     timeout = 60
-    for node in nodes.values():
-        if await node.api.startedz(timeout):
+    logging.info(f"Waiting up to {timeout}s for nodes to start up")
+    nodes_readyness = await asyncio.gather(*[node.api.startedz(timeout) for node in nodes.values()])
+    for node, res in zip(nodes.values(), nodes_readyness):
+        if res:
             logging.debug(f"Node {node} up")
         else:
-            logging.error(f"Node {node} not ready after {timeout} seconds")  # TODO (jean)
+            logging.error(f"Node {node} not ready after {timeout} seconds")
+
+    if not all(nodes_readyness):
+        raise logging.critical("Not all nodes are started, interrupting setup")
 
     if not skip_funding:
         # FUND NODES
@@ -389,14 +393,19 @@ async def shared_nodes_bringup(
         fund_nodes(test_suite_name, test_dir, anvil_port)
 
     # WAIT FOR NODES TO BE UP
-    logging.info("Waiting for nodes to be ready")
     timeout = 60
-    for node in nodes.values():
-        if await node.api.readyz(timeout):
-            logging.debug(f"Node {node} ready")
+    logging.info(f"Waiting up to {timeout}s for nodes to be ready")
+    nodes_readyness = await asyncio.gather(*[node.api.readyz(timeout) for node in nodes.values()])
+    for node, res in zip(nodes.values(), nodes_readyness):
+        if res:
+            logging.debug(f"Node {node} up")
         else:
-            logging.info(f"Node {node} not ready after {timeout} seconds")
+            logging.error(f"Node {node} not ready after {timeout} seconds")
 
+    if not all(nodes_readyness):
+        raise logging.critical("Not all nodes are ready, interrupting setup")
+
+    for node in nodes.values():
         if addresses := await node.api.addresses():
             node.peer_id = addresses["hopr"]
             node.address = addresses["native"]
@@ -406,17 +415,7 @@ async def shared_nodes_bringup(
     # WAIT FOR NODES TO CONNECT TO ALL PEERS
     logging.info("Waiting for nodes to connect to all peers")
     for node in nodes.values():
-
-        def is_same_node(a, b):
-            return a.peer_id == b.peer_id
-
-        def is_in_same_network(a, b):
-            return a.network == b.network
-
-        required_peers = [
-            n.peer_id for n in nodes.values() if not is_same_node(n, node) and is_in_same_network(n, node)
-        ]
-
+        required_peers = [n.peer_id for n in nodes.values() if n != node and n.network == node.network]
         while not await all_peers_connected(node, required_peers):
             logging.info(f"Node {node} does not have all peers connected yet, retrying")
             await asyncio.sleep(1)
@@ -517,7 +516,7 @@ async def swarm7(request):
         }
 
         for node in nodes.values():
-            logging.info(f"Creating safe and module for {node}")
+            logging.debug(f"Creating safe and module for {node}")
             assert node.create_local_safe(safe_custom_env)
 
         # wait before contract deployments are finalized
@@ -563,6 +562,13 @@ async def swarm7(request):
     logging.info(f"Tearing down the {len(nodes)} nodes cluster")
     [node.clean_up() for node in nodes.values()]
     run(["make", "kill-anvil", f"port={anvil_port}"], cwd=PWD.parent, check=True)
+
+
+@pytest.fixture(autouse=True)
+async def teardown(swarm7: dict[str, Node]):
+    yield
+    await asyncio.gather(*[node.api.reset_tickets_statistics() for node in swarm7.values()])
+    await asyncio.gather(*[node.api.messages_pop_all(0) for node in swarm7.values()])
 
 
 def to_ws_url(host, port):
