@@ -19,14 +19,13 @@ pub use session::{HOPR_TCP_BUFFER_SIZE, HOPR_UDP_BUFFER_SIZE, HOPR_UDP_QUEUE_SIZ
 use async_lock::RwLock;
 use axum::{
     extract::Json,
-    http::{status::StatusCode, Method},
+    http::{header::AUTHORIZATION, status::StatusCode, Method},
     middleware,
     response::{IntoResponse, Response},
     routing::{delete, get, post},
     Router,
 };
 use bimap::BiHashMap;
-use hyper::header::AUTHORIZATION;
 use libp2p_identity::PeerId;
 use serde::Serialize;
 use std::collections::HashMap;

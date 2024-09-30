@@ -12,7 +12,7 @@ license = "GPL-3.0-only"
 crate-type = ["rlib"]
 
 [dependencies]
-prometheus = "0.13.4"
+prometheus = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }

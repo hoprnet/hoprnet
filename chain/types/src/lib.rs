@@ -10,6 +10,7 @@ use bindings::hopr_node_stake_factory::HoprNodeStakeFactory;
 use bindings::hopr_safe_proxy_for_network_registry::HoprSafeProxyForNetworkRegistry;
 use bindings::hopr_ticket_price_oracle::HoprTicketPriceOracle;
 use bindings::hopr_token::HoprToken;
+use bindings::hopr_winning_probability_oracle::HoprWinningProbabilityOracle;
 use ethers::abi::Token;
 use ethers::prelude::*;
 use hex_literal::hex;
@@ -49,6 +50,8 @@ pub struct ContractAddresses {
     pub safe_registry: Address,
     /// Price oracle contract
     pub price_oracle: Address,
+    /// Minimum ticket winning probability contract
+    pub win_prob_oracle: Address,
     /// Stake factory contract
     pub stake_factory: Address,
     /// Node management module contract (can be zero if safe is not used)
@@ -80,6 +83,7 @@ pub struct ContractInstances<M: Middleware> {
     pub network_registry_proxy: NetworkRegistryProxy<M>,
     pub safe_registry: HoprNodeSafeRegistry<M>,
     pub price_oracle: HoprTicketPriceOracle<M>,
+    pub win_prob_oracle: HoprWinningProbabilityOracle<M>,
     pub stake_factory: HoprNodeStakeFactory<M>,
     pub module_implementation: HoprNodeManagementModule<M>,
 }
@@ -103,6 +107,7 @@ impl<M: Middleware> Clone for ContractInstances<M> {
             },
             safe_registry: HoprNodeSafeRegistry::new(self.safe_registry.address(), client.clone()),
             price_oracle: HoprTicketPriceOracle::new(self.price_oracle.address(), client.clone()),
+            win_prob_oracle: HoprWinningProbabilityOracle::new(self.win_prob_oracle.address(), client.clone()),
             stake_factory: HoprNodeStakeFactory::new(self.stake_factory.address(), client.clone()),
             module_implementation: HoprNodeManagementModule::new(self.module_implementation.address(), client.clone()),
         }
@@ -129,6 +134,7 @@ impl<M: Middleware> ContractInstances<M> {
             },
             safe_registry: HoprNodeSafeRegistry::new(contract_addresses.safe_registry, provider.clone()),
             price_oracle: HoprTicketPriceOracle::new(contract_addresses.price_oracle, provider.clone()),
+            win_prob_oracle: HoprWinningProbabilityOracle::new(contract_addresses.win_prob_oracle, provider.clone()),
             stake_factory: HoprNodeStakeFactory::new(contract_addresses.stake_factory, provider.clone()),
             module_implementation: HoprNodeManagementModule::new(
                 contract_addresses.module_implementation,
@@ -165,6 +171,12 @@ impl<M: Middleware> ContractInstances<M> {
         let price_oracle = HoprTicketPriceOracle::deploy(
             provider.clone(),
             (self_address, ethers::types::U256::from(100000000000000000_u128)),
+        )?
+        .send()
+        .await?;
+        let win_prob_oracle = HoprWinningProbabilityOracle::deploy(
+            provider.clone(),
+            (self_address, ethers::types::U256::from(72057594037927935_u128)), // 0xFFFFFFFFFFFFFF
         )?
         .send()
         .await?;
@@ -207,6 +219,7 @@ impl<M: Middleware> ContractInstances<M> {
             network_registry_proxy: NetworkRegistryProxy::Dummy(network_registry_proxy),
             safe_registry,
             price_oracle,
+            win_prob_oracle,
             stake_factory,
             module_implementation,
         })
@@ -223,6 +236,7 @@ impl<M: Middleware> From<&ContractInstances<M>> for ContractAddresses {
             network_registry_proxy: value.network_registry_proxy.address(),
             safe_registry: value.safe_registry.address().into(),
             price_oracle: value.price_oracle.address().into(),
+            win_prob_oracle: value.win_prob_oracle.address().into(),
             stake_factory: value.stake_factory.address().into(),
             module_implementation: value.module_implementation.address().into(),
         }
@@ -234,17 +248,8 @@ impl<M: Middleware> From<&ContractInstances<M>> for ContractAddresses {
 /// Used for testing. When block time is given, new blocks are mined periodically.
 /// Otherwise, a new block is mined per transaction.
 pub fn create_anvil(block_time: Option<std::time::Duration>) -> ethers::utils::AnvilInstance {
-    let output = std::process::Command::new(env!("CARGO"))
-        .arg("locate-project")
-        .arg("--workspace")
-        .arg("--message-format=plain")
-        .output()
-        .expect("should succeed")
-        .stdout;
-    let cargo_path = std::path::Path::new(std::str::from_utf8(&output).unwrap().trim());
-    let workspace_dir = cargo_path.parent().unwrap().to_path_buf();
-
-    let mut anvil = ethers::utils::Anvil::new().path(workspace_dir.join(".foundry/bin/anvil"));
+    // The anvil binary must be in the PATH.
+    let mut anvil = ethers::utils::Anvil::new();
 
     if let Some(bt) = block_time {
         anvil = anvil.block_time(bt.as_secs());
