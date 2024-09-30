@@ -64,7 +64,7 @@ impl AsRef<TicketSelector> for WrappedTicketSelector {
 
 impl IntoCondition for WrappedTicketSelector {
     fn into_condition(self) -> Condition {
-        let mut expr = self
+        let expr = self
             .0
             .channel_identifiers
             .into_iter()
@@ -73,8 +73,14 @@ impl IntoCondition for WrappedTicketSelector {
                     .eq(channel_id.to_hex())
                     .and(ticket::Column::ChannelEpoch.eq(epoch.to_be_bytes().to_vec()))
             })
-            .reduce(SimpleExpr::or)
-            .expect("impossible to have an empty channel identifier vector");
+            .reduce(SimpleExpr::or);
+
+        // This cannot happen, but instead of panicking, return an impossible condition object
+        if expr.is_none() {
+            return Condition::any().not()
+        }
+
+        let mut expr = expr.unwrap();
 
         match self.0.index {
             TicketIndexSelector::None => {
@@ -1486,7 +1492,7 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn test_mark_ticket_rejected() -> anyhow::Result<()> {
+    async fn test_mark_unsaved_ticket_rejected() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ALICE.clone()).await?;
 
         let (_, mut ticket) = init_db_with_tickets(&db, 1).await?;
