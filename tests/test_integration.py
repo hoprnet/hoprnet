@@ -371,7 +371,7 @@ async def test_hoprd_should_be_able_to_send_0_hop_messages_without_open_channels
     await send_and_receive_packets_with_pop(packets, src=swarm7[src], dest=swarm7[dest], path=[])
 
     # Remove all messages so they do not interfere with the later tests
-    await swarm7[dest].api.messages_pop_all(0)
+    await swarm7[dest].api.messages_pop_all(None)
 
 
 @pytest.mark.asyncio
@@ -943,6 +943,7 @@ async def test_hoprd_should_relay_packets_with_lower_win_prob_then_agg_and_redee
             redeemed_value_before = balance_str_to_int(statistics_before.redeemed_value)
 
             # the destination should receive all the packets
+            await swarm7[dest].api.messages_pop_all(None)
             packets = [f"Lower ticket win probability check: #{i:08d}" for i in range(ticket_count)]
             await send_and_receive_packets_with_pop(
                 packets, src=swarm7[src], dest=swarm7[dest], path=[swarm7[relay].peer_id]
@@ -1005,6 +1006,7 @@ async def test_hoprd_should_reject_unredeemed_tickets_with_lower_win_prob_when_m
             rejected_value_before = balance_str_to_int(statistics_before.rejected_value)
 
             # the destination should receive all the packets
+            await swarm7[dest].api.messages_pop_all(None)
             packets = [f"Lowering ticket win probability check: #{i:08d}" for i in range(ticket_count)]
             await send_and_receive_packets_with_pop(
                 packets, src=swarm7[src], dest=swarm7[dest], path=[swarm7[relay].peer_id]
@@ -1073,6 +1075,7 @@ async def test_hoprd_should_relay_with_increased_win_prob(route, swarm7: dict[st
                 unredeemed_value_before_2 = balance_str_to_int(statistics_before_2.unredeemed_value)
 
                 # the destination should receive all the packets
+                await swarm7[dest].api.messages_pop_all(None)
                 packets = [f"Relaying ticket win probability check: #{i:08d}" for i in range(ticket_count)]
                 await send_and_receive_packets_with_pop(
                     packets, src=swarm7[src], dest=swarm7[dest], path=[swarm7[relay_1].peer_id, swarm7[relay_2].peer_id]
@@ -1131,6 +1134,7 @@ async def test_hoprd_should_relay_packets_with_higher_than_min_win_prob(route, s
             rejected_value_before = balance_str_to_int(statistics_before.rejected_value)
 
             # the destination should receive all the packets
+            await swarm7[dest].api.messages_pop_all(None)
             packets = [f"Standard ticket win probability check: #{i:08d}" for i in range(ticket_count)]
             await send_and_receive_packets_with_pop(
                 packets, src=swarm7[src], dest=swarm7[dest], path=[swarm7[relay].peer_id]
@@ -1174,6 +1178,7 @@ async def test_hoprd_should_not_accept_tickets_with_lower_than_min_win_prob(rout
         unredeemed_value_before = balance_str_to_int(statistics_before.unredeemed_value)
 
         # sent out all packets at from source
+        await swarm7[dest].api.messages_pop_all(None)
         packets = [f"Rejected ticket win probability check: #{i:08d}" for i in range(ticket_count)]
         random_tag = gen_random_tag()
 
