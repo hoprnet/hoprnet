@@ -117,8 +117,9 @@ impl TicketSelector {
 
     /// If `false` is returned, the selector can fetch more than a single ticket.
     pub fn is_unique(&self) -> bool {
-        self.is_single_channel() && matches!(&self.index, TicketIndexSelector::Single(_))
-            || matches!(&self.index, TicketIndexSelector::Multiple(indices) if indices.len() == 1)
+        self.is_single_channel()
+            && (matches!(&self.index, TicketIndexSelector::Single(_))
+                || matches!(&self.index, TicketIndexSelector::Multiple(indices) if indices.len() == 1))
     }
 
     /// Returns this instance with a ticket index set.
@@ -167,7 +168,7 @@ impl TicketSelector {
         self
     }
 
-    /// Returns this instance with a with winning probability upper bound set.
+    /// Returns this instance with a winning probability upper bound set.
     pub fn with_winning_probability_lt(mut self, win_prob_lt: EncodedWinProb) -> Self {
         self.win_prob_lt = Some(win_prob_lt);
         self
