@@ -393,7 +393,8 @@ async def shared_nodes_bringup(
             logging.error(f"Node {node} not ready after {timeout} seconds")
 
     if not all(nodes_readyness):
-        raise logging.critical("Not all nodes are started, interrupting setup")
+        logging.critical("Not all nodes are started, interrupting setup")
+        raise RuntimeError
 
     if not skip_funding:
         # FUND NODES
@@ -411,7 +412,8 @@ async def shared_nodes_bringup(
             logging.error(f"Node {node} not ready after {timeout} seconds")
 
     if not all(nodes_readyness):
-        raise logging.critical("Not all nodes are ready, interrupting setup")
+        logging.critical("Not all nodes are ready, interrupting setup")
+        raise RuntimeError
 
     for node in nodes.values():
         if addresses := await node.api.addresses():
@@ -436,7 +438,8 @@ async def shared_nodes_bringup(
             logging.error(f"Node {node} did not connect to all peers")
 
     if not all(nodes_connectivity):
-        raise logging.critical("Not all nodes are connected to all peers, interrupting setup")
+        logging.critical("Not all nodes are connected to all peers, interrupting setup")
+        raise RuntimeError
 
 
 def load_private_key(test_suite_name, pos=0):
