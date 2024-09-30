@@ -750,26 +750,15 @@ async def test_hoprd_strategy_UNFINISHED():
 
 
 @pytest.mark.asyncio
-async def test_hoprd_check_native_withdraw_results_UNFINISHED():
-    """
-    # this 2 functions are runned at the end of the tests when withdraw transaction should clear on blockchain
-    # and we don't have to block and wait for it
-    check_native_withdraw_results() {
-    local initial_native_balance="${1}"
+@pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
+async def test_hoprd_check_native_withdraw(peer, swarm7: dict[str, Node]):
+    amount = "9876"
 
-    balances=$(api_get_balances ${api1})
-    new_native_balance=$(echo ${balances} | jq -r .native)
-    [[ "${initial_native_balance}" == "${new_native_balance}" ]] && \
-        { msg "Native withdraw failed, pre: ${initial_native_balance}, post: ${new_native_balance}"; exit 1; }
+    before_balance = await swarm7[peer].api.balances()
+    await swarm7[peer].api.withdraw(amount, swarm7[peer].safe_address, "Native")
+    after_balance = await swarm7[peer].api.balances()
 
-    echo "withdraw native successful"
-    }
-
-    # checking statuses of the long running tests
-    balances=$(api_get_balances ${api1})
-    native_balance=$(echo ${balances} | jq -r .native)
-    """
-    assert True
+    assert int(after_balance.safe_native) - int(before_balance.safe_native) == int(amount)
 
 
 @pytest.mark.asyncio

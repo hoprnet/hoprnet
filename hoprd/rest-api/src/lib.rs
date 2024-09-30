@@ -323,7 +323,7 @@ pub async fn run_hopr_api(
 
         api.at("/account/addresses").get(account::addresses);
         api.at("/account/balances").get(account::balances);
-        api.at("/account/withdraw").get(account::withdraw);
+        api.at("/account/withdraw").post(account::withdraw);
 
         api.at("/peers/:peerId")
             .get(peers::show_peer_info)
@@ -691,8 +691,6 @@ mod alias {
 }
 
 mod account {
-    use hopr_lib::U256;
-
     use super::*;
 
     #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
@@ -806,7 +804,7 @@ mod account {
     #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
     #[schema(example = json!({
         "address": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
-        "amount": 20000,
+        "amount": "20000",
         "currency": "HOPR"
     }))]
     #[serde(rename_all = "camelCase")]
@@ -816,7 +814,7 @@ mod account {
         currency: BalanceType,
         #[serde_as(as = "DisplayFromStr")]
         #[schema(value_type = String)]
-        amount: U256,
+        amount: String,
         #[serde_as(as = "DisplayFromStr")]
         #[schema(value_type = String)]
         address: Address,
@@ -850,7 +848,7 @@ mod account {
             .hopr
             .withdraw(
                 withdraw_req_data.address,
-                Balance::new(withdraw_req_data.amount, withdraw_req_data.currency),
+                Balance::new_from_str(&withdraw_req_data.amount, withdraw_req_data.currency),
             )
             .await
         {
