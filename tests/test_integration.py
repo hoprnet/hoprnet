@@ -173,10 +173,6 @@ async def check_all_tickets_redeemed(src: Node):
     while balance_str_to_int((await src.api.get_tickets_statistics()).unredeemed_value) > 0:
         await asyncio.sleep(CHECK_RETRY_INTERVAL)
 
-async def check_tickets_rejected(src: Node, total_amount: int):
-    while balance_str_to_int((await src.api.get_tickets_statistics()).rejected_value) >= total_amount:
-        await asyncio.sleep(CHECK_RETRY_INTERVAL)
-
 async def send_and_receive_packets_with_pop(
     packets, src: Node, dest: Node, path: list[str], timeout: float = MULTIHOP_MESSAGE_SEND_TIMEOUT
 ):
@@ -1187,7 +1183,7 @@ async def test_hoprd_should_not_accept_tickets_with_lower_than_min_win_prob(rout
             assert await swarm7[src].api.send_message(swarm7[dest].peer_id, packet, [swarm7[relay].peer_id], random_tag)
 
         # wait until the relay rejects all the tickets
-        await asyncio.wait_for(check_tickets_rejected(swarm7[relay], rejected_value_before + ticket_count * TICKET_PRICE_PER_HOP), 30.0)
+        await asyncio.wait_for(check_rejected_tickets_value(swarm7[relay], rejected_value_before + ticket_count * TICKET_PRICE_PER_HOP), 30.0)
 
         # unredeemed value should not change on the relay
         ticket_statistics = await swarm7[relay].api.get_tickets_statistics()
