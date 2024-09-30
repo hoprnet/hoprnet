@@ -297,7 +297,9 @@ mod tests {
     use hopr_crypto_types::prelude::Keypair;
     use hopr_internal_types::channels::ChannelStatus;
     use hopr_internal_types::prelude::{ChannelDirection, ChannelEntry};
+    use hopr_parallelize::cpu::rayon::range;
     use hopr_primitive_types::prelude::{Address, BalanceType};
+    use rand::seq::SliceRandom;
 
     #[async_std::test]
     async fn test_insert_get_by_id() -> anyhow::Result<()> {
@@ -431,6 +433,54 @@ mod tests {
 
         assert_eq!(vec![ce_2], db.get_incoming_channels(None).await?);
         assert_eq!(vec![ce_1], db.get_outgoing_channels(None).await?);
+
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn channels_should_dealocate_resources() -> anyhow::Result<()> {
+        let ckp = ChainKeypair::random();
+        let left_addrs = (0..300)
+            .map(|_| ChainKeypair::random().public().to_address())
+            .collect::<Vec<_>>();
+        let right_addrs = (0..300)
+            .map(|_| ChainKeypair::random().public().to_address())
+            .collect::<Vec<_>>();
+
+        let db = HoprDb::new_in_memory(ckp).await?;
+
+        for i in left_addrs {
+            for _ in 0..20 {
+                let db_clone = db.clone();
+                let right = right_addrs.choose(&mut rand::thread_rng()).unwrap().clone();
+                db.begin_transaction()
+                    .await?
+                    .perform(|tx| {
+                        let i = i.clone();
+                        let right = right.clone();
+                        Box::pin(async move {
+                            db_clone
+                                .upsert_channel(
+                                    Some(tx),
+                                    ChannelEntry::new(
+                                        i,
+                                        right,
+                                        BalanceType::HOPR.zero(),
+                                        1_u32.into(),
+                                        ChannelStatus::Open,
+                                        0_u32.into(),
+                                    ),
+                                )
+                                .await
+                        })
+                    })
+                    .await?;
+            }
+        }
+
+        for _ in 0..100 {
+            let _ = db.get_all_channels(None).await?;
+        }
 
         Ok(())
     }
