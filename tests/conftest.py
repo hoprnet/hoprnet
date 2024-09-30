@@ -361,9 +361,17 @@ def fund_nodes(test_suite_name, test_dir: Path, anvil_port):
 
 
 async def all_peers_connected(node: Node, required_peers):
-    peers = [p["peer_id"] for p in await asyncio.wait_for(node.api.peers(), timeout=60)]
-    missing_peers = [p for p in required_peers if p not in peers]
-    return len(missing_peers) == 0
+    ready = False
+
+    while not ready:
+        peers = [p["peer_id"] for p in await asyncio.wait_for(node.api.peers(), timeout=20)]
+        missing_peers = [p for p in required_peers if p not in peers]
+        ready = len(missing_peers) == 0
+
+        if not ready:
+            await asyncio.sleep(1)
+
+    return ready
 
 
 async def shared_nodes_bringup(
@@ -413,13 +421,22 @@ async def shared_nodes_bringup(
             logging.error(f"Node {node} did not return addresses")
 
     # WAIT FOR NODES TO CONNECT TO ALL PEERS
-    logging.info("Waiting for nodes to connect to all peers")
+    timeout = 60
+    logging.info(f"Waiting up to {timeout}s for nodes to connect to all peers")
+
+    tasks = []
     for node in nodes.values():
         required_peers = [n.peer_id for n in nodes.values() if n != node and n.network == node.network]
-        while not await all_peers_connected(node, required_peers):
-            logging.info(f"Node {node} does not have all peers connected yet, retrying")
-            await asyncio.sleep(1)
-        logging.debug(f"Node {node} connected to all peers")
+        tasks.append(asyncio.create_task(all_peers_connected(node, required_peers)))
+    nodes_connectivity = await asyncio.gather(*tasks)
+    for node, res in zip(nodes.values(), nodes_connectivity):
+        if res:
+            logging.debug(f"Node {node} connected to all peers")
+        else:
+            logging.error(f"Node {node} did not connect to all peers")
+
+    if not all(nodes_connectivity):
+        raise logging.critical("Not all nodes are connected to all peers, interrupting setup")
 
 
 def load_private_key(test_suite_name, pos=0):
@@ -503,7 +520,7 @@ async def swarm7(request):
         copy_identities(test_dir)
 
         # CREATE LOCAL SAFES AND MODULES FOR ALL THE IDS
-        logging.info("Create safe and modules for all the ids, store them in args files")
+        logging.info("Creating safe and modules for all the ids, store them in args files")
 
         private_key = load_private_key(test_suite_name)
 
@@ -567,8 +584,18 @@ async def swarm7(request):
 @pytest.fixture(autouse=True)
 async def teardown(swarm7: dict[str, Node]):
     yield
-    await asyncio.gather(*[node.api.reset_tickets_statistics() for node in swarm7.values()])
-    await asyncio.gather(*[node.api.messages_pop_all(0) for node in swarm7.values()])
+
+    try:
+        await asyncio.gather(*[node.api.reset_tickets_statistics() for node in swarm7.values()])
+    except Exception as e:
+        logging.error(f"Error resetting tickets statistics in teardown: {e}")
+        raise e
+
+    try:
+        await asyncio.gather(*[node.api.messages_pop_all(0) for node in swarm7.values()])
+    except Exception as e:
+        logging.error(f"Error popping all messages in teardown: {e}")
+        raise e
 
 
 def to_ws_url(host, port):
