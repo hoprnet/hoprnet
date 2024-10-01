@@ -121,7 +121,7 @@ pub struct InternalState {
         schemas(
             ApiError,
             alias::PeerIdResponse, alias::AliasPeerIdBodyRequest,
-            account::AccountAddressesResponse, account::AccountBalancesResponse, account::WithdrawBodyRequest,
+            account::AccountAddressesResponse, account::AccountBalancesResponse, account::WithdrawBodyRequest,account::WithdrawResponse,
             peers::NodePeerInfoResponse, peers::PingResponse,
             channels::ChannelsQueryRequest,channels::CloseChannelResponse, channels::OpenChannelBodyRequest, channels::OpenChannelResponse,
             channels::NodeChannel, channels::NodeChannelsResponse, channels::ChannelInfoResponse, channels::FundBodyRequest,
@@ -820,6 +820,15 @@ mod account {
         address: Address,
     }
 
+    #[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
+    #[schema(example = json!({
+            "receipt": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
+    }))]
+    #[serde(rename_all = "camelCase")]
+    pub(crate) struct WithdrawResponse {
+        receipt: String,
+    }
+
     /// Withdraw funds from this node to the ethereum wallet address.
     ///
     /// Both NATIVE or HOPR can be withdrawn using this method.
@@ -830,7 +839,7 @@ mod account {
             content = WithdrawBodyRequest,
             content_type = "application/json"),
         responses(
-            (status = 200, description = "The node's funds have been withdrawn", body = AccountBalancesResponse),
+            (status = 200, description = "The node's funds have been withdrawn", body = WithdrawResponse),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
@@ -852,7 +861,11 @@ mod account {
             )
             .await
         {
-            Ok(receipt) => Ok(Response::builder(200).body(json!({"receipt": receipt})).build()),
+            Ok(receipt) => Ok(Response::builder(200)
+                .body(json!(WithdrawResponse {
+                    receipt: receipt.to_string(),
+                }))
+                .build()),
             Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
         }
     }
