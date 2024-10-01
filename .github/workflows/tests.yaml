@@ -81,6 +81,11 @@ jobs:
           token_format: "access_token"
           credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
 
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          version: '>= 363.0.0'
+
       - name: Install Nix
         if: env.needs_nix_setup == 'true'
         uses: cachix/install-nix-action@v27
@@ -100,10 +105,7 @@ jobs:
         if: ${{ !env.ACT }}
         run: |
           mkdir -p /tmp/hopr-smoke-test/test_websocket_api/snapshot
-          nix-shell -p google-cloud-sdk --command "\
-            gcloud storage rsync \
-            gs://hoprnet-test-artifacts/websocket_api/snapshot \
-            /tmp/hopr-smoke-test/test_websocket_api/snapshot"
+          gcloud storage rsync gs://hoprnet-test-artifacts/websocket_api/snapshot /tmp/hopr-smoke-test/test_websocket_api/snapshot
         continue-on-error: true
 
       - name: Check snapshot for test_websocket_api
@@ -187,10 +189,7 @@ jobs:
         if: ${{ !env.ACT }}
         run: |
           mkdir -p /tmp/hopr-smoke-test/test_${{ matrix.suite }}/snapshot
-          nix-shell -p google-cloud-sdk --command "\
-            gcloud storage rsync \
-            gs://hoprnet-test-artifacts/${{ matrix.suite }}/snapshot \
-            /tmp/hopr-smoke-test/test_${{ matrix.suite }}/snapshot"
+          gcloud storage rsync gs://hoprnet-test-artifacts/${{ matrix.suite }}/snapshot /tmp/hopr-smoke-test/test_${{ matrix.suite }}/snapshot
         continue-on-error: true
 
       - name: Check snapshot for test_${{ matrix.suite }}
