@@ -34,9 +34,10 @@ prometheus = [
   "core-network/prometheus",
   "core-path/prometheus",
   "hopr-db-sql/prometheus",
+  "hopr-network-types/prometheus",
   "hopr-transport-p2p/prometheus",
   "hopr-transport-protocol/prometheus",
-  "hopr-network-types/prometheus",
+  "hopr-transport-session/prometheus",
 ]
 
 [dependencies]

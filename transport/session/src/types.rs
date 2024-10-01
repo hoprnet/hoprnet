@@ -7,7 +7,8 @@ use hopr_network_types::session::state::{SessionConfig, SessionSocket};
 use hopr_primitive_types::traits::BytesRepresentable;
 use libp2p_identity::PeerId;
 use std::collections::HashSet;
-use std::fmt::Formatter;
+use std::fmt::{Debug, Formatter};
+use std::hash::{Hash, Hasher};
 use std::time::Duration;
 use std::{
     fmt::Display,
@@ -21,21 +22,47 @@ use tracing::{debug, error};
 
 use crate::{errors::TransportSessionError, traits::SendMsg, Capability};
 
+#[cfg(all(feature = "prometheus", not(test)))]
+lazy_static::lazy_static! {
+    static ref METRIC_SESSION_INNER_SIZES: hopr_metrics::MultiHistogram =
+        hopr_metrics::MultiHistogram::new(
+            "hopr_session_inner_sizes",
+            "Sizes of data chunks fed from inner session to HOPR protocol",
+            vec![20.0, 40.0, 80.0, 160.0, 320.0, 640.0, 1280.0],
+            &["session_id"]
+    ).unwrap();
+}
+
+// Enough to fit Ed25519 peer IDs and 2-byte tag number
+const MAX_SESSION_ID_STR_LEN: usize = 64;
+
 /// Unique ID of a specific session.
 ///
 /// Simple wrapper around the maximum range of the port like session unique identifier.
 /// It is a simple combination of an application tag and a peer id that will in future be
 /// replaced by a more robust session id representation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SessionId {
     tag: u16,
     peer: PeerId,
+    // Since this SessionId is commonly represented as a string,
+    // we cache its string representation here.
+    // Also by using a statically allocated ArrayString, we allow the SessionId to remain Copy.
+    // This representation is possibly truncated to MAX_SESSION_ID_STR_LEN.
+    cached: arrayvec::ArrayString<MAX_SESSION_ID_STR_LEN>,
 }
 
 impl SessionId {
     pub fn new(tag: u16, peer: PeerId) -> Self {
-        Self { tag, peer }
+        let mut cached = format!("{peer}:{tag}");
+        cached.truncate(MAX_SESSION_ID_STR_LEN);
+
+        Self {
+            tag,
+            peer,
+            cached: cached.parse().expect("cannot fail due to truncation"),
+        }
     }
 
     pub fn tag(&self) -> u16 {
@@ -46,15 +73,39 @@ impl SessionId {
         &self.peer
     }
 
-    pub fn with_peer(mut self, peer: PeerId) -> Self {
-        self.peer = peer;
-        self
+    pub fn with_peer(self, peer: PeerId) -> Self {
+        Self::new(self.tag, peer)
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.cached
     }
 }
 
 impl Display for SessionId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}:{}", self.peer, self.tag)
+        write!(f, "{}", self.cached)
+    }
+}
+
+impl Debug for SessionId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.cached)
+    }
+}
+
+impl PartialEq for SessionId {
+    fn eq(&self, other: &Self) -> bool {
+        self.tag == other.tag && self.peer == other.peer
+    }
+}
+
+impl Eq for SessionId {}
+
+impl Hash for SessionId {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.tag.hash(state);
+        self.peer.hash(state);
     }
 }
 
@@ -226,7 +277,7 @@ impl futures::AsyncWrite for Session {
                 if let Some(notifier) = self.shutdown_notifier.take() {
                     if let Err(err) = notifier.unbounded_send(self.id) {
                         error!(
-                            session_id = tracing::field::debug(self.id),
+                            session_id = tracing::field::display(self.id),
                             "failed to notify session closure: {err}"
                         );
                     }
@@ -285,6 +336,9 @@ impl futures::AsyncWrite for InnerSession {
         cx: &mut std::task::Context<'_>,
         buf: &[u8],
     ) -> Poll<std::io::Result<usize>> {
+        #[cfg(all(feature = "prometheus", not(test)))]
+        METRIC_SESSION_INNER_SIZES.observe(&[self.id.as_str()], buf.len() as f64);
+
         if !self.tx_buffer.is_empty() {
             loop {
                 match self.tx_buffer.poll_next_unpin(cx) {
@@ -469,14 +523,11 @@ where
         "session egress buffer: {max_buffer}, session ingress buffer: {into_session_len}"
     );
 
-    hopr_network_types::utils::copy_duplex(
-        &mut tokio_util::compat::FuturesAsyncReadCompatExt::compat(session),
-        stream,
-        max_buffer,
-        into_session_len,
-    )
-    .await
-    .map(|(a, b)| (a as usize, b as usize))
+    let mut session = tokio_util::compat::FuturesAsyncReadCompatExt::compat(session);
+
+    hopr_network_types::utils::copy_duplex(&mut session, stream, max_buffer, into_session_len)
+        .await
+        .map(|(a, b)| (a as usize, b as usize))
 }
 
 #[cfg(test)]

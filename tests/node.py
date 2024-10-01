@@ -121,7 +121,7 @@ class Node:
         
         api_token_param = f"--api-token={self.api_token}" if self.api_token else "--disableApiAuthentication"
         custom_env = {
-            "RUST_LOG": f"{log_level},libp2p_swarm=info,libp2p_mplex=info,multistream_select=info,isahc=error" +
+            "RUST_LOG": f"{log_level},libp2p_swarm=info,libp2p_mplex=info,multistream_select=info,isahc=error," +
                         "sea_orm=warn,sqlx=warn,hyper_util=warn,libp2p_tcp=info,libp2p_dns=info,hickory_resolver=warn",
             "RUST_BACKTRACE": "full",
             "HOPRD_HEARTBEAT_INTERVAL": "2500",

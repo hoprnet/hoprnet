@@ -516,3 +516,57 @@ async def test_session_communication_over_n_hop_with_an_https_server(
             assert await src_peer.api.session_close_client(protocol='tcp', bound_ip='127.0.0.1', bound_port=src_sock_port) is True
             assert len(await src_peer.api.session_list_clients('tcp')) == 0
 
+
+@pytest.mark.skipif(
+    os.environ.get("HOPR_TEST_RUNNING_WIREGUARD_TUNNEL") is None,
+    reason="Wireguard tunnel with for hoprnet running"
+)
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "route",
+    [barebone_nodes()[:3]]
+    #[shuffled(barebone_nodes())[:3] for _ in range(PARAMETERIZED_SAMPLE_SIZE)],
+    # + [shuffled(nodes())[:5] for _ in range(PARAMETERIZED_SAMPLE_SIZE)],
+)
+async def test_session_with_wireguard_tunnel(route, swarm7: dict[str, Node]):
+    packet_count = 10_000_000
+    wireguard_tunnel = os.environ.get("HOPR_TEST_RUNNING_WIREGUARD_TUNNEL")
+
+    src_peer = swarm7[route[0]]
+    dest_peer = swarm7[route[-1]]
+    path = [swarm7[node].peer_id for node in route[1:-1]]
+
+    logging.info(f"Opening channels for route '{route}'")
+
+    async with AsyncExitStack() as channels:
+        channels_to = [
+            channels.enter_async_context(
+                create_channel(swarm7[route[i]], swarm7[route[i + 1]], funding=20 * packet_count * TICKET_PRICE_PER_HOP)
+            )
+            for i in range(len(route) - 1)
+        ]
+        channels_back = [
+            channels.enter_async_context(
+                create_channel(swarm7[route[i]], swarm7[route[i - 1]], funding=20 * packet_count * TICKET_PRICE_PER_HOP)
+            )
+            for i in reversed(range(1, len(route)))
+        ]
+
+        await asyncio.gather(*(channels_to + channels_back))
+
+        # sleep to wait for the socket to be active
+        await asyncio.sleep(1.0)
+
+        logging.info(f"Opening session for route '{route}'")
+
+        src_sock_port = await src_peer.api.session_client(dest_peer.peer_id, path={"IntermediatePath": path}, protocol='udp',
+                                                          target=wireguard_tunnel, listen_on="127.0.0.1:60006",
+                                                          capabilities=['Segmentation'])
+
+        assert src_sock_port is not None, "Failed to open session"
+        assert len(await src_peer.api.session_list_clients('udp')) == 1
+
+        logging.info("Test ready for execution")
+
+        # TODO: Placeholder for actual test
+        await asyncio.sleep(3600)
