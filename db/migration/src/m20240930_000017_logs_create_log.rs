@@ -42,6 +42,7 @@ impl MigrationTrait for Migration {
                     )
                     .col(ColumnDef::new(LogStatus::Processed).boolean().not_null().default(false))
                     .col(ColumnDef::new(LogStatus::ProcessedAt).date_time())
+                    .col(ColumnDef::new(LogStatus::Checksum).binary_len(32))
                     .to_owned(),
             )
             .await?;
@@ -59,26 +60,11 @@ impl MigrationTrait for Migration {
                             .col(LogStatus::TransactionIndex)
                             .col(LogStatus::LogIndex),
                     )
-                    .col(
-                        ColumnDef::new(Log::TransactionIndex)
-                            .not_null()
-                            .binary_len(8)
-                            .default(vec![0u8; 8]),
-                    )
-                    .col(
-                        ColumnDef::new(Log::LogIndex)
-                            .not_null()
-                            .binary_len(8)
-                            .default(vec![0u8; 8]),
-                    )
-                    .col(
-                        ColumnDef::new(Log::BlockNumber)
-                            .not_null()
-                            .binary_len(8)
-                            .default(vec![0u8; 8]),
-                    )
-                    .col(ColumnDef::new(Log::BlockHash).string_len(64).not_null())
-                    .col(ColumnDef::new(Log::TransactionHash).string_len(64).not_null())
+                    .col(ColumnDef::new(Log::TransactionIndex).not_null().binary_len(8))
+                    .col(ColumnDef::new(Log::LogIndex).not_null().binary_len(8))
+                    .col(ColumnDef::new(Log::BlockNumber).not_null().binary_len(8))
+                    .col(ColumnDef::new(Log::BlockHash).binary_len(32).not_null())
+                    .col(ColumnDef::new(Log::TransactionHash).binary_len(32).not_null())
                     .col(ColumnDef::new(Log::Address).string_len(40).not_null())
                     .col(ColumnDef::new(Log::Topics).string().not_null())
                     .col(ColumnDef::new(Log::Data).binary().not_null())
@@ -144,4 +130,6 @@ enum LogStatus {
     Processed,
     // Time when the log was processed.
     ProcessedAt,
+    // Computed checksum of this log and previous logs
+    Checksum,
 }

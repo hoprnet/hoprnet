@@ -1,5 +1,5 @@
-use async_stream::stream;
 use async_trait::async_trait;
+use futures::stream;
 use futures::stream::BoxStream;
 use futures::StreamExt;
 use futures::TryStreamExt;
@@ -7,11 +7,12 @@ use sea_orm::query::QueryTrait;
 use sea_orm::sea_query::{Expr, OnConflict, Value};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DbErr, EntityTrait, IntoActiveModel, ModelTrait, PaginatorTrait, QueryFilter,
-    QueryOrder, Related, StreamTrait,
+    QueryOrder, QuerySelect, Related, StreamTrait,
 };
 use std::str::FromStr;
 use tracing::error;
 
+use hopr_crypto_types::prelude::Hash;
 use hopr_db_api::errors::{DbError, Result};
 use hopr_db_api::logs::HoprDbLogOperations;
 use hopr_db_entity::errors::DbEntityError;
@@ -27,15 +28,20 @@ use crate::{HoprDbGeneralModelOperations, OptTx};
 #[async_trait]
 impl HoprDbLogOperations for HoprDb {
     async fn store_log<'a>(&'a self, log: SerializableLog) -> Result<()> {
-        let model = log::ActiveModel::from(log.clone());
-        let status_model = log_status::ActiveModel::from(log);
+        self.store_logs([log].to_vec())
+            .await
+            .map(|res| res.into_iter().next().unwrap().unwrap())
+    }
 
+    async fn store_logs(&self, logs: Vec<SerializableLog>) -> Result<Vec<Result<()>>> {
         self.nest_transaction_in_db(None, TargetDb::Logs)
             .await?
             .perform(|tx| {
                 Box::pin(async move {
-                    match log_status::Entity::insert(status_model)
-                        .on_conflict(
+                    let results = stream::iter(logs).then(|log| async {
+                        let model = log::ActiveModel::from(log.clone());
+                        let status_model = log_status::ActiveModel::from(log);
+                        let log_status_query = LogStatus::insert(status_model).on_conflict(
                             OnConflict::columns([
                                 log_status::Column::LogIndex,
                                 log_status::Column::TransactionIndex,
@@ -43,38 +49,34 @@ impl HoprDbLogOperations for HoprDb {
                             ])
                             .do_nothing()
                             .to_owned(),
-                        )
-                        .exec(tx.as_ref())
-                        .await
-                    {
-                        Ok(_) => {
-                            match log::Entity::insert(model)
-                                .on_conflict(
-                                    OnConflict::columns([
-                                        log::Column::LogIndex,
-                                        log::Column::TransactionIndex,
-                                        log::Column::BlockNumber,
-                                    ])
-                                    .do_nothing()
-                                    .to_owned(),
-                                )
-                                .exec(tx.as_ref())
-                                .await
-                            {
+                        );
+                        let log_query = Log::insert(model).on_conflict(
+                            OnConflict::columns([
+                                log::Column::LogIndex,
+                                log::Column::TransactionIndex,
+                                log::Column::BlockNumber,
+                            ])
+                            .do_nothing()
+                            .to_owned(),
+                        );
+
+                        match log_status_query.exec(tx.as_ref()).await {
+                            Ok(_) => match log_query.exec(tx.as_ref()).await {
                                 Ok(_) => Ok(()),
                                 Err(DbErr::RecordNotInserted) => {
                                     error!("Failed to insert log status into db");
                                     Err(DbError::from(DbSqlError::from(DbErr::RecordNotInserted)))
                                 }
                                 Err(e) => Err(DbError::General(e.to_string())),
+                            },
+                            Err(DbErr::RecordNotInserted) => {
+                                error!("Failed to insert log into db");
+                                Err(DbError::from(DbSqlError::from(DbErr::RecordNotInserted)))
                             }
+                            Err(e) => Err(DbError::General(e.to_string())),
                         }
-                        Err(DbErr::RecordNotInserted) => {
-                            error!("Failed to insert log into db");
-                            Err(DbError::from(DbSqlError::from(DbErr::RecordNotInserted)))
-                        }
-                        Err(e) => Err(DbError::General(e.to_string())),
-                    }
+                    });
+                    Ok(results.collect::<Vec<_>>().await)
                 })
             })
             .await
@@ -124,7 +126,7 @@ impl HoprDbLogOperations for HoprDb {
             .order_by_asc(log::Column::TransactionIndex)
             .order_by_asc(log::Column::LogIndex);
 
-        Ok(Box::pin(stream! {
+        Ok(Box::pin(async_stream::stream! {
             match query.stream(self.conn(TargetDb::Logs)).await {
                 Ok(mut stream) => {
                     while let Ok(Some(object)) = stream.try_next().await {
@@ -140,6 +142,55 @@ impl HoprDbLogOperations for HoprDb {
                 Err(e) => error!("Failed to get logs from db: {:?}", e),
             }
         }))
+    }
+
+    async fn get_logs_block_numbers<'a>(
+        &'a self,
+        block_number: Option<u64>,
+        block_offset: Option<u64>,
+    ) -> Result<BoxStream<'a, u64>> {
+        let min_block_number = block_number.unwrap_or(0);
+
+        let query = Log::find()
+            .select_only()
+            .column(log::Column::BlockNumber)
+            .distinct()
+            .filter(log::Column::BlockNumber.gte(min_block_number.to_be_bytes().to_vec()))
+            .apply_if(block_offset, |q, v| {
+                q.filter(log::Column::BlockNumber.lt((min_block_number + v).to_be_bytes().to_vec()))
+            })
+            .order_by_asc(log::Column::BlockNumber);
+
+        Ok(Box::pin(async_stream::stream! {
+            match query.stream(self.conn(TargetDb::Logs)).await {
+                Ok(mut stream) => {
+                    while let Ok(Some(object)) = stream.try_next().await {
+                        yield  U256::from_be_bytes(object.block_number).as_u64()
+                }},
+                Err(e) => error!("Failed to get logs block numbers from db: {:?}", e),
+            }
+        }))
+    }
+
+    async fn set_logs_processed(&self, block_number: Option<u64>, block_offset: Option<u64>) -> Result<()> {
+        let min_block_number = block_number.unwrap_or(0);
+        let now = Utc::now();
+
+        let query = LogStatus::update_many()
+            .col_expr(log_status::Column::Processed, Expr::value(Value::Bool(Some(true))))
+            .col_expr(
+                log_status::Column::ProcessedAt,
+                Expr::value(Value::ChronoDateTimeUtc(Some(now.into()))),
+            )
+            .filter(log::Column::BlockNumber.gte(min_block_number.to_be_bytes().to_vec()))
+            .apply_if(block_offset, |q, v| {
+                q.filter(log::Column::BlockNumber.lt((min_block_number + v).to_be_bytes().to_vec()))
+            });
+
+        match query.exec(self.conn(TargetDb::Logs)).await {
+            Ok(_) => Ok(()),
+            Err(e) => Err(DbError::from(DbSqlError::from(e))),
+        }
     }
 
     async fn set_log_processed<'a>(&'a self, mut log: SerializableLog) -> Result<()> {
@@ -181,26 +232,83 @@ impl HoprDbLogOperations for HoprDb {
             Err(e) => Err(DbError::from(DbSqlError::from(e))),
         }
     }
+
+    async fn get_last_checksummed_log(&self) -> Result<Option<SerializableLog>> {
+        let query = LogStatus::find()
+            .filter(log_status::Column::Checksum.is_not_null())
+            .order_by_desc(log::Column::BlockNumber)
+            .order_by_desc(log::Column::TransactionIndex)
+            .order_by_desc(log::Column::LogIndex)
+            .find_also_related(Log)
+            .limit(1);
+
+        match query.clone().one(self.conn(TargetDb::Logs)).await {
+            Ok(Some((status, Some(log)))) => Ok(Some(create_log(log, status))),
+            Ok(_) => Ok(None),
+            Err(e) => Err(DbError::from(DbSqlError::from(e))),
+        }
+    }
+
+    async fn update_logs_checksums(&self) -> Result<()> {
+        let last_log = self.get_last_checksummed_log().await?;
+        let mut last_checksum = last_log.map_or(Hash::default(), |log| {
+            Hash::from_hex(log.checksum.unwrap().as_str()).unwrap()
+        });
+        let db_tx = self.nest_transaction_in_db(None, TargetDb::Logs).await?;
+
+        db_tx
+            .perform(|tx| {
+                Box::pin(async move {
+                    let query = LogStatus::find()
+                        .filter(log_status::Column::Checksum.is_null())
+                        .order_by_asc(log::Column::BlockNumber)
+                        .order_by_asc(log::Column::TransactionIndex)
+                        .order_by_asc(log::Column::LogIndex)
+                        .find_also_related(Log);
+
+                    match query.stream(tx.as_ref()).await {
+                        Ok(mut stream) => {
+                            while let Ok(Some((status, Some(log_entry)))) = stream.try_next().await {
+                                // we compute the has of a single log as a combination of the block
+                                // hash, tx hash and log index
+                                let log_hash = Hash::create(&[
+                                    log_entry.block_hash,
+                                    Hash::from_hex(log_entry.transaction_hash).unwrap().as_ref(),
+                                    log_entry.log_index,
+                                ]);
+                                let next_checksum = Hash::create(&[last_checksum.as_ref(), log_hash.as_ref()]);
+                                let updated_status = log_status::ActiveModel::from(log_status::Model {
+                                    checksum: Some(next_checksum.as_ref().to_vec()),
+                                });
+                                LogStatus::update(updated_status).exec(tx.as_ref()).await?;
+                                last_checksum = next_checksum;
+                            }
+                            Ok(())
+                        }
+                        Err(e) => Err(DbError::from(DbSqlError::from(e))),
+                    }
+                })
+            })
+            .await
+    }
 }
 
 fn create_log(raw_log: log::Model, status: log_status::Model) -> SerializableLog {
     let log = SerializableLog::from(raw_log);
+
     if let Some(raw_ts) = status.processed_at {
-        let ts = DateTime::<Utc>::from_str(raw_ts.as_str())
-            .map_err(|e| {
-                error!("Failed to decode processed_at {} of log status {}", raw_ts, log);
-                e
-            })
-            .ok();
+        let ts = DateTime::<Utc>::from_naive_utc_and_offset(raw_ts, Utc);
         SerializableLog {
             processed: Some(status.processed),
-            processed_at: ts,
+            processed_at: Some(ts),
+            checksum: status.checksum,
             ..log
         }
     } else {
         SerializableLog {
             processed: Some(status.processed),
             processed_at: None,
+            checksum: status.checksum,
             ..log
         }
     }

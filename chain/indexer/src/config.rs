@@ -11,4 +11,6 @@ pub struct IndexerConfig {
     ///
     /// Default is `0`.
     pub start_block_number: u64,
+
+    pub fast_sync: bool,
 }

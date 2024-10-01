@@ -97,7 +97,7 @@ impl HoprDb {
 
         let logs = PoolOptions::new()
             .min_connections(0)
-            .connect_with(cfg_template.clone().filename(dir.join(SQL_DB_LOGS_FILE_NAME)))
+            .connect_with(cfg_template.clone().filename(directory.join(SQL_DB_LOGS_FILE_NAME)))
             .await
             .unwrap_or_else(|e| panic!("failed to create logs database: {e}"));
 

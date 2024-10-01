@@ -24,6 +24,7 @@ pub struct DescribedBlock {
     pub latest_block_number: u32,
     pub checksum: Hash,
     pub block_prior_to_checksum_update: u32,
+    pub log_count: u32,
 }
 
 /// Defines DB access API for various node information.
@@ -145,20 +146,17 @@ impl HoprDbInfoOperations for HoprDb {
     }
 
     async fn clear_index_db<'a>(&'a self) -> Result<()> {
-        [
-            Account,
-            Announcement,
-            Channel,
-            NetworkEligibility,
-            NetworkRegistry,
-            ChainInfo,
-            NodeInfo,
-        ]
-        .iter()
-        .try_for_each(|table| async {
-            table.delete_many().exec(self.conn(TargetDb::Index)).await?;
-            Ok(())
-        })?
+        Account::delete_many().exec(self.conn(TargetDb::Index)).await?;
+        Announcement::delete_many().exec(self.conn(TargetDb::Index)).await?;
+        Channel::delete_many().exec(self.conn(TargetDb::Index)).await?;
+        NetworkEligibility::delete_many()
+            .exec(self.conn(TargetDb::Index))
+            .await?;
+        NetworkRegistry::delete_many().exec(self.conn(TargetDb::Index)).await?;
+        ChainInfo::delete_many().exec(self.conn(TargetDb::Index)).await?;
+        NodeInfo::delete_many().exec(self.conn(TargetDb::Index)).await?;
+
+        Ok(())
     }
 
     async fn get_safe_hopr_balance<'a>(&'a self, tx: OptTx<'a>) -> Result<Balance> {
@@ -455,6 +453,7 @@ impl HoprDbInfoOperations for HoprDb {
                             };
                             Ok(DescribedBlock {
                                 latest_block_number: m.last_indexed_block as u32,
+                                log_count: m.log_count as u32,
                                 checksum: chain_checksum,
                                 block_prior_to_checksum_update: m.previous_indexed_block_prio_to_checksum_update as u32,
                             })

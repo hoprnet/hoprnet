@@ -1,5 +1,6 @@
 use sea_orm::Set;
 
+use hopr_crypto_types::types::Hash;
 use hopr_primitive_types::prelude::*;
 
 use crate::{log, log_status};
@@ -41,7 +42,11 @@ impl From<log::Model> for SerializableLog {
 impl From<SerializableLog> for log_status::ActiveModel {
     fn from(value: SerializableLog) -> Self {
         let processed = value.processed.map_or(false, |p| p);
-        let processed_at = value.processed_at.map_or(None, |p| Some(p.to_string()));
+        let processed_at = value.processed_at.map_or(None, |p| Some(p.naive_utc()));
+        let checksum = value
+            .checksum
+            .map(|c| Hash::from_hex(c.as_str()).expect("Invalid checksum"))
+            .map(|c| c.as_ref().to_vec());
 
         log_status::ActiveModel {
             block_number: Set(value.block_number.to_be_bytes().to_vec()),
@@ -49,6 +54,7 @@ impl From<SerializableLog> for log_status::ActiveModel {
             log_index: Set(value.log_index.to_be_bytes().to_vec()),
             processed: Set(processed),
             processed_at: Set(processed_at),
+            checksum: Set(checksum),
         }
     }
 }

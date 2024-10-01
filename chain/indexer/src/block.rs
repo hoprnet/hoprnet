@@ -156,30 +156,13 @@ where
             info!("Fast sync is enabled, starting the fast sync process...");
             // To ensure a proper state, we reset any auxiliary data in the database
             self.db.clear_index_db().await?;
-            self.db.set_logs_unprocessed().await?;
-            self.db.set_last_indexed_block(None, 0, None).await?;
+            self.db.set_logs_unprocessed(None, None).await?;
 
             // Now fast-sync can start
-            self.fast_sync(
-                rpc,
-                db_processor,
-                db,
-                log_filter,
-                next_block_to_process,
-                tx_significant_events,
-            )
-            .await
+            while let Some(block_number) = self.db.get_logs_block_numbers(None, None).await?.next().await {
+                self.process_block_by_id(&db_processor, block_number).await?;
+            }
         }
-
-        self.rpc_indexer(
-            rpc,
-            db_processor,
-            db,
-            log_filter,
-            next_block_to_process,
-            tx_significant_events,
-        )
-        .await;
 
         info!("Building rpc indexer background process");
         let (tx, mut rx) = futures::channel::mpsc::channel::<()>(1);
@@ -203,45 +186,7 @@ where
                     )
                 })
                 .filter_map(|block_with_logs| async {
-                    debug!("processing events in {block_with_logs} ...");
-                    let block_description = block_with_logs.to_string();
-                    let log_count = block_with_logs.logs.len();
-                    let outgoing_events = match db_processor.collect_block_events(block_with_logs).await {
-                        Ok(events) => {
-                            trace!(
-                                "retrieved {} significant chain events from {block_description}",
-                                events.len()
-                            );
-                            Some(events)
-                        }
-                        Err(e) => {
-                            error!("failed to process logs in {block_description} into events: {e}");
-                            None
-                        }
-                    };
-
-                    // Printout indexer state, we can do this on every processed block because not
-                    // every block will have events
-                    match db.get_last_indexed_block(None).await {
-                        Ok(current_described_block) => {
-                            info!(
-                                block_id,
-                                log_count,
-                                checksum = %current_described_block.checksum,
-                                "Indexer state update",
-                            );
-
-                            #[cfg(all(feature = "prometheus", not(test)))]
-                            {
-                                let low_4_bytes = hopr_primitive_types::prelude::U256::from_big_endian(
-                                    current_described_block.checksum.as_ref(),
-                                )
-                                .low_u32();
-                                METRIC_INDEXER_CHECKSUM.set(low_4_bytes.into());
-                            }
-                        }
-                        Err(e) => error!("Cannot retrieve indexer state: {e}"),
-                    }
+                    let outgoing_events = self.process_block(&db_processor, block_with_logs).await;
 
                     outgoing_events
                 })
@@ -277,12 +222,11 @@ where
         }
     }
 
-    async fn process_block(&self, block_id: u64) -> crate::errors::Result<()>
+    async fn process_block_by_id(&self, db_processor: &U, block_id: u64) -> crate::errors::Result<()>
     where
         U: ChainLogHandler + 'static,
         Db: HoprDbLogOperations + 'static,
     {
-        debug!("Processing events from block {block_id}");
         let mut log_stream = self.db.get_logs(Some(block_id), Some(0)).await?;
         let mut block_with_logs = BlockWithLogs {
             block_id,
@@ -300,32 +244,80 @@ where
             }
         }
 
-        let events = match self.db_processor.take().collect_block_events(block_with_logs).await {
+        self.process_block(db_processor, block_with_logs).await
+    }
+
+    async fn process_block(
+        &self,
+        db_processor: &U,
+        block_with_logs: BlockWithLogs,
+    ) -> Option<Vec<SignificantChainEvent>>
+    where
+        U: ChainLogHandler + 'static,
+        Db: HoprDbLogOperations + 'static,
+    {
+        let block_id = block_with_logs.block_id;
+        debug!("Processing events from block {block_id}");
+
+        match db_processor.collect_block_events(block_with_logs).await {
             Ok(events) => {
+                match self.db.set_logs_processed(Some(block_id), Some(0)).await {
+                    Ok(_) => match self.db.update_logs_checksums().await {
+                        Ok(_) => self.print_indexer_state(block_with_logs).await,
+                        Err(e) => error!("Failed to update checksums for logs from block #{block_id}: {e}"),
+                    },
+                    Err(e) => error!("Failed to mark logs from block #{block_id} as processed: {e}"),
+                }
                 info!(
                     "Processed {} significant chain events from block #{}",
                     events.len(),
-                    block_with_logs.block_id
+                    block_id
                 );
+                Some(events)
             }
             Err(e) => {
-                error!(
-                    "Failed to process logs from block #{} into events: {e}",
-                    block_with_logs.block_id
-                );
+                error!("Failed to process logs from block #{block_id} into events: {e}");
+                None
             }
-        };
-
-        Ok(events)
+        }
     }
 
-    async fn store_block_logs(&self, block_with_logs: BlockWithLogs) -> crate::errors::Result<u64> {
+    async fn store_block_logs(&self, block_with_logs: BlockWithLogs) -> crate::errors::Result<u64>
+    where
+        Db: HoprDbLogOperations + 'static,
+    {
         debug!("Storing logs from {block_with_logs}");
-        for log in block_with_logs.logs.into_iter().map(SerializableLog::from) {
-            self.db.store_log(log).await?;
-        }
+        self.db
+            .store_logs(block_with_logs.logs.into_iter().map(SerializableLog::from).collect())
+            .await?;
 
         Ok(block_with_logs.block_id)
+    }
+
+    // Printout indexer state, we can do this on every processed block because not
+    // every block will have events
+    async fn print_indexer_state(&self, block_with_logs: BlockWithLogs) -> ()
+    where
+        Db: HoprDbInfoOperations + 'static,
+    {
+        match self.db.get_last_indexed_block(None).await {
+            Ok(block) => {
+                info!(
+                    block_number = block.latest_block_number,
+                    log_count = block.log_count,
+                    checksum = %block.checksum,
+                    "Indexer state update",
+                );
+
+                #[cfg(all(feature = "prometheus", not(test)))]
+                {
+                    let low_4_bytes =
+                        hopr_primitive_types::prelude::U256::from_big_endian(block.checksum.as_ref()).low_u32();
+                    METRIC_INDEXER_CHECKSUM.set(low_4_bytes.into());
+                }
+            }
+            Err(e) => error!("Cannot retrieve indexer state: {e}"),
+        }
     }
 
     async fn calculate_sync_process(

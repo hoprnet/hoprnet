@@ -434,6 +434,8 @@ pub struct SerializableLog {
     pub processed: Option<bool>,
     /// Processed time
     pub processed_at: Option<DateTime<Utc>>,
+    /// Log hashes checksum
+    pub checksum: Option<String>,
 }
 
 impl Display for SerializableLog {
