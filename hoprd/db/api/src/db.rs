@@ -1,4 +1,3 @@
-
 use hoprd_migration::{MigratorMetadata, MigratorTrait};
 use sea_orm::SqlxSqliteConnector;
 use sqlx::pool::PoolOptions;
