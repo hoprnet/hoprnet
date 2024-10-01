@@ -124,7 +124,13 @@ if [ -n "${dump_state_file}" ]; then
   flags="${flags} --dump-state ${dump_state_file}"
 fi
 if [ -n "${load_state_file}" ]; then
-  flags="${flags} --load-state ${load_state_file}"
+  if [ -f "${load_state_file}" ]; then
+    flags="${flags} --load-state ${load_state_file}"
+    cp "${load_state_file}" "${tmp}/anvil_state_dump.log"
+  else
+    log "State file {load_state_file} does not exist!"
+    exit 101
+  fi
 fi
 
 # prepare PATH if anvil is not present yet
