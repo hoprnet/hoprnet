@@ -108,7 +108,7 @@ jobs:
           gcloud storage rsync gs://hoprnet-test-artifacts/smoke_test_snapshot/snapshot /tmp/hopr-smoke-test/test_websocket_api/snapshot --recursive
         continue-on-error: true
 
-      - name: Check snapshot for test_websocket_api
+      - name: Check snapshot
         run: ls -lR /tmp/hopr-smoke-test/test_websocket_api/snapshot || echo "no snapshot found"
 
       - name: Run smoke tests websocket
@@ -200,7 +200,7 @@ jobs:
           gcloud storage rsync gs://hoprnet-test-artifacts/smoke_test_snapshot/snapshot /tmp/hopr-smoke-test/test_${{ matrix.suite }}/snapshot --recursive
         continue-on-error: true
 
-      - name: Check snapshot for test_${{ matrix.suite }}
+      - name: Check snapshot
         run: ls -lR /tmp/hopr-smoke-test/test_${{ matrix.suite }}/snapshot || echo "no snapshot found"
 
       - name: Run smoke tests ${{ matrix.suite }}

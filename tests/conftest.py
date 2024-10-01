@@ -215,6 +215,9 @@ def snapshot_reuse(parent_dir: Path, nodes):
     parent_dir.joinpath("anvil.state.json").unlink(missing_ok=True)
     shutil.copy(sdir.joinpath("anvil.state.json"), parent_dir)
 
+    sfile = sdir.joinpath("anvil.state.json")
+    logging.info(f"Copied {sfile} to {parent_dir}")
+
     # copy configuration files
     for f in sdir.glob("*.cfg.yaml"):
         parent_dir.joinpath(f.name).unlink(missing_ok=True)
@@ -479,6 +482,9 @@ async def swarm7(request):
     snapshot_reuse(test_dir, nodes)
 
     logging.info("Starting and waiting for local anvil server to be up (load state enabled)")
+    with open(anvil_state_file(test_dir), 'r') as sf:
+        logging.info(f"state file: {sf.read()}")
+
     run(
         f"./run-local-anvil.sh -s -l {anvil_log_file(test_suite_name)} -c {anvil_cfg_file(test_suite_name)} -p {anvil_port} -ls {anvil_state_file(test_dir)}".split(),
         check=True,
