@@ -220,6 +220,9 @@ def snapshot_reuse(parent_dir: Path, nodes):
         parent_dir.joinpath(f.name).unlink(missing_ok=True)
         shutil.copy(f, parent_dir)
 
+    # copy protocol-config.json
+    shutil.copy(sdir.joinpath("protocol-config.json"), parent_dir)
+
     # copy node data
     for i in range(len(nodes)):
         node_target_dir = parent_dir.joinpath(f"{NODE_NAME_PREFIX}_{i+1}/db/")
@@ -255,6 +258,9 @@ def snapshot_create(anvil_port, parent_dir: Path, nodes):
     for f in parent_dir.glob("*.cfg.yaml"):
         shutil.copy(f, sdir)
 
+    # copy protocol config file
+    shutil.copy(parent_dir.joinpath("protocol-config.json"), sdir)
+
     # copy node data and env files
     for i in range(len(nodes)):
         node_dir = parent_dir.joinpath(f"{NODE_NAME_PREFIX}_{i+1}")
@@ -274,6 +280,7 @@ def snapshot_usable(parent_dir: Path, nodes):
         "anvil.state.json",
         "barebone.cfg.yaml",
         "default.cfg.yaml",
+        "protocol-config.json",
     ]
     for i in range(len(nodes)):
         node_dir = f"{NODE_NAME_PREFIX}_{i+1}"
@@ -443,7 +450,6 @@ async def swarm7(request):
         )
 
         logging.info("Mirror contract data because of anvil-deploy node only writing to localhost")
-
         shutil.copy(INPUT_PROTOCOL_CONFIG_FILE, protocol_config_file(test_suite_name))
         mirror_contract_data(protocol_config_file(test_suite_name), INPUT_DEPLOYMENTS_SUMMARY_FILE, NETWORK1, NETWORK1)
 
