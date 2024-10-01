@@ -120,6 +120,7 @@ jobs:
         with:
           path: /tmp/hopr-smoke-test/test_websocket_api/snapshot
           destination: hoprnet-test-artifacts/smoke_test_snapshot
+          gzip: false
 
       - name: Compress test logs
         if: ${{ !env.ACT && always() }}
@@ -212,6 +213,7 @@ jobs:
         with:
           path: /tmp/hopr-smoke-test/test_${{ matrix.suite }}/snapshot
           destination: hoprnet-test-artifacts/smoke_test_snapshot
+          gzip: false
 
       - name: Compress test logs
         if: ${{ !env.ACT && always() }}
