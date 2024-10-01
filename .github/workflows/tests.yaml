@@ -155,7 +155,10 @@ jobs:
       matrix:
         suite:
           - integration
+          - redeeming
+          - rest_api
           - session
+          - win_prob
           - hopli
     if: github.event.pull_request.draft == false
     steps:
@@ -169,6 +172,11 @@ jobs:
         with:
           token_format: "access_token"
           credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          version: '>= 363.0.0'
 
       - name: Install Nix
         if: env.needs_nix_setup == 'true'
