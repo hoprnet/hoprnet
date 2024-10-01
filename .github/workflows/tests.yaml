@@ -100,12 +100,12 @@ jobs:
         env:
           USER: runner
 
-      - name: Download snapshot for test_websocket_api
+      - name: Download snapshot
         id: download-snapshot
         if: ${{ !env.ACT }}
         run: |
           mkdir -p /tmp/hopr-smoke-test/test_websocket_api/snapshot
-          gcloud storage rsync gs://hoprnet-test-artifacts/websocket_api/snapshot /tmp/hopr-smoke-test/test_websocket_api/snapshot --recursive
+          gcloud storage rsync gs://hoprnet-test-artifacts/smoke_test_snapshot/snapshot /tmp/hopr-smoke-test/test_websocket_api/snapshot --recursive
         continue-on-error: true
 
       - name: Check snapshot for test_websocket_api
@@ -114,12 +114,12 @@ jobs:
       - name: Run smoke tests websocket
         run: nix develop .#smoke-tests -c python3 -m pytest tests/test_websocket_api.py
 
-      - name: Upload snapshot for test_websocket_api
+      - name: Upload snapshot
         uses: "google-github-actions/upload-cloud-storage@v2"
         if: ${{ !env.ACT && always() && steps.download-snapshot.outcome != 'success' }}
         with:
           path: /tmp/hopr-smoke-test/test_websocket_api/snapshot
-          destination: hoprnet-test-artifacts/websocket_api
+          destination: hoprnet-test-artifacts/smoke_test_snapshot
 
       - name: Compress test logs
         if: ${{ !env.ACT && always() }}
@@ -192,12 +192,12 @@ jobs:
         env:
           USER: runner
 
-      - name: Download snapshot for test_${{ matrix.suite }}
+      - name: Download snapshot
         id: download-snapshot
         if: ${{ !env.ACT }}
         run: |
           mkdir -p /tmp/hopr-smoke-test/test_${{ matrix.suite }}/snapshot
-          gcloud storage rsync gs://hoprnet-test-artifacts/${{ matrix.suite }}/snapshot /tmp/hopr-smoke-test/test_${{ matrix.suite }}/snapshot --recursive
+          gcloud storage rsync gs://hoprnet-test-artifacts/smoke_test_snapshot/snapshot /tmp/hopr-smoke-test/test_${{ matrix.suite }}/snapshot --recursive
         continue-on-error: true
 
       - name: Check snapshot for test_${{ matrix.suite }}
@@ -206,12 +206,12 @@ jobs:
       - name: Run smoke tests ${{ matrix.suite }}
         run: nix develop .#smoke-tests -c python3 -m pytest tests/test_${{ matrix.suite }}.py
 
-      - name: Upload snapshot for test_${{ matrix.suite }}
+      - name: Upload snapshot
         uses: "google-github-actions/upload-cloud-storage@v2"
         if: ${{ !env.ACT && always() && steps.download-snapshot.outcome != 'success' }}
         with:
           path: /tmp/hopr-smoke-test/test_${{ matrix.suite }}/snapshot
-          destination: hoprnet-test-artifacts/${{ matrix.suite }}
+          destination: hoprnet-test-artifacts/smoke_test_snapshot
 
       - name: Compress test logs
         if: ${{ !env.ACT && always() }}
