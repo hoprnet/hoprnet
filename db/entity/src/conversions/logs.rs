@@ -12,9 +12,15 @@ impl From<SerializableLog> for log::ActiveModel {
             topics: Set(value.topics.join(",")),
             data: Set(value.data),
             block_number: Set(value.block_number.to_be_bytes().to_vec()),
-            transaction_hash: Set(value.tx_hash),
+            transaction_hash: Set(Hash::from_hex(value.tx_hash.as_str())
+                .expect("invalid tx_hash")
+                .as_ref()
+                .to_vec()),
             transaction_index: Set(value.tx_index.to_be_bytes().to_vec()),
-            block_hash: Set(value.block_hash),
+            block_hash: Set(Hash::from_hex(value.block_hash.as_str())
+                .expect("invalid block_hash")
+                .as_ref()
+                .to_vec()),
             log_index: Set(value.log_index.to_be_bytes().to_vec()),
             removed: Set(value.removed),
             ..Default::default()
@@ -24,14 +30,17 @@ impl From<SerializableLog> for log::ActiveModel {
 
 impl From<log::Model> for SerializableLog {
     fn from(value: log::Model) -> Self {
+        let tx_hash: [u8; 32] = value.transaction_hash.try_into().expect("Invalid tx_hash");
+        let block_hash: [u8; 32] = value.block_hash.try_into().expect("Invalid block_hash");
+
         SerializableLog {
             address: value.address,
             topics: value.topics.split(",").map(|s| s.to_string()).collect(),
             data: value.data,
             block_number: U256::from_be_bytes(value.block_number).as_u64(),
-            tx_hash: value.transaction_hash,
+            tx_hash: Hash::from(tx_hash).to_hex(),
             tx_index: U256::from_be_bytes(value.transaction_index).as_u64(),
-            block_hash: value.block_hash,
+            block_hash: Hash::from(block_hash).to_hex(),
             log_index: U256::from_be_bytes(value.log_index).as_u64(),
             removed: value.removed,
             ..Default::default()

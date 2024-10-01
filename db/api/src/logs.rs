@@ -22,6 +22,8 @@ pub trait HoprDbLogOperations {
         block_offset: Option<u64>,
     ) -> Result<BoxStream<'a, SerializableLog>>;
 
+    async fn get_logs_count(&self, block_number: Option<u64>, block_offset: Option<u64>) -> Result<u64>;
+
     async fn get_logs_block_numbers<'a>(
         &'a self,
         block_number: Option<u64>,

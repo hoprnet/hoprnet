@@ -10,7 +10,7 @@ use sea_orm::{
     QueryOrder, QuerySelect, Related, StreamTrait,
 };
 use std::str::FromStr;
-use tracing::error;
+use tracing::{error, trace};
 
 use hopr_crypto_types::prelude::Hash;
 use hopr_db_api::errors::{DbError, Result};
@@ -144,6 +144,24 @@ impl HoprDbLogOperations for HoprDb {
         }))
     }
 
+    async fn get_logs_count(&self, block_number: Option<u64>, block_offset: Option<u64>) -> Result<u64> {
+        let min_block_number = block_number.unwrap_or(0);
+
+        let query = Log::find()
+            .filter(log::Column::BlockNumber.gte(min_block_number.to_be_bytes().to_vec()))
+            .apply_if(block_offset, |q, v| {
+                q.filter(log::Column::BlockNumber.lt((min_block_number + v).to_be_bytes().to_vec()))
+            })
+            .order_by_asc(log::Column::BlockNumber)
+            .order_by_asc(log::Column::TransactionIndex)
+            .order_by_asc(log::Column::LogIndex);
+
+        match query.count(self.conn(TargetDb::Logs)).await {
+            Ok(count) => Ok(count as u64),
+            Err(e) => Err(DbError::from(DbSqlError::from(e))),
+        }
+    }
+
     async fn get_logs_block_numbers<'a>(
         &'a self,
         block_number: Option<u64>,
@@ -269,18 +287,28 @@ impl HoprDbLogOperations for HoprDb {
                     match query.stream(tx.as_ref()).await {
                         Ok(mut stream) => {
                             while let Ok(Some((status, Some(log_entry)))) = stream.try_next().await {
+                                let slog = create_log(log_entry.clone(), status.clone());
                                 // we compute the has of a single log as a combination of the block
                                 // hash, tx hash and log index
                                 let log_hash = Hash::create(&[
-                                    log_entry.block_hash,
-                                    Hash::from_hex(log_entry.transaction_hash).unwrap().as_ref(),
-                                    log_entry.log_index,
+                                    log_entry.block_hash.as_slice(),
+                                    log_entry.transaction_hash.as_slice(),
+                                    log_entry.log_index.as_slice(),
                                 ]);
                                 let next_checksum = Hash::create(&[last_checksum.as_ref(), log_hash.as_ref()]);
                                 let updated_status = log_status::ActiveModel::from(log_status::Model {
                                     checksum: Some(next_checksum.as_ref().to_vec()),
+                                    ..status
                                 });
-                                LogStatus::update(updated_status).exec(tx.as_ref()).await?;
+                                match LogStatus::update(updated_status).exec(tx.as_ref()).await {
+                                    Ok(_) => {
+                                        trace!("Generated log checksum {next_checksum} @ {slog}");
+                                    }
+                                    Err(e) => {
+                                        error!("Failed to update log status checksum in db: {:?}", e);
+                                        break;
+                                    }
+                                }
                                 last_checksum = next_checksum;
                             }
                             Ok(())
@@ -295,20 +323,24 @@ impl HoprDbLogOperations for HoprDb {
 
 fn create_log(raw_log: log::Model, status: log_status::Model) -> SerializableLog {
     let log = SerializableLog::from(raw_log);
+    let checksum = status.checksum.map(|c| {
+        let h: [u8; 32] = c.try_into().expect("Invalid checksum");
+        Hash::from(h).to_hex()
+    });
 
     if let Some(raw_ts) = status.processed_at {
         let ts = DateTime::<Utc>::from_naive_utc_and_offset(raw_ts, Utc);
         SerializableLog {
             processed: Some(status.processed),
             processed_at: Some(ts),
-            checksum: status.checksum,
+            checksum,
             ..log
         }
     } else {
         SerializableLog {
             processed: Some(status.processed),
             processed_at: None,
-            checksum: status.checksum,
+            checksum,
             ..log
         }
     }

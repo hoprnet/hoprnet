@@ -90,18 +90,6 @@ pub trait HoprDbInfoOperations {
     /// note that this setter should invalidate the cache.
     async fn update_ticket_price<'a>(&'a self, tx: OptTx<'a>, price: Balance) -> Result<()>;
 
-    /// Retrieves the last indexed block number.
-    async fn get_last_indexed_block<'a>(&'a self, tx: OptTx<'a>) -> Result<DescribedBlock>;
-
-    /// Updates the last indexed block number together with the checksum of log TXs processed
-    /// in that block (if there were any logs in this block).
-    async fn set_last_indexed_block<'a>(
-        &'a self,
-        tx: OptTx<'a>,
-        block_num: u32,
-        block_log_tx_hash: Option<Hash>,
-    ) -> Result<()>;
-
     /// Updates the network registry state.
     /// To retrieve the stored network registry state, use [`HoprDbInfoOperations::get_indexer_data`],
     /// note that this setter should invalidate the cache.
@@ -436,74 +424,6 @@ impl HoprDbInfoOperations for HoprDb {
         Ok(())
     }
 
-    async fn get_last_indexed_block<'a>(&'a self, tx: OptTx<'a>) -> Result<DescribedBlock> {
-        self.nest_transaction(tx)
-            .await?
-            .perform(|tx| {
-                Box::pin(async move {
-                    chain_info::Entity::find_by_id(SINGULAR_TABLE_FIXED_ID)
-                        .one(tx.as_ref())
-                        .await?
-                        .ok_or(DbSqlError::MissingFixedTableEntry("chain_info".into()))
-                        .and_then(|m| {
-                            let chain_checksum = if let Some(b) = m.chain_checksum {
-                                Hash::try_from(b.as_slice()).map_err(|_| DbSqlError::DecodingError)?
-                            } else {
-                                Hash::default()
-                            };
-                            Ok(DescribedBlock {
-                                latest_block_number: m.last_indexed_block as u32,
-                                log_count: m.log_count as u32,
-                                checksum: chain_checksum,
-                                block_prior_to_checksum_update: m.previous_indexed_block_prio_to_checksum_update as u32,
-                            })
-                        })
-                })
-            })
-            .await
-    }
-
-    async fn set_last_indexed_block<'a>(
-        &'a self,
-        tx: OptTx<'a>,
-        block_num: u32,
-        block_log_tx_hash: Option<Hash>,
-    ) -> Result<()> {
-        self.nest_transaction(tx)
-            .await?
-            .perform(|tx| {
-                Box::pin(async move {
-                    let model = chain_info::Entity::find_by_id(SINGULAR_TABLE_FIXED_ID)
-                        .one(tx.as_ref())
-                        .await?
-                        .ok_or(MissingFixedTableEntry("chain_info".into()))?;
-
-                    let current_last_indexed_block = model.last_indexed_block;
-                    let current_checksum = model
-                        .chain_checksum
-                        .clone()
-                        .map(|v| Hash::try_from(v.as_ref()))
-                        .unwrap_or(Ok(Hash::default()))?;
-
-                    let mut active_model = model.into_active_model();
-
-                    if let Some(block_log_hash) = block_log_tx_hash {
-                        let new_hash = Hash::create(&[current_checksum.as_ref(), block_log_hash.as_ref()]);
-                        active_model.chain_checksum = Set(Some(new_hash.as_ref().to_vec()));
-                        // when a new checksum is computed, we need to update previous_indexed_block_prio_to_checksum_update
-                        active_model.previous_indexed_block_prio_to_checksum_update = Set(current_last_indexed_block);
-                        trace!("updating block checksum {current_checksum} @ {current_last_indexed_block} -> {new_hash} @ {block_num}");
-                    }
-
-                    active_model.last_indexed_block = Set(block_num as i32);
-                    active_model.update(tx.as_ref()).await?;
-
-                    Ok::<_, DbSqlError>(())
-                })
-            })
-            .await
-    }
-
     async fn set_network_registry_enabled<'a>(&'a self, tx: OptTx<'a>, enabled: bool) -> Result<()> {
         self.nest_transaction(tx)
             .await?
@@ -688,29 +608,6 @@ mod tests {
         db.caches.single_values.invalidate_all();
 
         assert_eq!(Some(safe_info), db.get_safe_info(None).await?);
-        Ok(())
-    }
-
-    #[async_std::test]
-    async fn test_set_last_indexed_block() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
-
-        let described_block = db.get_last_indexed_block(None).await?;
-        assert_eq!(0, described_block.latest_block_number);
-        assert_eq!(0, described_block.block_prior_to_checksum_update);
-
-        let checksum = Hash::default().hash();
-        let expexted_block_num = 100000;
-
-        db.set_last_indexed_block(None, expexted_block_num, Some(checksum))
-            .await?;
-
-        let next_described_block = db.get_last_indexed_block(None).await?;
-        assert_eq!(expexted_block_num, next_described_block.latest_block_number);
-        assert_eq!(0, next_described_block.block_prior_to_checksum_update);
-
-        let expected_next_checksum = Hash::create(&[described_block.checksum.as_ref(), checksum.as_ref()]);
-        assert_eq!(expected_next_checksum, next_described_block.checksum);
         Ok(())
     }
 

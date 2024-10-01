@@ -22,24 +22,9 @@ impl MigrationTrait for Migration {
                             .col(LogStatus::TransactionIndex)
                             .col(LogStatus::LogIndex),
                     )
-                    .col(
-                        ColumnDef::new(LogStatus::TransactionIndex)
-                            .not_null()
-                            .binary_len(8)
-                            .default(vec![0u8; 8]),
-                    )
-                    .col(
-                        ColumnDef::new(LogStatus::LogIndex)
-                            .not_null()
-                            .binary_len(8)
-                            .default(vec![0u8; 8]),
-                    )
-                    .col(
-                        ColumnDef::new(LogStatus::BlockNumber)
-                            .not_null()
-                            .binary_len(8)
-                            .default(vec![0u8; 8]),
-                    )
+                    .col(ColumnDef::new(LogStatus::TransactionIndex).not_null().binary_len(8))
+                    .col(ColumnDef::new(LogStatus::LogIndex).not_null().binary_len(8))
+                    .col(ColumnDef::new(LogStatus::BlockNumber).not_null().binary_len(8))
                     .col(ColumnDef::new(LogStatus::Processed).boolean().not_null().default(false))
                     .col(ColumnDef::new(LogStatus::ProcessedAt).date_time())
                     .col(ColumnDef::new(LogStatus::Checksum).binary_len(32))

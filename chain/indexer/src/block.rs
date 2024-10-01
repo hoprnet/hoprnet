@@ -10,7 +10,7 @@ use hopr_crypto_types::types::Hash;
 use hopr_db_api::logs::HoprDbLogOperations;
 use hopr_db_sql::info::HoprDbInfoOperations;
 use hopr_db_sql::HoprDbGeneralModelOperations;
-use hopr_primitive_types::prelude::SerializableLog;
+use hopr_primitive_types::prelude::*;
 
 use crate::{
     errors::{CoreEthereumIndexerError, Result},
@@ -108,24 +108,6 @@ where
         let db = self.db.clone();
         let tx_significant_events = self.egress.clone();
 
-        let described_block = self.db.get_last_indexed_block(None).await?;
-        info!(
-            "Loaded indexer state at block #{0} with checksum: {1}",
-            described_block.latest_block_number, described_block.checksum
-        );
-
-        let next_block_to_process = if self.cfg.start_block_number < described_block.latest_block_number as u64 {
-            // If some prior indexing took place already, avoid reprocessing the `described_block.latest_block_number`
-            described_block.latest_block_number as u64 + 1
-        } else {
-            self.cfg.start_block_number
-        };
-
-        info!(
-            "DB latest processed block: {0}, next block to process {next_block_to_process}",
-            described_block.latest_block_number
-        );
-
         // we skip on addresses which have no topics
         let mut addresses = vec![];
         let mut topics = vec![];
@@ -166,6 +148,25 @@ where
 
         info!("Building rpc indexer background process");
         let (tx, mut rx) = futures::channel::mpsc::channel::<()>(1);
+
+        let next_block_to_process = if let Some(last_log) = self.db.get_last_checksummed_log().await? {
+            info!(
+                "Loaded indexer state at block #{0} with checksum: {1}",
+                last_log.block_number,
+                last_log.checksum.unwrap()
+            );
+
+            if self.cfg.start_block_number < last_log.block_number {
+                // If some prior indexing took place already, avoid reprocessing
+                last_log.block_number + 1
+            } else {
+                self.cfg.start_block_number
+            }
+        } else {
+            self.cfg.start_block_number
+        };
+
+        info!("Indexer next block to process {next_block_to_process}");
 
         let indexing_proc = spawn(async move {
             let is_synced = Arc::new(AtomicBool::new(false));
@@ -222,7 +223,11 @@ where
         }
     }
 
-    async fn process_block_by_id(&self, db_processor: &U, block_id: u64) -> crate::errors::Result<()>
+    async fn process_block_by_id(
+        &self,
+        db_processor: &U,
+        block_id: u64,
+    ) -> crate::errors::Result<Option<Vec<SignificantChainEvent>>>
     where
         U: ChainLogHandler + 'static,
         Db: HoprDbLogOperations + 'static,
@@ -244,7 +249,7 @@ where
             }
         }
 
-        self.process_block(db_processor, block_with_logs).await
+        Ok(self.process_block(db_processor, block_with_logs).await)
     }
 
     async fn process_block(
@@ -259,7 +264,7 @@ where
         let block_id = block_with_logs.block_id;
         debug!("Processing events from block {block_id}");
 
-        match db_processor.collect_block_events(block_with_logs).await {
+        match db_processor.collect_block_events(block_with_logs.clone()).await {
             Ok(events) => {
                 match self.db.set_logs_processed(Some(block_id), Some(0)).await {
                     Ok(_) => match self.db.update_logs_checksums().await {
@@ -298,25 +303,33 @@ where
     // every block will have events
     async fn print_indexer_state(&self, block_with_logs: BlockWithLogs) -> ()
     where
-        Db: HoprDbInfoOperations + 'static,
+        Db: HoprDbLogOperations + 'static,
     {
-        match self.db.get_last_indexed_block(None).await {
-            Ok(block) => {
-                info!(
-                    block_number = block.latest_block_number,
-                    log_count = block.log_count,
-                    checksum = %block.checksum,
-                    "Indexer state update",
-                );
+        match self.db.get_last_checksummed_log().await {
+            Ok(Some(log)) => match self.db.get_logs_count(Some(log.block_number), Some(0)).await {
+                Ok(count) => {
+                    let checksum = log.checksum.unwrap();
+                    info!(
+                        block_number = log.block_number,
+                        log_count = count,
+                        last_log_checksum = checksum,
+                        "Indexer state update",
+                    );
 
-                #[cfg(all(feature = "prometheus", not(test)))]
-                {
-                    let low_4_bytes =
-                        hopr_primitive_types::prelude::U256::from_big_endian(block.checksum.as_ref()).low_u32();
-                    METRIC_INDEXER_CHECKSUM.set(low_4_bytes.into());
+                    #[cfg(all(feature = "prometheus", not(test)))]
+                    {
+                        let checksum_hash = Hash::from_hex(checksum.as_str()).expect("Invalid checksum");
+                        let low_4_bytes =
+                            hopr_primitive_types::prelude::U256::from_big_endian(checksum_hash.as_ref()).low_u32();
+                        METRIC_INDEXER_CHECKSUM.set(low_4_bytes.into());
+                    }
                 }
+                Err(e) => error!("Cannot retrieve log count: {e}"),
+            },
+            Ok(None) => {
+                debug!("No logs have been checksummed yet");
             }
-            Err(e) => error!("Cannot retrieve indexer state: {e}"),
+            Err(e) => error!("Cannot retrieve last checksummed log: {e}"),
         }
     }
 
