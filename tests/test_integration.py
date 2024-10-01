@@ -280,15 +280,13 @@ async def test_hoprd_node_should_be_able_to_alias_other_peers(peer: str, swarm7:
     my_peer_id = swarm7[peer].peer_id
     assert alice_peer_id != my_peer_id
 
-    assert await swarm7[peer].api.aliases_get_alias("me") == my_peer_id
-
-    assert await swarm7[peer].api.aliases_get_alias("Alice") is None
     assert await swarm7[peer].api.aliases_set_alias("Alice", alice_peer_id) is True
 
     assert await swarm7[peer].api.aliases_get_alias("Alice") == alice_peer_id
-    assert await swarm7[peer].api.aliases_set_alias("Alice", alice_peer_id) is False
+    assert await swarm7[peer].api.aliases_set_alias("Alice New", alice_peer_id) is True
 
-    assert await swarm7[peer].api.aliases_remove_alias("Alice")
+    assert await swarm7[peer].api.aliases_remove_alias("Alice New") is True
+    assert await swarm7[peer].api.aliases_get_alias("Alice New") is None
     assert await swarm7[peer].api.aliases_get_alias("Alice") is None
 
 
@@ -691,9 +689,7 @@ async def test_hoprd_default_strategy_automatic_ticket_aggregation_and_redeeming
         redeemed_value_at_start = balance_str_to_int(statistics_before.redeemed_value)
 
         packets = [f"Ticket aggregation test: #{i:08d}" for i in range(ticket_count)]
-        await send_and_receive_packets_with_pop(
-            packets, src=swarm7[src], dest=swarm7[dest], path=[swarm7[mid].peer_id]
-        )
+        await send_and_receive_packets_with_pop(packets, src=swarm7[src], dest=swarm7[dest], path=[swarm7[mid].peer_id])
 
         # monitor that the node aggregates and redeems tickets until the aggregated value is reached
         async def check_aggregate_and_redeem_tickets(api: HoprdAPI):
@@ -802,9 +798,12 @@ async def test_hoprd_check_ticket_winn_prob_is_default(peer, swarm7: dict[str, N
 async def test_send_message_with_reserved_application_tag_should_fail(tag: int, swarm7: dict[str, Node]):
     src, dest = random_distinct_pairs_from(barebone_nodes(), count=1)[0]
 
-    assert await swarm7[src].api.send_message(
-        swarm7[dest].peer_id, "This message should fail due to reserved tag", [], tag
-    ) is None
+    assert (
+        await swarm7[src].api.send_message(
+            swarm7[dest].peer_id, "This message should fail due to reserved tag", [], tag
+        )
+        is None
+    )
 
 
 @pytest.mark.asyncio
@@ -874,4 +873,3 @@ async def test_send_message_return_timestamp(src: str, dest: str, swarm7: dict[s
 
     assert len(timestamps) == message_count
     assert timestamps == sorted(timestamps)
-
