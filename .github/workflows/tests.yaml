@@ -153,6 +153,7 @@ jobs:
     env:
       needs_nix_setup: true
     strategy:
+      fail-fast: false
       matrix:
         suite:
           - integration
