@@ -276,7 +276,7 @@ def snapshot_usable(parent_dir: Path, nodes):
         "default.cfg.yaml",
     ]
     for i in range(len(nodes)):
-        node_dir = parent_dir.joinpath(f"{NODE_NAME_PREFIX}_{i+1}")
+        node_dir = f"{NODE_NAME_PREFIX}_{i+1}"
         expected_files.append(f"{node_dir}/db/hopr_index.db")
         expected_files.append(f"{node_dir}/db/hopr_index.db-shm")
         expected_files.append(f"{node_dir}/db/hopr_index.db-wal")

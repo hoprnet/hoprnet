@@ -105,8 +105,7 @@ jobs:
         if: ${{ !env.ACT }}
         run: |
           mkdir -p /tmp/hopr-smoke-test/test_websocket_api/snapshot
-          gcloud storage rsync gs://hoprnet-test-artifacts/websocket_api/snapshot /tmp/hopr-smoke-test/test_websocket_api/ --recursive --exclude=".*\.json$|.*\.yaml$"
-          gcloud storage rsync gs://hoprnet-test-artifacts/websocket_api/snapshot /tmp/hopr-smoke-test/test_websocket_api/snapshot
+          gcloud storage rsync gs://hoprnet-test-artifacts/websocket_api/snapshot /tmp/hopr-smoke-test/test_websocket_api/snapshot --recursive
         continue-on-error: true
 
       - name: Check snapshot for test_websocket_api
@@ -198,8 +197,7 @@ jobs:
         if: ${{ !env.ACT }}
         run: |
           mkdir -p /tmp/hopr-smoke-test/test_${{ matrix.suite }}/snapshot
-          gcloud storage rsync gs://hoprnet-test-artifacts/${{ matrix.suite }}/snapshot /tmp/hopr-smoke-test/test_${{ matrix.suite }}/ --recursive --exclude=".*\.json$|.*\.yaml$"
-          gcloud storage rsync gs://hoprnet-test-artifacts/${{ matrix.suite }}/snapshot /tmp/hopr-smoke-test/test_${{ matrix.suite }}/snapshot
+          gcloud storage rsync gs://hoprnet-test-artifacts/${{ matrix.suite }}/snapshot /tmp/hopr-smoke-test/test_${{ matrix.suite }}/snapshot --recursive
         continue-on-error: true
 
       - name: Check snapshot for test_${{ matrix.suite }}
