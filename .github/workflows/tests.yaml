@@ -100,7 +100,10 @@ jobs:
         if: ${{ !env.ACT }}
         run: |
           mkdir -p /tmp/hopr-smoke-test/test_websocket_api/snapshot
-          gcloud storage rsync gs://hoprnet-test-artifacts/websocket_api/snapshot /tmp/hopr-smoke-test/test_websocket_api/snapshot
+          nix-shell -p google-cloud-sdk --command "\
+            gcloud storage rsync \
+            gs://hoprnet-test-artifacts/websocket_api/snapshot \
+            /tmp/hopr-smoke-test/test_websocket_api/snapshot"
         continue-on-error: true
 
       - name: Check snapshot for test_websocket_api
