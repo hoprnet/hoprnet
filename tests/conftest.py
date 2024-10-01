@@ -334,7 +334,7 @@ async def shared_nodes_bringup(test_suite_name: str, test_dir: Path, anvil_port,
 
     # minimal wait to ensure api is ready for `startedz` call.
     for id, node in nodes.items():
-        await asyncio.wait_for(node.api.startedz(), timeout=60)
+        await asyncio.wait_for(node.api.startedz(), timeout=10)
         logging.info(f"Node {id} is up")
 
     if not skip_funding:
@@ -342,12 +342,14 @@ async def shared_nodes_bringup(test_suite_name: str, test_dir: Path, anvil_port,
       logging.info("Funding nodes")
       fund_nodes(test_suite_name, test_dir, anvil_port)
 
+    async def is_node_ready(target: Node):
+        while not await asyncio.wait_for(target.api.readyz(), timeout=10):
+            await asyncio.sleep(1)
+
     # WAIT FOR NODES TO BE UP
     logging.info("Node setup finished, waiting for nodes to be ready")
     for node in nodes.values():
-        while not await asyncio.wait_for(node.api.readyz(), timeout=60):
-            logging.info(f"Node {node} not ready yet, retrying")
-            await asyncio.sleep(1)
+        await asyncio.wait_for(is_node_ready(node), timeout=60)
 
         addresses = await node.api.addresses()
         node.peer_id = addresses["hopr"]
