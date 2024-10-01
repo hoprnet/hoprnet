@@ -13,7 +13,7 @@ from tests.utils import balance_str_to_int, shuffled, PARAMETERIZED_SAMPLE_SIZE,
 PORT_BASE = 19000
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("peer", barebone_nodes())
+@pytest.mark.parametrize("peer", [barebone_nodes()])
 async def test_hoprd_should_not_have_unredeemed_tickets_without_sending_messages(peer: str, swarm7: dict[str, Node]):
     statistics = await swarm7[peer].api.get_tickets_statistics()
 
