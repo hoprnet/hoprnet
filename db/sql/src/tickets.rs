@@ -3206,10 +3206,10 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn test_set_ticket_statistics_when_tickets_are_in_db() {
-        let db = HoprDb::new_in_memory(ALICE.clone()).await;
+    async fn test_set_ticket_statistics_when_tickets_are_in_db() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ALICE.clone()).await?;
 
-        let ticket = init_db_with_tickets(&db, 1).await.1.pop().unwrap();
+        let ticket = init_db_with_tickets(&db, 1).await?.1.pop().unwrap();
 
         db.mark_tickets_redeemed((&ticket).into()).await.expect("must not fail");
 
@@ -3220,5 +3220,7 @@ mod tests {
 
         let stats = db.get_ticket_statistics(None).await.expect("must not fail");
         assert_eq!(stats.redeemed_value, BalanceType::HOPR.zero());
+
+        Ok(())
     }
 }

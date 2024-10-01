@@ -595,7 +595,7 @@ async def teardown(swarm7: dict[str, Node]):
         raise e
 
     try:
-        await asyncio.gather(*[node.api.messages_pop_all(0) for node in swarm7.values()])
+        await asyncio.gather(*[node.api.messages_pop_all(None) for node in swarm7.values()])
     except Exception as e:
         logging.error(f"Error popping all messages in teardown: {e}")
         raise e
