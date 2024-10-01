@@ -559,6 +559,7 @@ impl Hopr {
             cfg.safe_module.safe_address,
             chain_indexer::IndexerConfig {
                 start_block_number: resolved_environment.channel_contract_deploy_block as u64,
+                fast_sync: cfg.chain.fast_sync,
             },
             tx_indexer_events,
         );

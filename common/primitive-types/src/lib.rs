@@ -56,6 +56,7 @@ pub mod prelude {
     pub use super::primitives::*;
     pub use super::sma::*;
     pub use super::traits::*;
+    pub use chrono::{DateTime, Utc};
 }
 
 #[allow(deprecated)]

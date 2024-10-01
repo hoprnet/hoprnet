@@ -1,0 +1,19 @@
+stateDiagram-v2
+    direction TB
+
+    init_db: Initialize or Load Logs DB
+    start_rpc_log_fetch: Use RPC to fetch Logs
+    start_fast_log_fetch: Use P2P network to fetch batch logs
+
+    state if_close_to_head <<choice>>
+
+    [*] --> init_db: startup
+
+    init_db --> if_close_to_head: Calculate Logs Diff
+    if_close_to_head --> start_rpc_log_fetch: close to chain head (configurable) or fast sync disabled (configurable)
+    if_close_to_head --> start_fast_log_fetch: not close to chain head (configurable)
+    start_fast_log_fetch --> start_rpc_log_fetch: get logs batch
+
+    start_rpc_log_fetch --> [*]: system shutdown
+    start_fast_log_fetch --> [*]: system shutdown
+
