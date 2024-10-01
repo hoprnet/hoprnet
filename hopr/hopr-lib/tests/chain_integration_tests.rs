@@ -257,10 +257,10 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
         chain_id: anvil.chain_id(),
         finality,
         contract_addrs,
-        module_address: Address::default(),
         expected_block_time: block_time,
         tx_polling_interval: Duration::from_millis(100),
         max_block_range_fetch_size: 100,
+        ..RpcOperationsConfig::default()
     };
 
     let actions_cfg = ActionQueueConfig {
