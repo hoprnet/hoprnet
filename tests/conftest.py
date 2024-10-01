@@ -282,7 +282,13 @@ def snapshot_usable(parent_dir: Path, nodes):
         expected_files.append(f"{node_dir}/db/hopr_index.db-wal")
         expected_files.append(f"{node_dir}.env")
 
-    return all([sdir.joinpath(f).exists() for f in expected_files])
+    for f in expected_files:
+        file_path = sdir.joinpath(f)
+        if not file_path.exists():
+            logging.info(f"Cannot find {file_path} in snapshot")
+            return False
+
+    return True
 
 def fund_nodes(test_suite_name, test_dir: Path, anvil_port):
     private_key = load_private_key(test_suite_name)
