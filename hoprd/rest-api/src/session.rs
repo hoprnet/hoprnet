@@ -2,7 +2,7 @@ use std::io::ErrorKind;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use crate::types::UnifiedPeerType;
+use crate::types::PeerOrAddress;
 use crate::{ApiErrorStatus, InternalState, ListenerId, BASE_PATH};
 use axum::extract::Path;
 use axum::{
@@ -48,7 +48,7 @@ lazy_static::lazy_static! {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct SessionClientRequest {
     #[serde_as(as = "DisplayFromStr")]
-    pub destination: UnifiedPeerType,
+    pub destination: PeerOrAddress,
     pub path: RoutingOptions,
     pub target: String,
     pub listen_host: Option<String>,
@@ -62,7 +62,7 @@ impl SessionClientRequest {
         target_protocol: IpProtocol,
     ) -> Result<SessionClientConfig, HoprLibError> {
         Ok(SessionClientConfig {
-            peer: self.destination.peer_id,
+            peer: self.destination.peer_id.unwrap(),
             path_options: self.path,
             target_protocol,
             target: self

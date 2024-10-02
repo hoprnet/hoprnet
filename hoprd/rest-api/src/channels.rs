@@ -16,7 +16,7 @@ use hopr_lib::{
     Address, AsUnixTimestamp, Balance, BalanceType, ChainActionsError, ChannelEntry, ChannelStatus, Hopr, ToHex,
 };
 
-use crate::{types::UnifiedPeerType, ApiErrorStatus, InternalState, BASE_PATH};
+use crate::{types::PeerOrAddress, ApiErrorStatus, InternalState, BASE_PATH};
 
 #[serde_as]
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
@@ -238,7 +238,7 @@ pub(crate) struct OpenChannelBodyRequest {
     /// On-chain address of the counterparty.
     #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String)]
-    destination: UnifiedPeerType,
+    destination: PeerOrAddress,
     /// Initial amount of stake in HOPR tokens.
     amount: String,
 }
@@ -290,9 +290,15 @@ pub(super) async fn open_channel(
 ) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
+    let destination = open_req.clone().destination.fullfill(&hopr.hopr_db()).await;
+    if destination.is_err() {
+        return (StatusCode::NOT_FOUND, ApiErrorStatus::InvalidInput).into_response();
+    }
+    let destination = destination.unwrap();
+
     match hopr
         .open_channel(
-            &open_req.destination.address,
+            &destination.address.unwrap(),
             &Balance::new_from_str(&open_req.amount, BalanceType::HOPR),
         )
         .await

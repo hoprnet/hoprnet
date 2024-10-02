@@ -1194,6 +1194,11 @@ impl Hopr {
         Ok(self.transport_api.ticket_statistics().await?)
     }
 
+    // DB ============
+    pub fn hopr_db(&self) -> HoprDb {
+        self.db.clone()
+    }
+
     // Chain =========
     pub fn me_onchain(&self) -> Address {
         self.chain_api.me_onchain()

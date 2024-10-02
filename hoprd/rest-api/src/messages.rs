@@ -22,7 +22,7 @@ use hopr_lib::{
     ApplicationData, AsUnixTimestamp, RoutingOptions, RESERVED_TAG_UPPER_LIMIT,
 };
 
-use crate::{types::UnifiedPeerType, ApiErrorStatus, InternalState, BASE_PATH};
+use crate::{types::PeerOrAddress, ApiErrorStatus, InternalState, BASE_PATH};
 
 #[derive(Debug, Default, Clone, Deserialize, utoipa::ToSchema, utoipa::IntoParams)]
 #[into_params(parameter_in = Query)]
@@ -57,7 +57,7 @@ pub(crate) struct SendMessageBodyRequest {
     /// The recipient HOPR PeerId
     #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String)]
-    destination: UnifiedPeerType,
+    destination: PeerOrAddress,
     #[serde_as(as = "Option<Vec<DisplayFromStr>>")]
     #[validate(length(min = 0, max = 3))]
     #[schema(value_type = Option<Vec<String>>)]
@@ -119,6 +119,12 @@ pub(super) async fn send_message(
 ) -> Result<impl IntoResponse, impl IntoResponse> {
     let hopr = state.hopr.clone();
 
+    let destination = args.clone().destination.fullfill(&hopr.hopr_db()).await;
+    if destination.is_err() {
+        return Err((StatusCode::NOT_FOUND, ApiErrorStatus::InvalidInput).into_response());
+    }
+    let destination = destination.unwrap();
+
     args.validate().map_err(|e| {
         (
             StatusCode::UNPROCESSABLE_ENTITY,
@@ -167,7 +173,7 @@ pub(super) async fn send_message(
     let timestamp = std::time::SystemTime::now().as_unix_timestamp();
 
     match hopr
-        .send_message(msg_body, args.destination.peer_id, options, Some(args.tag))
+        .send_message(msg_body, destination.peer_id.unwrap(), options, Some(args.tag))
         .await
     {
         Ok(_) => Ok((StatusCode::ACCEPTED, Json(SendMessageResponse { timestamp })).into_response()),
@@ -303,6 +309,12 @@ async fn handle_send_message(input: &str, state: Arc<InternalState>) -> Result<(
         Ok(msg) => {
             let hopr = state.hopr.clone();
 
+            let destination = msg.destination.clone().fullfill(&hopr.hopr_db()).await;
+            if destination.is_err() {
+                return Err("invalid destination".to_string());
+            }
+            let destination = destination.unwrap();
+
             // Use the message encoder, if any
             // TODO: remove RLP in 3.0
             let msg_body = state
@@ -328,7 +340,7 @@ async fn handle_send_message(input: &str, state: Arc<InternalState>) -> Result<(
             };
 
             if let Err(e) = hopr
-                .send_message(msg_body, msg.destination.peer_id, options, Some(msg.tag))
+                .send_message(msg_body, destination.peer_id.unwrap(), options, Some(msg.tag))
                 .await
             {
                 return Err(e.to_string());
@@ -644,7 +656,7 @@ mod tests {
 
     #[test]
     fn send_message_accepts_bytes_in_body() {
-        let destination = UnifiedPeerType::from(PeerId::random());
+        let destination = PeerOrAddress::from(PeerId::random());
         let test_sequence = b"wow, this actually works";
 
         let json_value = json!({
@@ -668,7 +680,7 @@ mod tests {
 
     #[test]
     fn send_message_accepts_utf8_string_in_body() {
-        let destination = UnifiedPeerType::from(PeerId::random());
+        let destination = PeerOrAddress::from(PeerId::random());
         let test_sequence = b"wow, this actually works";
 
         let json_value = json!({

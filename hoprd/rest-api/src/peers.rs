@@ -10,7 +10,7 @@ use std::{sync::Arc, time::Duration};
 
 use hopr_lib::errors::HoprLibError;
 
-use crate::{types::UnifiedPeerType, ApiError, ApiErrorStatus, InternalState, BASE_PATH};
+use crate::{types::PeerOrAddress, ApiError, ApiErrorStatus, InternalState, BASE_PATH};
 
 #[serde_as]
 #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
@@ -34,7 +34,7 @@ pub(crate) struct NodePeerInfoResponse {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct PeerIdParams {
-    destination: UnifiedPeerType,
+    destination: PeerOrAddress,
 }
 
 /// Returns transport-related information about the given peer.
@@ -64,13 +64,24 @@ pub(super) async fn show_peer_info(
     State(state): State<Arc<InternalState>>,
 ) -> impl IntoResponse {
     let hopr = state.hopr.clone();
-    (
+
+    let destination = destination.clone().fullfill(&hopr.hopr_db()).await;
+    if destination.is_err() {
+        return Err((StatusCode::NOT_FOUND, ApiErrorStatus::InvalidInput).into_response());
+    }
+    let destination = destination.unwrap();
+
+    Ok((
         StatusCode::OK,
         Json(NodePeerInfoResponse {
-            announced: hopr.multiaddresses_announced_on_chain(&destination.peer_id).await,
-            observed: hopr.network_observed_multiaddresses(&destination.peer_id).await,
+            announced: hopr
+                .multiaddresses_announced_on_chain(&destination.peer_id.unwrap())
+                .await,
+            observed: hopr
+                .network_observed_multiaddresses(&destination.peer_id.unwrap())
+                .await,
         }),
-    )
+    ))
 }
 
 #[serde_as]
@@ -112,10 +123,15 @@ pub(super) async fn ping_peer(
     State(state): State<Arc<InternalState>>,
 ) -> Result<impl IntoResponse, ApiError> {
     let hopr = state.hopr.clone();
+    let destination = destination.clone().fullfill(&hopr.hopr_db()).await;
+    if destination.is_err() {
+        return Ok((StatusCode::NOT_FOUND, ApiErrorStatus::InvalidInput).into_response());
+    }
+    let destination = destination.unwrap();
 
-    match hopr.ping(&destination.peer_id).await {
+    match hopr.ping(&destination.peer_id.unwrap()).await {
         Ok(latency) => {
-            let info = hopr.network_peer_info(&destination.peer_id).await?;
+            let info = hopr.network_peer_info(&destination.peer_id.unwrap()).await?;
             let resp = Json(PingResponse {
                 latency: latency.unwrap_or(Duration::ZERO), // TODO: what should be the correct default ?
                 reported_version: info.and_then(|p| p.peer_version).unwrap_or("unknown".into()),
