@@ -2,7 +2,7 @@ import asyncio
 import random
 import re
 import string
-from contextlib import AsyncExitStack, asynccontextmanager, contextmanager
+from contextlib import AsyncExitStack, asynccontextmanager
 
 import pytest
 import requests
@@ -828,9 +828,12 @@ async def test_hoprd_check_ticket_winn_prob_is_default(peer, swarm7: dict[str, N
 async def test_send_message_with_reserved_application_tag_should_fail(tag: int, swarm7: dict[str, Node]):
     src, dest = random_distinct_pairs_from(barebone_nodes(), count=1)[0]
 
-    assert await swarm7[src].api.send_message(
-        swarm7[dest].peer_id, "This message should fail due to reserved tag", [], tag
-    ) is None
+    assert (
+        await swarm7[src].api.send_message(
+            swarm7[dest].peer_id, "This message should fail due to reserved tag", [], tag
+        )
+        is None
+    )
 
 
 @pytest.mark.asyncio
