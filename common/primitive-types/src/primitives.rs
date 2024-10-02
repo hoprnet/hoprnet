@@ -410,7 +410,7 @@ impl UnitaryFloatOps for U256 {
 /// A type containing selected fields from  the `eth_getLogs` RPC calls.
 ///
 /// This is further restricted to already mined blocks.
-#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub struct SerializableLog {
     /// Contract address
     pub address: String,

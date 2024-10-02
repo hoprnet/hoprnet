@@ -5,13 +5,13 @@ use axum::{
 };
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
-use hopr_crypto_types::prelude::Hash;
-use hopr_lib::Address;
-use hopr_lib::{AsUnixTimestamp, Health, Multiaddr};
 use libp2p_identity::PeerId;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use std::{collections::HashMap, sync::Arc};
+
+use hopr_crypto_types::prelude::Hash;
+use hopr_lib::{Address, AsUnixTimestamp, Health, Multiaddr, ToHex};
 
 use crate::{ApiError, ApiErrorStatus, InternalState, BASE_PATH};
 
@@ -337,8 +337,9 @@ pub(super) async fn info(State(state): State<Arc<InternalState>>) -> Result<impl
     let safe_config = hopr.get_safe_config();
     let network = hopr.network();
 
-    let (indexer_block, indexer_checksum, index_block_prev_checksum) = match hopr.get_indexer_state().await {
-        Ok(p) => (p.latest_block_number, p.checksum, p.block_prior_to_checksum_update),
+    let (indexer_block, indexer_checksum) = match hopr.get_indexer_state().await {
+        Ok(Some(slog)) => (slog.block_number as u32, slog.checksum.unwrap().to_hex()),
+        Ok(None) => (0u32, Hash::default().to_hex()),
         Err(error) => return Ok((StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(error)).into_response()),
     };
 
@@ -360,7 +361,9 @@ pub(super) async fn info(State(state): State<Arc<InternalState>>) -> Result<impl
                 channel_closure_period: channel_closure_notice_period.as_secs(),
                 indexer_block,
                 indexer_checksum,
-                index_block_prev_checksum,
+                // FIXME: this is only done for backwards-compatibility, ideally we don't return
+                // this value
+                index_block_prev_checksum: indexer_block,
             };
 
             Ok((StatusCode::OK, Json(body)).into_response())

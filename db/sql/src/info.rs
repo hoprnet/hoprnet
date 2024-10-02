@@ -1,15 +1,13 @@
 use async_trait::async_trait;
-use futures::{FutureExt, TryFutureExt};
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, QuerySelect, Select, Set};
-
-use tracing::trace;
+use futures::TryFutureExt;
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set};
 
 use hopr_crypto_types::prelude::Hash;
 use hopr_db_api::info::*;
 use hopr_db_entity::prelude::{
     Account, Announcement, ChainInfo, Channel, NetworkEligibility, NetworkRegistry, NodeInfo,
 };
-use hopr_db_entity::{chain_info, global_settings, network_registry, node_info};
+use hopr_db_entity::{chain_info, global_settings, node_info};
 use hopr_primitive_types::prelude::*;
 
 use crate::cache::{CachedValue, CachedValueDiscriminants};
@@ -110,23 +108,23 @@ impl HoprDbInfoOperations for HoprDb {
     async fn index_is_empty<'a>(&'a self) -> Result<bool> {
         let c = self.conn(TargetDb::Index);
 
-        if Account::find().limit(1).one(c).await?.is_some() {
+        if Account::find().one(c).await?.is_some() {
             return Ok(false);
         }
 
-        if Announcement::find().limit(1).one(c).await?.is_some() {
+        if Announcement::find().one(c).await?.is_some() {
             return Ok(false);
         }
 
-        if Channel::find().limit(1).one(c).await?.is_some() {
+        if Channel::find().one(c).await?.is_some() {
             return Ok(false);
         }
 
-        if NetworkEligibility::find().limit(1).one(c).await?.is_some() {
+        if NetworkEligibility::find().one(c).await?.is_some() {
             return Ok(false);
         }
 
-        if NetworkRegistry::find().limit(1).one(c).await?.is_some() {
+        if NetworkRegistry::find().one(c).await?.is_some() {
             return Ok(false);
         }
 
@@ -155,7 +153,7 @@ impl HoprDbInfoOperations for HoprDb {
                     node_info::Entity::find_by_id(SINGULAR_TABLE_FIXED_ID)
                         .one(tx.as_ref())
                         .await?
-                        .ok_or(DbSqlError::MissingFixedTableEntry("node_info".into()))
+                        .ok_or(MissingFixedTableEntry("node_info".into()))
                         .map(|m| BalanceType::HOPR.balance_bytes(m.safe_balance))
                 })
             })
@@ -191,7 +189,7 @@ impl HoprDbInfoOperations for HoprDb {
                     node_info::Entity::find_by_id(SINGULAR_TABLE_FIXED_ID)
                         .one(tx.as_ref())
                         .await?
-                        .ok_or(DbSqlError::MissingFixedTableEntry("node_info".into()))
+                        .ok_or(MissingFixedTableEntry("node_info".into()))
                         .map(|m| BalanceType::HOPR.balance_bytes(m.safe_allowance))
                 })
             })
@@ -231,7 +229,7 @@ impl HoprDbInfoOperations for HoprDb {
                                 let info = node_info::Entity::find_by_id(SINGULAR_TABLE_FIXED_ID)
                                     .one(tx.as_ref())
                                     .await?
-                                    .ok_or(DbSqlError::MissingFixedTableEntry("node_info".into()))?;
+                                    .ok_or(MissingFixedTableEntry("node_info".into()))?;
                                 Ok::<_, DbSqlError>(info.safe_address.zip(info.module_address))
                             })
                         })
@@ -294,7 +292,7 @@ impl HoprDbInfoOperations for HoprDb {
                                 let model = chain_info::Entity::find_by_id(SINGULAR_TABLE_FIXED_ID)
                                     .one(tx.as_ref())
                                     .await?
-                                    .ok_or(DbSqlError::MissingFixedTableEntry("chain_info".into()))?;
+                                    .ok_or(MissingFixedTableEntry("chain_info".into()))?;
 
                                 let ledger_dst = if let Some(b) = model.ledger_dst {
                                     Some(Hash::try_from(b.as_ref())?)

@@ -68,6 +68,7 @@ chain-rpc = { workspace = true }
 chain-types = { workspace = true }
 chain-indexer = { workspace = true }
 hopr-crypto-types = { workspace = true }
+hopr-db-api = { workspace = true }
 hopr-db-sql = { workspace = true }
 hopr-internal-types = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }

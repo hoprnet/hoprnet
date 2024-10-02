@@ -3,6 +3,7 @@ use sea_orm::Set;
 use hopr_crypto_types::types::Hash;
 use hopr_primitive_types::prelude::*;
 
+use crate::errors::DbEntityError;
 use crate::{log, log_status};
 
 impl From<SerializableLog> for log::ActiveModel {
@@ -28,23 +29,35 @@ impl From<SerializableLog> for log::ActiveModel {
     }
 }
 
-impl From<log::Model> for SerializableLog {
-    fn from(value: log::Model) -> Self {
-        let tx_hash: [u8; 32] = value.transaction_hash.try_into().expect("Invalid tx_hash");
-        let block_hash: [u8; 32] = value.block_hash.try_into().expect("Invalid block_hash");
+impl TryFrom<log::Model> for SerializableLog {
+    type Error = DbEntityError;
 
-        SerializableLog {
+    fn try_from(value: log::Model) -> Result<Self, Self::Error> {
+        let tx_hash: Result<[u8; 32], _> = value.transaction_hash.try_into();
+        let block_hash: Result<[u8; 32], _> = value.block_hash.try_into();
+
+        if let Err(_) = tx_hash {
+            return Err(DbEntityError::ConversionError(format!("Invalid tx_hash")));
+        }
+
+        if let Err(_) = block_hash {
+            return Err(DbEntityError::ConversionError(format!("Invalid block_hash")));
+        }
+
+        let log = SerializableLog {
             address: value.address,
             topics: value.topics.split(",").map(|s| s.to_string()).collect(),
             data: value.data,
             block_number: U256::from_be_bytes(value.block_number).as_u64(),
-            tx_hash: Hash::from(tx_hash).to_hex(),
+            tx_hash: Hash::from(tx_hash.unwrap()).to_hex(),
             tx_index: U256::from_be_bytes(value.transaction_index).as_u64(),
-            block_hash: Hash::from(block_hash).to_hex(),
+            block_hash: Hash::from(block_hash.unwrap()).to_hex(),
             log_index: U256::from_be_bytes(value.log_index).as_u64(),
             removed: value.removed,
             ..Default::default()
-        }
+        };
+
+        Ok(log)
     }
 }
 

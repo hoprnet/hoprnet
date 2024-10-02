@@ -4098,6 +4098,7 @@ dependencies = [
  "futures-concurrency",
  "hopr-async-runtime",
  "hopr-crypto-types",
+ "hopr-db-api",
  "hopr-db-sql",
  "hopr-internal-types",
  "hopr-metrics",

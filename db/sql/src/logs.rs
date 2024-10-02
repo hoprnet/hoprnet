@@ -1,15 +1,9 @@
 use async_trait::async_trait;
-use futures::stream;
 use futures::stream::BoxStream;
-use futures::StreamExt;
-use futures::TryStreamExt;
+use futures::{stream, StreamExt, TryStreamExt};
 use sea_orm::query::QueryTrait;
 use sea_orm::sea_query::{Expr, OnConflict, Value};
-use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DbErr, EntityTrait, IntoActiveModel, ModelTrait, PaginatorTrait, QueryFilter,
-    QueryOrder, QuerySelect, Related, StreamTrait,
-};
-use std::str::FromStr;
+use sea_orm::{ColumnTrait, DbErr, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect};
 use tracing::{error, trace};
 
 use hopr_crypto_types::prelude::Hash;
@@ -22,8 +16,7 @@ use hopr_primitive_types::prelude::*;
 
 use crate::db::HoprDb;
 use crate::errors::DbSqlError;
-use crate::TargetDb;
-use crate::{HoprDbGeneralModelOperations, OptTx};
+use crate::{HoprDbGeneralModelOperations, TargetDb};
 
 #[async_trait]
 impl HoprDbLogOperations for HoprDb {
@@ -97,7 +90,7 @@ impl HoprDbLogOperations for HoprDb {
             Ok(mut res) => {
                 if let Some((log, log_status)) = res.pop() {
                     if let Some(status) = log_status {
-                        Ok(create_log(log, status))
+                        create_log(log, status).map_err(DbError::from)
                     } else {
                         Err(DbError::MissingLogStatus)
                     }
@@ -131,10 +124,16 @@ impl HoprDbLogOperations for HoprDb {
                 Ok(mut stream) => {
                     while let Ok(Some(object)) = stream.try_next().await {
                         match object {
-                            (log, Some(log_status)) => yield create_log(log, log_status),
+                            (log, Some(log_status)) => {
+                                if let Ok(slog) = create_log(log, log_status) {
+                                    yield slog
+                                }
+                            },
                             (log, None) => {
                                 error!("Missing log status for log in db: {:?}", log);
-                                yield SerializableLog::from(log)
+                                if let Ok(slog) = SerializableLog::try_from(log) {
+                                    yield slog
+                                }
                             }
                         }
                     }
@@ -257,11 +256,16 @@ impl HoprDbLogOperations for HoprDb {
             .order_by_desc(log::Column::BlockNumber)
             .order_by_desc(log::Column::TransactionIndex)
             .order_by_desc(log::Column::LogIndex)
-            .find_also_related(Log)
-            .limit(1);
+            .find_also_related(Log);
 
         match query.clone().one(self.conn(TargetDb::Logs)).await {
-            Ok(Some((status, Some(log)))) => Ok(Some(create_log(log, status))),
+            Ok(Some((status, Some(log)))) => {
+                if let Ok(slog) = create_log(log, status) {
+                    Ok(Some(slog))
+                } else {
+                    Ok(None)
+                }
+            }
             Ok(_) => Ok(None),
             Err(e) => Err(DbError::from(DbSqlError::from(e))),
         }
@@ -287,7 +291,7 @@ impl HoprDbLogOperations for HoprDb {
                     match query.stream(tx.as_ref()).await {
                         Ok(mut stream) => {
                             while let Ok(Some((status, Some(log_entry)))) = stream.try_next().await {
-                                let slog = create_log(log_entry.clone(), status.clone());
+                                let slog = create_log(log_entry.clone(), status.clone())?;
                                 // we compute the has of a single log as a combination of the block
                                 // hash, tx hash and log index
                                 let log_hash = Hash::create(&[
@@ -321,14 +325,24 @@ impl HoprDbLogOperations for HoprDb {
     }
 }
 
-fn create_log(raw_log: log::Model, status: log_status::Model) -> SerializableLog {
-    let log = SerializableLog::from(raw_log);
-    let checksum = status.checksum.map(|c| {
-        let h: [u8; 32] = c.try_into().expect("Invalid checksum");
-        Hash::from(h).to_hex()
-    });
+fn create_log(raw_log: log::Model, status: log_status::Model) -> crate::errors::Result<SerializableLog> {
+    let log = SerializableLog::try_from(raw_log).map_err(DbSqlError::from)?;
 
-    if let Some(raw_ts) = status.processed_at {
+    let checksum = if let Some(c) = status.checksum {
+        let h: std::result::Result<[u8; 32], _> = c.try_into();
+
+        if let Err(_) = h {
+            return Err(DbSqlError::from(DbEntityError::ConversionError(format!(
+                "Invalid log checksum"
+            ))));
+        } else {
+            Some(Hash::from(h.unwrap()).to_hex())
+        }
+    } else {
+        None
+    };
+
+    let log = if let Some(raw_ts) = status.processed_at {
         let ts = DateTime::<Utc>::from_naive_utc_and_offset(raw_ts, Utc);
         SerializableLog {
             processed: Some(status.processed),
@@ -343,7 +357,9 @@ fn create_log(raw_log: log::Model, status: log_status::Model) -> SerializableLog
             checksum,
             ..log
         }
-    }
+    };
+
+    Ok(log)
 }
 
 #[cfg(test)]
