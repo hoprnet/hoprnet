@@ -70,7 +70,7 @@ where
 impl<T, U, Db> Indexer<T, U, Db>
 where
     T: HoprIndexerRpcOperations + Sync + Send + 'static,
-    U: ChainLogHandler + Send + Sync + 'static,
+    U: ChainLogHandler + Clone + Send + Sync + 'static,
     Db: HoprDbGeneralModelOperations + Clone + Send + Sync + 'static,
 {
     pub fn new(
@@ -142,7 +142,7 @@ where
 
             // Now fast-sync can start
             while let Some(block_number) = self.db.get_logs_block_numbers(None, None).await?.next().await {
-                self.process_block_by_id(&db_processor, block_number).await?;
+                Self::process_block_by_id(&db, &db_processor, block_number).await?;
             }
         }
 
@@ -175,10 +175,10 @@ where
             let event_stream = rpc
                 .try_stream_logs(next_block_to_process, log_filter)
                 .expect("block stream should be constructible")
-                .then(|block_with_logs| {
-                    self.calculate_sync_process(
+                .then(|block| {
+                    Self::calculate_sync_process(
                         "rpc",
-                        block_with_logs,
+                        block.clone(),
                         &rpc,
                         chain_head.clone(),
                         is_synced.clone(),
@@ -186,10 +186,49 @@ where
                         tx.clone(),
                     )
                 })
-                .filter_map(|block_with_logs| async {
-                    let outgoing_events = self.process_block(&db_processor, block_with_logs).await;
+                .filter_map(|block| {
+                    let db = db.clone();
 
-                    outgoing_events
+                    async move {
+                        debug!("Storing logs from {}", block.clone());
+                        let logs = block.clone().logs;
+                        match db
+                            .store_logs(logs.into_iter().map(SerializableLog::from).collect())
+                            .await
+                        {
+                            Ok(store_results) => {
+                                if let Some(err) = store_results
+                                    .into_iter()
+                                    .filter(|r| r.is_err())
+                                    .map(|r| r.unwrap_err())
+                                    .next()
+                                {
+                                    error!("Failed to store logs from {block}: {err}");
+                                    None
+                                } else {
+                                    Some(block)
+                                }
+                            }
+                            Err(e) => {
+                                error!("Failed to store logs from {block}: {e}");
+                                None
+                            }
+                        }
+                    }
+                })
+                .filter_map(|block| {
+                    let db = db.clone();
+                    let db_processor = db_processor.clone();
+
+                    async move {
+                        match Self::process_block_by_id(&db, &db_processor, block.block_id).await {
+                            Ok(events) => events,
+                            Err(e) => {
+                                error!("Failed to process logs from {block}: {e}");
+                                None
+                            }
+                        }
+                    }
                 })
                 .flat_map(stream::iter);
 
@@ -224,7 +263,7 @@ where
     }
 
     async fn process_block_by_id(
-        &self,
+        db: &Db,
         db_processor: &U,
         block_id: u64,
     ) -> crate::errors::Result<Option<Vec<SignificantChainEvent>>>
@@ -232,15 +271,15 @@ where
         U: ChainLogHandler + 'static,
         Db: HoprDbLogOperations + 'static,
     {
-        let mut log_stream = self.db.get_logs(Some(block_id), Some(0)).await?;
-        let mut block_with_logs = BlockWithLogs {
+        let mut log_stream = db.get_logs(Some(block_id), Some(0)).await?;
+        let mut block = BlockWithLogs {
             block_id,
             ..Default::default()
         };
 
         while let Some(log) = log_stream.next().await {
             if log.block_number == block_id {
-                block_with_logs.logs.insert(log);
+                block.logs.insert(log);
             } else {
                 error!(
                     "block number mismatch in logs stream, expected {block_id} but got {}",
@@ -249,26 +288,22 @@ where
             }
         }
 
-        Ok(self.process_block(db_processor, block_with_logs).await)
+        Ok(Self::process_block(db, db_processor, block).await)
     }
 
-    async fn process_block(
-        &self,
-        db_processor: &U,
-        block_with_logs: BlockWithLogs,
-    ) -> Option<Vec<SignificantChainEvent>>
+    async fn process_block(db: &Db, db_processor: &U, block: BlockWithLogs) -> Option<Vec<SignificantChainEvent>>
     where
         U: ChainLogHandler + 'static,
         Db: HoprDbLogOperations + 'static,
     {
-        let block_id = block_with_logs.block_id;
+        let block_id = block.block_id;
         debug!("Processing events from block {block_id}");
 
-        match db_processor.collect_block_events(block_with_logs.clone()).await {
+        match db_processor.collect_block_events(block.clone()).await {
             Ok(events) => {
-                match self.db.set_logs_processed(Some(block_id), Some(0)).await {
-                    Ok(_) => match self.db.update_logs_checksums().await {
-                        Ok(_) => self.print_indexer_state(block_with_logs).await,
+                match db.set_logs_processed(Some(block_id), Some(0)).await {
+                    Ok(_) => match db.update_logs_checksums().await {
+                        Ok(_) => Self::print_indexer_state(&db).await,
                         Err(e) => error!("Failed to update checksums for logs from block #{block_id}: {e}"),
                     },
                     Err(e) => error!("Failed to mark logs from block #{block_id} as processed: {e}"),
@@ -287,26 +322,14 @@ where
         }
     }
 
-    async fn store_block_logs(&self, block_with_logs: BlockWithLogs) -> crate::errors::Result<u64>
-    where
-        Db: HoprDbLogOperations + 'static,
-    {
-        debug!("Storing logs from {block_with_logs}");
-        self.db
-            .store_logs(block_with_logs.logs.into_iter().map(SerializableLog::from).collect())
-            .await?;
-
-        Ok(block_with_logs.block_id)
-    }
-
     // Printout indexer state, we can do this on every processed block because not
     // every block will have events
-    async fn print_indexer_state(&self, block_with_logs: BlockWithLogs) -> ()
+    async fn print_indexer_state(db: &Db) -> ()
     where
         Db: HoprDbLogOperations + 'static,
     {
-        match self.db.get_last_checksummed_log().await {
-            Ok(Some(log)) => match self.db.get_logs_count(Some(log.block_number), Some(0)).await {
+        match db.get_last_checksummed_log().await {
+            Ok(Some(log)) => match db.get_logs_count(Some(log.block_number), Some(0)).await {
                 Ok(count) => {
                     let checksum = log.checksum.unwrap();
                     info!(
@@ -334,9 +357,8 @@ where
     }
 
     async fn calculate_sync_process(
-        &self,
         prefix: &str,
-        block_with_logs: BlockWithLogs,
+        block: BlockWithLogs,
         rpc: &T,
         chain_head: Arc<AtomicU64>,
         is_synced: Arc<AtomicBool>,
@@ -346,9 +368,9 @@ where
     where
         T: HoprIndexerRpcOperations + 'static,
     {
-        info!("Processing block number: {}", block_with_logs.block_id);
+        info!("Processing block number: {}", block.block_id);
 
-        let current_block = block_with_logs.block_id;
+        let current_block = block.block_id;
         #[cfg(all(feature = "prometheus", not(test)))]
         {
             METRIC_INDEXER_CURRENT_BLOCK.set(current_block as f64);
@@ -391,7 +413,7 @@ where
             }
         }
 
-        block_with_logs
+        block
     }
 }
 
