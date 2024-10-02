@@ -357,7 +357,7 @@ impl HoprDbProtocolOperations for HoprDb {
                                 )
                                 .await;
 
-                            // Check that the calculated path position from the ticket matches value from the packet header
+                            // Check that the calculated path position from the ticket matches the value from the packet header
                             let ticket_path_pos = ticket.get_path_position(ticket_price.amount())?;
                             if !ticket_path_pos.eq(&path_pos) {
                                 return Err(DbSqlError::LogicalError(format!(
@@ -369,7 +369,7 @@ impl HoprDbProtocolOperations for HoprDb {
                             let ticket_builder = if ticket_path_pos == 1 {
                                 TicketBuilder::zero_hop().direction(&myself.me_onchain, &next_hop_addr)
                             } else {
-                                // We currently take maximum of the win prob on the ticket
+                                // We currently take the maximum of the win prob on the ticket
                                 // and the one configured on this node.
                                 // Therefore, the winning probability can only increase on the path.
                                 myself
@@ -401,9 +401,9 @@ impl HoprDbProtocolOperations for HoprDb {
                     Err(DbSqlError::TicketValidationError(boxed_error)) => {
                         let (rejected_ticket, error) = *boxed_error;
                         let rejected_value = rejected_ticket.amount;
-                        warn!("encountered validation error during forwarding for {rejected_ticket} with value: {rejected_value}");
+                        warn!("encountered validation error during forwarding for {rejected_ticket} with value: {rejected_value}: {error}");
 
-                        self.mark_ticket_rejected(&rejected_ticket).await.map_err(|e| {
+                        self.mark_unsaved_ticket_rejected(&rejected_ticket).await.map_err(|e| {
                             DbSqlError::TicketValidationError(Box::new((
                                 rejected_ticket.clone(),
                                 format!("during validation error '{error}' update another error occurred: {e}"),

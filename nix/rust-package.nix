@@ -1,5 +1,6 @@
 { buildDocs ? false
 , CARGO_PROFILE ? "release"
+, cargoExtraArgs ? ""
 , cargoToml
 , craneLib
 , curl
@@ -70,7 +71,7 @@ let
     buildInputs = [ openssl ] ++ stdenv.extraBuildInputs ++ darwinBuildInputs;
 
     CARGO_HOME = ".cargo";
-    cargoExtraArgs = "--offline -p ${pname} ";
+    cargoExtraArgs = "--offline -p ${pname} ${cargoExtraArgs}";
     cargoVendorDir = "vendor/cargo";
     # disable running tests automatically for now
     doCheck = false;

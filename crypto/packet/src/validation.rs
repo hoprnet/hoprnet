@@ -40,7 +40,12 @@ pub fn validate_unacknowledged_ticket(
     }
 
     // ticket must have at least required winning probability
-    if verified_ticket.win_prob() < required_win_prob {
+    if !f64_approx_eq(
+        verified_ticket.win_prob(),
+        required_win_prob,
+        LOWEST_POSSIBLE_WINNING_PROB,
+    ) && verified_ticket.win_prob() < required_win_prob
+    {
         return Err(TicketValidationError {
             reason: format!(
                 "ticket winning probability {} is lower than required winning probability {required_win_prob}",

@@ -55,7 +55,7 @@ enum Commands {
 
     /// Commands around winning probability
     #[command(visible_alias = "wp")]
-    WinProbModule {
+    WinProb {
         #[command(subcommand)]
         command: WinProbSubcommands,
     },
@@ -90,7 +90,7 @@ async fn main() -> Result<(), HelperErrors> {
         Commands::SafeModule { command } => {
             command.async_run().await?;
         }
-        Commands::WinProbModule { command } => {
+        Commands::WinProb { command } => {
             command.async_run().await?;
         }
     }
