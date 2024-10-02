@@ -388,6 +388,16 @@ class HoprdAPI:
         _, response = self.__call_api(MessagesApi, "peek_all", body=body)
         return response
 
+    async def messages_pop_all(self, tag: int = MESSAGE_TAG) -> dict:
+        """
+        Pop all messages from the inbox
+        :param: tag = 0x0320
+        :return: dict
+        """
+        body = TagQueryRequest(tag=tag)
+        _, response = self.__call_api(MessagesApi, "pop_all", body=body)
+        return response
+
     async def tickets_redeem(self):
         """
         Redeems all tickets.
@@ -443,9 +453,9 @@ class HoprdAPI:
         status, _ = self.__call_api(SessionApi, "close_client", body=body, protocol=protocol)
         return status
 
-    async def ticket_winn_prob(self):
+    async def ticket_min_win_prob(self):
         """
-        Returns the ticket winning probability.
+        Returns the minimum incoming ticket winning probability.
         :return: probability: float
         """
         _, response = self.__call_api(NetworkApi, "probability")

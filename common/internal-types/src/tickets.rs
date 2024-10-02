@@ -10,8 +10,8 @@ use tracing::{debug, error};
 
 use crate::errors;
 use crate::errors::CoreTypesError;
-use crate::prelude::generate_channel_id;
 use crate::prelude::CoreTypesError::InvalidInputData;
+use crate::prelude::{generate_channel_id, DEFAULT_OUTGOING_TICKET_WIN_PROB};
 
 /// Size-optimized encoding of the ticket, used for both,
 /// network transfer and in the smart contract.
@@ -31,10 +31,7 @@ const ALWAYS_WINNING: EncodedWinProb = hex!("ffffffffffffff");
 /// Encodes 0% winning probability
 const NEVER_WINNING: EncodedWinProb = hex!("00000000000000");
 
-/// Ticket winning probability
-pub const WINNING_PROB: f64 = 1.0;
-
-/// Helper function to checks if the given ticket values belong to a winning ticket.
+/// Helper function checks if the given ticket values belong to a winning ticket.
 pub(crate) fn check_ticket_win(
     ticket_hash: &Hash,
     ticket_signature: &Signature,
@@ -78,7 +75,7 @@ pub struct TicketBuilder {
     index_offset: u32,
     #[default = 1]
     channel_epoch: u32,
-    #[default(Some(WINNING_PROB))]
+    #[default(Some(DEFAULT_OUTGOING_TICKET_WIN_PROB))]
     win_prob: Option<f64>,
     win_prob_enc: Option<EncodedWinProb>,
     challenge: Option<EthereumChallenge>,
@@ -179,8 +176,8 @@ impl TicketBuilder {
     }
 
     /// Sets the encoded ticket winning probability.
-    /// Mutually exlusive with [TicketBuilder::win_prob].
-    /// Defaults to encoded [WINNING_PROB]
+    /// Mutually exclusive with [TicketBuilder::win_prob].
+    /// Defaults to [ALWAYS_WINNING].
     #[must_use]
     pub fn win_prob_encoded(mut self, win_prob: EncodedWinProb) -> Self {
         self.win_prob = None;
@@ -594,21 +591,10 @@ impl VerifiedTicket {
     ///
     /// Does not support path lengths greater than 255.
     pub fn get_path_position(&self, price_per_packet: U256) -> errors::Result<u8> {
-        let mut win_prob = [0u8; 8];
-        win_prob[1..].copy_from_slice(&self.0.encoded_win_prob);
-
-        // Add + 1 to project interval [0x00ffffffffffff, 0x00000000000000] to [0x00000000000001, 0x01000000000000]
-        // Add + 1 to "round to next integer"
-        let win_prob = (u64::from_be_bytes(win_prob) >> 4) + 1 + 1;
-
-        let expected_payout = (self.0.amount.amount() * U256::from(win_prob)) >> U256::from(52_u64);
-
-        (expected_payout / price_per_packet)
-            .as_u64()
-            .try_into() // convert to u8
-            .map_err(|_| {
-                CoreTypesError::ArithmeticError(format!("Cannot convert {} to u8", price_per_packet / expected_payout))
-            })
+        let pos = self.0.amount.amount() / price_per_packet.div_f64(self.win_prob())?;
+        pos.as_u64()
+            .try_into() // convert to u8 = makes sure it's < 256
+            .map_err(|_| CoreTypesError::ArithmeticError(format!("Cannot convert {pos} to u8")))
     }
 
     /// Ticket with already verified signature.

@@ -1227,7 +1227,7 @@ dependencies = [
 
 [[package]]
 name = "chain-indexer"
-version = "0.3.1"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "async-channel 2.3.1",
@@ -1253,6 +1253,7 @@ dependencies = [
  "primitive-types",
  "sea-orm",
  "smart-default",
+ "test-log",
  "thiserror",
  "tracing",
 ]
@@ -2724,6 +2725,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "float-cmp"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b09cf3155332e944990140d967ff5eceb70df778b34f77d8075db46e4704e6d8"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
 name = "flume"
 version = "0.9.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3871,7 +3881,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-crypto-packet"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "anyhow",
  "async-std",
@@ -3959,7 +3969,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-api"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "futures",
@@ -4007,7 +4017,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-sql"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "async-lock 3.4.0",
@@ -4047,7 +4057,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-internal-types"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "aquamarine",
@@ -4194,6 +4204,7 @@ name = "hopr-primitive-types"
 version = "0.4.0"
 dependencies = [
  "anyhow",
+ "float-cmp",
  "hex",
  "hex-literal",
  "hopr-crypto-random",
@@ -4427,7 +4438,7 @@ dependencies = [
 
 [[package]]
 name = "hoprd-api"
-version = "3.4.0"
+version = "3.3.1"
 dependencies = [
  "anyhow",
  "async-broadcast",

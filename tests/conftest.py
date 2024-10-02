@@ -4,11 +4,11 @@ import json
 import logging
 import os
 import random
+import re
 import shutil
-import socket
 from copy import deepcopy
 from pathlib import Path
-from subprocess import run
+from subprocess import run, Popen, PIPE, STDOUT, CalledProcessError
 
 import pytest
 
@@ -58,7 +58,6 @@ FIXTURES_PREFIX = "hopr"
 NODE_NAME_PREFIX = f"{FIXTURES_PREFIX}-node"
 
 NETWORK1 = "anvil-localhost"
-NETWORK2 = "anvil-localhost2"
 
 API_TOKEN = "e2e-API-token^^"
 PASSWORD = "e2e-test"
@@ -144,15 +143,8 @@ NODES = {
         6,
         API_TOKEN,
         LOCALHOST,
-        NETWORK2,
-        "barebone.cfg.yaml",
-    ),
-    "7": Node(
-        7,
-        API_TOKEN,
-        "localhost",
         NETWORK1,
-        "barebone.cfg.yaml",
+        "barebone-lower-win-prob.cfg.yaml",
     ),
 }
 
@@ -172,24 +164,13 @@ def default_nodes():
     return ["5"]
 
 
-def nodes_with_different_network():
-    """Nodes with different network"""
-    return ["6", "7"]
+def nodes_with_lower_outgoing_win_prob():
+    """Nodes with outgoing ticket winning probability"""
+    return ["6"]
 
 
 def random_distinct_pairs_from(values: list, count: int):
     return random.sample([(left, right) for left, right in itertools.product(values, repeat=2) if left != right], count)
-
-
-def check_socket(address: str, port: str):
-    s = socket.socket()
-    try:
-        s.connect((address, port))
-        return True
-    except Exception:
-        return False
-    finally:
-        s.close()
 
 
 def mirror_contract_data(dest_file_path: Path, src_file_path: Path, src_network: str, dest_network: str):
@@ -260,6 +241,9 @@ def snapshot_reuse(parent_dir: Path, nodes):
         parent_dir.joinpath(f.name).unlink(missing_ok=True)
         shutil.copy(f, parent_dir)
 
+    # copy protocol-config.json
+    shutil.copy(sdir.joinpath("protocol-config.json"), parent_dir)
+
     # copy node data
     for i in range(len(nodes)):
         node_target_dir = parent_dir.joinpath(f"{NODE_NAME_PREFIX}_{i+1}/db/")
@@ -296,6 +280,9 @@ def snapshot_create(anvil_port, parent_dir: Path, nodes):
     for f in parent_dir.glob("*.cfg.yaml"):
         shutil.copy(f, sdir)
 
+    # copy protocol config file
+    shutil.copy(parent_dir.joinpath("protocol-config.json"), sdir)
+
     # copy node data and env files
     for i in range(len(nodes)):
         node_dir = parent_dir.joinpath(f"{NODE_NAME_PREFIX}_{i+1}")
@@ -315,15 +302,22 @@ def snapshot_usable(parent_dir: Path, nodes):
         "anvil.state.json",
         "barebone.cfg.yaml",
         "default.cfg.yaml",
+        "protocol-config.json",
     ]
     for i in range(len(nodes)):
-        node_dir = parent_dir.joinpath(f"{NODE_NAME_PREFIX}_{i+1}")
+        node_dir = f"{NODE_NAME_PREFIX}_{i+1}"
         expected_files.append(f"{node_dir}/db/hopr_index.db")
         expected_files.append(f"{node_dir}/db/hopr_index.db-shm")
         expected_files.append(f"{node_dir}/db/hopr_index.db-wal")
         expected_files.append(f"{node_dir}.env")
 
-    return all([sdir.joinpath(f).exists() for f in expected_files])
+    for f in expected_files:
+        file_path = sdir.joinpath(f)
+        if not file_path.exists():
+            logging.info(f"Cannot find {file_path} in snapshot")
+            return False
+
+    return True
 
 
 def fund_nodes(test_suite_name, test_dir: Path, anvil_port):
@@ -400,6 +394,10 @@ async def shared_nodes_bringup(
         # FUND NODES
         logging.info("Funding nodes")
         fund_nodes(test_suite_name, test_dir, anvil_port)
+
+    async def is_node_ready(target: Node):
+        while not await asyncio.wait_for(target.api.readyz(), timeout=10):
+            await asyncio.sleep(1)
 
     # WAIT FOR NODES TO BE UP
     timeout = 60
@@ -513,10 +511,8 @@ async def swarm7(request):
         )
 
         logging.info("Mirror contract data because of anvil-deploy node only writing to localhost")
-
         shutil.copy(INPUT_PROTOCOL_CONFIG_FILE, protocol_config_file(test_suite_name))
         mirror_contract_data(protocol_config_file(test_suite_name), INPUT_DEPLOYMENTS_SUMMARY_FILE, NETWORK1, NETWORK1)
-        mirror_contract_data(protocol_config_file(test_suite_name), INPUT_DEPLOYMENTS_SUMMARY_FILE, NETWORK1, NETWORK2)
 
         # SETUP NODES USING STORED IDENTITIES
         logging.info("Using pre-generated identities and configs")
@@ -552,6 +548,7 @@ async def swarm7(request):
     snapshot_reuse(test_dir, nodes)
 
     logging.info("Starting and waiting for local anvil server to be up (load state enabled)")
+
     run(
         f"""./run-local-anvil.sh 
         -s
@@ -600,3 +597,16 @@ async def teardown(swarm7: dict[str, Node]):
 
 def to_ws_url(host, port):
     return f"ws://{host}:{port}/api/v3/messages/websocket"
+
+
+def run_hopli_cmd(cmd: list[str], custom_env):
+    env = os.environ | custom_env
+    proc = Popen(cmd, env=env, stdout=PIPE, stderr=STDOUT, bufsize=0)
+    # filter out ansi color codes
+    color_regex = re.compile(r"\x1b\[\d{,3}m")
+    with proc.stdout:
+        for line in iter(proc.stdout.readline, b""):
+            logging.info("[Hopli] %r", color_regex.sub("", line.decode("utf-8")[:-1]))
+    retcode = proc.wait()
+    if retcode:
+        raise CalledProcessError(retcode, cmd)
