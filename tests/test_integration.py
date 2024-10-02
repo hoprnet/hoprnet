@@ -1,11 +1,10 @@
 import asyncio
-import pytest
 import random
 import re
 import string
-
 from contextlib import AsyncExitStack
 
+import pytest
 
 from .conftest import (
     OPEN_CHANNEL_FUNDING_VALUE_HOPR,
@@ -14,18 +13,30 @@ from .conftest import (
     TICKET_PRICE_PER_HOP,
     barebone_nodes,
     default_nodes,
-    random_distinct_pairs_from
+    random_distinct_pairs_from,
 )
 from .hopr import HoprdAPI
 from .node import Node
-
-from .utils import PARAMETERIZED_SAMPLE_SIZE, balance_str_to_int, gen_random_tag, send_and_receive_packets_with_pop, \
-    shuffled, create_channel, check_native_balance_below, check_safe_balance, check_all_tickets_redeemed, \
-    check_unredeemed_tickets_value, check_rejected_tickets_value, check_min_incoming_win_prob_eq, \
-    check_received_packets_with_peek, MULTIHOP_MESSAGE_SEND_TIMEOUT
+from .utils import (
+    MULTIHOP_MESSAGE_SEND_TIMEOUT,
+    PARAMETERIZED_SAMPLE_SIZE,
+    balance_str_to_int,
+    check_all_tickets_redeemed,
+    check_min_incoming_win_prob_eq,
+    check_native_balance_below,
+    check_received_packets_with_peek,
+    check_rejected_tickets_value,
+    check_safe_balance,
+    check_unredeemed_tickets_value,
+    create_channel,
+    gen_random_tag,
+    send_and_receive_packets_with_pop,
+    shuffled,
+)
 
 # used by nodes to get unique port assignments
 PORT_BASE = 19000
+
 
 # NOTE: this test is first, ensuring that all tests following it have ensured connectivity and
 # correct ticket price from api
@@ -125,6 +136,7 @@ async def test_hoprd_ping_should_not_be_able_to_ping_nodes_not_present_in_the_re
     """
     assert True
 
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize("src, dest", random_distinct_pairs_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
 async def test_hoprd_should_be_able_to_send_0_hop_messages_without_open_channels(
@@ -212,8 +224,10 @@ async def test_reset_ticket_statistics_from_metrics(src: Node, dest: Node, swarm
     await swarm7[dest].api.reset_tickets_statistics()
 
     assert count_metrics(await swarm7[dest].api.metrics()) == 0
-    
-    
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("src,dest", [tuple(shuffled(barebone_nodes())[:2]) for _ in range(PARAMETERIZED_SAMPLE_SIZE)])
 async def test_hoprd_should_fail_sending_a_message_when_the_channel_is_out_of_funding(
     src: str, dest: str, swarm7: dict[str, Node]
 ):
@@ -417,6 +431,7 @@ async def test_hoprd_check_ticket_price_is_default(peer, swarm7: dict[str, Node]
 
     assert isinstance(price, int)
     assert price > 0
+
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("tag", [random.randint(0, RESERVED_TAG_UPPER_BOUND) for _ in range(5)])
