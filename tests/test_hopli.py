@@ -1,8 +1,8 @@
 import json
 import logging
 import os
-from subprocess import run, CalledProcessError
-
+import random
+from subprocess import CalledProcessError, run
 
 import pytest
 
@@ -13,7 +13,8 @@ from .conftest import (
     PASSWORD,
     barebone_nodes,
     fixtures_dir,
-    load_private_key, run_hopli_cmd,
+    load_private_key,
+    run_hopli_cmd,
 )
 from .node import Node
 from .test_integration import balance_str_to_int
@@ -34,7 +35,7 @@ def run_cast_cmd(cmd: str, params: list[str]):
     except CalledProcessError as e:
         logging.error("Error executing cast command: %s", str(e))
         raise
-        
+
 
 def faucet(private_key: str, hopr_amount: str, native_amount: str):
     test_suite_name = __name__.split(".")[-1]
@@ -354,6 +355,7 @@ def get_win_prob():
         custom_env,
     )
 
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
 @pytest.mark.xfail(reason="race-conditions lead to incorrect balances on nodes")
@@ -499,9 +501,10 @@ async def test_hopli_should_be_able_to_create_safe_module(swarm7: dict[str, Node
     # Remove the created identity
     run(["rm", "-f", test_dir.joinpath(f"{FIXTURES_PREFIX_NEW}{extra_prefix}0.id")], check=True, capture_output=True)
 
+
 @pytest.mark.asyncio
 async def test_hopli_should_be_able_to_set_and_read_win_prob():
-    test_suite_name = __name__.split('.')[-1]
+    test_suite_name = __name__.split(".")[-1]
 
     # READ CONTRACT ADDRESS
     with open(INPUT_DEPLOYMENTS_SUMMARY_FILE, "r") as file:
@@ -510,11 +513,12 @@ async def test_hopli_should_be_able_to_set_and_read_win_prob():
 
     # get current win prob
     get_win_prob()
-    old_win_prob = run_cast_cmd(
-        "call", [win_prob_oracle, "currentWinProb()()"]
-    )
+    old_win_prob = run_cast_cmd("call", [win_prob_oracle, "currentWinProb()()"])
     logging.info("old_win_prob %s", old_win_prob.stdout.decode("utf-8").split("is")[0].split("\n")[0].lower())
-    assert old_win_prob.stdout.decode("utf-8").split("is")[0].split("\n")[0].lower() == "0x00000000000000000000000000000000000000000000000000ffffffffffffff"
+    assert (
+        old_win_prob.stdout.decode("utf-8").split("is")[0].split("\n")[0].lower()
+        == "0x00000000000000000000000000000000000000000000000000ffffffffffffff"
+    )
 
     # set new win prob
     private_key = load_private_key(test_suite_name)
@@ -522,8 +526,9 @@ async def test_hopli_should_be_able_to_set_and_read_win_prob():
 
     # get new win prob
     get_win_prob()
-    new_win_prob = run_cast_cmd(
-        "call", [win_prob_oracle, "currentWinProb()()"]
-    )
+    new_win_prob = run_cast_cmd("call", [win_prob_oracle, "currentWinProb()()"])
     logging.info("new_win_prob %s", new_win_prob.stdout.decode("utf-8").split("is")[0].split("\n")[0].lower())
-    assert new_win_prob.stdout.decode("utf-8").split("is")[0].split("\n")[0].lower() == "0x000000000000000000000000000000000000000000000000007fffffffffffff"
+    assert (
+        new_win_prob.stdout.decode("utf-8").split("is")[0].split("\n")[0].lower()
+        == "0x000000000000000000000000000000000000000000000000007fffffffffffff"
+    )
