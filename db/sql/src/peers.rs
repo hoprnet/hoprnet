@@ -1,4 +1,4 @@
-use std::{str::FromStr, time::Duration};
+use std::time::Duration;
 
 use async_stream::stream;
 use async_trait::async_trait;
@@ -69,12 +69,9 @@ impl HoprDbPeersOperations for HoprDb {
                     .as_ref(),
             )),
             multi_addresses: sea_orm::ActiveValue::Set(
-                mas.into_iter()
-                    .map(|m| m.to_string())
-                    .collect::<Vec<String>>()
-                    .join(","),
+                mas.into_iter().map(|m| m.to_string()).collect::<Vec<String>>().into(),
             ),
-            origin: sea_orm::ActiveValue::Set((origin as u8).into()),
+            origin: sea_orm::ActiveValue::Set(origin as i8),
             backoff: sea_orm::ActiveValue::Set(Some(backoff)),
             quality_sma: sea_orm::ActiveValue::Set(Some(
                 bincode::serialize(&SingleSumSMA::<f64>::new(quality_window as usize))
@@ -127,14 +124,13 @@ impl HoprDbPeersOperations for HoprDb {
                     .into_iter()
                     .map(|m| m.to_string())
                     .collect::<Vec<String>>()
-                    .join(","),
+                    .into(),
             );
-            peer_data.origin = sea_orm::ActiveValue::Set((new_status.origin as u8).into());
+            peer_data.origin = sea_orm::ActiveValue::Set(new_status.origin as i8);
             peer_data.version = sea_orm::ActiveValue::Set(new_status.peer_version);
-            peer_data.last_seen = sea_orm::ActiveValue::Set(DateTime::<Utc>::from(new_status.last_seen).to_string());
+            peer_data.last_seen = sea_orm::ActiveValue::Set(DateTime::<Utc>::from(new_status.last_seen));
             peer_data.last_seen_latency = sea_orm::ActiveValue::Set(new_status.last_seen_latency.as_millis() as i32);
-            peer_data.ignored =
-                sea_orm::ActiveValue::Set(new_status.ignored.map(|v| DateTime::<Utc>::from(v).to_string()));
+            peer_data.ignored = sea_orm::ActiveValue::Set(new_status.ignored.map(DateTime::<Utc>::from));
             peer_data.public = sea_orm::ActiveValue::Set(new_status.is_public);
             peer_data.quality = sea_orm::ActiveValue::Set(new_status.quality);
             peer_data.quality_sma = sea_orm::ActiveValue::Set(Some(
@@ -281,30 +277,31 @@ impl TryFrom<hopr_db_entity::network_peer::Model> for WrappedPeerStatus {
             id: (key, key.into()),
             origin: PeerOrigin::try_from(value.origin as u8).map_err(|_| Self::Error::DecodingError)?,
             is_public: value.public,
-            last_seen: chrono::DateTime::<chrono::Utc>::from_str(&value.last_seen)
-                .map_err(|_| Self::Error::DecodingError)?
-                .into(),
+            last_seen: value.last_seen.into(),
             last_seen_latency: Duration::from_millis(value.last_seen_latency as u64),
             heartbeats_sent: value.heartbeats_sent.unwrap_or_default() as u64,
             heartbeats_succeeded: value.heartbeats_successful.unwrap_or_default() as u64,
-            backoff: value.backoff.unwrap_or(1.0),
-            ignored: if let Some(v) = value.ignored {
-                Some(
-                    chrono::DateTime::<chrono::Utc>::from_str(&v)
-                        .map_err(|_| Self::Error::DecodingError)?
-                        .into(),
-                )
-            } else {
-                None
-            },
+            backoff: value.backoff.unwrap_or(1.0f64),
+            ignored: value.ignored.map(|v| v.into()),
             peer_version: value.version,
-            multiaddresses: value
-                .multi_addresses
-                .split(',')
-                .filter(|s| !s.trim().is_empty())
-                .map(Multiaddr::try_from)
-                .collect::<core::result::Result<Vec<_>, multiaddr::Error>>()
-                .map_err(|_| Self::Error::DecodingError)?,
+            multiaddresses: {
+                if let sea_orm::query::JsonValue::Array(mas) = value.multi_addresses {
+                    mas.into_iter()
+                        .filter_map(|s| {
+                            if let sea_orm::query::JsonValue::String(s) = s {
+                                Some(s)
+                            } else {
+                                None
+                            }
+                        })
+                        .filter(|s| !s.trim().is_empty())
+                        .map(Multiaddr::try_from)
+                        .collect::<std::result::Result<Vec<_>, multiaddr::Error>>()
+                        .map_err(|_| Self::Error::DecodingError)
+                } else {
+                    Err(Self::Error::DecodingError)
+                }?
+            },
             quality: value.quality,
             quality_avg: bincode::deserialize(
                 value
@@ -443,6 +440,7 @@ mod tests {
         for i in [0.1_f64, 0.4_64, 0.6_f64].into_iter() {
             peer_status.update_quality(i);
         }
+        peer_status.quality = peer_status.quality as f32 as f64;
 
         let peer_status_from_db = db.get_network_peer(&peer_id).await?.expect("entry should exist");
 

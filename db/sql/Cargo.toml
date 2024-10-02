@@ -1,6 +1,6 @@
 [package]
 name = "hopr-db-sql"
-version = "0.5.0"
+version = "0.6.0"
 edition = "2021"
 description = "Contains SQL DB functionality implementing the DB API traits to be used by other crates in the code base"
 homepage = "https://hoprnet.org/"
@@ -36,7 +36,7 @@ libp2p-identity = { workspace = true }
 moka = { workspace = true }
 multiaddr = { workspace = true }
 sea-orm = { workspace = true }
-sea-query = { version = "0.30.7", default-features = false, features = [
+sea-query = { workspace = true, default-features = false, features = [
   "with-chrono",
   "derive",
   "backend-sqlite",
@@ -64,7 +64,7 @@ anyhow = { workspace = true }
 async-std = { workspace = true }
 rand = { workspace = true }
 sea-orm = { workspace = true, features = ["runtime-async-std-rustls"] }
-sea-query-binder = { version = "0.5.0", default-features = false, features = [
+sea-query-binder = { workspace = true, default-features = false, features = [
   "with-chrono",
   "sqlx-sqlite",
   "runtime-async-std-rustls",

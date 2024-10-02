@@ -55,9 +55,10 @@ jobs:
 
       - name: Run unit tests
         run: |
+          # run sc tests
           nix develop -c make -j smart-contract-test
-          nix build .#hoprd-test
-          nix build .#hopli-test
+          # run rust unit tests for entire workspace
+          nix build -L .#hopr-test
         env:
           HOPR_NETWORK: anvil-localhost
 
@@ -80,6 +81,11 @@ jobs:
           token_format: "access_token"
           credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
 
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          version: '>= 363.0.0'
+
       - name: Install Nix
         if: env.needs_nix_setup == 'true'
         uses: cachix/install-nix-action@v27
@@ -94,26 +100,27 @@ jobs:
         env:
           USER: runner
 
-      - name: Download snapshot for test_websocket_api
+      - name: Download snapshot
         id: download-snapshot
         if: ${{ !env.ACT }}
         run: |
           mkdir -p /tmp/hopr-smoke-test/test_websocket_api/snapshot
-          gcloud storage rsync gs://hoprnet-test-artifacts/websocket_api/snapshot /tmp/hopr-smoke-test/test_websocket_api/snapshot
+          gcloud storage rsync gs://hoprnet-test-artifacts/smoke_test_snapshot/snapshot /tmp/hopr-smoke-test/test_websocket_api/snapshot --recursive
         continue-on-error: true
 
-      - name: Check snapshot for test_websocket_api
+      - name: Check snapshot
         run: ls -lR /tmp/hopr-smoke-test/test_websocket_api/snapshot || echo "no snapshot found"
 
       - name: Run smoke tests websocket
         run: nix develop .#smoke-tests -c python3 -m pytest tests/test_websocket_api.py
 
-      - name: Upload snapshot for test_websocket_api
+      - name: Upload snapshot
         uses: "google-github-actions/upload-cloud-storage@v2"
         if: ${{ !env.ACT && always() && steps.download-snapshot.outcome != 'success' }}
         with:
           path: /tmp/hopr-smoke-test/test_websocket_api/snapshot
-          destination: hoprnet-test-artifacts/websocket_api
+          destination: hoprnet-test-artifacts/smoke_test_snapshot
+          gzip: false
 
       - name: Compress test logs
         if: ${{ !env.ACT && always() }}
@@ -146,10 +153,14 @@ jobs:
     env:
       needs_nix_setup: true
     strategy:
+      fail-fast: false
       matrix:
         suite:
           - integration
+          - redeeming
+          - rest_api
           - session
+          - win_prob
           - hopli
     if: github.event.pull_request.draft == false
     steps:
@@ -163,6 +174,11 @@ jobs:
         with:
           token_format: "access_token"
           credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          version: '>= 363.0.0'
 
       - name: Install Nix
         if: env.needs_nix_setup == 'true'
@@ -178,26 +194,27 @@ jobs:
         env:
           USER: runner
 
-      - name: Download snapshot for test_${{ matrix.suite }}
+      - name: Download snapshot
         id: download-snapshot
         if: ${{ !env.ACT }}
         run: |
           mkdir -p /tmp/hopr-smoke-test/test_${{ matrix.suite }}/snapshot
-          gcloud storage rsync gs://hoprnet-test-artifacts/${{ matrix.suite }}/snapshot /tmp/hopr-smoke-test/test_${{ matrix.suite }}/snapshot
+          gcloud storage rsync gs://hoprnet-test-artifacts/smoke_test_snapshot/snapshot /tmp/hopr-smoke-test/test_${{ matrix.suite }}/snapshot --recursive
         continue-on-error: true
 
-      - name: Check snapshot for test_${{ matrix.suite }}
+      - name: Check snapshot
         run: ls -lR /tmp/hopr-smoke-test/test_${{ matrix.suite }}/snapshot || echo "no snapshot found"
 
       - name: Run smoke tests ${{ matrix.suite }}
         run: nix develop .#smoke-tests -c python3 -m pytest tests/test_${{ matrix.suite }}.py
 
-      - name: Upload snapshot for test_${{ matrix.suite }}
+      - name: Upload snapshot
         uses: "google-github-actions/upload-cloud-storage@v2"
         if: ${{ !env.ACT && always() && steps.download-snapshot.outcome != 'success' }}
         with:
           path: /tmp/hopr-smoke-test/test_${{ matrix.suite }}/snapshot
-          destination: hoprnet-test-artifacts/${{ matrix.suite }}
+          destination: hoprnet-test-artifacts/smoke_test_snapshot
+          gzip: false
 
       - name: Compress test logs
         if: ${{ !env.ACT && always() }}

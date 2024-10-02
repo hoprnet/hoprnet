@@ -280,7 +280,7 @@ impl HoprDbInfoOperations for HoprDb {
                                     safe_registry_dst,
                                     channels_dst,
                                     ticket_price: model.ticket_price.map(|p| BalanceType::HOPR.balance_bytes(p)),
-                                    minimum_incoming_ticket_winning_prob: model.min_incoming_ticket_win_prob,
+                                    minimum_incoming_ticket_winning_prob: model.min_incoming_ticket_win_prob as f64,
                                     nr_enabled: model.network_registry_enabled,
                                 }))
                             })
@@ -342,7 +342,7 @@ impl HoprDbInfoOperations for HoprDb {
                 Box::pin(async move {
                     chain_info::ActiveModel {
                         id: Set(SINGULAR_TABLE_FIXED_ID),
-                        min_incoming_ticket_win_prob: Set(win_prob),
+                        min_incoming_ticket_win_prob: Set(win_prob as f32),
                         ..Default::default()
                     }
                     .update(tx.as_ref())

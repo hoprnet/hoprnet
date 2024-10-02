@@ -13,6 +13,7 @@ pub mod topics {
         hopr_node_safe_registry::{DergisteredNodeSafeFilter, RegisteredNodeSafeFilter},
         hopr_ticket_price_oracle::TicketPriceUpdatedFilter,
         hopr_token::{ApprovalFilter, TransferFilter},
+        hopr_winning_probability_oracle::WinProbUpdatedFilter,
     };
     use ethers::{contract::EthEvent, types::TxHash};
 
@@ -63,6 +64,10 @@ pub mod topics {
 
     pub fn ticket_price_oracle() -> Vec<TxHash> {
         vec![TicketPriceUpdatedFilter::signature()]
+    }
+
+    pub fn winning_prob_oracle() -> Vec<TxHash> {
+        vec![WinProbUpdatedFilter::signature()]
     }
 
     pub fn module_implementation() -> Vec<TxHash> {

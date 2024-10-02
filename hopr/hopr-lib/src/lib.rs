@@ -549,6 +549,7 @@ impl Hopr {
                 channels: resolved_environment.channels,
                 token: resolved_environment.token,
                 price_oracle: resolved_environment.ticket_price_oracle,
+                win_prob_oracle: resolved_environment.winning_probability_oracle,
                 network_registry: resolved_environment.network_registry,
                 network_registry_proxy: resolved_environment.network_registry_proxy,
                 stake_factory: resolved_environment.node_stake_v2_factory,
@@ -1212,9 +1213,13 @@ impl Hopr {
         Ok(self.chain_api.ticket_price().await?)
     }
 
-    /// Get ticket winning probability
-    pub async fn get_ticket_probability(&self) -> errors::Result<f64> {
-        Ok(hopr_internal_types::tickets::WINNING_PROB)
+    /// Get minimum incoming ticket winning probability
+    pub async fn get_minimum_incoming_ticket_win_probability(&self) -> errors::Result<f64> {
+        Ok(self
+            .db
+            .get_indexer_data(None)
+            .await?
+            .minimum_incoming_ticket_winning_prob)
     }
 
     /// List of all accounts announced on the chain

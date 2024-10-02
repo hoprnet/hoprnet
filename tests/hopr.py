@@ -369,6 +369,16 @@ class HoprdAPI:
         _, response = self.__call_api(MessagesApi, "peek_all", body=body)
         return response
 
+    async def messages_pop_all(self, tag: int = MESSAGE_TAG) -> dict:
+        """
+        Pop all messages from the inbox
+        :param: tag = 0x0320
+        :return: dict
+        """
+        body = TagQueryRequest(tag=tag)
+        _, response = self.__call_api(MessagesApi, "pop_all", body=body)
+        return response
+
     async def tickets_redeem(self):
         """
         Redeems all tickets.
@@ -385,12 +395,20 @@ class HoprdAPI:
         _, response = self.__call_api(NetworkApi, "price")
         return int(response.price) if hasattr(response, "price") else None
 
-    async def session_client(self, destination: str, path: str, protocol: str, target: str):
+    async def session_client(self, destination: str, path: str, protocol: str, target: str, listen_on: str = "127.0.0.1:0", capabilities=None):
         """
         Returns the port of the client session.
-        :return: port: int
+        :param destination: Peer ID of the session exit node.
+        :param path: Routing options for the session.
+        :param protocol: Transport protocol for the session (TCP/UDP).
+        :param target: Destination for the session packets.
+        :param listen_on: The host to listen on for input packets (default: "127.0.0.1:0")
+        :param capabilities: Optional list of capabilities for the session (default: None)
         """
-        body = SessionClientRequest(destination=destination, path=path, target=target)
+        if capabilities is None:
+            body = SessionClientRequest(destination=destination, path=path, target=target, listen_host=listen_on)
+        else:
+            body = SessionClientRequest(destination=destination, path=path, target=target, listen_host=listen_on, capabilities=capabilities)
 
         _, response = self.__call_api(SessionApi, "create_client", body=body, protocol=protocol)
         return int(response.port) if hasattr(response, "port") else None
@@ -412,9 +430,9 @@ class HoprdAPI:
         status, _ = self.__call_api(SessionApi, "close_client", body=body, protocol=protocol)
         return status
 
-    async def ticket_winn_prob(self):
+    async def ticket_min_win_prob(self):
         """
-        Returns the ticket winning probability.
+        Returns the minimum incoming ticket winning probability.
         :return: probability: float
         """
         _, response = self.__call_api(NetworkApi, "probability")

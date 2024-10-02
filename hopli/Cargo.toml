@@ -1,6 +1,6 @@
 [package]
 name = "hopli"
-version = "0.6.0"
+version = "0.7.0"
 edition = "2021"
 license = "GPL-3.0-only"
 
@@ -23,6 +23,7 @@ tracing-subscriber = { workspace = true }
 uuid = { workspace = true }
 chain-rpc = { workspace = true }
 chain-api = { workspace = true }
+hopr-internal-types = { workspace = true }
 hopr-lib = { workspace = true, features = ["runtime-async-std"] }
 chain-types = { workspace = true }
 async-std = { workspace = true, features = ["attributes"] }
