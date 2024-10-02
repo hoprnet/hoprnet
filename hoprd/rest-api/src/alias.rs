@@ -140,7 +140,7 @@ pub(super) async fn get_alias(
         Ok(Some(entry)) => (
             StatusCode::OK,
             Json(PeerIdResponse {
-                peer_id: PeerId::from_bytes(&entry.as_bytes()).unwrap(),
+                peer_id: PeerId::from_bytes(entry.as_bytes()).unwrap(),
             }),
         )
             .into_response(),

@@ -217,6 +217,7 @@ pub async fn serve_api(params: RestApiParameters) -> Result<(), std::io::Error> 
     axum::serve(listener, router).await
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn build_api(
     hoprd_cfg: String,
     cfg: crate::config::Api,
