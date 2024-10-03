@@ -4,9 +4,10 @@ use axum::{
     response::IntoResponse,
 };
 use hopr_lib::{errors::HoprStatusError, HoprTransportError, Multiaddr};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr, DurationMilliSeconds};
 use std::{sync::Arc, time::Duration};
+use tracing::debug;
 
 use hopr_lib::errors::HoprLibError;
 
@@ -31,9 +32,12 @@ pub(crate) struct NodePeerInfoResponse {
     observed: Vec<Multiaddr>,
 }
 
-#[derive(Deserialize)]
+#[serde_as]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct PeerIdParams {
+pub(crate) struct DestinationParams {
+    #[serde_as(as = "DisplayFromStr")]
+    #[schema(value_type = String)]
     destination: PeerOrAddress,
 }
 
@@ -43,13 +47,13 @@ pub(crate) struct PeerIdParams {
 /// and peer ids that are actually `observed` by the transport layer.
 #[utoipa::path(
     get,
-    path = const_format::formatcp!("{BASE_PATH}/peers/{{peerId}}"),
+    path = const_format::formatcp!("{BASE_PATH}/peers/{{destination}}"),
     params(
-        ("peerId" = String, Path, description = "PeerID of the requested peer")
+        ("destination" = String, Path, description = "PeerID or address of the requested peer")
     ),
     responses(
         (status = 200, description = "Peer information fetched successfully.", body = NodePeerInfoResponse),
-        (status = 400, description = "Invalid peer id", body = ApiError),
+        (status = 400, description = "Invalid destination", body = ApiError),
         (status = 401, description = "Invalid authorization token.", body = ApiError),
         (status = 422, description = "Unknown failure", body = ApiError)
     ),
@@ -60,7 +64,7 @@ pub(crate) struct PeerIdParams {
     tag = "Peers",
 )]
 pub(super) async fn show_peer_info(
-    Path(PeerIdParams { destination }): Path<PeerIdParams>,
+    Path(DestinationParams { destination }): Path<DestinationParams>,
     State(state): State<Arc<InternalState>>,
 ) -> impl IntoResponse {
     let hopr = state.hopr.clone();
@@ -101,9 +105,9 @@ pub(crate) struct PingResponse {
 /// Directly pings the given peer.
 #[utoipa::path(
     post,
-    path = const_format::formatcp!("{BASE_PATH}/peers/{{peerId}}/ping"),
+    path = const_format::formatcp!("{BASE_PATH}/peers/{{destination}}/ping"),
     params(
-        ("peerId" = String, Path, description = "PeerID of the requested peer")
+        ("destination" = String, Path, description = "PeerID or address of the requested peer")
     ),
     responses(
         (status = 200, description = "Ping successful", body = PingResponse),
@@ -119,11 +123,14 @@ pub(crate) struct PingResponse {
     tag = "Peers",
 )]
 pub(super) async fn ping_peer(
-    Path(PeerIdParams { destination }): Path<PeerIdParams>,
+    Path(DestinationParams { destination }): Path<DestinationParams>,
     State(state): State<Arc<InternalState>>,
 ) -> Result<impl IntoResponse, ApiError> {
+    debug!("Ping peer {:?}", destination);
+
     let hopr = state.hopr.clone();
     let destination = destination.clone().fullfill(&hopr.hopr_db()).await;
+
     if destination.is_err() {
         return Ok((StatusCode::NOT_FOUND, ApiErrorStatus::InvalidInput).into_response());
     }

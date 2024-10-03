@@ -9,7 +9,6 @@ use axum::{
 };
 use futures::{sink::SinkExt, stream::StreamExt};
 use futures_concurrency::stream::Merge;
-use libp2p_identity::PeerId;
 use serde::Deserialize;
 use serde_json::json;
 use serde_with::{serde_as, Bytes, DisplayFromStr, DurationMilliSeconds};
@@ -45,7 +44,7 @@ pub(crate) struct SizeResponse {
         "path": [
             "12D3KooWR4uwjKCDCAY1xsEFB4esuWLF9Q5ijYvCjz5PNkTbnu33"
         ],
-        "peerId": "12D3KooWEDc1vGJevww48trVDDf6pr1f6N3F86sGJfQrKCyc8kJ1",
+        "destination": "12D3KooWEDc1vGJevww48trVDDf6pr1f6N3F86sGJfQrKCyc8kJ1",
         "tag": 2000
     }))]
 pub(crate) struct SendMessageBodyRequest {
@@ -54,14 +53,14 @@ pub(crate) struct SendMessageBodyRequest {
     /// Message to be transmitted over the network
     #[serde_as(as = "Bytes")]
     body: Vec<u8>,
-    /// The recipient HOPR PeerId
+    /// The recipient HOPR PeerId or address
     #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String)]
     destination: PeerOrAddress,
     #[serde_as(as = "Option<Vec<DisplayFromStr>>")]
     #[validate(length(min = 0, max = 3))]
     #[schema(value_type = Option<Vec<String>>)]
-    path: Option<Vec<PeerId>>, // TODO (jean): should be a new type
+    path: Option<Vec<PeerOrAddress>>,
     #[validate(range(min = 0, max = 3))]
     hops: Option<u16>,
 }
@@ -140,17 +139,43 @@ pub(super) async fn send_message(
         .map(|enc| enc(&args.body))
         .unwrap_or_else(|| args.body.into_boxed_slice());
 
-    let options = if let Some(intermediate_path) = args.path {
-        RoutingOptions::IntermediatePath(intermediate_path.try_into().map_err(|_| {
-            (
-                StatusCode::UNPROCESSABLE_ENTITY,
-                ApiErrorStatus::UnknownFailure(format!(
-                    "Intermediate path cannot be longer than {}",
-                    RoutingOptions::MAX_INTERMEDIATE_HOPS
-                )),
-            )
-                .into_response()
-        })?)
+    let path = args.path.clone();
+
+    // TODO (jean): find a nice way to handle PeeroOrAddress fullfilling
+    // if let Some(path) = path {
+    //     let path = path
+    //         .iter()
+    //         .map(|address| {
+    //             let hopr_db = hopr.hopr_db();
+    //             async move { address.clone().fullfill(&hopr_db).await }
+    //         })
+    //         .collect::<Vec<_>>();
+
+    //     let path = futures::future::join_all(path).await;
+    //     if path.iter().any(|p| p.is_err()) {
+    //         return Err((StatusCode::NOT_FOUND, ApiErrorStatus::InvalidInput).into_response());
+    //     }
+    // }
+
+    let options = if let Some(intermediate_path) = path {
+        RoutingOptions::IntermediatePath(
+            // get a vec of peer ids from the intermediate path
+            intermediate_path
+                .into_iter()
+                .map(|peer| peer.peer_id.unwrap())
+                .collect::<Vec<_>>()
+                .try_into()
+                .map_err(|_| {
+                    (
+                        StatusCode::UNPROCESSABLE_ENTITY,
+                        ApiErrorStatus::UnknownFailure(format!(
+                            "Intermediate path cannot be longer than {}",
+                            RoutingOptions::MAX_INTERMEDIATE_HOPS
+                        )),
+                    )
+                        .into_response()
+                })?,
+        )
     } else if let Some(hops) = args.hops {
         RoutingOptions::Hops((hops as u8).try_into().map_err(|_| {
             (
@@ -326,6 +351,9 @@ async fn handle_send_message(input: &str, state: Arc<InternalState>) -> Result<(
             let options = if let Some(intermediate_path) = msg.path {
                 RoutingOptions::IntermediatePath(
                     intermediate_path
+                        .into_iter()
+                        .map(|peer| peer.peer_id.unwrap())
+                        .collect::<Vec<_>>()
                         .try_into()
                         .map_err(|_| "invalid number of intermediate hops".to_string())?,
                 )

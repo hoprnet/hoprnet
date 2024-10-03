@@ -1,6 +1,6 @@
-// Unified type for PeerID and Address
+// Unified type for PeerId and Address
 //
-// This module provides a unified type for PeerID and Address. This is useful for APIs that accept both PeerID and Address.
+// This module provides a unified type for PeerId and Address. This is useful for APIs that accept both PeerId and Address.
 
 use core::result::Result;
 use hopr_crypto_types::types::OffchainPublicKey;
@@ -19,7 +19,6 @@ pub struct PeerOrAddress {
 
 impl PeerOrAddress {
     pub fn new(identifier: String) -> Self {
-        // string to &[u8]
         if let Ok(peer_id) = PeerId::from_str(&identifier) {
             Self::from(peer_id)
         } else if let Ok(address) = Address::from_str(&identifier) {
@@ -83,12 +82,4 @@ impl Display for PeerOrAddress {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?} {:?}", self.peer_id, self.address)
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn foo_test() {}
 }

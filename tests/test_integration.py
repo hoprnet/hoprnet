@@ -694,9 +694,7 @@ async def test_hoprd_default_strategy_automatic_ticket_aggregation_and_redeeming
         redeemed_value_at_start = balance_str_to_int(statistics_before.redeemed_value)
 
         packets = [f"Ticket aggregation test: #{i:08d}" for i in range(ticket_count)]
-        await send_and_receive_packets_with_pop(
-            packets, src=swarm7[src], dest=swarm7[dest], path=[swarm7[mid].peer_id]
-        )
+        await send_and_receive_packets_with_pop(packets, src=swarm7[src], dest=swarm7[dest], path=[swarm7[mid].peer_id])
 
         # monitor that the node aggregates and redeems tickets until the aggregated value is reached
         async def check_aggregate_and_redeem_tickets(api: HoprdAPI):
@@ -946,9 +944,7 @@ def connect_udp_socket():
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("src,dest", random_distinct_pairs_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
-async def test_session_communication_with_a_tcp_echo_server(
-        src: str, dest: str, swarm7: dict[str, Node]
-):
+async def test_session_communication_with_a_tcp_echo_server(src: str, dest: str, swarm7: dict[str, Node]):
     """
     HOPR TCP socket buffers are set to 462 bytes to mimic the underlying MTU of the HOPR protocol.
     """
@@ -961,12 +957,13 @@ async def test_session_communication_with_a_tcp_echo_server(
     src_peer = swarm7[src]
     dest_peer = swarm7[dest]
 
-    src_sock_port = await src_peer.api.session_client(dest_peer.peer_id, path={"Hops": 0}, protocol='tcp',
-                                                      target=f"localhost:{ECHO_SERVER_PORT}")
+    src_sock_port = await src_peer.api.session_client(
+        dest_peer.peer_id, path={"Hops": 0}, protocol="tcp", target=f"localhost:{ECHO_SERVER_PORT}"
+    )
 
-    assert len(await src_peer.api.session_list_clients('tcp')) == 1
+    assert len(await src_peer.api.session_list_clients("tcp")) == 1
 
-    actual = ''
+    actual = ""
 
     with echo_tcp_server(ECHO_SERVER_PORT):
         # socket.listen does not actually listen immediately and needs some time to be working
@@ -984,17 +981,15 @@ async def test_session_communication_with_a_tcp_echo_server(
                 total_sent = total_sent - len(chunk)
                 actual = actual + chunk.decode()
 
-    assert ''.join(expected) == actual
+    assert "".join(expected) == actual
 
-    await src_peer.api.session_close_client(protocol='tcp', bound_ip='127.0.0.1', bound_port=src_sock_port) is True
-    assert len(await src_peer.api.session_list_clients('tcp')) == 0
+    await src_peer.api.session_close_client(protocol="tcp", bound_ip="127.0.0.1", bound_port=src_sock_port) is True
+    assert len(await src_peer.api.session_list_clients("tcp")) == 0
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("src,dest", random_distinct_pairs_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
-async def test_session_communication_with_a_udp_echo_server(
-        src: str, dest: str, swarm7: dict[str, Node]
-):
+async def test_session_communication_with_a_udp_echo_server(src: str, dest: str, swarm7: dict[str, Node]):
     """
     HOPR UDP socket buffers are set to 462 bytes to mimic the underlying MTU of the HOPR protocol.
     """
@@ -1007,10 +1002,11 @@ async def test_session_communication_with_a_udp_echo_server(
     src_peer = swarm7[src]
     dest_peer = swarm7[dest]
 
-    src_sock_port = await src_peer.api.session_client(dest_peer.peer_id, path={"Hops": 0}, protocol='udp',
-                                                      target=f"localhost:{ECHO_SERVER_PORT}")
+    src_sock_port = await src_peer.api.session_client(
+        dest_peer.peer_id, path={"Hops": 0}, protocol="udp", target=f"localhost:{ECHO_SERVER_PORT}"
+    )
 
-    assert len(await src_peer.api.session_list_clients('udp')) == 1
+    assert len(await src_peer.api.session_list_clients("udp")) == 1
 
     actual = []
 
@@ -1019,13 +1015,13 @@ async def test_session_communication_with_a_udp_echo_server(
         # otherwise a `ConnectionRefusedError: [Errno 61] Connection refused` will be encountered
         await asyncio.sleep(1.0)
 
-        addr = ('127.0.0.1', src_sock_port)
+        addr = ("127.0.0.1", src_sock_port)
         with connect_udp_socket() as s:
             s.settimeout(20)
             total_sent = 0
             for message in expected:
                 total_sent = total_sent + s.sendto(message.encode(), addr)
-                await asyncio.sleep(0.01) # UDP has no flow-control, so we must insert an artificial gap
+                await asyncio.sleep(0.01)  # UDP has no flow-control, so we must insert an artificial gap
 
             while total_sent > 0:
                 chunk, _ = s.recvfrom(min(HOPR_SESSION_MAX_PAYLOAD_SIZE, total_sent))
@@ -1036,6 +1032,5 @@ async def test_session_communication_with_a_udp_echo_server(
     expected.sort()
     assert actual == expected
 
-    await src_peer.api.session_close_client(protocol='udp', bound_ip='127.0.0.1', bound_port=src_sock_port) is True
-    assert len(await src_peer.api.session_list_clients('udp')) == 0
-
+    await src_peer.api.session_close_client(protocol="udp", bound_ip="127.0.0.1", bound_port=src_sock_port) is True
+    assert len(await src_peer.api.session_list_clients("udp")) == 0

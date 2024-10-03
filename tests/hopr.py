@@ -16,7 +16,7 @@ from hoprd_sdk.api import (
     TicketsApi,
 )
 from hoprd_sdk.models import (
-    AliasPeerIdBodyRequest,
+    AliasDestinationBodyRequest,
     FundBodyRequest,
     GetMessageBodyRequest,
     OpenChannelBodyRequest,
@@ -98,7 +98,7 @@ class HoprdAPI:
         Returns the aliases recognized by the node.
         :return: bool
         """
-        body = AliasPeerIdBodyRequest(alias, peer_id)
+        body = AliasDestinationBodyRequest(alias, peer_id)
         status, _ = self.__call_api(AliasApi, "set_alias", body=body)
         return status
 
@@ -152,7 +152,7 @@ class HoprdAPI:
         :param: amount: str
         :return: channel id: str | undefined
         """
-        body = OpenChannelBodyRequest(amount, peer_address)
+        body = OpenChannelBodyRequest(amount, destination=peer_address)
 
         status, response = self.__call_api(ChannelsApi, "open_channel", body=body)
         return response.channel_id if status else None
@@ -271,13 +271,13 @@ class HoprdAPI:
         )
         return response if status else []
 
-    async def ping(self, peer_id: str):
+    async def ping(self, destination: str):
         """
         Pings the given peer_id and returns the measure.
         :param: peer_id: str
         :return: response: dict
         """
-        _, response = self.__call_api(PeersApi, "ping_peer", peer_id)
+        _, response = self.__call_api(PeersApi, "ping_peer", destination)
         return response
 
     async def peers(self, params: list or str = "peer_id", status: str = "connected"):
@@ -329,7 +329,7 @@ class HoprdAPI:
         :param: tag: int = 0x0320
         :return: bool
         """
-        body = SendMessageBodyRequest(message, None, hops, destination, tag)
+        body = SendMessageBodyRequest(body=message, hops=None, path=hops, destination=destination, tag=tag)
         _, response = self.__call_api(MessagesApi, "send_message", body=body)
         return response
 
@@ -403,7 +403,7 @@ class HoprdAPI:
         _, response = self.__call_api(SessionApi, "list_clients", protocol=protocol)
         return response
 
-    async def session_close_client(self, protocol: str, bound_port: int, bound_ip: str = '127.0.0.1'):
+    async def session_close_client(self, protocol: str, bound_port: int, bound_ip: str = "127.0.0.1"):
         """
         Closes a previously opened and bound session
         """

@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use std::{collections::HashMap, sync::Arc};
 
-use crate::{ApiErrorStatus, InternalState, BASE_PATH};
+use crate::{types::PeerOrAddress, ApiErrorStatus, InternalState, BASE_PATH};
 
 #[serde_as]
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
@@ -26,14 +26,14 @@ pub(crate) struct PeerIdResponse {
 #[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 #[schema(example = json!({
         "alias": "Alice",
-        "peerId": "12D3KooWRWeTozREYHzWTbuCYskdYhED1MXpDwTrmccwzFrd2mEA"
+        "destination": "12D3KooWRWeTozREYHzWTbuCYskdYhED1MXpDwTrmccwzFrd2mEA"
     }))]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct AliasPeerIdBodyRequest {
+pub(crate) struct AliasDestinationBodyRequest {
     pub alias: String,
     #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String)]
-    pub peer_id: PeerId, // TODO (jean): should be a new type
+    pub destination: PeerOrAddress,
 }
 
 /// Get each previously set alias and its corresponding PeerId.
@@ -71,7 +71,7 @@ pub(super) async fn aliases(State(state): State<Arc<InternalState>>) -> impl Int
         post,
         path = const_format::formatcp!("{BASE_PATH}/aliases"),
         request_body(
-            content = AliasPeerIdBodyRequest,
+            content = AliasDestinationBodyRequest,
             description = "Alias name along with the PeerId to be aliased",
             content_type = "application/json"),
         responses(
@@ -89,13 +89,29 @@ pub(super) async fn aliases(State(state): State<Arc<InternalState>>) -> impl Int
     )]
 pub(super) async fn set_alias(
     State(state): State<Arc<InternalState>>,
-    Json(args): Json<AliasPeerIdBodyRequest>,
+    Json(args): Json<AliasDestinationBodyRequest>,
 ) -> impl IntoResponse {
     let aliases = state.aliases.clone();
+    let hopr = state.hopr.clone();
 
-    let inserted = aliases.write().await.insert_no_overwrite(args.alias, args.peer_id);
+    let destination = args.clone().destination.fullfill(&hopr.hopr_db()).await;
+    if destination.is_err() {
+        return (StatusCode::NOT_FOUND, ApiErrorStatus::InvalidInput).into_response();
+    }
+    let destination = destination.unwrap();
+
+    let inserted = aliases
+        .write()
+        .await
+        .insert_no_overwrite(args.alias, destination.peer_id.unwrap());
     match inserted {
-        Ok(_) => (StatusCode::CREATED, Json(PeerIdResponse { peer_id: args.peer_id })).into_response(),
+        Ok(_) => (
+            StatusCode::CREATED,
+            Json(PeerIdResponse {
+                peer_id: destination.peer_id.unwrap(),
+            }),
+        )
+            .into_response(),
         Err(_) => (StatusCode::CONFLICT, ApiErrorStatus::AliasAlreadyExists).into_response(),
     }
 }

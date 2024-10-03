@@ -232,7 +232,7 @@ pub(super) async fn list_channels(
 #[serde(rename_all = "camelCase")]
 #[schema(example = json!({
         "amount": "10",
-        "peerAddress": "0xa8194d36e322592d4c707b70dbe96121f5c74c64"
+        "destination": "0xa8194d36e322592d4c707b70dbe96121f5c74c64"
     }))]
 pub(crate) struct OpenChannelBodyRequest {
     /// On-chain address of the counterparty.
