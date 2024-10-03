@@ -8,6 +8,7 @@ use std::{collections::HashMap, sync::Arc};
 use async_lock::RwLock;
 use futures::StreamExt;
 use futures_concurrency::stream::Merge;
+use hopr_crypto_types::prelude::Hash;
 use hopr_lib::{
     errors::HoprLibError,
     TransportOutput, {Address, Balance, BalanceType, Hopr},
@@ -121,7 +122,7 @@ pub struct InternalState {
         schemas(
             ApiError,
             alias::PeerIdResponse, alias::AliasPeerIdBodyRequest,
-            account::AccountAddressesResponse, account::AccountBalancesResponse, account::WithdrawBodyRequest,
+            account::AccountAddressesResponse, account::AccountBalancesResponse, account::WithdrawBodyRequest,account::WithdrawResponse,
             peers::NodePeerInfoResponse, peers::PingResponse,
             channels::ChannelsQueryRequest,channels::CloseChannelResponse, channels::OpenChannelBodyRequest, channels::OpenChannelResponse,
             channels::NodeChannel, channels::NodeChannelsResponse, channels::ChannelInfoResponse, channels::FundBodyRequest,
@@ -323,7 +324,7 @@ pub async fn run_hopr_api(
 
         api.at("/account/addresses").get(account::addresses);
         api.at("/account/balances").get(account::balances);
-        api.at("/account/withdraw").get(account::withdraw);
+        api.at("/account/withdraw").post(account::withdraw);
 
         api.at("/peers/:peerId")
             .get(peers::show_peer_info)
@@ -691,8 +692,6 @@ mod alias {
 }
 
 mod account {
-    use hopr_lib::U256;
-
     use super::*;
 
     #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
@@ -806,7 +805,7 @@ mod account {
     #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
     #[schema(example = json!({
         "address": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
-        "amount": 20000,
+        "amount": "20000",
         "currency": "HOPR"
     }))]
     #[serde(rename_all = "camelCase")]
@@ -816,10 +815,22 @@ mod account {
         currency: BalanceType,
         #[serde_as(as = "DisplayFromStr")]
         #[schema(value_type = String)]
-        amount: U256,
+        amount: String,
         #[serde_as(as = "DisplayFromStr")]
         #[schema(value_type = String)]
         address: Address,
+    }
+
+    #[serde_as]
+    #[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
+    #[schema(example = json!({
+            "receipt": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
+    }))]
+    #[serde(rename_all = "camelCase")]
+    pub(crate) struct WithdrawResponse {
+        #[serde_as(as = "DisplayFromStr")]
+        #[schema(value_type = String)]
+        receipt: Hash,
     }
 
     /// Withdraw funds from this node to the ethereum wallet address.
@@ -832,7 +843,7 @@ mod account {
             content = WithdrawBodyRequest,
             content_type = "application/json"),
         responses(
-            (status = 200, description = "The node's funds have been withdrawn", body = AccountBalancesResponse),
+            (status = 200, description = "The node's funds have been withdrawn", body = WithdrawResponse),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
@@ -850,11 +861,11 @@ mod account {
             .hopr
             .withdraw(
                 withdraw_req_data.address,
-                Balance::new(withdraw_req_data.amount, withdraw_req_data.currency),
+                Balance::new_from_str(&withdraw_req_data.amount, withdraw_req_data.currency),
             )
             .await
         {
-            Ok(receipt) => Ok(Response::builder(200).body(json!({"receipt": receipt})).build()),
+            Ok(receipt) => Ok(Response::builder(200).body(json!(WithdrawResponse { receipt })).build()),
             Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
         }
     }
