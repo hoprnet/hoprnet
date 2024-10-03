@@ -8,6 +8,7 @@ use std::{collections::HashMap, sync::Arc};
 use async_lock::RwLock;
 use futures::StreamExt;
 use futures_concurrency::stream::Merge;
+use hopr_crypto_types::prelude::Hash;
 use hopr_lib::{
     errors::HoprLibError,
     TransportOutput, {Address, Balance, BalanceType, Hopr},
@@ -820,6 +821,7 @@ mod account {
         address: Address,
     }
 
+    #[serde_as]
     #[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
     #[schema(example = json!({
             "receipt": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
@@ -863,11 +865,7 @@ mod account {
             )
             .await
         {
-            Ok(receipt) => Ok(Response::builder(200)
-                .body(json!(WithdrawResponse {
-                    receipt: receipt.to_string(),
-                }))
-                .build()),
+            Ok(receipt) => Ok(Response::builder(200).body(json!(WithdrawResponse { receipt })).build()),
             Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
         }
     }
