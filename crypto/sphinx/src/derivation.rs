@@ -177,31 +177,28 @@ mod tests {
     }
 
     #[test]
-    fn test_vrf_parameter_generation() {
+    fn test_vrf_parameter_generation() -> anyhow::Result<()> {
         let dst = b"some DST tag";
         let priv_key: [u8; 32] = hex!("f13233ff60e1f618525dac5f7d117bef0bad0eb0b0afb2459f9cbc57a3a987ba"); // dummy
         let message = hex!("f13233ff60e1f618525dac5f7d117bef0bad0eb0b0afb2459f9cbc57a3a987ba"); // dummy
 
-        let keypair = ChainKeypair::from_secret(&priv_key).unwrap();
+        let keypair = ChainKeypair::from_secret(&priv_key)?;
         // vrf verification algorithm
-        let pub_key = PublicKey::from_privkey(&priv_key).unwrap();
+        let pub_key = PublicKey::from_privkey(&priv_key)?;
 
-        let params = derive_vrf_parameters(&message, &keypair, dst).unwrap();
+        let params = derive_vrf_parameters(&message, &keypair, dst)?;
 
         let cap_b = Secp256k1::hash_from_bytes::<ExpandMsgXmd<sha3::Keccak256>>(
             &[&pub_key.to_address().as_ref(), &message],
             &[dst],
-        )
-        .unwrap();
+        )?;
 
         assert_eq!(
-            params
-                .get_s_b_witness(&keypair.public().to_address(), &message, dst)
-                .unwrap(),
+            params.get_s_b_witness(&keypair.public().to_address(), &message, dst)?,
             (cap_b * params.s).to_encoded_point(false)
         );
 
-        let a: Scalar = ScalarPrimitive::<Secp256k1>::from_slice(&priv_key).unwrap().into();
+        let a: Scalar = ScalarPrimitive::<Secp256k1>::from_slice(&priv_key)?.into();
         assert_eq!(params.get_h_v_witness(), (cap_b * a * params.h).to_encoded_point(false));
 
         let r_v: ProjectivePoint<Secp256k1> = cap_b * params.s - params.v.clone().into_projective_point() * params.h;
@@ -214,10 +211,11 @@ mod tests {
                 &message,
             ],
             &[dst],
-        )
-        .unwrap();
+        )?;
 
         assert_eq!(h_check, params.h);
+
+        Ok(())
     }
 
     #[test]

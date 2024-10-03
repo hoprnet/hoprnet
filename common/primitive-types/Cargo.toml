@@ -12,6 +12,7 @@ license = "GPL-3.0-only"
 crate-type = ["rlib"]
 
 [dependencies]
+float-cmp = { workspace = true }
 hex = { workspace = true }
 primitive-types = { workspace = true }
 rlp = "0.5.2"                          # TODO: remove in 3.0
@@ -23,6 +24,7 @@ thiserror = { workspace = true }
 hopr-crypto-random = { workspace = true }
 
 [dev-dependencies]
+anyhow = { workspace = true }
 hex-literal = { workspace = true }
 
 [features]

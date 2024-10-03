@@ -683,7 +683,7 @@ mod tests {
     use serde_json::from_value;
 
     #[test]
-    fn send_message_accepts_bytes_in_body() {
+    fn send_message_accepts_bytes_in_body() -> anyhow::Result<()> {
         let destination = PeerOrAddress::from(PeerId::random());
         let test_sequence = b"wow, this actually works";
 
@@ -701,20 +701,22 @@ mod tests {
             hops: None,
         };
 
-        let actual: SendMessageBodyRequest = from_value(json_value).unwrap();
+        let actual: SendMessageBodyRequest = from_value(json_value)?;
 
         assert_eq!(actual, expected);
+
+        Ok(())
     }
 
     #[test]
-    fn send_message_accepts_utf8_string_in_body() {
+    fn send_message_accepts_utf8_string_in_body() -> anyhow::Result<()> {
         let destination = PeerOrAddress::from(PeerId::random());
         let test_sequence = b"wow, this actually works";
 
         let json_value = json!({
             "tag": 5,
-            "body": String::from_utf8(test_sequence.to_vec()).expect("should be a utf-8 string"),
             "destination": destination
+            "body": String::from_utf8(test_sequence.to_vec())?,
         });
 
         let expected = SendMessageBodyRequest {
@@ -725,8 +727,10 @@ mod tests {
             hops: None,
         };
 
-        let actual: SendMessageBodyRequest = from_value(json_value).unwrap();
+        let actual: SendMessageBodyRequest = from_value(json_value)?;
 
         assert_eq!(actual, expected);
+
+        Ok(())
     }
 }

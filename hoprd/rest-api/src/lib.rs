@@ -15,17 +15,18 @@ mod session;
 mod tickets;
 mod types;
 
+pub use session::{HOPR_TCP_BUFFER_SIZE, HOPR_UDP_BUFFER_SIZE, HOPR_UDP_QUEUE_SIZE};
+
 use async_lock::RwLock;
 use axum::{
     extract::Json,
-    http::{status::StatusCode, Method},
+    http::{header::AUTHORIZATION, status::StatusCode, Method},
     middleware,
     response::{IntoResponse, Response},
     routing::{delete, get, post},
     Router,
 };
 use bimap::BiHashMap;
-use hyper::header::AUTHORIZATION;
 use libp2p_identity::PeerId;
 use serde::Serialize;
 use std::collections::HashMap;
@@ -157,7 +158,10 @@ pub struct SecurityAddon;
 
 impl Modify for SecurityAddon {
     fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
-        let components = openapi.components.as_mut().unwrap(); // we can unwrap safely since there already is components registered.
+        let components = openapi
+            .components
+            .as_mut()
+            .expect("components should be registered at this point");
         components.add_security_scheme(
             "bearer_token",
             SecurityScheme::Http(
@@ -174,17 +178,31 @@ impl Modify for SecurityAddon {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
-pub async fn serve_api(
-    listener: TcpListener,
-    hoprd_cfg: String,
-    cfg: crate::config::Api,
-    hopr: Arc<hopr_lib::Hopr>,
-    inbox: Arc<RwLock<hoprd_inbox::Inbox>>,
-    session_listener_sockets: ListenerJoinHandles,
-    websocket_rx: async_broadcast::InactiveReceiver<ApplicationData>,
-    msg_encoder: Option<MessageEncoder>,
-) -> Result<(), std::io::Error> {
+/// Parameters needed to construct the Rest API via [`serve_api`].
+pub struct RestApiParameters {
+    pub listener: TcpListener,
+    pub hoprd_cfg: String,
+    pub cfg: crate::config::Api,
+    pub hopr: Arc<hopr_lib::Hopr>,
+    pub inbox: Arc<RwLock<hoprd_inbox::Inbox>>,
+    pub session_listener_sockets: ListenerJoinHandles,
+    pub websocket_rx: async_broadcast::InactiveReceiver<ApplicationData>,
+    pub msg_encoder: Option<MessageEncoder>,
+}
+
+/// Starts the Rest API listener and router.
+pub async fn serve_api(params: RestApiParameters) -> Result<(), std::io::Error> {
+    let RestApiParameters {
+        listener,
+        hoprd_cfg,
+        cfg,
+        hopr,
+        inbox,
+        session_listener_sockets,
+        websocket_rx,
+        msg_encoder,
+    } = params;
+
     let router = build_api(
         hoprd_cfg,
         cfg,
@@ -322,6 +340,8 @@ enum ApiErrorStatus {
     /// An invalid application tag from the reserved range was provided.
     InvalidApplicationTag,
     InvalidChannelId,
+    InvalidPeerId,
+    PeerNotFound,
     ChannelNotFound,
     TicketsNotFound,
     NotEnoughBalance,

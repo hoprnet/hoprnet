@@ -3,12 +3,15 @@ use std::net::ToSocketAddrs;
 use std::num::ParseIntError;
 use std::str::FromStr;
 
+use libp2p::Multiaddr;
 use proc_macro_regex::regex;
 use serde::{Deserialize, Serialize};
 use validator::{Validate, ValidationError};
 
 pub use core_network::{config::NetworkConfig, heartbeat::HeartbeatConfig};
 pub use hopr_transport_protocol::config::ProtocolConfig;
+
+use crate::errors::HoprTransportError;
 
 regex!(is_dns_address_regex "^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)*[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$");
 
@@ -85,6 +88,21 @@ impl FromStr for HostConfig {
 impl Display for HostConfig {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}:{}", self.address, self.port)
+    }
+}
+
+impl TryFrom<&HostConfig> for Multiaddr {
+    type Error = HoprTransportError;
+
+    fn try_from(value: &HostConfig) -> Result<Self, Self::Error> {
+        match &value.address {
+            HostType::IPv4(ip) => Multiaddr::from_str(format!("/ip4/{}/tcp/{}", ip.as_str(), value.port).as_str())
+                .map_err(|e| HoprTransportError::Api(e.to_string())),
+            HostType::Domain(domain) => {
+                Multiaddr::from_str(format!("/dns4/{}/tcp/{}", domain.as_str(), value.port).as_str())
+                    .map_err(|e| HoprTransportError::Api(e.to_string()))
+            }
+        }
     }
 }
 

@@ -9,6 +9,9 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum DbSqlError {
+    #[error("failed to construct the database, {0}")]
+    Construction(String),
+
     #[error("account entry for announcement not found")]
     MissingAccount,
 
@@ -21,7 +24,7 @@ pub enum DbSqlError {
     #[error("ticket aggregation error: {0}")]
     TicketAggregationError(String),
 
-    #[error("ticket validation error for {:?}: {}", 0.0, 0.1)]
+    #[error("ticket validation error for {}: {}", .0.0, .0.1)]
     TicketValidationError(Box<(Ticket, String)>),
 
     #[error("transaction error: {0}")]

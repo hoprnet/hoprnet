@@ -51,11 +51,23 @@ pub mod rlp {
     }
 }
 
+/// Approximately compares two double-precision floats.
+///
+/// This function first tests if the two values relatively differ by at least `epsilon`.
+/// In case they are equal, the second test checks if they differ by at least two representable
+/// units of precision - meaning there can be only two other floats represented in between them.
+/// If both tests pass, the two values are considered (approximately) equal.
+pub fn f64_approx_eq(a: f64, b: f64, epsilon: f64) -> bool {
+    float_cmp::ApproxEq::approx_eq(a, b, (epsilon, 2))
+}
+
 pub mod prelude {
     pub use super::errors::GeneralError;
     pub use super::primitives::*;
     pub use super::sma::*;
     pub use super::traits::*;
+
+    pub use super::f64_approx_eq;
 }
 
 #[allow(deprecated)]
@@ -67,13 +79,13 @@ mod tests {
     use crate::traits::AsUnixTimestamp;
 
     #[test]
-    fn test_rlp() {
+    fn test_rlp() -> anyhow::Result<()> {
         let mut b_1 = [0u8; 100];
         let ts_1 = SystemTime::now().as_unix_timestamp();
 
         hopr_crypto_random::random_fill(&mut b_1);
 
-        let (b_2, ts_2) = crate::rlp::decode(crate::rlp::encode(&b_1, ts_1).as_ref()).expect("must decode");
+        let (b_2, ts_2) = crate::rlp::decode(crate::rlp::encode(&b_1, ts_1).as_ref())?;
 
         assert_eq!(&b_1, b_2.as_ref(), "data must be equal");
         assert_eq!(
@@ -81,10 +93,12 @@ mod tests {
             ts_2.as_millis(),
             "timestamps must be equal up to milliseconds"
         );
+
+        Ok(())
     }
 
     #[test]
-    fn test_rlp_fixed() {
+    fn test_rlp_fixed() -> anyhow::Result<()> {
         let b_1 = b"hello";
         let ts_1 = Duration::from_millis(1703086927316);
 
@@ -95,20 +109,22 @@ mod tests {
             "encoded data must be equal"
         );
 
-        let (b_2, ts_2) = crate::rlp::decode(&data).expect("must decode");
+        let (b_2, ts_2) = crate::rlp::decode(&data)?;
         assert_eq!(b_1, b_2.as_ref(), "decoded data must be equal");
         assert_eq!(
             ts_1.as_millis(),
             ts_2.as_millis(),
             "timestamps must be equal up to milliseconds"
         );
+
+        Ok(())
     }
 
     #[test]
-    fn test_rlp_zero() {
+    fn test_rlp_zero() -> anyhow::Result<()> {
         let b_1 = [0u8; 0];
         let ts_1 = SystemTime::now().as_unix_timestamp();
-        let (b_2, ts_2) = crate::rlp::decode(crate::rlp::encode(&b_1, ts_1).as_ref()).expect("must decode");
+        let (b_2, ts_2) = crate::rlp::decode(crate::rlp::encode(&b_1, ts_1).as_ref())?;
 
         assert_eq!(&b_1, b_2.as_ref(), "data must be equal");
         assert_eq!(
@@ -116,5 +132,7 @@ mod tests {
             ts_2.as_millis(),
             "timestamps must be equal up to milliseconds"
         );
+
+        Ok(())
     }
 }

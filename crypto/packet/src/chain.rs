@@ -220,14 +220,14 @@ mod tests {
             hex!("9a82976f7182c05126313bead5617c623b93d11f9f9691c87b1a26f869d569ed"),
             hex!("ca4bdfd54a8467b5283a0216288fdca7091122479ccf3cfb147dfa59d13f3486"),
             hex!("e306ebfb0d01d0da0952c9a567d758093a80622c6cb55052bf5f1a6ebd8d7b5c")
-        ].map(|privkey| ChainKeypair::from_secret(&privkey).unwrap());
+        ].map(|privkey| ChainKeypair::from_secret(&privkey).expect("lazy static keypair should be valid"));
 
         static ref PEERS_OFFCHAIN: [OffchainKeypair; 4] = [
             hex!("5eb212d4d6aa5948c4f71574d45dad43afef6d330edb873fca69d0e1b197e906"),
             hex!("e995db483ada5174666c46bafbf3628005aca449c94ebdc0c9239c3f65d61ae0"),
             hex!("9dec751c00f49e50fceff7114823f726a0425a68a8dc6af0e4287badfea8f4a4"),
             hex!("9a82976f7182c05126313bead5617c623b93d11f9f9691c87b1a26f869d569ed")
-        ].map(|privkey| OffchainKeypair::from_secret(&privkey).unwrap());
+        ].map(|privkey| OffchainKeypair::from_secret(&privkey).expect("lazy static keypair should be valid"));
     }
 
     impl ChainPacketComponents {
@@ -245,28 +245,42 @@ mod tests {
         }
     }
 
-    fn mock_ticket(next_peer_channel_key: &PublicKey, path_len: usize, private_key: &ChainKeypair) -> TicketBuilder {
+    fn mock_ticket(
+        next_peer_channel_key: &PublicKey,
+        path_len: usize,
+        private_key: &ChainKeypair,
+    ) -> anyhow::Result<TicketBuilder> {
         assert!(path_len > 0);
         let price_per_packet: U256 = 10000000000000000u128.into();
 
         if path_len > 1 {
-            TicketBuilder::default()
+            Ok(TicketBuilder::default()
                 .direction(&private_key.public().to_address(), &next_peer_channel_key.to_address())
-                .amount(price_per_packet.div_f64(1.0).unwrap() * U256::from(path_len as u64 - 1))
+                .amount(price_per_packet.div_f64(1.0)? * U256::from(path_len as u64 - 1))
                 .index(1)
                 .index_offset(1)
                 .win_prob(1.0)
                 .channel_epoch(1)
-                .challenge(Default::default())
+                .challenge(Default::default()))
         } else {
-            TicketBuilder::zero_hop().direction(&private_key.public().to_address(), &next_peer_channel_key.to_address())
+            Ok(TicketBuilder::zero_hop()
+                .direction(&private_key.public().to_address(), &next_peer_channel_key.to_address()))
         }
     }
-    async fn resolve_mock_path(me: Address, peers_offchain: Vec<PeerId>, peers_onchain: Vec<Address>) -> TransportPath {
+    async fn resolve_mock_path(
+        me: Address,
+        peers_offchain: Vec<PeerId>,
+        peers_onchain: Vec<Address>,
+    ) -> anyhow::Result<TransportPath> {
         let peers_addrs = peers_offchain
             .iter()
             .zip(peers_onchain)
-            .map(|(peer_id, addr)| (OffchainPublicKey::try_from(peer_id).unwrap(), addr))
+            .map(|(peer_id, addr)| {
+                (
+                    OffchainPublicKey::try_from(peer_id).expect("PeerId should be convertible to offchain public key"),
+                    addr,
+                )
+            })
             .collect::<Vec<_>>();
         let mut cg = ChannelGraph::new(me);
         let mut last_addr = cg.my_address();
@@ -302,42 +316,47 @@ mod tests {
             }
         }
 
-        TransportPath::resolve(peers_offchain, &TestResolver(peers_addrs), &cg)
+        Ok(TransportPath::resolve(peers_offchain, &TestResolver(peers_addrs), &cg)
             .await
-            .unwrap()
-            .0
+            .map_err(|_e| hopr_db_api::errors::DbError::General("failed to generate a transport path".into()))?
+            .0)
     }
 
     #[parameterized(amount = { 4, 3, 2 })]
-    fn test_packet_create_and_transform(amount: usize) {
+    fn test_packet_create_and_transform(amount: usize) -> anyhow::Result<()> {
         let mut keypairs_offchain = Vec::from_iter(PEERS_OFFCHAIN[0..amount].iter());
         let mut keypairs_onchain = Vec::from_iter(PEERS_ONCHAIN[0..amount].iter());
 
-        let own_channel_kp = keypairs_onchain.drain(..1).last().unwrap();
-        let own_packet_kp = keypairs_offchain.drain(..1).last().unwrap();
+        let own_channel_kp = keypairs_onchain
+            .drain(..1)
+            .last()
+            .expect("should have at least one onchain keypair");
+        let own_packet_kp = keypairs_offchain
+            .drain(..1)
+            .last()
+            .expect("should have at least one offchain keypair");
 
         // Create ticket for the first peer on the path
         let ticket = mock_ticket(
             &keypairs_onchain[0].public().0,
             keypairs_offchain.len(),
             &own_channel_kp,
-        );
+        )?;
 
         let test_message = b"some testing message";
         let path = async_std::task::block_on(resolve_mock_path(
             own_channel_kp.public().to_address(),
             keypairs_offchain.iter().map(|kp| kp.public().into()).collect(),
             keypairs_onchain.iter().map(|kp| kp.public().to_address()).collect(),
-        ));
+        ))?;
 
         let path = core_path::path::Path::hops(&path)
             .iter()
-            .map(|v| OffchainPublicKey::try_from(v).unwrap())
-            .collect::<Vec<_>>();
+            .map(|v| OffchainPublicKey::try_from(v))
+            .collect::<hopr_primitive_types::errors::Result<Vec<_>>>()?;
 
         let mut packet =
-            ChainPacketComponents::into_outgoing(test_message, &path, &own_channel_kp, ticket, &Hash::default())
-                .expect("failed to construct packet");
+            ChainPacketComponents::into_outgoing(test_message, &path, &own_channel_kp, ticket, &Hash::default())?;
 
         match &packet {
             ChainPacketComponents::Outgoing { .. } => {}
@@ -347,7 +366,7 @@ mod tests {
         for (i, path_element) in keypairs_offchain.iter().enumerate() {
             let sender = (i == 0)
                 .then_some(own_packet_kp)
-                .unwrap_or_else(|| keypairs_offchain.get(i - 1).unwrap())
+                .unwrap_or_else(|| keypairs_offchain.get(i - 1).expect("should have previous keypair"))
                 .public()
                 .clone();
 
@@ -364,11 +383,13 @@ mod tests {
                         &keypairs_onchain[i + 1].public().0,
                         keypairs_offchain.len() - i - 1,
                         &keypairs_onchain[i],
-                    );
+                    )?;
                     packet = super::super::forward(packet.clone(), &keypairs_onchain[i], ticket, &Hash::default());
                 }
                 ChainPacketComponents::Outgoing { .. } => panic!("invalid packet state"),
             }
         }
+
+        Ok(())
     }
 }

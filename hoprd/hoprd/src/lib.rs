@@ -87,8 +87,9 @@
 //! ```
 
 use hopr_lib::errors::HoprLibError;
+use hopr_lib::transfer_session;
 use hopr_network_types::prelude::ForeignDataMode;
-use hopr_network_types::utils::copy_duplex;
+use hoprd_api::{HOPR_TCP_BUFFER_SIZE, HOPR_UDP_BUFFER_SIZE, HOPR_UDP_QUEUE_SIZE};
 
 pub mod cli;
 pub mod config;
@@ -122,7 +123,7 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                 // so we just take the first resolved address.
                 let resolved_udp_target = udp_target
                     .clone()
-                    .resolve()
+                    .resolve_tokio()
                     .await
                     .map_err(|e| HoprLibError::GeneralError(format!("failed to resolve DNS name {udp_target}: {e}")))?
                     .first()
@@ -135,10 +136,13 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                     "UDP target {udp_target} resolved to {resolved_udp_target}"
                 );
 
-                let udp_bridge = hopr_network_types::udp::ConnectedUdpStream::bind(("0.0.0.0", 0))
-                    .await
-                    .and_then(|s| s.with_counterparty(resolved_udp_target))
-                    .map(|s| s.with_foreign_data_mode(ForeignDataMode::Error))
+                let mut udp_bridge = hopr_network_types::udp::ConnectedUdpStream::builder()
+                    .with_buffer_size(HOPR_UDP_BUFFER_SIZE)
+                    .with_counterparty(resolved_udp_target)
+                    .with_foreign_data_mode(ForeignDataMode::Error)
+                    .with_queue_size(HOPR_UDP_QUEUE_SIZE)
+                    .with_parallelism(0)
+                    .build(("0.0.0.0", 0))
                     .map_err(|e| {
                         HoprLibError::GeneralError(format!(
                             "could not bridge the incoming session to {udp_target}: {e}"
@@ -153,14 +157,17 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                     #[cfg(all(feature = "prometheus", not(test)))]
                     METRIC_ACTIVE_TARGETS.increment(&["tcp"], 1.0);
 
-                    match copy_duplex(&mut session.session, &mut tokio_util::compat::TokioAsyncReadCompatExt::compat(udp_bridge), hopr_lib::SESSION_USABLE_MTU_SIZE, hopr_lib::SESSION_USABLE_MTU_SIZE).await {
-                        Ok(bound_stream_finished) => tracing::info!(
+                    match transfer_session(&mut session.session, &mut udp_bridge, HOPR_UDP_BUFFER_SIZE).await {
+                        Ok((session_to_stream_bytes, stream_to_session_bytes)) => tracing::info!(
                             session_id = debug(session_id),
-                            "server bridged session through UDP {udp_target} ended with {bound_stream_finished:?} bytes transferred in both directions."
+                            session_to_stream_bytes,
+                            stream_to_session_bytes,
+                            "server bridged session to UDP {udp_target} ended"
                         ),
-                        Err(e) => tracing::error!(session_id = debug(session_id),
+                        Err(e) => tracing::error!(
+                            session_id = debug(session_id),
                             "UDP server stream ({udp_target}) is closed: {e:?}"
-                        )
+                        ),
                     }
 
                     #[cfg(all(feature = "prometheus", not(test)))]
@@ -178,7 +185,7 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                 // TCP is able to determine which of the resolved multiple addresses is viable,
                 // and therefore we can pass all of them.
                 let resolved_tcp_targets =
-                    tcp_target.clone().resolve().await.map_err(|e| {
+                    tcp_target.clone().resolve_tokio().await.map_err(|e| {
                         HoprLibError::GeneralError(format!("failed to resolve DNS name {tcp_target}: {e}"))
                     })?;
                 tracing::debug!(
@@ -189,7 +196,7 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                 // TODO: make TCP connection retry strategy configurable either by the server or the client
                 let strategy = tokio_retry::strategy::FixedInterval::from_millis(1500).take(15);
 
-                let tcp_bridge = tokio_retry::Retry::spawn(strategy, || {
+                let mut tcp_bridge = tokio_retry::Retry::spawn(strategy, || {
                     tokio::net::TcpStream::connect(resolved_tcp_targets.as_slice())
                 })
                 .await
@@ -211,15 +218,17 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                     #[cfg(all(feature = "prometheus", not(test)))]
                     METRIC_ACTIVE_TARGETS.increment(&["udp"], 1.0);
 
-                    match copy_duplex(&mut session.session, &mut tokio_util::compat::TokioAsyncReadCompatExt::compat(tcp_bridge), hopr_lib::SESSION_USABLE_MTU_SIZE, hopr_lib::SESSION_USABLE_MTU_SIZE).await {
-                        Ok(bound_stream_finished) => tracing::info!(
+                    match transfer_session(&mut session.session, &mut tcp_bridge, HOPR_TCP_BUFFER_SIZE).await {
+                        Ok((session_to_stream_bytes, stream_to_session_bytes)) => tracing::info!(
                             session_id = debug(session_id),
-                            "server bridged session through TCP {tcp_target} ended with {bound_stream_finished:?} bytes transferred in both directions."
+                            session_to_stream_bytes,
+                            stream_to_session_bytes,
+                            "server bridged session to TCP {tcp_target} ended"
                         ),
                         Err(e) => tracing::error!(
                             session_id = debug(session_id),
                             "TCP server stream ({tcp_target}) is closed: {e:?}"
-                        )
+                        ),
                     }
 
                     #[cfg(all(feature = "prometheus", not(test)))]

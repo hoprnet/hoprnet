@@ -1,11 +1,7 @@
 use async_trait::async_trait;
 use futures::{
-    future::{
-        select,
-        Either,
-        FutureExt, // .fuse()
-    },
-    pin_mut,
+    future::{select, Either, FutureExt},
+    pin_mut, TryStreamExt,
 };
 use hopr_db_api::peers::HoprDbPeersOperations;
 use hopr_primitive_types::traits::SaturatingSub;
@@ -180,21 +176,23 @@ impl<T: Pinging, API: HeartbeatExternalApi> Heartbeat<T, API> {
             )
         });
 
+        debug!(peers = tracing::field::debug(&peers), "Heartbeat round start");
         let timeout = (self.sleep_fn)(this_round_planned_duration).fuse();
-        let ping = self.pinger.ping(peers).fuse();
+        let ping_stream = self.pinger.ping(peers);
 
-        pin_mut!(timeout, ping);
+        pin_mut!(timeout, ping_stream);
 
-        match select(timeout, ping).await {
+        match select(timeout, ping_stream.try_collect::<Vec<_>>().fuse()).await {
             Either::Left(_) => debug!("Heartbeat round interrupted by timeout"),
             Either::Right(_) => {
+                // We intentionally ignore any ping errors here
                 let this_round_actual_duration = current_time().saturating_sub(start);
                 let time_to_wait_for_next_round =
                     this_round_planned_duration.saturating_sub(this_round_actual_duration);
 
                 info!(
-                    round_duration = tracing::field::debug(this_round_actual_duration.as_millis()),
-                    time_til_next_round = tracing::field::debug(time_to_wait_for_next_round.as_millis()),
+                    round_duration_ms = tracing::field::debug(this_round_actual_duration.as_millis()),
+                    time_til_next_round_ms = tracing::field::debug(time_to_wait_for_next_round.as_millis()),
                     "Heartbeat round finished for all peers"
                 );
 
@@ -224,6 +222,8 @@ impl<T: Pinging, API: HeartbeatExternalApi> Heartbeat<T, API> {
 mod tests {
     use super::*;
     use async_std::task::sleep;
+    use futures::Stream;
+    use std::time::Duration;
 
     fn simple_heartbeat_config() -> HeartbeatConfig {
         HeartbeatConfig {
@@ -237,10 +237,12 @@ mod tests {
         pub delay: std::time::Duration,
     }
 
-    #[async_trait]
     impl Pinging for DelayingPinger {
-        async fn ping(&self, _peers: Vec<PeerId>) {
-            sleep(self.delay).await;
+        fn ping(&self, _peers: Vec<PeerId>) -> impl Stream<Item = crate::errors::Result<Duration>> {
+            futures::stream::once(async {
+                sleep(self.delay).await;
+                Ok(Duration::from_millis(1))
+            })
         }
     }
 

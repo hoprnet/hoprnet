@@ -1,4 +1,3 @@
-use crate::{errors::TransportSessionError, traits::SendMsg, Capability};
 use futures::{channel::mpsc::UnboundedReceiver, pin_mut, StreamExt};
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_internal_types::protocol::{ApplicationData, PAYLOAD_SIZE};
@@ -8,7 +7,8 @@ use hopr_network_types::session::state::{SessionConfig, SessionSocket};
 use hopr_primitive_types::traits::BytesRepresentable;
 use libp2p_identity::PeerId;
 use std::collections::HashSet;
-use std::fmt::Formatter;
+use std::fmt::{Debug, Formatter};
+use std::hash::{Hash, Hasher};
 use std::time::Duration;
 use std::{
     fmt::Display,
@@ -20,21 +20,49 @@ use std::{
 use strum::IntoEnumIterator;
 use tracing::{debug, error};
 
+use crate::{errors::TransportSessionError, traits::SendMsg, Capability};
+
+#[cfg(all(feature = "prometheus", not(test)))]
+lazy_static::lazy_static! {
+    static ref METRIC_SESSION_INNER_SIZES: hopr_metrics::MultiHistogram =
+        hopr_metrics::MultiHistogram::new(
+            "hopr_session_inner_sizes",
+            "Sizes of data chunks fed from inner session to HOPR protocol",
+            vec![20.0, 40.0, 80.0, 160.0, 320.0, 640.0, 1280.0],
+            &["session_id"]
+    ).unwrap();
+}
+
+// Enough to fit Ed25519 peer IDs and 2-byte tag number
+const MAX_SESSION_ID_STR_LEN: usize = 64;
+
 /// Unique ID of a specific session.
 ///
 /// Simple wrapper around the maximum range of the port like session unique identifier.
 /// It is a simple combination of an application tag and a peer id that will in future be
 /// replaced by a more robust session id representation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SessionId {
     tag: u16,
     peer: PeerId,
+    // Since this SessionId is commonly represented as a string,
+    // we cache its string representation here.
+    // Also by using a statically allocated ArrayString, we allow the SessionId to remain Copy.
+    // This representation is possibly truncated to MAX_SESSION_ID_STR_LEN.
+    cached: arrayvec::ArrayString<MAX_SESSION_ID_STR_LEN>,
 }
 
 impl SessionId {
     pub fn new(tag: u16, peer: PeerId) -> Self {
-        Self { tag, peer }
+        let mut cached = format!("{peer}:{tag}");
+        cached.truncate(MAX_SESSION_ID_STR_LEN);
+
+        Self {
+            tag,
+            peer,
+            cached: cached.parse().expect("cannot fail due to truncation"),
+        }
     }
 
     pub fn tag(&self) -> u16 {
@@ -45,20 +73,45 @@ impl SessionId {
         &self.peer
     }
 
-    pub fn with_peer(mut self, peer: PeerId) -> Self {
-        self.peer = peer;
-        self
+    pub fn with_peer(self, peer: PeerId) -> Self {
+        Self::new(self.tag, peer)
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.cached
     }
 }
 
 impl Display for SessionId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}:{}", self.peer, self.tag)
+        write!(f, "{}", self.cached)
+    }
+}
+
+impl Debug for SessionId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.cached)
+    }
+}
+
+impl PartialEq for SessionId {
+    fn eq(&self, other: &Self) -> bool {
+        self.tag == other.tag && self.peer == other.peer
+    }
+}
+
+impl Eq for SessionId {}
+
+impl Hash for SessionId {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.tag.hash(state);
+        self.peer.hash(state);
     }
 }
 
 const PADDING_HEADER_SIZE: usize = 4;
-// Inner MTU size of what the HOPR payload can take (payload - peer_id - application_tag)
+
+/// Inner MTU size of what the HOPR payload can take (payload - peer_id - application_tag)
 pub const SESSION_USABLE_MTU_SIZE: usize = PAYLOAD_SIZE
     - OffchainPublicKey::SIZE
     - std::mem::size_of::<hopr_internal_types::protocol::Tag>()
@@ -96,6 +149,7 @@ pub struct Session {
     id: SessionId,
     inner: Pin<Box<dyn AsyncReadWrite>>,
     routing_options: RoutingOptions,
+    capabilities: HashSet<Capability>,
     shutdown_notifier: Option<futures::channel::mpsc::UnboundedSender<SessionId>>,
 }
 
@@ -124,13 +178,16 @@ impl Session {
                 ]);
             }
 
+            // This is a very coarse assumption, that it takes max 2 seconds for each hop one way.
+            let rto_base = 2 * Duration::from_secs(2) * (routing_options.count_hops() + 1) as u32;
+
             // TODO: tweak the default Session protocol config
             let cfg = SessionConfig {
                 enabled_features,
-                acknowledged_frames_buffer: 10_000,
-                frame_expiration_age: Duration::from_secs(60),
-                rto_base_receiver: Duration::from_secs(20),
-                rto_base_sender: Duration::from_secs(30),
+                acknowledged_frames_buffer: 100_000, // Can hold frames for > 40 sec at 2000 frames/sec
+                frame_expiration_age: rto_base * 10,
+                rto_base_receiver: rto_base, // Ask for segment resend, if not yet complete after this period
+                rto_base_sender: rto_base * 2, // Resend frame if not acknowledged after this period
                 ..Default::default()
             };
             debug!(
@@ -142,6 +199,7 @@ impl Session {
                 id,
                 inner: Box::pin(SessionSocket::<SESSION_USABLE_MTU_SIZE>::new(id, inner_session, cfg)),
                 routing_options,
+                capabilities,
                 shutdown_notifier,
             }
         } else {
@@ -150,6 +208,7 @@ impl Session {
                 id,
                 inner: Box::pin(inner_session),
                 routing_options,
+                capabilities,
                 shutdown_notifier,
             }
         }
@@ -163,6 +222,11 @@ impl Session {
     /// Routing options used to deliver data.
     pub fn routing_options(&self) -> &RoutingOptions {
         &self.routing_options
+    }
+
+    /// Capabilities of this Session.
+    pub fn capabilities(&self) -> &HashSet<Capability> {
+        &self.capabilities
     }
 }
 
@@ -213,7 +277,7 @@ impl futures::AsyncWrite for Session {
                 if let Some(notifier) = self.shutdown_notifier.take() {
                     if let Err(err) = notifier.unbounded_send(self.id) {
                         error!(
-                            session_id = tracing::field::debug(self.id),
+                            session_id = tracing::field::display(self.id),
                             "failed to notify session closure: {err}"
                         );
                     }
@@ -272,6 +336,9 @@ impl futures::AsyncWrite for InnerSession {
         cx: &mut std::task::Context<'_>,
         buf: &[u8],
     ) -> Poll<std::io::Result<usize>> {
+        #[cfg(all(feature = "prometheus", not(test)))]
+        METRIC_SESSION_INNER_SIZES.observe(&[self.id.as_str()], buf.len() as f64);
+
         if !self.tx_buffer.is_empty() {
             loop {
                 match self.tx_buffer.poll_next_unpin(cx) {
@@ -427,6 +494,42 @@ pub fn unwrap_offchain_key(payload: Box<[u8]>) -> crate::errors::Result<(PeerId,
     Ok((opk.into(), data))
 }
 
+/// Convenience function to copy data in both directions between a [Session] and arbitrary
+/// async IO stream.
+/// This function is only available with Tokio and will panic with other runtimes.
+#[cfg(feature = "runtime-tokio")]
+pub async fn transfer_session<S>(
+    session: &mut Session,
+    stream: &mut S,
+    max_buffer: usize,
+) -> std::io::Result<(usize, usize)>
+where
+    S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
+{
+    // We can always read as much as possible from the Session and then write it to the Stream.
+    // There are two possibilities for the opposite direction:
+    // 1) If Session protocol is used for segmentation,
+    //    we need to buffer up data at MAX_WRITE_SIZE.
+    // 2) Otherwise, the bare session implements chunking therefore,
+    //    data can be written with arbitrary sizes.
+    let into_session_len = if session.capabilities().contains(&Capability::Segmentation) {
+        max_buffer.min(SessionSocket::<SESSION_USABLE_MTU_SIZE>::MAX_WRITE_SIZE)
+    } else {
+        max_buffer
+    };
+
+    debug!(
+        session_id = tracing::field::debug(session.id()),
+        "session egress buffer: {max_buffer}, session ingress buffer: {into_session_len}"
+    );
+
+    let mut session = tokio_util::compat::FuturesAsyncReadCompatExt::compat(session);
+
+    hopr_network_types::utils::copy_duplex(&mut session, stream, max_buffer, into_session_len)
+        .await
+        .map(|(a, b)| (a as usize, b as usize))
+}
+
 #[cfg(test)]
 mod tests {
     use futures::{AsyncReadExt, AsyncWriteExt};
@@ -444,19 +547,21 @@ mod tests {
     }
 
     #[test]
-    fn wrapping_and_unwrapping_with_offchain_key_should_be_an_identity() {
+    fn wrapping_and_unwrapping_with_offchain_key_should_be_an_identity() -> anyhow::Result<()> {
         let peer: PeerId = OffchainKeypair::random().public().into();
         let data = hopr_crypto_random::random_bytes::<SESSION_USABLE_MTU_SIZE>()
             .as_ref()
             .to_vec()
             .into_boxed_slice();
 
-        let wrapped = wrap_with_offchain_key(&peer, data.clone()).expect("Wrapping should work");
+        let wrapped = wrap_with_offchain_key(&peer, data.clone())?;
 
-        let (peer_id, unwrapped) = unwrap_offchain_key(wrapped.into_boxed_slice()).expect("Unwrapping should work");
+        let (peer_id, unwrapped) = unwrap_offchain_key(wrapped.into_boxed_slice())?;
 
         assert_eq!(peer, peer_id);
         assert_eq!(data, unwrapped);
+
+        Ok(())
     }
 
     #[test]
@@ -513,7 +618,7 @@ mod tests {
     }
 
     #[test]
-    fn session_should_identify_with_its_own_id() {
+    fn session_should_identify_with_its_own_id() -> anyhow::Result<()> {
         let id = SessionId::new(1, PeerId::random());
         let (_tx, rx) = futures::channel::mpsc::unbounded();
         let mock = MockSendMsg::new();
@@ -521,16 +626,18 @@ mod tests {
         let session = InnerSession::new(
             id,
             PeerId::random(),
-            RoutingOptions::Hops(1_u32.try_into().unwrap()),
+            RoutingOptions::Hops(1_u32.try_into()?),
             Arc::new(mock),
             rx,
         );
 
         assert_eq!(session.id(), &id);
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn session_should_read_data_in_one_swoop_if_the_buffer_is_sufficiently_large() {
+    async fn session_should_read_data_in_one_swoop_if_the_buffer_is_sufficiently_large() -> anyhow::Result<()> {
         let id = SessionId::new(1, PeerId::random());
         let (tx, rx) = futures::channel::mpsc::unbounded();
         let mock = MockSendMsg::new();
@@ -538,7 +645,7 @@ mod tests {
         let mut session = InnerSession::new(
             id,
             PeerId::random(),
-            RoutingOptions::Hops(1_u32.try_into().unwrap()),
+            RoutingOptions::Hops(1_u32.try_into()?),
             Arc::new(mock),
             rx,
         );
@@ -552,14 +659,17 @@ mod tests {
 
         let mut buffer = vec![0; PAYLOAD_SIZE * 2];
 
-        let bytes_read = session.read(&mut buffer[..]).await.expect("Read should work");
+        let bytes_read = session.read(&mut buffer[..]).await?;
 
         assert_eq!(bytes_read, random_data.len());
         assert_eq!(&buffer[..bytes_read], random_data.as_ref());
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn session_should_read_data_in_multiple_rounds_if_the_buffer_is_not_sufficiently_large() {
+    async fn session_should_read_data_in_multiple_rounds_if_the_buffer_is_not_sufficiently_large() -> anyhow::Result<()>
+    {
         let id = SessionId::new(1, PeerId::random());
         let (tx, rx) = futures::channel::mpsc::unbounded();
         let mock = MockSendMsg::new();
@@ -567,7 +677,7 @@ mod tests {
         let mut session = InnerSession::new(
             id,
             PeerId::random(),
-            RoutingOptions::Hops(1_u32.try_into().unwrap()),
+            RoutingOptions::Hops(1_u32.try_into()?),
             Arc::new(mock),
             rx,
         );
@@ -582,19 +692,21 @@ mod tests {
         const BUFFER_SIZE: usize = PAYLOAD_SIZE - 1;
         let mut buffer = vec![0; BUFFER_SIZE];
 
-        let bytes_read = session.read(&mut buffer[..]).await.expect("Read should work #1");
+        let bytes_read = session.read(&mut buffer[..]).await?;
 
         assert_eq!(bytes_read, BUFFER_SIZE);
         assert_eq!(&buffer[..bytes_read], &random_data[..BUFFER_SIZE]);
 
-        let bytes_read = session.read(&mut buffer[..]).await.expect("Read should work #1");
+        let bytes_read = session.read(&mut buffer[..]).await?;
 
         assert_eq!(bytes_read, PAYLOAD_SIZE - BUFFER_SIZE);
         assert_eq!(&buffer[..bytes_read], &random_data[BUFFER_SIZE..]);
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn session_should_write_data() {
+    async fn session_should_write_data() -> anyhow::Result<()> {
         let id = SessionId::new(1, OffchainKeypair::random().public().into());
         let (_tx, rx) = futures::channel::mpsc::unbounded();
         let mut mock = MockSendMsg::new();
@@ -606,7 +718,10 @@ mod tests {
             .withf(move |data, _peer, options| {
                 let (_peer_id, data) = unwrap_offchain_key(data.plain_text.clone()).expect("Unwrapping should work");
                 assert_eq!(data, b"Hello, world!".to_vec().into_boxed_slice());
-                assert_eq!(options, &RoutingOptions::Hops(1_u32.try_into().unwrap()));
+                assert_eq!(
+                    options,
+                    &RoutingOptions::Hops(1_u32.try_into().expect("must be convertible"))
+                );
                 true
             })
             .returning(|_, _, _| Ok(()));
@@ -614,19 +729,21 @@ mod tests {
         let mut session = InnerSession::new(
             id,
             OffchainKeypair::random().public().into(),
-            RoutingOptions::Hops(1_u32.try_into().unwrap()),
+            RoutingOptions::Hops(1_u32.try_into()?),
             Arc::new(mock),
             rx,
         );
 
-        let bytes_written = session.write(&data).await.expect("Write should work #1");
+        let bytes_written = session.write(&data).await?;
 
         assert_eq!(bytes_written, data.len());
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn session_should_chunk_the_data_if_without_segmentation_the_write_size_is_greater_than_the_usable_mtu_size()
-    {
+    async fn session_should_chunk_the_data_if_without_segmentation_the_write_size_is_greater_than_the_usable_mtu_size(
+    ) -> anyhow::Result<()> {
         const TO_SEND: usize = SESSION_USABLE_MTU_SIZE * 2 + 10;
 
         let id = SessionId::new(1, OffchainKeypair::random().public().into());
@@ -643,13 +760,15 @@ mod tests {
         let mut session = InnerSession::new(
             id,
             OffchainKeypair::random().public().into(),
-            RoutingOptions::Hops(1_u32.try_into().unwrap()),
+            RoutingOptions::Hops(1_u32.try_into()?),
             Arc::new(mock),
             rx,
         );
 
-        let bytes_written = session.write(&data).await.expect("Write should work #1");
+        let bytes_written = session.write(&data).await?;
 
         assert_eq!(bytes_written, TO_SEND);
+
+        Ok(())
     }
 }

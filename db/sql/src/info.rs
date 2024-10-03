@@ -70,6 +70,10 @@ pub trait HoprDbInfoOperations {
     /// note that this setter should invalidate the cache.
     async fn set_domain_separator<'a>(&'a self, tx: OptTx<'a>, dst_type: DomainSeparator, value: Hash) -> Result<()>;
 
+    /// Sets the minimum required winning probability for incoming tickets.
+    /// The value must be between zero and 1.
+    async fn set_minimum_incoming_ticket_win_prob<'a>(&'a self, tx: OptTx<'a>, win_prob: f64) -> Result<()>;
+
     /// Updates the ticket price.
     /// To retrieve the stored ticket price, use [`HoprDbInfoOperations::get_indexer_data`],
     /// note that this setter should invalidate the cache.
@@ -276,6 +280,7 @@ impl HoprDbInfoOperations for HoprDb {
                                     safe_registry_dst,
                                     channels_dst,
                                     ticket_price: model.ticket_price.map(|p| BalanceType::HOPR.balance_bytes(p)),
+                                    minimum_incoming_ticket_winning_prob: model.min_incoming_ticket_win_prob as f64,
                                     nr_enabled: model.network_registry_enabled,
                                 }))
                             })
@@ -324,6 +329,37 @@ impl HoprDbInfoOperations for HoprDb {
         Ok(())
     }
 
+    async fn set_minimum_incoming_ticket_win_prob<'a>(&'a self, tx: OptTx<'a>, win_prob: f64) -> Result<()> {
+        if !(0.0..=1.0).contains(&win_prob) {
+            return Err(DbSqlError::LogicalError(
+                "winning probability must be between 0 and 1".into(),
+            ));
+        }
+
+        self.nest_transaction(tx)
+            .await?
+            .perform(|tx| {
+                Box::pin(async move {
+                    chain_info::ActiveModel {
+                        id: Set(SINGULAR_TABLE_FIXED_ID),
+                        min_incoming_ticket_win_prob: Set(win_prob as f32),
+                        ..Default::default()
+                    }
+                    .update(tx.as_ref())
+                    .await?;
+
+                    Ok::<(), DbSqlError>(())
+                })
+            })
+            .await?;
+
+        self.caches
+            .single_values
+            .invalidate(&CachedValueDiscriminants::IndexerDataCache)
+            .await;
+        Ok(())
+    }
+
     async fn update_ticket_price<'a>(&'a self, tx: OptTx<'a>, price: Balance) -> Result<()> {
         self.nest_transaction(tx)
             .await?
@@ -358,17 +394,17 @@ impl HoprDbInfoOperations for HoprDb {
                         .one(tx.as_ref())
                         .await?
                         .ok_or(DbSqlError::MissingFixedTableEntry("chain_info".into()))
-                        .map(|m| {
+                        .and_then(|m| {
                             let chain_checksum = if let Some(b) = m.chain_checksum {
-                                Hash::try_from(b.as_slice()).expect("invalid chain checksum in the db")
+                                Hash::try_from(b.as_slice()).map_err(|_| DbSqlError::DecodingError)?
                             } else {
                                 Hash::default()
                             };
-                            DescribedBlock {
+                            Ok(DescribedBlock {
                                 latest_block_number: m.last_indexed_block as u32,
                                 checksum: chain_checksum,
                                 block_prior_to_checksum_update: m.previous_indexed_block_prio_to_checksum_update as u32,
-                            }
+                            })
                         })
                 })
             })
@@ -507,98 +543,107 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn test_set_get_balance() {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
+    async fn test_set_get_balance() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
         assert_eq!(
             BalanceType::HOPR.zero(),
-            db.get_safe_hopr_balance(None).await.unwrap(),
+            db.get_safe_hopr_balance(None).await?,
             "balance must be 0"
         );
 
         let balance = BalanceType::HOPR.balance(10_000);
-        db.set_safe_hopr_balance(None, balance).await.unwrap();
+        db.set_safe_hopr_balance(None, balance).await?;
 
         assert_eq!(
             balance,
-            db.get_safe_hopr_balance(None).await.unwrap(),
+            db.get_safe_hopr_balance(None).await?,
             "balance must be {balance}"
         );
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_set_get_allowance() {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
+    async fn test_set_get_allowance() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
         assert_eq!(
             BalanceType::HOPR.zero(),
-            db.get_safe_hopr_allowance(None).await.unwrap(),
+            db.get_safe_hopr_allowance(None).await?,
             "balance must be 0"
         );
 
         let balance = BalanceType::HOPR.balance(10_000);
-        db.set_safe_hopr_allowance(None, balance).await.unwrap();
+        db.set_safe_hopr_allowance(None, balance).await?;
 
         assert_eq!(
             balance,
-            db.get_safe_hopr_allowance(None).await.unwrap(),
+            db.get_safe_hopr_allowance(None).await?,
             "balance must be {balance}"
         );
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_set_get_indexer_data() {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
+    async fn test_set_get_indexer_data() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
-        let data = db.get_indexer_data(None).await.unwrap();
+        let data = db.get_indexer_data(None).await?;
         assert_eq!(data.ticket_price, None);
 
         let price = BalanceType::HOPR.balance(10);
-        db.update_ticket_price(None, price).await.unwrap();
+        db.update_ticket_price(None, price).await?;
 
-        let data = db.get_indexer_data(None).await.unwrap();
+        db.set_minimum_incoming_ticket_win_prob(None, 0.5).await?;
+
+        let data = db.get_indexer_data(None).await?;
 
         assert_eq!(data.ticket_price, Some(price));
+        assert_eq!(data.minimum_incoming_ticket_winning_prob, 0.5);
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_set_get_safe_info_with_cache() {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
+    async fn test_set_get_safe_info_with_cache() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
-        assert_eq!(None, db.get_safe_info(None).await.unwrap());
+        assert_eq!(None, db.get_safe_info(None).await?);
 
         let safe_info = SafeInfo {
             safe_address: *ADDR_1,
             module_address: *ADDR_2,
         };
 
-        db.set_safe_info(None, safe_info).await.unwrap();
+        db.set_safe_info(None, safe_info).await?;
 
-        assert_eq!(Some(safe_info), db.get_safe_info(None).await.unwrap());
+        assert_eq!(Some(safe_info), db.get_safe_info(None).await?);
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_set_get_safe_info() {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
+    async fn test_set_get_safe_info() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
-        assert_eq!(None, db.get_safe_info(None).await.unwrap());
+        assert_eq!(None, db.get_safe_info(None).await?);
 
         let safe_info = SafeInfo {
             safe_address: *ADDR_1,
             module_address: *ADDR_2,
         };
 
-        db.set_safe_info(None, safe_info).await.unwrap();
+        db.set_safe_info(None, safe_info).await?;
         db.caches.single_values.invalidate_all();
 
-        assert_eq!(Some(safe_info), db.get_safe_info(None).await.unwrap());
+        assert_eq!(Some(safe_info), db.get_safe_info(None).await?);
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_set_last_indexed_block() {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
+    async fn test_set_last_indexed_block() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
-        let described_block = db.get_last_indexed_block(None).await.unwrap();
+        let described_block = db.get_last_indexed_block(None).await?;
         assert_eq!(0, described_block.latest_block_number);
         assert_eq!(0, described_block.block_prior_to_checksum_update);
 
@@ -606,32 +651,33 @@ mod tests {
         let expexted_block_num = 100000;
 
         db.set_last_indexed_block(None, expexted_block_num, Some(checksum))
-            .await
-            .unwrap();
+            .await?;
 
-        let next_described_block = db.get_last_indexed_block(None).await.unwrap();
+        let next_described_block = db.get_last_indexed_block(None).await?;
         assert_eq!(expexted_block_num, next_described_block.latest_block_number);
         assert_eq!(0, next_described_block.block_prior_to_checksum_update);
 
         let expected_next_checksum = Hash::create(&[described_block.checksum.as_ref(), checksum.as_ref()]);
         assert_eq!(expected_next_checksum, next_described_block.checksum);
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_set_get_global_setting() {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
+    async fn test_set_get_global_setting() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
         let key = "test";
         let value = hex!("deadbeef");
 
-        assert_eq!(None, db.get_global_setting(None, key).await.unwrap());
+        assert_eq!(None, db.get_global_setting(None, key).await?);
 
-        db.set_global_setting(None, key, Some(&value)).await.unwrap();
+        db.set_global_setting(None, key, Some(&value)).await?;
 
-        assert_eq!(Some(value.into()), db.get_global_setting(None, key).await.unwrap());
+        assert_eq!(Some(value.into()), db.get_global_setting(None, key).await?);
 
-        db.set_global_setting(None, key, None).await.unwrap();
+        db.set_global_setting(None, key, None).await?;
 
-        assert_eq!(None, db.get_global_setting(None, key).await.unwrap());
+        assert_eq!(None, db.get_global_setting(None, key).await?);
+        Ok(())
     }
 }

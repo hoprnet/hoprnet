@@ -4,7 +4,6 @@ use hopr_internal_types::channels::ChannelStatus;
 use hopr_internal_types::prelude::ChannelEntry;
 use hopr_primitive_types::prelude::{BalanceType, IntoEndian, ToHex, U256};
 use sea_orm::Set;
-use std::str::FromStr;
 
 /// Extension trait for updating [ChannelStatus] inside [channel::ActiveModel].
 /// This is needed as `status` maps to two model members.
@@ -15,9 +14,9 @@ pub trait ChannelStatusUpdate {
 
 impl ChannelStatusUpdate for channel::ActiveModel {
     fn set_status(&mut self, new_status: ChannelStatus) {
-        self.status = Set(u8::from(new_status) as i32);
+        self.status = Set(i8::from(new_status));
         if let ChannelStatus::PendingToClose(t) = new_status {
-            self.closure_time = Set(Some(chrono::DateTime::<chrono::Utc>::from(t).to_rfc3339()))
+            self.closure_time = Set(Some(chrono::DateTime::<chrono::Utc>::from(t)))
         }
     }
 }
@@ -29,17 +28,12 @@ impl TryFrom<&channel::Model> for ChannelStatus {
         match value.status {
             0 => Ok(ChannelStatus::Closed),
             1 => Ok(ChannelStatus::Open),
-            2 => {
-                if let Some(ct) = &value.closure_time {
-                    let time = chrono::DateTime::<chrono::Utc>::from_str(ct)
-                        .map_err(|_| DbEntityError::ConversionError("channel closure time".into()))?;
-                    Ok(ChannelStatus::PendingToClose(time.into()))
-                } else {
-                    Err(DbEntityError::ConversionError(
-                        "channel is pending to close but without closure time".into(),
-                    ))
-                }
-            }
+            2 => value
+                .closure_time
+                .ok_or(DbEntityError::ConversionError(
+                    "channel is pending to close but without closure time".into(),
+                ))
+                .map(|time| ChannelStatus::PendingToClose(time.into())),
             _ => Err(DbEntityError::ConversionError("invalid channel status value".into())),
         }
     }

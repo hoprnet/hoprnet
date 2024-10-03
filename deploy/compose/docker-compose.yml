@@ -20,8 +20,8 @@ services:
     networks:
       - hoprnet
     ports:
-      - "${HOPRD_P2P_PORT}:9091/tcp"
-      - "${HOPRD_P2P_PORT}:9091/udp"
+      - "${HOPRD_P2P_PORT}:${HOPRD_P2P_PORT}/tcp"
+      - "${HOPRD_P2P_PORT}:${HOPRD_P2P_PORT}/udp"
       - "${HOPRD_API_PORT}:3001"
     env_file:
       - .env-secrets
@@ -56,7 +56,7 @@ services:
     container_name: admin
     hostname: admin
     ports:
-      - "${HOPR_ADMIN_PORT}:80"
+      - "${HOPR_ADMIN_PORT}:4677"
     networks:
       - hoprnet
     deploy:

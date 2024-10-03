@@ -16,8 +16,18 @@ pub const INTERMEDIATE_HOPS: usize = 3;
 /// Maximum size of the packet payload in bytes.
 pub const PAYLOAD_SIZE: usize = 500;
 
-/// Fixed ticket winning probability
-pub const TICKET_WIN_PROB: f64 = 1.0f64;
+/// Default required minimum incoming ticket winning probability
+pub const DEFAULT_MINIMUM_INCOMING_TICKET_WIN_PROB: f64 = 1.0;
+
+/// Default maximum incoming ticket winning probability, above which tickets will not be accepted
+/// due to privacy.
+pub const DEFAULT_MAXIMUM_INCOMING_TICKET_WIN_PROB: f64 = 1.0; // TODO: change this in 3.0
+
+/// Default ticket winning probability that will be printed on outgoing tickets
+pub const DEFAULT_OUTGOING_TICKET_WIN_PROB: f64 = 1.0;
+
+/// The lowest possible ticket winning probability due to SC representation limit.
+pub const LOWEST_POSSIBLE_WINNING_PROB: f64 = 0.00000001;
 
 /// Tags are currently 16-bit unsigned integers
 pub type Tag = u16;
@@ -42,9 +52,14 @@ impl Acknowledgement {
         }
     }
 
+    /// Generates random, but still a valid acknowledgement.
+    pub fn random(offchain_keypair: &OffchainKeypair) -> Self {
+        Self::new(HalfKey::random(), offchain_keypair)
+    }
+
     /// Validates the acknowledgement.
     ///
-    /// Must be called immediately after deserialization or otherwise
+    /// Must be called immediately after deserialization, or otherwise
     /// any operations with the deserialized acknowledgement will panic.
     #[tracing::instrument(level = "debug", skip(self, sender_node_key))]
     pub fn validate(&mut self, sender_node_key: &OffchainPublicKey) -> bool {
@@ -176,10 +191,6 @@ impl ApplicationData {
             Err(PayloadSizeExceeded)
         }
     }
-
-    pub fn new_fixed(application_tag: Option<Tag>, plain_text: [u8; PAYLOAD_SIZE - Self::SIZE]) -> Self {
-        Self::new(application_tag, &plain_text).unwrap()
-    }
 }
 
 impl Display for ApplicationData {
@@ -225,26 +236,28 @@ impl ApplicationData {
 
 #[cfg(test)]
 mod tests {
-    use crate::protocol::{ApplicationData, TagBloomFilter};
+    use super::*;
     use hopr_crypto_random::random_bytes;
 
     #[test]
-    fn test_application_data() {
-        let ad_1 = ApplicationData::new(Some(10), &[0_u8, 1_u8]).unwrap();
-        let ad_2 = ApplicationData::from_bytes(&ad_1.to_bytes()).unwrap();
+    fn test_application_data() -> anyhow::Result<()> {
+        let ad_1 = ApplicationData::new(Some(10), &[0_u8, 1_u8])?;
+        let ad_2 = ApplicationData::from_bytes(&ad_1.to_bytes())?;
         assert_eq!(ad_1, ad_2);
 
-        let ad_1 = ApplicationData::new(None, &[]).unwrap();
-        let ad_2 = ApplicationData::from_bytes(&ad_1.to_bytes()).unwrap();
+        let ad_1 = ApplicationData::new(None, &[])?;
+        let ad_2 = ApplicationData::from_bytes(&ad_1.to_bytes())?;
         assert_eq!(ad_1, ad_2);
 
-        let ad_1 = ApplicationData::new(Some(10), &[0_u8, 1_u8]).unwrap();
-        let ad_2 = ApplicationData::from_bytes(&ad_1.to_bytes()).unwrap();
+        let ad_1 = ApplicationData::new(Some(10), &[0_u8, 1_u8])?;
+        let ad_2 = ApplicationData::from_bytes(&ad_1.to_bytes())?;
         assert_eq!(ad_1, ad_2);
+
+        Ok(())
     }
 
     #[test]
-    fn test_packet_tag_bloom_filter() {
+    fn test_packet_tag_bloom_filter() -> anyhow::Result<()> {
         let mut filter1 = TagBloomFilter::default();
 
         let items = (0..10_000)
@@ -265,7 +278,7 @@ mod tests {
         // Count number of items in the BF (incl. false positives)
         let match_count_1 = items.iter().filter(|item| filter1.check(item)).count();
 
-        let filter2 = TagBloomFilter::from_bytes(&filter1.to_bytes()).unwrap();
+        let filter2 = TagBloomFilter::from_bytes(&filter1.to_bytes())?;
 
         // Count number of items in the BF (incl. false positives)
         let match_count_2 = items.iter().filter(|item| filter2.check(item)).count();
@@ -285,5 +298,7 @@ mod tests {
             !filter2.check(&[0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8]),
             "bf 2 must not contain zero tag"
         );
+
+        Ok(())
     }
 }

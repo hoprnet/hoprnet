@@ -1,5 +1,5 @@
 use std::io::ErrorKind;
-use std::str::FromStr;
+use std::net::IpAddr;
 use std::sync::Arc;
 
 use crate::types::PeerOrAddress;
@@ -12,18 +12,27 @@ use axum::{
 };
 use futures::{StreamExt, TryStreamExt};
 use hopr_lib::errors::HoprLibError;
+use hopr_lib::transfer_session;
 use hopr_lib::{HoprSession, IpProtocol, RoutingOptions, SessionCapability, SessionClientConfig};
+
 use hopr_network_types::prelude::ConnectedUdpStream;
 use hopr_network_types::udp::ForeignDataMode;
-use hopr_network_types::utils::copy_duplex;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
-use tokio::net::{TcpListener, ToSocketAddrs};
-use tokio_util::compat::TokioAsyncReadCompatExt;
+use tokio::net::TcpListener;
 use tracing::{debug, error, info};
 
 /// Default listening host the session listener socket binds to.
 pub const DEFAULT_LISTEN_HOST: &str = "127.0.0.1:0";
+
+/// Size of the buffer for forwarding data to/from a TCP stream.
+pub const HOPR_TCP_BUFFER_SIZE: usize = 4096;
+
+/// Size of the buffer for forwarding data to/from a UDP stream.
+pub const HOPR_UDP_BUFFER_SIZE: usize = 16384;
+
+/// Size of the queue (back-pressure) for data incoming from a UDP stream.
+pub const HOPR_UDP_QUEUE_SIZE: usize = 8192;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -42,7 +51,7 @@ lazy_static::lazy_static! {
             "Hops": 1
         },
         "target": "localhost:8080",
-        "listen_host": "127.0.0.1:10000",
+        "listenHost": "127.0.0.1:10000",
         "capabilities": ["Retransmission", "Segmentation"]
     }))]
 #[serde(rename_all = "camelCase")]
@@ -171,6 +180,9 @@ pub(crate) async fn create_client(
         )
     })?;
 
+    // TODO: make this retry strategy configurable
+    let session_init_retry_strategy = tokio_retry::strategy::ExponentialBackoff::from_millis(1000).take(3);
+
     // TODO: consider pooling the sessions on a listener, so that the negotiation is amortized
 
     debug!("binding {protocol} session listening socket to {bind_host}");
@@ -195,11 +207,21 @@ pub(crate) async fn create_client(
                     .for_each_concurrent(None, move |accepted_client| {
                         let data = data.clone();
                         let hopr = hopr.clone();
+                        let session_init_retry_strategy = session_init_retry_strategy.clone();
                         async move {
                             match accepted_client {
                                 Ok((sock_addr, stream)) => {
                                     debug!("incoming TCP connection {sock_addr}");
-                                    let session = match hopr.connect_to(data).await {
+                                    let session_init =
+                                        tokio_retry::Retry::spawn(session_init_retry_strategy, move || {
+                                            let hopr = hopr.clone();
+                                            let data = data.clone();
+                                            async move {
+                                                debug!("trying tcp session establishment");
+                                                hopr.connect_to(data).await
+                                            }
+                                        });
+                                    let session = match session_init.await {
                                         Ok(s) => s,
                                         Err(e) => {
                                             error!("failed to establish session: {e}");
@@ -215,7 +237,7 @@ pub(crate) async fn create_client(
                                     #[cfg(all(feature = "prometheus", not(test)))]
                                     METRIC_ACTIVE_CLIENTS.increment(&["tcp"], 1.0);
 
-                                    bind_session_to_stream(session, stream).await;
+                                    bind_session_to_stream(session, stream, HOPR_TCP_BUFFER_SIZE).await;
 
                                     #[cfg(all(feature = "prometheus", not(test)))]
                                     METRIC_ACTIVE_CLIENTS.decrement(&["tcp"], 1.0);
@@ -234,7 +256,16 @@ pub(crate) async fn create_client(
             bound_host
         }
         IpProtocol::UDP => {
-            let session = state.hopr.clone().connect_to(data).await.map_err(|e| {
+            let hopr = state.hopr.clone();
+            let session_init = tokio_retry::Retry::spawn(session_init_retry_strategy.clone(), move || {
+                let hopr = hopr.clone();
+                let data = data.clone();
+                async move {
+                    debug!("trying udp session establishment");
+                    hopr.connect_to(data).await
+                }
+            });
+            let session = session_init.await.map_err(|e| {
                 (
                     StatusCode::UNPROCESSABLE_ENTITY,
                     ApiErrorStatus::UnknownFailure(e.to_string()),
@@ -265,7 +296,7 @@ pub(crate) async fn create_client(
                         #[cfg(all(feature = "prometheus", not(test)))]
                         METRIC_ACTIVE_CLIENTS.increment(&["udp"], 1.0);
 
-                        bind_session_to_stream(session, udp_socket).await;
+                        bind_session_to_stream(session, udp_socket, HOPR_UDP_BUFFER_SIZE).await;
 
                         #[cfg(all(feature = "prometheus", not(test)))]
                         METRIC_ACTIVE_CLIENTS.decrement(&["udp"], 1.0);
@@ -344,6 +375,8 @@ pub(crate) struct SessionCloseClientRequest {
 /// Closes an existing Session listener.
 /// The listener must've been previously created and bound for the given IP protocol.
 /// Once a listener is closed, no more socket connections can be made to it.
+/// If the passed port number is 0, listeners on all ports of the given listening IP and protocol
+/// will be closed.
 #[utoipa::path(
     delete,
     path = const_format::formatcp!("{BASE_PATH}/session/{{protocol}}"),
@@ -372,50 +405,67 @@ pub(crate) async fn close_client(
     Path(protocol): Path<IpProtocol>,
     Json(SessionCloseClientRequest { listening_ip, port }): Json<SessionCloseClientRequest>,
 ) -> Result<impl IntoResponse, impl IntoResponse> {
-    let bound_addr = std::net::SocketAddr::from_str(&format!("{listening_ip}:{port}"))
+    let listening_ip: IpAddr = listening_ip
+        .parse()
         .map_err(|_| (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidInput))?;
 
-    let (_, handle) = state
-        .open_listeners
-        .write()
-        .await
-        .remove(&ListenerId(protocol, bound_addr))
-        .ok_or((StatusCode::NOT_FOUND, ApiErrorStatus::InvalidInput))?;
+    {
+        let mut open_listeners = state.open_listeners.write().await;
 
-    hopr_async_runtime::prelude::cancel_join_handle(handle).await;
+        let mut to_remove = Vec::new();
+
+        // Find all listeners with protocol, listening IP and optionally port number (if > 0)
+        open_listeners
+            .iter()
+            .filter(|(ListenerId(proto, addr), _)| {
+                protocol == *proto && addr.ip() == listening_ip && (addr.port() == port || port == 0)
+            })
+            .for_each(|(id, _)| to_remove.push(*id));
+
+        if to_remove.is_empty() {
+            return Err((StatusCode::NOT_FOUND, ApiErrorStatus::InvalidInput));
+        }
+
+        for bound_addr in to_remove {
+            let (_, handle) = open_listeners
+                .remove(&bound_addr)
+                .ok_or((StatusCode::NOT_FOUND, ApiErrorStatus::InvalidInput))?;
+
+            hopr_async_runtime::prelude::cancel_join_handle(handle).await;
+        }
+    }
+
     Ok::<_, (StatusCode, ApiErrorStatus)>((StatusCode::NO_CONTENT, "").into_response())
 }
 
-async fn tcp_listen_on<A: ToSocketAddrs>(address: A) -> std::io::Result<(std::net::SocketAddr, TcpListener)> {
-    let tcp_listener = TcpListener::bind(address).await?;
+async fn tcp_listen_on<A: std::net::ToSocketAddrs>(address: A) -> std::io::Result<(std::net::SocketAddr, TcpListener)> {
+    let tcp_listener = TcpListener::bind(address.to_socket_addrs()?.collect::<Vec<_>>().as_slice()).await?;
 
     Ok((tcp_listener.local_addr()?, tcp_listener))
 }
 
-async fn udp_bind_to<A: ToSocketAddrs>(address: A) -> std::io::Result<(std::net::SocketAddr, ConnectedUdpStream)> {
-    let udp_socket = ConnectedUdpStream::bind(address)
-        .await?
-        .with_foreign_data_mode(ForeignDataMode::Discard); // discard data from UDP clients other than the first one served
+async fn udp_bind_to<A: std::net::ToSocketAddrs>(
+    address: A,
+) -> std::io::Result<(std::net::SocketAddr, ConnectedUdpStream)> {
+    let udp_socket = ConnectedUdpStream::builder()
+        .with_buffer_size(HOPR_UDP_BUFFER_SIZE)
+        .with_foreign_data_mode(ForeignDataMode::Discard) // discard data from UDP clients other than the first one served
+        .with_queue_size(HOPR_UDP_QUEUE_SIZE)
+        .with_parallelism(0)
+        .build(address)?;
 
-    Ok((udp_socket.socket().local_addr()?, udp_socket))
+    Ok((*udp_socket.bound_address(), udp_socket))
 }
 
-async fn bind_session_to_stream<T>(mut session: HoprSession, stream: T)
+async fn bind_session_to_stream<T>(mut session: HoprSession, mut stream: T, max_buf: usize)
 where
     T: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
 {
     let session_id = *session.id();
-    match copy_duplex(
-        &mut session,
-        &mut stream.compat(),
-        hopr_lib::SESSION_USABLE_MTU_SIZE,
-        hopr_lib::SESSION_USABLE_MTU_SIZE,
-    )
-    .await
-    {
-        Ok(bound_stream_finished) => info!(
+    match transfer_session(&mut session, &mut stream, max_buf).await {
+        Ok((session_to_stream_bytes, stream_to_session_bytes)) => info!(
             session_id = tracing::field::debug(session_id),
-            "client session ended with {bound_stream_finished:?} bytes transferred in both directions.",
+            session_to_stream_bytes, stream_to_session_bytes, "client session ended",
         ),
         Err(e) => error!(
             session_id = tracing::field::debug(session_id),
@@ -431,7 +481,6 @@ mod tests {
     use futures::channel::mpsc::UnboundedSender;
     use hopr_lib::{ApplicationData, Keypair, PeerId, SendMsg};
     use hopr_transport_session::errors::TransportSessionError;
-    use hopr_transport_session::RoutingOptions;
     use std::collections::HashSet;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
@@ -459,7 +508,7 @@ mod tests {
             self.tx
                 .clone()
                 .unbounded_send(data)
-                .expect("send message: failed to send data");
+                .map_err(|_| TransportSessionError::Closed)?;
 
             Ok(())
         }
@@ -487,7 +536,7 @@ mod tests {
 
         tokio::task::spawn(async move {
             match tcp_listener.accept().await {
-                Ok((stream, _)) => bind_session_to_stream(session, stream).await,
+                Ok((stream, _)) => bind_session_to_stream(session, stream, HOPR_TCP_BUFFER_SIZE).await,
                 Err(e) => error!("failed to accept connection: {e}"),
             }
         });
@@ -528,12 +577,18 @@ mod tests {
 
         let (listen_addr, udp_listener) = udp_bind_to(("127.0.0.1", 0)).await.context("udp_bind_to failed")?;
 
-        tokio::task::spawn(bind_session_to_stream(session, udp_listener));
+        tokio::task::spawn(bind_session_to_stream(
+            session,
+            udp_listener,
+            hopr_lib::SESSION_USABLE_MTU_SIZE,
+        ));
 
-        let mut udp_stream = ConnectedUdpStream::bind(("127.0.0.1", 0))
-            .await
-            .context("bind failed")?
-            .with_counterparty(listen_addr)?;
+        let mut udp_stream = ConnectedUdpStream::builder()
+            .with_buffer_size(hopr_lib::SESSION_USABLE_MTU_SIZE)
+            .with_queue_size(HOPR_UDP_QUEUE_SIZE)
+            .with_counterparty(listen_addr)
+            .build(("127.0.0.1", 0))
+            .context("bind failed")?;
 
         let data = vec![b"hello", b"world", b"this ", b"is   ", b"    a", b" test"];
 

@@ -1,6 +1,6 @@
 [package]
 name = "chain-indexer"
-version = "0.3.1"
+version = "0.4.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Core-Ethereum-specific interaction with the backend database"
@@ -51,9 +51,11 @@ hopr-primitive-types = { workspace = true }
 hopr-async-runtime = { workspace = true }
 
 [dev-dependencies]
+anyhow = { workspace = true }
 async-std = { workspace = true }
 hopr-db-sql = { workspace = true, features = ["runtime-async-std"] }
 hex-literal = { workspace = true }
 mockall = { workspace = true }
 primitive-types = { workspace = true }
 hopr-crypto-random = { workspace = true }
+test-log = { workspace = true }

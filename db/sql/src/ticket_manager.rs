@@ -143,8 +143,14 @@ impl TicketManager {
 
     /// Get unrealized value for a channel
     pub async fn unrealized_value(&self, selector: TicketSelector) -> Result<Balance> {
+        if !selector.is_single_channel() {
+            return Err(crate::DbSqlError::LogicalError(
+                "selector must represent a single channel".into(),
+            ));
+        }
+
+        let channel_id = selector.channel_identifiers[0].0;
         let selector: WrappedTicketSelector = selector.into();
-        let channel_id = selector.0.channel_id;
 
         let transaction = OpenTransaction(
             self.tickets_db
@@ -215,8 +221,8 @@ mod tests {
     use crate::info::HoprDbInfoOperations;
 
     lazy_static::lazy_static! {
-        static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).unwrap();
-        static ref BOB: ChainKeypair = ChainKeypair::from_secret(&hex!("48680484c6fc31bc881a0083e6e32b6dc789f9eaba0f8b981429fd346c697f8c")).unwrap();
+        static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).expect("lazy static keypair should be valid");
+        static ref BOB: ChainKeypair = ChainKeypair::from_secret(&hex!("48680484c6fc31bc881a0083e6e32b6dc789f9eaba0f8b981429fd346c697f8c")).expect("lazy static keypair should be valid");
     }
 
     lazy_static::lazy_static! {
@@ -242,12 +248,12 @@ mod tests {
         Ok(())
     }
 
-    fn generate_random_ack_ticket(index: u32) -> AcknowledgedTicket {
+    fn generate_random_ack_ticket(index: u32) -> anyhow::Result<AcknowledgedTicket> {
         let hk1 = HalfKey::random();
         let hk2 = HalfKey::random();
 
-        let cp1: CurvePoint = hk1.to_challenge().try_into().unwrap();
-        let cp2: CurvePoint = hk2.to_challenge().try_into().unwrap();
+        let cp1: CurvePoint = hk1.to_challenge().try_into()?;
+        let cp2: CurvePoint = hk2.to_challenge().try_into()?;
         let cp_sum = CurvePoint::combine(&[&cp1, &cp2]);
 
         let ticket = TicketBuilder::default()
@@ -256,16 +262,14 @@ mod tests {
             .index(index as u64)
             .channel_epoch(4)
             .challenge(Challenge::from(cp_sum).to_ethereum_challenge())
-            .build_signed(&BOB, &Hash::default())
-            .unwrap();
+            .build_signed(&BOB, &Hash::default())?;
 
-        ticket.into_acknowledged(Response::from_half_keys(&hk1, &hk2).unwrap())
+        Ok(ticket.into_acknowledged(Response::from_half_keys(&hk1, &hk2)?))
     }
 
     #[async_std::test]
-    async fn test_insert_ticket_properly_resolves_the_cached_value(
-    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
-        let db = HoprDb::new_in_memory(ALICE.clone()).await;
+    async fn test_insert_ticket_properly_resolves_the_cached_value() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ALICE.clone()).await?;
         db.set_domain_separator(None, DomainSeparator::Channel, Hash::default())
             .await?;
         add_peer_mappings(
@@ -286,14 +290,14 @@ mod tests {
             4_u32.into(),
         );
 
-        db.upsert_channel(None, channel.clone()).await.unwrap();
+        db.upsert_channel(None, channel.clone()).await?;
 
         assert_eq!(
             Balance::zero(BalanceType::HOPR),
             db.ticket_manager.unrealized_value((&channel).into()).await?
         );
 
-        let ticket = generate_random_ack_ticket(1);
+        let ticket = generate_random_ack_ticket(1)?;
         let ticket_value = ticket.verified_ticket().amount;
 
         db.ticket_manager.insert_ticket(ticket).await?;

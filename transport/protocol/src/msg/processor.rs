@@ -72,14 +72,19 @@ where
 {
     type Input = ApplicationData;
 
-    #[tracing::instrument(level = "debug", skip(self, data))]
+    #[tracing::instrument(level = "trace", skip(self, data))]
     async fn send(&self, data: ApplicationData, path: TransportPath) -> Result<(PeerId, Box<[u8]>)> {
         let path: std::result::Result<Vec<OffchainPublicKey>, hopr_primitive_types::errors::GeneralError> =
             path.hops().iter().map(OffchainPublicKey::try_from).collect();
 
         let packet = self
             .db
-            .to_send(data.to_bytes(), self.cfg.chain_keypair.clone(), path?)
+            .to_send(
+                data.to_bytes(),
+                self.cfg.chain_keypair.clone(),
+                path?,
+                self.cfg.outgoing_ticket_win_prob,
+            )
             .await
             .map_err(|e| PacketError::PacketConstructionError(e.to_string()))?;
 
@@ -98,7 +103,7 @@ where
 {
     type Packet = RecvOperation;
 
-    #[tracing::instrument(level = "debug", skip(self, data))]
+    #[tracing::instrument(level = "trace", skip(self, data))]
     async fn recv(&self, peer: &PeerId, data: Box<[u8]>) -> Result<RecvOperation> {
         let previous_hop = OffchainPublicKey::try_from(peer)
             .map_err(|e| PacketError::LogicError(format!("failed to convert '{peer}' into the public key: {e}")))?;
@@ -110,6 +115,7 @@ where
                 self.cfg.chain_keypair.clone(),
                 &self.cfg.packet_keypair,
                 previous_hop,
+                self.cfg.outgoing_ticket_win_prob,
             )
             .await
             .map_err(|e| match e {
@@ -256,7 +262,7 @@ impl MsgSender {
     }
 
     /// Pushes a new packet into processing.
-    #[tracing::instrument(level = "debug", skip(self, data))]
+    #[tracing::instrument(level = "trace", skip(self, data))]
     pub async fn send_packet(&self, data: ApplicationData, path: TransportPath) -> Result<PacketSendAwaiter> {
         let (tx, rx) = futures::channel::oneshot::channel::<std::result::Result<(), PacketError>>();
 
@@ -279,21 +285,24 @@ pub struct PacketInteractionConfig {
     pub packet_keypair: OffchainKeypair,
     pub chain_keypair: ChainKeypair,
     pub mixer: MixerConfig,
+    pub outgoing_ticket_win_prob: f64,
 }
 
 impl PacketInteractionConfig {
-    pub fn new(packet_keypair: &OffchainKeypair, chain_keypair: &ChainKeypair) -> Self {
+    pub fn new(packet_keypair: &OffchainKeypair, chain_keypair: &ChainKeypair, outgoing_ticket_win_prob: f64) -> Self {
         Self {
             packet_keypair: packet_keypair.clone(),
             chain_keypair: chain_keypair.clone(),
             check_unrealized_balance: true,
             mixer: MixerConfig::default(),
+            outgoing_ticket_win_prob,
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use anyhow::Context;
     use async_std::future::timeout;
     use futures::StreamExt;
 
@@ -315,12 +324,12 @@ mod tests {
     }
 
     #[async_std::test]
-    pub async fn message_sender_operation_reacts_on_finalizer_closure() {
+    pub async fn message_sender_operation_reacts_on_finalizer_closure() -> anyhow::Result<()> {
         let (tx, mut rx) = futures::channel::mpsc::unbounded::<SendMsgInput>();
 
         let sender = MsgSender::new(tx);
 
-        let expected_data = ApplicationData::from_bytes(&[0x01, 0x02, 0x03]).expect("Data must be constructible");
+        let expected_data = ApplicationData::from_bytes(&[0x01, 0x02, 0x03])?;
         let expected_path = TransportPath::direct(PeerId::random());
 
         let result = sender.send_packet(expected_data.clone(), expected_path.clone()).await;
@@ -329,8 +338,8 @@ mod tests {
         let received = rx.next();
         let (data, path, finalizer) = timeout(Duration::from_millis(20), received)
             .await
-            .expect("Timeout")
-            .unwrap();
+            .context("Timeout")?
+            .context("value should be present")?;
 
         assert_eq!(data, expected_data);
         assert_eq!(path, expected_path);
@@ -341,9 +350,11 @@ mod tests {
         });
 
         assert!(result
-            .expect("Awaiter must be present")
+            .context("Awaiter must be present")?
             .consume_and_wait(Duration::from_millis(10))
             .await
-            .is_ok())
+            .is_ok());
+
+        Ok(())
     }
 }

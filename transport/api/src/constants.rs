@@ -22,7 +22,8 @@ pub(crate) const RESERVED_SESSION_TAG_UPPER_LIMIT: u16 = 1024;
 pub(crate) const RESERVED_SUBPROTOCOL_TAG_UPPER_LIMIT: u16 = 16;
 
 /// Time within Start protocol must finish session initiation.
-pub(crate) const SESSION_INITIATION_TIMEOUT: Duration = Duration::from_secs(60);
+/// This base value is always multiplied by the (max) number of hops, times 2 (for both-ways).
+pub(crate) const SESSION_INITIATION_TIMEOUT_BASE: Duration = Duration::from_secs(5);
 
 /// Maximum lifetime of an idle session.
 pub(crate) const SESSION_LIFETIME: Duration = Duration::from_secs(2 * 60);

@@ -31,7 +31,7 @@ pub(crate) async fn authenticate(
                 .iter()
                 .filter_map(|(n, v)| {
                     (AUTHORIZATION.eq(n) || x_auth_header.eq(n) || websocket_proto_header.eq(n))
-                        .then_some((n, v.to_str().unwrap()))
+                        .then_some((n, v.to_str().expect("Invalid header value")))
                 })
                 .collect::<Vec<_>>();
 

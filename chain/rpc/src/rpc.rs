@@ -260,7 +260,7 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use crate::rpc::{RpcOperations, RpcOperationsConfig};
     use crate::{HoprRpcOperations, PendingTransaction};
     use chain_types::{ContractAddresses, ContractInstances};
@@ -287,12 +287,12 @@ pub mod tests {
     }
 
     #[async_std::test]
-    async fn test_should_send_tx() {
+    async fn test_should_send_tx() -> anyhow::Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
 
         let expected_block_time = Duration::from_secs(1);
         let anvil = chain_types::utils::create_anvil(Some(expected_block_time));
-        let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
+        let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
 
         let cfg = RpcOperationsConfig {
             chain_id: anvil.chain_id(),
@@ -311,30 +311,28 @@ pub mod tests {
         // Wait until contracts deployments are final
         sleep((1 + cfg.finality) * expected_block_time).await;
 
-        let rpc = RpcOperations::new(client, &chain_key_0, cfg).expect("failed to construct rpc");
+        let rpc = RpcOperations::new(client, &chain_key_0, cfg)?;
 
-        let balance_1 = rpc
-            .get_balance((&chain_key_0).into(), BalanceType::Native)
-            .await
-            .unwrap();
+        let balance_1 = rpc.get_balance((&chain_key_0).into(), BalanceType::Native).await?;
         assert!(balance_1.amount().gt(&0.into()), "balance must be greater than 0");
 
         // Send 1 ETH to some random address
         let tx_hash = rpc
             .send_transaction(chain_types::utils::create_native_transfer(*RANDY, 1000000_u32.into()))
-            .await
-            .expect("failed to send tx");
+            .await?;
 
         wait_until_tx(tx_hash, Duration::from_secs(8)).await;
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_should_send_consecutive_txs() {
+    async fn test_should_send_consecutive_txs() -> anyhow::Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
 
         let expected_block_time = Duration::from_secs(1);
         let anvil = chain_types::utils::create_anvil(Some(expected_block_time));
-        let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
+        let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
 
         let cfg = RpcOperationsConfig {
             chain_id: anvil.chain_id(),
@@ -353,12 +351,9 @@ pub mod tests {
         // Wait until contracts deployments are final
         sleep((1 + cfg.finality) * expected_block_time).await;
 
-        let rpc = RpcOperations::new(client, &chain_key_0, cfg).expect("failed to construct rpc");
+        let rpc = RpcOperations::new(client, &chain_key_0, cfg)?;
 
-        let balance_1 = rpc
-            .get_balance((&chain_key_0).into(), BalanceType::Native)
-            .await
-            .unwrap();
+        let balance_1 = rpc.get_balance((&chain_key_0).into(), BalanceType::Native).await?;
         assert!(balance_1.amount().gt(&0.into()), "balance must be greater than 0");
 
         let txs_count = 5_u64;
@@ -374,24 +369,23 @@ pub mod tests {
         }))
         .await;
 
-        let balance_2 = rpc
-            .get_balance((&chain_key_0).into(), BalanceType::Native)
-            .await
-            .unwrap();
+        let balance_2 = rpc.get_balance((&chain_key_0).into(), BalanceType::Native).await?;
 
         assert!(
             balance_2.amount() <= balance_1.amount() - txs_count * send_amount,
             "balance must be less"
         );
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_get_balance_native() {
+    async fn test_get_balance_native() -> anyhow::Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
 
         let expected_block_time = Duration::from_secs(1);
         let anvil = chain_types::utils::create_anvil(Some(expected_block_time));
-        let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
+        let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
 
         let cfg = RpcOperationsConfig {
             chain_id: anvil.chain_id(),
@@ -410,43 +404,36 @@ pub mod tests {
         // Wait until contracts deployments are final
         sleep((1 + cfg.finality) * expected_block_time).await;
 
-        let rpc = RpcOperations::new(client, &chain_key_0, cfg).expect("failed to construct rpc");
+        let rpc = RpcOperations::new(client, &chain_key_0, cfg)?;
 
-        let balance_1 = rpc
-            .get_balance((&chain_key_0).into(), BalanceType::Native)
-            .await
-            .unwrap();
+        let balance_1 = rpc.get_balance((&chain_key_0).into(), BalanceType::Native).await?;
         assert!(balance_1.amount().gt(&0.into()), "balance must be greater than 0");
 
         // Send 1 ETH to some random address
         let tx_hash = rpc
             .send_transaction(chain_types::utils::create_native_transfer(*RANDY, 1_u32.into()))
-            .await
-            .expect("failed to send tx");
+            .await?;
 
         wait_until_tx(tx_hash, Duration::from_secs(8)).await;
 
-        let balance_2 = rpc
-            .get_balance((&chain_key_0).into(), BalanceType::Native)
-            .await
-            .unwrap();
+        let balance_2 = rpc.get_balance((&chain_key_0).into(), BalanceType::Native).await?;
         assert!(balance_2.lt(&balance_1), "balance must be diminished");
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_get_balance_token() {
+    async fn test_get_balance_token() -> anyhow::Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
 
         let expected_block_time = Duration::from_secs(1);
         let anvil = chain_types::utils::create_anvil(Some(expected_block_time));
-        let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
+        let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
 
         // Deploy contracts
         let contract_instances = {
             let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &chain_key_0);
-            ContractInstances::deploy_for_testing(client, &chain_key_0)
-                .await
-                .expect("could not deploy contracts")
+            ContractInstances::deploy_for_testing(client, &chain_key_0).await?
         };
 
         let cfg = RpcOperationsConfig {
@@ -470,9 +457,11 @@ pub mod tests {
         // Wait until contracts deployments are final
         sleep((1 + cfg.finality) * expected_block_time).await;
 
-        let rpc = RpcOperations::new(client, &chain_key_0, cfg).expect("failed to construct rpc");
+        let rpc = RpcOperations::new(client, &chain_key_0, cfg)?;
 
-        let balance = rpc.get_balance((&chain_key_0).into(), BalanceType::HOPR).await.unwrap();
+        let balance = rpc.get_balance((&chain_key_0).into(), BalanceType::HOPR).await?;
         assert_eq!(amount, balance.amount().as_u64(), "invalid balance");
+
+        Ok(())
     }
 }

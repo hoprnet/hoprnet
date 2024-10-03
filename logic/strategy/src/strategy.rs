@@ -280,7 +280,7 @@ mod tests {
     use mockall::Sequence;
 
     #[async_std::test]
-    async fn test_multi_strategy_logical_or_flow() {
+    async fn test_multi_strategy_logical_or_flow() -> anyhow::Result<()> {
         let mut seq = Sequence::new();
 
         let mut s1 = MockSingularStrategy::new();
@@ -303,7 +303,9 @@ mod tests {
             strategies: vec![Box::new(s1), Box::new(s2)],
             cfg,
         };
-        ms.on_tick().await.expect("on_tick should not fail");
+        ms.on_tick().await?;
+
+        Ok(())
     }
 
     #[async_std::test]

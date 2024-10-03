@@ -68,7 +68,7 @@ impl From<AcknowledgedTicket> for ticket::ActiveModel {
             channel_epoch: Set(U256::from(value.verified_ticket().channel_epoch).to_be_bytes().to_vec()),
             signature: Set(value.verified_ticket().signature.unwrap().as_ref().to_vec()),
             response: Set(value.response.as_ref().to_vec()),
-            state: Set(value.status as u8 as i32),
+            state: Set(value.status as i8),
             hash: Set(value.ticket.verified_hash().as_ref().to_vec()),
             ..Default::default()
         }

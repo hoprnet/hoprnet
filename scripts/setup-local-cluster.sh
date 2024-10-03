@@ -154,7 +154,7 @@ function setup_node() {
     HOPRD_HEARTBEAT_THRESHOLD=3 \
     HOPRD_HEARTBEAT_VARIANCE=1 \
     HOPRD_NETWORK_QUALITY_THRESHOLD="0.3" \
-    RUST_LOG="debug,libp2p_mplex=info,multistream_select=info,isahc::handler=error,isahc::client=error" \
+    RUST_LOG="debug,libp2p_mplex=info,multistream_select=info,isahc=error,sea_orm=warn,sqlx=warn,hyper_util=warn,libp2p_tcp=info,libp2p_dns=info" \
     RUST_BACKTRACE=1 \
     ${hoprd_command} \
       --announce \
@@ -269,11 +269,12 @@ declare deployments_summary="${mydir}/../ethereum/contracts/contracts-addresses.
 
 # --- Running Mock Blockchain --- {{{
 log "Running anvil local node"
-make -C "${mydir}/../" run-anvil args="-l ${anvil_rpc_log}"
+anvil_port=8545
+make -C "${mydir}/../" run-anvil args="-l ${anvil_rpc_log} -p ${anvil_port}"
 
 log "Wait for anvil local node to complete startup"
-wait_for_regex "${anvil_rpc_log}" "Listening on 0.0.0.0:8545"
-log "Anvil node started (0.0.0.0:8545)"
+wait_for_regex "${anvil_rpc_log}" "Listening on 0.0.0.0:${anvil_port}"
+log "Anvil node started (0.0.0.0:${anvil_port})"
 
 # need to mirror contract data because of anvil-deploy node only writing to localhost
 update_protocol_config_addresses "${protocol_config}" "${deployments_summary}" "anvil-localhost" "anvil-localhost"

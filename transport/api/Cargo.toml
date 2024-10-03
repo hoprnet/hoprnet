@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport"
-version = "0.7.0"
+version = "0.8.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Implements the main HOPR interface for the core library"
 edition = "2021"
@@ -30,23 +30,24 @@ runtime-tokio = [
   "hopr-network-types/runtime-tokio",
 ]
 prometheus = [
-  "dep:lazy_static",
   "dep:hopr-metrics",
   "core-network/prometheus",
   "core-path/prometheus",
   "hopr-db-sql/prometheus",
+  "hopr-network-types/prometheus",
   "hopr-transport-p2p/prometheus",
   "hopr-transport-protocol/prometheus",
+  "hopr-transport-session/prometheus",
 ]
 
 [dependencies]
 async-trait = { workspace = true }
 async-lock = { workspace = true }
 futures = { workspace = true }
-lazy_static = { workspace = true, optional = true }
+lazy_static = { workspace = true }
 libp2p = { workspace = true, features = ["request-response"] }
 moka = { workspace = true }
-proc-macro-regex = "~1.1.0"
+proc-macro-regex = { workspace = true }
 rust-stream-ext-concurrent = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }

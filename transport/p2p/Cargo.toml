@@ -34,7 +34,7 @@ multiaddr = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 thiserror = { workspace = true }
 tracing = { workspace = true }
-void = "1.0.2" # needed for Behavior implementations from libp2p
+void = { workspace = true } # needed for Behavior implementations from libp2p
 
 core-network = { workspace = true }
 hopr-crypto-types = { workspace = true }
@@ -43,4 +43,5 @@ hopr-metrics = { workspace = true, optional = true }
 hopr-transport-protocol = { workspace = true }
 
 [dev-dependencies]
+anyhow = { workspace = true }
 async-std = { workspace = true }

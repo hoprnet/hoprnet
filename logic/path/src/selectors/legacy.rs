@@ -286,11 +286,13 @@ mod tests {
         ChannelEntry::new(src, dst, stake, U256::zero(), status, U256::zero())
     }
 
-    fn check_path(path: &ChannelPath, graph: &ChannelGraph, dst: Address) {
-        let other = ChannelPath::new(path.hops().into(), graph).expect("path must be valid");
+    fn check_path(path: &ChannelPath, graph: &ChannelGraph, dst: Address) -> anyhow::Result<()> {
+        let other = ChannelPath::new(path.hops().into(), graph)?;
         assert_eq!(other, path.clone(), "valid paths must be equal");
         assert!(!path.contains_cycle(), "path must not be cyclic");
         assert!(!path.hops().contains(&dst), "path must not contain destination");
+
+        Ok(())
     }
 
     /// Quickly define a graph with edge weights.
@@ -454,7 +456,7 @@ mod tests {
     }
 
     #[test]
-    fn test_dfs_should_find_path_in_reliable_star() {
+    fn test_dfs_should_find_path_in_reliable_star() -> anyhow::Result<()> {
         let star = define_graph(
             "0 [1] <-> [2] 1, 0 [1] <-> [3] 2, 0 [1] <-> [4] 3, 0 [1] <-> [5] 4",
             ADDRESSES[1],
@@ -462,16 +464,16 @@ mod tests {
         );
 
         let selector = DfsPathSelector::<TestWeights>::default();
-        let path = selector
-            .select_path(&star, ADDRESSES[1], ADDRESSES[5], 1, 2)
-            .expect("should find a path");
+        let path = selector.select_path(&star, ADDRESSES[1], ADDRESSES[5], 1, 2)?;
 
-        check_path(&path, &star, ADDRESSES[5]);
+        check_path(&path, &star, ADDRESSES[5])?;
         assert_eq!(2, path.length(), "should have 2 hops");
+
+        Ok(())
     }
 
     #[test]
-    fn test_dfs_should_find_path_in_reliable_arrow_with_lower_weight() {
+    fn test_dfs_should_find_path_in_reliable_arrow_with_lower_weight() -> anyhow::Result<()> {
         let arrow = define_graph(
             "0 [1] -> 1, 1 [1] -> 2, 2 [1] -> 3, 1 [1] -> 3",
             ADDRESSES[0],
@@ -479,15 +481,15 @@ mod tests {
         );
         let selector = DfsPathSelector::<TestWeights>::default();
 
-        let path = selector
-            .select_path(&arrow, ADDRESSES[0], ADDRESSES[5], 3, 3)
-            .expect("should find a path");
-        check_path(&path, &arrow, ADDRESSES[5]);
+        let path = selector.select_path(&arrow, ADDRESSES[0], ADDRESSES[5], 3, 3)?;
+        check_path(&path, &arrow, ADDRESSES[5])?;
         assert_eq!(3, path.length(), "should have 3 hops");
+
+        Ok(())
     }
 
     #[test]
-    fn test_dfs_should_find_path_in_reliable_arrow_with_higher_weight() {
+    fn test_dfs_should_find_path_in_reliable_arrow_with_higher_weight() -> anyhow::Result<()> {
         let arrow = define_graph(
             "0 [1] -> 1, 1 [2] -> 2, 2 [3] -> 3, 1 [2] -> 3",
             ADDRESSES[0],
@@ -495,15 +497,15 @@ mod tests {
         );
         let selector = DfsPathSelector::<TestWeights>::default();
 
-        let path = selector
-            .select_path(&arrow, ADDRESSES[0], ADDRESSES[5], 3, 3)
-            .expect("should find a path");
-        check_path(&path, &arrow, ADDRESSES[5]);
+        let path = selector.select_path(&arrow, ADDRESSES[0], ADDRESSES[5], 3, 3)?;
+        check_path(&path, &arrow, ADDRESSES[5])?;
         assert_eq!(3, path.length(), "should have 3 hops");
+
+        Ok(())
     }
 
     #[test]
-    fn test_dfs_should_find_path_in_reliable_arrow_with_random_weight() {
+    fn test_dfs_should_find_path_in_reliable_arrow_with_random_weight() -> anyhow::Result<()> {
         let arrow = define_graph(
             "0 [29] -> 1, 1 [5] -> 2, 2 [31] -> 3, 1 [2] -> 3",
             ADDRESSES[0],
@@ -511,10 +513,10 @@ mod tests {
         );
         let selector = DfsPathSelector::<RandomizedEdgeWeighting>::default();
 
-        let path = selector
-            .select_path(&arrow, ADDRESSES[0], ADDRESSES[5], 3, 3)
-            .expect("should find a path");
-        check_path(&path, &arrow, ADDRESSES[5]);
+        let path = selector.select_path(&arrow, ADDRESSES[0], ADDRESSES[5], 3, 3)?;
+        check_path(&path, &arrow, ADDRESSES[5])?;
         assert_eq!(3, path.length(), "should have 3 hops");
+
+        Ok(())
     }
 }

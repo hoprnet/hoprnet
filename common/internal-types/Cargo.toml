@@ -1,6 +1,6 @@
 [package]
 name = "hopr-internal-types"
-version = "0.5.0"
+version = "0.6.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Contains types required internally by the HOPR library, these are not generic enough to be used in the external APIs"
 edition = "2021"
@@ -33,6 +33,7 @@ tracing = { workspace = true }
 hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
+anyhow = { workspace = true }
 async-std = { workspace = true }
 bincode = { workspace = true }
 cbor4ii = { version = "0.3.2", features = ["serde1", "use_std"] }

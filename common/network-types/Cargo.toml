@@ -1,6 +1,6 @@
 [package]
 name = "hopr-network-types"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Contains types used for networking over the HOPR protocol"
 edition = "2021"
@@ -21,33 +21,39 @@ runtime-tokio = [
   "hopr-async-runtime/runtime-tokio",
   "hickory-resolver/tokio-runtime",
 ]
+prometheus = ["dep:lazy_static", "dep:hopr-metrics"]
 
 [dependencies]
-async-std-resolver = { version = "0.24.1", optional = true }
-bitvec = "1.0.1"
-crossbeam-queue = "0.3.11"
+arrayvec = { workspace = true }
+async-std-resolver = { workspace = true, optional = true }
+bitvec = { workspace = true }
+crossbeam-queue = { workspace = true }
 crossbeam-skiplist = { workspace = true }
 dashmap = { workspace = true }
+flume = { workspace = true }
 futures = { workspace = true }
-governor = "0.6.3"
+governor = { workspace = true }
 hex = { workspace = true }
 hickory-resolver = { workspace = true }
+lazy_static = { workspace = true, optional = true }
 libp2p-identity = { workspace = true }
 rand = { workspace = true }
-rand_distr = "0.4.3"
+rand_distr = { workspace = true }
 serde = { workspace = true, optional = true }
 serde_with = { workspace = true, optional = true }
 serde_bytes = { workspace = true, optional = true }
 smart-default = { workspace = true }
+socket2 = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, optional = true }
-tokio-util = { workspace = true, optional = true, features = ["net"] }
+tokio-util = { workspace = true, optional = true, features = ["net", "io"] }
 tracing = { workspace = true }
 
 hopr-platform = { workspace = true }
 hopr-primitive-types = { workspace = true }
 hopr-async-runtime = { workspace = true }
+hopr-metrics = { workspace = true, optional = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
@@ -58,9 +64,9 @@ hex-literal = { workspace = true }
 lazy_static = { workspace = true }
 parameterized = { workspace = true }
 rand = { workspace = true }
-rand_distr = "0.4.3"
+rand_distr = { workspace = true }
 rayon = { workspace = true }
-test-log = { version = "0.2.16", features = ["trace"] }
+test-log = { workspace = true, features = ["trace"] }
 tokio = { workspace = true }
 tokio-util = { workspace = true }
 

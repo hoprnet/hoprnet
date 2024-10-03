@@ -26,12 +26,14 @@ use futures::{
     Stream, StreamExt,
 };
 use futures_concurrency::stream::StreamExt as _;
-use std::fmt::{Display, Formatter};
 use std::{
     collections::HashMap,
-    str::FromStr,
     sync::{atomic::Ordering, Arc},
     time::Duration,
+};
+use std::{
+    fmt::{Display, Formatter},
+    path::PathBuf,
 };
 use tracing::{debug, error, info, warn};
 
@@ -64,7 +66,7 @@ use hopr_platform::file::native::{join, remove_dir_all};
 use hopr_strategy::strategy::{MultiStrategy, SingularStrategy};
 use hopr_transport::{
     execute_on_tick, ChainKeypair, Hash, HoprTransport, HoprTransportConfig, HoprTransportProcess, IncomingSession,
-    IndexerTransportEvent, Network, OffchainKeypair, PeerDiscovery, PeerEligibility, PeerOrigin,
+    IndexerTransportEvent, Network, OffchainKeypair, PeerDiscovery, PeerEligibility, PeerOrigin, PeerStatus,
 };
 pub use {
     chain_actions::errors::ChainActionsError,
@@ -79,13 +81,16 @@ pub use {
     hopr_transport::{
         config::{looks_like_domain, HostConfig, HostType},
         constants::RESERVED_TAG_UPPER_LIMIT,
-        errors::{HoprTransportError, ProtocolError},
+        errors::{HoprTransportError, NetworkingError, ProtocolError},
         libp2p::identity::PeerId,
         ApplicationData, HalfKeyChallenge, Health, IncomingSession as HoprIncomingSession, Keypair, Multiaddr,
         OffchainKeypair as HoprOffchainKeypair, SendMsg, Session as HoprSession, SessionCapability,
         SessionClientConfig, SessionId as HoprSessionId, SessionTarget, TicketStatistics, SESSION_USABLE_MTU_SIZE,
     },
 };
+
+#[cfg(feature = "runtime-tokio")]
+pub use hopr_transport::transfer_session;
 
 use crate::constants::{MIN_NATIVE_BALANCE, ONBOARDING_INFORMATION_INTERVAL, SUGGESTED_NATIVE_BALANCE};
 use crate::{config::SafeModule, errors::HoprLibError};
@@ -94,6 +99,7 @@ use crate::{config::SafeModule, errors::HoprLibError};
 use {
     hopr_metrics::metrics::{MultiGauge, SimpleGauge},
     hopr_platform::time::native::current_time,
+    std::str::FromStr,
 };
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -342,12 +348,12 @@ where
                                 match allowed {
                                     chain_types::chain_events::NetworkRegistryStatus::Allowed => {
                                         if let Err(e) = network.add(&peer_id, PeerOrigin::NetworkRegistry, vec![]).await {
-                                            error!("failed to allow '{peer_id}' locally, although it is allowed on-chain: {e}")
+                                            error!(peer = %peer_id, "failed to allow locally (already allowed on-chain): {e}")
                                         }
                                     },
                                     chain_types::chain_events::NetworkRegistryStatus::Denied => {
                                         if let Err(e) = network.remove(&peer_id).await {
-                                            error!("failed to allow '{peer_id}' locally, although it is allowed on-chain: {e}")
+                                            error!(peer = %peer_id, "failed to ban locally (already banned on-chain): {e}")
                                         }
                                     },
                                 };
@@ -360,7 +366,7 @@ where
 
                         }
                         Err(e) => {
-                            error!("on_network_registry_node_allowed failed with: {}", e);
+                            error!("on_network_registry_node_allowed failed with: {e}");
                             None
                         },
                     }
@@ -426,17 +432,6 @@ impl HoprSocket {
     }
 }
 
-fn as_host_multiaddress(host_cfg: &crate::HostConfig) -> Multiaddr {
-    match &host_cfg.address {
-        hopr_transport::config::HostType::IPv4(ip) => {
-            Multiaddr::from_str(format!("/ip4/{}/tcp/{}", ip.as_str(), host_cfg.port).as_str()).unwrap()
-        }
-        hopr_transport::config::HostType::Domain(domain) => {
-            Multiaddr::from_str(format!("/dns4/{}/tcp/{}", domain.as_str(), host_cfg.port).as_str()).unwrap()
-        }
-    }
-}
-
 /// HOPR main object providing the entire HOPR node functionality
 ///
 /// Instantiating this object creates all processes and objects necessary for
@@ -465,22 +460,34 @@ pub struct Hopr {
 }
 
 impl Hopr {
-    pub fn new(mut cfg: config::HoprLibConfig, me: &OffchainKeypair, me_onchain: &ChainKeypair) -> Self {
-        let multiaddress = as_host_multiaddress(&cfg.host);
+    pub fn new(
+        mut cfg: config::HoprLibConfig,
+        me: &OffchainKeypair,
+        me_onchain: &ChainKeypair,
+    ) -> crate::errors::Result<Self> {
+        let multiaddress: Multiaddr = (&cfg.host).try_into()?;
 
-        let db_path: String = join(&[&cfg.db.data, "db"]).expect("Could not create a db storage path");
-        info!("Initiating the DB at: {db_path}");
+        let db_path: PathBuf = [&cfg.db.data, "db"].iter().collect();
+        info!("Initiating the DB at '{db_path:?}'");
 
         if cfg.db.force_initialize {
             info!("Force cleaning up existing database");
-            remove_dir_all(&db_path).expect("Failed to remove the preexisting DB directory");
+            remove_dir_all(db_path.as_path()).map_err(|e| {
+                HoprLibError::GeneralError(format!(
+                    "Failed to remove the existing DB directory at '{db_path:?}': {e}"
+                ))
+            })?;
             cfg.db.initialize = true
         }
 
         // create DB dir if it does not exist
-        if let Some(parent_dir_path) = std::path::Path::new(&db_path).parent() {
+        if let Some(parent_dir_path) = db_path.as_path().parent() {
             if !parent_dir_path.is_dir() {
-                std::fs::create_dir_all(parent_dir_path).expect("Failed to create a DB directory")
+                std::fs::create_dir_all(parent_dir_path).map_err(|e| {
+                    HoprLibError::GeneralError(format!(
+                        "Failed to create DB parent directory at '{parent_dir_path:?}': {e}"
+                    ))
+                })?
             }
         }
 
@@ -489,7 +496,7 @@ impl Hopr {
             force_create: cfg.db.force_initialize,
             log_slow_queries: std::time::Duration::from_millis(150),
         };
-        let db = futures::executor::block_on(HoprDb::new(db_path.clone(), me_onchain.clone(), db_cfg));
+        let db = futures::executor::block_on(HoprDb::new(db_path.as_path(), me_onchain.clone(), db_cfg))?;
 
         if let Some(provider) = &cfg.chain.provider {
             info!("Creating chain components using the custom provider: {provider}");
@@ -503,15 +510,14 @@ impl Hopr {
             cfg.chain.max_rpc_requests_per_sec,
             &mut cfg.chain.protocols,
         )
-        .expect("Failed to resolve blockchain environment");
+        .map_err(|e| HoprLibError::GeneralError(format!("Failed to resolve blockchain environment: {e}")))?;
+
         let contract_addresses = ContractAddresses::from(&resolved_environment);
         info!(
-            "Resolved contract addresses for myself as '{}': {contract_addresses:?}",
-            me_onchain.public().to_hex(),
+            myself = me_onchain.public().to_hex(),
+            contract_addresses = tracing::field::debug(contract_addresses),
+            "Resolved contract addresses",
         );
-
-        // let mut packetCfg = PacketInteractionConfig::new(packetKeypair, chainKeypair)
-        // packetCfg.check_unrealized_balance = cfg.chain.check_unrealized_balance
 
         let my_multiaddresses = vec![multiaddress];
 
@@ -543,6 +549,7 @@ impl Hopr {
                 channels: resolved_environment.channels,
                 token: resolved_environment.token,
                 price_oracle: resolved_environment.ticket_price_oracle,
+                win_prob_oracle: resolved_environment.winning_probability_oracle,
                 network_registry: resolved_environment.network_registry,
                 network_registry_proxy: resolved_environment.network_registry_proxy,
                 stake_factory: resolved_environment.node_stake_v2_factory,
@@ -562,7 +569,10 @@ impl Hopr {
             hopr_chain_api.actions_ref().clone(),
             hopr_transport_api.ticket_aggregator(),
         ));
-        debug!("Initialized strategies: {multi_strategy:?}");
+        debug!(
+            strategies = tracing::field::debug(&multi_strategy),
+            "Initialized strategies"
+        );
 
         #[cfg(all(feature = "prometheus", not(test)))]
         {
@@ -583,7 +593,7 @@ impl Hopr {
             }
         }
 
-        Self {
+        Ok(Self {
             me: me.clone(),
             me_onchain: me_onchain.clone(),
             cfg,
@@ -595,7 +605,7 @@ impl Hopr {
             channel_graph,
             multistrategy: multi_strategy,
             rx_indexer_significant_events: rx_indexer_events,
-        }
+        })
     }
 
     fn error_if_not_in_state(&self, state: HoprState, error: String) -> errors::Result<()> {
@@ -685,7 +695,7 @@ impl Hopr {
         info!(
             "Node is not started, please fund this node {} with at least {}",
             self.me_onchain(),
-            Balance::new_from_str(SUGGESTED_NATIVE_BALANCE, BalanceType::HOPR).to_formatted_string()
+            Balance::new_from_str(SUGGESTED_NATIVE_BALANCE, BalanceType::Native).to_formatted_string()
         );
 
         let mut processes: HashMap<HoprLibProcesses, JoinHandle<()>> = HashMap::new();
@@ -696,8 +706,7 @@ impl Hopr {
             Duration::from_secs(200),
             self.chain_api.rpc(),
         )
-        .await
-        .expect("failed to wait for funds");
+        .await?;
 
         info!("Starting hopr node...");
 
@@ -1001,9 +1010,9 @@ impl Hopr {
                     let multi_strategy = multi_strategy.clone();
 
                     async move {
-                        info!("doing strategy tick");
+                        debug!(state = "started", "strategy tick");
                         let _ = multi_strategy.on_tick().await;
-                        info!("strategy tick done");
+                        debug!(state = "finished", "strategy tick");
                     }
                 })
                 .await;
@@ -1054,7 +1063,7 @@ impl Hopr {
     }
 
     /// Ping another node in the network based on the PeerId
-    pub async fn ping(&self, peer: &PeerId) -> errors::Result<Option<std::time::Duration>> {
+    pub async fn ping(&self, peer: &PeerId) -> errors::Result<(std::time::Duration, PeerStatus)> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
         Ok(self.transport_api.ping(peer).await?)
@@ -1209,9 +1218,13 @@ impl Hopr {
         Ok(self.chain_api.ticket_price().await?)
     }
 
-    /// Get ticket winning probability
-    pub async fn get_ticket_probability(&self) -> errors::Result<f64> {
-        Ok(hopr_internal_types::tickets::WINNING_PROB)
+    /// Get minimum incoming ticket winning probability
+    pub async fn get_minimum_incoming_ticket_win_probability(&self) -> errors::Result<f64> {
+        Ok(self
+            .db
+            .get_indexer_data(None)
+            .await?
+            .minimum_incoming_ticket_winning_prob)
     }
 
     /// List of all accounts announced on the chain
