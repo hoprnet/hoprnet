@@ -95,23 +95,18 @@ pub(super) async fn set_alias(
     let hopr = state.hopr.clone();
 
     let destination = args.clone().destination.fullfill(&hopr.hopr_db()).await;
-    if destination.is_err() {
-        return (StatusCode::NOT_FOUND, ApiErrorStatus::InvalidInput).into_response();
-    }
-    let destination = destination.unwrap();
 
-    let inserted = aliases
-        .write()
-        .await
-        .insert_no_overwrite(args.alias, destination.peer_id.unwrap());
+    let peer_id = match destination {
+        Ok(destination) => match destination.peer_id {
+            Some(peer_id) => peer_id,
+            None => return (StatusCode::NOT_FOUND, ApiErrorStatus::InvalidInput).into_response(),
+        },
+        Err(e) => return e.into_response(),
+    };
+
+    let inserted = aliases.write().await.insert_no_overwrite(args.alias, peer_id);
     match inserted {
-        Ok(_) => (
-            StatusCode::CREATED,
-            Json(PeerIdResponse {
-                peer_id: destination.peer_id.unwrap(),
-            }),
-        )
-            .into_response(),
+        Ok(_) => (StatusCode::CREATED, Json(PeerIdResponse { peer_id })).into_response(),
         Err(_) => (StatusCode::CONFLICT, ApiErrorStatus::AliasAlreadyExists).into_response(),
     }
 }

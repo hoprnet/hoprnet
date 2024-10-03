@@ -340,7 +340,6 @@ enum ApiErrorStatus {
     /// An invalid application tag from the reserved range was provided.
     InvalidApplicationTag,
     InvalidChannelId,
-    InvalidPeerId,
     PeerNotFound,
     ChannelNotFound,
     TicketsNotFound,

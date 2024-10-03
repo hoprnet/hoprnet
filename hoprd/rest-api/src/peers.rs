@@ -70,20 +70,19 @@ pub(super) async fn show_peer_info(
     let hopr = state.hopr.clone();
 
     let destination = destination.clone().fullfill(&hopr.hopr_db()).await;
-    if destination.is_err() {
-        return Err((StatusCode::NOT_FOUND, ApiErrorStatus::InvalidInput).into_response());
-    }
-    let destination = destination.unwrap();
+    let peer_id = match destination {
+        Ok(destination) => match destination.peer_id {
+            Some(peer_id) => peer_id,
+            None => return Err((StatusCode::NOT_FOUND, ApiErrorStatus::InvalidInput).into_response()),
+        },
+        Err(e) => return Err(e.into_response()),
+    };
 
     Ok((
         StatusCode::OK,
         Json(NodePeerInfoResponse {
-            announced: hopr
-                .multiaddresses_announced_on_chain(&destination.peer_id.unwrap())
-                .await,
-            observed: hopr
-                .network_observed_multiaddresses(&destination.peer_id.unwrap())
-                .await,
+            announced: hopr.multiaddresses_announced_on_chain(&peer_id).await,
+            observed: hopr.network_observed_multiaddresses(&peer_id).await,
         }),
     ))
 }
@@ -131,32 +130,31 @@ pub(super) async fn ping_peer(
 
     let hopr = state.hopr.clone();
     let destination = destination.clone().fullfill(&hopr.hopr_db()).await;
-
-    if destination.is_err() {
-        return Ok((StatusCode::NOT_FOUND, ApiErrorStatus::InvalidInput).into_response());
-    }
-    let destination = destination.unwrap();
-
-    match destination.peer_id {
-        Some(peer) => match hopr.ping(&peer).await {
-            Ok((latency, status)) => {
-                let resp = Json(PingResponse {
-                    latency,
-                    reported_version: status.peer_version.unwrap_or("unknown".into()),
-                });
-                Ok((StatusCode::OK, resp).into_response())
-            }
-            Err(HoprLibError::TransportError(HoprTransportError::Protocol(hopr_lib::ProtocolError::Timeout))) => {
-                Ok((StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::Timeout).into_response())
-            }
-            Err(HoprLibError::TransportError(HoprTransportError::NetworkError(
-                hopr_lib::NetworkingError::NonExistingPeer,
-            ))) => Ok((StatusCode::NOT_FOUND, ApiErrorStatus::PeerNotFound).into_response()),
-            Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(_, _))) => {
-                Ok((StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response())
-            }
-            Err(e) => Ok((StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response()),
+    let peer_id = match destination {
+        Ok(destination) => match destination.peer_id {
+            Some(peer_id) => peer_id,
+            None => return Ok((StatusCode::NOT_FOUND, ApiErrorStatus::InvalidInput).into_response()),
         },
-        None => Ok((StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidPeerId).into_response()),
+        Err(e) => return Ok(e.into_response()),
+    };
+
+    match hopr.ping(&peer_id).await {
+        Ok((latency, status)) => {
+            let resp = Json(PingResponse {
+                latency,
+                reported_version: status.peer_version.unwrap_or("unknown".into()),
+            });
+            Ok((StatusCode::OK, resp).into_response())
+        }
+        Err(HoprLibError::TransportError(HoprTransportError::Protocol(hopr_lib::ProtocolError::Timeout))) => {
+            Ok((StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::Timeout).into_response())
+        }
+        Err(HoprLibError::TransportError(HoprTransportError::NetworkError(
+            hopr_lib::NetworkingError::NonExistingPeer,
+        ))) => Ok((StatusCode::NOT_FOUND, ApiErrorStatus::PeerNotFound).into_response()),
+        Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(_, _))) => {
+            Ok((StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response())
+        }
+        Err(e) => Ok((StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response()),
     }
 }

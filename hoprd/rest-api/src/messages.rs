@@ -12,7 +12,7 @@ use futures_concurrency::stream::Merge;
 use serde::Deserialize;
 use serde_json::json;
 use serde_with::{serde_as, Bytes, DisplayFromStr, DurationMilliSeconds};
-use std::{sync::Arc, time::Duration};
+use std::{f32::consts::E, sync::Arc, time::Duration};
 use tracing::{debug, error, trace};
 use validator::Validate;
 
@@ -119,10 +119,14 @@ pub(super) async fn send_message(
     let hopr = state.hopr.clone();
 
     let destination = args.clone().destination.fullfill(&hopr.hopr_db()).await;
-    if destination.is_err() {
-        return Err((StatusCode::NOT_FOUND, ApiErrorStatus::InvalidInput).into_response());
-    }
-    let destination = destination.unwrap();
+
+    let peer_id = match destination {
+        Ok(destination) => match destination.peer_id {
+            Some(peer_id) => peer_id,
+            None => return Err((StatusCode::NOT_FOUND, ApiErrorStatus::InvalidInput).into_response()),
+        },
+        Err(e) => return Err(e.into_response()),
+    };
 
     args.validate().map_err(|e| {
         (
@@ -197,10 +201,7 @@ pub(super) async fn send_message(
 
     let timestamp = std::time::SystemTime::now().as_unix_timestamp();
 
-    match hopr
-        .send_message(msg_body, destination.peer_id.unwrap(), options, Some(args.tag))
-        .await
-    {
+    match hopr.send_message(msg_body, peer_id, options, Some(args.tag)).await {
         Ok(_) => Ok((StatusCode::ACCEPTED, Json(SendMessageResponse { timestamp })).into_response()),
         Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(_, _))) => {
             Err((StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response())
@@ -335,10 +336,13 @@ async fn handle_send_message(input: &str, state: Arc<InternalState>) -> Result<(
             let hopr = state.hopr.clone();
 
             let destination = msg.destination.clone().fullfill(&hopr.hopr_db()).await;
-            if destination.is_err() {
-                return Err("invalid destination".to_string());
-            }
-            let destination = destination.unwrap();
+            let peer_id = match destination {
+                Ok(destination) => match destination.peer_id {
+                    Some(peer_id) => peer_id,
+                    None => return Err("peer id not found".to_string()),
+                },
+                Err(_) => return Err("invalid destination".to_string()),
+            };
 
             // Use the message encoder, if any
             // TODO: remove RLP in 3.0
@@ -367,10 +371,7 @@ async fn handle_send_message(input: &str, state: Arc<InternalState>) -> Result<(
                 return Err("one of hops or intermediate path must be provided".to_string());
             };
 
-            if let Err(e) = hopr
-                .send_message(msg_body, destination.peer_id.unwrap(), options, Some(msg.tag))
-                .await
-            {
+            if let Err(e) = hopr.send_message(msg_body, peer_id, options, Some(msg.tag)).await {
                 return Err(e.to_string());
             }
 
@@ -680,6 +681,7 @@ pub(super) async fn peek_all(
 mod tests {
     use super::*;
 
+    use libp2p_identity::PeerId;
     use serde_json::from_value;
 
     #[test]
@@ -690,7 +692,7 @@ mod tests {
         let json_value = json!({
             "tag": 5,
             "body": test_sequence.to_vec(),
-            "destination": destination
+            "destination": destination.peer_id.unwrap(),
         });
 
         let expected = SendMessageBodyRequest {
@@ -715,7 +717,7 @@ mod tests {
 
         let json_value = json!({
             "tag": 5,
-            "destination": destination
+            "destination": destination.peer_id.unwrap(),
             "body": String::from_utf8(test_sequence.to_vec())?,
         });
 

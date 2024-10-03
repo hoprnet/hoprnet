@@ -2,6 +2,8 @@
 //
 // This module provides a unified type for PeerId and Address. This is useful for APIs that accept both PeerId and Address.
 
+use crate::ApiErrorStatus;
+use axum::http::StatusCode;
 use core::result::Result;
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_db_sql::prelude::HoprDbResolverOperations;
@@ -18,19 +20,25 @@ pub struct PeerOrAddress {
 }
 
 impl PeerOrAddress {
-    pub fn new(identifier: String) -> Self {
+    pub fn new(identifier: String) -> Result<Self, GeneralError> {
         if let Ok(peer_id) = PeerId::from_str(&identifier) {
-            Self::from(peer_id)
+            Ok(Self::from(peer_id))
         } else if let Ok(address) = Address::from_str(&identifier) {
-            Self::from(address)
+            Ok(Self::from(address))
         } else {
-            Self::default()
+            Err(GeneralError::InvalidInput)
         }
     }
 
-    pub async fn fullfill<T: HoprDbResolverOperations>(&mut self, resolver: &T) -> Result<Self, ()> {
+    pub async fn fullfill<T: HoprDbResolverOperations>(
+        &mut self,
+        resolver: &T,
+    ) -> Result<Self, (StatusCode, ApiErrorStatus)> {
         if let Some(peer_id) = self.peer_id {
-            let offchain_key = OffchainPublicKey::try_from(peer_id).unwrap();
+            let offchain_key = match OffchainPublicKey::try_from(peer_id) {
+                Ok(key) => key,
+                Err(_) => return Err((StatusCode::NOT_FOUND, ApiErrorStatus::PeerNotFound)),
+            };
 
             if let Ok(Some(address)) = resolver.resolve_chain_key(&offchain_key).await {
                 self.address = Some(address);
@@ -43,7 +51,7 @@ impl PeerOrAddress {
             }
         }
 
-        Err(())
+        Err((StatusCode::NOT_FOUND, ApiErrorStatus::PeerNotFound))
     }
 }
 
@@ -67,8 +75,11 @@ impl From<Address> for PeerOrAddress {
 impl FromStr for PeerOrAddress {
     type Err = GeneralError;
 
-    fn from_str(value: &str) -> Result<PeerOrAddress, hopr_lib::GeneralError> {
-        Ok(Self::new(value.to_owned()))
+    fn from_str(value: &str) -> Result<PeerOrAddress, GeneralError> {
+        match Self::new(value.to_owned()) {
+            Ok(peer_or_address) => Ok(peer_or_address),
+            Err(err) => Err(err),
+        }
     }
 }
 
@@ -80,6 +91,11 @@ impl Debug for PeerOrAddress {
 
 impl Display for PeerOrAddress {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?} {:?}", self.peer_id, self.address)
+        match (self.peer_id, self.address) {
+            (Some(peer_id), Some(address)) => write!(f, "peerId: {}, address: {}", peer_id, address),
+            (Some(peer_id), _) => write!(f, "peerId: {}", peer_id),
+            (_, Some(address)) => write!(f, "address: {}", address),
+            _ => write!(f, "No peerId or address provided"),
+        }
     }
 }

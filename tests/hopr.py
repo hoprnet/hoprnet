@@ -93,12 +93,12 @@ class HoprdAPI:
         status, response = self.__call_api(AliasApi, "get_alias", alias)
         return response.peer_id if status else None
 
-    async def aliases_set_alias(self, alias: str, peer_id: str):
+    async def aliases_set_alias(self, alias: str, destination: str):
         """
         Returns the aliases recognized by the node.
         :return: bool
         """
-        body = AliasDestinationBodyRequest(alias, peer_id)
+        body = AliasDestinationBodyRequest(alias, destination)
         status, _ = self.__call_api(AliasApi, "set_alias", body=body)
         return status
 
@@ -145,14 +145,14 @@ class HoprdAPI:
         status, response = self.__call_api(AccountApi, "balances")
         return response if status else None
 
-    async def open_channel(self, peer_address: str, amount: str):
+    async def open_channel(self, destination: str, amount: str):
         """
-        Opens a channel with the given peer_address and amount.
-        :param: peer_address: str
+        Opens a channel with the given destination and amount.
+        :param: destination: str
         :param: amount: str
         :return: channel id: str | undefined
         """
-        body = OpenChannelBodyRequest(amount, destination=peer_address)
+        body = OpenChannelBodyRequest(amount, destination=destination)
 
         status, response = self.__call_api(ChannelsApi, "open_channel", body=body)
         return response.channel_id if status else None
@@ -273,8 +273,8 @@ class HoprdAPI:
 
     async def ping(self, destination: str):
         """
-        Pings the given peer_id and returns the measure.
-        :param: peer_id: str
+        Pings the given destination and returns the measure.
+        :param: destination: str
         :return: response: dict
         """
         _, response = self.__call_api(PeersApi, "ping_peer", destination)
@@ -395,7 +395,9 @@ class HoprdAPI:
         _, response = self.__call_api(NetworkApi, "price")
         return int(response.price) if hasattr(response, "price") else None
 
-    async def session_client(self, destination: str, path: str, protocol: str, target: str, listen_on: str = "127.0.0.1:0", capabilities=None):
+    async def session_client(
+        self, destination: str, path: str, protocol: str, target: str, listen_on: str = "127.0.0.1:0", capabilities=None
+    ):
         """
         Returns the port of the client session.
         :param destination: Peer ID of the session exit node.
@@ -408,7 +410,9 @@ class HoprdAPI:
         if capabilities is None:
             body = SessionClientRequest(destination=destination, path=path, target=target, listen_host=listen_on)
         else:
-            body = SessionClientRequest(destination=destination, path=path, target=target, listen_host=listen_on, capabilities=capabilities)
+            body = SessionClientRequest(
+                destination=destination, path=path, target=target, listen_host=listen_on, capabilities=capabilities
+            )
 
         _, response = self.__call_api(SessionApi, "create_client", body=body, protocol=protocol)
         return int(response.port) if hasattr(response, "port") else None

@@ -291,16 +291,17 @@ pub(super) async fn open_channel(
     let hopr = state.hopr.clone();
 
     let destination = open_req.clone().destination.fullfill(&hopr.hopr_db()).await;
-    if destination.is_err() {
-        return (StatusCode::NOT_FOUND, ApiErrorStatus::InvalidInput).into_response();
-    }
-    let destination = destination.unwrap();
+
+    let address = match destination {
+        Ok(destination) => match destination.address {
+            Some(address) => address,
+            None => return (StatusCode::NOT_FOUND, ApiErrorStatus::InvalidInput).into_response(),
+        },
+        Err(e) => return e.into_response(),
+    };
 
     match hopr
-        .open_channel(
-            &destination.address.unwrap(),
-            &Balance::new_from_str(&open_req.amount, BalanceType::HOPR),
-        )
+        .open_channel(&address, &Balance::new_from_str(&open_req.amount, BalanceType::HOPR))
         .await
     {
         Ok(channel_details) => (
