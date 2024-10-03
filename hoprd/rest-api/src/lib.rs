@@ -826,7 +826,9 @@ mod account {
     }))]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct WithdrawResponse {
-        receipt: String,
+        #[serde_as(as = "DisplayFromStr")]
+        #[schema(value_type = String)]
+        receipt: Hash,
     }
 
     /// Withdraw funds from this node to the ethereum wallet address.
