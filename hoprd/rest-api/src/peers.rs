@@ -6,7 +6,7 @@ use axum::{
 use hopr_lib::{errors::HoprStatusError, HoprTransportError, Multiaddr};
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr, DurationMilliSeconds};
-use std::{str::FromStr, sync::Arc, time::Duration};
+use std::sync::Arc;
 use tracing::debug;
 
 use hopr_lib::errors::HoprLibError;
@@ -138,26 +138,25 @@ pub(super) async fn ping_peer(
     let destination = destination.unwrap();
 
     match destination.peer_id {
-      Ok(peer) => match hopr.ping(&peer).await {
-          Ok(latency) => {
-              let info = hopr.network_peer_info(&peer).await?;
-              let resp = Json(PingResponse {
-                  latency: latency.unwrap_or(Duration::ZERO), // TODO: what should be the correct default ?
-                  reported_version: info.and_then(|p| p.peer_version).unwrap_or("unknown".into()),
-              });
-              Ok((StatusCode::OK, resp).into_response())
-          }
-          Err(HoprLibError::TransportError(HoprTransportError::Protocol(hopr_lib::ProtocolError::Timeout))) => {
-              Ok((StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::Timeout).into_response())
-          }
-          Err(HoprLibError::TransportError(HoprTransportError::NetworkError(
-              hopr_lib::NetworkingError::NonExistingPeer,
-          ))) => Ok((StatusCode::NOT_FOUND, ApiErrorStatus::PeerNotFound).into_response()),
-          Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(_, _))) => {
-              Ok((StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response())
-          }
-          Err(e) => Ok((StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response()),
-      },
-      Err(_) => Ok((StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidPeerId).into_response()),
+        Some(peer) => match hopr.ping(&peer).await {
+            Ok((latency, status)) => {
+                let resp = Json(PingResponse {
+                    latency,
+                    reported_version: status.peer_version.unwrap_or("unknown".into()),
+                });
+                Ok((StatusCode::OK, resp).into_response())
+            }
+            Err(HoprLibError::TransportError(HoprTransportError::Protocol(hopr_lib::ProtocolError::Timeout))) => {
+                Ok((StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::Timeout).into_response())
+            }
+            Err(HoprLibError::TransportError(HoprTransportError::NetworkError(
+                hopr_lib::NetworkingError::NonExistingPeer,
+            ))) => Ok((StatusCode::NOT_FOUND, ApiErrorStatus::PeerNotFound).into_response()),
+            Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(_, _))) => {
+                Ok((StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response())
+            }
+            Err(e) => Ok((StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response()),
+        },
+        None => Ok((StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidPeerId).into_response()),
     }
 }
