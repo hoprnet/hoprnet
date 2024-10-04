@@ -8,7 +8,7 @@ import re
 import shutil
 from copy import deepcopy
 from pathlib import Path
-from subprocess import run, Popen, PIPE, STDOUT, CalledProcessError
+from subprocess import PIPE, STDOUT, CalledProcessError, Popen, run
 
 import pytest
 
@@ -395,10 +395,6 @@ async def shared_nodes_bringup(
         logging.info("Funding nodes")
         fund_nodes(test_suite_name, test_dir, anvil_port)
 
-    async def is_node_ready(target: Node):
-        while not await asyncio.wait_for(target.api.readyz(), timeout=10):
-            await asyncio.sleep(1)
-
     # WAIT FOR NODES TO BE UP
     timeout = 60
     logging.info(f"Waiting up to {timeout}s for nodes to be ready")
@@ -543,9 +539,9 @@ async def swarm7(request):
 
         logging.info("Taking snapshot")
         snapshot_create(anvil_port, test_dir, nodes)
-
-    logging.info("Re-using snapshot")
-    snapshot_reuse(test_dir, nodes)
+    else:
+        logging.info("Re-using snapshot")
+        snapshot_reuse(test_dir, nodes)
 
     logging.info("Starting and waiting for local anvil server to be up (load state enabled)")
 
@@ -594,6 +590,7 @@ async def teardown(swarm7: dict[str, Node]):
         await asyncio.gather(*[node.api.messages_pop_all(None) for node in swarm7.values()])
     except Exception as e:
         logging.error(f"Error popping all messages in teardown: {e}")
+
 
 def to_ws_url(host, port):
     return f"ws://{host}:{port}/api/v3/messages/websocket"
