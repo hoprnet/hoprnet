@@ -290,7 +290,7 @@ pub(super) async fn open_channel(
 ) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
-    let destination = open_req.clone().destination.fullfill(&hopr.hopr_db()).await;
+    let destination = open_req.clone().destination.fulfill(hopr.peer_resolver()).await;
 
     let address = match destination {
         Ok(destination) => match destination.address {

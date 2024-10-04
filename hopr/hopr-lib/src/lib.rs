@@ -1204,8 +1204,8 @@ impl Hopr {
     }
 
     // DB ============
-    pub fn hopr_db(&self) -> HoprDb {
-        self.db.clone()
+    pub fn peer_resolver(&self) -> &impl HoprDbResolverOperations {
+        &self.db
     }
 
     // Chain =========

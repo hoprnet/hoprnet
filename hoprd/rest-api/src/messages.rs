@@ -12,7 +12,7 @@ use futures_concurrency::stream::Merge;
 use serde::Deserialize;
 use serde_json::json;
 use serde_with::{serde_as, Bytes, DisplayFromStr, DurationMilliSeconds};
-use std::{f32::consts::E, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 use tracing::{debug, error, trace};
 use validator::Validate;
 
@@ -118,7 +118,15 @@ pub(super) async fn send_message(
 ) -> Result<impl IntoResponse, impl IntoResponse> {
     let hopr = state.hopr.clone();
 
-    let destination = args.clone().destination.fullfill(&hopr.hopr_db()).await;
+    args.validate().map_err(|e| {
+        (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            ApiErrorStatus::UnknownFailure(e.to_string()),
+        )
+            .into_response()
+    })?;
+
+    let destination = args.clone().destination.fulfill(hopr.peer_resolver()).await;
 
     let peer_id = match destination {
         Ok(destination) => match destination.peer_id {
@@ -128,14 +136,6 @@ pub(super) async fn send_message(
         Err(e) => return Err(e.into_response()),
     };
 
-    args.validate().map_err(|e| {
-        (
-            StatusCode::UNPROCESSABLE_ENTITY,
-            ApiErrorStatus::UnknownFailure(e.to_string()),
-        )
-            .into_response()
-    })?;
-
     // Use the message encoder, if any
     let msg_body = state
         .msg_encoder
@@ -143,15 +143,15 @@ pub(super) async fn send_message(
         .map(|enc| enc(&args.body))
         .unwrap_or_else(|| args.body.into_boxed_slice());
 
-    let path = args.path.clone();
+    let path = args.path;
 
-    // TODO (jean): find a nice way to handle PeeroOrAddress fullfilling
+    // TODO (jean): find a nice way to handle PeeroOrAddress fulfilling
     // if let Some(path) = path {
     //     let path = path
     //         .iter()
     //         .map(|address| {
     //             let hopr_db = hopr.hopr_db();
-    //             async move { address.clone().fullfill(&hopr_db).await }
+    //             async move { address.clone().fulfill(&hopr_db).await }
     //         })
     //         .collect::<Vec<_>>();
 
@@ -335,7 +335,7 @@ async fn handle_send_message(input: &str, state: Arc<InternalState>) -> Result<(
         Ok(msg) => {
             let hopr = state.hopr.clone();
 
-            let destination = msg.destination.clone().fullfill(&hopr.hopr_db()).await;
+            let destination = msg.destination.clone().fulfill(hopr.peer_resolver()).await;
             let peer_id = match destination {
                 Ok(destination) => match destination.peer_id {
                     Some(peer_id) => peer_id,

@@ -94,7 +94,7 @@ pub(super) async fn set_alias(
     let aliases = state.aliases.clone();
     let hopr = state.hopr.clone();
 
-    let destination = args.clone().destination.fullfill(&hopr.hopr_db()).await;
+    let destination = args.clone().destination.fulfill(hopr.peer_resolver()).await;
 
     let peer_id = match destination {
         Ok(destination) => match destination.peer_id {

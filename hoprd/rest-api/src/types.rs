@@ -30,7 +30,7 @@ impl PeerOrAddress {
         }
     }
 
-    pub async fn fullfill<T: HoprDbResolverOperations>(
+    pub async fn fulfill<T: HoprDbResolverOperations>(
         &mut self,
         resolver: &T,
     ) -> Result<Self, (StatusCode, ApiErrorStatus)> {
