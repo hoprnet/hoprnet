@@ -297,7 +297,6 @@ mod tests {
     use hopr_crypto_types::prelude::Keypair;
     use hopr_internal_types::channels::ChannelStatus;
     use hopr_internal_types::prelude::{ChannelDirection, ChannelEntry};
-    use hopr_parallelize::cpu::rayon::range;
     use hopr_primitive_types::prelude::{Address, BalanceType};
     use rand::seq::SliceRandom;
 
