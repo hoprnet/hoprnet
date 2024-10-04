@@ -210,12 +210,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create the metadata database
     let db_path: String = join(&[&cfg.hopr.db.data, "db"]).expect("Could not create a db storage path");
 
-    let hoprd_db = Arc::new(hoprd_db_api::db::HoprdDb::new(db_path.clone()).await);
+    let hoprd_db = match hoprd_db_api::db::HoprdDb::new(db_path.clone()).await {
+        Ok(db) => {
+            info!("Metadata database created successfully");
+            Arc::new(db)
+        }
+        Err(e) => {
+            error!("Failed to create the metadata database: {e}");
+            return Err(e.into());
+        }
+    };
 
     // Ensures that "OWN_ALIAS" is set as alias
-    let _ = hoprd_db
+    if let Err(e) = hoprd_db
         .set_alias(node.me_peer_id().to_string(), ME_AS_ALIAS.to_string())
-        .await;
+        .await
+    {
+        error!("Failed to set the alias for the node: {e}");
+    }
 
     let (mut ws_events_tx, ws_events_rx) =
         async_broadcast::broadcast::<ApplicationData>(WEBSOCKET_EVENT_BROADCAST_CAPACITY);

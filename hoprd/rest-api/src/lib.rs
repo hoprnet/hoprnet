@@ -349,6 +349,8 @@ enum ApiErrorStatus {
     NotEnoughAllowance,
     ChannelAlreadyOpen,
     ChannelNotOpen,
+    AliasNotFound,
+    DatabaseError,
     UnsupportedFeature,
     Timeout,
     Unauthorized,

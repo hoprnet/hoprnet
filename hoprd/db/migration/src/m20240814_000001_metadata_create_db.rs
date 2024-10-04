@@ -19,7 +19,7 @@ impl MigrationTrait for Migration {
                             .primary_key(),
                     )
                     .col(ColumnDef::new(Aliases::Alias).string().not_null().unique_key())
-                    .col(ColumnDef::new(Aliases::PeerID).string().not_null().unique_key())
+                    .col(ColumnDef::new(Aliases::PeerId).string().not_null().unique_key())
                     .to_owned(),
             )
             .await
@@ -35,5 +35,5 @@ enum Aliases {
     Table,
     Id,
     Alias,
-    PeerID,
+    PeerId,
 }

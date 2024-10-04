@@ -3,6 +3,9 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum DbError {
+    #[error("alias not found: {0}")]
+    AliasNotFound(String),
+
     #[error("transaction error: {0}")]
     TransactionError(Box<dyn std::error::Error + Send + Sync>),
 
@@ -17,7 +20,7 @@ impl<E: std::error::Error + Send + Sync + 'static> From<TransactionError<E>> for
     fn from(value: TransactionError<E>) -> Self {
         match value {
             TransactionError::Connection(e) => Self::BackendError(e),
-            TransactionError::Transaction(e) => Self::TransactionError(e.into()),
+            TransactionError::Transaction(e) => Self::TransactionError(Box::new(e)),
         }
     }
 }

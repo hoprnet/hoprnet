@@ -45,7 +45,7 @@ fn main() {
 
     println!(
         "cargo:rerun-if-changed={}",
-        db_migration_package_path.join("src").to_str().unwrap()
+        db_migration_package_path.join("src").to_string_lossy()
     );
     println!(
         "cargo:rerun-if-changed={}",
@@ -60,14 +60,7 @@ fn main() {
 
     let tmp_db = temp_dir().join("tmp_migration.db");
 
-    let _ = std::fs::remove_file(
-        tmp_db
-            .clone()
-            .into_os_string()
-            .into_string()
-            .expect("should contain valid temporary db path")
-            .as_str(),
-    );
+    let _ = std::fs::remove_file(&tmp_db);
 
     async_std::task::block_on(execute_sea_orm_cli_command([
         "sea-orm-cli",
@@ -76,20 +69,11 @@ fn main() {
         "-u",
         format!(
             "sqlite://{}?mode=rwc",
-            tmp_db
-                .clone()
-                .into_os_string()
-                .into_string()
-                .expect("should contain valid temporary db path")
+            tmp_db.to_str().expect("should contain valid temporary db path")
         )
         .as_str(),
         "-d",
-        db_migration_package_path
-            .clone()
-            .into_os_string()
-            .into_string()
-            .expect("should contain valid db migration path")
-            .as_str(),
+        db_migration_package_path.to_string_lossy().as_ref(),
     ]));
 
     async_std::task::block_on(execute_sea_orm_cli_command([

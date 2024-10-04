@@ -48,12 +48,16 @@ impl HoprdDbAliasesOperations for HoprdDb {
     }
 
     async fn set_aliases(&self, aliases: Vec<Alias>) -> Result<()> {
-        if let Some(me) = self.resolve_alias(ME_AS_ALIAS.to_string()).await.unwrap() {
-            if aliases.iter().any(|entry| entry.peer_id == me) {
-                return Err(crate::errors::DbError::LogicalError(
-                    "own alias cannot be modified".into(),
-                ));
+        match self.resolve_alias(ME_AS_ALIAS.to_string()).await {
+            Ok(Some(me)) => {
+                if aliases.iter().any(|entry| entry.peer_id == me) {
+                    return Err(crate::errors::DbError::LogicalError(
+                        "own alias cannot be modified".into(),
+                    ));
+                }
             }
+            Ok(None) => {}
+            Err(e) => return Err(e),
         }
 
         let new_aliases = aliases
@@ -72,19 +76,20 @@ impl HoprdDbAliasesOperations for HoprdDb {
                     .to_owned(),
             )
             .exec(&self.metadata)
-            .await;
+            .await?;
 
         Ok(())
     }
 
     async fn set_alias(&self, peer: String, alias: String) -> Result<()> {
-        if let Some(me) = self.resolve_alias(ME_AS_ALIAS.to_string()).await.unwrap() {
+        if let Ok(Some(me)) = self.resolve_alias(ME_AS_ALIAS.to_string()).await {
             if me == peer {
                 return Err(crate::errors::DbError::LogicalError(
                     "own alias cannot be modified".into(),
                 ));
             }
         }
+
         let res = self
             .metadata
             .transaction::<_, _, DbErr>(|tx| {
@@ -126,7 +131,7 @@ impl HoprdDbAliasesOperations for HoprdDb {
             Ok(())
         } else {
             Err(crate::errors::DbError::LogicalError(
-                "peer cannot be removed because it does not exist or is self".into(),
+                "alias cannot be removed because it does not exist or it is the node's own alias.".into(),
             ))
         }
     }
@@ -375,7 +380,7 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn set_aliases_with_existing_entry_shoud_do_nothing() {
+    async fn set_aliases_with_existing_entry_should_do_nothing() {
         let db = HoprdDb::new_in_memory().await;
 
         let peer_id = PeerId::random().to_string();

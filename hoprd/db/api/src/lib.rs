@@ -1,12 +1,9 @@
-//! Crate for accessing database(s) of a HOPR node.
+//! Crate for accessing HOPRd database.
 //! Functionality defined here is meant to be used mostly by other higher-level crates.
 
 pub mod aliases;
 pub mod db;
 pub mod errors;
-
-pub use sea_orm::DatabaseConnection;
-pub use sea_orm::DatabaseTransaction;
 
 use crate::aliases::HoprdDbAliasesOperations;
 

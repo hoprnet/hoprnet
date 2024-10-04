@@ -4482,23 +4482,21 @@ dependencies = [
 
 [[package]]
 name = "hoprd-db-api"
-version = "0.2.0"
+version = "0.1.0"
 dependencies = [
+ "anyhow",
  "async-std",
  "async-trait",
- "chrono",
  "env_logger",
- "futures",
  "hex-literal",
+ "hopr-async-runtime",
  "hopr-crypto-random",
  "hopr-metrics",
- "hopr-primitive-types",
  "hoprd-db-entity",
  "hoprd-db-migration",
  "lazy_static",
  "libp2p-identity",
  "sea-orm",
- "serde",
  "sqlx",
  "thiserror",
  "tracing",

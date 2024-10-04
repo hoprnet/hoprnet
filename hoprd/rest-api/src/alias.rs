@@ -10,6 +10,7 @@ use libp2p_identity::PeerId;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use std::{collections::HashMap, sync::Arc};
+
 #[serde_as]
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[schema(example = json!({
@@ -19,7 +20,7 @@ use std::{collections::HashMap, sync::Arc};
 pub(crate) struct PeerIdResponse {
     #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String)]
-    pub peer_id: PeerId,
+    pub peer_id: String,
 }
 
 #[serde_as]
@@ -61,11 +62,12 @@ pub(super) async fn aliases(State(state): State<Arc<InternalState>>) -> impl Int
         Ok(aliases) => {
             let aliases = aliases
                 .iter()
-                .map(|alias| (alias.peer_id.clone(), alias.alias.clone()))
+                .map(|alias| (alias.alias.clone(), alias.peer_id.clone()))
                 .collect::<HashMap<_, _>>();
             (StatusCode::OK, Json(aliases)).into_response()
         }
-        Err(e) => (StatusCode::NOT_FOUND, ApiErrorStatus::from(e)).into_response(),
+        Err(DbError::BackendError(_)) => (StatusCode::NOT_FOUND, ApiErrorStatus::AliasNotFound).into_response(),
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, ApiErrorStatus::DatabaseError).into_response(),
     }
 }
 
@@ -95,7 +97,13 @@ pub(super) async fn set_alias(
     Json(args): Json<AliasPeerIdBodyRequest>,
 ) -> impl IntoResponse {
     match state.hoprd_db.set_alias(args.peer_id.to_string(), args.alias).await {
-        Ok(()) => (StatusCode::CREATED, Json(PeerIdResponse { peer_id: args.peer_id })).into_response(),
+        Ok(()) => (
+            StatusCode::CREATED,
+            Json(PeerIdResponse {
+                peer_id: args.peer_id.to_string(),
+            }),
+        )
+            .into_response(),
         Err(DbError::LogicalError(_)) => (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidPeerId).into_response(),
         Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
     }
@@ -137,14 +145,8 @@ pub(super) async fn get_alias(
     let alias = alias.unwrap().into_owned();
 
     match state.hoprd_db.resolve_alias(alias.clone()).await {
-        Ok(Some(entry)) => (
-            StatusCode::OK,
-            Json(PeerIdResponse {
-                peer_id: PeerId::from_bytes(entry.as_bytes()).unwrap(),
-            }),
-        )
-            .into_response(),
-        Ok(None) => (StatusCode::NOT_FOUND, ApiErrorStatus::InvalidInput).into_response(),
+        Ok(Some(entry)) => (StatusCode::OK, Json(PeerIdResponse { peer_id: entry })).into_response(),
+        Ok(None) => (StatusCode::NOT_FOUND, ApiErrorStatus::AliasNotFound).into_response(),
         Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
     }
 }
@@ -185,7 +187,7 @@ pub(super) async fn delete_alias(
     let alias = alias.unwrap().into_owned();
 
     match state.hoprd_db.delete_alias(alias.clone()).await {
-        Ok(_) => (StatusCode::OK,).into_response(),
+        Ok(_) => (StatusCode::NO_CONTENT,).into_response(),
         Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
     }
 }
@@ -206,6 +208,8 @@ pub(super) async fn delete_alias(
         tag = "Alias",
     )]
 pub(super) async fn clear_aliases(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
-    let _ = state.hoprd_db.clear_aliases().await;
-    (StatusCode::OK,).into_response()
+    match state.hoprd_db.clear_aliases().await {
+        Ok(_) => (StatusCode::NO_CONTENT,).into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, ApiErrorStatus::from(e)).into_response(),
+    }
 }
