@@ -380,9 +380,9 @@ impl<'a, const C: usize> SessionMessageIter<'a, C> {
         self.last_err.as_ref()
     }
 
-    /// Check if this iterator will yield any more messages.
+    /// Check if this iterator can yield any more messages.
     pub fn is_done(&self) -> bool {
-        self.data.len() - self.offset < SessionMessage::<C>::minimum_message_size()
+        self.last_err.is_some() || self.data.len() - self.offset < SessionMessage::<C>::minimum_message_size()
     }
 
     fn try_next(&mut self) -> Result<SessionMessage<C>, SessionError> {
@@ -428,7 +428,7 @@ impl<'a, const C: usize> Iterator for SessionMessageIter<'a, C> {
     type Item = Result<SessionMessage<C>, NetworkTypeError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.last_err.is_none() && !self.is_done() {
+        if !self.is_done() {
             self.try_next()
                 .inspect_err(|e| self.last_err = Some(e.clone()))
                 .map_err(NetworkTypeError::SessionProtocolError)
@@ -646,6 +646,7 @@ mod tests {
 
         assert!(iter.next().is_none());
         assert!(iter.last_error().is_none());
+        assert!(iter.is_done());
 
         Ok(())
     }
@@ -685,6 +686,7 @@ mod tests {
 
         let err = iter.next();
         assert!(matches!(err, Some(Err(_))));
+        assert!(iter.is_done());
         assert!(iter.last_error().is_some());
 
         assert!(iter.next().is_none());
