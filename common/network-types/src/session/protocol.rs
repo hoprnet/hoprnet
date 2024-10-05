@@ -379,43 +379,50 @@ impl<'a, const C: usize> SessionMessageIter<'a, C> {
     }
 
     /// Check if this iterator can yield any more messages.
+    ///
+    /// Returns `true` only if a [prior error](SessionMessageIter::last_error) occurred or all useful bytes
+    /// from the underlying chunk were consumed and all messages were parsed.
     pub fn is_done(&self) -> bool {
         self.last_err.is_some() || self.data.len() - self.offset < SessionMessage::<C>::minimum_message_size()
     }
 
+    /// Attempts to parse the current message and moves the offset if successful.
     fn try_next(&mut self) -> Result<SessionMessage<C>, SessionError> {
+        let mut offset = self.offset;
+
         // Protocol version
-        if self.data[self.offset] != SessionMessage::<C>::VERSION {
+        if self.data[offset] != SessionMessage::<C>::VERSION {
             return Err(SessionError::WrongVersion);
         }
-        self.offset += 1;
+        offset += 1;
 
         // Message discriminant
-        let disc = self.data[self.offset];
-        self.offset += 1;
+        let disc = self.data[offset];
+        offset += 1;
 
         // Message length
         let len = u16::from_be_bytes(
-            self.data[self.offset..self.offset + mem::size_of::<u16>()]
+            self.data[offset..offset + mem::size_of::<u16>()]
                 .try_into()
                 .map_err(|_| SessionError::IncorrectMessageLength)?,
         ) as usize;
-        self.offset += mem::size_of::<u16>();
+        offset += mem::size_of::<u16>();
 
         // Read the message
         let res = match SessionMessageDiscriminants::from_repr(disc).ok_or(SessionError::UnknownMessageTag)? {
             SessionMessageDiscriminants::Segment => {
-                SessionMessage::Segment(self.data[self.offset..self.offset + len].try_into()?)
+                SessionMessage::Segment(self.data[offset..offset + len].try_into()?)
             }
             SessionMessageDiscriminants::Request => {
-                SessionMessage::Request(self.data[self.offset..self.offset + len].try_into()?)
+                SessionMessage::Request(self.data[offset..offset + len].try_into()?)
             }
             SessionMessageDiscriminants::Acknowledge => {
-                SessionMessage::Acknowledge(self.data[self.offset..self.offset + len].try_into()?)
+                SessionMessage::Acknowledge(self.data[offset..offset + len].try_into()?)
             }
         };
 
-        self.offset += len;
+        // Move the internal offset only once the message has been fully parsed
+        self.offset = offset + len;
         Ok(res)
     }
 }
@@ -576,6 +583,19 @@ mod tests {
         assert_eq!(iter.next(), Some(SegmentId(10, 2)));
         assert_eq!(iter.next(), Some(SegmentId(10, 5)));
         assert_eq!(iter.next(), None);
+    }
+
+    #[test]
+    fn session_message_iter_should_be_empty_if_slice_has_no_messages() {
+        const MTU: usize = 462;
+
+        let mut iter = SessionMessageIter::<MTU>::from(Vec::<u8>::new());
+        assert!(iter.next().is_none());
+        assert!(iter.is_done());
+
+        let mut iter = SessionMessageIter::<MTU>::from(&[0u8; 2]);
+        assert!(iter.next().is_none());
+        assert!(iter.is_done());
     }
 
     #[test]
