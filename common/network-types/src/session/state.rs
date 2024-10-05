@@ -99,7 +99,7 @@ use std::collections::{BTreeSet, HashSet};
 use std::fmt::{Debug, Display};
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::atomic::{AtomicU32, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
@@ -108,6 +108,7 @@ use tracing::{debug, error, trace, warn};
 use hopr_async_runtime::prelude::spawn;
 
 use crate::errors::NetworkTypeError;
+use crate::prelude::protocol::SessionMessageIter;
 use crate::session::errors::SessionError;
 use crate::session::frame::{segment, FrameId, FrameReassembler, Segment, SegmentId};
 use crate::session::protocol::{FrameAcknowledgements, SegmentRequest, SessionMessage};
@@ -213,6 +214,11 @@ pub struct SessionConfig {
     /// Set of [features](SessionFeature) that should be enabled on this Session.
     #[default(_code = "HashSet::from_iter(SessionFeature::all())")]
     pub enabled_features: HashSet<SessionFeature>,
+
+    /// Allows output Session messages to be buffered first, until they are
+    /// forwarded to the underlying transport.
+    #[default(false)]
+    pub allow_output_buffering: bool,
 }
 
 /// Contains the cloneable state of the session bound to a [`SessionSocket`].
@@ -234,7 +240,6 @@ pub struct SessionState<const C: usize> {
     frame_reassembler: Arc<FrameReassembler>,
     cfg: SessionConfig,
     segment_egress_send: UnboundedSender<SessionMessage<C>>,
-    segment_egress_send_bytes: Arc<AtomicUsize>,
 }
 
 fn maybe_fused_future<'a, F>(condition: bool, future: F) -> futures::future::Fuse<BoxFuture<'a, ()>>
@@ -789,12 +794,14 @@ impl<const C: usize> SessionSocket<C> {
             incoming_frame_retries,
             segment_egress_send,
             cfg: cfg.clone(),
-            segment_egress_send_bytes: Arc::new(AtomicUsize::new(0)),
         };
 
         let (downstream_read, downstream_write) = transport.split();
+        let downstream_write =
+            futures::io::BufWriter::with_capacity(if cfg.allow_output_buffering { C } else { 0 }, downstream_write);
 
         // Segment egress to downstream
+        // If `segment_egress_recv` terminates `forward` will flush the downstream buffer.
         if let Some(rate_limit) = cfg.max_msg_per_sec.filter(|r| *r > 0).map(|r| r as u32) {
             // Apply rate-limiting for egress segments if configured
             let rate_limiter = RateLimiter::direct(Quota::per_second(rate_limit.try_into().unwrap()));
@@ -825,9 +832,8 @@ impl<const C: usize> SessionSocket<C> {
         spawn(
             AsyncReadStreamer::<_, C>::new(downstream_read)
                 .map_err(|e| NetworkTypeError::SessionProtocolError(SessionError::ProcessingError(e.to_string())))
-                .and_then(|m| {
-                    futures::future::ready(SessionMessage::try_from(m.as_ref()).map_err(NetworkTypeError::from))
-                })
+                .and_then(|m| futures::future::ok(futures::stream::iter(SessionMessageIter::new(m.into_vec().into()))))
+                .try_flatten()
                 .forward(state.clone()),
         );
 
@@ -885,7 +891,7 @@ impl<const C: usize> AsyncWrite for SessionSocket<C> {
             session_id = self.state.session_id(),
             "polling close on socket reader inside session"
         );
-        // TODO: fix so it calls poll_close
+        // We call close_channel instead of poll_close to also end the receiver
         self.state.segment_egress_send.close_channel();
         Poll::Ready(Ok(()))
     }

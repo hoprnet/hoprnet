@@ -315,6 +315,7 @@ mod tokio_utils {
     }
 }
 
+#[cfg(feature = "runtime-tokio")]
 #[cfg(test)]
 mod tests {
     use super::*;

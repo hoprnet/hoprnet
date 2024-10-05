@@ -158,6 +158,9 @@ impl Segment {
     /// Size of the segment header.
     pub const HEADER_SIZE: usize = mem::size_of::<FrameId>() + 2 * mem::size_of::<SeqNum>();
 
+    /// The minimum size of a segment: [`Segment::HEADER_SIZE`] + 1 byte of data.
+    pub const MINIMUM_SIZE: usize = Self::HEADER_SIZE + 1;
+
     /// Returns the [SegmentId] for this segment.
     pub fn id(&self) -> SegmentId {
         SegmentId(self.frame_id, self.seq_idx)
@@ -202,7 +205,7 @@ impl From<Segment> for Vec<u8> {
 }
 
 impl TryFrom<&[u8]> for Segment {
-    type Error = NetworkTypeError;
+    type Error = SessionError;
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         let (header, data) = value.split_at(Self::HEADER_SIZE);
@@ -214,7 +217,7 @@ impl TryFrom<&[u8]> for Segment {
         };
         (segment.frame_id > 0 && segment.seq_idx < segment.seq_len)
             .then_some(segment)
-            .ok_or(SessionError::InvalidSegment.into())
+            .ok_or(SessionError::InvalidSegment)
     }
 }
 
