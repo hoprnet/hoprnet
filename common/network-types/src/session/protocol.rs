@@ -18,7 +18,10 @@
 //! MTU size `C` (which is a generic const argument of the `SessionMessage` type).
 //! The header of the `SessionMessage` encoding consists of the [`version`](SessionMessage::VERSION)
 //! byte, followed by the discriminator byte of one of the above messages and then followed by
-//! the message's encoding itself.
+//! the message length and message's encoding itself.
+//!
+//! Multiple [`SessionMessages`](SessionMessage) can be read from a binary blob using the
+//! [`SessionMessageIter`].
 //!
 //! ## Segment message ([`Segment`](SessionMessage::Segment))
 //! The Segment message contains the payload [`Segment`] of some [`Frame`](crate::session::Frame).
@@ -47,15 +50,14 @@
 //! per message. If more frames need to be acknowledged, more messages need to be sent.
 //! If the message contains fewer entries, it is padded with zeros (0 is not a valid frame ID).
 //!
+use std::borrow::Cow;
+use std::collections::{BTreeMap, BTreeSet};
+use std::fmt::{Display, Formatter};
+use std::mem;
 
 use crate::errors::NetworkTypeError;
 use crate::session::errors::SessionError;
 use crate::session::frame::{FrameId, FrameInfo, Segment, SegmentId, SeqNum};
-use std::borrow::Cow;
-use std::collections::{BTreeMap, BTreeSet};
-use std::fmt::{Display, Formatter};
-use std::iter::FusedIterator;
-use std::mem;
 
 /// Holds the Segment Retransmission Request message.
 /// That is an ordered map of frame IDs and a bitmap of missing segments in each frame.
@@ -326,7 +328,7 @@ impl<const C: usize> TryFrom<&[u8]> for SessionMessage<C> {
     type Error = SessionError;
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
-        SessionMessageIter::new(value.into()).try_next()
+        SessionMessageIter::from(value).try_next()
     }
 }
 
@@ -350,10 +352,16 @@ impl<const C: usize> From<SessionMessage<C>> for Vec<u8> {
     }
 }
 
-/// Allows parsing of multiple [`SessionMessages`](SessionMessage) from a byte slice.
+/// Allows parsing of multiple [`SessionMessages`](SessionMessage)
+/// from a borrowed or an owned binary chunk.
 ///
-/// The iterator will yield [`SessionMessages`](SessionMessage) until the underlying
-/// slice is consumed or an error occurs.
+/// The iterator will yield [`SessionMessages`](SessionMessage) until all the messages from
+/// the underlying data chunk are completely parsed or an error occurs.
+///
+/// In other words, it keeps yielding `Some(Ok(_))` until it yields either `None`
+/// or `Some(Err(_))` immediately followed by `None`.
+///
+/// This iterator is [fused](std::iter::FusedIterator).
 #[derive(Debug, Clone)]
 pub struct SessionMessageIter<'a, const C: usize> {
     data: Cow<'a, [u8]>,
@@ -362,20 +370,10 @@ pub struct SessionMessageIter<'a, const C: usize> {
 }
 
 impl<'a, const C: usize> SessionMessageIter<'a, C> {
-    /// Creates an iterator over the given byte slice.
-    pub(crate) fn new(data: Cow<'a, [u8]>) -> Self {
-        Self {
-            data,
-            offset: 0,
-            last_err: None,
-        }
-    }
-
     /// Determines if there was an error reading the last message.
     ///
     /// If this function returns some error value, the iterator will not
     /// yield any more messages.
-    ///
     pub fn last_error(&self) -> Option<&SessionError> {
         self.last_err.as_ref()
     }
@@ -422,7 +420,15 @@ impl<'a, const C: usize> SessionMessageIter<'a, C> {
     }
 }
 
-impl<'a, const C: usize> FusedIterator for SessionMessageIter<'a, C> {}
+impl<'a, const C: usize, T: Into<Cow<'a, [u8]>>> From<T> for SessionMessageIter<'a, C> {
+    fn from(value: T) -> Self {
+        Self {
+            data: value.into(),
+            offset: 0,
+            last_err: None,
+        }
+    }
+}
 
 impl<'a, const C: usize> Iterator for SessionMessageIter<'a, C> {
     type Item = Result<SessionMessage<C>, NetworkTypeError>;
@@ -438,6 +444,8 @@ impl<'a, const C: usize> Iterator for SessionMessageIter<'a, C> {
         }
     }
 }
+
+impl<'a, const C: usize> std::iter::FusedIterator for SessionMessageIter<'a, C> {}
 
 #[cfg(test)]
 mod tests {
@@ -598,15 +606,14 @@ mod tests {
         let frame_ids: Vec<u32> = (0..100).map(|_| rng.gen()).collect();
         messages_1.push(SessionMessage::<MTU>::Acknowledge(frame_ids.into()));
 
-        let iter = SessionMessageIter::<MTU>::new(
+        let iter = SessionMessageIter::<MTU>::from(
             messages_1
                 .iter()
                 .cloned()
                 .map(|m| m.into_encoded().into_vec())
                 .flatten()
                 .chain(std::iter::repeat(0).take(10))
-                .collect::<Vec<u8>>()
-                .into(),
+                .collect::<Vec<u8>>(),
         );
 
         let messages_2 = iter.collect::<Result<Vec<_>, _>>()?;
@@ -638,7 +645,7 @@ mod tests {
             .chain(std::iter::repeat(0u8).take(10))
             .collect::<Vec<_>>();
 
-        let mut iter = SessionMessageIter::<MTU>::new(data.into());
+        let mut iter = SessionMessageIter::<MTU>::from(data);
         assert!(matches!(iter.next(), Some(Ok(m)) if m == messages[0]));
         assert!(matches!(iter.next(), Some(Ok(m)) if m == messages[1]));
         assert!(matches!(iter.next(), Some(Ok(m)) if m == messages[2]));
@@ -680,7 +687,7 @@ mod tests {
             .flatten()
             .collect::<Vec<_>>();
 
-        let mut iter = SessionMessageIter::<MTU>::new(data.into());
+        let mut iter = SessionMessageIter::<MTU>::from(data);
         assert!(matches!(iter.next(), Some(Ok(m)) if m == messages[0]));
         assert!(matches!(iter.next(), Some(Ok(m)) if m == messages[1]));
 

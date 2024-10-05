@@ -832,7 +832,7 @@ impl<const C: usize> SessionSocket<C> {
         spawn(
             AsyncReadStreamer::<_, C>::new(downstream_read)
                 .map_err(|e| NetworkTypeError::SessionProtocolError(SessionError::ProcessingError(e.to_string())))
-                .and_then(|m| futures::future::ok(futures::stream::iter(SessionMessageIter::new(m.into_vec().into()))))
+                .and_then(|m| futures::future::ok(futures::stream::iter(SessionMessageIter::from(m.into_vec()))))
                 .try_flatten()
                 .forward(state.clone()),
         );
