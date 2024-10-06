@@ -92,8 +92,7 @@ use futures::future::BoxFuture;
 use futures::{
     pin_mut, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, FutureExt, Sink, SinkExt, StreamExt, TryStreamExt,
 };
-use governor::prelude::StreamRateLimitExt;
-use governor::{Jitter, Quota, RateLimiter};
+use governor::Quota;
 use smart_default::SmartDefault;
 use std::collections::{BTreeSet, HashSet};
 use std::fmt::{Debug, Display};
@@ -204,12 +203,6 @@ pub struct SessionConfig {
     /// `rto_base_sender`. Must be between 0 and 0.25.
     #[default(0.05)]
     pub rto_jitter: f64,
-
-    /// Optional rate limiting of egress messages per second.
-    /// This will force the [SessionSocket] not to pass more than this quota of messages
-    /// to the underlying transport.
-    #[default(None)]
-    pub max_msg_per_sec: Option<usize>,
 
     /// Set of [features](SessionFeature) that should be enabled on this Session.
     #[default(_code = "HashSet::from_iter(SessionFeature::all())")]
@@ -797,36 +790,19 @@ impl<const C: usize> SessionSocket<C> {
         };
 
         let (downstream_read, downstream_write) = transport.split();
+
+        // As `segment_egress_recv` terminates `forward` will flush the downstream buffer
         let downstream_write =
             futures::io::BufWriter::with_capacity(if cfg.allow_output_buffering { C } else { 0 }, downstream_write);
 
         // Segment egress to downstream
-        // As `segment_egress_recv` terminates `forward` will flush the downstream buffer.
-        if let Some(rate_limit) = cfg.max_msg_per_sec.filter(|r| *r > 0).map(|r| r as u32) {
-            // Apply rate-limiting for egress segments if configured
-            let rate_limiter = RateLimiter::direct(Quota::per_second(rate_limit.try_into().unwrap()));
-            let jitter = Jitter::up_to(Duration::from_millis(5));
-
-            spawn(async move {
-                if let Err(e) = segment_egress_recv
-                    .ratelimit_stream_with_jitter(&rate_limiter, jitter)
-                    .forward(downstream_write.into_sink())
-                    .await
-                {
-                    error!("FINISHED: forwarding to downstream terminated with error {e}")
-                } else {
-                    debug!("FINISHED: forwarding to downstream done");
-                }
-            });
-        } else {
-            spawn(async move {
-                if let Err(e) = segment_egress_recv.forward(downstream_write.into_sink()).await {
-                    error!("FINISHED: forwarding to downstream terminated with error {e}")
-                } else {
-                    debug!("FINISHED: forwarding to downstream done");
-                }
-            });
-        }
+        spawn(async move {
+            if let Err(e) = segment_egress_recv.forward(downstream_write.into_sink()).await {
+                error!("FINISHED: forwarding to downstream terminated with error {e}")
+            } else {
+                debug!("FINISHED: forwarding to downstream done");
+            }
+        });
 
         // Segment ingress from downstream
         spawn(
@@ -958,7 +934,7 @@ mod tests {
     pub struct FaultyNetwork<'a> {
         ingress: UnboundedSender<Box<[u8]>>,
         egress: BoxStream<'a, Box<[u8]>>,
-        stats: Option<NetworkStats>
+        stats: Option<NetworkStats>,
     }
 
     impl AsyncWrite for FaultyNetwork<'_> {
@@ -999,7 +975,7 @@ mod tests {
                     buf[..len].copy_from_slice(&item.as_ref()[..len]);
 
                     if let Some(stats) = &self.stats {
-                        stats.bytes_received.fetch_add(buf.len(), Ordering::Relaxed);
+                        stats.bytes_received.fetch_add(len, Ordering::Relaxed);
                         stats.packets_received.fetch_add(1, Ordering::Relaxed);
                     }
 
@@ -1068,12 +1044,22 @@ mod tests {
         }
     }
 
-    async fn send_and_recv<S>(num_frames: usize, frame_size: usize, alice: S, bob: S, timeout: Duration, alice_to_bob_only: bool)
-    where
+    async fn send_and_recv<S>(
+        num_frames: usize,
+        frame_size: usize,
+        alice: S,
+        bob: S,
+        timeout: Duration,
+        alice_to_bob_only: bool,
+    ) where
         S: AsyncRead + AsyncWrite + Unpin + Send + 'static,
     {
         #[derive(PartialEq, Eq)]
-        enum Direction { Send, Recv, Both }
+        enum Direction {
+            Send,
+            Recv,
+            Both,
+        }
 
         let socket_worker = |mut socket: S, d: Direction| async move {
             let mut received = Vec::with_capacity(num_frames * frame_size);
@@ -1105,11 +1091,19 @@ mod tests {
 
         let alice_worker = async_std::task::spawn(socket_worker(
             alice,
-            if alice_to_bob_only { Direction::Send } else { Direction::Both },
+            if alice_to_bob_only {
+                Direction::Send
+            } else {
+                Direction::Both
+            },
         ));
         let bob_worker = async_std::task::spawn(socket_worker(
             bob,
-            if alice_to_bob_only { Direction::Recv } else { Direction::Both },
+            if alice_to_bob_only {
+                Direction::Recv
+            } else {
+                Direction::Both
+            },
         ));
 
         let send_recv = futures::future::join(alice_worker, bob_worker);
@@ -1178,10 +1172,13 @@ mod tests {
         const MIX_FACTOR: usize = 2;
         const COUNT: usize = 20;
 
-        let (recv, send) = FaultyNetwork::new(FaultyNetworkConfig {
-            mixing_factor: MIX_FACTOR,
-            ..Default::default()
-        }, None)
+        let (recv, send) = FaultyNetwork::new(
+            FaultyNetworkConfig {
+                mixing_factor: MIX_FACTOR,
+                ..Default::default()
+            },
+            None,
+        )
         .split();
 
         let (read, written) = spawn_single_byte_read_write(recv, send, (0..COUNT as u8).collect());
@@ -1200,10 +1197,13 @@ mod tests {
         const DROP: f64 = 0.3333;
         const COUNT: usize = 20;
 
-        let (recv, send) = FaultyNetwork::new(FaultyNetworkConfig {
-            fault_prob: DROP,
-            ..Default::default()
-        }, None)
+        let (recv, send) = FaultyNetwork::new(
+            FaultyNetworkConfig {
+                fault_prob: DROP,
+                ..Default::default()
+            },
+            None,
+        )
         .split();
 
         let (read, written) = spawn_single_byte_read_write(recv, send, (0..COUNT as u8).collect());
@@ -1382,6 +1382,9 @@ mod tests {
 
     #[test(async_std::test)]
     async fn small_frames_should_be_sent_as_single_transport_msgs_with_buffering_disabled() {
+        const NUM_FRAMES: usize = 10;
+        const FRAME_SIZE: usize = 64;
+
         let cfg = SessionConfig {
             enabled_features: HashSet::new(),
             allow_output_buffering: false,
@@ -1391,23 +1394,41 @@ mod tests {
         let alice_stats = NetworkStats::default();
         let bob_stats = NetworkStats::default();
 
-        let (alice_to_bob, bob_to_alice) = setup_alice_bob(cfg, FaultyNetworkConfig::default(), alice_stats.clone().into(), bob_stats.clone().into());
+        let (alice_to_bob, bob_to_alice) = setup_alice_bob(
+            cfg,
+            FaultyNetworkConfig::default(),
+            alice_stats.clone().into(),
+            bob_stats.clone().into(),
+        );
 
         send_and_recv(
-            10,
-            64,
+            NUM_FRAMES,
+            FRAME_SIZE,
             alice_to_bob,
             bob_to_alice,
             Duration::from_secs(30),
             true,
-        ).await;
+        )
+        .await;
 
-        assert_eq!(bob_stats.packets_received.load(Ordering::Relaxed), 10);
-        assert_eq!(alice_stats.packets_sent.load(Ordering::Relaxed), 10);
+        assert_eq!(bob_stats.packets_received.load(Ordering::Relaxed), NUM_FRAMES);
+        assert_eq!(alice_stats.packets_sent.load(Ordering::Relaxed), NUM_FRAMES);
+
+        assert_eq!(
+            alice_stats.bytes_sent.load(Ordering::Relaxed),
+            NUM_FRAMES * (FRAME_SIZE + SessionMessage::<MTU>::SEGMENT_OVERHEAD)
+        );
+        assert_eq!(
+            bob_stats.bytes_received.load(Ordering::Relaxed),
+            NUM_FRAMES * (FRAME_SIZE + SessionMessage::<MTU>::SEGMENT_OVERHEAD)
+        );
     }
 
     #[test(async_std::test)]
     async fn small_frames_should_be_sent_batched_in_transport_msgs_with_buffering_enabled() {
+        const NUM_FRAMES: usize = 10;
+        const FRAME_SIZE: usize = 64;
+
         let cfg = SessionConfig {
             enabled_features: HashSet::new(),
             allow_output_buffering: true,
@@ -1417,19 +1438,34 @@ mod tests {
         let alice_stats = NetworkStats::default();
         let bob_stats = NetworkStats::default();
 
-        let (alice_to_bob, bob_to_alice) = setup_alice_bob(cfg, FaultyNetworkConfig::default(), alice_stats.clone().into(), bob_stats.clone().into());
+        let (alice_to_bob, bob_to_alice) = setup_alice_bob(
+            cfg,
+            FaultyNetworkConfig::default(),
+            alice_stats.clone().into(),
+            bob_stats.clone().into(),
+        );
 
         send_and_recv(
-            10,
-            64,
+            NUM_FRAMES,
+            FRAME_SIZE,
             alice_to_bob,
             bob_to_alice,
             Duration::from_secs(30),
             true,
-        ).await;
+        )
+        .await;
 
-        assert!(bob_stats.packets_received.load(Ordering::Relaxed) < 10);
-        assert!(alice_stats.packets_sent.load(Ordering::Relaxed) < 10);
+        assert!(bob_stats.packets_received.load(Ordering::Relaxed) < NUM_FRAMES);
+        assert!(alice_stats.packets_sent.load(Ordering::Relaxed) < NUM_FRAMES);
+
+        assert_eq!(
+            alice_stats.bytes_sent.load(Ordering::Relaxed),
+            NUM_FRAMES * (FRAME_SIZE + SessionMessage::<MTU>::SEGMENT_OVERHEAD)
+        );
+        assert_eq!(
+            bob_stats.bytes_received.load(Ordering::Relaxed),
+            NUM_FRAMES * (FRAME_SIZE + SessionMessage::<MTU>::SEGMENT_OVERHEAD)
+        );
     }
 
     #[test(async_std::test)]

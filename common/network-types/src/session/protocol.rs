@@ -303,6 +303,11 @@ impl<const C: usize> SessionMessage<C> {
     /// and two bytes for the message length.
     pub const HEADER_SIZE: usize = 1 + mem::size_of::<SessionMessageDiscriminants>() + mem::size_of::<u16>();
 
+    /// Size of the overhead that's added to the raw payload of each [`Segment`].
+    ///
+    /// This amounts to [`SessionMessage::HEADER_SIZE`] + [`Segment::HEADER_SIZE`].
+    pub const SEGMENT_OVERHEAD: usize = Self::HEADER_SIZE + Segment::HEADER_SIZE;
+
     /// Current version of the protocol.
     pub const VERSION: u8 = 1;
 
