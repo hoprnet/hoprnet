@@ -801,7 +801,7 @@ impl<const C: usize> SessionSocket<C> {
             futures::io::BufWriter::with_capacity(if cfg.allow_output_buffering { C } else { 0 }, downstream_write);
 
         // Segment egress to downstream
-        // If `segment_egress_recv` terminates `forward` will flush the downstream buffer.
+        // As `segment_egress_recv` terminates `forward` will flush the downstream buffer.
         if let Some(rate_limit) = cfg.max_msg_per_sec.filter(|r| *r > 0).map(|r| r as u32) {
             // Apply rate-limiting for egress segments if configured
             let rate_limiter = RateLimiter::direct(Quota::per_second(rate_limit.try_into().unwrap()));
@@ -924,6 +924,7 @@ mod tests {
     use rand::{Rng, SeedableRng};
     use std::fmt::Debug;
     use std::iter::Extend;
+    use std::sync::atomic::AtomicUsize;
     use test_log::test;
 
     const MTU: usize = 466; // MTU used by HOPR
@@ -935,6 +936,14 @@ mod tests {
     pub struct FaultyNetworkConfig {
         pub fault_prob: f64,
         pub mixing_factor: usize,
+    }
+
+    #[derive(Clone, Debug, Default)]
+    pub struct NetworkStats {
+        packets_sent: Arc<AtomicUsize>,
+        packets_received: Arc<AtomicUsize>,
+        bytes_sent: Arc<AtomicUsize>,
+        bytes_received: Arc<AtomicUsize>,
     }
 
     impl Default for FaultyNetworkConfig {
@@ -949,6 +958,7 @@ mod tests {
     pub struct FaultyNetwork<'a> {
         ingress: UnboundedSender<Box<[u8]>>,
         egress: BoxStream<'a, Box<[u8]>>,
+        stats: Option<NetworkStats>
     }
 
     impl AsyncWrite for FaultyNetwork<'_> {
@@ -961,6 +971,13 @@ mod tests {
             }
 
             self.ingress.unbounded_send(buf.into()).unwrap();
+
+            if let Some(stats) = &self.stats {
+                stats.bytes_sent.fetch_add(buf.len(), Ordering::Relaxed);
+                stats.packets_sent.fetch_add(1, Ordering::Relaxed);
+            }
+
+            debug!("sent {} bytes", buf.len());
             Poll::Ready(Ok(buf.len()))
         }
 
@@ -980,6 +997,13 @@ mod tests {
                 Poll::Ready(Some(item)) => {
                     let len = buf.len().min(item.len());
                     buf[..len].copy_from_slice(&item.as_ref()[..len]);
+
+                    if let Some(stats) = &self.stats {
+                        stats.bytes_received.fetch_add(buf.len(), Ordering::Relaxed);
+                        stats.packets_received.fetch_add(1, Ordering::Relaxed);
+                    }
+
+                    debug!("read {} bytes", len);
                     Poll::Ready(Ok(item.len()))
                 }
                 Poll::Ready(None) => Poll::Ready(Ok(0)),
@@ -991,9 +1015,31 @@ mod tests {
     fn setup_alice_bob(
         cfg: SessionConfig,
         network_cfg: FaultyNetworkConfig,
+        alice_stats: Option<NetworkStats>,
+        bob_stats: Option<NetworkStats>,
     ) -> (SessionSocket<MTU>, SessionSocket<MTU>) {
-        let (alice_reader, alice_writer) = FaultyNetwork::new(network_cfg.clone()).split();
-        let (bob_reader, bob_writer) = FaultyNetwork::new(network_cfg.clone()).split();
+        let (alice_stats, bob_stats) = alice_stats
+            .zip(bob_stats)
+            .map(|(alice, bob)| {
+                (
+                    NetworkStats {
+                        packets_sent: bob.packets_sent,
+                        bytes_sent: bob.bytes_sent,
+                        packets_received: alice.packets_received,
+                        bytes_received: alice.bytes_received,
+                    },
+                    NetworkStats {
+                        packets_sent: alice.packets_sent,
+                        bytes_sent: alice.bytes_sent,
+                        packets_received: bob.packets_received,
+                        bytes_received: bob.bytes_received,
+                    },
+                )
+            })
+            .unzip();
+
+        let (alice_reader, alice_writer) = FaultyNetwork::new(network_cfg.clone(), alice_stats).split();
+        let (bob_reader, bob_writer) = FaultyNetwork::new(network_cfg.clone(), bob_stats).split();
 
         let alice_to_bob = SessionSocket::new("alice", DuplexIO(alice_reader, bob_writer), cfg.clone());
         let bob_to_alice = SessionSocket::new("bob", DuplexIO(bob_reader, alice_writer), cfg.clone());
@@ -1002,7 +1048,7 @@ mod tests {
     }
 
     impl FaultyNetwork<'_> {
-        pub fn new(cfg: FaultyNetworkConfig) -> Self {
+        pub fn new(cfg: FaultyNetworkConfig, stats: Option<NetworkStats>) -> Self {
             let (ingress, egress) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
 
             let mut rng = StdRng::from_seed(RNG_SEED);
@@ -1018,21 +1064,17 @@ mod tests {
                 egress.boxed()
             };
 
-            Self { ingress, egress }
+            Self { ingress, egress, stats }
         }
     }
 
-    #[derive(PartialEq, Eq)]
-    enum Direction {
-        Send,
-        Recv,
-        Both,
-    }
-
-    async fn send_and_recv<S>(num_frames: usize, frame_size: usize, alice: S, bob: S, timeout: Duration, one_way: bool)
+    async fn send_and_recv<S>(num_frames: usize, frame_size: usize, alice: S, bob: S, timeout: Duration, alice_to_bob_only: bool)
     where
         S: AsyncRead + AsyncWrite + Unpin + Send + 'static,
     {
+        #[derive(PartialEq, Eq)]
+        enum Direction { Send, Recv, Both }
+
         let socket_worker = |mut socket: S, d: Direction| async move {
             let mut received = Vec::with_capacity(num_frames * frame_size);
             let mut sent = Vec::with_capacity(num_frames * frame_size);
@@ -1055,6 +1097,7 @@ mod tests {
             }
 
             // TODO: fix this so it works properly
+            // We cannot close immediately as some ack/resends might be ongoing
             //socket.close().await.unwrap();
 
             Ok::<_, std::io::Error>((sent, received))
@@ -1062,11 +1105,11 @@ mod tests {
 
         let alice_worker = async_std::task::spawn(socket_worker(
             alice,
-            if one_way { Direction::Send } else { Direction::Both },
+            if alice_to_bob_only { Direction::Send } else { Direction::Both },
         ));
         let bob_worker = async_std::task::spawn(socket_worker(
             bob,
-            if one_way { Direction::Recv } else { Direction::Both },
+            if alice_to_bob_only { Direction::Recv } else { Direction::Both },
         ));
 
         let send_recv = futures::future::join(alice_worker, bob_worker);
@@ -1138,7 +1181,7 @@ mod tests {
         let (recv, send) = FaultyNetwork::new(FaultyNetworkConfig {
             mixing_factor: MIX_FACTOR,
             ..Default::default()
-        })
+        }, None)
         .split();
 
         let (read, written) = spawn_single_byte_read_write(recv, send, (0..COUNT as u8).collect());
@@ -1160,7 +1203,7 @@ mod tests {
         let (recv, send) = FaultyNetwork::new(FaultyNetworkConfig {
             fault_prob: DROP,
             ..Default::default()
-        })
+        }, None)
         .split();
 
         let (read, written) = spawn_single_byte_read_write(recv, send, (0..COUNT as u8).collect());
@@ -1174,7 +1217,7 @@ mod tests {
     async fn faulty_network_reliable() {
         const COUNT: usize = 20;
 
-        let (recv, send) = FaultyNetwork::new(Default::default()).split();
+        let (recv, send) = FaultyNetwork::new(Default::default(), None).split();
 
         let (read, written) = spawn_single_byte_read_write(recv, send, (0..COUNT as u8).collect());
         let (read, written) = futures::future::join(read, written).await;
@@ -1190,7 +1233,7 @@ mod tests {
             ..Default::default()
         };
 
-        let (alice_to_bob, bob_to_alice) = setup_alice_bob(cfg, Default::default());
+        let (alice_to_bob, bob_to_alice) = setup_alice_bob(cfg, Default::default(), None, None);
 
         send_and_recv(
             num_frames,
@@ -1206,7 +1249,7 @@ mod tests {
     #[parameterized(num_frames = {10, 100, 1000}, frame_size = {1500, 1500, 1500})]
     #[parameterized_macro(async_std::test)]
     async fn reliable_send_recv_with_with_acks(num_frames: usize, frame_size: usize) {
-        let (alice_to_bob, bob_to_alice) = setup_alice_bob(Default::default(), Default::default());
+        let (alice_to_bob, bob_to_alice) = setup_alice_bob(Default::default(), Default::default(), None, None);
 
         send_and_recv(
             num_frames,
@@ -1235,7 +1278,7 @@ mod tests {
             ..Default::default()
         };
 
-        let (alice_to_bob, bob_to_alice) = setup_alice_bob(cfg, net_cfg);
+        let (alice_to_bob, bob_to_alice) = setup_alice_bob(cfg, net_cfg, None, None);
 
         send_and_recv(
             num_frames,
@@ -1265,7 +1308,7 @@ mod tests {
             ..Default::default()
         };
 
-        let (alice_to_bob, bob_to_alice) = setup_alice_bob(cfg, net_cfg);
+        let (alice_to_bob, bob_to_alice) = setup_alice_bob(cfg, net_cfg, None, None);
 
         send_and_recv(
             num_frames,
@@ -1295,7 +1338,7 @@ mod tests {
             ..Default::default()
         };
 
-        let (alice_to_bob, bob_to_alice) = setup_alice_bob(cfg, net_cfg);
+        let (alice_to_bob, bob_to_alice) = setup_alice_bob(cfg, net_cfg, None, None);
 
         send_and_recv(
             num_frames,
@@ -1324,7 +1367,7 @@ mod tests {
             ..Default::default()
         };
 
-        let (alice_to_bob, bob_to_alice) = setup_alice_bob(cfg, net_cfg);
+        let (alice_to_bob, bob_to_alice) = setup_alice_bob(cfg, net_cfg, None, None);
 
         send_and_recv(
             num_frames,
@@ -1338,7 +1381,59 @@ mod tests {
     }
 
     #[test(async_std::test)]
-    async fn receving_on_disconnected_network_should_timeout() {
+    async fn small_frames_should_be_sent_as_single_transport_msgs_with_buffering_disabled() {
+        let cfg = SessionConfig {
+            enabled_features: HashSet::new(),
+            allow_output_buffering: false,
+            ..Default::default()
+        };
+
+        let alice_stats = NetworkStats::default();
+        let bob_stats = NetworkStats::default();
+
+        let (alice_to_bob, bob_to_alice) = setup_alice_bob(cfg, FaultyNetworkConfig::default(), alice_stats.clone().into(), bob_stats.clone().into());
+
+        send_and_recv(
+            10,
+            64,
+            alice_to_bob,
+            bob_to_alice,
+            Duration::from_secs(30),
+            true,
+        ).await;
+
+        assert_eq!(bob_stats.packets_received.load(Ordering::Relaxed), 10);
+        assert_eq!(alice_stats.packets_sent.load(Ordering::Relaxed), 10);
+    }
+
+    #[test(async_std::test)]
+    async fn small_frames_should_be_sent_batched_in_transport_msgs_with_buffering_enabled() {
+        let cfg = SessionConfig {
+            enabled_features: HashSet::new(),
+            allow_output_buffering: true,
+            ..Default::default()
+        };
+
+        let alice_stats = NetworkStats::default();
+        let bob_stats = NetworkStats::default();
+
+        let (alice_to_bob, bob_to_alice) = setup_alice_bob(cfg, FaultyNetworkConfig::default(), alice_stats.clone().into(), bob_stats.clone().into());
+
+        send_and_recv(
+            10,
+            64,
+            alice_to_bob,
+            bob_to_alice,
+            Duration::from_secs(30),
+            true,
+        ).await;
+
+        assert!(bob_stats.packets_received.load(Ordering::Relaxed) < 10);
+        assert!(alice_stats.packets_sent.load(Ordering::Relaxed) < 10);
+    }
+
+    #[test(async_std::test)]
+    async fn receiving_on_disconnected_network_should_timeout() {
         let cfg = SessionConfig {
             rto_base_sender: Duration::from_millis(250),
             rto_base_receiver: Duration::from_millis(300),
@@ -1351,7 +1446,7 @@ mod tests {
             mixing_factor: 0,
         };
 
-        let (mut alice_to_bob, mut bob_to_alice) = setup_alice_bob(cfg, net_cfg);
+        let (mut alice_to_bob, mut bob_to_alice) = setup_alice_bob(cfg, net_cfg, None, None);
         let data = b"will not be delivered!";
 
         alice_to_bob.write(data.as_ref()).await.unwrap();
@@ -1382,7 +1477,7 @@ mod tests {
             mixing_factor: 0,
         };
 
-        let (mut alice_to_bob, mut bob_to_alice) = setup_alice_bob(cfg, net_cfg);
+        let (mut alice_to_bob, mut bob_to_alice) = setup_alice_bob(cfg, net_cfg, None, None);
         let data = b"will be re-delivered!";
 
         alice_to_bob.write(data.as_ref()).await.unwrap();
