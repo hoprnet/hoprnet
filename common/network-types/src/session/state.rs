@@ -1068,7 +1068,7 @@ mod tests {
             let norm_dist = rand_distr::Normal::new(frame_size as f64 * 0.75, frame_size as f64 / 4.0).unwrap();
             StdRng::from_seed(RNG_SEED)
                 .sample_iter(norm_dist)
-                .map(|s| s.max(10.0) as usize)
+                .map(|s| (s as usize).max(10).min(2 * frame_size))
                 .take(num_frames)
                 .collect::<Vec<_>>()
         } else {
@@ -1150,15 +1150,15 @@ mod tests {
         }
     }
 
-    fn spawn_single_byte_read_write<R, W>(
-        mut recv: R,
-        mut send: W,
+    fn spawn_single_byte_read_write<C>(
+        channel: C,
         data: Vec<u8>,
     ) -> (impl Future<Output = Vec<u8>>, impl Future<Output = Vec<u8>>)
     where
-        R: AsyncRead + Unpin + Send + 'static,
-        W: AsyncWrite + Unpin + Send + 'static,
+        C: AsyncRead + AsyncWrite + Unpin + Send + 'static,
     {
+        let (mut recv, mut send) = channel.split();
+
         let len = data.len();
         let read = async_std::task::spawn(async move {
             let mut out = Vec::with_capacity(len);
@@ -1191,16 +1191,15 @@ mod tests {
         const MIX_FACTOR: usize = 2;
         const COUNT: usize = 20;
 
-        let (recv, send) = FaultyNetwork::new(
+        let net = FaultyNetwork::new(
             FaultyNetworkConfig {
                 mixing_factor: MIX_FACTOR,
                 ..Default::default()
             },
             None,
-        )
-        .split();
+        );
 
-        let (read, written) = spawn_single_byte_read_write(recv, send, (0..COUNT as u8).collect());
+        let (read, written) = spawn_single_byte_read_write(net, (0..COUNT as u8).collect());
         let (read, _) = futures::future::join(read, written).await;
 
         for (pos, value) in read.into_iter().enumerate() {
@@ -1216,16 +1215,15 @@ mod tests {
         const DROP: f64 = 0.3333;
         const COUNT: usize = 20;
 
-        let (recv, send) = FaultyNetwork::new(
+        let net = FaultyNetwork::new(
             FaultyNetworkConfig {
                 fault_prob: DROP,
                 ..Default::default()
             },
             None,
-        )
-        .split();
+        );
 
-        let (read, written) = spawn_single_byte_read_write(recv, send, (0..COUNT as u8).collect());
+        let (read, written) = spawn_single_byte_read_write(net, (0..COUNT as u8).collect());
         let (read, written) = futures::future::join(read, written).await;
 
         let max_drop = (written.len() as f64 * (1.0 - DROP) - 2.0).floor() as usize;
@@ -1236,9 +1234,9 @@ mod tests {
     async fn faulty_network_reliable() {
         const COUNT: usize = 20;
 
-        let (recv, send) = FaultyNetwork::new(Default::default(), None).split();
+        let net = FaultyNetwork::new(Default::default(), None);
 
-        let (read, written) = spawn_single_byte_read_write(recv, send, (0..COUNT as u8).collect());
+        let (read, written) = spawn_single_byte_read_write(net, (0..COUNT as u8).collect());
         let (read, written) = futures::future::join(read, written).await;
 
         assert_eq!(read, written);
