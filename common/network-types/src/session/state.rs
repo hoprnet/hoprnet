@@ -162,7 +162,7 @@ pub struct SessionConfig {
     /// The value should be large enough so that the buffer can accommodate segments
     /// for an at least `frame_expiration_age` period, given the expected maximum bandwidth.
     ///
-    /// If set to 0, no frame acknowledgements will be sent.
+    /// Minimum value is 1.
     #[default = 1024]
     pub acknowledged_frames_buffer: usize,
 
@@ -489,7 +489,7 @@ impl<const C: usize> SessionState<C> {
 
         let now = Instant::now();
 
-        // Retain only non-expired frames, collect all which are due for re-send
+        // Retain only non-expired frames, collect all of those which are due for re-send
         let mut frames_to_resend = BTreeSet::new();
         self.outgoing_frame_resends.retain(|frame_id, retry_log| {
             let check_res = retry_log.check(
@@ -564,7 +564,7 @@ impl<const C: usize> SessionState<C> {
     /// is the expected underlying transport bandwidth (segment/sec) to guarantee the retransmission
     /// can still happen within some time window.
     pub async fn send_frame_data(&mut self, data: &[u8]) -> crate::errors::Result<()> {
-        if data.is_empty() || data.len() > Self::MAX_WRITE_SIZE {
+        if !(1..Self::MAX_WRITE_SIZE).contains(&data.len()) {
             return Err(SessionError::IncorrectMessageLength.into());
         }
 
@@ -654,7 +654,9 @@ impl<const C: usize> SessionState<C> {
             );
             let mut is_done = maybe_fused_future(self.segment_egress_send.is_closed(), futures::future::ready(()));
 
-            // Futures in select_biased! are ordered from the least often happening first
+            // Futures in `select_biased!` are ordered from the least often happening first.
+            // This means that the least happening events will not get starved by those
+            // that happen very often.
             if let Err(e) = futures::select_biased! {
                 _ = is_done => {
                     Err(NetworkTypeError::Other("session writer has been closed".into()))
@@ -744,40 +746,51 @@ impl<const C: usize> SessionSocket<C> {
         let (reassembler, egress) = FrameReassembler::new(cfg.frame_expiration_age);
 
         let to_acknowledge = Arc::new(ArrayQueue::new(cfg.acknowledged_frames_buffer.max(1)));
-        let is_acknowledging = (cfg.acknowledged_frames_buffer > 0).then_some(to_acknowledge.clone());
         let incoming_frame_retries = Arc::new(DashMap::new());
 
         let incoming_frame_retries_clone = incoming_frame_retries.clone();
         let id_clone = id.to_string().clone();
+        let to_acknowledge_clone = to_acknowledge.clone();
+        let cfg_clone = cfg.clone();
 
         let frame_egress = Box::new(
             egress
-                .inspect(move |maybe_frame| {
+                .filter_map(move |maybe_frame| {
                     match maybe_frame {
                         Ok(frame) => {
                             trace!(session_id = id_clone, frame_id = frame.frame_id, "frame completed");
                             // The frame has been completed, so remove its retry record
                             incoming_frame_retries_clone.remove(&frame.frame_id);
-                            if let Some(ack_buffer) = &is_acknowledging {
+                            if cfg_clone.enabled_features.contains(&SessionFeature::AcknowledgeFrames) {
                                 // Acts as a ring buffer, so if the buffer is full, any unsent acknowledgements
                                 // will be discarded.
-                                ack_buffer.force_push(frame.frame_id);
+                                to_acknowledge_clone.force_push(frame.frame_id);
                             }
+                            futures::future::ready(Some(Ok(frame)))
                         }
-                        Err(SessionError::FrameDiscarded(id)) | Err(SessionError::IncompleteFrame(id)) => {
+                        Err(SessionError::FrameDiscarded(fid)) | Err(SessionError::IncompleteFrame(fid)) => {
                             // Remove the retry token because the frame has been discarded
-                            incoming_frame_retries_clone.remove(id);
-                            warn!(session_id = id_clone, frame_id = id, "frame skipped");
+                            incoming_frame_retries_clone.remove(&fid);
+                            warn!(session_id = id_clone, frame_id = fid, "frame skipped");
+                            futures::future::ready(None) // Skip discarded frames
                         }
-                        _ => {}
+                        Err(e) => {
+                            error!(session_id = id_clone, "error on frame reassembly: {e}");
+                            futures::future::ready(Some(Err(std::io::Error::other(e))))
+                        }
                     }
                 })
-                .filter_map(|r| futures::future::ready(r.ok().map(Ok))) // Skip discarded frames
                 .into_async_read(),
         );
 
         let (segment_egress_send, segment_egress_recv) = futures::channel::mpsc::unbounded();
         let segment_egress_recv = segment_egress_recv.map(|m: SessionMessage<C>| Ok(m.into_encoded()));
+
+        let (downstream_read, downstream_write) = transport.split();
+
+        // As `segment_egress_recv` terminates `forward` will flush the downstream buffer
+        let downstream_write =
+            futures::io::BufWriter::with_capacity(if cfg.allow_output_buffering { C } else { 0 }, downstream_write);
 
         let state = SessionState {
             lookbehind: Arc::new(SkipMap::new()),
@@ -788,14 +801,8 @@ impl<const C: usize> SessionSocket<C> {
             to_acknowledge,
             incoming_frame_retries,
             segment_egress_send,
-            cfg: cfg.clone(),
+            cfg,
         };
-
-        let (downstream_read, downstream_write) = transport.split();
-
-        // As `segment_egress_recv` terminates `forward` will flush the downstream buffer
-        let downstream_write =
-            futures::io::BufWriter::with_capacity(if cfg.allow_output_buffering { C } else { 0 }, downstream_write);
 
         // Segment egress to downstream
         spawn(async move {

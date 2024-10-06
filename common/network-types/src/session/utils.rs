@@ -72,6 +72,8 @@ impl RetryToken {
     }
 }
 
+/// Converts a [`AsyncRead`] into [`Stream`] by reading at most `S` bytes
+/// in each call to [`Stream::poll_next`].
 pub(crate) struct AsyncReadStreamer<R: AsyncRead + Unpin, const S: usize>(R);
 
 impl<R: AsyncRead + Unpin, const S: usize> AsyncReadStreamer<R, S> {

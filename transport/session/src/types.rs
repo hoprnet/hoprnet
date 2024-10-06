@@ -19,7 +19,6 @@ use std::{
     task::Poll,
 };
 use strum::IntoEnumIterator;
-use tokio::io::ReadBuf;
 use tracing::{debug, error};
 
 use crate::{errors::TransportSessionError, traits::SendMsg, Capability};
@@ -285,7 +284,11 @@ impl futures::AsyncWrite for Session {
 
 #[cfg(feature = "runtime-tokio")]
 impl tokio::io::AsyncRead for Session {
-    fn poll_read(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut ReadBuf<'_>) -> Poll<std::io::Result<()>> {
+    fn poll_read(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut tokio::io::ReadBuf<'_>,
+    ) -> Poll<std::io::Result<()>> {
         let slice = buf.initialize_unfilled();
         let n = ready!(futures::AsyncRead::poll_read(self.as_mut(), cx, slice))?;
         buf.advance(n);
