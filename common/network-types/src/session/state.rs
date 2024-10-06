@@ -210,7 +210,7 @@ pub struct SessionConfig {
 
     /// Allows output Session messages to be buffered first, until they are
     /// forwarded to the underlying transport.
-    #[default(false)]
+    #[default(true)]
     pub allow_output_buffering: bool,
 }
 
@@ -549,8 +549,10 @@ impl<const C: usize> SessionState<C> {
         Ok(count)
     }
 
-    const PAYLOAD_CAPACITY: usize = C - SessionMessage::<C>::HEADER_SIZE - Segment::HEADER_SIZE;
+    /// How much space for payload there is in a single packet.
+    const PAYLOAD_CAPACITY: usize = C - SessionMessage::<C>::SEGMENT_OVERHEAD;
 
+    /// Maximum size of a frame, which is determined by the maximum number of possible segments.
     const MAX_WRITE_SIZE: usize = SessionMessage::<C>::MAX_SEGMENTS_PER_FRAME * Self::PAYLOAD_CAPACITY;
 
     /// Segments the `data` and sends them as (possibly multiple) [`SessionMessage::Segment`].
@@ -1051,6 +1053,7 @@ mod tests {
         bob: S,
         timeout: Duration,
         alice_to_bob_only: bool,
+        randomized_frame_sizes: bool,
     ) where
         S: AsyncRead + AsyncWrite + Unpin + Send + 'static,
     {
@@ -1061,32 +1064,48 @@ mod tests {
             Both,
         }
 
-        let socket_worker = |mut socket: S, d: Direction| async move {
-            let mut received = Vec::with_capacity(num_frames * frame_size);
-            let mut sent = Vec::with_capacity(num_frames * frame_size);
+        let frame_sizes = if randomized_frame_sizes {
+            let norm_dist = rand_distr::Normal::new(frame_size as f64 * 0.75, frame_size as f64 / 4.0).unwrap();
+            StdRng::from_seed(RNG_SEED)
+                .sample_iter(norm_dist)
+                .map(|s| s.max(10.0) as usize)
+                .take(num_frames)
+                .collect::<Vec<_>>()
+        } else {
+            std::iter::repeat(frame_size).take(num_frames).collect::<Vec<_>>()
+        };
 
-            if d == Direction::Send || d == Direction::Both {
-                for _ in 0..num_frames {
-                    let mut write = vec![0u8; frame_size];
-                    hopr_crypto_random::random_fill(&mut write);
-                    socket.write(&write).await?;
-                    sent.extend(write);
+        let socket_worker = |mut socket: S, d: Direction| {
+            let frame_sizes = frame_sizes.clone();
+            let frame_sizes_total = frame_sizes.iter().sum();
+            async move {
+                let mut received = Vec::with_capacity(frame_sizes_total);
+                let mut sent = Vec::with_capacity(frame_sizes_total);
+
+                if d == Direction::Send || d == Direction::Both {
+                    for frame_size in &frame_sizes {
+                        let mut write = vec![0u8; *frame_size];
+                        hopr_crypto_random::random_fill(&mut write);
+                        socket.write(&write).await?;
+                        sent.extend(write);
+                    }
                 }
-            }
 
-            if d == Direction::Recv || d == Direction::Both {
-                for _ in 0..num_frames {
-                    let mut read = vec![0u8; frame_size];
-                    socket.read_exact(&mut read).await?;
-                    received.extend(read);
+                if d == Direction::Recv || d == Direction::Both {
+                    // Either read everything or timeout trying
+                    while received.len() < frame_sizes_total {
+                        let mut buffer = [0u8; 2048];
+                        let read = socket.read(&mut buffer).await?;
+                        received.extend(buffer.into_iter().take(read));
+                    }
                 }
+
+                // TODO: fix this so it works properly
+                // We cannot close immediately as some ack/resends might be ongoing
+                //socket.close().await.unwrap();
+
+                Ok::<_, std::io::Error>((sent, received))
             }
-
-            // TODO: fix this so it works properly
-            // We cannot close immediately as some ack/resends might be ongoing
-            //socket.close().await.unwrap();
-
-            Ok::<_, std::io::Error>((sent, received))
         };
 
         let alice_worker = async_std::task::spawn(socket_worker(
@@ -1242,6 +1261,7 @@ mod tests {
             bob_to_alice,
             Duration::from_secs(10),
             false,
+            false,
         )
         .await;
     }
@@ -1249,7 +1269,9 @@ mod tests {
     #[parameterized(num_frames = {10, 100, 1000}, frame_size = {1500, 1500, 1500})]
     #[parameterized_macro(async_std::test)]
     async fn reliable_send_recv_with_with_acks(num_frames: usize, frame_size: usize) {
-        let (alice_to_bob, bob_to_alice) = setup_alice_bob(Default::default(), Default::default(), None, None);
+        let cfg = SessionConfig { ..Default::default() };
+
+        let (alice_to_bob, bob_to_alice) = setup_alice_bob(cfg, Default::default(), None, None);
 
         send_and_recv(
             num_frames,
@@ -1257,6 +1279,7 @@ mod tests {
             alice_to_bob,
             bob_to_alice,
             Duration::from_secs(10),
+            false,
             false,
         )
         .await;
@@ -1266,8 +1289,8 @@ mod tests {
     #[parameterized_macro(async_std::test)]
     async fn unreliable_send_recv(num_frames: usize, frame_size: usize) {
         let cfg = SessionConfig {
-            rto_base_sender: Duration::from_millis(500),
             rto_base_receiver: Duration::from_millis(10),
+            rto_base_sender: Duration::from_millis(500),
             frame_expiration_age: Duration::from_secs(30),
             backoff_base: 1.001,
             ..Default::default()
@@ -1287,6 +1310,7 @@ mod tests {
             bob_to_alice,
             Duration::from_secs(30),
             false,
+            false,
         )
         .await;
     }
@@ -1295,8 +1319,8 @@ mod tests {
     #[parameterized_macro(async_std::test)]
     async fn unreliable_send_recv_with_mixing(num_frames: usize, frame_size: usize) {
         let cfg = SessionConfig {
-            rto_base_sender: Duration::from_millis(500),
             rto_base_receiver: Duration::from_millis(10),
+            rto_base_sender: Duration::from_millis(500),
             frame_expiration_age: Duration::from_secs(30),
             backoff_base: 1.001,
             ..Default::default()
@@ -1316,6 +1340,7 @@ mod tests {
             alice_to_bob,
             bob_to_alice,
             Duration::from_secs(30),
+            false,
             false,
         )
         .await;
@@ -1347,6 +1372,7 @@ mod tests {
             bob_to_alice,
             Duration::from_secs(30),
             false,
+            false,
         )
         .await;
     }
@@ -1375,6 +1401,7 @@ mod tests {
             alice_to_bob,
             bob_to_alice,
             Duration::from_secs(30),
+            false,
             false,
         )
         .await;
@@ -1408,6 +1435,7 @@ mod tests {
             bob_to_alice,
             Duration::from_secs(30),
             true,
+            false,
         )
         .await;
 
@@ -1452,6 +1480,7 @@ mod tests {
             bob_to_alice,
             Duration::from_secs(30),
             true,
+            false,
         )
         .await;
 
