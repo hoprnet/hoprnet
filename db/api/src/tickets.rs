@@ -1367,7 +1367,7 @@ impl HoprDbTicketOperations for HoprDb {
 
             if channel_id != acked_ticket.ticket.channel_id {
                 return Err(DbError::LogicalError(format!(
-                    "aggregated ticket has an invalid channel id {}",
+                    "aggregated ticket has an invalid channel id {} (should be {channel_id})",
                     acked_ticket.ticket.channel_id
                 )));
             }
@@ -1380,9 +1380,9 @@ impl HoprDbTicketOperations for HoprDb {
                 && acked_ticket.ticket.index + acked_ticket.ticket.index_offset as u64
                     > acked_tickets[i + 1].ticket.index
             {
-                return Err(DbError::LogicalError(
-                    "Tickets with overlapping index intervals".to_owned(),
-                ));
+                return Err(DbError::LogicalError(format!(
+                    "Tickets with overlapping index intervals in channel {channel_id}"
+                )));
             }
 
             final_value = final_value.add(&acked_ticket.ticket.amount);
