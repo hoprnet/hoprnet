@@ -4412,6 +4412,7 @@ dependencies = [
  "hopr-network-types",
  "hopr-platform",
  "hoprd-api",
+ "hoprd-db-api",
  "hoprd-inbox",
  "hoprd-keypair",
  "lazy_static",
@@ -4454,6 +4455,9 @@ dependencies = [
  "hopr-metrics",
  "hopr-network-types",
  "hopr-transport-session",
+ "hoprd-db-api",
+ "hoprd-db-entity",
+ "hoprd-db-migration",
  "hoprd-inbox",
  "lazy_static",
  "libp2p-identity",
@@ -4474,6 +4478,54 @@ dependencies = [
  "utoipa",
  "utoipa-scalar",
  "validator",
+]
+
+[[package]]
+name = "hoprd-db-api"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-std",
+ "async-trait",
+ "env_logger",
+ "hex-literal",
+ "hopr-async-runtime",
+ "hopr-crypto-random",
+ "hopr-metrics",
+ "hoprd-db-entity",
+ "hoprd-db-migration",
+ "lazy_static",
+ "libp2p-identity",
+ "sea-orm",
+ "sqlx",
+ "thiserror",
+ "tracing",
+ "tracing-test",
+]
+
+[[package]]
+name = "hoprd-db-entity"
+version = "0.1.0"
+dependencies = [
+ "async-std",
+ "clap",
+ "hopr-crypto-types",
+ "hopr-internal-types",
+ "hopr-primitive-types",
+ "hoprd-db-migration",
+ "sea-orm",
+ "sea-orm-cli",
+ "sea-orm-migration",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
+name = "hoprd-db-migration"
+version = "0.1.0"
+dependencies = [
+ "async-std",
+ "sea-orm-migration",
 ]
 
 [[package]]

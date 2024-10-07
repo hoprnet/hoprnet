@@ -56,6 +56,9 @@ utoipa-scalar = { version = "0.1.0", features = ["axum"] }
 validator = { workspace = true }
 
 hopr-lib = { workspace = true, features = ["runtime-tokio", "session-client"] }
+hoprd-db-api = { workspace = true }
+hoprd-db-entity = { workspace = true }
+hoprd-db-migration = { workspace = true }
 hoprd-inbox = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-network-types = { workspace = true, features = ["runtime-tokio"] }
