@@ -3,8 +3,8 @@ use futures::stream::BoxStream;
 use futures::{stream, StreamExt, TryStreamExt};
 use sea_orm::query::QueryTrait;
 use sea_orm::sea_query::{Expr, OnConflict, Value};
-use sea_orm::{ColumnTrait, DbErr, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect};
-use tracing::{error, trace};
+use sea_orm::{ColumnTrait, DbErr, EntityTrait, FromQueryResult, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect};
+use tracing::{error, info, trace};
 
 use hopr_crypto_types::prelude::Hash;
 use hopr_db_api::errors::{DbError, Result};
@@ -17,6 +17,11 @@ use hopr_primitive_types::prelude::*;
 use crate::db::HoprDb;
 use crate::errors::DbSqlError;
 use crate::{HoprDbGeneralModelOperations, TargetDb};
+
+#[derive(FromQueryResult)]
+struct BlockNumber {
+    block_number: Vec<u8>,
+}
 
 #[async_trait]
 impl HoprDbLogOperations for HoprDb {
@@ -115,12 +120,13 @@ impl HoprDbLogOperations for HoprDb {
         block_offset: Option<u64>,
     ) -> Result<BoxStream<'a, SerializableLog>> {
         let min_block_number = block_number.unwrap_or(0);
+        let max_block_number = block_offset.map(|v| min_block_number + v + 1);
 
         let query = Log::find()
             .find_also_related(LogStatus)
             .filter(log::Column::BlockNumber.gte(min_block_number.to_be_bytes().to_vec()))
-            .apply_if(block_offset, |q, v| {
-                q.filter(log::Column::BlockNumber.lt((min_block_number + v).to_be_bytes().to_vec()))
+            .apply_if(max_block_number, |q, v| {
+                q.filter(log::Column::BlockNumber.lt(v.to_be_bytes().to_vec()))
             })
             .order_by_asc(log::Column::BlockNumber)
             .order_by_asc(log::Column::TransactionIndex)
@@ -152,11 +158,12 @@ impl HoprDbLogOperations for HoprDb {
 
     async fn get_logs_count(&self, block_number: Option<u64>, block_offset: Option<u64>) -> Result<u64> {
         let min_block_number = block_number.unwrap_or(0);
+        let max_block_number = block_offset.map(|v| min_block_number + v + 1);
 
         let query = Log::find()
             .filter(log::Column::BlockNumber.gte(min_block_number.to_be_bytes().to_vec()))
-            .apply_if(block_offset, |q, v| {
-                q.filter(log::Column::BlockNumber.lt((min_block_number + v).to_be_bytes().to_vec()))
+            .apply_if(max_block_number, |q, v| {
+                q.filter(log::Column::BlockNumber.lt(v.to_be_bytes().to_vec()))
             })
             .order_by_asc(log::Column::BlockNumber)
             .order_by_asc(log::Column::TransactionIndex)
@@ -174,22 +181,25 @@ impl HoprDbLogOperations for HoprDb {
         block_offset: Option<u64>,
     ) -> Result<BoxStream<'a, u64>> {
         let min_block_number = block_number.unwrap_or(0);
+        let max_block_number = block_offset.map(|v| min_block_number + v + 1);
 
         let query = Log::find()
             .select_only()
             .column(log::Column::BlockNumber)
             .distinct()
             .filter(log::Column::BlockNumber.gte(min_block_number.to_be_bytes().to_vec()))
-            .apply_if(block_offset, |q, v| {
-                q.filter(log::Column::BlockNumber.lt((min_block_number + v).to_be_bytes().to_vec()))
+            .apply_if(max_block_number, |q, v| {
+                q.filter(log::Column::BlockNumber.lt(v.to_be_bytes().to_vec()))
             })
-            .order_by_asc(log::Column::BlockNumber);
+            .order_by_asc(log::Column::BlockNumber)
+            .into_model::<BlockNumber>();
 
         Ok(Box::pin(async_stream::stream! {
             match query.stream(self.conn(TargetDb::Logs)).await {
                 Ok(mut stream) => {
-                    while let Ok(Some(object)) = stream.try_next().await {
-                        yield  U256::from_be_bytes(object.block_number).as_u64()
+                    while let Some(Ok(object)) = stream.next().await {
+                        info!("object: {:?}", object.block_number);
+                        yield U256::from_be_bytes(object.block_number).as_u64()
                 }},
                 Err(e) => error!("Failed to get logs block numbers from db: {:?}", e),
             }
@@ -198,6 +208,7 @@ impl HoprDbLogOperations for HoprDb {
 
     async fn set_logs_processed(&self, block_number: Option<u64>, block_offset: Option<u64>) -> Result<()> {
         let min_block_number = block_number.unwrap_or(0);
+        let max_block_number = block_offset.map(|v| min_block_number + v + 1);
         let now = Utc::now();
 
         let query = LogStatus::update_many()
@@ -206,9 +217,9 @@ impl HoprDbLogOperations for HoprDb {
                 log_status::Column::ProcessedAt,
                 Expr::value(Value::ChronoDateTimeUtc(Some(now.into()))),
             )
-            .filter(log::Column::BlockNumber.gte(min_block_number.to_be_bytes().to_vec()))
-            .apply_if(block_offset, |q, v| {
-                q.filter(log::Column::BlockNumber.lt((min_block_number + v).to_be_bytes().to_vec()))
+            .filter(log_status::Column::BlockNumber.gte(min_block_number.to_be_bytes().to_vec()))
+            .apply_if(max_block_number, |q, v| {
+                q.filter(log_status::Column::BlockNumber.lt(v.to_be_bytes().to_vec()))
             });
 
         match query.exec(self.conn(TargetDb::Logs)).await {
@@ -242,13 +253,14 @@ impl HoprDbLogOperations for HoprDb {
 
     async fn set_logs_unprocessed(&self, block_number: Option<u64>, block_offset: Option<u64>) -> Result<()> {
         let min_block_number = block_number.unwrap_or(0);
+        let max_block_number = block_offset.map(|v| min_block_number + v + 1);
 
         let query = LogStatus::update_many()
             .col_expr(log_status::Column::Processed, Expr::value(Value::Bool(Some(false))))
             .col_expr(log_status::Column::ProcessedAt, Expr::value(Value::String(None)))
-            .filter(log::Column::BlockNumber.gte(min_block_number.to_be_bytes().to_vec()))
-            .apply_if(block_offset, |q, v| {
-                q.filter(log::Column::BlockNumber.lt((min_block_number + v).to_be_bytes().to_vec()))
+            .filter(log_status::Column::BlockNumber.gte(min_block_number.to_be_bytes().to_vec()))
+            .apply_if(max_block_number, |q, v| {
+                q.filter(log_status::Column::BlockNumber.lt(v.to_be_bytes().to_vec()))
             });
 
         match query.exec(self.conn(TargetDb::Logs)).await {
@@ -290,14 +302,14 @@ impl HoprDbLogOperations for HoprDb {
                 Box::pin(async move {
                     let query = LogStatus::find()
                         .filter(log_status::Column::Checksum.is_null())
-                        .order_by_asc(log::Column::BlockNumber)
-                        .order_by_asc(log::Column::TransactionIndex)
-                        .order_by_asc(log::Column::LogIndex)
+                        .order_by_asc(log_status::Column::BlockNumber)
+                        .order_by_asc(log_status::Column::TransactionIndex)
+                        .order_by_asc(log_status::Column::LogIndex)
                         .find_also_related(Log);
 
                     match query.stream(tx.as_ref()).await {
                         Ok(mut stream) => {
-                            while let Ok(Some((status, Some(log_entry)))) = stream.try_next().await {
+                            while let Some(Ok((status, Some(log_entry)))) = stream.next().await {
                                 let slog = create_log(log_entry.clone(), status.clone())?;
                                 // we compute the has of a single log as a combination of the block
                                 // hash, tx hash and log index
@@ -372,12 +384,9 @@ fn create_log(raw_log: log::Model, status: log_status::Model) -> crate::errors::
 #[cfg(test)]
 mod tests {
     use super::*;
-    
-    
-    
+
     use futures::StreamExt;
     use hopr_crypto_types::prelude::{ChainKeypair, Hash, Keypair};
-    
 
     #[async_std::test]
     async fn test_store_single_log() {
@@ -529,13 +538,13 @@ mod tests {
         assert_eq!(log_db_updated.processed_at.is_some(), true);
     }
 
-    #[async_std::test]
+    #[test_log::test(async_std::test)]
     async fn test_list_logs_ordered() {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await.unwrap();
 
-        let logs_per_tx = 5;
-        let tx_per_block = 10;
-        let blocks = 100;
+        let logs_per_tx = 3;
+        let tx_per_block = 3;
+        let blocks = 10;
         let start_block = 32183412;
 
         for block_offset in 0..blocks {
@@ -558,7 +567,7 @@ mod tests {
             }
         }
 
-        let block_fetch_interval = 842;
+        let block_fetch_interval = 3;
         let mut next_block = start_block;
 
         while next_block <= start_block + blocks {
@@ -568,6 +577,8 @@ mod tests {
                 .unwrap()
                 .collect::<Vec<SerializableLog>>()
                 .await;
+
+            assert!(ordered_logs.len() > 0);
 
             ordered_logs.iter().reduce(|prev_log, curr_log| {
                 assert!(prev_log.block_number >= next_block);
@@ -587,5 +598,167 @@ mod tests {
             });
             next_block = next_block + block_fetch_interval;
         }
+    }
+
+    #[async_std::test]
+    async fn test_get_nonexistent_log() {
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await.unwrap();
+
+        let result = db.get_log(999, 999, 999).await;
+
+        assert!(result.is_err());
+    }
+
+    #[async_std::test]
+    async fn test_get_logs_with_block_offset() {
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await.unwrap();
+
+        let log_1 = SerializableLog {
+            address: Hash::create(&[b"address1"]).to_hex(),
+            topics: [Hash::create(&[b"topic1"]).to_hex()].into(),
+            data: [1, 2, 3, 4].into(),
+            tx_index: 1,
+            block_number: 1,
+            block_hash: Hash::create(&[b"block_hash1"]).to_hex(),
+            tx_hash: Hash::create(&[b"tx_hash1"]).to_hex(),
+            log_index: 1,
+            removed: false,
+            processed: Some(false),
+            ..Default::default()
+        };
+
+        let log_2 = SerializableLog {
+            address: Hash::create(&[b"address2"]).to_hex(),
+            topics: [Hash::create(&[b"topic2"]).to_hex()].into(),
+            data: [1, 2, 3, 4].into(),
+            tx_index: 2,
+            block_number: 2,
+            block_hash: Hash::create(&[b"block_hash2"]).to_hex(),
+            tx_hash: Hash::create(&[b"tx_hash2"]).to_hex(),
+            log_index: 2,
+            removed: false,
+            processed: Some(false),
+            ..Default::default()
+        };
+
+        db.store_logs(vec![log_1.clone(), log_2.clone()])
+            .await
+            .unwrap()
+            .into_iter()
+            .for_each(|r| assert!(r.is_ok()));
+
+        let logs = db
+            .get_logs(Some(1), Some(0))
+            .await
+            .unwrap()
+            .collect::<Vec<SerializableLog>>()
+            .await;
+
+        assert_eq!(logs.len(), 1);
+        assert_eq!(logs[0], log_1);
+    }
+
+    #[async_std::test]
+    async fn test_set_logs_unprocessed() {
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await.unwrap();
+
+        let log = SerializableLog {
+            address: Hash::create(&[b"address"]).to_hex(),
+            topics: [Hash::create(&[b"topic"]).to_hex()].into(),
+            data: [1, 2, 3, 4].into(),
+            tx_index: 1,
+            block_number: 1,
+            block_hash: Hash::create(&[b"block_hash"]).to_hex(),
+            tx_hash: Hash::create(&[b"tx_hash"]).to_hex(),
+            log_index: 1,
+            removed: false,
+            processed: Some(true),
+            processed_at: Some(Utc::now()),
+            ..Default::default()
+        };
+
+        db.store_log(log.clone()).await.unwrap();
+
+        db.set_logs_unprocessed(Some(1), Some(0)).await.unwrap();
+
+        let log_db = db.get_log(log.block_number, log.tx_index, log.log_index).await.unwrap();
+
+        assert_eq!(log_db.processed, Some(false));
+        assert!(log_db.processed_at.is_none());
+    }
+
+    #[test_log::test(async_std::test)]
+    async fn test_get_logs_block_numbers() {
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await.unwrap();
+
+        let log_1 = SerializableLog {
+            address: Hash::create(&[b"address1"]).to_hex(),
+            topics: [Hash::create(&[b"topic1"]).to_hex()].into(),
+            data: [1, 2, 3, 4].into(),
+            tx_index: 1,
+            block_number: 1,
+            block_hash: Hash::create(&[b"block_hash1"]).to_hex(),
+            tx_hash: Hash::create(&[b"tx_hash1"]).to_hex(),
+            log_index: 1,
+            removed: false,
+            processed: Some(false),
+            ..Default::default()
+        };
+
+        let log_2 = SerializableLog {
+            address: Hash::create(&[b"address2"]).to_hex(),
+            topics: [Hash::create(&[b"topic2"]).to_hex()].into(),
+            data: [1, 2, 3, 4].into(),
+            tx_index: 2,
+            block_number: 2,
+            block_hash: Hash::create(&[b"block_hash2"]).to_hex(),
+            tx_hash: Hash::create(&[b"tx_hash2"]).to_hex(),
+            log_index: 2,
+            removed: false,
+            processed: Some(false),
+            ..Default::default()
+        };
+
+        db.store_logs(vec![log_1.clone(), log_2.clone()])
+            .await
+            .unwrap()
+            .into_iter()
+            .for_each(|r| assert!(r.is_ok()));
+
+        let block_numbers = db
+            .get_logs_block_numbers(Some(1), Some(0))
+            .await
+            .unwrap()
+            .collect::<Vec<u64>>()
+            .await;
+
+        assert_eq!(block_numbers.len(), 1);
+        assert_eq!(block_numbers[0], 1);
+    }
+
+    #[test_log::test(async_std::test)]
+    async fn test_update_logs_checksums() {
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await.unwrap();
+
+        let log = SerializableLog {
+            address: Hash::create(&[b"address"]).to_hex(),
+            topics: [Hash::create(&[b"topic"]).to_hex()].into(),
+            data: [1, 2, 3, 4].into(),
+            tx_index: 1,
+            block_number: 1,
+            block_hash: Hash::create(&[b"block_hash"]).to_hex(),
+            tx_hash: Hash::create(&[b"tx_hash"]).to_hex(),
+            log_index: 1,
+            removed: false,
+            ..Default::default()
+        };
+
+        db.store_log(log.clone()).await.unwrap();
+
+        db.update_logs_checksums().await.unwrap();
+
+        let updated_log = db.get_last_checksummed_log().await.unwrap().unwrap();
+
+        assert!(updated_log.checksum.is_some());
     }
 }
