@@ -73,16 +73,25 @@ pub(crate) struct ChannelInfoResponse {
 /// Listing of channels.
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[schema(example = json!({
-        "all": [],
+        "all": [{
+            "channelId": "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f",
+            "sourceAddress": "0x07eaf07d6624f741e04f4092a755a9027aaab7f6",
+            "destinationAddress": "0x188c4462b75e46f0c7262d7f48d182447b93a93c",
+            "sourcePeerId": "12D3KooWJmLm8FnBfvYQ5BAZ5qcYBxQFFBzAAEYUBUNJNE8cRsYS",
+            "destinationPeerId": "12D3KooWPWD5P5ZzMRDckgfVaicY5JNoo7JywGotoAv17d7iKx1z",
+            "balance": "10000000000000000000",
+            "status": "Open",
+            "ticketIndex": 0,
+            "channelEpoch": 1,
+            "closureTime": 0
+        }],
         "incoming": [],
-        "outgoing": [
-        {
+        "outgoing": [{
             "balance": "10000000000000000010",
             "id": "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f",
             "peerAddress": "0x188c4462b75e46f0c7262d7f48d182447b93a93c",
             "status": "Open"
-        }
-        ]
+        }]
     }))]
 pub(crate) struct NodeChannelsResponse {
     /// Channels incoming to this node.
@@ -321,7 +330,10 @@ pub(super) async fn open_channel(
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
+#[schema(example = json!({
+    "channelId": "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f"
+}))]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ChannelIdParams {
     channel_id: String,
@@ -372,8 +384,8 @@ pub(super) async fn show_channel(
 #[serde_as]
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[schema(example = json!({
-        "channelStatus": "PendingToClose",
-        "receipt": "0xd77da7c1821249e663dead1464d185c03223d9663a06bc1d46ed0ad449a07118"
+        "receipt": "0xd77da7c1821249e663dead1464d185c03223d9663a06bc1d46ed0ad449a07118",
+        "channelStatus": "PendingToClose"
     }))]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct CloseChannelResponse {
@@ -446,7 +458,7 @@ pub(super) async fn close_channel(
 /// Specifies the amount of HOPR tokens to fund a channel with.
 #[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 #[schema(example = json!({
-        "amount": "1000"
+        "amount": "10000000000000000000"
     }))]
 pub(crate) struct FundBodyRequest {
     /// Amount of HOPR tokens to fund the channel with.
