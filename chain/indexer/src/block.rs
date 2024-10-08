@@ -262,6 +262,20 @@ where
         }
     }
 
+    /// Processes a block by its ID.
+    ///
+    /// This function retrieves logs for the given block ID and processes them using the database
+    /// and log handler.
+    ///
+    /// # Arguments
+    ///
+    /// * `db` - The database operations handler.
+    /// * `db_processor` - The database log handler.
+    /// * `block_id` - The ID of the block to process.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing an optional vector of significant chain events if the operation succeeds or an error if it fails.
     async fn process_block_by_id(
         db: &Db,
         db_processor: &U,
@@ -291,6 +305,19 @@ where
         Ok(Self::process_block(db, db_processor, block).await)
     }
 
+    /// Processes a block and its logs.
+    ///
+    /// This function collects events from the block logs and updates the database with the processed logs.
+    ///
+    /// # Arguments
+    ///
+    /// * `db` - The database operations handler.
+    /// * `db_processor` - The database log handler.
+    /// * `block` - The block with logs to process.
+    ///
+    /// # Returns
+    ///
+    /// An optional vector of significant chain events if the operation succeeds.
     async fn process_block(db: &Db, db_processor: &U, block: BlockWithLogs) -> Option<Vec<SignificantChainEvent>>
     where
         U: ChainLogHandler + 'static,
@@ -322,8 +349,13 @@ where
         }
     }
 
-    // Printout indexer state, we can do this on every processed block because not
-    // every block will have events
+    /// Prints the current state of the indexer.
+    ///
+    /// This function retrieves and logs the last checksummed log entry and the count of logs.
+    ///
+    /// # Arguments
+    ///
+    /// * `db` - The database operations handler.
     async fn print_indexer_state(db: &Db) -> ()
     where
         Db: HoprDbLogOperations + 'static,
@@ -356,6 +388,23 @@ where
         }
     }
 
+    /// Calculates the synchronization progress.
+    ///
+    /// This function processes a block and updates synchronization metrics and state.
+    ///
+    /// # Arguments
+    ///
+    /// * `prefix` - A string prefix for logging purposes.
+    /// * `block` - The block with logs to process.
+    /// * `rpc` - The RPC operations handler.
+    /// * `chain_head` - The current chain head block number.
+    /// * `is_synced` - A boolean indicating whether the indexer is synced.
+    /// * `next_block_to_process` - The next block number to process.
+    /// * `tx` - A sender channel for synchronization notifications.
+    ///
+    /// # Returns
+    ///
+    /// The block which was provided as input.
     async fn calculate_sync_process(
         prefix: &str,
         block: BlockWithLogs,
