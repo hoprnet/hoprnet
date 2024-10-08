@@ -44,9 +44,17 @@ pub struct DescribedBlock {
 #[async_trait]
 pub trait HoprDbInfoOperations {
     /// Checks if the index is empty.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing a boolean indicating whether the index is empty.
     async fn index_is_empty<'a>(&'a self) -> Result<bool>;
 
-    /// Remove all data from all tables in the index database.
+    /// Removes all data from all tables in the index database.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` indicating the success or failure of the operation.
     async fn clear_index_db<'a>(&'a self) -> Result<()>;
 
     /// Gets node's Safe balance of HOPR tokens.

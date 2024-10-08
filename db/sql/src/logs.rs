@@ -21,9 +21,16 @@ use crate::{HoprDbGeneralModelOperations, TargetDb};
 #[async_trait]
 impl HoprDbLogOperations for HoprDb {
     async fn store_log<'a>(&'a self, log: SerializableLog) -> Result<()> {
-        self.store_logs([log].to_vec())
-            .await
-            .map(|res| res.into_iter().next().unwrap().unwrap())
+        match self.store_logs([log].to_vec()).await {
+            Ok(results) => {
+                if let Some(result) = results.into_iter().next() {
+                    result
+                } else {
+                    panic!("when inserting a log into the db, the result should be a single item")
+                }
+            }
+            Err(e) => Err(e),
+        }
     }
 
     async fn store_logs(&self, logs: Vec<SerializableLog>) -> Result<Vec<Result<()>>> {
@@ -57,13 +64,13 @@ impl HoprDbLogOperations for HoprDb {
                             Ok(_) => match log_query.exec(tx.as_ref()).await {
                                 Ok(_) => Ok(()),
                                 Err(DbErr::RecordNotInserted) => {
-                                    error!("Failed to insert log status into db");
+                                    error!("Failed to insert log into db");
                                     Err(DbError::from(DbSqlError::from(DbErr::RecordNotInserted)))
                                 }
                                 Err(e) => Err(DbError::General(e.to_string())),
                             },
                             Err(DbErr::RecordNotInserted) => {
-                                error!("Failed to insert log into db");
+                                error!("Failed to insert log status into db");
                                 Err(DbError::from(DbSqlError::from(DbErr::RecordNotInserted)))
                             }
                             Err(e) => Err(DbError::General(e.to_string())),
