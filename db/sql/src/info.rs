@@ -509,7 +509,7 @@ mod tests {
     use hex_literal::hex;
     use hopr_crypto_types::keypairs::ChainKeypair;
     use hopr_crypto_types::prelude::Keypair;
-    use hopr_crypto_types::types::Hash;
+    
     use hopr_primitive_types::prelude::{Address, BalanceType};
 
     use crate::db::HoprDb;

@@ -372,12 +372,12 @@ fn create_log(raw_log: log::Model, status: log_status::Model) -> crate::errors::
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::errors::DbSqlError;
-    use crate::errors::DbSqlError::DecodingError;
-    use crate::HoprDbGeneralModelOperations;
-    use futures::{stream, StreamExt};
-    use hopr_crypto_types::prelude::{ChainKeypair, Hash, Keypair, OffchainKeypair};
-    use hopr_internal_types::prelude::AccountType::NotAnnounced;
+    
+    
+    
+    use futures::StreamExt;
+    use hopr_crypto_types::prelude::{ChainKeypair, Hash, Keypair};
+    
 
     #[async_std::test]
     async fn test_store_single_log() {
