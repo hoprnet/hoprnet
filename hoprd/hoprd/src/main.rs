@@ -64,7 +64,19 @@ fn init_logger() -> Result<(), Box<dyn std::error::Error>> {
         .with_thread_ids(true)
         .with_thread_names(false);
 
-    let registry = tracing_subscriber::Registry::default().with(env_filter).with(format);
+    #[cfg(feature = "prof")]
+    let registry = tracing_subscriber::Registry::default()
+        .with(
+            env_filter
+                .add_directive("tokio=trace".parse()?)
+                .add_directive("runtime=trace".parse()?),
+        )
+        .with(console_subscriber::spawn());
+
+    #[cfg(not(feature = "prof"))]
+    let registry = tracing_subscriber::Registry::default().with(env_filter);
+
+    let registry = registry.with(format);
 
     let mut telemetry = None;
 

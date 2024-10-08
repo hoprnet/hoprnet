@@ -44,6 +44,7 @@ telemetry = [
   "dep:opentelemetry_sdk",
   "dep:tracing-opentelemetry",
 ]
+prof = ["dep:console-subscriber"]   # must be build with 'tokio_unstable': https://github.com/tokio-rs/console/tree/main/console-subscriber
 
 [dependencies]
 anyhow = { workspace = true }
@@ -73,6 +74,8 @@ tokio-util = { workspace = true, optional = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 validator = { workspace = true }
+
+console-subscriber = { workspace = true, optional = true }
 
 opentelemetry = { workspace = true, optional = true }
 opentelemetry-otlp = { workspace = true, default-features = false, features = [

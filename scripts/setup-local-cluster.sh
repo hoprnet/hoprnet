@@ -89,8 +89,8 @@ node_prefix="local"
 password="local"
 anvil_rpc_log="${tmp_dir}/hopr-local-anvil-rpc.log"
 env_file="${tmp_dir}/local-cluster.env"
-node_api_base_port=13301
-node_p2p_base_port=19091
+node_api_base_port=19091
+node_p2p_base_port=13301
 cluster_size=5
 
 function cleanup {
@@ -154,6 +154,7 @@ function setup_node() {
     HOPRD_HEARTBEAT_THRESHOLD=3 \
     HOPRD_HEARTBEAT_VARIANCE=1 \
     HOPRD_NETWORK_QUALITY_THRESHOLD="0.3" \
+    TOKIO_CONSOLE_BIND=localhost:$((api_port + 100)) \
     RUST_LOG="debug,libp2p_mplex=info,multistream_select=info,isahc=error,sea_orm=warn,sqlx=warn,hyper_util=warn,libp2p_tcp=info,libp2p_dns=info" \
     RUST_BACKTRACE=1 \
     ${hoprd_command} \

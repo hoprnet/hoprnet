@@ -1,0 +1,81 @@
+syntax = "proto3";
+
+package rs.tokio.console.instrument;
+
+import "google/protobuf/timestamp.proto";
+import "common.proto";
+import "tasks.proto";
+import "resources.proto";
+import "async_ops.proto";
+
+// `InstrumentServer<T>` implements `Instrument` as a service.
+service Instrument {
+    // Produces a stream of updates representing the behavior of the instrumented async runtime.
+    rpc WatchUpdates(InstrumentRequest) returns (stream Update) {}
+    // Produces a stream of updates describing the activity of a specific task.
+    rpc WatchTaskDetails(TaskDetailsRequest) returns (stream tasks.TaskDetails) {}
+    // Registers that the console observer wants to pause the stream.
+    rpc Pause(PauseRequest) returns (PauseResponse) {}
+    // Registers that the console observer wants to resume the stream.
+    rpc Resume(ResumeRequest) returns (ResumeResponse) {}
+}
+
+// InstrumentRequest requests the stream of updates
+// to observe the async runtime state over time.
+//
+// TODO: In the future allow for the request to specify
+// only the data that the caller cares about (i.e. only
+// tasks but no resources)
+message InstrumentRequest {
+}
+
+// TaskDetailsRequest requests the stream of updates about
+// the specific task identified in the request.
+message TaskDetailsRequest {
+    // Identifies the task for which details were requested.
+    common.Id id = 1;
+}
+
+// PauseRequest requests the stream of updates to pause.
+message PauseRequest {
+}
+
+// ResumeRequest requests the stream of updates to resume after a pause.
+message ResumeRequest {
+}
+
+// Update carries all information regarding tasks, resources, async operations
+// and resource operations in one message. There are a couple of reasons to combine all
+// of these into a single message:
+//
+// - we can use one single timestamp for all the data
+// - we can have all the new_metadata in one place
+// - things such as async ops and resource ops do not make sense
+//   on their own as they have relations to tasks and resources
+message Update {
+    // The system time when this update was recorded.
+    //
+    // This is the timestamp any durations in the included `Stats` were
+    // calculated relative to.
+    google.protobuf.Timestamp now = 1;
+
+    // Task state update.
+    tasks.TaskUpdate task_update = 2;
+
+    // Resource state update.
+    resources.ResourceUpdate resource_update = 3;
+
+    // Async operations state update
+    async_ops.AsyncOpUpdate async_op_update = 4;
+
+    // Any new span metadata that was registered since the last update.
+    common.RegisterMetadata new_metadata = 5;
+}
+
+// `PauseResponse` is the value returned after a pause request.
+message PauseResponse {
+}
+
+// `ResumeResponse` is the value returned after a resume request.
+message ResumeResponse {
+}
