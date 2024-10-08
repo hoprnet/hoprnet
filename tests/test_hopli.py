@@ -1,8 +1,8 @@
-import random
 import json
 import logging
 import os
-from subprocess import run, CalledProcessError
+import random
+from subprocess import CalledProcessError, run
 
 import pytest
 
@@ -13,12 +13,11 @@ from .conftest import (
     PASSWORD,
     barebone_nodes,
     fixtures_dir,
-    load_private_key, run_hopli_cmd,
-)
-from .test_integration import (
-    balance_str_to_int,
+    load_private_key,
+    run_hopli_cmd,
 )
 from .node import Node
+from .test_integration import balance_str_to_int
 
 FIXTURES_PREFIX_NEW = "hopr-node-new_"
 PASSWORD_NEW = "e2e-test-new"
@@ -26,9 +25,10 @@ PASSWORD_NEW = "e2e-test-new"
 PORT_BASE = 19200
 ANVIL_ENDPOINT = f"http://127.0.0.1:{PORT_BASE}"
 
+
 def run_cast_cmd(cmd: str, params: list[str]):
     cast_cmd = ["cast", cmd, "-r", ANVIL_ENDPOINT] + params
-    logging.info("Running cast command: %s", ' '.join(cast_cmd))
+    logging.info("Running cast command: %s", " ".join(cast_cmd))
     try:
         result = run(cast_cmd, check=True, capture_output=True)
         return result
@@ -38,7 +38,7 @@ def run_cast_cmd(cmd: str, params: list[str]):
 
 
 def faucet(private_key: str, hopr_amount: str, native_amount: str):
-    test_suite_name = __name__.split('.')[-1]
+    test_suite_name = __name__.split(".")[-1]
     test_dir = fixtures_dir(test_suite_name)
 
     custom_env = {
@@ -148,7 +148,7 @@ def manager_force_sync(private_key: str, safes: str, eligibility: str):
 
 
 def new_identity(extra_prefix: str):
-    test_suite_name = __name__.split('.')[-1]
+    test_suite_name = __name__.split(".")[-1]
     test_dir = fixtures_dir(test_suite_name)
 
     custom_env = {
@@ -173,7 +173,7 @@ def new_identity(extra_prefix: str):
 
 
 def read_identity(extra_prefix: str, pwd: str):
-    test_suite_name = __name__.split('.')[-1]
+    test_suite_name = __name__.split(".")[-1]
     test_dir = fixtures_dir(test_suite_name)
 
     custom_env = {
@@ -203,7 +203,7 @@ def read_identity(extra_prefix: str, pwd: str):
 
 
 def update_identity(extra_prefix: str, old_pwd: str, new_pwd: str):
-    test_suite_name = __name__.split('.')[-1]
+    test_suite_name = __name__.split(".")[-1]
     test_dir = fixtures_dir(test_suite_name)
 
     custom_env = {
@@ -227,7 +227,7 @@ def update_identity(extra_prefix: str, old_pwd: str, new_pwd: str):
 
 
 def create_safe_module(extra_prefix: str, private_key: str, manager_private_key: str):
-    test_suite_name = __name__.split('.')[-1]
+    test_suite_name = __name__.split(".")[-1]
     test_dir = fixtures_dir(test_suite_name)
 
     custom_env = {
@@ -276,7 +276,7 @@ def create_safe_module(extra_prefix: str, private_key: str, manager_private_key:
 
 
 def migrate_safe_module(private_key: str, manager_private_key: str, safe: str, module: str):
-    test_suite_name = __name__.split('.')[-1]
+    test_suite_name = __name__.split(".")[-1]
     test_dir = fixtures_dir(test_suite_name)
 
     new_network = "anvil-localhost2"
@@ -355,11 +355,12 @@ def get_win_prob():
         custom_env,
     )
 
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
 @pytest.mark.xfail(reason="race-conditions lead to incorrect balances on nodes")
 async def test_hopli_should_be_able_to_fund_nodes(peer: str, swarm7: dict[str, Node]):
-    test_suite_name = __name__.split('.')[-1]
+    test_suite_name = __name__.split(".")[-1]
     private_key = load_private_key(test_suite_name)
 
     balance_before = await swarm7[peer].api.balances()
@@ -388,7 +389,7 @@ async def test_hopli_should_be_able_to_fund_nodes(peer: str, swarm7: dict[str, N
 @pytest.mark.asyncio
 @pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
 async def test_hopli_should_be_able_to_deregister_nodes_and_register_it(peer: str, swarm7: dict[str, Node]):
-    test_suite_name = __name__.split('.')[-1]
+    test_suite_name = __name__.split(".")[-1]
     private_key = load_private_key(test_suite_name)
 
     with open(INPUT_DEPLOYMENTS_SUMMARY_FILE, "r") as file:
@@ -433,7 +434,7 @@ async def test_hopli_should_be_able_to_deregister_nodes_and_register_it(peer: st
 @pytest.mark.asyncio
 @pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
 async def test_hopli_should_be_able_to_sync_eligibility_for_all_nodes(peer: str, swarm7: dict[str, Node]):
-    test_suite_name = __name__.split('.')[-1]
+    test_suite_name = __name__.split(".")[-1]
     private_key = load_private_key(test_suite_name)
 
     # remove all the nodes from the network registry
@@ -442,7 +443,7 @@ async def test_hopli_should_be_able_to_sync_eligibility_for_all_nodes(peer: str,
 
 @pytest.mark.asyncio
 async def test_hopli_create_update_read_identity():
-    test_suite_name = __name__.split('.')[-1]
+    test_suite_name = __name__.split(".")[-1]
     test_dir = fixtures_dir(test_suite_name)
     extra_prefix = "one"
 
@@ -466,7 +467,7 @@ async def test_hopli_create_update_read_identity():
 
 @pytest.mark.asyncio
 async def test_hopli_should_be_able_to_create_safe_module(swarm7: dict[str, Node]):
-    test_suite_name = __name__.split('.')[-1]
+    test_suite_name = __name__.split(".")[-1]
     test_dir = fixtures_dir(test_suite_name)
     manager_private_key = load_private_key(test_suite_name)
     private_key = load_private_key(test_suite_name, 1)
@@ -485,25 +486,25 @@ async def test_hopli_should_be_able_to_create_safe_module(swarm7: dict[str, Node
     new_node = read_identity(extra_prefix, PASSWORD)
 
     # create safe and module for
-    new_safe_module = create_safe_module(extra_prefix, private_key, manager_private_key)
-    node_balance = run_cast_cmd("balance", [new_node])
-    safe_code = run_cast_cmd("code", [new_safe_module[0]])
-    module_code = run_cast_cmd("code", [new_safe_module[1]])
+    safe_address, module_address = create_safe_module(extra_prefix, private_key, manager_private_key)
+    run_cast_cmd("balance", [new_node])
+    run_cast_cmd("code", [safe_address])
+    run_cast_cmd("code", [module_address])
 
     # Check the node node is registered with the new safe
     res_check_created_safe_registration = run_cast_cmd(
         "call", [network_registry_contract_1, "nodeRegisterdToAccount(address)(address)", new_node]
     )
-    new_safe_module_address = new_safe_module[0].lower()
     res_registration = res_check_created_safe_registration.stdout.decode("utf-8").split("\n")[0].lower()
-    assert res_registration == new_safe_module_address
+    assert res_registration == safe_address.lower()
 
     # Remove the created identity
     run(["rm", "-f", test_dir.joinpath(f"{FIXTURES_PREFIX_NEW}{extra_prefix}0.id")], check=True, capture_output=True)
 
+
 @pytest.mark.asyncio
 async def test_hopli_should_be_able_to_set_and_read_win_prob():
-    test_suite_name = __name__.split('.')[-1]
+    test_suite_name = __name__.split(".")[-1]
 
     # READ CONTRACT ADDRESS
     with open(INPUT_DEPLOYMENTS_SUMMARY_FILE, "r") as file:
@@ -512,11 +513,12 @@ async def test_hopli_should_be_able_to_set_and_read_win_prob():
 
     # get current win prob
     get_win_prob()
-    old_win_prob = run_cast_cmd(
-        "call", [win_prob_oracle, "currentWinProb()()"]
-    )
+    old_win_prob = run_cast_cmd("call", [win_prob_oracle, "currentWinProb()()"])
     logging.info("old_win_prob %s", old_win_prob.stdout.decode("utf-8").split("is")[0].split("\n")[0].lower())
-    assert old_win_prob.stdout.decode("utf-8").split("is")[0].split("\n")[0].lower() == "0x00000000000000000000000000000000000000000000000000ffffffffffffff"
+    assert (
+        old_win_prob.stdout.decode("utf-8").split("is")[0].split("\n")[0].lower()
+        == "0x00000000000000000000000000000000000000000000000000ffffffffffffff"
+    )
 
     # set new win prob
     private_key = load_private_key(test_suite_name)
@@ -524,8 +526,9 @@ async def test_hopli_should_be_able_to_set_and_read_win_prob():
 
     # get new win prob
     get_win_prob()
-    new_win_prob = run_cast_cmd(
-        "call", [win_prob_oracle, "currentWinProb()()"]
-    )
+    new_win_prob = run_cast_cmd("call", [win_prob_oracle, "currentWinProb()()"])
     logging.info("new_win_prob %s", new_win_prob.stdout.decode("utf-8").split("is")[0].split("\n")[0].lower())
-    assert new_win_prob.stdout.decode("utf-8").split("is")[0].split("\n")[0].lower() == "0x000000000000000000000000000000000000000000000000007fffffffffffff"
+    assert (
+        new_win_prob.stdout.decode("utf-8").split("is")[0].split("\n")[0].lower()
+        == "0x000000000000000000000000000000000000000000000000007fffffffffffff"
+    )

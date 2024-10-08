@@ -1203,6 +1203,11 @@ impl Hopr {
         Ok(self.transport_api.ticket_statistics().await?)
     }
 
+    /// Reset the ticket metrics to zero
+    pub async fn reset_ticket_statistics(&self) -> errors::Result<()> {
+        Ok(self.db.reset_ticket_statistics().await?)
+    }
+
     // Chain =========
     pub fn me_onchain(&self) -> Address {
         self.chain_api.me_onchain()
