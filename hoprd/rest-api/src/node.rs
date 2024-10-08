@@ -338,8 +338,11 @@ pub(super) async fn info(State(state): State<Arc<InternalState>>) -> Result<impl
     let network = hopr.network();
 
     let (indexer_block, indexer_checksum) = match hopr.get_indexer_state().await {
-        Ok(Some(slog)) => (slog.block_number as u32, slog.checksum.unwrap().to_hex()),
-        Ok(None) => (0u32, Hash::default().to_hex()),
+        Ok(Some(slog)) => (
+            slog.block_number as u32,
+            Hash::from_hex(slog.checksum.unwrap().as_str())?,
+        ),
+        Ok(None) => (0u32, Hash::default()),
         Err(error) => return Ok((StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(error)).into_response()),
     };
 

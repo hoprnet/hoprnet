@@ -374,7 +374,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_store_single_log() {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await.unwrap();
 
         let log = SerializableLog {
             address: Hash::create(&[b"my address"]).to_hex(),
@@ -405,7 +405,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_store_multiple_logs() {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await.unwrap();
 
         let log_1 = SerializableLog {
             address: Hash::create(&[b"my address"]).to_hex(),
@@ -459,7 +459,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_store_duplicate_log() {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await.unwrap();
 
         let log = SerializableLog {
             address: Hash::create(&[b"my address"]).to_hex(),
@@ -492,7 +492,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_set_log_processed() {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await.unwrap();
 
         let log = SerializableLog {
             address: Hash::create(&[b"my address"]).to_hex(),
@@ -524,7 +524,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_list_logs_ordered() {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await.unwrap();
 
         let logs_per_tx = 5;
         let tx_per_block = 10;
