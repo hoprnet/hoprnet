@@ -230,7 +230,7 @@ impl<const C: usize> FaultyNetwork<'_, C> {
 mod tests {
     use std::future::Future;
     use super::*;
-    use futures::TryStreamExt;
+    use futures::{FutureExt, TryStreamExt};
     use futures::io::{AsyncReadExt, AsyncWriteExt};
 
     fn spawn_single_byte_read_write<C>(
@@ -266,6 +266,10 @@ mod tests {
             out
         });
 
+        #[cfg(feature = "runtime-tokio")]
+        { (read.map(|v| v.unwrap()), written.map(|v| v.unwrap())) }
+
+        #[cfg(not(feature = "runtime-tokio"))]
         (read, written)
     }
 

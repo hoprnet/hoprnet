@@ -564,7 +564,7 @@ impl<const C: usize> SessionState<C> {
     /// is the expected underlying transport bandwidth (segment/sec) to guarantee the retransmission
     /// can still happen within some time window.
     pub async fn send_frame_data(&mut self, data: &[u8]) -> crate::errors::Result<()> {
-        if !(1..Self::MAX_WRITE_SIZE).contains(&data.len()) {
+        if !(1..=Self::MAX_WRITE_SIZE).contains(&data.len()) {
             return Err(SessionError::IncorrectMessageLength.into());
         }
 
@@ -1058,7 +1058,7 @@ mod tests {
     #[parameterized_macro(async_std::test)]
     async fn reliable_send_recv_with_no_acks(num_frames: usize, frame_size: usize) {
         let cfg = SessionConfig {
-            acknowledged_frames_buffer: 0,
+            enabled_features: HashSet::new(),
             ..Default::default()
         };
 

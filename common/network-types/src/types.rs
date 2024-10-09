@@ -245,14 +245,13 @@ mod tests {
     #[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
     #[tokio::test]
     async fn ip_or_host_must_resolve_ip_address() -> anyhow::Result<()> {
-        assert_eq!(
-            *IpOrHost::Ip("127.0.0.1:1000".parse()?)
-                .resolve_tokio()
-                .await?
-                .first()
-                .ok_or(anyhow!("must resolve"))?,
-            "127.0.0.1:1000".parse()?
-        );
+        let actual = IpOrHost::Ip("127.0.0.1:1000".parse()?).resolve_tokio().await?;
+
+        let actual = actual.first().ok_or(anyhow!("must resolve"))?;
+
+        let expected: SocketAddr = "127.0.0.1:1000".parse()?;
+
+        assert_eq!(*actual, expected);
         Ok(())
     }
 
