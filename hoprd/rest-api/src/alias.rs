@@ -94,14 +94,14 @@ pub(super) async fn set_alias(
     let aliases = state.aliases.clone();
     let hopr = state.hopr.clone();
 
-    let destination = args.clone().destination.fulfill(hopr.peer_resolver()).await;
+    let destination = args.destination.fulfill(hopr.peer_resolver()).await;
 
     let peer_id = match destination {
         Ok(destination) => match destination.peer_id {
             Some(peer_id) => peer_id,
-            None => return (StatusCode::NOT_FOUND, ApiErrorStatus::InvalidInput).into_response(),
+            None => return (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidInput).into_response(),
         },
-        Err(e) => return e.into_response(),
+        Err(e) => return (StatusCode::NOT_FOUND, e).into_response(),
     };
 
     let inserted = aliases.write().await.insert_no_overwrite(args.alias, peer_id);

@@ -69,7 +69,7 @@ pub(super) async fn show_peer_info(
 ) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
-    let destination = destination.clone().fulfill(hopr.peer_resolver()).await;
+    let destination = destination.fulfill(hopr.peer_resolver()).await;
     let peer_id = match destination {
         Ok(destination) => match destination.peer_id {
             Some(peer_id) => peer_id,
@@ -129,7 +129,7 @@ pub(super) async fn ping_peer(
     debug!("Ping peer {:?}", destination);
 
     let hopr = state.hopr.clone();
-    let destination = destination.clone().fulfill(hopr.peer_resolver()).await;
+    let destination = destination.fulfill(hopr.peer_resolver()).await;
     let peer_id = match destination {
         Ok(destination) => match destination.peer_id {
             Some(peer_id) => peer_id,

@@ -3,11 +3,12 @@
 // This module provides a unified type for PeerId and Address. This is useful for APIs that accept both PeerId and Address.
 
 use crate::ApiErrorStatus;
-use axum::http::StatusCode;
-use core::result::Result;
+
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_db_sql::prelude::HoprDbResolverOperations;
 use hopr_lib::{Address, GeneralError};
+
+use core::result::Result;
 use libp2p_identity::PeerId;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display, Formatter};
@@ -30,28 +31,33 @@ impl PeerOrAddress {
         }
     }
 
-    pub async fn fulfill<T: HoprDbResolverOperations>(
-        &mut self,
-        resolver: &T,
-    ) -> Result<Self, (StatusCode, ApiErrorStatus)> {
+    pub async fn fulfill<T: HoprDbResolverOperations>(mut self, resolver: &T) -> Result<Self, ApiErrorStatus> {
         if let Some(peer_id) = self.peer_id {
             let offchain_key = match OffchainPublicKey::try_from(peer_id) {
                 Ok(key) => key,
-                Err(_) => return Err((StatusCode::NOT_FOUND, ApiErrorStatus::PeerNotFound)),
+                Err(_) => return Err(ApiErrorStatus::InvalidInput),
             };
 
-            if let Ok(Some(address)) = resolver.resolve_chain_key(&offchain_key).await {
-                self.address = Some(address);
-                return Ok(*self);
+            match resolver.resolve_chain_key(&offchain_key).await {
+                Ok(Some(address)) => {
+                    self.address = Some(address);
+                    Ok(self)
+                }
+                Ok(None) => Err(ApiErrorStatus::PeerNotFound),
+                Err(_) => Err(ApiErrorStatus::PeerNotFound),
             }
         } else if let Some(address) = self.address {
-            if let Ok(Some(offchain_key)) = resolver.resolve_packet_key(&address).await {
-                self.peer_id = Some(PeerId::from(offchain_key));
-                return Ok(*self);
+            match resolver.resolve_packet_key(&address).await {
+                Ok(Some(offchain_key)) => {
+                    self.peer_id = Some(PeerId::from(offchain_key));
+                    Ok(self)
+                }
+                Ok(None) => Err(ApiErrorStatus::PeerNotFound),
+                Err(_) => Err(ApiErrorStatus::PeerNotFound),
             }
+        } else {
+            Err(ApiErrorStatus::InvalidInput)
         }
-
-        Err((StatusCode::NOT_FOUND, ApiErrorStatus::PeerNotFound))
     }
 }
 
