@@ -16,7 +16,7 @@ from hoprd_sdk.api import (
     TicketsApi,
 )
 from hoprd_sdk.models import (
-    AliasPeerIdBodyRequest,
+    AliasDestinationBodyRequest,
     FundBodyRequest,
     GetMessageBodyRequest,
     OpenChannelBodyRequest,
@@ -93,12 +93,12 @@ class HoprdAPI:
         status, response = self.__call_api(AliasApi, "get_alias", alias)
         return response.peer_id if status else None
 
-    async def aliases_set_alias(self, alias: str, peer_id: str):
+    async def aliases_set_alias(self, alias: str, destination: str):
         """
         Returns the aliases recognized by the node.
         :return: bool
         """
-        body = AliasPeerIdBodyRequest(alias, peer_id)
+        body = AliasDestinationBodyRequest(alias, destination)
         status, _ = self.__call_api(AliasApi, "set_alias", body=body)
         return status
 
@@ -145,14 +145,14 @@ class HoprdAPI:
         status, response = self.__call_api(AccountApi, "balances")
         return response if status else None
 
-    async def open_channel(self, peer_address: str, amount: str):
+    async def open_channel(self, destination: str, amount: str):
         """
-        Opens a channel with the given peer_address and amount.
-        :param: peer_address: str
+        Opens a channel with the given destination and amount.
+        :param: destination: str
         :param: amount: str
         :return: channel id: str | undefined
         """
-        body = OpenChannelBodyRequest(amount, peer_address)
+        body = OpenChannelBodyRequest(amount, destination=destination)
 
         status, response = self.__call_api(ChannelsApi, "open_channel", body=body)
         return response.channel_id if status else None
@@ -271,13 +271,13 @@ class HoprdAPI:
         )
         return response if status else []
 
-    async def ping(self, peer_id: str):
+    async def ping(self, destination: str):
         """
-        Pings the given peer_id and returns the measure.
-        :param: peer_id: str
+        Pings the given destination and returns the measure.
+        :param: destination: str
         :return: response: dict
         """
-        _, response = self.__call_api(PeersApi, "ping_peer", peer_id)
+        _, response = self.__call_api(PeersApi, "ping_peer", destination)
         return response
 
     async def peers(self, params: list or str = "peer_id", status: str = "connected"):
@@ -337,7 +337,7 @@ class HoprdAPI:
         :param: tag: int = 0x0320
         :return: bool
         """
-        body = SendMessageBodyRequest(message, None, hops, destination, tag)
+        body = SendMessageBodyRequest(body=message, hops=None, path=hops, destination=destination, tag=tag)
         _, response = self.__call_api(MessagesApi, "send_message", body=body)
         return response
 
