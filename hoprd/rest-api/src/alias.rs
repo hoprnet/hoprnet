@@ -1,4 +1,3 @@
-use crate::{ApiErrorStatus, InternalState, BASE_PATH};
 use axum::{
     extract::{Json, Path, State},
     http::status::StatusCode,
@@ -6,7 +5,6 @@ use axum::{
 };
 use hoprd_db_api::aliases::HoprdDbAliasesOperations;
 use hoprd_db_api::errors::DbError;
-use libp2p_identity::PeerId;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use std::{collections::HashMap, sync::Arc};
@@ -110,15 +108,15 @@ pub(super) async fn set_alias(
         Err(e) => return (StatusCode::NOT_FOUND, e).into_response(),
     };
 
-    match state.hoprd_db.set_alias(args.peer_id.to_string(), args.alias).await {
+    match state.hoprd_db.set_alias(peer_id.to_string(), args.alias).await {
         Ok(()) => (
             StatusCode::CREATED,
             Json(PeerIdResponse {
-                peer_id: args.peer_id.to_string(),
+                peer_id: peer_id.to_string(),
             }),
         )
             .into_response(),
-        Err(DbError::LogicalError(_)) => (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidPeerId).into_response(),
+        Err(DbError::LogicalError(_)) => (StatusCode::BAD_REQUEST, ApiErrorStatus::PeerNotFound).into_response(),
         Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
     }
 }
