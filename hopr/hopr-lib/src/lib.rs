@@ -1202,12 +1202,12 @@ impl Hopr {
     pub async fn ticket_statistics(&self) -> errors::Result<TicketStatistics> {
         Ok(self.transport_api.ticket_statistics().await?)
     }
-    
+
     /// Reset the ticket metrics to zero
     pub async fn reset_ticket_statistics(&self) -> errors::Result<()> {
         Ok(self.db.reset_ticket_statistics().await?)
     }
-  
+
     // DB ============
     pub fn peer_resolver(&self) -> &impl HoprDbResolverOperations {
         &self.db
