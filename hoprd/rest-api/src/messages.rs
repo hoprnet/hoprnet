@@ -7,7 +7,7 @@ use axum::{
     response::IntoResponse,
     Error,
 };
-use futures::{sink::SinkExt, stream::StreamExt};
+use futures::{sink::SinkExt, stream::StreamExt, TryFutureExt};
 use futures_concurrency::stream::Merge;
 use serde::Deserialize;
 use serde_json::json;
@@ -143,44 +143,36 @@ pub(super) async fn send_message(
         .map(|enc| enc(&args.body))
         .unwrap_or_else(|| args.body.into_boxed_slice());
 
-    // TODO (jean): find a nice way to handle PeeroOrAddress fulfilling
-
     let options = if let Some(intermediate_path) = args.path {
-        let path_futures = intermediate_path
+        let peer_ids_future = intermediate_path
             .into_iter()
-            .map(|address| address.fulfill(hopr.peer_resolver()))
+            .map(|address| {
+                address.fulfill(hopr.peer_resolver()).and_then(|resolver| {
+                    futures::future::ready(
+                        resolver
+                            .peer_id
+                            .ok_or(ApiErrorStatus::UnknownFailure("cannot happen".into())),
+                    )
+                })
+            })
             .collect::<Vec<_>>();
 
-        let path = futures::future::try_join_all(path_futures).await.map_err(|e| {
-            (
-                StatusCode::UNPROCESSABLE_ENTITY, // TODO (jean): VERIFY THIS
-                ApiErrorStatus::UnknownFailure(format!("Failed to fulfill path: {e}")),
-            )
-                .into_response()
-        })?;
-
-        let peer_ids = path
-            .into_iter()
-            .map(|peer| {
-                peer.peer_id
-                    .ok_or("Peer ID not found. Should never happen here.".to_string())
-            })
-            .collect::<Result<Vec<_>, String>>()
-            .map_err(|e| {
+        let path = futures::future::try_join_all(peer_ids_future)
+            .await
+            .map_err(|e: ApiErrorStatus| {
                 (
-                    // TODO (jean): VERIFY THIS
                     StatusCode::UNPROCESSABLE_ENTITY,
-                    ApiErrorStatus::UnknownFailure(e),
+                    ApiErrorStatus::UnknownFailure(format!("Failed to fulfill path: {e}")),
                 )
                     .into_response()
             })?;
 
         RoutingOptions::IntermediatePath(
             // get a vec of peer ids from the intermediate path
-            peer_ids.try_into().map_err(|_| {
+            path.try_into().map_err(|_| {
                 (
                     StatusCode::UNPROCESSABLE_ENTITY,
-                    ApiErrorStatus::UnknownFailure("Invalid number of intermediate hops".into()),
+                    ApiErrorStatus::InvalidPath("Invalid number of hops".into()),
                 )
                     .into_response()
             })?,
@@ -189,7 +181,7 @@ pub(super) async fn send_message(
         RoutingOptions::Hops((hops as u8).try_into().map_err(|_| {
             (
                 StatusCode::UNPROCESSABLE_ENTITY,
-                ApiErrorStatus::UnknownFailure(format!(
+                ApiErrorStatus::InvalidPath(format!(
                     "Number of hops cannot be larger than {}",
                     RoutingOptions::MAX_INTERMEDIATE_HOPS
                 )),
@@ -199,7 +191,7 @@ pub(super) async fn send_message(
     } else {
         return Err((
             StatusCode::UNPROCESSABLE_ENTITY,
-            ApiErrorStatus::UnknownFailure("One of either hops or intermediate path must be specified".to_string()),
+            ApiErrorStatus::InvalidPath("One of either hops or intermediate path must be specified".into()),
         )
             .into_response());
     };
@@ -358,42 +350,29 @@ async fn handle_send_message(input: &str, state: Arc<InternalState>) -> Result<(
                 .unwrap_or_else(|| msg.body.into_boxed_slice());
 
             let options = if let Some(intermediate_path) = msg.path {
-                let path_futures = intermediate_path
+                let peer_ids_future = intermediate_path
                     .into_iter()
-                    .map(|address| address.fulfill(hopr.peer_resolver()))
+                    .map(|address| {
+                        address.fulfill(hopr.peer_resolver()).and_then(|resolver| {
+                            futures::future::ready(
+                                resolver
+                                    .peer_id
+                                    .ok_or(ApiErrorStatus::UnknownFailure("cannot happen".into())),
+                            )
+                        })
+                    })
                     .collect::<Vec<_>>();
 
-                let path = match futures::future::try_join_all(path_futures).await {
+                let path = match futures::future::try_join_all(peer_ids_future).await {
                     Ok(fullfilled_path) => fullfilled_path,
                     Err(e) => {
                         return Err(format!("failed to fulfill path: {e}"));
                     }
                 };
 
-                let peer_ids = if let Ok(peer_ids) = path
-                    .into_iter()
-                    .map(|peer| {
-                        peer.peer_id
-                            .ok_or("Peer ID not found. Should never happen here.".to_string())
-                    })
-                    .collect::<Result<Vec<_>, String>>()
-                    .map_err(|e| {
-                        (
-                            // TODO (jean): VERIFY THIS
-                            StatusCode::UNPROCESSABLE_ENTITY,
-                            ApiErrorStatus::UnknownFailure(e),
-                        )
-                            .into_response()
-                    }) {
-                    peer_ids
-                } else {
-                    return Err("failed to get peer ids from path".to_string());
-                };
-
                 RoutingOptions::IntermediatePath(
                     // get a vec of peer ids from the intermediate path
-                    peer_ids
-                        .try_into()
+                    path.try_into()
                         .map_err(|_| "Invalid number of intermediate hops".to_string())?,
                 )
             } else if let Some(hops) = msg.hops {

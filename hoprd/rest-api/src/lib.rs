@@ -353,6 +353,8 @@ enum ApiErrorStatus {
     InvalidQuality,
     AliasAlreadyExists,
     NotReady,
+    #[strum(serialize = "INVALID_PATH")]
+    InvalidPath(String),
     #[strum(serialize = "UNKNOWN_FAILURE")]
     UnknownFailure(String),
 }
