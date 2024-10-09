@@ -132,12 +132,12 @@ impl<S: SphinxSuite> MetaPacket<S> {
     /// Fixed length of the Sphinx packet header.
     pub const HEADER_LEN: usize = header_length::<S>(INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0);
 
-    /// Creates a new outgoing packet with given payload `msg`, `path` and `shared_keys` computed along the path.
+    /// Creates a new outgoing packet with the given payload `msg`, `path` and `shared_keys` computed along the path.
     ///
-    /// Size of the `msg` must be less or equal [PAYLOAD_SIZE], otherwise the
+    /// The size of the `msg` must be less or equal [PAYLOAD_SIZE], otherwise the
     /// constructor will panic. The caller **must** ensure the size is correct beforehand.
     /// The `additional_data_relayer` contain the PoR challenges for the individual relayers along the path,
-    /// each of the challenges have the same size of `additional_relayer_data_len`.
+    /// each of the challenges has the same size of `additional_relayer_data_len`.
     ///
     /// Optionally, there could be some additional data (`additional_data_last_hop`) for the packet destination.
     /// This is reserved for the future use by SURBs.
