@@ -320,6 +320,14 @@ class HoprdAPI:
         _, response = self.__call_api(TicketsApi, "show_ticket_statistics")
         return response
 
+    async def reset_tickets_statistics(self):
+        """
+        Resets the ticket statistics of the node.
+        :return: bool
+        """
+        status, _ = self.__call_api(TicketsApi, "reset_ticket_statistics")
+        return status
+
     async def send_message(self, destination: str, message: str, hops: list[str], tag: int = MESSAGE_TAG) -> bool:
         """
         Sends a message to the given destination.
@@ -342,6 +350,17 @@ class HoprdAPI:
 
         body = TagQueryRequest(tag=tag)
         _, response = self.__call_api(MessagesApi, "pop", body=body)
+        return response
+
+    async def messages_pop_all(self, tag: int = MESSAGE_TAG) -> dict:
+        """
+        Pop all messages from the inbox
+        :param: tag = 0x0320
+        :return: dict
+        """
+        body = GetMessageBodyRequest(tag=tag)
+
+        _, response = self.__call_api(MessagesApi, "pop_all", body=body)
         return response
 
     async def messages_peek(self, tag: int = MESSAGE_TAG) -> dict:
@@ -369,6 +388,16 @@ class HoprdAPI:
         _, response = self.__call_api(MessagesApi, "peek_all", body=body)
         return response
 
+    async def messages_pop_all(self, tag: int = MESSAGE_TAG) -> dict:
+        """
+        Pop all messages from the inbox
+        :param: tag = 0x0320
+        :return: dict
+        """
+        body = TagQueryRequest(tag=tag)
+        _, response = self.__call_api(MessagesApi, "pop_all", body=body)
+        return response
+
     async def tickets_redeem(self):
         """
         Redeems all tickets.
@@ -385,7 +414,9 @@ class HoprdAPI:
         _, response = self.__call_api(NetworkApi, "price")
         return int(response.price) if hasattr(response, "price") else None
 
-    async def session_client(self, destination: str, path: str, protocol: str, target: str, listen_on: str = "127.0.0.1:0", capabilities=None):
+    async def session_client(
+        self, destination: str, path: str, protocol: str, target: str, listen_on: str = "127.0.0.1:0", capabilities=None
+    ):
         """
         Returns the port of the client session.
         :param destination: Peer ID of the session exit node.
@@ -398,7 +429,9 @@ class HoprdAPI:
         if capabilities is None:
             body = SessionClientRequest(destination=destination, path=path, target=target, listen_host=listen_on)
         else:
-            body = SessionClientRequest(destination=destination, path=path, target=target, listen_host=listen_on, capabilities=capabilities)
+            body = SessionClientRequest(
+                destination=destination, path=path, target=target, listen_host=listen_on, capabilities=capabilities
+            )
 
         _, response = self.__call_api(SessionApi, "create_client", body=body, protocol=protocol)
         return int(response.port) if hasattr(response, "port") else None
@@ -411,7 +444,7 @@ class HoprdAPI:
         _, response = self.__call_api(SessionApi, "list_clients", protocol=protocol)
         return response
 
-    async def session_close_client(self, protocol: str, bound_port: int, bound_ip: str = '127.0.0.1'):
+    async def session_close_client(self, protocol: str, bound_port: int, bound_ip: str = "127.0.0.1"):
         """
         Closes a previously opened and bound session
         """
@@ -420,9 +453,9 @@ class HoprdAPI:
         status, _ = self.__call_api(SessionApi, "close_client", body=body, protocol=protocol)
         return status
 
-    async def ticket_winn_prob(self):
+    async def ticket_min_win_prob(self):
         """
-        Returns the ticket winning probability.
+        Returns the minimum incoming ticket winning probability.
         :return: probability: float
         """
         _, response = self.__call_api(NetworkApi, "probability")
@@ -440,34 +473,36 @@ class HoprdAPI:
         status, response = self.__call_api(AccountApi, "withdraw", body=body)
         return status, response
 
-    async def startedz(self):
+    async def metrics(self):
+        _, response = self.__call_api(NodeApi, "metrics")
+        return response
+
+    async def startedz(self, timeout: int = 20):
         """
         Checks if the node is started.
         """
-        return await is_url_returning_200(f"{self.configuration.host}/startedz")
+        return await is_url_returning_200(f"{self.configuration.host}/startedz", timeout)
 
-    async def readyz(self):
+    async def readyz(self, timeout: int = 20):
         """
         Checks if the node is ready to accept connections.
         """
-        return await is_url_returning_200(f"{self.configuration.host}/readyz")
+        return await is_url_returning_200(f"{self.configuration.host}/readyz", timeout)
 
 
-def query_url(url):
-    return requests.get(url, timeout=0.3)
-
-
-async def is_url_returning_200(url, timeout=20):
+async def is_url_returning_200(url, timeout):
     async def check_url():
-        while True:
+        ready = False
+
+        while not ready:
             try:
-                query_url(url)
-                break
+                ready = requests.get(url, timeout=0.3).status_code == 200
             except Exception:
                 await asyncio.sleep(0.2)
 
+        return ready
+
     try:
-        await asyncio.wait_for(check_url(), timeout=timeout)
-        return query_url(url).status_code == 200
+        return await asyncio.wait_for(check_url(), timeout=timeout)
     except Exception:
         return False

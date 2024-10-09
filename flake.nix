@@ -119,6 +119,7 @@
 
           hoprdBuildArgs = {
             inherit src depsSrc;
+            cargoExtraArgs = "-p hoprd-api";
             cargoToml = ./hoprd/hoprd/Cargo.toml;
           };
 

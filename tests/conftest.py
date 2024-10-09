@@ -4,11 +4,11 @@ import json
 import logging
 import os
 import random
+import re
 import shutil
-import socket
 from copy import deepcopy
 from pathlib import Path
-from subprocess import run
+from subprocess import PIPE, STDOUT, CalledProcessError, Popen, run
 
 import pytest
 
@@ -33,13 +33,15 @@ def pytest_addoption(parser: pytest.Parser):
         "--stress-sources",
         action="store",
         type=str,
-        help="The JSON string containing the list of dicts with 'url' and 'token' keys for each stress test source node",
+        help="""The JSON string containing the list of dicts with 'url' and 'token' keys for each 
+        stress test source node""",
     )
     parser.addoption(
         "--stress-target",
         action="store",
         type=str,
-        help="The JSON string containing the dict with 'url' and 'token' keys for the stressed target node",
+        help="""The JSON string containing the dict with 'url' and 'token' keys for the stressed
+        target node""",
     )
 
 
@@ -56,7 +58,6 @@ FIXTURES_PREFIX = "hopr"
 NODE_NAME_PREFIX = f"{FIXTURES_PREFIX}-node"
 
 NETWORK1 = "anvil-localhost"
-NETWORK2 = "anvil-localhost2"
 
 API_TOKEN = "e2e-API-token^^"
 PASSWORD = "e2e-test"
@@ -73,12 +74,30 @@ PASSWORD = "e2e-test"
 
 PWD = Path(__file__).parent
 
-def fixtures_dir(name: str): return Path(f"/tmp/hopr-smoke-test/{name}")
-def anvil_cfg_file(name: str): return Path(f"{fixtures_dir(name)}/anvil.cfg")
-def anvil_log_file(name: str): return Path(f"{fixtures_dir(name)}/anvil.log")
-def protocol_config_file(name: str): return Path(f"{fixtures_dir(name)}/protocol-config.json")
-def snapshot_dir(parent_dir: Path): return parent_dir.joinpath("snapshot")
-def anvil_state_file(parent_dir: Path): return parent_dir.joinpath("anvil.state.json")
+
+def fixtures_dir(name: str):
+    return Path(f"/tmp/hopr-smoke-test/{name}")
+
+
+def anvil_cfg_file(name: str):
+    return Path(f"{fixtures_dir(name)}/anvil.cfg")
+
+
+def anvil_log_file(name: str):
+    return Path(f"{fixtures_dir(name)}/anvil.log")
+
+
+def protocol_config_file(name: str):
+    return Path(f"{fixtures_dir(name)}/protocol-config.json")
+
+
+def snapshot_dir(parent_dir: Path):
+    return parent_dir.joinpath("snapshot")
+
+
+def anvil_state_file(parent_dir: Path):
+    return parent_dir.joinpath("anvil.state.json")
+
 
 INPUT_PROTOCOL_CONFIG_FILE = PWD.parent.joinpath("scripts/protocol-config-anvil.json")
 INPUT_DEPLOYMENTS_SUMMARY_FILE = PWD.parent.joinpath("ethereum/contracts/contracts-addresses.json")
@@ -124,15 +143,8 @@ NODES = {
         6,
         API_TOKEN,
         LOCALHOST,
-        NETWORK2,
-        "barebone.cfg.yaml",
-    ),
-    "7": Node(
-        7,
-        API_TOKEN,
-        "localhost",
         NETWORK1,
-        "barebone.cfg.yaml",
+        "barebone-lower-win-prob.cfg.yaml",
     ),
 }
 
@@ -152,24 +164,13 @@ def default_nodes():
     return ["5"]
 
 
-def nodes_with_different_network():
-    """Nodes with different network"""
-    return ["6", "7"]
+def nodes_with_lower_outgoing_win_prob():
+    """Nodes with outgoing ticket winning probability"""
+    return ["6"]
 
 
 def random_distinct_pairs_from(values: list, count: int):
     return random.sample([(left, right) for left, right in itertools.product(values, repeat=2) if left != right], count)
-
-
-def check_socket(address: str, port: str):
-    s = socket.socket()
-    try:
-        s.connect((address, port))
-        return True
-    except Exception:
-        return False
-    finally:
-        s.close()
 
 
 def mirror_contract_data(dest_file_path: Path, src_file_path: Path, src_network: str, dest_network: str):
@@ -197,9 +198,10 @@ def cleanup_data(parent_dir: Path):
     for f in parent_dir.glob(f"{NODE_NAME_PREFIX}_*"):
         if not f.is_dir():
             continue
-        logging.info(f"Remove db in {f}")
+        logging.debug(f"Remove db in {f}")
         shutil.rmtree(f, ignore_errors=True)
     logging.info(f"Removed all dbs in {parent_dir}")
+
 
 def copy_identities(dir: Path):
     # Remove old identities
@@ -239,6 +241,9 @@ def snapshot_reuse(parent_dir: Path, nodes):
         parent_dir.joinpath(f.name).unlink(missing_ok=True)
         shutil.copy(f, parent_dir)
 
+    # copy protocol-config.json
+    shutil.copy(sdir.joinpath("protocol-config.json"), parent_dir)
+
     # copy node data
     for i in range(len(nodes)):
         node_target_dir = parent_dir.joinpath(f"{NODE_NAME_PREFIX}_{i+1}/db/")
@@ -253,6 +258,7 @@ def snapshot_reuse(parent_dir: Path, nodes):
 
         parent_dir.joinpath(f"{NODE_NAME_PREFIX}_{i+1}.env").unlink(missing_ok=True)
         shutil.copy(sdir.joinpath(f"{NODE_NAME_PREFIX}_{i+1}.env"), parent_dir)
+
 
 def snapshot_create(anvil_port, parent_dir: Path, nodes):
     sdir = snapshot_dir(parent_dir)
@@ -274,6 +280,9 @@ def snapshot_create(anvil_port, parent_dir: Path, nodes):
     for f in parent_dir.glob("*.cfg.yaml"):
         shutil.copy(f, sdir)
 
+    # copy protocol config file
+    shutil.copy(parent_dir.joinpath("protocol-config.json"), sdir)
+
     # copy node data and env files
     for i in range(len(nodes)):
         node_dir = parent_dir.joinpath(f"{NODE_NAME_PREFIX}_{i+1}")
@@ -293,15 +302,23 @@ def snapshot_usable(parent_dir: Path, nodes):
         "anvil.state.json",
         "barebone.cfg.yaml",
         "default.cfg.yaml",
+        "protocol-config.json",
     ]
     for i in range(len(nodes)):
-        node_dir = parent_dir.joinpath(f"{NODE_NAME_PREFIX}_{i+1}")
+        node_dir = f"{NODE_NAME_PREFIX}_{i+1}"
         expected_files.append(f"{node_dir}/db/hopr_index.db")
         expected_files.append(f"{node_dir}/db/hopr_index.db-shm")
         expected_files.append(f"{node_dir}/db/hopr_index.db-wal")
         expected_files.append(f"{node_dir}.env")
 
-    return all([sdir.joinpath(f).exists() for f in expected_files])
+    for f in expected_files:
+        file_path = sdir.joinpath(f)
+        if not file_path.exists():
+            logging.info(f"Cannot find {file_path} in snapshot")
+            return False
+
+    return True
+
 
 def fund_nodes(test_suite_name, test_dir: Path, anvil_port):
     private_key = load_private_key(test_suite_name)
@@ -336,61 +353,90 @@ def fund_nodes(test_suite_name, test_dir: Path, anvil_port):
         capture_output=True,
     )
 
-async def shared_nodes_bringup(test_suite_name: str, test_dir: Path, anvil_port,
-                               nodes, skip_funding=False):
+
+async def all_peers_connected(node: Node, required_peers):
+    ready = False
+
+    while not ready:
+        peers = [p["peer_id"] for p in await asyncio.wait_for(node.api.peers(), timeout=20)]
+        missing_peers = [p for p in required_peers if p not in peers]
+        ready = len(missing_peers) == 0
+
+        if not ready:
+            await asyncio.sleep(1)
+
+    return ready
+
+
+async def shared_nodes_bringup(
+    test_suite_name: str, test_dir: Path, anvil_port, nodes: dict[str, Node], skip_funding=False
+):
+    logging.info("Setting up nodes with protocol config files")
     for node in nodes.values():
-        logging.info(f"Setting up {node}")
+        logging.debug(f"Setting up {node}")
         node.setup(PASSWORD, protocol_config_file(test_suite_name), PWD.parent)
 
     # WAIT FOR NODES TO BE UP
-    logging.info(f"Wait for {len(nodes)} nodes to start up")
+    timeout = 60
+    logging.info(f"Waiting up to {timeout}s for nodes to start up")
+    nodes_readyness = await asyncio.gather(*[node.api.startedz(timeout) for node in nodes.values()])
+    for node, res in zip(nodes.values(), nodes_readyness):
+        if res:
+            logging.debug(f"Node {node} up")
+        else:
+            logging.error(f"Node {node} not ready after {timeout} seconds")
 
-    # minimal wait to ensure api is ready for `startedz` call.
-    for id, node in nodes.items():
-        await asyncio.wait_for(node.api.startedz(), timeout=60)
-        logging.info(f"Node {id} is up")
+    if not all(nodes_readyness):
+        logging.critical("Not all nodes are started, interrupting setup")
+        raise RuntimeError
 
     if not skip_funding:
-      # FUND NODES
-      logging.info("Funding nodes")
-      fund_nodes(test_suite_name, test_dir, anvil_port)
+        # FUND NODES
+        logging.info("Funding nodes")
+        fund_nodes(test_suite_name, test_dir, anvil_port)
 
     # WAIT FOR NODES TO BE UP
-    logging.info("Node setup finished, waiting for nodes to be ready")
-    for node in nodes.values():
-        while not await asyncio.wait_for(node.api.readyz(), timeout=60):
-            logging.info(f"Node {node} not ready yet, retrying")
-            await asyncio.sleep(1)
+    timeout = 60
+    logging.info(f"Waiting up to {timeout}s for nodes to be ready")
+    nodes_readyness = await asyncio.gather(*[node.api.readyz(timeout) for node in nodes.values()])
+    for node, res in zip(nodes.values(), nodes_readyness):
+        if res:
+            logging.debug(f"Node {node} up")
+        else:
+            logging.error(f"Node {node} not ready after {timeout} seconds")
 
-        addresses = await node.api.addresses()
-        node.peer_id = addresses["hopr"]
-        node.address = addresses["native"]
-        logging.info(f"Node {node} is ready")
+    if not all(nodes_readyness):
+        logging.critical("Not all nodes are ready, interrupting setup")
+        raise RuntimeError
+
+    for node in nodes.values():
+        if addresses := await node.api.addresses():
+            node.peer_id = addresses["hopr"]
+            node.address = addresses["native"]
+        else:
+            logging.error(f"Node {node} did not return addresses")
 
     # WAIT FOR NODES TO CONNECT TO ALL PEERS
-    logging.info("Waiting for nodes to connect to all peers")
+    timeout = 60
+    logging.info(f"Waiting up to {timeout}s for nodes to connect to all peers")
+
+    tasks = []
     for node in nodes.values():
+        required_peers = [n.peer_id for n in nodes.values() if n != node and n.network == node.network]
+        tasks.append(asyncio.create_task(all_peers_connected(node, required_peers)))
+    nodes_connectivity = await asyncio.gather(*tasks)
+    for node, res in zip(nodes.values(), nodes_connectivity):
+        if res:
+            logging.debug(f"Node {node} connected to all peers")
+        else:
+            logging.error(f"Node {node} did not connect to all peers")
 
-        def is_same_node(a, b):
-            return a.peer_id == b.peer_id
+    if not all(nodes_connectivity):
+        logging.critical("Not all nodes are connected to all peers, interrupting setup")
+        raise RuntimeError
 
-        def is_in_same_network(a, b):
-            return a.network == b.network
 
-        required_peers = [
-            n.peer_id for n in nodes.values() if not is_same_node(n, node) and is_in_same_network(n, node)
-        ]
-
-        async def all_peers_connected():
-            peers = [p["peer_id"] for p in await asyncio.wait_for(node.api.peers(), timeout=60)]
-            missing_peers = [p for p in required_peers if p not in peers]
-            return len(missing_peers) == 0
-
-        while not await all_peers_connected():
-            logging.info(f"Node {node} does not have all peers connected yet, retrying")
-            await asyncio.sleep(1)
-
-def load_private_key(test_suite_name, pos = 0):
+def load_private_key(test_suite_name, pos=0):
     with open(anvil_cfg_file(test_suite_name), "r") as file:
         data: dict = json.load(file)
         return data.get("private_keys", [""])[pos]
@@ -403,10 +449,11 @@ def event_loop():
     yield loop
     loop.close()
 
+
 @pytest.fixture(scope="module")
 async def paths(request):
     test_suite = request.module
-    test_suite_name = test_suite.__name__.split('.')[-1]
+    test_suite_name = test_suite.__name__.split(".")[-1]
 
     paths = {
         anvil_cfg_file: anvil_cfg_file(test_suite_name),
@@ -414,13 +461,14 @@ async def paths(request):
 
     yield paths
 
+
 @pytest.fixture(scope="module")
 async def swarm7(request):
     logging.info(f"Using the random seed: {SEED}")
 
     # PREPARE TEST SUITE ENVIRONMENT
     test_suite = request.module
-    test_suite_name = test_suite.__name__.split('.')[-1]
+    test_suite_name = test_suite.__name__.split(".")[-1]
     if test_suite.PORT_BASE is None:
         raise ValueError("PORT_BASE must be set in the test suite")
     test_dir = fixtures_dir(test_suite_name)
@@ -446,25 +494,28 @@ async def swarm7(request):
         # START NEW LOCAL ANVIL SERVER
         logging.info("Starting and waiting for local anvil server to be up (dump state enabled)")
         run(
-            f"./run-local-anvil.sh -l {anvil_log_file(test_suite_name)} -c {anvil_cfg_file(test_suite_name)} -p {anvil_port} -ds {anvil_state_file(test_dir)}"
-            .split(),
+            f"""
+            ./run-local-anvil.sh 
+            -l {anvil_log_file(test_suite_name)} 
+            -c {anvil_cfg_file(test_suite_name)} 
+            -p {anvil_port} 
+            -ds {anvil_state_file(test_dir)}
+            """.split(),
             check=True,
             capture_output=True,
             cwd=PWD.parent.joinpath("scripts"),
         )
 
         logging.info("Mirror contract data because of anvil-deploy node only writing to localhost")
-
         shutil.copy(INPUT_PROTOCOL_CONFIG_FILE, protocol_config_file(test_suite_name))
         mirror_contract_data(protocol_config_file(test_suite_name), INPUT_DEPLOYMENTS_SUMMARY_FILE, NETWORK1, NETWORK1)
-        mirror_contract_data(protocol_config_file(test_suite_name), INPUT_DEPLOYMENTS_SUMMARY_FILE, NETWORK1, NETWORK2)
 
         # SETUP NODES USING STORED IDENTITIES
-        logging.info("Reuse pre-generated identities and configs")
+        logging.info("Using pre-generated identities and configs")
         copy_identities(test_dir)
 
         # CREATE LOCAL SAFES AND MODULES FOR ALL THE IDS
-        logging.info("Create safe and modules for all the ids, store them in args files")
+        logging.info("Creating safe and modules for all the ids, store them in args files")
 
         private_key = load_private_key(test_suite_name)
 
@@ -477,7 +528,7 @@ async def swarm7(request):
         }
 
         for node in nodes.values():
-            logging.info(f"Creating safe and module for {node}")
+            logging.debug(f"Creating safe and module for {node}")
             assert node.create_local_safe(safe_custom_env)
 
         # wait before contract deployments are finalized
@@ -488,20 +539,27 @@ async def swarm7(request):
 
         logging.info("Taking snapshot")
         snapshot_create(anvil_port, test_dir, nodes)
-
-    logging.info("Re-using snapshot")
-    snapshot_reuse(test_dir, nodes)
+    else:
+        logging.info("Re-using snapshot")
+        snapshot_reuse(test_dir, nodes)
 
     logging.info("Starting and waiting for local anvil server to be up (load state enabled)")
+
     run(
-        f"./run-local-anvil.sh -s -l {anvil_log_file(test_suite_name)} -c {anvil_cfg_file(test_suite_name)} -p {anvil_port} -ls {anvil_state_file(test_dir)}".split(),
+        f"""./run-local-anvil.sh 
+        -s
+        -l {anvil_log_file(test_suite_name)} 
+        -c {anvil_cfg_file(test_suite_name)} 
+        -p {anvil_port} 
+        -ls {anvil_state_file(test_dir)}
+        """.split(),
         check=True,
         capture_output=True,
         cwd=PWD.parent.joinpath("scripts"),
     )
 
     # SETUP NODES USING STORED IDENTITIES
-    logging.info("Reuse pre-generated identities and configs")
+    logging.info("Using pre-generated identities and configs")
     copy_identities(test_dir)
     for node in nodes.values():
         node.load_addresses()
@@ -510,7 +568,7 @@ async def swarm7(request):
     await shared_nodes_bringup(test_suite_name, test_dir, anvil_port, nodes, skip_funding=True)
 
     # YIELD NODES
-    logging.info("Nodes all ready, starting test")
+    logging.info("All nodes ready, starting tests")
     yield nodes
 
     # POST TEST CLEANUP
@@ -519,5 +577,33 @@ async def swarm7(request):
     run(["make", "kill-anvil", f"port={anvil_port}"], cwd=PWD.parent, check=True)
 
 
+@pytest.fixture(autouse=True)
+async def teardown(swarm7: dict[str, Node]):
+    yield
+
+    try:
+        await asyncio.gather(*[node.api.reset_tickets_statistics() for node in swarm7.values()])
+    except Exception as e:
+        logging.error(f"Error resetting tickets statistics in teardown: {e}")
+
+    try:
+        await asyncio.gather(*[node.api.messages_pop_all(None) for node in swarm7.values()])
+    except Exception as e:
+        logging.error(f"Error popping all messages in teardown: {e}")
+
+
 def to_ws_url(host, port):
     return f"ws://{host}:{port}/api/v3/messages/websocket"
+
+
+def run_hopli_cmd(cmd: list[str], custom_env):
+    env = os.environ | custom_env
+    proc = Popen(cmd, env=env, stdout=PIPE, stderr=STDOUT, bufsize=0)
+    # filter out ansi color codes
+    color_regex = re.compile(r"\x1b\[\d{,3}m")
+    with proc.stdout:
+        for line in iter(proc.stdout.readline, b""):
+            logging.info("[Hopli] %r", color_regex.sub("", line.decode("utf-8")[:-1]))
+    retcode = proc.wait()
+    if retcode:
+        raise CalledProcessError(retcode, cmd)

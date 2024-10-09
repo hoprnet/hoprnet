@@ -1,11 +1,11 @@
 import asyncio
-from contextlib import AsyncExitStack
 import json
+import logging
 import os
 import random
 import time
+from contextlib import AsyncExitStack
 
-import logging
 import pytest
 import websockets
 
@@ -13,7 +13,6 @@ from .conftest import TICKET_PRICE_PER_HOP, to_ws_url
 from .hopr import HoprdAPI
 from .node import Node
 from .test_integration import create_channel
-
 
 logging.basicConfig(format="%(asctime)s %(message)s")
 
@@ -92,7 +91,8 @@ async def test_stress_relayed_flood_test_with_sources_performing_1_hop_to_self(s
             ) as socket:
                 tag = random.randint(30000, 60000)
                 packets = [
-                    f"1 hop stress msg to self ({host}:{port}) through {target_peer_id} #{i+1:08d}/{STRESS_1_HOP_TO_SELF_MESSAGE_COUNT:08d}"
+                    f"1 hop stress msg to self ({host}:{port}) through {target_peer_id} "
+                    + f"#{i+1:08d}/{STRESS_1_HOP_TO_SELF_MESSAGE_COUNT:08d}"
                     for i in range(STRESS_1_HOP_TO_SELF_MESSAGE_COUNT)
                 ]
 
@@ -100,7 +100,10 @@ async def test_stress_relayed_flood_test_with_sources_performing_1_hop_to_self(s
 
                 for packet in packets:
                     msg = {
-                        "body": packet, "peerId": self_peer_id, "path": [target_peer_id], "tag": tag,
+                        "body": packet,
+                        "peerId": self_peer_id,
+                        "path": [target_peer_id],
+                        "tag": tag,
                     }
                     await socket.send(json.dumps(msg))
 
@@ -117,9 +120,10 @@ async def test_stress_relayed_flood_test_with_sources_performing_1_hop_to_self(s
                 end_time = time.time()
 
                 logging.info(
-                    f"The websocket stress test ran at {STRESS_1_HOP_TO_SELF_MESSAGE_COUNT/(end_time - start_time)} packets/s/node"
+                    "The websocket stress test ran at "
+                    + f"{STRESS_1_HOP_TO_SELF_MESSAGE_COUNT/(end_time - start_time)} packets/s/node"
                 )
-                
+
                 recv_packets.sort()
                 assert recv_packets == packets
 
