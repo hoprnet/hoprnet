@@ -8,6 +8,9 @@ use std::sync::Arc;
 use crate::{ApiErrorStatus, InternalState, BASE_PATH};
 
 #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
+#[schema(example = json!({
+    "price": "30000000000000000"
+}))]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct TicketPriceResponse {
     /// Price of the ticket in HOPR tokens.
@@ -50,6 +53,9 @@ pub(super) async fn price(State(state): State<Arc<InternalState>>) -> impl IntoR
 }
 
 #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
+#[schema(example = json!({
+    "probability": 0.5
+}))]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct TicketProbabilityResponse {
     /// Winning probability of a ticket.

@@ -62,6 +62,9 @@ pub(super) async fn configuration(State(state): State<Arc<InternalState>>) -> im
 }
 
 #[derive(Debug, Clone, Deserialize, utoipa::ToSchema, utoipa::IntoParams)]
+#[schema(example = json!({
+        "quality": 0.7
+    }))]
 #[into_params(parameter_in = Query)]
 pub(crate) struct NodePeersQueryRequest {
     #[schema(required = false)]
@@ -70,6 +73,10 @@ pub(crate) struct NodePeersQueryRequest {
 }
 
 #[derive(Debug, Default, Clone, Serialize, utoipa::ToSchema)]
+#[schema(example = json!({
+    "sent": 10,
+    "success": 10
+}))]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct HeartbeatInfo {
     sent: u64,
@@ -100,6 +107,11 @@ pub(crate) struct PeerInfo {
 
 #[serde_as]
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
+#[schema(example = json!({
+    "peerId": "12D3KooWRWeaTozREYHzWTbuCYskdYhED1MXpDwTrmccwzFrd2mEA",
+    "peerAddress": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
+    "multiaddr": "/ip4/178.12.1.9/tcp/19092"
+}))]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct AnnouncedPeer {
     #[serde_as(as = "DisplayFromStr")]

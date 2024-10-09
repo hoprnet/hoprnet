@@ -121,9 +121,9 @@ pub(super) async fn show_all_tickets() -> impl IntoResponse {
 #[schema(example = json!({
         "winning_count": 0,
         "neglectedValue": "0",
-        "redeemedValue": "100",
+        "redeemedValue": "1000000000000000000",
         "rejectedValue": "0",
-        "unredeemedValue": "200",
+        "unredeemedValue": "2000000000000000",
     }))]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct NodeTicketStatisticsResponse {
