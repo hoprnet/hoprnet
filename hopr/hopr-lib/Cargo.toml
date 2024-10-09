@@ -15,6 +15,7 @@ crate-type = ["rlib"]
 default = []
 session-client = []
 session-server = []
+transport-quic = ["hopr-transport/transport-quic"]
 runtime-async-std = [
   "chain-api/runtime-async-std",
   "chain-rpc/runtime-async-std",
