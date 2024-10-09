@@ -1,8 +1,11 @@
+use crate::{ApiErrorStatus, InternalState, BASE_PATH};
 use axum::{
     extract::{Json, Path, State},
     http::status::StatusCode,
     response::IntoResponse,
 };
+use hoprd_db_api::aliases::HoprdDbAliasesOperations;
+use hoprd_db_api::errors::DbError;
 use libp2p_identity::PeerId;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
@@ -19,7 +22,7 @@ use crate::{types::PeerOrAddress, ApiErrorStatus, InternalState, BASE_PATH};
 pub(crate) struct PeerIdResponse {
     #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String)]
-    pub peer_id: PeerId,
+    pub peer_id: String,
 }
 
 #[serde_as]
@@ -36,7 +39,7 @@ pub(crate) struct AliasDestinationBodyRequest {
     pub destination: PeerOrAddress,
 }
 
-/// Get each previously set alias and its corresponding PeerId.
+/// (deprecated, will be removed in v3.0) Get each previously set alias and its corresponding PeerId.
 #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/aliases"),
@@ -45,7 +48,8 @@ pub(crate) struct AliasDestinationBodyRequest {
                     "alice": "12D3KooWPWD5P5ZzMRDckgfVaicY5JNoo7JywGotoAv17d7iKx1z",
                     "me": "12D3KooWJmLm8FnBfvYQ5BAZ5qcYBxQFFBzAAEYUBUNJNE8cRsYS"
             })),
-            (status = 401, description = "Invalid authorization token.", body = ApiError)
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
+            (status = 404, description = "No aliases found", body = ApiError),
         ),
         security(
             ("api_token" = []),
@@ -54,19 +58,22 @@ pub(crate) struct AliasDestinationBodyRequest {
         tag = "Alias",
     )]
 pub(super) async fn aliases(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
-    let aliases = state.aliases.clone();
+    let aliases = state.hoprd_db.get_aliases().await;
 
-    let aliases = aliases
-        .read()
-        .await
-        .iter()
-        .map(|(key, value)| (key.clone(), value.to_string()))
-        .collect::<HashMap<String, String>>();
-
-    (StatusCode::OK, Json(aliases)).into_response()
+    match aliases {
+        Ok(aliases) => {
+            let aliases = aliases
+                .iter()
+                .map(|alias| (alias.alias.clone(), alias.peer_id.clone()))
+                .collect::<HashMap<_, _>>();
+            (StatusCode::OK, Json(aliases)).into_response()
+        }
+        Err(DbError::BackendError(_)) => (StatusCode::NOT_FOUND, ApiErrorStatus::AliasNotFound).into_response(),
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, ApiErrorStatus::DatabaseError).into_response(),
+    }
 }
 
-/// Set alias for a peer with a specific PeerId.
+/// (deprecated, will be removed in v3.0) Set alias for a peer with a specific PeerId.
 #[utoipa::path(
         post,
         path = const_format::formatcp!("{BASE_PATH}/aliases"),
@@ -91,7 +98,6 @@ pub(super) async fn set_alias(
     State(state): State<Arc<InternalState>>,
     Json(args): Json<AliasDestinationBodyRequest>,
 ) -> impl IntoResponse {
-    let aliases = state.aliases.clone();
     let hopr = state.hopr.clone();
 
     let destination = args.destination.fulfill(hopr.peer_resolver()).await;
@@ -104,10 +110,16 @@ pub(super) async fn set_alias(
         Err(e) => return (StatusCode::NOT_FOUND, e).into_response(),
     };
 
-    let inserted = aliases.write().await.insert_no_overwrite(args.alias, peer_id);
-    match inserted {
-        Ok(_) => (StatusCode::CREATED, Json(PeerIdResponse { peer_id })).into_response(),
-        Err(_) => (StatusCode::CONFLICT, ApiErrorStatus::AliasAlreadyExists).into_response(),
+    match state.hoprd_db.set_alias(args.peer_id.to_string(), args.alias).await {
+        Ok(()) => (
+            StatusCode::CREATED,
+            Json(PeerIdResponse {
+                peer_id: args.peer_id.to_string(),
+            }),
+        )
+            .into_response(),
+        Err(DbError::LogicalError(_)) => (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidPeerId).into_response(),
+        Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
     }
 }
 
@@ -116,7 +128,7 @@ pub(crate) struct GetAliasParams {
     alias: String,
 }
 
-/// Get alias for the PeerId (Hopr address) that have this alias assigned to it.
+/// (deprecated, will be removed in v3.0) Get alias for the PeerId (Hopr address) that have this alias assigned to it.
 #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/aliases/{{alias}}"),
@@ -138,13 +150,18 @@ pub(super) async fn get_alias(
     Path(GetAliasParams { alias }): Path<GetAliasParams>,
     State(state): State<Arc<InternalState>>,
 ) -> impl IntoResponse {
-    let aliases = state.aliases.clone();
+    let alias = urlencoding::decode(&alias);
 
-    let aliases = aliases.read().await;
-    if let Some(peer_id) = aliases.get_by_left(&alias) {
-        (StatusCode::OK, Json(PeerIdResponse { peer_id: *peer_id })).into_response()
-    } else {
-        (StatusCode::NOT_FOUND, ApiErrorStatus::InvalidInput).into_response()
+    if alias.is_err() {
+        return (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidInput).into_response();
+    }
+
+    let alias = alias.unwrap().into_owned();
+
+    match state.hoprd_db.resolve_alias(alias.clone()).await {
+        Ok(Some(entry)) => (StatusCode::OK, Json(PeerIdResponse { peer_id: entry })).into_response(),
+        Ok(None) => (StatusCode::NOT_FOUND, ApiErrorStatus::AliasNotFound).into_response(),
+        Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
     }
 }
 
@@ -153,7 +170,7 @@ pub(crate) struct DeleteAliasParams {
     alias: String,
 }
 
-/// Delete an alias.
+/// (deprecated, will be removed in v3.0) Delete an alias.
 #[utoipa::path(
         delete,
         path = const_format::formatcp!("{BASE_PATH}/aliases/{{alias}}"),
@@ -175,9 +192,38 @@ pub(super) async fn delete_alias(
     Path(DeleteAliasParams { alias }): Path<DeleteAliasParams>,
     State(state): State<Arc<InternalState>>,
 ) -> impl IntoResponse {
-    let aliases = state.aliases.clone();
+    let alias = urlencoding::decode(&alias);
 
-    let _ = aliases.write().await.remove_by_left(&alias);
+    if alias.is_err() {
+        return (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidInput).into_response();
+    }
 
-    (StatusCode::NO_CONTENT, "").into_response()
+    let alias = alias.unwrap().into_owned();
+
+    match state.hoprd_db.delete_alias(alias.clone()).await {
+        Ok(_) => (StatusCode::NO_CONTENT,).into_response(),
+        Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
+    }
+}
+
+/// (deprecated, will be removed in v3.0) Clear all aliases.
+#[utoipa::path(
+        delete,
+        path = const_format::formatcp!("{BASE_PATH}/aliases"),
+        responses(
+            (status = 204, description = "All aliases removed successfully"),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
+            (status = 422, description = "Unknown failure", body = ApiError)   // This can never happen
+        ),
+        security(
+            ("api_token" = []),
+            ("bearer_token" = [])
+        ),
+        tag = "Alias",
+    )]
+pub(super) async fn clear_aliases(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
+    match state.hoprd_db.clear_aliases().await {
+        Ok(_) => (StatusCode::NO_CONTENT,).into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, ApiErrorStatus::from(e)).into_response(),
+    }
 }

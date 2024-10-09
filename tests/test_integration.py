@@ -23,6 +23,7 @@ from .utils import (
     PARAMETERIZED_SAMPLE_SIZE,
     balance_str_to_int,
     check_all_tickets_redeemed,
+    check_min_incoming_win_prob_eq,
     check_native_balance_below,
     check_received_packets_with_peek,
     check_rejected_tickets_value,
@@ -92,15 +93,13 @@ async def test_hoprd_node_should_be_able_to_alias_other_peers_with_peer_id(peer:
     my_peer_id = swarm7[peer].peer_id
     assert alice_peer_id != my_peer_id
 
-    assert await swarm7[peer].api.aliases_get_alias("me") == my_peer_id
-
-    assert await swarm7[peer].api.aliases_get_alias("Alice") is None
     assert await swarm7[peer].api.aliases_set_alias("Alice", alice_peer_id) is True
 
     assert await swarm7[peer].api.aliases_get_alias("Alice") == alice_peer_id
-    assert await swarm7[peer].api.aliases_set_alias("Alice", alice_peer_id) is False
+    assert await swarm7[peer].api.aliases_set_alias("Alice New", alice_peer_id) is True
 
-    assert await swarm7[peer].api.aliases_remove_alias("Alice")
+    assert await swarm7[peer].api.aliases_remove_alias("Alice New") is True
+    assert await swarm7[peer].api.aliases_get_alias("Alice New") is None
     assert await swarm7[peer].api.aliases_get_alias("Alice") is None
 
 
@@ -220,6 +219,32 @@ async def test_hoprd_api_channel_should_register_fund_increase_using_fund_endpoi
         ) == balance_str_to_int(hopr_amount)
 
         await asyncio.wait_for(check_native_balance_below(swarm7[src], balance_str_to_int(balance_before.native)), 20.0)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("src,dest", [tuple(shuffled(barebone_nodes())[:2]) for _ in range(PARAMETERIZED_SAMPLE_SIZE)])
+async def test_reset_ticket_statistics_from_metrics(src: Node, dest: Node, swarm7: dict[str, Node]):
+    def count_metrics(metrics: str):
+        types = ["neglected", "redeemed", "rejected"]
+        count = 0
+        for line in metrics.split("\\n"):
+            count += (
+                line.startswith("hopr_tickets_incoming_statistics")
+                and any(t in line for t in types)
+                and line.split(" ")[-1] != "0"
+            )
+        return count
+
+    async with create_channel(swarm7[src], swarm7[dest], funding=TICKET_PRICE_PER_HOP, close_from_dest=False):
+        await send_and_receive_packets_with_pop(
+            ["1 hop message to self"], src=swarm7[src], dest=swarm7[src], path=[swarm7[dest].peer_id]
+        )
+
+    assert count_metrics(await swarm7[dest].api.metrics()) != 0
+
+    await swarm7[dest].api.reset_tickets_statistics()
+
+    assert count_metrics(await swarm7[dest].api.metrics()) == 0
 
 
 @pytest.mark.asyncio

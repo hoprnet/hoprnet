@@ -563,6 +563,41 @@ impl HoprDbTicketOperations for HoprDb {
         Ok(res?)
     }
 
+    async fn reset_ticket_statistics(&self) -> Result<()> {
+        let res = self
+            .nest_transaction_in_db(None, TargetDb::Tickets)
+            .await?
+            .perform(|tx| {
+                Box::pin(async move {
+                    #[cfg(all(feature = "prometheus", not(test)))]
+                    let rows = ticket_statistics::Entity::find().all(tx.as_ref()).await?;
+
+                    // delete statistics for the found rows
+                    let deleted = ticket_statistics::Entity::delete_many().exec(tx.as_ref()).await?;
+
+                    #[cfg(all(feature = "prometheus", not(test)))]
+                    {
+                        if deleted.rows_affected > 0 {
+                            for row in rows {
+                                METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(&[&row.channel_id, "neglected"], 0.0_f64);
+
+                                METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(&[&row.channel_id, "redeemed"], 0.0_f64);
+
+                                METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(&[&row.channel_id, "rejected"], 0.0_f64);
+                            }
+                        }
+                    }
+
+                    debug!("reset ticket statistics for {:} channel(s)", deleted.rows_affected);
+
+                    Ok::<_, DbSqlError>(())
+                })
+            })
+            .await;
+
+        Ok(res?)
+    }
+
     async fn get_tickets_value(&self, selector: TicketSelector) -> Result<(usize, Balance)> {
         self.get_tickets_value_int(None, selector).await
     }
@@ -3231,6 +3266,27 @@ mod tests {
         db.aggregate_tickets(*ALICE_OFFCHAIN.public(), tickets.clone(), &BOB)
             .await
             .expect_err("should not aggregate non-winning tickets");
+
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn test_set_ticket_statistics_when_tickets_are_in_db() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ALICE.clone()).await?;
+
+        let ticket = init_db_with_tickets(&db, 1).await?.1.pop().unwrap();
+
+        db.mark_tickets_as((&ticket).into(), TicketMarker::Redeemed)
+            .await
+            .expect("must not fail");
+
+        let stats = db.get_ticket_statistics(None).await.expect("must not fail");
+        assert_ne!(stats.redeemed_value, BalanceType::HOPR.zero());
+
+        db.reset_ticket_statistics().await.expect("must not fail");
+
+        let stats = db.get_ticket_statistics(None).await.expect("must not fail");
+        assert_eq!(stats.redeemed_value, BalanceType::HOPR.zero());
 
         Ok(())
     }

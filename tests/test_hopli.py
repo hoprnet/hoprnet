@@ -485,19 +485,18 @@ async def test_hopli_should_be_able_to_create_safe_module(swarm7: dict[str, Node
     # read the identity
     new_node = read_identity(extra_prefix, PASSWORD)
 
-    # create safe and module for
-    new_safe_module = create_safe_module(extra_prefix, private_key, manager_private_key)
-    _ = run_cast_cmd("balance", [new_node])
-    _ = run_cast_cmd("code", [new_safe_module[0]])
-    _ = run_cast_cmd("code", [new_safe_module[1]])
+    # create safe and module
+    safe_address, module_address = create_safe_module(extra_prefix, private_key, manager_private_key)
+    run_cast_cmd("balance", [new_node])
+    run_cast_cmd("code", [safe_address])
+    run_cast_cmd("code", [module_address])
 
     # Check the node node is registered with the new safe
     res_check_created_safe_registration = run_cast_cmd(
         "call", [network_registry_contract_1, "nodeRegisterdToAccount(address)(address)", new_node]
     )
-    new_safe_module_address = new_safe_module[0].lower()
     res_registration = res_check_created_safe_registration.stdout.decode("utf-8").split("\n")[0].lower()
-    assert res_registration == new_safe_module_address
+    assert res_registration == safe_address.lower()
 
     # Remove the created identity
     run(["rm", "-f", test_dir.joinpath(f"{FIXTURES_PREFIX_NEW}{extra_prefix}0.id")], check=True, capture_output=True)
