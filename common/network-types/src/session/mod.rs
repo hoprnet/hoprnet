@@ -24,3 +24,5 @@ pub mod state;
 mod utils;
 
 pub use frame::{Frame, FrameId, FrameInfo, FrameReassembler, Segment, SegmentId};
+
+pub use utils::{FaultyNetwork, FaultyNetworkConfig};

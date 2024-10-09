@@ -848,14 +848,14 @@ impl<const C: usize> SessionSocket<C> {
 
 impl<const C: usize> AsyncWrite for SessionSocket<C> {
     fn poll_write(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
+        let len_to_write = Self::MAX_WRITE_SIZE.min(buf.len());
         tracing::trace!(
             session_id = self.state.session_id(),
-            "polling write of {} bytes on socket reader inside session",
-            buf.len()
+            "polling write of {len_to_write} bytes on socket reader inside session",
         );
-        let mut socket_future = self.state.send_frame_data(buf).boxed();
+        let mut socket_future = self.state.send_frame_data(&buf[..len_to_write]).boxed();
         match Pin::new(&mut socket_future).poll(cx) {
-            Poll::Ready(Ok(())) => Poll::Ready(Ok(buf.len())),
+            Poll::Ready(Ok(())) => Poll::Ready(Ok(len_to_write)),
             Poll::Ready(Err(e)) => Poll::Ready(Err(std::io::Error::other(e))),
             Poll::Pending => Poll::Pending,
         }
@@ -898,104 +898,22 @@ impl<const C: usize> AsyncRead for SessionSocket<C> {
 mod tests {
     use super::*;
     use crate::utils::DuplexIO;
-    use async_std::prelude::FutureExt;
     use futures::future::Either;
     use futures::io::{AsyncReadExt, AsyncWriteExt};
     use futures::pin_mut;
-    use futures::stream::BoxStream;
     use hex_literal::hex;
     use parameterized::parameterized;
     use rand::rngs::StdRng;
     use rand::{Rng, SeedableRng};
-    use std::fmt::Debug;
     use std::iter::Extend;
-    use std::sync::atomic::AtomicUsize;
     use test_log::test;
+
+    use crate::session::utils::{FaultyNetwork, FaultyNetworkConfig, NetworkStats};
 
     const MTU: usize = 466; // MTU used by HOPR
 
     // Using static RNG seed to make tests reproducible between different runs
     const RNG_SEED: [u8; 32] = hex!("d8a471f1c20490a3442b96fdde9d1807428096e1601b0cef0eea7e6d44a24c01");
-
-    #[derive(Debug, Clone)]
-    pub struct FaultyNetworkConfig {
-        pub fault_prob: f64,
-        pub mixing_factor: usize,
-    }
-
-    #[derive(Clone, Debug, Default)]
-    pub struct NetworkStats {
-        packets_sent: Arc<AtomicUsize>,
-        packets_received: Arc<AtomicUsize>,
-        bytes_sent: Arc<AtomicUsize>,
-        bytes_received: Arc<AtomicUsize>,
-    }
-
-    impl Default for FaultyNetworkConfig {
-        fn default() -> Self {
-            Self {
-                fault_prob: 0.0,
-                mixing_factor: 0,
-            }
-        }
-    }
-
-    pub struct FaultyNetwork<'a> {
-        ingress: UnboundedSender<Box<[u8]>>,
-        egress: BoxStream<'a, Box<[u8]>>,
-        stats: Option<NetworkStats>,
-    }
-
-    impl AsyncWrite for FaultyNetwork<'_> {
-        fn poll_write(self: Pin<&mut Self>, _cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
-            if buf.len() > MTU {
-                return Poll::Ready(Err(std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    "data length passed to downstream must be less or equal to MTU",
-                )));
-            }
-
-            self.ingress.unbounded_send(buf.into()).unwrap();
-
-            if let Some(stats) = &self.stats {
-                stats.bytes_sent.fetch_add(buf.len(), Ordering::Relaxed);
-                stats.packets_sent.fetch_add(1, Ordering::Relaxed);
-            }
-
-            debug!("sent {} bytes", buf.len());
-            Poll::Ready(Ok(buf.len()))
-        }
-
-        fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
-            Poll::Ready(Ok(()))
-        }
-
-        fn poll_close(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
-            self.ingress.close_channel();
-            Poll::Ready(Ok(()))
-        }
-    }
-
-    impl AsyncRead for FaultyNetwork<'_> {
-        fn poll_read(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<std::io::Result<usize>> {
-            match self.egress.poll_next_unpin(cx) {
-                Poll::Ready(Some(item)) => {
-                    let len = buf.len().min(item.len());
-                    buf[..len].copy_from_slice(&item.as_ref()[..len]);
-
-                    if let Some(stats) = &self.stats {
-                        stats.bytes_received.fetch_add(len, Ordering::Relaxed);
-                        stats.packets_received.fetch_add(1, Ordering::Relaxed);
-                    }
-
-                    debug!("read {} bytes", len);
-                    Poll::Ready(Ok(item.len()))
-                }
-                Poll::Ready(None) => Poll::Ready(Ok(0)),
-                Poll::Pending => Poll::Pending,
-            }
-        }
-    }
 
     fn setup_alice_bob(
         cfg: SessionConfig,
@@ -1023,34 +941,13 @@ mod tests {
             })
             .unzip();
 
-        let (alice_reader, alice_writer) = FaultyNetwork::new(network_cfg.clone(), alice_stats).split();
-        let (bob_reader, bob_writer) = FaultyNetwork::new(network_cfg.clone(), bob_stats).split();
+        let (alice_reader, alice_writer) = FaultyNetwork::<MTU>::new(network_cfg.clone(), alice_stats).split();
+        let (bob_reader, bob_writer) = FaultyNetwork::<MTU>::new(network_cfg.clone(), bob_stats).split();
 
         let alice_to_bob = SessionSocket::new("alice", DuplexIO(alice_reader, bob_writer), cfg.clone());
         let bob_to_alice = SessionSocket::new("bob", DuplexIO(bob_reader, alice_writer), cfg.clone());
 
         (alice_to_bob, bob_to_alice)
-    }
-
-    impl FaultyNetwork<'_> {
-        pub fn new(cfg: FaultyNetworkConfig, stats: Option<NetworkStats>) -> Self {
-            let (ingress, egress) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
-
-            let mut rng = StdRng::from_seed(RNG_SEED);
-            let egress = egress.filter(move |_| futures::future::ready(rng.gen_bool(1.0 - cfg.fault_prob)));
-
-            let egress = if cfg.mixing_factor > 0 {
-                let mut rng = StdRng::from_seed(RNG_SEED);
-                egress
-                    .map(move |e| futures::future::ready(e).delay(Duration::from_micros(rng.gen_range(0..20))))
-                    .buffer_unordered(cfg.mixing_factor)
-                    .boxed()
-            } else {
-                egress.boxed()
-            };
-
-            Self { ingress, egress, stats }
-        }
     }
 
     async fn send_and_recv<S>(
@@ -1155,98 +1052,6 @@ mod tests {
             Either::Left(((_, Err(e)), _)) => panic!("bob send recv error: {e}"),
             Either::Right(_) => panic!("timeout"),
         }
-    }
-
-    fn spawn_single_byte_read_write<C>(
-        channel: C,
-        data: Vec<u8>,
-    ) -> (impl Future<Output = Vec<u8>>, impl Future<Output = Vec<u8>>)
-    where
-        C: AsyncRead + AsyncWrite + Unpin + Send + 'static,
-    {
-        let (mut recv, mut send) = channel.split();
-
-        let len = data.len();
-        let read = async_std::task::spawn(async move {
-            let mut out = Vec::with_capacity(len);
-            for _ in 0..len {
-                let mut bytes = [0u8; 1];
-                if recv.read(&mut bytes).await.unwrap() > 0 {
-                    out.push(bytes[0]);
-                } else {
-                    break;
-                }
-            }
-            out
-        });
-
-        let written = async_std::task::spawn(async move {
-            let mut out = Vec::with_capacity(len);
-            for byte in data {
-                send.write(&[byte]).await.unwrap();
-                out.push(byte);
-            }
-            send.close().await.unwrap();
-            out
-        });
-
-        (read, written)
-    }
-
-    #[async_std::test]
-    async fn faulty_network_mixing() {
-        const MIX_FACTOR: usize = 2;
-        const COUNT: usize = 20;
-
-        let net = FaultyNetwork::new(
-            FaultyNetworkConfig {
-                mixing_factor: MIX_FACTOR,
-                ..Default::default()
-            },
-            None,
-        );
-
-        let (read, written) = spawn_single_byte_read_write(net, (0..COUNT as u8).collect());
-        let (read, _) = futures::future::join(read, written).await;
-
-        for (pos, value) in read.into_iter().enumerate() {
-            assert!(
-                pos.abs_diff(value as usize) <= MIX_FACTOR,
-                "packet must not be off from its position by more than then mixing factor"
-            );
-        }
-    }
-
-    #[async_std::test]
-    async fn faulty_network_packet_drop() {
-        const DROP: f64 = 0.3333;
-        const COUNT: usize = 20;
-
-        let net = FaultyNetwork::new(
-            FaultyNetworkConfig {
-                fault_prob: DROP,
-                ..Default::default()
-            },
-            None,
-        );
-
-        let (read, written) = spawn_single_byte_read_write(net, (0..COUNT as u8).collect());
-        let (read, written) = futures::future::join(read, written).await;
-
-        let max_drop = (written.len() as f64 * (1.0 - DROP) - 2.0).floor() as usize;
-        assert!(read.len() >= max_drop, "dropped more than {max_drop}: {}", read.len());
-    }
-
-    #[async_std::test]
-    async fn faulty_network_reliable() {
-        const COUNT: usize = 20;
-
-        let net = FaultyNetwork::new(Default::default(), None);
-
-        let (read, written) = spawn_single_byte_read_write(net, (0..COUNT as u8).collect());
-        let (read, written) = futures::future::join(read, written).await;
-
-        assert_eq!(read, written);
     }
 
     #[parameterized(num_frames = {10, 100, 1000}, frame_size = {1500, 1500, 1500})]
@@ -1514,6 +1319,7 @@ mod tests {
         let net_cfg = FaultyNetworkConfig {
             fault_prob: 1.0, // throws away 100% of packets
             mixing_factor: 0,
+            ..Default::default()
         };
 
         let (mut alice_to_bob, mut bob_to_alice) = setup_alice_bob(cfg, net_cfg, None, None);
@@ -1545,6 +1351,7 @@ mod tests {
         let net_cfg = FaultyNetworkConfig {
             fault_prob: 0.5, // throws away 50% of packets
             mixing_factor: 0,
+            ..Default::default()
         };
 
         let (mut alice_to_bob, mut bob_to_alice) = setup_alice_bob(cfg, net_cfg, None, None);
