@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 use futures::stream::BoxStream;
 use futures::{stream, StreamExt, TryStreamExt};
+use sea_orm::entity::Set;
 use sea_orm::query::QueryTrait;
 use sea_orm::sea_query::{Expr, OnConflict, Value};
 use sea_orm::{ColumnTrait, DbErr, EntityTrait, FromQueryResult, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect};
@@ -238,7 +239,7 @@ impl HoprDbLogOperations for HoprDb {
         db_tx
             .perform(|tx| {
                 Box::pin(async move {
-                    match log_status::Entity::update(log_status).exec(tx.as_ref()).await {
+                    match LogStatus::update(log_status).exec(tx.as_ref()).await {
                         Ok(_) => Ok(()),
                         Err(DbErr::RecordNotUpdated) => {
                             error!("Failed to update log status in db");
@@ -272,9 +273,9 @@ impl HoprDbLogOperations for HoprDb {
     async fn get_last_checksummed_log(&self) -> Result<Option<SerializableLog>> {
         let query = LogStatus::find()
             .filter(log_status::Column::Checksum.is_not_null())
-            .order_by_desc(log::Column::BlockNumber)
-            .order_by_desc(log::Column::TransactionIndex)
-            .order_by_desc(log::Column::LogIndex)
+            .order_by_desc(log_status::Column::BlockNumber)
+            .order_by_desc(log_status::Column::TransactionIndex)
+            .order_by_desc(log_status::Column::LogIndex)
             .find_also_related(Log);
 
         match query.clone().one(self.conn(TargetDb::Logs)).await {
@@ -307,9 +308,9 @@ impl HoprDbLogOperations for HoprDb {
                         .order_by_asc(log_status::Column::LogIndex)
                         .find_also_related(Log);
 
-                    match query.stream(tx.as_ref()).await {
-                        Ok(mut stream) => {
-                            while let Some(Ok((status, Some(log_entry)))) = stream.next().await {
+                    match query.all(tx.as_ref()).await {
+                        Ok(mut entries) => {
+                            while let Some((status, Some(log_entry))) = entries.pop() {
                                 let slog = create_log(log_entry.clone(), status.clone())?;
                                 // we compute the has of a single log as a combination of the block
                                 // hash, tx hash and log index
@@ -319,12 +320,13 @@ impl HoprDbLogOperations for HoprDb {
                                     log_entry.log_index.as_slice(),
                                 ]);
                                 let next_checksum = Hash::create(&[last_checksum.as_ref(), log_hash.as_ref()]);
-                                let updated_status = log_status::ActiveModel::from(log_status::Model {
-                                    checksum: Some(next_checksum.as_ref().to_vec()),
-                                    ..status
-                                });
+                                let updated_status = log_status::ActiveModel {
+                                    checksum: Set(Some(next_checksum.as_ref().to_vec())),
+                                    ..status.into()
+                                };
                                 match LogStatus::update(updated_status).exec(tx.as_ref()).await {
                                     Ok(_) => {
+                                        last_checksum = next_checksum;
                                         trace!("Generated log checksum {next_checksum} @ {slog}");
                                     }
                                     Err(e) => {
@@ -332,7 +334,6 @@ impl HoprDbLogOperations for HoprDb {
                                         break;
                                     }
                                 }
-                                last_checksum = next_checksum;
                             }
                             Ok(())
                         }
@@ -538,7 +539,7 @@ mod tests {
         assert_eq!(log_db_updated.processed_at.is_some(), true);
     }
 
-    #[test_log::test(async_std::test)]
+    #[async_std::test]
     async fn test_list_logs_ordered() {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await.unwrap();
 
@@ -546,21 +547,27 @@ mod tests {
         let tx_per_block = 3;
         let blocks = 10;
         let start_block = 32183412;
+        let base_log = SerializableLog {
+            address: Hash::create(&[b"my address"]).to_hex(),
+            topics: [Hash::create(&[b"my topic"]).to_hex()].into(),
+            data: [1, 2, 3, 4].into(),
+            tx_index: 0,
+            block_number: 0,
+            block_hash: Hash::create(&[b"my block hash"]).to_hex(),
+            tx_hash: Hash::create(&[b"my tx hash"]).to_hex(),
+            log_index: 0,
+            removed: false,
+            ..Default::default()
+        };
 
         for block_offset in 0..blocks {
             for tx_index in 0..tx_per_block {
                 for log_index in 0..logs_per_tx {
                     let log = SerializableLog {
-                        address: Hash::create(&[b"my address"]).to_hex(),
-                        topics: [Hash::create(&[b"my topic"]).to_hex()].into(),
-                        data: [1, 2, 3, 4].into(),
                         tx_index,
                         block_number: start_block + block_offset,
-                        block_hash: Hash::create(&[b"my block hash"]).to_hex(),
-                        tx_hash: Hash::create(&[b"my tx hash"]).to_hex(),
                         log_index,
-                        removed: false,
-                        ..Default::default()
+                        ..base_log.clone()
                     };
                     db.store_log(log).await.unwrap()
                 }
@@ -582,9 +589,9 @@ mod tests {
 
             ordered_logs.iter().reduce(|prev_log, curr_log| {
                 assert!(prev_log.block_number >= next_block);
-                assert!(prev_log.block_number < (next_block + block_fetch_interval));
+                assert!(prev_log.block_number <= (next_block + block_fetch_interval));
                 assert!(curr_log.block_number >= next_block);
-                assert!(curr_log.block_number < (next_block + block_fetch_interval));
+                assert!(curr_log.block_number <= (next_block + block_fetch_interval));
                 if prev_log.block_number == curr_log.block_number {
                     if prev_log.tx_index == curr_log.tx_index {
                         assert!(prev_log.log_index < curr_log.log_index);
@@ -687,7 +694,7 @@ mod tests {
         assert!(log_db.processed_at.is_none());
     }
 
-    #[test_log::test(async_std::test)]
+    #[async_std::test]
     async fn test_get_logs_block_numbers() {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await.unwrap();
 
@@ -736,11 +743,12 @@ mod tests {
         assert_eq!(block_numbers[0], 1);
     }
 
-    #[test_log::test(async_std::test)]
+    #[async_std::test]
     async fn test_update_logs_checksums() {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await.unwrap();
 
-        let log = SerializableLog {
+        // insert first log and update checksum
+        let log_1 = SerializableLog {
             address: Hash::create(&[b"address"]).to_hex(),
             topics: [Hash::create(&[b"topic"]).to_hex()].into(),
             data: [1, 2, 3, 4].into(),
@@ -753,12 +761,56 @@ mod tests {
             ..Default::default()
         };
 
-        db.store_log(log.clone()).await.unwrap();
+        db.store_log(log_1.clone()).await.unwrap();
+
+        assert!(db.get_last_checksummed_log().await.unwrap().is_none());
 
         db.update_logs_checksums().await.unwrap();
 
-        let updated_log = db.get_last_checksummed_log().await.unwrap().unwrap();
+        let updated_log_1 = db.get_last_checksummed_log().await.unwrap().unwrap();
+        assert!(updated_log_1.checksum.is_some());
 
-        assert!(updated_log.checksum.is_some());
+        // insert two more logs and update checksums
+        let log_2 = SerializableLog {
+            block_number: 2,
+            ..log_1.clone()
+        };
+        let log_3 = SerializableLog {
+            block_number: 3,
+            ..log_1.clone()
+        };
+
+        db.store_logs(vec![log_2.clone(), log_3.clone()])
+            .await
+            .unwrap()
+            .into_iter()
+            .for_each(|r| assert!(r.is_ok()));
+
+        // ensure the first log is still the last updated
+        assert_eq!(
+            updated_log_1.clone().checksum.unwrap(),
+            db.get_last_checksummed_log().await.unwrap().unwrap().checksum.unwrap()
+        );
+
+        db.update_logs_checksums().await.unwrap();
+
+        let updated_log_3 = db.get_last_checksummed_log().await.unwrap().unwrap();
+
+        db.get_logs(None, None)
+            .await
+            .unwrap()
+            .collect::<Vec<SerializableLog>>()
+            .await
+            .into_iter()
+            .for_each(|log| {
+                assert!(log.checksum.is_some());
+            });
+
+        // ensure the first log is not the last updated anymore
+        assert_ne!(
+            updated_log_1.clone().checksum.unwrap(),
+            updated_log_3.clone().checksum.unwrap(),
+        );
+        assert_ne!(updated_log_1, updated_log_3);
     }
 }

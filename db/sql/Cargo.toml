@@ -60,7 +60,6 @@ hopr-parallelize = { workspace = true, features = ["rayon"] }
 hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
-test-log = { workspace = true }
 anyhow = { workspace = true }
 async-std = { workspace = true }
 rand = { workspace = true }
