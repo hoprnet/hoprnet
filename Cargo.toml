@@ -27,6 +27,9 @@ members = [
   "hopli",
   "hopr-socks/hopr-socks-server",
   "hopr/hopr-lib",
+  "hoprd/db/api",
+  "hoprd/db/migration",
+  "hoprd/db/entity",
   "hoprd/hoprd",
   "hoprd/inbox",
   "hoprd/keypair",
@@ -74,6 +77,7 @@ divan = "0.1.14"
 env_logger = "0.11.3"
 ethers = { version = "2.0.10", default-features = false }
 flume = "0.11.0"
+float-cmp = "0.10.0"
 futures = "0.3.30"
 futures-concurrency = "7.6.1"
 futures-timer = "3.0.3"
@@ -210,6 +214,9 @@ hopr-transport-session = { path = "transport/session" }
 hoprd-api = { path = "hoprd/rest-api", default-features = false }
 hoprd-inbox = { path = "hoprd/inbox", default-features = false }
 hoprd-keypair = { path = "hoprd/keypair", default-features = false }
+hoprd-db-api = { path = "hoprd/db/api" }
+hoprd-db-entity = { path = "hoprd/db/entity" }
+hoprd-db-migration = { path = "hoprd/db/migration" }
 
 # [build]
 # rustflags = ["-C", "link-arg=-fuse-ld=lld"]       # needs the "pkgs.llvmPackages.bintools" nix package

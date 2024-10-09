@@ -70,7 +70,7 @@ fn main() -> anyhow::Result<()> {
 
     println!(
         "cargo:rerun-if-changed={}",
-        db_migration_package_path.join("src").to_str().unwrap()
+        db_migration_package_path.join("src").to_string_lossy()
     );
     println!(
         "cargo:rerun-if-changed={}",

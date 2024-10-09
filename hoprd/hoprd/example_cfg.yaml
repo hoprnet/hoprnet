@@ -211,6 +211,9 @@ hopr:
     prefer_local_addresses: false
   # Configuration of various HOPR sub-protocols.
   protocol:
+    # Outgoing ticket winning probability.
+    # Should not be lower than the minimum ticket winning probability set on-chain
+    # outgoing_ticket_winning_prob: 1.0
     # Heartbeat sub-protocol configuration
     heartbeat:
       # Timeout in seconds

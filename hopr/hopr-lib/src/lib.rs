@@ -1205,6 +1205,11 @@ impl Hopr {
         Ok(self.transport_api.ticket_statistics().await?)
     }
 
+    /// Reset the ticket metrics to zero
+    pub async fn reset_ticket_statistics(&self) -> errors::Result<()> {
+        Ok(self.db.reset_ticket_statistics().await?)
+    }
+
     // Chain =========
     pub fn me_onchain(&self) -> Address {
         self.chain_api.me_onchain()
@@ -1215,9 +1220,13 @@ impl Hopr {
         Ok(self.chain_api.ticket_price().await?)
     }
 
-    /// Get ticket winning probability
-    pub async fn get_ticket_probability(&self) -> errors::Result<f64> {
-        Ok(hopr_internal_types::tickets::WINNING_PROB)
+    /// Get minimum incoming ticket winning probability
+    pub async fn get_minimum_incoming_ticket_win_probability(&self) -> errors::Result<f64> {
+        Ok(self
+            .db
+            .get_indexer_data(None)
+            .await?
+            .minimum_incoming_ticket_winning_prob)
     }
 
     /// List of all accounts announced on the chain

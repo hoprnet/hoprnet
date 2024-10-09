@@ -12,7 +12,7 @@ use bindings::{
     hopr_announcements::HoprAnnouncementsEvents, hopr_channels::HoprChannelsEvents,
     hopr_network_registry::HoprNetworkRegistryEvents, hopr_node_management_module::HoprNodeManagementModuleEvents,
     hopr_node_safe_registry::HoprNodeSafeRegistryEvents, hopr_ticket_price_oracle::HoprTicketPriceOracleEvents,
-    hopr_token::HoprTokenEvents,
+    hopr_token::HoprTokenEvents, hopr_winning_probability_oracle::HoprWinningProbabilityOracleEvents,
 };
 use chain_rpc::{BlockWithLogs, Log};
 use chain_types::chain_events::{ChainEventType, NetworkRegistryStatus, SignificantChainEvent};
@@ -23,6 +23,7 @@ use hopr_crypto_types::types::OffchainSignature;
 use hopr_db_sql::api::info::DomainSeparator;
 use hopr_db_sql::api::tickets::TicketSelector;
 use hopr_db_sql::errors::DbSqlError;
+use hopr_db_sql::prelude::TicketMarker;
 use hopr_db_sql::{HoprDbAllOperations, OpenTransaction};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
@@ -30,22 +31,19 @@ use hopr_primitive_types::prelude::*;
 use crate::errors::{CoreEthereumIndexerError, Result};
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use hopr_metrics::metrics::MultiCounter;
-
-#[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_INDEXER_LOG_COUNTERS: MultiCounter =
-        MultiCounter::new(
+    static ref METRIC_INDEXER_LOG_COUNTERS: hopr_metrics::MultiCounter =
+        hopr_metrics::MultiCounter::new(
             "hopr_indexer_contract_log_counters",
             "Counts of different HOPR contract logs processed by the Indexer",
             &["contract"]
     ).unwrap();
 }
 
-/// Event handling object for on-chain operations
+/// Event handling an object for on-chain operations
 ///
 /// Once an on-chain operation is recorded by the [crate::block::Indexer], it is pre-processed
-/// and passed on to this object that handles event specific actions for each on-chain operation.
+/// and passed on to this object that handles event-specific actions for each on-chain operation.
 ///
 #[derive(Clone)]
 pub struct ContractEventHandlers<Db: Clone> {
@@ -229,7 +227,9 @@ where
                 if let Some(channel_edits) = maybe_channel {
                     // Incoming channel, so once closed. All unredeemed tickets just became invalid
                     if channel_edits.entry().destination == self.chain_key.public().to_address() {
-                        self.db.mark_tickets_neglected(channel_edits.entry().into()).await?;
+                        self.db
+                            .mark_tickets_as(channel_edits.entry().into(), TicketMarker::Neglected)
+                            .await?;
                     }
 
                     // set all channel fields like we do on-chain on close
@@ -281,7 +281,7 @@ where
                         || destination == self.chain_key.public().to_address()
                     {
                         self.db
-                            .mark_tickets_neglected(TicketSelector::new(channel_id, current_epoch))
+                            .mark_tickets_as(TicketSelector::new(channel_id, current_epoch), TicketMarker::Neglected)
                             .await?;
 
                         self.db.reset_outgoing_ticket_index(channel_id).await?;
@@ -351,7 +351,9 @@ where
                                 Ordering::Equal => {
                                     let ack_ticket = matching_tickets.pop().unwrap();
 
-                                    self.db.mark_tickets_redeemed((&ack_ticket).into()).await?;
+                                    self.db
+                                        .mark_tickets_as((&ack_ticket).into(), TicketMarker::Redeemed)
+                                        .await?;
                                     info!("{ack_ticket} has been marked as redeemed");
                                     Some(ack_ticket)
                                 }
@@ -395,7 +397,7 @@ where
                                 .await?;
                             None
                         }
-                        // For channel where neither source nor destination is us, we don't care
+                        // For a channel where neither source nor destination is us, we don't care
                         None => {
                             // Not our redeem event
                             debug!("observed redeem event on a foreign {}", channel_edits.entry());
@@ -415,8 +417,9 @@ where
                     // Neglect all the tickets in this channel
                     // which have a lower ticket index than `ticket_redeemed.new_ticket_index`
                     self.db
-                        .mark_tickets_neglected(
+                        .mark_tickets_as(
                             TicketSelector::from(&channel).with_index_lt(ticket_redeemed.new_ticket_index),
+                            TicketMarker::Neglected,
                         )
                         .await?;
 
@@ -652,35 +655,62 @@ where
         Ok(None)
     }
 
-    // TODO: uncomment this once ticket winning probability oracle is implemented
-    /*async fn on_ticket_winning_probability_oracle_event(
+    async fn on_ticket_winning_probability_oracle_event(
         &self,
         tx: &OpenTransaction,
-        event: HoprTicketWinningProbabilityOracleEvents,
+        event: HoprWinningProbabilityOracleEvents,
     ) -> Result<Option<ChainEventType>> {
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_INDEXER_LOG_COUNTERS.increment(&["win_prob_oracle"]);
 
         match event {
-            HoprTicketWinningProbabilityOracleEvents::TicketMinWinningProbability(update) => {
+            HoprWinningProbabilityOracleEvents::WinProbUpdatedFilter(update) => {
+                let mut encoded_old: EncodedWinProb = Default::default();
+                encoded_old.copy_from_slice(&update.old_win_prob.to_be_bytes()[1..]);
+                let old_minimum_win_prob = win_prob_to_f64(&encoded_old);
+
+                let mut encoded_new: EncodedWinProb = Default::default();
+                encoded_new.copy_from_slice(&update.new_win_prob.to_be_bytes()[1..]);
+                let new_minimum_win_prob = win_prob_to_f64(&encoded_new);
+
                 trace!(
-                    "on_ticket_minimum_win_prob_updated - old: {:?} - new: {:?}",
-                    update.0.to_string(),
-                    update.1.to_string()
+                    "on_ticket_minimum_win_prob_updated - old: {old_minimum_win_prob} - new: {new_minimum_win_prob}",
                 );
 
                 self.db
-                    .set_minimum_incoming_ticket_win_prob(Some(tx), win_prob_to_f64(update.1))
+                    .set_minimum_incoming_ticket_win_prob(Some(tx), new_minimum_win_prob)
                     .await?;
 
-                info!("minimum ticket winning probability has been set to {}", update.1);
+                info!("minimum ticket winning probability has been updated {old_minimum_win_prob} -> {new_minimum_win_prob}");
+
+                // If the old minimum was less strict, we need to mark of all the
+                // tickets below the new higher minimum as rejected
+                if old_minimum_win_prob < new_minimum_win_prob {
+                    let mut selector: Option<TicketSelector> = None;
+                    for channel in self.db.get_incoming_channels(tx.into()).await? {
+                        selector = selector
+                            .map(|s| s.also_on_channel(channel.get_id(), channel.channel_epoch))
+                            .or_else(|| Some(TicketSelector::from(channel)));
+                    }
+                    // Reject unredeemed tickets on all the channels with win prob lower than the new one
+                    if let Some(selector) = selector {
+                        let num_rejected = self
+                            .db
+                            .mark_tickets_as(
+                                selector.with_winning_probability_lt(encoded_new),
+                                TicketMarker::Rejected,
+                            )
+                            .await?;
+                        info!("{num_rejected} unredeemed tickets were rejected because the minimum winning probability has been increased");
+                    }
+                }
             }
             _ => {
-                // ignore other events
+                // Ignore other events
             }
         }
         Ok(None)
-    }*/
+    }
 
     async fn on_ticket_price_oracle_event(
         &self,
@@ -739,9 +769,8 @@ where
             let event = HoprTicketPriceOracleEvents::decode_log(&log.into())?;
             self.on_ticket_price_oracle_event(tx, event).await
         } else if log.address.eq(&self.addresses.win_prob_oracle) {
-            // TODO: add win prob oracle implementation
-            warn!("winning probability oracle not yet implemented");
-            Ok(None)
+            let event = HoprWinningProbabilityOracleEvents::decode_log(&log.into())?;
+            self.on_ticket_winning_probability_oracle_event(tx, event).await
         } else {
             #[cfg(all(feature = "prometheus", not(test)))]
             METRIC_INDEXER_LOG_COUNTERS.increment(&["unknown"]);
@@ -831,7 +860,8 @@ mod tests {
     use std::time::SystemTime;
 
     use super::ContractEventHandlers;
-    use anyhow::Context;
+    use anyhow::{anyhow, Context};
+    use bindings::hopr_winning_probability_oracle_events::WinProbUpdatedFilter;
     use bindings::{
         hopr_announcements::{AddressAnnouncementFilter, KeyBindingFilter, RevokeAnnouncementFilter},
         hopr_channels::{
@@ -1934,14 +1964,14 @@ mod tests {
         Ok(())
     }
 
+    const PRICE_PER_PACKET: u32 = 20_u32;
+
     fn mock_acknowledged_ticket(
         signer: &ChainKeypair,
         destination: &ChainKeypair,
         index: u64,
+        win_prob: f64,
     ) -> anyhow::Result<AcknowledgedTicket> {
-        let price_per_packet: U256 = 20_u32.into();
-        let ticket_win_prob = 1.0f64;
-
         let channel_id = generate_channel_id(&signer.into(), &destination.into());
 
         let channel_epoch = 1u64;
@@ -1953,10 +1983,10 @@ mod tests {
 
         Ok(TicketBuilder::default()
             .direction(&signer.into(), &destination.into())
-            .amount(price_per_packet.div_f64(ticket_win_prob)?)
+            .amount(U256::from(PRICE_PER_PACKET).div_f64(win_prob)?)
             .index(index)
             .index_offset(1)
-            .win_prob(ticket_win_prob)
+            .win_prob(win_prob)
             .channel_epoch(1)
             .challenge(response.to_challenge().into())
             .build_signed(signer, &domain_separator)?
@@ -1983,7 +2013,8 @@ mod tests {
         let ticket_index = U256::from((1u128 << 48) - 1);
         let next_ticket_index = ticket_index + 1;
 
-        let mut ticket = mock_acknowledged_ticket(&COUNTERPARTY_CHAIN_KEY, &SELF_CHAIN_KEY, ticket_index.as_u64())?;
+        let mut ticket =
+            mock_acknowledged_ticket(&COUNTERPARTY_CHAIN_KEY, &SELF_CHAIN_KEY, ticket_index.as_u64(), 1.0)?;
         ticket.status = AcknowledgedTicketStatus::BeingRedeemed;
 
         let ticket_value = ticket.verified_ticket().amount;
@@ -2085,7 +2116,8 @@ mod tests {
         let ticket_index = U256::from((1u128 << 48) - 1);
         let next_ticket_index = ticket_index + 1;
 
-        let mut ticket = mock_acknowledged_ticket(&COUNTERPARTY_CHAIN_KEY, &SELF_CHAIN_KEY, ticket_index.as_u64())?;
+        let mut ticket =
+            mock_acknowledged_ticket(&COUNTERPARTY_CHAIN_KEY, &SELF_CHAIN_KEY, ticket_index.as_u64(), 1.0)?;
         ticket.status = AcknowledgedTicketStatus::BeingRedeemed;
 
         let ticket_value = ticket.verified_ticket().amount;
@@ -2093,7 +2125,8 @@ mod tests {
         db.upsert_channel(None, channel).await?;
         db.upsert_ticket(None, ticket.clone()).await?;
 
-        let old_ticket = mock_acknowledged_ticket(&COUNTERPARTY_CHAIN_KEY, &SELF_CHAIN_KEY, ticket_index.as_u64() - 1)?;
+        let old_ticket =
+            mock_acknowledged_ticket(&COUNTERPARTY_CHAIN_KEY, &SELF_CHAIN_KEY, ticket_index.as_u64() - 1, 1.0)?;
         db.upsert_ticket(None, old_ticket.clone()).await?;
 
         let ticket_redeemed_log = SerializableLog {
@@ -2492,6 +2525,148 @@ mod tests {
             db.get_indexer_data(None).await?.ticket_price.map(|p| p.amount()),
             Some(U256::from(123u64))
         );
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn minimum_win_prob_update() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
+
+        let handlers = init_handlers(db.clone());
+
+        let win_prob_change_log = ethers::prelude::Log {
+            address: handlers.addresses.win_prob_oracle.into(),
+            topics: vec![WinProbUpdatedFilter::signature()],
+            data: encode(&[
+                Token::Uint(EthU256::from(f64_to_win_prob(1.0)?.as_ref())),
+                Token::Uint(EthU256::from(f64_to_win_prob(0.5)?.as_ref())),
+            ])
+            .into(),
+            ..test_log()
+        };
+
+        assert_eq!(
+            db.get_indexer_data(None).await?.minimum_incoming_ticket_winning_prob,
+            1.0
+        );
+
+        let event_type = db
+            .begin_transaction()
+            .await?
+            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, win_prob_change_log.into()).await }))
+            .await?;
+
+        assert!(
+            event_type.is_none(),
+            "there's no associated chain event type with winning probability change"
+        );
+
+        assert_eq!(
+            db.get_indexer_data(None).await?.minimum_incoming_ticket_winning_prob,
+            0.5
+        );
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn lowering_minimum_win_prob_update_should_reject_non_satisfying_unredeemed_tickets() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
+        db.set_minimum_incoming_ticket_win_prob(None, 0.1).await?;
+
+        let new_minimum = 0.5;
+        let ticket_win_probs = [0.1, 1.0, 0.3, 0.2];
+
+        let channel_1 = ChannelEntry::new(
+            *COUNTERPARTY_CHAIN_ADDRESS,
+            *SELF_CHAIN_ADDRESS,
+            Balance::new(U256::from((1u128 << 96) - 1), BalanceType::HOPR),
+            3_u32.into(),
+            ChannelStatus::Open,
+            U256::one(),
+        );
+
+        db.upsert_channel(None, channel_1.clone()).await?;
+
+        let ticket = mock_acknowledged_ticket(&COUNTERPARTY_CHAIN_KEY, &SELF_CHAIN_KEY, 1, ticket_win_probs[0])?;
+        db.upsert_ticket(None, ticket).await?;
+
+        let ticket = mock_acknowledged_ticket(&COUNTERPARTY_CHAIN_KEY, &SELF_CHAIN_KEY, 2, ticket_win_probs[1])?;
+        db.upsert_ticket(None, ticket).await?;
+
+        let tickets = db.get_tickets((&channel_1).into()).await?;
+        assert_eq!(tickets.len(), 2);
+
+        // ---
+
+        let other_counterparty = ChainKeypair::random();
+        let channel_2 = ChannelEntry::new(
+            other_counterparty.public().to_address(),
+            *SELF_CHAIN_ADDRESS,
+            Balance::new(U256::from((1u128 << 96) - 1), BalanceType::HOPR),
+            3_u32.into(),
+            ChannelStatus::Open,
+            U256::one(),
+        );
+
+        db.upsert_channel(None, channel_2.clone()).await?;
+
+        let ticket = mock_acknowledged_ticket(&other_counterparty, &SELF_CHAIN_KEY, 1, ticket_win_probs[2])?;
+        db.upsert_ticket(None, ticket).await?;
+
+        let ticket = mock_acknowledged_ticket(&other_counterparty, &SELF_CHAIN_KEY, 2, ticket_win_probs[3])?;
+        db.upsert_ticket(None, ticket).await?;
+
+        let tickets = db.get_tickets((&channel_2).into()).await?;
+        assert_eq!(tickets.len(), 2);
+
+        let stats = db.get_ticket_statistics(None).await?;
+        assert_eq!(BalanceType::HOPR.zero(), stats.rejected_value);
+
+        let handlers = init_handlers(db.clone());
+
+        let win_prob_change_log = ethers::prelude::Log {
+            address: handlers.addresses.win_prob_oracle.into(),
+            topics: vec![WinProbUpdatedFilter::signature()],
+            data: encode(&[
+                Token::Uint(EthU256::from(f64_to_win_prob(0.1)?.as_ref())),
+                Token::Uint(EthU256::from(f64_to_win_prob(new_minimum)?.as_ref())),
+            ])
+            .into(),
+            ..test_log()
+        };
+
+        let event_type = db
+            .begin_transaction()
+            .await?
+            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, win_prob_change_log.into()).await }))
+            .await?;
+
+        assert!(
+            event_type.is_none(),
+            "there's no associated chain event type with winning probability change"
+        );
+
+        assert_eq!(
+            db.get_indexer_data(None).await?.minimum_incoming_ticket_winning_prob,
+            new_minimum
+        );
+
+        let tickets = db.get_tickets((&channel_1).into()).await?;
+        assert_eq!(tickets.len(), 1);
+
+        let tickets = db.get_tickets((&channel_2).into()).await?;
+        assert_eq!(tickets.len(), 0);
+
+        let stats = db.get_ticket_statistics(None).await?;
+        let rejected_value: U256 = ticket_win_probs
+            .iter()
+            .filter(|p| **p < new_minimum)
+            .map(|p| U256::from(PRICE_PER_PACKET).div_f64(*p).expect("must divide"))
+            .reduce(|a, b| a + b)
+            .ok_or(anyhow!("must sum"))?;
+
+        assert_eq!(BalanceType::HOPR.balance(rejected_value), stats.rejected_value);
+
         Ok(())
     }
 }

@@ -10,11 +10,11 @@ use async_trait::async_trait;
 use futures::stream::BoxStream;
 use futures::TryStreamExt;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder, Set};
-use sea_query::{Condition, Expr, IntoCondition};
+use sea_query::{Condition, Expr, IntoCondition, SimpleExpr};
 use tracing::{debug, error, info, trace, warn};
 
 use hopr_crypto_types::prelude::*;
-use hopr_db_api::prelude::TicketIndexSelector;
+use hopr_db_api::prelude::{TicketIndexSelector, TicketMarker};
 use hopr_db_api::{
     errors::Result,
     info::DomainSeparator,
@@ -64,12 +64,28 @@ impl AsRef<TicketSelector> for WrappedTicketSelector {
 
 impl IntoCondition for WrappedTicketSelector {
     fn into_condition(self) -> Condition {
-        let mut expr = ticket::Column::ChannelId
-            .eq(self.0.channel_id.to_hex())
-            .and(ticket::Column::ChannelEpoch.eq(self.0.epoch.to_be_bytes().to_vec()));
+        let expr = self
+            .0
+            .channel_identifiers
+            .into_iter()
+            .map(|(channel_id, epoch)| {
+                ticket::Column::ChannelId
+                    .eq(channel_id.to_hex())
+                    .and(ticket::Column::ChannelEpoch.eq(epoch.to_be_bytes().to_vec()))
+            })
+            .reduce(SimpleExpr::or);
+
+        // This cannot happen, but instead of panicking, return an impossible condition object
+        if expr.is_none() {
+            return Condition::any().not();
+        }
+
+        let mut expr = expr.unwrap();
 
         match self.0.index {
-            TicketIndexSelector::None => {}
+            TicketIndexSelector::None => {
+                // This will always be the case if there were multiple channel identifiers
+            }
             TicketIndexSelector::Single(idx) => expr = expr.and(ticket::Column::Index.eq(idx.to_be_bytes().to_vec())),
             TicketIndexSelector::Multiple(idxs) => {
                 expr = expr.and(ticket::Column::Index.is_in(idxs.into_iter().map(|i| i.to_be_bytes().to_vec())));
@@ -82,8 +98,13 @@ impl IntoCondition for WrappedTicketSelector {
         if let Some(state) = self.0.state {
             expr = expr.and(ticket::Column::State.eq(state as u8))
         }
+
         if self.0.only_aggregated {
             expr = expr.and(ticket::Column::IndexOffset.gt(1));
+        }
+
+        if let Some(prob) = self.0.win_prob_lt {
+            expr = expr.and(ticket::Column::WinningProbability.lt(prob.to_vec()));
         }
         expr.into_condition()
     }
@@ -250,144 +271,97 @@ impl HoprDbTicketOperations for HoprDb {
             .await?)
     }
 
-    async fn mark_tickets_redeemed(&self, selector: TicketSelector) -> Result<usize> {
-        let selector: WrappedTicketSelector = selector.into();
-        let channel_id = selector.as_ref().channel_id;
-
+    async fn mark_tickets_as(&self, selector: TicketSelector, mark_as: TicketMarker) -> Result<usize> {
         let myself = self.clone();
         Ok(self
             .ticket_manager
             .with_write_locked_db(|tx| {
                 Box::pin(async move {
-                    // Get the number of redeemed tickets and their value
-                    let (redeemed_count, redeemed_value) =
-                        myself.get_tickets_value_int(Some(tx), selector.0.clone()).await?;
+                    let mut total_marked_count = 0;
+                    for (channel_id, epoch) in selector.channel_identifiers.iter() {
+                        let channel_selector = selector.clone().just_on_channel(*channel_id, epoch);
 
-                    if redeemed_count > 0 {
-                        // Delete the redeemed tickets first
-                        let deleted = ticket::Entity::delete_many()
-                            .filter(selector.clone())
-                            .exec(tx.as_ref())
-                            .await?;
+                        // Get the number of tickets and their value just for this channel
+                        let (marked_count, marked_value) =
+                            myself.get_tickets_value_int(Some(tx), channel_selector.clone()).await?;
+                        trace!("{marked_count} tickets of total value {marked_value} will be marked as {mark_as}");
 
-                        // Update the stats if successful
-                        if deleted.rows_affected == redeemed_count as u64 {
-                            let current_stats = find_stats_for_channel(tx, &channel_id).await?;
+                        if marked_count > 0 {
+                            // Delete the redeemed tickets first
+                            let deleted = ticket::Entity::delete_many()
+                                .filter(WrappedTicketSelector::from(channel_selector.clone()))
+                                .exec(tx.as_ref())
+                                .await?;
 
-                            let current_redeemed_value = U256::from_be_bytes(current_stats.redeemed_value.clone());
+                            // Update the stats if successful
+                            if deleted.rows_affected == marked_count as u64 {
+                                let mut new_stats = find_stats_for_channel(tx, channel_id).await?.into_active_model();
+                                let _current_value = match mark_as {
+                                    TicketMarker::Redeemed => {
+                                        let current_value = U256::from_be_bytes(new_stats.redeemed_value.as_ref());
+                                        new_stats.redeemed_value =
+                                            Set((current_value + marked_value.amount()).to_be_bytes().into());
+                                        current_value
+                                    }
+                                    TicketMarker::Rejected => {
+                                        let current_value = U256::from_be_bytes(new_stats.rejected_value.as_ref());
+                                        new_stats.rejected_value =
+                                            Set((current_value + marked_value.amount()).to_be_bytes().into());
+                                        current_value
+                                    }
+                                    TicketMarker::Neglected => {
+                                        let current_value = U256::from_be_bytes(new_stats.neglected_value.as_ref());
+                                        new_stats.neglected_value =
+                                            Set((current_value + marked_value.amount()).to_be_bytes().into());
+                                        current_value
+                                    }
+                                };
+                                new_stats.save(tx.as_ref()).await?;
 
-                            let mut new_stats = current_stats.into_active_model();
-                            new_stats.redeemed_value =
-                                Set((current_redeemed_value + redeemed_value.amount()).to_be_bytes().into());
-                            new_stats.save(tx.as_ref()).await?;
+                                #[cfg(all(feature = "prometheus", not(test)))]
+                                {
+                                    let channel = channel_id.to_string();
+                                    METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(
+                                        &[&channel, &mark_as.to_string()],
+                                        (_current_value + marked_value.amount()).as_u128() as f64,
+                                    );
 
-                            #[cfg(all(feature = "prometheus", not(test)))]
-                            {
-                                let channel = channel_id.to_string();
-                                METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(
-                                    &[&channel, "redeemed"],
-                                    (current_redeemed_value + redeemed_value.amount()).as_u128() as f64,
-                                );
+                                    let unredeemed_value = myself
+                                        .caches
+                                        .unrealized_value
+                                        .get(channel_id)
+                                        .await
+                                        .unwrap_or(Balance::zero(BalanceType::HOPR));
 
-                                let unredeemed_value = myself
-                                    .caches
-                                    .unrealized_value
-                                    .get(&channel_id)
-                                    .await
-                                    .unwrap_or(Balance::zero(BalanceType::HOPR));
+                                    METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(
+                                        &[&channel, "unredeemed"],
+                                        (unredeemed_value - marked_value.amount()).amount().as_u128() as f64,
+                                    );
+                                }
 
-                                METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(
-                                    &[&channel, "unredeemed"],
-                                    (unredeemed_value - redeemed_value.amount()).amount().as_u128() as f64,
-                                );
+                                myself.caches.unrealized_value.invalidate(channel_id).await;
+                            } else {
+                                return Err(DbSqlError::LogicalError(format!(
+                                    "could not mark {marked_count} ticket as {mark_as}"
+                                )));
                             }
 
-                            myself.caches.unrealized_value.invalidate(&channel_id).await;
-                        } else {
-                            return Err(DbSqlError::LogicalError(format!(
-                                "could not mark {redeemed_count} ticket as redeemed"
-                            )));
-                        }
-                    }
-
-                    info!("removed {redeemed_count} of redeemed tickets from channel {channel_id}");
-                    Ok(redeemed_count)
-                })
-            })
-            .await?)
-    }
-
-    async fn mark_tickets_neglected(&self, selector: TicketSelector) -> Result<usize> {
-        let myself = self.clone();
-
-        Ok(self
-            .ticket_manager
-            .with_write_locked_db(|tx| {
-                Box::pin(async move {
-                    // Get the number of neglected tickets and their value
-                    let (neglectable_count, neglectable_value) =
-                        myself.get_tickets_value_int(Some(tx), selector.clone()).await?;
-
-                    if neglectable_count > 0 {
-                        // Delete the neglectable tickets first
-                        let deleted = ticket::Entity::delete_many()
-                            .filter(WrappedTicketSelector::from(selector.clone()))
-                            .exec(tx.as_ref())
-                            .await?;
-
-                        // Update the stats if successful
-                        if deleted.rows_affected == neglectable_count as u64 {
-                            let current_status = find_stats_for_channel(tx, &selector.channel_id).await?;
-
-                            let current_neglected_value = U256::from_be_bytes(current_status.neglected_value.clone());
-
-                            let mut new_stats = current_status.into_active_model();
-                            new_stats.neglected_value = Set((current_neglected_value + neglectable_value.amount())
-                                .to_be_bytes()
-                                .into());
-                            new_stats.save(tx.as_ref()).await?;
-
-                            #[cfg(all(feature = "prometheus", not(test)))]
-                            {
-                                let channel = selector.channel_id.to_string();
-                                METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(
-                                    &[&channel, "neglected"],
-                                    (current_neglected_value + neglectable_value.amount()).as_u128() as f64,
-                                );
-
-                                let unredeemed_value = myself
-                                    .caches
-                                    .unrealized_value
-                                    .get(&selector.channel_id)
-                                    .await
-                                    .unwrap_or(Balance::zero(BalanceType::HOPR));
-
-                                METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(
-                                    &[&channel, "unredeemed"],
-                                    (unredeemed_value - neglectable_value.amount()).amount().as_u128() as f64,
-                                );
-                            }
-
-                            // invalidating unrealized balance for the channel
-                            myself.caches.unrealized_value.invalidate(&selector.channel_id).await;
-                        } else {
-                            return Err(DbSqlError::LogicalError(format!(
-                                "could not mark {neglectable_count} ticket as neglected"
-                            )));
+                            trace!("removed {marked_count} of {mark_as} tickets in channel {channel_id}");
+                            total_marked_count += marked_count;
                         }
                     }
 
                     info!(
-                        "removed {neglectable_count} of neglected tickets from channel {}",
-                        selector.channel_id
+                        "removed {total_marked_count} of {mark_as} tickets in {} channels",
+                        selector.channel_identifiers.len()
                     );
-                    Ok(neglectable_count)
+                    Ok(total_marked_count)
                 })
             })
             .await?)
     }
 
-    async fn mark_ticket_rejected(&self, ticket: &Ticket) -> Result<()> {
+    async fn mark_unsaved_ticket_rejected(&self, ticket: &Ticket) -> Result<()> {
         let channel_id = ticket.channel_id;
         let amount = ticket.amount;
         Ok(self
@@ -589,6 +563,41 @@ impl HoprDbTicketOperations for HoprDb {
         Ok(res?)
     }
 
+    async fn reset_ticket_statistics(&self) -> Result<()> {
+        let res = self
+            .nest_transaction_in_db(None, TargetDb::Tickets)
+            .await?
+            .perform(|tx| {
+                Box::pin(async move {
+                    #[cfg(all(feature = "prometheus", not(test)))]
+                    let rows = ticket_statistics::Entity::find().all(tx.as_ref()).await?;
+
+                    // delete statistics for the found rows
+                    let deleted = ticket_statistics::Entity::delete_many().exec(tx.as_ref()).await?;
+
+                    #[cfg(all(feature = "prometheus", not(test)))]
+                    {
+                        if deleted.rows_affected > 0 {
+                            for row in rows {
+                                METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(&[&row.channel_id, "neglected"], 0.0_f64);
+
+                                METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(&[&row.channel_id, "redeemed"], 0.0_f64);
+
+                                METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(&[&row.channel_id, "rejected"], 0.0_f64);
+                            }
+                        }
+                    }
+
+                    debug!("reset ticket statistics for {:} channel(s)", deleted.rows_affected);
+
+                    Ok::<_, DbSqlError>(())
+                })
+            })
+            .await;
+
+        Ok(res?)
+    }
+
     async fn get_tickets_value(&self, selector: TicketSelector) -> Result<(usize, Balance)> {
         self.get_tickets_value_int(None, selector).await
     }
@@ -715,7 +724,7 @@ impl HoprDbTicketOperations for HoprDb {
 
         let channel_id = *channel;
 
-        let (channel_entry, peer, domain_separator) = self
+        let (channel_entry, peer, domain_separator, encoded_min_win_prob) = self
             .nest_transaction_in_db(None, TargetDb::Index)
             .await?
             .perform(|tx| {
@@ -741,12 +750,16 @@ impl HoprDbTicketOperations for HoprDb {
                             entry.source
                         )))?;
 
-                    let domain_separator =
-                        myself.get_indexer_data(Some(tx)).await?.channels_dst.ok_or_else(|| {
-                            crate::errors::DbSqlError::LogicalError("domain separator missing".into())
-                        })?;
+                    let indexer_data = myself.get_indexer_data(Some(tx)).await?;
 
-                    Ok((entry, pk, domain_separator))
+                    let domain_separator = indexer_data
+                        .channels_dst
+                        .ok_or_else(|| crate::errors::DbSqlError::LogicalError("domain separator missing".into()))?;
+
+                    let encoded_min_win_prob = f64_to_win_prob(indexer_data.minimum_incoming_ticket_winning_prob)
+                        .map_err(|e| DbSqlError::LogicalError(e.to_string()))?;
+
+                    Ok((entry, pk, domain_separator, encoded_min_win_prob))
                 })
             })
             .await?;
@@ -787,6 +800,7 @@ impl HoprDbTicketOperations for HoprDb {
                         .filter(WrappedTicketSelector::from(TicketSelector::from(&channel_entry)))
                         .filter(ticket::Column::Index.gte(first_idx_to_take.to_be_bytes().to_vec()))
                         .filter(ticket::Column::State.ne(AcknowledgedTicketStatus::BeingAggregated as u8))
+                        .filter(ticket::Column::WinningProbability.gte(encoded_min_win_prob.to_vec()))
                         .order_by_asc(ticket::Column::Index)// tickets must be sorted by indices in ascending order
                         .all(tx.as_ref())
                         .await?;
@@ -841,6 +855,7 @@ impl HoprDbTicketOperations for HoprDb {
                             .filter(ticket::Column::Index.gte(first_idx_to_take.to_be_bytes().to_vec()))
                             .filter(ticket::Column::Index.lte(last_idx_to_take.to_be_bytes().to_vec()))
                             .filter(ticket::Column::Index.is_not_in(neglected_idxs.into_iter().map(|i| i.to_be_bytes().to_vec())))
+                            .filter(ticket::Column::WinningProbability.gte(encoded_min_win_prob.to_vec()))
                             .filter(ticket::Column::State.ne(AcknowledgedTicketStatus::BeingAggregated as u8))
                             .col_expr(
                                 ticket::Column::State,
@@ -944,7 +959,7 @@ impl HoprDbTicketOperations for HoprDb {
             })?;
 
         // Aggregated tickets always have 100% winning probability
-        if aggregated_ticket.win_prob() != 1.0f64 {
+        if !f64_approx_eq(aggregated_ticket.win_prob(), 1.0, LOWEST_POSSIBLE_WINNING_PROB) {
             return Err(DbSqlError::LogicalError("Aggregated tickets must have 100% win probability".into()).into());
         }
 
@@ -1082,7 +1097,7 @@ impl HoprDbTicketOperations for HoprDb {
                 destination.to_peerid_str()
             )))?;
 
-        let (channel_entry, destination) = self
+        let (channel_entry, destination, min_win_prob) = self
             .nest_transaction_in_db(None, TargetDb::Index)
             .await?
             .perform(|tx| {
@@ -1100,7 +1115,11 @@ impl HoprDbTicketOperations for HoprDb {
                         return Err(DbSqlError::LogicalError(format!("{entry} is not outgoing")));
                     }
 
-                    Ok((entry, address))
+                    let min_win_prob = myself
+                        .get_indexer_data(Some(tx))
+                        .await?
+                        .minimum_incoming_ticket_winning_prob;
+                    Ok((entry, address, min_win_prob))
                 })
             })
             .await?;
@@ -1139,6 +1158,18 @@ impl HoprDbTicketOperations for HoprDb {
                     > verified_tickets[i + 1].verified_ticket().index
             {
                 return Err(DbSqlError::LogicalError("tickets with overlapping index intervals".into()).into());
+            }
+
+            if !f64_approx_eq(
+                acked_ticket.verified_ticket().win_prob(),
+                min_win_prob,
+                LOWEST_POSSIBLE_WINNING_PROB,
+            ) && acked_ticket.verified_ticket().win_prob() < min_win_prob
+            {
+                return Err(DbSqlError::LogicalError(
+                    "cannot aggregate ticket with lower than minimum winning probability in network".into(),
+                )
+                .into());
             }
 
             final_value = final_value.add(&acked_ticket.verified_ticket().amount);
@@ -1217,11 +1248,11 @@ mod tests {
         filter_satisfying_ticket_models, AggregationPrerequisites, HoprDbTicketOperations, TicketSelector,
     };
     use crate::{HoprDbGeneralModelOperations, TargetDb};
-    use anyhow::Context;
+    use anyhow::{anyhow, Context};
     use futures::StreamExt;
     use hex_literal::hex;
     use hopr_crypto_types::prelude::*;
-    use hopr_db_api::prelude::DbError;
+    use hopr_db_api::prelude::{DbError, TicketMarker};
     use hopr_db_api::{info::DomainSeparator, tickets::ChannelTicketStatistics};
     use hopr_db_entity::ticket;
     use hopr_internal_types::prelude::*;
@@ -1264,7 +1295,8 @@ mod tests {
         src: &ChainKeypair,
         dst: &ChainKeypair,
         index: u64,
-        index_offset: Option<u32>,
+        index_offset: u32,
+        win_prob: f64,
     ) -> anyhow::Result<AcknowledgedTicket> {
         let hk1 = HalfKey::random();
         let hk2 = HalfKey::random();
@@ -1277,8 +1309,8 @@ mod tests {
             .addresses(src, dst)
             .amount(TICKET_VALUE)
             .index(index)
-            .index_offset(index_offset.unwrap_or(1))
-            .win_prob(1.0)
+            .index_offset(index_offset)
+            .win_prob(win_prob)
             .channel_epoch(4)
             .challenge(Challenge::from(cp_sum).to_ethereum_challenge())
             .build_signed(src, &Hash::default())?
@@ -1302,7 +1334,7 @@ mod tests {
 
         let tickets: Vec<AcknowledgedTicket> = (0..count_tickets)
             .into_iter()
-            .map(|i| generate_random_ack_ticket(&BOB, &ALICE, i, None))
+            .map(|i| generate_random_ack_ticket(&BOB, &ALICE, i, 1, 1.0))
             .collect::<anyhow::Result<Vec<AcknowledgedTicket>>>()?;
 
         let db_clone = db.clone();
@@ -1386,7 +1418,9 @@ mod tests {
             .perform(|_tx| {
                 Box::pin(async move {
                     for i in 0..TO_REDEEM as usize {
-                        let r = db_clone.mark_tickets_redeemed((&tickets[i]).into()).await?;
+                        let r = db_clone
+                            .mark_tickets_as((&tickets[i]).into(), TicketMarker::Redeemed)
+                            .await?;
                         assert_eq!(1, r, "must redeem only a single ticket");
                     }
                     Ok::<(), DbSqlError>(())
@@ -1425,8 +1459,8 @@ mod tests {
             .pop()
             .context("should contain a ticket")?;
 
-        db.mark_tickets_redeemed((&ticket).into()).await?;
-        assert_eq!(0, db.mark_tickets_redeemed((&ticket).into()).await?);
+        db.mark_tickets_as((&ticket).into(), TicketMarker::Redeemed).await?;
+        assert_eq!(0, db.mark_tickets_as((&ticket).into(), TicketMarker::Redeemed).await?);
 
         Ok(())
     }
@@ -1438,7 +1472,7 @@ mod tests {
         let count_tickets = 10;
         let channel = init_db_with_tickets(&db, count_tickets).await?.0;
 
-        let count_marked = db.mark_tickets_redeemed((&channel).into()).await?;
+        let count_marked = db.mark_tickets_as((&channel).into(), TicketMarker::Redeemed).await?;
         assert_eq!(count_tickets, count_marked as u64, "must mark all tickets in channel");
 
         Ok(())
@@ -1469,7 +1503,7 @@ mod tests {
             "per channel stats must be same"
         );
 
-        db.mark_tickets_neglected((&channel).into()).await?;
+        db.mark_tickets_as((&channel).into(), TicketMarker::Neglected).await?;
 
         let stats = db.get_ticket_statistics(None).await?;
         assert_eq!(
@@ -1493,7 +1527,7 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn test_mark_ticket_rejected() -> anyhow::Result<()> {
+    async fn test_mark_unsaved_ticket_rejected() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ALICE.clone()).await?;
 
         let (_, mut ticket) = init_db_with_tickets(&db, 1).await?;
@@ -1507,7 +1541,7 @@ mod tests {
             "per channel stats must be same"
         );
 
-        db.mark_ticket_rejected(ticket.verified_ticket()).await?;
+        db.mark_unsaved_ticket_rejected(ticket.verified_ticket()).await?;
 
         let stats = db.get_ticket_statistics(None).await?;
         assert_eq!(ticket.verified_ticket().amount, stats.rejected_value);
@@ -1676,8 +1710,8 @@ mod tests {
 
         db.upsert_channel(None, channel_2).await?;
 
-        let t1 = generate_random_ack_ticket(&BOB, &ALICE, 1, None)?;
-        let t2 = generate_random_ack_ticket(&ALICE, &BOB, 1, None)?;
+        let t1 = generate_random_ack_ticket(&BOB, &ALICE, 1, 1, 1.0)?;
+        let t2 = generate_random_ack_ticket(&ALICE, &BOB, 1, 1, 1.0)?;
 
         let value = t1.verified_ticket().amount;
 
@@ -1706,7 +1740,7 @@ mod tests {
 
         assert_eq!(stats_1, stats_2);
 
-        db.mark_tickets_neglected(channel_1.into()).await?;
+        db.mark_tickets_as(channel_1.into(), TicketMarker::Neglected).await?;
 
         let stats_1 = db
             .get_ticket_statistics(Some(generate_channel_id(
@@ -2247,6 +2281,36 @@ mod tests {
     }
 
     #[async_std::test]
+    async fn test_ticket_aggregation_should_not_offer_tickets_with_lower_than_min_win_prob() -> anyhow::Result<()> {
+        const COUNT_TICKETS: usize = 5;
+
+        let (db, channel, tickets) = create_alice_db_with_tickets_from_bob(COUNT_TICKETS).await?;
+
+        assert_eq!(tickets.len(), COUNT_TICKETS);
+
+        let existing_channel_with_multiple_tickets = channel.get_id();
+
+        // Decrease the win prob of one ticket
+        let mut ticket = hopr_db_entity::ticket::Entity::find()
+            .one(&db.tickets_db)
+            .await?
+            .context("should have an active model")?
+            .into_active_model();
+        ticket.winning_probability = Set(f64_to_win_prob(0.5)?.to_vec());
+        ticket.save(&db.tickets_db).await?;
+
+        let prepared_tickets = db
+            .prepare_aggregation_in_channel(&existing_channel_with_multiple_tickets, Default::default())
+            .await?
+            .ok_or(anyhow!("should contain tickets"))?
+            .1;
+
+        assert_eq!(COUNT_TICKETS - 1, prepared_tickets.len());
+
+        Ok(())
+    }
+
+    #[async_std::test]
     async fn test_ticket_aggregation_prepare_request_with_0_tickets_should_return_empty_result() -> anyhow::Result<()> {
         const COUNT_TICKETS: usize = 0;
 
@@ -2304,10 +2368,10 @@ mod tests {
     ) -> anyhow::Result<()> {
         let (db, channel, _) = create_alice_db_with_tickets_from_bob(0).await?;
         let tickets = vec![
-            generate_random_ack_ticket(&BOB, &ALICE, 1, None),
-            generate_random_ack_ticket(&BOB, &ALICE, 0, Some(2)),
-            generate_random_ack_ticket(&BOB, &ALICE, 2, None),
-            generate_random_ack_ticket(&BOB, &ALICE, 3, None),
+            generate_random_ack_ticket(&BOB, &ALICE, 1, 1, 1.0),
+            generate_random_ack_ticket(&BOB, &ALICE, 0, 2, 1.0),
+            generate_random_ack_ticket(&BOB, &ALICE, 2, 1, 1.0),
+            generate_random_ack_ticket(&BOB, &ALICE, 3, 1, 1.0),
         ]
         .into_iter()
         .collect::<anyhow::Result<Vec<AcknowledgedTicket>>>()?;
@@ -2737,7 +2801,7 @@ mod tests {
         let tickets = (0..COUNT_TICKETS)
             .into_iter()
             .map(|i| {
-                generate_random_ack_ticket(&BOB, &ALICE, i as u64, None)
+                generate_random_ack_ticket(&BOB, &ALICE, i as u64, 1, 1.0)
                     .and_then(|v| Ok(v.into_transferable(&ALICE, &Hash::default())?))
             })
             .collect::<anyhow::Result<Vec<_>>>()?;
@@ -2827,14 +2891,14 @@ mod tests {
         let mut tickets = (1..COUNT_TICKETS)
             .into_iter()
             .map(|i| {
-                generate_random_ack_ticket(&BOB, &ALICE, (i + offset) as u64, None)
+                generate_random_ack_ticket(&BOB, &ALICE, (i + offset) as u64, 1, 1.0)
                     .and_then(|v| Ok(v.into_transferable(&ALICE, &Hash::default())?))
             })
             .collect::<anyhow::Result<Vec<_>>>()?;
 
         // Add an aggregated ticket to the set too
         tickets.push(
-            generate_random_ack_ticket(&BOB, &ALICE, 0, Some(offset as u32))
+            generate_random_ack_ticket(&BOB, &ALICE, 0, offset as u32, 1.0)
                 .and_then(|v| Ok(v.into_transferable(&ALICE, &Hash::default())?))?,
         );
 
@@ -2932,7 +2996,7 @@ mod tests {
         let mut tickets = (0..COUNT_TICKETS)
             .into_iter()
             .map(|i| {
-                generate_random_ack_ticket(&BOB, &ALICE, i as u64, None)
+                generate_random_ack_ticket(&BOB, &ALICE, i as u64, 1, 1.0)
                     .and_then(|v| Ok(v.into_transferable(&ALICE, &Hash::default())?))
             })
             .collect::<anyhow::Result<Vec<_>>>()?;
@@ -2967,7 +3031,7 @@ mod tests {
         let tickets = (0..COUNT_TICKETS)
             .into_iter()
             .map(|i| {
-                generate_random_ack_ticket(&BOB, &ALICE, i as u64, None)
+                generate_random_ack_ticket(&BOB, &ALICE, i as u64, 1, 1.0)
                     .and_then(|v| Ok(v.into_transferable(&ALICE, &Hash::default())?))
             })
             .collect::<anyhow::Result<Vec<_>>>()?;
@@ -2997,7 +3061,7 @@ mod tests {
         let tickets = (0..COUNT_TICKETS)
             .into_iter()
             .map(|i| {
-                generate_random_ack_ticket(&BOB, &ALICE, i as u64, None)
+                generate_random_ack_ticket(&BOB, &ALICE, i as u64, 1, 1.0)
                     .and_then(|v| Ok(v.into_transferable(&ALICE, &Hash::default())?))
             })
             .collect::<anyhow::Result<Vec<_>>>()?;
@@ -3027,12 +3091,12 @@ mod tests {
         let mut tickets = (0..COUNT_TICKETS)
             .into_iter()
             .map(|i| {
-                generate_random_ack_ticket(&BOB, &ALICE, i as u64, None)
+                generate_random_ack_ticket(&BOB, &ALICE, i as u64, 1, 1.0)
                     .and_then(|v| Ok(v.into_transferable(&ALICE, &Hash::default())?))
             })
             .collect::<anyhow::Result<Vec<_>>>()?;
 
-        tickets[2] = generate_random_ack_ticket(&BOB, &ChainKeypair::random(), 2, None)
+        tickets[2] = generate_random_ack_ticket(&BOB, &ChainKeypair::random(), 2, 1, 1.0)
             .and_then(|v| Ok(v.into_transferable(&ALICE, &Hash::default())?))?;
 
         db.aggregate_tickets(*ALICE_OFFCHAIN.public(), tickets.clone(), &BOB)
@@ -3060,7 +3124,7 @@ mod tests {
         let tickets = (0..COUNT_TICKETS)
             .into_iter()
             .map(|i| {
-                generate_random_ack_ticket(&BOB, &ALICE, i as u64, None)
+                generate_random_ack_ticket(&BOB, &ALICE, i as u64, 1, 1.0)
                     .and_then(|v| Ok(v.into_transferable(&ALICE, &Hash::default())?))
             })
             .collect::<anyhow::Result<Vec<_>>>()?;
@@ -3090,12 +3154,12 @@ mod tests {
         let mut tickets = (0..COUNT_TICKETS)
             .into_iter()
             .map(|i| {
-                generate_random_ack_ticket(&BOB, &ALICE, i as u64, None)
+                generate_random_ack_ticket(&BOB, &ALICE, i as u64, 1, 1.0)
                     .and_then(|v| Ok(v.into_transferable(&ALICE, &Hash::default())?))
             })
             .collect::<anyhow::Result<Vec<_>>>()?;
 
-        tickets[1] = generate_random_ack_ticket(&BOB, &ALICE, 1, Some(2))
+        tickets[1] = generate_random_ack_ticket(&BOB, &ALICE, 1, 2, 1.0)
             .and_then(|v| Ok(v.into_transferable(&ALICE, &Hash::default())?))?;
 
         db.aggregate_tickets(*ALICE_OFFCHAIN.public(), tickets.clone(), &BOB)
@@ -3122,7 +3186,7 @@ mod tests {
         let mut tickets = (0..COUNT_TICKETS)
             .into_iter()
             .map(|i| {
-                generate_random_ack_ticket(&BOB, &ALICE, i as u64, None)
+                generate_random_ack_ticket(&BOB, &ALICE, i as u64, 1, 1.0)
                     .and_then(|v| Ok(v.into_transferable(&ALICE, &Hash::default())?))
             })
             .collect::<anyhow::Result<Vec<_>>>()?;
@@ -3133,6 +3197,36 @@ mod tests {
         db.aggregate_tickets(*ALICE_OFFCHAIN.public(), tickets.clone(), &BOB)
             .await
             .expect_err("should not aggregate on invalid tickets");
+
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn test_aggregate_ticket_should_not_aggregate_if_ticket_has_lower_than_min_win_prob() -> anyhow::Result<()> {
+        const COUNT_TICKETS: usize = 3;
+
+        let channel = ChannelEntry::new(
+            ALICE.public().to_address(),
+            BOB.public().to_address(),
+            BalanceType::HOPR.balance(u32::MAX),
+            (COUNT_TICKETS + 1).into(),
+            ChannelStatus::Open,
+            3_u32.into(),
+        );
+
+        let db = init_db_with_channel(channel).await?;
+
+        let tickets = (0..COUNT_TICKETS)
+            .into_iter()
+            .map(|i| {
+                generate_random_ack_ticket(&BOB, &ALICE, i as u64, 1, if i > 0 { 1.0 } else { 0.9 })
+                    .and_then(|v| Ok(v.into_transferable(&ALICE, &Hash::default())?))
+            })
+            .collect::<anyhow::Result<Vec<_>>>()?;
+
+        db.aggregate_tickets(*ALICE_OFFCHAIN.public(), tickets.clone(), &BOB)
+            .await
+            .expect_err("should not aggregate tickets with less than minimum win prob");
 
         Ok(())
     }
@@ -3155,7 +3249,7 @@ mod tests {
         let mut tickets = (0..COUNT_TICKETS)
             .into_iter()
             .map(|i| {
-                generate_random_ack_ticket(&BOB, &ALICE, i as u64, None)
+                generate_random_ack_ticket(&BOB, &ALICE, i as u64, 1, 1.0)
                     .and_then(|v| Ok(v.into_transferable(&ALICE, &Hash::default())?))
             })
             .collect::<anyhow::Result<Vec<_>>>()?;
@@ -3172,6 +3266,27 @@ mod tests {
         db.aggregate_tickets(*ALICE_OFFCHAIN.public(), tickets.clone(), &BOB)
             .await
             .expect_err("should not aggregate non-winning tickets");
+
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn test_set_ticket_statistics_when_tickets_are_in_db() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ALICE.clone()).await?;
+
+        let ticket = init_db_with_tickets(&db, 1).await?.1.pop().unwrap();
+
+        db.mark_tickets_as((&ticket).into(), TicketMarker::Redeemed)
+            .await
+            .expect("must not fail");
+
+        let stats = db.get_ticket_statistics(None).await.expect("must not fail");
+        assert_ne!(stats.redeemed_value, BalanceType::HOPR.zero());
+
+        db.reset_ticket_statistics().await.expect("must not fail");
+
+        let stats = db.get_ticket_statistics(None).await.expect("must not fail");
+        assert_eq!(stats.redeemed_value, BalanceType::HOPR.zero());
 
         Ok(())
     }

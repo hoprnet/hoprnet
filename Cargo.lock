@@ -1227,7 +1227,7 @@ dependencies = [
 
 [[package]]
 name = "chain-indexer"
-version = "0.3.1"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "async-channel 2.3.1",
@@ -1254,6 +1254,7 @@ dependencies = [
  "primitive-types",
  "sea-orm",
  "smart-default",
+ "test-log",
  "thiserror",
  "tracing",
 ]
@@ -2725,6 +2726,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "float-cmp"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b09cf3155332e944990140d967ff5eceb70df778b34f77d8075db46e4704e6d8"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
 name = "flume"
 version = "0.9.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3872,7 +3882,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-crypto-packet"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "anyhow",
  "async-std",
@@ -3960,7 +3970,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-api"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "futures",
@@ -4008,7 +4018,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-sql"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "async-lock 3.4.0",
@@ -4048,7 +4058,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-internal-types"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "aquamarine",
@@ -4197,6 +4207,7 @@ version = "0.4.0"
 dependencies = [
  "anyhow",
  "chrono",
+ "float-cmp",
  "hex",
  "hex-literal",
  "hopr-crypto-random",
@@ -4404,6 +4415,7 @@ dependencies = [
  "hopr-network-types",
  "hopr-platform",
  "hoprd-api",
+ "hoprd-db-api",
  "hoprd-inbox",
  "hoprd-keypair",
  "lazy_static",
@@ -4430,7 +4442,7 @@ dependencies = [
 
 [[package]]
 name = "hoprd-api"
-version = "3.3.0"
+version = "3.3.2"
 dependencies = [
  "anyhow",
  "async-broadcast",
@@ -4446,6 +4458,9 @@ dependencies = [
  "hopr-metrics",
  "hopr-network-types",
  "hopr-transport-session",
+ "hoprd-db-api",
+ "hoprd-db-entity",
+ "hoprd-db-migration",
  "hoprd-inbox",
  "lazy_static",
  "libp2p-identity",
@@ -4466,6 +4481,54 @@ dependencies = [
  "utoipa",
  "utoipa-scalar",
  "validator",
+]
+
+[[package]]
+name = "hoprd-db-api"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-std",
+ "async-trait",
+ "env_logger",
+ "hex-literal",
+ "hopr-async-runtime",
+ "hopr-crypto-random",
+ "hopr-metrics",
+ "hoprd-db-entity",
+ "hoprd-db-migration",
+ "lazy_static",
+ "libp2p-identity",
+ "sea-orm",
+ "sqlx",
+ "thiserror",
+ "tracing",
+ "tracing-test",
+]
+
+[[package]]
+name = "hoprd-db-entity"
+version = "0.1.0"
+dependencies = [
+ "async-std",
+ "clap",
+ "hopr-crypto-types",
+ "hopr-internal-types",
+ "hopr-primitive-types",
+ "hoprd-db-migration",
+ "sea-orm",
+ "sea-orm-cli",
+ "sea-orm-migration",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
+name = "hoprd-db-migration"
+version = "0.1.0"
+dependencies = [
+ "async-std",
+ "sea-orm-migration",
 ]
 
 [[package]]
