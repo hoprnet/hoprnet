@@ -57,68 +57,71 @@ where
 
     fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         tracing::trace!("Sequencer::poll_ready");
-        if !self.is_closed {
-            if self.buffer.len() >= self.cfg.capacity {
-                self.rx_waker = Some(cx.waker().clone());
+        if self.is_closed {
+            return Poll::Ready(Err(SessionError::ReassemblerClosed));
+        }
 
-                // Give the stream a chance to yield an element
-                if let Some(waker) = self.tx_waker.take() {
-                    waker.wake();
-                }
-                Poll::Pending
-            } else {
-                Poll::Ready(Ok(()))
+        if self.buffer.len() >= self.cfg.capacity {
+            self.rx_waker = Some(cx.waker().clone());
+
+            // Give the stream a chance to yield an element
+            if let Some(waker) = self.tx_waker.take() {
+                waker.wake();
             }
+            Poll::Pending
         } else {
-            Poll::Ready(Err(SessionError::ReassemblerClosed))
+            Poll::Ready(Ok(()))
         }
     }
 
     fn start_send(mut self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
         tracing::trace!("Sequencer::start_ready");
-        if !self.is_closed {
-            if item.ge(&self.next_id) {
-                self.buffer.push(std::cmp::Reverse(item));
-                if self.buffer.len() >= self.cfg.flush_at {
-                    if let Some(waker) = self.tx_waker.take() {
-                        waker.wake();
-                    }
-                }
-            } else {
-                tracing::warn!("cannot accept frame older than {}", self.next_id);
-            }
-            Ok(())
-        } else {
-            Err(SessionError::ReassemblerClosed)
+        if self.is_closed {
+            return Err(SessionError::ReassemblerClosed);
         }
+
+        if item.ge(&self.next_id) {
+            self.buffer.push(std::cmp::Reverse(item));
+            if self.buffer.len() >= self.cfg.flush_at {
+                if let Some(waker) = self.tx_waker.take() {
+                    waker.wake();
+                }
+            }
+        } else {
+            tracing::warn!("cannot accept frame older than {}", self.next_id);
+        }
+
+        Ok(())
     }
 
     fn poll_flush(mut self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         tracing::trace!("Sequencer::poll_flush");
-        if !self.is_closed {
-            if let Some(waker) = self.tx_waker.take() {
-                waker.wake();
-            }
-            Poll::Ready(Ok(()))
-        } else {
-            Poll::Ready(Err(SessionError::ReassemblerClosed))
+        if self.is_closed {
+            return Poll::Ready(Err(SessionError::ReassemblerClosed));
         }
+
+        if let Some(waker) = self.tx_waker.take() {
+            waker.wake();
+        }
+
+        Poll::Ready(Ok(()))
     }
 
     fn poll_close(mut self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         tracing::trace!("Sequencer::poll_close");
-        if !self.is_closed {
-            self.is_closed = true;
-            if let Some(waker) = self.tx_waker.take() {
-                waker.wake();
-            }
-            if let Some(waker) = self.rx_waker.take() {
-                waker.wake();
-            }
-            Poll::Ready(Ok(()))
-        } else {
-            Poll::Ready(Err(SessionError::ReassemblerClosed))
+        if self.is_closed {
+            return Poll::Ready(Err(SessionError::ReassemblerClosed));
         }
+
+        self.is_closed = true;
+        if let Some(waker) = self.tx_waker.take() {
+            waker.wake();
+        }
+        if let Some(waker) = self.rx_waker.take() {
+            waker.wake();
+        }
+
+        Poll::Ready(Ok(()))
     }
 }
 

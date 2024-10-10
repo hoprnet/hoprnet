@@ -107,7 +107,7 @@ impl futures::Sink<Segment> for Reassembler {
             return Err(SessionError::ReassemblerClosed);
         }
 
-        let emit_frame = match self.frames.entry(item.frame_id) {
+        let maybe_frame = match self.frames.entry(item.frame_id) {
             Entry::Occupied(mut e) => {
                 let builder = e.get_mut();
                 builder.add_segment(item);
@@ -130,7 +130,7 @@ impl futures::Sink<Segment> for Reassembler {
             }
         };
 
-        if let Some(frame) = emit_frame {
+        if let Some(frame) = maybe_frame {
             self.complete_frames.push_back(frame);
             if let Some(waker) = self.tx_waker.take() {
                 waker.wake();
