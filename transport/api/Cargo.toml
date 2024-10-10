@@ -11,6 +11,7 @@ crate-type = ["rlib"]
 
 [features]
 default = []
+transport-quic = []
 runtime-async-std = [
   "core-network/runtime-async-std",
   "hopr-async-runtime/runtime-async-std",

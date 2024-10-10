@@ -44,6 +44,7 @@ telemetry = [
   "dep:opentelemetry_sdk",
   "dep:tracing-opentelemetry",
 ]
+transport-quic = ["hopr-lib/transport-quic"]
 
 [dependencies]
 anyhow = { workspace = true }

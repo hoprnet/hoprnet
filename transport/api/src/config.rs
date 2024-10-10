@@ -91,17 +91,29 @@ impl Display for HostConfig {
     }
 }
 
+#[cfg(not(feature = "transport-quic"))]
+fn default_multiaddr_transport(port: u16) -> String {
+    format!("tcp/{port}")
+}
+
+#[cfg(feature = "transport-quic")]
+fn default_multiaddr_transport(port: u16) -> String {
+    format!("udp/{port}/quic-v1")
+}
+
 impl TryFrom<&HostConfig> for Multiaddr {
     type Error = HoprTransportError;
 
     fn try_from(value: &HostConfig) -> Result<Self, Self::Error> {
         match &value.address {
-            HostType::IPv4(ip) => Multiaddr::from_str(format!("/ip4/{}/tcp/{}", ip.as_str(), value.port).as_str())
-                .map_err(|e| HoprTransportError::Api(e.to_string())),
-            HostType::Domain(domain) => {
-                Multiaddr::from_str(format!("/dns4/{}/tcp/{}", domain.as_str(), value.port).as_str())
-                    .map_err(|e| HoprTransportError::Api(e.to_string()))
-            }
+            HostType::IPv4(ip) => Multiaddr::from_str(
+                format!("/ip4/{}/{}", ip.as_str(), default_multiaddr_transport(value.port)).as_str(),
+            )
+            .map_err(|e| HoprTransportError::Api(e.to_string())),
+            HostType::Domain(domain) => Multiaddr::from_str(
+                format!("/dns4/{}/{}", domain.as_str(), default_multiaddr_transport(value.port)).as_str(),
+            )
+            .map_err(|e| HoprTransportError::Api(e.to_string())),
         }
     }
 }
