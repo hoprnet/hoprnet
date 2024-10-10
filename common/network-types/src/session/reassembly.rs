@@ -149,15 +149,14 @@ impl futures::Sink<Segment> for Reassembler {
         Poll::Ready(Ok(()))
     }
 
-    fn poll_close(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_close(mut self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         tracing::trace!("Reassembler::poll_close");
         if self.is_closed {
             return Poll::Ready(Err(SessionError::ReassemblerClosed));
         }
 
-        let this = self.project();
-        *this.is_closed = true;
-        if let Some(waker) = this.tx_waker.take() {
+        self.is_closed = true;
+        if let Some(waker) = self.tx_waker.take() {
             waker.wake();
         }
         Poll::Ready(Ok(()))

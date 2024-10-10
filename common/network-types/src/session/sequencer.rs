@@ -10,7 +10,7 @@ use crate::prelude::FrameId;
 pub struct SequencerConfig {
     pub timeout: Duration,
     pub flush_at: usize,
-    pub initial_capacity: usize,
+    pub capacity: usize,
 }
 
 impl Default for SequencerConfig {
@@ -18,7 +18,7 @@ impl Default for SequencerConfig {
         Self {
             timeout: Duration::from_secs(5),
             flush_at: 0,
-            initial_capacity: 1024,
+            capacity: 1024,
         }
     }
 }
@@ -30,6 +30,7 @@ pub struct Sequencer<T> {
     next_id: FrameId,
     last_emitted: Instant,
     tx_waker: Option<Waker>,
+    rx_waker: Option<Waker>,
     is_closed: bool,
     cfg: SequencerConfig,
 }
@@ -37,10 +38,11 @@ pub struct Sequencer<T> {
 impl<T: Ord> Sequencer<T> {
     pub fn new(cfg: SequencerConfig) -> Self {
         Self {
-            buffer: BinaryHeap::with_capacity(cfg.initial_capacity),
+            buffer: BinaryHeap::with_capacity(cfg.capacity),
             next_id: 1,
             last_emitted: Instant::now(),
             tx_waker: None,
+            rx_waker: None,
             is_closed: false,
             cfg,
         }
@@ -53,31 +55,37 @@ where
 {
     type Error = SessionError;
 
-    fn poll_ready(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         tracing::trace!("Sequencer::poll_ready");
-        let this = self.project();
-        if !*this.is_closed {
-            if this.buffer.len() >= this.cfg.initial_capacity {
-                this.buffer.reserve(this.cfg.initial_capacity);
+        if !self.is_closed {
+            if self.buffer.len() >= self.cfg.capacity {
+                self.rx_waker = Some(cx.waker().clone());
+
+                // Give the stream a chance to yield an element
+                if let Some(waker) = self.tx_waker.take() {
+                    waker.wake();
+                }
+                Poll::Pending
+            } else {
+                Poll::Ready(Ok(()))
             }
-            Poll::Ready(Ok(()))
         } else {
             Poll::Ready(Err(SessionError::ReassemblerClosed))
         }
     }
 
-    fn start_send(self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
-        let this = self.project();
-        if !*this.is_closed {
-            if item.ge(this.next_id) {
-                this.buffer.push(std::cmp::Reverse(item));
-                if this.buffer.len() >= this.cfg.flush_at {
-                    if let Some(waker) = this.tx_waker.take() {
+    fn start_send(mut self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
+        tracing::trace!("Sequencer::start_ready");
+        if !self.is_closed {
+            if item.ge(&self.next_id) {
+                self.buffer.push(std::cmp::Reverse(item));
+                if self.buffer.len() >= self.cfg.flush_at {
+                    if let Some(waker) = self.tx_waker.take() {
                         waker.wake();
                     }
                 }
             } else {
-                tracing::warn!("cannot accept frame older than {}", this.next_id);
+                tracing::warn!("cannot accept frame older than {}", self.next_id);
             }
             Ok(())
         } else {
@@ -85,11 +93,10 @@ where
         }
     }
 
-    fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_flush(mut self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         tracing::trace!("Sequencer::poll_flush");
-        let this = self.project();
-        if !*this.is_closed {
-            if let Some(waker) = this.tx_waker.take() {
+        if !self.is_closed {
+            if let Some(waker) = self.tx_waker.take() {
                 waker.wake();
             }
             Poll::Ready(Ok(()))
@@ -98,12 +105,14 @@ where
         }
     }
 
-    fn poll_close(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_close(mut self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         tracing::trace!("Sequencer::poll_close");
-        let this = self.project();
-        if !*this.is_closed {
-            *this.is_closed = true;
-            if let Some(waker) = this.tx_waker.take() {
+        if !self.is_closed {
+            self.is_closed = true;
+            if let Some(waker) = self.tx_waker.take() {
+                waker.wake();
+            }
+            if let Some(waker) = self.rx_waker.take() {
                 waker.wake();
             }
             Poll::Ready(Ok(()))
@@ -136,7 +145,11 @@ where
 
                 return if is_next_ready {
                     tracing::trace!("Sequencer::poll_next ready {current_to_emit}");
-                    Poll::Ready(self.buffer.pop().map(|r| Ok(r.0)))
+                    let popped = self.buffer.pop().map(|r| Ok(r.0));
+                    if let Some(waker) = self.rx_waker.take() {
+                        waker.wake();
+                    }
+                    Poll::Ready(popped)
                 } else {
                     tracing::trace!("Sequencer::poll_next discard {current_to_emit}");
                     Poll::Ready(Some(Err(SessionError::FrameDiscarded(current_to_emit))))
@@ -155,8 +168,13 @@ where
 
         // The next Sink operation will wake us up
         self.tx_waker = Some(cx.waker().clone());
-        tracing::trace!("Sequencer::poll_next pending");
 
+        // ... but we need to give it a chance
+        if let Some(waker) = self.rx_waker.take() {
+            waker.wake();
+        }
+
+        tracing::trace!("Sequencer::poll_next pending");
         Poll::Pending
     }
 }
