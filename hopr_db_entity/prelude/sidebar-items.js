@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":["Account","Announcement","ChainInfo","Channel","GlobalSettings","NetworkEligibility","NetworkPeer","NetworkRegistry","NodeInfo","OutgoingTicketIndex","Ticket","TicketStatistics"]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"mod":["hopr_winning_probability_oracle_events"],"static":["HOPRWINNINGPROBABILITYORACLEEVENTS_ABI"],"struct":["HoprWinningProbabilityOracleEvents","WinProbUpdatedFilter"]};

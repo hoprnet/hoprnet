@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["PACKET_TAG_LENGTH"],"struct":["Challenge","CompressedPublicKey","CurvePoint","HalfKey","HalfKeyChallenge","Hash","OffchainPublicKey","OffchainSignature","PeerId","PublicKey","Response","Signature"],"trait":["ToChecksum"],"type":["PacketTag"]};
