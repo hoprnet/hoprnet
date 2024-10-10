@@ -14,9 +14,7 @@ from .node import Node
 # used by nodes to get unique port assignments
 PORT_BASE = 19100
 
-
 EXTRA_HEADERS = [("X-Auth-Token", API_TOKEN)]
-
 
 @pytest.mark.parametrize("peer", random.sample(nodes_with_auth(), 1))
 def test_hoprd_websocket_api_should_reject_a_connection_without_a_valid_token(peer: str, swarm7: dict[str, Node]):
