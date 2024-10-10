@@ -36,6 +36,9 @@ pub enum RpcError {
 
     #[error(transparent)]
     ProviderError(#[from] ProviderError),
+
+    #[error("multicall Error: {0}")]
+    MulticallError(String),
 }
 
 pub type Result<T> = std::result::Result<T, RpcError>;

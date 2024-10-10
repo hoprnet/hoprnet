@@ -183,6 +183,7 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
             chain_id: chain_config.chain.chain_id as u64,
             contract_addrs: contract_addresses,
             module_address,
+            safe_address,
             expected_block_time: Duration::from_millis(chain_config.chain.block_time),
             tx_polling_interval: Duration::from_millis(chain_config.tx_polling_interval),
             finality: chain_config.confirmations,
