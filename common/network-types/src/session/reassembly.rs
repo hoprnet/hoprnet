@@ -102,37 +102,40 @@ impl futures::Sink<Segment> for Reassembler {
         }
     }
 
-    fn start_send(self: Pin<&mut Self>, item: Segment) -> Result<(), Self::Error> {
+    fn start_send(mut self: Pin<&mut Self>, item: Segment) -> Result<(), Self::Error> {
         if self.is_closed {
             return Err(SessionError::ReassemblerClosed);
         }
 
-        let this = self.project();
-        match this.frames.entry(item.frame_id) {
+        let emit_frame = match self.frames.entry(item.frame_id) {
             Entry::Occupied(mut e) => {
                 let builder = e.get_mut();
                 builder.add_segment(item);
                 if builder.remaining() == 0 {
                     tracing::trace!("frame {} is complete", e.key());
-                    this.complete_frames.push_back(e.remove().build());
-                    if let Some(waker) = this.tx_waker.take() {
-                        waker.wake();
-                    }
+                    Some(e.remove().build())
+                } else {
+                    None
                 }
             }
             Entry::Vacant(e) => {
                 let builder = FrameBuilder::from(item);
                 if builder.remaining() == 0 {
                     tracing::trace!("single segment frame {} is complete", builder.frame_id());
-                    this.complete_frames.push_back(builder.build());
-                    if let Some(waker) = this.tx_waker.take() {
-                        waker.wake();
-                    }
+                    Some(builder.build())
                 } else {
                     e.insert(builder);
+                    None
                 }
             }
         };
+
+        if let Some(frame) = emit_frame {
+            self.complete_frames.push_back(frame);
+            if let Some(waker) = self.tx_waker.take() {
+                waker.wake();
+            }
+        }
 
         Ok(())
     }
