@@ -49,7 +49,7 @@ COMPOSE_PROFILES=hoprd docker compose up -d
 COMPOSE_PROFILES=hoprd,admin-ui docker compose up -d
 ```
 
-Access the website at [http://localhost:8080](http://localhost:8080), where `HOPR_ADMIN_PORT=8080` is the configured port.
+Access the website at [http://localhost:4677](http://localhost:4677), where `HOPR_ADMIN_PORT=4677` is the configured port.
 The default hoprd endpoint is available at [http://localhost:3001](http://localhost:3001), with `HOPRD_API_PORT=3001` as the configured port.
 
 3. Run hopr node with a full internal monitoring system (Prometheus and Grafana)

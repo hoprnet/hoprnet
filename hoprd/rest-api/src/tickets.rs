@@ -169,6 +169,29 @@ pub(super) async fn show_ticket_statistics(State(state): State<Arc<InternalState
     }
 }
 
+/// Resets the ticket metrics.
+#[utoipa::path(
+        delete,
+        path = const_format::formatcp!("{BASE_PATH}/tickets/statistics"),
+        responses(
+            (status = 204, description = "Ticket statistics reset successfully."),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
+            (status = 422, description = "Unknown failure", body = ApiError)
+        ),
+        security(
+            ("api_token" = []),
+            ("bearer_token" = [])
+        ),
+        tag = "Tickets"
+    )]
+pub(super) async fn reset_ticket_statistics(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
+    let hopr = state.hopr.clone();
+    match hopr.reset_ticket_statistics().await {
+        Ok(()) => (StatusCode::NO_CONTENT, "").into_response(),
+        Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
+    }
+}
+
 /// Starts redeeming of all tickets in all channels.
 ///
 /// **WARNING:** this should almost **never** be used as it can issue a large

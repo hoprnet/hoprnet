@@ -1,4 +1,6 @@
+use crate::utils::SocketAddrStr;
 use futures::{pin_mut, ready, FutureExt, Sink, SinkExt};
+use std::fmt::Debug;
 use std::io::ErrorKind;
 use std::pin::Pin;
 use std::sync::{Arc, OnceLock};
@@ -51,7 +53,7 @@ pub struct ConnectedUdpStream {
     socket_handles: Vec<(tokio::task::JoinHandle<()>, tokio::task::JoinHandle<()>)>,
     ingress_rx: Box<dyn AsyncRead + Send + Unpin>,
     egress_tx: Option<BoxIoSink<Box<[u8]>>>,
-    counterparty: Arc<OnceLock<std::net::SocketAddr>>,
+    counterparty: Arc<OnceLock<SocketAddrStr>>,
     bound_to: std::net::SocketAddr,
 }
 
@@ -131,16 +133,22 @@ impl UdpStreamBuilder {
 
     /// Sets how many parallel readers/writer sockets should be bound.
     ///
-    /// Each UDP socket is bound with `SO_REUSEADDR` to facilitate parallel processing
+    /// Each UDP socket is bound with `SO_REUSEADDR` and `SO_REUSEPORT` to facilitate parallel processing
     /// of read and write operations.
+    ///
+    /// **NOTE**: This is a Linux-specific optimization, and it will have no effect on other systems.
     ///
     /// - If some value `n` > 0 is given, the stream will bind `n` sockets.
     /// - If 0 is given, the number of sockets is determined by [`std::thread::available_parallelism`].
     /// - If none is given, only a single socket will be created (no parallelism).
     ///
-    /// Default is none.
+    /// Default is none. This will always be the case for non-Linux systems.
+    #[allow(unused_variables, unused_mut)]
     pub fn with_parallelism(mut self, parallelism: usize) -> Self {
-        self.parallelism = Some(parallelism);
+        #[cfg(target_os = "linux")]
+        {
+            self.parallelism = Some(parallelism);
+        }
         self
     }
 
@@ -167,19 +175,29 @@ impl UdpStreamBuilder {
     /// if the [counterparty](UdpStreamBuilder::with_counterparty) has been set.
     pub fn build<A: std::net::ToSocketAddrs>(self, bind_addr: A) -> std::io::Result<ConnectedUdpStream> {
         let avail_parallelism = std::thread::available_parallelism()
-            .map(usize::from)
+            .map(|v| usize::from(v) / 2) // Each socket gets one RX and one TX task
             .unwrap_or_else(|e| {
                 warn!("failed to determine available parallelism, defaulting to 1: {e}");
                 1
             })
-            / 2; // Each socket gets one RX and one TX task
+            .max(1);
+
         let num_socks = self
             .parallelism
-            .map(|n| if n == 0 { avail_parallelism } else { n })
-            .unwrap_or(1)
-            .max(avail_parallelism);
+            .map(|n| {
+                if n == 0 {
+                    avail_parallelism
+                } else {
+                    n.min(avail_parallelism)
+                }
+            })
+            .unwrap_or(1);
 
-        let counterparty = Arc::new(self.counterparty.map(OnceLock::from).unwrap_or_default());
+        let counterparty = Arc::new(
+            self.counterparty
+                .map(|s| OnceLock::from(SocketAddrStr::from(s)))
+                .unwrap_or_default(),
+        );
         let ((ingress_tx, ingress_rx), (egress_tx, egress_rx)) = if let Some(q) = self.queue_size {
             (flume::bounded(q), flume::bounded(q))
         } else {
@@ -198,9 +216,12 @@ impl UdpStreamBuilder {
                     std::net::SocketAddr::V6(_) => socket2::Domain::IPV6,
                 };
 
-                // Bind a new non-blocking UDP socket with SO_REUSEADDR
+                // Bind a new non-blocking UDP socket
                 let sock = socket2::Socket::new(domain, socket2::Type::DGRAM, None)?;
-                sock.set_reuse_address(true)?;
+                if num_socks > 1 {
+                    sock.set_reuse_address(true)?; // Needed for every next socket with non-wildcard IP
+                    sock.set_reuse_port(true)?; // Needed on Linux to evenly distribute datagrams
+                }
                 sock.set_nonblocking(true)?;
                 sock.bind(&bound_addr.unwrap_or(first_bind_addr).into())?;
 
@@ -265,7 +286,7 @@ impl ConnectedUdpStream {
         socket_id: usize,
         sock_rx: Arc<UdpSocket>,
         ingress_tx: flume::Sender<std::io::Result<tokio_util::bytes::Bytes>>,
-        counterparty: Arc<OnceLock<std::net::SocketAddr>>,
+        counterparty: Arc<OnceLock<SocketAddrStr>>,
         foreign_data_mode: ForeignDataMode,
         buf_size: usize,
     ) -> std::io::Result<futures::future::BoxFuture<'static, ()>> {
@@ -282,10 +303,11 @@ impl ConnectedUdpStream {
                             udp_bound_addr = tracing::field::debug(sock_rx.local_addr()),
                             "got {read} bytes of data from {read_addr}"
                         );
-                        #[cfg(all(feature = "prometheus", not(test)))]
-                        METRIC_UDP_INGRESS_LEN.observe(&[&read.to_string()], read as f64);
 
-                        let addr = counterparty_rx.get_or_init(|| read_addr);
+                        let addr = counterparty_rx.get_or_init(|| read_addr.into());
+
+                        #[cfg(all(feature = "prometheus", not(test)))]
+                        METRIC_UDP_INGRESS_LEN.observe(&[addr.as_str()], read as f64);
 
                         // If the data is from a counterparty, or we accept anything, pass it
                         if read_addr.eq(addr) || foreign_data_mode == ForeignDataMode::Accept {
@@ -368,7 +390,7 @@ impl ConnectedUdpStream {
         socket_id: usize,
         sock_tx: Arc<UdpSocket>,
         egress_rx: flume::Receiver<Box<[u8]>>,
-        counterparty: Arc<OnceLock<std::net::SocketAddr>>,
+        counterparty: Arc<OnceLock<SocketAddrStr>>,
     ) -> std::io::Result<futures::future::BoxFuture<'static, ()>> {
         let counterparty_tx = counterparty.clone();
         Ok(async move {
@@ -376,7 +398,7 @@ impl ConnectedUdpStream {
                 match egress_rx.recv_async().await {
                     Ok(data) => {
                         if let Some(target) = counterparty_tx.get() {
-                            if let Err(e) = sock_tx.send_to(&data, target).await {
+                            if let Err(e) = sock_tx.send_to(&data, target.as_ref()).await {
                                 error!(
                                     socket_id,
                                     udp_bound_addr = tracing::field::debug(sock_tx.local_addr()),
@@ -386,7 +408,7 @@ impl ConnectedUdpStream {
                             trace!(socket_id, "sent {} bytes of data to {target}", data.len());
 
                             #[cfg(all(feature = "prometheus", not(test)))]
-                            METRIC_UDP_EGRESS_LEN.observe(&[&target.to_string()], data.len() as f64);
+                            METRIC_UDP_EGRESS_LEN.observe(&[target.as_str()], data.len() as f64);
                         } else {
                             error!(
                                 socket_id,

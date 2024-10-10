@@ -1,9 +1,10 @@
-import os
 import logging
+import os
 from pathlib import Path
 from subprocess import STDOUT, Popen, run
 
 from .hopr import HoprdAPI
+
 
 def load_env_file(env_file: str) -> dict:
     env = {}
@@ -19,6 +20,7 @@ def load_env_file(env_file: str) -> dict:
     except ValueError:
         logging.error(f"Incorrect format in environment file {env_file}.")
     return env
+
 
 class Node:
     def __init__(
@@ -65,8 +67,8 @@ class Node:
 
     def load_addresses(self):
         loaded_env = load_env_file(f"{self.dir}.env")
-        self.safe_address = loaded_env.get('HOPRD_SAFE_ADDRESS')
-        self.module_address = loaded_env.get('HOPRD_MODULE_ADDRESS')
+        self.safe_address = loaded_env.get("HOPRD_SAFE_ADDRESS")
+        self.module_address = loaded_env.get("HOPRD_MODULE_ADDRESS")
         if self.safe_address is None or self.module_address is None:
             raise ValueError("Critical addresses are missing in the environment file.")
 
@@ -118,18 +120,31 @@ class Node:
     def setup(self, password: str, config_file: Path, dir: Path):
         trace_telemetry = "true" if os.getenv("TRACE_TELEMETRY") is not None else "false"
         log_level = "trace" if os.getenv("TRACE_TELEMETRY") is not None else "debug"
-        
+
         api_token_param = f"--api-token={self.api_token}" if self.api_token else "--disableApiAuthentication"
         custom_env = {
-            "RUST_LOG": f"{log_level},libp2p_swarm=info,libp2p_mplex=info,multistream_select=info,isahc=error" +
-                        "sea_orm=warn,sqlx=warn,hyper_util=warn,libp2p_tcp=info,libp2p_dns=info,hickory_resolver=warn",
+            "RUST_LOG": ",".join(
+                [
+                    log_level,
+                    "libp2p_swarm=info",
+                    "libp2p_mplex=info",
+                    "multistream_select=info",
+                    "isahc=error",
+                    "sea_orm=warn",
+                    "sqlx=warn",
+                    "hyper_util=warn",
+                    "libp2p_tcp=info",
+                    "libp2p_dns=info",
+                    "hickory_resolver=warn",
+                ]
+            ),
             "RUST_BACKTRACE": "full",
             "HOPRD_HEARTBEAT_INTERVAL": "2500",
             "HOPRD_HEARTBEAT_THRESHOLD": "2500",
             "HOPRD_HEARTBEAT_VARIANCE": "1000",
             "HOPRD_NETWORK_QUALITY_THRESHOLD": "0.3",
             "HOPRD_USE_OPENTELEMETRY": trace_telemetry,
-            "OTEL_SERVICE_NAME": f"hoprd-{self.p2p_port}" 
+            "OTEL_SERVICE_NAME": f"hoprd-{self.p2p_port}",
         }
         loaded_env = load_env_file(f"{self.dir}.env")
 
@@ -163,6 +178,9 @@ class Node:
             )
 
         return self.proc is not None
+
+    def __eq__(self, other):
+        return self.peer_id == other.peer_id
 
     def clean_up(self):
         self.proc.kill()

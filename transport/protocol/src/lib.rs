@@ -73,7 +73,7 @@ use msg::processor::{PacketSendFinalizer, PacketUnwrapping, PacketWrapping};
 use libp2p::PeerId;
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use std::collections::HashMap;
-use tracing::{debug, error};
+use tracing::{error, trace};
 
 use hopr_async_runtime::prelude::{sleep, spawn};
 use hopr_db_api::protocol::HoprDbProtocolOperations;
@@ -286,7 +286,7 @@ where
 
                     async move {
                         let random_delay = cfg.random_delay();
-                        debug!(
+                        trace!(
                             delay_in_ms = random_delay.as_millis(),
                             "Mixer created a random packet delay",
                         );
