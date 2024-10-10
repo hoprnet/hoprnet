@@ -8,7 +8,7 @@ use std::task::{Context, Poll};
 /// Joins [futures::AsyncRead] and [futures::AsyncWrite] into a single object.
 pub struct DuplexIO<R, W>(pub R, pub W);
 
-impl<R, W> From<(R,W)> for DuplexIO<R, W> {
+impl<R, W> From<(R, W)> for DuplexIO<R, W> {
     fn from(value: (R, W)) -> Self {
         Self(value.0, value.1)
     }

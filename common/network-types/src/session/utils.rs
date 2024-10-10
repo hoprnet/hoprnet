@@ -1,13 +1,14 @@
 use std::pin::Pin;
-use std::task::{Context, Poll};
-use std::time::{Duration, Instant};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::task::{Context, Poll};
+use std::time::{Duration, Instant};
 
 use futures::channel::mpsc::UnboundedSender;
 use futures::stream::BoxStream;
 use futures::{AsyncRead, AsyncWrite, Stream, StreamExt};
-use rand::prelude::{thread_rng, Distribution, StdRng, Rng, SeedableRng};
+use rand::distributions::Bernoulli;
+use rand::prelude::{thread_rng, Distribution, Rng, SeedableRng, StdRng};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) struct RetryToken {
@@ -131,11 +132,9 @@ impl Default for FaultyNetworkConfig {
             fault_prob: 0.0,
             mixing_factor: 0,
             rng_seed: [
-                0xd8, 0xa4, 0x71, 0xf1, 0xc2, 0x04, 0x90, 0xa3,
-                0x44, 0x2b, 0x96, 0xfd, 0xde, 0x9d, 0x18, 0x07,
-                0x42, 0x80, 0x96, 0xe1, 0x60, 0x1b, 0x0c, 0xef,
-                0x0e, 0xea, 0x7e, 0x6d, 0x44, 0xa2, 0x4c, 0x01
-            ]
+                0xd8, 0xa4, 0x71, 0xf1, 0xc2, 0x04, 0x90, 0xa3, 0x44, 0x2b, 0x96, 0xfd, 0xde, 0x9d, 0x18, 0x07, 0x42,
+                0x80, 0x96, 0xe1, 0x60, 0x1b, 0x0c, 0xef, 0x0e, 0xea, 0x7e, 0x6d, 0x44, 0xa2, 0x4c, 0x01,
+            ],
         }
     }
 }
@@ -203,7 +202,8 @@ impl<const C: usize> FaultyNetwork<'_, C> {
         let (ingress, egress) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
 
         let mut rng = StdRng::from_seed(cfg.rng_seed);
-        let egress = egress.filter(move |_| futures::future::ready(rng.gen_bool(1.0 - cfg.fault_prob)));
+        let bernoulli = Bernoulli::new(1.0 - cfg.fault_prob).unwrap();
+        let egress = egress.filter(move |_| futures::future::ready(bernoulli.sample(&mut rng)));
 
         let egress = if cfg.mixing_factor > 0 {
             let mut rng = StdRng::from_seed(cfg.rng_seed);
@@ -225,13 +225,12 @@ impl<const C: usize> FaultyNetwork<'_, C> {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
-    use std::future::Future;
     use super::*;
-    use futures::{FutureExt, TryStreamExt};
     use futures::io::{AsyncReadExt, AsyncWriteExt};
+    use futures::TryStreamExt;
+    use std::future::Future;
 
     fn spawn_single_byte_read_write<C>(
         channel: C,
@@ -267,7 +266,9 @@ mod tests {
         });
 
         #[cfg(feature = "runtime-tokio")]
-        { (read.map(|v| v.unwrap()), written.map(|v| v.unwrap())) }
+        {
+            (read.map(|v| v.unwrap()), written.map(|v| v.unwrap()))
+        }
 
         #[cfg(not(feature = "runtime-tokio"))]
         (read, written)
