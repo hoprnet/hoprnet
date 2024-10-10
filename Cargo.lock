@@ -1305,6 +1305,7 @@ dependencies = [
  "hopr-crypto-types",
  "hopr-internal-types",
  "hopr-primitive-types",
+ "lazy_static",
  "libp2p-identity",
  "multiaddr",
  "serde",

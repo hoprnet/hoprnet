@@ -831,15 +831,15 @@ impl Hopr {
             }
         }
 
-        // Check Safe-module configuration:
+        // Check Safe-module status:
         // 1) if the node is already included into the module
         // 2) if the module is enabled in the safe
         // 3) if the safe is the owner of the module
-        // if any of the conditions is not met, node panic
+        // if any of the conditions is not met, return error
         let safe_module_configuration = self
             .chain_api
             .rpc()
-            .check_node_safe_module_configuration(self.me_onchain())
+            .check_node_safe_module_status(self.me_onchain())
             .await
             .map_err(HoprChainError::Rpc)?;
 
@@ -848,9 +848,10 @@ impl Hopr {
                 "Something is wrong with the safe module configuration: {:?}",
                 safe_module_configuration
             );
-            return Err(HoprLibError::ChainApi(HoprChainError::Api(
-                "Safe and module are not configured correctly".into(),
-            )));
+            return Err(HoprLibError::ChainApi(HoprChainError::Api(format!(
+                "Safe and module are not configured correctly {:?}",
+                safe_module_configuration,
+            ))));
         }
 
         // Possibly register node-safe pair to NodeSafeRegistry. Following that the
