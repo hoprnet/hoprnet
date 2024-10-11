@@ -240,6 +240,41 @@
               ];
             };
           };
+
+          plutoSrc = fs.toSource {
+            root = ./.;
+            fileset = fs.unions [
+              ./scripts/setup-local-cluster.sh
+              ./topology/full_interconnected_cluster.sh
+            ];
+          };
+          pluto-docker = pkgs.dockerTools.buildLayeredImage {
+            name = "hopr-pluto";
+            tag = "latest";
+            # breaks binary reproducibility, but makes usage easier
+            created = "now";
+            contents = [ pkgs.foundry-bin plutoSrc anvilSrc pkgs.tini pkgs.runtimeShellPackage ];
+            enableFakechroot = true;
+            fakeRootCommands = ''
+              #!${pkgs.runtimeShell}
+              /scripts/run-local-anvil.sh
+              sleep 2
+              lsof -i :8545 -s TCP:LISTEN -t | xargs -I {} -n 1 kill {} || :
+              rm -rf /ethereum/contracts/broadcast/
+              rm -f /tmp/*.log
+              rm -f /.anvil.state.json
+            '';
+            config = {
+              Cmd = [
+                "/bin/tini"
+                "--"
+                "/scripts/run-local-anvil.sh"
+                "-s"
+                "-f"
+              ];
+            };
+          };
+
           dockerImageUploadScript = image: pkgs.writeShellScriptBin "docker-image-upload" ''
             set -eu
             OCI_ARCHIVE="$(nix build --no-link --print-out-paths ${image})"
@@ -421,7 +456,7 @@
             inherit hoprd hoprd-debug hoprd-docker hoprd-debug-docker hoprd-profile-docker;
             inherit hopli hopli-debug hopli-docker hopli-debug-docker hopli-profile-docker;
             inherit hopr-test;
-            inherit anvil-docker;
+            inherit anvil-docker pluto-docker;
             inherit smoke-tests docs;
             inherit pre-commit-check;
             inherit hoprd-aarch64-linux hoprd-armv7l-linux hoprd-x86_64-linux;
