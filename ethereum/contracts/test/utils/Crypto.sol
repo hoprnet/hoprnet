@@ -27,7 +27,9 @@ abstract contract CryptoUtils is Test, HoprCrypto, SECP2561k {
         return keccak256(abi.encodePacked(source, destination));
     }
 
-    function getRedeemableTicket(RedeemTicketArgBuilder memory args)
+    function getRedeemableTicket(
+        RedeemTicketArgBuilder memory args
+    )
         internal
         view
         returns (HoprChannels.RedeemableTicket memory redeemable, VRFParameters memory vrf)
