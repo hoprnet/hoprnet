@@ -82,9 +82,7 @@ contract TargetUtilsMock {
         return TargetUtils.decodeDefaultPermissions(target);
     }
 
-    function convertFunctionToTargetPermission(
-        CapabilityPermission functionPermission
-    )
+    function convertFunctionToTargetPermission(CapabilityPermission functionPermission)
         public
         pure
         returns (TargetPermission)
