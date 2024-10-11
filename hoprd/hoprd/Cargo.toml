@@ -44,6 +44,7 @@ telemetry = [
   "dep:opentelemetry_sdk",
   "dep:tracing-opentelemetry",
 ]
+transport-quic = ["hopr-lib/transport-quic"]
 
 [dependencies]
 anyhow = { workspace = true }
@@ -71,7 +72,7 @@ tokio = { workspace = true, optional = true }
 tokio-retry = { workspace = true, optional = true }
 tokio-util = { workspace = true, optional = true }
 tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["fmt", "json"] }
 validator = { workspace = true }
 
 opentelemetry = { workspace = true, optional = true }

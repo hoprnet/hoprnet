@@ -297,6 +297,21 @@ impl<'a> IntoFuture for PendingTransaction<'a> {
     }
 }
 
+/// Represents the on-chain status for the Node Safe module.
+#[derive(Clone, Debug, Copy, PartialEq, Eq)]
+pub struct NodeSafeModuleStatus {
+    pub is_node_included_in_module: bool,
+    pub is_module_enabled_in_safe: bool,
+    pub is_safe_owner_of_module: bool,
+}
+
+impl NodeSafeModuleStatus {
+    /// Determines if the node passes all status checks.
+    pub fn should_pass(&self) -> bool {
+        self.is_node_included_in_module && self.is_module_enabled_in_safe && self.is_safe_owner_of_module
+    }
+}
+
 /// Trait defining a general set of operations an RPC provider
 /// must provide to the HOPR node.
 #[async_trait]
@@ -321,6 +336,9 @@ pub trait HoprRpcOperations {
 
     /// Retrieves the notice period of channel closure from the Channels contract.
     async fn get_channel_closure_notice_period(&self) -> Result<Duration>;
+
+    /// Retrieves the on-chain status of node, safe, and module.
+    async fn check_node_safe_module_status(&self, node_address: Address) -> Result<NodeSafeModuleStatus>;
 
     /// Sends transaction to the RPC provider.
     async fn send_transaction(&self, tx: TypedTransaction) -> Result<PendingTransaction>;
