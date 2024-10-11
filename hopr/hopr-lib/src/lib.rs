@@ -1232,6 +1232,11 @@ impl Hopr {
         Ok(self.db.reset_ticket_statistics().await?)
     }
 
+    // DB ============
+    pub fn peer_resolver(&self) -> &impl HoprDbResolverOperations {
+        &self.db
+    }
+
     // Chain =========
     pub fn me_onchain(&self) -> Address {
         self.chain_api.me_onchain()
