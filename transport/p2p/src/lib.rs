@@ -221,7 +221,11 @@ pub async fn build_p2p_network(
                 // FIXME: benchmark and find appropriate values
                 mplex_config.set_max_buffer_behaviour(libp2p_mplex::MaxBufferBehaviour::Block);
 
-                let yamux_config: libp2p::yamux::Config = libp2p::yamux::Config::default();
+                let yamux_config: libp2p::yamux::Config = {
+                    let mut cfg = libp2p::yamux::Config::default();
+                    cfg.set_max_num_streams(1024);
+                    cfg
+                };
 
                 libp2p::core::upgrade::SelectUpgrade::new(yamux_config, mplex_config)
             },
