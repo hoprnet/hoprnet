@@ -16,6 +16,7 @@ PORT_BASE = 19100
 
 EXTRA_HEADERS = [("X-Auth-Token", API_TOKEN)]
 
+
 @pytest.mark.parametrize("peer", random.sample(nodes_with_auth(), 1))
 def test_hoprd_websocket_api_should_reject_a_connection_without_a_valid_token(peer: str, swarm7: dict[str, Node]):
     ws = websocket.WebSocket()
@@ -123,15 +124,12 @@ def test_hoprd_websocket_api_should_reject_connection_on_invalid_path(peer: str,
 
 @pytest.fixture
 async def ws_connections(swarm7: dict[str, Node]):
-    async with websockets.connect(
-        to_ws_url(swarm7["1"].host_addr, swarm7["1"].api_port), extra_headers=EXTRA_HEADERS
-    ) as ws1, websockets.connect(
-        to_ws_url(swarm7["2"].host_addr, swarm7["2"].api_port), extra_headers=EXTRA_HEADERS
-    ) as ws2, websockets.connect(
-        to_ws_url(swarm7["3"].host_addr, swarm7["3"].api_port), extra_headers=EXTRA_HEADERS
-    ) as ws3, websockets.connect(
-        to_ws_url(swarm7["4"].host_addr, swarm7["4"].api_port), extra_headers=EXTRA_HEADERS
-    ) as ws4:
+    async with (
+        websockets.connect(to_ws_url(swarm7["1"].host_addr, swarm7["1"].api_port), extra_headers=EXTRA_HEADERS) as ws1,
+        websockets.connect(to_ws_url(swarm7["2"].host_addr, swarm7["2"].api_port), extra_headers=EXTRA_HEADERS) as ws2,
+        websockets.connect(to_ws_url(swarm7["3"].host_addr, swarm7["3"].api_port), extra_headers=EXTRA_HEADERS) as ws3,
+        websockets.connect(to_ws_url(swarm7["4"].host_addr, swarm7["4"].api_port), extra_headers=EXTRA_HEADERS) as ws4,
+    ):
         yield {"1": ws1, "2": ws2, "3": ws3, "4": ws4}
 
 
@@ -145,7 +143,12 @@ async def test_websocket_send_receive_messages(src: str, dest: str, swarm7: dict
         body = f"hello msg {i} from peer {swarm7[src].peer_id} to peer {swarm7[dest].peer_id}"
 
         # we test direct messaging only
-        msg = {"body": body, "peerId": swarm7[dest].peer_id, "path": [], "tag": tag}
+        msg = {
+            "body": body,
+            "destination": random.choice([swarm7[dest].peer_id, swarm7[dest].address]),
+            "path": [],
+            "tag": tag,
+        }
 
         await ws_connections[src].send(json.dumps(msg))
 

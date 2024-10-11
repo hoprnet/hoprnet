@@ -4452,7 +4452,7 @@ dependencies = [
 
 [[package]]
 name = "hoprd-api"
-version = "3.3.2"
+version = "3.4.0"
 dependencies = [
  "anyhow",
  "async-broadcast",
@@ -4464,6 +4464,7 @@ dependencies = [
  "futures-concurrency",
  "hopr-async-runtime",
  "hopr-crypto-types",
+ "hopr-db-sql",
  "hopr-lib",
  "hopr-metrics",
  "hopr-network-types",
