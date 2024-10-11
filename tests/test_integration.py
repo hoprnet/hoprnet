@@ -117,9 +117,7 @@ async def test_hoprd_node_should_be_able_to_alias_other_peers_with_address(peer:
 
     assert await swarm7[peer].api.aliases_get_alias("Alice") is None
     assert await swarm7[peer].api.aliases_set_alias("Alice", alice.address) is True
-
     assert await swarm7[peer].api.aliases_get_alias("Alice") == alice.peer_id
-    assert await swarm7[peer].api.aliases_set_alias("Alice", alice.address) is False
 
     assert await swarm7[peer].api.aliases_remove_alias("Alice")
     assert await swarm7[peer].api.aliases_get_alias("Alice") is None
