@@ -2534,9 +2534,9 @@ mod tests {
 
         let handlers = init_handlers(db.clone());
 
-        let win_prob_change_log = ethers::prelude::Log {
-            address: handlers.addresses.win_prob_oracle.into(),
-            topics: vec![WinProbUpdatedFilter::signature()],
+        let win_prob_change_log = SerializableLog {
+            address: handlers.addresses.win_prob_oracle.to_hex(),
+            topics: vec![format!("{:#x}", WinProbUpdatedFilter::signature())],
             data: encode(&[
                 Token::Uint(EthU256::from(f64_to_win_prob(1.0)?.as_ref())),
                 Token::Uint(EthU256::from(f64_to_win_prob(0.5)?.as_ref())),
@@ -2624,9 +2624,9 @@ mod tests {
 
         let handlers = init_handlers(db.clone());
 
-        let win_prob_change_log = ethers::prelude::Log {
-            address: handlers.addresses.win_prob_oracle.into(),
-            topics: vec![WinProbUpdatedFilter::signature()],
+        let win_prob_change_log = SerializableLog {
+            address: handlers.addresses.win_prob_oracle.to_hex(),
+            topics: vec![format!("{:#x}", WinProbUpdatedFilter::signature())],
             data: encode(&[
                 Token::Uint(EthU256::from(f64_to_win_prob(0.1)?.as_ref())),
                 Token::Uint(EthU256::from(f64_to_win_prob(new_minimum)?.as_ref())),

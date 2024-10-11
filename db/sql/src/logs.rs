@@ -199,7 +199,6 @@ impl HoprDbLogOperations for HoprDb {
             match query.stream(self.conn(TargetDb::Logs)).await {
                 Ok(mut stream) => {
                     while let Some(Ok(object)) = stream.next().await {
-                        info!("object: {:?}", object.block_number);
                         yield U256::from_be_bytes(object.block_number).as_u64()
                 }},
                 Err(e) => error!("Failed to get logs block numbers from db: {:?}", e),

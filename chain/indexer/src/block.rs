@@ -57,7 +57,7 @@ lazy_static::lazy_static! {
 pub struct Indexer<T, U, Db>
 where
     T: HoprIndexerRpcOperations + Send + 'static,
-    U: ChainLogHandler + Send + 'static,
+    U: ChainLogHandler + Clone + Send + 'static,
     Db: HoprDbGeneralModelOperations + Clone + Send + Sync + 'static,
 {
     rpc: Option<T>,
@@ -132,17 +132,24 @@ where
         //   4. finally starting the rpc indexer.
         let fast_sync_configured = self.cfg.fast_sync;
         let index_empty = self.db.index_is_empty().await?;
-        if fast_sync_configured && !index_empty {
-            info!("Fast sync is enabled, but the index database is not empty. In order to use fast-sync again you must stop this node and remove the index database manually.");
-        } else {
-            info!("Fast sync is enabled, starting the fast sync process...");
-            // To ensure a proper state, we reset any auxiliary data in the database
-            self.db.clear_index_db().await?;
-            self.db.set_logs_unprocessed(None, None).await?;
 
-            // Now fast-sync can start
-            while let Some(block_number) = self.db.get_logs_block_numbers(None, None).await?.next().await {
-                Self::process_block_by_id(&db, &db_processor, block_number).await?;
+        match (fast_sync_configured, index_empty) {
+            (true, false) => {
+                info!("Fast sync is enabled, but the index database is not empty. In order to use fast-sync again you must stop this node and remove the index database manually.");
+            }
+            (false, _) => {
+                info!("Fast sync is disabled");
+            }
+            (true, true) => {
+                info!("Fast sync is enabled, starting the fast sync process");
+                // To ensure a proper state, we reset any auxiliary data in the database
+                self.db.clear_index_db().await?;
+                self.db.set_logs_unprocessed(None, None).await?;
+
+                // Now fast-sync can start
+                while let Some(block_number) = self.db.get_logs_block_numbers(None, None).await?.next().await {
+                    Self::process_block_by_id(&db, &db_processor, block_number).await?;
+                }
             }
         }
 
@@ -192,10 +199,8 @@ where
                     async move {
                         debug!("Storing logs from {}", block.clone());
                         let logs = block.clone().logs;
-                        match db
-                            .store_logs(logs.into_iter().map(SerializableLog::from).collect())
-                            .await
-                        {
+                        let logs_vec = logs.into_iter().map(SerializableLog::from).collect();
+                        match db.store_logs(logs_vec).await {
                             Ok(store_results) => {
                                 if let Some(err) = store_results
                                     .into_iter()
@@ -486,7 +491,6 @@ mod tests {
     use hopr_crypto_types::keypairs::{Keypair, OffchainKeypair};
     use hopr_crypto_types::prelude::ChainKeypair;
     use hopr_db_sql::db::HoprDb;
-    use hopr_db_sql::info::HoprDbInfoOperations;
     use hopr_primitive_types::prelude::*;
 
     use crate::traits::MockChainLogHandler;
@@ -583,19 +587,17 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[test_log::test(async_std::test)]
     async fn test_indexer_should_check_the_db_for_last_processed_block_and_supply_it_when_found() -> anyhow::Result<()>
     {
         let mut handlers = MockChainLogHandler::new();
         let mut rpc = MockHoprIndexerOps::new();
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
+        let head_block = 1000;
+        let latest_block = 15u64;
 
         handlers.expect_contract_addresses().return_const(vec![]);
 
-        let head_block = 1000;
-        let latest_block = 15u64;
-        db.set_last_indexed_block(None, latest_block as u32, Some(Hash::default()))
-            .await?;
         rpc.expect_block_number().return_once(move || Ok(head_block));
 
         let (tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
@@ -603,13 +605,32 @@ mod tests {
             .withf(move |x: &u64, _y: &chain_rpc::LogFilter| *x == latest_block)
             .return_once(move |_, _| Ok(Box::pin(rx)));
 
+        // insert and process latest block
+        let log_1 = SerializableLog {
+            address: Hash::create(&[b"my address"]).to_hex(),
+            topics: [Hash::create(&[b"my topic"]).to_hex()].into(),
+            data: [1, 2, 3, 4].into(),
+            tx_index: 1u64,
+            block_number: latest_block,
+            block_hash: Hash::create(&[b"my block hash"]).to_hex(),
+            tx_hash: Hash::create(&[b"my tx hash"]).to_hex(),
+            log_index: 1u64,
+            removed: false,
+            processed: Some(false),
+            ..Default::default()
+        };
+        assert!(db.store_log(log_1.clone()).await.is_ok());
+        assert!(db.set_logs_processed(Some(latest_block), Some(0)).await.is_ok());
+        assert!(db.update_logs_checksums().await.is_ok());
+
         let mut indexer = Indexer::new(
             rpc,
             handlers,
             db.clone(),
-            IndexerConfig::default(),
+            IndexerConfig::default().disable_fast_sync(),
             async_channel::unbounded().0,
         );
+
         let (indexing, _) = join!(indexer.start(), async move {
             async_std::task::sleep(std::time::Duration::from_millis(200)).await;
             tx.close_channel()
@@ -737,14 +758,29 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[test_log::test(async_std::test)]
     async fn test_indexer_should_not_reprocess_last_processed_block() -> anyhow::Result<()> {
         let last_processed_block = 100_u64;
 
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
-        db.set_last_indexed_block(None, last_processed_block as u32, Some(Hash::default()))
-            .await?;
+        // insert and process latest block
+        let log_1 = SerializableLog {
+            address: Hash::create(&[b"my address"]).to_hex(),
+            topics: [Hash::create(&[b"my topic"]).to_hex()].into(),
+            data: [1, 2, 3, 4].into(),
+            tx_index: 1u64,
+            block_number: last_processed_block,
+            block_hash: Hash::create(&[b"my block hash"]).to_hex(),
+            tx_hash: Hash::create(&[b"my tx hash"]).to_hex(),
+            log_index: 1u64,
+            removed: false,
+            processed: Some(false),
+            ..Default::default()
+        };
+        assert!(db.store_log(log_1.clone()).await.is_ok());
+        assert!(db.set_logs_processed(Some(last_processed_block), Some(0)).await.is_ok());
+        assert!(db.update_logs_checksums().await.is_ok());
 
         let (mut tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
 
