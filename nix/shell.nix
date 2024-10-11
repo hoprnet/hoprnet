@@ -29,7 +29,7 @@ craneLib.devShell {
     curl
     bash
     gnumake
-    which
+    busybox
 
     # github integration
     gh

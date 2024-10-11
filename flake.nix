@@ -212,6 +212,8 @@
               (fs.fileFilter (file: file.hasExt "sol") ./vendor/solidity)
               ./ethereum/contracts
               ./scripts/run-local-anvil.sh
+              ./scripts/utils.sh
+              ./Makefile
             ];
           };
           anvil-docker = pkgs.dockerTools.buildLayeredImage {
@@ -219,7 +221,7 @@
             tag = "latest";
             # breaks binary reproducibility, but makes usage easier
             created = "now";
-            contents = [ pkgs.foundry-bin anvilSrc pkgs.tini pkgs.runtimeShellPackage ];
+            contents = [ pkgs.foundry-bin anvilSrc pkgs.tini pkgs.runtimeShellPackage pkgs.busybox pkgs.jq pkgs.curl pkgs.gnumake ];
             enableFakechroot = true;
             fakeRootCommands = ''
               #!${pkgs.runtimeShell}
@@ -234,10 +236,12 @@
               Cmd = [
                 "/bin/tini"
                 "--"
+                "bash"
                 "/scripts/run-local-anvil.sh"
-                "-s"
-                "-f"
               ];
+              ExposedPorts = {
+                "8545/tcp" = { };
+              };
             };
           };
 
@@ -245,7 +249,7 @@
             root = ./.;
             fileset = fs.unions [
               ./scripts/setup-local-cluster.sh
-              ./topology/full_interconnected_cluster.sh
+              ./scripts/topologies/full_interconnected_cluster.sh
             ];
           };
           pluto-docker = pkgs.dockerTools.buildLayeredImage {
@@ -253,26 +257,8 @@
             tag = "latest";
             # breaks binary reproducibility, but makes usage easier
             created = "now";
-            contents = [ pkgs.foundry-bin plutoSrc anvilSrc pkgs.tini pkgs.runtimeShellPackage ];
-            enableFakechroot = true;
-            fakeRootCommands = ''
-              #!${pkgs.runtimeShell}
-              /scripts/run-local-anvil.sh
-              sleep 2
-              lsof -i :8545 -s TCP:LISTEN -t | xargs -I {} -n 1 kill {} || :
-              rm -rf /ethereum/contracts/broadcast/
-              rm -f /tmp/*.log
-              rm -f /.anvil.state.json
-            '';
-            config = {
-              Cmd = [
-                "/bin/tini"
-                "--"
-                "/scripts/run-local-anvil.sh"
-                "-s"
-                "-f"
-              ];
-            };
+            contents = [ plutoSrc ];
+            fromImage = anvil-docker;
           };
 
           dockerImageUploadScript = image: pkgs.writeShellScriptBin "docker-image-upload" ''
