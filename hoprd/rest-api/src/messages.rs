@@ -40,13 +40,18 @@ pub(crate) struct SizeResponse {
 #[serde(rename_all = "camelCase")]
 #[schema(example = json!({
         "body": "Test message",
-        "hops": 1,
         "path": [
             "12D3KooWR4uwjKCDCAY1xsEFB4esuWLF9Q5ijYvCjz5PNkTbnu33"
         ],
         "destination": "12D3KooWEDc1vGJevww48trVDDf6pr1f6N3F86sGJfQrKCyc8kJ1",
         "tag": 2000
     }))]
+#[schema(example = json!({
+    "body": "Test message",
+    "hops": 1,
+    "peerId": "12D3KooWEDc1vGJevww48trVDDf6pr1f6N3F86sGJfQrKCyc8kJ1",
+    "tag": 2000
+}))]
 pub(crate) struct SendMessageBodyRequest {
     /// The message tag used to filter messages based on application
     tag: u16,
@@ -68,7 +73,7 @@ pub(crate) struct SendMessageBodyRequest {
 #[serde_as]
 #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
 #[schema(example = json!({
-        "challenge": "031916ee5bfc0493f40c353a670fc586a3a28f9fce9cd065ff9d1cbef19b46eeba"
+        "timestamp": 2147483647
     }))]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct SendMessageResponse {
@@ -79,6 +84,10 @@ pub(crate) struct SendMessageResponse {
 
 #[serde_as]
 #[derive(Debug, Default, Clone, Deserialize, utoipa::ToSchema)]
+#[schema(example = json!({
+    "tag": 801,
+    "timestamp": 2147483647
+}))]
 pub(crate) struct GetMessageBodyRequest {
     /// The message tag used to filter messages based on application
     #[schema(required = false)]

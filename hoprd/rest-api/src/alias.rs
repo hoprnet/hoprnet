@@ -37,7 +37,7 @@ pub(crate) struct AliasDestinationBodyRequest {
     pub destination: PeerOrAddress,
 }
 
-/// (deprecated, will be removed in v3.0) Get each previously set alias and its corresponding PeerId.
+/// (deprecated, will be removed in v3.0) Get each previously set alias and its corresponding PeerId as a hashmap.
 #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/aliases"),
@@ -121,8 +121,13 @@ pub(super) async fn set_alias(
     }
 }
 
-#[derive(Deserialize)]
-pub(crate) struct GetAliasParams {
+#[serde_as]
+#[derive(Deserialize, utoipa::ToSchema)]
+#[schema(example = json!({
+    "alias": "Alice",
+}))]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct GetAliasRequest {
     alias: String,
 }
 
@@ -145,7 +150,7 @@ pub(crate) struct GetAliasParams {
         tag = "Alias",
     )]
 pub(super) async fn get_alias(
-    Path(GetAliasParams { alias }): Path<GetAliasParams>,
+    Path(GetAliasRequest { alias }): Path<GetAliasRequest>,
     State(state): State<Arc<InternalState>>,
 ) -> impl IntoResponse {
     let alias = urlencoding::decode(&alias);
@@ -163,8 +168,12 @@ pub(super) async fn get_alias(
     }
 }
 
-#[derive(Deserialize)]
-pub(crate) struct DeleteAliasParams {
+#[serde_as]
+#[derive(Deserialize, utoipa::ToSchema)]
+#[schema(example = json!({
+    "alias": "Alice",
+}))]
+pub(crate) struct DeleteAliasRequest {
     alias: String,
 }
 
@@ -187,7 +196,7 @@ pub(crate) struct DeleteAliasParams {
         tag = "Alias",
     )]
 pub(super) async fn delete_alias(
-    Path(DeleteAliasParams { alias }): Path<DeleteAliasParams>,
+    Path(DeleteAliasRequest { alias }): Path<DeleteAliasRequest>,
     State(state): State<Arc<InternalState>>,
 ) -> impl IntoResponse {
     let alias = urlencoding::decode(&alias);
