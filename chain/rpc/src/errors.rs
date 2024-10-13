@@ -63,7 +63,7 @@ where
 }
 
 /// Error abstraction for `HttpRequestor`.
-#[derive(Error, Debug, PartialEq)]
+#[derive(Error, Clone, Debug, PartialEq)]
 pub enum HttpRequestError {
     #[error("connection timed out")]
     Timeout,

@@ -11,12 +11,15 @@
 //! for `ethers` to work with different async runtimes, since the HTTP client is typically not agnostic to
 //! async runtimes (the default HTTP client in `ethers` is using `reqwest`, which is `tokio` specific).
 //! Secondly, this abstraction also allows to implement WASM-compatible HTTP client if needed at some point.
+
 use async_trait::async_trait;
 use ethers::providers::{JsonRpcClient, JsonRpcError};
+use futures::StreamExt;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Formatter};
-use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU32, AtomicU64, AtomicUsize, Ordering};
+use std::sync::Arc;
 use std::time::Duration;
 use tracing::{debug, trace, warn};
 use validator::Validate;
@@ -603,6 +606,135 @@ pub mod reqwest_client {
     }
 }
 
+/// Snapshot of a response cached by the [`SnapshotRequestor`].
+#[serde_with::serde_as]
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
+pub struct RequestorResponseSnapshot {
+    id: usize,
+    request: String,
+    #[serde_as(as = "serde_with::base64::Base64")]
+    response: Vec<u8>,
+}
+
+/// Replays an RPC response to a request if it is found in the snapshot YAML file.
+/// If no such request has been seen before,
+/// it captures the new request/response pair obtained from the inner [`HttpPostRequestor`]
+/// and stores it into the snapshot file.
+///
+/// This is useful for snapshot testing only and should **NOT** be used in production.
+#[derive(Debug, Clone)]
+pub struct SnapshotRequestor<T> {
+    inner: T,
+    next_id: Arc<AtomicUsize>,
+    entries: moka::future::Cache<String, RequestorResponseSnapshot>,
+    file: String,
+}
+
+impl<T> SnapshotRequestor<T> {
+    /// Creates a new instance by wrapping an existing [`HttpPostRequestor`] and capturing
+    /// the request/response pairs.
+    ///
+    /// The constructor does not load any [snapshot entries](SnapshotRequestor) from
+    /// the `snapshot_file`.
+    /// The [`SnapshotRequestor::load`] method must be used after construction to do that.
+    pub fn new(inner: T, snapshot_file: &str) -> Self {
+        Self {
+            inner,
+            next_id: Arc::new(AtomicUsize::new(1)),
+            entries: moka::future::Cache::builder().build(),
+            file: snapshot_file.to_owned(),
+        }
+    }
+
+    /// Gets the path to the snapshot disk file.
+    pub fn snapshot_path(&self) -> &str {
+        &self.file
+    }
+
+    /// Clears all entries from the snapshot in memory.
+    /// The snapshot file is not changed.
+    pub fn clear(&mut self) {
+        self.entries.invalidate_all();
+        self.next_id.store(1, Ordering::Relaxed);
+    }
+
+    /// Clears all entries and loads them from the snapshot file.
+    pub async fn try_load(&mut self) -> Result<(), std::io::Error> {
+        let loaded = serde_yaml::from_reader::<_, Vec<RequestorResponseSnapshot>>(std::fs::File::open(&self.file)?)
+            .map_err(std::io::Error::other)?;
+
+        self.clear();
+
+        let loaded_len = futures::stream::iter(loaded)
+            .then(|entry| {
+                self.next_id.fetch_max(entry.id, Ordering::Relaxed);
+                self.entries.insert(entry.request.clone(), entry)
+            })
+            .collect::<Vec<_>>()
+            .await
+            .len();
+
+        tracing::debug!("snapshot with {loaded_len} entries has been loaded from {}", &self.file);
+        Ok(())
+    }
+
+    /// Similar as [`SnapshotRequestor::try_load`], except that no entries are cleared if the load fails.
+    ///
+    /// This method consumes and returns self for easier call chaining.
+    pub async fn load(mut self) -> Self {
+        let _ = self.try_load().await;
+        self
+    }
+
+    /// Save the currently cached entries to the snapshot file on disk.
+    ///
+    /// Note that this method is automatically called on Drop, so usually it is unnecessary
+    /// to call it explicitly.
+    pub fn save(&self) -> Result<(), std::io::Error> {
+        let mut values: Vec<RequestorResponseSnapshot> = self.entries.iter().map(|(_, r)| r).collect();
+        values.sort_unstable_by_key(|a| a.id);
+
+        serde_yaml::to_writer(std::fs::File::create(&self.file)?, &values).map_err(std::io::Error::other)?;
+
+        tracing::debug!("snapshot with {} entries saved to file {}", values.len(), self.file);
+        Ok(())
+    }
+}
+
+impl<T> Drop for SnapshotRequestor<T> {
+    fn drop(&mut self) {
+        let _ = self.save();
+    }
+}
+
+#[async_trait]
+impl<R: HttpPostRequestor> HttpPostRequestor for SnapshotRequestor<R> {
+    async fn http_post<T>(&self, url: &str, data: T) -> Result<Box<[u8]>, HttpRequestError>
+    where
+        T: Serialize + Send + Sync,
+    {
+        let request = serde_json::to_string(&data)
+            .map_err(|e| HttpRequestError::UnknownError(format!("serialize error: {e}")))?;
+
+        self.entries
+            .entry(request.clone())
+            .or_try_insert_with(async {
+                let response = self.inner.http_post(url, data).await?;
+                let id = self.next_id.fetch_add(1, Ordering::SeqCst);
+
+                tracing::debug!("saved new snapshot entry #{id}");
+                Ok(RequestorResponseSnapshot {
+                    id,
+                    request,
+                    response: response.into_vec(),
+                })
+            })
+            .await
+            .map(|e| e.into_value().response.into_boxed_slice())
+            .map_err(|e: Arc<HttpRequestError>| e.as_ref().clone())
+    }
+}
+
 type AnvilRpcClient<R> = std::sync::Arc<
     ethers::middleware::SignerMiddleware<
         ethers::providers::Provider<JsonRpcProviderClient<R, SimpleJsonRpcRetryPolicy>>,
@@ -633,22 +765,26 @@ pub fn create_rpc_client_to_anvil<R: HttpPostRequestor + Debug>(
 
 #[cfg(test)]
 mod tests {
+    use async_trait::async_trait;
+    use chain_types::utils::create_anvil;
+    use chain_types::{ContractAddresses, ContractInstances};
     use ethers::providers::JsonRpcClient;
+    use hopr_async_runtime::prelude::sleep;
+    use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
+    use hopr_primitive_types::primitives::Address;
+    use serde::Serialize;
     use serde_json::json;
     use std::fmt::Debug;
     use std::sync::atomic::Ordering;
     use std::time::Duration;
-
-    use chain_types::utils::create_anvil;
-    use chain_types::{ContractAddresses, ContractInstances};
-    use hopr_async_runtime::prelude::sleep;
-    use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
-    use hopr_primitive_types::primitives::Address;
+    use tempfile::NamedTempFile;
 
     use crate::client::reqwest_client::ReqwestRequestor;
     use crate::client::surf_client::SurfRequestor;
-    use crate::client::{create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy};
-    use crate::errors::JsonRpcProviderClientError;
+    use crate::client::{
+        create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy, SnapshotRequestor,
+    };
+    use crate::errors::{HttpRequestError, JsonRpcProviderClientError};
     use crate::{HttpPostRequestor, ZeroRetryPolicy};
 
     async fn deploy_contracts<R: HttpPostRequestor + Debug>(req: R) -> anyhow::Result<ContractAddresses> {
@@ -1014,5 +1150,67 @@ mod tests {
             client.requests_enqueued.load(Ordering::SeqCst),
             "retry queue should be zero when policy says no more retries"
         );
+    }
+
+    // Requires manual implementation, because mockall does not work well with generic methods
+    // in non-generic traits.
+    struct NullHttpPostRequestor;
+
+    #[async_trait]
+    impl HttpPostRequestor for NullHttpPostRequestor {
+        async fn http_post<T>(&self, _: &str, _: T) -> Result<Box<[u8]>, HttpRequestError>
+        where
+            T: Serialize + Send + Sync,
+        {
+            Err(HttpRequestError::UnknownError("use of NullHttpPostRequestor".into()))
+        }
+    }
+
+    #[test_log::test(async_std::test)]
+    async fn test_client_from_file() -> anyhow::Result<()> {
+        let block_time = Duration::from_secs(1);
+        let snapshot_file = NamedTempFile::new()?;
+
+        let anvil = create_anvil(Some(block_time));
+        {
+            let client = JsonRpcProviderClient::new(
+                &anvil.endpoint(),
+                SnapshotRequestor::new(SurfRequestor::default(), snapshot_file.path().to_str().unwrap()),
+                SimpleJsonRpcRetryPolicy::default(),
+            );
+
+            let mut last_number = 0;
+
+            for _ in 0..3 {
+                sleep(block_time).await;
+
+                let number: ethers::types::U64 = client.request("eth_blockNumber", ()).await?;
+
+                assert!(number.as_u64() > last_number, "next block number must be greater");
+                last_number = number.as_u64();
+            }
+        }
+
+        {
+            let client = JsonRpcProviderClient::new(
+                &anvil.endpoint(),
+                SnapshotRequestor::new(NullHttpPostRequestor, snapshot_file.path().to_str().unwrap())
+                    .load()
+                    .await,
+                SimpleJsonRpcRetryPolicy::default(),
+            );
+
+            let mut last_number = 0;
+            for _ in 0..3 {
+                sleep(block_time).await;
+
+                let number: ethers::types::U64 = client.request("eth_blockNumber", ()).await?;
+
+                assert!(number.as_u64() > last_number, "next block number must be greater");
+                last_number = number.as_u64();
+            }
+        }
+
+        Ok(())
     }
 }
