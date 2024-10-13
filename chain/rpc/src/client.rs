@@ -701,17 +701,10 @@ impl<T> SnapshotRequestor<T> {
     }
 }
 
-impl<T> Drop for SnapshotRequestor<T> {
-    fn drop(&mut self) {
-        let _ = self.save();
-    }
-}
-
-#[async_trait]
-impl<R: HttpPostRequestor> HttpPostRequestor for SnapshotRequestor<R> {
-    async fn http_post<T>(&self, url: &str, data: T) -> Result<Box<[u8]>, HttpRequestError>
+impl<R: HttpPostRequestor> SnapshotRequestor<R> {
+    async fn http_post_with_snapshot<In>(&self, url: &str, data: In) -> Result<Box<[u8]>, HttpRequestError>
     where
-        T: Serialize + Send + Sync,
+        In: Serialize + Send + Sync,
     {
         let request = serde_json::to_string(&data)
             .map_err(|e| HttpRequestError::UnknownError(format!("serialize error: {e}")))?;
@@ -732,6 +725,32 @@ impl<R: HttpPostRequestor> HttpPostRequestor for SnapshotRequestor<R> {
             .await
             .map(|e| e.into_value().response.into_boxed_slice())
             .map_err(|e: Arc<HttpRequestError>| e.as_ref().clone())
+    }
+}
+
+impl<T> Drop for SnapshotRequestor<T> {
+    fn drop(&mut self) {
+        let _ = self.save();
+    }
+}
+
+#[async_trait::async_trait]
+impl<R: HttpPostRequestor> HttpPostRequestor for SnapshotRequestor<R> {
+    async fn http_post<T>(&self, url: &str, data: T) -> Result<Box<[u8]>, HttpRequestError>
+    where
+        T: Serialize + Send + Sync
+    {
+        self.http_post_with_snapshot(url, data).await
+    }
+}
+
+#[async_trait]
+impl<R: HttpPostRequestor> HttpPostRequestor for &SnapshotRequestor<R> {
+    async fn http_post<T>(&self, url: &str, data: T) -> Result<Box<[u8]>, HttpRequestError>
+    where
+        T: Serialize + Send + Sync,
+    {
+        self.http_post_with_snapshot(url, data).await
     }
 }
 
