@@ -15,13 +15,15 @@ use {
 
 use signal_hook::low_level;
 use tracing::{error, info, trace, warn};
-use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
+use tracing_subscriber::prelude::*;
 
 use hopr_async_runtime::prelude::{cancel_join_handle, spawn, JoinHandle};
 use hopr_lib::{ApplicationData, AsUnixTimestamp, HoprLibProcesses, ToHex};
+use hopr_platform::file::native::join;
 use hoprd::cli::CliArgs;
 use hoprd::errors::HoprdError;
 use hoprd_api::{serve_api, ListenerJoinHandles, RestApiParameters};
+use hoprd_db_api::aliases::{HoprdDbAliasesOperations, ME_AS_ALIAS};
 use hoprd_keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
 
 use hoprd::HoprServerIpForwardingReactor;
@@ -61,6 +63,15 @@ fn init_logger() -> Result<(), Box<dyn std::error::Error>> {
         .with_target(true)
         .with_thread_ids(true)
         .with_thread_names(false);
+
+    let format = if std::env::var("HOPRD_LOG_FORMAT")
+        .map(|v| v.to_lowercase() == "json")
+        .unwrap_or(false)
+    {
+        format.json().boxed()
+    } else {
+        format.boxed()
+    };
 
     let registry = tracing_subscriber::Registry::default().with(env_filter).with(format);
 
@@ -205,6 +216,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }),
     ));
 
+    // Create the metadata database
+    let db_path: String = join(&[&cfg.hopr.db.data, "db"]).expect("Could not create a db storage path");
+
+    let hoprd_db = match hoprd_db_api::db::HoprdDb::new(db_path.clone()).await {
+        Ok(db) => {
+            info!("Metadata database created successfully");
+            Arc::new(db)
+        }
+        Err(e) => {
+            error!("Failed to create the metadata database: {e}");
+            return Err(e.into());
+        }
+    };
+
+    // Ensures that "OWN_ALIAS" is set as alias
+    if let Err(e) = hoprd_db
+        .set_alias(node.me_peer_id().to_string(), ME_AS_ALIAS.to_string())
+        .await
+    {
+        error!("Failed to set the alias for the node: {e}");
+    }
+
     let (mut ws_events_tx, ws_events_rx) =
         async_broadcast::broadcast::<ApplicationData>(WEBSOCKET_EVENT_BROADCAST_CAPACITY);
     let ws_events_rx = ws_events_rx.deactivate(); // No need to copy the data unless the websocket is opened, but leaves the channel open
@@ -245,6 +278,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 hoprd_cfg: node_cfg_str,
                 cfg: api_cfg,
                 hopr: node_clone,
+                hoprd_db,
                 inbox,
                 session_listener_sockets,
                 websocket_rx: ws_events_rx,

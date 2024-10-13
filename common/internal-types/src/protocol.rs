@@ -17,7 +17,7 @@ pub const INTERMEDIATE_HOPS: usize = 3;
 pub const PAYLOAD_SIZE: usize = 500;
 
 /// Default required minimum incoming ticket winning probability
-pub const DEFAULT_MINIMUM_INCOMING_TICKET_WIN_PROB: f64 = 1.0; // TODO: change this to load from SC
+pub const DEFAULT_MINIMUM_INCOMING_TICKET_WIN_PROB: f64 = 1.0;
 
 /// Default maximum incoming ticket winning probability, above which tickets will not be accepted
 /// due to privacy.
@@ -25,6 +25,9 @@ pub const DEFAULT_MAXIMUM_INCOMING_TICKET_WIN_PROB: f64 = 1.0; // TODO: change t
 
 /// Default ticket winning probability that will be printed on outgoing tickets
 pub const DEFAULT_OUTGOING_TICKET_WIN_PROB: f64 = 1.0;
+
+/// The lowest possible ticket winning probability due to SC representation limit.
+pub const LOWEST_POSSIBLE_WINNING_PROB: f64 = 0.00000001;
 
 /// Tags are currently 16-bit unsigned integers
 pub type Tag = u16;
@@ -233,7 +236,7 @@ impl ApplicationData {
 
 #[cfg(test)]
 mod tests {
-    use crate::protocol::{ApplicationData, TagBloomFilter};
+    use super::*;
     use hopr_crypto_random::random_bytes;
 
     #[test]

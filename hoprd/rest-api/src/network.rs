@@ -8,6 +8,9 @@ use std::sync::Arc;
 use crate::{ApiErrorStatus, InternalState, BASE_PATH};
 
 #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
+#[schema(example = json!({
+    "price": "30000000000000000"
+}))]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct TicketPriceResponse {
     /// Price of the ticket in HOPR tokens.
@@ -50,18 +53,21 @@ pub(super) async fn price(State(state): State<Arc<InternalState>>) -> impl IntoR
 }
 
 #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
+#[schema(example = json!({
+    "probability": 0.5
+}))]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct TicketProbabilityResponse {
     /// Winning probability of a ticket.
     probability: f64,
 }
 
-/// Obtains the current ticket winning probability.
+/// Gets the current minimum incoming ticket winning probability defined by the network.
 #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/network/probability"),
         responses(
-            (status = 200, description = "Winning ticket probability", body = TicketProbabilityResponse),
+            (status = 200, description = "Minimum incoming ticket winning probability defined by the network", body = TicketProbabilityResponse),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
@@ -74,7 +80,7 @@ pub(crate) struct TicketProbabilityResponse {
 pub(super) async fn probability(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
-    match hopr.get_ticket_probability().await {
+    match hopr.get_minimum_incoming_ticket_win_probability().await {
         Ok(probability) => (StatusCode::OK, Json(TicketProbabilityResponse { probability })).into_response(),
         Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
     }

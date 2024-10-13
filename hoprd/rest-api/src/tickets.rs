@@ -121,9 +121,9 @@ pub(super) async fn show_all_tickets() -> impl IntoResponse {
 #[schema(example = json!({
         "winning_count": 0,
         "neglectedValue": "0",
-        "redeemedValue": "100",
+        "redeemedValue": "1000000000000000000",
         "rejectedValue": "0",
-        "unredeemedValue": "200",
+        "unredeemedValue": "2000000000000000",
     }))]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct NodeTicketStatisticsResponse {
@@ -165,6 +165,29 @@ pub(super) async fn show_ticket_statistics(State(state): State<Arc<InternalState
     let hopr = state.hopr.clone();
     match hopr.ticket_statistics().await.map(NodeTicketStatisticsResponse::from) {
         Ok(stats) => (StatusCode::OK, Json(stats)).into_response(),
+        Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
+    }
+}
+
+/// Resets the ticket metrics.
+#[utoipa::path(
+        delete,
+        path = const_format::formatcp!("{BASE_PATH}/tickets/statistics"),
+        responses(
+            (status = 204, description = "Ticket statistics reset successfully."),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
+            (status = 422, description = "Unknown failure", body = ApiError)
+        ),
+        security(
+            ("api_token" = []),
+            ("bearer_token" = [])
+        ),
+        tag = "Tickets"
+    )]
+pub(super) async fn reset_ticket_statistics(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
+    let hopr = state.hopr.clone();
+    match hopr.reset_ticket_statistics().await {
+        Ok(()) => (StatusCode::NO_CONTENT, "").into_response(),
         Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
     }
 }

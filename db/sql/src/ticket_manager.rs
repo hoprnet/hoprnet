@@ -143,8 +143,14 @@ impl TicketManager {
 
     /// Get unrealized value for a channel
     pub async fn unrealized_value(&self, selector: TicketSelector) -> Result<Balance> {
+        if !selector.is_single_channel() {
+            return Err(crate::DbSqlError::LogicalError(
+                "selector must represent a single channel".into(),
+            ));
+        }
+
+        let channel_id = selector.channel_identifiers[0].0;
         let selector: WrappedTicketSelector = selector.into();
-        let channel_id = selector.0.channel_id;
 
         let transaction = OpenTransaction(
             self.tickets_db

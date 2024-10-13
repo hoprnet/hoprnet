@@ -26,9 +26,8 @@ from datetime import datetime, timedelta
 
 from .conftest import random_distinct_pairs_from, barebone_nodes, TICKET_PRICE_PER_HOP, fixtures_dir
 from .node import Node
-from .test_integration import create_channel, shuffled
+from .utils import shuffled, create_channel, PARAMETERIZED_SAMPLE_SIZE
 
-PARAMETERIZED_SAMPLE_SIZE = 1  # if os.getenv("CI", default="false") == "false" else 3
 HOPR_SESSION_MAX_PAYLOAD_SIZE = 462
 STANDARD_MTU_SIZE = 1500
 
