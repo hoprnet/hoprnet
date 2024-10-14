@@ -22,7 +22,6 @@ use std::io::{BufWriter, Write};
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
-use surf::http;
 use tracing::{debug, trace, warn};
 use validator::Validate;
 
@@ -738,7 +737,7 @@ impl<R: HttpPostRequestor> SnapshotRequestor<R> {
             .or_try_insert_with(async {
                 if self.fail_on_miss {
                     tracing::error!("{request} is missing in {}", &self.file);
-                    return Err(HttpRequestError::HttpError(http::StatusCode::NotFound));
+                    return Err(HttpRequestError::HttpError(http_types::StatusCode::NotFound));
                 }
 
                 let response = self.inner.http_post(url, data).await?;
