@@ -10,7 +10,7 @@
 //! to make the underlying HTTP client implementation easily replaceable. This is needed to make it possible
 //! for `ethers` to work with different async runtimes, since the HTTP client is typically not agnostic to
 //! async runtimes (the default HTTP client in `ethers` is using `reqwest`, which is `tokio` specific).
-//! Secondly, this abstraction also allows to implement WASM-compatible HTTP client if needed at some point.
+//! Secondly, this abstraction also allows implementing WASM-compatible HTTP client if needed at some point.
 
 use async_trait::async_trait;
 use ethers::providers::{JsonRpcClient, JsonRpcError};
@@ -18,9 +18,11 @@ use futures::StreamExt;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Formatter};
-use std::sync::atomic::{AtomicU32, AtomicU64, AtomicUsize, Ordering};
+use std::io::{BufWriter, Write};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
+use surf::http;
 use tracing::{debug, trace, warn};
 use validator::Validate;
 
@@ -130,6 +132,7 @@ pub struct SimpleJsonRpcRetryPolicy {
     /// Default is \[429, -32005, -32016\]
     #[default(_code = "vec![-32005, -32016, 429]")]
     pub retryable_json_rpc_errors: Vec<i64>,
+
     /// List of HTTP errors that should be retried with backoff.
     ///
     /// Default is \[429, 504, 503\]
@@ -607,13 +610,11 @@ pub mod reqwest_client {
 }
 
 /// Snapshot of a response cached by the [`SnapshotRequestor`].
-#[serde_with::serde_as]
 #[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
 pub struct RequestorResponseSnapshot {
     id: usize,
     request: String,
-    #[serde_as(as = "serde_with::base64::Base64")]
-    response: Vec<u8>,
+    response: String,
 }
 
 /// Replays an RPC response to a request if it is found in the snapshot YAML file.
@@ -628,6 +629,8 @@ pub struct SnapshotRequestor<T> {
     next_id: Arc<AtomicUsize>,
     entries: moka::future::Cache<String, RequestorResponseSnapshot>,
     file: String,
+    aggressive_save: bool,
+    fail_on_miss: bool,
 }
 
 impl<T> SnapshotRequestor<T> {
@@ -643,6 +646,8 @@ impl<T> SnapshotRequestor<T> {
             next_id: Arc::new(AtomicUsize::new(1)),
             entries: moka::future::Cache::builder().build(),
             file: snapshot_file.to_owned(),
+            aggressive_save: false,
+            fail_on_miss: false,
         }
     }
 
@@ -653,13 +658,15 @@ impl<T> SnapshotRequestor<T> {
 
     /// Clears all entries from the snapshot in memory.
     /// The snapshot file is not changed.
-    pub fn clear(&mut self) {
+    pub fn clear(&self) {
         self.entries.invalidate_all();
         self.next_id.store(1, Ordering::Relaxed);
     }
 
     /// Clears all entries and loads them from the snapshot file.
-    pub async fn try_load(&mut self) -> Result<(), std::io::Error> {
+    /// If `fail_on_miss` is set and the data is successfully loaded, all later
+    /// requests that miss the loaded snapshot will result in HTTP error 404.
+    pub async fn try_load(&mut self, fail_on_miss: bool) -> Result<(), std::io::Error> {
         let loaded = serde_yaml::from_reader::<_, Vec<RequestorResponseSnapshot>>(std::fs::File::open(&self.file)?)
             .map_err(std::io::Error::other)?;
 
@@ -674,6 +681,10 @@ impl<T> SnapshotRequestor<T> {
             .await
             .len();
 
+        if loaded_len > 0 {
+            self.fail_on_miss = fail_on_miss;
+        }
+
         tracing::debug!("snapshot with {loaded_len} entries has been loaded from {}", &self.file);
         Ok(())
     }
@@ -681,8 +692,15 @@ impl<T> SnapshotRequestor<T> {
     /// Similar as [`SnapshotRequestor::try_load`], except that no entries are cleared if the load fails.
     ///
     /// This method consumes and returns self for easier call chaining.
-    pub async fn load(mut self) -> Self {
-        let _ = self.try_load().await;
+    pub async fn load(mut self, fail_on_miss: bool) -> Self {
+        let _ = self.try_load(fail_on_miss).await;
+        self
+    }
+
+    /// Forces saving to disk on each newly inserted entry.
+    /// Use this only when the expected number of entries in the snapshot is small.
+    pub fn with_aggresive_save(mut self) -> Self {
+        self.aggressive_save = true;
         self
     }
 
@@ -694,7 +712,11 @@ impl<T> SnapshotRequestor<T> {
         let mut values: Vec<RequestorResponseSnapshot> = self.entries.iter().map(|(_, r)| r).collect();
         values.sort_unstable_by_key(|a| a.id);
 
-        serde_yaml::to_writer(std::fs::File::create(&self.file)?, &values).map_err(std::io::Error::other)?;
+        let mut writer = BufWriter::new(std::fs::File::create(&self.file)?);
+
+        serde_yaml::to_writer(&mut writer, &values).map_err(std::io::Error::other)?;
+
+        writer.flush()?;
 
         tracing::debug!("snapshot with {} entries saved to file {}", values.len(), self.file);
         Ok(())
@@ -709,28 +731,48 @@ impl<R: HttpPostRequestor> SnapshotRequestor<R> {
         let request = serde_json::to_string(&data)
             .map_err(|e| HttpRequestError::UnknownError(format!("serialize error: {e}")))?;
 
-        self.entries
+        let inserted = AtomicBool::new(false);
+        let result = self
+            .entries
             .entry(request.clone())
             .or_try_insert_with(async {
+                if self.fail_on_miss {
+                    tracing::error!("{request} is missing in {}", &self.file);
+                    return Err(HttpRequestError::HttpError(http::StatusCode::NotFound));
+                }
+
                 let response = self.inner.http_post(url, data).await?;
                 let id = self.next_id.fetch_add(1, Ordering::SeqCst);
+                inserted.store(true, Ordering::Relaxed);
 
                 tracing::debug!("saved new snapshot entry #{id}");
                 Ok(RequestorResponseSnapshot {
                     id,
-                    request,
-                    response: response.into_vec(),
+                    request: request.clone(),
+                    response: String::from_utf8(response.into_vec())
+                        .map_err(|e| HttpRequestError::UnknownError(format!("unparseable data: {e}")))?,
                 })
             })
             .await
-            .map(|e| e.into_value().response.into_boxed_slice())
-            .map_err(|e: Arc<HttpRequestError>| e.as_ref().clone())
+            .map(|e| e.into_value().response.into_bytes().into_boxed_slice())
+            .map_err(|e: Arc<HttpRequestError>| e.as_ref().clone())?;
+
+        if inserted.load(Ordering::Relaxed) && self.aggressive_save {
+            tracing::debug!("{request} was NOT found and was resolved");
+            self.save().map_err(|e| HttpRequestError::UnknownError(e.to_string()))?;
+        } else {
+            tracing::debug!("{request} was found");
+        }
+
+        Ok(result)
     }
 }
 
 impl<T> Drop for SnapshotRequestor<T> {
     fn drop(&mut self) {
-        let _ = self.save();
+        if let Err(e) = self.save() {
+            tracing::error!("failed to save snapshot: {e}");
+        }
     }
 }
 
@@ -738,7 +780,7 @@ impl<T> Drop for SnapshotRequestor<T> {
 impl<R: HttpPostRequestor> HttpPostRequestor for SnapshotRequestor<R> {
     async fn http_post<T>(&self, url: &str, data: T) -> Result<Box<[u8]>, HttpRequestError>
     where
-        T: Serialize + Send + Sync
+        T: Serialize + Send + Sync,
     {
         self.http_post_with_snapshot(url, data).await
     }
@@ -1214,7 +1256,7 @@ mod tests {
             let client = JsonRpcProviderClient::new(
                 &anvil.endpoint(),
                 SnapshotRequestor::new(NullHttpPostRequestor, snapshot_file.path().to_str().unwrap())
-                    .load()
+                    .load(true)
                     .await,
                 SimpleJsonRpcRetryPolicy::default(),
             );

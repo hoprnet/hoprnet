@@ -8,23 +8,52 @@
 
 use generic_array::{ArrayLength, GenericArray};
 
-pub use rand::rngs::OsRng;
+//pub use rand::rngs::OsRng;
+use rand::CryptoRng;
 pub use rand::{Rng, RngCore};
 
 /// Maximum random integer that can be generated.
 /// This is the last positive 64-bit value in the two's complement representation.
 pub const MAX_RANDOM_INTEGER: u64 = 9007199254740991;
 
+/// Gets the default cryptographically secure random number generator.
+///
+/// **WARNING** On debug builds with `fixed_rng` feature enabled during
+/// compilation, this function will return an RNG with a fixed seed, which is *NOT SECURE*!
+/// This is reserved for deterministic testing.
+#[cfg(all(debug_assertions, feature = "fixed_rng"))]
+#[inline]
+pub fn rng() -> impl RngCore + CryptoRng {
+    use rand::SeedableRng;
+    rand::rngs::StdRng::from_seed([
+        0x5f, 0x57, 0xce, 0x2a, 0x84, 0x14, 0x7e, 0x88, 0x43, 0x56, 0x44, 0x56, 0x7f, 0x90, 0x4f, 0xb2, 0x04, 0x6b,
+        0x18, 0x42, 0x75, 0x69, 0xbe, 0x53, 0xb2, 0x29, 0x78, 0xbd, 0xf3, 0x0a, 0xda, 0xba,
+    ])
+}
+
+/// Gets the default cryptographically secure random number generator.
+#[cfg(any(not(debug_assertions), not(feature = "fixed_rng")))]
+#[inline]
+pub fn rng() -> impl RngCore + CryptoRng {
+    rand::rngs::OsRng
+}
+
+/// Returns `true` if the build is using an **insecure** RNG with a fixed seed.
+#[inline]
+pub const fn is_rng_fixed() -> bool {
+    cfg!(debug_assertions) && cfg!(feature = "fixed_rng")
+}
+
 /// Generates a random float uniformly distributed between 0 (inclusive) and 1 (exclusive).
 #[inline]
 pub fn random_float() -> f64 {
-    OsRng.gen()
+    rng().gen()
 }
 
 /// Generates a random float uniformly distributed in the given range.
 #[inline]
 pub fn random_float_in_range(range: std::ops::Range<f64>) -> f64 {
-    OsRng.gen_range(range)
+    rng().gen_range(range)
 }
 
 /// Generates a random unsigned integer which is at least `start` and optionally strictly less than `end`.
@@ -39,13 +68,13 @@ pub fn random_integer(start: u64, end: Option<u64>) -> u64 {
     );
 
     let bound = real_end - start;
-    start + OsRng.gen_range(0..bound)
+    start + rng().gen_range(0..bound)
 }
 
 /// Fills the specific number of bytes starting from the given offset in the given buffer.
 #[inline]
 pub fn random_fill(buffer: &mut [u8]) {
-    OsRng.fill_bytes(buffer);
+    rng().fill_bytes(buffer);
 }
 
 /// Allocates an array of the given size and fills it with random bytes

@@ -1,6 +1,7 @@
 use ethers::providers::Middleware;
 use ethers::utils::AnvilInstance;
 use futures::{pin_mut, StreamExt};
+use hex_literal::hex;
 use std::time::Duration;
 use tracing::info;
 
@@ -14,7 +15,9 @@ use chain_actions::ChainActions;
 use chain_api::executors::{EthereumTransactionExecutor, RpcEthereumClient, RpcEthereumClientConfig};
 use chain_indexer::{block::Indexer, handlers::ContractEventHandlers, IndexerConfig};
 use chain_rpc::client::surf_client::SurfRequestor;
-use chain_rpc::client::{create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy};
+use chain_rpc::client::{
+    create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy, SnapshotRequestor,
+};
 use chain_rpc::rpc::{RpcOperations, RpcOperationsConfig};
 use chain_types::chain_events::ChainEventType;
 use chain_types::utils::{
@@ -29,20 +32,18 @@ use hopr_primitive_types::prelude::*;
 use hopr_transport::{ChainKeypair, Hash, Keypair, Multiaddr, OffchainKeypair};
 
 // Helper function to generate the first acked ticket (channel_epoch 1, index 0, offset 0) of win prob 100%
-async fn generate_the_first_ack_ticket<M: Middleware + 'static>(
+async fn generate_the_first_ack_ticket(
     myself: &ChainNode,
     counterparty: &ChainKeypair,
     price: Balance,
-    instances: &ContractInstances<M>,
+    domain_separator: Hash,
 ) -> anyhow::Result<()> {
-    let hk1 = HalfKey::random();
-    let hk2 = HalfKey::random();
+    let hk1 = HalfKey::try_from(hex!("16e1d5a405315958b7db2d70ed797d858c9e6ba979783cf5110c13e0200ab0d0").as_ref())?;
+    let hk2 = HalfKey::try_from(hex!("bc580f2aad36f35419d5936cc3256e2eb4a7a5f42c934b91a94305da8c4f7e81").as_ref())?;
 
     let cp1: CurvePoint = hk1.to_challenge().try_into()?;
     let cp2: CurvePoint = hk2.to_challenge().try_into()?;
     let cp_sum = CurvePoint::combine(&[&cp1, &cp2]);
-
-    let domain_separator: Hash = instances.channels.domain_separator().call().await?.into();
 
     let ack_ticket = TicketBuilder::default()
         .addresses(counterparty, &myself.chain_key)
@@ -127,7 +128,9 @@ async fn onboard_node<M: Middleware + 'static>(
     Ok((module, safe))
 }
 
-type TestRpc = RpcOperations<JsonRpcProviderClient<SurfRequestor, SimpleJsonRpcRetryPolicy>>;
+type Requestor = SnapshotRequestor<SurfRequestor>;
+
+type TestRpc = RpcOperations<JsonRpcProviderClient<Requestor, SimpleJsonRpcRetryPolicy>>;
 
 struct ChainNode {
     chain_key: ChainKeypair,
@@ -143,10 +146,11 @@ async fn start_node_chain_logic(
     chain_key: &ChainKeypair,
     offchain_key: &OffchainKeypair,
     anvil: &AnvilInstance,
+    requestor_in: Requestor,
+    requestor_out: Requestor,
     contract_addrs: ContractAddresses,
-    module_addr: Address,
-    safe_addr: Address,
-    rpc_cfg: RpcOperationsConfig,
+    safe_cfg: NodeSafeConfig,
+    mut rpc_cfg: RpcOperationsConfig,
     actions_cfg: ActionQueueConfig,
     indexer_cfg: IndexerConfig,
 ) -> anyhow::Result<ChainNode> {
@@ -170,19 +174,24 @@ async fn start_node_chain_logic(
         .await?;
 
     // RPC
-    let json_rpc_client = JsonRpcProviderClient::new(
-        &anvil.endpoint(),
-        SurfRequestor::default(),
-        SimpleJsonRpcRetryPolicy::default(),
-    );
+    rpc_cfg.safe_address = safe_cfg.safe_address;
+    rpc_cfg.module_address = safe_cfg.module_address;
 
-    let rpc_ops = RpcOperations::new(json_rpc_client, chain_key, rpc_cfg)?;
+    let json_rpc_client =
+        JsonRpcProviderClient::new(&anvil.endpoint(), requestor_in, SimpleJsonRpcRetryPolicy::default());
+
+    let rpc_ops_in = RpcOperations::new(json_rpc_client, chain_key, rpc_cfg)?;
+
+    let json_rpc_client =
+        JsonRpcProviderClient::new(&anvil.endpoint(), requestor_out, SimpleJsonRpcRetryPolicy::default());
+
+    let rpc_ops_out = RpcOperations::new(json_rpc_client, chain_key, rpc_cfg)?;
 
     // Transaction executor
-    let eth_client = RpcEthereumClient::new(rpc_ops.clone(), RpcEthereumClientConfig::default());
+    let eth_client = RpcEthereumClient::new(rpc_ops_out, RpcEthereumClientConfig::default());
     let tx_exec = EthereumTransactionExecutor::new(
         eth_client,
-        SafePayloadGenerator::new(chain_key, contract_addrs, module_addr),
+        SafePayloadGenerator::new(chain_key, contract_addrs, safe_cfg.module_address),
     );
 
     // Actions
@@ -209,9 +218,10 @@ async fn start_node_chain_logic(
     }));
 
     // Indexer
-    let chain_log_handler = ContractEventHandlers::new(contract_addrs, safe_addr, chain_key.clone(), db.clone());
+    let chain_log_handler =
+        ContractEventHandlers::new(contract_addrs, safe_cfg.safe_address, chain_key.clone(), db.clone());
 
-    let mut indexer = Indexer::new(rpc_ops.clone(), chain_log_handler, db.clone(), indexer_cfg, sce_tx);
+    let mut indexer = Indexer::new(rpc_ops_in, chain_log_handler, db.clone(), indexer_cfg, sce_tx);
     indexer.start().await?;
 
     Ok(ChainNode {
@@ -224,36 +234,91 @@ async fn start_node_chain_logic(
     })
 }
 
-#[cfg_attr(feature = "runtime-async-std", async_std::test)]
-#[cfg_attr(all(feature = "runtime-tokio", not(feature = "runtime-async-std")), tokio::test)]
-async fn integration_test_indexer() -> anyhow::Result<()> {
-    let block_time = Duration::from_secs(1);
-    let anvil = create_anvil(Some(block_time));
+#[derive(Clone, Copy, Default)]
+struct NodeSafeConfig {
+    pub safe_address: Address,
+    pub module_address: Address,
+}
+
+type AnvilRpcClient<R> = ethers::middleware::SignerMiddleware<
+    ethers::providers::Provider<JsonRpcProviderClient<R, SimpleJsonRpcRetryPolicy>>,
+    ethers::signers::Wallet<ethers::core::k256::ecdsa::SigningKey>,
+>;
+
+const SNAPSHOT_BASE: &str = "tests/snapshots/indexer_snapshot_base";
+const SNAPSHOT_ALICE_TX: &str = "tests/snapshots/indexer_snapshot_alice_out";
+const SNAPSHOT_ALICE_RX: &str = "tests/snapshots/indexer_snapshot_alice_in";
+const SNAPSHOT_BOB_TX: &str = "tests/snapshots/indexer_snapshot_bob_out";
+const SNAPSHOT_BOB_RX: &str = "tests/snapshots/indexer_snapshot_bob_in";
+
+async fn onboard_nodes<const N: usize>(
+    keys: [&ChainKeypair; N],
+    anvil: &AnvilInstance,
+) -> anyhow::Result<(
+    ContractAddresses,
+    ContractInstances<AnvilRpcClient<Requestor>>,
+    [NodeSafeConfig; N],
+)> {
+    let mut safe_cfg = [NodeSafeConfig::default(); N];
+
     let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
 
-    let alice_chain_key = ChainKeypair::from_secret(anvil.keys()[1].to_bytes().as_ref())?;
-    let bob_chain_key = ChainKeypair::from_secret(anvil.keys()[2].to_bytes().as_ref())?;
+    let requestor = SnapshotRequestor::new(SurfRequestor::default(), SNAPSHOT_BASE)
+        .load(true)
+        .await;
 
-    let alice_offchain_key = OffchainKeypair::random();
-    let bob_offchain_key = OffchainKeypair::random();
-
-    let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &contract_deployer);
+    let client = create_rpc_client_to_anvil(requestor.clone(), anvil, &contract_deployer);
     info!("Deploying SCs to Anvil...");
-    let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
-        .await
-        .expect("failed to deploy");
+    let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer).await?;
 
     // Mint some tokens
     chain_types::utils::mint_tokens(instances.token.clone(), 1_000_000_u128.into()).await;
 
     let contract_addrs = ContractAddresses::from(&instances);
 
+    for i in 0..N {
+        let (module_addr, safe_addr) = onboard_node(&instances, &contract_deployer, keys[i]).await?;
+        safe_cfg[i].module_address = module_addr;
+        safe_cfg[i].safe_address = safe_addr;
+    }
+
+    Ok((contract_addrs, instances, safe_cfg))
+}
+
+#[cfg_attr(feature = "runtime-async-std", test_log::test(async_std::test))]
+#[cfg_attr(
+    all(feature = "runtime-tokio", not(feature = "runtime-async-std")),
+    test_log::test(tokio::test)
+)]
+async fn integration_test_indexer() -> anyhow::Result<()> {
+    assert!(
+        hopr_crypto_random::is_rng_fixed(),
+        "snapshot based tests require fixed RNG"
+    );
+
+    let block_time = Duration::from_secs(1);
+    let anvil = create_anvil(Some(block_time));
+
+    let alice_chain_key = ChainKeypair::from_secret(anvil.keys()[1].to_bytes().as_ref())?;
+    let bob_chain_key = ChainKeypair::from_secret(anvil.keys()[2].to_bytes().as_ref())?;
+
+    let alice_offchain_key = OffchainKeypair::from_secret(&hex!(
+        "2ba8cd4c723083159c00464fe0e6d7dbb1f931383cec4a04d21b63e49f8a18cf"
+    ))?;
+    let bob_offchain_key = OffchainKeypair::from_secret(&hex!(
+        "4166d6b8455a6be8aa0f41e6b1d0446ad95e744de1eb3e4e6e5af30ca27d7af5"
+    ))?;
+
+    let (contract_addrs, instances, safe_cfgs) = onboard_nodes([&alice_chain_key, &bob_chain_key], &anvil).await?;
+
     let finality = 2;
     sleep((1 + finality) * block_time).await;
 
+    let domain_separator: Hash = instances.channels.domain_separator().call().await?.into();
+
     // ----------------------------------------
 
-    let mut rpc_cfg = RpcOperationsConfig {
+    let rpc_cfg = RpcOperationsConfig {
         chain_id: anvil.chain_id(),
         finality,
         contract_addrs,
@@ -270,18 +335,22 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
     let indexer_cfg = IndexerConfig { start_block_number: 1 };
 
     // Setup ALICE
-    info!("Setting up ALICE");
-    let (alice_module_addr, alice_safe_addr) = onboard_node(&instances, &contract_deployer, &alice_chain_key).await?;
-
-    rpc_cfg.module_address = alice_module_addr;
+    info!("Starting up ALICE");
 
     let alice_node = start_node_chain_logic(
         &alice_chain_key,
         &alice_offchain_key,
         &anvil,
+        SnapshotRequestor::new(SurfRequestor::default(), SNAPSHOT_ALICE_RX)
+            .with_aggresive_save()
+            .load(true)
+            .await,
+        SnapshotRequestor::new(SurfRequestor::default(), SNAPSHOT_ALICE_TX)
+            .with_aggresive_save()
+            .load(true)
+            .await,
         contract_addrs,
-        alice_module_addr,
-        alice_safe_addr,
+        safe_cfgs[0],
         rpc_cfg,
         actions_cfg,
         indexer_cfg,
@@ -289,18 +358,22 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
     .await?;
 
     // Setup BOB
-    info!("Setting up BOB");
-    let (bob_module_addr, bob_safe_addr) = onboard_node(&instances, &contract_deployer, &bob_chain_key).await?;
-
-    rpc_cfg.module_address = bob_module_addr;
+    info!("Starting up BOB");
 
     let bob_node = start_node_chain_logic(
         &bob_chain_key,
         &bob_offchain_key,
         &anvil,
+        SnapshotRequestor::new(SurfRequestor::default(), SNAPSHOT_BOB_RX)
+            .with_aggresive_save()
+            .load(true)
+            .await,
+        SnapshotRequestor::new(SurfRequestor::default(), SNAPSHOT_BOB_TX)
+            .with_aggresive_save()
+            .load(true)
+            .await,
         contract_addrs,
-        bob_module_addr,
-        bob_safe_addr,
+        safe_cfgs[1],
         rpc_cfg,
         actions_cfg,
         indexer_cfg,
@@ -322,14 +395,14 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
     // Register Safe Alice
     let confirmation = alice_node
         .actions
-        .register_safe_by_node(alice_safe_addr)
+        .register_safe_by_node(safe_cfgs[0].safe_address)
         .await
         .expect("should submit safe registration tx")
         .await
         .expect("should confirm safe registration");
 
     assert!(
-        matches!(confirmation.event, Some(ChainEventType::NodeSafeRegistered(reg_safe)) if reg_safe == alice_safe_addr),
+        matches!(confirmation.event, Some(ChainEventType::NodeSafeRegistered(reg_safe)) if reg_safe == safe_cfgs[0].safe_address),
         "confirmed safe address must match"
     );
     info!("--> Alice's Safe has been registered");
@@ -337,14 +410,14 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
     // Register Safe Bob
     let confirmation = bob_node
         .actions
-        .register_safe_by_node(bob_safe_addr)
+        .register_safe_by_node(safe_cfgs[1].safe_address)
         .await
         .expect("should submit safe registration tx")
         .await
         .expect("should confirm safe registration");
 
     assert!(
-        matches!(confirmation.event, Some(ChainEventType::NodeSafeRegistered(reg_safe)) if reg_safe == bob_safe_addr),
+        matches!(confirmation.event, Some(ChainEventType::NodeSafeRegistered(reg_safe)) if reg_safe == safe_cfgs[1].safe_address),
         "confirmed safe address must match"
     );
     info!("--> Bob's Safe has been registered");
@@ -497,7 +570,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
         _ => panic!("invalid confirmation"),
     };
 
-    sleep(Duration::from_millis(1000)).await;
+    sleep(Duration::from_millis(2000)).await;
 
     // After the funding, read channel_alice_bob again and compare its balance
     let channel_alice_bob = alice_node
@@ -580,7 +653,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
     let ticket_price = Balance::new(1, BalanceType::HOPR);
 
     // Create ticket from Alice in Bob's DB
-    generate_the_first_ack_ticket(&bob_node, &alice_chain_key, ticket_price, &instances).await?;
+    generate_the_first_ack_ticket(&bob_node, &alice_chain_key, ticket_price, domain_separator).await?;
 
     let bob_ack_tickets = bob_node
         .db
@@ -804,6 +877,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
     );
 
     futures::future::join_all(alice_node.node_tasks.into_iter().map(|t| cancel_join_handle(t))).await;
+    futures::future::join_all(bob_node.node_tasks.into_iter().map(|t| cancel_join_handle(t))).await;
 
     Ok(())
 }

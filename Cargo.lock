@@ -3925,7 +3925,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-crypto-random"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "generic-array",
  "rand 0.8.5",
@@ -4123,7 +4123,9 @@ dependencies = [
  "ethers",
  "futures",
  "futures-concurrency",
+ "hex-literal",
  "hopr-async-runtime",
+ "hopr-crypto-random",
  "hopr-crypto-types",
  "hopr-db-sql",
  "hopr-internal-types",
@@ -4425,6 +4427,7 @@ dependencies = [
  "futures",
  "home",
  "hopr-async-runtime",
+ "hopr-crypto-random",
  "hopr-lib",
  "hopr-metrics",
  "hopr-network-types",
