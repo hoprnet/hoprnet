@@ -7,9 +7,8 @@
 //! random traits is necessary.
 
 use generic_array::{ArrayLength, GenericArray};
-
-//pub use rand::rngs::OsRng;
 use rand::CryptoRng;
+
 pub use rand::{Rng, RngCore};
 
 /// Maximum random integer that can be generated.
@@ -18,7 +17,7 @@ pub const MAX_RANDOM_INTEGER: u64 = 9007199254740991;
 
 /// Gets the default cryptographically secure random number generator.
 ///
-/// **WARNING** On debug builds with `fixed_rng` feature enabled during
+/// **WARNING** On debug builds with the ` fixed_rng ` feature enabled during
 /// compilation, this function will return an RNG with a fixed seed, which is *NOT SECURE*!
 /// This is reserved for deterministic testing.
 #[cfg(all(debug_assertions, feature = "fixed_rng"))]
@@ -39,6 +38,8 @@ pub fn rng() -> impl RngCore + CryptoRng {
 }
 
 /// Returns `true` if the build is using an **insecure** RNG with a fixed seed.
+///
+/// See also [`rng`].
 #[inline]
 pub const fn is_rng_fixed() -> bool {
     cfg!(debug_assertions) && cfg!(feature = "fixed_rng")
