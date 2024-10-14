@@ -485,7 +485,7 @@ async def test_hopli_should_be_able_to_create_safe_module(swarm7: dict[str, Node
     # read the identity
     new_node = read_identity(extra_prefix, PASSWORD)
 
-    # create safe and module for
+    # create safe and module
     safe_address, module_address = create_safe_module(extra_prefix, private_key, manager_private_key)
     run_cast_cmd("balance", [new_node])
     run_cast_cmd("code", [safe_address])

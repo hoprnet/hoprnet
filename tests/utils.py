@@ -1,6 +1,5 @@
 import asyncio
 import random
-
 from contextlib import asynccontextmanager
 
 from .conftest import (
@@ -8,7 +7,6 @@ from .conftest import (
     TICKET_AGGREGATION_THRESHOLD,
     TICKET_PRICE_PER_HOP,
 )
-
 from .node import Node
 
 PARAMETERIZED_SAMPLE_SIZE = 1  # if os.getenv("CI", default="false") == "false" else 3
@@ -16,6 +14,7 @@ AGGREGATED_TICKET_PRICE = TICKET_AGGREGATION_THRESHOLD * TICKET_PRICE_PER_HOP
 MULTIHOP_MESSAGE_SEND_TIMEOUT = 30.0
 CHECK_RETRY_INTERVAL = 0.5
 APPLICATION_TAG_THRESHOLD_FOR_SESSIONS = RESERVED_TAG_UPPER_BOUND + 1
+
 
 def shuffled(coll):
     random.shuffle(coll)
@@ -27,8 +26,9 @@ def gen_random_tag():
 
 
 @asynccontextmanager
-async def create_channel(src: Node, dest: Node, funding: int, close_from_dest: bool = True):
-    channel = await src.api.open_channel(dest.address, str(int(funding)))
+async def create_channel(src: Node, dest: Node, funding: int, close_from_dest: bool = True, use_peer_id: bool = False):
+
+    channel = await src.api.open_channel(dest.peer_id if use_peer_id else dest.address, str(int(funding)))
     assert channel is not None
     await asyncio.wait_for(check_channel_status(src, dest, status="Open"), 10.0)
     try:
@@ -75,10 +75,10 @@ async def check_channel_status(src: Node, dest: Node, status: str):
         channel = await get_channel(src, dest, include_closed)
         channel_seen_from_dst = await get_channel_seen_from_dst(src, dest, include_closed)
         if (
-                channel is not None
-                and channel.status == status
-                and channel_seen_from_dst is not None
-                and channel_seen_from_dst.status == status
+            channel is not None
+            and channel.status == status
+            and channel_seen_from_dst is not None
+            and channel_seen_from_dst.status == status
         ):
             break
         else:
@@ -149,16 +149,19 @@ async def check_native_balance_below(src: Node, value: int):
     while balance_str_to_int((await src.api.balances()).native) >= value:
         await asyncio.sleep(CHECK_RETRY_INTERVAL)
 
+
 async def check_min_incoming_win_prob_eq(src: Node, value: float):
     while round(await src.api.ticket_min_win_prob(), 5) != value:
         await asyncio.sleep(CHECK_RETRY_INTERVAL)
+
 
 async def check_all_tickets_redeemed(src: Node):
     while balance_str_to_int((await src.api.get_tickets_statistics()).unredeemed_value) > 0:
         await asyncio.sleep(CHECK_RETRY_INTERVAL)
 
+
 async def send_and_receive_packets_with_pop(
-        packets, src: Node, dest: Node, path: list[str], timeout: float = MULTIHOP_MESSAGE_SEND_TIMEOUT
+    packets, src: Node, dest: Node, path: list[str], timeout: float = MULTIHOP_MESSAGE_SEND_TIMEOUT
 ):
     random_tag = gen_random_tag()
 
@@ -169,7 +172,7 @@ async def send_and_receive_packets_with_pop(
 
 
 async def send_and_receive_packets_with_peek(
-        packets, src: Node, dest: Node, path: list[str], timeout: float = MULTIHOP_MESSAGE_SEND_TIMEOUT
+    packets, src: Node, dest: Node, path: list[str], timeout: float = MULTIHOP_MESSAGE_SEND_TIMEOUT
 ):
     random_tag = gen_random_tag()
 
@@ -183,4 +186,3 @@ async def send_and_receive_packets_with_peek(
 
 def balance_str_to_int(balance: str):
     return int(balance.split(" ", 1)[0])
-

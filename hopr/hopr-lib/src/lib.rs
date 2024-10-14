@@ -21,6 +21,7 @@ pub mod constants;
 pub mod errors;
 
 use async_lock::RwLock;
+use chain_rpc::HoprRpcOperations;
 use futures::{
     channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender},
     Stream, StreamExt,
@@ -44,8 +45,8 @@ use chain_actions::{
     redeem::TicketRedeemActions,
 };
 use chain_api::{
-    can_register_with_safe, config::ChainNetworkConfig, wait_for_funds, HoprChain, HoprChainProcess,
-    SignificantChainEvent,
+    can_register_with_safe, config::ChainNetworkConfig, errors::HoprChainError, wait_for_funds, HoprChain,
+    HoprChainProcess, SignificantChainEvent,
 };
 use chain_types::chain_events::ChainEventType;
 use chain_types::ContractAddresses;
@@ -830,6 +831,29 @@ impl Hopr {
             }
         }
 
+        // Check Safe-module status:
+        // 1) if the node is already included into the module
+        // 2) if the module is enabled in the safe
+        // 3) if the safe is the owner of the module
+        // if any of the conditions is not met, return error
+        let safe_module_configuration = self
+            .chain_api
+            .rpc()
+            .check_node_safe_module_status(self.me_onchain())
+            .await
+            .map_err(HoprChainError::Rpc)?;
+
+        if !safe_module_configuration.should_pass() {
+            error!(
+                "Something is wrong with the safe module configuration: {:?}",
+                safe_module_configuration
+            );
+            return Err(HoprLibError::ChainApi(HoprChainError::Api(format!(
+                "Safe and module are not configured correctly {:?}",
+                safe_module_configuration,
+            ))));
+        }
+
         // Possibly register node-safe pair to NodeSafeRegistry. Following that the
         // connector is set to use safe tx variants.
         if can_register_with_safe(
@@ -1206,6 +1230,11 @@ impl Hopr {
     /// Reset the ticket metrics to zero
     pub async fn reset_ticket_statistics(&self) -> errors::Result<()> {
         Ok(self.db.reset_ticket_statistics().await?)
+    }
+
+    // DB ============
+    pub fn peer_resolver(&self) -> &impl HoprDbResolverOperations {
+        &self.db
     }
 
     // Chain =========
