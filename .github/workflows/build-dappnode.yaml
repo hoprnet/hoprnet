@@ -67,7 +67,9 @@ jobs:
         uses: docker/setup-buildx-action@v2
 
       - name: Set up Docker Compose
-        run: sudo apt-get update && sudo apt-get install docker-compose-plugin
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y docker-compose
 
       - name: Set up Google Cloud Credentials
         id: auth
@@ -125,7 +127,6 @@ jobs:
         run: |
           docker_tag=$(gcloud artifacts docker tags list ${{ vars.DOCKER_IMAGE_REGISTRY }}/hoprd --filter=tag:${{ steps.setup.outputs.current_version }} --format="csv[no-heading](tag,version)" | grep "${{ steps.setup.outputs.current_version }}," | sed 's/,/@/')
           yq -i e ".services.node.build.args.UPSTREAM_VERSION |= \"${docker_tag}\"" ./docker-compose.yml
-          cat ./docker-compose.yml
           npm install
           npx @dappnode/dappnodesdk publish patch  --provider "remote" --upload_to "ipfs" --verbose | tee build.log
 
