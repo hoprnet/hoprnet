@@ -9,6 +9,7 @@ on:
     types: [checks_requested]
   pull_request:
     types:
+      - opened
       - synchronize
       - ready_for_review
 
@@ -82,8 +83,21 @@ jobs:
       interpreter: ${{ matrix.target.interpreter }}
     secrets: inherit
 
+  label:
+    name: Add PR labels
+    runs-on: self-hosted-hoprnet-small
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/labeler@v5
+        with:
+          repo-token: "${{ secrets.GITHUB_TOKEN }}"
+          sync-labels: true
+
   docs:
     name: Docs
-    if: github.event.pull_request.draft == false
     uses: ./.github/workflows/build-docs.yaml
     secrets: inherit
+    with:
+      publish: false

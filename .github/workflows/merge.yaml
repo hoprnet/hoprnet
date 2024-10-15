@@ -224,6 +224,15 @@ jobs:
       base_branch: ${{ github.event.pull_request.base.ref }}
     secrets: inherit
 
+  docs:
+    name: Docs
+    needs: 
+      - build_docker
+    uses: ./.github/workflows/build-docs.yaml
+    secrets: inherit
+    with:
+      publish: true
+
   notify:
     name: Notify Changes
     runs-on: self-hosted-hoprnet-small
