@@ -136,7 +136,7 @@ jobs:
           IMAGE_TARGET: ${{ vars.DOCKER_IMAGE_REGISTRY }}/${{ inputs.package }}:${{ steps.options.outputs.DOCKER_RELEASE_LATEST_TAG }}
 
       - name: Trigger deploy workflow if needed
-        if: (contains(github.event.pull_request.labels.*.name, 'deploy_nodes') || inputs.production ) && contains(inputs.package,'hoprd') 
+        if: (contains(github.event.pull_request.labels.*.name, 'deploy_nodes') || inputs.production ) && contains(inputs.package,'hoprd')
         uses: peter-evans/repository-dispatch@v2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}

@@ -53,6 +53,7 @@ jobs:
 
       - name: "Undeploy PR deployment"
         if: contains(github.event.pull_request.labels.*.name, 'deploy_nodes')
+        # Remove the deploy_nodes label to indicate that the PR deployment has been cleaned up
         run: |
           gh pr edit ${{ github.event.pull_request.number }} --remove-label "deploy_nodes"
         env:
