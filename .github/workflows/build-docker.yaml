@@ -36,19 +36,13 @@ jobs:
         with:
           ref: ${{ inputs.branch }}
 
-      - name: Set up Google Cloud Credentials
-        id: auth
-        uses: google-github-actions/auth@v2
+      - name: Setup GCP
+        id: gcp
+        uses: hoprnet/hopr-workflows/actions/setup-gcp@master
         with:
-          token_format: "access_token"
-          credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
-
-      - name: Login Google Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: europe-west3-docker.pkg.dev
-          username: oauth2accesstoken
-          password: ${{ steps.auth.outputs.access_token }}
+          google-credentials: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+          login-artifact-registry: 'true'
+          install-sdk: 'false'
 
       - name: Install Nix
         if: env.needs_nix_setup == true
@@ -85,8 +79,8 @@ jobs:
           else
             next_version=$(./scripts/get-next-version.sh Build)
             ./scripts/bump-version.sh ${next_version}
-            docker_tag_pr=$(echo "${next_version}" | sed 's/+.*/-pr.'${{ github.event.pull_request.number }}'/')
             docker_tag=$(echo "${next_version}" | sed 's/+/-/')
+            docker_tag_pr=$(echo "${next_version}" | sed 's/+.*/-pr.'${{ github.event.pull_request.number }}'/')
             echo "DOCKER_TAG=${docker_tag}" >> $GITHUB_OUTPUT
             echo "DOCKER_TAG_PR=${docker_tag_pr}" >> $GITHUB_OUTPUT
             echo "NIX_BUILD_TARGET=${{ inputs.package }}${nix_debug_option}-docker-build-and-upload" >> $GITHUB_OUTPUT
@@ -103,36 +97,33 @@ jobs:
             echo "HOPRD_CLUSTER_NAME=hoprd-node-${docker_tag_pr//./-}" >> $GITHUB_OUTPUT
           fi
           echo "DOCKER_RELEASE_LATEST_TAG=${docker_release_latest_tag}" >> $GITHUB_OUTPUT
-          echo "DOCKER_TAG=${docker_tag}"
-          echo "DOCKER_TAG_PR=${docker_tag_pr}"
-          echo "DOCKER_RELEASE_LATEST_TAG=${docker_release_latest_tag}"
         env:
           COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
 
       - name: Build and push ${{ inputs.package }} docker image - Default
         run: nix run .#${{ steps.options.outputs.NIX_BUILD_TARGET }}
         env:
-          GOOGLE_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+          GOOGLE_ACCESS_TOKEN: ${{ steps.gcp.outputs.access_token }}
           IMAGE_TARGET: ${{ vars.DOCKER_IMAGE_REGISTRY }}/${{ inputs.package }}:${{ steps.options.outputs.DOCKER_TAG }}
 
       - name: Build and push ${{ inputs.package }} docker image - PR
         run: nix run .#${{ steps.options.outputs.NIX_BUILD_TARGET }}
         env:
-          GOOGLE_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+          GOOGLE_ACCESS_TOKEN: ${{ steps.gcp.outputs.access_token }}
           IMAGE_TARGET: ${{ vars.DOCKER_IMAGE_REGISTRY }}/${{ inputs.package }}:${{ steps.options.outputs.DOCKER_TAG_PR }}
 
       - name: Build and push ${{ inputs.package }} docker image - latest
         run: nix run .#${{ steps.options.outputs.NIX_BUILD_TARGET }}
         if: inputs.production && github.event.pull_request.base.ref == 'master'
         env:
-          GOOGLE_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+          GOOGLE_ACCESS_TOKEN: ${{ steps.gcp.outputs.access_token }}
           IMAGE_TARGET: ${{ vars.DOCKER_IMAGE_REGISTRY }}/${{ inputs.package }}:latest
 
       - name: Build and push ${{ inputs.package }} docker image - release-latest
         run: nix run .#${{ steps.options.outputs.NIX_BUILD_TARGET }}
         if: inputs.production
         env:
-          GOOGLE_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+          GOOGLE_ACCESS_TOKEN: ${{ steps.gcp.outputs.access_token }}
           IMAGE_TARGET: ${{ vars.DOCKER_IMAGE_REGISTRY }}/${{ inputs.package }}:${{ steps.options.outputs.DOCKER_RELEASE_LATEST_TAG }}
 
       - name: Trigger deploy workflow if needed

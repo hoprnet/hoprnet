@@ -24,7 +24,7 @@ on:
           - rotsee
           - dufour
         required: true
-        description: 'Package network'
+        description: 'Package network (rotsee: testnet, dufour: mainnet)'
         default: 'dufour'
 
 concurrency:
@@ -40,7 +40,7 @@ jobs:
       - name: Set environment variables
         id: vars
         run: |
-          if [ -z "${{ inputs.network }}" ]; then
+          if [[ "${{ github.event_name }}" == "workflow_call" ]]; then
             echo "The workflow is triggered by other pipeline"
             {
               echo "GITHUB_REF_NAME=${{ inputs.branch }}"
@@ -50,7 +50,7 @@ jobs:
             echo "The workflow is triggered manually"
             {
               echo "GITHUB_REF_NAME=${{ github.ref_name }}"
-              if [ "${{ github.event.inputs.network }}" == "rotsee" ]; then
+              if [[ "${{ github.event.inputs.network }}" == "rotsee" ]]; then
                 echo "DAPPNODE_REPOSITORY=DAppNodePackage-Hopr-testnet"
               else
                 echo "DAPPNODE_REPOSITORY=DAppNodePackage-Hopr"
@@ -71,18 +71,13 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y docker-compose
 
-      - name: Set up Google Cloud Credentials
-        id: auth
-        uses: google-github-actions/auth@v2
+      - name: Setup GCP
+        id: gcp
+        uses: hoprnet/hopr-workflows/actions/setup-gcp@master
         with:
-          token_format: "access_token"
-          credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
-
-      - name: Set up Google Cloud SDK
-        uses: google-github-actions/setup-gcloud@v2
-        with:
-          project_id: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
-          install_components: beta
+          google-credentials: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+          login-artifact-registry: 'false'
+          install-sdk: 'true'
 
       - name: Setup Node.js
         uses: actions/setup-node@v4

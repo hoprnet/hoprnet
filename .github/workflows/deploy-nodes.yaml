@@ -12,8 +12,9 @@ on:
       hoprd_cluster_name:
         description: 'Name of the hoprd cluster to deploy'
         required: true
-        type: string
-        default: "core-node"
+        type: choice
+        options:
+          - 'core-node'
 
 concurrency:
   group: deploy-nodes
@@ -26,24 +27,15 @@ jobs:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4
 
-      - name: Set up Google Cloud Credentials
-        uses: google-github-actions/auth@v2
+      - name: Setup GCP
+        id: gcp
+        uses: hoprnet/hopr-workflows/actions/setup-gcp@master
         with:
-          token_format: "access_token"
-          credentials_json: ${{ secrets.GCP_SA_TERRAFORM_JSON }}
-
-      - name: Set up Google Cloud SDK
-        uses: google-github-actions/setup-gcloud@v2
-        with:
-          project_id: hopr-staging
-          install_components: beta
-
-      - name: Get credentials
-        uses: google-github-actions/get-gke-credentials@v2
-        with:
-          cluster_name: cluster-staging
-          location: europe-west3
-          project_id: hopr-staging
+          google-credentials: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+          login-artifact-registry: 'true'
+          install-sdk: 'true'
+          login-gke: 'true'
+          project: hopr-staging
 
       - name: Set environment variables
         id: vars
@@ -62,6 +54,7 @@ jobs:
 
       - name: "Restart deployment for cluster ${{ steps.vars.outputs.HOPRD_CLUSTER_NAME }}"
         run: |
+          echo "Starting deployment restart for cluster ${{ steps.vars.outputs.HOPRD_CLUSTER_NAME }}"
           if ! kubectl rollout restart deployments -n core-team -l hoprds.hoprnet.org/cluster=${{ steps.vars.outputs.HOPRD_CLUSTER_NAME }}; then
             echo "Failed to restart deployment"
             exit 1
@@ -70,4 +63,5 @@ jobs:
             echo "Deployment did not complete within the timeout period"
             exit 1
           fi
+          echo "Deployment completed successfully"
         timeout-minutes: 11
