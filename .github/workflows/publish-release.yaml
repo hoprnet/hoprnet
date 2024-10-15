@@ -38,8 +38,10 @@ jobs:
       - name: Tag docker images with release name
         run: |
           images=(hopli hoprd)
-          for image in ${images[@]};
+          for image in "${images[@]}";
           do
             echo "Tagging ${image}"
-            gcloud artifacts docker tags add ${{ vars.DOCKER_IMAGE_REGISTRY }}/${image}:${{ github.event.inputs.from_tag }} ${{ vars.DOCKER_IMAGE_REGISTRY }}/${image}:${{ github.event.inputs.to_tag }}
+            gcloud artifacts docker tags add \
+              "${{ vars.DOCKER_IMAGE_REGISTRY }}/${image}:${{ github.event.inputs.from_tag }}" \
+              "${{ vars.DOCKER_IMAGE_REGISTRY }}/${image}:${{ github.event.inputs.to_tag }}"
           done
