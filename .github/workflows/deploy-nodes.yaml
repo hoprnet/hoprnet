@@ -41,4 +41,5 @@ jobs:
       - name: "Restart deployment for cluster ${{ github.event.client_payload.hoprd_cluster_name }}"
         run: |
           kubectl rollout restart deployments -n core-team -l hoprds.hoprnet.org/cluster=${{ github.event.client_payload.hoprd_cluster_name }}
-          kubectl rollout status  deployments -n core-team -l hoprds.hoprnet.org/cluster=${{ github.event.client_payload.hoprd_cluster_name }}
+          kubectl rollout status  deployments -n core-team -l hoprds.hoprnet.org/cluster=${{ github.event.client_payload.hoprd_cluster_name }} --timeout=600s
+        timeout-minutes: 11

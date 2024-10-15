@@ -73,7 +73,7 @@ jobs:
     secrets: inherit
 
   load_test:
-    name: Execute
+    name: Load tests
     if: contains(github.event.pull_request.labels.*.name, 'load_tests') && contains(github.event.pull_request.base.ref, 'master')
     needs:
       - build_docker
@@ -161,10 +161,16 @@ jobs:
           for image in ${images[@]};
           do
             echo "Tagging ${image}:${{ steps.tag.outputs.release_name }}"
-            gcloud artifacts docker tags add ${{ vars.DOCKER_IMAGE_REGISTRY }}/${image}:${{ steps.setup.outputs.current_version }} ${{ vars.DOCKER_IMAGE_REGISTRY }}/${image}:${{ steps.tag.outputs.release_name }}
+            gcloud artifacts docker tags add \
+              ${{ vars.DOCKER_IMAGE_REGISTRY }}/${image}:${{ steps.setup.outputs.current_version }} \
+              ${{ vars.DOCKER_IMAGE_REGISTRY }}/${image}:${{ steps.tag.outputs.release_name }}
             docker pull ${{ vars.DOCKER_IMAGE_REGISTRY }}/${image}:${{ steps.setup.outputs.current_version }}
-            docker tag ${{ vars.DOCKER_IMAGE_REGISTRY }}/${image}:${{ steps.setup.outputs.current_version }} ${{ vars.DOCKER_HUB_ORGANIZATION_NAME }}/${image}:${{ steps.setup.outputs.current_version }}
-            docker tag ${{ vars.DOCKER_IMAGE_REGISTRY }}/${image}:${{ steps.setup.outputs.current_version }} ${{ vars.DOCKER_HUB_ORGANIZATION_NAME }}/${image}:${{ steps.tag.outputs.release_name }}
+            docker tag \
+              ${{ vars.DOCKER_IMAGE_REGISTRY }}/${image}:${{ steps.setup.outputs.current_version }} \
+              ${{ vars.DOCKER_HUB_ORGANIZATION_NAME }}/${image}:${{ steps.setup.outputs.current_version }}
+            docker tag \
+              ${{ vars.DOCKER_IMAGE_REGISTRY }}/${image}:${{ steps.setup.outputs.current_version }} \
+              ${{ vars.DOCKER_HUB_ORGANIZATION_NAME }}/${image}:${{ steps.tag.outputs.release_name }}
             echo "Pushing images into Docker Hub"
             docker push ${{ vars.DOCKER_HUB_ORGANIZATION_NAME }}/${image}:${{ steps.setup.outputs.current_version }}
             docker push ${{ vars.DOCKER_HUB_ORGANIZATION_NAME }}/${image}:${{ steps.tag.outputs.release_name }}
@@ -226,7 +232,7 @@ jobs:
 
   docs:
     name: Docs
-    needs: 
+    needs:
       - build_docker
     uses: ./.github/workflows/build-docs.yaml
     secrets: inherit
