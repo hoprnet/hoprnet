@@ -34,7 +34,7 @@ concurrency:
 jobs:
   build:
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' && contains(inputs.labels, format('package:{0},',inputs.repository))
-    name: build-dappnode
+    name: Build package
     runs-on: ubuntu-latest
     steps:
       - name: Set environment variables
@@ -62,6 +62,12 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ steps.vars.outputs.GITHUB_REF_NAME }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Set up Docker Compose
+        run: sudo apt-get update && sudo apt-get install docker-compose-plugin
 
       - name: Set up Google Cloud Credentials
         id: auth
