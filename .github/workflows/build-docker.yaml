@@ -27,7 +27,7 @@ concurrency:
   group: ${{ github.ref }}-build-docker-${{ inputs.package }}
   cancel-in-progress: true
 jobs:
-  build-docker:
+  docker:
     runs-on: self-hosted-hoprnet-bigger
     timeout-minutes: 60
     steps:
