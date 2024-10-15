@@ -39,11 +39,12 @@ jobs:
           - DAppNodePackage-Hopr
           - DAppNodePackage-Hopr-testnet
     name: ${{ matrix.repository }}
-    if: contains(join(github.event.pull_request.labels.*.name, ','), format('package:{0},', matrix.repository))
+    #if: contains(join(github.event.pull_request.labels.*.name, ','), format('package:{0},', matrix.repository))
     uses: ./.github/workflows/build-dappnode.yaml
     with:
       branch: ${{ github.event.pull_request.head.ref }}
       repository: ${{ matrix.repository }}
+      labels: ${{ join(github.event.pull_request.labels.*.name | map('replace', 'package:', ''), ',') }}
     secrets: inherit
 
   build-binaries:
