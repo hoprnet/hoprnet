@@ -630,6 +630,7 @@ pub struct SnapshotRequestor<T> {
     file: String,
     aggressive_save: bool,
     fail_on_miss: bool,
+    ignore_snapshot: bool,
 }
 
 impl<T> SnapshotRequestor<T> {
@@ -647,6 +648,7 @@ impl<T> SnapshotRequestor<T> {
             file: snapshot_file.to_owned(),
             aggressive_save: false,
             fail_on_miss: false,
+            ignore_snapshot: false,
         }
     }
 
@@ -666,6 +668,10 @@ impl<T> SnapshotRequestor<T> {
     /// If `fail_on_miss` is set and the data is successfully loaded, all later
     /// requests that miss the loaded snapshot will result in HTTP error 404.
     pub async fn try_load(&mut self, fail_on_miss: bool) -> Result<(), std::io::Error> {
+        if self.ignore_snapshot {
+            return Ok(());
+        }
+
         let loaded = serde_yaml::from_reader::<_, Vec<RequestorResponseSnapshot>>(std::fs::File::open(&self.file)?)
             .map_err(std::io::Error::other)?;
 
@@ -697,9 +703,20 @@ impl<T> SnapshotRequestor<T> {
     }
 
     /// Forces saving to disk on each newly inserted entry.
+    ///
     /// Use this only when the expected number of entries in the snapshot is small.
     pub fn with_aggresive_save(mut self) -> Self {
         self.aggressive_save = true;
+        self
+    }
+
+    /// If set, the snapshot data will be ignored and resolution
+    /// will always be done with the inner requestor.
+    ///
+    /// This will inhibit any attempts to [`load`](SnapshotRequestor::try_load) or
+    /// [`save`](SnapshotRequestor::save) snapshot data.
+    pub fn with_ignore_snapshot(mut self, ignore_snapshot: bool) -> Self {
+        self.ignore_snapshot = ignore_snapshot;
         self
     }
 
@@ -708,6 +725,10 @@ impl<T> SnapshotRequestor<T> {
     /// Note that this method is automatically called on Drop, so usually it is unnecessary
     /// to call it explicitly.
     pub fn save(&self) -> Result<(), std::io::Error> {
+        if self.ignore_snapshot {
+            return Ok(());
+        }
+
         let mut values: Vec<RequestorResponseSnapshot> = self.entries.iter().map(|(_, r)| r).collect();
         values.sort_unstable_by_key(|a| a.id);
 
@@ -804,7 +825,7 @@ type AnvilRpcClient<R> = std::sync::Arc<
 
 /// Used for testing. Creates Ethers RPC client to the local Anvil instance.
 #[cfg(not(target_arch = "wasm32"))]
-pub fn create_rpc_client_to_anvil<R: HttpPostRequestor + Debug>(
+pub fn create_rpc_client_to_anvil<R: HttpPostRequestor>(
     backend: R,
     anvil: &ethers::utils::AnvilInstance,
     signer: &hopr_crypto_types::keypairs::ChainKeypair,

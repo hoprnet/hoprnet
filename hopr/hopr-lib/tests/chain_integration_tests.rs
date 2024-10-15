@@ -253,6 +253,7 @@ const SNAPSHOT_BOB_RX: &str = "tests/snapshots/indexer_snapshot_bob_in";
 
 async fn onboard_nodes<const N: usize>(
     keys: [&ChainKeypair; N],
+    requestor: Requestor,
     anvil: &AnvilInstance,
 ) -> anyhow::Result<(
     ContractAddresses,
@@ -263,11 +264,7 @@ async fn onboard_nodes<const N: usize>(
 
     let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
 
-    let requestor = SnapshotRequestor::new(SurfRequestor::default(), SNAPSHOT_BASE)
-        .load(true)
-        .await;
-
-    let client = create_rpc_client_to_anvil(requestor.clone(), anvil, &contract_deployer);
+    let client = create_rpc_client_to_anvil(requestor, anvil, &contract_deployer);
     info!("Deploying SCs to Anvil...");
     let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer).await?;
 
@@ -291,11 +288,6 @@ async fn onboard_nodes<const N: usize>(
     test_log::test(tokio::test)
 )]
 async fn integration_test_indexer() -> anyhow::Result<()> {
-    assert!(
-        hopr_crypto_random::is_rng_fixed(),
-        "snapshot based tests require fixed RNG"
-    );
-
     let block_time = Duration::from_secs(1);
     let anvil = create_anvil(Some(block_time));
 
@@ -309,14 +301,42 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
         "4166d6b8455a6be8aa0f41e6b1d0446ad95e744de1eb3e4e6e5af30ca27d7af5"
     ))?;
 
-    let (contract_addrs, instances, safe_cfgs) = onboard_nodes([&alice_chain_key, &bob_chain_key], &anvil).await?;
+    if !hopr_crypto_random::is_rng_fixed() {
+        tracing::warn!("snapshot based tests require fixed RNG")
+    }
+
+    let requestor_base = SnapshotRequestor::new(SurfRequestor::default(), SNAPSHOT_BASE)
+        .with_ignore_snapshot(!hopr_crypto_random::is_rng_fixed())
+        .load(true)
+        .await;
+    let requestor_alice_rx = SnapshotRequestor::new(SurfRequestor::default(), SNAPSHOT_ALICE_RX)
+        .with_ignore_snapshot(!hopr_crypto_random::is_rng_fixed())
+        .with_aggresive_save()
+        .load(true)
+        .await;
+    let requestor_alice_tx = SnapshotRequestor::new(SurfRequestor::default(), SNAPSHOT_ALICE_TX)
+        .with_ignore_snapshot(!hopr_crypto_random::is_rng_fixed())
+        .with_aggresive_save()
+        .load(true)
+        .await;
+    let requestor_bob_rx = SnapshotRequestor::new(SurfRequestor::default(), SNAPSHOT_BOB_RX)
+        .with_ignore_snapshot(!hopr_crypto_random::is_rng_fixed())
+        .with_aggresive_save()
+        .load(true)
+        .await;
+    let requestor_bob_tx = SnapshotRequestor::new(SurfRequestor::default(), SNAPSHOT_BOB_TX)
+        .with_ignore_snapshot(!hopr_crypto_random::is_rng_fixed())
+        .with_aggresive_save()
+        .load(true)
+        .await;
+
+    let (contract_addrs, instances, safe_cfgs) =
+        onboard_nodes([&alice_chain_key, &bob_chain_key], requestor_base, &anvil).await?;
 
     let finality = 2;
     sleep((1 + finality) * block_time).await;
 
     let domain_separator: Hash = instances.channels.domain_separator().call().await?.into();
-
-    // ----------------------------------------
 
     let rpc_cfg = RpcOperationsConfig {
         chain_id: anvil.chain_id(),
@@ -341,14 +361,8 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
         &alice_chain_key,
         &alice_offchain_key,
         &anvil,
-        SnapshotRequestor::new(SurfRequestor::default(), SNAPSHOT_ALICE_RX)
-            .with_aggresive_save()
-            .load(true)
-            .await,
-        SnapshotRequestor::new(SurfRequestor::default(), SNAPSHOT_ALICE_TX)
-            .with_aggresive_save()
-            .load(true)
-            .await,
+        requestor_alice_rx,
+        requestor_alice_tx,
         contract_addrs,
         safe_cfgs[0],
         rpc_cfg,
@@ -364,14 +378,8 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
         &bob_chain_key,
         &bob_offchain_key,
         &anvil,
-        SnapshotRequestor::new(SurfRequestor::default(), SNAPSHOT_BOB_RX)
-            .with_aggresive_save()
-            .load(true)
-            .await,
-        SnapshotRequestor::new(SurfRequestor::default(), SNAPSHOT_BOB_TX)
-            .with_aggresive_save()
-            .load(true)
-            .await,
+        requestor_bob_rx,
+        requestor_bob_tx,
         contract_addrs,
         safe_cfgs[1],
         rpc_cfg,
@@ -652,7 +660,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
 
     let ticket_price = Balance::new(1, BalanceType::HOPR);
 
-    // Create ticket from Alice in Bob's DB
+    // Create a ticket from Alice in Bob's DB
     generate_the_first_ack_ticket(&bob_node, &alice_chain_key, ticket_price, domain_separator).await?;
 
     let bob_ack_tickets = bob_node
