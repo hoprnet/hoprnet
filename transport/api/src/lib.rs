@@ -596,12 +596,17 @@ where
 
     #[tracing::instrument(level = "debug", skip(self))]
     pub async fn network_observed_multiaddresses(&self, peer: &PeerId) -> Vec<Multiaddr> {
-        self.network
-            .get(peer)
-            .await
-            .unwrap_or(None)
-            .map(|peer| peer.multiaddresses)
-            .unwrap_or(vec![])
+        match self.network.get(peer).await {
+            Ok(Some(peer)) => peer.multiaddresses,
+            Ok(None) => {
+                tracing::debug!("Peer not found in network storage");
+                vec![]
+            }
+            Err(e) => {
+                tracing::error!("Failed to get peer from network storage: {e}");
+                vec![]
+            }
+        }
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
