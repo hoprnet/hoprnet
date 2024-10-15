@@ -28,13 +28,12 @@ on:
         default: 'dufour'
 
 concurrency:
-  group: dappnode
+  group: dappnode-${{ inputs.repository }}
   cancel-in-progress: false
 
 jobs:
   build:
-    if: github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' 
-    # && contains(inputs.labels, format('package:{0},',inputs.repository))
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' && contains(inputs.labels, format('package:{0},',inputs.repository))
     name: build-dappnode
     runs-on: ubuntu-latest
     steps:
