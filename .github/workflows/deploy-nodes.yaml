@@ -1,0 +1,44 @@
+---
+#################################################################################
+# Child pipeline to deploy hoprd nodes in K8s cluster
+#################################################################################
+name: Deploy Nodes
+
+on:
+  repository_dispatch:
+    types: [deploy_nodes]
+
+concurrency:
+  group: deploy-nodes
+  cancel-in-progress: true
+jobs:
+
+  deploy:
+    runs-on: self-hosted-hoprnet-small
+    steps:
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@v4
+
+      - name: Set up Google Cloud Credentials
+        uses: google-github-actions/auth@v2
+        with:
+          token_format: "access_token"
+          credentials_json: ${{ secrets.GCP_SA_TERRAFORM_JSON }}
+
+      - name: Set up Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: hopr-staging
+          install_components: beta
+
+      - name: Get credentials
+        uses: google-github-actions/get-gke-credentials@v2
+        with:
+          cluster_name: cluster-staging
+          location: europe-west3
+          project_id: hopr-staging
+
+      - name: "Restart deployment for cluster ${{ github.event.client_payload.hoprd_cluster_name }}"
+        run: |
+          kubectl rollout restart deployments -n core-team -l hoprds.hoprnet.org/cluster=${{ github.event.client_payload.hoprd_cluster_name }}
+          kubectl rollout status  deployments -n core-team -l hoprds.hoprnet.org/cluster=${{ github.event.client_payload.hoprd_cluster_name }}

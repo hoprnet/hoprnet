@@ -28,6 +28,7 @@ jobs:
     with:
       branch: ${{ github.event.pull_request.head.ref }}
       package: ${{ matrix.package }}
+      production: false
     secrets: inherit
 
   build-dappnode:
