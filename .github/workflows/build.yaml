@@ -43,7 +43,7 @@ jobs:
     with:
       branch: ${{ github.event.pull_request.head.ref }}
       repository: ${{ matrix.repository }}
-      labels: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+      labels: ${{ format('{0},', join(github.event.pull_request.labels.*.name, ',')) }}
     secrets: inherit
 
   build-binaries:

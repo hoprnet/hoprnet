@@ -41,8 +41,8 @@ jobs:
       - name: Set environment variables
         id: vars
         run: |
-          echo "Labels: ${{ inputs.labels}}
-          echo "Checking format: ${{ format('package:{0},',inputs.repository) }}
+          echo "Labels: ${{ inputs.labels}}"
+          echo "Checking format: ${{ format('package:{0},',inputs.repository) }}"
           echo "Checking condition: ${{ contains(inputs.labels, format('package:{0},',inputs.repository)) }}
           if [ -z "${{ inputs.network }}" ]; then
             echo "The workflow is triggered by other pipeline"
