@@ -4,7 +4,7 @@ use futures::{
 };
 use futures_concurrency::stream::Merge;
 use hopr_internal_types::prelude::*;
-use libp2p::request_response::OutboundRequestId;
+use libp2p::{core::ConnectedPoint, request_response::OutboundRequestId};
 use std::{
     collections::{HashMap, HashSet},
     net::Ipv4Addr,
@@ -547,8 +547,8 @@ pub async fn p2p_loop<T>(
                 SwarmEvent::ConnectionEstablished {
                     peer_id,
                     connection_id,
+                    endpoint,
                     ..
-                    // endpoint,
                     // num_established,
                     // concurrent_dial_errors,
                     // established_in,
@@ -567,7 +567,11 @@ pub async fn p2p_loop<T>(
                         let network = network.clone();
                         async_std::task::block_on(async move {
                             if !network.has(&peer_id).await {
-                                if let Err(e) = network.add(&peer_id, PeerOrigin::IncomingConnection, vec![]).await {
+                                let multi_address = match endpoint {
+                                    ConnectedPoint::Dialer { address, .. } => address,
+                                    ConnectedPoint::Listener { local_addr: _, send_back_addr } => send_back_addr,
+                                };
+                                if let Err(e) = network.add(&peer_id, PeerOrigin::IncomingConnection, vec![multi_address]).await {
                                     error!("transport - p2p - failed to update the record for '{peer_id}': {e}")
                                 }
                             }
