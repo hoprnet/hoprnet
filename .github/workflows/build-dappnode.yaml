@@ -24,7 +24,6 @@ on:
         description: 'Package network'
         default: 'dufour'
 
-
 concurrency:
   group: dappnode
   cancel-in-progress: false
@@ -38,7 +37,7 @@ jobs:
       - name: Set environment variables
         id: vars
         run: |
-          if [ -z "${{ inputs.branch }}" ]; then
+          if [ -z "${{ inputs.network }}" ]; then
             echo "The workflow is triggered by other pipeline"
             {
               echo "GITHUB_REF_NAME=${{ inputs.branch }}"
