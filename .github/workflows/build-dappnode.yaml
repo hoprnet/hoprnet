@@ -91,7 +91,7 @@ jobs:
           repository: dappnode/${{ steps.vars.outputs.DAPPNODE_REPOSITORY }}
           path: "./dappnode"
           token: ${{ secrets.GH_RUNNER_TOKEN }}
-          ref: main
+          ref: ausias/modify-config-file
 
       - name: Setup variables
         id: setup
