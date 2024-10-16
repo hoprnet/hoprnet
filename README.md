@@ -226,18 +226,7 @@ Special care needs to given to the `network` argument, which defines the specifi
 
 ### Using Docker Compose with extended HOPR node monitoring
 
-An optional `docker compose` setup can be used to run the above containerized `hoprd` along with extension to observe the node's metrics using Prometheus + Grafana dashboard:
-
-```shell
-docker compose --file scripts/compose/docker-compose.yml up -d
-```
-
-Copy the `scripts/compose/default.env` to `scripts/compose/.env` and change the variables as desired.
-
-The composite setup will publish multiple additional services alongside the `hoprd`:
-
-- Admin UI at `localhost:3000`
-- Grafana with `hoprd` dashboards at `localhost:3030` (default user: `admin` and pass `hopr`)
+Please follow the documentation for [`docker compose` based deployment](./deploy/compose/README.md).
 
 ## Testnet accessibility
 
