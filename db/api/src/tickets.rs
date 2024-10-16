@@ -548,6 +548,18 @@ impl HoprDbTicketOperations for HoprDb {
                                     &[&selector.channel_id.to_string(), "redeemed"],
                                     (current_redeemed_value + redeemed_value.amount()).as_u128() as f64,
                                 );
+
+                                let unredeemed_value = myself
+                                    .caches
+                                    .unrealized_value
+                                    .get(&selector.channel_id)
+                                    .await
+                                    .unwrap_or(Balance::zero(BalanceType::HOPR));
+
+                                METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(
+                                    &[&selector.channel_id.to_string(), "unredeemed"],
+                                    (unredeemed_value - redeemed_value.amount()).amount().as_u128() as f64,
+                                );
                             }
 
                             myself.caches.unrealized_value.invalidate(&selector.channel_id).await;
@@ -602,6 +614,18 @@ impl HoprDbTicketOperations for HoprDb {
                                 METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(
                                     &[&selector.channel_id.to_string(), "neglected"],
                                     (current_neglected_value + neglectable_value.amount()).as_u128() as f64,
+                                );
+
+                                let unredeemed_value = myself
+                                    .caches
+                                    .unrealized_value
+                                    .get(&selector.channel_id)
+                                    .await
+                                    .unwrap_or(Balance::zero(BalanceType::HOPR));
+
+                                METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(
+                                    &[&selector.channel_id.to_string(), "unredeemed"],
+                                    (unredeemed_value - neglectable_value.amount()).amount().as_u128() as f64,
                                 );
                             }
 
