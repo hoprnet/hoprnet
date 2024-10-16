@@ -8,18 +8,21 @@ use crate::{log, log_status};
 
 impl From<SerializableLog> for log::ActiveModel {
     fn from(value: SerializableLog) -> Self {
+        let tx_hash = value.tx_hash;
+        let block_hash = value.block_hash;
+
         log::ActiveModel {
             address: Set(value.address),
             topics: Set(value.topics.join(",")),
             data: Set(value.data),
             block_number: Set(value.block_number.to_be_bytes().to_vec()),
-            transaction_hash: Set(Hash::from_hex(value.tx_hash.as_str())
-                .expect("invalid tx_hash")
+            transaction_hash: Set(Hash::from_hex(tx_hash.clone().as_str())
+                .expect(format!("invalid tx_hash {tx_hash}").as_str())
                 .as_ref()
                 .to_vec()),
             transaction_index: Set(value.tx_index.to_be_bytes().to_vec()),
-            block_hash: Set(Hash::from_hex(value.block_hash.as_str())
-                .expect("invalid block_hash")
+            block_hash: Set(Hash::from_hex(block_hash.clone().as_str())
+                .expect(format!("invalid block_hash {block_hash}").as_str())
                 .as_ref()
                 .to_vec()),
             log_index: Set(value.log_index.to_be_bytes().to_vec()),

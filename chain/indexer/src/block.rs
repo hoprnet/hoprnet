@@ -65,6 +65,7 @@ where
     db: Db,
     cfg: IndexerConfig,
     egress: async_channel::Sender<SignificantChainEvent>,
+    panic_on_completion: bool,
 }
 
 impl<T, U, Db> Indexer<T, U, Db>
@@ -86,7 +87,13 @@ where
             db,
             cfg,
             egress,
+            panic_on_completion: true,
         }
+    }
+
+    pub fn disable_panic_on_completion(mut self) -> Self {
+        self.panic_on_completion = false;
+        self
     }
 
     pub async fn start(&mut self) -> Result<JoinHandle<()>>
@@ -107,6 +114,7 @@ where
         let db_processor = self.db_processor.take().expect("db_processor should be present");
         let db = self.db.clone();
         let tx_significant_events = self.egress.clone();
+        let panic_on_completion = self.panic_on_completion.clone();
 
         // we skip on addresses which have no topics
         let mut addresses = vec![];
@@ -173,7 +181,7 @@ where
             self.cfg.start_block_number
         };
 
-        info!("Indexer next block to process {next_block_to_process}");
+        info!("Indexer next block to process #{next_block_to_process}");
 
         let indexing_proc = spawn(async move {
             let is_synced = Arc::new(AtomicBool::new(false));
@@ -248,11 +256,13 @@ where
                 }
             }
 
-            panic!(
-                "Indexer event stream has been terminated, cannot proceed further!\n\
-                This error indicates that an issue has occurred at the RPC provider!\n\
-                The node cannot function without a good RPC connection."
-            );
+            if panic_on_completion {
+                panic!(
+                    "Indexer event stream has been terminated, cannot proceed further!\n\
+                    This error indicates that an issue has occurred at the RPC provider!\n\
+                    The node cannot function without a good RPC connection."
+                );
+            }
         });
 
         if std::future::poll_fn(|cx| futures::Stream::poll_next(std::pin::Pin::new(&mut rx), cx))
@@ -517,18 +527,20 @@ mod tests {
         log_index: U256,
     ) -> anyhow::Result<Vec<SerializableLog>> {
         let mut logs: Vec<SerializableLog> = vec![];
+        let block_hash = Hash::create(&[b"my block hash {block_number}"]).to_hex();
 
         for i in 0..size {
             let test_multiaddr: Multiaddr = format!("/ip4/1.2.3.4/tcp/{}", 1000 + i).parse()?;
             logs.push(SerializableLog {
                 address: address.to_hex(),
+                block_hash: block_hash.clone(),
                 topics: vec![format!("{:#x}", AddressAnnouncementFilter::signature())],
                 data: encode(&[
                     Token::Address(ethers::abi::Address::from_slice(address.as_ref())),
                     Token::String(test_multiaddr.to_string()),
                 ])
                 .into(),
-                tx_hash: Default::default(),
+                tx_hash: Hash::create(&[b"my tx hash {i}"]).to_hex(),
                 tx_index: 0,
                 block_number,
                 log_index: log_index.as_u64(),
@@ -577,7 +589,9 @@ mod tests {
             db.clone(),
             IndexerConfig::default(),
             async_channel::unbounded().0,
-        );
+        )
+        .disable_panic_on_completion();
+
         let (indexing, _) = join!(indexer.start(), async move {
             async_std::task::sleep(std::time::Duration::from_millis(200)).await;
             tx.close_channel()
@@ -602,7 +616,8 @@ mod tests {
 
         let (tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
         rpc.expect_try_stream_logs()
-            .withf(move |x: &u64, _y: &chain_rpc::LogFilter| *x == latest_block)
+            .once()
+            .withf(move |x: &u64, _y: &chain_rpc::LogFilter| *x == latest_block + 1)
             .return_once(move |_, _| Ok(Box::pin(rx)));
 
         // insert and process latest block
@@ -629,7 +644,8 @@ mod tests {
             db.clone(),
             IndexerConfig::default().disable_fast_sync(),
             async_channel::unbounded().0,
-        );
+        )
+        .disable_panic_on_completion();
 
         let (indexing, _) = join!(indexer.start(), async move {
             async_std::task::sleep(std::time::Duration::from_millis(200)).await;
@@ -677,7 +693,8 @@ mod tests {
         assert!(tx.start_send(finalized_block.clone()).is_ok());
         assert!(tx.start_send(head_allowing_finalization.clone()).is_ok());
 
-        let mut indexer = Indexer::new(rpc, handlers, db.clone(), cfg, async_channel::unbounded().0);
+        let mut indexer =
+            Indexer::new(rpc, handlers, db.clone(), cfg, async_channel::unbounded().0).disable_panic_on_completion();
         let _ = join!(indexer.start(), async move {
             async_std::task::sleep(std::time::Duration::from_millis(200)).await;
             tx.close_channel()
@@ -694,41 +711,42 @@ mod tests {
 
         let cfg = IndexerConfig::default();
 
+        // Set to be an empty list because we don't want to index anything really
         handlers.expect_contract_addresses().return_const(vec![]);
 
         let (mut tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
+        // Expected to be called once starting at 0 and yield the respective blocks
         rpc.expect_try_stream_logs()
             .times(1)
             .withf(move |x: &u64, _y: &chain_rpc::LogFilter| *x == 0)
             .return_once(move |_, _| Ok(Box::pin(rx)));
 
-        let head_block = 1000;
+        handlers.expect_clone().returning(|| {
+            let mut handlers2 = MockChainLogHandler::new();
+            handlers2.expect_contract_addresses().return_const(vec![]);
+            handlers2
+        });
 
-        let blocks = vec![
-            // head - 1 sync block
-            BlockWithLogs {
-                block_id: head_block - 1,
-                logs: BTreeSet::from_iter(build_announcement_logs(*ALICE, 1, head_block - 1, U256::from(23u8))?),
-            },
-            // head sync block
-            BlockWithLogs {
-                block_id: head_block,
-                logs: BTreeSet::from_iter(build_announcement_logs(*BOB, 1, head_block, U256::from(23u8))?),
-            },
-            // post-sync block
-            BlockWithLogs {
-                block_id: head_block,
-                logs: BTreeSet::from_iter(build_announcement_logs(*CHRIS, 1, head_block, U256::from(23u8))?),
-            },
-        ];
+        let head_block = 1000;
+        let block_numbers = vec![head_block - 1, head_block, head_block + 1];
+
+        let blocks: Vec<BlockWithLogs> = block_numbers
+            .iter()
+            .map(|block_id| BlockWithLogs {
+                block_id: *block_id,
+                logs: BTreeSet::from_iter(build_announcement_logs(*ALICE, 1, *block_id, U256::from(23u8)).unwrap()),
+            })
+            .collect();
 
         for _ in 0..(blocks.len() as u64) {
             rpc.expect_block_number().returning(move || Ok(head_block));
         }
 
+        // Generate the expected events to be able to process the blocks
         handlers
             .expect_collect_block_events()
             .times(blocks.len())
+            .withf(move |b| block_numbers.contains(&b.block_id))
             .returning(|_| {
                 Ok(vec![SignificantChainEvent {
                     tx_hash: Default::default(),
@@ -741,7 +759,7 @@ mod tests {
         }
 
         let (tx_events, rx_events) = async_channel::unbounded();
-        let mut indexer = Indexer::new(rpc, handlers, db.clone(), cfg, tx_events);
+        let mut indexer = Indexer::new(rpc, handlers, db.clone(), cfg, tx_events).disable_panic_on_completion();
         indexer.start().await?;
 
         // tx.close_channel();
@@ -810,7 +828,8 @@ mod tests {
         handlers.expect_contract_addresses().return_const(vec![]);
 
         let (tx_events, _) = async_channel::unbounded();
-        let mut indexer = Indexer::new(rpc, handlers, db.clone(), IndexerConfig::default(), tx_events);
+        let mut indexer =
+            Indexer::new(rpc, handlers, db.clone(), IndexerConfig::default(), tx_events).disable_panic_on_completion();
         indexer.start().await?;
 
         Ok(())
