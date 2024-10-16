@@ -5,22 +5,29 @@ use std::sync::Arc;
 use crate::types::PeerOrAddress;
 use crate::{ApiErrorStatus, InternalState, ListenerId, BASE_PATH};
 use axum::extract::Path;
+use axum::Error;
 use axum::{
-    extract::{Json, State},
+    extract::{
+        ws::{Message, WebSocket, WebSocketUpgrade},
+        Json, State,
+    },
     http::status::StatusCode,
     response::IntoResponse,
 };
-use futures::{StreamExt, TryStreamExt};
-use hopr_lib::errors::HoprLibError;
-use hopr_lib::transfer_session;
-use hopr_lib::{HoprSession, IpProtocol, RoutingOptions, SessionCapability, SessionClientConfig};
-
-use hopr_network_types::prelude::ConnectedUdpStream;
-use hopr_network_types::udp::ForeignDataMode;
+use futures::{AsyncReadExt, AsyncWriteExt, SinkExt, StreamExt, TryStreamExt};
+use futures_concurrency::stream::Merge;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use tokio::net::TcpListener;
-use tracing::{debug, error, info};
+use tokio_util::compat::FuturesAsyncReadCompatExt;
+use tokio_util::io::ReaderStream;
+use tracing::{debug, error, info, trace};
+
+use hopr_lib::errors::HoprLibError;
+use hopr_lib::transfer_session;
+use hopr_lib::{HoprSession, IpProtocol, RoutingOptions, SessionCapability, SessionClientConfig};
+use hopr_network_types::prelude::ConnectedUdpStream;
+use hopr_network_types::udp::ForeignDataMode;
 
 /// Default listening host the session listener socket binds to.
 pub const DEFAULT_LISTEN_HOST: &str = "127.0.0.1:0";
@@ -41,6 +48,159 @@ lazy_static::lazy_static! {
         "Number of clients connected at this Entry node",
         &["type"]
     ).unwrap();
+}
+
+#[serde_as]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+#[schema(example = json!({
+        "destination": "12D3KooWR4uwjKCDCAY1xsEFB4esuWLF9Q5ijYvCjz5PNkTbnu33",
+        "path": {
+            "Hops": 1
+        },
+        "capabilities": ["Retransmission", "Segmentation"]
+    }))]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct SessionWebsocketClientRequest {
+    #[serde_as(as = "DisplayFromStr")]
+    pub destination: PeerOrAddress,
+    pub path: RoutingOptions,
+    #[serde_as(as = "Option<Vec<DisplayFromStr>>")]
+    pub capabilities: Option<Vec<SessionCapability>>,
+}
+
+impl SessionWebsocketClientRequest {
+    pub(crate) fn into_protocol_session_config(self) -> Result<SessionClientConfig, HoprLibError> {
+        Ok(SessionClientConfig {
+            peer: self.destination.peer_id.unwrap(),
+            path_options: self.path,
+            target_protocol: IpProtocol::TCP, // TODO: change this to a more reasonable value
+            target: "127.0.0.1:0"
+                .parse()
+                .map_err(|e| HoprLibError::GeneralError(format!("target host parse error: {e}")))?,
+            capabilities: self
+                .capabilities
+                .unwrap_or(vec![SessionCapability::Retransmission, SessionCapability::Segmentation]), // TODO: change this to a more reasonable value
+        })
+    }
+}
+
+#[derive(Debug, Default, Clone, Deserialize, utoipa::ToSchema)]
+#[schema(value_type = String, format = Binary)]
+#[allow(dead_code)] // not dead code, just for codegen
+struct WssData(Vec<u8>);
+
+/// Websocket endpoint exposing a binary socket-like connection to a peer through websockets using underlying HOPR sessions.
+///
+/// Once configured, the session represents and automatically managed connection to a target peer through a network routing
+/// configuration. The session can be used to send and receive binary data over the network.
+///
+/// Authentication (if enabled) is done by cookie `X-Auth-Token`.
+///
+/// Connect to the endpoint by using a WS client. No preview available. Example: `ws://127.0.0.1:3001/api/v3/session/websocket
+#[allow(dead_code)] // not dead code, just for documentation
+#[utoipa::path(
+        get,
+        path = const_format::formatcp!("{BASE_PATH}/session/websocket"),
+        request_body(
+            content = SessionWebsocketClientRequest,
+            description = "Creates a new client HOPR session that will be initiated and returned as a websocket connection. Once the websocket is returned, it is possible to use the socket for bidirectional binary read and write communication.",
+            content_type = "application/json"),
+        responses(
+            (status = 200, description = "Successfully created a new client websocket session."),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
+            (status = 422, description = "Unknown failure", body = ApiError),
+        ),
+        security(
+            ("api_token" = []),
+            ("bearer_token" = [])
+        ),
+        tag = "Session",
+    )]
+
+pub(crate) async fn websocket(
+    ws: WebSocketUpgrade,
+    State(state): State<Arc<InternalState>>,
+    Json(args): Json<SessionWebsocketClientRequest>,
+) -> Result<impl IntoResponse, impl IntoResponse> {
+    let data = args.into_protocol_session_config().map_err(|e| {
+        (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            ApiErrorStatus::UnknownFailure(e.to_string()),
+        )
+    })?;
+
+    let hopr = state.hopr.clone();
+    let session: HoprSession = hopr.connect_to(data).await.map_err(|e| {
+        (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            ApiErrorStatus::UnknownFailure(e.to_string()),
+        )
+    })?; // TODO: handle error
+
+    Ok::<_, (StatusCode, ApiErrorStatus)>((
+        StatusCode::OK,
+        ws.on_upgrade(move |socket| websocket_connection(socket, session)),
+    ))
+}
+
+enum WebSocketInput {
+    Network(Result<tokio_util::bytes::Bytes, std::io::Error>),
+    WsInput(core::result::Result<Message, Error>),
+}
+
+#[tracing::instrument(level = "debug", skip(socket, session))]
+async fn websocket_connection(socket: WebSocket, session: HoprSession) {
+    let (rx, mut tx) = session.split();
+    let (mut sender, receiver) = socket.split();
+
+    let mut queue = (
+        receiver.map(WebSocketInput::WsInput),
+        ReaderStream::new(rx.compat()).map(WebSocketInput::Network),
+    )
+        .merge();
+
+    while let Some(v) = queue.next().await {
+        match v {
+            WebSocketInput::Network(bytes) => match bytes {
+                Ok(bytes) => {
+                    if let Err(e) = sender.send(Message::Binary(bytes.into())).await {
+                        error!(
+                            error = %e,
+                            "Failed to emit read data onto the websocket, closing connection"
+                        );
+                    };
+                }
+                Err(e) => {
+                    error!(
+                        error = %e,
+                        "Failed to push data from network to socket, closing connection"
+                    );
+                    break;
+                }
+            },
+            WebSocketInput::WsInput(ws_in) => match ws_in {
+                Ok(Message::Binary(data)) => {
+                    if let Err(e) = tx.write(data.as_ref()).await {
+                        error!(error = %e, "Failed to write data to the session, closing connection");
+                        break;
+                    }
+                }
+                Ok(Message::Text(_)) => {
+                    error!("Received string instead of binary data, closing connection");
+                    break;
+                }
+                Ok(Message::Close(_)) => {
+                    debug!("Received close frame, closing connection");
+                    break;
+                }
+                Ok(m) => trace!("skipping an unsupported websocket message: {m:?}"),
+                Err(e) => {
+                    error!(error=%e, "Failed to get a valid websocket message, closing connection");
+                    break;
+                }
+            },
+        }
+    }
 }
 
 #[serde_as]
