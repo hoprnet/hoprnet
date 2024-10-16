@@ -331,7 +331,6 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
 mod tests {
     use crate::rpc::{RpcOperations, RpcOperationsConfig};
     use crate::{HoprRpcOperations, PendingTransaction};
-    use bindings::hopr_node_stake_factory::HoprNodeStakeFactory;
     use chain_types::{ContractAddresses, ContractInstances};
     use ethers::contract::ContractError;
     use ethers::providers::Middleware;

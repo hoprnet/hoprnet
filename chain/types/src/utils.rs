@@ -47,8 +47,11 @@ pub const ERC_1820_SIGNED_DEPLOYMENT_TX: &str = "f90a388085174876e800830c3500808
 ///
 /// Used for testing. When block time is given, new blocks are mined periodically.
 /// Otherwise, a new block is mined per transaction.
+///
+/// Uses a fixed mnemonic to make generated accounts deterministic.
 pub fn create_anvil(block_time: Option<std::time::Duration>) -> ethers::utils::AnvilInstance {
-    let mut anvil = ethers::utils::Anvil::new();
+    let mut anvil = ethers::utils::Anvil::new()
+        .mnemonic("gentle wisdom move brush express similar canal dune emotion series because parrot");
     if let Some(bt) = block_time {
         anvil = anvil.block_time(bt.as_secs());
     }
