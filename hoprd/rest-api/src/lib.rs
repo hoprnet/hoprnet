@@ -293,7 +293,6 @@ async fn build_api(
                 .route("/node/entryNodes", get(node::entry_nodes))
                 .route("/node/metrics", get(node::metrics))
                 .route("/peers/:destination/ping", post(peers::ping_peer))
-                .route("/session/websocket", post(session::websocket))
                 .route("/session/websocket", get(session::websocket))
                 .route("/session/:protocol", post(session::create_client))
                 .route("/session/:protocol", get(session::list_clients))

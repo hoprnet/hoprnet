@@ -14,6 +14,7 @@ use axum::{
     http::status::StatusCode,
     response::IntoResponse,
 };
+use axum_extra::extract::Query;
 use futures::{AsyncReadExt, AsyncWriteExt, SinkExt, StreamExt, TryStreamExt};
 use futures_concurrency::stream::Merge;
 use serde::{Deserialize, Serialize};
@@ -24,7 +25,7 @@ use tokio_util::io::ReaderStream;
 use tracing::{debug, error, info, trace};
 
 use hopr_lib::errors::HoprLibError;
-use hopr_lib::transfer_session;
+use hopr_lib::{transfer_session, PeerId};
 use hopr_lib::{HoprSession, IpProtocol, RoutingOptions, SessionCapability, SessionClientConfig};
 use hopr_network_types::prelude::ConnectedUdpStream;
 use hopr_network_types::udp::ForeignDataMode;
@@ -51,35 +52,43 @@ lazy_static::lazy_static! {
 }
 
 #[serde_as]
-#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
-#[schema(example = json!({
-        "destination": "12D3KooWR4uwjKCDCAY1xsEFB4esuWLF9Q5ijYvCjz5PNkTbnu33",
-        "path": {
-            "Hops": 1
-        },
-        "capabilities": ["Retransmission", "Segmentation"]
-    }))]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::IntoParams, utoipa::ToSchema)]
+#[into_params(parameter_in = Query)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct SessionWebsocketClientRequest {
+pub(crate) struct SessionWebsocketClientQueryRequest {
+    #[schema(required = true)]
     #[serde_as(as = "DisplayFromStr")]
-    pub destination: PeerOrAddress,
-    pub path: RoutingOptions,
-    #[serde_as(as = "Option<Vec<DisplayFromStr>>")]
-    pub capabilities: Option<Vec<SessionCapability>>,
+    pub destination: PeerId,
+    #[schema(required = true)]
+    pub hops: u8,
+    #[schema(required = true)]
+    #[serde_as(as = "Vec<DisplayFromStr>")]
+    pub capabilities: Vec<SessionCapability>,
+    // NOTE: the following fields should be removed from the session client request, they contain knowledge of server they should not have
+    #[schema(required = false)]
+    pub target: Option<String>,
+    #[schema(required = false)]
+    #[serde(default = "default_protocol")]
+    pub protocol: IpProtocol,
 }
 
-impl SessionWebsocketClientRequest {
+#[inline]
+fn default_protocol() -> IpProtocol {
+    IpProtocol::TCP
+}
+
+impl SessionWebsocketClientQueryRequest {
     pub(crate) fn into_protocol_session_config(self) -> Result<SessionClientConfig, HoprLibError> {
         Ok(SessionClientConfig {
-            peer: self.destination.peer_id.unwrap(),
-            path_options: self.path,
-            target_protocol: IpProtocol::TCP, // TODO: change this to a more reasonable value
-            target: "127.0.0.1:0"
+            peer: self.destination,
+            path_options: RoutingOptions::Hops((self.hops as u32).try_into()?),
+            target_protocol: self.protocol,
+            target: self
+                .target
+                .unwrap_or("127.0.0.1:4677".to_owned())
                 .parse()
                 .map_err(|e| HoprLibError::GeneralError(format!("target host parse error: {e}")))?,
-            capabilities: self
-                .capabilities
-                .unwrap_or(vec![SessionCapability::Retransmission, SessionCapability::Segmentation]), // TODO: change this to a more reasonable value
+            capabilities: self.capabilities,
         })
     }
 }
@@ -101,10 +110,7 @@ struct WssData(Vec<u8>);
 #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/session/websocket"),
-        request_body(
-            content = SessionWebsocketClientRequest,
-            description = "Creates a new client HOPR session that will be initiated and returned as a websocket connection. Once the websocket is returned, it is possible to use the socket for bidirectional binary read and write communication.",
-            content_type = "application/json"),
+        params(SessionWebsocketClientQueryRequest),
         responses(
             (status = 200, description = "Successfully created a new client websocket session."),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
@@ -119,10 +125,10 @@ struct WssData(Vec<u8>);
 
 pub(crate) async fn websocket(
     ws: WebSocketUpgrade,
+    Query(query): Query<SessionWebsocketClientQueryRequest>,
     State(state): State<Arc<InternalState>>,
-    Json(args): Json<SessionWebsocketClientRequest>,
 ) -> Result<impl IntoResponse, impl IntoResponse> {
-    let data = args.into_protocol_session_config().map_err(|e| {
+    let data = query.into_protocol_session_config().map_err(|e| {
         (
             StatusCode::UNPROCESSABLE_ENTITY,
             ApiErrorStatus::UnknownFailure(e.to_string()),
@@ -135,12 +141,9 @@ pub(crate) async fn websocket(
             StatusCode::UNPROCESSABLE_ENTITY,
             ApiErrorStatus::UnknownFailure(e.to_string()),
         )
-    })?; // TODO: handle error
+    })?;
 
-    Ok::<_, (StatusCode, ApiErrorStatus)>((
-        StatusCode::OK,
-        ws.on_upgrade(move |socket| websocket_connection(socket, session)),
-    ))
+    Ok::<_, (StatusCode, ApiErrorStatus)>(ws.on_upgrade(move |socket| websocket_connection(socket, session)))
 }
 
 enum WebSocketInput {
