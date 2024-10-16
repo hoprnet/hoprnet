@@ -1,24 +1,18 @@
 use axum::{
-    extract::{
-        ws::{Message, WebSocket, WebSocketUpgrade},
-        Json, Query, State,
-    },
+    extract::{Json, Query, State},
     http::status::StatusCode,
     response::IntoResponse,
-    Error,
 };
-use futures::{sink::SinkExt, stream::StreamExt, TryFutureExt};
-use futures_concurrency::stream::Merge;
+use futures::TryFutureExt;
 use serde::Deserialize;
-use serde_json::json;
 use serde_with::{serde_as, Bytes, DisplayFromStr, DurationMilliSeconds};
 use std::{sync::Arc, time::Duration};
-use tracing::{debug, error, trace};
+use tracing::error;
 use validator::Validate;
 
 use hopr_lib::{
     errors::{HoprLibError, HoprStatusError},
-    ApplicationData, AsUnixTimestamp, RoutingOptions, RESERVED_TAG_UPPER_LIMIT,
+    AsUnixTimestamp, RoutingOptions, RESERVED_TAG_UPPER_LIMIT,
 };
 
 use crate::{types::PeerOrAddress, ApiErrorStatus, InternalState, BASE_PATH};
@@ -213,194 +207,6 @@ pub(super) async fn send_message(
             Err((StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response())
         }
         Err(e) => Err((StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response()),
-    }
-}
-
-#[derive(Debug, Default, Clone, Deserialize, utoipa::ToSchema)]
-#[schema(value_type = String)] //, format = Binary)]
-#[allow(dead_code)] // not dead code, just for codegen
-struct Text(String);
-
-type WebSocketSendMsg = SendMessageBodyRequest;
-
-#[derive(Debug, Clone, serde::Serialize)]
-struct WebSocketReadMsg {
-    #[serde(rename = "type")]
-    type_: String,
-    tag: u16,
-    body: String,
-}
-
-impl From<hopr_lib::ApplicationData> for WebSocketReadMsg {
-    fn from(value: hopr_lib::ApplicationData) -> Self {
-        Self {
-            type_: "message".into(),
-            tag: value.application_tag.unwrap_or(0),
-            // TODO: Byte order structures should be used instead of the String object
-            body: String::from_utf8_lossy(value.plain_text.as_ref()).to_string(),
-        }
-    }
-}
-
-/// Websocket endpoint exposing a subset of message functions.
-///
-/// Incoming messages from other nodes are sent to the websocket client.
-///
-/// The following message can be set to the server by the client:
-/// ```json
-/// {
-///     peerId: "SOME_PEER_ID",
-///     path: [],
-///     hops: 1,
-///     body: "asdasd",
-///     tag: 2
-/// }
-/// ```
-///
-/// The arguments follow the same semantics as in the dedicated API endpoint for sending messages.
-///
-/// The following messages may be sent by the server over the Websocket connection:
-/// ````json
-/// {
-///   type: "message",
-///   tag: 12,
-///   body: "my example message"
-/// }
-///
-/// Authentication (if enabled) is done by cookie `X-Auth-Token`.
-///
-/// Connect to the endpoint by using a WS client. No preview available. Example: `ws://127.0.0.1:3001/api/v3/messages/websocket
-#[allow(dead_code)] // not dead code, just for documentation
-#[utoipa::path(
-        get,
-        path = const_format::formatcp!("{BASE_PATH}/messages/websocket"),
-        responses(
-            (status = 206, description = "Incoming data", body = Text, content_type = "application/text"),
-            (status = 401, description = "Invalid authorization token.", body = ApiError),
-            (status = 422, description = "Unknown failure", body = ApiError)
-        ),
-        security(
-            ("api_token" = []),
-            ("bearer_token" = [])
-        ),
-        tag = "Messages",
-    )]
-pub(crate) async fn websocket(ws: WebSocketUpgrade, State(state): State<Arc<InternalState>>) -> impl IntoResponse {
-    ws.on_upgrade(move |socket| websocket_connection(socket, state))
-}
-
-enum WebSocketInput {
-    Network(ApplicationData),
-    WsInput(core::result::Result<Message, Error>),
-}
-
-#[tracing::instrument(level = "debug", skip(socket, state))]
-async fn websocket_connection(socket: WebSocket, state: Arc<InternalState>) {
-    let (mut sender, receiver) = socket.split();
-
-    let ws_rx = state.websocket_rx.activate_cloned();
-
-    let mut queue = (
-        receiver.map(WebSocketInput::WsInput),
-        ws_rx.map(WebSocketInput::Network),
-    )
-        .merge();
-
-    while let Some(v) = queue.next().await {
-        match v {
-            WebSocketInput::Network(net_in) => {
-                if let Err(e) = sender
-                    .send(Message::Text(json!(WebSocketReadMsg::from(net_in)).to_string()))
-                    .await
-                {
-                    error!("Failed to emit read data onto the websocket: {e}");
-                };
-            }
-            WebSocketInput::WsInput(ws_in) => match ws_in {
-                Ok(Message::Text(input)) => {
-                    if let Err(e) = handle_send_message(&input, state.clone()).await {
-                        error!("Failed to send message: {e}");
-                    }
-                }
-                Ok(Message::Close(_)) => {
-                    debug!("Received close frame, closing connection");
-                    break;
-                }
-                Ok(m) => trace!("skipping an unsupported websocket message: {m:?}"),
-                Err(e) => {
-                    error!("Failed to get a valid websocket message: {e}, closing connection");
-                    break;
-                }
-            },
-        }
-    }
-}
-
-async fn handle_send_message(input: &str, state: Arc<InternalState>) -> Result<(), String> {
-    match serde_json::from_str::<WebSocketSendMsg>(input) {
-        Ok(msg) => {
-            let hopr = state.hopr.clone();
-
-            let destination = msg.destination.fulfill(hopr.peer_resolver()).await;
-            let peer_id = match destination {
-                Ok(destination) => match destination.peer_id {
-                    Some(peer_id) => peer_id,
-                    None => return Err("peer id not found".to_string()),
-                },
-                Err(_) => return Err("invalid destination".to_string()),
-            };
-
-            // Use the message encoder, if any
-            // TODO: remove RLP in 3.0
-            let msg_body = state
-                .msg_encoder
-                .as_ref()
-                .map(|enc| enc(&msg.body))
-                .unwrap_or_else(|| msg.body.into_boxed_slice());
-
-            let options = if let Some(intermediate_path) = msg.path {
-                let peer_ids_future = intermediate_path
-                    .into_iter()
-                    .map(|address| {
-                        address.fulfill(hopr.peer_resolver()).and_then(|resolver| {
-                            futures::future::ready(
-                                resolver
-                                    .peer_id
-                                    .ok_or(ApiErrorStatus::UnknownFailure("cannot happen".into())),
-                            )
-                        })
-                    })
-                    .collect::<Vec<_>>();
-
-                let path = match futures::future::try_join_all(peer_ids_future).await {
-                    Ok(fullfilled_path) => fullfilled_path,
-                    Err(e) => {
-                        return Err(format!("failed to fulfill path: {e}"));
-                    }
-                };
-
-                RoutingOptions::IntermediatePath(
-                    // get a vec of peer ids from the intermediate path
-                    path.try_into()
-                        .map_err(|_| "Invalid number of intermediate hops".to_string())?,
-                )
-            } else if let Some(hops) = msg.hops {
-                RoutingOptions::Hops(
-                    (hops as u8)
-                        .try_into()
-                        .map_err(|_| "invalid number of intermediate hops".to_string())?,
-                )
-            } else {
-                return Err("one of hops or intermediate path must be provided".to_string());
-            };
-
-            if let Err(e) = hopr.send_message(msg_body, peer_id, options, Some(msg.tag)).await {
-                return Err(e.to_string());
-            }
-
-            Ok(())
-        }
-        Err(e) => Err(format!("failed to parse websocket message: {e}")),
     }
 }
 
@@ -705,7 +511,7 @@ mod tests {
     use super::*;
 
     use libp2p_identity::PeerId;
-    use serde_json::from_value;
+    use serde_json::{from_value, json};
 
     #[test]
     fn send_message_accepts_bytes_in_body() -> anyhow::Result<()> {
