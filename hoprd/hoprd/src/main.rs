@@ -15,7 +15,7 @@ use {
 
 use signal_hook::low_level;
 use tracing::{error, info, trace, warn};
-use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
+use tracing_subscriber::prelude::*;
 
 use hopr_async_runtime::prelude::{cancel_join_handle, spawn, JoinHandle};
 use hopr_lib::{ApplicationData, AsUnixTimestamp, HoprLibProcesses, ToHex};
@@ -63,6 +63,15 @@ fn init_logger() -> Result<(), Box<dyn std::error::Error>> {
         .with_target(true)
         .with_thread_ids(true)
         .with_thread_names(false);
+
+    let format = if std::env::var("HOPRD_LOG_FORMAT")
+        .map(|v| v.to_lowercase() == "json")
+        .unwrap_or(false)
+    {
+        format.json().boxed()
+    } else {
+        format.boxed()
+    };
 
     let registry = tracing_subscriber::Registry::default().with(env_filter).with(format);
 
@@ -139,6 +148,10 @@ impl std::fmt::Debug for HoprdProcesses {
 #[cfg_attr(all(feature = "runtime-tokio", not(feature = "runtime-async-std")), tokio::main)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     init_logger()?;
+
+    if hopr_crypto_random::is_rng_fixed() {
+        warn!("!! FOR TESTING ONLY !! THIS BUILD IS USING AN INSECURE FIXED RNG !!")
+    }
 
     let args = <CliArgs as clap::Parser>::parse();
     let cfg = hoprd::config::HoprdConfig::from_cli_args(args, false)?;
