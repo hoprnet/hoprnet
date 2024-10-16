@@ -517,6 +517,32 @@ async def test_session_communication_over_n_hop_with_an_https_server(
 
 
 @pytest.mark.skipif(
+    os.environ.get("HOPR_CUSTOM_TEST") is None,
+    reason="Required environment variable not set (HOPR_CUSTOM_TEST)"
+)
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "nodes",
+    [barebone_nodes()]
+)
+async def test_session_with_fully_interconnected_cluster(nodes, swarm7: dict[str, Node]):
+    packet_count = 10_000_000
+    async with AsyncExitStack() as channels:
+        to_open = [
+            channels.enter_async_context(
+                create_channel(swarm7[x], swarm7[y], funding=20 * packet_count * TICKET_PRICE_PER_HOP)
+            )
+            for x in nodes for y in nodes if x != y
+        ]
+
+        await asyncio.gather(*to_open)
+
+        logging.info("Test ready for execution")
+
+        # TODO: Placeholder for actual test
+        await asyncio.sleep(3600)
+
+@pytest.mark.skipif(
     os.environ.get("HOPR_TEST_RUNNING_WIREGUARD_TUNNEL") is None,
     reason="Wireguard tunnel with for hoprnet running"
 )
