@@ -11,6 +11,7 @@ from contextlib import closing
 
 from .conftest import API_TOKEN, nodes_with_auth, random_distinct_pairs_from, to_ws_url
 from .node import Node
+from .test_session import STANDARD_MTU_SIZE, EchoServer, SocketType
 
 # used by nodes to get unique port assignments
 PORT_BASE = 19100
@@ -28,8 +29,11 @@ DEFAULT_ARGS = [
 def test_hoprd_websocket_api_should_reject_a_connection_without_a_valid_token(src: str, dest: str, swarm7: dict[str, Node]):
     with closing(websocket.WebSocket()) as ws:
         try:
-            url = to_ws_url(swarm7[src].host_addr, swarm7[src].api_port,
-                            args=DEFAULT_ARGS + [("destination", f"{swarm7[dest].peer_id}")])
+            url = to_ws_url(
+                swarm7[src].host_addr,
+                swarm7[src].api_port,
+                args=DEFAULT_ARGS + [("destination", f"{swarm7[dest].peer_id}")]
+            )
             ws.connect(url)
         except websocket.WebSocketBadStatusException as e:
             assert "401 Unauthorized" in str(e)
@@ -41,8 +45,11 @@ def test_hoprd_websocket_api_should_reject_a_connection_without_a_valid_token(sr
 def test_hoprd_websocket_api_should_reject_a_connection_with_an_invalid_token(src: str, dest: str, swarm7: dict[str, Node]):
     with closing(websocket.WebSocket()) as ws:
         try:
-            url = to_ws_url(swarm7[src].host_addr, swarm7[src].api_port,
-                            args=DEFAULT_ARGS + [("destination", f"{swarm7[dest].peer_id}")])
+            url = to_ws_url(
+                swarm7[src].host_addr,
+                swarm7[src].api_port,
+                args=DEFAULT_ARGS + [("destination", f"{swarm7[dest].peer_id}")]
+            )
             ws.connect(url, header={"X-Auth-Token": "InvAliD_toKeN"})
         except websocket.WebSocketBadStatusException as e:
             assert "401 Unauthorized" in str(e)
@@ -56,8 +63,11 @@ def test_hoprd_websocket_api_should_not_accept_a_connection_with_an_invalid_toke
 ):
     with closing(websocket.WebSocket()) as ws:
         try:
-            url = to_ws_url(swarm7[src].host_addr, swarm7[src].api_port,
-                            args=[("apiToken", "InvAlid_Token")] + DEFAULT_ARGS + [("destination", f"{swarm7[dest].peer_id}")])
+            url = to_ws_url(
+                swarm7[src].host_addr, 
+                swarm7[src].api_port,
+                args=[("apiToken", "InvAlid_Token")] + DEFAULT_ARGS + [("destination", f"{swarm7[dest].peer_id}")]
+            )
             ws.connect(url)
         except websocket.WebSocketBadStatusException as e:
             assert "401 Unauthorized" in str(e)
@@ -71,8 +81,11 @@ def test_hoprd_websocket_api_should_reject_a_connection_with_an_invalid_bearer_t
 ):
     with closing(websocket.WebSocket()) as ws:
         try:
-            url = to_ws_url(swarm7[src].host_addr, swarm7[src].api_port,
-                            args=DEFAULT_ARGS + [("destination", f"{swarm7[dest].peer_id}")])
+            url = to_ws_url(
+                swarm7[src].host_addr,
+                swarm7[src].api_port,
+                args=DEFAULT_ARGS + [("destination", f"{swarm7[dest].peer_id}")]
+            )
             ws.connect(url, header={"Authorization": "Bearer InvAliD_toKeN"})
         except websocket.WebSocketBadStatusException as e:
             assert "401 Unauthorized" in str(e)
@@ -83,8 +96,11 @@ def test_hoprd_websocket_api_should_reject_a_connection_with_an_invalid_bearer_t
 @pytest.mark.parametrize("src,dest", random_distinct_pairs_from(nodes_with_auth(), count=1))
 def test_hoprd_websocket_api_should_accept_a_connection_with_a_valid_token(src: str, dest: str, swarm7: dict[str, Node]):
     with closing(websocket.WebSocket()) as ws:
-        url = to_ws_url(swarm7[src].host_addr, swarm7[src].api_port,
-                        args=DEFAULT_ARGS + [("destination", f"{swarm7[dest].peer_id}")])
+        url = to_ws_url(
+            swarm7[src].host_addr, 
+            swarm7[src].api_port,
+            args=DEFAULT_ARGS + [("destination", f"{swarm7[dest].peer_id}")]
+        )
         ws.connect(url, header={"X-Auth-Token": API_TOKEN})
 
     time.sleep(0.5)
@@ -96,8 +112,11 @@ def test_hoprd_websocket_api_should_accept_a_connection_with_a_query_param_passe
     src: str, dest: str, swarm7: dict[str, Node]
 ):
     with closing(websocket.WebSocket()) as ws:
-        url = to_ws_url(swarm7[src].host_addr, swarm7[src].api_port,
-                        args=[("apiToken", API_TOKEN)] + DEFAULT_ARGS + [("destination", f"{swarm7[dest].peer_id}")])
+        url = to_ws_url(
+            swarm7[src].host_addr,
+            swarm7[src].api_port,
+            args=[("apiToken", API_TOKEN)] + DEFAULT_ARGS + [("destination", f"{swarm7[dest].peer_id}")]
+        )
         ws.connect(url)
 
     time.sleep(0.5)
@@ -106,12 +125,12 @@ def test_hoprd_websocket_api_should_accept_a_connection_with_a_query_param_passe
 @pytest.mark.parametrize("src,dest", random_distinct_pairs_from(nodes_with_auth(), count=1))
 def test_hoprd_websocket_api_should_accept_a_connection_with_a_valid_bearer_token(src: str, dest: str, swarm7: dict[str, Node]):
     with closing(websocket.WebSocket()) as ws:
-        url = to_ws_url(swarm7[src].host_addr, swarm7[src].api_port,
-                        args=DEFAULT_ARGS + [("destination", f"{swarm7[dest].peer_id}")])
-        ws.connect(url
-            ,
-            header={"Authorization": "Bearer " + API_TOKEN},
+        url = to_ws_url(
+            swarm7[src].host_addr,
+            swarm7[src].api_port,
+            args=DEFAULT_ARGS + [("destination", f"{swarm7[dest].peer_id}")]
         )
+        ws.connect(url, header={"Authorization": "Bearer " + API_TOKEN})
 
     time.sleep(0.5)
 
@@ -120,18 +139,17 @@ def test_hoprd_websocket_api_should_accept_a_connection_with_a_valid_bearer_toke
 def test_hoprd_websocket_api_should_reject_connection_on_invalid_path(src: str, dest: str, swarm7: dict[str, Node]):
     ws = websocket.WebSocket()
     try:
-        url = to_ws_url(swarm7[src].host_addr, swarm7[src].api_port, args=DEFAULT_ARGS + [('destination', f"{swarm7[dest].peer_id}")])
-        ws.connect(
-            f"{url}/defIniteLY_InVAliD_paTh",
-            header={"X-Auth-Token": API_TOKEN},
+        url = to_ws_url(
+            swarm7[src].host_addr,
+            f"{swarm7[src].api_port}/defIniteLY_InVAliD_paTh",
+            args=DEFAULT_ARGS + [('destination', f"{swarm7[dest].peer_id}")]
         )
+        ws.connect(url, header={"X-Auth-Token": API_TOKEN})
     except websocket.WebSocketBadStatusException as e:
         assert "404 Not Found" in str(e)
     else:
         assert False, "Failed to raise 404 on invalid path"
 
-
-from .test_session import STANDARD_MTU_SIZE, EchoServer, SocketType
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("src,dest", random_distinct_pairs_from(nodes_with_auth(), count=1))
@@ -140,7 +158,18 @@ async def test_websocket_send_receive_messages(src: str, dest: str, swarm7: dict
     message_target_count = 10
 
     with EchoServer(SocketType.TCP, STANDARD_MTU_SIZE) as server:
-        async with websockets.connect(to_ws_url(swarm7[src].host_addr, swarm7[src].api_port, args=[("target", f"127.0.0.1:{server.port}")] + DEFAULT_ARGS + [("destination", f"{swarm7[dest].peer_id}")]), extra_headers=EXTRA_HEADERS) as ws:
+        async with websockets.connect(
+             to_ws_url(
+                 swarm7[src].host_addr,
+                 swarm7[src].api_port,
+                 args=[
+                     ("target", f"127.0.0.1:{server.port}")
+                 ] + DEFAULT_ARGS + [
+                     ("destination", f"{swarm7[dest].peer_id}")
+                 ]
+             ),
+             extra_headers=EXTRA_HEADERS
+         ) as ws:
             for i in range(message_target_count):
                 body = f"hello msg #{i} from peer {swarm7[src].peer_id} to peer {swarm7[dest].peer_id}"
 

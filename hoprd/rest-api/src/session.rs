@@ -171,6 +171,7 @@ async fn websocket_connection(socket: WebSocket, session: HoprSession) {
                             error = %e,
                             "Failed to emit read data onto the websocket, closing connection"
                         );
+                        break;
                     };
                 }
                 Err(e) => {

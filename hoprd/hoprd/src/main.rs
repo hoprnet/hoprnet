@@ -128,7 +128,7 @@ impl std::fmt::Display for HoprdProcesses {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             HoprdProcesses::HoprLib(p, _) => write!(f, "HoprLib process: {p}"),
-            HoprdProcesses::Inbox(_) => write!(f, "WebSocket"),
+            HoprdProcesses::Inbox(_) => write!(f, "Inbox"),
             HoprdProcesses::ListenerSockets(_) => write!(f, "SessionListenerSockets"),
             HoprdProcesses::RestApi(_) => write!(f, "RestApi"),
         }
