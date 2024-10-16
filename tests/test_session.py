@@ -530,7 +530,7 @@ async def test_session_with_fully_interconnected_cluster(nodes, swarm7: dict[str
     async with AsyncExitStack() as channels:
         to_open = [
             channels.enter_async_context(
-                create_channel(swarm7[x], swarm7[y], funding=20 * packet_count * TICKET_PRICE_PER_HOP)
+                create_channel(swarm7[x], swarm7[y], funding=packet_count * TICKET_PRICE_PER_HOP)
             )
             for x in nodes for y in nodes if x != y
         ]
