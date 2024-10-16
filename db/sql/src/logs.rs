@@ -5,7 +5,7 @@ use sea_orm::entity::Set;
 use sea_orm::query::QueryTrait;
 use sea_orm::sea_query::{Expr, OnConflict, Value};
 use sea_orm::{ColumnTrait, DbErr, EntityTrait, FromQueryResult, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect};
-use tracing::{error, info, trace};
+use tracing::{error, trace};
 
 use hopr_crypto_types::prelude::Hash;
 use hopr_db_api::errors::{DbError, Result};
@@ -171,7 +171,7 @@ impl HoprDbLogOperations for HoprDb {
             .order_by_asc(log::Column::LogIndex);
 
         match query.count(self.conn(TargetDb::Logs)).await {
-            Ok(count) => Ok(count as u64),
+            Ok(count) => Ok(count),
             Err(e) => Err(DbError::from(DbSqlError::from(e))),
         }
     }
@@ -350,12 +350,12 @@ fn create_log(raw_log: log::Model, status: log_status::Model) -> crate::errors::
     let checksum = if let Some(c) = status.checksum {
         let h: std::result::Result<[u8; 32], _> = c.try_into();
 
-        if let Err(_) = h {
-            return Err(DbSqlError::from(DbEntityError::ConversionError(format!(
-                "Invalid log checksum"
-            ))));
+        if let Ok(hash) = h {
+            Some(Hash::from(hash).to_hex())
         } else {
-            Some(Hash::from(h.unwrap()).to_hex())
+            return Err(DbSqlError::from(DbEntityError::ConversionError(
+                "Invalid log checksum".into(),
+            )));
         }
     } else {
         None

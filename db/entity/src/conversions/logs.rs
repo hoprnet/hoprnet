@@ -36,25 +36,23 @@ impl TryFrom<log::Model> for SerializableLog {
     type Error = DbEntityError;
 
     fn try_from(value: log::Model) -> Result<Self, Self::Error> {
-        let tx_hash: Result<[u8; 32], _> = value.transaction_hash.try_into();
-        let block_hash: Result<[u8; 32], _> = value.block_hash.try_into();
-
-        if let Err(_) = tx_hash {
-            return Err(DbEntityError::ConversionError(format!("Invalid tx_hash")));
-        }
-
-        if let Err(_) = block_hash {
-            return Err(DbEntityError::ConversionError(format!("Invalid block_hash")));
-        }
+        let tx_hash: [u8; 32] = value
+            .transaction_hash
+            .try_into()
+            .map_err(|_| DbEntityError::ConversionError("Invalid tx_hash".into()))?;
+        let block_hash: [u8; 32] = value
+            .block_hash
+            .try_into()
+            .map_err(|_| DbEntityError::ConversionError("Invalid tx_hash".into()))?;
 
         let log = SerializableLog {
             address: value.address,
             topics: value.topics.split(",").map(|s| s.to_string()).collect(),
             data: value.data,
             block_number: U256::from_be_bytes(value.block_number).as_u64(),
-            tx_hash: Hash::from(tx_hash.unwrap()).to_hex(),
+            tx_hash: Hash::from(tx_hash).to_hex(),
             tx_index: U256::from_be_bytes(value.transaction_index).as_u64(),
-            block_hash: Hash::from(block_hash.unwrap()).to_hex(),
+            block_hash: Hash::from(block_hash).to_hex(),
             log_index: U256::from_be_bytes(value.log_index).as_u64(),
             removed: value.removed,
             ..Default::default()
@@ -70,8 +68,7 @@ impl From<SerializableLog> for log_status::ActiveModel {
         let processed_at = value.processed_at.map_or(None, |p| Some(p.naive_utc()));
         let checksum = value
             .checksum
-            .map(|c| Hash::from_hex(c.as_str()).expect("Invalid checksum"))
-            .map(|c| c.as_ref().to_vec());
+            .map(|c| Hash::from_hex(&c).expect("Invalid checksum").as_ref().to_vec());
 
         log_status::ActiveModel {
             block_number: Set(value.block_number.to_be_bytes().to_vec()),

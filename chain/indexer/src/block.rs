@@ -114,7 +114,7 @@ where
         let db_processor = self.db_processor.take().expect("db_processor should be present");
         let db = self.db.clone();
         let tx_significant_events = self.egress.clone();
-        let panic_on_completion = self.panic_on_completion.clone();
+        let panic_on_completion = self.panic_on_completion;
 
         // we skip on addresses which have no topics
         let mut addresses = vec![];
@@ -345,7 +345,7 @@ where
             Ok(events) => {
                 match db.set_logs_processed(Some(block_id), Some(0)).await {
                     Ok(_) => match db.update_logs_checksums().await {
-                        Ok(_) => Self::print_indexer_state(&db).await,
+                        Ok(_) => Self::print_indexer_state(db).await,
                         Err(e) => error!("Failed to update checksums for logs from block #{block_id}: {e}"),
                     },
                     Err(e) => error!("Failed to mark logs from block #{block_id} as processed: {e}"),
@@ -371,7 +371,7 @@ where
     /// # Arguments
     ///
     /// * `db` - The database operations handler.
-    async fn print_indexer_state(db: &Db) -> ()
+    async fn print_indexer_state(db: &Db)
     where
         Db: HoprDbLogOperations + 'static,
     {
