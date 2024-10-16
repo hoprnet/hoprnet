@@ -48,7 +48,7 @@ pub(crate) fn check_ticket_win(
     computed_ticket_luck[1..].copy_from_slice(
         &Hash::create(&[
             ticket_hash.as_ref(),
-            &vrf_params.v.as_uncompressed().as_bytes()[1..], // skip prefix
+            &vrf_params.V.as_uncompressed().as_bytes()[1..], // skip prefix
             response.as_ref(),
             ticket_signature.as_ref(),
         ])
@@ -1274,7 +1274,7 @@ pub mod tests {
         let redeemable_2 = transferable.into_redeemable(&ALICE.public().to_address(), &Hash::default())?;
 
         assert_eq!(redeemable_1, redeemable_2);
-        assert_eq!(redeemable_1.vrf_params.v, redeemable_2.vrf_params.v);
+        assert_eq!(redeemable_1.vrf_params.V, redeemable_2.vrf_params.V);
         Ok(())
     }
 }
