@@ -603,7 +603,7 @@ where
                 vec![]
             }
             Err(e) => {
-                tracing::error!(peer=%peer, "Failed to get peer from network storage {e}");
+                tracing::error!(peer=%peer, error=%e, "Failed to get peer from network storage");
                 vec![]
             }
         }
