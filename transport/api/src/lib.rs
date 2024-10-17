@@ -599,7 +599,7 @@ where
         match self.network.get(peer).await {
             Ok(Some(peer)) => peer.multiaddresses,
             Ok(None) => {
-                tracing::debug!("Peer not found in network storage");
+                tracing::trace!(peer=%peer, "Peer not found in network storage");
                 vec![]
             }
             Err(e) => {
