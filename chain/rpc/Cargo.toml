@@ -39,10 +39,13 @@ futures-timer = { workspace = true }
 governor = { workspace = true, optional = true }
 http-types = { workspace = true }
 lazy_static = { workspace = true }
+moka = { workspace = true }
 primitive-types = { workspace = true }
 reqwest = { workspace = true, optional = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+serde_with = { workspace = true }
 smart-default = { workspace = true }
 surf = { workspace = true, optional = true }
 surf-governor = { workspace = true, optional = true }
@@ -67,3 +70,5 @@ env_logger = { workspace = true }
 mockall = { workspace = true }
 mockito = { workspace = true }
 hex-literal = { workspace = true }
+test-log = { workspace = true }
+tempfile = { workspace = true }
