@@ -65,11 +65,7 @@ jobs:
 
       - name: Patch ${{ inputs.binary }} binary
         if: ${{ inputs.interpreter != '' }}
-        run: |
-          nix develop -c patchelf \
-            --set-interpreter ${{ inputs.interpreter }} \
-            --output ${{ inputs.binary }}-patched \
-            ./result/bin/${{ inputs.binary }}
+        run: nix-shell -I "nixpkgs=https://github.com/NixOS/nixpkgs/archive/refs/heads/nixos-24.05-small.zip" -p patchelf --command "patchelf --set-interpreter ${{ inputs.interpreter }} ./result/bin/${{ inputs.binary }}"
 
       - name: Upload ${{ inputs.binary }} binary
         uses: actions/upload-artifact@v4
