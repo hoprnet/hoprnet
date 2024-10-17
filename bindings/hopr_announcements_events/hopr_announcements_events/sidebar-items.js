@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["HoprAnnouncementsEventsEvents"],"static":["HOPRANNOUNCEMENTSEVENTS_ABI"],"struct":["AddressAnnouncementFilter","HoprAnnouncementsEvents","KeyBindingFilter","RevokeAnnouncementFilter"]};

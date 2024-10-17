@@ -1,0 +1,9 @@
+(function() {
+    var implementors = Object.fromEntries([["hoprd_migration",[["impl <a class=\"trait\" href=\"hoprd_migration/trait.MigratorTrait.html\" title=\"trait hoprd_migration::MigratorTrait\">MigratorTrait</a> for <a class=\"struct\" href=\"hoprd_migration/struct.Migrator.html\" title=\"struct hoprd_migration::Migrator\">Migrator</a>"],["impl <a class=\"trait\" href=\"hoprd_migration/trait.MigratorTrait.html\" title=\"trait hoprd_migration::MigratorTrait\">MigratorTrait</a> for <a class=\"struct\" href=\"hoprd_migration/struct.MigratorMetadata.html\" title=\"struct hoprd_migration::MigratorMetadata\">MigratorMetadata</a>"]]],["migration",[["impl <a class=\"trait\" href=\"migration/trait.MigratorTrait.html\" title=\"trait migration::MigratorTrait\">MigratorTrait</a> for <a class=\"struct\" href=\"migration/struct.Migrator.html\" title=\"struct migration::Migrator\">Migrator</a>"],["impl <a class=\"trait\" href=\"migration/trait.MigratorTrait.html\" title=\"trait migration::MigratorTrait\">MigratorTrait</a> for <a class=\"struct\" href=\"migration/struct.MigratorIndex.html\" title=\"struct migration::MigratorIndex\">MigratorIndex</a>"],["impl <a class=\"trait\" href=\"migration/trait.MigratorTrait.html\" title=\"trait migration::MigratorTrait\">MigratorTrait</a> for <a class=\"struct\" href=\"migration/struct.MigratorPeers.html\" title=\"struct migration::MigratorPeers\">MigratorPeers</a>"],["impl <a class=\"trait\" href=\"migration/trait.MigratorTrait.html\" title=\"trait migration::MigratorTrait\">MigratorTrait</a> for <a class=\"struct\" href=\"migration/struct.MigratorTickets.html\" title=\"struct migration::MigratorTickets\">MigratorTickets</a>"]]]]);
+    if (window.register_implementors) {
+        window.register_implementors(implementors);
+    } else {
+        window.pending_implementors = implementors;
+    }
+})()
+//{"start":57,"fragment_lengths":[583,1047]}

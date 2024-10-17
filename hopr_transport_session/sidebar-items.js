@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["Capability","IpOrHost","IpProtocol","RoutingOptions"],"mod":["errors","initiation","traits","types"],"struct":["CapabilityIter","SessionClientConfig"]};

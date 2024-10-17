@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["HoprChainProcess"],"fn":["can_register_with_safe","wait_for_funds"],"mod":["config","errors","executors"],"struct":["ChannelEntry","HoprChain","SignificantChainEvent"],"type":["DefaultHttpPostRequestor","JsonRpcClient"]};

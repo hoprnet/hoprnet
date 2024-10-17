@@ -1,0 +1,41 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="This module contains arguments and functions to interact with the Network Registry contract for a privileged account. To participate in the HOPR network, a node must be included in the network registry contract. Nodes and the staking account (Safe) that manages them should be registered as a pair in the Network registry contrat. Nodes and safes can be registered by either a manager or by the staking account itself."><title>hopli::network_registry - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-42fa08075bb476ff.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="hopli" data-themes="" data-resource-suffix="" data-rustdoc-version="1.83.0-nightly (363ae4188 2024-09-24)" data-channel="nightly" data-search-js="search-e056c65ede92db13.js" data-settings-js="settings-805db61a62df4bd2.js" ><script src="../../static.files/storage-1d39b6787ed640ff.js"></script><script defer src="../sidebar-items.js"></script><script defer src="../../static.files/main-54bc299d2a5e4e43.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-0111fcff984fae8f.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle" title="show sidebar"></button></nav><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../hopli/index.html">hopli</a><span class="version">0.7.0</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Module network_<wbr>registry</a></h2><h3><a href="#enums">Module Items</a></h3><ul class="block"><li><a href="#enums" title="Enums">Enums</a></li></ul></section><div id="rustdoc-modnav"><h2 class="in-crate"><a href="../index.html">In crate hopli</a></h2></div></div></nav><div class="sidebar-resizer"></div><main><div class="width-limiter"><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><span class="rustdoc-breadcrumbs"><a href="../index.html">hopli</a></span><h1>Module <span>network_registry</span><button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../src/hopli/network_registry.rs.html#1-384">source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>This module contains arguments and functions to interact with the Network Registry contract for a privileged account.
+To participate in the HOPR network, a node must be included in the network registry contract.
+Nodes and the staking account (Safe) that manages them should be registered as a pair in the Network registry contrat.
+Nodes and safes can be registered by either a manager or by the staking account itself.</p>
+<p>Note the currently only manager wallet can register node-safe pairs. Node runners cannot self-register their nodes.</p>
+<p>A manager (i.e. an account with <code>MANAGER_ROLE</code> role), can perform the following actions with <code>hopli network-registry</code>,
+by specifying the subcommand:
+A manager account can register nodes and safes with <code>manager-regsiter</code>
+A manager account can deregister nodes with <code>manager-deregsiter</code>
+A manager account can set eligibility of staking accounts with <code>manager-force-sync</code></p>
+<p>Some sample commands:</p>
+<ul>
+<li>Manager registers nodes:</li>
+</ul>
+<div class="example-wrap"><pre class="language-text"><code>hopli network-registry manager-register \
+    --network anvil-localhost \
+    --contracts-root &quot;../ethereum/contracts&quot; \
+    --identity-directory &quot;./test&quot; --password-path &quot;./test/pwd&quot; \
+    --node-address 0x9e820e68f8c024779ebcb6cd2edda1885e1dbe1f,0xb3724772badf4d8fffa186a5ca0bea87693a6c2a \
+    --safe-address 0x0aa7420c43b8c1a7b165d216948870c8ecfe1ee1,0x0aa7420c43b8c1a7b165d216948870c8ecfe1ee1,0x0aa7420c43b8c1a7b165d216948870c8ecfe1ee1,0xd057604a14982fe8d88c5fc25aac3267ea142a08,0xd057604a14982fe8d88c5fc25aac3267ea142a08 \
+    --private-key ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+    --provider-url &quot;http://localhost:8545&quot;</code></pre></div>
+<ul>
+<li>Manager deregisters nodes:</li>
+</ul>
+<div class="example-wrap"><pre class="language-text"><code>hopli network-registry manager-deregister \
+    --network anvil-localhost \
+    --contracts-root &quot;../ethereum/contracts&quot; \
+    --node-address 0x9e820e68f8c024779ebcb6cd2edda1885e1dbe1f,0xb3724772badf4d8fffa186a5ca0bea87693a6c2a \
+    --private-key ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+    --provider-url &quot;http://localhost:8545&quot;</code></pre></div>
+<ul>
+<li>Manager syncs the eligibility of safes</li>
+</ul>
+<div class="example-wrap"><pre class="language-text"><code>hopli network-registry manager-force-sync \
+    --network anvil-localhost \
+    --contracts-root &quot;../ethereum/contracts&quot; \
+    --safe-address 0x9e820e68f8c024779ebcb6cd2edda1885e1dbe1f,0xb3724772badf4d8fffa186a5ca0bea87693a6c2a \
+    --eligibility true \
+    --private-key ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+    --provider-url &quot;http://localhost:8545&quot;</code></pre></div></div></details><h2 id="enums" class="section-header">Enums<a href="#enums" class="anchor">§</a></h2><ul class="item-table"><li><div class="item-name"><a class="enum" href="enum.NetworkRegistrySubcommands.html" title="enum hopli::network_registry::NetworkRegistrySubcommands">Network<wbr>Registry<wbr>Subcommands</a></div><div class="desc docblock-short">CLI arguments for <code>hopli network-registry</code></div></li></ul></section></div></main></body></html>

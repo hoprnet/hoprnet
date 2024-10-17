@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["AcknowledgedTicketStatus"],"fn":["f64_to_win_prob","win_prob_to_f64"],"struct":["AcknowledgedTicket","RedeemableTicket","Ticket","TicketBuilder","TransferableWinningTicket","UnacknowledgedTicket","VerifiedTicket"],"type":["EncodedWinProb"]};
