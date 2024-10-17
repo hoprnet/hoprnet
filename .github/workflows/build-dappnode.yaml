@@ -21,7 +21,7 @@ on:
       network:
         type: choice
         options:
-          - rotsee${{ vars.HOPRD_NETWORK_TESTNET }}
+          - ${{ vars.HOPRD_NETWORK_TESTNET }}
           - ${{ vars.HOPRD_NETWORK_MAINNET }}
         required: true
         description: 'Package network (${{ vars.HOPRD_NETWORK_TESTNET }}: testnet, ${{ vars.HOPRD_NETWORK_MAINNET }}: mainnet)'
