@@ -34,9 +34,7 @@ concurrency:
 jobs:
   build:
     # The original event_name registered is 'pull_request' even the trigger action is 'workflow_call'
-    if: >
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'pull_request' && contains(inputs.labels, format('package:{0},',inputs.repository)))
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && contains(inputs.labels, format('package:{0},',inputs.repository)))
     name: Build package
     runs-on: ubuntu-latest
     steps:
@@ -139,5 +137,3 @@ jobs:
           issue-number: ${{ github.event.pull_request.number }}
           body: |
             The latest dAppNode package for ${{ inputs.repository }} has been built and uploaded with IPFS hash: ${{ steps.publish.outputs.ipfs_hash }}
-
-
