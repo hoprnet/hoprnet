@@ -13,6 +13,7 @@ mod preconditions;
 mod prometheus;
 mod session;
 mod tickets;
+mod types;
 
 pub use session::{HOPR_TCP_BUFFER_SIZE, HOPR_UDP_BUFFER_SIZE, HOPR_UDP_QUEUE_SIZE};
 
@@ -25,8 +26,6 @@ use axum::{
     routing::{delete, get, post},
     Router,
 };
-use bimap::BiHashMap;
-use libp2p_identity::PeerId;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::error::Error;
@@ -69,7 +68,7 @@ pub(crate) struct InternalState {
     pub auth: Arc<Auth>,
     pub hopr: Arc<Hopr>,
     pub inbox: Arc<RwLock<hoprd_inbox::Inbox>>,
-    pub aliases: Arc<RwLock<BiHashMap<String, PeerId>>>,
+    pub hoprd_db: Arc<hoprd_db_api::db::HoprdDb>,
     pub websocket_rx: async_broadcast::InactiveReceiver<ApplicationData>,
     pub msg_encoder: Option<MessageEncoder>,
     pub open_listeners: ListenerJoinHandles,
@@ -82,9 +81,10 @@ pub(crate) struct InternalState {
         account::balances,
         account::withdraw,
         alias::aliases,
-        alias::delete_alias,
-        alias::get_alias,
         alias::set_alias,
+        alias::get_alias,
+        alias::delete_alias,
+        alias::clear_aliases,
         channels::close_channel,
         channels::fund_channel,
         channels::list_channels,
@@ -119,13 +119,14 @@ pub(crate) struct InternalState {
         tickets::redeem_tickets_in_channel,
         tickets::show_all_tickets,
         tickets::show_channel_tickets,
-        tickets::show_ticket_statistics
+        tickets::show_ticket_statistics,
+        tickets::reset_ticket_statistics,
     ),
     components(
         schemas(
             ApiError,
             account::AccountAddressesResponse, account::AccountBalancesResponse, account::WithdrawBodyRequest, account::WithdrawResponse,
-            alias::PeerIdResponse, alias::AliasPeerIdBodyRequest,
+            alias::PeerIdResponse, alias::AliasDestinationBodyRequest,
             channels::ChannelsQueryRequest,channels::CloseChannelResponse, channels::OpenChannelBodyRequest, channels::OpenChannelResponse,
             channels::NodeChannel, channels::NodeChannelsResponse, channels::ChannelInfoResponse, channels::FundBodyRequest,
             messages::MessagePopAllResponse,
@@ -183,6 +184,7 @@ pub struct RestApiParameters {
     pub hoprd_cfg: String,
     pub cfg: crate::config::Api,
     pub hopr: Arc<hopr_lib::Hopr>,
+    pub hoprd_db: Arc<hoprd_db_api::db::HoprdDb>,
     pub inbox: Arc<RwLock<hoprd_inbox::Inbox>>,
     pub session_listener_sockets: ListenerJoinHandles,
     pub websocket_rx: async_broadcast::InactiveReceiver<ApplicationData>,
@@ -196,6 +198,7 @@ pub async fn serve_api(params: RestApiParameters) -> Result<(), std::io::Error> 
         hoprd_cfg,
         cfg,
         hopr,
+        hoprd_db,
         inbox,
         session_listener_sockets,
         websocket_rx,
@@ -207,6 +210,7 @@ pub async fn serve_api(params: RestApiParameters) -> Result<(), std::io::Error> 
         cfg,
         hopr,
         inbox,
+        hoprd_db,
         session_listener_sockets,
         websocket_rx,
         msg_encoder,
@@ -215,19 +219,17 @@ pub async fn serve_api(params: RestApiParameters) -> Result<(), std::io::Error> 
     axum::serve(listener, router).await
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn build_api(
     hoprd_cfg: String,
     cfg: crate::config::Api,
     hopr: Arc<hopr_lib::Hopr>,
     inbox: Arc<RwLock<hoprd_inbox::Inbox>>,
+    hoprd_db: Arc<hoprd_db_api::db::HoprdDb>,
     open_listeners: ListenerJoinHandles,
     websocket_rx: async_broadcast::InactiveReceiver<ApplicationData>,
     msg_encoder: Option<MessageEncoder>,
 ) -> Router {
-    // Prepare alias part of the state
-    let aliases: Arc<RwLock<BiHashMap<String, PeerId>>> = Arc::new(RwLock::new(BiHashMap::new()));
-    aliases.write().await.insert("me".to_owned(), hopr.me_peer_id());
-
     let state = AppState { hopr };
     let inner_state = InternalState {
         auth: Arc::new(cfg.auth.clone()),
@@ -235,13 +237,12 @@ async fn build_api(
         hopr: state.hopr.clone(),
         msg_encoder,
         inbox,
+        hoprd_db,
         websocket_rx,
-        aliases,
         open_listeners,
     };
 
     Router::new()
-        // FIXME: Remove API UIs which are not going to be used.
         .nest("/", Router::new().merge(Scalar::with_url("/scalar", ApiDoc::openapi())))
         .nest(
             "/",
@@ -257,12 +258,13 @@ async fn build_api(
             Router::new()
                 .route("/aliases", get(alias::aliases))
                 .route("/aliases", post(alias::set_alias))
+                .route("/aliases", delete(alias::clear_aliases))
                 .route("/aliases/:alias", get(alias::get_alias))
                 .route("/aliases/:alias", delete(alias::delete_alias))
                 .route("/account/addresses", get(account::addresses))
                 .route("/account/balances", get(account::balances))
                 .route("/account/withdraw", post(account::withdraw))
-                .route("/peers/:peerId", get(peers::show_peer_info))
+                .route("/peers/:destination", get(peers::show_peer_info))
                 .route("/channels", get(channels::list_channels))
                 .route("/channels", post(channels::open_channel))
                 .route("/channels/:channelId", get(channels::show_channel))
@@ -280,6 +282,7 @@ async fn build_api(
                 .route("/tickets", get(tickets::show_all_tickets))
                 .route("/tickets/redeem", post(tickets::redeem_all_tickets))
                 .route("/tickets/statistics", get(tickets::show_ticket_statistics))
+                .route("/tickets/statistics", delete(tickets::reset_ticket_statistics))
                 .route("/messages", delete(messages::delete_messages))
                 .route("/messages", post(messages::send_message))
                 .route("/messages/pop", post(messages::pop))
@@ -296,7 +299,7 @@ async fn build_api(
                 .route("/node/peers", get(node::peers))
                 .route("/node/entryNodes", get(node::entry_nodes))
                 .route("/node/metrics", get(node::metrics))
-                .route("/peers/:peerId/ping", post(peers::ping_peer))
+                .route("/peers/:destination/ping", post(peers::ping_peer))
                 .route("/session/:protocol", post(session::create_client))
                 .route("/session/:protocol", get(session::list_clients))
                 .route("/session/:protocol", delete(session::close_client))
@@ -340,7 +343,6 @@ enum ApiErrorStatus {
     /// An invalid application tag from the reserved range was provided.
     InvalidApplicationTag,
     InvalidChannelId,
-    InvalidPeerId,
     PeerNotFound,
     ChannelNotFound,
     TicketsNotFound,
@@ -348,12 +350,15 @@ enum ApiErrorStatus {
     NotEnoughAllowance,
     ChannelAlreadyOpen,
     ChannelNotOpen,
+    AliasNotFound,
+    DatabaseError,
     UnsupportedFeature,
     Timeout,
     Unauthorized,
     InvalidQuality,
-    AliasAlreadyExists,
     NotReady,
+    #[strum(serialize = "INVALID_PATH")]
+    InvalidPath(String),
     #[strum(serialize = "UNKNOWN_FAILURE")]
     UnknownFailure(String),
 }

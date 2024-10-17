@@ -152,7 +152,7 @@ pub(crate) struct WithdrawResponse {
 
 /// Withdraw funds from this node to the ethereum wallet address.
 ///
-/// Both NATIVE or HOPR can be withdrawn using this method.
+/// Both Native or HOPR can be withdrawn using this method.
 #[utoipa::path(
         post,
         path = const_format::formatcp!("{BASE_PATH}/account/withdraw"),
