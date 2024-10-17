@@ -395,10 +395,6 @@ async def shared_nodes_bringup(
         logging.info("Funding nodes")
         fund_nodes(test_suite_name, test_dir, anvil_port)
 
-    async def is_node_ready(target: Node):
-        while not await asyncio.wait_for(target.api.readyz(), timeout=10):
-            await asyncio.sleep(1)
-
     # WAIT FOR NODES TO BE UP
     timeout = 60
     logging.info(f"Waiting up to {timeout}s for nodes to be ready")

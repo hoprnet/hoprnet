@@ -6,7 +6,7 @@ import time
 
 import pytest
 import websocket
-import websockets
+from websockets.asyncio.client import connect
 from contextlib import closing
 
 from .conftest import API_TOKEN, nodes_with_auth, random_distinct_pairs_from, to_ws_url
@@ -38,7 +38,7 @@ def test_hoprd_websocket_api_should_reject_a_connection_without_a_valid_token(sr
         except websocket.WebSocketBadStatusException as e:
             assert "401 Unauthorized" in str(e)
         else:
-            assert False
+            pytest.fail("Should fail with 401 Unauthorized")
 
 
 @pytest.mark.parametrize("src,dest", random_distinct_pairs_from(nodes_with_auth(), count=1))
@@ -54,7 +54,7 @@ def test_hoprd_websocket_api_should_reject_a_connection_with_an_invalid_token(sr
         except websocket.WebSocketBadStatusException as e:
             assert "401 Unauthorized" in str(e)
         else:
-            assert False, "Failed to raise 401 on invalid token"
+            pytest.fail("Should fail with 401 Unauthorized")
 
 
 @pytest.mark.parametrize("src,dest", random_distinct_pairs_from(nodes_with_auth(), count=1))
@@ -72,7 +72,7 @@ def test_hoprd_websocket_api_should_not_accept_a_connection_with_an_invalid_toke
         except websocket.WebSocketBadStatusException as e:
             assert "401 Unauthorized" in str(e)
         else:
-            assert False, "Failed to raise 401 on invalid token"
+            pytest.fail("Should fail with 401 Unauthorized")
 
 
 @pytest.mark.parametrize("src,dest", random_distinct_pairs_from(nodes_with_auth(), count=1))
@@ -90,7 +90,7 @@ def test_hoprd_websocket_api_should_reject_a_connection_with_an_invalid_bearer_t
         except websocket.WebSocketBadStatusException as e:
             assert "401 Unauthorized" in str(e)
         else:
-            assert False, "Failed to raise 401 on invalid token"
+            pytest.fail("Should fail with 401 Unauthorized")
 
 
 @pytest.mark.parametrize("src,dest", random_distinct_pairs_from(nodes_with_auth(), count=1))
@@ -148,17 +148,16 @@ def test_hoprd_websocket_api_should_reject_connection_on_invalid_path(src: str, 
     except websocket.WebSocketBadStatusException as e:
         assert "404 Not Found" in str(e)
     else:
-        assert False, "Failed to raise 404 on invalid path"
+        pytest.fail("Should fail with 404 Not Found")
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("src,dest", random_distinct_pairs_from(nodes_with_auth(), count=1))
 async def test_websocket_send_receive_messages(src: str, dest: str, swarm7: dict[str, Node]):
-    tag = random.randint(30000, 60000)
     message_target_count = 10
 
     with EchoServer(SocketType.TCP, STANDARD_MTU_SIZE) as server:
-        async with websockets.connect(
+        async with connect(
              to_ws_url(
                  swarm7[src].host_addr,
                  swarm7[src].api_port,
@@ -168,12 +167,12 @@ async def test_websocket_send_receive_messages(src: str, dest: str, swarm7: dict
                      ("destination", f"{swarm7[dest].peer_id}")
                  ]
              ),
-             extra_headers=EXTRA_HEADERS
+             additional_headers=EXTRA_HEADERS
          ) as ws:
             for i in range(message_target_count):
                 body = f"hello msg #{i} from peer {swarm7[src].peer_id} to peer {swarm7[dest].peer_id}"
 
-                await ws.send(str.encode(body))
+                await ws.send(body.encode())
 
                 try:
                     msg = await asyncio.wait_for(ws.recv(), timeout=5)
