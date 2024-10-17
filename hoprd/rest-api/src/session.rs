@@ -1,5 +1,7 @@
+use std::fmt::Formatter;
 use std::io::ErrorKind;
 use std::net::IpAddr;
+use std::str::FromStr;
 use std::sync::Arc;
 
 use crate::types::PeerOrAddress;
@@ -15,7 +17,7 @@ use hopr_lib::errors::HoprLibError;
 use hopr_lib::transfer_session;
 use hopr_lib::{HoprSession, IpProtocol, RoutingOptions, SessionCapability, SessionClientConfig};
 
-use hopr_network_types::prelude::ConnectedUdpStream;
+use hopr_network_types::prelude::{ConnectedUdpStream, IpOrHost, SealedHost};
 use hopr_network_types::udp::ForeignDataMode;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
@@ -44,13 +46,29 @@ lazy_static::lazy_static! {
 }
 
 #[serde_as]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum SessionTargetSpec {
+    Plain(String),
+    Sealed(#[serde_as(as = "serde_with::base64::Base64")] Vec<u8>)
+}
+
+impl std::fmt::Display for SessionTargetSpec {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SessionTargetSpec::Plain(t) => write!(f, "{t}"),
+            SessionTargetSpec::Sealed(_) => write!(f, "<redacted>")
+        }
+    }
+}
+
+#[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 #[schema(example = json!({
         "destination": "12D3KooWR4uwjKCDCAY1xsEFB4esuWLF9Q5ijYvCjz5PNkTbnu33",
         "path": {
             "Hops": 1
         },
-        "target": "localhost:8080",
+        "target": {"Plain": "localhost:8080"},
         "listenHost": "127.0.0.1:10000",
         "capabilities": ["Retransmission", "Segmentation"]
     }))]
@@ -59,7 +77,7 @@ pub(crate) struct SessionClientRequest {
     #[serde_as(as = "DisplayFromStr")]
     pub destination: PeerOrAddress,
     pub path: RoutingOptions,
-    pub target: String,
+    pub target: SessionTargetSpec,
     pub listen_host: Option<String>,
     #[serde_as(as = "Option<Vec<DisplayFromStr>>")]
     pub capabilities: Option<Vec<SessionCapability>>,
@@ -74,10 +92,10 @@ impl SessionClientRequest {
             peer: self.destination.peer_id.unwrap(),
             path_options: self.path,
             target_protocol,
-            target: self
-                .target
-                .parse()
-                .map_err(|e| HoprLibError::GeneralError(format!("target host parse error: {e}")))?,
+            target: match self.target {
+                SessionTargetSpec::Plain(plain) => IpOrHost::from_str(&plain).map_err(|e| HoprLibError::GeneralError(e.to_string()))?.into(),
+                SessionTargetSpec::Sealed(enc) => SealedHost::Sealed(enc.into_boxed_slice()),
+            },
             capabilities: self.capabilities.unwrap_or_else(|| match target_protocol {
                 IpProtocol::TCP => {
                     vec![SessionCapability::Retransmission, SessionCapability::Segmentation]
@@ -312,7 +330,7 @@ pub(crate) async fn create_client(
             StatusCode::OK,
             Json(SessionClientResponse {
                 protocol,
-                target,
+                target: target.to_string(),
                 ip: bound_host.ip().to_string(),
                 port: bound_host.port(),
             }),
@@ -352,7 +370,7 @@ pub(crate) async fn list_clients(
         .filter(|(id, _)| id.0 == protocol)
         .map(|(id, (target, _))| SessionClientResponse {
             protocol,
-            target: target.clone(),
+            target: target.to_string(),
             ip: id.1.ip().to_string(),
             port: id.1.port(),
         })

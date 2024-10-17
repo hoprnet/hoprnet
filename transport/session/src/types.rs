@@ -2,7 +2,7 @@ use futures::{channel::mpsc::UnboundedReceiver, pin_mut, StreamExt};
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_internal_types::protocol::{ApplicationData, PAYLOAD_SIZE};
 use hopr_network_types::prelude::state::SessionFeature;
-use hopr_network_types::prelude::{IpOrHost, RoutingOptions};
+use hopr_network_types::prelude::{RoutingOptions, SealedHost};
 use hopr_network_types::session::state::{SessionConfig, SessionSocket};
 use hopr_primitive_types::traits::BytesRepresentable;
 use libp2p_identity::PeerId;
@@ -128,9 +128,9 @@ impl<T: futures::AsyncWrite + futures::AsyncRead + Send> AsyncReadWrite for T {}
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum SessionTarget {
     /// Target is running over UDP with the given IP address and port.
-    UdpStream(IpOrHost),
+    UdpStream(SealedHost),
     /// Target is running over TCP with the given address and port.
-    TcpStream(IpOrHost),
+    TcpStream(SealedHost),
     /// Target is a service directly at the exit node with a given service ID.
     ExitNode(u32),
 }

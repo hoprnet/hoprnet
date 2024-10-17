@@ -6,6 +6,7 @@ use libp2p_identity::PeerId;
 use std::fmt::{Display, Formatter};
 use std::net::SocketAddr;
 use std::str::FromStr;
+use hopr_crypto_types::prelude::OffchainKeypair;
 
 /// Lists some of the IP protocols.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, strum::Display, strum::EnumString)]
@@ -156,6 +157,93 @@ impl IpOrHost {
     /// i.e.: it does not perform any DNS resolution.
     pub fn is_loopback_ip(&self) -> bool {
         matches!(self, IpOrHost::Ip(addr) if addr.ip().is_loopback())
+    }
+}
+
+/// Contains an optionally encrypted [`IpOrHost`].
+///
+/// This is useful for hiding the [`IpOrHost`] instance from the Entry node.
+/// The client first encrypts the `IpOrHost` instance via [`SealedHost::seal`] using
+/// the Exit node's public key.
+/// Upon receiving the `SealedHost` instance by the Exit node, it can call
+/// [`SealedHost::unseal`] using its private key to get the original `IpOrHost` instance.
+///
+/// Sealing is fully randomized and therefore does not leak information about equal `IpOrHost`
+/// instances.
+///
+/// ### Example
+/// ````rust
+/// use libp2p_identity::PeerId;
+/// use hopr_crypto_types::prelude::{Keypair, OffchainKeypair};
+/// use hopr_network_types::prelude::{IpOrHost, SealedHost};
+///
+/// let keypair = OffchainKeypair::random();
+///
+/// let exit_node_peer_id: PeerId = keypair.public().into();
+/// let host: IpOrHost = "127.0.0.1:1000".parse()?;
+///
+/// // On the Client
+/// let encrypted = SealedHost::seal(host.clone(), keypair.public().into())?;
+///
+/// // On the Exit node
+/// let decrypted = encrypted.unseal(&keypair)?;
+/// assert_eq!(host, decrypted);
+///
+/// // Plain SealedHost unseals trivially
+/// let plain_sealed: SealedHost = host.clone().into();
+/// assert_eq!(host, plain_sealed.try_into()?);
+///
+/// // The same host sealing is randomized
+/// let encrypted_1 = SealedHost::seal(host.clone(), keypair.public().into())?;
+/// let encrypted_2 = SealedHost::seal(host.clone(), keypair.public().into())?;
+/// assert_ne!(encrypted_1, encrypted_2);
+///
+/// ````
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum SealedHost {
+    /// Plain (not sealed) [`IpOrHost`]
+    Plain(IpOrHost),
+    /// Encrypted [`IpOrHost`]
+    Sealed(Box<[u8]>)
+}
+
+impl SealedHost {
+    pub fn seal(_host: IpOrHost, _peer_id: PeerId) -> crate::errors::Result<Self> {
+        unimplemented!()
+    }
+
+    pub fn unseal(self, _key: &OffchainKeypair) -> crate::errors::Result<IpOrHost> {
+        match self {
+            SealedHost::Plain(host) => Ok(host),
+            SealedHost::Sealed(_) => unimplemented!(),
+        }
+    }
+}
+
+impl From<IpOrHost> for SealedHost {
+    fn from(value: IpOrHost) -> Self {
+        Self::Plain(value)
+    }
+}
+
+impl TryFrom<SealedHost> for IpOrHost {
+    type Error = NetworkTypeError;
+
+    fn try_from(value: SealedHost) -> Result<Self, Self::Error> {
+        match value {
+            SealedHost::Plain(host) => Ok(host),
+            SealedHost::Sealed(_) => Err(NetworkTypeError::Other("instance is sealed".into())),
+        }
+    }
+}
+
+impl std::fmt::Display for SealedHost {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SealedHost::Plain(h) => write!(f, "{h}"),
+            SealedHost::Sealed(_) => write!(f, "<redacted host>"),
+        }
     }
 }
 

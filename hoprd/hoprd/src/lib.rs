@@ -87,7 +87,7 @@
 //! ```
 
 use hopr_lib::errors::HoprLibError;
-use hopr_lib::transfer_session;
+use hopr_lib::{transfer_session, HoprOffchainKeypair};
 use hopr_network_types::prelude::ForeignDataMode;
 use hoprd_api::{HOPR_TCP_BUFFER_SIZE, HOPR_UDP_BUFFER_SIZE, HOPR_UDP_QUEUE_SIZE};
 
@@ -105,7 +105,7 @@ lazy_static::lazy_static! {
 }
 
 #[derive(Debug, Clone)]
-pub struct HoprServerIpForwardingReactor;
+pub struct HoprServerIpForwardingReactor(pub HoprOffchainKeypair);
 
 #[hopr_lib::async_trait]
 impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
@@ -114,6 +114,9 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
         let session_id = *session.session.id();
         match session.target {
             hopr_lib::SessionTarget::UdpStream(udp_target) => {
+                let udp_target = udp_target.unseal(&self.0)
+                    .map_err(|e| HoprLibError::GeneralError(format!("cannot unseal target: {e}")))?;
+
                 tracing::debug!(
                     session_id = debug(session_id),
                     "binding socket to the UDP server {udp_target}..."
@@ -177,6 +180,9 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                 Ok(())
             }
             hopr_lib::SessionTarget::TcpStream(tcp_target) => {
+                let tcp_target = tcp_target.unseal(&self.0)
+                    .map_err(|e| HoprLibError::GeneralError(format!("cannot unseal target: {e}")))?;
+
                 tracing::debug!(
                     session_id = debug(session_id),
                     "creating a connection to the TCP server {tcp_target}..."

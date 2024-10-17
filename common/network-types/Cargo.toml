@@ -52,6 +52,7 @@ tracing = { workspace = true }
 
 hopr-platform = { workspace = true }
 hopr-primitive-types = { workspace = true }
+hopr-crypto-types = { workspace = true }
 hopr-async-runtime = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 
