@@ -41,9 +41,9 @@ jobs:
           base_branch="${{ github.event.pull_request.base.ref }}"
           # Identify parameters depending on branch
           if [[ "${base_branch}" =~ ^"release" ]]; then
-            network=${{ env.HOPRD_NETWORK_MAINNET }}
+            network=${{ vars.HOPRD_NETWORK_MAINNET }}
           else
-            network=${{ env.HOPRD_NETWORK_TESTNET }}
+            network=${{ vars.HOPRD_NETWORK_TESTNET }}
           fi
           cd ./hoprnet-ci
           pip install -r ./scripts/requirements.txt
