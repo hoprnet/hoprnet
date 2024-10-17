@@ -45,7 +45,7 @@ use utoipa::{Modify, OpenApi};
 use utoipa_scalar::{Scalar, Servable};
 
 use crate::config::Auth;
-use hopr_lib::{errors::HoprLibError, ApplicationData, Hopr};
+use hopr_lib::{errors::HoprLibError, Hopr};
 use hopr_network_types::prelude::IpProtocol;
 
 pub(crate) const BASE_PATH: &str = "/api/v3";
@@ -69,7 +69,6 @@ pub(crate) struct InternalState {
     pub hopr: Arc<Hopr>,
     pub inbox: Arc<RwLock<hoprd_inbox::Inbox>>,
     pub hoprd_db: Arc<hoprd_db_api::db::HoprdDb>,
-    pub websocket_rx: async_broadcast::InactiveReceiver<ApplicationData>,
     pub msg_encoder: Option<MessageEncoder>,
     pub open_listeners: ListenerJoinHandles,
 }
@@ -187,7 +186,6 @@ pub struct RestApiParameters {
     pub hoprd_db: Arc<hoprd_db_api::db::HoprdDb>,
     pub inbox: Arc<RwLock<hoprd_inbox::Inbox>>,
     pub session_listener_sockets: ListenerJoinHandles,
-    pub websocket_rx: async_broadcast::InactiveReceiver<ApplicationData>,
     pub msg_encoder: Option<MessageEncoder>,
 }
 
@@ -201,7 +199,6 @@ pub async fn serve_api(params: RestApiParameters) -> Result<(), std::io::Error> 
         hoprd_db,
         inbox,
         session_listener_sockets,
-        websocket_rx,
         msg_encoder,
     } = params;
 
@@ -212,7 +209,6 @@ pub async fn serve_api(params: RestApiParameters) -> Result<(), std::io::Error> 
         inbox,
         hoprd_db,
         session_listener_sockets,
-        websocket_rx,
         msg_encoder,
     )
     .await;
@@ -227,7 +223,6 @@ async fn build_api(
     inbox: Arc<RwLock<hoprd_inbox::Inbox>>,
     hoprd_db: Arc<hoprd_db_api::db::HoprdDb>,
     open_listeners: ListenerJoinHandles,
-    websocket_rx: async_broadcast::InactiveReceiver<ApplicationData>,
     msg_encoder: Option<MessageEncoder>,
 ) -> Router {
     let state = AppState { hopr };
@@ -238,7 +233,6 @@ async fn build_api(
         msg_encoder,
         inbox,
         hoprd_db,
-        websocket_rx,
         open_listeners,
     };
 
@@ -290,7 +284,6 @@ async fn build_api(
                 .route("/messages/peek", post(messages::peek))
                 .route("/messages/peek-all", post(messages::peek_all))
                 .route("/messages/size", get(messages::size))
-                .route("/messages/websocket", get(messages::websocket))
                 .route("/network/price", get(network::price))
                 .route("/network/probability", get(network::probability))
                 .route("/node/version", get(node::version))
@@ -300,6 +293,7 @@ async fn build_api(
                 .route("/node/entryNodes", get(node::entry_nodes))
                 .route("/node/metrics", get(node::metrics))
                 .route("/peers/:destination/ping", post(peers::ping_peer))
+                .route("/session/websocket", get(session::websocket))
                 .route("/session/:protocol", post(session::create_client))
                 .route("/session/:protocol", get(session::list_clients))
                 .route("/session/:protocol", delete(session::close_client))
