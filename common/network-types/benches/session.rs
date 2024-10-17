@@ -61,8 +61,5 @@ pub fn session_one_way_reliable_send_recv_benchmark(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(
-    benches,
-    session_one_way_reliable_send_recv_benchmark,
-);
+criterion_group!(benches, session_one_way_reliable_send_recv_benchmark,);
 criterion_main!(benches);
