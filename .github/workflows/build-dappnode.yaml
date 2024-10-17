@@ -21,11 +21,11 @@ on:
       network:
         type: choice
         options:
-          - ${{ env.HOPRD_NETWORK_TESTNET }}
-          - ${{ env.HOPRD_NETWORK_MAINNET }}
+          - rotsee
+          - dufour
         required: true
-        description: 'Package network (${{ env.HOPRD_NETWORK_TESTNET }}: testnet, ${{ env.HOPRD_NETWORK_MAINNET }}: mainnet)'
-        default: ${{ env.HOPRD_NETWORK_MAINNET }}
+        description: 'Package network (rotsee: testnet, dufour: mainnet)'
+        default: dufour
 
 concurrency:
   group: dappnode-${{ inputs.repository }}
