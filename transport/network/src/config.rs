@@ -14,7 +14,7 @@ pub const DEFAULT_NETWORK_QUALITY_AVERAGE_WINDOW_SIZE: u32 = 25;
 pub const DEFAULT_NETWORK_BACKOFF_EXPONENT: f64 = 1.5;
 pub const DEFAULT_NETWORK_BACKOFF_MIN: f64 = 2.0;
 
-/// Configuration for the [`Network`] object
+/// Configuration for the [`crate::network::Network`] object
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize, SmartDefault, PartialEq)]
 #[serde(deny_unknown_fields)]
