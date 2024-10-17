@@ -67,8 +67,8 @@ jobs:
 
       - name: Create Milestone
         run: |
-          milestone_number=$(gh api repos/${{ github.repository }}/milestones | jq -r --arg version "${{ steps.bump.outputs.next_version }}"  ' to_entries[] | select(.value.title | test($version)).value.number')
-          if [ -z $milestone_number ]; 
+          milestone_number=$(gh api "repos/${{ github.repository }}/milestones" | jq -r --arg version "${{ steps.bump.outputs.next_version }}"  ' to_entries[] | select(.value.title | test($version)).value.number')
+          if [ -z $milestone_number ];
           then
             echo '{ "title": "${{ steps.bump.outputs.next_version }}", "state": "open" }' | gh api --method POST repos/${{ github.repository }}/milestones --input -
           else
