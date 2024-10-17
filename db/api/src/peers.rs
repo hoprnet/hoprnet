@@ -446,7 +446,10 @@ impl TryFrom<hopr_db_entity::network_peer::Model> for PeerStatus {
             last_seen_latency: Duration::from_millis(value.last_seen_latency as u64),
             heartbeats_sent: value.heartbeats_sent.unwrap_or_default() as u64,
             heartbeats_succeeded: value.heartbeats_successful.unwrap_or_default() as u64,
-            backoff: value.backoff.unwrap_or(1.0),
+            backoff: value
+                .backoff
+                .map(|x| if x.is_nan() { 1.0f64 } else { x })
+                .unwrap_or(1.0f64),
             ignored: if let Some(v) = value.ignored {
                 Some(
                     chrono::DateTime::<chrono::Utc>::from_str(&v)
