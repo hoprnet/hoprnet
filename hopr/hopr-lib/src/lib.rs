@@ -54,13 +54,14 @@ use core_path::channel_graph::ChannelGraph;
 use errors::HoprStatusError;
 use hopr_async_runtime::prelude::{sleep, spawn, JoinHandle};
 use hopr_crypto_types::prelude::OffchainPublicKey;
+use hopr_db_api::logs::HoprDbLogOperations;
 use hopr_db_sql::{
     accounts::HoprDbAccountOperations,
     api::{info::SafeInfo, resolver::HoprDbResolverOperations, tickets::HoprDbTicketOperations},
     channels::HoprDbChannelOperations,
     db::{HoprDb, HoprDbConfig},
     info::HoprDbInfoOperations,
-    prelude::{ChainOrPacketKey::ChainKey, DbSqlError, DescribedBlock, HoprDbPeersOperations},
+    prelude::{ChainOrPacketKey::ChainKey, DbSqlError, HoprDbPeersOperations},
     HoprDbAllOperations, HoprDbGeneralModelOperations,
 };
 use hopr_platform::file::native::{join, remove_dir_all};
@@ -560,6 +561,7 @@ impl Hopr {
             cfg.safe_module.safe_address,
             chain_indexer::IndexerConfig {
                 start_block_number: resolved_environment.channel_contract_deploy_block as u64,
+                fast_sync: cfg.chain.fast_sync,
             },
             tx_indexer_events,
         );
@@ -1085,8 +1087,8 @@ impl Hopr {
     }
 
     /// Gets the current indexer state: last indexed block ID and checksum
-    pub async fn get_indexer_state(&self) -> errors::Result<DescribedBlock> {
-        Ok(self.db.get_last_indexed_block(None).await?)
+    pub async fn get_indexer_state(&self) -> errors::Result<Option<SerializableLog>> {
+        Ok(self.db.get_last_checksummed_log().await?)
     }
 
     /// Test whether the peer with PeerId is allowed to access the network

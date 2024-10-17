@@ -136,6 +136,11 @@
             runTests = true;
           });
 
+          hopr-test-nightly = rust-builder-local-nightly.callPackage ./nix/rust-package.nix (hoprdBuildArgs // {
+            runTests = true;
+            cargoExtraArgs = "-Z panic-abort-tests";
+          });
+
           hoprd-clippy = rust-builder-local.callPackage ./nix/rust-package.nix (hoprdBuildArgs // { runClippy = true; });
           hoprd-debug = rust-builder-local.callPackage ./nix/rust-package.nix (hoprdBuildArgs // {
             CARGO_PROFILE = "dev";
@@ -420,7 +425,7 @@
           packages = {
             inherit hoprd hoprd-debug hoprd-docker hoprd-debug-docker hoprd-profile-docker;
             inherit hopli hopli-debug hopli-docker hopli-debug-docker hopli-profile-docker;
-            inherit hopr-test;
+            inherit hopr-test hopr-test-nightly;
             inherit anvil-docker;
             inherit smoke-tests docs;
             inherit pre-commit-check;

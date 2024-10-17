@@ -1255,6 +1255,7 @@ dependencies = [
  "hopr-async-runtime",
  "hopr-crypto-random",
  "hopr-crypto-types",
+ "hopr-db-api",
  "hopr-db-entity",
  "hopr-db-sql",
  "hopr-internal-types",
@@ -4127,6 +4128,7 @@ dependencies = [
  "hopr-async-runtime",
  "hopr-crypto-random",
  "hopr-crypto-types",
+ "hopr-db-api",
  "hopr-db-sql",
  "hopr-internal-types",
  "hopr-metrics",
@@ -4224,6 +4226,7 @@ name = "hopr-primitive-types"
 version = "0.4.0"
 dependencies = [
  "anyhow",
+ "chrono",
  "float-cmp",
  "hex",
  "hex-literal",

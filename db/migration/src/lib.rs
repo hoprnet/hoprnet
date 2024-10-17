@@ -16,6 +16,7 @@ mod m20240404_000013_tickets_recreate_ticket;
 mod m20240810_000014_index_extend_chain_info_with_pre_checksum_block;
 mod m20240917_000015_add_minimum_incoming_ticket_win_prob_column;
 mod m20240926_000016_peers_create_peer_store_with_new_sea_orm;
+mod m20240930_000017_logs_create_log;
 
 #[derive(PartialEq)]
 pub enum BackendType {
@@ -55,6 +56,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20240926_000016_peers_create_peer_store_with_new_sea_orm::Migration(
                 BackendType::Postgres,
             )),
+            Box::new(m20240930_000017_logs_create_log::Migration),
         ]
     }
 }
@@ -113,5 +115,17 @@ impl MigratorTrait for MigratorTickets {
             )),
             Box::new(m20240404_000013_tickets_recreate_ticket::Migration(BackendType::SQLite)),
         ]
+    }
+}
+
+/// The logs are kept separate from the rest of the database to allow for
+/// easier export of the logs themselves and also to not block any other database operations
+/// made by the node at runtime.
+pub struct MigratorChainLogs;
+
+#[async_trait::async_trait]
+impl MigratorTrait for MigratorChainLogs {
+    fn migrations() -> Vec<Box<dyn MigrationTrait>> {
+        vec![Box::new(m20240930_000017_logs_create_log::Migration)]
     }
 }
