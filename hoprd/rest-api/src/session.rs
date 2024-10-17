@@ -137,6 +137,7 @@ pub(crate) async fn websocket(
 
     let hopr = state.hopr.clone();
     let session: HoprSession = hopr.connect_to(data).await.map_err(|e| {
+        error!(error = %e, "Failed to establish session");
         (
             StatusCode::UNPROCESSABLE_ENTITY,
             ApiErrorStatus::UnknownFailure(e.to_string()),

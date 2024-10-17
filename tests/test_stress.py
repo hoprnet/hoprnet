@@ -82,6 +82,17 @@ async def test_stress_relayed_flood_test_with_sources_performing_1_hop_to_self(s
                     )
                 )
                 for source in api_sources
+            ],
+            *[
+                channels.enter_async_context(
+                    create_channel(
+                        ApiWrapper(api_target, await api_target.addresses("native")),
+                        ApiWrapper(source, await source.addresses("native")),
+                        funding=STRESS_1_HOP_TO_SELF_MESSAGE_COUNT * TICKET_PRICE_PER_HOP * 3,
+                        close_from_dest=False,
+                    )
+                )
+                for source in api_sources
             ]
         )
 
