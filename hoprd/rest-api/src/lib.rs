@@ -45,6 +45,7 @@ use utoipa::{Modify, OpenApi};
 use utoipa_scalar::{Scalar, Servable};
 
 use crate::config::Auth;
+use crate::session::SessionTargetSpec;
 use hopr_lib::{errors::HoprLibError, ApplicationData, Hopr};
 use hopr_network_types::prelude::IpProtocol;
 
@@ -60,7 +61,8 @@ pub type MessageEncoder = fn(&[u8]) -> Box<[u8]>;
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct ListenerId(pub IpProtocol, pub std::net::SocketAddr);
 
-pub type ListenerJoinHandles = Arc<RwLock<HashMap<ListenerId, (String, hopr_async_runtime::prelude::JoinHandle<()>)>>>;
+pub type ListenerJoinHandles =
+    Arc<RwLock<HashMap<ListenerId, (SessionTargetSpec, hopr_async_runtime::prelude::JoinHandle<()>)>>>;
 
 #[derive(Clone)]
 pub(crate) struct InternalState {

@@ -47,7 +47,7 @@ pub struct SessionClientConfig {
     pub target_protocol: IpProtocol,
 
     /// Target of the session.
-    pub target: IpOrHost,
+    pub target: SealedHost,
 
     /// Capabilities offered by the session.
     pub capabilities: Vec<Capability>,

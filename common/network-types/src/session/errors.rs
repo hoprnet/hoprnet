@@ -1,7 +1,7 @@
 use crate::prelude::FrameId;
 use thiserror::Error;
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone)]
 pub enum SessionError {
     #[error("error while processing frame or segment: {0}")]
     ProcessingError(String),
