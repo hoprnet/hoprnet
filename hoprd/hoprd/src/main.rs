@@ -295,7 +295,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         })));
     }
 
-    let (hopr_socket, hopr_processes) = node.run(HoprServerIpForwardingReactor(hopr_keys.packet_key.clone())).await?;
+    let (hopr_socket, hopr_processes) = node
+        .run(HoprServerIpForwardingReactor(hopr_keys.packet_key.clone()))
+        .await?;
 
     // process extracting the received data from the socket
     let mut ingress = hopr_socket.reader();

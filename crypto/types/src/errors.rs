@@ -28,6 +28,9 @@ pub enum CryptoError {
     #[error("signature verification failed")]
     SignatureVerification,
 
+    #[error("error during sealing/unsealing of data: {0}")]
+    SealingError(String),
+
     #[error("ethereum challenge on the ticket is invalid")]
     InvalidChallenge,
 

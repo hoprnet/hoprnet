@@ -4049,6 +4049,7 @@ name = "hopr-crypto-types"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "bincode",
  "blake2",
  "chacha20",
  "curve25519-dalek",
@@ -4269,6 +4270,7 @@ dependencies = [
  "hickory-resolver",
  "hopr-async-runtime",
  "hopr-crypto-random",
+ "hopr-crypto-types",
  "hopr-metrics",
  "hopr-platform",
  "hopr-primitive-types",

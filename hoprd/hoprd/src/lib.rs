@@ -114,7 +114,8 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
         let session_id = *session.session.id();
         match session.target {
             hopr_lib::SessionTarget::UdpStream(udp_target) => {
-                let udp_target = udp_target.unseal(&self.0)
+                let udp_target = udp_target
+                    .unseal(&self.0)
                     .map_err(|e| HoprLibError::GeneralError(format!("cannot unseal target: {e}")))?;
 
                 tracing::debug!(
@@ -180,7 +181,8 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                 Ok(())
             }
             hopr_lib::SessionTarget::TcpStream(tcp_target) => {
-                let tcp_target = tcp_target.unseal(&self.0)
+                let tcp_target = tcp_target
+                    .unseal(&self.0)
                     .map_err(|e| HoprLibError::GeneralError(format!("cannot unseal target: {e}")))?;
 
                 tracing::debug!(

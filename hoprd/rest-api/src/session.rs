@@ -49,14 +49,14 @@ lazy_static::lazy_static! {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SessionTargetSpec {
     Plain(String),
-    Sealed(#[serde_as(as = "serde_with::base64::Base64")] Vec<u8>)
+    Sealed(#[serde_as(as = "serde_with::base64::Base64")] Vec<u8>),
 }
 
 impl std::fmt::Display for SessionTargetSpec {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             SessionTargetSpec::Plain(t) => write!(f, "{t}"),
-            SessionTargetSpec::Sealed(_) => write!(f, "<redacted>")
+            SessionTargetSpec::Sealed(_) => write!(f, "<redacted>"),
         }
     }
 }
@@ -93,7 +93,9 @@ impl SessionClientRequest {
             path_options: self.path,
             target_protocol,
             target: match self.target {
-                SessionTargetSpec::Plain(plain) => IpOrHost::from_str(&plain).map_err(|e| HoprLibError::GeneralError(e.to_string()))?.into(),
+                SessionTargetSpec::Plain(plain) => IpOrHost::from_str(&plain)
+                    .map_err(|e| HoprLibError::GeneralError(e.to_string()))?
+                    .into(),
                 SessionTargetSpec::Sealed(enc) => SealedHost::Sealed(enc.into_boxed_slice()),
             },
             capabilities: self.capabilities.unwrap_or_else(|| match target_protocol {
