@@ -9,6 +9,7 @@ on:
     types: [checks_requested]
   pull_request:
     types:
+      - opened
       - synchronize
       - ready_for_review
 
@@ -28,6 +29,7 @@ jobs:
     with:
       branch: ${{ github.event.pull_request.head.ref }}
       package: ${{ matrix.package }}
+      production: false
     secrets: inherit
 
   build-dappnode:
@@ -41,6 +43,7 @@ jobs:
     with:
       branch: ${{ github.event.pull_request.head.ref }}
       repository: ${{ matrix.repository }}
+      labels: ${{ format('{0},', join(github.event.pull_request.labels.*.name, ',')) }}
     secrets: inherit
 
   build-binaries:
@@ -80,8 +83,21 @@ jobs:
       interpreter: ${{ matrix.target.interpreter }}
     secrets: inherit
 
+  label:
+    name: Add PR labels
+    runs-on: self-hosted-hoprnet-small
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/labeler@v5
+        with:
+          repo-token: "${{ secrets.GITHUB_TOKEN }}"
+          sync-labels: true
+
   docs:
     name: Docs
-    if: github.event.pull_request.draft == false
     uses: ./.github/workflows/build-docs.yaml
     secrets: inherit
+    with:
+      publish: false
