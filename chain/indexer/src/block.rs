@@ -1,7 +1,7 @@
 use futures::{stream, StreamExt};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
-use tracing::{debug, error, info, trace};
+use tracing::{debug, error, info, trace, warn};
 
 use chain_rpc::{BlockWithLogs, HoprIndexerRpcOperations, LogFilter};
 use chain_types::chain_events::SignificantChainEvent;
@@ -143,7 +143,7 @@ where
 
         match (fast_sync_configured, index_empty) {
             (true, false) => {
-                info!("Fast sync is enabled, but the index database is not empty. In order to use fast-sync again you must stop this node and remove the index database manually.");
+                warn!("Fast sync is enabled, but the index database is not empty. In order to use fast-sync again you must stop this node and remove the index database manually.");
             }
             (false, _) => {
                 info!("Fast sync is disabled");
@@ -151,7 +151,7 @@ where
             (true, true) => {
                 info!("Fast sync is enabled, starting the fast sync process");
                 // To ensure a proper state, we reset any auxiliary data in the database
-                self.db.clear_index_db().await?;
+                self.db.clear_index_db(None).await?;
                 self.db.set_logs_unprocessed(None, None).await?;
 
                 // Now fast-sync can start

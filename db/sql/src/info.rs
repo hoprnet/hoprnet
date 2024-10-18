@@ -55,7 +55,7 @@ pub trait HoprDbInfoOperations {
     /// # Returns
     ///
     /// A `Result` indicating the success or failure of the operation.
-    async fn clear_index_db<'a>(&'a self) -> Result<()>;
+    async fn clear_index_db<'a>(&'a self, tx: OptTx<'a>) -> Result<()>;
 
     /// Gets node's Safe balance of HOPR tokens.
     async fn get_safe_hopr_balance<'a>(&'a self, tx: OptTx<'a>) -> Result<Balance>;
@@ -139,16 +139,23 @@ impl HoprDbInfoOperations for HoprDb {
         Ok(true)
     }
 
-    async fn clear_index_db<'a>(&'a self) -> Result<()> {
-        Account::delete_many().exec(self.conn(TargetDb::Index)).await?;
-        Announcement::delete_many().exec(self.conn(TargetDb::Index)).await?;
-        Channel::delete_many().exec(self.conn(TargetDb::Index)).await?;
-        NetworkEligibility::delete_many()
-            .exec(self.conn(TargetDb::Index))
+    async fn clear_index_db<'a>(&'a self, tx: OptTx<'a>) -> Result<()> {
+        self.nest_transaction(tx)
+            .await?
+            .perform(|tx| {
+                Box::pin(async move {
+                    Account::delete_many().exec(tx.as_ref()).await?;
+                    Announcement::delete_many().exec(tx.as_ref()).await?;
+                    Channel::delete_many().exec(tx.as_ref()).await?;
+                    NetworkEligibility::delete_many().exec(tx.as_ref()).await?;
+                    NetworkRegistry::delete_many().exec(tx.as_ref()).await?;
+                    ChainInfo::delete_many().exec(tx.as_ref()).await?;
+                    NodeInfo::delete_many().exec(tx.as_ref()).await?;
+
+                    Ok::<(), DbSqlError>(())
+                })
+            })
             .await?;
-        NetworkRegistry::delete_many().exec(self.conn(TargetDb::Index)).await?;
-        ChainInfo::delete_many().exec(self.conn(TargetDb::Index)).await?;
-        NodeInfo::delete_many().exec(self.conn(TargetDb::Index)).await?;
 
         Ok(())
     }

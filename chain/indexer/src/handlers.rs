@@ -744,7 +744,7 @@ where
     #[tracing::instrument(level = "debug", skip(self))]
     async fn process_log_event(&self, tx: &OpenTransaction, slog: SerializableLog) -> Result<Option<ChainEventType>> {
         trace!("processing events in {slog}");
-        let log = Log::from(slog);
+        let log = Log::try_from(slog)?;
 
         if log.address.eq(&self.addresses.announcements) {
             let bn = log.block_number as u32;

@@ -23,13 +23,13 @@ impl IndexerConfig {
         }
     }
 
-    pub fn disable_fast_sync(&mut self) -> Self {
+    pub fn disable_fast_sync(mut self) -> Self {
         self.fast_sync = false;
-        *self
+        self
     }
 
-    pub fn enable_fast_sync(&mut self) -> Self {
+    pub fn enable_fast_sync(mut self) -> Self {
         self.fast_sync = true;
-        *self
+        self
     }
 }

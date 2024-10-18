@@ -7,6 +7,12 @@
 //!
 //! Both of these traits implemented and realized via the [RpcOperations](rpc::RpcOperations) type,
 //! so this represents the main entry point to all RPC related operations.
+use async_trait::async_trait;
+pub use ethers::types::transaction::eip2718::TypedTransaction;
+use futures::{FutureExt, Stream};
+use http_types::convert::Deserialize;
+use primitive_types::H256;
+use serde::Serialize;
 use std::cmp::Ordering;
 use std::collections::BTreeSet;
 use std::fmt::{Display, Formatter};
@@ -15,20 +21,12 @@ use std::marker::PhantomData;
 use std::pin::Pin;
 use std::time::Duration;
 
-use async_trait::async_trait;
-use futures::{FutureExt, Stream};
-use primitive_types::H256;
-use serde::Serialize;
-
 use hopr_crypto_types::types::Hash;
 use hopr_primitive_types::prelude::*;
 
-use crate::errors::RpcError::{ProviderError, TransactionDropped};
-use crate::errors::{HttpRequestError, Result};
+use crate::errors::RpcError::{ConversionError, ProviderError, TransactionDropped};
+use crate::errors::{HttpRequestError, Result, RpcError};
 use crate::RetryAction::NoRetry;
-
-pub use ethers::types::transaction::eip2718::TypedTransaction;
-use http_types::convert::Deserialize;
 
 pub mod client;
 pub mod errors;
@@ -86,23 +84,36 @@ impl From<Log> for ethers::abi::RawLog {
     }
 }
 
-impl From<SerializableLog> for Log {
-    fn from(value: SerializableLog) -> Self {
-        Log {
-            address: Address::from_hex(value.address.as_str()).expect("invalid address"),
-            topics: value
-                .topics
-                .into_iter()
-                .map(|t| Hash::from_hex(t.as_str()).expect("invalid topic"))
-                .collect(),
+impl TryFrom<SerializableLog> for Log {
+    type Error = RpcError;
+
+    fn try_from(value: SerializableLog) -> std::result::Result<Self, Self::Error> {
+        let address =
+            Address::from_hex(value.address.as_str()).map_err(|_| ConversionError("Invalid address".into()))?;
+        let block_hash =
+            Hash::from_hex(value.block_hash.as_str()).map_err(|_| ConversionError("Invalid block_hash".into()))?;
+        let tx_hash = Hash::from_hex(value.tx_hash.as_str()).map_err(|_| ConversionError("Invalid tx_hash".into()))?;
+
+        let mut topics = Vec::with_capacity(value.topics.len());
+        let mut topics_iter = value.topics.into_iter();
+        while let Some(topic) = topics_iter.next() {
+            let topic = Hash::from_hex(topic.as_str()).map_err(|_| ConversionError("Invalid topic".into()))?;
+            topics.push(topic);
+        }
+
+        let log = Log {
+            address,
+            topics,
             data: Box::from(value.data.as_ref()),
             tx_index: value.tx_index,
             block_number: value.block_number,
-            block_hash: Hash::from_hex(value.block_hash.as_str()).expect("invalid block hash"),
+            block_hash,
             log_index: value.log_index.into(),
-            tx_hash: Hash::from_hex(value.tx_hash.as_str()).expect("invalid tx hash"),
+            tx_hash,
             removed: value.removed,
-        }
+        };
+
+        Ok(log)
     }
 }
 
