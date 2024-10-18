@@ -29,7 +29,6 @@ use async_lock::RwLock;
 use async_trait::async_trait;
 use chain_actions::channels::ChannelActions;
 use futures::StreamExt;
-use hopr_crypto_random::OsRng;
 use hopr_db_sql::api::peers::PeerSelector;
 use hopr_db_sql::errors::DbSqlError;
 use hopr_db_sql::HoprDbAllOperations;
@@ -343,7 +342,7 @@ where
             // Sort the new channel candidates by the best quality first, then truncate to the number of available slots
             // This way, we'll prefer candidates with higher quality, when we don't have enough node balance.
             // Shuffle first, so the equal candidates are randomized and then use unstable sorting for that purpose.
-            new_channel_candidates.shuffle(&mut OsRng);
+            new_channel_candidates.shuffle(&mut hopr_crypto_random::rng());
             new_channel_candidates
                 .sort_unstable_by(|(_, q1), (_, q2)| q1.partial_cmp(q2).expect("should be comparable").reverse());
             new_channel_candidates.truncate(max_auto_channels - occupied);

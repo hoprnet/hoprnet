@@ -54,7 +54,7 @@ mod tests {
     const TINY_CONSTANT_DELAY: Duration = Duration::from_millis(10);
 
     fn random_packets(count: usize) -> Vec<Packet> {
-        let mut rng = hopr_crypto_random::OsRng;
+        let mut rng = hopr_crypto_random::rng();
         let mut packets: Vec<Packet> = Vec::new();
 
         for _ in 0..count {

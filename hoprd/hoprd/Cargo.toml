@@ -99,6 +99,7 @@ hopr-platform = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-network-types = { workspace = true }
 hopr-async-runtime = { workspace = true }
+hopr-crypto-random = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

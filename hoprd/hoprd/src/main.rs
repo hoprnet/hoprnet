@@ -149,6 +149,10 @@ impl std::fmt::Debug for HoprdProcesses {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     init_logger()?;
 
+    if hopr_crypto_random::is_rng_fixed() {
+        warn!("!! FOR TESTING ONLY !! THIS BUILD IS USING AN INSECURE FIXED RNG !!")
+    }
+
     let args = <CliArgs as clap::Parser>::parse();
     let cfg = hoprd::config::HoprdConfig::from_cli_args(args, false)?;
 
