@@ -729,6 +729,7 @@ pub mod tests {
         );
     }
 
+    #[async_std::test]
     async fn withdraw_token() {
         let anvil = chain_types::utils::create_anvil(None);
         let chain_key_alice = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
@@ -761,7 +762,7 @@ pub mod tests {
         let tx = generator
             .transfer(
                 (&chain_key_bob).into(),
-                Balance::new(ethers::types::U256::from(0_u128), BalanceType::HOPR),
+                Balance::new(ethers::types::U256::from(100_u128), BalanceType::HOPR),
             )
             .expect("should generate tx");
 
