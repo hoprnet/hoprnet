@@ -681,6 +681,14 @@ impl Hopr {
         self.chain_cfg.clone()
     }
 
+    pub fn get_provider(&self) -> String {
+        self.cfg
+            .chain
+            .provider
+            .clone()
+            .unwrap_or(self.chain_cfg.chain.default_provider.clone())
+    }
+
     #[inline]
     fn is_public(&self) -> bool {
         self.cfg.chain.announce
