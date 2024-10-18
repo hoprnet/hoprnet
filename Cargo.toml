@@ -52,7 +52,6 @@ aes = "0.8"
 anyhow = "1.0.93"
 aquamarine = "0.6.0"
 arrayvec = { version = "0.7.6", features = ["serde"] }
-async-broadcast = "0.7.1"
 async-channel = "2.3.1"
 async-lock = "3.4.0"
 async-signal = "0.2.8"
