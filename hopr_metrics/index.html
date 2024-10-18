@@ -1,0 +1,66 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="HOPR Metrics Collection"><title>hopr_metrics - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../static.files/rustdoc-42fa08075bb476ff.css"><meta name="rustdoc-vars" data-root-path="../" data-static-root-path="../static.files/" data-current-crate="hopr_metrics" data-themes="" data-resource-suffix="" data-rustdoc-version="1.83.0-nightly (363ae4188 2024-09-24)" data-channel="nightly" data-search-js="search-e056c65ede92db13.js" data-settings-js="settings-805db61a62df4bd2.js" ><script src="../static.files/storage-1d39b6787ed640ff.js"></script><script defer src="../crates.js"></script><script defer src="../static.files/main-54bc299d2a5e4e43.js"></script><noscript><link rel="stylesheet" href="../static.files/noscript-0111fcff984fae8f.css"></noscript><link rel="alternate icon" type="image/png" href="../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc mod crate"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle" title="show sidebar"></button></nav><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../hopr_metrics/index.html">hopr_<wbr>metrics</a><span class="version">1.2.0</span></h2></div><div class="sidebar-elems"><ul class="block"><li><a id="all-types" href="all.html">All Items</a></li></ul><section id="rustdoc-toc"><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#hopr-metrics-collection" title="HOPR Metrics Collection">HOPR Metrics Collection</a><ul><li><a href="#usage-in-rust-code" title="Usage in Rust code">Usage in Rust code</a></li></ul></li></ul><h3><a href="#modules">Crate Items</a></h3><ul class="block"><li><a href="#modules" title="Modules">Modules</a></li><li><a href="#macros" title="Macros">Macros</a></li></ul></section><div id="rustdoc-modnav"></div></div></nav><div class="sidebar-resizer"></div><main><div class="width-limiter"><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><h1>Crate <span>hopr_metrics</span><button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../src/hopr_metrics/lib.rs.html#1-81">source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><h2 id="hopr-metrics-collection"><a class="doc-anchor" href="#hopr-metrics-collection">§</a>HOPR Metrics Collection</h2>
+<p>The purpose of the <code>hopr_metrics</code> Rust crate is to create a thin wrapper
+over the <a href="https://docs.rs/prometheus/latest/prometheus/">Prometheus Metrics Rust API</a> or
+a similar metrics library, should it change in the future.</p>
+<p>This wrapper merely simplifies the 3 basic Metric Types:</p>
+<ul>
+<li>Counter (integer only)</li>
+<li>Gauge (floating point only)</li>
+<li>Histogram (floating point only)</li>
+</ul>
+<p>The above 3 types are wrapped using the following structs:</p>
+<ul>
+<li><a href="metrics/struct.SimpleCounter.html" title="struct hopr_metrics::metrics::SimpleCounter">SimpleCounter</a></li>
+<li><a href="metrics/struct.MultiCounter.html" title="struct hopr_metrics::metrics::MultiCounter">MultiCounter</a></li>
+<li><a href="metrics/struct.SimpleGauge.html" title="struct hopr_metrics::metrics::SimpleGauge">SimpleGauge</a></li>
+<li><a href="metrics/struct.MultiGauge.html" title="struct hopr_metrics::metrics::MultiGauge">MultiGauge</a></li>
+<li><a href="metrics/struct.SimpleHistogram.html" title="struct hopr_metrics::metrics::SimpleHistogram">SimpleHistogram</a></li>
+<li><a href="metrics/struct.MultiHistogram.html" title="struct hopr_metrics::metrics::MultiHistogram">MultiHistogram</a></li>
+</ul>
+<p>The “simple” types represent a singular named metrics, whereas the “multi” metrics represent a
+vector extension.</p>
+<p>The vector extensions basically maintain multiple labelled metrics in a single
+entity. This makes it possible to have categorized metric values within a single metric, e.g.
+counter of successful HTTP requests categorized by HTTP method.</p>
+<p>The metrics are registered within global metrics registry (singleton).
+Currently, the crate does not support additional individual registries apart from the global one.</p>
+<h4 id="usage-in-rust-code"><a class="doc-anchor" href="#usage-in-rust-code">§</a>Usage in Rust code</h4>
+<p>When writing pure Rust code that uses this crate, one can use the above structs by directly instantiating them.
+During their construction, the metric registers itself in the global metrics registry.</p>
+<h5 id="example-use-in-rust"><a class="doc-anchor" href="#example-use-in-rust">§</a>Example use in Rust</h5>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>hopr_metrics::metrics::<span class="kw-2">*</span>;
+
+<span class="kw">let </span>metric_counter = SimpleCounter::new(<span class="string">"test_counter"</span>, <span class="string">"Some testing counter"</span>).unwrap();
+
+<span class="comment">// Counter can be only incremented by integers only
+</span>metric_counter.increment_by(<span class="number">10</span>);
+
+<span class="kw">let </span>metric_gauge = SimpleGauge::new(<span class="string">"test_gauge"</span>, <span class="string">"Some testing gauge"</span>).unwrap();
+
+<span class="comment">// Gauges can be incremented and decrements and support floats
+</span>metric_gauge.increment(<span class="number">5.0</span>);
+metric_gauge.decrement(<span class="number">3.2</span>);
+
+<span class="kw">let </span>metric_histogram = SimpleHistogram::new(<span class="string">"test_histogram"</span>, <span class="string">"Some testing histogram"</span>, <span class="macro">vec!</span>[<span class="number">1.0</span>, <span class="number">2.0</span>]).unwrap();
+
+<span class="comment">// Histograms can observe floating point values
+</span>metric_histogram.observe(<span class="number">10.1</span>);
+
+<span class="comment">// ... and also can be used to measure time durations in seconds
+</span><span class="kw">let </span>timer = metric_histogram.start_measure();
+std::thread::sleep(std::time::Duration::from_secs(<span class="number">1</span>));
+metric_histogram.record_measure(timer);
+
+<span class="comment">// Multi-metrics are labeled extensions
+</span><span class="kw">let </span>metric_counts_per_version = MultiCounter::new(<span class="string">"test_multi_counter"</span>, <span class="string">"Testing labeled counter"</span>, <span class="kw-2">&amp;</span>[<span class="string">"version"</span>]).unwrap();
+
+<span class="comment">// Tracks counters per different versions
+</span>metric_counts_per_version.increment_by(<span class="kw-2">&amp;</span>[<span class="string">"1.0.0"</span>], <span class="number">2</span>);
+metric_counts_per_version.increment_by(<span class="kw-2">&amp;</span>[<span class="string">"1.0.1"</span>], <span class="number">1</span>);
+
+<span class="comment">// All metrics live in a global state and can be serialized at any time
+</span><span class="kw">let </span>gathered_metrics = gather_all_metrics();
+
+<span class="comment">// Metrics are in text format and can be exposed using an HTTP API endpoint
+</span><span class="macro">println!</span>(<span class="string">"{:?}"</span>, gathered_metrics);</code></pre></div>
+</div></details><h2 id="reexports" class="section-header">Re-exports<a href="#reexports" class="anchor">§</a></h2><ul class="item-table"><li><div class="item-name"><code>pub use crate::<a class="mod" href="metrics/index.html" title="mod hopr_metrics::metrics">metrics</a>::*;</code></div></li></ul><h2 id="modules" class="section-header">Modules<a href="#modules" class="anchor">§</a></h2><ul class="item-table"><li><div class="item-name"><a class="mod" href="metrics/index.html" title="mod hopr_metrics::metrics">metrics</a></div><div class="desc docblock-short">Contains definitions of metric types.</div></li></ul><h2 id="macros" class="section-header">Macros<a href="#macros" class="anchor">§</a></h2><ul class="item-table"><li><div class="item-name"><a class="macro" href="macro.histogram_start_measure.html" title="macro hopr_metrics::histogram_start_measure">histogram_<wbr>start_<wbr>measure</a></div></li></ul></section></div></main></body></html>
