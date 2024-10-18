@@ -408,6 +408,12 @@ mod tests {
         let approval_filter = format!("{:#x}", ApprovalFilter::signature());
         let transfer_filter = format!("{:#x}", TransferFilter::signature());
 
+        debug!("{:#?}", last_block_logs);
+        debug!("channel_open_filter: {:#?}", channel_open_filter);
+        debug!("channel_balance_filter: {:#?}", channel_balance_filter);
+        debug!("approval_filter: {:#?}", approval_filter);
+        debug!("transfer_filter: {:#?}", transfer_filter);
+
         assert!(
             last_block_logs
                 .iter()

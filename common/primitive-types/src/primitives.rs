@@ -1,3 +1,4 @@
+use chrono::serde::ts_seconds_option;
 use chrono::{DateTime, Utc};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -433,6 +434,7 @@ pub struct SerializableLog {
     /// Processed flag
     pub processed: Option<bool>,
     /// Processed time
+    #[serde(with = "ts_seconds_option")]
     pub processed_at: Option<DateTime<Utc>>,
     /// Log hashes checksum
     pub checksum: Option<String>,

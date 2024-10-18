@@ -20,7 +20,7 @@ regex = { workspace = true }
 strum = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
-chrono = { workspace = true }
+chrono = { workspace = true, features = ["serde"] }
 
 hopr-crypto-random = { workspace = true }
 

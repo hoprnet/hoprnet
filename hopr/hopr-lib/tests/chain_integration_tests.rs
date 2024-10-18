@@ -352,7 +352,10 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
         max_action_confirmation_wait: Duration::from_secs(60), // lower action confirmation limit
     };
 
-    let indexer_cfg = IndexerConfig { start_block_number: 1 };
+    let indexer_cfg = IndexerConfig {
+        start_block_number: 1,
+        fast_sync: false,
+    };
 
     // Setup ALICE
     info!("Starting up ALICE");
@@ -874,8 +877,16 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
 
     info!("--> successfully initiated channel closure for Alice -> Bob");
 
-    let alice_checksum = alice_node.db.get_last_indexed_block(None).await?;
-    let bob_checksum = bob_node.db.get_last_indexed_block(None).await?;
+    let alice_checksum = alice_node
+        .db
+        .get_last_checksummed_log()
+        .await?
+        .expect("alice must have a checksum");
+    let bob_checksum = bob_node
+        .db
+        .get_last_checksummed_log()
+        .await?
+        .expect("bob must have a checksum");
     info!("alice completed at {:?}", alice_checksum);
     info!("bob completed at {:?}", bob_checksum);
 

@@ -339,7 +339,7 @@ where
         Db: HoprDbLogOperations + 'static,
     {
         let block_id = block.block_id;
-        debug!("Processing events from block {block_id}");
+        debug!("Processing events from block #{block_id}");
 
         match db_processor.collect_block_events(block.clone()).await {
             Ok(events) => {
@@ -527,7 +527,7 @@ mod tests {
         log_index: U256,
     ) -> anyhow::Result<Vec<SerializableLog>> {
         let mut logs: Vec<SerializableLog> = vec![];
-        let block_hash = Hash::create(&[b"my block hash {block_number}"]).to_hex();
+        let block_hash = Hash::create(&[format!("my block hash {block_number}").as_bytes()]).to_hex();
 
         for i in 0..size {
             let test_multiaddr: Multiaddr = format!("/ip4/1.2.3.4/tcp/{}", 1000 + i).parse()?;
@@ -540,7 +540,7 @@ mod tests {
                     Token::String(test_multiaddr.to_string()),
                 ])
                 .into(),
-                tx_hash: Hash::create(&[b"my tx hash {i}"]).to_hex(),
+                tx_hash: Hash::create(&[format!("my tx hash {i}").as_bytes()]).to_hex(),
                 tx_index: 0,
                 block_number,
                 log_index: log_index.as_u64(),
@@ -674,7 +674,6 @@ mod tests {
 
         let head_block = 1000;
         rpc.expect_block_number().returning(move || Ok(head_block));
-        rpc.expect_block_number().returning(move || Ok(head_block));
 
         let finalized_block = BlockWithLogs {
             block_id: head_block - 1,
@@ -703,7 +702,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[test_log::test(async_std::test)]
     async fn test_indexer_should_yield_back_once_the_past_events_are_indexed() -> anyhow::Result<()> {
         let mut handlers = MockChainLogHandler::new();
         let mut rpc = MockHoprIndexerOps::new();
@@ -721,12 +720,6 @@ mod tests {
             .withf(move |x: &u64, _y: &chain_rpc::LogFilter| *x == 0)
             .return_once(move |_, _| Ok(Box::pin(rx)));
 
-        handlers.expect_clone().returning(|| {
-            let mut handlers2 = MockChainLogHandler::new();
-            handlers2.expect_contract_addresses().return_const(vec![]);
-            handlers2
-        });
-
         let head_block = 1000;
         let block_numbers = vec![head_block - 1, head_block, head_block + 1];
 
@@ -742,36 +735,42 @@ mod tests {
             rpc.expect_block_number().returning(move || Ok(head_block));
         }
 
-        // Generate the expected events to be able to process the blocks
-        handlers
-            .expect_collect_block_events()
-            .times(blocks.len())
-            .withf(move |b| block_numbers.contains(&b.block_id))
-            .returning(|_| {
-                Ok(vec![SignificantChainEvent {
-                    tx_hash: Default::default(),
-                    event_type: RANDOM_ANNOUNCEMENT_CHAIN_EVENT.clone(),
-                }])
-            });
-
         for block in blocks.iter() {
             assert!(tx.start_send(block.clone()).is_ok());
         }
+
+        handlers.expect_clone().times(blocks.len()).returning(move || {
+            let block_numbers = block_numbers.clone();
+            let mut handlers2 = MockChainLogHandler::new();
+
+            // Generate the expected events to be able to process the blocks
+            handlers2.expect_contract_addresses().return_const(vec![]);
+            handlers2
+                .expect_collect_block_events()
+                .times(1)
+                .withf(move |b| block_numbers.contains(&b.block_id))
+                .returning(|b| {
+                    let block_id = b.block_id;
+                    Ok(vec![SignificantChainEvent {
+                        tx_hash: Hash::create(&[format!("my tx hash {block_id}").as_bytes()]),
+                        event_type: RANDOM_ANNOUNCEMENT_CHAIN_EVENT.clone(),
+                    }])
+                });
+
+            handlers2
+        });
 
         let (tx_events, rx_events) = async_channel::unbounded();
         let mut indexer = Indexer::new(rpc, handlers, db.clone(), cfg, tx_events).disable_panic_on_completion();
         indexer.start().await?;
 
-        // tx.close_channel();
+        // At this point we expect 2 events to arrive. The third event, which was generated first,
+        // should be dropped because it was generated before the indexer was in sync with head.
+        let _first = rx_events.recv();
+        let _second = rx_events.recv();
+        let third = rx_events.try_recv();
 
-        let received = async_std::future::timeout(
-            std::time::Duration::from_millis(500),
-            rx_events.take(1).collect::<Vec<_>>(),
-        )
-        .await;
-
-        assert!(received.is_ok());
-        assert_eq!(received?.len(), 1);
+        assert!(third.is_err());
 
         Ok(())
     }
