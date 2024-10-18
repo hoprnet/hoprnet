@@ -20,6 +20,7 @@ craneLib.devShell {
   packages = with pkgs; [
     openssl
     pkg-config
+    patchelf
     foundry-bin
     solcDefault
 

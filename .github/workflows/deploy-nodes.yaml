@@ -1,0 +1,67 @@
+---
+#################################################################################
+# Child pipeline to deploy hoprd nodes in K8s cluster
+#################################################################################
+name: Deploy Nodes
+
+on:
+  repository_dispatch:
+    types: [deploy_nodes]
+  workflow_dispatch:
+    inputs:
+      hoprd_cluster_name:
+        description: 'Name of the hoprd cluster to deploy'
+        required: true
+        type: choice
+        options:
+          - 'core-node'
+
+concurrency:
+  group: deploy-nodes
+  cancel-in-progress: true
+jobs:
+
+  deploy:
+    runs-on: self-hosted-hoprnet-small
+    steps:
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@v4
+
+      - name: Setup GCP
+        id: gcp
+        uses: hoprnet/hopr-workflows/actions/setup-gcp@master
+        with:
+          google-credentials: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+          login-artifact-registry: 'true'
+          install-sdk: 'true'
+          login-gke: 'true'
+          project: hopr-staging
+
+      - name: Set environment variables
+        id: vars
+        run: |
+          if [ -z "${{ inputs.hoprd_cluster_name }}" ]; then
+            echo "The workflow is triggered from other pipeline"
+            {
+              echo "HOPRD_CLUSTER_NAME=${{ github.event.client_payload.hoprd_cluster_name }}"
+            } >> $GITHUB_OUTPUT
+          else
+            echo "The workflow is triggered manually"
+            {
+              echo "HOPRD_CLUSTER_NAME=${{ inputs.hoprd_cluster_name }}"
+            } >> $GITHUB_OUTPUT
+          fi
+
+      - name: "Restart deployment for cluster ${{ steps.vars.outputs.HOPRD_CLUSTER_NAME }}"
+        run: |
+          echo "Starting deployment restart for cluster ${{ steps.vars.outputs.HOPRD_CLUSTER_NAME }}"
+          if ! kubectl rollout restart deployments -n core-team -l hoprds.hoprnet.org/cluster=${{ steps.vars.outputs.HOPRD_CLUSTER_NAME }}; then
+            echo "Failed to restart deployment"
+            exit 1
+          fi
+          if ! kubectl rollout status deployments -n core-team -l hoprds.hoprnet.org/cluster=${{ steps.vars.outputs.HOPRD_CLUSTER_NAME }} --timeout=600s; then
+            echo "Deployment did not complete within the timeout period"
+            exit 1
+          fi
+          echo "Deployment completed successfully"
+        timeout-minutes: 11
