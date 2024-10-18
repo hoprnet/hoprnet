@@ -95,8 +95,7 @@ impl TryFrom<SerializableLog> for Log {
         let tx_hash = Hash::from_hex(value.tx_hash.as_str()).map_err(|_| ConversionError("Invalid tx_hash".into()))?;
 
         let mut topics = Vec::with_capacity(value.topics.len());
-        let mut topics_iter = value.topics.into_iter();
-        while let Some(topic) = topics_iter.next() {
+        for topic in value.topics.into_iter() {
             let topic = Hash::from_hex(topic.as_str()).map_err(|_| ConversionError("Invalid topic".into()))?;
             topics.push(topic);
         }

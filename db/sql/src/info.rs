@@ -48,7 +48,7 @@ pub trait HoprDbInfoOperations {
     /// # Returns
     ///
     /// A `Result` containing a boolean indicating whether the index is empty.
-    async fn index_is_empty<'a>(&'a self) -> Result<bool>;
+    async fn index_is_empty(&self) -> Result<bool>;
 
     /// Removes all data from all tables in the index database.
     ///
@@ -113,7 +113,7 @@ pub trait HoprDbInfoOperations {
 
 #[async_trait]
 impl HoprDbInfoOperations for HoprDb {
-    async fn index_is_empty<'a>(&'a self) -> Result<bool> {
+    async fn index_is_empty(&self) -> Result<bool> {
         let c = self.conn(TargetDb::Index);
 
         if Account::find().one(c).await?.is_some() {
