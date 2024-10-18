@@ -168,7 +168,7 @@ impl PayloadGenerator<TypedTransaction> for BasicPayloadGenerator {
         let mut tx = transfer_tx(destination, amount);
         tx.set_to(H160::from(match amount.balance_type() {
             BalanceType::Native => destination,
-            BalanceType::HOPR => self.contract_addrs.channels,
+            BalanceType::HOPR => self.contract_addrs.token,
         }));
         Ok(tx)
     }
@@ -342,7 +342,7 @@ impl PayloadGenerator<TypedTransaction> for SafePayloadGenerator {
         tx.set_to(NameOrAddress::Address(
             match amount.balance_type() {
                 BalanceType::Native => destination,
-                BalanceType::HOPR => self.contract_addrs.channels,
+                BalanceType::HOPR => self.contract_addrs.token,
             }
             .into(),
         ));
