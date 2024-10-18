@@ -4440,7 +4440,6 @@ name = "hoprd"
 version = "2.2.0"
 dependencies = [
  "anyhow",
- "async-broadcast",
  "async-lock 3.4.0",
  "async-signal",
  "async-std",
