@@ -1240,7 +1240,7 @@ dependencies = [
 
 [[package]]
 name = "chain-indexer"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "async-channel 2.3.1",
@@ -1255,6 +1255,7 @@ dependencies = [
  "hopr-async-runtime",
  "hopr-crypto-random",
  "hopr-crypto-types",
+ "hopr-db-api",
  "hopr-db-entity",
  "hopr-db-sql",
  "hopr-internal-types",
@@ -1273,7 +1274,7 @@ dependencies = [
 
 [[package]]
 name = "chain-rpc"
-version = "0.2.4"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "async-std",
@@ -3987,7 +3988,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-api"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "async-trait",
  "futures",
@@ -4005,7 +4006,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-entity"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "async-std",
@@ -4025,7 +4026,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-migration"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "async-std",
  "hopr-internal-types",
@@ -4035,7 +4036,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-sql"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "async-lock 3.4.0",
@@ -4127,6 +4128,7 @@ dependencies = [
  "hopr-async-runtime",
  "hopr-crypto-random",
  "hopr-crypto-types",
+ "hopr-db-api",
  "hopr-db-sql",
  "hopr-internal-types",
  "hopr-metrics",
@@ -4221,9 +4223,10 @@ dependencies = [
 
 [[package]]
 name = "hopr-primitive-types"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "anyhow",
+ "chrono",
  "float-cmp",
  "hex",
  "hex-literal",
@@ -4414,7 +4417,7 @@ dependencies = [
 
 [[package]]
 name = "hoprd"
-version = "2.2.0"
+version = "2.2.0-rc.1"
 dependencies = [
  "anyhow",
  "async-broadcast",
@@ -4460,7 +4463,7 @@ dependencies = [
 
 [[package]]
 name = "hoprd-api"
-version = "3.4.0"
+version = "3.4.1"
 dependencies = [
  "anyhow",
  "async-broadcast",

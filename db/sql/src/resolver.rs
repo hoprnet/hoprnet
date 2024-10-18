@@ -83,7 +83,7 @@ mod tests {
         };
 
         hopr_db_entity::account::Entity::insert_many([account_1, account_2])
-            .exec(&db.db)
+            .exec(&db.index_db)
             .await?;
 
         let actual_ck = db.resolve_chain_key(&packet_1).await?;
@@ -135,7 +135,7 @@ mod tests {
         };
 
         hopr_db_entity::account::Entity::insert_many([account_1, account_2])
-            .exec(&db.db)
+            .exec(&db.index_db)
             .await?;
 
         let actual_pk = db.resolve_packet_key(&chain_2).await?;

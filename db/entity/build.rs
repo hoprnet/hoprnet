@@ -43,6 +43,7 @@ where
                         let mut migrations = migration::MigratorIndex::migrations();
                         migrations.extend(migration::MigratorPeers::migrations());
                         migrations.extend(migration::MigratorTickets::migrations());
+                        migrations.extend(migration::MigratorChainLogs::migrations());
 
                         migrations
                     }

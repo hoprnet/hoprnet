@@ -1,0 +1,36 @@
+sequenceDiagram
+    participant node_a as Node A
+    participant node_b as Node B
+    participant node_c as Node C
+    participant node_d as Node D
+
+    par fetch batch checksums from multiple nodes (number configured)
+        node_a->>node_b: req_logs_batch_checksum[min_block,max_block]
+        node_b->>node_a: resp_logs_batch_checksum[checksum_b] OK
+    and
+        node_a->>node_c: req_logs_batch_checksum[min_block,max_block]
+        node_c->>node_a: resp_logs_batch_checksum[checksum_c] OK
+    end
+    opt checksum_b =/= checksum_c
+        node_a->>node_d: req_logs_batch_checksum[min_block,max_block]
+        node_d->>node_a: resp_logs_batch_checksum[checksum_d]
+    end
+
+    note over node_a,node_d: 2 (configured) checksums match: checksum_b == checksum_d
+
+    node_a->>node_b: req_logs_batch_fetch[min_block,max_block]
+    node_b->>node_a: resp_logs_batch_fetch[] FAIL
+
+    note over node_a,node_d: fetch failed because Node B has reached configured threshold of handled requests
+
+    node_a->>node_d: req_logs_batch_fetch[min_block,max_block]
+    node_d->>node_a: resp_logs_batch_fetch[logs] OK
+    node_a->>node_a: verify_logs_batch_checksum
+
+    alt checksum is correct
+        node_a->>node_a: process_logs
+    else checksum is incorrect
+        node_a->>node_a: ignore batch
+    end
+
+    note over node_a,node_d: failed checksum check restarts the entire flow but ignores Node D

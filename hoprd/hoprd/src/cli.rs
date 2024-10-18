@@ -153,6 +153,22 @@ pub struct CliArgs {
     pub check_unrealized_balance: u8,
 
     #[arg(
+        long = "keepLogs",
+        env = "HOPRD_KEEP_LOGS",
+        help = "Enables keeping RPC logs in the logs database after they were processed.",
+        action = ArgAction::Count
+    )]
+    pub keep_logs: u8,
+
+    #[arg(
+        long = "fastSync",
+        env = "HOPRD_FAST_SYNC",
+        help = "Enables using fast sync at node start when possible.",
+        action = ArgAction::Count
+    )]
+    pub fast_sync: u8,
+
+    #[arg(
         long = "maxBlockRange",
         help = "Maximum number of blocks that can be fetched in a batch request from the RPC provider.",
         env = "HOPRD_MAX_BLOCK_RANGE",

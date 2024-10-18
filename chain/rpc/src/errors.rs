@@ -39,6 +39,9 @@ pub enum RpcError {
 
     #[error("multicall Error: {0}")]
     MulticallError(String),
+
+    #[error("conversion error: {0}")]
+    ConversionError(String),
 }
 
 pub type Result<T> = std::result::Result<T, RpcError>;
