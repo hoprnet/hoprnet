@@ -1,3 +1,5 @@
+use std::{sync::Arc, time::Duration};
+
 use axum::{
     extract::{
         ws::{Message, WebSocket, WebSocketUpgrade},
@@ -7,18 +9,20 @@ use axum::{
     response::IntoResponse,
     Error,
 };
-use futures::{sink::SinkExt, stream::StreamExt, TryFutureExt};
+use futures::TryFutureExt;
+use futures::{sink::SinkExt, stream::StreamExt};
 use futures_concurrency::stream::Merge;
 use serde::Deserialize;
 use serde_json::json;
 use serde_with::{serde_as, Bytes, DisplayFromStr, DurationMilliSeconds};
-use std::{sync::Arc, time::Duration};
-use tracing::{debug, error, trace};
+use tracing::error;
+use tracing::{debug, trace};
 use validator::Validate;
 
+use hopr_lib::ApplicationData;
 use hopr_lib::{
     errors::{HoprLibError, HoprStatusError},
-    ApplicationData, AsUnixTimestamp, RoutingOptions, RESERVED_TAG_UPPER_LIMIT,
+    AsUnixTimestamp, RoutingOptions, RESERVED_TAG_UPPER_LIMIT,
 };
 
 use crate::{types::PeerOrAddress, ApiErrorStatus, InternalState, BASE_PATH};
@@ -705,7 +709,7 @@ mod tests {
     use super::*;
 
     use libp2p_identity::PeerId;
-    use serde_json::from_value;
+    use serde_json::{from_value, json};
 
     #[test]
     fn send_message_accepts_bytes_in_body() -> anyhow::Result<()> {

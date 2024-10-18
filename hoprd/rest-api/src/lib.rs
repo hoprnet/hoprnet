@@ -45,7 +45,8 @@ use utoipa::{Modify, OpenApi};
 use utoipa_scalar::{Scalar, Servable};
 
 use crate::config::Auth;
-use hopr_lib::{errors::HoprLibError, ApplicationData, Hopr};
+use hopr_lib::ApplicationData;
+use hopr_lib::{errors::HoprLibError, Hopr};
 use hopr_network_types::prelude::IpProtocol;
 
 pub(crate) const BASE_PATH: &str = "/api/v3";
@@ -300,6 +301,7 @@ async fn build_api(
                 .route("/node/entryNodes", get(node::entry_nodes))
                 .route("/node/metrics", get(node::metrics))
                 .route("/peers/:destination/ping", post(peers::ping_peer))
+                .route("/session/websocket", get(session::websocket))
                 .route("/session/:protocol", post(session::create_client))
                 .route("/session/:protocol", get(session::list_clients))
                 .route("/session/:protocol", delete(session::close_client))
