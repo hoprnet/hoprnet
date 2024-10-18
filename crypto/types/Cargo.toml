@@ -8,6 +8,7 @@ edition = "2021"
 blake2 = { version = "0.10.6", features = ["reset"] }
 bincode = { workspace = true }
 chacha20 = { version = "0.9.1", features = ["zeroize"] }
+crypto_box = { version = "0.9.1", features = ["seal"] }
 curve25519-dalek = { version = "4.1.3", features = [
   "rand_core",
   "serde",

@@ -12,6 +12,7 @@ use axum::{
     http::status::StatusCode,
     response::IntoResponse,
 };
+use base64::Engine;
 use futures::{StreamExt, TryStreamExt};
 use hopr_lib::errors::HoprLibError;
 use hopr_lib::transfer_session;
@@ -56,7 +57,23 @@ impl std::fmt::Display for SessionTargetSpec {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             SessionTargetSpec::Plain(t) => write!(f, "{t}"),
-            SessionTargetSpec::Sealed(_) => write!(f, "<redacted>"),
+            SessionTargetSpec::Sealed(t) => write!(f, "%{}", base64::prelude::BASE64_URL_SAFE.encode(t)),
+        }
+    }
+}
+
+impl std::str::FromStr for SessionTargetSpec {
+    type Err = HoprLibError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.starts_with("$") {
+            Ok(Self::Sealed(
+                base64::prelude::BASE64_URL_SAFE
+                    .decode(&s[1..])
+                    .map_err(|e| HoprLibError::GeneralError(e.to_string()))?,
+            ))
+        } else {
+            Ok(Self::Plain(s.to_owned()))
         }
     }
 }
@@ -77,7 +94,7 @@ pub(crate) struct SessionClientRequest {
     #[serde_as(as = "DisplayFromStr")]
     pub destination: PeerOrAddress,
     pub path: RoutingOptions,
-    pub target: SessionTargetSpec,
+    pub target: SessionTargetSpec, // to be URL-encodable use: #[serde_as(as = "DisplayFromStr")]
     pub listen_host: Option<String>,
     #[serde_as(as = "Option<Vec<DisplayFromStr>>")]
     pub capabilities: Option<Vec<SessionCapability>>,
