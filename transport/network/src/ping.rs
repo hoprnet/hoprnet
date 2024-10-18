@@ -197,7 +197,7 @@ where
     /// # Arguments
     ///
     /// * `peers` - A vector of PeerId objects referencing the peers to be pinged
-    #[tracing::instrument(level = "info", skip(self, peers))]
+    #[tracing::instrument(level = "info", skip(self, peers), fields(peers.count = peers.len()))]
     fn ping(&self, mut peers: Vec<PeerId>) -> impl Stream<Item = crate::errors::Result<std::time::Duration>> {
         let start_all_peers = current_time();
 
