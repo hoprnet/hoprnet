@@ -746,9 +746,6 @@ pub mod tests {
 
         let generator = BasicPayloadGenerator::new((&chain_key_alice).into(), (&contract_instances).into());
 
-        // Mint 1000 HOPR to Alice
-        chain_types::utils::mint_tokens(contract_instances.token.clone(), 1000_u128.into()).await;
-
         // Check balance is 1000 HOPR
         let balance: ethers::types::U256 = contract_instances
             .token
