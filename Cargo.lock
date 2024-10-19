@@ -789,6 +789,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "axum-extra"
+version = "0.9.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "73c3220b188aea709cf1b6c5f9b01c3bd936bb08bd2b5184a12b35ac8131b1f9"
+dependencies = [
+ "axum",
+ "axum-core",
+ "bytes 1.5.0",
+ "futures-util",
+ "http 1.1.0",
+ "http-body 1.0.1",
+ "http-body-util",
+ "mime",
+ "pin-project-lite",
+ "serde",
+ "serde_html_form",
+ "tower 0.5.1",
+ "tower-layer",
+ "tower-service",
+ "tracing",
+]
+
+[[package]]
 name = "backtrace"
 version = "0.3.73"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1295,13 +1318,18 @@ dependencies = [
  "lazy_static",
  "mockall",
  "mockito",
+ "moka",
  "primitive-types",
  "reqwest 0.12.7",
  "serde",
  "serde_json",
+ "serde_with",
+ "serde_yaml",
  "smart-default",
  "surf",
  "surf-governor",
+ "tempfile",
+ "test-log",
  "thiserror",
  "tokio",
  "tracing",
@@ -3920,7 +3948,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-crypto-random"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "generic-array",
  "rand 0.8.5",
@@ -4118,7 +4146,9 @@ dependencies = [
  "ethers",
  "futures",
  "futures-concurrency",
+ "hex-literal",
  "hopr-async-runtime",
+ "hopr-crypto-random",
  "hopr-crypto-types",
  "hopr-db-sql",
  "hopr-internal-types",
@@ -4420,6 +4450,7 @@ dependencies = [
  "futures",
  "home",
  "hopr-async-runtime",
+ "hopr-crypto-random",
  "hopr-lib",
  "hopr-metrics",
  "hopr-network-types",
@@ -4452,12 +4483,13 @@ dependencies = [
 
 [[package]]
 name = "hoprd-api"
-version = "3.4.0"
+version = "3.5.0"
 dependencies = [
  "anyhow",
  "async-broadcast",
  "async-lock 3.4.0",
  "axum",
+ "axum-extra",
  "bimap",
  "const_format",
  "futures",
@@ -8058,6 +8090,19 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.63",
+]
+
+[[package]]
+name = "serde_html_form"
+version = "0.2.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8de514ef58196f1fc96dcaef80fe6170a1ce6215df9687a93fe8300e773fefc5"
+dependencies = [
+ "form_urlencoded",
+ "indexmap 2.4.0",
+ "itoa",
+ "ryu",
+ "serde",
 ]
 
 [[package]]

@@ -270,6 +270,7 @@ pub(super) async fn metrics() -> impl IntoResponse {
             "/ip4/10.0.2.100/tcp/19092"
         ],
         "chain": "anvil-localhost",
+        "provider": "http://127.0.0.1:8545",
         "channelClosurePeriod": 15,
         "connectivityStatus": "Green",
         "hoprChannels": "0x9a9f2ccfde556a7e9ff0848998aa4a0cfd8863ae",
@@ -297,6 +298,7 @@ pub(crate) struct NodeInfoResponse {
     #[schema(value_type = Vec<String>)]
     listening_address: Vec<Multiaddr>,
     chain: String,
+    provider: String,
     #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String)]
     hopr_token: Address,
@@ -361,6 +363,7 @@ pub(super) async fn info(State(state): State<Arc<InternalState>>) -> Result<impl
                 announced_address: hopr.local_multiaddresses(),
                 listening_address: hopr.local_multiaddresses(),
                 chain: chain_config.id,
+                provider: hopr.get_provider(),
                 hopr_token: chain_config.token,
                 hopr_channels: chain_config.channels,
                 hopr_network_registry: chain_config.network_registry,
