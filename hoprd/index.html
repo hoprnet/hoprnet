@@ -1,0 +1,81 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="HOPR daemon application providing a higher level interface for creating a HOPRd with or without a dedicated REST API."><title>hoprd - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../static.files/rustdoc-42fa08075bb476ff.css"><meta name="rustdoc-vars" data-root-path="../" data-static-root-path="../static.files/" data-current-crate="hoprd" data-themes="" data-resource-suffix="" data-rustdoc-version="1.83.0-nightly (363ae4188 2024-09-24)" data-channel="nightly" data-search-js="search-e056c65ede92db13.js" data-settings-js="settings-805db61a62df4bd2.js" ><script src="../static.files/storage-1d39b6787ed640ff.js"></script><script defer src="../crates.js"></script><script defer src="../static.files/main-54bc299d2a5e4e43.js"></script><noscript><link rel="stylesheet" href="../static.files/noscript-0111fcff984fae8f.css"></noscript><link rel="alternate icon" type="image/png" href="../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc mod crate"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle" title="show sidebar"></button></nav><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../hoprd/index.html">hoprd</a><span class="version">2.2.0</span></h2></div><div class="sidebar-elems"><ul class="block"><li><a id="all-types" href="all.html">All Items</a></li></ul><section id="rustdoc-toc"><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#usage" title="Usage">Usage</a></li></ul><h3><a href="#modules">Crate Items</a></h3><ul class="block"><li><a href="#modules" title="Modules">Modules</a></li><li><a href="#structs" title="Structs">Structs</a></li></ul></section><div id="rustdoc-modnav"></div></div></nav><div class="sidebar-resizer"></div><main><div class="width-limiter"><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><h1>Crate <span>hoprd</span><button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../src/hoprd/lib.rs.html#1-245">source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>HOPR daemon application providing a higher level interface for creating a HOPRd with or without
+a dedicated REST API.</p>
+<p>When the Rest API is enabled, the node serves a Swagger UI to inspect and test
+the Rest API v3 at: http://localhost:3001/scalar</p>
+<p>NOTE: Hostname and port can be different, since they depend on the settings <code>--apiHost</code> and <code>--apiPort</code>.</p>
+<h3 id="usage"><a class="doc-anchor" href="#usage">§</a>Usage</h3>
+<p>See <code>hoprd --help</code> for full list.</p>
+<div class="example-wrap"><pre class="language-shell"><code>$ hoprd --help
+Contains the main entry point of HOPR daemon applicatio
+
+Usage: hoprd [OPTIONS]
+
+Options:
+      --network &lt;NETWORK&gt;
+          ID of the network the node will attempt to connect to [env: HOPRD_NETWORK=]
+      --identity &lt;IDENTITY&gt;
+          The path to the identity file [env: HOPRD_IDENTITY=]
+      --data &lt;DATA&gt;
+          Specifies the directory to hold all the data [env: HOPRD_DATA=]
+      --host &lt;HOST&gt;
+          Host to listen on for P2P connections [env: HOPRD_HOST=]
+      --announce
+          Announce the node on chain with a public address [env: HOPRD_ANNOUNCE=]
+      --api
+          Expose the API on localhost:3001 [env: HOPRD_API=]
+      --apiHost &lt;HOST&gt;
+          Set host IP to which the API server will bind [env: HOPRD_API_HOST=]
+      --apiPort &lt;PORT&gt;
+          Set port to which the API server will bind [env: HOPRD_API_PORT=]
+      --apiToken &lt;TOKEN&gt;
+          A REST API token and for user authentication [env: HOPRD_API_TOKEN=]
+      --password &lt;PASSWORD&gt;
+          A password to encrypt your keys [env: HOPRD_PASSWORD=]
+      --defaultStrategy &lt;DEFAULT_STRATEGY&gt;
+          Default channel strategy to use after node starts up [env: HOPRD_DEFAULT_STRATEGY=] [possible values: promiscuous, aggregating, auto_redeeming, auto_funding, multi, passive]
+      --maxAutoChannels &lt;MAX_AUTO_CHANNELS&gt;
+          Maximum number of channel a strategy can open. If not specified, square root of number of available peers is used. [env: HOPRD_MAX_AUTO_CHANNELS=]
+      --disableTicketAutoRedeem
+          Disables automatic redeeming of winning tickets. [env: HOPRD_DISABLE_AUTO_REDEEEM_TICKETS=]
+      --disableUnrealizedBalanceCheck
+          Disables checking of unrealized balance before validating unacknowledged tickets. [env: HOPRD_DISABLE_UNREALIZED_BALANCE_CHECK=]
+      --provider &lt;PROVIDER&gt;
+          A custom RPC provider to be used for the node to connect to blockchain [env: HOPRD_PROVIDER=]
+      --init
+          initialize a database if it doesn&#39;t already exist [env: HOPRD_INIT=]
+      --forceInit
+          initialize a database, even if it already exists [env: HOPRD_FORCE_INIT=]
+      --inbox-capacity &lt;INBOX_CAPACITY&gt;
+          Set maximum capacity of the HOPRd inbox [env: HOPRD_INBOX_CAPACITY=]
+      --testAnnounceLocalAddresses
+          For testing local testnets. Announce local addresses [env: HOPRD_TEST_ANNOUNCE_LOCAL_ADDRESSES=]
+      --heartbeatInterval &lt;MILLISECONDS&gt;
+          Interval in milliseconds in which the availability of other nodes get measured [env: HOPRD_HEARTBEAT_INTERVAL=]
+      --heartbeatThreshold &lt;MILLISECONDS&gt;
+          Timeframe in milliseconds after which a heartbeat to another peer is performed, if it hasn&#39;t been seen since [env: HOPRD_HEARTBEAT_THRESHOLD=]
+      --heartbeatVariance &lt;MILLISECONDS&gt;
+          Upper bound for variance applied to heartbeat interval in milliseconds [env: HOPRD_HEARTBEAT_VARIANCE=]
+      --networkQualityThreshold &lt;THRESHOLD&gt;
+          Minimum quality of a peer connection to be considered usable [env: HOPRD_NETWORK_QUALITY_THRESHOLD=]
+      --configurationFilePath &lt;CONFIG_FILE_PATH&gt;
+          Path to a file containing the entire HOPRd configuration [env: HOPRD_CONFIGURATION_FILE_PATH=]
+      --safeTransactionServiceProvider &lt;HOPRD_SAFE_TX_SERVICE_PROVIDER&gt;
+          Base URL for safe transaction service [env: HOPRD_SAFE_TRANSACTION_SERVICE_PROVIDER=]
+      --safeAddress &lt;HOPRD_SAFE_ADDR&gt;
+          Address of Safe that safeguards tokens [env: HOPRD_SAFE_ADDRESS=]
+      --moduleAddress &lt;HOPRD_MODULE_ADDR&gt;
+          Address of the node mangement module [env: HOPRD_MODULE_ADDRESS=]
+      --protocolConfig &lt;HOPRD_PROTOCOL_CONFIG_PATH&gt;
+          Path to the protocol-config.json file [env: HOPRD_PROTOCOL_CONFIG_PATH=]
+      --dryRun
+          DEPRECATED [env: HOPRD_DRY_RUN=]
+      --healthCheck
+          DEPRECATED
+      --healthCheckHost &lt;HEALTH_CHECK_HOST&gt;
+          DEPRECATED
+      --healthCheckPort &lt;HEALTH_CHECK_PORT&gt;
+          DEPRECATED
+  -h, --help
+          Print help
+  -V, --version
+          Print version</code></pre></div></div></details><h2 id="modules" class="section-header">Modules<a href="#modules" class="anchor">§</a></h2><ul class="item-table"><li><div class="item-name"><a class="mod" href="cli/index.html" title="mod hoprd::cli">cli</a></div></li><li><div class="item-name"><a class="mod" href="config/index.html" title="mod hoprd::config">config</a></div></li><li><div class="item-name"><a class="mod" href="errors/index.html" title="mod hoprd::errors">errors</a></div></li></ul><h2 id="structs" class="section-header">Structs<a href="#structs" class="anchor">§</a></h2><ul class="item-table"><li><div class="item-name"><a class="struct" href="struct.HoprServerIpForwardingReactor.html" title="struct hoprd::HoprServerIpForwardingReactor">Hopr<wbr>Server<wbr>IpForwarding<wbr>Reactor</a></div></li></ul></section></div></main></body></html>

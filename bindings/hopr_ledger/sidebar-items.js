@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["HoprLedgerCalls"],"mod":["hopr_ledger"],"static":["HOPRLEDGER_ABI"],"struct":["HoprLedger","LedgerDomainSeparatorCall","LedgerDomainSeparatorReturn","LedgerDomainSeparatorUpdatedFilter","LedgerVersionCall","LedgerVersionReturn","UpdateLedgerDomainSeparatorCall"]};

@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta name="generator" content=
+  "HTML Tidy for HTML5 for Linux version 5.8.0">
+  <meta charset="utf-8">
+  <meta name="viewport" content=
+  "width=device-width, initial-scale=1.0">
+  <meta name="generator" content="rustdoc">
+  <meta name="description" content="List of crates">
+  <title>Index of crates</title>
+  <script>
+  if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="./static.files/${f}">`).join(""))
+  </script>
+  <link rel="stylesheet" href=
+  "./static.files/normalize-76eba96aa4d2e634.css">
+  <link rel="stylesheet" href=
+  "./static.files/rustdoc-42fa08075bb476ff.css">
+  <meta name="rustdoc-vars" data-root-path="./"
+  data-static-root-path="./static.files/" data-current-crate=
+  "hopr_parallelize" data-themes="" data-resource-suffix=""
+  data-rustdoc-version="1.83.0-nightly (363ae4188 2024-09-24)"
+  data-channel="nightly" data-search-js=
+  "search-e056c65ede92db13.js" data-settings-js=
+  "settings-805db61a62df4bd2.js">
+  <script src=
+  "./static.files/storage-1d39b6787ed640ff.js"></script>
+  <script defer src=
+  "./static.files/main-54bc299d2a5e4e43.js"></script><noscript>
+  <link rel="stylesheet" href=
+  "./static.files/noscript-0111fcff984fae8f.css"></noscript>
+  <link rel="alternate icon" type="image/png" href=
+  "./static.files/favicon-32x32-422f7d1d52889060.png">
+  <link rel="icon" type="image/svg+xml" href=
+  "./static.files/favicon-2c020d218678b618.svg">
+</head>
+<body class="rustdoc mod sys">
+  <!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]-->
+  <nav class="mobile-topbar">
+    <a class="logo-container" href="./index.html"><img class=
+    "rust-logo" src="./static.files/rust-logo-151179464ae7ed46.svg"
+    alt=""></a>
+  </nav>
+  <nav class="sidebar">
+    <div class="sidebar-crate">
+      <a class="logo-container" href="./index.html"><img class=
+      "rust-logo" src=
+      "./static.files/rust-logo-151179464ae7ed46.svg" alt=
+      "logo"></a>
+      <h2><a href="./index.html">Rustdoc</a><span class=
+      "version">1.83.0-nightly</span></h2>
+    </div>
+    <div class="version">
+      (363ae4188 2024-09-24)
+    </div>
+  </nav>
+  <div class="sidebar-resizer"></div>
+  <main>
+    <div class="width-limiter">
+      <rustdoc-search></rustdoc-search>
+      <section id="main-content" class="content">
+<!-- INTRODUCTION -->
+<p align="center">
+<p><a href="https://hoprnet.org" target="_blank" rel="noopener noreferrer"><br />
+<img align="middle" width="100" src="https://github.com/hoprnet/hopr-assets/blob/master/v1/logo/hopr_logo_padded.png?raw=true" alt="HOPR Logo"><br />
+</a></p>
+<!-- Title Placeholder -->
+<h3 align="center">
+HOPR
+</h3>
+<p align="center">
+<code>A project by the HOPR Association</code><br />
+
+</p>
+<p align="center">
+HOPR is a privacy-preserving messaging protocol which enables the
+creation of a secure communication network via relay nodes powered by
+economic incentives using digital tokens.<br />
+
+</p>
+</p>
+<h2 id="table-of-contents">Table of Contents</h2>
+<ul>
+<li><a href="#table-of-contents">Table of Contents</a></li>
+<li><a href="#about">About</a></li>
+<li><a href="#install">Install</a>
+<ul>
+<li><a href="#install-via-docker">Install via Docker</a></li>
+<li><a href="#install-via-nix-package-manager">Install via Nix package
+manager</a></li>
+</ul></li>
+<li><a href="#usage">Usage</a>
+<ul>
+<li><a href="#example-execution">Example execution</a></li>
+<li><a
+href="#using-docker-compose-with-extended-hopr-node-monitoring">Using
+Docker Compose with extended HOPR node monitoring</a></li>
+</ul></li>
+<li><a href="#testnet-accessibility">Testnet accessibility</a></li>
+<li><a href="#migrating-between-releases">Migrating between
+releases</a></li>
+<li><a href="#develop">Develop</a>
+<ul>
+<li><a href="#nix-environment-setup">Nix environment setup</a>
+<ul>
+<li><a href="#nix-flake-outputs">Nix flake outputs</a></li>
+<li><a href="#code-formatting">Code Formatting</a></li>
+<li><a href="#code-linting">Code Linting</a></li>
+</ul></li>
+<li><a href="#local-node-with-safe-staking-service-local-network">Local
+node with safe staking service (local network)</a></li>
+<li><a href="#local-node-with-safe-staking-service-dufour-network">Local
+node with safe staking service (dufour network)</a></li>
+</ul></li>
+<li><a href="#local-cluster">Local cluster</a></li>
+<li><a href="#test">Test</a>
+<ul>
+<li><a href="#unit-testing">Unit testing</a></li>
+<li><a href="#github-actions-ci">Github Actions CI</a></li>
+<li><a href="#end-to-end-testing">End-to-End Testing</a>
+<ul>
+<li><a href="#running-tests-locally">Running Tests Locally</a>
+<ul>
+<li><a href="#testing-environment">Testing environment</a></li>
+<li><a href="#test-execution">Test execution</a></li>
+</ul></li>
+</ul></li>
+</ul></li>
+<li><a href="#contact">Contact</a></li>
+<li><a href="#license">License</a></li>
+</ul>
+<h2 id="about">About</h2>
+<p>The HOPR project produces multiple artifacts that allow running,
+maintaining and modiyfing the HOPR node. The most relevant components
+for production use cases are:</p>
+<ol type="1">
+<li><a
+href="https://hoprnet.github.io/hoprnet/hopr_lib/index.html">hopr-lib</a>
+<ul>
+<li>A fully self-contained referential implementation of the HOPR
+protocol over a libp2p based connection mechanism that can be
+incroporated into another projects as a transport layer.</li>
+</ul></li>
+<li><a
+href="https://hoprnet.github.io/hoprnet/hoprd/index.html">hoprd</a>
+<ul>
+<li>Daemon application providing a higher level interface for creating a
+HOPR protocol compliant node that can use a dedicated REST API.</li>
+</ul></li>
+<li><a
+href="https://hoprnet.github.io/hoprnet/hoprd_api_schema/index.html">hoprd-api-schema</a>
+<ul>
+<li>Utility to generate the OpenAPI spec for the <code>hoprd</code>
+served REST API.</li>
+</ul></li>
+<li><a
+href="https://hoprnet.github.io/hoprnet/hoprd_cfg/index.html">hoprd-cfg</a>
+<ul>
+<li>Utility for configuration management of the <code>hoprd</code></li>
+</ul></li>
+<li><a
+href="https://hoprnet.github.io/hoprnet/hopli/index.html">hopli</a>
+<ul>
+<li>Utility designed to simplify and unify the management of on-chain
+and identity related tasks.</li>
+</ul></li>
+</ol>
+<p>Unless stated otherwise, the following sections only apply to
+<code>hoprd</code>.</p>
+<h2 id="install">Install</h2>
+<p>For production purposes always run the latest stable release.</p>
+<p>Multiple options for installation exist, the preferred choice for any
+production system should be to use the container image (e.g. using
+<code>docker</code>).</p>
+<p>All releases and associated changelogs are located in the <a
+href="https://github.com/hoprnet/hoprnet/releases">official releases</a>
+section of the <a
+href="https://github.com/hoprnet/hoprnet"><code>hoprnet</code></a>
+repository.</p>
+<h3 id="install-via-docker">Install via Docker</h3>
+<p>The following instructions show how any <code>$RELEASE</code> may be
+installed, to select the release, override the <code>$RELEASE</code>
+variable, e.g.:</p>
+<ul>
+<li><code>export RELEASE=latest</code> to track the latest changes on
+the repository’s <code>master</code> branch</li>
+<li><code>export RELEASE=saint-louis</code> to track the latest changes
+on the repository’s <code>release/saint-louis</code> branch (2.1.X)</li>
+<li><code>export RELEASE=&lt;version&gt;</code> to get a specific
+<code>&lt;version&gt;</code></li>
+</ul>
+<p>Container image has the format<br />
+<code>europe-west3-docker.pkg.dev/hoprassociation/docker-images/$PROJECT:$RELEASE</code>.<br />
+where:</p>
+<ul>
+<li><code>$PROJECT</code> can be either <code>hopli</code> or
+<code>hoprd</code></li>
+</ul>
+<p>Pull the container image with <code>docker</code>:</p>
+<pre class="shell"><code>$ docker pull europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd:saint-louis</code></pre>
+<p>It is recommended to setup an alias <code>hoprd</code> for the docker
+command invocation.</p>
+<h3 id="install-via-nix-package-manager1">Install via <a
+href="https://nixos.org/learn.html">Nix package manager</a></h3>
+<p>WARNING: This setup should only be used for development or advanced
+usage without any further support.</p>
+<p>Clone and initialize the <a
+href="https://github.com/hoprnet/hoprnet"><code>hoprnet</code></a>
+repository:</p>
+<pre class="shell"><code>$ git clone https://github.com/hoprnet/hoprnet
+$ cd hoprnet</code></pre>
+<p>Build and install the <code>hoprd</code> binary, e.g. on a UNIX
+platform:</p>
+<pre class="shell"><code>$ nix build
+$ sudo cp result/bin/* /usr/local/bin/</code></pre>
+<h2 id="usage">Usage</h2>
+<p><code>hoprd</code> provides various command-line switches to
+configure its behaviour. For reference these are documented here as
+well:</p>
+<pre class="shell"><code>$ hoprd --help
+HOPR node executable.
+
+Usage: hoprd [OPTIONS]
+
+Options:
+      --network &lt;NETWORK&gt;
+          ID of the network the node will attempt to connect to [env: HOPRD_NETWORK=]
+      --identity &lt;IDENTITY&gt;
+          The path to the identity file [env: HOPRD_IDENTITY=]
+      --data &lt;DATA&gt;
+          Specifies the directory to hold all the data [env: HOPRD_DATA=]
+      --host &lt;HOST&gt;
+          Host to listen on for P2P connections [env: HOPRD_HOST=]
+      --announce...
+          Announce the node on chain with a public address [env: HOPRD_ANNOUNCE=]
+      --api...
+          Expose the API on localhost:3001 [env: HOPRD_API=]
+      --apiHost &lt;HOST&gt;
+          Set host IP to which the API server will bind [env: HOPRD_API_HOST=]
+      --apiPort &lt;PORT&gt;
+          Set port to which the API server will bind [env: HOPRD_API_PORT=]
+      --apiToken &lt;TOKEN&gt;
+          A REST API token and for user authentication [env: HOPRD_API_TOKEN=]
+      --password &lt;PASSWORD&gt;
+          A password to encrypt your keys [env: HOPRD_PASSWORD=]
+      --disableUnrealizedBalanceCheck...
+          Disables checking of unrealized balance before validating unacknowledged tickets. [env: HOPRD_DISABLE_UNREALIZED_BALANCE_CHECK=]
+      --maxBlockRange &lt;MAX_BLOCK_RANGE&gt;
+          Maximum number of blocks that can be fetched in a batch request from the RPC provider. [env: HOPRD_MAX_BLOCK_RANGE=]
+      --maxRequestsPerSec &lt;MAX_RPC_REQUESTS_PER_SEC&gt;
+          Maximum number of RPC requestes that can be performed per second. [env: HOPRD_MAX_RPC_REQUESTS_PER_SEC=]
+      --provider &lt;PROVIDER&gt;
+          A custom RPC provider to be used for the node to connect to blockchain [env: HOPRD_PROVIDER=]
+      --init...
+          initialize a database if it doesn&#39;t already exist [env: HOPRD_INIT=]
+      --forceInit...
+          initialize a database, even if it already exists [env: HOPRD_FORCE_INIT=]
+      --inbox-capacity &lt;INBOX_CAPACITY&gt;
+          Set maximum capacity of the HOPRd inbox [env: HOPRD_INBOX_CAPACITY=]
+      --heartbeatInterval &lt;MILLISECONDS&gt;
+          Interval in milliseconds in which the availability of other nodes get measured [env: HOPRD_HEARTBEAT_INTERVAL=]
+      --heartbeatThreshold &lt;MILLISECONDS&gt;
+          Timeframe in milliseconds after which a heartbeat to another peer is performed, if it hasn&#39;t been seen since [env: HOPRD_HEARTBEAT_THRESHOLD=]
+      --heartbeatVariance &lt;MILLISECONDS&gt;
+          Upper bound for variance applied to heartbeat interval in milliseconds [env: HOPRD_HEARTBEAT_VARIANCE=]
+      --networkQualityThreshold &lt;THRESHOLD&gt;
+          Minimum quality of a peer connection to be considered usable [env: HOPRD_NETWORK_QUALITY_THRESHOLD=]
+      --configurationFilePath &lt;CONFIG_FILE_PATH&gt;
+          Path to a file containing the entire HOPRd configuration [env: HOPRD_CONFIGURATION_FILE_PATH=]
+      --safeTransactionServiceProvider &lt;HOPRD_SAFE_TX_SERVICE_PROVIDER&gt;
+          Base URL for safe transaction service [env: HOPRD_SAFE_TRANSACTION_SERVICE_PROVIDER=]
+      --safeAddress &lt;HOPRD_SAFE_ADDR&gt;
+          Address of Safe that safeguards tokens [env: HOPRD_SAFE_ADDRESS=]
+      --moduleAddress &lt;HOPRD_MODULE_ADDR&gt;
+          Address of the node mangement module [env: HOPRD_MODULE_ADDRESS=]
+      --protocolConfig &lt;HOPRD_PROTOCOL_CONFIG_PATH&gt;
+          Path to the protocol-config.json file [env: HOPRD_PROTOCOL_CONFIG_PATH=]
+      --dryRun
+          DEPRECATED [env: HOPRD_DRY_RUN=]
+      --healthCheck
+          DEPRECATED
+      --healthCheckHost &lt;HEALTH_CHECK_HOST&gt;
+          DEPRECATED
+      --healthCheckPort &lt;HEALTH_CHECK_PORT&gt;
+          DEPRECATED
+      --defaultStrategy &lt;DEFAULT_STRATEGY&gt;
+          DEPRECATED [env: HOPRD_DEFAULT_STRATEGY=] [possible values: promiscuous, aggregating, auto_redeeming, auto_funding, closure_finalizer, multi, passive]
+      --maxAutoChannels &lt;MAX_AUTO_CHANNELS&gt;
+          DEPRECATED [env: HOPRD_MAX_AUTO_CHANNELS=]
+      --disableTicketAutoRedeem...
+          DEPRECATED [env: HOPRD_DISABLE_AUTO_REDEEEM_TICKETS=]
+  -h, --help
+          Print help
+  -V, --version
+          Print version</code></pre>
+<h3 id="example-execution">Example execution</h3>
+<p>Running the node without any command-line argument might not work
+depending on the installation method used. Some command line arguments
+are required.</p>
+<p>A basic reasonable setup is that uses a custom identity and enabels a
+REST API of the <code>hoprd</code> could look like:</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="ex">hoprd</span> <span class="at">--identity</span> /app/hoprd-db/.hopr-identity <span class="at">--password</span> switzerland <span class="at">--init</span> <span class="at">--announce</span> <span class="at">--host</span> <span class="st">&quot;0.0.0.0:9091&quot;</span> <span class="at">--apiToken</span> <span class="op">&lt;</span>MY_TOKEN<span class="op">&gt;</span> --network doufur</span></code></pre></div>
+<p>Here is a short breakdown of each argument.</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="ex">hoprd</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  <span class="co"># store your node identity information in the persisted database folder</span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>  <span class="ex">--identity</span> /app/hoprd-db/.hopr-identity</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>  <span class="co"># set the encryption password for your identity</span></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>  <span class="ex">--password</span> switzerland</span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>  <span class="co"># initialize the database and identity if not present</span></span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>  <span class="ex">--init</span></span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>  <span class="co"># announce the node to other nodes in the network and act as relay if publicly reachable</span></span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>  <span class="ex">--announce</span></span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>  <span class="co"># set IP and port of the P2P API to the container&#39;s external IP so it can be reached on your host</span></span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>  <span class="ex">--host</span> <span class="st">&quot;0.0.0.0:9091&quot;</span></span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>  <span class="co"># specify password for accessing REST API</span></span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>  <span class="ex">--apiToken</span> <span class="op">&lt;</span>MY_TOKEN<span class="op">&gt;</span></span>
+<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a>  <span class="co"># an network is defined as a chain plus a number of deployed smart contract addresses to use on that chain</span></span>
+<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a>  <span class="ex">--network</span> doufur</span></code></pre></div>
+<p>Special care needs to given to the <code>network</code> argument,
+which defines the specific network <code>hoprd</code> node should join.
+Only nodes within the same network can communicate using the HOPR
+protocol.</p>
+<h3 id="using-docker-compose-with-extended-hopr-node-monitoring">Using
+Docker Compose with extended HOPR node monitoring</h3>
+<p>Please follow the documentation for <a
+href="./deploy/compose/README.md"><code>docker compose</code> based
+deployment</a>.</p>
+<h2 id="testnet-accessibility">Testnet accessibility</h2>
+<p>To participate in a public network the node must be eligible. See <a
+href="https://github.com/hoprnet/hoprnet/blob/master/NETWORK_REGISTRY.md">Network
+Registry</a> for details.</p>
+<p>Node eligibility is not required in a local development cluster (see
+<a href="#develop">Develop section below</a>).</p>
+<h2 id="migrating-between-releases">Migrating between releases</h2>
+<p>There is <strong>NO</strong> backward compatibility between
+releases.</p>
+<p>We attempt to provide instructions on how to migrate your tokens
+between releases.</p>
+<ol type="1">
+<li>Set your automatic channel strategy to <code>passive</code>.</li>
+<li>Redeem all unredeemed tickets.</li>
+<li>Close all open payment channels.</li>
+<li>Once all payment channels have closed, withdraw your funds to an
+external<br />
+wallet.</li>
+<li>Run <code>info</code> and take note of the <strong>network
+name</strong>.</li>
+<li>Once funds are confirmed to exist in a different wallet, backup
+<code>.hopr-identity</code> folder.</li>
+<li>Launch new <code>HOPRd</code> instance using latest release, observe
+the account address.</li>
+<li>Only transfer funds to new <code>HOPRd</code> instance if
+<code>HOPRd</code> operates on the <strong>same network</strong> as last
+release, you can compare the two networks using <code>info</code>.</li>
+</ol>
+<h2 id="develop">Develop</h2>
+<p>Either setup <code>nix</code> and <code>flake</code> to use the nix
+environment, or <a
+href="https://www.rust-lang.org/tools/install">install Rust
+toolchain</a> from the <code>rust-toolchain.toml</code>, as well as
+<code>foundry-rs</code> binaries (<code>forge</code>,
+<code>anvil</code>).</p>
+<h3 id="nix-environment-setup">Nix environment setup</h3>
+<p>Install `nix`` from the official website at <a
+href="https://nix.dev/install-nix.html">https://nix.dev/install-nix.html</a>.</p>
+<p>Create a nix configuration file at
+<code>~/.config/nix/nix.conf</code> with the following content:</p>
+<div class="sourceCode" id="cb7"><pre
+class="sourceCode nix"><code class="sourceCode nix"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>experimental<span class="op">-</span>features = nix<span class="op">-</span>command flakes</span></code></pre></div>
+<p>Install the <code>nix-direnv</code> package to introduce the
+<code>direnv</code>:</p>
+<pre class="shell"><code>$ nix-env -i nix-direnv</code></pre>
+<p>Append the following line to the shell rc file (depending on the
+shell used it can be <code>~\.zshrc</code>, <code>~\.bashrc</code>,
+<code>~\.cshrc</code>, etc.). Modify the <code>&lt;shell&gt;</code>
+variable inside the below command with the currently used
+(<code>zsh</code>, <code>bash</code>, <code>csh</code>, etc.):</p>
+<pre class="shell"><code>$ eval &quot;$(direnv hook &lt;shell&gt;)&quot;</code></pre>
+<p>From within the <a
+href="https://github.com/hoprnet/hoprnet"><code>hoprnet</code></a>
+repository’s directory, execute the following command.</p>
+<div class="sourceCode" id="cb10"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="ex">$</span> direnv allow .</span></code></pre></div>
+<h4 id="nix-flake-outputs">Nix flake outputs</h4>
+<p>We provide a couple of packages, apps and shells to make building
+and<br />
+development easier, to get the full list execute:. You may get the full
+list like so:</p>
+<pre class="shell"><code>$ nix flake show</code></pre>
+<h4 id="code-formatting">Code Formatting</h4>
+<p>All nix, rust, solidity and python code can be automatically
+formatted:</p>
+<pre class="shell"><code>nix fmt</code></pre>
+<p>These formatters are also automatically run as a Git pre-commit
+check.</p>
+<h4 id="code-linting">Code Linting</h4>
+<p>All linters can be executed via a Nix flake helper app:</p>
+<pre class="shell"><code>nix run .#lint</code></pre>
+<p>This will in particular run <code>clippy</code> for the entire Rust
+codebase.</p>
+<h3 id="local-node-with-safe-staking-service-local-network">Local node
+with safe staking service (local network)</h3>
+<p>Running one node in test mode, with safe and module attached (in an
+<code>anvil-localhost</code> network)</p>
+<pre class="shell"><code># clean up, e.g.
+# make kill-anvil
+# make clean
+
+# build deps and HOPRd code
+make -j deps &amp;&amp; make -j build
+
+# starting network
+make run-anvil args=&quot;-p&quot;
+
+# update protocol-config
+scripts/update-protocol-config.sh -n anvil-localhost
+
+# create identity files
+make create-local-identity id_count=1
+
+# create a safe and a node management module instance,
+# and passing the created safe and module as argument to
+# run a test node local (separate terminal)
+# It also register the created pairs in network registry, and
+# approve tokens for channels to move token.
+# fund safe with 2k token and 1 native token
+make run-local-with-safe id_file_path=/tmp
+# or to restart a node and use the same id, safe and module
+# run:
+# make run-local id_path=$(find `pwd` -name &quot;.identity-local*.id&quot; | sort -r | head -n 1)
+
+# fund all your nodes to get started
+make fund-local-all id_dir=`pwd`
+
+# start local HOPR admin in a container (and put into background)
+make run-hopr-admin &amp;</code></pre>
+<h3 id="local-node-with-safe-staking-service-dufour-network">Local node
+with safe staking service (dufour network)</h3>
+<p>Running one node in test mode, with safe and module attached (in
+dufour network)</p>
+<pre class="shell"><code># build deps and HOPRd code
+make -j deps &amp;&amp; make -j build
+
+# Fill out the `ethereum/contract/.env` from the `ethereum/contracts/example.env`
+#
+# ensure a private key with enough xDAI is set as PRIVATE_KEY
+# This PRIVATE_KEY is the &quot;admin_key&quot; (i.e. owner of the created safe and node management module)
+#
+# Please use the deployer private key as DEPLOYER_PRIVATE_KEY
+# The Ethereum address to the DEPLOYER_PRIVATE_KEY should be a &quot;manager&quot; of the network registry.
+# Role can be checked in the explorer:
+# ```
+# echo &quot;https://gnosisscan.io/address/$(jq &#39;.networks.dufour.addresses.network_registry&#39; ./ethereum/contracts/contracts-addresses.json)\#readContract&quot;
+# ```
+source ./ethereum/contracts/.env
+
+export HOPR_NETWORK=&quot;dufour&quot;
+export IDENTITY_PASSWORD=&quot;SOmeranDOmPassHere-DefiniteLyChangeThis!&quot;
+
+# create identity files
+bash scripts/generate-identity.sh
+
+# start local HOPR admin in a container (and put into background)
+make run-hopr-admin &amp;</code></pre>
+<h2 id="local-cluster">Local cluster</h2>
+<p>The best way to test with multiple HOPR nodes is by using a <a
+href="https://github.com/hoprnet/hoprnet/blob/master/SETUP_LOCAL_CLUSTER.md">local
+cluster of interconnected nodes</a>.</p>
+<h2 id="test">Test</h2>
+<h3 id="unit-testing">Unit testing</h3>
+<p>Tests both the Rust and Solidity code.</p>
+<pre class="shell"><code>make test</code></pre>
+<h3 id="github-actions-ci">Github Actions CI</h3>
+<p>We run a fair amount of automation using Github Actions. To ease
+development<br />
+of these workflows one can use <a
+href="https://github.com/nektos/act">act</a> to run workflows locally in
+a<br />
+Docker environment.</p>
+<p>E.g. running the build workflow:</p>
+<pre class="shell"><code>$ act -j build</code></pre>
+<p>For more information please refer to <a
+href="https://github.com/nektos/act">act</a>’s documentation.</p>
+<h3 id="end-to-end-testing">End-to-End Testing</h3>
+<p>When using the <code>nix</code> environment, the test environment
+preparation and activation is automatic.</p>
+<p>Tests are using the <code>pytest</code> infrastructure.</p>
+<h4 id="running-tests-locally">Running Tests Locally</h4>
+<h5 id="testing-environment">Testing environment</h5>
+<p>If not using <code>nix</code>, setup the <code>pytest</code>
+environment:</p>
+<pre class="shell"><code>python3 -m venv .venv
+source .venv/bin/activate
+python3 -m pip install -r tests/requirements.txt</code></pre>
+<p>To deactivate the activated testing environment if no longer
+needed:</p>
+<pre class="shell"><code>deactivate</code></pre>
+<h5 id="test-execution">Test execution</h5>
+<p>With the environment activated, execute the tests locally:</p>
+<pre class="shell"><code>make smoke-tests</code></pre>
+<h4 id="section"></h4>
+<h2 id="contact">Contact</h2>
+<ul>
+<li><a href="https://twitter.com/hoprnet">Twitter</a></li>
+<li><a href="https://t.me/hoprnet">Telegram</a></li>
+<li><a href="https://medium.com/hoprnet">Medium</a></li>
+<li><a href="https://www.reddit.com/r/HOPR/">Reddit</a></li>
+<li><a href="mailto:contact@hoprnet.org">Email</a></li>
+<li><a href="https://discord.gg/5FWSfq7">Discord</a></li>
+<li><a
+href="https://www.youtube.com/channel/UC2DzUtC90LXdW7TfT3igasA">Youtube</a></li>
+</ul>
+<h2 id="license">License</h2>
+<p><a href="https://github.com/hoprnet/hoprnet/blob/master/LICENSE">GPL
+v3</a> © HOPR Association</p>
+        <h1>List of all crates</h1>
+        <ul class="all-items">
+          <li>
+            <a href="bindings/index.html">bindings</a>
+          </li>
+          <li>
+            <a href="chain_actions/index.html">chain_actions</a>
+          </li>
+          <li>
+            <a href="chain_api/index.html">chain_api</a>
+          </li>
+          <li>
+            <a href="chain_indexer/index.html">chain_indexer</a>
+          </li>
+          <li>
+            <a href="chain_rpc/index.html">chain_rpc</a>
+          </li>
+          <li>
+            <a href="chain_types/index.html">chain_types</a>
+          </li>
+          <li>
+            <a href="core_network/index.html">core_network</a>
+          </li>
+          <li>
+            <a href="core_path/index.html">core_path</a>
+          </li>
+          <li>
+            <a href="hopli/index.html">hopli</a>
+          </li>
+          <li>
+            <a href=
+            "hopr_async_runtime/index.html">hopr_async_runtime</a>
+          </li>
+          <li>
+            <a href=
+            "hopr_crypto_packet/index.html">hopr_crypto_packet</a>
+          </li>
+          <li>
+            <a href=
+            "hopr_crypto_random/index.html">hopr_crypto_random</a>
+          </li>
+          <li>
+            <a href=
+            "hopr_crypto_sphinx/index.html">hopr_crypto_sphinx</a>
+          </li>
+          <li>
+            <a href=
+            "hopr_crypto_types/index.html">hopr_crypto_types</a>
+          </li>
+          <li>
+            <a href="hopr_db_api/index.html">hopr_db_api</a>
+          </li>
+          <li>
+            <a href="hopr_db_entity/index.html">hopr_db_entity</a>
+          </li>
+          <li>
+            <a href=
+            "hopr_db_migration/index.html">hopr_db_migration</a>
+          </li>
+          <li>
+            <a href="hopr_db_sql/index.html">hopr_db_sql</a>
+          </li>
+          <li>
+            <a href=
+            "hopr_internal_types/index.html">hopr_internal_types</a>
+          </li>
+          <li>
+            <a href="hopr_lib/index.html">hopr_lib</a>
+          </li>
+          <li>
+            <a href="hopr_metrics/index.html">hopr_metrics</a>
+          </li>
+          <li>
+            <a href=
+            "hopr_network_types/index.html">hopr_network_types</a>
+          </li>
+          <li>
+            <a href=
+            "hopr_parallelize/index.html">hopr_parallelize</a>
+          </li>
+          <li>
+            <a href="hopr_platform/index.html">hopr_platform</a>
+          </li>
+          <li>
+            <a href=
+            "hopr_primitive_types/index.html">hopr_primitive_types</a>
+          </li>
+          <li>
+            <a href=
+            "hopr_socks_server/index.html">hopr_socks_server</a>
+          </li>
+          <li>
+            <a href="hopr_strategy/index.html">hopr_strategy</a>
+          </li>
+          <li>
+            <a href="hopr_transport/index.html">hopr_transport</a>
+          </li>
+          <li>
+            <a href=
+            "hopr_transport_p2p/index.html">hopr_transport_p2p</a>
+          </li>
+          <li>
+            <a href=
+            "hopr_transport_protocol/index.html">hopr_transport_protocol</a>
+          </li>
+          <li>
+            <a href=
+            "hopr_transport_session/index.html">hopr_transport_session</a>
+          </li>
+          <li>
+            <a href="hoprd/index.html">hoprd</a>
+          </li>
+          <li>
+            <a href="hoprd_api/index.html">hoprd_api</a>
+          </li>
+          <li>
+            <a href=
+            "hoprd_api_schema/index.html">hoprd_api_schema</a>
+          </li>
+          <li>
+            <a href="hoprd_cfg/index.html">hoprd_cfg</a>
+          </li>
+          <li>
+            <a href="hoprd_db_api/index.html">hoprd_db_api</a>
+          </li>
+          <li>
+            <a href=
+            "hoprd_db_entity/index.html">hoprd_db_entity</a>
+          </li>
+          <li>
+            <a href=
+            "hoprd_db_migration/index.html">hoprd_db_migration</a>
+          </li>
+          <li>
+            <a href="hoprd_inbox/index.html">hoprd_inbox</a>
+          </li>
+          <li>
+            <a href="hoprd_keypair/index.html">hoprd_keypair</a>
+          </li>
+          <li>
+            <a href=
+            "hoprd_migration/index.html">hoprd_migration</a>
+          </li>
+          <li>
+            <a href="migration/index.html">migration</a>
+          </li>
+        </ul>
+      </section>
+    </div>
+  </main>
+  <!--{"start":2531,"fragment_lengths":[51,61,53,61,53,57,59,53,45,71,71,71,71,69,57,63,69,57,73,51,59,71,67,61,75,69,61,63,71,81,79,45,53,67,53,59,65,71,57,61,65,53]}-->
+</body>
+</html>

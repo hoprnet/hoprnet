@@ -1,0 +1,421 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `hopli/src/utils.rs`."><title>utils.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-42fa08075bb476ff.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="hopli" data-themes="" data-resource-suffix="" data-rustdoc-version="1.83.0-nightly (363ae4188 2024-09-24)" data-channel="nightly" data-search-js="search-e056c65ede92db13.js" data-settings-js="settings-805db61a62df4bd2.js" ><script src="../../static.files/storage-1d39b6787ed640ff.js"></script><script defer src="../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-54bc299d2a5e4e43.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-0111fcff984fae8f.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><h1><div class="sub-heading">hopli/</div>utils.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers">
+<a href="#1" id="1">1</a>
+<a href="#2" id="2">2</a>
+<a href="#3" id="3">3</a>
+<a href="#4" id="4">4</a>
+<a href="#5" id="5">5</a>
+<a href="#6" id="6">6</a>
+<a href="#7" id="7">7</a>
+<a href="#8" id="8">8</a>
+<a href="#9" id="9">9</a>
+<a href="#10" id="10">10</a>
+<a href="#11" id="11">11</a>
+<a href="#12" id="12">12</a>
+<a href="#13" id="13">13</a>
+<a href="#14" id="14">14</a>
+<a href="#15" id="15">15</a>
+<a href="#16" id="16">16</a>
+<a href="#17" id="17">17</a>
+<a href="#18" id="18">18</a>
+<a href="#19" id="19">19</a>
+<a href="#20" id="20">20</a>
+<a href="#21" id="21">21</a>
+<a href="#22" id="22">22</a>
+<a href="#23" id="23">23</a>
+<a href="#24" id="24">24</a>
+<a href="#25" id="25">25</a>
+<a href="#26" id="26">26</a>
+<a href="#27" id="27">27</a>
+<a href="#28" id="28">28</a>
+<a href="#29" id="29">29</a>
+<a href="#30" id="30">30</a>
+<a href="#31" id="31">31</a>
+<a href="#32" id="32">32</a>
+<a href="#33" id="33">33</a>
+<a href="#34" id="34">34</a>
+<a href="#35" id="35">35</a>
+<a href="#36" id="36">36</a>
+<a href="#37" id="37">37</a>
+<a href="#38" id="38">38</a>
+<a href="#39" id="39">39</a>
+<a href="#40" id="40">40</a>
+<a href="#41" id="41">41</a>
+<a href="#42" id="42">42</a>
+<a href="#43" id="43">43</a>
+<a href="#44" id="44">44</a>
+<a href="#45" id="45">45</a>
+<a href="#46" id="46">46</a>
+<a href="#47" id="47">47</a>
+<a href="#48" id="48">48</a>
+<a href="#49" id="49">49</a>
+<a href="#50" id="50">50</a>
+<a href="#51" id="51">51</a>
+<a href="#52" id="52">52</a>
+<a href="#53" id="53">53</a>
+<a href="#54" id="54">54</a>
+<a href="#55" id="55">55</a>
+<a href="#56" id="56">56</a>
+<a href="#57" id="57">57</a>
+<a href="#58" id="58">58</a>
+<a href="#59" id="59">59</a>
+<a href="#60" id="60">60</a>
+<a href="#61" id="61">61</a>
+<a href="#62" id="62">62</a>
+<a href="#63" id="63">63</a>
+<a href="#64" id="64">64</a>
+<a href="#65" id="65">65</a>
+<a href="#66" id="66">66</a>
+<a href="#67" id="67">67</a>
+<a href="#68" id="68">68</a>
+<a href="#69" id="69">69</a>
+<a href="#70" id="70">70</a>
+<a href="#71" id="71">71</a>
+<a href="#72" id="72">72</a>
+<a href="#73" id="73">73</a>
+<a href="#74" id="74">74</a>
+<a href="#75" id="75">75</a>
+<a href="#76" id="76">76</a>
+<a href="#77" id="77">77</a>
+<a href="#78" id="78">78</a>
+<a href="#79" id="79">79</a>
+<a href="#80" id="80">80</a>
+<a href="#81" id="81">81</a>
+<a href="#82" id="82">82</a>
+<a href="#83" id="83">83</a>
+<a href="#84" id="84">84</a>
+<a href="#85" id="85">85</a>
+<a href="#86" id="86">86</a>
+<a href="#87" id="87">87</a>
+<a href="#88" id="88">88</a>
+<a href="#89" id="89">89</a>
+<a href="#90" id="90">90</a>
+<a href="#91" id="91">91</a>
+<a href="#92" id="92">92</a>
+<a href="#93" id="93">93</a>
+<a href="#94" id="94">94</a>
+<a href="#95" id="95">95</a>
+<a href="#96" id="96">96</a>
+<a href="#97" id="97">97</a>
+<a href="#98" id="98">98</a>
+<a href="#99" id="99">99</a>
+<a href="#100" id="100">100</a>
+<a href="#101" id="101">101</a>
+<a href="#102" id="102">102</a>
+<a href="#103" id="103">103</a>
+<a href="#104" id="104">104</a>
+<a href="#105" id="105">105</a>
+<a href="#106" id="106">106</a>
+<a href="#107" id="107">107</a>
+<a href="#108" id="108">108</a>
+<a href="#109" id="109">109</a>
+<a href="#110" id="110">110</a>
+<a href="#111" id="111">111</a>
+<a href="#112" id="112">112</a>
+<a href="#113" id="113">113</a>
+<a href="#114" id="114">114</a>
+<a href="#115" id="115">115</a>
+<a href="#116" id="116">116</a>
+<a href="#117" id="117">117</a>
+<a href="#118" id="118">118</a>
+<a href="#119" id="119">119</a>
+<a href="#120" id="120">120</a>
+<a href="#121" id="121">121</a>
+<a href="#122" id="122">122</a>
+<a href="#123" id="123">123</a>
+<a href="#124" id="124">124</a>
+<a href="#125" id="125">125</a>
+<a href="#126" id="126">126</a>
+<a href="#127" id="127">127</a>
+<a href="#128" id="128">128</a>
+<a href="#129" id="129">129</a>
+<a href="#130" id="130">130</a>
+<a href="#131" id="131">131</a>
+<a href="#132" id="132">132</a>
+<a href="#133" id="133">133</a>
+<a href="#134" id="134">134</a>
+<a href="#135" id="135">135</a>
+<a href="#136" id="136">136</a>
+<a href="#137" id="137">137</a>
+<a href="#138" id="138">138</a>
+<a href="#139" id="139">139</a>
+<a href="#140" id="140">140</a>
+<a href="#141" id="141">141</a>
+<a href="#142" id="142">142</a>
+<a href="#143" id="143">143</a>
+<a href="#144" id="144">144</a>
+<a href="#145" id="145">145</a>
+<a href="#146" id="146">146</a>
+<a href="#147" id="147">147</a>
+<a href="#148" id="148">148</a>
+<a href="#149" id="149">149</a>
+<a href="#150" id="150">150</a>
+<a href="#151" id="151">151</a>
+<a href="#152" id="152">152</a>
+<a href="#153" id="153">153</a>
+<a href="#154" id="154">154</a>
+<a href="#155" id="155">155</a>
+<a href="#156" id="156">156</a>
+<a href="#157" id="157">157</a>
+<a href="#158" id="158">158</a>
+<a href="#159" id="159">159</a>
+<a href="#160" id="160">160</a>
+<a href="#161" id="161">161</a>
+<a href="#162" id="162">162</a>
+<a href="#163" id="163">163</a>
+<a href="#164" id="164">164</a>
+<a href="#165" id="165">165</a>
+<a href="#166" id="166">166</a>
+<a href="#167" id="167">167</a>
+<a href="#168" id="168">168</a>
+<a href="#169" id="169">169</a>
+<a href="#170" id="170">170</a>
+<a href="#171" id="171">171</a>
+<a href="#172" id="172">172</a>
+<a href="#173" id="173">173</a>
+<a href="#174" id="174">174</a>
+<a href="#175" id="175">175</a>
+<a href="#176" id="176">176</a>
+<a href="#177" id="177">177</a>
+<a href="#178" id="178">178</a>
+<a href="#179" id="179">179</a>
+<a href="#180" id="180">180</a>
+<a href="#181" id="181">181</a>
+<a href="#182" id="182">182</a>
+<a href="#183" id="183">183</a>
+<a href="#184" id="184">184</a>
+<a href="#185" id="185">185</a>
+<a href="#186" id="186">186</a>
+<a href="#187" id="187">187</a>
+<a href="#188" id="188">188</a>
+<a href="#189" id="189">189</a>
+<a href="#190" id="190">190</a>
+<a href="#191" id="191">191</a>
+<a href="#192" id="192">192</a>
+<a href="#193" id="193">193</a>
+<a href="#194" id="194">194</a>
+<a href="#195" id="195">195</a>
+<a href="#196" id="196">196</a>
+<a href="#197" id="197">197</a>
+<a href="#198" id="198">198</a>
+<a href="#199" id="199">199</a>
+<a href="#200" id="200">200</a>
+<a href="#201" id="201">201</a>
+<a href="#202" id="202">202</a>
+<a href="#203" id="203">203</a>
+<a href="#204" id="204">204</a>
+<a href="#205" id="205">205</a>
+<a href="#206" id="206">206</a>
+<a href="#207" id="207">207</a>
+<a href="#208" id="208">208</a>
+<a href="#209" id="209">209</a>
+<a href="#210" id="210">210</a></pre></div><pre class="rust"><code><span class="doccomment">//! This module contains errors produced in this crate
+</span><span class="comment">// use ethers::providers::{Http, JsonRpcClient, ProviderError};
+</span><span class="kw">use </span>hoprd_keypair::errors::KeyPairError;
+<span class="kw">use </span>thiserror::Error;
+
+<span class="kw">pub trait </span>Cmd: clap::Parser + Sized {
+    <span class="kw">fn </span>run(<span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;(), HelperErrors&gt;;
+    <span class="kw">fn </span>async_run(<span class="self">self</span>) -&gt; <span class="kw">impl </span>std::future::Future&lt;Output = <span class="prelude-ty">Result</span>&lt;(), HelperErrors&gt;&gt; + Send;
+}
+
+<span class="doccomment">/// Enumerates different errors produced by this crate.
+</span><span class="attr">#[derive(Error, Debug)]
+</span><span class="kw">pub enum </span>HelperErrors {
+    <span class="doccomment">/// Error propagated by IO operations
+    </span><span class="attr">#[error(transparent)]
+    </span>UnableToReadFromPath(<span class="attr">#[from] </span>std::io::Error),
+
+    <span class="doccomment">/// Error in parsing provided comma-separated addresses
+    </span><span class="attr">#[error(<span class="string">"error parsing address: {0:?}"</span>)]
+    </span>UnableToParseAddress(String),
+
+    <span class="doccomment">/// System time rrror
+    </span><span class="attr">#[error(transparent)]
+    </span>SystemTime(<span class="attr">#[from] </span>std::time::SystemTimeError),
+
+    <span class="doccomment">/// Error when identity cannot be created
+    </span><span class="attr">#[error(<span class="string">"unable to create identity"</span>)]
+    </span>UnableToCreateIdentity,
+
+    <span class="attr">#[error(<span class="string">"unable to update identity password"</span>)]
+    </span>UnableToUpdateIdentityPassword,
+
+    <span class="doccomment">/// Error due to supplying a non-existing file name
+    </span><span class="attr">#[error(<span class="string">"incorrect filename: {0}"</span>)]
+    </span>IncorrectFilename(String),
+
+    <span class="doccomment">/// Error when identity existed
+    </span><span class="attr">#[error(<span class="string">"identity file exists: {0}"</span>)]
+    </span>IdentityFileExists(String),
+
+    <span class="doccomment">/// Fail to read identity
+    </span><span class="attr">#[error(<span class="string">"unable to read identity"</span>)]
+    </span>UnableToReadIdentity,
+
+    <span class="doccomment">/// Fail to find the identity directory
+    </span><span class="attr">#[error(<span class="string">"unable to read identity directory"</span>)]
+    </span>MissingIdentityDirectory,
+
+    <span class="doccomment">/// Fail to delete an identity
+    </span><span class="attr">#[error(<span class="string">"unable to delete identity"</span>)]
+    </span>UnableToDeleteIdentity,
+
+    <span class="doccomment">/// Provided environement does not match with that in the `ethereum/contracts/contracts-addresses.json`
+    </span><span class="attr">#[error(<span class="string">"environment info mismatch"</span>)]
+    </span>EnvironmentInfoMismatch,
+
+    <span class="doccomment">/// Wrong foundry contract root is provided
+    </span><span class="attr">#[error(<span class="string">"unable to set foundry root"</span>)]
+    </span>UnableToSetFoundryRoot,
+
+    <span class="doccomment">/// Fail to run foundry
+    </span><span class="attr">#[error(<span class="string">"unable to run foundry"</span>)]
+    </span>ErrorInRunningFoundry,
+
+    <span class="doccomment">/// Fail to read password
+    </span><span class="attr">#[error(<span class="string">"unable read password"</span>)]
+    </span>UnableToReadPassword,
+
+    <span class="doccomment">/// Fail to read private key
+    </span><span class="attr">#[error(<span class="string">"cannot read private key error: {0}"</span>)]
+    </span>UnableToReadPrivateKey(String),
+
+    <span class="doccomment">/// Paramters are missing
+    </span><span class="attr">#[error(<span class="string">"missing parameter: {0}"</span>)]
+    </span>MissingParameter(String),
+
+    <span class="doccomment">/// Error with the keystore file
+    </span><span class="attr">#[error(transparent)]
+    </span>KeyStoreError(<span class="attr">#[from] </span>KeyPairError),
+
+    <span class="attr">#[error(<span class="string">"deserialization Error: {0}"</span>)]
+    </span><span class="doccomment">/// Serde JSON Error
+    </span>SerdeJson(<span class="attr">#[from] </span>serde_json::Error),
+
+    <span class="doccomment">/// Cannot find network details from the given network name
+    </span><span class="attr">#[error(<span class="string">"unable to find network details from the given network name "</span>)]
+    </span>UnknownNetwork,
+
+    <span class="doccomment">/// Error with HTTP Json RPC provider
+    </span><span class="attr">#[error(transparent)]
+    </span>RpcError(<span class="attr">#[from] </span>chain_rpc::errors::RpcError),
+
+    <span class="doccomment">/// Error with signer wallet error
+    </span><span class="attr">#[error(transparent)]
+    </span>WalletError(<span class="attr">#[from] </span>ethers::signers::WalletError),
+
+    <span class="doccomment">/// Fail to make a multicall
+    </span><span class="attr">#[error(<span class="string">"multicall Error: {0}"</span>)]
+    </span>MulticallError(String),
+
+    <span class="doccomment">/// Fail to make a multisend call
+    </span><span class="attr">#[error(<span class="string">"internal transaction failure in multisend"</span>)]
+    </span>MultiSendError,
+
+    <span class="doccomment">/// Txn caller does not have the minter role
+    </span><span class="attr">#[error(<span class="string">"caller does not have the privilege to mint tokens"</span>)]
+    </span>NotAMinter,
+
+    <span class="doccomment">/// Error with middleware
+    </span><span class="attr">#[error(<span class="string">"middleware Error: {0}"</span>)]
+    </span>MiddlewareError(String),
+
+    <span class="doccomment">/// A required smart contract (Safe or module proxy instance) is not deployed
+    </span><span class="attr">#[error(<span class="string">"contract not deployed: {0}"</span>)]
+    </span>ContractNotDeployed(String),
+
+    <span class="comment">// encode packed error
+    </span><span class="attr">#[error(transparent)]
+    </span>EncodePackedError(<span class="attr">#[from] </span>ethers::abi::EncodePackedError),
+
+    <span class="comment">// error of parsing addresses
+    </span><span class="attr">#[error(<span class="string">"Cannot parse address: {0}"</span>)]
+    </span>InvalidAddress(String),
+
+    <span class="comment">// general error of parsing
+    </span><span class="attr">#[error(<span class="string">"Cannot parse: {0}"</span>)]
+    </span>ParseError(String),
+}
+
+<span class="doccomment">/// Multicall3 deployer wallet
+</span><span class="kw">pub const </span>MULTICALL3_DEPLOYER: <span class="kw-2">&amp;</span>str = <span class="string">"05f32b3cc3888453ff71b01135b34ff8e41263f2"</span>;
+
+<span class="doccomment">/// Amount of ETH to fund MULTICALL3_DEPLOYER, to deployer Multicall3 contract
+</span><span class="kw">pub const </span>ETH_VALUE_FOR_MULTICALL3_DEPLOYER: u128 = <span class="number">100_000_000_000_000_000</span>; <span class="comment">// 0.1 (anvil) ETH
+
+</span><span class="doccomment">/// Contract creation code for mullticall3, as in &lt;https://etherscan.io/address/0xcA11bde05977b3631167028862bE2a173976CA11&gt;
+</span><span class="kw">pub const </span>MULTICALL3_CONTRACT_CREATION_CODE: <span class="kw-2">&amp;</span>str = <span class="string">"608060405234801561001057600080fd5b50610ee0806100206000396000f3fe6080604052600436106100f35760003560e01c80634d2301cc1161008a578063a8b0574e11610059578063a8b0574e1461025a578063bce38bd714610275578063c3077fa914610288578063ee82ac5e1461029b57600080fd5b80634d2301cc146101ec57806372425d9d1461022157806382ad56cb1461023457806386d516e81461024757600080fd5b80633408e470116100c65780633408e47014610191578063399542e9146101a45780633e64a696146101c657806342cbb15c146101d957600080fd5b80630f28c97d146100f8578063174dea711461011a578063252dba421461013a57806327e86d6e1461015b575b600080fd5b34801561010457600080fd5b50425b6040519081526020015b60405180910390f35b61012d610128366004610a85565b6102ba565b6040516101119190610bbe565b61014d610148366004610a85565b6104ef565b604051610111929190610bd8565b34801561016757600080fd5b50437fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0140610107565b34801561019d57600080fd5b5046610107565b6101b76101b2366004610c60565b610690565b60405161011193929190610cba565b3480156101d257600080fd5b5048610107565b3480156101e557600080fd5b5043610107565b3480156101f857600080fd5b50610107610207366004610ce2565b73ffffffffffffffffffffffffffffffffffffffff163190565b34801561022d57600080fd5b5044610107565b61012d610242366004610a85565b6106ab565b34801561025357600080fd5b5045610107565b34801561026657600080fd5b50604051418152602001610111565b61012d610283366004610c60565b61085a565b6101b7610296366004610a85565b610a1a565b3480156102a757600080fd5b506101076102b6366004610d18565b4090565b60606000828067ffffffffffffffff8111156102d8576102d8610d31565b60405190808252806020026020018201604052801561031e57816020015b6040805180820190915260008152606060208201528152602001906001900390816102f65790505b5092503660005b8281101561047757600085828151811061034157610341610d60565b6020026020010151905087878381811061035d5761035d610d60565b905060200281019061036f9190610d8f565b6040810135958601959093506103886020850185610ce2565b73ffffffffffffffffffffffffffffffffffffffff16816103ac6060870187610dcd565b6040516103ba929190610e32565b60006040518083038185875af1925050503d80600081146103f7576040519150601f19603f3d011682016040523d82523d6000602084013e6103fc565b606091505b50602080850191909152901515808452908501351761046d577f08c379a000000000000000000000000000000000000000000000000000000000600052602060045260176024527f4d756c746963616c6c333a2063616c6c206661696c656400000000000000000060445260846000fd5b5050600101610325565b508234146104e6576040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601a60248201527f4d756c746963616c6c333a2076616c7565206d69736d6174636800000000000060448201526064015b60405180910390fd5b50505092915050565b436060828067ffffffffffffffff81111561050c5761050c610d31565b60405190808252806020026020018201604052801561053f57816020015b606081526020019060019003908161052a5790505b5091503660005b8281101561068657600087878381811061056257610562610d60565b90506020028101906105749190610e42565b92506105836020840184610ce2565b73ffffffffffffffffffffffffffffffffffffffff166105a66020850185610dcd565b6040516105b4929190610e32565b6000604051808303816000865af19150503d80600081146105f1576040519150601f19603f3d011682016040523d82523d6000602084013e6105f6565b606091505b5086848151811061060957610609610d60565b602090810291909101015290508061067d576040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601760248201527f4d756c746963616c6c333a2063616c6c206661696c656400000000000000000060448201526064016104dd565b50600101610546565b5050509250929050565b43804060606106a086868661085a565b905093509350939050565b6060818067ffffffffffffffff8111156106c7576106c7610d31565b60405190808252806020026020018201604052801561070d57816020015b6040805180820190915260008152606060208201528152602001906001900390816106e55790505b5091503660005b828110156104e657600084828151811061073057610730610d60565b6020026020010151905086868381811061074c5761074c610d60565b905060200281019061075e9190610e76565b925061076d6020840184610ce2565b73ffffffffffffffffffffffffffffffffffffffff166107906040850185610dcd565b60405161079e929190610e32565b6000604051808303816000865af19150503d80600081146107db576040519150601f19603f3d011682016040523d82523d6000602084013e6107e0565b606091505b506020808401919091529015158083529084013517610851577f08c379a000000000000000000000000000000000000000000000000000000000600052602060045260176024527f4d756c746963616c6c333a2063616c6c206661696c656400000000000000000060445260646000fd5b50600101610714565b6060818067ffffffffffffffff81111561087657610876610d31565b6040519080825280602002602001820160405280156108bc57816020015b6040805180820190915260008152606060208201528152602001906001900390816108945790505b5091503660005b82811015610a105760008482815181106108df576108df610d60565b602002602001015190508686838181106108fb576108fb610d60565b905060200281019061090d9190610e42565b925061091c6020840184610ce2565b73ffffffffffffffffffffffffffffffffffffffff1661093f6020850185610dcd565b60405161094d929190610e32565b6000604051808303816000865af19150503d806000811461098a576040519150601f19603f3d011682016040523d82523d6000602084013e61098f565b606091505b506020830152151581528715610a07578051610a07576040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601760248201527f4d756c746963616c6c333a2063616c6c206661696c656400000000000000000060448201526064016104dd565b506001016108c3565b5050509392505050565b6000806060610a2b60018686610690565b919790965090945092505050565b60008083601f840112610a4b57600080fd5b50813567ffffffffffffffff811115610a6357600080fd5b6020830191508360208260051b8501011115610a7e57600080fd5b9250929050565b60008060208385031215610a9857600080fd5b823567ffffffffffffffff811115610aaf57600080fd5b610abb85828601610a39565b90969095509350505050565b6000815180845260005b81811015610aed57602081850181015186830182015201610ad1565b81811115610aff576000602083870101525b50601f017fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0169290920160200192915050565b600082825180855260208086019550808260051b84010181860160005b84811015610bb1578583037fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe001895281518051151584528401516040858501819052610b9d81860183610ac7565b9a86019a9450505090830190600101610b4f565b5090979650505050505050565b602081526000610bd16020830184610b32565b9392505050565b600060408201848352602060408185015281855180845260608601915060608160051b870101935082870160005b82811015610c52577fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffa0888703018452610c40868351610ac7565b95509284019290840190600101610c06565b509398975050505050505050565b600080600060408486031215610c7557600080fd5b83358015158114610c8557600080fd5b9250602084013567ffffffffffffffff811115610ca157600080fd5b610cad86828701610a39565b9497909650939450505050565b838152826020820152606060408201526000610cd96060830184610b32565b95945050505050565b600060208284031215610cf457600080fd5b813573ffffffffffffffffffffffffffffffffffffffff81168114610bd157600080fd5b600060208284031215610d2a57600080fd5b5035919050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052604160045260246000fd5b7f4e487b7100000000000000000000000000000000000000000000000000000000600052603260045260246000fd5b600082357fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff81833603018112610dc357600080fd5b9190910192915050565b60008083357fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe1843603018112610e0257600080fd5b83018035915067ffffffffffffffff821115610e1d57600080fd5b602001915036819003821315610a7e57600080fd5b8183823760009101908152919050565b600082357fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc1833603018112610dc357600080fd5b600082357fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffa1833603018112610dc357600080fdfea2646970667358221220bb2b5c71a328032f97c676ae39a1ec2148d3e5d6f73d95e9b17910152d61f16264736f6c634300080c0033"</span>;
+
+<span class="doccomment">/// Default capability permissions, as in smart contract
+/// ```text
+///     [
+///       CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, // defaultRedeemTicketSafeFunctionPermisson
+///       CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, // RESERVED
+///       CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, // defaultCloseIncomingChannelSafeFunctionPermisson
+///       CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, // defaultInitiateOutgoingChannelClosureSafeFunctionPermisson
+///       CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, // defaultFinalizeOutgoingChannelClosureSafeFunctionPermisson
+///       CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, // defaultFundChannelMultiFunctionPermisson
+///       CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, // defaultSetCommitmentSafeFunctionPermisson
+///       CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, // defaultApproveFunctionPermisson
+///       CapabilityPermission.SPECIFIC_FALLBACK_ALLOW  // defaultSendFunctionPermisson
+///     ]
+/// ```
+</span><span class="kw">pub const </span>DEFAULT_CAPABILITY_PERMISSIONS: <span class="kw-2">&amp;</span>str = <span class="string">"010103030303030303030303"</span>;
+
+<span class="doccomment">/// Default announcement permissions, where nothing is specified and falls back to the default, as in smart contract
+/// ```text
+///     [
+///       CapabilityPermission.NONE, // defaultRedeemTicketSafeFunctionPermisson
+///       CapabilityPermission.NONE, // RESERVED
+///       CapabilityPermission.NONE, // defaultCloseIncomingChannelSafeFunctionPermisson
+///       CapabilityPermission.NONE, // defaultInitiateOutgoingChannelClosureSafeFunctionPermisson
+///       CapabilityPermission.NONE, // defaultFinalizeOutgoingChannelClosureSafeFunctionPermisson
+///       CapabilityPermission.NONE, // defaultFundChannelMultiFunctionPermisson
+///       CapabilityPermission.NONE, // defaultSetCommitmentSafeFunctionPermisson
+///       CapabilityPermission.NONE, // defaultApproveFunctionPermisson
+///       CapabilityPermission.NONE  // defaultSendFunctionPermisson
+///     ]
+/// ```
+</span><span class="kw">pub const </span>DEFAULT_ANNOUNCEMENT_PERMISSIONS: <span class="kw-2">&amp;</span>str = <span class="string">"010003000000000000000000"</span>;
+
+<span class="doccomment">/// Default node permissions, where nothing is specified and falls back to the default, as in smart contract
+/// ```text
+///     [
+///       CapabilityPermission.NONE, // defaultRedeemTicketSafeFunctionPermisson
+///       CapabilityPermission.NONE, // RESERVED
+///       CapabilityPermission.NONE, // defaultCloseIncomingChannelSafeFunctionPermisson
+///       CapabilityPermission.NONE, // defaultInitiateOutgoingChannelClosureSafeFunctionPermisson
+///       CapabilityPermission.NONE, // defaultFinalizeOutgoingChannelClosureSafeFunctionPermisson
+///       CapabilityPermission.NONE, // defaultFundChannelMultiFunctionPermisson
+///       CapabilityPermission.NONE, // defaultSetCommitmentSafeFunctionPermisson
+///       CapabilityPermission.NONE, // defaultApproveFunctionPermisson
+///       CapabilityPermission.NONE  // defaultSendFunctionPermisson
+///     ]
+/// ```
+</span><span class="kw">pub const </span>DEFAULT_NODE_PERMISSIONS: <span class="kw-2">&amp;</span>str = <span class="string">"010303000000000000000000"</span>;
+
+<span class="doccomment">/// Safe compatibility fallback handler contract deployed for v1.4.0, as in &lt;https://github.com/safe-global/safe-deployments/blob/b707e5e2994e6f86d76ff7ffade0445c4e49ae9a/src/assets/v1.4.0/compatibility_fallback_handler.json&gt;
+</span><span class="kw">pub const </span>SAFE_COMPATIBILITYFALLBACKHANDLER_ADDRESS: <span class="kw-2">&amp;</span>str = <span class="string">"2a15DE4410d4c8af0A7b6c12803120f43C42B820"</span>;
+<span class="doccomment">/// Safe implementation contract deployed for v1.4.1, as in &lt;https://github.com/safe-global/safe-deployments/blob/8c504f44d148f4c898fee02749c88372bae6609a/src/assets/v1.4.1/safe.json&gt;
+</span><span class="kw">pub const </span>SAFE_SAFE_ADDRESS: <span class="kw-2">&amp;</span>str = <span class="string">"41675C099F32341bf84BFc5382aF534df5C7461a"</span>;
+<span class="doccomment">/// Safe proxy factory contract deployed for v1.4.0, &lt;https://github.com/safe-global/safe-deployments/blob/b707e5e2994e6f86d76ff7ffade0445c4e49ae9a/src/assets/v1.4.0/safe_proxy_factory.json&gt;
+</span><span class="kw">pub const </span>SAFE_SAFEPROXYFACTORY_ADDRESS: <span class="kw-2">&amp;</span>str = <span class="string">"4e1DCf7AD4e460CfD30791CCC4F9c8a4f820ec67"</span>;
+<span class="doccomment">/// Safe multisend contract deployed for v1.4.0,  &lt;https://github.com/safe-global/safe-deployments/blob/b707e5e2994e6f86d76ff7ffade0445c4e49ae9a/src/assets/v1.4.0/multi_send.json&gt;
+</span><span class="kw">pub const </span>SAFE_MULTISEND_ADDRESS: <span class="kw-2">&amp;</span>str = <span class="string">"38869bf66a61cF6bDB996A6aE40D5853Fd43B526"</span>;
+
+<span class="doccomment">/// Topic hash for `NewHoprNodeStakeModule` event
+</span><span class="kw">pub const </span>NEW_HOPR_NODE_STAKE_MODULE_TOPIC: <span class="kw-2">&amp;</span>str = <span class="string">"0x813d391dc490d6c1dae7d3fdd555f337533d1da2c908c6efd36d4cf557a63206"</span>;
+<span class="doccomment">/// Topic hash for `NewHoprNodeStakeSafe` event
+</span><span class="kw">pub const </span>NEW_HOPR_NODE_STAKE_SAFE_TOPIC: <span class="kw-2">&amp;</span>str = <span class="string">"0x8231d169f416b666ae7fa43faa24a18899738075a53f32c97617d173b189e386"</span>;
+
+<span class="doccomment">/// Starting point for a linked list in safe contract, as in &lt;https://github.com/safe-global/safe-smart-account/blob/2278f7ccd502878feb5cec21dd6255b82df374b5/contracts/base/OwnerManager.sol#L14&gt;
+</span><span class="kw">pub const </span>SENTINEL_OWNERS: <span class="kw-2">&amp;</span>str = <span class="string">"0x0000000000000000000000000000000000000001"</span>;
+<span class="doccomment">/// Safe transaction type hash, as in &lt;https://github.com/safe-global/safe-smart-account/blob/2278f7ccd502878feb5cec21dd6255b82df374b5/contracts/Safe.sol#L59&gt;
+</span><span class="kw">pub const </span>SAFE_TX_TYPEHASH: <span class="kw-2">&amp;</span>str = <span class="string">"bb8310d486368db6bd6f849402fdd73ad53d316b5a4b2644ad6efe0f941286d8"</span>;
+
+<span class="doccomment">/// Safe domain separator typehash, as in &lt;https://github.com/safe-global/safe-smart-account/blob/2278f7ccd502878feb5cec21dd6255b82df374b5/contracts/Safe.sol#L54&gt;
+</span><span class="kw">pub const </span>DOMAIN_SEPARATOR_TYPEHASH: <span class="kw-2">&amp;</span>str = <span class="string">"47e79534a245952e8b16893a336b85a3d9ea9fa8c573f3d803afb92a79469218"</span>;
+
+<span class="doccomment">/// Topic hash for `ExecutionSuccess` event, as in &lt;https://github.com/safe-global/safe-smart-account/blob/2278f7ccd502878feb5cec21dd6255b82df374b5/contracts/interfaces/ISafe.sol#L18&gt;
+</span><span class="kw">pub const </span>SAFE_EXECUTION_SUCCESS: <span class="kw-2">&amp;</span>str = <span class="string">"0x442e715f626346e8c54381002da614f62bee8d27386535b2521ec8540898556e"</span>;
+</code></pre></div></section></main></body></html>

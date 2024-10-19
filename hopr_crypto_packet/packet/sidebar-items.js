@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["PACKET_LENGTH"],"enum":["ForwardedMetaPacket"],"fn":["packet_length"],"struct":["MetaPacket"],"type":["CurrentSphinxSuite"]};

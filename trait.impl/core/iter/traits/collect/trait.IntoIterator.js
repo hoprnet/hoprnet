@@ -1,0 +1,9 @@
+(function() {
+    var implementors = Object.fromEntries([["hopr_network_types",[["impl&lt;const C: <a class=\"primitive\" href=\"https://doc.rust-lang.org/nightly/std/primitive.usize.html\">usize</a>&gt; <a class=\"trait\" href=\"https://doc.rust-lang.org/nightly/core/iter/traits/collect/trait.IntoIterator.html\" title=\"trait core::iter::traits::collect::IntoIterator\">IntoIterator</a> for <a class=\"struct\" href=\"hopr_network_types/session/protocol/struct.FrameAcknowledgements.html\" title=\"struct hopr_network_types::session::protocol::FrameAcknowledgements\">FrameAcknowledgements</a>&lt;C&gt;"],["impl&lt;const C: <a class=\"primitive\" href=\"https://doc.rust-lang.org/nightly/std/primitive.usize.html\">usize</a>&gt; <a class=\"trait\" href=\"https://doc.rust-lang.org/nightly/core/iter/traits/collect/trait.IntoIterator.html\" title=\"trait core::iter::traits::collect::IntoIterator\">IntoIterator</a> for <a class=\"struct\" href=\"hopr_network_types/session/protocol/struct.SegmentRequest.html\" title=\"struct hopr_network_types::session::protocol::SegmentRequest\">SegmentRequest</a>&lt;C&gt;"]]],["hopr_primitive_types",[["impl&lt;T, const N: <a class=\"primitive\" href=\"https://doc.rust-lang.org/nightly/std/primitive.usize.html\">usize</a>&gt; <a class=\"trait\" href=\"https://doc.rust-lang.org/nightly/core/iter/traits/collect/trait.IntoIterator.html\" title=\"trait core::iter::traits::collect::IntoIterator\">IntoIterator</a> for <a class=\"struct\" href=\"hopr_primitive_types/bounded/struct.BoundedVec.html\" title=\"struct hopr_primitive_types::bounded::BoundedVec\">BoundedVec</a>&lt;T, N&gt;"]]]]);
+    if (window.register_implementors) {
+        window.register_implementors(implementors);
+    } else {
+        window.pending_implementors = implementors;
+    }
+})()
+//{"start":57,"fragment_lengths":[1059,513]}
