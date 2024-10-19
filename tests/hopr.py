@@ -415,7 +415,7 @@ class HoprdAPI:
         return int(response.price) if hasattr(response, "price") else None
 
     async def session_client(
-        self, destination: str, path: str, protocol: str, target: str, listen_on: str = "127.0.0.1:0", capabilities=None
+        self, destination: str, path: str, protocol: str, target: str, listen_on: str = "127.0.0.1:0", capabilities=None, sealed_target=False
     ):
         """
         Returns the port of the client session.
@@ -425,9 +425,14 @@ class HoprdAPI:
         :param target: Destination for the session packets.
         :param listen_on: The host to listen on for input packets (default: "127.0.0.1:0")
         :param capabilities: Optional list of capabilities for the session (default: None)
+        :param sealed_target: The target parameter is encrypted (default: False)
         """
+        actual_target = { "Plain": target }
+        if sealed_target:
+            actual_target = { "Sealed": target }
+
         if capabilities is None:
-            body = SessionClientRequest(destination=destination, path=path, target=target, listen_host=listen_on)
+            body = SessionClientRequest(destination=destination, path=path, target=actual_target, listen_host=listen_on)
         else:
             body = SessionClientRequest(
                 destination=destination, path=path, target=target, listen_host=listen_on, capabilities=capabilities
