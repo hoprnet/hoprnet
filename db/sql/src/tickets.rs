@@ -326,17 +326,21 @@ impl HoprDbTicketOperations for HoprDb {
                                         (_current_value + marked_value.amount()).as_u128() as f64,
                                     );
 
-                                    let unredeemed_value = myself
-                                        .caches
-                                        .unrealized_value
-                                        .get(channel_id)
-                                        .await
-                                        .unwrap_or(Balance::zero(BalanceType::HOPR));
+                                    // Tickets that are counted as rejected were never counted as unredeemed,
+                                    // so skip the metric subtraction in that case.
+                                    if mark_as != TicketMarker::Rejected {
+                                        let unredeemed_value = myself
+                                            .caches
+                                            .unrealized_value
+                                            .get(channel_id)
+                                            .await
+                                            .unwrap_or(Balance::zero(BalanceType::HOPR));
 
-                                    METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(
-                                        &[&channel, "unredeemed"],
-                                        (unredeemed_value - marked_value.amount()).amount().as_u128() as f64,
-                                    );
+                                        METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(
+                                            &[&channel, "unredeemed"],
+                                            (unredeemed_value - marked_value.amount()).amount().as_u128() as f64,
+                                        );
+                                    }
                                 }
 
                                 myself.caches.unrealized_value.invalidate(channel_id).await;
