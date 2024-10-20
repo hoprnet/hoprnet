@@ -168,7 +168,7 @@ impl PayloadGenerator<TypedTransaction> for BasicPayloadGenerator {
         let mut tx = transfer_tx(destination, amount);
         tx.set_to(H160::from(match amount.balance_type() {
             BalanceType::Native => destination,
-            BalanceType::HOPR => self.contract_addrs.channels,
+            BalanceType::HOPR => self.contract_addrs.token,
         }));
         Ok(tx)
     }
@@ -339,7 +339,7 @@ impl PayloadGenerator<TypedTransaction> for SafePayloadGenerator {
         tx.set_to(NameOrAddress::Address(
             match amount.balance_type() {
                 BalanceType::Native => destination,
-                BalanceType::HOPR => self.contract_addrs.channels,
+                BalanceType::HOPR => self.contract_addrs.token,
             }
             .into(),
         ));
@@ -727,5 +727,57 @@ pub mod tests {
             "{:?}",
             client.send_transaction(redeem_ticket_tx, None).await.unwrap().await
         );
+    }
+
+    #[async_std::test]
+    async fn withdraw_token() {
+        let anvil = chain_types::utils::create_anvil(None);
+        let chain_key_alice = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
+        let chain_key_bob = ChainKeypair::from_secret(anvil.keys()[1].to_bytes().as_ref()).unwrap();
+        let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &chain_key_alice);
+
+        // Deploy contracts
+        let contract_instances = ContractInstances::deploy_for_testing(client.clone(), &chain_key_alice)
+            .await
+            .expect("could not deploy contracts");
+
+        // Mint 1000 HOPR to Alice
+        chain_types::utils::mint_tokens(contract_instances.token.clone(), 1000_u128.into()).await;
+
+        let generator = BasicPayloadGenerator::new((&chain_key_alice).into(), (&contract_instances).into());
+
+        // Check balance is 1000 HOPR
+        let balance: ethers::types::U256 = contract_instances
+            .token
+            .balance_of(hopr_primitive_types::primitives::Address::from(&chain_key_alice).into())
+            .call()
+            .await
+            .unwrap();
+        assert_eq!(balance, 1000_u128.into());
+
+        // Alice withdraws 100 HOPR (to Bob's address)
+        let tx = generator
+            .transfer(
+                (&chain_key_bob).into(),
+                Balance::new(ethers::types::U256::from(100_u128), BalanceType::HOPR),
+            )
+            .expect("should generate tx");
+
+        assert!(client
+            .send_transaction(tx, None)
+            .await
+            .unwrap()
+            .await
+            .unwrap()
+            .is_some());
+
+        // Alice withdraws 100 HOPR, leaving 900 HOPR to the node
+        let balance: ethers::types::U256 = contract_instances
+            .token
+            .balance_of(hopr_primitive_types::primitives::Address::from(&chain_key_alice).into())
+            .call()
+            .await
+            .unwrap();
+        assert_eq!(balance, 900_u128.into());
     }
 }
