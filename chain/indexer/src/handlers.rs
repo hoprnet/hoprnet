@@ -382,7 +382,7 @@ where
                         // index value in the cache is at least the index of the redeemed ticket
                         Some(ChannelDirection::Outgoing) => {
                             // We need to ensure the outgoing ticket index is at least this new value
-                            debug!("observed redeem event on an outgoing {}", channel_edits.entry());
+                            debug!(channel = %channel_edits.entry(), "observed redeem event on an outgoing channel");
                             self.db
                                 .compare_and_set_outgoing_ticket_index(
                                     channel_edits.entry().get_id(),
@@ -394,7 +394,7 @@ where
                         // For a channel where neither source nor destination is us, we don't care
                         None => {
                             // Not our redeem event
-                            debug!("observed redeem event on a foreign {}", channel_edits.entry());
+                            debug!(channel = %channel_edits.entry(), "observed redeem event on a foreign channel");
                             None
                         }
                     };
@@ -840,7 +840,7 @@ where
                         // If a significant chain event can be extracted from the log, push it
                         if let Some(event_type) = myself.process_log_event(tx, log).await? {
                             let significant_event = SignificantChainEvent { tx_hash, event_type };
-                            debug!("indexer got {significant_event}");
+                            debug!(?significant_event, "indexer got significant_event");
                             ret.push(significant_event);
                         }
 
@@ -849,9 +849,9 @@ where
 
                     // Update the hash only if any logs were processed in this block
                     let block_hash = if !log_tx_hashes.is_empty() {
-                        debug!("block {block_id} has hashes {:?}", log_tx_hashes);
+                        debug!(block = block_id, hashed = ?log_tx_hashes, "block log contents");
                         let h = Hash::create(log_tx_hashes.iter().map(|h| h.as_ref()).collect::<Vec<_>>().as_ref());
-                        debug!("block hash of {block_id} is {h}");
+                        debug!(block = block_id, hash = %h, "block hash");
                         Some(h)
                     } else {
                         None

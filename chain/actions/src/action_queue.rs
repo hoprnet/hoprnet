@@ -212,7 +212,7 @@ where
                 },
                 ChannelDirection::Outgoing => match channel.status {
                     ChannelStatus::Open => {
-                        debug!("initiating closure of {channel}");
+                        debug!(%channel, "initiating channel closure");
                         let tx_hash = self
                             .tx_exec
                             .initiate_outgoing_channel_closure(channel.destination)
@@ -223,7 +223,7 @@ where
                         )
                     }
                     ChannelStatus::PendingToClose(_) => {
-                        debug!("finalizing closure of {channel}");
+                        debug!(%channel, "finalizing channel closure");
                         let tx_hash = self
                             .tx_exec
                             .finalize_outgoing_channel_closure(channel.destination)
@@ -267,7 +267,7 @@ where
         };
 
         let tx_hash = expectation.tx_hash;
-        debug!("action {action} submitted via tx {tx_hash}, registering expectation");
+        debug!(?action, %tx_hash, "action submitted via tx, registering expectation");
 
         // Register new expectation and await it with timeout
         let confirmation = self.action_state.register_expectation(expectation).await?.fuse();

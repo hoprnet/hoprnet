@@ -80,8 +80,8 @@ where
             .get_channels_via(None, ChannelDirection::Incoming, &self.self_address())
             .await?;
         debug!(
-            "starting to redeem all tickets in {} incoming channels to us.",
-            incoming_channels.len()
+            channel_count = incoming_channels.len(),
+            "starting to redeem all tickets in channels to self"
         );
 
         let mut receivers: Vec<PendingAction> = vec![];

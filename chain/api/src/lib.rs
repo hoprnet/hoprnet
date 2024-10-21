@@ -56,9 +56,7 @@ pub async fn can_register_with_safe<Rpc: HoprRpcOperations>(
     rpc: &Rpc,
 ) -> Result<bool> {
     let target_address = rpc.get_module_target_address().await?;
-    debug!("-- node address: {me}");
-    debug!("-- safe address: {safe_address}");
-    debug!("-- module target address: {target_address}");
+    debug!(node_address = %me, %safe_address, %target_address, "can register with safe");
 
     if target_address != safe_address {
         // cannot proceed when the safe address is not the target/owner of given module
@@ -66,7 +64,7 @@ pub async fn can_register_with_safe<Rpc: HoprRpcOperations>(
     }
 
     let registered_address = rpc.get_safe_from_node_safe_registry(me).await?;
-    info!("currently registered Safe address in NodeSafeRegistry = {registered_address}");
+    info!(%registered_address, "currently registered Safe address in NodeSafeRegistry");
 
     if registered_address.is_zero() {
         info!("Node is not associated with a Safe in NodeSafeRegistry yet");

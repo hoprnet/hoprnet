@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use futures::{stream, StreamExt};
-use tracing::{debug, error, info, trace};
+use tracing::{error, info, trace};
 
 use chain_rpc::{HoprIndexerRpcOperations, LogFilter};
 use chain_types::chain_events::SignificantChainEvent;
@@ -206,7 +206,6 @@ where
                     }
                 })
                 .filter_map(|block_with_logs| async {
-                    debug!("processing events in {block_with_logs} ...");
                     let block_description = block_with_logs.to_string();
                     let block_id = block_with_logs.block_id;
                     let log_count = block_with_logs.logs.len();

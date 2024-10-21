@@ -77,13 +77,13 @@ where
             .perform(|tx| {
                 Box::pin(async move {
                     let allowance = db_clone.get_safe_hopr_allowance(Some(tx)).await?;
-                    debug!("current staking safe allowance is {allowance}");
+                    debug!(%allowance, "current staking safe allowance");
                     if allowance.lt(&amount) {
                         return Err(NotEnoughAllowance);
                     }
 
                     let hopr_balance = db_clone.get_safe_hopr_balance(Some(tx)).await?;
-                    debug!("current Safe HOPR balance is {hopr_balance}");
+                    debug!(balance = %hopr_balance, "current Safe HOPR balance");
                     if hopr_balance.lt(&amount) {
                         return Err(BalanceTooLow);
                     }
@@ -98,7 +98,7 @@ where
                         .get_channel_by_parties(Some(tx), &self_addr, &destination, false)
                         .await?;
                     if let Some(channel) = maybe_channel {
-                        debug!("already found existing {channel}");
+                        debug!(%channel, "already found existing channel");
                         if channel.status != ChannelStatus::Closed {
                             error!("channel to {destination} is already opened or pending to close");
                             return Err(ChannelAlreadyExists);
@@ -127,13 +127,13 @@ where
             .perform(|tx| {
                 Box::pin(async move {
                     let allowance = db_clone.get_safe_hopr_allowance(Some(tx)).await?;
-                    debug!("current staking safe allowance is {allowance}");
+                    debug!(%allowance, "current staking safe allowance");
                     if allowance.lt(&amount) {
                         return Err(NotEnoughAllowance);
                     }
 
                     let hopr_balance = db_clone.get_safe_hopr_balance(Some(tx)).await?;
-                    debug!("current Safe HOPR balance is {hopr_balance}");
+                    debug!(balance = %hopr_balance, "current Safe HOPR balance");
                     if hopr_balance.lt(&amount) {
                         return Err(BalanceTooLow);
                     }
