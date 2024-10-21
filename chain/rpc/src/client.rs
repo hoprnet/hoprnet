@@ -281,10 +281,11 @@ impl<Req: HttpPostRequestor, R: RetryPolicy<JsonRpcProviderClientError>> JsonRpc
         let next_id = self.id.fetch_add(1, Ordering::SeqCst);
         let payload = Request::new(next_id, method, params);
 
-        debug!("sending rpc {method} request");
+        debug!(method, "sending rpc request");
         trace!(
-            "sending rpc {method} request: {}",
-            serde_json::to_string(&payload).expect("request must be serializable")
+            method,
+            request = serde_json::to_string(&payload).expect("request must be serializable"),
+            "sending rpc request",
         );
 
         // Perform the actual request
@@ -292,7 +293,7 @@ impl<Req: HttpPostRequestor, R: RetryPolicy<JsonRpcProviderClientError>> JsonRpc
         let body = self.requestor.http_post(self.url.as_ref(), payload).await?;
         let req_duration = start.elapsed();
 
-        trace!("rpc {method} request took {}ms", req_duration.as_millis());
+        trace!(method, duration_in_ms = req_duration.as_millis(), "rpc request took");
 
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_RPC_CALLS_TIMING.observe(&[method], req_duration.as_secs_f64());
@@ -329,7 +330,7 @@ impl<Req: HttpPostRequestor, R: RetryPolicy<JsonRpcProviderClientError>> JsonRpc
 
         // Next, deserialize the data out of the Response object
         let json_str = raw.get();
-        trace!("rpc {method} request got response: {json_str}");
+        trace!(method, response = &json_str, "rpc request response received");
 
         let res = serde_json::from_str(json_str).map_err(|err| JsonRpcProviderClientError::SerdeJson {
             err,

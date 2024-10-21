@@ -158,7 +158,7 @@ where
                     let is_synced = is_synced.clone();
 
                     async move {
-                        trace!("Processed block number: {}", block_with_logs.block_id);
+                        trace!(block_id=block_with_logs.block_id, "Processed block");
 
                         let current_block = block_with_logs.block_id;
                         #[cfg(all(feature = "prometheus", not(test)))]
@@ -213,7 +213,7 @@ where
 
                     let outgoing_events = match db_processor.collect_block_events(block_with_logs).await {
                         Ok(events) => {
-                            trace!("retrieved {} significant chain events from {block_description}", events.len());
+                            trace!(event_count=events.len(), block_id, "retrieved significant chain events");
                             Some(events)
                         }
                         Err(e) => {
@@ -251,7 +251,7 @@ where
 
                 futures::pin_mut!(event_stream);
                 while let Some(event) = event_stream.next().await {
-                    trace!("Processing an onchain event: {event:?}");
+                    trace!(event=%event, "Processing onchain event");
                     // Pass the events further only once we're fully synced
                     if is_synced.load(std::sync::atomic::Ordering::Relaxed) {
                         if let Err(e) = tx_significant_events.try_send(event) {

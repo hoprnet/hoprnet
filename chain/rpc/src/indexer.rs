@@ -146,7 +146,7 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                         let mut retrieved_logs = self.stream_logs(filter.clone(), from_block, latest_block);
 
                         let mut current_block_log = BlockWithLogs { block_id: from_block, ..Default::default()};
-                        trace!("begin processing batch #{from_block} - #{latest_block}");
+                        trace!(from_block, to_block = latest_block, "processing batch");
                         loop {
                             match retrieved_logs.try_next().await {
                                 Ok(Some(log)) => {
@@ -169,11 +169,11 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                                     current_block_log.logs.insert(log);
                                 },
                                 Ok(None) => {
-                                    trace!("done processing batch #{from_block} - #{latest_block}");
+                                    trace!(from_block, to_block=latest_block, "done processing batch");
                                     break;
                                 },
                                 Err(e) => {
-                                    error!("failure when processing blocks from RPC: {e}");
+                                    error!(error=?e, "failed to process blocks");
                                     count_failures += 1;
 
                                     if count_failures < MAX_LOOP_FAILURES {

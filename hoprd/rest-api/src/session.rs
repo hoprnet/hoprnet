@@ -198,9 +198,9 @@ async fn websocket_connection(socket: WebSocket, session: HoprSession) {
                     debug!("Received close frame, closing connection");
                     break;
                 }
-                Ok(m) => trace!("skipping an unsupported websocket message: {m:?}"),
+                Ok(m) => trace!(message = ?m, "skipping an unsupported websocket message"),
                 Err(e) => {
-                    error!(error=%e, "Failed to get a valid websocket message, closing connection");
+                    error!(error = %e, "Failed to get a valid websocket message, closing connection");
                     break;
                 }
             },

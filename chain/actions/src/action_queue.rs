@@ -371,7 +371,7 @@ where
             spawn(async move {
                 let act_id = act.to_string();
                 let act_name: &'static str = (&act).into();
-                trace!("start executing {act_id} ({act_name})");
+                trace!(act_id, act_name, "executing");
 
                 let tx_result = exec_context.execute_action(act.clone(), channel_dst).await;
                 match &tx_result {

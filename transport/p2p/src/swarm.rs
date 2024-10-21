@@ -593,14 +593,14 @@ impl HoprSwarmWithProcessors {
                         error,
                         send_back_addr,
                     } => {
-                        error!(local_addr = %local_addr, send_back_addr = %send_back_addr, connection_id = %connection_id, transport="libp2p", dial_error= %error, "incoming connection error")
+                        error!(local_addr = %local_addr, send_back_addr = %send_back_addr, connection_id = %connection_id, transport="libp2p", error= %error, "incoming connection error")
                     }
                     SwarmEvent::OutgoingConnectionError {
                         connection_id,
                         error,
                         peer_id
                     } => {
-                        error!(peer = peer_id, connection_id = %connection_id, transport="libp2p", dial_error= %error, "outgoing connection error")
+                        error!(peer = ?peer_id, connection_id = %connection_id, transport="libp2p", error= %error, "outgoing connection error")
                     }
                     SwarmEvent::NewListenAddr {
                         listener_id,

@@ -497,8 +497,8 @@ where
         StartProtocol::SessionError(err) => {
             trace!(
                 challenge = err.challenge,
-                "received error during session initiation: {}",
-                err.reason
+                error = ?err.reason,
+                "failed to initialize a session",
             );
             // Currently, we don't distinguish between individual error types
             // and just discard the initiation attempt and pass on the error.
@@ -997,7 +997,7 @@ where
         .ok_or(HoprTransportError::Api("all challenge slots are occupied".into()))?; // almost impossible with u64
 
         // Prepare the session initiation message in the Start protocol
-        trace!(challenge, "initiating session with config {cfg:?}");
+        trace!(challenge, ?cfg, "initiating session with config");
         let start_session_msg = StartProtocol::<SessionId>::StartSession(StartInitiation {
             challenge,
             target: match cfg.target_protocol {

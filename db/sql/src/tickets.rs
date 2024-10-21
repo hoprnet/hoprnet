@@ -284,7 +284,7 @@ impl HoprDbTicketOperations for HoprDb {
                         // Get the number of tickets and their value just for this channel
                         let (marked_count, marked_value) =
                             myself.get_tickets_value_int(Some(tx), channel_selector.clone()).await?;
-                        trace!("{marked_count} tickets of total value {marked_value} will be marked as {mark_as}");
+                        trace!(marked_count, ?marked_value, ?mark_as, "ticket marking");
 
                         if marked_count > 0 {
                             // Delete the redeemed tickets first
@@ -346,14 +346,16 @@ impl HoprDbTicketOperations for HoprDb {
                                 )));
                             }
 
-                            trace!("removed {marked_count} of {mark_as} tickets in channel {channel_id}");
+                            trace!(marked_count, ?channel_id, ?mark_as, "removed tickets in channel");
                             total_marked_count += marked_count;
                         }
                     }
 
                     info!(
-                        "removed {total_marked_count} of {mark_as} tickets in {} channels",
-                        selector.channel_identifiers.len()
+                        count = total_marked_count,
+                        ?mark_as,
+                        channel_count = selector.channel_identifiers.len(),
+                        "removed tickets in channels",
                     );
                     Ok(total_marked_count)
                 })
@@ -708,7 +710,7 @@ impl HoprDbTicketOperations for HoprDb {
             } else {
                 // The value is not yet in the cache, meaning there's low traffic on this
                 // channel, so the value has not been yet fetched.
-                trace!("channel {channel_id} is in the DB but not yet in the cache.");
+                trace!(?channel_id, "channel not in cache yet");
             }
         }
 

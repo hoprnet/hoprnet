@@ -56,7 +56,7 @@ impl HoprDbProtocolOperations for HoprDb {
                             ))
                         })? {
                         PendingAcknowledgement::WaitingAsSender => {
-                            trace!("received acknowledgement as sender: first relayer has processed the packet.");
+                            trace!("received acknowledgement as sender: first relayer has processed the packet");
 
                             Ok(ResolvedAcknowledgement::Sending(ack.ack_challenge()))
                         }

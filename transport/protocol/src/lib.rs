@@ -288,7 +288,7 @@ where
                         let random_delay = cfg.random_delay();
                         trace!(
                             delay_in_ms = random_delay.as_millis(),
-                            "Mixer created a random packet delay",
+                            "Created random mixer delay",
                         );
 
                         sleep(random_delay).await;

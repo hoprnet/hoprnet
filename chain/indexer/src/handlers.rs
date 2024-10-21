@@ -91,15 +91,15 @@ where
         match event {
             HoprAnnouncementsEvents::AddressAnnouncementFilter(address_announcement) => {
                 trace!(
-                    "on_announcement_event - multiaddr: {} - node: {}",
-                    &address_announcement.base_multiaddr,
-                    &address_announcement.node.to_string()
+                    multiaddress = &address_announcement.base_multiaddr,
+                    address = &address_announcement.node.to_string(),
+                    "on_announcement_event",
                 );
                 // safeguard against empty multiaddrs, skip
                 if address_announcement.base_multiaddr.is_empty() {
                     warn!(
-                        "encountered empty multiaddress announcement for account {}",
-                        address_announcement.node
+                        address = ?address_announcement.node,
+                        "encountered empty multiaddress announcement",
                     );
                     return Ok(None);
                 }
@@ -268,9 +268,7 @@ where
                         )));
                     }
 
-                    trace!(
-                        "on_channel_reopened_event - source: {source} - destination: {destination} - channel_id: {channel_id}"
-                    );
+                    trace!(%source, %destination, %channel_id, "on_channel_reopened_event");
 
                     let current_epoch = channel_edits.entry().channel_epoch;
 
@@ -296,9 +294,7 @@ where
                         )
                         .await?
                 } else {
-                    trace!(
-                        "on_channel_opened_event - source: {source} - destination: {destination} - channel_id: {channel_id}"
-                    );
+                    trace!(%source, %destination, %channel_id, "on_channel_opened_event");
 
                     let new_channel = ChannelEntry::new(
                         source,
@@ -482,8 +478,8 @@ where
                 let to: Address = transferred.to.into();
 
                 trace!(
-                    "on_token_transfer_event - address_to_monitor: {:?} - to: {to} - from: {from}",
-                    &self.safe_address,
+                    safe_address = %&self.safe_address, %from, %to,
+                    "on_token_transfer_event"
                 );
 
                 let mut current_balance = self.db.get_safe_hopr_balance(Some(tx)).await?;
@@ -508,8 +504,9 @@ where
                 let spender: Address = approved.spender.into();
 
                 trace!(
-                    "on_token_approval_event - address_to_monitor: {:?} - owner: {owner} - spender: {spender}, allowance: {:?}",
-                    &self.safe_address, approved.value
+                    address = %&self.safe_address, %owner, %spender, allowance = %approved.value,
+                    "on_token_approval_event",
+
                 );
 
                 // if approval is for tokens on Safe contract to be spent by HoprChannels
@@ -672,7 +669,9 @@ where
                 let new_minimum_win_prob = win_prob_to_f64(&encoded_new);
 
                 trace!(
-                    "on_ticket_minimum_win_prob_updated - old: {old_minimum_win_prob} - new: {new_minimum_win_prob}",
+                    old = old_minimum_win_prob,
+                    new = new_minimum_win_prob,
+                    "on_ticket_minimum_win_prob_updated",
                 );
 
                 self.db
@@ -721,9 +720,9 @@ where
         match event {
             HoprTicketPriceOracleEvents::TicketPriceUpdatedFilter(update) => {
                 trace!(
-                    "on_ticket_price_updated - old: {:?} - new: {:?}",
-                    update.0.to_string(),
-                    update.1.to_string()
+                    old = update.0.to_string(),
+                    new = update.1.to_string(),
+                    "on_ticket_price_updated",
                 );
 
                 self.db
@@ -741,7 +740,7 @@ where
 
     #[tracing::instrument(level = "debug", skip(self))]
     async fn process_log_event(&self, tx: &OpenTransaction, log: Log) -> Result<Option<ChainEventType>> {
-        trace!("processing events in {log}");
+        trace!(?log, "processing log");
 
         if log.address.eq(&self.addresses.announcements) {
             let bn = log.block_number as u32;
