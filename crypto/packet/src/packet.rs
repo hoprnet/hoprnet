@@ -28,7 +28,7 @@ pub type CurrentSphinxSuite = hopr_crypto_sphinx::ec_groups::X25519Suite;
 pub const PACKET_LENGTH: usize = packet_length::<CurrentSphinxSuite>(INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0);
 
 /// Tag used to separate padding from data
-const PADDING_TAG: &[u8] = b"HOPR";
+pub const PADDING_TAG: &[u8] = b"HOPR";
 
 /// Determines the total length (header + payload) of the packet given the header information.
 pub const fn packet_length<S: SphinxSuite>(

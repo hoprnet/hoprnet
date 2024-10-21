@@ -28,6 +28,7 @@ use futures::{
     future::{select, Either},
     pin_mut, FutureExt, StreamExt, TryStreamExt,
 };
+use hopr_crypto_packet::packet::PADDING_TAG;
 use std::time::Duration;
 use std::{
     collections::HashMap,
@@ -1098,7 +1099,9 @@ where
             }
         }
 
-        if msg.len() > PAYLOAD_SIZE {
+        // PADDING_TAG should be part of the payload size, but since it is not, we need to check it here
+        // rather then breaking the understood payload size definition
+        if msg.len() > PAYLOAD_SIZE - PADDING_TAG.len() {
             return Err(HoprTransportError::Api(format!(
                 "Message exceeds the maximum allowed size of {PAYLOAD_SIZE} bytes"
             )));
