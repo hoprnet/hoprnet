@@ -8,23 +8,14 @@ use crate::{log, log_status};
 
 impl From<SerializableLog> for log::ActiveModel {
     fn from(value: SerializableLog) -> Self {
-        let tx_hash = value.tx_hash;
-        let block_hash = value.block_hash;
-
         log::ActiveModel {
-            address: Set(value.address),
-            topics: Set(value.topics.join(",")),
+            address: Set(value.address.as_ref().to_vec()),
+            topics: Set(value.topics.into_iter().flatten().collect()),
             data: Set(value.data),
             block_number: Set(value.block_number.to_be_bytes().to_vec()),
-            transaction_hash: Set(Hash::from_hex(tx_hash.clone().as_str())
-                .expect(format!("invalid tx_hash {tx_hash}").as_str())
-                .as_ref()
-                .to_vec()),
+            transaction_hash: Set(value.tx_hash.to_vec()),
             transaction_index: Set(value.tx_index.to_be_bytes().to_vec()),
-            block_hash: Set(Hash::from_hex(block_hash.clone().as_str())
-                .expect(format!("invalid block_hash {block_hash}").as_str())
-                .as_ref()
-                .to_vec()),
+            block_hash: Set(value.block_hash.to_vec()),
             log_index: Set(value.log_index.to_be_bytes().to_vec()),
             removed: Set(value.removed),
             ..Default::default()
@@ -44,15 +35,23 @@ impl TryFrom<log::Model> for SerializableLog {
             .block_hash
             .try_into()
             .map_err(|_| DbEntityError::ConversionError("Invalid tx_hash".into()))?;
+        let address = Address::new(value.address.as_ref());
+
+        let mut topics: Vec<[u8; 32]> = Vec::new();
+        for chunk in value.topics.chunks_exact(32) {
+            let mut topic = [0u8; 32];
+            topic.copy_from_slice(chunk);
+            topics.push(topic);
+        }
 
         let log = SerializableLog {
-            address: value.address,
-            topics: value.topics.split(",").map(|s| s.to_string()).collect(),
+            address,
+            topics,
             data: value.data,
             block_number: U256::from_be_bytes(value.block_number).as_u64(),
-            tx_hash: Hash::from(tx_hash).to_hex(),
+            tx_hash,
             tx_index: U256::from_be_bytes(value.transaction_index).as_u64(),
-            block_hash: Hash::from(block_hash).to_hex(),
+            block_hash,
             log_index: U256::from_be_bytes(value.log_index).as_u64(),
             removed: value.removed,
             ..Default::default()

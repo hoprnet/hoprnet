@@ -836,7 +836,7 @@ where
 
                     // Process all logs in the block
                     for log in block_with_logs.logs {
-                        let tx_hash = Hash::from_hex(log.tx_hash.as_str())?;
+                        let tx_hash = Hash::from(log.tx_hash);
 
                         // If a significant chain event can be extracted from the log, push it
                         if let Some(event_type) = myself.process_log_event(tx, log).await? {

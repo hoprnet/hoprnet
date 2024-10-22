@@ -40,6 +40,7 @@ pub enum RpcError {
     #[error("multicall Error: {0}")]
     MulticallError(String),
 
+    /// Error occurred during data conversion
     #[error("conversion error: {0}")]
     ConversionError(String),
 }

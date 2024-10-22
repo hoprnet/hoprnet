@@ -265,10 +265,7 @@ where
             }
         });
 
-        if std::future::poll_fn(|cx| futures::Stream::poll_next(std::pin::Pin::new(&mut rx), cx))
-            .await
-            .is_some()
-        {
+        if rx.next().await.is_some() {
             Ok(indexing_proc)
         } else {
             Err(crate::errors::CoreEthereumIndexerError::ProcessError(

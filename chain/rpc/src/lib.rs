@@ -24,7 +24,7 @@ use std::time::Duration;
 use hopr_crypto_types::types::Hash;
 use hopr_primitive_types::prelude::*;
 
-use crate::errors::RpcError::{ConversionError, ProviderError, TransactionDropped};
+use crate::errors::RpcError::{ProviderError, TransactionDropped};
 use crate::errors::{HttpRequestError, Result, RpcError};
 use crate::RetryAction::NoRetry;
 
@@ -88,17 +88,13 @@ impl TryFrom<SerializableLog> for Log {
     type Error = RpcError;
 
     fn try_from(value: SerializableLog) -> std::result::Result<Self, Self::Error> {
-        let address =
-            Address::from_hex(value.address.as_str()).map_err(|_| ConversionError("Invalid address".into()))?;
-        let block_hash =
-            Hash::from_hex(value.block_hash.as_str()).map_err(|_| ConversionError("Invalid block_hash".into()))?;
-        let tx_hash = Hash::from_hex(value.tx_hash.as_str()).map_err(|_| ConversionError("Invalid tx_hash".into()))?;
+        let address = Address::from(value.address);
 
-        let mut topics = Vec::with_capacity(value.topics.len());
-        for topic in value.topics.into_iter() {
-            let topic = Hash::from_hex(topic.as_str()).map_err(|_| ConversionError("Invalid topic".into()))?;
-            topics.push(topic);
-        }
+        let topics = value
+            .topics
+            .into_iter()
+            .map(|topic| topic.into())
+            .collect::<Vec<Hash>>();
 
         let log = Log {
             address,
@@ -106,9 +102,9 @@ impl TryFrom<SerializableLog> for Log {
             data: Box::from(value.data.as_ref()),
             tx_index: value.tx_index,
             block_number: value.block_number,
-            block_hash,
+            block_hash: value.block_hash.into(),
             log_index: value.log_index.into(),
-            tx_hash,
+            tx_hash: value.tx_hash.into(),
             removed: value.removed,
         };
 
@@ -119,16 +115,18 @@ impl TryFrom<SerializableLog> for Log {
 impl From<Log> for SerializableLog {
     fn from(value: Log) -> Self {
         SerializableLog {
-            address: value.address.to_string(),
-            topics: value.topics.into_iter().map(|t| t.to_string()).collect(),
+            address: value.address,
+            topics: value.topics.into_iter().map(|t| t.into()).collect(),
             data: value.data.into_vec(),
             tx_index: value.tx_index,
             block_number: value.block_number,
-            block_hash: value.block_hash.to_string(),
-            tx_hash: value.tx_hash.to_string(),
+            block_hash: value.block_hash.into(),
+            tx_hash: value.tx_hash.into(),
             log_index: value.log_index.as_u64(),
             removed: value.removed,
-            ..Default::default()
+            processed: None,
+            processed_at: None,
+            checksum: None,
         }
     }
 }

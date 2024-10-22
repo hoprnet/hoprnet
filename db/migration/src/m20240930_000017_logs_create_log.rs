@@ -50,8 +50,8 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(Log::BlockNumber).not_null().binary_len(8))
                     .col(ColumnDef::new(Log::BlockHash).binary_len(32).not_null())
                     .col(ColumnDef::new(Log::TransactionHash).binary_len(32).not_null())
-                    .col(ColumnDef::new(Log::Address).string_len(40).not_null())
-                    .col(ColumnDef::new(Log::Topics).string().not_null())
+                    .col(ColumnDef::new(Log::Address).binary_len(20).not_null())
+                    .col(ColumnDef::new(Log::Topics).binary().not_null())
                     .col(ColumnDef::new(Log::Data).binary().not_null())
                     .col(ColumnDef::new(Log::Removed).boolean().not_null().default(false))
                     .foreign_key(

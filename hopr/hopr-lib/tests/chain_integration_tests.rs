@@ -881,12 +881,12 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
         .db
         .get_last_checksummed_log()
         .await?
-        .expect("alice must have a checksum");
+        .ok_or_else(|| anyhow::anyhow!("alice must have a checksum"))?;
     let bob_checksum = bob_node
         .db
         .get_last_checksummed_log()
         .await?
-        .expect("bob must have a checksum");
+        .ok_or_else(|| anyhow::anyhow!("bob must have a checksum"))?;
     info!("alice completed at {:?}", alice_checksum);
     info!("bob completed at {:?}", bob_checksum);
 

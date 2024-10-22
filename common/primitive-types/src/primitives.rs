@@ -414,9 +414,9 @@ impl UnitaryFloatOps for U256 {
 #[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub struct SerializableLog {
     /// Contract address
-    pub address: String,
+    pub address: Address,
     /// Topics
-    pub topics: Vec<String>,
+    pub topics: Vec<[u8; 32]>,
     /// Raw log data
     pub data: Vec<u8>,
     /// Transaction index
@@ -424,9 +424,9 @@ pub struct SerializableLog {
     /// Corresponding block number
     pub block_number: u64,
     /// Corresponding block hash
-    pub block_hash: String,
+    pub block_hash: [u8; 32],
     /// Corresponding transaction hash
-    pub tx_hash: String,
+    pub tx_hash: [u8; 32],
     /// Log index
     pub log_index: u64,
     /// Removed flag
