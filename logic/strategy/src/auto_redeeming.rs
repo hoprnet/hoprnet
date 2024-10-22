@@ -86,7 +86,7 @@ where
 {
     async fn on_acknowledged_winning_ticket(&self, ack: &AcknowledgedTicket) -> crate::errors::Result<()> {
         if !self.cfg.redeem_only_aggregated || ack.verified_ticket().is_aggregated() {
-            info!("redeeming {ack}");
+            info!(%ack, "redeeming");
 
             #[cfg(all(feature = "prometheus", not(test)))]
             METRIC_COUNT_AUTO_REDEEMS.increment();
@@ -114,7 +114,7 @@ where
                 debug!("ignoring channel {channel} state change that's not in PendingToClose");
                 return Ok(());
             }
-            info!("checking to redeem a singular ticket in {channel} because it's now PendingToClose");
+            info!(%channel, "checking to redeem a singular ticket in because it's now PendingToClose");
 
             let mut ack_ticket_in_db = self
                 .db
@@ -131,7 +131,7 @@ where
                 let ack = ack_ticket_in_db
                     .pop()
                     .expect("should be unwrappable due to previous check");
-                info!("redeeming single {ack} worth {}", ack.verified_ticket().amount);
+                info!(%ack, worth = %ack.verified_ticket().amount, "redeeming single ticket", );
 
                 #[cfg(all(feature = "prometheus", not(test)))]
                 METRIC_COUNT_AUTO_REDEEMS.increment();
