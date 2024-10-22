@@ -177,7 +177,7 @@ impl UdpStreamBuilder {
         let avail_parallelism = std::thread::available_parallelism()
             .map(|v| usize::from(v) / 2) // Each socket gets one RX and one TX task
             .unwrap_or_else(|e| {
-                warn!("failed to determine available parallelism, defaulting to 1: {e}");
+                warn!(error = %e, "failed to determine available parallelism, defaulting to 1");
                 1
             })
             .max(1);
@@ -321,8 +321,10 @@ impl ConnectedUdpStream {
                                     // Don't even bother sending an error about discarded stuff
                                     warn!(
                                         socket_id,
-                                        udp_bound_addr = tracing::field::debug(sock_rx.local_addr()),
-                                        "discarded data from {read_addr}, which didn't come from {addr}"
+                                        udp_bound_addr = ?sock_rx.local_addr(),
+                                        ?read_addr,
+                                        ?addr,
+                                        "discarded data, which didn't come expected address"
                                     );
                                     None
                                 }

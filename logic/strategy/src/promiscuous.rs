@@ -303,7 +303,10 @@ where
         // If there are still more channels opened than we allow, close some
         // lowest-quality ones that passed the threshold
         if occupied > max_auto_channels && self.cfg.enforce_max_channels {
-            warn!("there are {occupied} effectively opened channels, but the strategy allows only {max_auto_channels}");
+            warn!(
+                count = occupied,
+                max_auto_channels, "the strategy allows only less occupied channels"
+            );
 
             // Get all open channels that are not planned to be closed
             let mut sorted_channels = outgoing_open_channels
@@ -358,7 +361,7 @@ where
             for (address, _) in new_channel_candidates {
                 // Stop if we ran out of balance
                 if remaining_balance.le(&self.cfg.minimum_node_balance) {
-                    warn!("ran out of allowed node balance - balance is {remaining_balance}");
+                    warn!(%remaining_balance, "node ran out of allowed node balance");
                     break;
                 }
 
@@ -366,7 +369,7 @@ where
                 if !tick_decision.will_address_be_opened(&address) {
                     tick_decision.add_to_open(address, self.cfg.new_channel_stake);
                     remaining_balance = remaining_balance.sub(&self.cfg.new_channel_stake);
-                    debug!("promoted peer {address} for channel opening");
+                    debug!(%address, "promoted for channel opening");
                 }
             }
         } else {

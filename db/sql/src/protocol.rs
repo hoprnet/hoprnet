@@ -401,7 +401,7 @@ impl HoprDbProtocolOperations for HoprDb {
                     Err(DbSqlError::TicketValidationError(boxed_error)) => {
                         let (rejected_ticket, error) = *boxed_error;
                         let rejected_value = rejected_ticket.amount;
-                        warn!("encountered validation error during forwarding for {rejected_ticket} with value: {rejected_value}: {error}");
+                        warn!(?rejected_ticket, %rejected_value, erorr = ?error, "failure to validate during forwarding");
 
                         self.mark_unsaved_ticket_rejected(&rejected_ticket).await.map_err(|e| {
                             DbSqlError::TicketValidationError(Box::new((

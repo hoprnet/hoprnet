@@ -168,8 +168,8 @@ impl RetryPolicy<JsonRpcProviderClientError> for SimpleJsonRpcRetryPolicy {
     ) -> RetryAction {
         if self.max_retries.is_some_and(|max| num_retries > max) {
             warn!(
-                "max number of retries {} has been reached",
-                self.max_retries.expect("max_retries must be set")
+                count = self.max_retries.expect("max_retries must be set"),
+                "max number of retries has been reached"
             );
             return NoRetry;
         }
@@ -178,8 +178,8 @@ impl RetryPolicy<JsonRpcProviderClientError> for SimpleJsonRpcRetryPolicy {
 
         if retry_queue_size > self.max_retry_queue_size {
             warn!(
-                "maximum size of retry queue {} has been reached",
-                self.max_retry_queue_size
+                size = self.max_retry_queue_size,
+                "maximum size of retry queue has been reached"
             );
             return NoRetry;
         }
@@ -439,19 +439,20 @@ where
             {
                 NoRetry => {
                     self.requests_enqueued.fetch_sub(1, Ordering::SeqCst);
-                    warn!("no more retries for RPC call {method}");
+                    warn!(method, "no more retries for RPC call");
 
                     #[cfg(all(feature = "prometheus", not(test)))]
                     METRIC_RETRIES_PER_RPC_CALL.observe(&[method], num_retries as f64);
 
                     debug!(
-                        "failed request {method} spent {}ms in the retry queue",
-                        start.elapsed().as_millis()
+                        method,
+                        duration_in_ms = start.elapsed().as_millis(),
+                        "failed request duration in the retry queue",
                     );
                     return Err(err);
                 }
                 RetryAfter(backoff) => {
-                    warn!("RPC call {method} will retry in {}ms", backoff.as_millis());
+                    warn!(method, backoff_in_ms = backoff.as_millis(), "RPC call will retry",);
                     sleep(backoff).await
                 }
             }

@@ -191,7 +191,7 @@ where
             self.agg_tasks.write().await.insert(channel_id, (false, task));
             let _ = can_remove_tx.send(()); // Allow the task to mark itself as done
         } else {
-            warn!("this strategy already aggregates in channel {channel_id}");
+            warn!(channel = %channel_id, "this strategy already aggregates in channel");
         }
 
         Ok(())

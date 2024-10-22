@@ -206,7 +206,7 @@ where
                         )
                     }
                     ChannelStatus::Closed => {
-                        warn!("channel {} is already closed", channel.get_id());
+                        warn!(%channel, "channel already closed");
                         return Err(ChannelAlreadyClosed);
                     }
                 },
@@ -234,7 +234,7 @@ where
                         )
                     }
                     ChannelStatus::Closed => {
-                        warn!("channel {} is already closed", channel.get_id());
+                        warn!(%channel, "channel already closed");
                         return Err(ChannelAlreadyClosed);
                     }
                 },

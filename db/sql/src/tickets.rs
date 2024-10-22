@@ -836,7 +836,7 @@ impl HoprDbTicketOperations for HoprDb {
                                 // Cleanup is the only reasonable thing to do at this point,
                                 // since the aggregator will check for index range overlaps and deny
                                 // the aggregation of the entire batch otherwise.
-                                warn!("ticket {current_idx} in channel {channel_id} has been already aggregated in {first_ticket} and will be removed");
+                                warn!(ticket_id = current_idx, channel = %channel_id, ?first_ticket, "ticket in channel has been already aggregated and will be removed");
                                 neglected_idxs.push(current_idx);
                                 to_be_aggregated.remove(i);
                             } else {
@@ -847,7 +847,7 @@ impl HoprDbTicketOperations for HoprDb {
                         // The cleanup (neglecting of tickets) is not made directly here but on the next ticket redemption in this channel
                         // See handler.rs around L402
                         if !neglected_idxs.is_empty() {
-                            warn!("{} tickets were neglected in channel {channel_id} due to duplication in an aggregated ticket!", neglected_idxs.len());
+                            warn!(count = neglected_idxs.len(), channel = %channel_id, "tickets were neglected due to duplication in an aggregated ticket!");
                         }
 
                         // mark all tickets with appropriate characteristics as being aggregated

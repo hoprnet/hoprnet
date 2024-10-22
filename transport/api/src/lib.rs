@@ -416,7 +416,7 @@ where
 
                 // Notify that a new incoming session has been created
                 if let Err(e) = new_session_notifier.unbounded_send(incoming_session) {
-                    warn!("failed to send session to incoming session queue: {e}");
+                    warn!(error = %e, "failed to send session to incoming session queue");
                 }
 
                 trace!(
@@ -950,7 +950,7 @@ where
 
         match select(timeout, ping.next().fuse()).await {
             Either::Left(_) => {
-                warn!(peer = peer.to_string(), "Manual ping to peer timed out");
+                warn!(%peer, "Manual ping to peer timed out");
                 return Err(ProtocolError::Timeout.into());
             }
             Either::Right((v, _)) => {

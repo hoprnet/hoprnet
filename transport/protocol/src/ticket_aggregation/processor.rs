@@ -130,7 +130,7 @@ where
         let awaiter = self.writer.clone().aggregate_tickets(channel, prerequisites)?;
 
         if let Err(e) = awaiter.consume_and_wait(self.agg_timeout).await {
-            warn!("Error occured on ticket aggregation for '{channel}', performing a rollback: {e}");
+            warn!(%channel, error = %e, "Error during ticket aggregation, performing a rollback");
             self.db.rollback_aggregation_in_channel(*channel).await?;
         }
 
@@ -327,12 +327,12 @@ where
                                         Some(TicketAggregationProcessed::Receive(destination, acked_ticket, request))
                                     }
                                     Err(e) => {
-                                        error!("Error while handling aggregated ticket: {e}");
+                                        error!(error = %e, "Error while handling aggregated ticket");
                                         None
                                     }
                                 },
                                 Err(e) => {
-                                    warn!("Counterparty refused to aggregate tickets: {e}");
+                                    warn!(error = %e, "Counterparty refused to aggregate tickets");
                                     None
                                 }
                             }
@@ -368,10 +368,10 @@ where
                     match poll_fn(|cx| Pin::new(&mut processed_tx).poll_ready(cx)).await {
                         Ok(_) => match processed_tx.start_send(event) {
                             Ok(_) => {}
-                            Err(e) => error!("Failed to pass a processed ack message: {}", e),
+                            Err(e) => error!(error = %e, "Failed to pass a processed ack message"),
                         },
                         Err(e) => {
-                            warn!("The receiver for processed ack no longer exists: {}", e);
+                            warn!(error = %e, "The receiver for processed ack no longer exists");
                         }
                     };
                 }

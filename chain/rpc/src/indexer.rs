@@ -152,7 +152,7 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                                 Ok(Some(log)) => {
                                     // This in general should not happen, but handle such a case to be safe
                                     if log.block_number > latest_block {
-                                        warn!("got {log} that has not yet reached the finalized tip at {latest_block}");
+                                        warn!(%log, latest_block, "got log that has not yet reached the finalized tip");
                                         break;
                                     }
 

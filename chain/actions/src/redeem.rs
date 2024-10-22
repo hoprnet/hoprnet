@@ -94,9 +94,9 @@ where
                 }
                 Err(e) => {
                     warn!(
-                        "Failed to redeem tickets in channel {} due to {}",
-                        generate_channel_id(&incoming_channel.source, &incoming_channel.destination),
-                        e
+                        channel = %generate_channel_id(&incoming_channel.source, &incoming_channel.destination),
+                        error = %e,
+                        "Failed to redeem tickets in channel",
                     );
                 }
             }

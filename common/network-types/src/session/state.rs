@@ -268,7 +268,7 @@ impl<const C: usize> SessionState<C> {
                 }
             }
             // The error here is intentionally not propagated
-            Err(e) => warn!(session_id = self.session_id, "segment {id:?} not pushed: {e}"),
+            Err(e) => warn!(session_id = self.session_id, ?id, error = %e, "segment not pushed"),
         }
 
         Ok(())
@@ -301,7 +301,8 @@ impl<const C: usize> SessionState<C> {
                 } else {
                     warn!(
                         session_id = self.session_id,
-                        "segment {segment_id:?} not in lookbehind buffer anymore",
+                        id = ?segment_id,
+                        "segment not in lookbehind buffer anymore",
                     );
                 }
                 ret

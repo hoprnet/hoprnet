@@ -659,7 +659,9 @@ impl Hopr {
                         let db_safe_balance = my_db.get_safe_hopr_balance(Some(tx)).await?;
                         if safe_balance != db_safe_balance {
                             warn!(
-                                "Safe balance in the DB {db_safe_balance} mismatches on chain balance: {safe_balance}"
+                                %db_safe_balance,
+                                %safe_balance,
+                                "Safe balance in the DB mismatches on chain balance"
                             );
                             my_db.set_safe_hopr_balance(Some(tx), safe_balance).await?;
                         }

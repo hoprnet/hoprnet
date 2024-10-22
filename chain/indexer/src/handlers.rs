@@ -138,10 +138,12 @@ where
                             )
                             .await?;
                     }
-                    Err(_) => {
+                    Err(e) => {
                         warn!(
-                            "Filtering announcement from {} with invalid signature.",
-                            key_binding.chain_key
+                            address = ?key_binding.chain_key,
+                            error = %e,
+                            "Filtering announcement with invalid signature",
+
                         )
                     }
                 }
