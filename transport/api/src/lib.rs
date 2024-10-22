@@ -959,9 +959,9 @@ where
                     .map(|r| r.map_err(HoprTransportError::NetworkError))
                     .collect::<errors::Result<Vec<Duration>>>()
                 {
-                    Ok(d) => info!(peer = peer.to_string(), "Manual ping succeeded: {d:?}"),
+                    Ok(d) => info!(%peer, rtt = ?d, "Manual ping succeeded"),
                     Err(e) => {
-                        error!(peer = peer.to_string(), "Manual ping failed: {e}");
+                        error!(%peer, error = %e, "Manual ping failed");
                         return Err(e);
                     }
                 }

@@ -363,7 +363,7 @@ pub(crate) async fn create_client(
                     )
                 }
             })?;
-            info!("TCP session listener bound to {bound_host}");
+            info!(%bound_host, "TCP session listener bound");
 
             let hopr = state.hopr.clone();
             let jh = hopr_async_runtime::prelude::spawn(
@@ -376,27 +376,28 @@ pub(crate) async fn create_client(
                         async move {
                             match accepted_client {
                                 Ok((sock_addr, stream)) => {
-                                    debug!("incoming TCP connection {sock_addr}");
+                                    debug!(socket = %sock_addr, "incoming TCP connection");
                                     let session_init =
                                         tokio_retry::Retry::spawn(session_init_retry_strategy, move || {
                                             let hopr = hopr.clone();
                                             let data = data.clone();
                                             async move {
-                                                debug!("trying tcp session establishment");
+                                                debug!("trying TCP session establishment");
                                                 hopr.connect_to(data).await
                                             }
                                         });
                                     let session = match session_init.await {
                                         Ok(s) => s,
                                         Err(e) => {
-                                            error!("failed to establish session: {e}");
+                                            error!(error = %e, "failed to establish session");
                                             return;
                                         }
                                     };
 
                                     debug!(
+                                        socket = ?sock_addr,
                                         session_id = tracing::field::debug(*session.id()),
-                                        "new session for incoming TCP connection from {sock_addr}",
+                                        "new session for incoming TCP connection",
                                     );
 
                                     #[cfg(all(feature = "prometheus", not(test)))]
@@ -451,7 +452,7 @@ pub(crate) async fn create_client(
                 }
             })?;
 
-            info!("UDP session listener bound to {bound_host}");
+            info!(%bound_host, "UDP session listener bound");
 
             state.open_listeners.write().await.insert(
                 ListenerId(protocol, bound_host),

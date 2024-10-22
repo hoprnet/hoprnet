@@ -99,7 +99,7 @@ where
             ));
         }
 
-        info!("Starting indexer...");
+        info!("Starting chain indexing");
 
         let rpc = self.rpc.take().expect("rpc should be present");
         let db_processor = self.db_processor.take().expect("db_processor should be present");
@@ -108,8 +108,9 @@ where
 
         let described_block = self.db.get_last_indexed_block(None).await?;
         info!(
-            "Loaded indexer state at block #{0} with checksum: {1}",
-            described_block.latest_block_number, described_block.checksum
+            block = described_block.latest_block_number,
+            checksum = %described_block.checksum,
+            "Loaded indexer state at block",
         );
 
         let next_block_to_process = if self.cfg.start_block_number < described_block.latest_block_number as u64 {
@@ -120,8 +121,8 @@ where
         };
 
         info!(
-            "DB latest processed block: {0}, next block to process {next_block_to_process}",
-            described_block.latest_block_number
+            block = described_block.latest_block_number,
+            next_block_to_process, "latest processed block and next block to process",
         );
 
         // we skip on addresses which have no topics
@@ -194,7 +195,7 @@ where
                             METRIC_INDEXER_SYNC_PROGRESS.set(progress);
 
                             if current_block >= head {
-                                info!("Indexer sync successfully completed");
+                                info!("Index fully synced with chain");
                                 is_synced.store(true, std::sync::atomic::Ordering::Relaxed);
                                 if let Err(e) = tx.try_send(()) {
                                     error!("failed to notify about achieving index synchronization: {e}")

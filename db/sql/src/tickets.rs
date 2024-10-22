@@ -146,7 +146,7 @@ pub(crate) fn filter_satisfying_ticket_models(
 
     // If there are no criteria, just send everything for aggregation
     if prerequisites.min_ticket_count.is_none() && prerequisites.min_unaggregated_ratio.is_none() {
-        info!("Aggregation check OK {channel_id}: no aggregation prerequisites were given");
+        info!(channel = %channel_id, "Aggregation check OK, no aggregation prerequisites were given");
         return Ok(to_be_aggregated);
     }
 
@@ -155,10 +155,10 @@ pub(crate) fn filter_satisfying_ticket_models(
     // Check the aggregation threshold
     if let Some(agg_threshold) = prerequisites.min_ticket_count {
         if to_be_agg_count >= agg_threshold {
-            info!("Aggregation check OK {channel_id}: {to_be_agg_count} >= {agg_threshold} ack tickets");
+            info!(channel = %channel_id, count = to_be_agg_count, threshold = agg_threshold, "Aggregation check OK aggregated value greater than threshold");
             return Ok(to_be_aggregated);
         } else {
-            debug!("Aggregation check FAIL {channel_id}: {to_be_agg_count} < {agg_threshold} ack tickets");
+            debug!(channel = %channel_id, count = to_be_agg_count, threshold = agg_threshold,"Aggregation check FAIL not enough resources to aggregate");
         }
     }
 
@@ -169,17 +169,17 @@ pub(crate) fn filter_satisfying_ticket_models(
         // and there are at least two tickets
         if unaggregated_balance.ge(&diminished_balance) {
             if to_be_agg_count > 1 {
-                info!("Aggregation check OK {channel_id}: unrealized balance {unaggregated_balance} >= {diminished_balance} in {to_be_agg_count} tickets");
+                info!(channel = %channel_id, count = ?to_be_aggregated, balance = ?unaggregated_balance, ?diminished_balance, "Aggregation check OK: less unrealized than diminished balance");
                 return Ok(to_be_aggregated);
             } else {
-                debug!("Aggregation check FAIL {channel_id}: unrealized balance {unaggregated_balance} >= {diminished_balance} but in only {to_be_agg_count} tickets");
+                debug!(channel = %channel_id, count = ?to_be_aggregated, balance = ?unaggregated_balance, ?diminished_balance, "Aggregation check FAIL: more unrealized than diminished balance");
             }
         } else {
-            debug!("Aggregation check FAIL {channel_id}: unrealized balance {unaggregated_balance} < {diminished_balance} in {to_be_agg_count} tickets");
+            debug!(channel = %channel_id, count = ?to_be_aggregated, balance = ?unaggregated_balance, ?diminished_balance, "Aggregation check FAIL: less unrealized than diminished balance");
         }
     }
 
-    debug!("Aggregation check FAIL {channel_id}: no prerequisites were met");
+    debug!(channel = %channel_id,"Aggregation check FAIL: no prerequisites were met");
     Ok(vec![])
 }
 

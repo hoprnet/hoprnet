@@ -98,7 +98,7 @@ where
             })
             .map(|channel| async {
                 let channel_cpy = *channel;
-                info!("channel closure finalizer: finalizing closure of {channel_cpy}");
+                info!(channel = %channel_cpy, "channel closure finalizer: finalizing closure");
                 match self
                     .chain_actions
                     .close_channel(channel_cpy.destination, ChannelDirection::Outgoing, false)

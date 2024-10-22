@@ -158,8 +158,8 @@ impl HoprSwarm {
                                     warn!(multiaddress = %ma, error = %e, "Failed to listen_on also using the unspecified multiaddress",);
                                 } else {
                                     info!(
-                                        listen_on = tracing::field::debug(ma),
-                                        multiaddress = tracing::field::debug(multiaddress),
+                                        listen_on = ?ma,
+                                        multiaddress = ?multiaddress,
                                         "Listening for p2p connections)"
                                     );
                                     swarm.add_external_address(multiaddress.clone());
@@ -171,8 +171,8 @@ impl HoprSwarm {
                         }
                     } else {
                         info!(
-                            listen_on = tracing::field::debug(ma),
-                            multiaddress = tracing::field::debug(multiaddress),
+                            listen_on = ?ma,
+                            multiaddress = ?multiaddress,
                             "Listening for p2p connections)"
                         );
                         swarm.add_external_address(multiaddress.clone());
@@ -488,7 +488,7 @@ impl HoprSwarmWithProcessors {
                         trace!(event = tracing::field::debug(&event), "Received a discovery event");
                         match event {
                             crate::behavior::discovery::Event::NewPeerMultiddress(peer, multiaddress) => {
-                                info!(%peer, multiaddress = %multiaddress, "New record");
+                                info!(%peer, address = %multiaddress, "New record");
                                 swarm.behaviour_mut().heartbeat.add_address(&peer, multiaddress.clone());
                                 swarm.behaviour_mut().msg.add_address(&peer, multiaddress.clone());
                                 swarm.behaviour_mut().ack.add_address(&peer, multiaddress.clone());

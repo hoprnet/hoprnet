@@ -376,7 +376,7 @@ where
                 let tx_result = exec_context.execute_action(act.clone(), channel_dst).await;
                 match &tx_result {
                     Ok(confirmation) => {
-                        info!("successful {confirmation}");
+                        info!(%confirmation, "successful confirmation");
 
                         #[cfg(all(feature = "prometheus", not(test)))]
                         METRIC_COUNT_ACTIONS.increment(&[act_name, "success"]);

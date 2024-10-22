@@ -373,7 +373,7 @@ where
                     }
                 }
                 ChainEventType::NodeSafeRegistered(safe_address) =>  {
-                    info!("node safe registered {safe_address}");
+                    info!(%safe_address, "node safe registered");
                     None
                 }
             }
@@ -469,7 +469,7 @@ impl Hopr {
         let multiaddress: Multiaddr = (&cfg.host).try_into()?;
 
         let db_path: PathBuf = [&cfg.db.data, "db"].iter().collect();
-        info!("Initiating the DB at '{db_path:?}'");
+        info!(path = ?db_path, "Initiating DB");
 
         if cfg.db.force_initialize {
             info!("Force cleaning up existing database");
@@ -500,7 +500,7 @@ impl Hopr {
         let db = futures::executor::block_on(HoprDb::new(db_path.as_path(), me_onchain.clone(), db_cfg))?;
 
         if let Some(provider) = &cfg.chain.provider {
-            info!("Creating chain components using the custom provider: {provider}");
+            info!(provider, "Creating chain components using the custom provider");
         } else {
             info!("Creating chain components using the default provider");
         }
@@ -516,7 +516,7 @@ impl Hopr {
         let contract_addresses = ContractAddresses::from(&resolved_environment);
         info!(
             myself = me_onchain.public().to_hex(),
-            contract_addresses = tracing::field::debug(contract_addresses),
+            contract_addresses = ?contract_addresses,
             "Resolved contract addresses",
         );
 
@@ -704,9 +704,8 @@ impl Hopr {
         )?;
 
         info!(
-            "Node is not started, please fund this node {} with at least {}",
-            self.me_onchain(),
-            Balance::new_from_str(SUGGESTED_NATIVE_BALANCE, BalanceType::Native).to_formatted_string()
+            address = %self.me_onchain(), minimum_balance = %Balance::new_from_str(SUGGESTED_NATIVE_BALANCE, BalanceType::Native),
+            "Node is not started, please fund this node",
         );
 
         let mut processes: HashMap<HoprLibProcesses, JoinHandle<()>> = HashMap::new();
@@ -728,10 +727,10 @@ impl Hopr {
         let minimum_balance = Balance::new_from_str(constants::MIN_NATIVE_BALANCE, BalanceType::Native);
 
         info!(
-            "Ethereum account {} has {}. Minimum balance is {}",
-            self.chain_api.me_onchain(),
-            balance.to_formatted_string(),
-            minimum_balance.to_formatted_string()
+            address = %self.chain_api.me_onchain(),
+            %balance,
+            %minimum_balance,
+            "Node information"
         );
 
         if balance.le(&minimum_balance) {
@@ -800,7 +799,7 @@ impl Hopr {
 
                 sleep(ONBOARDING_INFORMATION_INTERVAL).await;
 
-                info!("Node information: peerID => {my_peer_id}, Ethereum address => {my_ethereum_address}, version => {my_version}");
+                info!(peer_id = %my_peer_id, address = %my_ethereum_address, version = &my_version, "Node information");
                 info!("Node Ethereum address: {my_ethereum_address} <- put this into staking hub");
             }
         }

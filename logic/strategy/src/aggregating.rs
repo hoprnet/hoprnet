@@ -261,7 +261,7 @@ where
                 return Ok(());
             }
 
-            info!("going to aggregate tickets in {channel} because it transitioned to PendingToClose");
+            info!(%channel, "going to aggregate tickets in channel because it transitioned to PendingToClose");
 
             // On closing there must be at least 2 tickets to justify aggregation
             let on_close_agg_prerequisites = AggregationPrerequisites {

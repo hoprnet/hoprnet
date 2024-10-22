@@ -109,7 +109,7 @@ where
             })
             .await?;
 
-        info!("initiating channel open to {destination} with {amount}");
+        info!(%destination, %amount, "initiating channel open");
         self.tx_sender.send(Action::OpenChannel(destination, amount)).await
     }
 
@@ -182,10 +182,10 @@ where
                     ChannelStatus::Closed => Err(ChannelAlreadyClosed),
                     ChannelStatus::PendingToClose(_) => {
                         let remaining_closure_time = channel.remaining_closure_time(current_time());
-                        info!("{channel} - remaining closure time is {remaining_closure_time:?}");
+                        info!(%channel, ?remaining_closure_time, "remaining closure time update for a channel");
                         match remaining_closure_time {
                             Some(Duration::ZERO) => {
-                                info!("initiating finalization of channel closure of {channel} in {direction}");
+                                info!(%channel, %direction, "initiating finalization of channel closure");
                                 self.tx_sender.send(Action::CloseChannel(channel, direction)).await
                             }
                             _ => Err(ClosureTimeHasNotElapsed(
@@ -201,10 +201,10 @@ where
                             // TODO: trigger aggregation
                             // Do not await the redemption, just submit it to the queue
                             let redeemed = self.redeem_tickets_in_channel(&channel, false).await?.len();
-                            info!("{redeemed} tickets will be redeemed before closing {channel}");
+                            info!(count = redeemed, %channel, "redeemed tickets before channel closing");
                         }
 
-                        info!("initiating channel closure of {channel} in {direction}");
+                        info!(%channel, ?direction, "initiating channel closure");
                         self.tx_sender.send(Action::CloseChannel(channel, direction)).await
                     }
                 }

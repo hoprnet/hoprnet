@@ -139,7 +139,8 @@ where
         let (count_redeemable_tickets, _) = self.db.get_tickets_value(selector.clone()).await?;
 
         info!(
-            "there are {count_redeemable_tickets} acknowledged tickets in channel {channel_id} which can be redeemed"
+            count_redeemable_tickets, channel = %channel_id,
+            "acknowledged tickets in channel that can be redeemed"
         );
 
         // Return fast if there are no redeemable tickets
@@ -178,8 +179,10 @@ where
         }
 
         info!(
-            "{} acknowledged tickets were submitted to redeem in {channel_id}",
-            receivers.len()
+            count = receivers.len(),
+            channel = %channel_id,
+            "acknowledged tickets were submitted to redeem in channel",
+
         );
 
         Ok(receivers)

@@ -183,16 +183,15 @@ where
 
     async fn sample_size_and_evaluate_avg(&self, sample: u32) -> Option<u32> {
         self.sma.write().await.push(sample);
-        info!("evaluated qualities of {sample} peers seen in the network");
+        info!(peers = ?sample, "evaluated qualities of peers seen in the network");
 
         let sma = self.sma.read().await;
         if sma.len() >= sma.window_size() {
             sma.average()
         } else {
             info!(
-                "not yet enough samples ({} out of {}) of network size to perform a strategy tick, skipping.",
-                sma.len(),
-                sma.window_size()
+                count = sma.len(), window_size = %sma.window_size(),
+                "not yet enough samples of network size to perform a strategy tick, skipping",
             );
             None
         }
@@ -374,7 +373,10 @@ where
             }
         } else {
             // max_channels == occupied
-            info!("not going to allocate new channels, maximum number of effective channels is reached ({occupied})")
+            info!(
+                count = occupied,
+                "not going to allocate new channels, maximum number of effective channels is reached"
+            )
         }
 
         Ok(tick_decision)
@@ -454,7 +456,7 @@ where
             METRIC_COUNT_CLOSURES.increment_by(tick_decision.get_to_close().len() as u64);
         }
 
-        info!("on tick executed {tick_decision}");
+        info!(%tick_decision, "on tick executed");
         Ok(())
     }
 }

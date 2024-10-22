@@ -350,7 +350,7 @@ where
                                     self.db
                                         .mark_tickets_as((&ack_ticket).into(), TicketMarker::Redeemed)
                                         .await?;
-                                    info!("{ack_ticket} has been marked as redeemed");
+                                    info!(%ack_ticket, "ticket marked as redeemed");
                                     Some(ack_ticket)
                                 }
                                 Ordering::Less => {
@@ -491,11 +491,11 @@ where
                     return Ok(None);
                 } else if to.eq(&self.safe_address) {
                     // This + is internally defined as saturating add
-                    info!("Safe balance {current_balance} increased by {transferred_value}");
+                    info!(?current_balance, added_value = %transferred_value, "Safe balance increased ");
                     current_balance = current_balance + transferred_value;
                 } else if from.eq(&self.safe_address) {
                     // This - is internally defined as saturating sub
-                    info!("Safe balance {current_balance} decreased by {transferred_value}");
+                    info!(?current_balance, removed_value = %transferred_value, "Safe balance decreased");
                     current_balance = current_balance - transferred_value;
                 }
 
@@ -564,7 +564,7 @@ where
                     .await?;
 
                 if node_address == self.chain_key.public().to_address() {
-                    info!("Your node has been added to the registry and you can now continue the node activation process on http://hub.hoprnet.org/.");
+                    info!("This node has been added to the registry, node activation process continues on: http://hub.hoprnet.org/.");
                 }
 
                 return Ok(Some(ChainEventType::NetworkRegistryUpdate(
@@ -579,7 +579,7 @@ where
                     .await?;
 
                 if node_address == self.chain_key.public().to_address() {
-                    info!("Your node has been added to the registry and you can now continue the node activation process on http://hub.hoprnet.org/.");
+                    info!("This node has been added to the registry, node can now continue the node activation process on: http://hub.hoprnet.org/.");
                 }
 
                 return Ok(Some(ChainEventType::NetworkRegistryUpdate(
@@ -615,7 +615,7 @@ where
         match event {
             HoprNodeSafeRegistryEvents::RegisteredNodeSafeFilter(registered) => {
                 if self.chain_key.public().to_address() == registered.node_address.into() {
-                    info!("Node safe registered: {}", registered.safe_address);
+                    info!(safe_address = %registered.safe_address, "Node safe registered", );
                     // NOTE: we don't store this state in the DB
                     return Ok(Some(ChainEventType::NodeSafeRegistered(registered.safe_address.into())));
                 }
@@ -680,7 +680,11 @@ where
                     .set_minimum_incoming_ticket_win_prob(Some(tx), new_minimum_win_prob)
                     .await?;
 
-                info!("minimum ticket winning probability has been updated {old_minimum_win_prob} -> {new_minimum_win_prob}");
+                info!(
+                    old = old_minimum_win_prob,
+                    new = new_minimum_win_prob,
+                    "minimum ticket winning probability updated"
+                );
 
                 // If the old minimum was less strict, we need to mark of all the
                 // tickets below the new higher minimum as rejected
@@ -700,7 +704,7 @@ where
                                 TicketMarker::Rejected,
                             )
                             .await?;
-                        info!("{num_rejected} unredeemed tickets were rejected because the minimum winning probability has been increased");
+                        info!(count = num_rejected, "unredeemed tickets were rejected, because the minimum winning probability has been increased");
                     }
                 }
             }
@@ -731,7 +735,7 @@ where
                     .update_ticket_price(Some(tx), BalanceType::HOPR.balance(update.1))
                     .await?;
 
-                info!("ticket price has been set to {}", update.1);
+                info!(price = %update.1, "ticket price updated");
             }
             HoprTicketPriceOracleEvents::OwnershipTransferredFilter(_event) => {
                 // ignore ownership transfer event
