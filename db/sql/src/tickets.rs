@@ -414,7 +414,7 @@ impl HoprDbTicketOperations for HoprDb {
                         {
                             let _g = self.ticket_manager.mutex.lock();
                             if let Err(e) = active_ticket.update(self.conn(TargetDb::Tickets)).await {
-                                error!("failed to update ticket in the db: {e}");
+                                error!(error = %e,"failed to update ticket in the db");
                             }
                         }
 
@@ -425,12 +425,12 @@ impl HoprDbTicketOperations for HoprDb {
                                 yield ticket
                             },
                             Err(e) => {
-                                tracing::error!("failed to decode ticket from the db: {e}");
+                                tracing::error!(error = %e, "failed to decode ticket from the db");
                             }
                         }
                     }
                 },
-                Err(e) => tracing::error!("failed open ticket db stream: {e}")
+                Err(e) => tracing::error!(error = %e, "failed open ticket db stream")
             }
         }))
     }
@@ -996,7 +996,7 @@ impl HoprDbTicketOperations for HoprDb {
 
         // Value of received ticket can be higher (profit for us) but not lower
         if aggregated_ticket.verified_ticket().amount.lt(&stored_value) {
-            error!("Aggregated ticket value in '{channel_id}' is lower than sum of stored tickets",);
+            error!(channel = %channel_id, "Aggregated ticket value in channel is lower than sum of stored tickets");
             return Err(DbSqlError::LogicalError("Value of received aggregated ticket is too low".into()).into());
         }
 

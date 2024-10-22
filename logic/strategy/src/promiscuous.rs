@@ -220,15 +220,15 @@ where
                         {
                             Some((addr, status.get_average_quality()))
                         } else {
-                            error!("could not find on-chain address for {}", status.id.1);
+                            error!(address = %status.id.1, "could not find on-chain address");
                             None
                         }
                     } else {
-                        debug!("version of peer {} reports non-matching version {version}", status.id.1);
+                        debug!(peer = %status.id.1, ?version, "version of peer does not match the expectation");
                         None
                     }
                 } else {
-                    error!("cannot get version for peer id: {}", status.id.1);
+                    error!(peer = %status.id.1, "cannot get version");
                     None
                 }
             })
@@ -318,14 +318,14 @@ where
                 let q1 = match peers_with_quality.get(&p1.destination) {
                     Some(q) => *q,
                     None => {
-                        error!("could not determine peer quality for {p1}");
+                        error!(channel = ?p1, "could not determine peer quality");
                         0_f64
                     }
                 };
                 let q2 = match peers_with_quality.get(&p2.destination) {
                     Some(q) => *q,
                     None => {
-                        error!("could not determine peer quality for {p2}");
+                        error!(peer = %p2, "could not determine peer quality");
                         0_f64
                     }
                 };
@@ -429,7 +429,7 @@ where
                     debug!("issued channel closing tx: {}", channel_to_close);
                 }
                 Err(e) => {
-                    error!("error while closing channel: {e}");
+                    error!(error = %e, "error while closing channel");
                 }
             }
         }
@@ -445,7 +445,7 @@ where
                     debug!("issued channel opening tx: {}", channel_to_open.0);
                 }
                 Err(e) => {
-                    error!("error while issuing channel opening to {}: {e}", channel_to_open.0);
+                    error!(error = %e, channel = %channel_to_open.0, "error while issuing channel opening");
                 }
             }
         }

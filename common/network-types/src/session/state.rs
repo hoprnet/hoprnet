@@ -827,7 +827,7 @@ impl<const C: usize> SessionSocket<C> {
                     .forward(downstream_write.into_sink())
                     .await
                 {
-                    error!("FINISHED: forwarding to downstream terminated with error {e}")
+                    error!(error = %e,"FINISHED: forwarding to downstream terminated with error")
                 } else {
                     debug!("FINISHED: forwarding to downstream done");
                 }
@@ -835,7 +835,7 @@ impl<const C: usize> SessionSocket<C> {
         } else {
             spawn(async move {
                 if let Err(e) = segment_egress_recv.forward(downstream_write.into_sink()).await {
-                    error!("FINISHED: forwarding to downstream terminated with error {e}")
+                    error!(error = %e, "FINISHED: forwarding to downstream terminated with error")
                 } else {
                     debug!("FINISHED: forwarding to downstream done");
                 }

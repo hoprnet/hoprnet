@@ -173,6 +173,7 @@ where
                             }
                             Err(error) => {
                                 error!(
+                                    %error,
                                     "Failed to fetch block number from RPC, cannot continue indexing due to {error}"
                                 );
                                 panic!("Failed to fetch block number from RPC, cannot continue indexing due to {error}")
@@ -198,7 +199,7 @@ where
                                 info!("Index fully synced with chain");
                                 is_synced.store(true, std::sync::atomic::Ordering::Relaxed);
                                 if let Err(e) = tx.try_send(()) {
-                                    error!("failed to notify about achieving index synchronization: {e}")
+                                    error!(error = %e, "failed to notify about achieving index synchronization")
                                 }
                             }
                         }
@@ -217,7 +218,7 @@ where
                             Some(events)
                         }
                         Err(e) => {
-                            error!("failed to process logs in {block_description} into events: {e}");
+                            error!(error = %e, block = block_description, "failed to process logs into events");
                             None
                         }
                     };
@@ -242,7 +243,7 @@ where
                                 METRIC_INDEXER_CHECKSUM.set(low_4_bytes.into());
                             }
                         }
-                        Err(e) => error!("Cannot retrieve indexer state: {e}"),
+                        Err(e) => error!(error = %e, "Cannot retrieve indexer state"),
                     }
 
                     outgoing_events
@@ -255,7 +256,7 @@ where
                     // Pass the events further only once we're fully synced
                     if is_synced.load(std::sync::atomic::Ordering::Relaxed) {
                         if let Err(e) = tx_significant_events.try_send(event) {
-                            error!("failed to pass a significant chain event further: {e}");
+                            error!(error = %e,"failed to pass a significant chain event further");
                         }
                     }
                 }

@@ -312,7 +312,8 @@ where
                 Err(e) => {
                     error!(
                         session_id = tracing::field::debug(session_id),
-                        "failed to serialize CloseSession: {e}"
+                        error = %e,
+                        "failed to serialize CloseSession"
                     );
                     return futures::future::ready(()).boxed();
                 }
@@ -322,7 +323,8 @@ where
                 if let Err(err) = msg_sender.send_message(data, *session_id.peer(), routing_opts).await {
                     error!(
                         session_id = tracing::field::debug(session_id),
-                        "could not send notification of session closure after cache eviction: {err}"
+                        error = %err,
+                        "could not send notification of session closure after cache eviction"
                     );
                 }
 
@@ -511,12 +513,14 @@ where
                 }
                 error!(
                     challenge = err.challenge,
-                    "session establishment error received: {}", err.reason
+                    error = ?err,
+                    "session establishment error received"
                 );
             } else {
                 error!(
                     challenge = err.challenge,
-                    "session establishment attempt expired before error could be delivered: {}", err.reason
+                    error = ?err,
+                    "session establishment attempt expired before error could be delivered"
                 );
             }
 
@@ -535,7 +539,8 @@ where
                 ),
                 Err(e) => error!(
                     session_id = tracing::field::debug(session_id),
-                    "session could not be closed on other party's request: {e}"
+                    error = %e,
+                    "session could not be closed on other party's request"
                 ),
                 _ => {}
             }
@@ -799,7 +804,8 @@ where
                         ),
                         Err(e) => error!(
                             session_id = tracing::field::debug(closed_session_id),
-                            "cannot initiate session closure notification: {e}"
+                            error = %e,
+                            "cannot initiate session closure notification"
                         ),
                         _ => {}
                     }
@@ -839,7 +845,7 @@ where
                                     )
                                     .await
                                     {
-                                        error!("failed to handle Start protocol message: {e}");
+                                        error!(error = %e, "failed to handle Start protocol message");
                                     }
                                     None
                                 }
@@ -856,7 +862,8 @@ where
                                             if let Err(e) = session_data_sender.unbounded_send(data) {
                                                 error!(
                                                     session_id = tracing::field::debug(session_id),
-                                                    "failed to send received data to session: {e}"
+                                                    error = %e,
+                                                    "failed to send received data to session"
                                                 );
                                             }
                                         } else {
@@ -943,7 +950,7 @@ where
         pin_mut!(timeout, ping);
 
         if let Err(e) = self.network.add(peer, PeerOrigin::ManualPing, vec![]).await {
-            error!("Failed to store the peer observation: {e}");
+            error!(error = %e, "Failed to store the peer observation");
         }
 
         let start = current_time().as_unix_timestamp();
@@ -1065,7 +1072,8 @@ where
                 // The other side didn't allow us to establish a session
                 error!(
                     challenge = e.challenge,
-                    "the other party rejected the session initiation with error: {}", e.reason
+                    error = ?e,
+                    "the other party rejected the session initiation with error"
                 );
                 Err(TransportSessionError::Rejected(e.reason).into())
             }

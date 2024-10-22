@@ -100,7 +100,10 @@ where
                     if let Some(channel) = maybe_channel {
                         debug!(%channel, "already found existing channel");
                         if channel.status != ChannelStatus::Closed {
-                            error!("channel to {destination} is already opened or pending to close");
+                            error!(
+                                %destination,
+                                "channel to destination is already opened or pending to close"
+                            );
                             return Err(ChannelAlreadyExists);
                         }
                     }

@@ -596,7 +596,7 @@ pub(super) async fn pop_all(
         .filter_map(|(data, ts)| match to_api_message(data, ts) {
             Ok(msg) => Some(msg),
             Err(e) => {
-                error!("failed to pop message: {e}");
+                error!(error = %e, "failed to pop message");
                 None
             }
         })
@@ -695,7 +695,7 @@ pub(super) async fn peek_all(
         .filter_map(|(data, ts)| match to_api_message(data, ts) {
             Ok(msg) => Some(msg),
             Err(e) => {
-                error!("failed to peek message: {e}");
+                error!(error = %e, "failed to peek message:");
                 None
             }
         })

@@ -371,7 +371,8 @@ impl ConnectedUdpStream {
                         error!(
                             socket_id,
                             udp_bound_addr = tracing::field::debug(sock_rx.local_addr()),
-                            "failed to dispatch received data: {err}"
+                            error = %err,
+                            "failed to dispatch received data"
                         );
                         done = true;
                     }
@@ -405,9 +406,11 @@ impl ConnectedUdpStream {
                         if let Some(target) = counterparty_tx.get() {
                             if let Err(e) = sock_tx.send_to(&data, target.as_ref()).await {
                                 error!(
-                                    socket_id,
+                                    ?socket_id,
                                     udp_bound_addr = tracing::field::debug(sock_tx.local_addr()),
-                                    "failed to send data to {target}: {e}"
+                                    ?target,
+                                    error = %e,
+                                    "failed to send data"
                                 );
                             }
                             trace!(socket_id, bytes = data.len(), ?target, "sent bytes to");
@@ -416,7 +419,7 @@ impl ConnectedUdpStream {
                             METRIC_UDP_EGRESS_LEN.observe(&[target.as_str()], data.len() as f64);
                         } else {
                             error!(
-                                socket_id,
+                                ?socket_id,
                                 udp_bound_addr = tracing::field::debug(sock_tx.local_addr()),
                                 "cannot send data, counterparty not set"
                             );
@@ -425,15 +428,16 @@ impl ConnectedUdpStream {
                     }
                     Err(e) => {
                         error!(
-                            socket_id,
+                            ?socket_id,
                             udp_bound_addr = tracing::field::debug(sock_tx.local_addr()),
-                            "cannot receive more data from egress channel: {e}"
+                            error = %e,
+                            "cannot receive more data from egress channel"
                         );
                         break;
                     }
                 }
                 trace!(
-                    socket_id,
+                    ?socket_id,
                     udp_bound_addr = tracing::field::debug(sock_tx.local_addr()),
                     "tx queue done"
                 );

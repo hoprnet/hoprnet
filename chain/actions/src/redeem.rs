@@ -170,7 +170,7 @@ where
                         receivers.push(successful_tx);
                     }
                     Err(e) => {
-                        error!("Failed to submit transaction that redeems {ticket_id}: {e}",);
+                        error!(ticket_id, error = %e, "Failed to submit transaction that redeems ticket",);
                     }
                 }
             } else {

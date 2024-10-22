@@ -355,9 +355,9 @@ where
                                 }
                                 Ordering::Less => {
                                     error!(
-                                        "could not find acknowledged 'BeingRedeemed' ticket with idx {} in {}",
-                                        ticket_redeemed.new_ticket_index - 1,
-                                        channel_edits.entry()
+                                        idx = %ticket_redeemed.new_ticket_index - 1,
+                                        entry = %channel_edits.entry(),
+                                        "could not find acknowledged 'BeingRedeemed' ticket",
                                     );
                                     // This is not an error, because the ticket might've become neglected before
                                     // the ticket redemption could finish
@@ -365,10 +365,10 @@ where
                                 }
                                 Ordering::Greater => {
                                     error!(
-                                        "found {} tickets matching 'BeingRedeemed' index {} in {}",
-                                        matching_tickets.len(),
-                                        ticket_redeemed.new_ticket_index - 1,
-                                        channel_edits.entry()
+                                        count = matching_tickets.len(),
+                                        index = %ticket_redeemed.new_ticket_index - 1,
+                                        entry = %channel_edits.entry(),
+                                        "found tickets matching 'BeingRedeemed'",
                                     );
                                     return Err(CoreEthereumIndexerError::ProcessError(format!(
                                         "multiple tickets matching idx {} found in {}",
@@ -778,8 +778,8 @@ where
             METRIC_INDEXER_LOG_COUNTERS.increment(&["unknown"]);
 
             error!(
-                "on_event error - unknown contract address: {} - received log: {log:?}",
-                log.address
+                address = %log.address, log = ?log,
+                "on_event error - unknown contract address, received log"
             );
             return Err(CoreEthereumIndexerError::UnknownContract(log.address));
         }

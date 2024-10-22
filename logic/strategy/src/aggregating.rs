@@ -454,7 +454,7 @@ mod tests {
                         (),
                     ) {
                         Ok(_) => {}
-                        Err(e) => error!("{e}"),
+                        Err(e) => error!(error = %e, "Failed to received aggregation ticket"),
                     }
                 }
                 //  alice.ack_event_queue.0.start_send(super::TicketAggregationToProcess::ToProcess(destination, acked_tickets)),
@@ -468,7 +468,7 @@ mod tests {
                         .receive_ticket(PEERS[0].public().into(), aggregated_ticket, ())
                     {
                         Ok(_) => {}
-                        Err(e) => error!("{e}"),
+                        Err(e) => error!(error = %e, "Failed to receive a ticket"),
                     }
                 }
 

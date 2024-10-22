@@ -408,7 +408,7 @@ pub(crate) async fn create_client(
                                     #[cfg(all(feature = "prometheus", not(test)))]
                                     METRIC_ACTIVE_CLIENTS.decrement(&["tcp"], 1.0);
                                 }
-                                Err(e) => error!("failed to accept connection: {e}"),
+                                Err(e) => error!(error = %e, "failed to accept connection"),
                             }
                         }
                     }),
@@ -630,11 +630,12 @@ where
     let session_id = *session.id();
     match transfer_session(&mut session, &mut stream, max_buf).await {
         Ok((session_to_stream_bytes, stream_to_session_bytes)) => info!(
-            session_id = tracing::field::debug(session_id),
+            session_id = ?session_id,
             session_to_stream_bytes, stream_to_session_bytes, "client session ended",
         ),
         Err(e) => error!(
-            session_id = tracing::field::debug(session_id),
+            session_id = ?session_id,
+            error = %e,
             "error during data transfer: {e}"
         ),
     }

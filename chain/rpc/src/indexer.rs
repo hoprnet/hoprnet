@@ -76,9 +76,10 @@ impl<P: JsonRpcClient + 'static> RpcOperations<P> {
                         Ok(logs) => Ok(logs),
                         Err(e) => {
                             error!(
-                                "failed to fetch logs in block subrange {:?}-{:?}: {e}",
-                                subrange.get_from_block(),
-                                subrange.get_to_block()
+                                from = ?subrange.get_from_block(),
+                                to = ?subrange.get_to_block(),
+                                error = %e,
+                                "failed to fetch logs in block subrange"
                             );
                             Err(e)
                         }
@@ -173,7 +174,7 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                                     break;
                                 },
                                 Err(e) => {
-                                    error!(error=?e, "failed to process blocks");
+                                    error!(error=%e, "failed to process blocks");
                                     count_failures += 1;
 
                                     if count_failures < MAX_LOOP_FAILURES {
@@ -200,7 +201,7 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                         count_failures = 0;
                     }
 
-                    Err(e) => error!("failed to obtain current block number from chain: {e}")
+                    Err(e) => error!(error = %e, "failed to obtain current block number from chain")
                 }
 
                 futures_timer::Delay::new(self.cfg.expected_block_time).await;

@@ -384,24 +384,24 @@ where
                     Err(err) => {
                         // On error in Ticket redeem action, we also need to reset ack ticket state
                         if let Action::RedeemTicket(ack) = act {
-                            error!("marking the acknowledged ticket as untouched - redeem action failed: {err}");
+                            error!(rror = %err, "marking the acknowledged ticket as untouched - redeem action failed");
 
                             if let Err(e) = db_clone
                                 .update_ticket_states((&ack).into(), AcknowledgedTicketStatus::Untouched)
                                 .await
                             {
-                                error!("cannot mark {ack} as untouched: {e}");
+                                error!(%ack, error = %e, "cannot mark ticket as untouched");
                             }
                         }
 
                         // Timeout are accounted in different metric
                         if let Timeout = err {
-                            error!("timeout while waiting for confirmation of {act_id}");
+                            error!(act_id, "timeout while waiting for confirmation");
 
                             #[cfg(all(feature = "prometheus", not(test)))]
                             METRIC_COUNT_ACTIONS.increment(&[act_name, "timeout"]);
                         } else {
-                            error!("{act_id} failed: {err}");
+                            error!(act_id, error = %err, "ticket action failed");
 
                             #[cfg(all(feature = "prometheus", not(test)))]
                             METRIC_COUNT_ACTIONS.increment(&[act_name, "failure"]);

@@ -108,7 +108,7 @@ where
                         // Currently, we're not interested in awaiting the Close transactions to confirmation
                         debug!("channel closure finalizer: finalizing closure of {channel_cpy}");
                     }
-                    Err(e) => error!("channel closure finalizer: failed to finalize closure of {channel_cpy}: {e}"),
+                    Err(e) => error!(%channel_cpy, error = %e, "channel closure finalizer: failed to finalize closure"),
                 }
             })
             .collect::<FuturesUnordered<_>>()
