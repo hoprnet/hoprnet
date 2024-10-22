@@ -77,21 +77,21 @@ jobs:
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v7
         with:
-            token: ${{ secrets.GH_RUNNER_TOKEN }}
-            path: ./hoprd-sdk-python
-            commit-message: "Update SDK Python to version ${{ steps.setup.outputs.current_version }}"
-            title: "Bump SDK to ${{ steps.setup.outputs.current_version }}"
-            body-path: .github/files/pr-python-sdk.md
-            branch: bot/bump-${{ steps.setup.outputs.current_version }}
-            delete-branch: true
-            assignees: ${{ github.actor }}
-            team-reviewers: "@hoprnet/hopr-development"
+          token: ${{ secrets.GH_RUNNER_TOKEN }}
+          path: ./hoprd-sdk-python
+          commit-message: "Update SDK Python to version ${{ steps.setup.outputs.current_version }}"
+          title: "Bump SDK to ${{ steps.setup.outputs.current_version }}"
+          body-path: .github/files/pr-python-sdk.md
+          branch: bot/bump-${{ steps.setup.outputs.current_version }}
+          delete-branch: true
+          assignees: ${{ github.actor }}
+          team-reviewers: "@hoprnet/hopr-development"
 
       - name: Enable Auto Merge
         run: |
-            git fetch
-            git checkout bot/bump-${{ steps.setup.outputs.current_version }}
-            gh pr merge --auto --delete-branch --squash
+          git fetch
+          git checkout bot/bump-${{ steps.setup.outputs.current_version }}
+          gh pr merge --auto --delete-branch --squash
         env:
           GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
         working-directory: ./hoprd-sdk-python
