@@ -63,11 +63,12 @@ pub fn f64_approx_eq(a: f64, b: f64, epsilon: f64) -> bool {
 
 pub mod prelude {
     pub use super::errors::GeneralError;
+    pub use super::f64_approx_eq;
     pub use super::primitives::*;
     pub use super::sma::*;
     pub use super::traits::*;
 
-    pub use super::f64_approx_eq;
+    pub use chrono::{DateTime, Utc};
 }
 
 #[allow(deprecated)]

@@ -11,4 +11,27 @@ pub struct IndexerConfig {
     ///
     /// Default is `0`.
     pub start_block_number: u64,
+
+    /// Whether to use fast synchronization during indexing.
+    /// When enabled, it allows for quicker indexing of existing logs during node startup.
+    pub fast_sync: bool,
+}
+
+impl IndexerConfig {
+    pub fn new(start_block_number: u64, fast_sync: bool) -> Self {
+        Self {
+            start_block_number,
+            fast_sync,
+        }
+    }
+
+    pub fn disable_fast_sync(mut self) -> Self {
+        self.fast_sync = false;
+        self
+    }
+
+    pub fn enable_fast_sync(mut self) -> Self {
+        self.fast_sync = true;
+        self
+    }
 }
