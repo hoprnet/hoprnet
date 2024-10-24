@@ -21,7 +21,7 @@ use crate::{
     por::POR_SECRET_LENGTH,
 };
 
-/// Currently used ciphersuite for Sphinx
+/// Currently used cipher suite for Sphinx
 pub type CurrentSphinxSuite = hopr_crypto_sphinx::ec_groups::X25519Suite;
 
 /// Length of the packet including header and the payload
@@ -136,7 +136,7 @@ impl<S: SphinxSuite> MetaPacket<S> {
     ///
     /// The size of the `msg` must be less or equal [PAYLOAD_SIZE], otherwise the
     /// constructor will panic. The caller **must** ensure the size is correct beforehand.
-    /// The `additional_data_relayer` contain the PoR challenges for the individual relayers along the path,
+    /// The `additional_data_relayer` contains the PoR challenges for the individual relayers along the path,
     /// each of the challenges has the same size of `additional_relayer_data_len`.
     ///
     /// Optionally, there could be some additional data (`additional_data_last_hop`) for the packet destination.
@@ -358,6 +358,8 @@ mod tests {
             &por_strings.iter().map(|v| v.as_ref()).collect::<Vec<_>>(),
             None,
         );
+
+        assert!(mp.as_ref().len() < 1492, "metapacket too long {}", mp.as_ref().len());
 
         for (i, pair) in keypairs.iter().enumerate() {
             let fwd = mp

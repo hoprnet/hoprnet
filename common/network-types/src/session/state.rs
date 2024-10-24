@@ -83,6 +83,8 @@
 //!
 //! The above protocol features can be enabled by setting [SessionFeature] options in the configuration
 //! during [SessionSocket] construction.
+//!
+//! **For diagrams of individual retransmission situations, see the docs on the [`SessionSocket`] object.**
 use crossbeam_queue::ArrayQueue;
 use crossbeam_skiplist::SkipMap;
 use dashmap::mapref::entry::Entry;
@@ -711,11 +713,105 @@ impl<const C: usize> Sink<SessionMessage<C>> for SessionState<C> {
     }
 }
 
+#[cfg_attr(doc, aquamarine::aquamarine)]
 /// Represents a socket for a session between two nodes bound by the
 /// underlying [network transport](AsyncWrite) and the maximum transmission unit (MTU) of `C`.
 ///
 /// It also implements [`AsyncRead`] and [`AsyncWrite`] so that it can
 /// be used on top of the usual transport stack.
+///
+/// Based on the [configuration](SessionConfig), the `SessionSocket` can support:
+/// - frame segmentation and reassembly
+/// - segment and frame retransmission and reliability
+///
+/// See the module docs for details on retransmission.
+///
+/// # Retransmission driven by the Receiver
+///```mermaid
+/// sequenceDiagram
+///     Note over Sender,Receiver: Frame 1
+///     rect rgb(191, 223, 255)
+///     Note left of Sender: Frame 1 in buffer
+///     Sender->>Receiver: Segment 1/3 of Frame 1
+///     Sender->>Receiver: Segment 2/3 of Frame 1
+///     Sender--xReceiver: Segment 3/3 of Frame 1
+///     Note right of Receiver: RTO_BASE_RECEIVER elapsed
+///     Receiver->>Sender: Request Segment 3 of Frame 1
+///     Sender->>Receiver: Segment 3/3 of Frame 1
+///     Receiver->>Sender: Acknowledge Frame 1
+///     Note left of Sender: Frame 1 dropped from buffer
+///     end
+///     Note over Sender,Receiver: Frame 1 delivered
+///```
+///
+/// # Retransmission driven by the Sender
+/// ```mermaid
+/// sequenceDiagram
+///     Note over Sender,Receiver: Frame 1
+///     rect rgb(191, 223, 255)
+///     Note left of Sender: Frame 1 in buffer
+///     Sender->>Receiver: Segment 1/3 of Frame 1
+///     Sender->>Receiver: Segment 2/3 of Frame 1
+///     Sender--xReceiver: Segment 3/3 of Frame 1
+///     Note right of Receiver: RTO_BASE_RECEIVER elapsed
+///     Receiver--xSender: Request Segment 3 of Frame 1
+///     Note left of Sender: RTO_BASE_SENDER elapsed
+///     Sender->>Receiver: Segment 1/3 of Frame 1
+///     Sender->>Receiver: Segment 2/3 of Frame 1
+///     Sender->>Receiver: Segment 3/3 of Frame 1
+///     Receiver->>Sender: Acknowledge Frame 1
+///     Note left of Sender: Frame 1 dropped from buffer
+///     end
+///     Note over Sender,Receiver: Frame 1 delivered
+/// ```
+///
+/// # Sender-Receiver retransmission handover
+///
+/// ```mermaid
+///    sequenceDiagram
+///     Note over Sender,Receiver: Frame 1
+///     rect rgb(191, 223, 255)
+///     Note left of Sender: Frame 1 in buffer
+///     Sender->>Receiver: Segment 1/3 of Frame 1
+///     Sender--xReceiver: Segment 2/3 of Frame 1
+///     Sender--xReceiver: Segment 3/3 of Frame 1
+///     Note right of Receiver: RTO_BASE_RECEIVER elapsed
+///     Receiver->>Sender: Request Segments 2,3 of Frame 1
+///     Note left of Sender: RTO_BASE_SENDER cancelled
+///     Sender->>Receiver: Segment 2/3 of Frame 1
+///     Sender--xReceiver: Segment 3/3 of Frame 1
+///     Note right of Receiver: RTO_BASE_RECEIVER elapsed
+///     Receiver--xSender: Request Segments 3 of Frame 1
+///     Note right of Receiver: RTO_BASE_RECEIVER elapsed
+///     Receiver->>Sender: Request Segments 3 of Frame 1
+///     Sender->>Receiver: Segment 3/3 of Frame 1
+///     Receiver->>Sender: Acknowledge Frame 1
+///     Note left of Sender: Frame 1 dropped from buffer
+///     end
+///     Note over Sender,Receiver: Frame 1 delivered
+/// ```
+///
+/// # Retransmission failure
+///
+/// ```mermaid
+///    sequenceDiagram
+///     Note over Sender,Receiver: Frame 1
+///     rect rgb(191, 223, 255)
+///     Note left of Sender: Frame 1 in buffer
+///     Sender->>Receiver: Segment 1/3 of Frame 1
+///     Sender->>Receiver: Segment 2/3 of Frame 1
+///     Sender--xReceiver: Segment 3/3 of Frame 1
+///     Note right of Receiver: RTO_BASE_RECEIVER elapsed
+///     Receiver--xSender: Request Segment 3 of Frame 1
+///     Note left of Sender: RTO_BASE_SENDER elapsed
+///     Sender--xReceiver: Segment 1/3 of Frame 1
+///     Sender--xReceiver: Segment 2/3 of Frame 1
+///     Sender--xReceiver: Segment 3/3 of Frame 1
+///     Note left of Sender: FRAME_MAX_AGE elapsed<br/>Frame 1 dropped from buffer
+///     Note right of Receiver: FRAME_MAX_AGE elapsed<br/>Frame 1 dropped from buffer
+///     end
+///     Note over Sender,Receiver: Frame 1 never delivered
+/// ```
 pub struct SessionSocket<const C: usize> {
     state: SessionState<C>,
     frame_egress: Box<dyn AsyncRead + Send + Unpin>,

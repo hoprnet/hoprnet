@@ -18,6 +18,7 @@ use crate::utils::k256_scalar_from_bytes;
 ///
 /// The VRF is thereby needed because it generates on-demand deterministic
 /// entropy that can only be derived by the ticket redeemer.
+#[allow(non_snake_case)]
 #[derive(Clone, Default)]
 pub struct VrfParameters {
     /// the pseudo-random point
@@ -112,6 +113,7 @@ impl BytesEncodable<VRF_PARAMETERS_SIZE> for VrfParameters {}
 impl VrfParameters {
     /// Verifies that VRF values are valid.
     /// The SC performs the verification. This method is here just to test correctness.
+    #[allow(non_snake_case)]
     pub fn verify<const T: usize>(&self, creator: &Address, msg: &[u8; T], dst: &[u8]) -> Result<()> {
         let cap_B = self.get_encoded_payload(creator, msg, dst)?;
 
@@ -179,6 +181,7 @@ impl VrfParameters {
 /// Takes a private key, the corresponding Ethereum address and a payload
 /// and creates all parameters that are required by the smart contract
 /// to prove that a ticket is a win.
+#[allow(non_snake_case)]
 pub fn derive_vrf_parameters<T: AsRef<[u8]>>(
     msg: T,
     chain_keypair: &ChainKeypair,
