@@ -26,7 +26,7 @@ use hoprd_api::{serve_api, ListenerJoinHandles, RestApiParameters};
 use hoprd_db_api::aliases::{HoprdDbAliasesOperations, ME_AS_ALIAS};
 use hoprd_keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
 
-use hoprd::HoprServerIpForwardingReactor;
+use hoprd::exit::HoprServerIpForwardingReactor;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleHistogram;
@@ -296,7 +296,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let (hopr_socket, hopr_processes) = node
-        .run(HoprServerIpForwardingReactor(hopr_keys.packet_key.clone()))
+        .run(HoprServerIpForwardingReactor::new(
+            hopr_keys.packet_key.clone(),
+            Default::default(),
+        ))
         .await?;
 
     // process extracting the received data from the socket
