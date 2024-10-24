@@ -29,7 +29,10 @@ where
 
                 let action_duration = current_time().as_unix_timestamp().saturating_sub(start);
                 if let Some(remaining) = cycle.checked_sub(action_duration) {
-                    trace!("Universal timer sleeping for: {}ms", remaining.as_millis());
+                    trace!(
+                        remaining_time_in_ms = remaining.as_millis(),
+                        "Universal timer sleeping for",
+                    );
                     sleep(remaining).await
                 }
             }

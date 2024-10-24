@@ -39,7 +39,7 @@ impl WrappedTagBloomFilter {
         let bloom = self.tbf.read().await.clone(); // Clone to immediately release the lock
 
         if let Err(e) = write(&self.path, bloom.to_bytes()) {
-            error!("Tag Bloom filter save failed: {e}")
+            error!(erorr = %e, "Tag Bloom filter save failed")
         } else {
             info!("Tag Bloom filter saved successfully")
         };

@@ -130,7 +130,7 @@ where
         let awaiter = self.writer.clone().aggregate_tickets(channel, prerequisites)?;
 
         if let Err(e) = awaiter.consume_and_wait(self.agg_timeout).await {
-            warn!("Error occured on ticket aggregation for '{channel}', performing a rollback: {e}");
+            warn!(%channel, error = %e, "Error during ticket aggregation, performing a rollback");
             self.db.rollback_aggregation_in_channel(*channel).await?;
         }
 
@@ -297,45 +297,46 @@ where
                             destination.try_into();
                         match opk {
                             Ok(opk) => match db.aggregate_tickets(opk, acked_tickets, &chain_key).await {
-                                Ok(ticket) => {
-                                    Some(TicketAggregationProcessed::Reply(destination, Ok(ticket.leak()), response))
-                                }
+                                Ok(ticket) => Some(TicketAggregationProcessed::Reply(
+                                    destination,
+                                    Ok(ticket.leak()),
+                                    response,
+                                )),
                                 Err(DbError::TicketAggregationError(e)) => {
                                     // forward error to counterparty
                                     Some(TicketAggregationProcessed::Reply(destination, Err(e), response))
                                 }
                                 Err(e) => {
-                                    error!("Dropping tickets aggregation request due unexpected error {e}");
+                                    error!(error = %e, "Dropping tickets aggregation request due to an error");
                                     None
                                 }
                             },
                             Err(e) => {
                                 error!(
-                                    "Failed to deserialize the destination '{destination}' to an offchain public key: {e}"
+                                    ?destination, error = %e,
+                                    "Failed to deserialize the destination to an offchain public key"
                                 );
                                 None
                             }
                         }
                     }
                     TicketAggregationToProcess::ToReceive(destination, aggregated_ticket, request) => {
-                            match aggregated_ticket {
-                                Ok(ticket) => match db
-                                    .process_received_aggregated_ticket(ticket.clone(), &chain_key)
-                                    .await
-                                {
-                                    Ok(acked_ticket) => {
-                                        Some(TicketAggregationProcessed::Receive(destination, acked_ticket, request))
-                                    }
-                                    Err(e) => {
-                                        error!("Error while handling aggregated ticket: {e}");
-                                        None
-                                    }
-                                },
+                        match aggregated_ticket {
+                            Ok(ticket) => match db.process_received_aggregated_ticket(ticket.clone(), &chain_key).await
+                            {
+                                Ok(acked_ticket) => {
+                                    Some(TicketAggregationProcessed::Receive(destination, acked_ticket, request))
+                                }
                                 Err(e) => {
-                                    warn!("Counterparty refused to aggregate tickets: {e}");
+                                    error!(error = %e, "Error while handling aggregated ticket");
                                     None
                                 }
+                            },
+                            Err(e) => {
+                                warn!(error = %e, "Counterparty refused to aggregate tickets");
+                                None
                             }
+                        }
                     }
                     TicketAggregationToProcess::ToSend(channel, prerequsites, finalizer) => {
                         match db.prepare_aggregation_in_channel(&channel, prerequsites).await {
@@ -348,17 +349,19 @@ where
 
                                 // TODO: remove this transformation in 3.0 once proper aggregation protocol format is introduced
                                 let addr = chain_key.public().to_address();
-                                let tickets = tickets.into_iter()
+                                let tickets = tickets
+                                    .into_iter()
                                     .map(|t| hopr_internal_types::legacy::AcknowledgedTicket::new(t, &addr, &dst))
                                     .collect::<Vec<_>>();
                                 Some(TicketAggregationProcessed::Send(source.into(), tickets, finalizer))
                             }
                             Err(e) => {
-                                error!("An error occured when preparing the channel aggregation: {e}");
+                                error!(error = %e, "An error occured when preparing the channel aggregation");
                                 None
-                            },
+                            }
                             _ => {
-                                finalizer.finalize(); None
+                                finalizer.finalize();
+                                None
                             }
                         }
                     }
@@ -368,10 +371,10 @@ where
                     match poll_fn(|cx| Pin::new(&mut processed_tx).poll_ready(cx)).await {
                         Ok(_) => match processed_tx.start_send(event) {
                             Ok(_) => {}
-                            Err(e) => error!("Failed to pass a processed ack message: {}", e),
+                            Err(e) => error!(error = %e, "Failed to pass a processed ack message"),
                         },
                         Err(e) => {
-                            warn!("The receiver for processed ack no longer exists: {}", e);
+                            warn!(error = %e, "The receiver for processed ack no longer exists");
                         }
                     };
                 }
