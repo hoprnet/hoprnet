@@ -128,7 +128,7 @@ jobs:
 
       - name: Trigger deploy workflow if needed
         if: (contains(github.event.pull_request.labels.*.name, 'deploy_nodes') || inputs.production ) && contains(inputs.package,'hoprd')
-        uses: peter-evans/repository-dispatch@v2
+        uses: peter-evans/repository-dispatch@v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           repository: ${{ github.repository }}
