@@ -195,10 +195,10 @@ impl HoprDbPeersOperations for HoprDb {
             loop {
                 match sub_stream.try_next().await {
                     Ok(Some(peer_row)) => {
-                        trace!("got db network row: {peer_row:?}");
+                        trace!(?peer_row, "got db network row");
                         match WrappedPeerStatus::try_from(peer_row) {
                             Ok(peer_status) => yield peer_status.0,
-                            Err(e) => error!("cannot map peer from row: {e}"),
+                            Err(e) => error!(error = %e, "cannot map peer from row"),
                         }
                     },
                     Ok(None) => {
@@ -206,7 +206,7 @@ impl HoprDbPeersOperations for HoprDb {
                         break;
                     }
                     Err(e) => {
-                        error!("failed to retrieve next network row: {e}");
+                        error!(error = %e, "failed to retrieve next network row");
                         break;
                     }
                 }

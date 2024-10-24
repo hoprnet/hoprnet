@@ -206,13 +206,13 @@ where
                         )
                     }
                     ChannelStatus::Closed => {
-                        warn!("channel {} is already closed", channel.get_id());
+                        warn!(%channel, "channel already closed");
                         return Err(ChannelAlreadyClosed);
                     }
                 },
                 ChannelDirection::Outgoing => match channel.status {
                     ChannelStatus::Open => {
-                        debug!("initiating closure of {channel}");
+                        debug!(%channel, "initiating channel closure");
                         let tx_hash = self
                             .tx_exec
                             .initiate_outgoing_channel_closure(channel.destination)
@@ -223,7 +223,7 @@ where
                         )
                     }
                     ChannelStatus::PendingToClose(_) => {
-                        debug!("finalizing closure of {channel}");
+                        debug!(%channel, "finalizing channel closure");
                         let tx_hash = self
                             .tx_exec
                             .finalize_outgoing_channel_closure(channel.destination)
@@ -234,7 +234,7 @@ where
                         )
                     }
                     ChannelStatus::Closed => {
-                        warn!("channel {} is already closed", channel.get_id());
+                        warn!(%channel, "channel already closed");
                         return Err(ChannelAlreadyClosed);
                     }
                 },
@@ -267,7 +267,7 @@ where
         };
 
         let tx_hash = expectation.tx_hash;
-        debug!("action {action} submitted via tx {tx_hash}, registering expectation");
+        debug!(?action, %tx_hash, "action submitted via tx, registering expectation");
 
         // Register new expectation and await it with timeout
         let confirmation = self.action_state.register_expectation(expectation).await?.fuse();
@@ -371,12 +371,12 @@ where
             spawn(async move {
                 let act_id = act.to_string();
                 let act_name: &'static str = (&act).into();
-                trace!("start executing {act_id} ({act_name})");
+                trace!(act_id, act_name, "executing");
 
                 let tx_result = exec_context.execute_action(act.clone(), channel_dst).await;
                 match &tx_result {
                     Ok(confirmation) => {
-                        info!("successful {confirmation}");
+                        info!(%confirmation, "successful confirmation");
 
                         #[cfg(all(feature = "prometheus", not(test)))]
                         METRIC_COUNT_ACTIONS.increment(&[act_name, "success"]);
@@ -384,24 +384,24 @@ where
                     Err(err) => {
                         // On error in Ticket redeem action, we also need to reset ack ticket state
                         if let Action::RedeemTicket(ack) = act {
-                            error!("marking the acknowledged ticket as untouched - redeem action failed: {err}");
+                            error!(rror = %err, "marking the acknowledged ticket as untouched - redeem action failed");
 
                             if let Err(e) = db_clone
                                 .update_ticket_states((&ack).into(), AcknowledgedTicketStatus::Untouched)
                                 .await
                             {
-                                error!("cannot mark {ack} as untouched: {e}");
+                                error!(%ack, error = %e, "cannot mark ticket as untouched");
                             }
                         }
 
                         // Timeout are accounted in different metric
                         if let Timeout = err {
-                            error!("timeout while waiting for confirmation of {act_id}");
+                            error!(act_id, "timeout while waiting for confirmation");
 
                             #[cfg(all(feature = "prometheus", not(test)))]
                             METRIC_COUNT_ACTIONS.increment(&[act_name, "timeout"]);
                         } else {
-                            error!("{act_id} failed: {err}");
+                            error!(act_id, error = %err, "ticket action failed");
 
                             #[cfg(all(feature = "prometheus", not(test)))]
                             METRIC_COUNT_ACTIONS.increment(&[act_name, "failure"]);

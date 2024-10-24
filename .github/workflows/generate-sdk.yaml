@@ -27,12 +27,12 @@ jobs:
           ref: ${{ inputs.base_branch }}
 
       - name: Sccache Setup
-        uses: mozilla-actions/sccache-action@v0.0.5
+        uses: mozilla-actions/sccache-action@v0.0.6
         with:
           version: "v0.4.0"
 
       - name: Install Nix
-        uses: cachix/install-nix-action@v27
+        uses: cachix/install-nix-action@v29
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -77,21 +77,21 @@ jobs:
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v7
         with:
-            token: ${{ secrets.GH_RUNNER_TOKEN }}
-            path: ./hoprd-sdk-python
-            commit-message: "Update SDK Python to version ${{ steps.setup.outputs.current_version }}"
-            title: "Bump SDK to ${{ steps.setup.outputs.current_version }}"
-            body-path: .github/files/pr-python-sdk.md
-            branch: bot/bump-${{ steps.setup.outputs.current_version }}
-            delete-branch: true
-            assignees: ${{ github.actor }}
-            team-reviewers: "@hoprnet/hopr-development"
+          token: ${{ secrets.GH_RUNNER_TOKEN }}
+          path: ./hoprd-sdk-python
+          commit-message: "Update SDK Python to version ${{ steps.setup.outputs.current_version }}"
+          title: "Bump SDK to ${{ steps.setup.outputs.current_version }}"
+          body-path: .github/files/pr-python-sdk.md
+          branch: bot/bump-${{ steps.setup.outputs.current_version }}
+          delete-branch: true
+          assignees: ${{ github.actor }}
+          team-reviewers: "@hoprnet/hopr-development"
 
       - name: Enable Auto Merge
         run: |
-            git fetch
-            git checkout bot/bump-${{ steps.setup.outputs.current_version }}
-            gh pr merge --auto --delete-branch --squash
+          git fetch
+          git checkout bot/bump-${{ steps.setup.outputs.current_version }}
+          gh pr merge --auto --delete-branch --squash
         env:
           GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
         working-directory: ./hoprd-sdk-python

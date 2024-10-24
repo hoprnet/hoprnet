@@ -13,6 +13,7 @@ mod preconditions;
 mod prometheus;
 mod session;
 mod tickets;
+mod types;
 
 pub use session::{HOPR_TCP_BUFFER_SIZE, HOPR_UDP_BUFFER_SIZE, HOPR_UDP_QUEUE_SIZE};
 
@@ -44,7 +45,8 @@ use utoipa::{Modify, OpenApi};
 use utoipa_scalar::{Scalar, Servable};
 
 use crate::config::Auth;
-use hopr_lib::{errors::HoprLibError, ApplicationData, Hopr};
+use hopr_lib::ApplicationData;
+use hopr_lib::{errors::HoprLibError, Hopr};
 use hopr_network_types::prelude::IpProtocol;
 
 pub(crate) const BASE_PATH: &str = "/api/v3";
@@ -125,7 +127,7 @@ pub(crate) struct InternalState {
         schemas(
             ApiError,
             account::AccountAddressesResponse, account::AccountBalancesResponse, account::WithdrawBodyRequest, account::WithdrawResponse,
-            alias::PeerIdResponse, alias::AliasPeerIdBodyRequest,
+            alias::PeerIdResponse, alias::AliasDestinationBodyRequest,
             channels::ChannelsQueryRequest,channels::CloseChannelResponse, channels::OpenChannelBodyRequest, channels::OpenChannelResponse,
             channels::NodeChannel, channels::NodeChannelsResponse, channels::ChannelInfoResponse, channels::FundBodyRequest,
             messages::MessagePopAllResponse,
@@ -242,7 +244,6 @@ async fn build_api(
     };
 
     Router::new()
-        // FIXME: Remove API UIs which are not going to be used.
         .nest("/", Router::new().merge(Scalar::with_url("/scalar", ApiDoc::openapi())))
         .nest(
             "/",
@@ -264,7 +265,7 @@ async fn build_api(
                 .route("/account/addresses", get(account::addresses))
                 .route("/account/balances", get(account::balances))
                 .route("/account/withdraw", post(account::withdraw))
-                .route("/peers/:peerId", get(peers::show_peer_info))
+                .route("/peers/:destination", get(peers::show_peer_info))
                 .route("/channels", get(channels::list_channels))
                 .route("/channels", post(channels::open_channel))
                 .route("/channels/:channelId", get(channels::show_channel))
@@ -299,7 +300,8 @@ async fn build_api(
                 .route("/node/peers", get(node::peers))
                 .route("/node/entryNodes", get(node::entry_nodes))
                 .route("/node/metrics", get(node::metrics))
-                .route("/peers/:peerId/ping", post(peers::ping_peer))
+                .route("/peers/:destination/ping", post(peers::ping_peer))
+                .route("/session/websocket", get(session::websocket))
                 .route("/session/:protocol", post(session::create_client))
                 .route("/session/:protocol", get(session::list_clients))
                 .route("/session/:protocol", delete(session::close_client))
@@ -343,7 +345,6 @@ enum ApiErrorStatus {
     /// An invalid application tag from the reserved range was provided.
     InvalidApplicationTag,
     InvalidChannelId,
-    InvalidPeerId,
     PeerNotFound,
     ChannelNotFound,
     TicketsNotFound,
@@ -358,6 +359,8 @@ enum ApiErrorStatus {
     Unauthorized,
     InvalidQuality,
     NotReady,
+    #[strum(serialize = "INVALID_PATH")]
+    InvalidPath(String),
     #[strum(serialize = "UNKNOWN_FAILURE")]
     UnknownFailure(String),
 }

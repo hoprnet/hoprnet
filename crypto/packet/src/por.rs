@@ -146,7 +146,7 @@ pub fn validate_por_half_keys(ethereum_challenge: &EthereumChallenge, own_key: &
     Response::from_half_keys(own_key, ack)
         .map(|response| validate_por_response(ethereum_challenge, &response))
         .unwrap_or_else(|e| {
-            error!("failed to validate por half keys: {e}");
+            error!(error = %e, "failed to validate por half keys");
             false
         })
 }
@@ -161,7 +161,7 @@ pub fn validate_por_hint(ethereum_challenge: &EthereumChallenge, own_share: &Hal
     Challenge::from_own_share_and_half_key(own_share, ack)
         .map(|c| c.to_ethereum_challenge().eq(ethereum_challenge))
         .unwrap_or_else(|e| {
-            error!("failed to validate por hint: {e}");
+            error!(error = %e,"failed to validate por hint");
             false
         })
 }

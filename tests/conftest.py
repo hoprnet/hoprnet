@@ -353,7 +353,7 @@ def fund_nodes(test_suite_name, test_dir: Path, anvil_port):
         capture_output=True,
     )
 
-
+    
 async def all_peers_connected(node: Node, required_peers):
     ready = False
 
@@ -435,7 +435,7 @@ async def shared_nodes_bringup(
         logging.critical("Not all nodes are connected to all peers, interrupting setup")
         raise RuntimeError
 
-
+        
 def load_private_key(test_suite_name, pos=0):
     with open(anvil_cfg_file(test_suite_name), "r") as file:
         data: dict = json.load(file)
@@ -592,8 +592,8 @@ async def teardown(swarm7: dict[str, Node]):
         logging.error(f"Error popping all messages in teardown: {e}")
 
 
-def to_ws_url(host, port):
-    return f"ws://{host}:{port}/api/v3/messages/websocket"
+def to_ws_url(host, port, args: list[tuple[str, str]]):
+    return f"ws://{host}:{port}/api/v3/session/websocket?" + '&'.join(f'{a[0]}={a[1]}' for a in args)
 
 
 def run_hopli_cmd(cmd: list[str], custom_env):

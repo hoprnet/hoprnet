@@ -15,6 +15,7 @@ crate-type = ["rlib"]
 default = []
 session-client = []
 session-server = []
+transport-quic = ["hopr-transport/transport-quic"]
 runtime-async-std = [
   "chain-api/runtime-async-std",
   "chain-rpc/runtime-async-std",
@@ -81,10 +82,12 @@ hopr-async-runtime = { workspace = true }
 anyhow = { workspace = true }
 async-std = { workspace = true }
 ethers = { workspace = true }
+hex-literal = { workspace = true }
 hopr-crypto-types = { workspace = true }
+hopr-crypto-random = { workspace = true }
 hopr-db-sql = { workspace = true, features = ["runtime-async-std"] }
 hopr-transport-session = { workspace = true, features = ["runtime-tokio"] }
 serde_yaml = { workspace = true }
-test-log = "0.2.16"
+test-log = { workspace = true }
 tokio = { workspace = true }
 tokio-util = { workspace = true }

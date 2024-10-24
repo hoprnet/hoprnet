@@ -77,13 +77,13 @@ where
             .perform(|tx| {
                 Box::pin(async move {
                     let allowance = db_clone.get_safe_hopr_allowance(Some(tx)).await?;
-                    debug!("current staking safe allowance is {allowance}");
+                    debug!(%allowance, "current staking safe allowance");
                     if allowance.lt(&amount) {
                         return Err(NotEnoughAllowance);
                     }
 
                     let hopr_balance = db_clone.get_safe_hopr_balance(Some(tx)).await?;
-                    debug!("current Safe HOPR balance is {hopr_balance}");
+                    debug!(balance = %hopr_balance, "current Safe HOPR balance");
                     if hopr_balance.lt(&amount) {
                         return Err(BalanceTooLow);
                     }
@@ -98,9 +98,12 @@ where
                         .get_channel_by_parties(Some(tx), &self_addr, &destination, false)
                         .await?;
                     if let Some(channel) = maybe_channel {
-                        debug!("already found existing {channel}");
+                        debug!(%channel, "already found existing channel");
                         if channel.status != ChannelStatus::Closed {
-                            error!("channel to {destination} is already opened or pending to close");
+                            error!(
+                                %destination,
+                                "channel to destination is already opened or pending to close"
+                            );
                             return Err(ChannelAlreadyExists);
                         }
                     }
@@ -109,7 +112,7 @@ where
             })
             .await?;
 
-        info!("initiating channel open to {destination} with {amount}");
+        info!(%destination, %amount, "initiating channel open");
         self.tx_sender.send(Action::OpenChannel(destination, amount)).await
     }
 
@@ -127,13 +130,13 @@ where
             .perform(|tx| {
                 Box::pin(async move {
                     let allowance = db_clone.get_safe_hopr_allowance(Some(tx)).await?;
-                    debug!("current staking safe allowance is {allowance}");
+                    debug!(%allowance, "current staking safe allowance");
                     if allowance.lt(&amount) {
                         return Err(NotEnoughAllowance);
                     }
 
                     let hopr_balance = db_clone.get_safe_hopr_balance(Some(tx)).await?;
-                    debug!("current Safe HOPR balance is {hopr_balance}");
+                    debug!(balance = %hopr_balance, "current Safe HOPR balance");
                     if hopr_balance.lt(&amount) {
                         return Err(BalanceTooLow);
                     }
@@ -182,10 +185,10 @@ where
                     ChannelStatus::Closed => Err(ChannelAlreadyClosed),
                     ChannelStatus::PendingToClose(_) => {
                         let remaining_closure_time = channel.remaining_closure_time(current_time());
-                        info!("{channel} - remaining closure time is {remaining_closure_time:?}");
+                        info!(%channel, ?remaining_closure_time, "remaining closure time update for a channel");
                         match remaining_closure_time {
                             Some(Duration::ZERO) => {
-                                info!("initiating finalization of channel closure of {channel} in {direction}");
+                                info!(%channel, %direction, "initiating finalization of channel closure");
                                 self.tx_sender.send(Action::CloseChannel(channel, direction)).await
                             }
                             _ => Err(ClosureTimeHasNotElapsed(
@@ -201,10 +204,10 @@ where
                             // TODO: trigger aggregation
                             // Do not await the redemption, just submit it to the queue
                             let redeemed = self.redeem_tickets_in_channel(&channel, false).await?.len();
-                            info!("{redeemed} tickets will be redeemed before closing {channel}");
+                            info!(count = redeemed, %channel, "redeemed tickets before channel closing");
                         }
 
-                        info!("initiating channel closure of {channel} in {direction}");
+                        info!(%channel, ?direction, "initiating channel closure");
                         self.tx_sender.send(Action::CloseChannel(channel, direction)).await
                     }
                 }

@@ -102,11 +102,11 @@ where
                     .map(|(p, _)| p)?
             }
             RoutingOptions::Hops(hops) if u32::from(hops) == 0 => {
-                trace!(hops = 0, "Resolved zero-hop path to {destination}");
+                trace!(hops = 0, %destination, "Resolved zero-hop path");
                 TransportPath::direct(destination)
             }
             RoutingOptions::Hops(hops) => {
-                trace!(hops = tracing::field::display(hops), "Resolving a path using hop count");
+                trace!(hops = tracing::field::display(hops), "Resolved path using hop count");
 
                 let pk = OffchainPublicKey::try_from(destination)?;
 
@@ -193,7 +193,6 @@ where
             .await
             .map_err(|_| TransportSessionError::Path)?;
 
-        trace!("Send packet");
         self.process_packet_send
             .get()
             .ok_or_else(|| TransportSessionError::Closed)?

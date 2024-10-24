@@ -21,6 +21,7 @@ pub mod constants;
 pub mod errors;
 
 use async_lock::RwLock;
+use chain_rpc::HoprRpcOperations;
 use futures::{
     channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender},
     Stream, StreamExt,
@@ -44,8 +45,8 @@ use chain_actions::{
     redeem::TicketRedeemActions,
 };
 use chain_api::{
-    can_register_with_safe, config::ChainNetworkConfig, wait_for_funds, HoprChain, HoprChainProcess,
-    SignificantChainEvent,
+    can_register_with_safe, config::ChainNetworkConfig, errors::HoprChainError, wait_for_funds, HoprChain,
+    HoprChainProcess, SignificantChainEvent,
 };
 use chain_types::chain_events::ChainEventType;
 use chain_types::ContractAddresses;
@@ -348,12 +349,12 @@ where
                                 match allowed {
                                     chain_types::chain_events::NetworkRegistryStatus::Allowed => {
                                         if let Err(e) = network.add(&peer_id, PeerOrigin::NetworkRegistry, vec![]).await {
-                                            error!(peer = %peer_id, "failed to allow locally (already allowed on-chain): {e}")
+                                            error!(peer = %peer_id, error = %e, "failed to allow locally (already allowed on-chain)")
                                         }
                                     },
                                     chain_types::chain_events::NetworkRegistryStatus::Denied => {
                                         if let Err(e) = network.remove(&peer_id).await {
-                                            error!(peer = %peer_id, "failed to ban locally (already banned on-chain): {e}")
+                                            error!(peer = %peer_id, error = %e, "failed to ban locally (already banned on-chain)")
                                         }
                                     },
                                 };
@@ -366,13 +367,13 @@ where
 
                         }
                         Err(e) => {
-                            error!("on_network_registry_node_allowed failed with: {e}");
+                            error!(error = %e, "on_network_registry_node_allowed failed with");
                             None
                         },
                     }
                 }
                 ChainEventType::NodeSafeRegistered(safe_address) =>  {
-                    info!("node safe registered {safe_address}");
+                    info!(%safe_address, "node safe registered");
                     None
                 }
             }
@@ -389,7 +390,7 @@ where
                     PeerEligibility::Eligible => Some(vec![PeerDiscovery::Allow(peer)]),
                     PeerEligibility::Ineligible => {
                         if let Err(e) = network.remove(&peer).await {
-                            error!("failed to remove '{peer}' from the local registry: {e}")
+                            error!(%peer, error = %e, "failed to remove peer from the local registry")
                         }
                         Some(vec![PeerDiscovery::Ban(peer)])
                     }
@@ -468,7 +469,7 @@ impl Hopr {
         let multiaddress: Multiaddr = (&cfg.host).try_into()?;
 
         let db_path: PathBuf = [&cfg.db.data, "db"].iter().collect();
-        info!("Initiating the DB at '{db_path:?}'");
+        info!(path = ?db_path, "Initiating DB");
 
         if cfg.db.force_initialize {
             info!("Force cleaning up existing database");
@@ -499,7 +500,7 @@ impl Hopr {
         let db = futures::executor::block_on(HoprDb::new(db_path.as_path(), me_onchain.clone(), db_cfg))?;
 
         if let Some(provider) = &cfg.chain.provider {
-            info!("Creating chain components using the custom provider: {provider}");
+            info!(provider, "Creating chain components using the custom provider");
         } else {
             info!("Creating chain components using the default provider");
         }
@@ -515,7 +516,7 @@ impl Hopr {
         let contract_addresses = ContractAddresses::from(&resolved_environment);
         info!(
             myself = me_onchain.public().to_hex(),
-            contract_addresses = tracing::field::debug(contract_addresses),
+            contract_addresses = ?contract_addresses,
             "Resolved contract addresses",
         );
 
@@ -589,7 +590,7 @@ impl Hopr {
 
             // Calling get_ticket_statistics will initialize the respective metrics on tickets
             if let Err(e) = futures::executor::block_on(db.get_ticket_statistics(None)) {
-                error!("failed to initialize ticket statistics metrics: {e}");
+                error!(error = %e,"failed to initialize ticket statistics metrics");
             }
         }
 
@@ -658,7 +659,9 @@ impl Hopr {
                         let db_safe_balance = my_db.get_safe_hopr_balance(Some(tx)).await?;
                         if safe_balance != db_safe_balance {
                             warn!(
-                                "Safe balance in the DB {db_safe_balance} mismatches on chain balance: {safe_balance}"
+                                %db_safe_balance,
+                                %safe_balance,
+                                "Safe balance in the DB mismatches on chain balance"
                             );
                             my_db.set_safe_hopr_balance(Some(tx), safe_balance).await?;
                         }
@@ -678,6 +681,14 @@ impl Hopr {
         self.chain_cfg.clone()
     }
 
+    pub fn get_provider(&self) -> String {
+        self.cfg
+            .chain
+            .provider
+            .clone()
+            .unwrap_or(self.chain_cfg.chain.default_provider.clone())
+    }
+
     #[inline]
     fn is_public(&self) -> bool {
         self.cfg.chain.announce
@@ -693,9 +704,8 @@ impl Hopr {
         )?;
 
         info!(
-            "Node is not started, please fund this node {} with at least {}",
-            self.me_onchain(),
-            Balance::new_from_str(SUGGESTED_NATIVE_BALANCE, BalanceType::Native).to_formatted_string()
+            address = %self.me_onchain(), minimum_balance = %Balance::new_from_str(SUGGESTED_NATIVE_BALANCE, BalanceType::Native),
+            "Node is not started, please fund this node",
         );
 
         let mut processes: HashMap<HoprLibProcesses, JoinHandle<()>> = HashMap::new();
@@ -717,10 +727,10 @@ impl Hopr {
         let minimum_balance = Balance::new_from_str(constants::MIN_NATIVE_BALANCE, BalanceType::Native);
 
         info!(
-            "Ethereum account {} has {}. Minimum balance is {}",
-            self.chain_api.me_onchain(),
-            balance.to_formatted_string(),
-            minimum_balance.to_formatted_string()
+            address = %self.chain_api.me_onchain(),
+            %balance,
+            %minimum_balance,
+            "Node information"
         );
 
         if balance.le(&minimum_balance) {
@@ -789,7 +799,7 @@ impl Hopr {
 
                 sleep(ONBOARDING_INFORMATION_INTERVAL).await;
 
-                info!("Node information: peerID => {my_peer_id}, Ethereum address => {my_ethereum_address}, version => {my_version}");
+                info!(peer_id = %my_peer_id, address = %my_ethereum_address, version = &my_version, "Node information");
                 info!("Node Ethereum address: {my_ethereum_address} <- put this into staking hub");
             }
         }
@@ -806,14 +816,14 @@ impl Hopr {
                     ))
                     .await
                 {
-                    error!("Failed to send index update event to transport: {e}");
+                    error!(error = %e,"Failed to send index update event to transport");
                 }
 
                 if let Err(e) = to_process_tx
                     .send(IndexerTransportEvent::Announce(peer, multiaddresses.clone()))
                     .await
                 {
-                    error!("Failed to send index update event to transport: {e}");
+                    error!(error = %e, "Failed to send index update event to transport");
                 }
 
                 // Self-reference is not needed in the network storage
@@ -824,10 +834,33 @@ impl Hopr {
                         .add(&peer, PeerOrigin::Initialization, multiaddresses)
                         .await
                     {
-                        error!("Failed to store the peer observation: {e}");
+                        error!(error = %e, "Failed to store the peer observation");
                     }
                 }
             }
+        }
+
+        // Check Safe-module status:
+        // 1) if the node is already included into the module
+        // 2) if the module is enabled in the safe
+        // 3) if the safe is the owner of the module
+        // if any of the conditions is not met, return error
+        let safe_module_configuration = self
+            .chain_api
+            .rpc()
+            .check_node_safe_module_status(self.me_onchain())
+            .await
+            .map_err(HoprChainError::Rpc)?;
+
+        if !safe_module_configuration.should_pass() {
+            error!(
+                ?safe_module_configuration,
+                "Something is wrong with the safe module configuration",
+            );
+            return Err(HoprLibError::ChainApi(HoprChainError::Api(format!(
+                "Safe and module are not configured correctly {:?}",
+                safe_module_configuration,
+            ))));
         }
 
         // Possibly register node-safe pair to NodeSafeRegistry. Following that the
@@ -855,7 +888,7 @@ impl Hopr {
                 .await
             {
                 // Intentionally ignoring the errored state
-                error!("Failed to register node with safe: {e}")
+                error!(error = %e, "Failed to register node with safe")
             }
         }
 
@@ -889,7 +922,7 @@ impl Hopr {
                 // If the announcement fails, we keep going to prevent the node from retrying
                 // after restart.
                 // Functionality is limited, and users must check the logs for errors.
-                Err(e) => error!("Failed to transmit node announcement: {e}"),
+                Err(e) => error!(error = %e, "Failed to transmit node announcement: {e}"),
             }
         }
 
@@ -914,7 +947,7 @@ impl Hopr {
                 if let Some(ChainKey(key)) = self.db.translate_key(None, peer.id.0).await? {
                     cg.update_channel_quality(self.me_onchain(), key, peer.get_quality());
                 } else {
-                    error!("could not translate peer info: {}", peer.id.1);
+                    error!(peer = %peer.id.1, "could not translate peer info:");
                 }
             }
         }
@@ -950,12 +983,13 @@ impl Hopr {
                         let session_id = *session.session.id();
                         match serve_handler.process(session).await {
                             Ok(_) => debug!(
-                                session_id = tracing::field::debug(session_id),
+                                session_id = ?session_id,
                                 "client session processed successfully"
                             ),
                             Err(e) => error!(
-                                session_id = tracing::field::debug(session_id),
-                                "client session {session_id} processing failed: {e}"
+                                session_id = ?session_id,
+                                error = %e,
+                                "client session processing failed"
                             ),
                         }
                     }
@@ -991,8 +1025,8 @@ impl Hopr {
                 let db_clone = db_clone.clone();
                 async move {
                     match db_clone.persist_outgoing_ticket_indices().await {
-                        Ok(n) => debug!("successfully flushed states of {} outgoing ticket indices", n),
-                        Err(e) => error!("failed to flush ticket indices: {e}"),
+                        Ok(n) => debug!(count = n, "successfully flushed states of outgoing ticket indices"),
+                        Err(e) => error!(error = %e, "failed to flush ticket indices"),
                     }
                 }
             }))),
@@ -1125,7 +1159,7 @@ impl Hopr {
         let key = match OffchainPublicKey::try_from(peer) {
             Ok(k) => k,
             Err(e) => {
-                error!("failed to convert peer id {peer} to off-chain key: {e}");
+                error!(%peer, error = %e, "failed to convert peer id to off-chain key");
                 return vec![];
             }
         };
@@ -1133,11 +1167,11 @@ impl Hopr {
         match self.db.get_account(None, key).await {
             Ok(Some(entry)) => Vec::from_iter(entry.get_multiaddr()),
             Ok(None) => {
-                error!("no information about {peer}");
+                error!(%peer, "no information");
                 vec![]
             }
             Err(e) => {
-                error!("failed to retrieve information about {peer}: {e}");
+                error!(%peer, error = %e, "failed to retrieve information");
                 vec![]
             }
         }
@@ -1206,6 +1240,11 @@ impl Hopr {
     /// Reset the ticket metrics to zero
     pub async fn reset_ticket_statistics(&self) -> errors::Result<()> {
         Ok(self.db.reset_ticket_statistics().await?)
+    }
+
+    // DB ============
+    pub fn peer_resolver(&self) -> &impl HoprDbResolverOperations {
+        &self.db
     }
 
     // Chain =========

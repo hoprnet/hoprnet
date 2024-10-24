@@ -228,7 +228,7 @@ impl SingularStrategy for MultiStrategy {
         for strategy in self.strategies.iter() {
             if let Err(e) = strategy.on_tick().await {
                 if !self.cfg.on_fail_continue {
-                    warn!("{self} on_tick chain stopped at {strategy}");
+                    warn!(%self, %strategy, "on_tick chain stopped at strategy");
                     return Err(e);
                 }
             }
@@ -240,7 +240,7 @@ impl SingularStrategy for MultiStrategy {
         for strategy in self.strategies.iter() {
             if let Err(e) = strategy.on_acknowledged_winning_ticket(ack).await {
                 if !self.cfg.on_fail_continue {
-                    warn!("{self} on_acknowledged_ticket chain stopped at {strategy}");
+                    warn!(%self, %strategy, "on_acknowledged_ticket chain stopped at strategy");
                     return Err(e);
                 }
             }
@@ -257,7 +257,7 @@ impl SingularStrategy for MultiStrategy {
         for strategy in self.strategies.iter() {
             if let Err(e) = strategy.on_own_channel_changed(channel, direction, change).await {
                 if !self.cfg.on_fail_continue {
-                    warn!("{self} on_channel_state_changed chain stopped at {strategy}");
+                    warn!(%self, "on_channel_state_changed chain stopped at strategy");
                     return Err(e);
                 }
             }

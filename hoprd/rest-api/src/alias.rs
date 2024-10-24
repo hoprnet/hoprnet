@@ -1,4 +1,3 @@
-use crate::{ApiErrorStatus, InternalState, BASE_PATH};
 use axum::{
     extract::{Json, Path, State},
     http::status::StatusCode,
@@ -6,10 +5,11 @@ use axum::{
 };
 use hoprd_db_api::aliases::HoprdDbAliasesOperations;
 use hoprd_db_api::errors::DbError;
-use libp2p_identity::PeerId;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use std::{collections::HashMap, sync::Arc};
+
+use crate::{types::PeerOrAddress, ApiErrorStatus, InternalState, BASE_PATH};
 
 #[serde_as]
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
@@ -27,17 +27,17 @@ pub(crate) struct PeerIdResponse {
 #[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 #[schema(example = json!({
         "alias": "Alice",
-        "peerId": "12D3KooWRWeTozREYHzWTbuCYskdYhED1MXpDwTrmccwzFrd2mEA"
+        "destination": "12D3KooWRWeTozREYHzWTbuCYskdYhED1MXpDwTrmccwzFrd2mEA"
     }))]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct AliasPeerIdBodyRequest {
+pub(crate) struct AliasDestinationBodyRequest {
     pub alias: String,
     #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String)]
-    pub peer_id: PeerId,
+    pub destination: PeerOrAddress,
 }
 
-/// (deprecated, will be removed in v3.0) Get each previously set alias and its corresponding PeerId.
+/// (deprecated, will be removed in v3.0) Get each previously set alias and its corresponding PeerId as a hashmap.
 #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/aliases"),
@@ -76,7 +76,7 @@ pub(super) async fn aliases(State(state): State<Arc<InternalState>>) -> impl Int
         post,
         path = const_format::formatcp!("{BASE_PATH}/aliases"),
         request_body(
-            content = AliasPeerIdBodyRequest,
+            content = AliasDestinationBodyRequest,
             description = "Alias name along with the PeerId to be aliased",
             content_type = "application/json"),
         responses(
@@ -94,23 +94,40 @@ pub(super) async fn aliases(State(state): State<Arc<InternalState>>) -> impl Int
     )]
 pub(super) async fn set_alias(
     State(state): State<Arc<InternalState>>,
-    Json(args): Json<AliasPeerIdBodyRequest>,
+    Json(args): Json<AliasDestinationBodyRequest>,
 ) -> impl IntoResponse {
-    match state.hoprd_db.set_alias(args.peer_id.to_string(), args.alias).await {
+    let hopr = state.hopr.clone();
+
+    let destination = args.destination.fulfill(hopr.peer_resolver()).await;
+
+    let peer_id = match destination {
+        Ok(destination) => match destination.peer_id {
+            Some(peer_id) => peer_id,
+            None => return (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidInput).into_response(),
+        },
+        Err(e) => return (StatusCode::NOT_FOUND, e).into_response(),
+    };
+
+    match state.hoprd_db.set_alias(peer_id.to_string(), args.alias).await {
         Ok(()) => (
             StatusCode::CREATED,
             Json(PeerIdResponse {
-                peer_id: args.peer_id.to_string(),
+                peer_id: peer_id.to_string(),
             }),
         )
             .into_response(),
-        Err(DbError::LogicalError(_)) => (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidPeerId).into_response(),
+        Err(DbError::LogicalError(_)) => (StatusCode::BAD_REQUEST, ApiErrorStatus::PeerNotFound).into_response(),
         Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
     }
 }
 
-#[derive(Deserialize)]
-pub(crate) struct GetAliasParams {
+#[serde_as]
+#[derive(Deserialize, utoipa::ToSchema)]
+#[schema(example = json!({
+    "alias": "Alice",
+}))]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct GetAliasRequest {
     alias: String,
 }
 
@@ -133,7 +150,7 @@ pub(crate) struct GetAliasParams {
         tag = "Alias",
     )]
 pub(super) async fn get_alias(
-    Path(GetAliasParams { alias }): Path<GetAliasParams>,
+    Path(GetAliasRequest { alias }): Path<GetAliasRequest>,
     State(state): State<Arc<InternalState>>,
 ) -> impl IntoResponse {
     let alias = urlencoding::decode(&alias);
@@ -151,8 +168,12 @@ pub(super) async fn get_alias(
     }
 }
 
-#[derive(Deserialize)]
-pub(crate) struct DeleteAliasParams {
+#[serde_as]
+#[derive(Deserialize, utoipa::ToSchema)]
+#[schema(example = json!({
+    "alias": "Alice",
+}))]
+pub(crate) struct DeleteAliasRequest {
     alias: String,
 }
 
@@ -175,7 +196,7 @@ pub(crate) struct DeleteAliasParams {
         tag = "Alias",
     )]
 pub(super) async fn delete_alias(
-    Path(DeleteAliasParams { alias }): Path<DeleteAliasParams>,
+    Path(DeleteAliasRequest { alias }): Path<DeleteAliasRequest>,
     State(state): State<Arc<InternalState>>,
 ) -> impl IntoResponse {
     let alias = urlencoding::decode(&alias);

@@ -7,12 +7,14 @@ import time
 from contextlib import AsyncExitStack
 
 import pytest
-import websockets
+from websockets.asyncio.client import connect
 
 from .conftest import TICKET_PRICE_PER_HOP, to_ws_url
 from .hopr import HoprdAPI
 from .node import Node
 from .test_integration import create_channel
+from .test_session import STANDARD_MTU_SIZE, EchoServer, SocketType
+
 
 logging.basicConfig(format="%(asctime)s %(message)s")
 
@@ -58,6 +60,7 @@ class ApiWrapper:
 )
 async def test_stress_relayed_flood_test_with_sources_performing_1_hop_to_self(stress_fixture, swarm7: dict[str, Node]):
     STRESS_1_HOP_TO_SELF_MESSAGE_COUNT = stress_fixture["request_count"]
+    ROUGH_PAYLOAD_SIZE = 460
 
     api_sources = [HoprdAPI(f'http://{d["url"]}', d["token"]) for d in stress_fixture["sources"]]
     api_target = HoprdAPI(f'http://{stress_fixture["target"]["url"]}', stress_fixture["target"]["token"])
@@ -74,7 +77,18 @@ async def test_stress_relayed_flood_test_with_sources_performing_1_hop_to_self(s
                     create_channel(
                         ApiWrapper(source, await source.addresses("native")),
                         ApiWrapper(api_target, await api_target.addresses("native")),
-                        funding=STRESS_1_HOP_TO_SELF_MESSAGE_COUNT * TICKET_PRICE_PER_HOP,
+                        funding=STRESS_1_HOP_TO_SELF_MESSAGE_COUNT * TICKET_PRICE_PER_HOP * 3,
+                        close_from_dest=False,
+                    )
+                )
+                for source in api_sources
+            ],
+            *[
+                channels.enter_async_context(
+                    create_channel(
+                        ApiWrapper(api_target, await api_target.addresses("native")),
+                        ApiWrapper(source, await source.addresses("native")),
+                        funding=STRESS_1_HOP_TO_SELF_MESSAGE_COUNT * TICKET_PRICE_PER_HOP * 3,
                         close_from_dest=False,
                     )
                 )
@@ -82,41 +96,18 @@ async def test_stress_relayed_flood_test_with_sources_performing_1_hop_to_self(s
             ]
         )
 
-        async def send_and_receive_all_messages(host, port, token, self_peer_id, target_peer_id):
-            start_time = time.time()
+        async def send_and_receive_all_messages(host, port, token, self_peer_id):
+            event = asyncio.Event()
 
-            async with websockets.connect(
-                f"{to_ws_url(host, port)}",
-                extra_headers=[("X-Auth-Token", token)],
-            ) as socket:
-                tag = random.randint(30000, 60000)
-                packets = [
-                    f"1 hop stress msg to self ({host}:{port}) through {target_peer_id} "
-                    + f"#{i+1:08d}/{STRESS_1_HOP_TO_SELF_MESSAGE_COUNT:08d}"
-                    for i in range(STRESS_1_HOP_TO_SELF_MESSAGE_COUNT)
-                ]
+            data = bytearray(os.urandom(ROUGH_PAYLOAD_SIZE))
 
-                recv_packets = []
+            async def compare_data(reader, writer):
+                read = bytearray()
+                start_time = time.time()
 
-                for packet in packets:
-                    msg = {
-                        "body": packet,
-                        "peerId": self_peer_id,
-                        "path": [target_peer_id],
-                        "tag": tag,
-                    }
-                    await socket.send(json.dumps(msg))
-
-                packets.sort()
-
-                # receive all messages
-                for _ in range(len(packets)):
-                    try:
-                        msg = await asyncio.wait_for(socket.recv(), timeout=5)
-                        recv_packets.append(json.loads(msg)["body"])
-                    except Exception:
-                        break
-
+                while len(read) < len(data):
+                    read += await reader.read(min(1024, len(data) - len(read)))
+                
                 end_time = time.time()
 
                 logging.info(
@@ -124,8 +115,30 @@ async def test_stress_relayed_flood_test_with_sources_performing_1_hop_to_self(s
                     + f"{STRESS_1_HOP_TO_SELF_MESSAGE_COUNT/(end_time - start_time)} packets/s/node"
                 )
 
-                recv_packets.sort()
-                assert recv_packets == packets
+                assert read == data, f"Received data does not match the sent data: {read} != {data}"
+
+                event.set()
+
+            server = await asyncio.start_server(compare_data, '127.0.0.1', 0)
+            assigned_port = server.sockets[0].getsockname()[1]
+
+            async with server:
+                async with connect(
+                    to_ws_url(
+                        host,
+                        port,
+                        args=[
+                            ("target", f"127.0.0.1:{assigned_port}"),
+                            ("hops", 1),
+                            ("capabilities", "Segmentation"),
+                            ("capabilities", "Retransmission"),
+                            ("destination", f"{self_peer_id}")
+                        ]
+                    ),
+                    additional_headers=[("X-Auth-Token", token)]
+                ) as ws:
+                    await ws.send(data)
+                    await asyncio.wait_for(event.wait(), timeout=60.0)
 
         await asyncio.gather(
             *[
@@ -135,7 +148,6 @@ async def test_stress_relayed_flood_test_with_sources_performing_1_hop_to_self(s
                         source["url"].split(":")[1],
                         source["token"],
                         await HoprdAPI(f'http://{source["url"]}', source["token"]).addresses("hopr"),
-                        target_peer_id,
                     ),
                     timeout=60.0,
                 )
