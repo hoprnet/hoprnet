@@ -26,10 +26,10 @@ const ENCODED_WIN_PROB_LENGTH: usize = 7;
 pub type EncodedWinProb = [u8; ENCODED_WIN_PROB_LENGTH];
 
 /// Encodes 100% winning probability
-const ALWAYS_WINNING: EncodedWinProb = hex!("ffffffffffffff");
+pub const ALWAYS_WINNING: EncodedWinProb = hex!("ffffffffffffff");
 
 /// Encodes 0% winning probability
-const NEVER_WINNING: EncodedWinProb = hex!("00000000000000");
+pub const NEVER_WINNING: EncodedWinProb = hex!("00000000000000");
 
 /// Helper function checks if the given ticket values belong to a winning ticket.
 pub(crate) fn check_ticket_win(
@@ -48,7 +48,7 @@ pub(crate) fn check_ticket_win(
     computed_ticket_luck[1..].copy_from_slice(
         &Hash::create(&[
             ticket_hash.as_ref(),
-            &vrf_params.v.as_uncompressed().as_bytes()[1..], // skip prefix
+            &vrf_params.V.as_uncompressed().as_bytes()[1..], // skip prefix
             response.as_ref(),
             ticket_signature.as_ref(),
         ])
@@ -1274,7 +1274,7 @@ pub mod tests {
         let redeemable_2 = transferable.into_redeemable(&ALICE.public().to_address(), &Hash::default())?;
 
         assert_eq!(redeemable_1, redeemable_2);
-        assert_eq!(redeemable_1.vrf_params.v, redeemable_2.vrf_params.v);
+        assert_eq!(redeemable_1.vrf_params.V, redeemable_2.vrf_params.V);
         Ok(())
     }
 }

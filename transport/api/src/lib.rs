@@ -196,7 +196,7 @@ pub struct HoprTransportConfig {
 }
 
 /// This function will use the given generator to generate an initial seeding key.
-/// It will check whether the given cache already contains a value for that key and if not,
+/// It will check whether the given cache already contains a value for that key, and if not,
 /// calls the generator (with the previous value) to generate a new seeding key and retry.
 /// The function either finds a suitable free slot, inserting the `value` and returns the found key,
 /// or terminates with `None` when `gen` returns the initial seed again.
@@ -643,7 +643,7 @@ where
     /// Execute all processes of the [`crate::HoprTransport`] object.
     ///
     /// This method will spawn the [`crate::HoprTransportProcess::Heartbeat`], [`crate::HoprTransportProcess::BloomFilterSave`],
-    /// [`crate::HoprTransportProcess::Swarm`] and [`crate::HoprTransportProcess::SessionsRouter`] processes and return
+    /// [`crate::HoprTransportProcess::Swarm`] and session-related processes and return
     /// join handles to the calling function. These processes are not started immediately but are
     /// waiting for a trigger from this piece of code.
     #[allow(clippy::too_many_arguments)]
