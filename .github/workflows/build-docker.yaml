@@ -100,7 +100,7 @@ jobs:
         env:
           COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
 
-      - name: Build and push ${{ inputs.package }} docker image - Default
+      - name: Build and push ${{ inputs.package }} docker image - Commit
         run: nix run .#${{ steps.options.outputs.NIX_BUILD_TARGET }}
         env:
           GOOGLE_ACCESS_TOKEN: ${{ steps.gcp.outputs.access_token }}

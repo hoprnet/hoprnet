@@ -30,6 +30,8 @@ pub const PACKET_LENGTH: usize = packet_length::<CurrentSphinxSuite>(INTERMEDIAT
 /// Tag used to separate padding from data
 const PADDING_TAG: &[u8] = b"HOPR";
 
+pub const USABLE_PAYLOAD_SIZE: usize = PAYLOAD_SIZE - PADDING_TAG.len();
+
 /// Determines the total length (header + payload) of the packet given the header information.
 pub const fn packet_length<S: SphinxSuite>(
     max_hops: usize,
@@ -43,10 +45,7 @@ pub const fn packet_length<S: SphinxSuite>(
 }
 
 fn add_padding(msg: &[u8]) -> Box<[u8]> {
-    assert!(
-        msg.len() <= PAYLOAD_SIZE - PADDING_TAG.len(),
-        "message too long for padding"
-    );
+    assert!(msg.len() <= USABLE_PAYLOAD_SIZE, "message too long for padding");
     let mut ret = vec![0u8; PAYLOAD_SIZE];
     ret[PAYLOAD_SIZE - msg.len()..PAYLOAD_SIZE].copy_from_slice(msg);
     ret[PAYLOAD_SIZE - msg.len() - PADDING_TAG.len()..PAYLOAD_SIZE - msg.len()].copy_from_slice(PADDING_TAG);
