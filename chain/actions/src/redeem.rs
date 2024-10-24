@@ -80,8 +80,8 @@ where
             .get_channels_via(None, ChannelDirection::Incoming, &self.self_address())
             .await?;
         debug!(
-            "starting to redeem all tickets in {} incoming channels to us.",
-            incoming_channels.len()
+            channel_count = incoming_channels.len(),
+            "starting to redeem all tickets in channels to self"
         );
 
         let mut receivers: Vec<PendingAction> = vec![];
@@ -94,9 +94,9 @@ where
                 }
                 Err(e) => {
                     warn!(
-                        "Failed to redeem tickets in channel {} due to {}",
-                        generate_channel_id(&incoming_channel.source, &incoming_channel.destination),
-                        e
+                        channel = %generate_channel_id(&incoming_channel.source, &incoming_channel.destination),
+                        error = %e,
+                        "Failed to redeem tickets in channel",
                     );
                 }
             }
@@ -139,7 +139,8 @@ where
         let (count_redeemable_tickets, _) = self.db.get_tickets_value(selector.clone()).await?;
 
         info!(
-            "there are {count_redeemable_tickets} acknowledged tickets in channel {channel_id} which can be redeemed"
+            count_redeemable_tickets, channel = %channel_id,
+            "acknowledged tickets in channel that can be redeemed"
         );
 
         // Return fast if there are no redeemable tickets
@@ -169,7 +170,7 @@ where
                         receivers.push(successful_tx);
                     }
                     Err(e) => {
-                        error!("Failed to submit transaction that redeems {ticket_id}: {e}",);
+                        error!(ticket_id, error = %e, "Failed to submit transaction that redeems ticket",);
                     }
                 }
             } else {
@@ -178,8 +179,10 @@ where
         }
 
         info!(
-            "{} acknowledged tickets were submitted to redeem in {channel_id}",
-            receivers.len()
+            count = receivers.len(),
+            channel = %channel_id,
+            "acknowledged tickets were submitted to redeem in channel",
+
         );
 
         Ok(receivers)

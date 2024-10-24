@@ -346,7 +346,7 @@ impl futures::AsyncWrite for InnerSession {
                         continue;
                     }
                     Poll::Ready(Some(Err(e))) => {
-                        error!("failed to send the message chunk inside a session: {e}");
+                        error!(error = %e, "failed to send the message chunk inside a session");
                         return Poll::Ready(Err(Error::from(ErrorKind::BrokenPipe)));
                     }
                     Poll::Ready(None) => {
@@ -371,12 +371,12 @@ impl futures::AsyncWrite for InnerSession {
 
             let payload = wrap_with_offchain_key(&self.me, buf[start..end].to_vec().into_boxed_slice())
                 .map_err(|e| {
-                    error!("failed to wrap the payload with offchain key: {e}");
+                    error!(error = %e, "failed to wrap the payload with offchain key");
                     Error::new(ErrorKind::InvalidData, e)
                 })
                 .and_then(move |payload| {
                     ApplicationData::new_from_owned(Some(tag), payload.into_boxed_slice()).map_err(|e| {
-                        error!("failed to extract application data from the payload: {e}");
+                        error!(error = %e, "failed to extract application data from the payload");
                         Error::new(ErrorKind::InvalidData, e)
                     })
                 })?;
@@ -398,7 +398,7 @@ impl futures::AsyncWrite for InnerSession {
                     continue;
                 }
                 Poll::Ready(Some(Err(e))) => {
-                    error!("failed to send the message chunk inside a session: {e}");
+                    error!(error = %e, "failed to send the message chunk inside a session");
                     break Poll::Ready(Err(Error::from(ErrorKind::BrokenPipe)));
                 }
                 Poll::Ready(None) => {

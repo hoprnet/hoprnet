@@ -146,7 +146,7 @@ pub(crate) fn filter_satisfying_ticket_models(
 
     // If there are no criteria, just send everything for aggregation
     if prerequisites.min_ticket_count.is_none() && prerequisites.min_unaggregated_ratio.is_none() {
-        info!("Aggregation check OK {channel_id}: no aggregation prerequisites were given");
+        info!(channel = %channel_id, "Aggregation check OK, no aggregation prerequisites were given");
         return Ok(to_be_aggregated);
     }
 
@@ -155,10 +155,10 @@ pub(crate) fn filter_satisfying_ticket_models(
     // Check the aggregation threshold
     if let Some(agg_threshold) = prerequisites.min_ticket_count {
         if to_be_agg_count >= agg_threshold {
-            info!("Aggregation check OK {channel_id}: {to_be_agg_count} >= {agg_threshold} ack tickets");
+            info!(channel = %channel_id, count = to_be_agg_count, threshold = agg_threshold, "Aggregation check OK aggregated value greater than threshold");
             return Ok(to_be_aggregated);
         } else {
-            debug!("Aggregation check FAIL {channel_id}: {to_be_agg_count} < {agg_threshold} ack tickets");
+            debug!(channel = %channel_id, count = to_be_agg_count, threshold = agg_threshold,"Aggregation check FAIL not enough resources to aggregate");
         }
     }
 
@@ -169,17 +169,17 @@ pub(crate) fn filter_satisfying_ticket_models(
         // and there are at least two tickets
         if unaggregated_balance.ge(&diminished_balance) {
             if to_be_agg_count > 1 {
-                info!("Aggregation check OK {channel_id}: unrealized balance {unaggregated_balance} >= {diminished_balance} in {to_be_agg_count} tickets");
+                info!(channel = %channel_id, count = ?to_be_aggregated, balance = ?unaggregated_balance, ?diminished_balance, "Aggregation check OK: less unrealized than diminished balance");
                 return Ok(to_be_aggregated);
             } else {
-                debug!("Aggregation check FAIL {channel_id}: unrealized balance {unaggregated_balance} >= {diminished_balance} but in only {to_be_agg_count} tickets");
+                debug!(channel = %channel_id, count = ?to_be_aggregated, balance = ?unaggregated_balance, ?diminished_balance, "Aggregation check FAIL: more unrealized than diminished balance");
             }
         } else {
-            debug!("Aggregation check FAIL {channel_id}: unrealized balance {unaggregated_balance} < {diminished_balance} in {to_be_agg_count} tickets");
+            debug!(channel = %channel_id, count = ?to_be_aggregated, balance = ?unaggregated_balance, ?diminished_balance, "Aggregation check FAIL: less unrealized than diminished balance");
         }
     }
 
-    debug!("Aggregation check FAIL {channel_id}: no prerequisites were met");
+    debug!(channel = %channel_id,"Aggregation check FAIL: no prerequisites were met");
     Ok(vec![])
 }
 
@@ -284,7 +284,7 @@ impl HoprDbTicketOperations for HoprDb {
                         // Get the number of tickets and their value just for this channel
                         let (marked_count, marked_value) =
                             myself.get_tickets_value_int(Some(tx), channel_selector.clone()).await?;
-                        trace!("{marked_count} tickets of total value {marked_value} will be marked as {mark_as}");
+                        trace!(marked_count, ?marked_value, ?mark_as, "ticket marking");
 
                         if marked_count > 0 {
                             // Delete the redeemed tickets first
@@ -350,14 +350,16 @@ impl HoprDbTicketOperations for HoprDb {
                                 )));
                             }
 
-                            trace!("removed {marked_count} of {mark_as} tickets in channel {channel_id}");
+                            trace!(marked_count, ?channel_id, ?mark_as, "removed tickets in channel");
                             total_marked_count += marked_count;
                         }
                     }
 
                     info!(
-                        "removed {total_marked_count} of {mark_as} tickets in {} channels",
-                        selector.channel_identifiers.len()
+                        count = total_marked_count,
+                        ?mark_as,
+                        channel_count = selector.channel_identifiers.len(),
+                        "removed tickets in channels",
                     );
                     Ok(total_marked_count)
                 })
@@ -416,7 +418,7 @@ impl HoprDbTicketOperations for HoprDb {
                         {
                             let _g = self.ticket_manager.mutex.lock();
                             if let Err(e) = active_ticket.update(self.conn(TargetDb::Tickets)).await {
-                                error!("failed to update ticket in the db: {e}");
+                                error!(error = %e,"failed to update ticket in the db");
                             }
                         }
 
@@ -427,12 +429,12 @@ impl HoprDbTicketOperations for HoprDb {
                                 yield ticket
                             },
                             Err(e) => {
-                                tracing::error!("failed to decode ticket from the db: {e}");
+                                tracing::error!(error = %e, "failed to decode ticket from the db");
                             }
                         }
                     }
                 },
-                Err(e) => tracing::error!("failed open ticket db stream: {e}")
+                Err(e) => tracing::error!(error = %e, "failed open ticket db stream")
             }
         }))
     }
@@ -712,7 +714,7 @@ impl HoprDbTicketOperations for HoprDb {
             } else {
                 // The value is not yet in the cache, meaning there's low traffic on this
                 // channel, so the value has not been yet fetched.
-                trace!("channel {channel_id} is in the DB but not yet in the cache.");
+                trace!(?channel_id, "channel not in cache yet");
             }
         }
 
@@ -838,7 +840,7 @@ impl HoprDbTicketOperations for HoprDb {
                                 // Cleanup is the only reasonable thing to do at this point,
                                 // since the aggregator will check for index range overlaps and deny
                                 // the aggregation of the entire batch otherwise.
-                                warn!("ticket {current_idx} in channel {channel_id} has been already aggregated in {first_ticket} and will be removed");
+                                warn!(ticket_id = current_idx, channel = %channel_id, ?first_ticket, "ticket in channel has been already aggregated and will be removed");
                                 neglected_idxs.push(current_idx);
                                 to_be_aggregated.remove(i);
                             } else {
@@ -849,7 +851,7 @@ impl HoprDbTicketOperations for HoprDb {
                         // The cleanup (neglecting of tickets) is not made directly here but on the next ticket redemption in this channel
                         // See handler.rs around L402
                         if !neglected_idxs.is_empty() {
-                            warn!("{} tickets were neglected in channel {channel_id} due to duplication in an aggregated ticket!", neglected_idxs.len());
+                            warn!(count = neglected_idxs.len(), channel = %channel_id, "tickets were neglected due to duplication in an aggregated ticket!");
                         }
 
                         // mark all tickets with appropriate characteristics as being aggregated
@@ -998,7 +1000,7 @@ impl HoprDbTicketOperations for HoprDb {
 
         // Value of received ticket can be higher (profit for us) but not lower
         if aggregated_ticket.verified_ticket().amount.lt(&stored_value) {
-            error!("Aggregated ticket value in '{channel_id}' is lower than sum of stored tickets",);
+            error!(channel = %channel_id, "Aggregated ticket value in channel is lower than sum of stored tickets");
             return Err(DbSqlError::LogicalError("Value of received aggregated ticket is too low".into()).into());
         }
 

@@ -183,16 +183,15 @@ where
 
     async fn sample_size_and_evaluate_avg(&self, sample: u32) -> Option<u32> {
         self.sma.write().await.push(sample);
-        info!("evaluated qualities of {sample} peers seen in the network");
+        info!(peers = ?sample, "evaluated qualities of peers seen in the network");
 
         let sma = self.sma.read().await;
         if sma.len() >= sma.window_size() {
             sma.average()
         } else {
             info!(
-                "not yet enough samples ({} out of {}) of network size to perform a strategy tick, skipping.",
-                sma.len(),
-                sma.window_size()
+                count = sma.len(), window_size = %sma.window_size(),
+                "not yet enough samples of network size to perform a strategy tick, skipping",
             );
             None
         }
@@ -221,15 +220,15 @@ where
                         {
                             Some((addr, status.get_average_quality()))
                         } else {
-                            error!("could not find on-chain address for {}", status.id.1);
+                            error!(address = %status.id.1, "could not find on-chain address");
                             None
                         }
                     } else {
-                        debug!("version of peer {} reports non-matching version {version}", status.id.1);
+                        debug!(peer = %status.id.1, ?version, "version of peer does not match the expectation");
                         None
                     }
                 } else {
-                    error!("cannot get version for peer id: {}", status.id.1);
+                    error!(peer = %status.id.1, "cannot get version");
                     None
                 }
             })
@@ -303,7 +302,10 @@ where
         // If there are still more channels opened than we allow, close some
         // lowest-quality ones that passed the threshold
         if occupied > max_auto_channels && self.cfg.enforce_max_channels {
-            warn!("there are {occupied} effectively opened channels, but the strategy allows only {max_auto_channels}");
+            warn!(
+                count = occupied,
+                max_auto_channels, "the strategy allows only less occupied channels"
+            );
 
             // Get all open channels that are not planned to be closed
             let mut sorted_channels = outgoing_open_channels
@@ -316,14 +318,14 @@ where
                 let q1 = match peers_with_quality.get(&p1.destination) {
                     Some(q) => *q,
                     None => {
-                        error!("could not determine peer quality for {p1}");
+                        error!(channel = ?p1, "could not determine peer quality");
                         0_f64
                     }
                 };
                 let q2 = match peers_with_quality.get(&p2.destination) {
                     Some(q) => *q,
                     None => {
-                        error!("could not determine peer quality for {p2}");
+                        error!(peer = %p2, "could not determine peer quality");
                         0_f64
                     }
                 };
@@ -358,7 +360,7 @@ where
             for (address, _) in new_channel_candidates {
                 // Stop if we ran out of balance
                 if remaining_balance.le(&self.cfg.minimum_node_balance) {
-                    warn!("ran out of allowed node balance - balance is {remaining_balance}");
+                    warn!(%remaining_balance, "node ran out of allowed node balance");
                     break;
                 }
 
@@ -366,12 +368,15 @@ where
                 if !tick_decision.will_address_be_opened(&address) {
                     tick_decision.add_to_open(address, self.cfg.new_channel_stake);
                     remaining_balance = remaining_balance.sub(&self.cfg.new_channel_stake);
-                    debug!("promoted peer {address} for channel opening");
+                    debug!(%address, "promoted for channel opening");
                 }
             }
         } else {
             // max_channels == occupied
-            info!("not going to allocate new channels, maximum number of effective channels is reached ({occupied})")
+            info!(
+                count = occupied,
+                "not going to allocate new channels, maximum number of effective channels is reached"
+            )
         }
 
         Ok(tick_decision)
@@ -424,7 +429,7 @@ where
                     debug!("issued channel closing tx: {}", channel_to_close);
                 }
                 Err(e) => {
-                    error!("error while closing channel: {e}");
+                    error!(error = %e, "error while closing channel");
                 }
             }
         }
@@ -440,7 +445,7 @@ where
                     debug!("issued channel opening tx: {}", channel_to_open.0);
                 }
                 Err(e) => {
-                    error!("error while issuing channel opening to {}: {e}", channel_to_open.0);
+                    error!(error = %e, channel = %channel_to_open.0, "error while issuing channel opening");
                 }
             }
         }
@@ -451,7 +456,7 @@ where
             METRIC_COUNT_CLOSURES.increment_by(tick_decision.get_to_close().len() as u64);
         }
 
-        info!("on tick executed {tick_decision}");
+        info!(%tick_decision, "on tick executed");
         Ok(())
     }
 }
