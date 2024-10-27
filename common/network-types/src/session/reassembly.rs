@@ -157,6 +157,7 @@ impl futures::Sink<Segment> for Reassembler {
     }
 
     fn start_send(mut self: Pin<&mut Self>, item: Segment) -> Result<(), Self::Error> {
+        tracing::trace!("Reassembler::start_send");
         if self.is_closed {
             return Err(SessionError::ReassemblerClosed);
         }
@@ -166,7 +167,7 @@ impl futures::Sink<Segment> for Reassembler {
                 let builder = e.get_mut();
                 builder.add_segment(item);
                 if builder.remaining() == 0 {
-                    tracing::trace!("frame {} is complete", e.key());
+                    tracing::trace!("Reassembler::start_send frame {} is complete", e.key());
                     Some(e.remove().build())
                 } else {
                     None
@@ -175,7 +176,10 @@ impl futures::Sink<Segment> for Reassembler {
             Entry::Vacant(e) => {
                 let builder = FrameBuilder::from(item);
                 if builder.remaining() == 0 {
-                    tracing::trace!("single segment frame {} is complete", builder.frame_id());
+                    tracing::trace!(
+                        "Reassembler::start_send single segment frame {} is complete",
+                        builder.frame_id()
+                    );
                     Some(builder.build())
                 } else {
                     e.insert(builder);
@@ -186,6 +190,7 @@ impl futures::Sink<Segment> for Reassembler {
 
         if let Some(frame) = maybe_frame {
             self.complete_frames.push_back(frame);
+            tracing::trace!("Reassembler::start_send pushed new");
             if let Some(waker) = self.tx_waker.take() {
                 waker.wake();
             }

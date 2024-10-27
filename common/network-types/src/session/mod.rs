@@ -79,7 +79,7 @@ mod tests {
     const RNG_SEED: [u8; 32] = hex_literal::hex!("d8a471f1c20490a3442b96fdde9d1807428096e1601b0cef0eea7e6d44a24c01");
 
     #[async_std::test]
-    pub async fn reassembler_and_sequencer_test() -> anyhow::Result<()> {
+    pub async fn framed_reconstructor_should_reconstruct_frames() -> anyhow::Result<()> {
         let expected = (1u32..=10)
             .map(|frame_id| Frame {
                 frame_id,
@@ -111,7 +111,7 @@ mod tests {
     }
 
     #[test_log::test(async_std::test)]
-    pub async fn reassembler_and_sequencer_test_missing_segment() -> anyhow::Result<()> {
+    pub async fn frame_reconstructor_should_discard_missing_segment() -> anyhow::Result<()> {
         let expected = (1u32..=10)
             .map(|frame_id| Frame {
                 frame_id,

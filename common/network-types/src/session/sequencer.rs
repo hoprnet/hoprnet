@@ -84,14 +84,14 @@ where
     }
 
     fn start_send(mut self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
-        tracing::trace!("Sequencer::start_ready");
+        tracing::trace!("Sequencer::start_send");
         if self.is_closed {
             return Err(SessionError::ReassemblerClosed);
         }
 
         if item.ge(&self.next_id) {
             self.buffer.push(std::cmp::Reverse(item));
-            tracing::trace!("Sequencer::start_ready pushed new");
+            tracing::trace!("Sequencer::start_send pushed new");
             if self.buffer.len() >= self.cfg.flush_at {
                 if let Some(waker) = self.tx_waker.take() {
                     waker.wake();
