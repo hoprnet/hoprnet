@@ -66,6 +66,7 @@ pub struct Reassembler {
     is_closed: bool,
     max_age: Duration,
     capacity: usize,
+    last_expiration: Instant,
 }
 
 impl Reassembler {
@@ -78,6 +79,7 @@ impl Reassembler {
             tx_waker: None,
             rx_waker: None,
             is_closed: false,
+            last_expiration: Instant::now(),
             max_age,
             capacity,
         }
@@ -85,16 +87,24 @@ impl Reassembler {
 
     fn expire_frames(&mut self) -> usize {
         let mut expired = 0;
-        self.frames.retain(|id, b| {
-            if b.last_recv.elapsed() >= self.max_age || self.is_closed {
-                self.complete_frames.push_back(Err(SessionError::FrameDiscarded(*id)));
-                tracing::trace!("frame {id} discarded");
-                expired += 1;
-                false
-            } else {
-                true
-            }
-        });
+
+        // Since the retaining operation is potentially expensive,
+        // do it actually only if there's a real chance that a frame is expired
+        // or if the reassembler is closing (= everything should be expired right away).
+        if self.is_closed || self.last_expiration.elapsed() >= self.max_age {
+            self.frames.retain(|id, b| {
+                if b.last_recv.elapsed() >= self.max_age || self.is_closed {
+                    self.complete_frames.push_back(Err(SessionError::FrameDiscarded(*id)));
+                    tracing::trace!("frame {id} discarded");
+                    expired += 1;
+                    false
+                } else {
+                    true
+                }
+            });
+
+            self.last_expiration = Instant::now();
+        }
 
         expired
     }
@@ -346,6 +356,7 @@ mod tests {
             if i != 1 {
                 assert!(matches!(&actual[i], Ok(f) if *f == expected[i]));
             } else {
+                // Frame 2 had missing segment, therefore there should be an error
                 assert!(matches!(actual[i], Err(SessionError::FrameDiscarded(2))));
             }
         }
@@ -378,6 +389,7 @@ mod tests {
 
         let mut actual = r_stream.collect::<Vec<_>>().timeout(Duration::from_secs(5)).await?;
 
+        // Since `forward` closed the sink, even the incomplete Frame 5 should be yielded as error
         assert_eq!(actual.len(), expected.len());
 
         actual.sort_by(|a, b| match (a, b) {
@@ -392,6 +404,7 @@ mod tests {
             if i != 4 {
                 assert!(matches!(&actual[i], Ok(f) if *f == expected[i]));
             } else {
+                // Frame 5 had a missing segment, therefore there should be an error
                 assert!(matches!(actual[i], Err(SessionError::FrameDiscarded(5))));
             }
         }
