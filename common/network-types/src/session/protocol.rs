@@ -339,9 +339,7 @@ impl<const C: usize> TryFrom<&[u8]> for SessionMessage<C> {
 
 impl<const C: usize> From<SessionMessage<C>> for Vec<u8> {
     fn from(value: SessionMessage<C>) -> Self {
-        let mut ret = Vec::with_capacity(C);
-        ret.push(SessionMessage::<C>::VERSION);
-        ret.push(SessionMessageDiscriminants::from(&value) as u8);
+        let disc = SessionMessageDiscriminants::from(&value) as u8;
 
         let msg = match value {
             SessionMessage::Segment(s) => Vec::from(s),
@@ -349,10 +347,13 @@ impl<const C: usize> From<SessionMessage<C>> for Vec<u8> {
             SessionMessage::Acknowledge(a) => Vec::from(a),
         };
 
-        ret.extend((msg.len() as u16).to_be_bytes());
-        ret.extend(msg);
+        let msg_len = msg.len() as u16;
 
-        ret.shrink_to_fit();
+        let mut ret = Vec::with_capacity(SessionMessage::<C>::HEADER_SIZE + msg_len.into());
+        ret.push(SessionMessage::<C>::VERSION);
+        ret.push(disc);
+        ret.extend(msg_len.to_be_bytes());
+        ret.extend(msg);
         ret
     }
 }

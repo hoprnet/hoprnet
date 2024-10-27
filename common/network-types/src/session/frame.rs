@@ -161,6 +161,10 @@ impl Segment {
     /// The minimum size of a segment: [`Segment::HEADER_SIZE`] + 1 byte of data.
     pub const MINIMUM_SIZE: usize = Self::HEADER_SIZE + 1;
 
+    /// The minimum size of a segment: [`Segment::HEADER_SIZE`] + data, regardless
+    /// any MTU.
+    pub const MAXIMUM_SIZE: usize = 1500;
+
     /// Returns the [SegmentId] for this segment.
     pub fn id(&self) -> SegmentId {
         SegmentId(self.frame_id, self.seq_idx)
@@ -208,6 +212,10 @@ impl TryFrom<&[u8]> for Segment {
     type Error = SessionError;
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+        if value.len() > Segment::MAXIMUM_SIZE {
+            return Err(SessionError::DataTooLong);
+        }
+
         let (header, data) = value.split_at(Self::HEADER_SIZE);
         let segment = Segment {
             frame_id: FrameId::from_be_bytes(header[0..4].try_into().map_err(|_| SessionError::InvalidSegment)?),
