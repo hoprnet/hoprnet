@@ -30,6 +30,9 @@ pub enum SessionError {
     #[error("cannot reassemble frame {0}, because it is not complete")]
     IncompleteFrame(FrameId),
 
+    #[error("there are too many incomplete frames in the reassembler")]
+    TooManyIncompleteFrames,
+
     #[error("segment could not be parsed correctly")]
     InvalidSegment,
 

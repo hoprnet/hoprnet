@@ -62,43 +62,78 @@ pub struct Reassembler {
     frames: HashMap<FrameId, FrameBuilder>,
     complete_frames: VecDeque<Result<Frame, SessionError>>,
     tx_waker: Option<Waker>,
+    rx_waker: Option<Waker>,
     is_closed: bool,
     max_age: Duration,
+    capacity: usize,
 }
 
 impl Reassembler {
-    pub fn new(max_age: Duration) -> Self {
+    pub const INCOMPLETE_FRAME_RATIO: usize = 2;
+
+    pub fn new(max_age: Duration, capacity: usize) -> Self {
         Self {
-            frames: Default::default(),
-            complete_frames: VecDeque::with_capacity(1024),
+            frames: HashMap::with_capacity(Self::INCOMPLETE_FRAME_RATIO * capacity + 1),
+            complete_frames: VecDeque::with_capacity(capacity),
             tx_waker: None,
+            rx_waker: None,
             is_closed: false,
             max_age,
+            capacity,
         }
     }
 
-    fn expire_frames(&mut self) {
+    fn expire_frames(&mut self) -> usize {
+        let mut expired = 0;
         self.frames.retain(|id, b| {
             if b.last_recv.elapsed() >= self.max_age || self.is_closed {
                 self.complete_frames.push_back(Err(SessionError::FrameDiscarded(*id)));
                 tracing::trace!("frame {id} discarded");
+                expired += 1;
                 false
             } else {
                 true
             }
         });
+
+        expired
     }
 }
 
 impl futures::Sink<Segment> for Reassembler {
     type Error = SessionError;
 
-    fn poll_ready(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         tracing::trace!("Reassembler::poll_ready");
-        if !self.is_closed {
-            Poll::Ready(Ok(()))
+        if self.is_closed {
+            return Poll::Ready(Err(SessionError::ReassemblerClosed));
+        }
+
+        // If we're at the capacity of incomplete frames,
+        // check if we can expire more than the amount that's over the capacity.
+        // Otherwise, give up.
+        if self.frames.len() >= self.capacity * Self::INCOMPLETE_FRAME_RATIO {
+            if self.expire_frames() <= self.frames.len() - self.capacity {
+                return Poll::Ready(Err(SessionError::TooManyIncompleteFrames));
+            }
+        }
+
+        if self.complete_frames.len() >= self.capacity {
+            self.rx_waker = Some(cx.waker().clone());
+
+            // Give the stream a chance to yield an element
+            if let Some(waker) = self.tx_waker.take() {
+                waker.wake();
+            }
+
+            tracing::trace!("Reassembler::poll_ready pending");
+            Poll::Pending
         } else {
-            Poll::Ready(Err(SessionError::ReassemblerClosed))
+            tracing::trace!(
+                "Reassembler::poll_ready ready (remaining {})",
+                self.capacity - self.complete_frames.len()
+            );
+            Poll::Ready(Ok(()))
         }
     }
 
@@ -140,15 +175,16 @@ impl futures::Sink<Segment> for Reassembler {
         Ok(())
     }
 
-    fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_flush(mut self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         tracing::trace!("Reassembler::poll_flush");
         if self.is_closed {
             return Poll::Ready(Err(SessionError::ReassemblerClosed));
         }
 
-        if let Some(waker) = self.project().tx_waker.take() {
+        if let Some(waker) = self.tx_waker.take() {
             waker.wake();
         }
+
         Poll::Ready(Ok(()))
     }
 
@@ -162,6 +198,10 @@ impl futures::Sink<Segment> for Reassembler {
         if let Some(waker) = self.tx_waker.take() {
             waker.wake();
         }
+        if let Some(waker) = self.rx_waker.take() {
+            waker.wake();
+        }
+
         Poll::Ready(Ok(()))
     }
 }
@@ -179,13 +219,22 @@ impl futures::Stream for Reassembler {
         }
 
         if let Some(complete) = self.complete_frames.pop_front() {
+            if let Some(waker) = self.rx_waker.take() {
+                waker.wake();
+            }
             Poll::Ready(Some(
                 complete
                     .inspect(|f| tracing::trace!("Reassembler::poll_next ready {}", f.frame_id))
                     .inspect_err(|e| tracing::trace!("Reassembler::poll_next ready error ({e})")),
             ))
         } else if !self.is_closed {
+            // The next sink operation will wake us up, but only if we give it a chance
             self.tx_waker = Some(cx.waker().clone());
+
+            if let Some(waker) = self.rx_waker.take() {
+                waker.wake();
+            }
+
             tracing::trace!("Reassembler::poll_next pending");
             Poll::Pending
         } else {
@@ -199,7 +248,7 @@ impl futures::Stream for Reassembler {
 mod tests {
     use super::*;
     use async_std::prelude::FutureExt;
-    use futures::{StreamExt, TryStreamExt};
+    use futures::{pin_mut, SinkExt, StreamExt, TryStreamExt};
     use hex_literal::hex;
     use rand::prelude::SliceRandom;
     use rand::rngs::StdRng;
@@ -216,7 +265,7 @@ mod tests {
             })
             .collect::<Vec<_>>();
 
-        let (r_sink, r_stream) = Reassembler::new(Duration::from_secs(5)).split();
+        let (r_sink, r_stream) = Reassembler::new(Duration::from_secs(5), 1024).split();
 
         let mut segments = expected
             .iter()
@@ -251,7 +300,7 @@ mod tests {
             })
             .collect::<Vec<_>>();
 
-        let (r_sink, r_stream) = Reassembler::new(Duration::from_millis(45)).split();
+        let (r_sink, r_stream) = Reassembler::new(Duration::from_millis(45), 1024).split();
 
         let mut segments = expected
             .iter()
@@ -313,7 +362,7 @@ mod tests {
             })
             .collect::<Vec<_>>();
 
-        let (r_sink, r_stream) = Reassembler::new(Duration::from_millis(100)).split();
+        let (r_sink, r_stream) = Reassembler::new(Duration::from_millis(100), 1024).split();
 
         let mut segments = expected
             .iter()
@@ -348,5 +397,109 @@ mod tests {
         }
 
         Ok(jh.await?)
+    }
+
+    #[test_log::test(async_std::test)]
+    pub async fn reassembler_should_wait_if_full() -> anyhow::Result<()> {
+        let expected = (1u32..=5)
+            .map(|frame_id| Frame {
+                frame_id,
+                data: hopr_crypto_random::random_bytes::<30>().into(),
+            })
+            .collect::<Vec<_>>();
+
+        let (r_sink, r_stream) = Reassembler::new(Duration::from_secs(5), 3).split();
+
+        pin_mut!(r_sink);
+        pin_mut!(r_stream);
+
+        let segments = expected
+            .iter()
+            .cloned()
+            .flat_map(|f| f.segment(20).unwrap())
+            .collect::<Vec<_>>();
+
+        // Frame 1
+        r_sink.send(segments[1].clone()).await?;
+        r_sink.send(segments[0].clone()).await?;
+
+        // Frame 2
+        r_sink.send(segments[2].clone()).await?;
+        r_sink.send(segments[3].clone()).await?;
+
+        // Frame 3
+        r_sink.send(segments[5].clone()).await?;
+        r_sink.send(segments[4].clone()).await?;
+
+        // Cannot insert more segments until some frames are yielded
+        assert!(r_sink
+            .send(segments[7].clone())
+            .timeout(Duration::from_millis(50))
+            .await
+            .is_err());
+
+        // Yield Frame 1
+        assert_eq!(Some(expected[0].clone()), r_stream.try_next().await?);
+
+        // This inserts segment 7 (from SplitSink's slot) and segment 6, thus completing Frame 4
+        r_sink.send(segments[6].clone()).await?;
+
+        // Cannot insert more segments until some frames are yielded
+        assert!(r_sink
+            .send(segments[8].clone())
+            .timeout(Duration::from_millis(50))
+            .await
+            .is_err());
+
+        // Yield Frame 2
+        assert_eq!(Some(expected[1].clone()), r_stream.try_next().await?);
+
+        // Yield Frame 3
+        assert_eq!(Some(expected[2].clone()), r_stream.try_next().await?);
+
+        // Completes Frame 5 (via SplitSink's slot)
+        r_sink.send(segments[9].clone()).await?;
+        r_sink.close().await?;
+
+        assert_eq!(Some(expected[3].clone()), r_stream.try_next().await?);
+        assert_eq!(Some(expected[4].clone()), r_stream.try_next().await?);
+        assert_eq!(None, r_stream.try_next().await?);
+
+        Ok(())
+    }
+
+    #[test_log::test(async_std::test)]
+    pub async fn reassembler_should_fail_with_too_many_incomplete_frames() -> anyhow::Result<()> {
+        let expected = (1u32..=5)
+            .map(|frame_id| Frame {
+                frame_id,
+                data: hopr_crypto_random::random_bytes::<30>().into(),
+            })
+            .collect::<Vec<_>>();
+
+        let reassembler = Reassembler::new(
+            Duration::from_secs(5),
+            2, // = max 4 incomplete frames before fail
+        );
+
+        pin_mut!(reassembler);
+
+        let segments = expected
+            .iter()
+            .cloned()
+            .flat_map(|f| f.segment(20).unwrap())
+            .collect::<Vec<_>>();
+
+        reassembler.send(segments[0].clone()).await?;
+        reassembler.send(segments[2].clone()).await?;
+        reassembler.send(segments[4].clone()).await?;
+        reassembler.send(segments[6].clone()).await?;
+
+        assert!(matches!(
+            reassembler.send(segments[7].clone()).await,
+            Err(SessionError::TooManyIncompleteFrames)
+        ));
+
+        Ok(())
     }
 }

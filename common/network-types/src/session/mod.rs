@@ -29,15 +29,17 @@ pub use frame::{Frame, FrameId, FrameInfo, FrameReassembler, Segment, SegmentId}
 
 pub fn frame_reconstructor(
     frame_timeout: std::time::Duration,
+    capacity: usize,
 ) -> (
     impl futures::Sink<Segment, Error = errors::SessionError>,
     impl futures::Stream<Item = Result<Frame, errors::SessionError>>,
 ) {
     use futures::StreamExt;
 
-    let (sink, rs_stream) = reassembly::Reassembler::new(frame_timeout).split();
+    let (sink, rs_stream) = reassembly::Reassembler::new(frame_timeout, capacity).split();
     let (seq_sink, stream) = sequencer::Sequencer::new(sequencer::SequencerConfig {
         timeout: frame_timeout,
+        capacity,
         ..Default::default()
     })
     .split();
@@ -85,7 +87,7 @@ mod tests {
             })
             .collect::<Vec<_>>();
 
-        let (r_sink, seq_stream) = frame_reconstructor(Duration::from_secs(5));
+        let (r_sink, seq_stream) = frame_reconstructor(Duration::from_secs(5), 1024);
 
         let mut segments = expected
             .iter()
@@ -117,7 +119,7 @@ mod tests {
             })
             .collect::<Vec<_>>();
 
-        let (r_sink, seq_stream) = frame_reconstructor(Duration::from_millis(50));
+        let (r_sink, seq_stream) = frame_reconstructor(Duration::from_millis(50), 1024);
 
         let mut segments = expected
             .iter()
