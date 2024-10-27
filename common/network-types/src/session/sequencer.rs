@@ -61,6 +61,8 @@ where
             return Poll::Ready(Err(SessionError::ReassemblerClosed));
         }
 
+        tracing::trace!("Sequencer::poll_ready buffer {}", self.buffer.len());
+
         if self.buffer.len() >= self.cfg.capacity {
             self.rx_waker = Some(cx.waker().clone());
 
@@ -68,8 +70,14 @@ where
             if let Some(waker) = self.tx_waker.take() {
                 waker.wake();
             }
+
+            tracing::trace!("Sequencer::poll_ready pending");
             Poll::Pending
         } else {
+            tracing::trace!(
+                "Sequencer::poll_ready ready (remaining {})",
+                self.cfg.capacity - self.buffer.len()
+            );
             Poll::Ready(Ok(()))
         }
     }
@@ -82,6 +90,7 @@ where
 
         if item.ge(&self.next_id) {
             self.buffer.push(std::cmp::Reverse(item));
+            tracing::trace!("Sequencer::start_ready pushed new");
             if self.buffer.len() >= self.cfg.flush_at {
                 if let Some(waker) = self.tx_waker.take() {
                     waker.wake();
@@ -147,11 +156,14 @@ where
                 self.next_id += 1;
 
                 return if is_next_ready {
-                    tracing::trace!("Sequencer::poll_next ready {current_to_emit}");
                     let popped = self.buffer.pop().map(|r| Ok(r.0));
                     if let Some(waker) = self.rx_waker.take() {
                         waker.wake();
                     }
+                    tracing::trace!(
+                        "Sequencer::poll_next ready {current_to_emit} (len = {})",
+                        self.buffer.len()
+                    );
                     Poll::Ready(popped)
                 } else {
                     tracing::trace!("Sequencer::poll_next discard {current_to_emit}");
@@ -161,7 +173,7 @@ where
 
             if self.is_closed && !is_next_ready {
                 // If the Sink is closed, but the buffer is not empty,
-                // we emit the missing ones as discarded frames, until we
+                // we emit the missing ones as discarded frames until we
                 // catch up with the rest of the buffered frames to flush out.
                 self.next_id += 1;
                 tracing::trace!("Sequencer::poll_next discard {current_to_emit}");
@@ -355,6 +367,48 @@ mod tests {
             Err(SessionError::FrameDiscarded(10))
         ));
         assert_eq!(Some(11), seq_stream.try_next().await?);
+        assert_eq!(None, seq_stream.try_next().await?);
+
+        Ok(())
+    }
+
+    #[test_log::test(async_std::test)]
+    async fn sequencer_should_wait_if_full() -> anyhow::Result<()> {
+        let cfg = SequencerConfig {
+            timeout: Duration::from_millis(25),
+            capacity: 3,
+            flush_at: 10,
+            ..Default::default()
+        };
+
+        let (seq_sink, seq_stream) = Sequencer::<u32>::new(cfg).split();
+        pin_mut!(seq_sink);
+        pin_mut!(seq_stream);
+
+        seq_sink.send(1u32).await?;
+        seq_sink.send(3u32).await?;
+        seq_sink.send(2u32).await?;
+
+        // Full capacity is reached here, but SplitSink has
+        // an extra slot, so the 4th will wait in the SplitSink's slot.
+        assert!(seq_sink.send(4u32).timeout(Duration::from_millis(50)).await.is_err());
+
+        assert_eq!(Some(1), seq_stream.try_next().await?);
+
+        // This inserts 4 into the sequencer and keeps 6 in the slot in the SplitSink
+        assert!(seq_sink.send(6u32).timeout(Duration::from_millis(50)).await.is_err());
+
+        assert_eq!(Some(2), seq_stream.try_next().await?);
+        assert_eq!(Some(3), seq_stream.try_next().await?);
+
+        // Since two elements were yielded from the Sequencer,
+        // there's now space for both: 6 (from the SplitSink's slot) and 5 (new insert)
+        seq_sink.send(5u32).await?;
+        seq_sink.close().await?;
+
+        assert_eq!(Some(4), seq_stream.try_next().await?);
+        assert_eq!(Some(5), seq_stream.try_next().await?);
+        assert_eq!(Some(6), seq_stream.try_next().await?);
         assert_eq!(None, seq_stream.try_next().await?);
 
         Ok(())

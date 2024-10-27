@@ -1042,7 +1042,7 @@ mod tests {
             let egress = if cfg.mixing_factor > 0 {
                 let mut rng = StdRng::from_seed(RNG_SEED);
                 egress
-                    .map(move |e| futures::future::ready(e).delay(Duration::from_micros(rng.gen_range(0..20))))
+                    .map(move |e| futures::future::ready(e).delay(Duration::from_micros(rng.gen_range(0..=20))))
                     .buffer_unordered(cfg.mixing_factor)
                     .boxed()
             } else {
