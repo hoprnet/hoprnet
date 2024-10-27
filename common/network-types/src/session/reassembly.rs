@@ -1,5 +1,5 @@
 use std::collections::hash_map::Entry;
-use std::collections::{BTreeSet, HashMap, VecDeque};
+use std::collections::{HashMap, VecDeque};
 use std::pin::Pin;
 use std::task::{Context, Poll, Waker};
 use std::time::{Duration, Instant};
@@ -10,39 +10,47 @@ use crate::session::frame::SeqNum;
 
 #[derive(Debug)]
 struct FrameBuilder {
-    segments: BTreeSet<Segment>,
+    segments: Vec<Segment>,
     last_recv: Instant,
 }
 
 impl From<Segment> for FrameBuilder {
     fn from(value: Segment) -> Self {
+        let mut segments = Vec::with_capacity(value.seq_len as usize);
+        segments.push(value);
         Self {
-            segments: BTreeSet::from_iter([value]),
             last_recv: Instant::now(),
+            segments,
         }
     }
 }
 
 impl FrameBuilder {
     pub fn add_segment(&mut self, segment: Segment) {
-        self.segments.insert(segment);
+        self.segments.push(segment);
         self.last_recv = Instant::now();
     }
 
+    #[inline]
     pub fn frame_id(&self) -> FrameId {
-        self.segments.first().unwrap().frame_id
+        self.segments[0].frame_id
     }
 
+    #[inline]
     pub fn remaining(&self) -> SeqNum {
-        self.segments.first().unwrap().seq_len - self.segments.len() as SeqNum
+        self.segments[0].seq_len - self.segments.len() as SeqNum
     }
 
-    pub fn build(self) -> Result<Frame, SessionError> {
+    pub fn build(mut self) -> Result<Frame, SessionError> {
         let frame_id = self.frame_id();
 
         if self.remaining() > 0 {
             return Err(SessionError::IncompleteFrame(frame_id));
         }
+
+        // There are most likely not many segments within a frame,
+        // so this is not an expensive operation.
+        self.segments.sort_unstable();
 
         Ok(Frame {
             frame_id,
@@ -57,6 +65,7 @@ impl FrameBuilder {
 }
 
 #[derive(Debug)]
+#[must_use = "streams do nothing unless polled"]
 #[pin_project::pin_project]
 pub struct Reassembler {
     frames: HashMap<FrameId, FrameBuilder>,
@@ -70,7 +79,8 @@ pub struct Reassembler {
 }
 
 impl Reassembler {
-    pub const INCOMPLETE_FRAME_RATIO: usize = 2;
+    /// Indicates how many incomplete frames there could be per a complete/discarded frame.
+    const INCOMPLETE_FRAME_RATIO: usize = 2;
 
     pub fn new(max_age: Duration, capacity: usize) -> Self {
         Self {
@@ -89,8 +99,8 @@ impl Reassembler {
         let mut expired = 0;
 
         // Since the retaining operation is potentially expensive,
-        // do it actually only if there's a real chance that a frame is expired
-        // or if the reassembler is closing (= everything should be expired right away).
+        // we do it actually only if there's a real chance that a frame is expired
+        // or if the reassembler is closing (= in such case everything is expired right away).
         if self.is_closed || self.last_expiration.elapsed() >= self.max_age {
             self.frames.retain(|id, b| {
                 if b.last_recv.elapsed() >= self.max_age || self.is_closed {
@@ -121,7 +131,6 @@ impl futures::Sink<Segment> for Reassembler {
 
         // If we're at the capacity of incomplete frames,
         // check if we can expire more than the amount that's over the capacity.
-        // Otherwise, give up.
         if self.frames.len() >= self.capacity * Self::INCOMPLETE_FRAME_RATIO {
             if self.expire_frames() <= self.frames.len() - self.capacity {
                 return Poll::Ready(Err(SessionError::TooManyIncompleteFrames));

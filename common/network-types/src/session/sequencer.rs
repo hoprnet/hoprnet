@@ -24,6 +24,7 @@ impl Default for SequencerConfig {
 }
 
 #[derive(Debug)]
+#[must_use = "streams do nothing unless polled"]
 #[pin_project::pin_project]
 pub struct Sequencer<T> {
     buffer: BinaryHeap<std::cmp::Reverse<T>>,
