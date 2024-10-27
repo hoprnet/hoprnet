@@ -349,7 +349,7 @@ impl<const C: usize> From<SessionMessage<C>> for Vec<u8> {
 
         let msg_len = msg.len() as u16;
 
-        let mut ret = Vec::with_capacity(SessionMessage::<C>::HEADER_SIZE + msg_len.into());
+        let mut ret = Vec::with_capacity(SessionMessage::<C>::HEADER_SIZE + msg_len as usize);
         ret.push(SessionMessage::<C>::VERSION);
         ret.push(disc);
         ret.extend(msg_len.to_be_bytes());

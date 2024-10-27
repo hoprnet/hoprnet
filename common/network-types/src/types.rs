@@ -1,8 +1,6 @@
 use crate::errors::NetworkTypeError;
 use hickory_resolver::name_server::ConnectionProvider;
 use hickory_resolver::AsyncResolver;
-use hopr_crypto_types::prelude::{seal_data, OffchainKeypair};
-use hopr_crypto_types::seal::unseal_data;
 use hopr_primitive_types::bounded::{BoundedSize, BoundedVec};
 use libp2p_identity::PeerId;
 use std::fmt::{Display, Formatter};
@@ -209,20 +207,21 @@ pub enum SealedHost {
     Sealed(Box<[u8]>),
 }
 
+#[cfg(feature = "serde")] // Serde feature required so that `IpOrHost` is serializable
 impl SealedHost {
     /// Seals the given [`IpOrHost`] using the Exit node's peer ID.
     pub fn seal(host: IpOrHost, peer_id: PeerId) -> crate::errors::Result<Self> {
-        seal_data(host, peer_id)
+        hopr_crypto_types::seal::seal_data(host, peer_id)
             .map(Self::Sealed)
             .map_err(|e| NetworkTypeError::Other(e.to_string()))
     }
 
     /// Tries to unseal the sealed [`IpOrHost`] using the private key as Exit node.
     /// No-op, if the data is already unsealed.
-    pub fn unseal(self, key: &OffchainKeypair) -> crate::errors::Result<IpOrHost> {
+    pub fn unseal(self, key: &hopr_crypto_types::keypairs::OffchainKeypair) -> crate::errors::Result<IpOrHost> {
         match self {
             SealedHost::Plain(host) => Ok(host),
-            SealedHost::Sealed(enc) => unseal_data(&enc, key).map_err(|e| NetworkTypeError::Other(e.to_string())),
+            SealedHost::Sealed(enc) => hopr_crypto_types::seal::unseal_data(&enc, key).map_err(|e| NetworkTypeError::Other(e.to_string())),
         }
     }
 }
