@@ -25,6 +25,32 @@ impl From<Segment> for FrameBuilder {
     }
 }
 
+impl TryFrom<FrameBuilder> for Frame {
+    type Error = SessionError;
+
+    fn try_from(mut value: FrameBuilder) -> Result<Self, Self::Error> {
+        let frame_id = value.frame_id();
+
+        if value.remaining() > 0 {
+            return Err(SessionError::IncompleteFrame(frame_id));
+        }
+
+        // There are most likely not many segments within a frame,
+        // so this is not an expensive operation.
+        value.segments.sort_unstable();
+
+        Ok(Frame {
+            frame_id,
+            data: value
+                .segments
+                .into_iter()
+                .flat_map(|s| s.data.into_vec())
+                .collect::<Vec<_>>()
+                .into_boxed_slice(),
+        })
+    }
+}
+
 impl FrameBuilder {
     pub fn add_segment(&mut self, segment: Segment) {
         self.segments.push(segment);
@@ -40,35 +66,13 @@ impl FrameBuilder {
     pub fn remaining(&self) -> SeqNum {
         self.segments[0].seq_len - self.segments.len() as SeqNum
     }
-
-    pub fn build(mut self) -> Result<Frame, SessionError> {
-        let frame_id = self.frame_id();
-
-        if self.remaining() > 0 {
-            return Err(SessionError::IncompleteFrame(frame_id));
-        }
-
-        // There are most likely not many segments within a frame,
-        // so this is not an expensive operation.
-        self.segments.sort_unstable();
-
-        Ok(Frame {
-            frame_id,
-            data: self
-                .segments
-                .into_iter()
-                .flat_map(|s| s.data.into_vec())
-                .collect::<Vec<_>>()
-                .into_boxed_slice(),
-        })
-    }
 }
 
 #[derive(Debug)]
 #[must_use = "streams do nothing unless polled"]
 #[pin_project::pin_project]
 pub struct Reassembler {
-    frames: HashMap<FrameId, FrameBuilder>,
+    incomplete_frames: HashMap<FrameId, FrameBuilder>,
     complete_frames: VecDeque<Result<Frame, SessionError>>,
     tx_waker: Option<Waker>,
     rx_waker: Option<Waker>,
@@ -84,7 +88,7 @@ impl Reassembler {
 
     pub fn new(max_age: Duration, capacity: usize) -> Self {
         Self {
-            frames: HashMap::with_capacity(Self::INCOMPLETE_FRAME_RATIO * capacity + 1),
+            incomplete_frames: HashMap::with_capacity(Self::INCOMPLETE_FRAME_RATIO * capacity + 1),
             complete_frames: VecDeque::with_capacity(capacity),
             tx_waker: None,
             rx_waker: None,
@@ -102,7 +106,7 @@ impl Reassembler {
         // we do it actually only if there's a real chance that a frame is expired
         // or if the reassembler is closing (= in such case everything is expired right away).
         if self.is_closed || self.last_expiration.elapsed() >= self.max_age {
-            self.frames.retain(|id, b| {
+            self.incomplete_frames.retain(|id, b| {
                 if b.last_recv.elapsed() >= self.max_age || self.is_closed {
                     self.complete_frames.push_back(Err(SessionError::FrameDiscarded(*id)));
                     tracing::trace!("frame {id} discarded");
@@ -131,8 +135,8 @@ impl futures::Sink<Segment> for Reassembler {
 
         // If we're at the capacity of incomplete frames,
         // check if we can expire more than the amount that's over the capacity.
-        if self.frames.len() >= self.capacity * Self::INCOMPLETE_FRAME_RATIO {
-            if self.expire_frames() <= self.frames.len() - self.capacity {
+        if self.incomplete_frames.len() >= self.capacity * Self::INCOMPLETE_FRAME_RATIO {
+            if self.expire_frames() <= self.incomplete_frames.len() - self.capacity {
                 return Poll::Ready(Err(SessionError::TooManyIncompleteFrames));
             }
         }
@@ -162,13 +166,13 @@ impl futures::Sink<Segment> for Reassembler {
             return Err(SessionError::ReassemblerClosed);
         }
 
-        let maybe_frame = match self.frames.entry(item.frame_id) {
+        let maybe_frame = match self.incomplete_frames.entry(item.frame_id) {
             Entry::Occupied(mut e) => {
                 let builder = e.get_mut();
                 builder.add_segment(item);
                 if builder.remaining() == 0 {
                     tracing::trace!("Reassembler::start_send frame {} is complete", e.key());
-                    Some(e.remove().build())
+                    Some(e.remove().try_into())
                 } else {
                     None
                 }
@@ -180,7 +184,7 @@ impl futures::Sink<Segment> for Reassembler {
                         "Reassembler::start_send single segment frame {} is complete",
                         builder.frame_id()
                     );
-                    Some(builder.build())
+                    Some(builder.try_into())
                 } else {
                     e.insert(builder);
                     None
