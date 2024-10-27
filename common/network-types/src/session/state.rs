@@ -784,7 +784,6 @@ impl<const C: usize> SessionSocket<C> {
         );
 
         let (segment_egress_send, segment_egress_recv) = futures::channel::mpsc::unbounded();
-        let segment_egress_recv = segment_egress_recv.map(|m: SessionMessage<C>| Ok(m.into_encoded()));
 
         let (downstream_read, downstream_write) = transport.split();
 
@@ -806,7 +805,10 @@ impl<const C: usize> SessionSocket<C> {
 
         // Segment egress to downstream
         spawn(async move {
-            if let Err(e) = segment_egress_recv.forward(downstream_write.into_sink()).await {
+            if let Err(e) = segment_egress_recv
+                .map(|m: SessionMessage<C>| Ok(m.into_encoded()))
+                .forward(downstream_write.into_sink())
+                .await {
                 error!("FINISHED: forwarding to downstream terminated with error {e}")
             } else {
                 debug!("FINISHED: forwarding to downstream done");
@@ -819,7 +821,7 @@ impl<const C: usize> SessionSocket<C> {
                 .map_err(|e| NetworkTypeError::SessionProtocolError(SessionError::ProcessingError(e.to_string())))
                 .and_then(|m| futures::future::ok(futures::stream::iter(SessionMessageIter::from(m.into_vec()))))
                 .try_flatten()
-                .forward(state.clone()),
+                .forward(state.clone())
         );
 
         // Advance the state until the socket is closed
