@@ -435,7 +435,7 @@ async def shared_nodes_bringup(
         logging.critical("Not all nodes are connected to all peers, interrupting setup")
         raise RuntimeError
 
-        
+
 def load_private_key(test_suite_name, pos=0):
     with open(anvil_cfg_file(test_suite_name), "r") as file:
         data: dict = json.load(file)
@@ -495,10 +495,10 @@ async def swarm7(request):
         logging.info("Starting and waiting for local anvil server to be up (dump state enabled)")
         run(
             f"""
-            ./run-local-anvil.sh 
-            -l {anvil_log_file(test_suite_name)} 
-            -c {anvil_cfg_file(test_suite_name)} 
-            -p {anvil_port} 
+            ./run-local-anvil.sh
+            -l {anvil_log_file(test_suite_name)}
+            -c {anvil_cfg_file(test_suite_name)}
+            -p {anvil_port}
             -ds {anvil_state_file(test_dir)}
             """.split(),
             check=True,

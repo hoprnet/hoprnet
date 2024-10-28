@@ -180,7 +180,6 @@ impl Modify for SecurityAddon {
     }
 }
 
-<<<<<<< HEAD
 /// Parameters needed to construct the Rest API via [`serve_api`].
 pub struct RestApiParameters {
     pub listener: TcpListener,
@@ -219,22 +218,6 @@ pub async fn serve_api(params: RestApiParameters) -> Result<(), std::io::Error> 
         msg_encoder,
     )
     .await;
-=======
-async fn serve_openapi_spec() -> impl IntoResponse {
-    (StatusCode::OK, Json(ApiDoc::openapi())).into_response()
-}
-
-pub async fn serve_api(
-    listener: TcpListener,
-    hoprd_cfg: String,
-    cfg: crate::config::Api,
-    hopr: Arc<hopr_lib::Hopr>,
-    inbox: Arc<RwLock<hoprd_inbox::Inbox>>,
-    websocket_rx: async_broadcast::InactiveReceiver<TransportOutput>,
-    msg_encoder: Option<MessageEncoder>,
-) -> Result<(), std::io::Error> {
-    let router = build_api(hoprd_cfg, cfg, hopr, inbox, websocket_rx, msg_encoder).await;
->>>>>>> parent of 98e42b2204 (rest-api: remove excess swagger ui endpoints)
     axum::serve(listener, router).await
 }
 
@@ -266,7 +249,7 @@ async fn build_api(
             "/",
             Router::new()
                 .merge(SwaggerUi::new("/swagger-ui").url("/api-docs2/openapi.json", ApiDoc::openapi()))
-                .merge(Scalar::with_url("/scalar", ApiDoc::openapi()))
+                .merge(Scalar::with_url("/scalar", ApiDoc::openapi())),
         )
         .nest(
             "/",

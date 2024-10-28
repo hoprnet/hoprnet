@@ -1,9 +1,3 @@
-use std::io::ErrorKind;
-use std::net::IpAddr;
-use std::sync::Arc;
-
-use crate::types::PeerOrAddress;
-use crate::{ApiErrorStatus, InternalState, ListenerId, BASE_PATH};
 use axum::extract::Path;
 use axum::Error;
 use axum::{
@@ -17,18 +11,25 @@ use axum::{
 use axum_extra::extract::Query;
 use futures::{AsyncReadExt, AsyncWriteExt, SinkExt, StreamExt, TryStreamExt};
 use futures_concurrency::stream::Merge;
+use libp2p_identity::PeerId;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
+use std::io::ErrorKind;
+use std::net::IpAddr;
+use std::sync::Arc;
 use tokio::net::TcpListener;
 use tokio_util::compat::FuturesAsyncReadCompatExt;
 use tokio_util::io::ReaderStream;
 use tracing::{debug, error, info, trace};
 
 use hopr_lib::errors::HoprLibError;
-use hopr_lib::{transfer_session, PeerId};
+use hopr_lib::transfer_session;
 use hopr_lib::{HoprSession, IpProtocol, RoutingOptions, SessionCapability, SessionClientConfig};
 use hopr_network_types::prelude::ConnectedUdpStream;
 use hopr_network_types::udp::ForeignDataMode;
+
+use crate::types::PeerOrAddress;
+use crate::{ApiErrorStatus, InternalState, ListenerId, BASE_PATH};
 
 /// Default listening host the session listener socket binds to.
 pub const DEFAULT_LISTEN_HOST: &str = "127.0.0.1:0";
