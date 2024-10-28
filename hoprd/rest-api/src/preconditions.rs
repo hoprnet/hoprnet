@@ -22,8 +22,7 @@ pub(crate) async fn authenticate(
     let auth = state.auth.clone();
 
     let x_auth_header = HeaderName::from_str("x-auth-token").expect("Invalid header name: x-auth-token");
-    let websocket_proto_header =
-        HeaderName::from_str("Sec-Websocket-Protocol").expect("Invalid header name: Sec-Websocket-Protocol");
+    let websocket_proto_header = HeaderName::from_str("Sec-Websocket-Protocol").expect("Invalid header name: Sec-Websocket-Protocol");
 
     let is_authorized = match auth.as_ref() {
         Auth::Token(expected_token) => {
