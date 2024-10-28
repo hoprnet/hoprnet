@@ -941,9 +941,9 @@ mod tests {
             address: Default::default(),
             topics: vec![],
             data: Default::default(),
-            block_hash: format!("{:#x}", H256::zero()),
+            block_hash: Hash::default().into(),
             block_number: 0,
-            tx_hash: format!("{:#x}", H256::zero()),
+            tx_hash: Hash::default().into(),
             tx_index: 0,
             log_index: 0,
             removed: false,
@@ -960,8 +960,8 @@ mod tests {
         let keybinding = KeyBinding::new(*SELF_CHAIN_ADDRESS, &SELF_PRIV_KEY);
 
         let keybinding_log = SerializableLog {
-            address: handlers.addresses.announcements.to_hex(),
-            topics: vec![format!("{:#x}", KeyBindingFilter::signature())],
+            address: handlers.addresses.announcements.into(),
+            topics: vec![KeyBindingFilter::signature().into()],
             data: encode(&[
                 Token::FixedBytes(keybinding.signature.as_ref().to_vec()),
                 Token::FixedBytes(keybinding.packet_key.as_ref().to_vec()),
@@ -1005,8 +1005,8 @@ mod tests {
         let test_multiaddr_empty: Multiaddr = "".parse()?;
 
         let address_announcement_empty_log = SerializableLog {
-            address: handlers.addresses.announcements.to_hex(),
-            topics: vec![format!("{:#x}", AddressAnnouncementFilter::signature())],
+            address: handlers.addresses.announcements.into(),
+            topics: vec![AddressAnnouncementFilter::signature().into()],
             data: encode(&[
                 Token::Address(EthereumAddress::from_slice(&SELF_CHAIN_ADDRESS.as_ref())),
                 Token::String(test_multiaddr_empty.to_string()),
@@ -1043,9 +1043,9 @@ mod tests {
         let test_multiaddr: Multiaddr = "/ip4/1.2.3.4/tcp/56".parse()?;
 
         let address_announcement_log = SerializableLog {
-            address: handlers.addresses.announcements.to_hex(),
+            address: handlers.addresses.announcements.into(),
             block_number: 1,
-            topics: vec![format!("{:#x}", AddressAnnouncementFilter::signature())],
+            topics: vec![AddressAnnouncementFilter::signature().into()],
             data: encode(&[
                 Token::Address(EthereumAddress::from_slice(&SELF_CHAIN_ADDRESS.as_ref())),
                 Token::String(test_multiaddr.to_string()),
@@ -1103,9 +1103,9 @@ mod tests {
         let test_multiaddr_dns: Multiaddr = "/dns4/useful.domain/tcp/56".parse()?;
 
         let address_announcement_dns_log = SerializableLog {
-            address: handlers.addresses.announcements.to_hex(),
+            address: handlers.addresses.announcements.into(),
             block_number: 2,
-            topics: vec![format!("{:#x}", AddressAnnouncementFilter::signature())],
+            topics: vec![AddressAnnouncementFilter::signature().into()],
             data: encode(&[
                 Token::Address(EthereumAddress::from_slice(&SELF_CHAIN_ADDRESS.as_ref())),
                 Token::String(test_multiaddr_dns.to_string()),
@@ -1180,7 +1180,7 @@ mod tests {
         db.insert_account(None, announced_account_entry).await?;
 
         let revoke_announcement_log = SerializableLog {
-            address: handlers.addresses.announcements.to_hex(),
+            address: handlers.addresses.announcements.into(),
             topics: vec![format!("{:#x}", RevokeAnnouncementFilter::signature())],
             data: encode(&[Token::Address(EthereumAddress::from_slice(
                 &SELF_CHAIN_ADDRESS.as_ref(),
@@ -1220,7 +1220,7 @@ mod tests {
         let value = U256::max_value();
 
         let transferred_log = SerializableLog {
-            address: handlers.addresses.token.to_hex(),
+            address: handlers.addresses.token.into(),
             topics: vec![
                 format!("{:#x}", TransferFilter::signature()),
                 format!("{:#x}", H256::from_slice(&Address::default().to_bytes32())),
@@ -1257,7 +1257,7 @@ mod tests {
         db.set_safe_hopr_balance(None, BalanceType::HOPR.balance(value)).await?;
 
         let transferred_log = SerializableLog {
-            address: handlers.addresses.token.to_hex(),
+            address: handlers.addresses.token.into(),
             topics: vec![
                 format!("{:#x}", TransferFilter::signature()),
                 format!("{:#x}", H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32())),
@@ -1351,7 +1351,7 @@ mod tests {
         let handlers = init_handlers(db.clone());
 
         let registered_log = SerializableLog {
-            address: handlers.addresses.network_registry.to_hex(),
+            address: handlers.addresses.network_registry.into(),
             topics: vec![
                 format!("{:#x}", RegisteredFilter::signature()),
                 format!("{:#x}", H256::from_slice(&STAKE_ADDRESS.to_bytes32())),
@@ -1388,7 +1388,7 @@ mod tests {
         let handlers = init_handlers(db.clone());
 
         let registered_log = SerializableLog {
-            address: handlers.addresses.network_registry.to_hex(),
+            address: handlers.addresses.network_registry.into(),
             topics: vec![
                 format!("{:#x}", RegisteredByManagerFilter::signature()),
                 format!("{:#x}", H256::from_slice(&STAKE_ADDRESS.to_bytes32())),
@@ -1428,7 +1428,7 @@ mod tests {
             .await?;
 
         let registered_log = SerializableLog {
-            address: handlers.addresses.network_registry.to_hex(),
+            address: handlers.addresses.network_registry.into(),
             topics: vec![
                 format!("{:#x}", DeregisteredFilter::signature()),
                 format!("{:#x}", H256::from_slice(&STAKE_ADDRESS.to_bytes32())),
@@ -1468,7 +1468,7 @@ mod tests {
             .await?;
 
         let registered_log = SerializableLog {
-            address: handlers.addresses.network_registry.to_hex(),
+            address: handlers.addresses.network_registry.into(),
             topics: vec![
                 format!("{:#x}", DeregisteredByManagerFilter::signature()),
                 format!("{:#x}", H256::from_slice(&STAKE_ADDRESS.to_bytes32())),
@@ -1505,7 +1505,7 @@ mod tests {
         let handlers = init_handlers(db.clone());
 
         let nr_enabled = SerializableLog {
-            address: handlers.addresses.network_registry.to_hex(),
+            address: handlers.addresses.network_registry.into(),
             topics: vec![
                 format!("{:#x}", NetworkRegistryStatusUpdatedFilter::signature()),
                 format!("{:#x}", H256::from_low_u64_be(1)),
@@ -1535,7 +1535,7 @@ mod tests {
         db.set_network_registry_enabled(None, true).await?;
 
         let nr_disabled = SerializableLog {
-            address: handlers.addresses.network_registry.to_hex(),
+            address: handlers.addresses.network_registry.into(),
             topics: vec![
                 format!("{:#x}", NetworkRegistryStatusUpdatedFilter::signature()),
                 format!("{:#x}", H256::from_low_u64_be(0)),
@@ -1563,7 +1563,7 @@ mod tests {
         let handlers = init_handlers(db.clone());
 
         let set_eligible = SerializableLog {
-            address: handlers.addresses.network_registry.to_hex(),
+            address: handlers.addresses.network_registry.into(),
             topics: vec![
                 format!("{:#x}", EligibilityUpdatedFilter::signature()),
                 format!("{:#x}", H256::from_slice(&STAKE_ADDRESS.to_bytes32())),
@@ -1598,7 +1598,7 @@ mod tests {
         db.set_safe_eligibility(None, *STAKE_ADDRESS, false).await?;
 
         let set_eligible = SerializableLog {
-            address: handlers.addresses.network_registry.to_hex(),
+            address: handlers.addresses.network_registry.into(),
             topics: vec![
                 format!("{:#x}", EligibilityUpdatedFilter::signature()),
                 format!("{:#x}", H256::from_slice(&STAKE_ADDRESS.to_bytes32())),
@@ -1645,7 +1645,7 @@ mod tests {
         let diff = solidity_balance - channel.balance;
 
         let balance_increased_log = SerializableLog {
-            address: handlers.addresses.channels.to_hex(),
+            address: handlers.addresses.channels.into(),
             topics: vec![
                 format!("{:#x}", ChannelBalanceIncreasedFilter::signature()),
                 format!("{:#x}", H256::from_slice(channel.get_id().as_ref())),
@@ -1683,7 +1683,7 @@ mod tests {
         let separator = Hash::from(hopr_crypto_random::random_bytes());
 
         let channels_dst_updated = SerializableLog {
-            address: handlers.addresses.channels.to_hex(),
+            address: handlers.addresses.channels.into(),
             topics: vec![
                 format!("{:#x}", DomainSeparatorUpdatedFilter::signature()),
                 format!("{:#x}", H256::from_slice(separator.as_ref())),
@@ -1737,7 +1737,7 @@ mod tests {
         let diff = channel.balance - solidity_balance;
 
         let balance_decreased_log = SerializableLog {
-            address: handlers.addresses.channels.to_hex(),
+            address: handlers.addresses.channels.into(),
             topics: vec![
                 format!("{:#x}", ChannelBalanceDecreasedFilter::signature()),
                 format!("{:#x}", H256::from_slice(channel.get_id().as_ref())),
@@ -1786,7 +1786,7 @@ mod tests {
         db.upsert_channel(None, channel).await?;
 
         let channel_closed_log = SerializableLog {
-            address: handlers.addresses.channels.to_hex(),
+            address: handlers.addresses.channels.into(),
             topics: vec![
                 format!("{:#x}", ChannelClosedFilter::signature()),
                 format!("{:#x}", H256::from_slice(channel.get_id().as_ref())),
@@ -1833,7 +1833,7 @@ mod tests {
         let channel_id = generate_channel_id(&SELF_CHAIN_ADDRESS, &COUNTERPARTY_CHAIN_ADDRESS);
 
         let channel_opened_log = SerializableLog {
-            address: handlers.addresses.channels.to_hex(),
+            address: handlers.addresses.channels.into(),
             topics: vec![
                 format!("{:#x}", ChannelOpenedFilter::signature()),
                 format!("{:#x}", H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32())),
@@ -1889,7 +1889,7 @@ mod tests {
         db.upsert_channel(None, channel).await?;
 
         let channel_opened_log = SerializableLog {
-            address: handlers.addresses.channels.to_hex(),
+            address: handlers.addresses.channels.into(),
             topics: vec![
                 format!("{:#x}", ChannelOpenedFilter::signature()),
                 format!("{:#x}", H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32())),
@@ -1946,7 +1946,7 @@ mod tests {
         db.upsert_channel(None, channel).await?;
 
         let channel_opened_log = SerializableLog {
-            address: handlers.addresses.channels.to_hex(),
+            address: handlers.addresses.channels.into(),
             topics: vec![
                 format!("{:#x}", ChannelOpenedFilter::signature()),
                 format!("{:#x}", H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32())),
@@ -2023,7 +2023,7 @@ mod tests {
         db.upsert_ticket(None, ticket.clone()).await?;
 
         let ticket_redeemed_log = SerializableLog {
-            address: handlers.addresses.channels.to_hex(),
+            address: handlers.addresses.channels.into(),
             topics: vec![
                 format!("{:#x}", TicketRedeemedFilter::signature()),
                 format!("{:#x}", H256::from_slice(channel.get_id().as_ref())),
@@ -2130,7 +2130,7 @@ mod tests {
         db.upsert_ticket(None, old_ticket.clone()).await?;
 
         let ticket_redeemed_log = SerializableLog {
-            address: handlers.addresses.channels.to_hex(),
+            address: handlers.addresses.channels.into(),
             topics: vec![
                 format!("{:#x}", TicketRedeemedFilter::signature()),
                 format!("{:#x}", H256::from_slice(&channel.get_id().as_ref())),
@@ -2225,7 +2225,7 @@ mod tests {
         db.upsert_channel(None, channel).await?;
 
         let ticket_redeemed_log = SerializableLog {
-            address: handlers.addresses.channels.to_hex(),
+            address: handlers.addresses.channels.into(),
             topics: vec![
                 format!("{:#x}", TicketRedeemedFilter::signature()),
                 format!("{:#x}", H256::from_slice(channel.get_id().as_ref())),
@@ -2295,7 +2295,7 @@ mod tests {
         let next_ticket_index = U256::from((1u128 << 48) - 1);
 
         let ticket_redeemed_log = SerializableLog {
-            address: handlers.addresses.channels.to_hex(),
+            address: handlers.addresses.channels.into(),
             topics: vec![
                 format!("{:#x}", TicketRedeemedFilter::signature()),
                 format!("{:#x}", H256::from_slice(channel.get_id().as_ref())),
@@ -2347,7 +2347,7 @@ mod tests {
         let next_ticket_index = U256::from((1u128 << 48) - 1);
 
         let ticket_redeemed_log = SerializableLog {
-            address: handlers.addresses.channels.to_hex(),
+            address: handlers.addresses.channels.into(),
             topics: vec![
                 format!("{:#x}", TicketRedeemedFilter::signature()),
                 format!("{:#x}", H256::from_slice(channel.get_id().as_ref())),
@@ -2399,7 +2399,7 @@ mod tests {
         let timestamp = SystemTime::now();
 
         let closure_initiated_log = SerializableLog {
-            address: handlers.addresses.channels.to_hex(),
+            address: handlers.addresses.channels.into(),
             topics: vec![
                 format!("{:#x}", OutgoingChannelClosureInitiatedFilter::signature()),
                 format!("{:#x}", H256::from_slice(channel.get_id().as_ref())),
@@ -2439,7 +2439,7 @@ mod tests {
         let handlers = init_handlers(db.clone());
 
         let safe_registered_log = SerializableLog {
-            address: handlers.addresses.safe_registry.to_hex(),
+            address: handlers.addresses.safe_registry.into(),
             topics: vec![
                 format!("{:#x}", RegisteredNodeSafeFilter::signature()),
                 format!("{:#x}", H256::from_slice(&SAFE_INSTANCE_ADDR.to_bytes32())),
@@ -2470,7 +2470,7 @@ mod tests {
         // Nothing to write to the DB here, since we do not track this
 
         let safe_registered_log = SerializableLog {
-            address: handlers.addresses.safe_registry.to_hex(),
+            address: handlers.addresses.safe_registry.into(),
             topics: vec![
                 format!("{:#x}", DergisteredNodeSafeFilter::signature()),
                 format!("{:#x}", H256::from_slice(&SAFE_INSTANCE_ADDR.to_bytes32())),
@@ -2502,7 +2502,7 @@ mod tests {
         let handlers = init_handlers(db.clone());
 
         let price_change_log = SerializableLog {
-            address: handlers.addresses.price_oracle.to_hex(),
+            address: handlers.addresses.price_oracle.into(),
             topics: vec![format!("{:#x}", TicketPriceUpdatedFilter::signature())],
             data: encode(&[Token::Uint(EthU256::from(1u64)), Token::Uint(EthU256::from(123u64))]).into(),
             ..test_log()
@@ -2535,7 +2535,7 @@ mod tests {
         let handlers = init_handlers(db.clone());
 
         let win_prob_change_log = SerializableLog {
-            address: handlers.addresses.win_prob_oracle.to_hex(),
+            address: handlers.addresses.win_prob_oracle.into(),
             topics: vec![format!("{:#x}", WinProbUpdatedFilter::signature())],
             data: encode(&[
                 Token::Uint(EthU256::from(f64_to_win_prob(1.0)?.as_ref())),
@@ -2625,7 +2625,7 @@ mod tests {
         let handlers = init_handlers(db.clone());
 
         let win_prob_change_log = SerializableLog {
-            address: handlers.addresses.win_prob_oracle.to_hex(),
+            address: handlers.addresses.win_prob_oracle.into(),
             topics: vec![format!("{:#x}", WinProbUpdatedFilter::signature())],
             data: encode(&[
                 Token::Uint(EthU256::from(f64_to_win_prob(0.1)?.as_ref())),

@@ -526,9 +526,9 @@ mod tests {
             .context("a value should be present")?
             .clone()
             .logs;
-        let channels_address = contract_addrs.channels.to_hex();
-        let channel_open_filter = format!("{:#x}", ChannelOpenedFilter::signature());
-        let channel_balance_filter = format!("{:#x}", ChannelBalanceIncreasedFilter::signature());
+        let channels_address = contract_addrs.channels;
+        let channel_open_filter: [u8; 32] = ChannelOpenedFilter::signature().into();
+        let channel_balance_filter: [u8; 32] = ChannelBalanceIncreasedFilter::signature().into();
 
         assert!(
             last_block_logs

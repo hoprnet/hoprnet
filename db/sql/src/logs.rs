@@ -393,13 +393,13 @@ mod tests {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await.unwrap();
 
         let log = SerializableLog {
-            address: Hash::create(&[b"my address"]).to_hex(),
-            topics: [Hash::create(&[b"my topic"]).to_hex()].into(),
+            address: Address::new(b"my address"),
+            topics: [Hash::create(&[b"my topic"]).into()].into(),
             data: [1, 2, 3, 4].into(),
             tx_index: 1u64,
             block_number: 1u64,
-            block_hash: Hash::create(&[b"my block hash"]).to_hex(),
-            tx_hash: Hash::create(&[b"my tx hash"]).to_hex(),
+            block_hash: Hash::create(&[b"my block hash"]).into(),
+            tx_hash: Hash::create(&[b"my tx hash"]).into(),
             log_index: 1u64,
             removed: false,
             processed: Some(false),
