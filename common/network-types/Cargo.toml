@@ -61,6 +61,7 @@ anyhow = { workspace = true }
 async-std = { workspace = true, features = ["attributes", "unstable"] }
 async-stream = { workspace = true }
 ctor = "0.2.8"
+criterion = { workspace = true }
 hex-literal = { workspace = true }
 lazy_static = { workspace = true }
 parameterized = { workspace = true }
@@ -72,3 +73,7 @@ tokio = { workspace = true }
 tokio-util = { workspace = true }
 
 hopr-crypto-random = { workspace = true }
+
+[[bench]]
+name = "frame_reconstructor_bench"
+harness = false

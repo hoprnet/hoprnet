@@ -27,6 +27,8 @@ mod utils;
 
 pub use frame::{Frame, FrameId, FrameInfo, FrameReassembler, Segment, SegmentId};
 
+pub use utils::linear_half_normal_shuffle;
+
 pub fn frame_reconstructor(
     frame_timeout: std::time::Duration,
     capacity: usize,

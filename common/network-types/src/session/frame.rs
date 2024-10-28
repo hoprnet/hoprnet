@@ -659,11 +659,12 @@ impl Sink<Segment> for FrameReassembler {
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
+    use crate::session::utils::{linear_half_normal_shuffle, sample_index};
     use async_stream::stream;
     use futures::{pin_mut, Stream, StreamExt, TryStreamExt};
     use hex_literal::hex;
     use lazy_static::lazy_static;
-    use rand::prelude::{Distribution, SliceRandom};
+    use rand::prelude::SliceRandom;
     use rand::{seq::IteratorRandom, thread_rng, Rng, SeedableRng};
     use rand_distr::Normal;
     use rayon::prelude::*;
@@ -693,29 +694,6 @@ pub(crate) mod tests {
             let mut rng = rand::rngs::StdRng::from_seed(RAND_SEED.clone());
             linear_half_normal_shuffle(&mut rng, vec, MIXING_FACTOR)
         };
-    }
-
-    /// Sample an index between `0` and `len - 1` using the given distribution and RNG.
-    pub fn sample_index<T: Distribution<f64>, R: Rng>(dist: &mut T, rng: &mut R, len: usize) -> usize {
-        let f: f64 = dist.sample(rng);
-        (f.max(0.0).round() as usize).min(len - 1)
-    }
-
-    /// Shuffles the given `vec` by taking a next element with index `|N(0,factor^2)`|, where
-    /// `N` denotes normal distribution.
-    /// When used on frame segments vector, it will shuffle the segments in a controlled manner;
-    /// such that an entire frame can unlikely swap position with another, if `factor` ~ frame length.
-    fn linear_half_normal_shuffle<T, R: Rng>(rng: &mut R, mut vec: VecDeque<T>, factor: f64) -> Vec<T> {
-        if factor == 0.0 || vec.is_empty() {
-            return vec.into(); // no mixing
-        }
-
-        let mut dist = Normal::new(0.0, factor).unwrap();
-        let mut ret = Vec::new();
-        while !vec.is_empty() {
-            ret.push(vec.remove(sample_index(&mut dist, rng, vec.len())).unwrap());
-        }
-        ret
     }
 
     #[ctor::ctor]
