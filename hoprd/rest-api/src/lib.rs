@@ -2469,7 +2469,7 @@ mod node {
 
                 async move {
                     if let Ok(Some(info)) = hopr.network_peer_info(&peer).await {
-                        if info.get_average_quality() >= quality {
+                        if info.get_average_quality() > quality {
                             Some((peer, info))
                         } else {
                             None
