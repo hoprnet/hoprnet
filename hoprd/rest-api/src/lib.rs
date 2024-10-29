@@ -1503,7 +1503,7 @@ mod messages {
     }))]
     pub(crate) struct SendMessageBodyRequest {
         /// The message tag used to filter messages based on application, must be from range <1024,65535>
-        #[schema(exclusive_minimum = 1024)]
+        #[schema(minimum = 1024)]
         pub tag: u16,
         /// Message to be transmitted over the network
         #[serde_as(as = "Bytes")]
