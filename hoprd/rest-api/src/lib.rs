@@ -569,7 +569,7 @@ mod alias {
         Ok(Response::builder(200)
             .body(json!(aliases
                 .iter()
-                .map(|alias| ( alias.alias.clone(), alias.peer_id.clone()))
+                .map(|alias| (alias.alias.clone(), alias.peer_id.clone()))
                 .collect::<HashMap<_, _>>()))
             .build())
     }
