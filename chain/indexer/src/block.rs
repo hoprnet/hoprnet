@@ -65,6 +65,8 @@ where
     db: Db,
     cfg: IndexerConfig,
     egress: async_channel::Sender<SignificantChainEvent>,
+    // If true (default), the indexer will panic if the event stream is terminated.
+    // Setting it to false is useful for testing.
     panic_on_completion: bool,
 }
 
@@ -91,6 +93,7 @@ where
         }
     }
 
+    /// Disables the panic on completion.
     pub fn disable_panic_on_completion(mut self) -> Self {
         self.panic_on_completion = false;
         self
@@ -205,8 +208,8 @@ where
                     let db = db.clone();
 
                     async move {
-                        debug!("Storing logs from {}", block.clone());
-                        let logs = block.clone().logs;
+                        debug!("Storing logs from {}", &block);
+                        let logs = block.logs.clone();
                         let logs_vec = logs.into_iter().map(SerializableLog::from).collect();
                         match db.store_logs(logs_vec).await {
                             Ok(store_results) => {
@@ -448,7 +451,7 @@ where
         let head = chain_head.load(Ordering::Relaxed);
 
         if !is_synced.load(Ordering::Relaxed) {
-            let block_difference = head - next_block_to_process;
+            let block_difference = head.saturating_sub(next_block_to_process);
             let progress = if block_difference == 0 {
                 1_f64
             } else {

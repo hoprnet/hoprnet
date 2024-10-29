@@ -494,7 +494,7 @@ mod tests {
 
         db.store_log(log.clone())
             .await
-            .expect_err("should not store duplicate log");
+            .expect_err("Expected error due to duplicate log insertion");
 
         let logs = db
             .get_logs(None, None)

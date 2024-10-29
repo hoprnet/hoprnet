@@ -15,7 +15,8 @@ crate-type = ["rlib"]
 float-cmp = { workspace = true }
 hex = { workspace = true }
 primitive-types = { workspace = true }
-rlp = "0.5.2"                                       # TODO: remove in 3.0
+# TODO: remove rlp in 3.0
+rlp = "0.5.2"
 regex = { workspace = true }
 strum = { workspace = true }
 serde = { workspace = true }

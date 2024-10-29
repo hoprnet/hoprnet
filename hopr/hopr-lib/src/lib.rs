@@ -1088,7 +1088,7 @@ impl Hopr {
         Ok(self.transport_api.get_public_nodes().await?)
     }
 
-    /// Gets the current indexer state: last indexed block ID and checksum
+    /// Returns the most recently indexed log, if any.
     pub async fn get_indexer_state(&self) -> errors::Result<Option<SerializableLog>> {
         Ok(self.db.get_last_checksummed_log().await?)
     }

@@ -88,8 +88,6 @@ impl TryFrom<SerializableLog> for Log {
     type Error = RpcError;
 
     fn try_from(value: SerializableLog) -> std::result::Result<Self, Self::Error> {
-        let address = Address::from(value.address);
-
         let topics = value
             .topics
             .into_iter()
@@ -97,7 +95,7 @@ impl TryFrom<SerializableLog> for Log {
             .collect::<Vec<Hash>>();
 
         let log = Log {
-            address,
+            address: value.address,
             topics,
             data: Box::from(value.data.as_ref()),
             tx_index: value.tx_index,
@@ -124,6 +122,8 @@ impl From<Log> for SerializableLog {
             tx_hash: value.tx_hash.into(),
             log_index: value.log_index.as_u64(),
             removed: value.removed,
+            // These fields stay empty for logs coming from the chain and will be populated by the
+            // indexer when processing the log.
             processed: None,
             processed_at: None,
             checksum: None,
