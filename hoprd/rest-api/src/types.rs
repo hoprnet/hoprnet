@@ -2,19 +2,20 @@
 //
 // This module provides a unified type for PeerId and Address. This is useful for APIs that accept both PeerId and Address.
 
-use crate::ApiErrorStatus;
-
-use hopr_crypto_types::types::OffchainPublicKey;
-use hopr_db_sql::prelude::HoprDbResolverOperations;
-use hopr_lib::{Address, GeneralError};
-
-use core::result::Result;
 use libp2p_identity::PeerId;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display, Formatter};
 use std::str::FromStr;
+use utoipa::ToSchema;
 
-#[derive(Clone, Copy, Default, Eq, Hash, Ord, Serialize, Deserialize, PartialEq, PartialOrd)]
+use core::result::Result;
+use hopr_crypto_types::types::OffchainPublicKey;
+use hopr_db_sql::prelude::HoprDbResolverOperations;
+use hopr_lib::{Address, GeneralError};
+
+use crate::ApiErrorStatus;
+
+#[derive(Clone, Copy, Default, Eq, Hash, Ord, Serialize, Deserialize, PartialEq, PartialOrd, ToSchema)]
 pub struct PeerOrAddress {
     pub peer_id: Option<PeerId>,
     pub address: Option<Address>,
