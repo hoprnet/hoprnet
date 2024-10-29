@@ -1499,10 +1499,10 @@ mod messages {
             "12D3KooWR4uwjKCDCAY1xsEFB4esuWLF9Q5ijYvCjz5PNkTbnu33"
         ],
         "peerId": "12D3KooWEDc1vGJevww48trVDDf6pr1f6N3F86sGJfQrKCyc8kJ1",
-        "tag": 20
+        "tag": 2000
     }))]
     pub(crate) struct SendMessageBodyRequest {
-        /// The message tag used to filter messages based on application
+        /// The message tag used to filter messages based on application, must be from range <1024,65535>
         pub tag: u16,
         /// Message to be transmitted over the network
         #[serde_as(as = "Bytes")]
