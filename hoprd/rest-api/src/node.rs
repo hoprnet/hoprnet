@@ -168,6 +168,21 @@ pub(super) async fn peers(
                 }
             }
         })
+        .filter_map(|peer| {
+            let hopr = hopr.clone();
+
+            async move {
+                if let Ok(Some(info)) = hopr.network_peer_info(&peer).await {
+                    if info.get_backoff() != NaN {
+                        Some((peer, info))
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            }
+        })
         .filter_map(|(peer_id, info)| {
             let hopr = hopr.clone();
 

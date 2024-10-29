@@ -150,6 +150,11 @@ impl PeerStatus {
     pub fn get_quality(&self) -> f64 {
         self.quality
     }
+
+    /// Gets the immediate node quality
+    pub fn get_backoff(&self) -> f64 {
+        self.backoff
+    }
 }
 
 impl std::fmt::Display for PeerStatus {
