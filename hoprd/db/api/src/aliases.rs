@@ -1,8 +1,10 @@
-use crate::{db::HoprdDb, errors::Result};
 use async_trait::async_trait;
+use sea_orm::{ActiveModelTrait, ColumnTrait, DbErr, EntityTrait, QueryFilter, TransactionTrait};
+
 use hoprd_db_entity::{aliases::Column, types::Alias};
 use hoprd_migration::OnConflict;
-use sea_orm::{ActiveModelTrait, ColumnTrait, DbErr, EntityTrait, QueryFilter, TransactionTrait};
+
+use crate::{db::HoprdDb, errors::Result};
 
 pub const ME_AS_ALIAS: &str = "me";
 

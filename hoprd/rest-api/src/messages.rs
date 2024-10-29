@@ -1,5 +1,3 @@
-use std::{sync::Arc, time::Duration};
-
 use axum::{
     extract::{
         ws::{Message, WebSocket, WebSocketUpgrade},
@@ -15,6 +13,7 @@ use futures_concurrency::stream::Merge;
 use serde::Deserialize;
 use serde_json::json;
 use serde_with::{serde_as, Bytes, DisplayFromStr, DurationMilliSeconds};
+use std::{sync::Arc, time::Duration};
 use tracing::error;
 use tracing::{debug, trace};
 use validator::Validate;
