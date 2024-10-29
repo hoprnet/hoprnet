@@ -151,7 +151,7 @@ impl PeerStatus {
         self.quality
     }
 
-    /// Gets the immediate node quality
+    /// Gets the nodes backoff
     pub fn get_backoff(&self) -> f64 {
         self.backoff
     }

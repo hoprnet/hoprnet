@@ -173,7 +173,7 @@ pub(super) async fn peers(
 
             async move {
                 if let Ok(Some(info)) = hopr.network_peer_info(&peer).await {
-                    if info.get_backoff() != NaN {
+                    if info.get_backoff() && info.get_backoff() != f64::NAN {
                         Some((peer, info))
                     } else {
                         None
