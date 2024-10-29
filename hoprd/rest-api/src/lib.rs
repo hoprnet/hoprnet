@@ -1503,7 +1503,7 @@ mod messages {
     }))]
     pub(crate) struct SendMessageBodyRequest {
         /// The message tag used to filter messages based on application, must be from range <1024,65535>
-        #[schema(minimum = 1024)]
+        #[schema(minimum = 1024, maximum = 65535)]
         pub tag: u16,
         /// Message to be transmitted over the network
         #[serde_as(as = "Bytes")]
@@ -1516,6 +1516,7 @@ mod messages {
         #[validate(length(min = 0, max = 3))]
         #[schema(value_type = Option<Vec<String>>)]
         pub path: Option<Vec<PeerId>>,
+        #[schema(minimum = 0, maximum = 3)]
         #[validate(range(min = 0, max = 3))]
         pub hops: Option<u16>,
     }
