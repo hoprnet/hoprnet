@@ -3,13 +3,13 @@ use axum::{
     http::status::StatusCode,
     response::IntoResponse,
 };
-use hopr_lib::{errors::HoprStatusError, HoprTransportError, Multiaddr};
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr, DurationMilliSeconds};
 use std::sync::Arc;
 use tracing::debug;
 
-use hopr_lib::errors::HoprLibError;
+use hopr_lib::errors::{HoprLibError, HoprStatusError};
+use hopr_lib::{HoprTransportError, Multiaddr};
 
 use crate::{types::PeerOrAddress, ApiError, ApiErrorStatus, InternalState, BASE_PATH};
 

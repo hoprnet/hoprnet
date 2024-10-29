@@ -3,11 +3,12 @@ use axum::{
     http::status::StatusCode,
     response::IntoResponse,
 };
-use hoprd_db_api::aliases::HoprdDbAliasesOperations;
-use hoprd_db_api::errors::DbError;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use std::{collections::HashMap, sync::Arc};
+
+use hoprd_db_api::aliases::HoprdDbAliasesOperations;
+use hoprd_db_api::errors::DbError;
 
 use crate::{types::PeerOrAddress, ApiErrorStatus, InternalState, BASE_PATH};
 
