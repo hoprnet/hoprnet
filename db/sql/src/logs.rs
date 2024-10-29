@@ -393,7 +393,7 @@ mod tests {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await.unwrap();
 
         let log = SerializableLog {
-            address: Address::new(b"my address"),
+            address: Address::new(b"my address 123456789"),
             topics: [Hash::create(&[b"my topic"]).into()].into(),
             data: [1, 2, 3, 4].into(),
             tx_index: 1u64,
@@ -424,13 +424,13 @@ mod tests {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await.unwrap();
 
         let log_1 = SerializableLog {
-            address: Hash::create(&[b"my address"]).to_hex(),
-            topics: [Hash::create(&[b"my topic"]).to_hex()].into(),
+            address: Address::new(b"my address 123456789"),
+            topics: [Hash::create(&[b"my topic"]).into()].into(),
             data: [1, 2, 3, 4].into(),
             tx_index: 1u64,
             block_number: 1u64,
-            block_hash: Hash::create(&[b"my block hash"]).to_hex(),
-            tx_hash: Hash::create(&[b"my tx hash"]).to_hex(),
+            block_hash: Hash::create(&[b"my block hash"]).into(),
+            tx_hash: Hash::create(&[b"my tx hash"]).into(),
             log_index: 1u64,
             removed: false,
             processed: Some(false),
@@ -438,13 +438,13 @@ mod tests {
         };
 
         let log_2 = SerializableLog {
-            address: Hash::create(&[b"my address 2"]).to_hex(),
-            topics: [Hash::create(&[b"my topic 2"]).to_hex()].into(),
+            address: Address::new(b"my address 223456789"),
+            topics: [Hash::create(&[b"my topic 2"]).into()].into(),
             data: [1, 2, 3, 4, 5].into(),
             tx_index: 2u64,
             block_number: 2u64,
-            block_hash: Hash::create(&[b"my block hash 2"]).to_hex(),
-            tx_hash: Hash::create(&[b"my tx hash 2"]).to_hex(),
+            block_hash: Hash::create(&[b"my block hash 2"]).into(),
+            tx_hash: Hash::create(&[b"my tx hash 2"]).into(),
             log_index: 2u64,
             removed: false,
             processed: Some(true),
@@ -478,13 +478,13 @@ mod tests {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await.unwrap();
 
         let log = SerializableLog {
-            address: Hash::create(&[b"my address"]).to_hex(),
-            topics: [Hash::create(&[b"my topic"]).to_hex()].into(),
+            address: Address::new(b"my address 123456789"),
+            topics: [Hash::create(&[b"my topic"]).into()].into(),
             data: [1, 2, 3, 4].into(),
             tx_index: 1u64,
             block_number: 1u64,
-            block_hash: Hash::create(&[b"my block hash"]).to_hex(),
-            tx_hash: Hash::create(&[b"my tx hash"]).to_hex(),
+            block_hash: Hash::create(&[b"my block hash"]).into(),
+            tx_hash: Hash::create(&[b"my tx hash"]).into(),
             log_index: 1u64,
             removed: false,
             ..Default::default()
@@ -511,13 +511,13 @@ mod tests {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await.unwrap();
 
         let log = SerializableLog {
-            address: Hash::create(&[b"my address"]).to_hex(),
-            topics: [Hash::create(&[b"my topic"]).to_hex()].into(),
+            address: Address::new(b"my address 123456789"),
+            topics: [Hash::create(&[b"my topic"]).into()].into(),
             data: [1, 2, 3, 4].into(),
             tx_index: 1u64,
             block_number: 1u64,
-            block_hash: Hash::create(&[b"my block hash"]).to_hex(),
-            tx_hash: Hash::create(&[b"my tx hash"]).to_hex(),
+            block_hash: Hash::create(&[b"my block hash"]).into(),
+            tx_hash: Hash::create(&[b"my tx hash"]).into(),
             log_index: 1u64,
             removed: false,
             ..Default::default()
@@ -547,13 +547,13 @@ mod tests {
         let blocks = 10;
         let start_block = 32183412;
         let base_log = SerializableLog {
-            address: Hash::create(&[b"my address"]).to_hex(),
-            topics: [Hash::create(&[b"my topic"]).to_hex()].into(),
+            address: Address::new(b"my address 123456789"),
+            topics: [Hash::create(&[b"my topic"]).into()].into(),
             data: [1, 2, 3, 4].into(),
             tx_index: 0,
             block_number: 0,
-            block_hash: Hash::create(&[b"my block hash"]).to_hex(),
-            tx_hash: Hash::create(&[b"my tx hash"]).to_hex(),
+            block_hash: Hash::create(&[b"my block hash"]).into(),
+            tx_hash: Hash::create(&[b"my tx hash"]).into(),
             log_index: 0,
             removed: false,
             ..Default::default()
@@ -620,13 +620,13 @@ mod tests {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await.unwrap();
 
         let log_1 = SerializableLog {
-            address: Hash::create(&[b"address1"]).to_hex(),
-            topics: [Hash::create(&[b"topic1"]).to_hex()].into(),
+            address: Address::new(b"my address 123456789"),
+            topics: [Hash::create(&[b"topic1"]).into()].into(),
             data: [1, 2, 3, 4].into(),
             tx_index: 1,
             block_number: 1,
-            block_hash: Hash::create(&[b"block_hash1"]).to_hex(),
-            tx_hash: Hash::create(&[b"tx_hash1"]).to_hex(),
+            block_hash: Hash::create(&[b"block_hash1"]).into(),
+            tx_hash: Hash::create(&[b"tx_hash1"]).into(),
             log_index: 1,
             removed: false,
             processed: Some(false),
@@ -634,13 +634,13 @@ mod tests {
         };
 
         let log_2 = SerializableLog {
-            address: Hash::create(&[b"address2"]).to_hex(),
-            topics: [Hash::create(&[b"topic2"]).to_hex()].into(),
+            address: Address::new(b"my address 223456789"),
+            topics: [Hash::create(&[b"topic2"]).into()].into(),
             data: [1, 2, 3, 4].into(),
             tx_index: 2,
             block_number: 2,
-            block_hash: Hash::create(&[b"block_hash2"]).to_hex(),
-            tx_hash: Hash::create(&[b"tx_hash2"]).to_hex(),
+            block_hash: Hash::create(&[b"block_hash2"]).into(),
+            tx_hash: Hash::create(&[b"tx_hash2"]).into(),
             log_index: 2,
             removed: false,
             processed: Some(false),
@@ -669,13 +669,13 @@ mod tests {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await.unwrap();
 
         let log = SerializableLog {
-            address: Hash::create(&[b"address"]).to_hex(),
-            topics: [Hash::create(&[b"topic"]).to_hex()].into(),
+            address: Address::new(b"my address 123456789"),
+            topics: [Hash::create(&[b"topic"]).into()].into(),
             data: [1, 2, 3, 4].into(),
             tx_index: 1,
             block_number: 1,
-            block_hash: Hash::create(&[b"block_hash"]).to_hex(),
-            tx_hash: Hash::create(&[b"tx_hash"]).to_hex(),
+            block_hash: Hash::create(&[b"block_hash"]).into(),
+            tx_hash: Hash::create(&[b"tx_hash"]).into(),
             log_index: 1,
             removed: false,
             processed: Some(true),
@@ -698,13 +698,13 @@ mod tests {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await.unwrap();
 
         let log_1 = SerializableLog {
-            address: Hash::create(&[b"address1"]).to_hex(),
-            topics: [Hash::create(&[b"topic1"]).to_hex()].into(),
+            address: Address::new(b"my address 123456789"),
+            topics: [Hash::create(&[b"topic1"]).into()].into(),
             data: [1, 2, 3, 4].into(),
             tx_index: 1,
             block_number: 1,
-            block_hash: Hash::create(&[b"block_hash1"]).to_hex(),
-            tx_hash: Hash::create(&[b"tx_hash1"]).to_hex(),
+            block_hash: Hash::create(&[b"block_hash1"]).into(),
+            tx_hash: Hash::create(&[b"tx_hash1"]).into(),
             log_index: 1,
             removed: false,
             processed: Some(false),
@@ -712,13 +712,13 @@ mod tests {
         };
 
         let log_2 = SerializableLog {
-            address: Hash::create(&[b"address2"]).to_hex(),
-            topics: [Hash::create(&[b"topic2"]).to_hex()].into(),
+            address: Address::new(b"my address 223456789"),
+            topics: [Hash::create(&[b"topic2"]).into()].into(),
             data: [1, 2, 3, 4].into(),
             tx_index: 2,
             block_number: 2,
-            block_hash: Hash::create(&[b"block_hash2"]).to_hex(),
-            tx_hash: Hash::create(&[b"tx_hash2"]).to_hex(),
+            block_hash: Hash::create(&[b"block_hash2"]).into(),
+            tx_hash: Hash::create(&[b"tx_hash2"]).into(),
             log_index: 2,
             removed: false,
             processed: Some(false),
@@ -748,13 +748,13 @@ mod tests {
 
         // insert first log and update checksum
         let log_1 = SerializableLog {
-            address: Hash::create(&[b"address"]).to_hex(),
-            topics: [Hash::create(&[b"topic"]).to_hex()].into(),
+            address: Address::new(b"my address 123456789"),
+            topics: [Hash::create(&[b"topic"]).into()].into(),
             data: [1, 2, 3, 4].into(),
             tx_index: 1,
             block_number: 1,
-            block_hash: Hash::create(&[b"block_hash"]).to_hex(),
-            tx_hash: Hash::create(&[b"tx_hash"]).to_hex(),
+            block_hash: Hash::create(&[b"block_hash"]).into(),
+            tx_hash: Hash::create(&[b"tx_hash"]).into(),
             log_index: 1,
             removed: false,
             ..Default::default()

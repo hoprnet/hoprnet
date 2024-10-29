@@ -227,7 +227,6 @@ mod tests {
     use chain_types::{ContractAddresses, ContractInstances};
     use hopr_async_runtime::prelude::{sleep, spawn};
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
-    use hopr_primitive_types::prelude::*;
 
     use crate::client::surf_client::SurfRequestor;
     use crate::client::{create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy};
@@ -403,40 +402,55 @@ mod tests {
 
         // The last block must contain all 4 events
         let last_block_logs = retrieved_logs.last().context("a log should be present")?.clone().logs;
-        let channels_address = contract_addrs.channels.to_hex();
-        let channel_open_filter = format!("{:#x}", ChannelOpenedFilter::signature());
-        let channel_balance_filter = format!("{:#x}", ChannelBalanceIncreasedFilter::signature());
-        let approval_filter = format!("{:#x}", ApprovalFilter::signature());
-        let transfer_filter = format!("{:#x}", TransferFilter::signature());
+        let channel_open_filter = ChannelOpenedFilter::signature();
+        let channel_balance_filter = ChannelBalanceIncreasedFilter::signature();
+        let approval_filter = ApprovalFilter::signature();
+        let transfer_filter = TransferFilter::signature();
 
-        debug!("{:#?}", last_block_logs);
-        debug!("channel_open_filter: {:#?}", channel_open_filter);
-        debug!("channel_balance_filter: {:#?}", channel_balance_filter);
-        debug!("approval_filter: {:#?}", approval_filter);
-        debug!("transfer_filter: {:#?}", transfer_filter);
+        debug!(
+            "channel_open_filter: {:?} - {:?}",
+            channel_open_filter,
+            channel_open_filter.as_ref().to_vec()
+        );
+        debug!(
+            "channel_balance_filter: {:?} - {:?}",
+            channel_balance_filter,
+            channel_balance_filter.as_ref().to_vec()
+        );
+        debug!(
+            "approval_filter: {:?} - {:?}",
+            approval_filter,
+            approval_filter.as_ref().to_vec()
+        );
+        debug!(
+            "transfer_filter: {:?} - {:?}",
+            transfer_filter,
+            transfer_filter.as_ref().to_vec()
+        );
+        debug!("logs: {:#?}", last_block_logs);
 
         assert!(
             last_block_logs
                 .iter()
-                .any(|log| log.address == channels_address && log.topics.contains(&channel_open_filter)),
+                .any(|log| log.address == contract_addrs.channels && log.topics.contains(&channel_open_filter.into())),
             "must contain channel open"
         );
         assert!(
-            last_block_logs
-                .iter()
-                .any(|log| log.address == channels_address && log.topics.contains(&channel_balance_filter)),
+            last_block_logs.iter().any(
+                |log| log.address == contract_addrs.channels && log.topics.contains(&channel_balance_filter.into())
+            ),
             "must contain channel balance increase"
         );
         assert!(
             last_block_logs
                 .iter()
-                .any(|log| log.address == channels_address && log.topics.contains(&approval_filter)),
+                .any(|log| log.address == contract_addrs.token && log.topics.contains(&approval_filter.into())),
             "must contain token approval"
         );
         assert!(
             last_block_logs
                 .iter()
-                .any(|log| log.address == channels_address && log.topics.contains(&transfer_filter)),
+                .any(|log| log.address == contract_addrs.token && log.topics.contains(&transfer_filter.into())),
             "must contain token transfer"
         );
 
@@ -527,20 +541,19 @@ mod tests {
             .context("a value should be present")?
             .clone()
             .logs;
-        let channels_address = contract_addrs.channels;
         let channel_open_filter: [u8; 32] = ChannelOpenedFilter::signature().into();
         let channel_balance_filter: [u8; 32] = ChannelBalanceIncreasedFilter::signature().into();
 
         assert!(
             last_block_logs
                 .iter()
-                .any(|log| log.address == channels_address && log.topics.contains(&channel_open_filter)),
+                .any(|log| log.address == contract_addrs.channels && log.topics.contains(&channel_open_filter)),
             "must contain channel open"
         );
         assert!(
             last_block_logs
                 .iter()
-                .any(|log| log.address == channels_address && log.topics.contains(&channel_balance_filter)),
+                .any(|log| log.address == contract_addrs.channels && log.topics.contains(&channel_balance_filter)),
             "must contain channel balance increase"
         );
 

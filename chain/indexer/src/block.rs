@@ -524,20 +524,20 @@ mod tests {
         log_index: U256,
     ) -> anyhow::Result<Vec<SerializableLog>> {
         let mut logs: Vec<SerializableLog> = vec![];
-        let block_hash = Hash::create(&[format!("my block hash {block_number}").as_bytes()]).to_hex();
+        let block_hash = Hash::create(&[format!("my block hash {block_number}").as_bytes()]);
 
         for i in 0..size {
             let test_multiaddr: Multiaddr = format!("/ip4/1.2.3.4/tcp/{}", 1000 + i).parse()?;
             logs.push(SerializableLog {
-                address: address.to_hex(),
-                block_hash: block_hash.clone(),
-                topics: vec![format!("{:#x}", AddressAnnouncementFilter::signature())],
+                address,
+                block_hash: block_hash.into(),
+                topics: vec![AddressAnnouncementFilter::signature().into()],
                 data: encode(&[
                     Token::Address(ethers::abi::Address::from_slice(address.as_ref())),
                     Token::String(test_multiaddr.to_string()),
                 ])
                 .into(),
-                tx_hash: Hash::create(&[format!("my tx hash {i}").as_bytes()]).to_hex(),
+                tx_hash: Hash::create(&[format!("my tx hash {i}").as_bytes()]).into(),
                 tx_index: 0,
                 block_number,
                 log_index: log_index.as_u64(),
@@ -619,13 +619,13 @@ mod tests {
 
         // insert and process latest block
         let log_1 = SerializableLog {
-            address: Hash::create(&[b"my address"]).to_hex(),
-            topics: [Hash::create(&[b"my topic"]).to_hex()].into(),
+            address: Address::new(b"my address 123456789"),
+            topics: [Hash::create(&[b"my topic"]).into()].into(),
             data: [1, 2, 3, 4].into(),
             tx_index: 1u64,
             block_number: latest_block,
-            block_hash: Hash::create(&[b"my block hash"]).to_hex(),
-            tx_hash: Hash::create(&[b"my tx hash"]).to_hex(),
+            block_hash: Hash::create(&[b"my block hash"]).into(),
+            tx_hash: Hash::create(&[b"my tx hash"]).into(),
             log_index: 1u64,
             removed: false,
             processed: Some(false),
@@ -780,13 +780,13 @@ mod tests {
 
         // insert and process latest block
         let log_1 = SerializableLog {
-            address: Hash::create(&[b"my address"]).to_hex(),
-            topics: [Hash::create(&[b"my topic"]).to_hex()].into(),
+            address: Address::new(b"my address 123456789"),
+            topics: [Hash::create(&[b"my topic"]).into()].into(),
             data: [1, 2, 3, 4].into(),
             tx_index: 1u64,
             block_number: last_processed_block,
-            block_hash: Hash::create(&[b"my block hash"]).to_hex(),
-            tx_hash: Hash::create(&[b"my tx hash"]).to_hex(),
+            block_hash: Hash::create(&[b"my block hash"]).into(),
+            tx_hash: Hash::create(&[b"my tx hash"]).into(),
             log_index: 1u64,
             removed: false,
             processed: Some(false),
