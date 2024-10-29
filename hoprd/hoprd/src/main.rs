@@ -229,7 +229,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Arc::new(db)
         }
         Err(e) => {
-            error!("Failed to create the metadata database: {e}");
+            error!(error = %e, "Failed to create the metadata database");
             return Err(e.into());
         }
     };
@@ -239,7 +239,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .set_alias(node.me_peer_id().to_string(), ME_AS_ALIAS.to_string())
         .await
     {
-        error!("Failed to set the alias for the node: {e}");
+        error!(error = %e, "Failed to set the alias for the node");
     }
 
     let (mut ws_events_tx, ws_events_rx) =
@@ -290,7 +290,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             })
             .await
             {
-                error!("the REST API server could not start: {e}")
+                error!(error = %e, "the REST API server could not start")
             }
         })));
     }
@@ -309,10 +309,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let latency = recv_at.as_unix_timestamp().saturating_sub(sent);
 
                     trace!(
-                        app_tag = data.application_tag.unwrap_or(0),
+                        tag = ?data.application_tag,
                         latency_in_ms = latency.as_millis(),
-                        "## NODE RECEIVED MESSAGE [@{}] ##",
-                        DateTime::<Utc>::from(recv_at).to_rfc3339(),
+                        receiged_at = DateTime::<Utc>::from(recv_at).to_rfc3339(),
+                        "received message"
                     );
 
                     #[cfg(all(feature = "prometheus", not(test)))]
@@ -323,7 +323,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             application_tag: data.application_tag,
                             plain_text: msg.clone(),
                         }) {
-                            error!("Failed to notify websockets about a new message: {e}");
+                            error!(error = %e, "Failed to notify websockets about a new message");
                         }
                     }
 
@@ -342,7 +342,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         )
                     }
                 }
-                Err(e) => error!("RLP decoding failed: {e}"),
+                Err(e) => error!(error = %e, "RLP decoding failed"),
             }
         }
     })));

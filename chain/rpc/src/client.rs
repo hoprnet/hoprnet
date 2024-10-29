@@ -168,8 +168,8 @@ impl RetryPolicy<JsonRpcProviderClientError> for SimpleJsonRpcRetryPolicy {
     ) -> RetryAction {
         if self.max_retries.is_some_and(|max| num_retries > max) {
             warn!(
-                "max number of retries {} has been reached",
-                self.max_retries.expect("max_retries must be set")
+                count = self.max_retries.expect("max_retries must be set"),
+                "max number of retries has been reached"
             );
             return NoRetry;
         }
@@ -178,8 +178,8 @@ impl RetryPolicy<JsonRpcProviderClientError> for SimpleJsonRpcRetryPolicy {
 
         if retry_queue_size > self.max_retry_queue_size {
             warn!(
-                "maximum size of retry queue {} has been reached",
-                self.max_retry_queue_size
+                size = self.max_retry_queue_size,
+                "maximum size of retry queue has been reached"
             );
             return NoRetry;
         }
@@ -281,10 +281,11 @@ impl<Req: HttpPostRequestor, R: RetryPolicy<JsonRpcProviderClientError>> JsonRpc
         let next_id = self.id.fetch_add(1, Ordering::SeqCst);
         let payload = Request::new(next_id, method, params);
 
-        debug!("sending rpc {method} request");
+        debug!(method, "sending rpc request");
         trace!(
-            "sending rpc {method} request: {}",
-            serde_json::to_string(&payload).expect("request must be serializable")
+            method,
+            request = serde_json::to_string(&payload).expect("request must be serializable"),
+            "sending rpc request",
         );
 
         // Perform the actual request
@@ -292,7 +293,7 @@ impl<Req: HttpPostRequestor, R: RetryPolicy<JsonRpcProviderClientError>> JsonRpc
         let body = self.requestor.http_post(self.url.as_ref(), payload).await?;
         let req_duration = start.elapsed();
 
-        trace!("rpc {method} request took {}ms", req_duration.as_millis());
+        trace!(method, duration_in_ms = req_duration.as_millis(), "rpc request took");
 
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_RPC_CALLS_TIMING.observe(&[method], req_duration.as_secs_f64());
@@ -329,7 +330,7 @@ impl<Req: HttpPostRequestor, R: RetryPolicy<JsonRpcProviderClientError>> JsonRpc
 
         // Next, deserialize the data out of the Response object
         let json_str = raw.get();
-        trace!("rpc {method} request got response: {json_str}");
+        trace!(method, response = &json_str, "rpc request response received");
 
         let res = serde_json::from_str(json_str).map_err(|err| JsonRpcProviderClientError::SerdeJson {
             err,
@@ -438,19 +439,20 @@ where
             {
                 NoRetry => {
                     self.requests_enqueued.fetch_sub(1, Ordering::SeqCst);
-                    warn!("no more retries for RPC call {method}");
+                    warn!(method, "no more retries for RPC call");
 
                     #[cfg(all(feature = "prometheus", not(test)))]
                     METRIC_RETRIES_PER_RPC_CALL.observe(&[method], num_retries as f64);
 
                     debug!(
-                        "failed request {method} spent {}ms in the retry queue",
-                        start.elapsed().as_millis()
+                        method,
+                        duration_in_ms = start.elapsed().as_millis(),
+                        "failed request duration in the retry queue",
                     );
                     return Err(err);
                 }
                 RetryAfter(backoff) => {
-                    warn!("RPC call {method} will retry in {}ms", backoff.as_millis());
+                    warn!(method, backoff_in_ms = backoff.as_millis(), "RPC call will retry",);
                     sleep(backoff).await
                 }
             }

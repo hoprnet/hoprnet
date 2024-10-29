@@ -31,14 +31,6 @@ jobs:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4
 
-      - name: Set up Google Cloud Credentials
-        id: auth
-        uses: google-github-actions/auth@v2
-        if: ${{ !env.ACT }}
-        with:
-          token_format: "access_token"
-          credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
-
       - name: Install Nix
         if: env.needs_nix_setup == 'true'
         uses: cachix/install-nix-action@v29
@@ -73,18 +65,13 @@ jobs:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4
 
-      - name: Set up Google Cloud Credentials
-        id: auth
-        uses: google-github-actions/auth@v2
-        if: ${{ !env.ACT }}
+      - name: Setup GCP
+        id: gcp
+        uses: hoprnet/hopr-workflows/actions/setup-gcp@master
         with:
-          token_format: "access_token"
-          credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
-
-      - name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@v2
-        with:
-          version: '>= 363.0.0'
+          google-credentials: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+          login-artifact-registry: 'false'
+          install-sdk: 'true'
 
       - name: Install Nix
         if: env.needs_nix_setup == 'true'
@@ -167,18 +154,13 @@ jobs:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4
 
-      - name: Set up Google Cloud Credentials
-        id: auth
-        uses: google-github-actions/auth@v2
-        if: ${{ !env.ACT }}
+      - name: Setup GCP
+        id: gcp
+        uses: hoprnet/hopr-workflows/actions/setup-gcp@master
         with:
-          token_format: "access_token"
-          credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
-
-      - name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@v2
-        with:
-          version: '>= 363.0.0'
+          google-credentials: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+          login-artifact-registry: 'false'
+          install-sdk: 'true'
 
       - name: Install Nix
         if: env.needs_nix_setup == 'true'

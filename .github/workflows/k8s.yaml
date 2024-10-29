@@ -41,9 +41,12 @@ jobs:
           base_branch="${{ github.event.pull_request.base.ref }}"
           # Identify parameters depending on branch
           if [[ "${base_branch}" =~ ^"release" ]]; then
-            network=dufour
+            network=${{ vars.HOPRD_NETWORK_MAINNET }}
+          elif [[ "${base_branch}" =~ ^"master" ]]; then
+            network=${{ vars.HOPRD_NETWORK_TESTNET }}
           else
-            network=rotsee
+            echo "Error: Deployment not supported for branch ${base_branch}"
+            exit 1
           fi
           cd ./hoprnet-ci
           pip install -r ./scripts/requirements.txt

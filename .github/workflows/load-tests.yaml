@@ -97,24 +97,15 @@ jobs:
           repository: hoprnet/hoprd-test
           ref: main
 
-      - name: Set up Google Cloud Credentials
-        uses: google-github-actions/auth@v2
+      - name: Setup GCP
+        id: gcp
+        uses: hoprnet/hopr-workflows/actions/setup-gcp@master
         with:
-          token_format: "access_token"
-          credentials_json: ${{ secrets.GCP_SA_TERRAFORM_JSON }}
-
-      - name: Set up Google Cloud SDK
-        uses: google-github-actions/setup-gcloud@v2
-        with:
-          project_id: hopr-staging
-          install_components: beta
-
-      - name: Get credentials
-        uses: google-github-actions/get-gke-credentials@v2
-        with:
-          cluster_name: cluster-staging
-          location: europe-west3
-          project_id: hopr-staging
+          google-credentials: ${{ secrets.GCP_SA_TERRAFORM_JSON }}
+          login-artifact-registry: 'true'
+          install-sdk: 'true'
+          login-gke: 'true'
+          project: hopr-staging
 
       - name: Setup NodeJs
         uses: actions/setup-node@v3

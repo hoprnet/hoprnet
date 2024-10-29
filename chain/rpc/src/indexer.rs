@@ -76,9 +76,10 @@ impl<P: JsonRpcClient + 'static> RpcOperations<P> {
                         Ok(logs) => Ok(logs),
                         Err(e) => {
                             error!(
-                                "failed to fetch logs in block subrange {:?}-{:?}: {e}",
-                                subrange.get_from_block(),
-                                subrange.get_to_block()
+                                from = ?subrange.get_from_block(),
+                                to = ?subrange.get_to_block(),
+                                error = %e,
+                                "failed to fetch logs in block subrange"
                             );
                             Err(e)
                         }
@@ -129,7 +130,7 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                                 from_block = latest_block;
                             } else if past_diff <= MAX_RPC_PAST_BLOCKS as u64 {
                                 // If we came here early (we tolerate only off-by MAX_RPC_PAST_BLOCKS), wait some more
-                                warn!("too early query, RPC provider still at block {latest_block}, diff to DB: {past_diff}");
+                                warn!(last_block = latest_block, start_block = start_block_number, blocks_diff = past_diff, "Indexer premature request. Block not found yet in RPC provider.");
                                 futures_timer::Delay::new(past_diff as u32 * self.cfg.expected_block_time / 3).await;
                                 continue;
                             } else {
@@ -146,13 +147,13 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                         let mut retrieved_logs = self.stream_logs(filter.clone(), from_block, latest_block);
 
                         let mut current_block_log = BlockWithLogs { block_id: from_block, ..Default::default()};
-                        trace!("begin processing batch #{from_block} - #{latest_block}");
+                        trace!(from_block, to_block = latest_block, "processing batch");
                         loop {
                             match retrieved_logs.try_next().await {
                                 Ok(Some(log)) => {
                                     // This in general should not happen, but handle such a case to be safe
                                     if log.block_number > latest_block {
-                                        warn!("got {log} that has not yet reached the finalized tip at {latest_block}");
+                                        warn!(%log, latest_block, "got log that has not yet reached the finalized tip");
                                         break;
                                     }
 
@@ -169,11 +170,11 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                                     current_block_log.logs.insert(log);
                                 },
                                 Ok(None) => {
-                                    trace!("done processing batch #{from_block} - #{latest_block}");
+                                    trace!(from_block, to_block=latest_block, "done processing batch");
                                     break;
                                 },
                                 Err(e) => {
-                                    error!("failure when processing blocks from RPC: {e}");
+                                    error!(error=%e, "failed to process blocks");
                                     count_failures += 1;
 
                                     if count_failures < MAX_LOOP_FAILURES {
@@ -200,7 +201,7 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                         count_failures = 0;
                     }
 
-                    Err(e) => error!("failed to obtain current block number from chain: {e}")
+                    Err(e) => error!(error = %e, "failed to obtain current block number from chain")
                 }
 
                 futures_timer::Delay::new(self.cfg.expected_block_time).await;
