@@ -1,5 +1,5 @@
 use std::fmt::Formatter;
-use std::io::ErrorKind;
+use std::future::Future;
 use std::net::IpAddr;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -226,7 +226,7 @@ pub(crate) async fn create_client(
     let bound_host = match protocol {
         IpProtocol::TCP => {
             let (bound_host, tcp_listener) = tcp_listen_on(bind_host).await.map_err(|e| {
-                if e.kind() == ErrorKind::AddrInUse {
+                if e.kind() == std::io::ErrorKind::AddrInUse {
                     (StatusCode::CONFLICT, ApiErrorStatus::InvalidInput)
                 } else {
                     (
@@ -310,7 +310,7 @@ pub(crate) async fn create_client(
             })?;
 
             let (bound_host, udp_socket) = udp_bind_to(bind_host).await.map_err(|e| {
-                if e.kind() == ErrorKind::AddrInUse {
+                if e.kind() == std::io::ErrorKind::AddrInUse {
                     (
                         StatusCode::CONFLICT,
                         ApiErrorStatus::UnknownFailure(format!("cannot bind to: {bind_host}: {e}")),
@@ -475,22 +475,95 @@ pub(crate) async fn close_client(
     Ok::<_, (StatusCode, ApiErrorStatus)>((StatusCode::NO_CONTENT, "").into_response())
 }
 
-async fn tcp_listen_on<A: std::net::ToSocketAddrs>(address: A) -> std::io::Result<(std::net::SocketAddr, TcpListener)> {
-    let tcp_listener = TcpListener::bind(address.to_socket_addrs()?.collect::<Vec<_>>().as_slice()).await?;
+async fn try_restricted_bind<'a, F, S, Fut>(
+    addrs: Vec<std::net::SocketAddr>,
+    range_str: &str,
+    binder: F,
+) -> std::io::Result<S>
+where
+    F: Fn(Vec<std::net::SocketAddr>) -> Fut,
+    Fut: Future<Output = std::io::Result<S>>,
+{
+    if addrs.is_empty() {
+        return Err(std::io::Error::other("no valid socket addresses found"));
+    }
 
+    let range = range_str
+        .split_once(":")
+        .and_then(
+            |(a, b)| match u16::from_str(a).and_then(|a| Ok((a, u16::from_str(b)?))) {
+                Ok((a, b)) if a <= b => Some(a..=b),
+                _ => None,
+            },
+        )
+        .ok_or(std::io::Error::other(
+            "invalid port range in HOPRD_SESSION_PORT_RANGE env variable",
+        ))?;
+
+    for port in range {
+        let addrs = addrs
+            .iter()
+            .map(|addr| std::net::SocketAddr::new(addr.ip(), port))
+            .collect::<Vec<_>>();
+        match binder(addrs).await {
+            Ok(listener) => return Ok(listener),
+            Err(e) => debug!("listen address not usable: {e}"),
+        }
+    }
+
+    Err(std::io::Error::new(
+        std::io::ErrorKind::AddrNotAvailable,
+        format!("no valid socket addresses found within range: {range_str}"),
+    ))
+}
+
+async fn tcp_listen_on<A: std::net::ToSocketAddrs>(address: A) -> std::io::Result<(std::net::SocketAddr, TcpListener)> {
+    let addrs = address.to_socket_addrs()?.collect::<Vec<_>>();
+
+    // If automatic port allocation is requested and there's a restriction on the port range
+    // (via HOPRD_SESSION_PORT_RANGE), try to find an address within that range.
+    if addrs.iter().all(|a| a.port() == 0) {
+        if let Some(range_str) = std::env::var("HOPRD_SESSION_PORT_RANGE").ok() {
+            let tcp_listener =
+                try_restricted_bind(
+                    addrs,
+                    &range_str,
+                    |a| async move { TcpListener::bind(a.as_slice()).await },
+                )
+                .await?;
+            return Ok((tcp_listener.local_addr()?, tcp_listener));
+        }
+    }
+
+    let tcp_listener = TcpListener::bind(addrs.as_slice()).await?;
     Ok((tcp_listener.local_addr()?, tcp_listener))
 }
 
 async fn udp_bind_to<A: std::net::ToSocketAddrs>(
     address: A,
 ) -> std::io::Result<(std::net::SocketAddr, ConnectedUdpStream)> {
-    let udp_socket = ConnectedUdpStream::builder()
+    let addrs = address.to_socket_addrs()?.collect::<Vec<_>>();
+
+    let builder = ConnectedUdpStream::builder()
         .with_buffer_size(HOPR_UDP_BUFFER_SIZE)
         .with_foreign_data_mode(ForeignDataMode::Discard) // discard data from UDP clients other than the first one served
         .with_queue_size(HOPR_UDP_QUEUE_SIZE)
-        .with_parallelism(0)
-        .build(address)?;
+        .with_parallelism(0);
 
+    // If automatic port allocation is requested and there's a restriction on the port range
+    // (via HOPRD_SESSION_PORT_RANGE), try to find an address within that range.
+    if addrs.iter().all(|a| a.port() == 0) {
+        if let Some(range_str) = std::env::var("HOPRD_SESSION_PORT_RANGE").ok() {
+            let udp_listener = try_restricted_bind(addrs, &range_str, |addrs| {
+                futures::future::ready(builder.clone().build(addrs.as_slice()))
+            })
+            .await?;
+
+            return Ok((*udp_listener.bound_address(), udp_listener));
+        }
+    }
+
+    let udp_socket = builder.build(address)?;
     Ok((*udp_socket.bound_address(), udp_socket))
 }
 

@@ -221,7 +221,9 @@ impl SealedHost {
     pub fn unseal(self, key: &hopr_crypto_types::keypairs::OffchainKeypair) -> crate::errors::Result<IpOrHost> {
         match self {
             SealedHost::Plain(host) => Ok(host),
-            SealedHost::Sealed(enc) => hopr_crypto_types::seal::unseal_data(&enc, key).map_err(|e| NetworkTypeError::Other(e.to_string())),
+            SealedHost::Sealed(enc) => {
+                hopr_crypto_types::seal::unseal_data(&enc, key).map_err(|e| NetworkTypeError::Other(e.to_string()))
+            }
         }
     }
 }

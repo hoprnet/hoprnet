@@ -808,7 +808,8 @@ impl<const C: usize> SessionSocket<C> {
             if let Err(e) = segment_egress_recv
                 .map(|m: SessionMessage<C>| Ok(m.into_encoded()))
                 .forward(downstream_write.into_sink())
-                .await {
+                .await
+            {
                 error!("FINISHED: forwarding to downstream terminated with error {e}")
             } else {
                 debug!("FINISHED: forwarding to downstream done");
@@ -821,7 +822,7 @@ impl<const C: usize> SessionSocket<C> {
                 .map_err(|e| NetworkTypeError::SessionProtocolError(SessionError::ProcessingError(e.to_string())))
                 .and_then(|m| futures::future::ok(futures::stream::iter(SessionMessageIter::from(m.into_vec()))))
                 .try_flatten()
-                .forward(state.clone())
+                .forward(state.clone()),
         );
 
         // Advance the state until the socket is closed

@@ -74,7 +74,7 @@ pub enum ForeignDataMode {
 /// Builder object for the [`ConnectedUdpStream`].
 ///
 /// If you wish to use defaults, do `UdpStreamBuilder::default().build(addr)`.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct UdpStreamBuilder {
     foreign_data_mode: ForeignDataMode,
     buffer_size: usize,
