@@ -93,15 +93,15 @@ where
         match event {
             HoprAnnouncementsEvents::AddressAnnouncementFilter(address_announcement) => {
                 trace!(
-                    "on_announcement_event - multiaddr: {} - node: {}",
-                    &address_announcement.base_multiaddr,
-                    &address_announcement.node.to_string()
+                    multiaddress = &address_announcement.base_multiaddr,
+                    address = &address_announcement.node.to_string(),
+                    "on_announcement_event",
                 );
                 // safeguard against empty multiaddrs, skip
                 if address_announcement.base_multiaddr.is_empty() {
                     warn!(
-                        "encountered empty multiaddress announcement for account {}",
-                        address_announcement.node
+                        address = ?address_announcement.node,
+                        "encountered empty multiaddress announcement",
                     );
                     return Ok(None);
                 }
@@ -140,10 +140,12 @@ where
                             )
                             .await?;
                     }
-                    Err(_) => {
+                    Err(e) => {
                         warn!(
-                            "Filtering announcement from {} with invalid signature.",
-                            key_binding.chain_key
+                            address = ?key_binding.chain_key,
+                            error = %e,
+                            "Filtering announcement with invalid signature",
+
                         )
                     }
                 }
@@ -270,9 +272,7 @@ where
                         )));
                     }
 
-                    trace!(
-                        "on_channel_reopened_event - source: {source} - destination: {destination} - channel_id: {channel_id}"
-                    );
+                    trace!(%source, %destination, %channel_id, "on_channel_reopened_event");
 
                     let current_epoch = channel_edits.entry().channel_epoch;
 
@@ -298,9 +298,7 @@ where
                         )
                         .await?
                 } else {
-                    trace!(
-                        "on_channel_opened_event - source: {source} - destination: {destination} - channel_id: {channel_id}"
-                    );
+                    trace!(%source, %destination, %channel_id, "on_channel_opened_event");
 
                     let new_channel = ChannelEntry::new(
                         source,
@@ -354,14 +352,14 @@ where
                                     self.db
                                         .mark_tickets_as((&ack_ticket).into(), TicketMarker::Redeemed)
                                         .await?;
-                                    info!("{ack_ticket} has been marked as redeemed");
+                                    info!(%ack_ticket, "ticket marked as redeemed");
                                     Some(ack_ticket)
                                 }
                                 Ordering::Less => {
                                     error!(
-                                        "could not find acknowledged 'BeingRedeemed' ticket with idx {} in {}",
-                                        ticket_redeemed.new_ticket_index - 1,
-                                        channel_edits.entry()
+                                        idx = %ticket_redeemed.new_ticket_index - 1,
+                                        entry = %channel_edits.entry(),
+                                        "could not find acknowledged 'BeingRedeemed' ticket",
                                     );
                                     // This is not an error, because the ticket might've become neglected before
                                     // the ticket redemption could finish
@@ -369,10 +367,10 @@ where
                                 }
                                 Ordering::Greater => {
                                     error!(
-                                        "found {} tickets matching 'BeingRedeemed' index {} in {}",
-                                        matching_tickets.len(),
-                                        ticket_redeemed.new_ticket_index - 1,
-                                        channel_edits.entry()
+                                        count = matching_tickets.len(),
+                                        index = %ticket_redeemed.new_ticket_index - 1,
+                                        entry = %channel_edits.entry(),
+                                        "found tickets matching 'BeingRedeemed'",
                                     );
                                     return Err(CoreEthereumIndexerError::ProcessError(format!(
                                         "multiple tickets matching idx {} found in {}",
@@ -388,7 +386,7 @@ where
                         // index value in the cache is at least the index of the redeemed ticket
                         Some(ChannelDirection::Outgoing) => {
                             // We need to ensure the outgoing ticket index is at least this new value
-                            debug!("observed redeem event on an outgoing {}", channel_edits.entry());
+                            debug!(channel = %channel_edits.entry(), "observed redeem event on an outgoing channel");
                             self.db
                                 .compare_and_set_outgoing_ticket_index(
                                     channel_edits.entry().get_id(),
@@ -400,7 +398,7 @@ where
                         // For a channel where neither source nor destination is us, we don't care
                         None => {
                             // Not our redeem event
-                            debug!("observed redeem event on a foreign {}", channel_edits.entry());
+                            debug!(channel = %channel_edits.entry(), "observed redeem event on a foreign channel");
                             None
                         }
                     };
@@ -484,8 +482,8 @@ where
                 let to: Address = transferred.to.into();
 
                 trace!(
-                    "on_token_transfer_event - address_to_monitor: {:?} - to: {to} - from: {from}",
-                    &self.safe_address,
+                    safe_address = %&self.safe_address, %from, %to,
+                    "on_token_transfer_event"
                 );
 
                 let mut current_balance = self.db.get_safe_hopr_balance(Some(tx)).await?;
@@ -495,11 +493,11 @@ where
                     return Ok(None);
                 } else if to.eq(&self.safe_address) {
                     // This + is internally defined as saturating add
-                    info!("Safe balance {current_balance} increased by {transferred_value}");
+                    info!(?current_balance, added_value = %transferred_value, "Safe balance increased ");
                     current_balance = current_balance + transferred_value;
                 } else if from.eq(&self.safe_address) {
                     // This - is internally defined as saturating sub
-                    info!("Safe balance {current_balance} decreased by {transferred_value}");
+                    info!(?current_balance, removed_value = %transferred_value, "Safe balance decreased");
                     current_balance = current_balance - transferred_value;
                 }
 
@@ -510,8 +508,9 @@ where
                 let spender: Address = approved.spender.into();
 
                 trace!(
-                    "on_token_approval_event - address_to_monitor: {:?} - owner: {owner} - spender: {spender}, allowance: {:?}",
-                    &self.safe_address, approved.value
+                    address = %&self.safe_address, %owner, %spender, allowance = %approved.value,
+                    "on_token_approval_event",
+
                 );
 
                 // if approval is for tokens on Safe contract to be spent by HoprChannels
@@ -567,7 +566,7 @@ where
                     .await?;
 
                 if node_address == self.chain_key.public().to_address() {
-                    info!("Your node has been added to the registry and you can now continue the node activation process on http://hub.hoprnet.org/.");
+                    info!("This node has been added to the registry, node activation process continues on: http://hub.hoprnet.org/.");
                 }
 
                 return Ok(Some(ChainEventType::NetworkRegistryUpdate(
@@ -582,7 +581,7 @@ where
                     .await?;
 
                 if node_address == self.chain_key.public().to_address() {
-                    info!("Your node has been added to the registry and you can now continue the node activation process on http://hub.hoprnet.org/.");
+                    info!("This node has been added to the registry, node can now continue the node activation process on: http://hub.hoprnet.org/.");
                 }
 
                 return Ok(Some(ChainEventType::NetworkRegistryUpdate(
@@ -618,7 +617,7 @@ where
         match event {
             HoprNodeSafeRegistryEvents::RegisteredNodeSafeFilter(registered) => {
                 if self.chain_key.public().to_address() == registered.node_address.into() {
-                    info!("Node safe registered: {}", registered.safe_address);
+                    info!(safe_address = %registered.safe_address, "Node safe registered", );
                     // NOTE: we don't store this state in the DB
                     return Ok(Some(ChainEventType::NodeSafeRegistered(registered.safe_address.into())));
                 }
@@ -674,14 +673,20 @@ where
                 let new_minimum_win_prob = win_prob_to_f64(&encoded_new);
 
                 trace!(
-                    "on_ticket_minimum_win_prob_updated - old: {old_minimum_win_prob} - new: {new_minimum_win_prob}",
+                    old = old_minimum_win_prob,
+                    new = new_minimum_win_prob,
+                    "on_ticket_minimum_win_prob_updated",
                 );
 
                 self.db
                     .set_minimum_incoming_ticket_win_prob(Some(tx), new_minimum_win_prob)
                     .await?;
 
-                info!("minimum ticket winning probability has been updated {old_minimum_win_prob} -> {new_minimum_win_prob}");
+                info!(
+                    old = old_minimum_win_prob,
+                    new = new_minimum_win_prob,
+                    "minimum ticket winning probability updated"
+                );
 
                 // If the old minimum was less strict, we need to mark of all the
                 // tickets below the new higher minimum as rejected
@@ -701,7 +706,7 @@ where
                                 TicketMarker::Rejected,
                             )
                             .await?;
-                        info!("{num_rejected} unredeemed tickets were rejected because the minimum winning probability has been increased");
+                        info!(count = num_rejected, "unredeemed tickets were rejected, because the minimum winning probability has been increased");
                     }
                 }
             }
@@ -723,16 +728,16 @@ where
         match event {
             HoprTicketPriceOracleEvents::TicketPriceUpdatedFilter(update) => {
                 trace!(
-                    "on_ticket_price_updated - old: {:?} - new: {:?}",
-                    update.0.to_string(),
-                    update.1.to_string()
+                    old = update.0.to_string(),
+                    new = update.1.to_string(),
+                    "on_ticket_price_updated",
                 );
 
                 self.db
                     .update_ticket_price(Some(tx), BalanceType::HOPR.balance(update.1))
                     .await?;
 
-                info!("ticket price has been set to {}", update.1);
+                info!(price = %update.1, "ticket price updated");
             }
             HoprTicketPriceOracleEvents::OwnershipTransferredFilter(_event) => {
                 // ignore ownership transfer event
@@ -743,7 +748,7 @@ where
 
     #[tracing::instrument(level = "debug", skip(self))]
     async fn process_log_event(&self, tx: &OpenTransaction, slog: SerializableLog) -> Result<Option<ChainEventType>> {
-        trace!("processing events in {slog}");
+        trace!(log = %slog, "processing events in log");
         let log = Log::try_from(slog)?;
 
         if log.address.eq(&self.addresses.announcements) {
@@ -776,8 +781,8 @@ where
             METRIC_INDEXER_LOG_COUNTERS.increment(&["unknown"]);
 
             error!(
-                "on_event error - unknown contract address: {} - received log: {log:?}",
-                log.address
+                address = %log.address, log = ?log,
+                "on_event error - unknown contract address, received log"
             );
             return Err(CoreEthereumIndexerError::UnknownContract(log.address));
         }
@@ -841,7 +846,7 @@ where
                         // If a significant chain event can be extracted from the log, push it
                         if let Some(event_type) = myself.process_log_event(tx, log).await? {
                             let significant_event = SignificantChainEvent { tx_hash, event_type };
-                            debug!("indexer got {significant_event}");
+                            debug!(?significant_event, "indexer got significant_event");
                             ret.push(significant_event);
                         }
                     }

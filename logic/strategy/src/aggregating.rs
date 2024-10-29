@@ -191,7 +191,7 @@ where
             self.agg_tasks.write().await.insert(channel_id, (false, task));
             let _ = can_remove_tx.send(()); // Allow the task to mark itself as done
         } else {
-            warn!("this strategy already aggregates in channel {channel_id}");
+            warn!(channel = %channel_id, "this strategy already aggregates in channel");
         }
 
         Ok(())
@@ -261,7 +261,7 @@ where
                 return Ok(());
             }
 
-            info!("going to aggregate tickets in {channel} because it transitioned to PendingToClose");
+            info!(%channel, "going to aggregate tickets in channel because it transitioned to PendingToClose");
 
             // On closing there must be at least 2 tickets to justify aggregation
             let on_close_agg_prerequisites = AggregationPrerequisites {
@@ -454,7 +454,7 @@ mod tests {
                         (),
                     ) {
                         Ok(_) => {}
-                        Err(e) => error!("{e}"),
+                        Err(e) => error!(error = %e, "Failed to received aggregation ticket"),
                     }
                 }
                 //  alice.ack_event_queue.0.start_send(super::TicketAggregationToProcess::ToProcess(destination, acked_tickets)),
@@ -468,7 +468,7 @@ mod tests {
                         .receive_ticket(PEERS[0].public().into(), aggregated_ticket, ())
                     {
                         Ok(_) => {}
-                        Err(e) => error!("{e}"),
+                        Err(e) => error!(error = %e, "Failed to receive a ticket"),
                     }
                 }
 

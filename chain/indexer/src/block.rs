@@ -108,7 +108,7 @@ where
             ));
         }
 
-        info!("Starting indexer...");
+        info!("Starting chain indexing");
 
         let rpc = self.rpc.take().expect("rpc should be present");
         let db_processor = self.db_processor.take().expect("db_processor should be present");
@@ -247,11 +247,11 @@ where
 
             futures::pin_mut!(event_stream);
             while let Some(event) = event_stream.next().await {
-                trace!("Processing an onchain event: {event:?}");
+                trace!(event=%event, "Processing onchain event");
                 // Pass the events further only once we're fully synced
                 if is_synced.load(Ordering::Relaxed) {
                     if let Err(e) = tx_significant_events.try_send(event) {
-                        error!("failed to pass a significant chain event further: {e}");
+                        error!(error = %e,"failed to pass a significant chain event further");
                     }
                 }
             }

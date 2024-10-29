@@ -1,5 +1,3 @@
-use std::{sync::Arc, time::Duration};
-
 use axum::{
     extract::{
         ws::{Message, WebSocket, WebSocketUpgrade},
@@ -15,6 +13,7 @@ use futures_concurrency::stream::Merge;
 use serde::Deserialize;
 use serde_json::json;
 use serde_with::{serde_as, Bytes, DisplayFromStr, DurationMilliSeconds};
+use std::{sync::Arc, time::Duration};
 use tracing::error;
 use tracing::{debug, trace};
 use validator::Validate;
@@ -317,22 +316,22 @@ async fn websocket_connection(socket: WebSocket, state: Arc<InternalState>) {
                     .send(Message::Text(json!(WebSocketReadMsg::from(net_in)).to_string()))
                     .await
                 {
-                    error!("Failed to emit read data onto the websocket: {e}");
+                    error!(error = %e, "Failed to emit read data onto the websocket");
                 };
             }
             WebSocketInput::WsInput(ws_in) => match ws_in {
                 Ok(Message::Text(input)) => {
                     if let Err(e) = handle_send_message(&input, state.clone()).await {
-                        error!("Failed to send message: {e}");
+                        error!(error = %e, "Failed to send message");
                     }
                 }
                 Ok(Message::Close(_)) => {
                     debug!("Received close frame, closing connection");
                     break;
                 }
-                Ok(m) => trace!("skipping an unsupported websocket message: {m:?}"),
+                Ok(m) => trace!(message = ?m, "Skipping unsupported websocket message"),
                 Err(e) => {
-                    error!("Failed to get a valid websocket message: {e}, closing connection");
+                    error!(error = %e, "Failed to get a valid websocket message, closing connection");
                     break;
                 }
             },
@@ -596,7 +595,7 @@ pub(super) async fn pop_all(
         .filter_map(|(data, ts)| match to_api_message(data, ts) {
             Ok(msg) => Some(msg),
             Err(e) => {
-                error!("failed to pop message: {e}");
+                error!(error = %e, "failed to pop message");
                 None
             }
         })
@@ -695,7 +694,7 @@ pub(super) async fn peek_all(
         .filter_map(|(data, ts)| match to_api_message(data, ts) {
             Ok(msg) => Some(msg),
             Err(e) => {
-                error!("failed to peek message: {e}");
+                error!(error = %e, "failed to peek message:");
                 None
             }
         })

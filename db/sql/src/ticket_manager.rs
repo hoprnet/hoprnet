@@ -95,10 +95,10 @@ impl TicketManager {
                             })
                             .await
                         {
-                            error!("failed to insert the winning ticket and update the ticket stats: {e}")
+                            error!(error = %e, "failed to insert the winning ticket and update the ticket stats")
                         };
                     }
-                    Err(e) => error!("Failed to create a transaction for ticket insertion: {e}"),
+                    Err(e) => error!(error = %e, "Failed to create a transaction for ticket insertion"),
                 }
             }
         });
