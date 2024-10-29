@@ -9,8 +9,9 @@ repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"
 
 [features]
-default = []
+default = ["frame-inspector"]
 serde = ["dep:serde", "dep:serde_bytes", "libp2p-identity/serde"]
+frame-inspector = []
 runtime-async-std = [
   "dep:async-std-resolver",
   "hopr-async-runtime/runtime-async-std",

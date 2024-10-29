@@ -26,7 +26,7 @@ pub fn frame_reconstructor_randomized_benchmark(c: &mut Criterion) {
     let mut group = c.benchmark_group("frame_reconstructor_randomized_benchmark");
 
     group.sample_size(100000);
-    group.measurement_time(Duration::from_secs(180));
+    group.measurement_time(Duration::from_secs(30));
 
     for size in [16 * KB, 64 * KB, 128 * KB, 1024 * KB].iter() {
         let mut data = vec![0u8; *size];

@@ -29,22 +29,15 @@ pub use frame::{Frame, FrameId, FrameInfo, FrameReassembler, Segment, SegmentId}
 
 pub use utils::linear_half_normal_shuffle;
 
-pub fn frame_reconstructor(
-    frame_timeout: std::time::Duration,
-    capacity: usize,
-) -> (
+fn build_reconstructor(reassembler: reassembly::Reassembler, sequencer: sequencer::Sequencer<Frame>)
+-> (
     impl futures::Sink<Segment, Error = errors::SessionError>,
     impl futures::Stream<Item = Result<Frame, errors::SessionError>>,
 ) {
     use futures::StreamExt;
 
-    let (sink, rs_stream) = reassembly::Reassembler::new(frame_timeout, capacity).split();
-    let (seq_sink, stream) = sequencer::Sequencer::new(sequencer::SequencerConfig {
-        timeout: frame_timeout,
-        capacity,
-        ..Default::default()
-    })
-    .split();
+    let (sink, rs_stream) = reassembler.split();
+    let (seq_sink, stream) = sequencer.split();
 
     hopr_async_runtime::prelude::spawn(async {
         match rs_stream
@@ -65,6 +58,47 @@ pub fn frame_reconstructor(
         }
     });
     (sink, stream)
+}
+
+pub fn frame_reconstructor(
+    frame_timeout: std::time::Duration,
+    capacity: usize,
+) -> (
+    impl futures::Sink<Segment, Error = errors::SessionError>,
+    impl futures::Stream<Item = Result<Frame, errors::SessionError>>,
+) {
+    build_reconstructor(
+        reassembly::Reassembler::new(frame_timeout, capacity),
+        sequencer::Sequencer::new(sequencer::SequencerConfig {
+            timeout: frame_timeout,
+            capacity,
+            ..Default::default()
+        })
+    )
+}
+
+#[cfg(feature = "frame-inspector")]
+pub fn frame_reconstructor_with_inspector(
+    frame_timeout: std::time::Duration,
+    capacity: usize,
+) -> (
+    impl futures::Sink<Segment, Error = errors::SessionError>,
+    impl futures::Stream<Item = Result<Frame, errors::SessionError>>,
+    reassembly::FrameInspector
+) {
+    let reassembler = reassembly::Reassembler::new(frame_timeout, capacity);
+    let inspector = reassembler.inspect();
+
+    let (sink, stream) = build_reconstructor(
+        reassembly::Reassembler::new(frame_timeout, capacity),
+        sequencer::Sequencer::new(sequencer::SequencerConfig {
+            timeout: frame_timeout,
+            capacity,
+            ..Default::default()
+        })
+    );
+
+    (sink, stream, inspector)
 }
 
 #[cfg(test)]

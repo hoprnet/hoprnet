@@ -1,8 +1,10 @@
-use std::collections::hash_map::Entry;
-use std::collections::{HashMap, VecDeque};
+use std::cmp::Ordering;
+use std::collections::VecDeque;
 use std::pin::Pin;
 use std::task::{Context, Poll, Waker};
 use std::time::{Duration, Instant};
+use bitvec::bitvec;
+use bitvec::prelude::BitVec;
 
 use crate::prelude::errors::SessionError;
 use crate::prelude::{Frame, FrameId, Segment};
@@ -10,14 +12,14 @@ use crate::session::frame::SeqNum;
 
 #[derive(Debug)]
 struct FrameBuilder {
-    segments: Vec<Segment>,
+    segments: Vec<Option<Segment>>,
     last_recv: Instant,
 }
 
 impl From<Segment> for FrameBuilder {
     fn from(value: Segment) -> Self {
-        let mut segments = Vec::with_capacity(value.seq_len as usize);
-        segments.push(value);
+        let mut segments = vec![None; value.seq_len as usize];
+        segments[value.seq_idx] = Some(value);
         Self {
             last_recv: Instant::now(),
             segments,
@@ -35,36 +37,90 @@ impl TryFrom<FrameBuilder> for Frame {
             return Err(SessionError::IncompleteFrame(frame_id));
         }
 
-        // There are most likely not many segments within a frame,
-        // so this is not an expensive operation.
-        value.segments.sort_unstable();
-
         Ok(Frame {
             frame_id,
             data: value
                 .segments
                 .into_iter()
-                .flat_map(|s| s.data.into_vec())
-                .collect::<Vec<_>>()
+                .flat_map(|s| s.ok_or(SessionError::IncompleteFrame(frame_id)).map(|s| s.data.into_vec()))
+                .collect::<Result<Vec<_>, Self::Error>>()?
                 .into_boxed_slice(),
         })
     }
 }
 
 impl FrameBuilder {
-    pub fn add_segment(&mut self, segment: Segment) {
-        self.segments.push(segment);
+    pub fn add_segment(&mut self, segment: Segment) -> Result<(), SessionError>{
+        let idx = segment.seq_idx;
+        if segment.frame_id != self.frame_id() || segment.seq_idx >= self.seq_len() {
+            return Err(SessionError::InvalidSegment)
+        }
+
+        self.segments[idx] = Some(segment);
         self.last_recv = Instant::now();
+        Ok(())
+    }
+
+    #[cfg(feature = "frame-inspector")]
+    pub fn as_missing(&self) -> BitVec {
+        self.segments.iter().map(Option::is_some).collect()
     }
 
     #[inline]
     pub fn frame_id(&self) -> FrameId {
-        self.segments[0].frame_id
+        self.segments[0].as_ref().unwrap().frame_id
+    }
+
+    #[inline]
+    pub fn seq_len(&self) -> SeqNum {
+        self.segments[0].as_ref().unwrap().seq_len
     }
 
     #[inline]
     pub fn remaining(&self) -> SeqNum {
-        self.segments[0].seq_len - self.segments.len() as SeqNum
+        self.seq_len() - self.segments.iter().filter(Option::is_some).count() as SeqNum
+    }
+}
+#[cfg(feature = "frame-inspector")]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FrameInfo {
+    pub frame_id: FrameId,
+    pub missing_segments: BitVec,
+    pub updated: Instant,
+}
+
+
+impl PartialOrd<Self> for FrameInfo {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for FrameInfo {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.updated.cmp(&other.updated)
+    }
+}
+
+#[cfg(feature = "frame-inspector")]
+#[derive(Clone, Debug)]
+pub struct FrameInspector {
+    incomplete_frames: std::sync::Arc<dashmap::DashMap<FrameId, FrameBuilder>>,
+}
+
+#[cfg(feature = "frame-inspector")]
+impl FrameInspector {
+    pub fn pending_frames(&self, next_frame: FrameId) -> Vec<FrameInfo> {
+        // TODO: add missing frames between next_frame and highest buffered
+        let mut latest_buffered = next_frame;
+        self.incomplete_frames.iter().map(|e| {
+
+            FrameInfo {
+                frame_id: e.frame_id(),
+                missing_segments: e.as_missing(),
+                updated: e.last_recv,
+            }
+        }).collect()
     }
 }
 
@@ -72,7 +128,10 @@ impl FrameBuilder {
 #[must_use = "streams do nothing unless polled"]
 #[pin_project::pin_project]
 pub struct Reassembler {
-    incomplete_frames: HashMap<FrameId, FrameBuilder>,
+    #[cfg(feature = "frame-inspector")]
+    incomplete_frames: std::sync::Arc<dashmap::DashMap<FrameId, FrameBuilder>>,
+    #[cfg(not(feature = "frame-inspector"))]
+    incomplete_frames: std::collections::HashMap<FrameId, FrameBuilder>,
     complete_frames: VecDeque<Result<Frame, SessionError>>,
     tx_waker: Option<Waker>,
     rx_waker: Option<Waker>,
@@ -88,7 +147,10 @@ impl Reassembler {
 
     pub fn new(max_age: Duration, capacity: usize) -> Self {
         Self {
-            incomplete_frames: HashMap::with_capacity(Self::INCOMPLETE_FRAME_RATIO * capacity + 1),
+            #[cfg(feature = "frame-inspector")]
+            incomplete_frames: dashmap::DashMap::with_capacity(Self::INCOMPLETE_FRAME_RATIO * capacity + 1).into(),
+            #[cfg(not(feature = "frame-inspector"))]
+            incomplete_frames: std::collections::HashMap::with_capacity(Self::INCOMPLETE_FRAME_RATIO * capacity + 1),
             complete_frames: VecDeque::with_capacity(capacity),
             tx_waker: None,
             rx_waker: None,
@@ -96,6 +158,13 @@ impl Reassembler {
             last_expiration: Instant::now(),
             max_age,
             capacity,
+        }
+    }
+
+    #[cfg(feature = "frame-inspector")]
+    pub fn inspect(&self) -> FrameInspector {
+        FrameInspector {
+            incomplete_frames: self.incomplete_frames.clone(),
         }
     }
 
@@ -165,6 +234,12 @@ impl futures::Sink<Segment> for Reassembler {
         if self.is_closed {
             return Err(SessionError::ReassemblerClosed);
         }
+
+        #[cfg(feature = "frame-inspector")]
+        use dashmap::mapref::entry::Entry;
+
+        #[cfg(not(feature = "frame-inspector"))]
+        use std::collections::hash_map::Entry;
 
         let maybe_frame = match self.incomplete_frames.entry(item.frame_id) {
             Entry::Occupied(mut e) => {
