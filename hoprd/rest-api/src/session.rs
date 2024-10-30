@@ -18,7 +18,7 @@ use hopr_lib::errors::HoprLibError;
 use hopr_lib::transfer_session;
 use hopr_lib::{HoprSession, IpProtocol, RoutingOptions, SessionCapability, SessionClientConfig};
 
-use hopr_network_types::prelude::{ConnectedUdpStream, IpOrHost, SealedHost};
+use hopr_network_types::prelude::{ConnectedUdpStream, IpOrHost, SealedHost, UdpStreamParallelism};
 use hopr_network_types::udp::ForeignDataMode;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
@@ -548,7 +548,7 @@ async fn udp_bind_to<A: std::net::ToSocketAddrs>(
         .with_buffer_size(HOPR_UDP_BUFFER_SIZE)
         .with_foreign_data_mode(ForeignDataMode::Discard) // discard data from UDP clients other than the first one served
         .with_queue_size(HOPR_UDP_QUEUE_SIZE)
-        .with_parallelism(0);
+        .with_receiver_parallelism(UdpStreamParallelism::Auto);
 
     // If automatic port allocation is requested and there's a restriction on the port range
     // (via HOPRD_SESSION_PORT_RANGE), try to find an address within that range.

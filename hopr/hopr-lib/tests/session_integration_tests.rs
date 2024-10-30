@@ -57,7 +57,7 @@ async fn udp_session_bridging() -> anyhow::Result<()> {
     let mut listener = ConnectedUdpStream::builder()
         .with_buffer_size(BUF_LEN)
         .with_queue_size(512)
-        .with_parallelism(0)
+        .with_receiver_parallelism(UdpStreamParallelism::Auto)
         .build(("127.0.0.1", 0))?;
 
     let addr = *listener.bound_address();
@@ -115,7 +115,7 @@ async fn udp_session_bridging_with_segmentation() -> anyhow::Result<()> {
     let mut listener = ConnectedUdpStream::builder()
         .with_buffer_size(BUF_LEN)
         .with_queue_size(512)
-        .with_parallelism(0)
+        .with_receiver_parallelism(UdpStreamParallelism::Auto)
         .build(("127.0.0.1", 0))?;
 
     let addr = *listener.bound_address();

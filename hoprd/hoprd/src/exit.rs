@@ -1,6 +1,7 @@
 use hopr_lib::errors::HoprLibError;
 use hopr_lib::{transfer_session, HoprOffchainKeypair};
 use hopr_network_types::prelude::ForeignDataMode;
+use hopr_network_types::udp::UdpStreamParallelism;
 use hoprd_api::{HOPR_TCP_BUFFER_SIZE, HOPR_UDP_BUFFER_SIZE, HOPR_UDP_QUEUE_SIZE};
 use serde_with::serde_as;
 use std::collections::HashSet;
@@ -107,7 +108,7 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                     .with_counterparty(resolved_udp_target)
                     .with_foreign_data_mode(ForeignDataMode::Error)
                     .with_queue_size(HOPR_UDP_QUEUE_SIZE)
-                    .with_parallelism(0)
+                    .with_receiver_parallelism(UdpStreamParallelism::Auto)
                     .build(("0.0.0.0", 0))
                     .map_err(|e| {
                         HoprLibError::GeneralError(format!(
