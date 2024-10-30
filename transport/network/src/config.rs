@@ -7,8 +7,8 @@ use validator::Validate;
 
 /// Network quality threshold since which a node is considered
 /// available enough to be used
-pub const DEFAULT_NETWORK_OFFLINE_QUALITY_THRESHOLD: f64 = 0.5;
-pub const DEFAULT_NETWORK_BAD_QUALITY_THRESHOLD: f64 = 0.2;
+pub const DEFAULT_NETWORK_OFFLINE_QUALITY_THRESHOLD: f64 = 0.0;
+pub const DEFAULT_NETWORK_BAD_QUALITY_THRESHOLD: f64 = 0.1;
 pub const DEFAULT_NETWORK_QUALITY_STEP: f64 = 0.1;
 pub const DEFAULT_NETWORK_QUALITY_AVERAGE_WINDOW_SIZE: u32 = 25;
 pub const DEFAULT_NETWORK_BACKOFF_EXPONENT: f64 = 1.5;
@@ -92,12 +92,12 @@ impl Validate for NetworkConfig {
             );
         }
 
-        // if self.quality_bad_threshold > self.quality_offline_threshold {
-        //     errors.add(
-        //         "quality_bad_threshold and quality_offline_threshold",
-        //         validator::ValidationError::new("quality_bad_threshold must be less than quality_offline_threshold"),
-        //     );
-        // }
+        if self.quality_bad_threshold > self.quality_offline_threshold {
+            errors.add(
+                "quality_bad_threshold and quality_offline_threshold",
+                validator::ValidationError::new("quality_bad_threshold must be greater than quality_offline_threshold"),
+            );
+        }
 
         // #[validate(range(min = 0.0, max = 1.0))]
         if !(0.0..=1.0).contains(&self.quality_step) {

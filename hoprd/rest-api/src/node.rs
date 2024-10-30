@@ -171,7 +171,8 @@ pub(super) async fn peers(
 
             async move {
                 if let Ok(Some(info)) = hopr.network_peer_info(&peer).await {
-                    if info.get_average_quality() >= quality {
+                    let avg_quality = info.get_average_quality();
+                    if avg_quality > 0.0f64 && avg_quality >= quality {
                         Some((peer, info))
                     } else {
                         None
