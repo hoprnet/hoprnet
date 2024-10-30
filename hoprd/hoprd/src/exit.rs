@@ -17,32 +17,48 @@ lazy_static::lazy_static! {
     ).unwrap();
 }
 
+fn fifteen() -> u32 {
+    15
+}
+
+fn default_target_retry_delay() -> Duration {
+    Duration::from_millis(1500)
+}
+
 /// Configuration of [`HoprServerIpForwardingReactor`].
 #[serde_as]
-#[derive(Clone, Debug, Eq, PartialEq, smart_default::SmartDefault, serde::Deserialize, serde::Serialize)]
+#[derive(
+    Clone, Debug, Eq, PartialEq, smart_default::SmartDefault, serde::Deserialize, serde::Serialize, validator::Validate,
+)]
 pub struct IpForwardingReactorConfig {
     /// If specified, enforces only the given target addresses (after DNS resolution).
     /// If `None` is specified, allows all targets.
     ///
     /// Defaults to `None`.
+    #[serde(default)]
     #[default(None)]
     #[serde_as(as = "Option<HashSet<serde_with::DisplayFromStr>>")]
     pub target_allow_list: Option<HashSet<SocketAddr>>,
 
-    /// Delay between retries in seconds to reach to target.
+    /// Delay between retries in seconds to reach a TCP target.
     ///
     /// Defaults to 1500 ms.
+    #[serde(default = "default_target_retry_delay")]
     #[default(Duration::from_millis(1500))]
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
     pub target_retry_delay: Duration,
 
-    /// Maximum number of retries to reach a target before giving up.
+    /// Maximum number of retries to reach a TCP target before giving up.
     ///
     /// Default is 15.
+    #[serde(default = "fifteen")]
     #[default(15)]
+    #[validate(range(min = 1))]
     pub max_target_retries: u32,
 }
 
+/// Implementation of [`hopr_lib::HoprSessionReactor`] that facilitates
+/// bridging of TCP or UDP sockets from the Session Exit node to a destination.
 #[derive(Debug, Clone)]
 pub struct HoprServerIpForwardingReactor {
     keypair: HoprOffchainKeypair,
