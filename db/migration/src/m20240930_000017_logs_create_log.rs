@@ -110,7 +110,7 @@ enum LogStatus {
     BlockNumber,
     TransactionIndex,
     LogIndex,
-    // Status of the log.
+    // Indicates whether the log has been processed.
     Processed,
     // Time when the log was processed.
     ProcessedAt,

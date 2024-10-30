@@ -4,7 +4,7 @@ use futures::{stream, StreamExt, TryStreamExt};
 use sea_orm::entity::Set;
 use sea_orm::query::QueryTrait;
 use sea_orm::sea_query::{Expr, OnConflict, Value};
-use sea_orm::{ColumnTrait, DbErr, EntityTrait, FromQueryResult, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect};
+use sea_orm::{ColumnTrait, EntityTrait, FromQueryResult, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect};
 use tracing::{error, trace};
 
 use hopr_crypto_types::prelude::Hash;
@@ -69,17 +69,15 @@ impl HoprDbLogOperations for HoprDb {
                         match log_status_query.exec(tx.as_ref()).await {
                             Ok(_) => match log_query.exec(tx.as_ref()).await {
                                 Ok(_) => Ok(()),
-                                Err(DbErr::RecordNotInserted) => {
-                                    error!("Failed to insert log into db");
-                                    Err(DbError::from(DbSqlError::from(DbErr::RecordNotInserted)))
+                                Err(e) => {
+                                    error!("Failed to insert log into db: {:?}", e);
+                                    Err(DbError::General(e.to_string()))
                                 }
-                                Err(e) => Err(DbError::General(e.to_string())),
                             },
-                            Err(DbErr::RecordNotInserted) => {
-                                error!("Failed to insert log status into db");
-                                Err(DbError::from(DbSqlError::from(DbErr::RecordNotInserted)))
+                            Err(e) => {
+                                error!("Failed to insert log status into db: {:?}", e);
+                                Err(DbError::General(e.to_string()))
                             }
-                            Err(e) => Err(DbError::General(e.to_string())),
                         }
                     });
                     Ok(results.collect::<Vec<_>>().await)
@@ -240,11 +238,10 @@ impl HoprDbLogOperations for HoprDb {
                 Box::pin(async move {
                     match LogStatus::update(log_status).exec(tx.as_ref()).await {
                         Ok(_) => Ok(()),
-                        Err(DbErr::RecordNotUpdated) => {
+                        Err(e) => {
                             error!("Failed to update log status in db");
-                            Err(DbError::from(DbSqlError::UpdateLogStatusError))
+                            Err(DbError::from(DbSqlError::from(e)))
                         }
-                        Err(e) => Err(DbError::from(DbSqlError::from(e))),
                     }
                 })
             })
@@ -257,7 +254,10 @@ impl HoprDbLogOperations for HoprDb {
 
         let query = LogStatus::update_many()
             .col_expr(log_status::Column::Processed, Expr::value(Value::Bool(Some(false))))
-            .col_expr(log_status::Column::ProcessedAt, Expr::value(Value::String(None)))
+            .col_expr(
+                log_status::Column::ProcessedAt,
+                Expr::value(Value::ChronoDateTimeUtc(None)),
+            )
             .filter(log_status::Column::BlockNumber.gte(min_block_number.to_be_bytes().to_vec()))
             .apply_if(max_block_number, |q, v| {
                 q.filter(log_status::Column::BlockNumber.lt(v.to_be_bytes().to_vec()))
@@ -308,8 +308,9 @@ impl HoprDbLogOperations for HoprDb {
                         .find_also_related(Log);
 
                     match query.all(tx.as_ref()).await {
-                        Ok(mut entries) => {
-                            while let Some((status, Some(log_entry))) = entries.pop() {
+                        Ok(entries) => {
+                            let mut entries = entries.into_iter();
+                            while let Some((status, Some(log_entry))) = entries.next() {
                                 let slog = create_log(log_entry.clone(), status.clone())?;
                                 // we compute the has of a single log as a combination of the block
                                 // hash, tx hash and log index

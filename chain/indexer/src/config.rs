@@ -18,6 +18,16 @@ pub struct IndexerConfig {
 }
 
 impl IndexerConfig {
+    /// Creates a new indexer configuration.
+    ///
+    /// # Arguments
+    ///
+    /// * `start_block_number` - The block number from which to start indexing
+    /// * `fast_sync` - Whether to enable fast synchronization during startup
+    ///
+    /// # Returns
+    ///
+    /// A new instance of `IndexerConfig`
     pub fn new(start_block_number: u64, fast_sync: bool) -> Self {
         Self {
             start_block_number,
