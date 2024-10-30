@@ -193,6 +193,7 @@ pub struct HoprTransportConfig {
     pub network: core_network::config::NetworkConfig,
     pub protocol: hopr_transport_protocol::config::ProtocolConfig,
     pub heartbeat: core_network::heartbeat::HeartbeatConfig,
+    pub session: config::SessionGlobalConfig,
 }
 
 /// This function will use the given generator to generate an initial seeding key.
@@ -613,7 +614,6 @@ where
             process_packet_send,
             path_planner: PathPlanner::new(db.clone(), channel_graph.clone()),
             db,
-            cfg,
             my_multiaddresses,
             process_ticket_aggregate: Arc::new(OnceLock::new()),
             session_initiations: moka::future::Cache::builder()
@@ -622,13 +622,14 @@ where
                 .build(),
             sessions: moka::future::Cache::builder()
                 .max_capacity(u16::MAX as u64)
-                .time_to_idle(constants::SESSION_LIFETIME)
+                .time_to_idle(cfg.session.idle_timeout)
                 .async_eviction_listener(move |k, v, c| {
                     let msg_sender = msg_sender.clone();
                     close_session_after_eviction(msg_sender, my_peer_id, k, v, c)
                 })
                 .build(),
             session_close_notifier: OnceLock::new(),
+            cfg,
         }
     }
 
@@ -893,13 +894,14 @@ where
         // This ensures the dangling expired sessions are properly closed
         // and their closure is timely notified to the other party.
         let sessions = self.sessions.clone();
+        let session_cfg = self.cfg.session;
         let session_initiations = self.session_initiations.clone();
         processes.insert(
             HoprTransportProcess::SessionsExpiration,
             spawn(async move {
                 let jitter = hopr_crypto_random::random_float_in_range(1.0..1.5);
                 let timeout = SESSION_INITIATION_TIMEOUT_MAX
-                    .min(constants::SESSION_LIFETIME)
+                    .min(session_cfg.idle_timeout)
                     .mul_f64(jitter)
                     / 2;
                 loop {

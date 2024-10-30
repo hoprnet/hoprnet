@@ -118,7 +118,7 @@ pub(crate) struct SessionWebsocketClientQueryRequest {
     #[serde_as(as = "Vec<DisplayFromStr>")]
     pub capabilities: Vec<SessionCapability>,
     #[schema(required = false)]
-    #[serde_as(as = "DisplayFromStr")]
+    #[serde_as(as = "Option<DisplayFromStr>")]
     pub target: Option<SessionTargetSpec>,
     #[schema(required = false)]
     #[serde(default = "default_protocol")]
@@ -395,9 +395,6 @@ pub(crate) async fn create_client(
         )
     })?;
 
-    // TODO: make this retry strategy configurable
-    let session_init_retry_strategy = tokio_retry::strategy::ExponentialBackoff::from_millis(1000).take(3);
-
     // TODO: consider pooling the sessions on a listener, so that the negotiation is amortized
 
     debug!("binding {protocol} session listening socket to {bind_host}");
@@ -422,21 +419,11 @@ pub(crate) async fn create_client(
                     .for_each_concurrent(None, move |accepted_client| {
                         let data = data.clone();
                         let hopr = hopr.clone();
-                        let session_init_retry_strategy = session_init_retry_strategy.clone();
                         async move {
                             match accepted_client {
                                 Ok((sock_addr, stream)) => {
-                                    debug!(socket = %sock_addr, "incoming TCP connection");
-                                    let session_init =
-                                        tokio_retry::Retry::spawn(session_init_retry_strategy, move || {
-                                            let hopr = hopr.clone();
-                                            let data = data.clone();
-                                            async move {
-                                                debug!("trying TCP session establishment");
-                                                hopr.connect_to(data).await
-                                            }
-                                        });
-                                    let session = match session_init.await {
+                                    debug!(socket = ?sock_addr, "incoming TCP connection");
+                                    let session = match hopr.connect_to(data).await {
                                         Ok(s) => s,
                                         Err(e) => {
                                             error!(error = %e, "failed to establish session");
@@ -473,15 +460,7 @@ pub(crate) async fn create_client(
         }
         IpProtocol::UDP => {
             let hopr = state.hopr.clone();
-            let session_init = tokio_retry::Retry::spawn(session_init_retry_strategy.clone(), move || {
-                let hopr = hopr.clone();
-                let data = data.clone();
-                async move {
-                    debug!("trying udp session establishment");
-                    hopr.connect_to(data).await
-                }
-            });
-            let session = session_init.await.map_err(|e| {
+            let session = hopr.connect_to(data).await.map_err(|e| {
                 (
                     StatusCode::UNPROCESSABLE_ENTITY,
                     ApiErrorStatus::UnknownFailure(e.to_string()),

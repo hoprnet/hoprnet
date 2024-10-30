@@ -3,7 +3,7 @@
 //!
 //! The [`Hopr`] object is standalone, meaning that once it is constructed and run,
 //! it will perform its functionality autonomously. The API it offers serves as a
-//! high level integration point for other applications and utilities, but offers
+//! high-level integration point for other applications and utilities, but offers
 //! a complete and fully featured HOPR node stripped from top level functionality
 //! such as the REST API, key management...
 //!
@@ -13,11 +13,11 @@
 //! For most of the practical use cases, the `hoprd` application should be a preferable
 //! choice.
 
-/// Configuration related public types
+/// Configuration-related public types
 pub mod config;
 /// Various public constants.
 pub mod constants;
-/// Enumerates all errors thrown from this library.
+/// Lists all errors thrown from this library.
 pub mod errors;
 
 use async_lock::RwLock;
@@ -122,6 +122,7 @@ lazy_static::lazy_static! {
 }
 
 pub use async_trait::async_trait;
+use backon::Retryable;
 
 /// Interface representing the HOPR server behavior for each incoming session instance
 /// supplied as an argument.
@@ -534,6 +535,7 @@ impl Hopr {
                 network: cfg.network_options.clone(),
                 protocol: cfg.protocol,
                 heartbeat: cfg.heartbeat,
+                session: cfg.session,
             },
             db.clone(),
             channel_graph.clone(),
@@ -1107,7 +1109,34 @@ impl Hopr {
     pub async fn connect_to(&self, cfg: SessionClientConfig) -> errors::Result<HoprSession> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
-        Ok(self.transport_api.new_session(cfg).await?)
+        let mut backoff = backon::ConstantBuilder::default()
+            .with_delay(self.cfg.session.establish_retry_timeout)
+            .with_jitter();
+
+        if self.cfg.session.establish_max_retries >= 0 {
+            backoff = backoff.with_max_times(self.cfg.session.establish_max_retries as usize);
+        }
+
+        struct Sleeper;
+        impl backon::Sleeper for Sleeper {
+            type Sleep = futures_timer::Delay;
+
+            fn sleep(&self, dur: Duration) -> Self::Sleep {
+                futures_timer::Delay::new(dur)
+            }
+        }
+
+        let f = || {
+            let cfg = cfg.clone();
+            async { self.transport_api.new_session(cfg).await }
+        };
+
+        Ok(f.retry(backoff).sleep(Sleeper).await?)
+        /*Ok(self.transport_api
+        .new_session(cfg)
+        .retry(backoff.build())
+        .sleep(Sleeper)
+        .await?)*/
     }
 
     /// Send a message to another peer in the network

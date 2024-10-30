@@ -827,6 +827,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "backon"
+version = "1.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e4fa97bb310c33c811334143cf64c5bb2b7b3c06e453db6b095d7061eff8f113"
+dependencies = [
+ "fastrand 2.1.0",
+]
+
+[[package]]
 name = "backtrace"
 version = "0.3.73"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4276,6 +4285,7 @@ dependencies = [
  "async-std",
  "async-trait",
  "atomic_enum",
+ "backon",
  "chain-actions",
  "chain-api",
  "chain-indexer",
@@ -4286,6 +4296,7 @@ dependencies = [
  "ethers",
  "futures",
  "futures-concurrency",
+ "futures-timer",
  "hex-literal",
  "hopr-async-runtime",
  "hopr-crypto-random",
@@ -4482,6 +4493,7 @@ dependencies = [
  "proc-macro-regex",
  "rust-stream-ext-concurrent",
  "serde",
+ "smart-default",
  "thiserror",
  "tracing",
  "uuid 1.10.0",

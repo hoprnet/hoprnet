@@ -164,6 +164,56 @@ pub struct TransportConfig {
     pub prefer_local_addresses: bool,
 }
 
+fn just_three() -> i32 {
+    3
+}
+
+fn two_minutes() -> std::time::Duration {
+    std::time::Duration::from_secs(120)
+}
+
+fn two_seconds() -> std::time::Duration {
+    std::time::Duration::from_secs(2)
+}
+
+fn validate_session_idle_timeout(value: &std::time::Duration) -> Result<(), ValidationError> {
+    let min_idle = std::time::Duration::from_secs(60);
+    if min_idle.le(value) {
+        Ok(())
+    } else {
+        Err(ValidationError::new("session idle timeout is too low"))
+    }
+}
+
+/// Global configuration of Sessions.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Validate, smart_default::SmartDefault)]
+#[serde(deny_unknown_fields)]
+pub struct SessionGlobalConfig {
+    /// Maximum time before an idle Session is closed.
+    ///
+    /// Defaults to 2 minutes.
+    #[validate(custom(function = "validate_session_idle_timeout"))]
+    #[default(std::time::Duration::from_secs(120))]
+    #[serde(default = "two_minutes")]
+    pub idle_timeout: std::time::Duration,
+
+    /// Maximum retries to attempt to establish the Session
+    /// Set to -1 to retry indefinitely, 0 for no retries.
+    ///
+    /// Defaults to 3.
+    #[validate(range(min = -1))]
+    #[default(3)]
+    #[serde(default = "just_three")]
+    pub establish_max_retries: i32,
+
+    /// Delay between Session establishment retries.
+    ///
+    /// Default is 2 seconds.
+    #[default(std::time::Duration::from_secs(2))]
+    #[serde(default = "two_seconds")]
+    pub establish_retry_timeout: std::time::Duration,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
