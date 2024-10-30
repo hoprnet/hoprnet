@@ -82,10 +82,7 @@ impl IndexerActions {
                     IndexerToProcess::Announce(peer, multiaddress) => IndexerProcessed::Announce(peer, multiaddress),
                     // TODO: when is this even triggered? network registry missing?
                     IndexerToProcess::RegisterStatusUpdate => {
-                        let peers = network
-                            .peer_filter(|peer| async move { Some(peer.id.1) })
-                            .await
-                            .unwrap_or(vec![]);
+                        let peers = network.connected_peers().await.unwrap_or(vec![]);
 
                         for peer in peers.into_iter() {
                             let is_allowed = {
