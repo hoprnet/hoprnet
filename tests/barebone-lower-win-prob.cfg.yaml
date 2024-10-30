@@ -5,6 +5,9 @@ hopr:
     interval: 10
     threshold: 10
     variance: 1
+  network_options:
+    # ignore for shorter than heartbeat cycle
+    ignore_timeframe: 5
   strategy:
     on_fail_continue: true
     allow_recursive: false
