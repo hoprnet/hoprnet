@@ -1126,17 +1126,13 @@ impl Hopr {
             }
         }
 
-        let f = || {
+        Ok((|| {
             let cfg = cfg.clone();
             async { self.transport_api.new_session(cfg).await }
-        };
-
-        Ok(f.retry(backoff).sleep(Sleeper).await?)
-        /*Ok(self.transport_api
-        .new_session(cfg)
-        .retry(backoff.build())
+        })
+        .retry(backoff)
         .sleep(Sleeper)
-        .await?)*/
+        .await?)
     }
 
     /// Send a message to another peer in the network
