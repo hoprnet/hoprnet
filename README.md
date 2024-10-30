@@ -199,7 +199,7 @@ On top of the default configuration options generated for the command line, the 
 - `HOPRD_USE_OPENTELEMETRY` - enable the opentelemetry output for this node
 - `OTEL_SERVICE_NAME` - the name of this node for the opentelemetry service
 - `HOPR_INTERNAL_LIBP2P_MAX_CONCURRENTLY_DIALED_PEER_COUNT` - the maximum number of concurrently dialed peers in libp2p
-- `HOPR_INTERNAL_LIBP2P_MAX_NEGOTIATING_INBOUND_STREAM_COUNT` - the maximum number of negotiating inboud streams
+- `HOPR_INTERNAL_LIBP2P_MAX_NEGOTIATING_INBOUND_STREAM_COUNT` - the maximum number of negotiating inbound streams
 - `ENV_WORKER_THREADS` - the number of environment worker threads for the tokio executor
 
 ### Example execution
