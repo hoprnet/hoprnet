@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport-session"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Session functionality providing session abstraction over the HOPR transport"
@@ -35,6 +35,7 @@ bincode = { workspace = true, optional = true }
 futures = { workspace = true }
 lazy_static = { workspace = true, optional = true }
 libp2p-identity = { workspace = true }
+moka = { workspace = true }
 ringbuffer = { workspace = true }
 serde = { workspace = true, optional = true }
 serde_with = { workspace = true, optional = true }
@@ -44,6 +45,7 @@ tracing = { workspace = true }
 tokio = { workspace = true, optional = true }
 tokio-util = { workspace = true, optional = true }
 
+hopr-async-runtime = { workspace = true }
 hopr-network-types = { workspace = true }
 hopr-crypto-random = { workspace = true }
 hopr-crypto-types = { workspace = true }

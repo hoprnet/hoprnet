@@ -4563,7 +4563,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-session"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "aquamarine",
@@ -4572,6 +4572,7 @@ dependencies = [
  "async-trait",
  "bincode",
  "futures",
+ "hopr-async-runtime",
  "hopr-crypto-random",
  "hopr-crypto-types",
  "hopr-internal-types",
@@ -4581,6 +4582,7 @@ dependencies = [
  "lazy_static",
  "libp2p-identity",
  "mockall",
+ "moka",
  "ringbuffer",
  "serde",
  "serde_with",

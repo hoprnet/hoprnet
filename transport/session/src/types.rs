@@ -9,7 +9,7 @@ use libp2p_identity::PeerId;
 use std::collections::HashSet;
 use std::fmt::{Debug, Formatter};
 use std::hash::{Hash, Hasher};
-use std::task::{ready, Context};
+use std::task::Context;
 use std::time::Duration;
 use std::{
     fmt::Display,
@@ -290,7 +290,7 @@ impl tokio::io::AsyncRead for Session {
         buf: &mut tokio::io::ReadBuf<'_>,
     ) -> Poll<std::io::Result<()>> {
         let slice = buf.initialize_unfilled();
-        let n = ready!(futures::AsyncRead::poll_read(self.as_mut(), cx, slice))?;
+        let n = std::task::ready!(futures::AsyncRead::poll_read(self.as_mut(), cx, slice))?;
         buf.advance(n);
         Poll::Ready(Ok(()))
     }

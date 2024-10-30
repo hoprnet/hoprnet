@@ -1,0 +1,704 @@
+use futures::channel::mpsc::UnboundedSender;
+use futures::future::Either;
+use futures::{pin_mut, FutureExt, StreamExt, TryStreamExt};
+use hopr_internal_types::prelude::ApplicationData;
+use hopr_network_types::prelude::*;
+use std::ops::RangeInclusive;
+use std::sync::{Arc, OnceLock};
+use std::time::Duration;
+use tracing::{debug, error, info, trace, warn};
+
+use crate::errors::TransportSessionError;
+use crate::initiation::{
+    StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation, StartProtocol,
+};
+use crate::traits::SendMsg;
+use crate::types::SessionTarget;
+use crate::{IncomingSession, Session, SessionClientConfig, SessionId};
+
+#[cfg(all(feature = "prometheus", not(test)))]
+lazy_static::lazy_static! {
+    static ref METRIC_ACTIVE_SESSIONS: hopr_metrics::SimpleGauge = hopr_metrics::SimpleGauge::new(
+        "hopr_session_num_active_session",
+        "Number of currently active HOPR sessions"
+    ).unwrap();
+    static ref METRIC_NUM_ESTABLISHED_SESSIONS: hopr_metrics::SimpleCounter = hopr_metrics::SimpleCounter::new(
+        "hopr_session_established_sessions",
+        "Number of sessions that were successfully established as an Exit node"
+    ).unwrap();
+    static ref METRIC_NUM_INITIATED_SESSIONS: hopr_metrics::SimpleCounter = hopr_metrics::SimpleCounter::new(
+        "hopr_session_initiated_sessions",
+        "Number of sessions that were successfully initiated as an Entry node"
+    ).unwrap();
+    static ref METRIC_RECEIVED_SESSION_ERRS: hopr_metrics::MultiCounter = hopr_metrics::MultiCounter::new(
+        "hopr_session_received_error_counts",
+        "Number of HOPR session errors received from an Exit node",
+        &["kind"]
+    ).unwrap();
+    static ref METRIC_SENT_SESSION_ERRS: hopr_metrics::MultiCounter = hopr_metrics::MultiCounter::new(
+        "hopr_session_sent_error_counts",
+        "Number of HOPR session errors sent to an Entry node",
+        &["kind"]
+    ).unwrap();
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SessionManagerConfig {
+    pub session_tag_range: RangeInclusive<u16>,
+    pub initiation_timeout_base: std::time::Duration,
+    pub idle_timeout: std::time::Duration,
+}
+
+impl Default for SessionManagerConfig {
+    fn default() -> Self {
+        Self {
+            session_tag_range: 16..=1024,
+            initiation_timeout_base: Duration::from_secs(5),
+            idle_timeout: Duration::from_secs(180),
+        }
+    }
+}
+
+fn close_session_after_eviction<S: SendMsg + Send + Sync + 'static>(
+    msg_sender: S,
+    me: PeerId,
+    session_id: SessionId,
+    (session_tx, routing_opts): (Arc<UnboundedSender<Box<[u8]>>>, RoutingOptions),
+    cause: moka::notification::RemovalCause,
+) -> moka::notification::ListenerFuture {
+    // When a Session is removed from the cache, we notify the other party only
+    // if this removal was due to expiration or cache size limit.
+    match cause {
+        moka::notification::RemovalCause::Expired | moka::notification::RemovalCause::Size /*if msg_sender.can_send()*/ => {
+            trace!(
+                session_id = tracing::field::debug(session_id),
+                "sending session termination due to eviction from the cache"
+            );
+            let data = match ApplicationData::try_from(StartProtocol::CloseSession(session_id.with_peer(me))) {
+                Ok(data) => data,
+                Err(e) => {
+                    error!(
+                        session_id = tracing::field::debug(session_id),
+                        error = %e,
+                        "failed to serialize CloseSession"
+                    );
+                    return futures::future::ready(()).boxed();
+                }
+            };
+
+            async move {
+                if let Err(err) = msg_sender.send_message(data, *session_id.peer(), routing_opts).await {
+                    error!(
+                        session_id = tracing::field::debug(session_id),
+                        error = %err,
+                        "could not send notification of session closure after cache eviction"
+                    );
+                }
+
+                session_tx.close_channel();
+                trace!(
+                    session_id = tracing::field::debug(session_id),
+                    "channel closed on session during eviction"
+                );
+
+                #[cfg(all(feature = "prometheus", not(test)))]
+                METRIC_ACTIVE_SESSIONS.decrement(1.0);
+            }
+            .boxed()
+        }
+        _ => {
+            #[cfg(all(feature = "prometheus", not(test)))]
+            METRIC_ACTIVE_SESSIONS.decrement(1.0);
+
+            futures::future::ready(()).boxed()
+        }
+    }
+}
+
+/// This function will use the given generator to generate an initial seeding key.
+/// It will check whether the given cache already contains a value for that key, and if not,
+/// calls the generator (with the previous value) to generate a new seeding key and retry.
+/// The function either finds a suitable free slot, inserting the `value` and returns the found key,
+/// or terminates with `None` when `gen` returns the initial seed again.
+async fn insert_into_next_slot<K, V, F>(cache: &moka::future::Cache<K, V>, gen: F, value: V) -> Option<K>
+where
+    K: Copy + std::hash::Hash + Eq + Send + Sync + 'static,
+    V: Clone + Send + Sync + 'static,
+    F: Fn(Option<K>) -> K,
+{
+    let initial = gen(None);
+    let mut next = initial;
+    loop {
+        let insertion_result = cache
+            .entry(next)
+            .and_try_compute_with(|e| {
+                if e.is_none() {
+                    futures::future::ok::<_, ()>(moka::ops::compute::Op::Put(value.clone()))
+                } else {
+                    futures::future::ok::<_, ()>(moka::ops::compute::Op::Nop)
+                }
+            })
+            .await;
+
+        // If we inserted successfully, break the loop and return the insertion key
+        if let Ok(moka::ops::compute::CompResult::Inserted(_)) = insertion_result {
+            return Some(next);
+        }
+
+        // Otherwise, generate a next key
+        next = gen(Some(next));
+
+        // If generated keys made it to full loop, return failure
+        if next == initial {
+            return None;
+        }
+    }
+}
+
+/// The first challenge value used in Start protocol to initiate a session.
+pub(crate) const MIN_CHALLENGE: StartChallenge = 1;
+
+// Needs to use an UnboundedSender instead of oneshot
+// because Moka cache requires the value to be Clone, which oneshot Sender is not.
+// It also cannot be enclosed in an Arc, since calling `send` consumes the oneshot Sender.
+type SessionInitiationCache =
+    moka::future::Cache<StartChallenge, UnboundedSender<Result<StartEstablished<SessionId>, StartErrorType>>>;
+
+// Sender needs to be put in Arc, so that no clones are made, and the entire channel closes
+// once the only sender is closed
+type SessionCache = moka::future::Cache<SessionId, (Arc<UnboundedSender<Box<[u8]>>>, RoutingOptions)>;
+
+pub struct SessionManager<S> {
+    session_initiations: SessionInitiationCache,
+    session_notifiers: Arc<OnceLock<(UnboundedSender<IncomingSession>, UnboundedSender<SessionId>)>>,
+    sessions: SessionCache,
+    my_peer_id: PeerId,
+    cfg: SessionManagerConfig,
+    sender_gen: Arc<dyn Fn() -> S + Send + Sync>,
+}
+
+impl<S> Clone for SessionManager<S> {
+    fn clone(&self) -> Self {
+        Self {
+            session_initiations: self.session_initiations.clone(),
+            session_notifiers: self.session_notifiers.clone(),
+            sessions: self.sessions.clone(),
+            my_peer_id: self.my_peer_id,
+            cfg: self.cfg.clone(),
+            sender_gen: self.sender_gen.clone(),
+        }
+    }
+}
+
+fn initiation_timeout_max(base: Duration, hops: usize) -> Duration {
+    2 * base * (hops as u32)
+}
+
+impl<S: SendMsg + Send + Sync + 'static> SessionManager<S> {
+    pub fn new<F: Fn() -> S + Send + Sync + 'static>(
+        my_peer_id: PeerId,
+        sender_gen: F,
+        cfg: SessionManagerConfig,
+    ) -> Self {
+        let sender_gen = Arc::new(sender_gen);
+        Self {
+            sender_gen: sender_gen.clone(),
+            session_initiations: moka::future::Cache::builder()
+                .max_capacity(cfg.session_tag_range.clone().count() as u64)
+                .time_to_live(initiation_timeout_max(
+                    cfg.initiation_timeout_base,
+                    RoutingOptions::MAX_INTERMEDIATE_HOPS,
+                ))
+                .build(),
+            sessions: moka::future::Cache::builder()
+                .max_capacity(u16::MAX as u64)
+                .time_to_idle(cfg.idle_timeout)
+                .async_eviction_listener(move |k, v, c| {
+                    let msg_sender = sender_gen();
+                    close_session_after_eviction(msg_sender, my_peer_id, *k, v, c)
+                })
+                .build(),
+            session_notifiers: Arc::new(OnceLock::new()),
+            my_peer_id,
+            cfg,
+        }
+    }
+
+    pub fn start(
+        &self,
+        new_session_notifier: UnboundedSender<IncomingSession>,
+    ) -> Vec<hopr_async_runtime::prelude::JoinHandle<()>> {
+        let (session_close_tx, session_close_rx) = futures::channel::mpsc::unbounded();
+        self.session_notifiers
+            .set((new_session_notifier, session_close_tx))
+            .expect("must set the session notifiers");
+
+        let myself = self.clone();
+        let jh_closure_notifications =
+            hopr_async_runtime::prelude::spawn(session_close_rx.for_each_concurrent(None, move |closed_session_id| {
+                let myself = myself.clone();
+                async move {
+                    trace!(
+                        session_id = tracing::field::debug(closed_session_id),
+                        "sending notification of session closure done by us"
+                    );
+                    match myself.close_session(closed_session_id, true).await {
+                        Ok(closed) if closed => debug!(
+                            session_id = tracing::field::debug(closed_session_id),
+                            "session has been closed by us"
+                        ),
+                        Err(e) => error!(
+                            session_id = tracing::field::debug(closed_session_id),
+                            error = %e,
+                            "cannot initiate session closure notification"
+                        ),
+                        _ => {}
+                    }
+                }
+            }));
+
+        let myself = self.clone();
+        let jh_session_expiration = hopr_async_runtime::prelude::spawn(async move {
+            let jitter = hopr_crypto_random::random_float_in_range(1.0..1.5);
+            let timeout = initiation_timeout_max(
+                myself.cfg.initiation_timeout_base,
+                RoutingOptions::MAX_INTERMEDIATE_HOPS,
+            )
+            .min(myself.cfg.idle_timeout)
+            .mul_f64(jitter)
+                / 2;
+            loop {
+                hopr_async_runtime::prelude::sleep(timeout).await;
+                trace!("executing session cache evictions");
+                futures::join!(
+                    myself.sessions.run_pending_tasks(),
+                    myself.session_initiations.run_pending_tasks()
+                );
+            }
+        });
+
+        vec![jh_closure_notifications, jh_session_expiration]
+    }
+
+    pub fn is_started(&self) -> bool {
+        self.session_notifiers.get().is_some()
+    }
+
+    /// Initiates new outgoing Session with the given configuration.
+    pub async fn new_session(&self, cfg: SessionClientConfig) -> crate::errors::Result<Session> {
+        if !self.is_started() {
+            return Err(TransportSessionError::Manager("manager not running".into()));
+        }
+
+        let (tx_initiation_done, rx_initiation_done) = futures::channel::mpsc::unbounded();
+        let challenge = insert_into_next_slot(
+            &self.session_initiations,
+            |ch| {
+                if let Some(challenge) = ch {
+                    ((challenge + 1) % hopr_crypto_random::MAX_RANDOM_INTEGER).max(MIN_CHALLENGE)
+                } else {
+                    hopr_crypto_random::random_integer(MIN_CHALLENGE, None)
+                }
+            },
+            tx_initiation_done,
+        )
+        .await
+        .ok_or(TransportSessionError::Manager(
+            "all challenge slots are occupied".into(),
+        ))?; // almost impossible with u64
+
+        // Prepare the session initiation message in the Start protocol
+        trace!(challenge, ?cfg, "initiating session with config");
+        let start_session_msg = StartProtocol::<SessionId>::StartSession(StartInitiation {
+            challenge,
+            target: match cfg.target_protocol {
+                IpProtocol::TCP => SessionTarget::TcpStream(cfg.target),
+                IpProtocol::UDP => SessionTarget::UdpStream(cfg.target),
+            },
+            capabilities: cfg.capabilities.iter().copied().collect(),
+            // Back-routing currently uses the same (inverted) route as session initiation
+            back_routing: Some((cfg.path_options.clone().invert(), self.my_peer_id)),
+        });
+
+        // Send the Session initiation message
+        trace!(challenge, "sending new session request");
+        let msg_sender = Arc::new((self.sender_gen)());
+        msg_sender
+            .send_message(start_session_msg.try_into()?, cfg.peer, cfg.path_options.clone())
+            .await?;
+
+        // Await session establishment response from the Exit node or timeout
+        pin_mut!(rx_initiation_done);
+        let initiation_done = TryStreamExt::try_next(&mut rx_initiation_done);
+
+        // The timeout is given by the number of hops requested
+        let timeout = hopr_async_runtime::prelude::sleep(initiation_timeout_max(
+            self.cfg.initiation_timeout_base,
+            cfg.path_options.count_hops() + 1,
+        ));
+        pin_mut!(timeout);
+
+        trace!(challenge, "awaiting session establishment");
+        match futures::future::select(initiation_done, timeout).await {
+            Either::Left((Ok(Some(est)), _)) => {
+                // Session has been established, construct it
+                let session_id = est.session_id;
+                debug!(
+                    challenge = est.orig_challenge,
+                    session_id = tracing::field::debug(session_id),
+                    "started a new session"
+                );
+
+                // Insert the Session object, forcibly overwrite any other session with the same ID
+                let (tx, rx) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
+                self.sessions
+                    .insert(session_id, (Arc::new(tx), cfg.path_options.clone()))
+                    .await;
+
+                #[cfg(all(feature = "prometheus", not(test)))]
+                {
+                    METRIC_NUM_INITIATED_SESSIONS.increment();
+                    METRIC_ACTIVE_SESSIONS.increment(1.0);
+                }
+
+                Ok(Session::new(
+                    session_id,
+                    self.my_peer_id,
+                    cfg.path_options,
+                    cfg.capabilities.into_iter().collect(),
+                    msg_sender,
+                    rx,
+                    self.session_notifiers.get().map(|(_, c)| c.clone()),
+                ))
+            }
+            Either::Left((Ok(None), _)) => Err(TransportSessionError::Manager(
+                "internal error: sender has been closed without completing the session establishment".into(),
+            )),
+            Either::Left((Err(e), _)) => {
+                // The other side didn't allow us to establish a session
+                error!(
+                    challenge = e.challenge,
+                    error = ?e,
+                    "the other party rejected the session initiation with error"
+                );
+                Err(TransportSessionError::Rejected(e.reason).into())
+            }
+            Either::Right(_) => {
+                // Timeout waiting for a session establishment
+                error!(challenge, "session initiation attempt timed out");
+
+                #[cfg(all(feature = "prometheus", not(test)))]
+                METRIC_RECEIVED_SESSION_ERRS.increment(&["timeout"]);
+
+                Err(TransportSessionError::Timeout.into())
+            }
+        }
+    }
+
+    /// Handles session initiation (the Start protocol) messages.
+    ///
+    /// ## Arguments
+    /// - `data`: Unparsed data of a Start protocol message
+    pub async fn handle_start_protocol_message(&self, data: ApplicationData) -> crate::errors::Result<()> {
+        match StartProtocol::<SessionId>::try_from(data)? {
+            StartProtocol::StartSession(session_req) => {
+                trace!(challenge = session_req.challenge, "received session initiation request");
+
+                // Back-routing information is mandatory until the Return Path is introduced
+                let (route, peer) = session_req.back_routing.ok_or(TransportSessionError::Manager(
+                    "no back-routing information given".into(),
+                ))?;
+
+                debug!(
+                    peer = tracing::field::display(peer),
+                    "got new session request, searching for a free session slot"
+                );
+
+                let (new_session_notifier, close_session_notifier) = self
+                    .session_notifiers
+                    .get()
+                    .cloned()
+                    .ok_or(TransportSessionError::Manager("manager not started".into()))?;
+
+                let msg_sender = Arc::new((self.sender_gen)());
+
+                // Construct the session
+                let (tx_session_data, rx_session_data) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
+                if let Some(session_id) = insert_into_next_slot(
+                    &self.sessions,
+                    |sid| {
+                        let next_tag = match sid {
+                            Some(session_id) => ((session_id.tag() + 1) % self.cfg.session_tag_range.end())
+                                .max(*self.cfg.session_tag_range.start()),
+                            None => hopr_crypto_random::random_integer(
+                                *self.cfg.session_tag_range.start() as u64,
+                                Some(*self.cfg.session_tag_range.end() as u64),
+                            ) as u16,
+                        };
+                        SessionId::new(next_tag, peer)
+                    },
+                    (Arc::new(tx_session_data), route.clone()),
+                )
+                .await
+                {
+                    debug!(
+                        session_id = tracing::field::debug(session_id),
+                        "assigning a new session"
+                    );
+
+                    let session = Session::new(
+                        session_id,
+                        self.my_peer_id,
+                        route.clone(),
+                        session_req.capabilities,
+                        msg_sender.clone(),
+                        rx_session_data,
+                        close_session_notifier.into(),
+                    );
+
+                    // Extract useful information about the session from the Start protocol message
+                    let incoming_session = IncomingSession {
+                        session,
+                        target: session_req.target,
+                    };
+
+                    // Notify that a new incoming session has been created
+                    if let Err(e) = new_session_notifier.unbounded_send(incoming_session) {
+                        warn!(error = %e, "failed to send session to incoming session queue");
+                    }
+
+                    trace!(
+                        session_id = tracing::field::debug(session_id),
+                        "session notification sent"
+                    );
+
+                    // Notify the sender that the session has been established.
+                    // Set our peer ID in the session ID sent back to them.
+                    let data = StartProtocol::SessionEstablished(StartEstablished {
+                        orig_challenge: session_req.challenge,
+                        session_id: session_id.with_peer(self.my_peer_id),
+                    });
+
+                    msg_sender
+                        .send_message(data.try_into()?, peer, route)
+                        .await
+                        .map_err(|e| {
+                            TransportSessionError::Manager(format!("failed to send session establishment message: {e}"))
+                        })?;
+
+                    info!(
+                        session_id = tracing::field::display(session_id),
+                        "new session established"
+                    );
+
+                    #[cfg(all(feature = "prometheus", not(test)))]
+                    {
+                        METRIC_NUM_ESTABLISHED_SESSIONS.increment();
+                        METRIC_ACTIVE_SESSIONS.increment(1.0);
+                    }
+                } else {
+                    error!(
+                        peer = tracing::field::display(peer),
+                        "failed to reserve a new session slot"
+                    );
+
+                    // Notify the sender that the session could not be established
+                    let reason = StartErrorReason::NoSlotsAvailable;
+                    let data = StartProtocol::<SessionId>::SessionError(StartErrorType {
+                        challenge: session_req.challenge,
+                        reason,
+                    });
+
+                    msg_sender
+                        .send_message(data.try_into()?, peer, route)
+                        .await
+                        .map_err(|e| {
+                            TransportSessionError::Manager(format!(
+                                "failed to send session establishment error message: {e}"
+                            ))
+                        })?;
+
+                    trace!(
+                        peer = tracing::field::display(peer),
+                        "session establishment failure message sent"
+                    );
+
+                    #[cfg(all(feature = "prometheus", not(test)))]
+                    METRIC_SENT_SESSION_ERRS.increment(&[&reason.to_string()])
+                }
+            }
+            StartProtocol::SessionEstablished(est) => {
+                trace!(
+                    session_id = tracing::field::debug(est.session_id),
+                    "received session establishment confirmation"
+                );
+                let challenge = est.orig_challenge;
+                if let Some(tx_est) = self.session_initiations.remove(&est.orig_challenge).await {
+                    if let Err(e) = tx_est.unbounded_send(Ok(est)) {
+                        return Err(TransportSessionError::Manager(format!(
+                            "could not notify session establishment: {e}"
+                        )));
+                    }
+                    debug!(challenge, "session establishment complete");
+                } else {
+                    error!(challenge, "session establishment attempt expired");
+                }
+            }
+            StartProtocol::SessionError(err) => {
+                trace!(
+                    challenge = err.challenge,
+                    error = ?err.reason,
+                    "failed to initialize a session",
+                );
+                // Currently, we don't distinguish between individual error types
+                // and just discard the initiation attempt and pass on the error.
+                if let Some(tx_est) = self.session_initiations.remove(&err.challenge).await {
+                    if let Err(e) = tx_est.unbounded_send(Err(err)) {
+                        return Err(TransportSessionError::Manager(format!(
+                            "could not notify session establishment error {err:?}: {e}"
+                        )));
+                    }
+                    error!(
+                        challenge = err.challenge,
+                        error = ?err,
+                        "session establishment error received"
+                    );
+                } else {
+                    error!(
+                        challenge = err.challenge,
+                        error = ?err,
+                        "session establishment attempt expired before error could be delivered"
+                    );
+                }
+
+                #[cfg(all(feature = "prometheus", not(test)))]
+                METRIC_RECEIVED_SESSION_ERRS.increment(&[&err.reason.to_string()])
+            }
+            StartProtocol::CloseSession(session_id) => {
+                trace!(
+                    session_id = tracing::field::debug(session_id),
+                    "received session close request"
+                );
+                match self.close_session(session_id, false).await {
+                    Ok(closed) if closed => debug!(
+                        session_id = tracing::field::debug(session_id),
+                        "session has been closed by the other party"
+                    ),
+                    Err(e) => error!(
+                        session_id = tracing::field::debug(session_id),
+                        error = %e,
+                        "session could not be closed on other party's request"
+                    ),
+                    _ => {}
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn close_session(&self, session_id: SessionId, notify_closure: bool) -> crate::errors::Result<bool> {
+        if let Some((session_tx, routing_options)) = self.sessions.remove(&session_id).await {
+            // Notification is not sent only when closing in response to the other party's request
+            if notify_closure {
+                trace!(
+                    session_id = tracing::field::debug(session_id),
+                    "sending session termination"
+                );
+                (self.sender_gen)()
+                    .send_message(
+                        StartProtocol::CloseSession(session_id.with_peer(self.my_peer_id)).try_into()?,
+                        *session_id.peer(),
+                        routing_options,
+                    )
+                    .await?;
+            }
+
+            // Closing the data sender on the session will cause the Session to terminate
+            session_tx.close_channel();
+            trace!(
+                session_id = tracing::field::debug(session_id),
+                "data tx channel closed on session"
+            );
+            Ok(true)
+        } else {
+            // Do not treat this as an error
+            debug!(
+                session_id = tracing::field::debug(session_id),
+                "could not find session id to close, maybe the session is already closed"
+            );
+            Ok(false)
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct BufferingMsgSender {
+        buffer: futures::channel::mpsc::UnboundedSender<ApplicationData>,
+    }
+
+    #[async_trait::async_trait]
+    impl SendMsg for BufferingMsgSender {
+        async fn send_message(
+            &self,
+            data: ApplicationData,
+            _destination: PeerId,
+            _options: RoutingOptions,
+        ) -> Result<(), TransportSessionError> {
+            self.buffer.unbounded_send(data).expect("buffer unbounded error");
+            Ok(())
+        }
+
+        fn close(&self) {}
+    }
+
+    #[async_std::test]
+    async fn session_manager_should_create_session() -> anyhow::Result<()> {
+        let alice_peer = PeerId::random();
+        let bob_peer = PeerId::random();
+
+        let (alice_tx, alice_rx) = futures::channel::mpsc::unbounded();
+        let (bob_tx, bob_rx) = futures::channel::mpsc::unbounded();
+
+        let alice_transport_gen = move || BufferingMsgSender { buffer: bob_tx.clone() };
+        let bob_transport_gen = move || BufferingMsgSender {
+            buffer: alice_tx.clone(),
+        };
+
+        // Alice's SessionManager and message loop
+        let alice_mgr = SessionManager::new(alice_peer, alice_transport_gen, Default::default());
+        let alice_mgr_clone = alice_mgr.clone();
+        let jh_1 = async_std::task::spawn(async move {
+            pin_mut!(alice_rx);
+            while let Some(msg) = alice_rx.next().await {
+                alice_mgr_clone.handle_start_protocol_message(msg).await.unwrap();
+            }
+        });
+
+        // Bob's SessionManager and message loop
+        let bob_mgr = SessionManager::new(bob_peer, bob_transport_gen, Default::default());
+        let bob_mgr_clone = bob_mgr.clone();
+        let jh_2 = async_std::task::spawn(async move {
+            pin_mut!(bob_rx);
+            while let Some(msg) = bob_rx.next().await {
+                bob_mgr_clone.handle_start_protocol_message(msg).await.unwrap();
+            }
+        });
+
+        // Start Alice
+        let (new_session_tx_alice, new_session_rx_alice) = futures::channel::mpsc::unbounded();
+        let alice_jhs = alice_mgr.start(new_session_tx_alice);
+
+        // Start Bob
+        let (new_session_tx_bob, new_session_rx_bob) = futures::channel::mpsc::unbounded();
+        let bob_jhs = bob_mgr.start(new_session_tx_bob);
+
+        for jh in alice_jhs.into_iter().chain(bob_jhs.into_iter()).chain([jh_1, jh_2]) {
+            hopr_async_runtime::prelude::cancel_join_handle(jh).await;
+        }
+        Ok(())
+    }
+}

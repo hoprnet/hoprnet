@@ -62,7 +62,7 @@ use hopr_transport_protocol::{
 };
 use hopr_transport_session::{
     initiation::{StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation, StartProtocol},
-    IpProtocol,
+    IpProtocol, SessionManager,
 };
 
 use crate::{
@@ -571,6 +571,7 @@ where
     session_initiations: SessionInitiationCache,
     session_close_notifier: OnceLock<UnboundedSender<SessionId>>,
     sessions: SessionCache,
+    _smgr: SessionManager<helpers::MessageSender<T>>,
 }
 
 // Needs lazy-static, since Duration multiplication by a constant is yet not a const-operation.
@@ -597,6 +598,16 @@ where
             process_packet_send.clone(),
             PathPlanner::new(db.clone(), channel_graph.clone()),
         );
+
+        let pkt_send_clone = process_packet_send.clone();
+        let db_clone = db.clone();
+        let cg_clone = channel_graph.clone();
+        let snd_gen = move || {
+            helpers::MessageSender::new(
+                pkt_send_clone.clone(),
+                PathPlanner::new(db_clone.clone(), cg_clone.clone()),
+            )
+        };
 
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_ACTIVE_SESSIONS.set(0.0);
@@ -630,6 +641,7 @@ where
                 .build(),
             session_close_notifier: OnceLock::new(),
             cfg,
+            _smgr: SessionManager::new(identity.public().to_peer_id(), snd_gen, Default::default()),
         }
     }
 

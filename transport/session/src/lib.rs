@@ -5,8 +5,11 @@
 
 pub mod errors;
 pub mod initiation;
+mod manager;
 pub mod traits;
 pub mod types;
+
+pub use manager::{SessionManager, SessionManagerConfig};
 
 use libp2p_identity::PeerId;
 #[cfg(feature = "serde")]

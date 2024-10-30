@@ -25,6 +25,12 @@ pub enum TransportSessionError {
     #[error("the other party rejected session initiation with error: {0}")]
     Rejected(StartErrorReason),
 
+    #[error("session manager error: {0}")]
+    Manager(String),
+
+    #[error(transparent)]
+    Network(#[from] hopr_network_types::errors::NetworkTypeError),
+
     #[error("session is closed")]
     Closed,
 }

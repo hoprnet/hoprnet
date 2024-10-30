@@ -209,7 +209,7 @@ On top of the default configuration options generated for the command line, the 
 
 Running the node without any command-line argument might not work depending on the installation method used. Some command line arguments are required.
 
-A basic reasonable setup is that uses a custom identity and enabels a REST API of the `hoprd` could look like:
+A basic reasonable setup is that uses a custom identity and enables a REST API of the `hoprd` could look like:
 
 ```sh
 hoprd --identity /app/hoprd-db/.hopr-identity --password switzerland --init --announce --host "0.0.0.0:9091" --apiToken <MY_TOKEN> --network doufur
