@@ -1,5 +1,10 @@
 ---
 hopr:
+  # run heartbeats more frequently
+  heartbeat:
+    interval: 10
+    threshold: 10
+    variance: 1
   strategy:
     on_fail_continue: true
     execution_interval: 1
