@@ -1,5 +1,4 @@
 use futures::{channel::mpsc::UnboundedReceiver, pin_mut, StreamExt};
-use hopr_crypto_packet::packet::USABLE_PAYLOAD_SIZE;
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_internal_types::protocol::{ApplicationData, PAYLOAD_SIZE};
 use hopr_network_types::prelude::state::SessionFeature;
@@ -112,7 +111,7 @@ impl Hash for SessionId {
 
 /// Inner MTU size of what the HOPR payload can take (payload - peer_id - application_tag)
 pub const SESSION_USABLE_MTU_SIZE: usize =
-    USABLE_PAYLOAD_SIZE - OffchainPublicKey::SIZE - std::mem::size_of::<hopr_internal_types::protocol::Tag>();
+    PAYLOAD_SIZE - OffchainPublicKey::SIZE - std::mem::size_of::<hopr_internal_types::protocol::Tag>();
 
 /// Helper trait to allow Box aliasing
 trait AsyncReadWrite: futures::AsyncWrite + futures::AsyncRead + Send {}
@@ -464,7 +463,7 @@ impl futures::AsyncRead for InnerSession {
 
 // TODO: 3.0 remove once return path is implemented
 pub fn wrap_with_offchain_key(peer: &PeerId, data: Box<[u8]>) -> crate::errors::Result<Vec<u8>> {
-    if data.len() > USABLE_PAYLOAD_SIZE.saturating_sub(OffchainPublicKey::SIZE) {
+    if data.len() > PAYLOAD_SIZE.saturating_sub(OffchainPublicKey::SIZE) {
         return Err(TransportSessionError::PayloadSize);
     }
 

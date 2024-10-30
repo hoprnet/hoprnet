@@ -28,7 +28,6 @@ use futures::{
     future::{select, Either},
     pin_mut, FutureExt, StreamExt, TryStreamExt,
 };
-use hopr_crypto_packet::packet::USABLE_PAYLOAD_SIZE;
 
 use std::time::Duration;
 use std::{
@@ -1108,9 +1107,9 @@ where
             }
         }
 
-        if msg.len() > USABLE_PAYLOAD_SIZE {
+        if msg.len() > PAYLOAD_SIZE {
             return Err(HoprTransportError::Api(format!(
-                "Message exceeds the maximum allowed size of {USABLE_PAYLOAD_SIZE} bytes"
+                "Message exceeds the maximum allowed size of {PAYLOAD_SIZE} bytes"
             )));
         }
 
