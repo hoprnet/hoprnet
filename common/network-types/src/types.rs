@@ -176,6 +176,7 @@ impl IpOrHost {
 /// use hopr_crypto_types::prelude::{Keypair, OffchainKeypair};
 /// use hopr_network_types::prelude::{IpOrHost, SealedHost};
 ///
+/// # fn main() -> anyhow::Result<()> {
 /// let keypair = OffchainKeypair::random();
 ///
 /// let exit_node_peer_id: PeerId = keypair.public().into();
@@ -197,6 +198,8 @@ impl IpOrHost {
 /// let encrypted_2 = SealedHost::seal(host.clone(), keypair.public().into())?;
 /// assert_ne!(encrypted_1, encrypted_2);
 ///
+/// # Ok(())
+/// # }
 /// ````
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]

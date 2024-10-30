@@ -265,12 +265,12 @@ mod tests {
             out
         });
 
-        #[cfg(feature = "runtime-tokio")]
+        #[cfg(all(feature = "runtime-tokio", not(test)))]
         {
             (read.map(|v| v.unwrap()), written.map(|v| v.unwrap()))
         }
 
-        #[cfg(not(feature = "runtime-tokio"))]
+        #[cfg(any(not(feature = "runtime-tokio"), test))]
         (read, written)
     }
 

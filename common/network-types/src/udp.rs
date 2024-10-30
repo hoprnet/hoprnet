@@ -700,7 +700,6 @@ mod tests {
         let mut builder = ConnectedUdpStream::builder()
             .with_buffer_size(1024)
             .with_queue_size(512)
-            .with_receiver_parallelism()
             .with_counterparty(listen_addr);
 
         if let Some(parallelism) = parallelism {

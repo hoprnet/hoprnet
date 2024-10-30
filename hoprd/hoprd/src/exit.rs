@@ -22,7 +22,7 @@ fn fifteen() -> u32 {
 }
 
 fn default_target_retry_delay() -> Duration {
-    Duration::from_millis(1500)
+    Duration::from_secs(2)
 }
 
 /// Configuration of [`HoprServerIpForwardingReactor`].
@@ -42,9 +42,9 @@ pub struct IpForwardingReactorConfig {
 
     /// Delay between retries in seconds to reach a TCP target.
     ///
-    /// Defaults to 1500 ms.
+    /// Defaults to 2 seconds.
     #[serde(default = "default_target_retry_delay")]
-    #[default(Duration::from_millis(1500))]
+    #[default(Duration::from_secs(2))]
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
     pub target_retry_delay: Duration,
 
