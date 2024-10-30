@@ -140,10 +140,10 @@ impl<S: SphinxSuite> MetaPacket<S> {
 
     /// Creates a new outgoing packet with the given payload `msg`, `path` and `shared_keys` computed along the path.
     ///
-    /// Size of the `msg` must be less or equal [PAYLOAD_SIZE], otherwise the
+    /// The size of the `msg` must be less or equal [PAYLOAD_SIZE], otherwise the
     /// constructor will panic. The caller **must** ensure the size is correct beforehand.
-    /// The `additional_data_relayer` contain the PoR challenges for the individual relayers along the path,
-    /// each of the challenges have the same size of `additional_relayer_data_len`.
+    /// The `additional_data_relayer` contains the PoR challenges for the individual relayers along the path,
+    /// each of the challenges has the same size of `additional_relayer_data_len`.
     ///
     /// Optionally, there could be some additional data (`additional_data_last_hop`) for the packet destination.
     /// This is reserved for the future use by SURBs.
@@ -371,6 +371,8 @@ mod tests {
             &por_strings.iter().map(|v| v.as_ref()).collect::<Vec<_>>(),
             None,
         );
+
+        assert!(mp.as_ref().len() < 1492, "metapacket too long {}", mp.as_ref().len());
 
         for (i, pair) in keypairs.iter().enumerate() {
             let fwd = mp
