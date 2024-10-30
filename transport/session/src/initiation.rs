@@ -59,8 +59,28 @@ pub struct StartEstablished<T> {
     pub session_id: T,
 }
 
+#[cfg_attr(doc, aquamarine::aquamarine)]
 /// Lists all messages of the Start protocol for a session establishment
 /// with `T` as session identifier.
+///
+/// # Diagram of the protocol
+/// ```mermaid
+/// sequenceDiagram
+///     Entry->>Exit: SessionInitiation (Challenge)
+///     alt If Exit can accept a new session
+///     Note right of Exit: SessionID_Exit [Entry PeerID, Tag]
+///     Exit->>Entry: SessionEstablished (Challenge, SessionID_Entry)
+///     Note left of Entry: SessionID_Entry [Exit PeerID, Tag]
+///     Note over Entry,Exit: Data
+///     Entry->>Exit: Close Session (SessionID_Entry)
+///     Exit->>Entry: Close Session (SessionID_Exit)
+///     else If Exit cannot accept a new session
+///     Exit->>Entry: SesssionError (Challenge, Reason)
+///     end
+///     opt If initiation attempt times out
+///     Note left of Entry: Failure
+///     end
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, strum::EnumDiscriminants)]
 // #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] -- enforce serialization via encode/decode
 #[strum_discriminants(vis(pub(crate)))]

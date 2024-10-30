@@ -18,10 +18,11 @@ use crate::utils::k256_scalar_from_bytes;
 ///
 /// The VRF is thereby needed because it generates on-demand deterministic
 /// entropy that can only be derived by the ticket redeemer.
+#[allow(non_snake_case)]
 #[derive(Clone, Default)]
 pub struct VrfParameters {
     /// the pseudo-random point
-    pub v: CurvePoint,
+    pub V: CurvePoint,
     pub h: Scalar,
     pub s: Scalar,
 }
@@ -66,7 +67,7 @@ impl<'de> Deserialize<'de> for VrfParameters {
 impl std::fmt::Debug for VrfParameters {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("VrfParameters")
-            .field("V", &hex::encode(self.v.as_compressed()))
+            .field("V", &hex::encode(self.V.as_compressed()))
             .field("h", &hex::encode(self.h.to_bytes()))
             .field("s", &hex::encode(self.s.to_bytes()))
             .finish()
@@ -76,7 +77,7 @@ impl std::fmt::Debug for VrfParameters {
 impl From<VrfParameters> for [u8; VRF_PARAMETERS_SIZE] {
     fn from(value: VrfParameters) -> Self {
         let mut ret = [0u8; VRF_PARAMETERS_SIZE];
-        ret[0..CurvePoint::SIZE_COMPRESSED].copy_from_slice(value.v.as_compressed().as_ref());
+        ret[0..CurvePoint::SIZE_COMPRESSED].copy_from_slice(value.V.as_compressed().as_ref());
         ret[CurvePoint::SIZE_COMPRESSED..CurvePoint::SIZE_COMPRESSED + 32].copy_from_slice(value.h.to_bytes().as_ref());
         ret[CurvePoint::SIZE_COMPRESSED + 32..CurvePoint::SIZE_COMPRESSED + 64]
             .copy_from_slice(value.s.to_bytes().as_ref());
@@ -92,7 +93,7 @@ impl TryFrom<&[u8]> for VrfParameters {
             let mut v = [0u8; CurvePoint::SIZE_COMPRESSED];
             v.copy_from_slice(&value[..CurvePoint::SIZE_COMPRESSED]);
             Ok(VrfParameters {
-                v: CurvePoint::try_from(&value[..CurvePoint::SIZE_COMPRESSED])?,
+                V: CurvePoint::try_from(&value[..CurvePoint::SIZE_COMPRESSED])?,
                 h: k256_scalar_from_bytes(&value[CurvePoint::SIZE_COMPRESSED..CurvePoint::SIZE_COMPRESSED + 32])
                     .map_err(|_| GeneralError::ParseError)?,
                 s: k256_scalar_from_bytes(
@@ -110,17 +111,19 @@ const VRF_PARAMETERS_SIZE: usize = CurvePoint::SIZE_COMPRESSED + 32 + 32;
 impl BytesEncodable<VRF_PARAMETERS_SIZE> for VrfParameters {}
 
 impl VrfParameters {
-    /// Verifies that VRF values are valid
+    /// Verifies that VRF values are valid.
+    /// The SC performs the verification. This method is here just to test correctness.
+    #[allow(non_snake_case)]
     pub fn verify<const T: usize>(&self, creator: &Address, msg: &[u8; T], dst: &[u8]) -> Result<()> {
-        let cap_b = self.get_encoded_payload(creator, msg, dst)?;
+        let cap_B = self.get_encoded_payload(creator, msg, dst)?;
 
-        let r_v: ProjectivePoint<Secp256k1> = cap_b * self.s - self.v.clone().into_projective_point() * self.h;
+        let R_v: ProjectivePoint<Secp256k1> = cap_B * self.s - self.V.clone().into_projective_point() * self.h;
 
         let h_check = Secp256k1::hash_to_scalar::<ExpandMsgXmd<sha3::Keccak256>>(
             &[
                 creator.as_ref(),
-                &self.v.as_uncompressed().as_bytes()[1..],
-                &r_v.to_affine().to_encoded_point(false).as_bytes()[1..],
+                &self.V.as_uncompressed().as_bytes()[1..],
+                &R_v.to_affine().to_encoded_point(false).as_bytes()[1..],
                 msg,
             ],
             &[dst],
@@ -139,7 +142,7 @@ impl VrfParameters {
     ///
     /// Used to create the witness values needed by the smart contract.
     pub fn get_h_v_witness(&self) -> k256::EncodedPoint {
-        (self.v.affine * self.h).to_affine().to_encoded_point(false)
+        (self.V.affine * self.h).to_affine().to_encoded_point(false)
     }
 
     /// Performs a scalar point multiplication with the encoded payload
@@ -178,13 +181,14 @@ impl VrfParameters {
 /// Takes a private key, the corresponding Ethereum address and a payload
 /// and creates all parameters that are required by the smart contract
 /// to prove that a ticket is a win.
+#[allow(non_snake_case)]
 pub fn derive_vrf_parameters<T: AsRef<[u8]>>(
     msg: T,
     chain_keypair: &ChainKeypair,
     dst: &[u8],
 ) -> crate::errors::Result<VrfParameters> {
     let chain_addr = chain_keypair.public().to_address();
-    let b = Secp256k1::hash_from_bytes::<ExpandMsgXmd<sha3::Keccak256>>(&[chain_addr.as_ref(), msg.as_ref()], &[dst])?;
+    let B = Secp256k1::hash_from_bytes::<ExpandMsgXmd<sha3::Keccak256>>(&[chain_addr.as_ref(), msg.as_ref()], &[dst])?;
 
     let a: Scalar = chain_keypair.into();
 
@@ -192,24 +196,24 @@ pub fn derive_vrf_parameters<T: AsRef<[u8]>>(
         return Err(crate::errors::CryptoError::InvalidSecretScalar);
     }
 
-    let v = b * a;
+    let V = B * a;
 
     let r = Secp256k1::hash_to_scalar::<ExpandMsgXmd<sha3::Keccak256>>(
         &[
             &a.to_bytes(),
-            &v.to_affine().to_encoded_point(false).as_bytes()[1..],
+            &V.to_affine().to_encoded_point(false).as_bytes()[1..],
             &random_bytes::<64>(),
         ],
         &[dst],
     )?;
 
-    let r_v = b * r;
+    let R_v = B * r;
 
     let h = Secp256k1::hash_to_scalar::<ExpandMsgXmd<sha3::Keccak256>>(
         &[
             chain_addr.as_ref(),
-            &v.to_affine().to_encoded_point(false).as_bytes()[1..],
-            &r_v.to_affine().to_encoded_point(false).as_bytes()[1..],
+            &V.to_affine().to_encoded_point(false).as_bytes()[1..],
+            &R_v.to_affine().to_encoded_point(false).as_bytes()[1..],
             msg.as_ref(),
         ],
         &[dst],
@@ -217,7 +221,7 @@ pub fn derive_vrf_parameters<T: AsRef<[u8]>>(
     let s = r + h * a;
 
     Ok(VrfParameters {
-        v: v.to_affine().into(),
+        V: V.to_affine().into(),
         h,
         s,
     })
@@ -248,7 +252,7 @@ mod tests {
         let deserialized = VrfParameters::try_from(ALICE_VRF_OUTPUT.as_ref())?;
 
         // check for regressions
-        assert_eq!(vrf_values.v, deserialized.v);
+        assert_eq!(vrf_values.V, deserialized.V);
         assert!(deserialized
             .verify(&*ALICE_ADDR, &*TEST_MSG, Hash::default().as_ref())
             .is_ok());
@@ -256,7 +260,7 @@ mod tests {
         // PartialEq is intentionally not implemented for VrfParameters
         let vrf: [u8; VrfParameters::SIZE] = vrf_values.clone().into();
         let other = VrfParameters::try_from(vrf.as_ref())?;
-        assert!(vrf_values.s == other.s && vrf_values.v == other.v && vrf_values.h == other.h);
+        assert!(vrf_values.s == other.s && vrf_values.V == other.V && vrf_values.h == other.h);
 
         Ok(())
     }
