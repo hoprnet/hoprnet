@@ -562,7 +562,6 @@ mod alias {
         ),
         tag = "Alias",
     )]
-
     pub async fn aliases(req: Request<InternalState>) -> tide::Result<Response> {
         let aliases = req.state().hoprd_db.get_aliases().await?;
 
@@ -2471,7 +2470,8 @@ mod node {
 
                 async move {
                     if let Ok(Some(info)) = hopr.network_peer_info(&peer).await {
-                        if info.get_average_quality() > quality {
+                        let avg_quality = info.get_average_quality();
+                        if avg_quality != 0.0f64 && info.get_average_quality() >= quality {
                             Some((peer, info))
                         } else {
                             None
@@ -2525,6 +2525,8 @@ mod node {
             .collect::<FuturesUnordered<_>>()
             .collect()
             .await;
+
+        tracing::error!("==> all connected peers: {all_network_peers:?}");
 
         let body = NodePeersResponse {
             connected: all_network_peers,

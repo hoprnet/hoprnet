@@ -103,15 +103,16 @@ NODES = {
         NETWORK2,
         FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_barebone.cfg.yaml"),
     ),
-    "7": Node(
-        19097,
-        13307,
-        API_TOKEN,
-        FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_7"),
-        "localhost",
-        NETWORK1,
-        FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_barebone.cfg.yaml"),
-    ),
+    # NOTE: not needed in the tests
+    # "7": Node(
+    #     19097,
+    #     13307,
+    #     API_TOKEN,
+    #     FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_7"),
+    #     "localhost",
+    #     NETWORK1,
+    #     FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_barebone.cfg.yaml"),
+    # ),
 }
 
 
