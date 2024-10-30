@@ -63,8 +63,8 @@ impl TryFrom<log::Model> for SerializableLog {
 
 impl From<SerializableLog> for log_status::ActiveModel {
     fn from(value: SerializableLog) -> Self {
-        let processed = value.processed.map_or(false, |p| p);
-        let processed_at = value.processed_at.map_or(None, |p| Some(p.naive_utc()));
+        let processed = value.processed.unwrap_or(false);
+        let processed_at = value.processed_at.map(|p| p.naive_utc());
         let checksum = value
             .checksum
             .map(|c| Hash::from_hex(&c).expect("Invalid checksum").as_ref().to_vec());

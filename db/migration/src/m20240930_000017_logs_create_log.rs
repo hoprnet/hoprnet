@@ -38,12 +38,13 @@ impl MigrationTrait for Migration {
                     .table(Log::Table)
                     .if_not_exists()
                     .primary_key(
+                    .primary_key(
                         Index::create()
-                            .name("pk_log_status")
-                            .table(LogStatus::Table)
-                            .col(LogStatus::BlockNumber)
-                            .col(LogStatus::TransactionIndex)
-                            .col(LogStatus::LogIndex),
+                            .name("pk_log")
+                            .table(Log::Table)
+                            .col(Log::BlockNumber)
+                            .col(Log::TransactionIndex)
+                            .col(Log::LogIndex),
                     )
                     .col(ColumnDef::new(Log::TransactionIndex).not_null().binary_len(8))
                     .col(ColumnDef::new(Log::LogIndex).not_null().binary_len(8))
@@ -89,7 +90,7 @@ enum Log {
     Topics,
     // contains zero or more 32 Bytes non-indexed arguments of the log.
     Data,
-    // the block number where this log was in. null when its pending. null when its pending log.
+    // the block number where this log was in. null when it's a pending log.
     BlockNumber,
     // hash of the transactions this log was created from. null when its pending log.
     TransactionHash,

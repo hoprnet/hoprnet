@@ -42,7 +42,7 @@
     - [Running Tests Locally](#running-tests-locally)
       - [Testing environment](#testing-environment)
       - [Test execution](#test-execution)
-- [Using Fast Sync](#fast-sync)
+- [Using Fast Sync](#using-fast-sync)
 - [Contact](#contact)
 - [License](#license)
 
