@@ -93,8 +93,9 @@ enum Log {
     // the block number where this log was in. null when it's a pending log.
     BlockNumber,
     // hash of the transactions this log was created from. null when its pending log.
+    // hash of the transaction this log was created from. null when it's a pending log.
     TransactionHash,
-    // integer of the transactions index position log was created from. null when its pending log.
+    // integer of the transaction's index position this log was created from. null when it's a pending log.
     TransactionIndex,
     // hash of the block where this log was in. null when its pending. null when its pending log.
     BlockHash,
