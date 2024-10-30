@@ -194,13 +194,16 @@ Options:
 ```
 
 ### Environment variables
+
 On top of the default configuration options generated for the command line, the following environment variables can be used in order to tweak the node functionality:
+
 - `HOPRD_LOG_FORMAT` - override for the default stdout log formatter (follows tracing formatting options)
 - `HOPRD_USE_OPENTELEMETRY` - enable the opentelemetry output for this node
 - `OTEL_SERVICE_NAME` - the name of this node for the opentelemetry service
 - `HOPR_INTERNAL_LIBP2P_MAX_CONCURRENTLY_DIALED_PEER_COUNT` - the maximum number of concurrently dialed peers in libp2p
 - `HOPR_INTERNAL_LIBP2P_MAX_NEGOTIATING_INBOUND_STREAM_COUNT` - the maximum number of negotiating inbound streams
 - `ENV_WORKER_THREADS` - the number of environment worker threads for the tokio executor
+- `HOPRD_SESSION_PORT_RANGE` - allows restricting the port range of Session listener automatic port selection (when port 0 is specified).
 
 ### Example execution
 

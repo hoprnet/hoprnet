@@ -12,14 +12,13 @@ use axum::{
     http::status::StatusCode,
     response::IntoResponse,
 };
-use base64::Engine;
 use axum_extra::extract::Query;
+use base64::Engine;
 use futures::{AsyncReadExt, AsyncWriteExt, SinkExt, StreamExt, TryStreamExt};
 use futures_concurrency::stream::Merge;
 use libp2p_identity::PeerId;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
-use std::io::ErrorKind;
 use std::net::IpAddr;
 use std::sync::Arc;
 use tokio::net::TcpListener;
@@ -48,6 +47,9 @@ pub const HOPR_UDP_BUFFER_SIZE: usize = 16384;
 /// Size of the queue (back-pressure) for data incoming from a UDP stream.
 pub const HOPR_UDP_QUEUE_SIZE: usize = 8192;
 
+/// Name of the environment variable specifying automatic port range selection for Sessions.
+pub const HOPRD_SESSION_PORT_RANGE: &str = "HOPRD_SESSION_PORT_RANGE";
+
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
     static ref METRIC_ACTIVE_CLIENTS: hopr_metrics::MultiGauge = hopr_metrics::MultiGauge::new(
@@ -68,7 +70,7 @@ impl std::fmt::Display for SessionTargetSpec {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             SessionTargetSpec::Plain(t) => write!(f, "{t}"),
-            SessionTargetSpec::Sealed(t) => write!(f, "%{}", base64::prelude::BASE64_URL_SAFE.encode(t)),
+            SessionTargetSpec::Sealed(t) => write!(f, "$${}", base64::prelude::BASE64_URL_SAFE.encode(t)),
         }
     }
 }
@@ -77,14 +79,27 @@ impl std::str::FromStr for SessionTargetSpec {
     type Err = HoprLibError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.starts_with("$") {
+        if s.starts_with("$$") {
             Ok(Self::Sealed(
                 base64::prelude::BASE64_URL_SAFE
-                    .decode(&s[1..])
+                    .decode(&s[2..])
                     .map_err(|e| HoprLibError::GeneralError(e.to_string()))?,
             ))
         } else {
             Ok(Self::Plain(s.to_owned()))
+        }
+    }
+}
+
+impl TryFrom<SessionTargetSpec> for SealedHost {
+    type Error = HoprLibError;
+
+    fn try_from(value: SessionTargetSpec) -> Result<Self, Self::Error> {
+        match value {
+            SessionTargetSpec::Plain(plain) => IpOrHost::from_str(&plain)
+                .map(SealedHost::from)
+                .map_err(|e| HoprLibError::GeneralError(e.to_string())),
+            SessionTargetSpec::Sealed(enc) => Ok(SealedHost::Sealed(enc.into_boxed_slice())),
         }
     }
 }
@@ -102,9 +117,9 @@ pub(crate) struct SessionWebsocketClientQueryRequest {
     #[schema(required = true)]
     #[serde_as(as = "Vec<DisplayFromStr>")]
     pub capabilities: Vec<SessionCapability>,
-    // NOTE: the following fields should be removed from the session client request, they contain knowledge of server they should not have
     #[schema(required = false)]
-    pub target: Option<String>,
+    #[serde_as(as = "DisplayFromStr")]
+    pub target: Option<SessionTargetSpec>,
     #[schema(required = false)]
     #[serde(default = "default_protocol")]
     pub protocol: IpProtocol,
@@ -121,11 +136,11 @@ impl SessionWebsocketClientQueryRequest {
             peer: self.destination,
             path_options: RoutingOptions::Hops((self.hops as u32).try_into()?),
             target_protocol: self.protocol,
-            target: self
-                .target
-                .unwrap_or("127.0.0.1:4677".to_owned())
-                .parse()
-                .map_err(|e| HoprLibError::GeneralError(format!("target host parse error: {e}")))?,
+            target: self.target.map(SealedHost::try_from).unwrap_or(
+                IpOrHost::from_str("127.0.0.1:4677")
+                    .map(SealedHost::Plain)
+                    .map_err(|e| HoprLibError::GeneralError(e.to_string())),
+            )?,
             capabilities: self.capabilities,
         })
     }
@@ -262,7 +277,7 @@ pub(crate) struct SessionClientRequest {
     #[serde_as(as = "DisplayFromStr")]
     pub destination: PeerOrAddress,
     pub path: RoutingOptions,
-    pub target: SessionTargetSpec, // to be URL-encodable use: #[serde_as(as = "DisplayFromStr")]
+    pub target: SessionTargetSpec,
     pub listen_host: Option<String>,
     #[serde_as(as = "Option<Vec<DisplayFromStr>>")]
     pub capabilities: Option<Vec<SessionCapability>>,
@@ -277,12 +292,7 @@ impl SessionClientRequest {
             peer: self.destination.peer_id.unwrap(),
             path_options: self.path,
             target_protocol,
-            target: match self.target {
-                SessionTargetSpec::Plain(plain) => IpOrHost::from_str(&plain)
-                    .map_err(|e| HoprLibError::GeneralError(e.to_string()))?
-                    .into(),
-                SessionTargetSpec::Sealed(enc) => SealedHost::Sealed(enc.into_boxed_slice()),
-            },
+            target: self.target.try_into()?,
             capabilities: self.capabilities.unwrap_or_else(|| match target_protocol {
                 IpProtocol::TCP => {
                     vec![SessionCapability::Retransmission, SessionCapability::Segmentation]
@@ -665,9 +675,7 @@ where
                 _ => None,
             },
         )
-        .ok_or(std::io::Error::other(
-            "invalid port range in HOPRD_SESSION_PORT_RANGE env variable",
-        ))?;
+        .ok_or(std::io::Error::other(format!("invalid port range {range_str}")))?;
 
     for port in range {
         let addrs = addrs
@@ -692,7 +700,7 @@ async fn tcp_listen_on<A: std::net::ToSocketAddrs>(address: A) -> std::io::Resul
     // If automatic port allocation is requested and there's a restriction on the port range
     // (via HOPRD_SESSION_PORT_RANGE), try to find an address within that range.
     if addrs.iter().all(|a| a.port() == 0) {
-        if let Some(range_str) = std::env::var("HOPRD_SESSION_PORT_RANGE").ok() {
+        if let Some(range_str) = std::env::var(HOPRD_SESSION_PORT_RANGE).ok() {
             let tcp_listener =
                 try_restricted_bind(
                     addrs,
@@ -722,7 +730,7 @@ async fn udp_bind_to<A: std::net::ToSocketAddrs>(
     // If automatic port allocation is requested and there's a restriction on the port range
     // (via HOPRD_SESSION_PORT_RANGE), try to find an address within that range.
     if addrs.iter().all(|a| a.port() == 0) {
-        if let Some(range_str) = std::env::var("HOPRD_SESSION_PORT_RANGE").ok() {
+        if let Some(range_str) = std::env::var(HOPRD_SESSION_PORT_RANGE).ok() {
             let udp_listener = try_restricted_bind(addrs, &range_str, |addrs| {
                 futures::future::ready(builder.clone().build(addrs.as_slice()))
             })
