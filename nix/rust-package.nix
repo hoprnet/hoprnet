@@ -72,6 +72,8 @@ let
 
     CARGO_HOME = ".cargo";
     cargoExtraArgs = "--offline -p ${pname} ${cargoExtraArgs}";
+    # this env var is used by utoipa-swagger-ui to prevent internet access
+    CARGO_FEATURE_VENDORED = "true";
     cargoVendorDir = "vendor/cargo";
     # disable running tests automatically for now
     doCheck = false;

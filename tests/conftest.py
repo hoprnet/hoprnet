@@ -395,10 +395,6 @@ async def shared_nodes_bringup(
         logging.info("Funding nodes")
         fund_nodes(test_suite_name, test_dir, anvil_port)
 
-    async def is_node_ready(target: Node):
-        while not await asyncio.wait_for(target.api.readyz(), timeout=10):
-            await asyncio.sleep(1)
-
     # WAIT FOR NODES TO BE UP
     timeout = 60
     logging.info(f"Waiting up to {timeout}s for nodes to be ready")
@@ -439,7 +435,7 @@ async def shared_nodes_bringup(
         logging.critical("Not all nodes are connected to all peers, interrupting setup")
         raise RuntimeError
 
-        
+
 def load_private_key(test_suite_name, pos=0):
     with open(anvil_cfg_file(test_suite_name), "r") as file:
         data: dict = json.load(file)
@@ -499,10 +495,10 @@ async def swarm7(request):
         logging.info("Starting and waiting for local anvil server to be up (dump state enabled)")
         run(
             f"""
-            ./run-local-anvil.sh 
-            -l {anvil_log_file(test_suite_name)} 
-            -c {anvil_cfg_file(test_suite_name)} 
-            -p {anvil_port} 
+            ./run-local-anvil.sh
+            -l {anvil_log_file(test_suite_name)}
+            -c {anvil_cfg_file(test_suite_name)}
+            -p {anvil_port}
             -ds {anvil_state_file(test_dir)}
             """.split(),
             check=True,
@@ -596,8 +592,8 @@ async def teardown(swarm7: dict[str, Node]):
         logging.error(f"Error popping all messages in teardown: {e}")
 
 
-def to_ws_url(host, port):
-    return f"ws://{host}:{port}/api/v3/messages/websocket"
+def to_ws_url(host, port, args: list[tuple[str, str]]):
+    return f"ws://{host}:{port}/api/v3/session/websocket?" + '&'.join(f'{a[0]}={a[1]}' for a in args)
 
 
 def run_hopli_cmd(cmd: list[str], custom_env):

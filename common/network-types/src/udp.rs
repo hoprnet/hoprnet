@@ -112,7 +112,7 @@ impl UdpStreamParallelism {
                 }
             })
             .unwrap_or_else(|e| {
-                warn!("failed to determine available parallelism, defaulting to 1: {e}");
+                warn!(error = %e, "failed to determine available parallelism, defaulting to 1.");
                 NonZeroUsize::MIN
             })
             .into()
@@ -412,8 +412,10 @@ impl ConnectedUdpStream {
                     Ok((read, read_addr)) if read > 0 => {
                         trace!(
                             socket_id,
-                            udp_bound_addr = tracing::field::debug(sock_rx.local_addr()),
-                            "got {read} bytes of data from {read_addr}"
+                            udp_bound_addr = ?sock_rx.local_addr(),
+                            bytes = read,
+                            from = %read_addr,
+                            "received data from"
                         );
 
                         let addr = counterparty_rx.get_or_init(|| read_addr.into());
@@ -431,8 +433,10 @@ impl ConnectedUdpStream {
                                     // Don't even bother sending an error about discarded stuff
                                     warn!(
                                         socket_id,
-                                        udp_bound_addr = tracing::field::debug(sock_rx.local_addr()),
-                                        "discarded data from {read_addr}, which didn't come from {addr}"
+                                        udp_bound_addr = ?sock_rx.local_addr(),
+                                        ?read_addr,
+                                        ?addr,
+                                        "discarded data, which didn't come expected address"
                                     );
                                     None
                                 }
@@ -464,7 +468,8 @@ impl ConnectedUdpStream {
                         debug!(
                             socket_id,
                             udp_bound_addr = tracing::field::debug(sock_rx.local_addr()),
-                            "forwarded error {e}"
+                            error = %e,
+                            "forwarded error from socket"
                         );
                         done = true;
                         Some(Err(e))
@@ -478,7 +483,8 @@ impl ConnectedUdpStream {
                         error!(
                             socket_id,
                             udp_bound_addr = tracing::field::debug(sock_rx.local_addr()),
-                            "failed to dispatch received data: {err}"
+                            error = %err,
+                            "failed to dispatch received data"
                         );
                         done = true;
                     }
@@ -512,18 +518,20 @@ impl ConnectedUdpStream {
                         if let Some(target) = counterparty_tx.get() {
                             if let Err(e) = sock_tx.send_to(&data, target.as_ref()).await {
                                 error!(
-                                    socket_id,
+                                    ?socket_id,
                                     udp_bound_addr = tracing::field::debug(sock_tx.local_addr()),
-                                    "failed to send data to {target}: {e}"
+                                    ?target,
+                                    error = %e,
+                                    "failed to send data"
                                 );
                             }
-                            trace!(socket_id, "sent {} bytes of data to {target}", data.len());
+                            trace!(socket_id, bytes = data.len(), ?target, "sent bytes to");
 
                             #[cfg(all(feature = "prometheus", not(test)))]
                             METRIC_UDP_EGRESS_LEN.observe(&[target.as_str()], data.len() as f64);
                         } else {
                             error!(
-                                socket_id,
+                                ?socket_id,
                                 udp_bound_addr = tracing::field::debug(sock_tx.local_addr()),
                                 "cannot send data, counterparty not set"
                             );
@@ -532,15 +540,16 @@ impl ConnectedUdpStream {
                     }
                     Err(e) => {
                         error!(
-                            socket_id,
+                            ?socket_id,
                             udp_bound_addr = tracing::field::debug(sock_tx.local_addr()),
-                            "cannot receive more data from egress channel: {e}"
+                            error = %e,
+                            "cannot receive more data from egress channel"
                         );
                         break;
                     }
                 }
                 trace!(
-                    socket_id,
+                    ?socket_id,
                     udp_bound_addr = tracing::field::debug(sock_tx.local_addr()),
                     "tx queue done"
                 );
@@ -575,14 +584,14 @@ impl tokio::io::AsyncRead for ConnectedUdpStream {
         buf: &mut tokio::io::ReadBuf<'_>,
     ) -> Poll<std::io::Result<()>> {
         trace!(
-            "polling read of {} from udp stream with {:?}",
-            buf.remaining(),
-            self.counterparty.get()
+            remaining_bytes = buf.remaining(),
+            counterparty = tracing::field::debug(self.counterparty.get()),
+            "polling read of from udp stream",
         );
         match Pin::new(&mut self.ingress_rx).poll_read(cx, buf) {
             Poll::Ready(Ok(())) => {
                 let read = buf.filled().len();
-                trace!("read {read} bytes");
+                trace!(bytes = read, "read bytes");
                 Poll::Ready(Ok(()))
             }
             Poll::Ready(Err(err)) => Poll::Ready(Err(err)),
@@ -594,9 +603,9 @@ impl tokio::io::AsyncRead for ConnectedUdpStream {
 impl tokio::io::AsyncWrite for ConnectedUdpStream {
     fn poll_write(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
         trace!(
-            "polling write of {} bytes to udp stream with {:?}",
-            buf.len(),
-            self.counterparty.get()
+            bytes = buf.len(),
+            counterparty = tracing::field::debug(self.counterparty.get()),
+            "polling write to udp stream",
         );
         if let Some(sender) = &mut self.egress_tx {
             if let Err(e) = ready!(sender.poll_ready_unpin(cx)) {
@@ -620,7 +629,10 @@ impl tokio::io::AsyncWrite for ConnectedUdpStream {
     }
 
     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
-        trace!("polling flush to udp stream {:?}", self.counterparty.get());
+        trace!(
+            counterparty = tracing::field::debug(self.counterparty.get()),
+            "polling flush to udp stream"
+        );
         if let Some(sender) = &mut self.egress_tx {
             pin_mut!(sender);
             sender
@@ -635,7 +647,10 @@ impl tokio::io::AsyncWrite for ConnectedUdpStream {
     }
 
     fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
-        trace!("polling close on udp stream with {:?}", self.counterparty.get());
+        trace!(
+            counterparty = tracing::field::debug(self.counterparty.get()),
+            "polling close on udp stream"
+        );
         // Take the sender to make sure it gets dropped
         let mut taken_sender = self.egress_tx.take();
         if let Some(sender) = &mut taken_sender {

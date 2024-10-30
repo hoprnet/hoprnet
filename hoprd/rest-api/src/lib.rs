@@ -42,7 +42,8 @@ use tower_http::{
 };
 use utoipa::openapi::security::{ApiKey, ApiKeyValue, HttpAuthScheme, HttpBuilder, SecurityScheme};
 use utoipa::{Modify, OpenApi};
-use utoipa_scalar::{Scalar, Servable};
+use utoipa_scalar::{Scalar, Servable as ScalarServable};
+use utoipa_swagger_ui::SwaggerUi;
 
 use crate::config::Auth;
 use crate::session::SessionTargetSpec;
@@ -245,7 +246,12 @@ async fn build_api(
     };
 
     Router::new()
-        .nest("/", Router::new().merge(Scalar::with_url("/scalar", ApiDoc::openapi())))
+        .nest(
+            "/",
+            Router::new()
+                .merge(SwaggerUi::new("/swagger-ui").url("/api-docs2/openapi.json", ApiDoc::openapi()))
+                .merge(Scalar::with_url("/scalar", ApiDoc::openapi())),
+        )
         .nest(
             "/",
             Router::new()
@@ -302,6 +308,7 @@ async fn build_api(
                 .route("/node/entryNodes", get(node::entry_nodes))
                 .route("/node/metrics", get(node::metrics))
                 .route("/peers/:destination/ping", post(peers::ping_peer))
+                .route("/session/websocket", get(session::websocket))
                 .route("/session/:protocol", post(session::create_client))
                 .route("/session/:protocol", get(session::list_clients))
                 .route("/session/:protocol", delete(session::close_client))

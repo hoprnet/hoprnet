@@ -13,34 +13,68 @@ on:
       repository:
         required: true
         type: string
+      labels:
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      network:
+        type: choice
+        options:
+          - rotsee
+          - dufour
+        required: true
+        description: 'Package network (rotsee: testnet, dufour: mainnet)'
+        default: dufour
 
 concurrency:
-  group: dappnode
+  group: dappnode-${{ inputs.repository }}
   cancel-in-progress: false
 
 jobs:
   build:
-    name: build-dappnode
+    # The original event_name registered is 'pull_request' even the trigger action is 'workflow_call'
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && contains(inputs.labels, format('package:{0},',inputs.repository)))
+    name: Build package
     runs-on: ubuntu-latest
-    if: contains(github.event.pull_request.labels.*.name, format('package:{0}', inputs.repository))
     steps:
+      - name: Set environment variables
+        id: vars
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "The workflow is triggered by other pipeline"
+            echo "GITHUB_REF_NAME=${{ inputs.branch }}" >> "$GITHUB_OUTPUT"
+            echo "DAPPNODE_REPOSITORY=${{ inputs.repository }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "The workflow is triggered manually"
+            echo "GITHUB_REF_NAME=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+            if [[ "${{ github.event.inputs.network }}" == "rotsee" ]]; then
+              echo "DAPPNODE_REPOSITORY=DAppNodePackage-Hopr-testnet" >> "$GITHUB_OUTPUT"
+            else
+              echo "DAPPNODE_REPOSITORY=DAppNodePackage-Hopr" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.branch }}
+          ref: ${{ steps.vars.outputs.GITHUB_REF_NAME }}
 
-      - name: Set up Google Cloud Credentials
-        id: auth
-        uses: google-github-actions/auth@v2
-        with:
-          token_format: "access_token"
-          credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-      - name: Set up Google Cloud SDK
-        uses: google-github-actions/setup-gcloud@v2
+      - name: Set up Docker Compose
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y docker-compose
+
+      - name: Setup GCP
+        id: gcp
+        uses: hoprnet/hopr-workflows/actions/setup-gcp@master
         with:
-          project_id: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
-          install_components: beta
+          google-credentials: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+          login-artifact-registry: 'false'
+          install-sdk: 'true'
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -50,7 +84,7 @@ jobs:
       - name: Checkout DAppNodePackage-Hopr
         uses: actions/checkout@v4
         with:
-          repository: dappnode/${{ inputs.repository }}
+          repository: dappnode/${{ steps.vars.outputs.DAPPNODE_REPOSITORY }}
           path: "./dappnode"
           token: ${{ secrets.GH_RUNNER_TOKEN }}
           ref: main
@@ -58,21 +92,40 @@ jobs:
       - name: Setup variables
         id: setup
         run: |
+          # Set current_version based on branch type:
+          # - For PRs: <current_version>-pr.<PR_number>
+          # - For 'master' branch: <master_version>-latest
+          # - For 'release/*' branches: <release_version>-latest
+          # - For other branches: exit with error
           current_version=$(./scripts/get-current-version.sh docker)
-          echo "current_version=${current_version}-pr.${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
+          if [[ -z "${{ github.event.pull_request.number }}" ]]; then
+            echo "Invoked manually"
+            declare base_branch=${{ steps.vars.outputs.GITHUB_REF_NAME }}
+            if [[ "${base_branch}" == "master" ]]; then
+              echo "current_version=${{ vars.BRANCH_MASTER_RELEASE_NAME }}-latest" >> "$GITHUB_OUTPUT"
+            elif [[ "${base_branch}" =~ ^"release" ]]; then
+              echo "current_version=${{ vars.BRANCH_RELEASE_RELEASE_NAME }}-latest" >> "$GITHUB_OUTPUT"
+            else
+              echo "Cannot generate a dAppNode package from branch ${base_branch}"
+              exit 1
+            fi
+          else
+            echo "Invoked from a pull request"
+            echo "current_version=${current_version}-pr.${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Publish DappNode Package
         id: publish
         run: |
-          docker_tag=$(gcloud artifacts docker tags list europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd --filter=tag:${{ steps.setup.outputs.current_version }} --format="csv[no-heading](tag,version)" | grep "${{ steps.setup.outputs.current_version }}," | sed 's/,/@/')
-          yq -i e ".services.node.build.args.UPSTREAM_VERSION |= \"${docker_tag}\"" ./docker-compose.yml
+          docker_tag=$(gcloud artifacts docker tags list "${{ vars.DOCKER_IMAGE_REGISTRY }}/hoprd" --filter="tag:${{ steps.setup.outputs.current_version }}" --format="csv[no-heading](tag,version)" | grep "${{ steps.setup.outputs.current_version }}," | sed 's/,/@/')
+          yq -i e ".services.node.build.args.UPSTREAM_VERSION |= \"${docker_tag}\"" "./docker-compose.yml"
           npm install
           npx @dappnode/dappnodesdk publish patch  --provider "remote" --upload_to "ipfs" --verbose | tee build.log
 
-          echo "DNP (DAppNode Package) built and uploaded" >> $GITHUB_STEP_SUMMARY
-          grep "ipfs" build.log >> $GITHUB_STEP_SUMMARY
+          echo "DNP (DAppNode Package) built and uploaded" >> "$GITHUB_STEP_SUMMARY"
+          grep "ipfs" build.log >> "$GITHUB_STEP_SUMMARY"
           ipfs_hash=$(grep -oP 'Release hash : \K/ipfs/\w+' build.log)
-          echo "ipfs_hash=$ipfs_hash" >> $GITHUB_OUTPUT
+          echo "ipfs_hash=$ipfs_hash" >> "$GITHUB_OUTPUT"
           echo "ipfs_hash=$ipfs_hash"
         working-directory: "./dappnode"
         env:
@@ -84,5 +137,3 @@ jobs:
           issue-number: ${{ github.event.pull_request.number }}
           body: |
             The latest dAppNode package for ${{ inputs.repository }} has been built and uploaded with IPFS hash: ${{ steps.publish.outputs.ipfs_hash }}
-
-

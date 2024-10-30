@@ -112,7 +112,7 @@ async fn query_topology_info(channel: &ChannelEntry, node: &Hopr) -> Result<Chan
             .await?
             .map(|v| PeerId::to_string(&v))
             .unwrap_or_else(|| {
-                warn!("failed to map {} to peerid", channel.source);
+                warn!(address = %channel.source, "failed to map address to PeerId", );
                 "<FAILED_TO_MAP_THE_PEERID>".into()
             }),
         destination_peer_id: node
@@ -120,7 +120,7 @@ async fn query_topology_info(channel: &ChannelEntry, node: &Hopr) -> Result<Chan
             .await?
             .map(|v| PeerId::to_string(&v))
             .unwrap_or_else(|| {
-                warn!("failed to map {} to peerid", channel.destination);
+                warn!(address = %channel.destination, "failed to map address to PeerId", );
                 "<FAILED_TO_MAP_THE_PEERID>".into()
             }),
         balance: channel.balance.amount().to_string(),

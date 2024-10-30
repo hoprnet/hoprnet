@@ -51,7 +51,7 @@ pub struct VrfParameters {
 impl From<VrfParameters> for hopr_crypto_types::vrf::VrfParameters {
     fn from(value: VrfParameters) -> Self {
         Self {
-            v: value.v.affine.into(),
+            V: value.v.affine.into(),
             h: value.h,
             s: value.s,
         }
@@ -139,7 +139,7 @@ impl AcknowledgedTicket {
         signer.addr.copy_from_slice(value.signer.as_ref());
 
         let vrf_params = VrfParameters {
-            v: AffinePoint::from_encoded_point(value.vrf_params.v.as_compressed())
+            v: AffinePoint::from_encoded_point(value.vrf_params.V.as_compressed())
                 .expect("invalid vrf params")
                 .into(),
             h: value.vrf_params.h,
