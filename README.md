@@ -194,7 +194,9 @@ Options:
 ```
 
 ### Environment variables
+
 On top of the default configuration options generated for the command line, the following environment variables can be used in order to tweak the node functionality:
+
 - `HOPRD_LOG_FORMAT` - override for the default stdout log formatter (follows tracing formatting options)
 - `HOPRD_USE_OPENTELEMETRY` - enable the opentelemetry output for this node
 - `OTEL_SERVICE_NAME` - the name of this node for the opentelemetry service
