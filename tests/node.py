@@ -139,7 +139,6 @@ class Node:
                 ]
             ),
             "RUST_BACKTRACE": "full",
-            "HOPRD_NETWORK_QUALITY_THRESHOLD": "0.3",
             "HOPRD_USE_OPENTELEMETRY": trace_telemetry,
             "OTEL_SERVICE_NAME": f"hoprd-{self.p2p_port}",
         }
