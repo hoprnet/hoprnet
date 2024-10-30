@@ -92,7 +92,7 @@ impl Validate for NetworkConfig {
             );
         }
 
-        if self.quality_bad_threshold > self.quality_offline_threshold {
+        if self.quality_bad_threshold < self.quality_offline_threshold {
             errors.add(
                 "quality_bad_threshold and quality_offline_threshold",
                 validator::ValidationError::new("quality_bad_threshold must be greater than quality_offline_threshold"),
