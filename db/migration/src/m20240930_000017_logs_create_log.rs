@@ -38,7 +38,6 @@ impl MigrationTrait for Migration {
                     .table(Log::Table)
                     .if_not_exists()
                     .primary_key(
-                    .primary_key(
                         Index::create()
                             .name("pk_log")
                             .table(Log::Table)
