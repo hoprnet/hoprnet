@@ -302,7 +302,7 @@ where
     // When a Session is removed from the cache, we notify the other party only
     // if this removal was due to expiration or cache size limit.
     match cause {
-        moka::notification::RemovalCause::Expired | moka::notification::RemovalCause::Size if msg_sender.can_send() => {
+        moka::notification::RemovalCause::Expired | moka::notification::RemovalCause::Size => {
             let session_id = *id;
             trace!(
                 session_id = tracing::field::debug(session_id),
@@ -599,16 +599,6 @@ where
             PathPlanner::new(db.clone(), channel_graph.clone()),
         );
 
-        let pkt_send_clone = process_packet_send.clone();
-        let db_clone = db.clone();
-        let cg_clone = channel_graph.clone();
-        let snd_gen = move || {
-            helpers::MessageSender::new(
-                pkt_send_clone.clone(),
-                PathPlanner::new(db_clone.clone(), cg_clone.clone()),
-            )
-        };
-
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_ACTIVE_SESSIONS.set(0.0);
 
@@ -641,7 +631,7 @@ where
                 .build(),
             session_close_notifier: OnceLock::new(),
             cfg,
-            _smgr: SessionManager::new(identity.public().to_peer_id(), snd_gen, Default::default()),
+            _smgr: SessionManager::new(identity.public().to_peer_id(), Default::default()),
         }
     }
 

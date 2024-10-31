@@ -3,6 +3,8 @@
 //! The session proxies the user interactions with the transport in order to hide the
 //! advanced interactions and functionality.
 
+extern crate core;
+
 pub mod errors;
 pub mod initiation;
 mod manager;

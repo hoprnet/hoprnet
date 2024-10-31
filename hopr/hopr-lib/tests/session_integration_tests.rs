@@ -33,8 +33,6 @@ impl SendMsg for BufferingMsgSender {
         tracing::debug!("wrote {len} bytes");
         Ok(())
     }
-
-    fn close(&self) {}
 }
 
 #[test_log::test(tokio::test)]

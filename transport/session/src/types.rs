@@ -324,6 +324,7 @@ pub struct InnerSession {
     tx_buffer: FuturesBuffer,
     rx_buffer: [u8; PAYLOAD_SIZE],
     rx_buffer_range: (usize, usize),
+    closed: bool,
 }
 
 impl InnerSession {
@@ -344,6 +345,7 @@ impl InnerSession {
             tx_buffer: futures::stream::FuturesUnordered::new(),
             rx_buffer: [0; PAYLOAD_SIZE],
             rx_buffer_range: (0, 0),
+            closed: false,
         }
     }
 
@@ -358,6 +360,10 @@ impl futures::AsyncWrite for InnerSession {
         cx: &mut std::task::Context<'_>,
         buf: &[u8],
     ) -> Poll<std::io::Result<usize>> {
+        if self.closed {
+            return Poll::Ready(Err(Error::new(ErrorKind::BrokenPipe, "session closed")));
+        }
+
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_SESSION_INNER_SIZES.observe(&[self.id.as_str()], buf.len() as f64);
 
@@ -438,8 +444,8 @@ impl futures::AsyncWrite for InnerSession {
         Poll::Ready(Ok(()))
     }
 
-    fn poll_close(self: std::pin::Pin<&mut Self>, _cx: &mut std::task::Context<'_>) -> Poll<std::io::Result<()>> {
-        self.tx.close();
+    fn poll_close(mut self: std::pin::Pin<&mut Self>, _cx: &mut std::task::Context<'_>) -> Poll<std::io::Result<()>> {
+        self.closed = true;
         Poll::Ready(Ok(()))
     }
 }

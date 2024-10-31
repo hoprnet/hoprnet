@@ -1,7 +1,6 @@
-use std::sync::{Arc, OnceLock};
-
 use async_lock::RwLock;
 use libp2p::{Multiaddr, PeerId};
+use std::sync::{Arc, OnceLock};
 use tracing::trace;
 
 use chain_types::chain_events::NetworkRegistryStatus;
@@ -63,17 +62,14 @@ pub struct TicketStatistics {
 }
 
 #[derive(Clone)]
-pub(crate) struct PathPlanner<T>
-where
-    T: HoprDbAllOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
-{
+pub(crate) struct PathPlanner<T> {
     db: T,
     channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
 }
 
 impl<T> PathPlanner<T>
 where
-    T: HoprDbAllOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
+    T: HoprDbAllOperations + std::fmt::Debug + Send + Sync + 'static,
 {
     pub(crate) fn new(db: T, channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>) -> Self {
         Self { db, channel_graph }
@@ -140,36 +136,27 @@ where
 }
 
 #[derive(Clone)]
-pub(crate) struct MessageSender<T>
-where
-    T: HoprDbAllOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
-{
+pub(crate) struct MessageSender<T> {
     pub process_packet_send: Arc<OnceLock<MsgSender>>,
     pub resolver: PathPlanner<T>,
-    pub closed: Arc<OnceLock<()>>,
 }
 
 impl<T> MessageSender<T>
 where
-    T: HoprDbAllOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
+    T: HoprDbAllOperations + std::fmt::Debug + Send + Sync + 'static,
 {
     pub fn new(process_packet_send: Arc<OnceLock<MsgSender>>, resolver: PathPlanner<T>) -> Self {
         Self {
             process_packet_send,
             resolver,
-            closed: Default::default(),
         }
-    }
-
-    pub fn can_send(&self) -> bool {
-        self.process_packet_send.get().is_some() && self.closed.get().is_none()
     }
 }
 
 #[async_trait::async_trait]
 impl<T> SendMsg for MessageSender<T>
 where
-    T: HoprDbAllOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
+    T: HoprDbAllOperations + std::fmt::Debug + Send + Sync + 'static,
 {
     #[tracing::instrument(level = "debug", skip(self, data))]
     async fn send_message(
@@ -178,10 +165,6 @@ where
         destination: PeerId,
         options: RoutingOptions,
     ) -> std::result::Result<(), TransportSessionError> {
-        if self.closed.get().is_some() {
-            return Err(TransportSessionError::Closed);
-        }
-
         data.application_tag
             .is_some_and(|application_tag| application_tag < RESERVED_SESSION_TAG_UPPER_LIMIT)
             .then_some(())
@@ -195,7 +178,7 @@ where
 
         self.process_packet_send
             .get()
-            .ok_or_else(|| TransportSessionError::Closed)?
+            .ok_or_else(|| TransportSessionError::Manager("sender not initialized".into()))?
             .send_packet(data, path)
             .await
             .map_err(|_| TransportSessionError::Closed)?
@@ -206,9 +189,5 @@ where
         trace!("Packet sent to the outgoing queue");
 
         Ok(())
-    }
-
-    fn close(&self) {
-        let _ = self.closed.set(());
     }
 }

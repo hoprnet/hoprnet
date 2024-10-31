@@ -779,8 +779,6 @@ mod tests {
 
             Ok(())
         }
-
-        fn close(&self) {}
     }
 
     #[tokio::test]

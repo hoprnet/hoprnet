@@ -3,7 +3,7 @@ use futures::future::Either;
 use futures::{pin_mut, FutureExt, StreamExt, TryStreamExt};
 use hopr_internal_types::prelude::ApplicationData;
 use hopr_network_types::prelude::*;
-use std::ops::RangeInclusive;
+use std::ops::Range;
 use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 use tracing::{debug, error, info, trace, warn};
@@ -44,7 +44,7 @@ lazy_static::lazy_static! {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SessionManagerConfig {
-    pub session_tag_range: RangeInclusive<u16>,
+    pub session_tag_range: Range<u16>,
     pub initiation_timeout_base: std::time::Duration,
     pub idle_timeout: std::time::Duration,
 }
@@ -52,7 +52,7 @@ pub struct SessionManagerConfig {
 impl Default for SessionManagerConfig {
     fn default() -> Self {
         Self {
-            session_tag_range: 16..=1024,
+            session_tag_range: 16..1024,
             initiation_timeout_base: Duration::from_secs(5),
             idle_timeout: Duration::from_secs(180),
         }
@@ -60,7 +60,7 @@ impl Default for SessionManagerConfig {
 }
 
 fn close_session_after_eviction<S: SendMsg + Send + Sync + 'static>(
-    msg_sender: S,
+    msg_sender: Arc<OnceLock<S>>,
     me: PeerId,
     session_id: SessionId,
     (session_tx, routing_opts): (Arc<UnboundedSender<Box<[u8]>>>, RoutingOptions),
@@ -69,7 +69,9 @@ fn close_session_after_eviction<S: SendMsg + Send + Sync + 'static>(
     // When a Session is removed from the cache, we notify the other party only
     // if this removal was due to expiration or cache size limit.
     match cause {
-        moka::notification::RemovalCause::Expired | moka::notification::RemovalCause::Size /*if msg_sender.can_send()*/ => {
+        moka::notification::RemovalCause::Expired | moka::notification::RemovalCause::Size
+            if msg_sender.get().is_some() =>
+        {
             trace!(
                 session_id = tracing::field::debug(session_id),
                 "sending session termination due to eviction from the cache"
@@ -86,8 +88,15 @@ fn close_session_after_eviction<S: SendMsg + Send + Sync + 'static>(
                 }
             };
 
+            let msg_sender = msg_sender.clone();
             async move {
-                if let Err(err) = msg_sender.send_message(data, *session_id.peer(), routing_opts).await {
+                // Unwrap cannot panic, since the value's existence is checked on L72
+                if let Err(err) = msg_sender
+                    .get()
+                    .unwrap()
+                    .send_message(data, *session_id.peer(), routing_opts)
+                    .await
+                {
                     error!(
                         session_id = tracing::field::debug(session_id),
                         error = %err,
@@ -182,8 +191,8 @@ pub struct SessionManager<S> {
     session_notifiers: Arc<OnceLock<(UnboundedSender<IncomingSession>, UnboundedSender<SessionId>)>>,
     sessions: SessionCache,
     my_peer_id: PeerId,
+    msg_sender: Arc<OnceLock<S>>,
     cfg: SessionManagerConfig,
-    sender_gen: Arc<dyn Fn() -> S + Send + Sync>,
 }
 
 impl<S> Clone for SessionManager<S> {
@@ -194,7 +203,7 @@ impl<S> Clone for SessionManager<S> {
             sessions: self.sessions.clone(),
             my_peer_id: self.my_peer_id,
             cfg: self.cfg.clone(),
-            sender_gen: self.sender_gen.clone(),
+            msg_sender: self.msg_sender.clone(),
         }
     }
 }
@@ -203,15 +212,11 @@ fn initiation_timeout_max(base: Duration, hops: usize) -> Duration {
     2 * base * (hops as u32)
 }
 
-impl<S: SendMsg + Send + Sync + 'static> SessionManager<S> {
-    pub fn new<F: Fn() -> S + Send + Sync + 'static>(
-        my_peer_id: PeerId,
-        sender_gen: F,
-        cfg: SessionManagerConfig,
-    ) -> Self {
-        let sender_gen = Arc::new(sender_gen);
+impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
+    pub fn new(my_peer_id: PeerId, cfg: SessionManagerConfig) -> Self {
+        let msg_sender = Arc::new(OnceLock::new());
         Self {
-            sender_gen: sender_gen.clone(),
+            msg_sender: msg_sender.clone(),
             session_initiations: moka::future::Cache::builder()
                 .max_capacity(cfg.session_tag_range.clone().count() as u64)
                 .time_to_live(initiation_timeout_max(
@@ -223,7 +228,7 @@ impl<S: SendMsg + Send + Sync + 'static> SessionManager<S> {
                 .max_capacity(u16::MAX as u64)
                 .time_to_idle(cfg.idle_timeout)
                 .async_eviction_listener(move |k, v, c| {
-                    let msg_sender = sender_gen();
+                    let msg_sender = msg_sender.clone();
                     close_session_after_eviction(msg_sender, my_peer_id, *k, v, c)
                 })
                 .build(),
@@ -235,12 +240,17 @@ impl<S: SendMsg + Send + Sync + 'static> SessionManager<S> {
 
     pub fn start(
         &self,
+        msg_sender: S,
         new_session_notifier: UnboundedSender<IncomingSession>,
-    ) -> Vec<hopr_async_runtime::prelude::JoinHandle<()>> {
+    ) -> crate::errors::Result<Vec<hopr_async_runtime::prelude::JoinHandle<()>>> {
+        self.msg_sender
+            .set(msg_sender)
+            .map_err(|_| TransportSessionError::Manager("already started".into()))?;
+
         let (session_close_tx, session_close_rx) = futures::channel::mpsc::unbounded();
         self.session_notifiers
             .set((new_session_notifier, session_close_tx))
-            .expect("must set the session notifiers");
+            .map_err(|_| TransportSessionError::Manager("already started".into()))?;
 
         let myself = self.clone();
         let jh_closure_notifications =
@@ -286,18 +296,20 @@ impl<S: SendMsg + Send + Sync + 'static> SessionManager<S> {
             }
         });
 
-        vec![jh_closure_notifications, jh_session_expiration]
+        Ok(vec![jh_closure_notifications, jh_session_expiration])
     }
 
+    /// Check if [`start`](SessionManager::start) has been called and the instance is running.
     pub fn is_started(&self) -> bool {
         self.session_notifiers.get().is_some()
     }
 
     /// Initiates new outgoing Session with the given configuration.
     pub async fn new_session(&self, cfg: SessionClientConfig) -> crate::errors::Result<Session> {
-        if !self.is_started() {
-            return Err(TransportSessionError::Manager("manager not running".into()));
-        }
+        let msg_sender = self
+            .msg_sender
+            .get()
+            .ok_or(TransportSessionError::Manager("not started".into()))?;
 
         let (tx_initiation_done, rx_initiation_done) = futures::channel::mpsc::unbounded();
         let challenge = insert_into_next_slot(
@@ -331,7 +343,6 @@ impl<S: SendMsg + Send + Sync + 'static> SessionManager<S> {
 
         // Send the Session initiation message
         trace!(challenge, "sending new session request");
-        let msg_sender = Arc::new((self.sender_gen)());
         msg_sender
             .send_message(start_session_msg.try_into()?, cfg.peer, cfg.path_options.clone())
             .await?;
@@ -375,7 +386,7 @@ impl<S: SendMsg + Send + Sync + 'static> SessionManager<S> {
                     self.my_peer_id,
                     cfg.path_options,
                     cfg.capabilities.into_iter().collect(),
-                    msg_sender,
+                    Arc::new(msg_sender.clone()),
                     rx,
                     self.session_notifiers.get().map(|(_, c)| c.clone()),
                 ))
@@ -412,7 +423,7 @@ impl<S: SendMsg + Send + Sync + 'static> SessionManager<S> {
     /// If the data are not recognized, they are returned as [`DispatchResult::Unrelated`].
     pub async fn dispatch_message(&self, data: ApplicationData) -> crate::errors::Result<DispatchResult> {
         if let Some(app_tag) = &data.application_tag {
-            if (0..*self.cfg.session_tag_range.start()).contains(app_tag) {
+            if (0..self.cfg.session_tag_range.start).contains(app_tag) {
                 return self
                     .handle_start_protocol_message(data)
                     .await
@@ -461,13 +472,16 @@ impl<S: SendMsg + Send + Sync + 'static> SessionManager<S> {
                     "got new session request, searching for a free session slot"
                 );
 
+                let msg_sender = self
+                    .msg_sender
+                    .get()
+                    .ok_or(TransportSessionError::Manager("not started".into()))?;
+
                 let (new_session_notifier, close_session_notifier) = self
                     .session_notifiers
                     .get()
                     .cloned()
-                    .ok_or(TransportSessionError::Manager("manager not started".into()))?;
-
-                let msg_sender = Arc::new((self.sender_gen)());
+                    .ok_or(TransportSessionError::Manager("not started".into()))?;
 
                 // Construct the session
                 let (tx_session_data, rx_session_data) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
@@ -475,11 +489,11 @@ impl<S: SendMsg + Send + Sync + 'static> SessionManager<S> {
                     &self.sessions,
                     |sid| {
                         let next_tag = match sid {
-                            Some(session_id) => ((session_id.tag() + 1) % self.cfg.session_tag_range.end())
-                                .max(*self.cfg.session_tag_range.start()),
+                            Some(session_id) => ((session_id.tag() + 1) % self.cfg.session_tag_range.end)
+                                .max(self.cfg.session_tag_range.start),
                             None => hopr_crypto_random::random_integer(
-                                *self.cfg.session_tag_range.start() as u64,
-                                Some(*self.cfg.session_tag_range.end() as u64),
+                                self.cfg.session_tag_range.start as u64,
+                                Some(self.cfg.session_tag_range.end as u64),
                             ) as u16,
                         };
                         SessionId::new(next_tag, peer)
@@ -498,7 +512,7 @@ impl<S: SendMsg + Send + Sync + 'static> SessionManager<S> {
                         self.my_peer_id,
                         route.clone(),
                         session_req.capabilities,
-                        msg_sender.clone(),
+                        Arc::new(msg_sender.clone()),
                         rx_session_data,
                         close_session_notifier.into(),
                     );
@@ -652,7 +666,9 @@ impl<S: SendMsg + Send + Sync + 'static> SessionManager<S> {
                     session_id = tracing::field::debug(session_id),
                     "sending session termination"
                 );
-                (self.sender_gen)()
+                self.msg_sender
+                    .get()
+                    .ok_or(TransportSessionError::Manager("not started".into()))?
                     .send_message(
                         StartProtocol::CloseSession(session_id.with_peer(self.my_peer_id)).try_into()?,
                         *session_id.peer(),
@@ -685,80 +701,110 @@ mod tests {
 
     use anyhow::anyhow;
     use async_std::prelude::FutureExt;
-    use futures::{AsyncWriteExt, TryStreamExt};
+    use async_trait::async_trait;
+    use futures::AsyncWriteExt;
     use hopr_primitive_types::bounded::BoundedSize;
 
-    struct BufferingMsgSender {
-        buffer: futures::channel::mpsc::UnboundedSender<ApplicationData>,
-    }
-
-    #[async_trait::async_trait]
-    impl SendMsg for BufferingMsgSender {
-        async fn send_message(
-            &self,
-            data: ApplicationData,
-            _destination: PeerId,
-            _options: RoutingOptions,
-        ) -> Result<(), TransportSessionError> {
-            self.buffer.unbounded_send(data).expect("buffer unbounded error");
-            Ok(())
+    mockall::mock! {
+        MsgSender {}
+        impl Clone for MsgSender {
+            fn clone(&self) -> Self;
         }
-
-        fn close(&self) {}
-    }
-
-    fn create_alice_bob(
-        alice: PeerId,
-        bob: PeerId,
-    ) -> (SessionManager<BufferingMsgSender>, SessionManager<BufferingMsgSender>) {
-        let (alice_tx, alice_rx) = futures::channel::mpsc::unbounded();
-        let (bob_tx, bob_rx) = futures::channel::mpsc::unbounded();
-
-        let alice_transport_gen = move || BufferingMsgSender { buffer: bob_tx.clone() };
-        let bob_transport_gen = move || BufferingMsgSender {
-            buffer: alice_tx.clone(),
-        };
-
-        // Alice's SessionManager and message loop
-        let alice_mgr = SessionManager::new(alice, alice_transport_gen, Default::default());
-        let alice_mgr_clone = alice_mgr.clone();
-        async_std::task::spawn(async move {
-            alice_rx
-                .map(Ok)
-                .and_then(|msg| alice_mgr_clone.dispatch_message(msg))
-                .try_collect::<Vec<_>>()
-                .await
-                .unwrap();
-        });
-
-        // Bob's SessionManager and message loop
-        let bob_mgr = SessionManager::new(bob, bob_transport_gen, Default::default());
-        let bob_mgr_clone = bob_mgr.clone();
-        async_std::task::spawn(async move {
-            bob_rx
-                .map(Ok)
-                .and_then(|msg| bob_mgr_clone.dispatch_message(msg))
-                .try_collect::<Vec<_>>()
-                .await
-                .unwrap();
-        });
-
-        (alice_mgr, bob_mgr)
+        #[async_trait]
+        impl SendMsg for MsgSender {
+            async fn send_message(
+                &self,
+                data: ApplicationData,
+                destination: PeerId,
+                options: RoutingOptions,
+            ) -> std::result::Result<(), TransportSessionError>;
+        }
     }
 
     #[test_log::test(async_std::test)]
-    async fn session_manager_should_create_session() -> anyhow::Result<()> {
+    async fn session_manager_should_follow_start_protocol_to_establish_new_session_and_close_it() -> anyhow::Result<()>
+    {
         let alice_peer = PeerId::random();
         let bob_peer = PeerId::random();
-        let (alice_mgr, bob_mgr) = create_alice_bob(alice_peer, bob_peer);
+
+        let alice_mgr = SessionManager::new(alice_peer, Default::default());
+        let bob_mgr = SessionManager::new(bob_peer, Default::default());
+
+        let mut sequence = mockall::Sequence::new();
+        let mut alice_transport = MockMsgSender::new();
+        let mut bob_transport = MockMsgSender::new();
+
+        // Alice sends the StartSession message
+        let bob_mgr_clone = bob_mgr.clone();
+        alice_transport
+            .expect_send_message()
+            .once()
+            .in_sequence(&mut sequence)
+            .withf(move |_, peer, _| *peer == bob_peer)
+            .returning(move |data, _, _| {
+                async_std::task::block_on(bob_mgr_clone.dispatch_message(data))?;
+                Ok(())
+            });
+
+        // Bob clones transport for Session
+        bob_transport
+            .expect_clone()
+            .once()
+            .in_sequence(&mut sequence)
+            .return_once(|| MockMsgSender::new());
+
+        // Bob sends the SessionEstablished message
+        let alice_mgr_clone = alice_mgr.clone();
+        bob_transport
+            .expect_send_message()
+            .once()
+            .in_sequence(&mut sequence)
+            .withf(move |_, peer, _| *peer == alice_peer)
+            .returning(move |data, _, _| {
+                async_std::task::block_on(alice_mgr_clone.dispatch_message(data))?;
+                Ok(())
+            });
+
+        // Alice clones transport for Session
+        alice_transport
+            .expect_clone()
+            .once()
+            .in_sequence(&mut sequence)
+            .return_once(|| MockMsgSender::new());
+
+        // Alice sends the CloseSession message to initiate closure
+        let bob_mgr_clone = bob_mgr.clone();
+        alice_transport
+            .expect_send_message()
+            .once()
+            .in_sequence(&mut sequence)
+            .withf(move |_, peer, _| *peer == bob_peer)
+            .returning(move |data, _, _| {
+                async_std::task::block_on(bob_mgr_clone.dispatch_message(data))?;
+                Ok(())
+            });
+
+        // Bob sends the CloseSession message to confirm
+        let alice_mgr_clone = alice_mgr.clone();
+        bob_transport
+            .expect_send_message()
+            .once()
+            .in_sequence(&mut sequence)
+            .withf(move |_, peer, _| *peer == alice_peer)
+            .returning(move |data, _, _| {
+                async_std::task::block_on(alice_mgr_clone.dispatch_message(data))?;
+                Ok(())
+            });
+
+        let mut jhs = Vec::new();
 
         // Start Alice
         let (new_session_tx_alice, _) = futures::channel::mpsc::unbounded();
-        let mut jhs = alice_mgr.start(new_session_tx_alice);
+        jhs.extend(alice_mgr.start(alice_transport, new_session_tx_alice)?);
 
         // Start Bob
         let (new_session_tx_bob, new_session_rx_bob) = futures::channel::mpsc::unbounded();
-        jhs.extend(bob_mgr.start(new_session_tx_bob));
+        jhs.extend(bob_mgr.start(bob_transport, new_session_tx_bob)?);
 
         let target = SealedHost::Plain("127.0.0.1:80".parse()?);
 
@@ -788,6 +834,7 @@ mod tests {
         futures::stream::iter(jhs)
             .for_each(hopr_async_runtime::prelude::cancel_join_handle)
             .await;
+
         Ok(())
     }
 }
