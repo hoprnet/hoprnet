@@ -58,3 +58,4 @@ anyhow = { workspace = true }
 async-std = { workspace = true }
 hopr-network-types = { workspace = true, features = ["runtime-async-std"] }
 mockall = { workspace = true }
+test-log = { workspace = true }

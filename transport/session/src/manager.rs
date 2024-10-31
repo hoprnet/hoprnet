@@ -13,7 +13,7 @@ use crate::initiation::{
     StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation, StartProtocol,
 };
 use crate::traits::SendMsg;
-use crate::types::SessionTarget;
+use crate::types::{unwrap_offchain_key, SessionTarget};
 use crate::{IncomingSession, Session, SessionClientConfig, SessionId};
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -167,6 +167,15 @@ type SessionInitiationCache =
 // Sender needs to be put in Arc, so that no clones are made, and the entire channel closes
 // once the only sender is closed
 type SessionCache = moka::future::Cache<SessionId, (Arc<UnboundedSender<Box<[u8]>>>, RoutingOptions)>;
+
+/// Indicates the result of processing a message.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum DispatchResult {
+    /// Session or Start protocol message has been processed successfully.
+    Processed,
+    /// The message was not related to Start or Session protocol.
+    Unrelated(ApplicationData),
+}
 
 pub struct SessionManager<S> {
     session_initiations: SessionInitiationCache,
@@ -395,11 +404,49 @@ impl<S: SendMsg + Send + Sync + 'static> SessionManager<S> {
         }
     }
 
-    /// Handles session initiation (the Start protocol) messages.
+    /// Main method to be called whenever data are received.
     ///
-    /// ## Arguments
-    /// - `data`: Unparsed data of a Start protocol message
-    pub async fn handle_start_protocol_message(&self, data: ApplicationData) -> crate::errors::Result<()> {
+    /// It tries to recognize the message and correctly dispatches either
+    /// the Session protocol or Start protocol messages.
+    ///
+    /// If the data are not recognized, they are returned as [`DispatchResult::Unrelated`].
+    pub async fn dispatch_message(&self, data: ApplicationData) -> crate::errors::Result<DispatchResult> {
+        if let Some(app_tag) = &data.application_tag {
+            if (0..*self.cfg.session_tag_range.start()).contains(app_tag) {
+                return self
+                    .handle_start_protocol_message(data)
+                    .await
+                    .map(|_| DispatchResult::Processed);
+            } else if self.cfg.session_tag_range.contains(app_tag) {
+                let (peer, data) = unwrap_offchain_key(data.plain_text.clone())?;
+
+                let session_id = SessionId::new(*app_tag, peer);
+
+                return if let Some((session_data_sender, _)) = self.sessions.get(&session_id).await {
+                    trace!(
+                        session_id = tracing::field::debug(session_id),
+                        "received data for a registered session"
+                    );
+
+                    session_data_sender
+                        .unbounded_send(data)
+                        .map(|_| DispatchResult::Processed)
+                        .map_err(|e| TransportSessionError::Manager(e.to_string()))
+                } else {
+                    error!(
+                        session_id = tracing::field::debug(session_id),
+                        "received data from an unestablished session"
+                    );
+                    Err(TransportSessionError::UnknownData)
+                };
+            }
+        }
+
+        Ok(DispatchResult::Unrelated(data))
+    }
+
+    /// Handles session initiation (the Start protocol) messages.
+    async fn handle_start_protocol_message(&self, data: ApplicationData) -> crate::errors::Result<()> {
         match StartProtocol::<SessionId>::try_from(data)? {
             StartProtocol::StartSession(session_req) => {
                 trace!(challenge = session_req.challenge, "received session initiation request");
@@ -636,6 +683,11 @@ impl<S: SendMsg + Send + Sync + 'static> SessionManager<S> {
 mod tests {
     use super::*;
 
+    use anyhow::anyhow;
+    use async_std::prelude::FutureExt;
+    use futures::{AsyncWriteExt, TryStreamExt};
+    use hopr_primitive_types::bounded::BoundedSize;
+
     struct BufferingMsgSender {
         buffer: futures::channel::mpsc::UnboundedSender<ApplicationData>,
     }
@@ -655,11 +707,10 @@ mod tests {
         fn close(&self) {}
     }
 
-    #[async_std::test]
-    async fn session_manager_should_create_session() -> anyhow::Result<()> {
-        let alice_peer = PeerId::random();
-        let bob_peer = PeerId::random();
-
+    fn create_alice_bob(
+        alice: PeerId,
+        bob: PeerId,
+    ) -> (SessionManager<BufferingMsgSender>, SessionManager<BufferingMsgSender>) {
         let (alice_tx, alice_rx) = futures::channel::mpsc::unbounded();
         let (bob_tx, bob_rx) = futures::channel::mpsc::unbounded();
 
@@ -669,36 +720,74 @@ mod tests {
         };
 
         // Alice's SessionManager and message loop
-        let alice_mgr = SessionManager::new(alice_peer, alice_transport_gen, Default::default());
+        let alice_mgr = SessionManager::new(alice, alice_transport_gen, Default::default());
         let alice_mgr_clone = alice_mgr.clone();
-        let jh_1 = async_std::task::spawn(async move {
-            pin_mut!(alice_rx);
-            while let Some(msg) = alice_rx.next().await {
-                alice_mgr_clone.handle_start_protocol_message(msg).await.unwrap();
-            }
+        async_std::task::spawn(async move {
+            alice_rx
+                .map(Ok)
+                .and_then(|msg| alice_mgr_clone.dispatch_message(msg))
+                .try_collect::<Vec<_>>()
+                .await
+                .unwrap();
         });
 
         // Bob's SessionManager and message loop
-        let bob_mgr = SessionManager::new(bob_peer, bob_transport_gen, Default::default());
+        let bob_mgr = SessionManager::new(bob, bob_transport_gen, Default::default());
         let bob_mgr_clone = bob_mgr.clone();
-        let jh_2 = async_std::task::spawn(async move {
-            pin_mut!(bob_rx);
-            while let Some(msg) = bob_rx.next().await {
-                bob_mgr_clone.handle_start_protocol_message(msg).await.unwrap();
-            }
+        async_std::task::spawn(async move {
+            bob_rx
+                .map(Ok)
+                .and_then(|msg| bob_mgr_clone.dispatch_message(msg))
+                .try_collect::<Vec<_>>()
+                .await
+                .unwrap();
         });
 
+        (alice_mgr, bob_mgr)
+    }
+
+    #[test_log::test(async_std::test)]
+    async fn session_manager_should_create_session() -> anyhow::Result<()> {
+        let alice_peer = PeerId::random();
+        let bob_peer = PeerId::random();
+        let (alice_mgr, bob_mgr) = create_alice_bob(alice_peer, bob_peer);
+
         // Start Alice
-        let (new_session_tx_alice, new_session_rx_alice) = futures::channel::mpsc::unbounded();
-        let alice_jhs = alice_mgr.start(new_session_tx_alice);
+        let (new_session_tx_alice, _) = futures::channel::mpsc::unbounded();
+        let mut jhs = alice_mgr.start(new_session_tx_alice);
 
         // Start Bob
         let (new_session_tx_bob, new_session_rx_bob) = futures::channel::mpsc::unbounded();
-        let bob_jhs = bob_mgr.start(new_session_tx_bob);
+        jhs.extend(bob_mgr.start(new_session_tx_bob));
 
-        for jh in alice_jhs.into_iter().chain(bob_jhs.into_iter()).chain([jh_1, jh_2]) {
-            hopr_async_runtime::prelude::cancel_join_handle(jh).await;
-        }
+        let target = SealedHost::Plain("127.0.0.1:80".parse()?);
+
+        pin_mut!(new_session_rx_bob);
+        let (alice_session, bob_session) = futures::future::join(
+            alice_mgr.new_session(SessionClientConfig {
+                peer: bob_peer,
+                path_options: RoutingOptions::Hops(BoundedSize::MIN),
+                target_protocol: IpProtocol::TCP,
+                target: target.clone(),
+                capabilities: vec![],
+            }),
+            new_session_rx_bob.next(),
+        )
+        .timeout(Duration::from_secs(2))
+        .await?;
+
+        let mut alice_session = alice_session?;
+        let bob_session = bob_session.ok_or(anyhow!("bob must get an incoming session"))?;
+
+        assert!(matches!(bob_session.target, SessionTarget::TcpStream(host) if host == target));
+
+        async_std::task::sleep(Duration::from_millis(100)).await;
+        alice_session.close().await?;
+
+        async_std::task::sleep(Duration::from_millis(100)).await;
+        futures::stream::iter(jhs)
+            .for_each(hopr_async_runtime::prelude::cancel_join_handle)
+            .await;
         Ok(())
     }
 }

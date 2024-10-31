@@ -4587,6 +4587,7 @@ dependencies = [
  "serde",
  "serde_with",
  "strum",
+ "test-log",
  "thiserror",
  "tokio",
  "tokio-util",

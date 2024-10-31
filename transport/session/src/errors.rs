@@ -25,6 +25,9 @@ pub enum TransportSessionError {
     #[error("the other party rejected session initiation with error: {0}")]
     Rejected(StartErrorReason),
 
+    #[error("received data for an unregistered session")]
+    UnknownData,
+
     #[error("session manager error: {0}")]
     Manager(String),
 
