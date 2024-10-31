@@ -48,7 +48,9 @@ transport-quic = ["hopr-lib/transport-quic"]
 # To use profiling:
 # 1. Set RUSTFLAGS="--cfg tokio_unstable" before building
 # 2. Enable the 'prof' feature: cargo build --feature prof
-prof = ["dep:console-subscriber"]   # must be build with 'tokio_unstable': https://github.com/tokio-rs/console/tree/main/console-subscriber
+prof = [
+  "dep:console-subscriber",
+] # must be build with 'tokio_unstable': https://github.com/tokio-rs/console/tree/main/console-subscriber
 
 [dependencies]
 anyhow = { workspace = true }

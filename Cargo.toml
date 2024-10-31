@@ -162,7 +162,11 @@ surf-governor = { version = "0.2.0" }
 tempfile = "3.10.1"
 test-log = { version = "0.2.16", features = ["trace"] }
 thiserror = "1.0.64"
-tokio = { version = "1.40.0", features = ["rt-multi-thread", "macros", "tracing"] }
+tokio = { version = "1.40.0", features = [
+  "rt-multi-thread",
+  "macros",
+  "tracing",
+] }
 tokio-util = { version = "0.7.12", features = ["compat"] }
 tokio-retry = "0.3.0"
 tracing = { version = "0.1.40" }
