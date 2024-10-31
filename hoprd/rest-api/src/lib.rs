@@ -2526,8 +2526,6 @@ mod node {
             .collect()
             .await;
 
-        tracing::error!("==> all connected peers: {all_network_peers:?}");
-
         let body = NodePeersResponse {
             connected: all_network_peers,
             announced: announced_peers,
