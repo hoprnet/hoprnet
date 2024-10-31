@@ -14,7 +14,7 @@ use crate::errors::{CoreTypesError, CoreTypesError::PayloadSizeExceeded, Result}
 pub const INTERMEDIATE_HOPS: usize = 3;
 
 /// Maximum size of the packet payload in bytes.
-pub const PAYLOAD_SIZE: usize = 500;
+pub const PAYLOAD_SIZE: usize = 496;
 
 /// Default required minimum incoming ticket winning probability
 pub const DEFAULT_MINIMUM_INCOMING_TICKET_WIN_PROB: f64 = 1.0;
