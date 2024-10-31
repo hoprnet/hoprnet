@@ -2,7 +2,7 @@ SHELL := env $(shell which bash)
 
 # utility wrapper for forge script to use same options on every invocation
 forge := time forge
-forge-script = env NETWORK=$(network) FOUNDRY_PROFILE=$(environment-type) ETHERSCAN_API_KEY=$(etherscan_api_key) time forge script
+forge-script = env NETWORK=$(network) FOUNDRY_PROFILE=$(environment-type) ETHERSCAN_API_KEY=$(etherscan_api_key) forge script --use /bin/solc
 
 .PHONY: sc-test
 sc-test:

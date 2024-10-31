@@ -28,9 +28,15 @@ craneLib.devShell {
     yq-go
     curl
     bash
-    gnumake
-    busybox
 
+    # anvil
+    gnumake
+    lsof
+    coreutils
+    which
+    findutils
+    time
+    
     # github integration
     gh
 

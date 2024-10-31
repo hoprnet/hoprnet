@@ -221,10 +221,12 @@
             tag = "latest";
             # breaks binary reproducibility, but makes usage easier
             created = "now";
-            contents = [ pkgs.foundry-bin anvilSrc pkgs.tini pkgs.runtimeShellPackage pkgs.busybox pkgs.jq pkgs.curl pkgs.gnumake ];
+            contents = [ pkgs.foundry-bin anvilSrc solcDefault pkgs.tini pkgs.runtimeShellPackage pkgs.jq pkgs.lsof pkgs.curl pkgs.coreutils pkgs.which pkgs.jq pkgs.findutils pkgs.time  pkgs.gnumake ];
             enableFakechroot = true;
             fakeRootCommands = ''
               #!${pkgs.runtimeShell}
+              ${pkgs.foundry-bin}/bin/forge build
+              mkdir /tmp/
               /scripts/run-local-anvil.sh
               sleep 2
               lsof -i :8545 -s TCP:LISTEN -t | xargs -I {} -n 1 kill {} || :
