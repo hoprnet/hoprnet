@@ -190,9 +190,9 @@ hopr:
     # Maximum delay in seconds
     max_delay: 300
     # Quality threshold since a node is considered having "bad" connectivity
-    quality_bad_threshold: 0.2
+    quality_bad_threshold: 0.1
     # Quality threshold from which a node is considered available enough to be used
-    quality_offline_threshold: 0.5
+    quality_offline_threshold: 0.0
     # Quality step on failed/successful ping probe
     quality_step: 0.1
     # Size of the quality moving average window.

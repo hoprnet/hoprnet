@@ -29,6 +29,8 @@
 - [Develop](#develop)
   - [Nix environment setup](#nix-environment-setup)
     - [Nix flake outputs](#nix-flake-outputs)
+    - [Code Formatting](#code-formatting)
+    - [Code Linting](#code-linting)
   - [Local node with safe staking service (local network)](#local-node-with-safe-staking-service-local-network)
   - [Local node with safe staking service (dufour network)](#local-node-with-safe-staking-service-dufour-network)
 - [Local cluster](#local-cluster)

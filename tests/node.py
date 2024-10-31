@@ -82,10 +82,6 @@ class Node:
         custom_env = {
             "RUST_LOG": "debug,libp2p_mplex=info,multistream_select=info,isahc::handler=error,isahc::client=error",
             "RUST_BACKTRACE": "full",
-            "HOPRD_HEARTBEAT_INTERVAL": "2500",
-            "HOPRD_HEARTBEAT_THRESHOLD": "2500",
-            "HOPRD_HEARTBEAT_VARIANCE": "1000",
-            "HOPRD_NETWORK_QUALITY_THRESHOLD": "0.3",
         }
         cmd = [
             "hoprd",

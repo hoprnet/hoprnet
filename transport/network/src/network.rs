@@ -101,13 +101,6 @@ where
     T: hopr_db_api::peers::HoprDbPeersOperations + Sync + Send + std::fmt::Debug,
 {
     pub fn new(my_peer_id: PeerId, my_multiaddresses: Vec<Multiaddr>, cfg: NetworkConfig, db: T) -> Self {
-        if cfg.quality_offline_threshold < cfg.quality_bad_threshold {
-            panic!(
-                "Strict requirement failed, bad quality threshold {} must be lower than quality offline threshold {}",
-                cfg.quality_bad_threshold, cfg.quality_offline_threshold
-            );
-        }
-
         #[cfg(all(feature = "prometheus", not(test)))]
         {
             METRIC_NETWORK_HEALTH.set(0.0);
@@ -245,7 +238,7 @@ where
 
                 let q = entry.get_quality();
 
-                if q < (self.cfg.quality_step / 2.0) || q < self.cfg.quality_bad_threshold {
+                if q < self.cfg.quality_bad_threshold {
                     entry.ignored = Some(current_time());
                 }
             }
@@ -259,13 +252,13 @@ where
                 self.refresh_metrics(&stats)
             }
 
-            if quality < (self.cfg.quality_step / 2.0) {
+            if quality <= self.cfg.quality_offline_threshold {
                 Ok(Some(NetworkTriggeredEvent::CloseConnection(peer_id)))
             } else {
                 Ok(Some(NetworkTriggeredEvent::UpdateQuality(peer_id, quality)))
             }
         } else {
-            debug!("Ignoring update request for unknown peer {}", peer);
+            debug!(%peer, "Ignoring update request for unknown peer");
             Ok(None)
         }
     }
@@ -297,8 +290,14 @@ where
         METRIC_NETWORK_HEALTH.set((health as i32).into());
     }
 
+    pub async fn connected_peers(&self) -> crate::errors::Result<Vec<PeerId>> {
+        let minimum_quality = self.cfg.quality_offline_threshold;
+        self.peer_filter(|peer| async move { (peer.get_quality() > minimum_quality).then_some(peer.id.1) })
+            .await
+    }
+
     // ======
-    pub async fn peer_filter<Fut, V, F>(&self, filter: F) -> crate::errors::Result<Vec<V>>
+    pub(crate) async fn peer_filter<Fut, V, F>(&self, filter: F) -> crate::errors::Result<Vec<V>>
     where
         F: FnMut(PeerStatus) -> Fut,
         Fut: std::future::Future<Output = Option<V>>,
@@ -578,7 +577,7 @@ mod tests {
             .expect("no error should occur");
         peers.update(&peer, Err(()), None).await.expect("no error should occur"); // should drop to ignored
 
-        // peers.update(&peer, Err(()), None).await.expect("no error should occur");    // should drop from network
+        peers.update(&peer, Err(()), None).await.expect("no error should occur"); // should drop from network
 
         assert!(!peers.has(&peer).await);
 

@@ -562,14 +562,13 @@ mod alias {
         ),
         tag = "Alias",
     )]
-
     pub async fn aliases(req: Request<InternalState>) -> tide::Result<Response> {
         let aliases = req.state().hoprd_db.get_aliases().await?;
 
         Ok(Response::builder(200)
             .body(json!(aliases
                 .iter()
-                .map(|alias| (alias.peer_id.clone(), alias.alias.clone()))
+                .map(|alias| (alias.alias.clone(), alias.peer_id.clone()))
                 .collect::<HashMap<_, _>>()))
             .build())
     }
@@ -1499,10 +1498,11 @@ mod messages {
             "12D3KooWR4uwjKCDCAY1xsEFB4esuWLF9Q5ijYvCjz5PNkTbnu33"
         ],
         "peerId": "12D3KooWEDc1vGJevww48trVDDf6pr1f6N3F86sGJfQrKCyc8kJ1",
-        "tag": 20
+        "tag": 2000
     }))]
     pub(crate) struct SendMessageBodyRequest {
-        /// The message tag used to filter messages based on application
+        /// The message tag used to filter messages based on application, must be from range <1024,65535>
+        #[schema(minimum = 1024, maximum = 65535)]
         pub tag: u16,
         /// Message to be transmitted over the network
         #[serde_as(as = "Bytes")]
@@ -1515,6 +1515,7 @@ mod messages {
         #[validate(length(min = 0, max = 3))]
         #[schema(value_type = Option<Vec<String>>)]
         pub path: Option<Vec<PeerId>>,
+        #[schema(minimum = 0, maximum = 3)]
         #[validate(range(min = 0, max = 3))]
         pub hops: Option<u16>,
     }
@@ -2469,7 +2470,8 @@ mod node {
 
                 async move {
                     if let Ok(Some(info)) = hopr.network_peer_info(&peer).await {
-                        if info.get_average_quality() >= quality {
+                        let avg_quality = info.get_average_quality();
+                        if avg_quality >= quality {
                             Some((peer, info))
                         } else {
                             None
