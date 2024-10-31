@@ -457,29 +457,40 @@ make smoke-tests
 ## Using Fast Sync
 
 Fast sync is a feature that allows the node to sync the blockchain state faster
-than the default sync mode. This is achieved by downloading a pre-built logs
-database from a remote server (manually) and using it to sync your node.
+than the default sync mode by using a pre-built logs database.
 
-In order to generate the logs database, you need to have a fully synched node
-which was configured to keep logs in the database. By default, logs are removed
-after processing them to keep the database size small. This setting can be
-configured via `hopr -> chain -> keep_logs` in the configuration file or through
-the CLI parameter `--keepLogs`.
+### Prerequisites
 
-The logs database is stored in the node's database folder as `hopr_logs.db`. In
-addition the auxiliary files `hopr_logs.db-shm` and `hopr_logs.db-wal` are
-needed.
+To generate the logs database, you need:
 
-To start a node using fast sync, you need to have a pre-built logs database in
-the node's database folder. Moreover, the node must be configured to run in fast
-sync mode. This can be done by setting `hopr -> chain -> fast_sync` to `true` in
-the configuration file or by using the CLI parameter `--fastSync`. Lastly, the
-node must not have any index data. This can be achieved by simply removing the
-index database files from the node's database folder: `rm hopr_index.db*`. If
-the node finds index data, it will skip the fast sync mode and start in normal
-sync mode.
+- A fully synced node
+- Node configured to keep logs in the database (disabled by default)
+  - Set `hopr -> chain -> keep_logs` in the configuration file, or
+  - Use the CLI parameter `--keepLogs`
 
-Once fast sync was completed the node will continue to run in normal sync mode.
+### Database Files
+
+The following files in the node's database folder are required:
+
+- `hopr_logs.db` - Main logs database
+- `hopr_logs.db-shm` - Auxiliary file
+- `hopr_logs.db-wal` - Auxiliary file
+
+### Configuration Steps
+
+1. Place the pre-built logs database files in the node's database folder
+2. Enable fast sync mode:
+   - Set `hopr -> chain -> fast_sync` to `true` in the configuration file, or
+   - Use the CLI parameter `--fastSync`
+3. Remove any existing index data:
+   ```shell
+   rm hopr_index.db*
+   ```
+
+### Post-sync Behavior
+
+- If index data exists, the node will skip fast sync and start in normal sync mode
+- After fast sync completes, the node automatically switches to normal sync mode
 
 ## Contact
 

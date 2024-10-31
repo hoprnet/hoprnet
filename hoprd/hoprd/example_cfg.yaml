@@ -280,6 +280,11 @@ hopr:
     # the node to reconcile the state of the chain with the state of the node
     # in future versions.
     keep_logs: false
+    # Configures whether to use fast synchronization during node startup.
+    # When enabled, the node will process existing logs faster (approximately
+    # 10 minutes on Dufour network) but may consume more resources during
+    # the sync process. Recommended for initial setup or when recovering
+    # from a clean state.
     fast_sync: false
 # HOPRd Message Inbox configuration
 inbox:
