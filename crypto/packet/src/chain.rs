@@ -106,8 +106,7 @@ impl ChainPacketComponents {
         if data.len() == Self::SIZE {
             let (pre_packet, pre_ticket) = data.split_at(MetaPacket::<CurrentSphinxSuite>::PACKET_LEN);
 
-            let mp: MetaPacket<hopr_crypto_sphinx::ec_groups::X25519Suite> =
-                MetaPacket::<CurrentSphinxSuite>::try_from(pre_packet)?;
+            let mp: MetaPacket<CurrentSphinxSuite> = MetaPacket::try_from(pre_packet)?;
 
             match mp.into_forwarded(node_keypair, INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0)? {
                 ForwardedMetaPacket::Relayed {
