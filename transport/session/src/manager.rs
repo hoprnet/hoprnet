@@ -6,11 +6,13 @@ use hopr_network_types::prelude::*;
 use std::ops::Range;
 use std::sync::{Arc, OnceLock};
 use std::time::Duration;
+use strum::EnumCount;
 use tracing::{debug, error, info, trace, warn};
 
 use crate::errors::TransportSessionError;
 use crate::initiation::{
     StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation, StartProtocol,
+    StartProtocolDiscriminants,
 };
 use crate::traits::SendMsg;
 use crate::types::{unwrap_offchain_key, SessionTarget};
@@ -69,12 +71,13 @@ fn close_session_after_eviction<S: SendMsg + Send + Sync + 'static>(
     // When a Session is removed from the cache, we notify the other party only
     // if this removal was due to expiration or cache size limit.
     match cause {
-        moka::notification::RemovalCause::Expired | moka::notification::RemovalCause::Size
+        r @ moka::notification::RemovalCause::Expired | r @ moka::notification::RemovalCause::Size
             if msg_sender.get().is_some() =>
         {
             trace!(
                 session_id = tracing::field::debug(session_id),
-                "sending session termination due to eviction from the cache"
+                reason = ?r,
+                "session termination due to eviction from the cache"
             );
             let data = match ApplicationData::try_from(StartProtocol::CloseSession(session_id.with_peer(me))) {
                 Ok(data) => data,
@@ -105,9 +108,10 @@ fn close_session_after_eviction<S: SendMsg + Send + Sync + 'static>(
                 }
 
                 session_tx.close_channel();
-                trace!(
+                debug!(
                     session_id = tracing::field::debug(session_id),
-                    "channel closed on session during eviction"
+                    reason = ?r,
+                    "session has been closed due to cache eviction"
                 );
 
                 #[cfg(all(feature = "prometheus", not(test)))]
@@ -214,11 +218,16 @@ fn initiation_timeout_max(base: Duration, hops: usize) -> Duration {
 
 impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
     pub fn new(my_peer_id: PeerId, cfg: SessionManagerConfig) -> Self {
+        assert!(
+            cfg.session_tag_range.start >= StartProtocolDiscriminants::COUNT as u16,
+            "session tag range start should allow start protocol messages"
+        );
+
         let msg_sender = Arc::new(OnceLock::new());
         Self {
             msg_sender: msg_sender.clone(),
             session_initiations: moka::future::Cache::builder()
-                .max_capacity(cfg.session_tag_range.clone().count() as u64)
+                .max_capacity(cfg.session_tag_range.clone().count().max(1) as u64)
                 .time_to_live(initiation_timeout_max(
                     cfg.initiation_timeout_base,
                     RoutingOptions::MAX_INTERMEDIATE_HOPS,
@@ -424,6 +433,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
     pub async fn dispatch_message(&self, data: ApplicationData) -> crate::errors::Result<DispatchResult> {
         if let Some(app_tag) = &data.application_tag {
             if (0..self.cfg.session_tag_range.start).contains(app_tag) {
+                trace!(tag = app_tag, "dispatching Start protocol message");
                 return self
                     .handle_start_protocol_message(data)
                     .await
@@ -699,6 +709,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
 mod tests {
     use super::*;
 
+    use crate::Capability;
     use anyhow::anyhow;
     use async_std::prelude::FutureExt;
     use async_trait::async_trait;
@@ -815,7 +826,7 @@ mod tests {
                 path_options: RoutingOptions::Hops(BoundedSize::MIN),
                 target_protocol: IpProtocol::TCP,
                 target: target.clone(),
-                capabilities: vec![],
+                capabilities: vec![Capability::Segmentation],
             }),
             new_session_rx_bob.next(),
         )
@@ -825,7 +836,9 @@ mod tests {
         let mut alice_session = alice_session?;
         let bob_session = bob_session.ok_or(anyhow!("bob must get an incoming session"))?;
 
+        assert!(alice_session.capabilities().contains(&Capability::Segmentation));
         assert!(matches!(bob_session.target, SessionTarget::TcpStream(host) if host == target));
+        assert!(bob_session.session.capabilities().contains(&Capability::Segmentation));
 
         async_std::task::sleep(Duration::from_millis(100)).await;
         alice_session.close().await?;
@@ -834,6 +847,256 @@ mod tests {
         futures::stream::iter(jhs)
             .for_each(hopr_async_runtime::prelude::cancel_join_handle)
             .await;
+
+        Ok(())
+    }
+
+    #[test_log::test(async_std::test)]
+    async fn session_manager_should_close_idle_session_automatically() -> anyhow::Result<()> {
+        let alice_peer = PeerId::random();
+        let bob_peer = PeerId::random();
+
+        let cfg = SessionManagerConfig {
+            idle_timeout: Duration::from_millis(200),
+            ..Default::default()
+        };
+
+        let alice_mgr = SessionManager::new(alice_peer, cfg);
+        let bob_mgr = SessionManager::new(bob_peer, Default::default());
+
+        let mut sequence = mockall::Sequence::new();
+        let mut alice_transport = MockMsgSender::new();
+        let mut bob_transport = MockMsgSender::new();
+
+        // Alice sends the StartSession message
+        let bob_mgr_clone = bob_mgr.clone();
+        alice_transport
+            .expect_send_message()
+            .once()
+            .in_sequence(&mut sequence)
+            .withf(move |_, peer, _| *peer == bob_peer)
+            .returning(move |data, _, _| {
+                async_std::task::block_on(bob_mgr_clone.dispatch_message(data))?;
+                Ok(())
+            });
+
+        // Bob clones transport for Session
+        bob_transport
+            .expect_clone()
+            .once()
+            .in_sequence(&mut sequence)
+            .return_once(|| MockMsgSender::new());
+
+        // Bob sends the SessionEstablished message
+        let alice_mgr_clone = alice_mgr.clone();
+        bob_transport
+            .expect_send_message()
+            .once()
+            .in_sequence(&mut sequence)
+            .withf(move |_, peer, _| *peer == alice_peer)
+            .returning(move |data, _, _| {
+                async_std::task::block_on(alice_mgr_clone.dispatch_message(data))?;
+                Ok(())
+            });
+
+        // Alice clones transport for Session
+        alice_transport
+            .expect_clone()
+            .once()
+            .in_sequence(&mut sequence)
+            .return_once(|| MockMsgSender::new());
+
+        // Alice sends the CloseSession message to initiate closure
+        let bob_mgr_clone = bob_mgr.clone();
+        alice_transport
+            .expect_send_message()
+            .once()
+            .in_sequence(&mut sequence)
+            .withf(move |_, peer, _| *peer == bob_peer)
+            .returning(move |data, _, _| {
+                async_std::task::block_on(bob_mgr_clone.dispatch_message(data))?;
+                Ok(())
+            });
+
+        // Bob sends the CloseSession message to confirm
+        let alice_mgr_clone = alice_mgr.clone();
+        bob_transport
+            .expect_send_message()
+            .once()
+            .in_sequence(&mut sequence)
+            .withf(move |_, peer, _| *peer == alice_peer)
+            .returning(move |data, _, _| {
+                async_std::task::block_on(alice_mgr_clone.dispatch_message(data))?;
+                Ok(())
+            });
+
+        let mut jhs = Vec::new();
+
+        // Start Alice
+        let (new_session_tx_alice, _) = futures::channel::mpsc::unbounded();
+        jhs.extend(alice_mgr.start(alice_transport, new_session_tx_alice)?);
+
+        // Start Bob
+        let (new_session_tx_bob, new_session_rx_bob) = futures::channel::mpsc::unbounded();
+        jhs.extend(bob_mgr.start(bob_transport, new_session_tx_bob)?);
+
+        let target = SealedHost::Plain("127.0.0.1:80".parse()?);
+
+        pin_mut!(new_session_rx_bob);
+        let (alice_session, bob_session) = futures::future::join(
+            alice_mgr.new_session(SessionClientConfig {
+                peer: bob_peer,
+                path_options: RoutingOptions::Hops(BoundedSize::MIN),
+                target_protocol: IpProtocol::TCP,
+                target: target.clone(),
+                capabilities: vec![Capability::Segmentation],
+            }),
+            new_session_rx_bob.next(),
+        )
+        .timeout(Duration::from_secs(2))
+        .await?;
+
+        let alice_session = alice_session?;
+        let bob_session = bob_session.ok_or(anyhow!("bob must get an incoming session"))?;
+
+        assert!(alice_session.capabilities().contains(&Capability::Segmentation));
+        assert!(matches!(bob_session.target, SessionTarget::TcpStream(host) if host == target));
+        assert!(bob_session.session.capabilities().contains(&Capability::Segmentation));
+
+        // Let the session timeout
+        async_std::task::sleep(Duration::from_millis(300)).await;
+
+        futures::stream::iter(jhs)
+            .for_each(hopr_async_runtime::prelude::cancel_join_handle)
+            .await;
+
+        Ok(())
+    }
+
+    #[test_log::test(async_std::test)]
+    async fn session_manager_should_not_allow_establish_session_when_tag_range_is_used_up() -> anyhow::Result<()> {
+        let alice_peer = PeerId::random();
+        let bob_peer = PeerId::random();
+
+        let cfg = SessionManagerConfig {
+            session_tag_range: 16..17, // Slot for exactly one session
+            ..Default::default()
+        };
+
+        let alice_mgr = SessionManager::new(alice_peer, Default::default());
+        let bob_mgr = SessionManager::new(bob_peer, cfg);
+
+        // Occupy the only free slot with tag 16
+        let (dummy_tx, _) = futures::channel::mpsc::unbounded();
+        bob_mgr
+            .sessions
+            .insert(
+                SessionId::new(16, alice_peer),
+                (Arc::new(dummy_tx), RoutingOptions::Hops(BoundedSize::MIN)),
+            )
+            .await;
+
+        let mut sequence = mockall::Sequence::new();
+        let mut alice_transport = MockMsgSender::new();
+        let mut bob_transport = MockMsgSender::new();
+
+        // Alice sends the StartSession message
+        let bob_mgr_clone = bob_mgr.clone();
+        alice_transport
+            .expect_send_message()
+            .once()
+            .in_sequence(&mut sequence)
+            .withf(move |_, peer, _| *peer == bob_peer)
+            .returning(move |data, _, _| {
+                async_std::task::block_on(bob_mgr_clone.dispatch_message(data))?;
+                Ok(())
+            });
+
+        // Bob sends the SessionError message
+        let alice_mgr_clone = alice_mgr.clone();
+        bob_transport
+            .expect_send_message()
+            .once()
+            .in_sequence(&mut sequence)
+            .withf(move |_, peer, _| *peer == alice_peer)
+            .returning(move |data, _, _| {
+                async_std::task::block_on(alice_mgr_clone.dispatch_message(data))?;
+                Ok(())
+            });
+
+        let mut jhs = Vec::new();
+
+        // Start Alice
+        let (new_session_tx_alice, _) = futures::channel::mpsc::unbounded();
+        jhs.extend(alice_mgr.start(alice_transport, new_session_tx_alice)?);
+
+        // Start Bob
+        let (new_session_tx_bob, _) = futures::channel::mpsc::unbounded();
+        jhs.extend(bob_mgr.start(bob_transport, new_session_tx_bob)?);
+
+        let result = alice_mgr
+            .new_session(SessionClientConfig {
+                peer: bob_peer,
+                path_options: RoutingOptions::Hops(BoundedSize::MIN),
+                target_protocol: IpProtocol::TCP,
+                target: SealedHost::Plain("127.0.0.1:80".parse()?),
+                capabilities: vec![Capability::Segmentation],
+            })
+            .await;
+
+        assert!(
+            matches!(result, Err(TransportSessionError::Rejected(reason)) if reason == StartErrorReason::NoSlotsAvailable)
+        );
+
+        Ok(())
+    }
+
+    #[test_log::test(async_std::test)]
+    async fn session_manager_should_timeout_new_session_attempt_when_no_response() -> anyhow::Result<()> {
+        let alice_peer = PeerId::random();
+        let bob_peer = PeerId::random();
+
+        let cfg = SessionManagerConfig {
+            initiation_timeout_base: Duration::from_millis(100),
+            ..Default::default()
+        };
+
+        let alice_mgr = SessionManager::new(alice_peer, cfg);
+        let bob_mgr = SessionManager::new(bob_peer, Default::default());
+
+        let mut sequence = mockall::Sequence::new();
+        let mut alice_transport = MockMsgSender::new();
+        let bob_transport = MockMsgSender::new();
+
+        // Alice sends the StartSession message, but Bob does not handle it
+        alice_transport
+            .expect_send_message()
+            .once()
+            .in_sequence(&mut sequence)
+            .withf(move |_, peer, _| *peer == bob_peer)
+            .returning(|_, _, _| Ok(()));
+
+        let mut jhs = Vec::new();
+
+        // Start Alice
+        let (new_session_tx_alice, _) = futures::channel::mpsc::unbounded();
+        jhs.extend(alice_mgr.start(alice_transport, new_session_tx_alice)?);
+
+        // Start Bob
+        let (new_session_tx_bob, _) = futures::channel::mpsc::unbounded();
+        jhs.extend(bob_mgr.start(bob_transport, new_session_tx_bob)?);
+
+        let result = alice_mgr
+            .new_session(SessionClientConfig {
+                peer: bob_peer,
+                path_options: RoutingOptions::Hops(BoundedSize::MIN),
+                target_protocol: IpProtocol::TCP,
+                target: SealedHost::Plain("127.0.0.1:80".parse()?),
+                capabilities: vec![Capability::Segmentation],
+            })
+            .await;
+
+        assert!(matches!(result, Err(TransportSessionError::Timeout)));
 
         Ok(())
     }

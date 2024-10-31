@@ -84,7 +84,7 @@ pub struct StartEstablished<T> {
 #[derive(Debug, Clone, PartialEq, Eq, strum::EnumDiscriminants)]
 // #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] -- enforce serialization via encode/decode
 #[strum_discriminants(vis(pub(crate)))]
-#[strum_discriminants(derive(strum::FromRepr), repr(u8))]
+#[strum_discriminants(derive(strum::FromRepr, strum::EnumCount), repr(u8))]
 pub enum StartProtocol<T> {
     /// Request to initiate a new session.
     StartSession(StartInitiation),
