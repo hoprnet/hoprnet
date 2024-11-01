@@ -172,6 +172,7 @@ where
 
                     async move { tbf_clone.save().await }
                 },
+                "persisting the bloom filter to disk".into(),
             ))),
         );
         tbf

@@ -110,13 +110,9 @@ impl Hash for SessionId {
     }
 }
 
-const PADDING_HEADER_SIZE: usize = 4;
-
 /// Inner MTU size of what the HOPR payload can take (payload - peer_id - application_tag)
-pub const SESSION_USABLE_MTU_SIZE: usize = PAYLOAD_SIZE
-    - OffchainPublicKey::SIZE
-    - std::mem::size_of::<hopr_internal_types::protocol::Tag>()
-    - PADDING_HEADER_SIZE;
+pub const SESSION_USABLE_MTU_SIZE: usize =
+    PAYLOAD_SIZE - OffchainPublicKey::SIZE - std::mem::size_of::<hopr_internal_types::protocol::Tag>();
 
 /// Helper trait to allow Box aliasing
 trait AsyncReadWrite: futures::AsyncWrite + futures::AsyncRead + Send {}
@@ -495,7 +491,7 @@ impl futures::AsyncRead for InnerSession {
 
 // TODO: 3.0 remove once return path is implemented
 pub fn wrap_with_offchain_key(peer: &PeerId, data: Box<[u8]>) -> crate::errors::Result<Vec<u8>> {
-    if data.len() > PAYLOAD_SIZE.saturating_sub(OffchainPublicKey::SIZE + PADDING_HEADER_SIZE) {
+    if data.len() > PAYLOAD_SIZE.saturating_sub(OffchainPublicKey::SIZE) {
         return Err(TransportSessionError::PayloadSize);
     }
 

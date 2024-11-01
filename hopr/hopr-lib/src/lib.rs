@@ -1014,15 +1014,19 @@ impl Hopr {
         let db_clone = self.db.clone();
         processes.insert(
             HoprLibProcesses::TicketIndexFlush,
-            spawn(Box::pin(execute_on_tick(Duration::from_secs(5), move || {
-                let db_clone = db_clone.clone();
-                async move {
-                    match db_clone.persist_outgoing_ticket_indices().await {
-                        Ok(n) => debug!(count = n, "successfully flushed states of outgoing ticket indices"),
-                        Err(e) => error!(error = %e, "failed to flush ticket indices"),
+            spawn(Box::pin(execute_on_tick(
+                Duration::from_secs(5),
+                move || {
+                    let db_clone = db_clone.clone();
+                    async move {
+                        match db_clone.persist_outgoing_ticket_indices().await {
+                            Ok(n) => debug!(count = n, "successfully flushed states of outgoing ticket indices"),
+                            Err(e) => error!(error = %e, "failed to flush ticket indices"),
+                        }
                     }
-                }
-            }))),
+                },
+                "flush the states of outgoing ticket indices".into(),
+            ))),
         );
 
         // NOTE: strategy ticks must start after the chain is synced, otherwise
@@ -1033,15 +1037,19 @@ impl Hopr {
         processes.insert(
             HoprLibProcesses::StrategyTick,
             spawn(async move {
-                execute_on_tick(Duration::from_secs(strategy_interval), move || {
-                    let multi_strategy = multi_strategy.clone();
+                execute_on_tick(
+                    Duration::from_secs(strategy_interval),
+                    move || {
+                        let multi_strategy = multi_strategy.clone();
 
-                    async move {
-                        debug!(state = "started", "strategy tick");
-                        let _ = multi_strategy.on_tick().await;
-                        debug!(state = "finished", "strategy tick");
-                    }
-                })
+                        async move {
+                            debug!(state = "started", "strategy tick");
+                            let _ = multi_strategy.on_tick().await;
+                            debug!(state = "finished", "strategy tick");
+                        }
+                    },
+                    "run strategies".into(),
+                )
                 .await;
             }),
         );
