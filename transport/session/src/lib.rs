@@ -11,7 +11,7 @@ mod manager;
 pub mod traits;
 pub mod types;
 
-pub use manager::{SessionManager, SessionManagerConfig};
+pub use manager::{DispatchResult, SessionManager, SessionManagerConfig};
 
 use libp2p_identity::PeerId;
 #[cfg(feature = "serde")]

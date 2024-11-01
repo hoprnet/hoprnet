@@ -176,12 +176,8 @@ pub enum HoprLibProcesses {
     ProtocolMsgIn,
     #[strum(to_string = "HOPR protocol processing: msg egress")]
     ProtocolMsgOut,
-    #[strum(to_string = "session router pairing the session streams based on the PeerId and ApplicationTag")]
-    SessionsRouter,
-    #[strum(to_string = "graceful session on stream close")]
-    SessionsTerminator,
-    #[strum(to_string = "gracefully session terminator upon expiration")]
-    SessionsExpiration,
+    #[strum(to_string = "session manager sub-process #{0}")]
+    SessionsManagement(usize),
     #[cfg(feature = "session-server")]
     #[strum(to_string = "session server providing the exit node session stream functionality")]
     SessionServer,
@@ -220,9 +216,9 @@ impl From<HoprTransportProcess> for HoprLibProcesses {
             hopr_transport::HoprTransportProcess::ProtocolMsgIn => HoprLibProcesses::ProtocolMsgIn,
             hopr_transport::HoprTransportProcess::ProtocolMsgOut => HoprLibProcesses::ProtocolMsgOut,
             hopr_transport::HoprTransportProcess::Heartbeat => HoprLibProcesses::Heartbeat,
-            hopr_transport::HoprTransportProcess::SessionsManagement => HoprLibProcesses::SessionsRouter,
-            hopr_transport::HoprTransportProcess::SessionsTerminator => HoprLibProcesses::SessionsTerminator,
-            hopr_transport::HoprTransportProcess::SessionsExpiration => HoprLibProcesses::SessionsExpiration,
+            hopr_transport::HoprTransportProcess::SessionsManagement(kind) => {
+                HoprLibProcesses::SessionsManagement(kind)
+            }
             hopr_transport::HoprTransportProcess::BloomFilterSave => HoprLibProcesses::BloomFilterSave,
         }
     }
@@ -447,8 +443,6 @@ impl HoprSocket {
 /// As such, the `hopr_lib` serves mainly as an integration point into Rust programs.
 pub struct Hopr {
     me: OffchainKeypair,
-    // onchain keypair is necessary, because the ack interaction needs it to be constructable in runtime
-    me_onchain: ChainKeypair,
     cfg: config::HoprLibConfig,
     state: Arc<AtomicHoprState>,
     transport_api: HoprTransport<HoprDb>,
@@ -598,7 +592,6 @@ impl Hopr {
 
         Ok(Self {
             me: me.clone(),
-            me_onchain: me_onchain.clone(),
             cfg,
             state: Arc::new(AtomicHoprState::new(HoprState::Uninitialized)),
             transport_api: hopr_transport_api,
@@ -829,7 +822,7 @@ impl Hopr {
                 }
 
                 // Self-reference is not needed in the network storage
-                if &peer != self.transport_api.me() {
+                if peer != self.me_peer_id() {
                     if let Err(e) = self
                         .transport_api
                         .network()
@@ -1002,8 +995,6 @@ impl Hopr {
         for (id, proc) in self
             .transport_api
             .run(
-                &self.me,
-                &self.me_onchain,
                 String::from(constants::APP_VERSION),
                 self.transport_api.network(),
                 join(&[&self.cfg.db.data, "tbf"]).map_err(|e| {
@@ -1058,7 +1049,7 @@ impl Hopr {
         self.state.store(HoprState::Running, Ordering::Relaxed);
 
         info!(
-            id = self.transport_api.me().to_string(),
+            id = %self.me_peer_id(),
             version = constants::APP_VERSION,
             "NODE STARTED AND RUNNING"
         );

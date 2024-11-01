@@ -1,4 +1,3 @@
-use hopr_transport_session::initiation::StartChallenge;
 use std::time::Duration;
 
 /// The maximum waiting time for a message send to produce a half-key challenge reply
@@ -24,6 +23,3 @@ pub(crate) const RESERVED_SUBPROTOCOL_TAG_UPPER_LIMIT: u16 = 16;
 /// Time within Start protocol must finish session initiation.
 /// This base value is always multiplied by the (max) number of hops, times 2 (for both-ways).
 pub(crate) const SESSION_INITIATION_TIMEOUT_BASE: Duration = Duration::from_secs(5);
-
-/// The first challenge value used in Start protocol to initiate a session.
-pub(crate) const MIN_CHALLENGE: StartChallenge = 1;

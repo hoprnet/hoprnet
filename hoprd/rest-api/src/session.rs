@@ -79,10 +79,10 @@ impl std::str::FromStr for SessionTargetSpec {
     type Err = HoprLibError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.starts_with("$$") {
+        if let Some(stripped) = s.strip_prefix("$$") {
             Ok(Self::Sealed(
                 base64::prelude::BASE64_URL_SAFE
-                    .decode(&s[2..])
+                    .decode(stripped)
                     .map_err(|e| HoprLibError::GeneralError(e.to_string()))?,
             ))
         } else {
@@ -679,7 +679,7 @@ async fn tcp_listen_on<A: std::net::ToSocketAddrs>(address: A) -> std::io::Resul
     // If automatic port allocation is requested and there's a restriction on the port range
     // (via HOPRD_SESSION_PORT_RANGE), try to find an address within that range.
     if addrs.iter().all(|a| a.port() == 0) {
-        if let Some(range_str) = std::env::var(HOPRD_SESSION_PORT_RANGE).ok() {
+        if let Ok(range_str) = std::env::var(HOPRD_SESSION_PORT_RANGE) {
             let tcp_listener =
                 try_restricted_bind(
                     addrs,
@@ -709,7 +709,7 @@ async fn udp_bind_to<A: std::net::ToSocketAddrs>(
     // If automatic port allocation is requested and there's a restriction on the port range
     // (via HOPRD_SESSION_PORT_RANGE), try to find an address within that range.
     if addrs.iter().all(|a| a.port() == 0) {
-        if let Some(range_str) = std::env::var(HOPRD_SESSION_PORT_RANGE).ok() {
+        if let Ok(range_str) = std::env::var(HOPRD_SESSION_PORT_RANGE) {
             let udp_listener = try_restricted_bind(addrs, &range_str, |addrs| {
                 futures::future::ready(builder.clone().build(addrs.as_slice()))
             })

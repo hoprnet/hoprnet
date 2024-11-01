@@ -303,6 +303,10 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                 }
             }));
 
+        // This is necessary to evict expired entries from the caches if
+        // no session-related operations happen at all.
+        // This ensures the dangling expired sessions are properly closed
+        // and their closure is timely notified to the other party.
         let myself = self.clone();
         let jh_session_expiration = hopr_async_runtime::prelude::spawn(async move {
             let jitter = hopr_crypto_random::random_float_in_range(1.0..1.5);
@@ -434,7 +438,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                     error = ?e,
                     "the other party rejected the session initiation with error"
                 );
-                Err(TransportSessionError::Rejected(e.reason).into())
+                Err(TransportSessionError::Rejected(e.reason))
             }
             Either::Right(_) => {
                 // Timeout waiting for a session establishment
@@ -443,7 +447,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                 #[cfg(all(feature = "prometheus", not(test)))]
                 METRIC_RECEIVED_SESSION_ERRS.increment(&["timeout"]);
 
-                Err(TransportSessionError::Timeout.into())
+                Err(TransportSessionError::Timeout)
             }
         }
     }
