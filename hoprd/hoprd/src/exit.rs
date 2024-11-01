@@ -18,7 +18,7 @@ lazy_static::lazy_static! {
 }
 
 fn ten() -> u32 {
-    105
+    10
 }
 
 fn default_target_retry_delay() -> Duration {
