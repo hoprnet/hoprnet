@@ -154,7 +154,7 @@ pub struct CliArgs {
 
     #[arg(
         long = "keepLogs",
-        env = "HOPRD_KEEP_LOGS",
+        env = "HOPRD_INDEXER_KEEP_LOGS",
         help = "Enables keeping RPC logs in the logs database after they were processed.",
         action = ArgAction::Count
     )]
@@ -162,7 +162,7 @@ pub struct CliArgs {
 
     #[arg(
         long = "fastSync",
-        env = "HOPRD_FAST_SYNC",
+        env = "HOPRD_INDEXER_ENABLE_FAST_SYNC",
         help = "Enables using fast sync at node start when possible.",
         action = ArgAction::Count
     )]
