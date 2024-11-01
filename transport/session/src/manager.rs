@@ -759,6 +759,28 @@ mod tests {
         }
     }
 
+    #[async_std::test]
+    async fn test_insert_into_next_slot() -> anyhow::Result<()> {
+        let cache = moka::future::Cache::new(10);
+
+        for i in 0..5 {
+            let v = insert_into_next_slot(&cache, |prev| prev.map(|v| (v + 1) % 5).unwrap_or(0), "foo".to_string())
+                .await
+                .ok_or(anyhow!("should insert"))?;
+            assert_eq!(v, i);
+            assert_eq!(Some("foo".to_string()), cache.get(&i).await);
+        }
+
+        assert!(
+            insert_into_next_slot(&cache, |prev| prev.map(|v| (v + 1) % 5).unwrap_or(0), "foo".to_string())
+                .await
+                .is_none(),
+            "must not find slot when full"
+        );
+
+        Ok(())
+    }
+
     #[test_log::test(async_std::test)]
     async fn session_manager_should_follow_start_protocol_to_establish_new_session_and_close_it() -> anyhow::Result<()>
     {
@@ -863,9 +885,11 @@ mod tests {
         let mut alice_session = alice_session?;
         let bob_session = bob_session.ok_or(anyhow!("bob must get an incoming session"))?;
 
-        assert!(alice_session.capabilities().contains(&Capability::Segmentation));
+        assert!(
+            alice_session.capabilities().len() == 1 && alice_session.capabilities().contains(&Capability::Segmentation)
+        );
+        assert_eq!(alice_session.capabilities(), bob_session.session.capabilities());
         assert!(matches!(bob_session.target, SessionTarget::TcpStream(host) if host == target));
-        assert!(bob_session.session.capabilities().contains(&Capability::Segmentation));
 
         async_std::task::sleep(Duration::from_millis(100)).await;
         alice_session.close().await?;
@@ -986,9 +1010,11 @@ mod tests {
         let alice_session = alice_session?;
         let bob_session = bob_session.ok_or(anyhow!("bob must get an incoming session"))?;
 
-        assert!(alice_session.capabilities().contains(&Capability::Segmentation));
+        assert!(
+            alice_session.capabilities().len() == 1 && alice_session.capabilities().contains(&Capability::Segmentation)
+        );
+        assert_eq!(alice_session.capabilities(), bob_session.session.capabilities());
         assert!(matches!(bob_session.target, SessionTarget::TcpStream(host) if host == target));
-        assert!(bob_session.session.capabilities().contains(&Capability::Segmentation));
 
         // Let the session timeout
         async_std::task::sleep(Duration::from_millis(300)).await;
@@ -1067,7 +1093,7 @@ mod tests {
                 path_options: RoutingOptions::Hops(BoundedSize::MIN),
                 target_protocol: IpProtocol::TCP,
                 target: SealedHost::Plain("127.0.0.1:80".parse()?),
-                capabilities: vec![Capability::Segmentation],
+                capabilities: vec![],
             })
             .await;
 
@@ -1119,7 +1145,7 @@ mod tests {
                 path_options: RoutingOptions::Hops(BoundedSize::MIN),
                 target_protocol: IpProtocol::TCP,
                 target: SealedHost::Plain("127.0.0.1:80".parse()?),
-                capabilities: vec![Capability::Segmentation],
+                capabilities: vec![],
             })
             .await;
 
