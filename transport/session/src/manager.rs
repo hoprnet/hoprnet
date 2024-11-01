@@ -190,11 +190,23 @@ pub enum DispatchResult {
     Unrelated(ApplicationData),
 }
 
+/// Manages lifecycles of Sessions.
+///
+/// Once the manager is [started](SessionManager::start), the [`SessionManager::dispatch_message`]
+/// should be called for each [`ApplicationData`] received by the node.
+/// This way, the `SessionManager` takes care of proper processing of the Start sub-protocol
+/// and correct dispatch of Session-related packets to individual existing Sessions.
+///
+/// Secondly, the manager can initiate new outgoing sessions via [`SessionManager::new_session`].
+///
+/// Since the `SessionManager` operates over the HOPR protocol,
+/// the [message transport `S`](SendMsg) is required.
+/// Such transport must also be `Clone`, since it will be cloned into the created [`Session`] objects.
 pub struct SessionManager<S> {
     session_initiations: SessionInitiationCache,
     session_notifiers: Arc<OnceLock<(UnboundedSender<IncomingSession>, UnboundedSender<SessionId>)>>,
     sessions: SessionCache,
-    my_peer_id: PeerId,
+    me: PeerId,
     msg_sender: Arc<OnceLock<S>>,
     cfg: SessionManagerConfig,
 }
@@ -205,7 +217,7 @@ impl<S> Clone for SessionManager<S> {
             session_initiations: self.session_initiations.clone(),
             session_notifiers: self.session_notifiers.clone(),
             sessions: self.sessions.clone(),
-            my_peer_id: self.my_peer_id,
+            me: self.me,
             cfg: self.cfg.clone(),
             msg_sender: self.msg_sender.clone(),
         }
@@ -217,17 +229,18 @@ fn initiation_timeout_max(base: Duration, hops: usize) -> Duration {
 }
 
 impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
-    pub fn new(my_peer_id: PeerId, cfg: SessionManagerConfig) -> Self {
+    /// Creates a new instance given the `PeerId` and [config](SessionManagerConfig).
+    pub fn new(me: PeerId, cfg: SessionManagerConfig) -> Self {
         assert!(
-            cfg.session_tag_range.start >= StartProtocolDiscriminants::COUNT as u16,
-            "session tag range start should allow start protocol messages"
+            cfg.session_tag_range.start > StartProtocolDiscriminants::COUNT as u16,
+            "session tag range start should allow Start protocol messages"
         );
 
         let msg_sender = Arc::new(OnceLock::new());
         Self {
             msg_sender: msg_sender.clone(),
             session_initiations: moka::future::Cache::builder()
-                .max_capacity(cfg.session_tag_range.clone().count().max(1) as u64)
+                .max_capacity(cfg.session_tag_range.clone().count() as u64)
                 .time_to_live(initiation_timeout_max(
                     cfg.initiation_timeout_base,
                     RoutingOptions::MAX_INTERMEDIATE_HOPS,
@@ -238,15 +251,20 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                 .time_to_idle(cfg.idle_timeout)
                 .async_eviction_listener(move |k, v, c| {
                     let msg_sender = msg_sender.clone();
-                    close_session_after_eviction(msg_sender, my_peer_id, *k, v, c)
+                    close_session_after_eviction(msg_sender, me, *k, v, c)
                 })
                 .build(),
             session_notifiers: Arc::new(OnceLock::new()),
-            my_peer_id,
+            me,
             cfg,
         }
     }
 
+    /// Starts the instance with the given [transport](SendMsg) implementation
+    /// and a channel that is used to notify when new incoming session is opened to us.
+    ///
+    /// This method must be called prior to any calls to [`SessionManager::new_session`] or
+    /// [`SessionManager::dispatch_message`].
     pub fn start(
         &self,
         msg_sender: S,
@@ -314,6 +332,12 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
     }
 
     /// Initiates new outgoing Session with the given configuration.
+    ///
+    /// If the Session's counterparty does not respond within
+    /// the [configured](SessionManagerConfig) period,
+    /// this method returns [`TransportSessionError::Timeout`].
+    ///
+    /// It will also fail if the instance has not been [started](SessionManager::start).
     pub async fn new_session(&self, cfg: SessionClientConfig) -> crate::errors::Result<Session> {
         let msg_sender = self
             .msg_sender
@@ -347,7 +371,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
             },
             capabilities: cfg.capabilities.iter().copied().collect(),
             // Back-routing currently uses the same (inverted) route as session initiation
-            back_routing: Some((cfg.path_options.clone().invert(), self.my_peer_id)),
+            back_routing: Some((cfg.path_options.clone().invert(), self.me)),
         });
 
         // Send the Session initiation message
@@ -392,7 +416,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
 
                 Ok(Session::new(
                     session_id,
-                    self.my_peer_id,
+                    self.me,
                     cfg.path_options,
                     cfg.capabilities.into_iter().collect(),
                     Arc::new(msg_sender.clone()),
@@ -466,7 +490,6 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
         Ok(DispatchResult::Unrelated(data))
     }
 
-    /// Handles session initiation (the Start protocol) messages.
     async fn handle_start_protocol_message(&self, data: ApplicationData) -> crate::errors::Result<()> {
         match StartProtocol::<SessionId>::try_from(data)? {
             StartProtocol::StartSession(session_req) => {
@@ -519,7 +542,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
 
                     let session = Session::new(
                         session_id,
-                        self.my_peer_id,
+                        self.me,
                         route.clone(),
                         session_req.capabilities,
                         Arc::new(msg_sender.clone()),
@@ -547,7 +570,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                     // Set our peer ID in the session ID sent back to them.
                     let data = StartProtocol::SessionEstablished(StartEstablished {
                         orig_challenge: session_req.challenge,
-                        session_id: session_id.with_peer(self.my_peer_id),
+                        session_id: session_id.with_peer(self.me),
                     });
 
                     msg_sender
@@ -680,7 +703,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                     .get()
                     .ok_or(TransportSessionError::Manager("not started".into()))?
                     .send_message(
-                        StartProtocol::CloseSession(session_id.with_peer(self.my_peer_id)).try_into()?,
+                        StartProtocol::CloseSession(session_id.with_peer(self.me)).try_into()?,
                         *session_id.peer(),
                         routing_options,
                     )
