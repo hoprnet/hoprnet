@@ -168,8 +168,7 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                                     }
 
                                     debug!("retrieved {log}");
-                                    let slog = SerializableLog::from(log);
-                                    current_block_log.logs.insert(slog);
+                                    current_block_log.logs.insert(log.into());
                                 },
                                 Ok(None) => {
                                     trace!(from_block, to_block=latest_block, "done processing batch");

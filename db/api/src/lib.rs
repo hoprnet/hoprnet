@@ -15,7 +15,7 @@ use crate::{
     resolver::HoprDbResolverOperations, tickets::HoprDbTicketOperations,
 };
 
-/// Convenience trait that contain all HOPR DB operations crates.
+/// Convenience trait that contains all HOPR DB operation interfaces.
 pub trait HoprDbAllAbstractedOperations:
     HoprDbTicketOperations
     + HoprDbPeersOperations
