@@ -15,8 +15,6 @@ use futures::{Stream, StreamExt, TryStreamExt};
 use std::pin::Pin;
 use tracing::{debug, error, trace, warn};
 
-use hopr_primitive_types::prelude::SerializableLog;
-
 use crate::errors::{Result, RpcError, RpcError::FilterIsEmpty};
 use crate::rpc::RpcOperations;
 use crate::{BlockWithLogs, HoprIndexerRpcOperations, Log, LogFilter};

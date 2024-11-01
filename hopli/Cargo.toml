@@ -21,7 +21,7 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 uuid = { workspace = true }
-chain-rpc = { workspace = true }
+hopr-chain-rpc = { workspace = true }
 chain-api = { workspace = true }
 hopr-internal-types = { workspace = true }
 hopr-lib = { workspace = true, features = ["runtime-async-std"] }

@@ -25,7 +25,7 @@ use hopr_crypto_types::types::Hash;
 use hopr_primitive_types::prelude::*;
 
 use crate::errors::RpcError::{ProviderError, TransactionDropped};
-use crate::errors::{HttpRequestError, Result, RpcError};
+use crate::errors::{HttpRequestError, Result};
 use crate::RetryAction::NoRetry;
 
 pub mod client;
@@ -84,17 +84,15 @@ impl From<Log> for ethers::abi::RawLog {
     }
 }
 
-impl TryFrom<SerializableLog> for Log {
-    type Error = RpcError;
-
-    fn try_from(value: SerializableLog) -> std::result::Result<Self, Self::Error> {
+impl From<SerializableLog> for Log {
+    fn from(value: SerializableLog) -> Self {
         let topics = value
             .topics
             .into_iter()
             .map(|topic| topic.into())
             .collect::<Vec<Hash>>();
 
-        let log = Log {
+        Self {
             address: value.address,
             topics,
             data: Box::from(value.data.as_ref()),
@@ -104,9 +102,7 @@ impl TryFrom<SerializableLog> for Log {
             log_index: value.log_index.into(),
             tx_hash: value.tx_hash.into(),
             removed: value.removed,
-        };
-
-        Ok(log)
+        }
     }
 }
 

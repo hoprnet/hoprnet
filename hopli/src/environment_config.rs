@@ -10,10 +10,6 @@
 //! [NetworkDetail] specifies the environment type of the network, the starting block number, and
 //! the deployed contract addresses in [ContractAddresses]
 
-use crate::utils::HelperErrors;
-use chain_api::config::{Addresses as ContractAddresses, EnvironmentType};
-use chain_api::{DefaultHttpPostRequestor, JsonRpcClient};
-use chain_rpc::{client::SimpleJsonRpcRetryPolicy, errors::RpcError, rpc::RpcOperationsConfig};
 use clap::Parser;
 use ethers::{
     core::k256::ecdsa::SigningKey,
@@ -21,8 +17,6 @@ use ethers::{
     providers::{Middleware, Provider},
     signers::{LocalWallet, Signer, Wallet},
 };
-use hopr_crypto_types::keypairs::ChainKeypair;
-use hopr_crypto_types::keypairs::Keypair;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use std::{
@@ -31,6 +25,14 @@ use std::{
     path::{Path, PathBuf},
     sync::Arc,
 };
+
+use chain_api::config::{Addresses as ContractAddresses, EnvironmentType};
+use chain_api::{DefaultHttpPostRequestor, JsonRpcClient};
+use hopr_chain_rpc::{client::SimpleJsonRpcRetryPolicy, errors::RpcError, rpc::RpcOperationsConfig};
+use hopr_crypto_types::keypairs::ChainKeypair;
+use hopr_crypto_types::keypairs::Keypair;
+
+use crate::utils::HelperErrors;
 
 // replace NetworkConfig with ProtocolConfig
 #[serde_as]
@@ -123,7 +125,7 @@ impl NetworkProviderArgs {
         // Build JSON RPC client
         let rpc_client = JsonRpcClient::new(
             self.provider_url.as_str(),
-            DefaultHttpPostRequestor::new(chain_rpc::HttpPostRequestorConfig {
+            DefaultHttpPostRequestor::new(hopr_chain_rpc::HttpPostRequestorConfig {
                 max_requests_per_sec: None,
                 ..Default::default()
             }),
@@ -155,7 +157,7 @@ impl NetworkProviderArgs {
         // Build JSON RPC client
         let rpc_client = JsonRpcClient::new(
             self.provider_url.as_str(),
-            DefaultHttpPostRequestor::new(chain_rpc::HttpPostRequestorConfig {
+            DefaultHttpPostRequestor::new(hopr_chain_rpc::HttpPostRequestorConfig {
                 max_requests_per_sec: None,
                 ..Default::default()
             }),

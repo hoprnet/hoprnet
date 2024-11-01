@@ -3,9 +3,9 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use tracing::{debug, error, info, trace, warn};
 
-use chain_rpc::{BlockWithLogs, HoprIndexerRpcOperations, LogFilter};
 use chain_types::chain_events::SignificantChainEvent;
 use hopr_async_runtime::prelude::{spawn, JoinHandle};
+use hopr_chain_rpc::{BlockWithLogs, HoprIndexerRpcOperations, LogFilter};
 use hopr_crypto_types::types::Hash;
 use hopr_db_api::logs::HoprDbLogOperations;
 use hopr_db_sql::info::HoprDbInfoOperations;
@@ -42,7 +42,7 @@ lazy_static::lazy_static! {
 
 /// Indexer
 ///
-/// Accepts the RPC operational functionality [chain_rpc::HoprIndexerRpcOperations]
+/// Accepts the RPC operational functionality [hopr_chain_rpc::HoprIndexerRpcOperations]
 /// and provides the indexing operation resulting in and output of [chain_types::chain_events::SignificantChainEvent]
 /// streamed outside the indexer by the unbounded channel.
 ///
@@ -496,8 +496,8 @@ mod tests {
     use std::pin::Pin;
 
     use bindings::hopr_announcements::AddressAnnouncementFilter;
-    use chain_rpc::BlockWithLogs;
     use chain_types::chain_events::ChainEventType;
+    use hopr_chain_rpc::BlockWithLogs;
     use hopr_crypto_types::keypairs::{Keypair, OffchainKeypair};
     use hopr_crypto_types::prelude::ChainKeypair;
     use hopr_db_sql::db::HoprDb;
@@ -556,13 +556,13 @@ mod tests {
 
         #[async_trait]
         impl HoprIndexerRpcOperations for HoprIndexerOps {
-            async fn block_number(&self) -> chain_rpc::errors::Result<u64>;
+            async fn block_number(&self) -> hopr_chain_rpc::errors::Result<u64>;
 
             fn try_stream_logs<'a>(
                 &'a self,
                 start_block_number: u64,
                 filter: LogFilter,
-            ) -> chain_rpc::errors::Result<Pin<Box<dyn Stream<Item = BlockWithLogs> + Send + 'a>>>;
+            ) -> hopr_chain_rpc::errors::Result<Pin<Box<dyn Stream<Item = BlockWithLogs> + Send + 'a>>>;
         }
     }
 
@@ -580,7 +580,7 @@ mod tests {
 
         let (tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
         rpc.expect_try_stream_logs()
-            .withf(move |x: &u64, _y: &chain_rpc::LogFilter| *x == 0)
+            .withf(move |x: &u64, _y: &hopr_chain_rpc::LogFilter| *x == 0)
             .return_once(move |_, _| Ok(Box::pin(rx)));
 
         let mut indexer = Indexer::new(
@@ -617,7 +617,7 @@ mod tests {
         let (tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
         rpc.expect_try_stream_logs()
             .once()
-            .withf(move |x: &u64, _y: &chain_rpc::LogFilter| *x == latest_block + 1)
+            .withf(move |x: &u64, _y: &hopr_chain_rpc::LogFilter| *x == latest_block + 1)
             .return_once(move |_, _| Ok(Box::pin(rx)));
 
         // insert and process latest block
@@ -672,7 +672,7 @@ mod tests {
         let (mut tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
         rpc.expect_try_stream_logs()
             .times(1)
-            .withf(move |x: &u64, _y: &chain_rpc::LogFilter| *x == 0)
+            .withf(move |x: &u64, _y: &hopr_chain_rpc::LogFilter| *x == 0)
             .return_once(move |_, _| Ok(Box::pin(rx)));
 
         let head_block = 1000;
@@ -720,7 +720,7 @@ mod tests {
         // Expected to be called once starting at 0 and yield the respective blocks
         rpc.expect_try_stream_logs()
             .times(1)
-            .withf(move |x: &u64, _y: &chain_rpc::LogFilter| *x == 0)
+            .withf(move |x: &u64, _y: &hopr_chain_rpc::LogFilter| *x == 0)
             .return_once(move |_, _| Ok(Box::pin(rx)));
 
         let head_block = 1000;
@@ -807,7 +807,7 @@ mod tests {
         let mut rpc = MockHoprIndexerOps::new();
         rpc.expect_try_stream_logs()
             .once()
-            .withf(move |x: &u64, _y: &chain_rpc::LogFilter| *x == last_processed_block + 1)
+            .withf(move |x: &u64, _y: &hopr_chain_rpc::LogFilter| *x == last_processed_block + 1)
             .return_once(move |_, _| Ok(Box::pin(rx)));
 
         rpc.expect_block_number()

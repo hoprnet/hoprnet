@@ -3,21 +3,7 @@
 //! [SafeTxOperation] corresponds to the `Operation` Enum used in Safe smart contract.
 //!
 //! [MultisendTransaction] struct is used for building transactions interacting with Multisend contract
-use crate::utils::{
-    HelperErrors, DEFAULT_ANNOUNCEMENT_PERMISSIONS, DEFAULT_CAPABILITY_PERMISSIONS, DEFAULT_NODE_PERMISSIONS,
-    DOMAIN_SEPARATOR_TYPEHASH, SAFE_COMPATIBILITYFALLBACKHANDLER_ADDRESS, SAFE_EXECUTION_SUCCESS,
-    SAFE_MULTISEND_ADDRESS, SAFE_SAFEPROXYFACTORY_ADDRESS, SAFE_SAFE_ADDRESS, SAFE_TX_TYPEHASH, SENTINEL_OWNERS,
-};
-use bindings::{
-    hopr_network_registry::HoprNetworkRegistry,
-    hopr_node_management_module::{
-        AddChannelsAndTokenTargetCall, HoprNodeManagementModule, IncludeNodeCall, RemoveNodeCall, ScopeTargetTokenCall,
-    },
-    hopr_node_safe_registry::{DeregisterNodeBySafeCall, HoprNodeSafeRegistry},
-    hopr_node_stake_factory::HoprNodeStakeFactory,
-    hopr_token::{ApproveCall, HoprToken},
-};
-use chain_rpc::TypedTransaction;
+
 use ethers::{
     abi::AbiEncode,
     contract::{
@@ -30,10 +16,27 @@ use ethers::{
     utils::{format_units, get_create2_address, keccak256, parse_units},
 };
 use hex_literal::hex;
-use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
 use std::sync::Arc;
 use std::{ops::Add, str::FromStr};
 use tracing::{debug, info};
+
+use bindings::{
+    hopr_network_registry::HoprNetworkRegistry,
+    hopr_node_management_module::{
+        AddChannelsAndTokenTargetCall, HoprNodeManagementModule, IncludeNodeCall, RemoveNodeCall, ScopeTargetTokenCall,
+    },
+    hopr_node_safe_registry::{DeregisterNodeBySafeCall, HoprNodeSafeRegistry},
+    hopr_node_stake_factory::HoprNodeStakeFactory,
+    hopr_token::{ApproveCall, HoprToken},
+};
+use hopr_chain_rpc::TypedTransaction;
+use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
+
+use crate::utils::{
+    HelperErrors, DEFAULT_ANNOUNCEMENT_PERMISSIONS, DEFAULT_CAPABILITY_PERMISSIONS, DEFAULT_NODE_PERMISSIONS,
+    DOMAIN_SEPARATOR_TYPEHASH, SAFE_COMPATIBILITYFALLBACKHANDLER_ADDRESS, SAFE_EXECUTION_SUCCESS,
+    SAFE_MULTISEND_ADDRESS, SAFE_SAFEPROXYFACTORY_ADDRESS, SAFE_SAFE_ADDRESS, SAFE_TX_TYPEHASH, SENTINEL_OWNERS,
+};
 
 abigen!(
     SafeSingleton,
@@ -1442,19 +1445,20 @@ pub async fn debug_node_safe_module_setup_main<M: Middleware>(
 
 #[cfg(test)]
 mod tests {
-    use std::vec;
-
-    use crate::utils::{NEW_HOPR_NODE_STAKE_MODULE_TOPIC, NEW_HOPR_NODE_STAKE_SAFE_TOPIC};
-
     use super::*;
-    use bindings::{hopr_announcements::HoprAnnouncements, hopr_channels::HoprChannels};
-    use chain_rpc::client::{create_rpc_client_to_anvil, surf_client::SurfRequestor};
-    use chain_types::ContractInstances;
+
     use ethers::abi::AbiDecode;
     use ethers::types::TransactionRequest;
+    use std::vec;
+
+    use bindings::{hopr_announcements::HoprAnnouncements, hopr_channels::HoprChannels};
+    use chain_types::ContractInstances;
+    use hopr_chain_rpc::client::{create_rpc_client_to_anvil, surf_client::SurfRequestor};
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
     use hopr_primitive_types::prelude::BytesRepresentable;
     use hopr_primitive_types::primitives::Address;
+
+    use crate::utils::{NEW_HOPR_NODE_STAKE_MODULE_TOPIC, NEW_HOPR_NODE_STAKE_SAFE_TOPIC};
 
     fn get_random_address_for_testing() -> Address {
         // Creates a random Ethereum address, only used for testing

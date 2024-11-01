@@ -8,7 +8,7 @@ pub enum HoprChainError {
     Api(String),
 
     #[error("rpc error: {0}")]
-    Rpc(#[from] chain_rpc::errors::RpcError),
+    Rpc(#[from] hopr_chain_rpc::errors::RpcError),
 
     #[error("indexer error: {0}")]
     Indexer(#[from] chain_indexer::errors::CoreEthereumIndexerError),

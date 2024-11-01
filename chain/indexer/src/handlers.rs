@@ -14,9 +14,9 @@ use bindings::{
     hopr_node_safe_registry::HoprNodeSafeRegistryEvents, hopr_ticket_price_oracle::HoprTicketPriceOracleEvents,
     hopr_token::HoprTokenEvents, hopr_winning_probability_oracle::HoprWinningProbabilityOracleEvents,
 };
-use chain_rpc::{BlockWithLogs, Log};
 use chain_types::chain_events::{ChainEventType, NetworkRegistryStatus, SignificantChainEvent};
 use chain_types::ContractAddresses;
+use hopr_chain_rpc::{BlockWithLogs, Log};
 use hopr_crypto_types::keypairs::ChainKeypair;
 use hopr_crypto_types::prelude::{Hash, Keypair};
 use hopr_crypto_types::types::OffchainSignature;
@@ -749,7 +749,7 @@ where
     #[tracing::instrument(level = "debug", skip(self))]
     async fn process_log_event(&self, tx: &OpenTransaction, slog: SerializableLog) -> Result<Option<ChainEventType>> {
         trace!(log = %slog, "processing events in log");
-        let log = Log::try_from(slog)?;
+        let log = Log::from(slog);
 
         if log.address.eq(&self.addresses.announcements) {
             let bn = log.block_number as u32;

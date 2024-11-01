@@ -23,7 +23,7 @@ runtime-tokio = [
 ]
 prometheus = [
   "dep:hopr-metrics",
-  "chain-rpc/prometheus",
+  "hopr-chain-rpc/prometheus",
   "hopr-db-sql/prometheus",
 ]
 
@@ -40,16 +40,16 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 
 bindings = { workspace = true }
+chain-types = { workspace = true }
+hopr-async-runtime = { workspace = true }
+hopr-chain-rpc = { workspace = true }
 hopr-crypto-types = { workspace = true }
+hopr-db-api = { workspace = true }
 hopr-db-entity = { workspace = true }
 hopr-db-sql = { workspace = true }
-hopr-db-api = { workspace = true }
-chain-rpc = { workspace = true }
-chain-types = { workspace = true }
-hopr-metrics = { workspace = true, optional = true }
 hopr-internal-types = { workspace = true }
+hopr-metrics = { workspace = true, optional = true }
 hopr-primitive-types = { workspace = true }
-hopr-async-runtime = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }

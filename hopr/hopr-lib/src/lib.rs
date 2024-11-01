@@ -21,7 +21,6 @@ pub mod constants;
 pub mod errors;
 
 use async_lock::RwLock;
-use chain_rpc::HoprRpcOperations;
 use futures::{
     channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender},
     Stream, StreamExt,
@@ -29,12 +28,10 @@ use futures::{
 use futures_concurrency::stream::StreamExt as _;
 use std::{
     collections::HashMap,
-    sync::{atomic::Ordering, Arc},
-    time::Duration,
-};
-use std::{
     fmt::{Display, Formatter},
     path::PathBuf,
+    sync::{atomic::Ordering, Arc},
+    time::Duration,
 };
 use tracing::{debug, error, info, warn};
 
@@ -53,6 +50,7 @@ use chain_types::ContractAddresses;
 use core_path::channel_graph::ChannelGraph;
 use errors::HoprStatusError;
 use hopr_async_runtime::prelude::{sleep, spawn, JoinHandle};
+use hopr_chain_rpc::HoprRpcOperations;
 use hopr_crypto_types::prelude::OffchainPublicKey;
 use hopr_db_api::logs::HoprDbLogOperations;
 use hopr_db_sql::{
