@@ -47,9 +47,6 @@ pub const HOPR_UDP_BUFFER_SIZE: usize = 16384;
 /// Size of the queue (back-pressure) for data incoming from a UDP stream.
 pub const HOPR_UDP_QUEUE_SIZE: usize = 8192;
 
-/// Name of the environment variable specifying automatic port range selection for Sessions.
-pub const HOPRD_SESSION_PORT_RANGE: &str = "HOPRD_SESSION_PORT_RANGE";
-
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
     static ref METRIC_ACTIVE_CLIENTS: hopr_metrics::MultiGauge = hopr_metrics::MultiGauge::new(
@@ -679,7 +676,7 @@ async fn tcp_listen_on<A: std::net::ToSocketAddrs>(address: A) -> std::io::Resul
     // If automatic port allocation is requested and there's a restriction on the port range
     // (via HOPRD_SESSION_PORT_RANGE), try to find an address within that range.
     if addrs.iter().all(|a| a.port() == 0) {
-        if let Ok(range_str) = std::env::var(HOPRD_SESSION_PORT_RANGE) {
+        if let Ok(range_str) = std::env::var(crate::env::HOPRD_SESSION_PORT_RANGE) {
             let tcp_listener =
                 try_restricted_bind(
                     addrs,
@@ -709,7 +706,7 @@ async fn udp_bind_to<A: std::net::ToSocketAddrs>(
     // If automatic port allocation is requested and there's a restriction on the port range
     // (via HOPRD_SESSION_PORT_RANGE), try to find an address within that range.
     if addrs.iter().all(|a| a.port() == 0) {
-        if let Ok(range_str) = std::env::var(HOPRD_SESSION_PORT_RANGE) {
+        if let Ok(range_str) = std::env::var(crate::env::HOPRD_SESSION_PORT_RANGE) {
             let udp_listener = try_restricted_bind(addrs, &range_str, |addrs| {
                 futures::future::ready(builder.clone().build(addrs.as_slice()))
             })

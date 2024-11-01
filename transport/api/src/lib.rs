@@ -96,7 +96,7 @@ pub use crate::helpers::{IndexerTransportEvent, PeerEligibility, TicketStatistic
 pub use hopr_network_types::prelude::RoutingOptions;
 pub use hopr_transport_session::types::SessionTarget;
 
-#[cfg(all(feature = "prometheus", not(test)))]
+/*#[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
     static ref METRIC_ACTIVE_SESSIONS: hopr_metrics::SimpleGauge = hopr_metrics::SimpleGauge::new(
         "hopr_session_num_active_session",
@@ -120,7 +120,7 @@ lazy_static::lazy_static! {
         "Number of HOPR session errors sent to an Entry node",
         &["kind"]
     ).unwrap();
-}
+}*/
 
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
 pub enum HoprTransportProcess {
@@ -232,9 +232,6 @@ where
         my_multiaddresses: Vec<Multiaddr>,
     ) -> Self {
         let process_packet_send = Arc::new(OnceLock::new());
-
-        #[cfg(all(feature = "prometheus", not(test)))]
-        METRIC_ACTIVE_SESSIONS.set(0.0);
 
         let me_peerid: PeerId = me.into();
 

@@ -36,7 +36,7 @@ use std::{
     fmt::{Display, Formatter},
     path::PathBuf,
 };
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info, trace, warn};
 
 use chain_actions::{
     action_state::{ActionState, IndexerActionTracker},
@@ -1043,9 +1043,9 @@ impl Hopr {
                         let multi_strategy = multi_strategy.clone();
 
                         async move {
-                            debug!(state = "started", "strategy tick");
+                            trace!(state = "started", "strategy tick");
                             let _ = multi_strategy.on_tick().await;
-                            debug!(state = "finished", "strategy tick");
+                            trace!(state = "finished", "strategy tick");
                         }
                     },
                     "run strategies".into(),

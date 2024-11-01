@@ -75,7 +75,7 @@ fn close_session_after_eviction<S: SendMsg + Send + Sync + 'static>(
             if msg_sender.get().is_some() =>
         {
             trace!(
-                session_id = tracing::field::debug(session_id),
+                ?session_id,
                 reason = ?r,
                 "session termination due to eviction from the cache"
             );
@@ -83,7 +83,7 @@ fn close_session_after_eviction<S: SendMsg + Send + Sync + 'static>(
                 Ok(data) => data,
                 Err(e) => {
                     error!(
-                        session_id = tracing::field::debug(session_id),
+                        ?session_id,
                         error = %e,
                         "failed to serialize CloseSession"
                     );
@@ -101,7 +101,7 @@ fn close_session_after_eviction<S: SendMsg + Send + Sync + 'static>(
                     .await
                 {
                     error!(
-                        session_id = tracing::field::debug(session_id),
+                        ?session_id,
                         error = %err,
                         "could not send notification of session closure after cache eviction"
                     );
@@ -109,7 +109,7 @@ fn close_session_after_eviction<S: SendMsg + Send + Sync + 'static>(
 
                 session_tx.close_channel();
                 debug!(
-                    session_id = tracing::field::debug(session_id),
+                    ?session_id,
                     reason = ?r,
                     "session has been closed due to cache eviction"
                 );
@@ -236,6 +236,9 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
             "session tag range start should allow Start protocol messages"
         );
 
+        #[cfg(all(feature = "prometheus", not(test)))]
+        METRIC_ACTIVE_SESSIONS.set(0.0);
+
         let msg_sender = Arc::new(OnceLock::new());
         Self {
             msg_sender: msg_sender.clone(),
@@ -285,16 +288,16 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                 let myself = myself.clone();
                 async move {
                     trace!(
-                        session_id = tracing::field::debug(closed_session_id),
+                        session_id = ?closed_session_id,
                         "sending notification of session closure done by us"
                     );
                     match myself.close_session(closed_session_id, true).await {
                         Ok(closed) if closed => debug!(
-                            session_id = tracing::field::debug(closed_session_id),
+                            session_id = ?closed_session_id,
                             "session has been closed by us"
                         ),
                         Err(e) => error!(
-                            session_id = tracing::field::debug(closed_session_id),
+                            session_id = ?closed_session_id,
                             error = %e,
                             "cannot initiate session closure notification"
                         ),
@@ -539,10 +542,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                 )
                 .await
                 {
-                    debug!(
-                        session_id = tracing::field::debug(session_id),
-                        "assigning a new session"
-                    );
+                    debug!(?session_id, "assigning a new session");
 
                     let session = Session::new(
                         session_id,
@@ -565,10 +565,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                         warn!(error = %e, "failed to send session to incoming session queue");
                     }
 
-                    trace!(
-                        session_id = tracing::field::debug(session_id),
-                        "session notification sent"
-                    );
+                    trace!(?session_id, "session notification sent");
 
                     // Notify the sender that the session has been established.
                     // Set our peer ID in the session ID sent back to them.
@@ -585,7 +582,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                         })?;
 
                     info!(
-                        session_id = tracing::field::display(session_id),
+                        %session_id,
                         "new session established"
                     );
 
@@ -596,7 +593,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                     }
                 } else {
                     error!(
-                        peer = tracing::field::display(peer),
+                        %peer,
                         "failed to reserve a new session slot"
                     );
 
@@ -617,7 +614,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                         })?;
 
                     trace!(
-                        peer = tracing::field::display(peer),
+                        %peer,
                         "session establishment failure message sent"
                     );
 
@@ -627,7 +624,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
             }
             StartProtocol::SessionEstablished(est) => {
                 trace!(
-                    session_id = tracing::field::debug(est.session_id),
+                    session_id = ?est.session_id,
                     "received session establishment confirmation"
                 );
                 let challenge = est.orig_challenge;
@@ -673,17 +670,11 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                 METRIC_RECEIVED_SESSION_ERRS.increment(&[&err.reason.to_string()])
             }
             StartProtocol::CloseSession(session_id) => {
-                trace!(
-                    session_id = tracing::field::debug(session_id),
-                    "received session close request"
-                );
+                trace!(?session_id, "received session close request");
                 match self.close_session(session_id, false).await {
-                    Ok(closed) if closed => debug!(
-                        session_id = tracing::field::debug(session_id),
-                        "session has been closed by the other party"
-                    ),
+                    Ok(closed) if closed => debug!(?session_id, "session has been closed by the other party"),
                     Err(e) => error!(
-                        session_id = tracing::field::debug(session_id),
+                        ?session_id,
                         error = %e,
                         "session could not be closed on other party's request"
                     ),
@@ -699,10 +690,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
         if let Some((session_tx, routing_options)) = self.sessions.remove(&session_id).await {
             // Notification is not sent only when closing in response to the other party's request
             if notify_closure {
-                trace!(
-                    session_id = tracing::field::debug(session_id),
-                    "sending session termination"
-                );
+                trace!(?session_id, "sending session termination");
                 self.msg_sender
                     .get()
                     .ok_or(TransportSessionError::Manager("not started".into()))?
@@ -716,15 +704,12 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
 
             // Closing the data sender on the session will cause the Session to terminate
             session_tx.close_channel();
-            trace!(
-                session_id = tracing::field::debug(session_id),
-                "data tx channel closed on session"
-            );
+            trace!(?session_id, "data tx channel closed on session");
             Ok(true)
         } else {
             // Do not treat this as an error
             debug!(
-                session_id = tracing::field::debug(session_id),
+                ?session_id,
                 "could not find session id to close, maybe the session is already closed"
             );
             Ok(false)

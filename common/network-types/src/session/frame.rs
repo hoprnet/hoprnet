@@ -161,8 +161,10 @@ impl Segment {
     /// The minimum size of a segment: [`Segment::HEADER_SIZE`] + 1 byte of data.
     pub const MINIMUM_SIZE: usize = Self::HEADER_SIZE + 1;
 
-    /// The minimum size of a segment: [`Segment::HEADER_SIZE`] + data, regardless
+    /// The maximum size of a segment: [`Segment::HEADER_SIZE`] + data, regardless
     /// any MTU.
+    /// This number is currently set, so that segment length is expressible
+    /// with just 10-bits.
     pub const MAXIMUM_SIZE: usize = 1500;
 
     /// Returns the [SegmentId] for this segment.

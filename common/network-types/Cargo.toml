@@ -22,6 +22,7 @@ runtime-tokio = [
   "hickory-resolver/tokio-runtime",
 ]
 prometheus = ["dep:lazy_static", "dep:hopr-metrics"]
+testing = []
 
 [dependencies]
 aquamarine = { workspace = true }

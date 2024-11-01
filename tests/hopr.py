@@ -427,15 +427,13 @@ class HoprdAPI:
         :param capabilities: Optional list of capabilities for the session (default: None)
         :param sealed_target: The target parameter is encrypted (default: False)
         """
-        actual_target = { "Plain": target }
-        if sealed_target:
-            actual_target = { "Sealed": target }
+        actual_target = { "Sealed": target } if sealed_target else { "Plain": target }
 
         if capabilities is None:
             body = SessionClientRequest(destination=destination, path=path, target=actual_target, listen_host=listen_on)
         else:
             body = SessionClientRequest(
-                destination=destination, path=path, target=target, listen_host=listen_on, capabilities=capabilities
+                destination=destination, path=path, target=actual_target, listen_host=listen_on, capabilities=capabilities
             )
 
         _, response = self.__call_api(SessionApi, "create_client", body=body, protocol=protocol)

@@ -39,7 +39,7 @@ mod tests {
     use crate::keypairs::Keypair;
 
     #[test]
-    fn seal_unseal_should_work() -> anyhow::Result<()> {
+    fn seal_unseal_should_be_identity() -> anyhow::Result<()> {
         let data = "some test data".to_string();
 
         let keypair = OffchainKeypair::random();

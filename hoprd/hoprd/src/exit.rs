@@ -17,8 +17,8 @@ lazy_static::lazy_static! {
     ).unwrap();
 }
 
-fn fifteen() -> u32 {
-    15
+fn ten() -> u32 {
+    105
 }
 
 fn default_target_retry_delay() -> Duration {
@@ -51,7 +51,7 @@ pub struct IpForwardingReactorConfig {
     /// Maximum number of retries to reach a TCP target before giving up.
     ///
     /// Default is 10.
-    #[serde(default = "fifteen")]
+    #[serde(default = "ten")]
     #[default(10)]
     #[validate(range(min = 1))]
     pub max_tcp_target_retries: u32,
@@ -92,8 +92,9 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                     .map_err(|e| HoprLibError::GeneralError(format!("cannot unseal target: {e}")))?;
 
                 tracing::debug!(
-                    session_id = debug(session_id),
-                    "binding socket to the UDP server {udp_target}..."
+                    session_id = ?session_id,
+                    %udp_target,
+                    "binding socket to the UDP server"
                 );
 
                 // In UDP, it is impossible to determine if the target is viable,
@@ -109,8 +110,10 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                     )))?
                     .to_owned();
                 tracing::debug!(
-                    session_id = debug(session_id),
-                    "UDP target {udp_target} resolved to {resolved_udp_target}"
+                    ?session_id,
+                    %udp_target,
+                    resolution = ?resolved_udp_target,
+                    "UDP target resolved"
                 );
 
                 if !self.all_ips_allowed(&[resolved_udp_target]) {
@@ -133,28 +136,33 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                     })?;
 
                 tracing::debug!(
-                    session_id = debug(session_id),
-                    "bridging the session to the UDP server {udp_target} ..."
+                    ?session_id,
+                    %udp_target,
+                    "bridging the session to the UDP server"
                 );
+
                 tokio::task::spawn(async move {
                     #[cfg(all(feature = "prometheus", not(test)))]
-                    METRIC_ACTIVE_TARGETS.increment(&["tcp"], 1.0);
+                    METRIC_ACTIVE_TARGETS.increment(&["udp"], 1.0);
 
                     match transfer_session(&mut session.session, &mut udp_bridge, HOPR_UDP_BUFFER_SIZE).await {
                         Ok((session_to_stream_bytes, stream_to_session_bytes)) => tracing::info!(
-                            session_id = debug(session_id),
+                            ?session_id,
                             session_to_stream_bytes,
                             stream_to_session_bytes,
-                            "server bridged session to UDP {udp_target} ended"
+                            %udp_target,
+                            "server bridged session to UDP ended"
                         ),
                         Err(e) => tracing::error!(
-                            session_id = debug(session_id),
-                            "UDP server stream ({udp_target}) is closed: {e:?}"
+                            ?session_id,
+                            %udp_target,
+                            error = %e,
+                            "UDP server stream is closed"
                         ),
                     }
 
                     #[cfg(all(feature = "prometheus", not(test)))]
-                    METRIC_ACTIVE_TARGETS.decrement(&["tcp"], 1.0);
+                    METRIC_ACTIVE_TARGETS.decrement(&["udp"], 1.0);
                 });
 
                 Ok(())
@@ -164,10 +172,7 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                     .unseal(&self.keypair)
                     .map_err(|e| HoprLibError::GeneralError(format!("cannot unseal target: {e}")))?;
 
-                tracing::debug!(
-                    session_id = debug(session_id),
-                    "creating a connection to the TCP server {tcp_target}..."
-                );
+                tracing::debug!(?session_id, %tcp_target, "creating a connection to the TCP server");
 
                 // TCP is able to determine which of the resolved multiple addresses is viable,
                 // and therefore we can pass all of them.
@@ -176,8 +181,10 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                         HoprLibError::GeneralError(format!("failed to resolve DNS name {tcp_target}: {e}"))
                     })?;
                 tracing::debug!(
-                    session_id = debug(session_id),
-                    "TCP target {tcp_target} resolved to {resolved_tcp_targets:?}"
+                    ?session_id,
+                    %tcp_target,
+                    resolution = ?resolved_tcp_targets,
+                    "TCP target resolved"
                 );
 
                 if !self.all_ips_allowed(&resolved_tcp_targets) {
@@ -204,28 +211,32 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                 })?;
 
                 tracing::debug!(
-                    session_id = debug(session_id),
-                    "bridging the session to the TCP server {tcp_target} ..."
+                    ?session_id,
+                    %tcp_target,
+                    "bridging the session to the TCP server"
                 );
                 tokio::task::spawn(async move {
                     #[cfg(all(feature = "prometheus", not(test)))]
-                    METRIC_ACTIVE_TARGETS.increment(&["udp"], 1.0);
+                    METRIC_ACTIVE_TARGETS.increment(&["tcp"], 1.0);
 
                     match transfer_session(&mut session.session, &mut tcp_bridge, HOPR_TCP_BUFFER_SIZE).await {
                         Ok((session_to_stream_bytes, stream_to_session_bytes)) => tracing::info!(
-                            session_id = debug(session_id),
+                            ?session_id,
                             session_to_stream_bytes,
                             stream_to_session_bytes,
-                            "server bridged session to TCP {tcp_target} ended"
+                            %tcp_target,
+                            "server bridged session to TCP ended"
                         ),
                         Err(e) => tracing::error!(
-                            session_id = debug(session_id),
-                            "TCP server stream ({tcp_target}) is closed: {e:?}"
+                            ?session_id,
+                            %tcp_target,
+                            error = %e,
+                            "TCP server stream is closed"
                         ),
                     }
 
                     #[cfg(all(feature = "prometheus", not(test)))]
-                    METRIC_ACTIVE_TARGETS.decrement(&["udp"], 1.0);
+                    METRIC_ACTIVE_TARGETS.decrement(&["tcp"], 1.0);
                 });
 
                 Ok(())

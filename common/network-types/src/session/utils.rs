@@ -198,6 +198,7 @@ impl<const C: usize> AsyncRead for FaultyNetwork<'_, C> {
 }
 
 impl<const C: usize> FaultyNetwork<'_, C> {
+    #[allow(dead_code)]
     pub fn new(cfg: FaultyNetworkConfig, stats: Option<NetworkStats>) -> Self {
         let (ingress, egress) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
 
@@ -242,7 +243,7 @@ mod tests {
         let (mut recv, mut send) = channel.split();
 
         let len = data.len();
-        let read = hopr_async_runtime::prelude::spawn(async move {
+        let read = async_std::task::spawn(async move {
             let mut out = Vec::with_capacity(len);
             for _ in 0..len {
                 let mut bytes = [0u8; 1];
@@ -255,7 +256,7 @@ mod tests {
             out
         });
 
-        let written = hopr_async_runtime::prelude::spawn(async move {
+        let written = async_std::task::spawn(async move {
             let mut out = Vec::with_capacity(len);
             for byte in data {
                 send.write(&[byte]).await.unwrap();
@@ -265,12 +266,6 @@ mod tests {
             out
         });
 
-        #[cfg(all(feature = "runtime-tokio", not(test)))]
-        {
-            (read.map(|v| v.unwrap()), written.map(|v| v.unwrap()))
-        }
-
-        #[cfg(any(not(feature = "runtime-tokio"), test))]
         (read, written)
     }
 

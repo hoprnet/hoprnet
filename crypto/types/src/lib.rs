@@ -14,7 +14,7 @@ pub mod seal;
 /// Implements basic cryptography-related types based on [primitives], such as [Hash](types::Hash),
 /// [PublicKey](types::PublicKey) and [Signature](types::Signature).
 pub mod types;
-/// Contains small utility functions used in another `hopr-crypto-...` crates
+/// Contains small utility functions used in the other `hopr-crypto-...` crates
 pub mod utils;
 /// Contains implementation of Verifiable Random Function used in tickets
 pub mod vrf;

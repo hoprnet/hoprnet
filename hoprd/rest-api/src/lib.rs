@@ -15,6 +15,11 @@ mod session;
 mod tickets;
 mod types;
 
+pub(crate) mod env {
+    /// Name of the environment variable specifying automatic port range selection for Sessions.
+    pub const HOPRD_SESSION_PORT_RANGE: &str = "HOPRD_SESSION_PORT_RANGE";
+}
+
 pub use session::{HOPR_TCP_BUFFER_SIZE, HOPR_UDP_BUFFER_SIZE, HOPR_UDP_QUEUE_SIZE};
 
 use async_lock::RwLock;

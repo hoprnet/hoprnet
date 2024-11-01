@@ -1,10 +1,14 @@
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use futures::{AsyncReadExt, AsyncWriteExt};
-use hopr_network_types::prelude::state::{SessionConfig, SessionFeature, SessionSocket};
-use hopr_network_types::prelude::{FaultyNetwork, FaultyNetworkConfig};
+use hopr_network_types::prelude::state::{SessionConfig, SessionSocket};
 use hopr_network_types::utils::DuplexIO;
 use rand::{thread_rng, Rng};
 use std::collections::HashSet;
+
+#[cfg(not(feature = "testing"))]
+compile_error!("Must specify the 'testing' feature");
+
+use hopr_network_types::prelude::{FaultyNetwork, FaultyNetworkConfig};
 
 const MTU: usize = 466;
 
@@ -21,16 +25,18 @@ fn setup_network<const MTU: usize>(
     )
 }
 
-async fn send_one_way(network_cfg: FaultyNetworkConfig, session_cfg: SessionConfig, data: &[u8]) {
+async fn send_one_way(network_cfg: FaultyNetworkConfig, session_cfg: SessionConfig, data: &[u8]) -> anyhow::Result<()> {
     let (mut a_to_b, mut b_to_a) = setup_network::<MTU>(network_cfg, session_cfg);
 
-    a_to_b.write_all(&data).await.unwrap();
+    a_to_b.write_all(&data).await?;
 
     let mut data_out = vec![0u8; data.len()];
-    b_to_a.read_exact(&mut data_out[..]).await.unwrap();
+    b_to_a.read_exact(&mut data_out[..]).await?;
 
-    a_to_b.close().await.unwrap();
-    b_to_a.close().await.unwrap();
+    a_to_b.close().await?;
+    b_to_a.close().await?;
+
+    Ok(())
 }
 
 pub fn session_one_way_reliable_send_recv_benchmark(c: &mut Criterion) {

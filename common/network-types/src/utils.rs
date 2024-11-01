@@ -8,7 +8,11 @@ use std::task::{Context, Poll};
 /// Joins [futures::AsyncRead] and [futures::AsyncWrite] into a single object.
 pub struct DuplexIO<R, W>(pub R, pub W);
 
-impl<R, W> From<(R, W)> for DuplexIO<R, W> {
+impl<R, W> From<(R, W)> for DuplexIO<R, W>
+where
+    R: AsyncRead,
+    W: AsyncWrite,
+{
     fn from(value: (R, W)) -> Self {
         Self(value.0, value.1)
     }
@@ -322,8 +326,7 @@ mod tokio_utils {
     }
 }
 
-#[cfg(feature = "runtime-tokio")]
-#[cfg(test)]
+#[cfg(all(feature = "runtime-tokio", test))]
 mod tests {
     use super::*;
     use crate::utils::DuplexIO;
