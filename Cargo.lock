@@ -3943,7 +3943,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-crypto-packet"
-version = "0.7.2"
+version = "0.8.0"
 dependencies = [
  "anyhow",
  "async-std",
@@ -4441,6 +4441,7 @@ dependencies = [
  "async-trait",
  "bincode",
  "futures",
+ "hopr-crypto-packet",
  "hopr-crypto-random",
  "hopr-crypto-types",
  "hopr-internal-types",

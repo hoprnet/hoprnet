@@ -21,12 +21,6 @@ use crate::{
     por::POR_SECRET_LENGTH,
 };
 
-/// Currently used cipher suite for Sphinx
-pub type CurrentSphinxSuite = hopr_crypto_sphinx::ec_groups::X25519Suite;
-
-/// Length of the packet including header and the payload
-pub const PACKET_LENGTH: usize = packet_length::<CurrentSphinxSuite>(INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0);
-
 /// Tag used to separate padding from data
 const PADDING_TAG: &[u8] = b"HOPR";
 
@@ -40,21 +34,30 @@ pub const fn packet_length<S: SphinxSuite>(
         + header_length::<S>(max_hops, additional_data_relayer_len, additional_data_last_hop_len)
         + SimpleMac::SIZE
         + PAYLOAD_SIZE
+        + PADDING_TAG.len()
 }
 
+// TODO: Make padding length prefixed in 3.0
+
 fn add_padding(msg: &[u8]) -> Box<[u8]> {
-    assert!(
-        msg.len() <= PAYLOAD_SIZE - PADDING_TAG.len(),
-        "message too long for padding"
-    );
-    let mut ret = vec![0u8; PAYLOAD_SIZE];
-    ret[PAYLOAD_SIZE - msg.len()..PAYLOAD_SIZE].copy_from_slice(msg);
-    ret[PAYLOAD_SIZE - msg.len() - PADDING_TAG.len()..PAYLOAD_SIZE - msg.len()].copy_from_slice(PADDING_TAG);
+    assert!(msg.len() <= PAYLOAD_SIZE, "message too long for padding");
+
+    let padded_len = PAYLOAD_SIZE + PADDING_TAG.len();
+    let mut ret = vec![0u8; padded_len];
+    ret[padded_len - msg.len()..padded_len].copy_from_slice(msg);
+
+    // Zeroes and the PADDING_TAG are prepended to the message to form padding
+    ret[padded_len - msg.len() - PADDING_TAG.len()..padded_len - msg.len()].copy_from_slice(PADDING_TAG);
     ret.into_boxed_slice()
 }
 
 fn remove_padding(msg: &[u8]) -> Option<&[u8]> {
-    assert_eq!(PAYLOAD_SIZE, msg.len(), "padded message must be PAYLOAD_SIZE long");
+    assert_eq!(
+        PAYLOAD_SIZE + PADDING_TAG.len(),
+        msg.len(),
+        "padded message must be {} bytes long",
+        PAYLOAD_SIZE + PADDING_TAG.len()
+    );
     let pos = msg
         .windows(PADDING_TAG.len())
         .position(|window| window == PADDING_TAG)?;
@@ -129,8 +132,11 @@ pub enum ForwardedMetaPacket<S: SphinxSuite> {
 }
 
 impl<S: SphinxSuite> MetaPacket<S> {
-    /// Fixed length of the Sphinx packet header.
+    /// The fixed length of the Sphinx packet header.
     pub const HEADER_LEN: usize = header_length::<S>(INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0);
+
+    /// The fixed length of the padded packet.
+    pub const PACKET_LEN: usize = packet_length::<S>(INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0);
 
     /// Creates a new outgoing packet with the given payload `msg`, `path` and `shared_keys` computed along the path.
     ///
@@ -182,7 +188,11 @@ impl<S: SphinxSuite> MetaPacket<S> {
             !routing_info.routing_information.is_empty(),
             "routing info must not be empty"
         );
-        assert_eq!(PAYLOAD_SIZE, payload.len(), "payload has incorrect length");
+        assert_eq!(
+            PAYLOAD_SIZE + PADDING_TAG.len(),
+            payload.len(),
+            "payload has incorrect length"
+        );
 
         let mut packet = Vec::with_capacity(Self::SIZE);
         packet.extend_from_slice(&alpha);
@@ -217,7 +227,7 @@ impl<S: SphinxSuite> MetaPacket<S> {
     /// Returns the payload subslice from the packet data.
     fn payload(&self) -> &[u8] {
         let base = <S::G as GroupElement<S::E>>::AlphaLen::USIZE + Self::HEADER_LEN + SimpleMac::SIZE;
-        &self.packet[base..base + PAYLOAD_SIZE]
+        &self.packet[base..base + PAYLOAD_SIZE + PADDING_TAG.len()]
     }
 
     /// Attempts to remove the layer of encryption of this packet by using the given `node_keypair`.
@@ -308,8 +318,11 @@ impl<S: SphinxSuite> TryFrom<&[u8]> for MetaPacket<S> {
 }
 
 impl<S: SphinxSuite> BytesRepresentable for MetaPacket<S> {
-    const SIZE: usize =
-        <S::G as GroupElement<S::E>>::AlphaLen::USIZE + Self::HEADER_LEN + SimpleMac::SIZE + PAYLOAD_SIZE;
+    const SIZE: usize = <S::G as GroupElement<S::E>>::AlphaLen::USIZE
+        + Self::HEADER_LEN
+        + SimpleMac::SIZE
+        + PAYLOAD_SIZE
+        + PADDING_TAG.len();
 }
 
 #[cfg(test)]
