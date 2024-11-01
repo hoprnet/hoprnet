@@ -464,9 +464,8 @@ than the default sync mode by using a pre-built logs database.
 To generate the logs database, you need:
 
 - A fully synced node
-- Node configured to keep logs in the database (disabled by default)
-  - Set `hopr -> chain -> keep_logs` in the configuration file, or
-  - Use the CLI parameter `--keepLogs`
+- Node configured to keep logs in the database (enabled by default)
+  - Set `hopr -> chain -> keep_logs` in the configuration file
 
 ### Database Files
 
@@ -479,9 +478,8 @@ The following files in the node's database folder are required:
 ### Configuration Steps
 
 1. Place the pre-built logs database files in the node's database folder
-2. Enable fast sync mode:
-   - Set `hopr -> chain -> fast_sync` to `true` in the configuration file, or
-   - Use the CLI parameter `--fastSync`
+2. Enable fast sync mode (enabled by default):
+   - Set `hopr -> chain -> fast_sync` to `true` in the configuration file
 3. Remove any existing index data:
    ```shell
    rm hopr_index.db*

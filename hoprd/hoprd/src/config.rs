@@ -270,12 +270,12 @@ impl HoprdConfig {
             cfg.hopr.chain.check_unrealized_balance = true;
         }
 
-        if cli_args.fast_sync == 0 {
-            cfg.hopr.chain.fast_sync = true;
+        if cli_args.no_fast_sync == 0 {
+            cfg.hopr.chain.fast_sync = false;
         }
 
-        if cli_args.keep_logs == 0 {
-            cfg.hopr.chain.keep_logs = true;
+        if cli_args.no_keep_logs == 0 {
+            cfg.hopr.chain.keep_logs = false;
         }
 
         // safe module

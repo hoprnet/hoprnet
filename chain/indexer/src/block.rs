@@ -642,7 +642,10 @@ mod tests {
             rpc,
             handlers,
             db.clone(),
-            IndexerConfig::default().disable_fast_sync(),
+            IndexerConfig {
+                fast_sync: false,
+                ..Default::default()
+            },
             async_channel::unbounded().0,
         )
         .disable_panic_on_completion();

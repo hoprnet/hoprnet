@@ -153,20 +153,20 @@ pub struct CliArgs {
     pub check_unrealized_balance: u8,
 
     #[arg(
-        long = "keepLogs",
-        env = "HOPRD_INDEXER_KEEP_LOGS",
-        help = "Enables keeping RPC logs in the logs database after they were processed.",
+        long = "noKeepLogs",
+        env = "HOPRD_INDEXER_DISABLE_KEEP_LOGS",
+        help = "Disables keeping RPC logs in the logs database after they were processed.",
         action = ArgAction::Count
     )]
-    pub keep_logs: u8,
+    pub no_keep_logs: u8,
 
     #[arg(
-        long = "fastSync",
-        env = "HOPRD_INDEXER_ENABLE_FAST_SYNC",
-        help = "Enables using fast sync at node start when possible.",
+        long = "noFastSync",
+        env = "HOPRD_INDEXER_DISABLE_FAST_SYNC",
+        help = "Disables using fast sync at node start.",
         action = ArgAction::Count
     )]
-    pub fast_sync: u8,
+    pub no_fast_sync: u8,
 
     #[arg(
         long = "maxBlockRange",

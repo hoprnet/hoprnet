@@ -275,17 +275,17 @@ hopr:
     # Strongly recommended to leave this enabled.
     check_unrealized_balance: true
     # Configures whether the node will keep RPC logs after they were processed.
-    # By default (disabled), the node will clean such logs. If enabled, the node
+    # By default (enabled), the node will clean such logs. If enabled, the node
     # will keep logs which will require more disk space, however, it will allow
     # the node to reconcile the state of the chain with the state of the node
     # in future versions.
-    keep_logs: false
+    keep_logs: true
     # Configures whether to use fast synchronization during node startup.
     # When enabled, the node will process existing logs faster (approximately
     # 10 minutes on Dufour network) but may consume more resources during
     # the sync process. Recommended for initial setup or when recovering
     # from a clean state.
-    fast_sync: false
+    fast_sync: true
 # HOPRd Message Inbox configuration
 inbox:
   # Capacity of messages in the Inbox, per message tag.
