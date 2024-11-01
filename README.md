@@ -481,6 +481,7 @@ The following files in the node's database folder are required:
 2. Enable fast sync mode (enabled by default):
    - Set `hopr -> chain -> fast_sync` to `true` in the configuration file
 3. Remove any existing index data:
+
    ```shell
    rm hopr_index.db*
    ```
