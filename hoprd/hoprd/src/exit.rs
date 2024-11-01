@@ -46,15 +46,15 @@ pub struct IpForwardingReactorConfig {
     #[serde(default = "default_target_retry_delay")]
     #[default(Duration::from_secs(2))]
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
-    pub target_retry_delay: Duration,
+    pub tcp_target_retry_delay: Duration,
 
     /// Maximum number of retries to reach a TCP target before giving up.
     ///
-    /// Default is 15.
+    /// Default is 10.
     #[serde(default = "fifteen")]
-    #[default(15)]
+    #[default(10)]
     #[validate(range(min = 1))]
-    pub max_target_retries: u32,
+    pub max_tcp_target_retries: u32,
 }
 
 /// Implementation of [`hopr_lib::HoprSessionReactor`] that facilitates
@@ -186,8 +186,8 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                     )));
                 }
 
-                let strategy = tokio_retry::strategy::FixedInterval::new(self.cfg.target_retry_delay)
-                    .take(self.cfg.max_target_retries as usize);
+                let strategy = tokio_retry::strategy::FixedInterval::new(self.cfg.tcp_target_retry_delay)
+                    .take(self.cfg.max_tcp_target_retries as usize);
 
                 let mut tcp_bridge = tokio_retry::Retry::spawn(strategy, || {
                     tokio::net::TcpStream::connect(resolved_tcp_targets.as_slice())

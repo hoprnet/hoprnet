@@ -6,6 +6,7 @@ use std::str::FromStr;
 use libp2p::Multiaddr;
 use proc_macro_regex::regex;
 use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
 use validator::{Validate, ValidationError};
 
 pub use core_network::{config::NetworkConfig, heartbeat::HeartbeatConfig};
@@ -186,6 +187,7 @@ fn validate_session_idle_timeout(value: &std::time::Duration) -> Result<(), Vali
 }
 
 /// Global configuration of Sessions.
+#[serde_as]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Validate, smart_default::SmartDefault)]
 #[serde(deny_unknown_fields)]
 pub struct SessionGlobalConfig {
@@ -195,6 +197,7 @@ pub struct SessionGlobalConfig {
     #[validate(custom(function = "validate_session_idle_timeout"))]
     #[default(std::time::Duration::from_secs(120))]
     #[serde(default = "two_minutes")]
+    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
     pub idle_timeout: std::time::Duration,
 
     /// Maximum retries to attempt to establish the Session
@@ -211,6 +214,7 @@ pub struct SessionGlobalConfig {
     /// Default is 2 seconds.
     #[default(std::time::Duration::from_secs(2))]
     #[serde(default = "two_seconds")]
+    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
     pub establish_retry_timeout: std::time::Duration,
 }
 

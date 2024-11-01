@@ -45,6 +45,15 @@ hopr:
     # If set, will overwrite and re-initialize any existing database
     # in the given directory.
     force_initialize: false
+  # Global configuration of Session management
+  # session:
+  # How many seconds it takes before Session is considered idle and is closed automatically
+  # idle_timeout: 120
+  # How many retries are made to establish an outgoing Session
+  # establish_max_retries: 3
+  # How many seconds to wait between retries to establish an outgoing Session
+  # Random jitter is always added to this value for each retry.
+  # establish_retry_timeout: 2
   # Configuration of node's Safe
   safe_module:
     # Node's safe transaction provider
@@ -283,3 +292,15 @@ inbox:
   max_age: 900
   # Tags which are not allowed into the Inbox
   excluded_tags: [0]
+# Session Exit configuration for this node
+# This applies whenever the node is an Exit node of a Session.
+# exit:
+# List of IP address and port tuples (written as e.g.: "127.0.0.1:8080") which are allowed
+# to be targets of incoming Sessions.
+# If the value is not set, all targets are allowed (default).
+# For targets specifying a DNS name, the DNS resolution is performed first before the list is matched.
+# target_allow_list:
+# If the target is on TCP protocol, the Exit node can try to reach it this number of times.
+# max_tcp_target_retries: 10
+# If a target on TCP protocol is retried to be reached, this is the delay in seconds between retries.
+# tcp_target_retry_delay: 2

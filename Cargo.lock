@@ -4493,6 +4493,7 @@ dependencies = [
  "proc-macro-regex",
  "rust-stream-ext-concurrent",
  "serde",
+ "serde_with",
  "smart-default",
  "thiserror",
  "tracing",
