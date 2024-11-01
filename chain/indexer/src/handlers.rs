@@ -748,7 +748,7 @@ where
 
     #[tracing::instrument(level = "debug", skip(self))]
     async fn process_log_event(&self, tx: &OpenTransaction, slog: SerializableLog) -> Result<Option<ChainEventType>> {
-        trace!(log = %slog, "processing events in log");
+        trace!(log = %slog, "log content");
         let log = Log::from(slog);
 
         if log.address.eq(&self.addresses.announcements) {
@@ -943,12 +943,9 @@ mod tests {
 
     fn test_log() -> SerializableLog {
         SerializableLog {
-            topics: vec![],
-            block_number: 0,
-            tx_index: 0,
-            log_index: 0,
-            removed: false,
             ..Default::default()
+        }
+    }
         }
     }
 

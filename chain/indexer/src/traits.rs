@@ -17,9 +17,15 @@ pub trait ChainLogHandler {
 }
 
 #[cfg(test)]
-use mockall::mock;
-
-#[cfg(test)]
+/// Mock implementation of ChainLogHandler for testing.
+/// 
+/// # Example
+/// ```
+/// use mockall::predicate::*;
+/// let mut mock = MockChainLogHandler::new();
+/// mock.expect_collect_block_events()
+///     .returning(|_| Ok(vec![]));
+/// ```
 mock! {
     pub ChainLogHandler {}
 
