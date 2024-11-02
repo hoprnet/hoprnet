@@ -6,7 +6,7 @@ use std::time::Duration;
 use tracing::info;
 
 use chain_actions::action_queue::{ActionQueue, ActionQueueConfig};
-use chain_actions::action_state::{ActionState, IndexerActionTracker};
+use chain_actions::action_state::IndexerActionTracker;
 use chain_actions::channels::ChannelActions;
 use chain_actions::node::NodeActions;
 use chain_actions::payload::SafePayloadGenerator;
@@ -14,17 +14,17 @@ use chain_actions::redeem::TicketRedeemActions;
 use chain_actions::ChainActions;
 use chain_api::executors::{EthereumTransactionExecutor, RpcEthereumClient, RpcEthereumClientConfig};
 use chain_indexer::{block::Indexer, handlers::ContractEventHandlers, IndexerConfig};
-use chain_rpc::client::surf_client::SurfRequestor;
-use chain_rpc::client::{
-    create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy, SnapshotRequestor,
-};
-use chain_rpc::rpc::{RpcOperations, RpcOperationsConfig};
 use chain_types::chain_events::ChainEventType;
 use chain_types::utils::{
     add_announcement_as_target, approve_channel_transfer_from_safe, create_anvil, include_node_to_module_by_safe,
 };
 use chain_types::{ContractAddresses, ContractInstances};
 use hopr_async_runtime::prelude::{cancel_join_handle, sleep, spawn, JoinHandle};
+use hopr_chain_rpc::client::surf_client::SurfRequestor;
+use hopr_chain_rpc::client::{
+    create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy, SnapshotRequestor,
+};
+use hopr_chain_rpc::rpc::{RpcOperations, RpcOperationsConfig};
 use hopr_crypto_types::prelude::*;
 use hopr_db_sql::{api::info::DomainSeparator, prelude::*};
 use hopr_internal_types::prelude::*;

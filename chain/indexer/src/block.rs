@@ -94,7 +94,7 @@ where
     }
 
     /// Disables the panic on completion.
-    pub fn disable_panic_on_completion(mut self) -> Self {
+    pub fn without_panic_on_completion(mut self) -> Self {
         self.panic_on_completion = false;
         self
     }
@@ -261,9 +261,7 @@ where
 
             if panic_on_completion {
                 panic!(
-                    "Indexer event stream has been terminated, cannot proceed further!\n\
-                    This error indicates that an issue has occurred at the RPC provider!\n\
-                    The node cannot function without a good RPC connection."
+                    "Indexer event stream has been terminated. This error may be caused by a failed RPC connection."
                 );
             }
         });
@@ -590,7 +588,7 @@ mod tests {
             IndexerConfig::default(),
             async_channel::unbounded().0,
         )
-        .disable_panic_on_completion();
+        .without_panic_on_completion();
 
         let (indexing, _) = join!(indexer.start(), async move {
             async_std::task::sleep(std::time::Duration::from_millis(200)).await;
@@ -648,7 +646,7 @@ mod tests {
             },
             async_channel::unbounded().0,
         )
-        .disable_panic_on_completion();
+        .without_panic_on_completion();
 
         let (indexing, _) = join!(indexer.start(), async move {
             async_std::task::sleep(std::time::Duration::from_millis(200)).await;
@@ -696,7 +694,7 @@ mod tests {
         assert!(tx.start_send(head_allowing_finalization.clone()).is_ok());
 
         let mut indexer =
-            Indexer::new(rpc, handlers, db.clone(), cfg, async_channel::unbounded().0).disable_panic_on_completion();
+            Indexer::new(rpc, handlers, db.clone(), cfg, async_channel::unbounded().0).without_panic_on_completion();
         let _ = join!(indexer.start(), async move {
             async_std::task::sleep(std::time::Duration::from_millis(200)).await;
             tx.close_channel()
@@ -764,7 +762,7 @@ mod tests {
         });
 
         let (tx_events, rx_events) = async_channel::unbounded();
-        let mut indexer = Indexer::new(rpc, handlers, db.clone(), cfg, tx_events).disable_panic_on_completion();
+        let mut indexer = Indexer::new(rpc, handlers, db.clone(), cfg, tx_events).without_panic_on_completion();
         indexer.start().await?;
 
         // At this point we expect 2 events to arrive. The third event, which was generated first,
@@ -831,7 +829,7 @@ mod tests {
 
         let (tx_events, _) = async_channel::unbounded();
         let mut indexer =
-            Indexer::new(rpc, handlers, db.clone(), IndexerConfig::default(), tx_events).disable_panic_on_completion();
+            Indexer::new(rpc, handlers, db.clone(), IndexerConfig::default(), tx_events).without_panic_on_completion();
         indexer.start().await?;
 
         Ok(())

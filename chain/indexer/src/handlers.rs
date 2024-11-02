@@ -942,11 +942,7 @@ mod tests {
     }
 
     fn test_log() -> SerializableLog {
-        SerializableLog {
-            ..Default::default()
-        }
-    }
-        }
+        SerializableLog { ..Default::default() }
     }
 
     #[async_std::test]

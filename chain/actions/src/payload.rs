@@ -592,19 +592,20 @@ pub fn convert_acknowledged_ticket(off_chain: &RedeemableTicket) -> Result<OnCha
 
 #[cfg(test)]
 mod tests {
+    use super::{BasicPayloadGenerator, PayloadGenerator};
+
     use anyhow::Context;
-    use chain_rpc::client::create_rpc_client_to_anvil;
-    use chain_rpc::client::surf_client::SurfRequestor;
-    use chain_types::ContractInstances;
     use ethers::providers::Middleware;
     use hex_literal::hex;
-    use hopr_crypto_types::prelude::*;
-    use hopr_internal_types::prelude::*;
-    use hopr_primitive_types::prelude::{Balance, BalanceType};
     use multiaddr::Multiaddr;
     use std::str::FromStr;
 
-    use super::{BasicPayloadGenerator, PayloadGenerator};
+    use chain_types::ContractInstances;
+    use hopr_chain_rpc::client::create_rpc_client_to_anvil;
+    use hopr_chain_rpc::client::surf_client::SurfRequestor;
+    use hopr_crypto_types::prelude::*;
+    use hopr_internal_types::prelude::*;
+    use hopr_primitive_types::prelude::{Balance, BalanceType};
 
     const PRIVATE_KEY: [u8; 32] = hex!("c14b8faa0a9b8a5fa4453664996f23a7e7de606d42297d723fc4a794f375e260");
     const RESPONSE_TO_CHALLENGE: [u8; 32] = hex!("b58f99c83ae0e7dd6a69f755305b38c7610c7687d2931ff3f70103f8f92b90bb");
