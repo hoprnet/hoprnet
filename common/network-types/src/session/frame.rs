@@ -164,7 +164,7 @@ impl Segment {
     /// The maximum size of a segment: [`Segment::HEADER_SIZE`] + data, regardless
     /// any MTU.
     /// This number is currently set, so that segment length is expressible
-    /// with just 10-bits.
+    /// with just 10-bits and fits typical Ethernet MTU size.
     pub const MAXIMUM_SIZE: usize = 1500;
 
     /// Returns the [SegmentId] for this segment.

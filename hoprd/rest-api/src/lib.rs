@@ -17,6 +17,7 @@ mod types;
 
 pub(crate) mod env {
     /// Name of the environment variable specifying automatic port range selection for Sessions.
+    /// Expected format: "<start_port>:<end_port>" (e.g., "9091:9099")
     pub const HOPRD_SESSION_PORT_RANGE: &str = "HOPRD_SESSION_PORT_RANGE";
 }
 

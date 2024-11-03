@@ -122,7 +122,6 @@ lazy_static::lazy_static! {
 }
 
 pub use async_trait::async_trait;
-use backon::Retryable;
 
 /// Interface representing the HOPR server behavior for each incoming session instance
 /// supplied as an argument.
@@ -1108,13 +1107,10 @@ impl Hopr {
     pub async fn connect_to(&self, cfg: SessionClientConfig) -> errors::Result<HoprSession> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
-        let mut backoff = backon::ConstantBuilder::default()
+        let backoff = backon::ConstantBuilder::default()
+            .with_max_times(self.cfg.session.establish_max_retries as usize)
             .with_delay(self.cfg.session.establish_retry_timeout)
             .with_jitter();
-
-        if self.cfg.session.establish_max_retries >= 0 {
-            backoff = backoff.with_max_times(self.cfg.session.establish_max_retries as usize);
-        }
 
         struct Sleeper;
         impl backon::Sleeper for Sleeper {
@@ -1124,6 +1120,8 @@ impl Hopr {
                 futures_timer::Delay::new(dur)
             }
         }
+
+        use backon::Retryable;
 
         Ok((|| {
             let cfg = cfg.clone();

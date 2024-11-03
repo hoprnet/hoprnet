@@ -153,10 +153,7 @@ impl UdpStreamParallelism {
 
 impl From<usize> for UdpStreamParallelism {
     fn from(value: usize) -> Self {
-        match value {
-            0 => Self::default(),
-            i => Self::Specific(NonZeroUsize::new(i).unwrap()),
-        }
+        NonZeroUsize::new(value).map(Self::Specific).unwrap_or_default()
     }
 }
 

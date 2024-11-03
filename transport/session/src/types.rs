@@ -1,7 +1,6 @@
 use futures::{channel::mpsc::UnboundedReceiver, pin_mut, StreamExt};
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_internal_types::protocol::{ApplicationData, PAYLOAD_SIZE};
-use hopr_network_types::prelude::state::SessionFeature;
 use hopr_network_types::prelude::{RoutingOptions, SealedHost};
 use hopr_network_types::session::state::{SessionConfig, SessionSocket};
 use hopr_primitive_types::traits::BytesRepresentable;
@@ -18,7 +17,6 @@ use std::{
     sync::Arc,
     task::Poll,
 };
-use strum::IntoEnumIterator;
 use tracing::{debug, error};
 
 use crate::{errors::TransportSessionError, traits::SendMsg, Capability};
@@ -163,24 +161,13 @@ impl Session {
         let inner_session = InnerSession::new(id, me, routing_options.clone(), tx, rx);
 
         // If we request any capability, we need to use Session protocol
-        if Capability::iter().any(|c| capabilities.contains(&c)) {
-            // In addition, if retransmission is requested,
-            // we need to enable more Session protocol features.
-            let mut enabled_features = HashSet::new();
-            if capabilities.contains(&Capability::Retransmission) {
-                enabled_features.extend([
-                    SessionFeature::AcknowledgeFrames,
-                    SessionFeature::RequestIncompleteFrames,
-                    SessionFeature::RetransmitFrames,
-                ]);
-            }
-
+        if !capabilities.is_empty() {
             // This is a very coarse assumption, that it takes max 2 seconds for each hop one way.
             let rto_base = 2 * Duration::from_secs(2) * (routing_options.count_hops() + 1) as u32;
 
             // TODO: tweak the default Session protocol config
             let cfg = SessionConfig {
-                enabled_features,
+                enabled_features: capabilities.iter().cloned().flatten().collect(),
                 acknowledged_frames_buffer: 100_000, // Can hold frames for > 40 sec at 2000 frames/sec
                 frame_expiration_age: rto_base * 10,
                 rto_base_receiver: rto_base, // Ask for segment resend, if not yet complete after this period
@@ -188,8 +175,9 @@ impl Session {
                 ..Default::default()
             };
             debug!(
-                session_id = tracing::field::debug(id),
-                "opening new session socket with {cfg:?}"
+                session_id = ?id,
+                ?cfg,
+                "opening new session socket"
             );
 
             Self {

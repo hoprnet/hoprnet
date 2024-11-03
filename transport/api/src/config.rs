@@ -165,7 +165,7 @@ pub struct TransportConfig {
     pub prefer_local_addresses: bool,
 }
 
-fn just_three() -> i32 {
+fn just_three() -> u32 {
     3
 }
 
@@ -179,7 +179,7 @@ fn two_seconds() -> std::time::Duration {
 
 fn validate_session_idle_timeout(value: &std::time::Duration) -> Result<(), ValidationError> {
     let min_idle = std::time::Duration::from_secs(60);
-    if min_idle.le(value) {
+    if min_idle <= *value {
         Ok(())
     } else {
         Err(ValidationError::new("session idle timeout is too low"))
@@ -201,13 +201,13 @@ pub struct SessionGlobalConfig {
     pub idle_timeout: std::time::Duration,
 
     /// Maximum retries to attempt to establish the Session
-    /// Set to -1 to retry indefinitely, 0 for no retries.
+    /// Set 0 for no retries.
     ///
-    /// Defaults to 3.
-    #[validate(range(min = -1))]
+    /// Defaults to 3, maximum is 20.
+    #[validate(range(min = 0, max = 20))]
     #[default(3)]
     #[serde(default = "just_three")]
-    pub establish_max_retries: i32,
+    pub establish_max_retries: u32,
 
     /// Delay between Session establishment retries.
     ///

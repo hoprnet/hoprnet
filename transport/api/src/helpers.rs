@@ -16,6 +16,7 @@ use hopr_transport_protocol::msg::processor::MsgSender;
 use hopr_transport_session::{errors::TransportSessionError, traits::SendMsg};
 
 use hopr_network_types::prelude::RoutingOptions;
+use hopr_transport_session::errors::SessionManagerError;
 #[cfg(all(feature = "prometheus", not(test)))]
 use {core_path::path::Path, hopr_metrics::metrics::SimpleHistogram};
 
@@ -178,7 +179,7 @@ where
 
         self.process_packet_send
             .get()
-            .ok_or_else(|| TransportSessionError::Manager("sender not initialized".into()))?
+            .ok_or_else(|| SessionManagerError::NotStarted)?
             .send_packet(data, path)
             .await
             .map_err(|_| TransportSessionError::Closed)?

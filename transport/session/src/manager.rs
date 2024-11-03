@@ -9,7 +9,7 @@ use std::time::Duration;
 use strum::EnumCount;
 use tracing::{debug, error, info, trace, warn};
 
-use crate::errors::TransportSessionError;
+use crate::errors::{SessionManagerError, TransportSessionError};
 use crate::initiation::{
     StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation, StartProtocol,
     StartProtocolDiscriminants,
@@ -65,7 +65,7 @@ fn close_session_after_eviction<S: SendMsg + Send + Sync + 'static>(
     msg_sender: Arc<OnceLock<S>>,
     me: PeerId,
     session_id: SessionId,
-    (session_tx, routing_opts): (Arc<UnboundedSender<Box<[u8]>>>, RoutingOptions),
+    session_data: CachedSession,
     cause: moka::notification::RemovalCause,
 ) -> moka::notification::ListenerFuture {
     // When a Session is removed from the cache, we notify the other party only
@@ -97,7 +97,7 @@ fn close_session_after_eviction<S: SendMsg + Send + Sync + 'static>(
                 if let Err(err) = msg_sender
                     .get()
                     .unwrap()
-                    .send_message(data, *session_id.peer(), routing_opts)
+                    .send_message(data, *session_id.peer(), session_data.routing_opts)
                     .await
                 {
                     error!(
@@ -107,7 +107,7 @@ fn close_session_after_eviction<S: SendMsg + Send + Sync + 'static>(
                     );
                 }
 
-                session_tx.close_channel();
+                session_data.session_tx.close_channel();
                 debug!(
                     ?session_id,
                     reason = ?r,
@@ -177,9 +177,13 @@ pub(crate) const MIN_CHALLENGE: StartChallenge = 1;
 type SessionInitiationCache =
     moka::future::Cache<StartChallenge, UnboundedSender<Result<StartEstablished<SessionId>, StartErrorType>>>;
 
-// Sender needs to be put in Arc, so that no clones are made, and the entire channel closes
-// once the only sender is closed
-type SessionCache = moka::future::Cache<SessionId, (Arc<UnboundedSender<Box<[u8]>>>, RoutingOptions)>;
+#[derive(Clone)]
+struct CachedSession {
+    // Sender needs to be put in Arc, so that no clones are made by `moka`.
+    // This makes sure that the entire channel closes once the one and only sender is closed.
+    session_tx: Arc<UnboundedSender<Box<[u8]>>>,
+    routing_opts: RoutingOptions,
+}
 
 /// Indicates the result of processing a message.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -205,7 +209,7 @@ pub enum DispatchResult {
 pub struct SessionManager<S> {
     session_initiations: SessionInitiationCache,
     session_notifiers: Arc<OnceLock<(UnboundedSender<IncomingSession>, UnboundedSender<SessionId>)>>,
-    sessions: SessionCache,
+    sessions: moka::future::Cache<SessionId, CachedSession>,
     me: PeerId,
     msg_sender: Arc<OnceLock<S>>,
     cfg: SessionManagerConfig,
@@ -275,12 +279,12 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
     ) -> crate::errors::Result<Vec<hopr_async_runtime::prelude::JoinHandle<()>>> {
         self.msg_sender
             .set(msg_sender)
-            .map_err(|_| TransportSessionError::Manager("already started".into()))?;
+            .map_err(|_| SessionManagerError::AlreadyStarted)?;
 
         let (session_close_tx, session_close_rx) = futures::channel::mpsc::unbounded();
         self.session_notifiers
             .set((new_session_notifier, session_close_tx))
-            .map_err(|_| TransportSessionError::Manager("already started".into()))?;
+            .map_err(|_| SessionManagerError::AlreadyStarted)?;
 
         let myself = self.clone();
         let jh_closure_notifications =
@@ -346,10 +350,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
     ///
     /// It will also fail if the instance has not been [started](SessionManager::start).
     pub async fn new_session(&self, cfg: SessionClientConfig) -> crate::errors::Result<Session> {
-        let msg_sender = self
-            .msg_sender
-            .get()
-            .ok_or(TransportSessionError::Manager("not started".into()))?;
+        let msg_sender = self.msg_sender.get().ok_or(SessionManagerError::NotStarted)?;
 
         let (tx_initiation_done, rx_initiation_done) = futures::channel::mpsc::unbounded();
         let challenge = insert_into_next_slot(
@@ -364,9 +365,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
             tx_initiation_done,
         )
         .await
-        .ok_or(TransportSessionError::Manager(
-            "all challenge slots are occupied".into(),
-        ))?; // almost impossible with u64
+        .ok_or(SessionManagerError::NoChallengeSlots)?; // almost impossible with u64
 
         // Prepare the session initiation message in the Start protocol
         trace!(challenge, ?cfg, "initiating session with config");
@@ -412,7 +411,13 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                 // Insert the Session object, forcibly overwrite any other session with the same ID
                 let (tx, rx) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
                 self.sessions
-                    .insert(session_id, (Arc::new(tx), cfg.path_options.clone()))
+                    .insert(
+                        session_id,
+                        CachedSession {
+                            session_tx: Arc::new(tx),
+                            routing_opts: cfg.path_options.clone(),
+                        },
+                    )
                     .await;
 
                 #[cfg(all(feature = "prometheus", not(test)))]
@@ -431,9 +436,10 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                     self.session_notifiers.get().map(|(_, c)| c.clone()),
                 ))
             }
-            Either::Left((Ok(None), _)) => Err(TransportSessionError::Manager(
+            Either::Left((Ok(None), _)) => Err(SessionManagerError::Other(
                 "internal error: sender has been closed without completing the session establishment".into(),
-            )),
+            )
+            .into()),
             Either::Left((Err(e), _)) => {
                 // The other side didn't allow us to establish a session
                 error!(
@@ -474,16 +480,17 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
 
                 let session_id = SessionId::new(*app_tag, peer);
 
-                return if let Some((session_data_sender, _)) = self.sessions.get(&session_id).await {
+                return if let Some(session_data) = self.sessions.get(&session_id).await {
                     trace!(
                         session_id = tracing::field::debug(session_id),
                         "received data for a registered session"
                     );
 
-                    session_data_sender
+                    Ok(session_data
+                        .session_tx
                         .unbounded_send(data)
                         .map(|_| DispatchResult::Processed)
-                        .map_err(|e| TransportSessionError::Manager(e.to_string()))
+                        .map_err(|e| SessionManagerError::Other(e.to_string()))?)
                 } else {
                     error!(
                         session_id = tracing::field::debug(session_id),
@@ -503,25 +510,20 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                 trace!(challenge = session_req.challenge, "received session initiation request");
 
                 // Back-routing information is mandatory until the Return Path is introduced
-                let (route, peer) = session_req.back_routing.ok_or(TransportSessionError::Manager(
-                    "no back-routing information given".into(),
-                ))?;
+                let (route, peer) = session_req.back_routing.ok_or(SessionManagerError::NoBackRoutingInfo)?;
 
                 debug!(
                     peer = tracing::field::display(peer),
                     "got new session request, searching for a free session slot"
                 );
 
-                let msg_sender = self
-                    .msg_sender
-                    .get()
-                    .ok_or(TransportSessionError::Manager("not started".into()))?;
+                let msg_sender = self.msg_sender.get().ok_or(SessionManagerError::NotStarted)?;
 
                 let (new_session_notifier, close_session_notifier) = self
                     .session_notifiers
                     .get()
                     .cloned()
-                    .ok_or(TransportSessionError::Manager("not started".into()))?;
+                    .ok_or(SessionManagerError::NotStarted)?;
 
                 // Construct the session
                 let (tx_session_data, rx_session_data) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
@@ -538,7 +540,10 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                         };
                         SessionId::new(next_tag, peer)
                     },
-                    (Arc::new(tx_session_data), route.clone()),
+                    CachedSession {
+                        session_tx: Arc::new(tx_session_data),
+                        routing_opts: route.clone(),
+                    },
                 )
                 .await
                 {
@@ -578,7 +583,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                         .send_message(data.try_into()?, peer, route)
                         .await
                         .map_err(|e| {
-                            TransportSessionError::Manager(format!("failed to send session establishment message: {e}"))
+                            SessionManagerError::Other(format!("failed to send session establishment message: {e}"))
                         })?;
 
                     info!(
@@ -608,7 +613,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                         .send_message(data.try_into()?, peer, route)
                         .await
                         .map_err(|e| {
-                            TransportSessionError::Manager(format!(
+                            SessionManagerError::Other(format!(
                                 "failed to send session establishment error message: {e}"
                             ))
                         })?;
@@ -630,9 +635,9 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                 let challenge = est.orig_challenge;
                 if let Some(tx_est) = self.session_initiations.remove(&est.orig_challenge).await {
                     if let Err(e) = tx_est.unbounded_send(Ok(est)) {
-                        return Err(TransportSessionError::Manager(format!(
-                            "could not notify session establishment: {e}"
-                        )));
+                        return Err(
+                            SessionManagerError::Other(format!("could not notify session establishment: {e}")).into(),
+                        );
                     }
                     debug!(challenge, "session establishment complete");
                 } else {
@@ -649,9 +654,10 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                 // and just discard the initiation attempt and pass on the error.
                 if let Some(tx_est) = self.session_initiations.remove(&err.challenge).await {
                     if let Err(e) = tx_est.unbounded_send(Err(err)) {
-                        return Err(TransportSessionError::Manager(format!(
+                        return Err(SessionManagerError::Other(format!(
                             "could not notify session establishment error {err:?}: {e}"
-                        )));
+                        ))
+                        .into());
                     }
                     error!(
                         challenge = err.challenge,
@@ -687,23 +693,23 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
     }
 
     async fn close_session(&self, session_id: SessionId, notify_closure: bool) -> crate::errors::Result<bool> {
-        if let Some((session_tx, routing_options)) = self.sessions.remove(&session_id).await {
+        if let Some(session_data) = self.sessions.remove(&session_id).await {
             // Notification is not sent only when closing in response to the other party's request
             if notify_closure {
                 trace!(?session_id, "sending session termination");
                 self.msg_sender
                     .get()
-                    .ok_or(TransportSessionError::Manager("not started".into()))?
+                    .ok_or(SessionManagerError::NotStarted)?
                     .send_message(
                         StartProtocol::CloseSession(session_id.with_peer(self.me)).try_into()?,
                         *session_id.peer(),
-                        routing_options,
+                        session_data.routing_opts,
                     )
                     .await?;
             }
 
             // Closing the data sender on the session will cause the Session to terminate
-            session_tx.close_channel();
+            session_data.session_tx.close_channel();
             trace!(?session_id, "data tx channel closed on session");
             Ok(true)
         } else {
@@ -1030,7 +1036,10 @@ mod tests {
             .sessions
             .insert(
                 SessionId::new(16, alice_peer),
-                (Arc::new(dummy_tx), RoutingOptions::Hops(BoundedSize::MIN)),
+                CachedSession {
+                    session_tx: Arc::new(dummy_tx),
+                    routing_opts: RoutingOptions::Hops(BoundedSize::MIN),
+                },
             )
             .await;
 

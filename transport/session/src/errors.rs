@@ -28,14 +28,28 @@ pub enum TransportSessionError {
     #[error("received data for an unregistered session")]
     UnknownData,
 
-    #[error("session manager error: {0}")]
-    Manager(String),
+    #[error(transparent)]
+    Manager(#[from] SessionManagerError),
 
     #[error(transparent)]
     Network(#[from] hopr_network_types::errors::NetworkTypeError),
 
     #[error("session is closed")]
     Closed,
+}
+
+#[derive(Error, Debug)]
+pub enum SessionManagerError {
+    #[error("manager is not started")]
+    NotStarted,
+    #[error("cannot start manager, because it is already started")]
+    AlreadyStarted,
+    #[error("no session backrouting information was given")]
+    NoBackRoutingInfo,
+    #[error("all challenge slots are occupied")]
+    NoChallengeSlots,
+    #[error("non-specific session manager error: {0}")]
+    Other(String),
 }
 
 pub type Result<T> = std::result::Result<T, TransportSessionError>;

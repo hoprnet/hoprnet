@@ -24,7 +24,7 @@ pub enum SessionError {
     #[error("attempt to insert invalid frame id")]
     InvalidFrameId,
 
-    #[error("input data is too long")]
+    #[error("input data exceeds the maximum allowed size of segment")]
     DataTooLong,
 
     #[error("cannot reassemble frame {0}, because it is not complete")]

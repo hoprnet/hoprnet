@@ -299,6 +299,7 @@ inbox:
 # to be targets of incoming Sessions.
 # If the value is not set, all targets are allowed (default).
 # For targets specifying a DNS name, the DNS resolution is performed first before the list is matched.
+# Production configuration should always use this allowlist, e.g.: target_allow_list: ["127.0.0.1:8080"]
 # target_allow_list:
 # If the target is on TCP protocol, the Exit node can try to reach it this number of times.
 # max_tcp_target_retries: 10

@@ -171,7 +171,7 @@ impl IpOrHost {
 /// instances.
 ///
 /// ### Example
-/// ````rust
+/// ```rust
 /// use libp2p_identity::PeerId;
 /// use hopr_crypto_types::prelude::{Keypair, OffchainKeypair};
 /// use hopr_network_types::prelude::{IpOrHost, SealedHost};
@@ -200,7 +200,7 @@ impl IpOrHost {
 ///
 /// # Ok(())
 /// # }
-/// ````
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum SealedHost {
@@ -243,7 +243,7 @@ impl TryFrom<SealedHost> for IpOrHost {
     fn try_from(value: SealedHost) -> Result<Self, Self::Error> {
         match value {
             SealedHost::Plain(host) => Ok(host),
-            SealedHost::Sealed(_) => Err(NetworkTypeError::Other("instance is sealed".into())),
+            SealedHost::Sealed(_) => Err(NetworkTypeError::SealedTarget),
         }
     }
 }

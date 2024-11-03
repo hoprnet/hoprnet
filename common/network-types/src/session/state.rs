@@ -136,11 +136,13 @@ pub enum SessionFeature {
     RetransmitFrames,
     /// Enable frame acknowledgement by the recipient.
     AcknowledgeFrames,
+    /// Disables small frame buffering.
+    NoDelay,
 }
 
 impl SessionFeature {
-    /// All features
-    fn all() -> Vec<SessionFeature> {
+    /// Default features.
+    fn default_features() -> Vec<SessionFeature> {
         vec![
             SessionFeature::AcknowledgeFrames,
             SessionFeature::RequestIncompleteFrames,
@@ -150,12 +152,14 @@ impl SessionFeature {
 }
 
 /// Configuration of Session protocol.
-#[derive(Debug, Clone, SmartDefault)]
+#[derive(Debug, Clone, SmartDefault, validator::Validate)]
 pub struct SessionConfig {
     /// Maximum number of buffered segments.
     ///
     /// The value should be large enough to accommodate segments for an at least
     /// `frame_expiration_age` period, considering the expected maximum bandwidth.
+    ///
+    /// Default is 50,000.
     #[default = 50_000]
     pub max_buffered_segments: usize,
 
@@ -164,12 +168,15 @@ pub struct SessionConfig {
     /// The value should be large enough so that the buffer can accommodate segments
     /// for an at least `frame_expiration_age` period, given the expected maximum bandwidth.
     ///
-    /// Minimum value is 1.
+    /// The minimum value is 1, default is 1024.
     #[default = 1024]
+    #[validate(range(min = 1))]
     pub acknowledged_frames_buffer: usize,
 
     /// Specifies the maximum period a frame should be kept by the sender and
     /// asked for retransmission by the recipient.
+    ///
+    /// Default is 30 seconds.
     #[default(Duration::from_secs(30))]
     pub frame_expiration_age: Duration,
 
@@ -182,6 +189,8 @@ pub struct SessionConfig {
     /// retransmission requests are interleaved with the sender's retransmissions.
     ///
     /// In *most* cases, you want to 0 < `rto_base_receiver` < `rto_base_sender` < `frame_expiration_age`.
+    ///
+    /// Default is 1 second.
     #[default(Duration::from_millis(1000))]
     pub rto_base_receiver: Duration,
 
@@ -194,26 +203,31 @@ pub struct SessionConfig {
     /// retransmission requests are interleaved with the sender's retransmissions.
     ///
     /// In *most* cases, you want to 0 < `rto_base_receiver` < `rto_base_sender` < `frame_expiration_age`.
+    ///
+    /// Default is 1.5 seconds.
     #[default(Duration::from_millis(1500))]
     pub rto_base_sender: Duration,
 
     /// Base for the exponential backoff on retries.
+    ///
+    /// Default is 2.
     #[default(2.0)]
+    #[validate(range(min = 0.0))]
     pub backoff_base: f64,
 
     /// Standard deviation of a Gaussian jitter applied to `rto_base_receiver` and
     /// `rto_base_sender`. Must be between 0 and 0.25.
+    ///
+    /// Default is 0.05
     #[default(0.05)]
+    #[validate(range(min = 0.0))]
     pub rto_jitter: f64,
 
     /// Set of [features](SessionFeature) that should be enabled on this Session.
-    #[default(_code = "HashSet::from_iter(SessionFeature::all())")]
+    ///
+    /// Default is [`SessionFeature::default_features`].
+    #[default(_code = "HashSet::from_iter(SessionFeature::default_features())")]
     pub enabled_features: HashSet<SessionFeature>,
-
-    /// Allows output Session messages to be buffered first, until they are
-    /// forwarded to the underlying transport.
-    #[default(true)]
-    pub allow_output_buffering: bool,
 }
 
 /// Contains the cloneable state of the session bound to a [`SessionSocket`].
@@ -503,7 +517,7 @@ impl<const C: usize> SessionState<C> {
 
         let now = Instant::now();
 
-        // Retain only non-expired frames, collect all of those which are due for re-send
+        // Retain only non-expired frames, collect all of which are due for re-send
         let mut frames_to_resend = BTreeSet::new();
         self.outgoing_frame_resends.retain(|frame_id, retry_log| {
             let check_res = retry_log.check(
@@ -855,7 +869,7 @@ impl<const C: usize> SessionSocket<C> {
     pub fn new<T, I>(id: I, transport: T, cfg: SessionConfig) -> Self
     where
         T: AsyncWrite + AsyncRead + Send + 'static,
-        I: Display,
+        I: Display + Send + 'static,
     {
         assert!(
             C >= SessionMessage::<C>::minimum_message_size(),
@@ -870,7 +884,7 @@ impl<const C: usize> SessionSocket<C> {
         let incoming_frame_retries_clone = incoming_frame_retries.clone();
         let id_clone = id.to_string().clone();
         let to_acknowledge_clone = to_acknowledge.clone();
-        let cfg_clone = cfg.clone();
+        let ack_enabled = cfg.enabled_features.contains(&SessionFeature::AcknowledgeFrames);
 
         let frame_egress = Box::new(
             egress
@@ -880,7 +894,7 @@ impl<const C: usize> SessionSocket<C> {
                             trace!(session_id = id_clone, frame_id = frame.frame_id, "frame completed");
                             // The frame has been completed, so remove its retry record
                             incoming_frame_retries_clone.remove(&frame.frame_id);
-                            if cfg_clone.enabled_features.contains(&SessionFeature::AcknowledgeFrames) {
+                            if ack_enabled {
                                 // Acts as a ring buffer, so if the buffer is full, any unsent acknowledgements
                                 // will be discarded.
                                 to_acknowledge_clone.force_push(frame.frame_id);
@@ -907,8 +921,14 @@ impl<const C: usize> SessionSocket<C> {
         let (downstream_read, downstream_write) = transport.split();
 
         // As `segment_egress_recv` terminates `forward` will flush the downstream buffer
-        let downstream_write =
-            futures::io::BufWriter::with_capacity(if cfg.allow_output_buffering { C } else { 0 }, downstream_write);
+        let downstream_write = futures::io::BufWriter::with_capacity(
+            if !cfg.enabled_features.contains(&SessionFeature::NoDelay) {
+                C
+            } else {
+                0
+            },
+            downstream_write,
+        );
 
         let state = SessionState {
             lookbehind: Arc::new(SkipMap::new()),
@@ -929,9 +949,9 @@ impl<const C: usize> SessionSocket<C> {
                 .forward(downstream_write.into_sink())
                 .await
             {
-                error!("FINISHED: forwarding to downstream terminated with error {e}")
+                error!(session_id = %id, error = %e, "FINISHED: forwarding to downstream terminated with error")
             } else {
-                debug!("FINISHED: forwarding to downstream done");
+                debug!(session_id = %id, "FINISHED: forwarding to downstream done");
             }
         });
 
@@ -1346,8 +1366,7 @@ mod tests {
         const FRAME_SIZE: usize = 64;
 
         let cfg = SessionConfig {
-            enabled_features: HashSet::new(),
-            allow_output_buffering: false,
+            enabled_features: HashSet::from_iter([SessionFeature::NoDelay]),
             ..Default::default()
         };
 
@@ -1392,7 +1411,6 @@ mod tests {
 
         let cfg = SessionConfig {
             enabled_features: HashSet::new(),
-            allow_output_buffering: true,
             ..Default::default()
         };
 

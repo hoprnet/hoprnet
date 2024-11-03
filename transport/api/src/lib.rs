@@ -200,7 +200,7 @@ where
     T: HoprDbAllOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
 {
     me: OffchainKeypair,
-    me_peerid: PeerId,
+    me_peerid: PeerId, // Cache to avoid an expensive conversion: OffchainPublicKey -> PeerId
     me_onchain: ChainKeypair,
     cfg: HoprTransportConfig,
     db: T,
@@ -647,12 +647,13 @@ where
 
     #[tracing::instrument(level = "debug", skip(self))]
     pub async fn listening_multiaddresses(&self) -> Vec<Multiaddr> {
-        self.network
-            .get(&self.me_peerid)
-            .await
-            .unwrap_or(None)
-            .map(|peer| peer.multiaddresses)
-            .unwrap_or(vec![])
+        match self.network.get(&self.me_peerid).await {
+            Ok(addrs) => addrs.map(|peer| peer.multiaddresses).unwrap_or_default(),
+            Err(e) => {
+                error!(error = %e, "failed to obtain listening multi-addresses");
+                vec![]
+            }
+        }
     }
 
     #[tracing::instrument(level = "debug", skip(self))]

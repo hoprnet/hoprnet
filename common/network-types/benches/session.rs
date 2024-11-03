@@ -40,7 +40,7 @@ async fn send_one_way(network_cfg: FaultyNetworkConfig, session_cfg: SessionConf
 }
 
 pub fn session_one_way_reliable_send_recv_benchmark(c: &mut Criterion) {
-    static KB: usize = 1024;
+    const KB: usize = 1024;
 
     let mut group = c.benchmark_group("session_one_way_reliable_send_recv");
 
@@ -52,11 +52,11 @@ pub fn session_one_way_reliable_send_recv_benchmark(c: &mut Criterion) {
         ..Default::default()
     };
 
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+
     for size in [16 * KB, 64 * KB, 128 * KB, 1024 * KB].iter() {
         let mut data = vec![0u8; *size];
         thread_rng().fill(&mut data[..]);
-
-        let runtime = tokio::runtime::Runtime::new().unwrap();
 
         group.throughput(Throughput::Bytes(*size as u64));
         group.bench_with_input(BenchmarkId::from_parameter(size), &data, |b, data| {

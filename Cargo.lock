@@ -4377,6 +4377,7 @@ dependencies = [
  "tokio",
  "tokio-util",
  "tracing",
+ "validator",
 ]
 
 [[package]]

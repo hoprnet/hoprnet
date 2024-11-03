@@ -150,12 +150,17 @@ impl<const C: usize> AsyncWrite for FaultyNetwork<'_, C> {
     fn poll_write(self: Pin<&mut Self>, _cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
         if buf.len() > C {
             return Poll::Ready(Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
+                std::io::ErrorKind::InvalidInput,
                 format!("data length passed to downstream must be less or equal to {C}"),
             )));
         }
 
-        self.ingress.unbounded_send(buf.into()).unwrap();
+        if let Err(e) = self.ingress.unbounded_send(buf.into()) {
+            return Poll::Ready(Err(std::io::Error::new(
+                std::io::ErrorKind::BrokenPipe,
+                format!("failed to send data: {e}"),
+            )));
+        }
 
         if let Some(stats) = &self.stats {
             stats.bytes_sent.fetch_add(buf.len(), Ordering::Relaxed);
@@ -189,7 +194,7 @@ impl<const C: usize> AsyncRead for FaultyNetwork<'_, C> {
                 }
 
                 tracing::trace!("FaultyNetwork::poll_read: {len} bytes ready");
-                Poll::Ready(Ok(item.len()))
+                Poll::Ready(Ok(len))
             }
             Poll::Ready(None) => Poll::Ready(Ok(0)),
             Poll::Pending => Poll::Pending,
