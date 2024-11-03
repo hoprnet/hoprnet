@@ -6,7 +6,7 @@ use std::time::Duration;
 use tracing::info;
 
 use chain_actions::action_queue::{ActionQueue, ActionQueueConfig};
-use chain_actions::action_state::IndexerActionTracker;
+use chain_actions::action_state::{ActionState, IndexerActionTracker};
 use chain_actions::channels::ChannelActions;
 use chain_actions::node::NodeActions;
 use chain_actions::payload::SafePayloadGenerator;
