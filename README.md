@@ -453,6 +453,19 @@ With the environment activated, execute the tests locally:
 make smoke-tests
 ```
 
+## Profiling & Instrumentation
+
+Multiple layers of profiling and instrumentation can be used to debug the `hoprd`:
+
+### `tokio` executor instrumentation
+
+Requires a special build:
+
+1. Set `RUSTFLAGS="--cfg tokio_unstable"` before building
+2. Enable the `prof` feature on the `hoprd` package: `cargo build --feature prof`
+
+Once an instrumented tokio is built into hoprd, the application can be instrumented by `tokio_console` as described in the [official crate documentation](https://docs.rs/tokio-console/latest/tokio_console/#instrumenting-the-application).
+
 ## Contact
 
 - [Twitter](https://twitter.com/hoprnet)
