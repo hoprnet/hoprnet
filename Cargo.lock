@@ -4588,6 +4588,7 @@ dependencies = [
  "ringbuffer",
  "serde",
  "serde_with",
+ "smart-default",
  "strum",
  "test-log",
  "thiserror",

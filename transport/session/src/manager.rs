@@ -1,18 +1,16 @@
 use futures::channel::mpsc::UnboundedSender;
 use futures::future::Either;
 use futures::{pin_mut, FutureExt, StreamExt, TryStreamExt};
-use hopr_internal_types::prelude::ApplicationData;
+use hopr_internal_types::prelude::{ApplicationData, Tag};
 use hopr_network_types::prelude::*;
 use std::ops::Range;
 use std::sync::{Arc, OnceLock};
 use std::time::Duration;
-use strum::EnumCount;
 use tracing::{debug, error, info, trace, warn};
 
 use crate::errors::{SessionManagerError, TransportSessionError};
 use crate::initiation::{
     StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation, StartProtocol,
-    StartProtocolDiscriminants,
 };
 use crate::traits::SendMsg;
 use crate::types::{unwrap_offchain_key, SessionTarget};
@@ -44,21 +42,33 @@ lazy_static::lazy_static! {
     ).unwrap();
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+/// Configuration for the [`SessionManager`].
+#[derive(Clone, Debug, PartialEq, Eq, smart_default::SmartDefault)]
 pub struct SessionManagerConfig {
-    pub session_tag_range: Range<u16>,
-    pub initiation_timeout_base: std::time::Duration,
-    pub idle_timeout: std::time::Duration,
-}
+    /// Ranges of tags available for Sessions.
+    ///
+    /// **NOTE**: If the range starts lower than [`MIN_SESSION_TAG_RANGE_RESERVATION`],
+    /// it will be automatically transformed to start at this value.
+    /// This is due to the reserved range by the Start sub-protocol.
+    ///
+    /// Default is 16..1024.
+    #[default(_code = "16..1024")]
+    pub session_tag_range: Range<Tag>,
 
-impl Default for SessionManagerConfig {
-    fn default() -> Self {
-        Self {
-            session_tag_range: 16..1024,
-            initiation_timeout_base: Duration::from_secs(5),
-            idle_timeout: Duration::from_secs(180),
-        }
-    }
+    /// The base timeout for initiation of Session initiation.
+    ///
+    /// The actual timeout is adjusted according to the number of hops for that Session:
+    /// `t = 2 * initiation_time_out_base * (num_hops + 1)`
+    ///
+    /// Default is 5 seconds.
+    #[default(Duration::from_secs(5))]
+    pub initiation_timeout_base: Duration,
+
+    /// Timeout for Session to be closed due to inactivity.
+    ///
+    /// Default is 180 seconds.
+    #[default(Duration::from_secs(180))]
+    pub idle_timeout: Duration,
 }
 
 fn close_session_after_eviction<S: SendMsg + Send + Sync + 'static>(
@@ -232,13 +242,17 @@ fn initiation_timeout_max(base: Duration, hops: usize) -> Duration {
     2 * base * (hops as u32)
 }
 
+/// The Minimum Session tag due to Start-protocol messages.
+pub const MIN_SESSION_TAG_RANGE_RESERVATION: Tag = 16;
+
 impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
     /// Creates a new instance given the `PeerId` and [config](SessionManagerConfig).
-    pub fn new(me: PeerId, cfg: SessionManagerConfig) -> Self {
-        assert!(
-            cfg.session_tag_range.start > StartProtocolDiscriminants::COUNT as u16,
-            "session tag range start should allow Start protocol messages"
-        );
+    pub fn new(me: PeerId, mut cfg: SessionManagerConfig) -> Self {
+        // Accommodate the lower bound if too low.
+        if cfg.session_tag_range.start < MIN_SESSION_TAG_RANGE_RESERVATION {
+            let diff = MIN_SESSION_TAG_RANGE_RESERVATION - cfg.session_tag_range.start;
+            cfg.session_tag_range = MIN_SESSION_TAG_RANGE_RESERVATION..cfg.session_tag_range.end + diff;
+        }
 
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_ACTIVE_SESSIONS.set(0.0);

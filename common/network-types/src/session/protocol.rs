@@ -473,6 +473,15 @@ mod tests {
     use std::time::SystemTime;
 
     #[test]
+    fn ensure_session_protocol_version_1_values() {
+        // All of these values are independent of C, so we can set C = 0
+        assert_eq!(1, SessionMessage::<0>::VERSION);
+        assert_eq!(4, SessionMessage::<0>::HEADER_SIZE);
+        assert_eq!(10, SessionMessage::<0>::SEGMENT_OVERHEAD);
+        assert_eq!(8, SessionMessage::<0>::MAX_SEGMENTS_PER_FRAME);
+    }
+
+    #[test]
     fn segment_request_should_be_constructible_from_frame_info() {
         let frames = (1..20)
             .map(|i| {
