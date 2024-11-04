@@ -141,6 +141,7 @@ class Node:
             "RUST_BACKTRACE": "full",
             "HOPRD_USE_OPENTELEMETRY": trace_telemetry,
             "OTEL_SERVICE_NAME": f"hoprd-{self.p2p_port}",
+            "TOKIO_CONSOLE_BIND": f"localhost:{self.p2p_port+100}" 
         }
         loaded_env = load_env_file(f"{self.dir}.env")
 

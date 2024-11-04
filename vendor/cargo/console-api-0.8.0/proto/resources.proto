@@ -1,0 +1,114 @@
+syntax = "proto3";
+
+package rs.tokio.console.resources;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/duration.proto";
+import "common.proto";
+
+// A resource state update.
+//
+// Each `ResourceUpdate` contains any resource data that has changed since the last
+// update. This includes:
+// - any new resources that were created since the last update
+// - the current stats for any resource whose stats changed since the last update
+// - any new poll ops that have been invoked on a resource
+message ResourceUpdate {
+    // A list of new resources that were created since the last `ResourceUpdate` was
+    // sent.
+    repeated Resource new_resources = 1;
+
+    // Any resource stats that have changed since the last update.
+    map<uint64, Stats> stats_update = 2;
+
+    // A list of all new poll ops that have been invoked on resources since the last update.
+    repeated PollOp new_poll_ops = 3;
+
+    // A count of how many resource events (e.g. polls, creation, etc) were not
+    // recorded because the application's event buffer was at capacity.
+    //
+    // If everything is working normally, this should be 0. If it is greater
+    // than 0, that may indicate that some data is missing from this update, and
+    // it may be necessary to increase the number of events buffered by the
+    // application to ensure that data loss is avoided.
+    //
+    // If the application's instrumentation ensures reliable delivery of events,
+    // this will always be 0.
+    uint64 dropped_events = 4;
+}
+
+// Static data recorded when a new resource is created.
+message Resource {
+    // The resources's ID.
+    //
+    // This uniquely identifies this resource across all *currently live*
+    // resources. This is also the primary way any operations on a resource
+    // are associated with it
+    common.Id id = 1;
+    // The numeric ID of the resources's `Metadata`.
+    common.MetaId metadata = 2;
+    // The resources's concrete rust type.
+    string concrete_type = 3;
+    // The kind of resource (e.g timer, mutex)
+    Kind kind = 4;
+    // The location in code where the resource was created.
+    common.Location location = 5;
+    // The ID of the parent resource.
+    common.Id parent_resource_id = 6;
+    // Is the resource an internal component of another resource?
+    //
+    // For example, a `tokio::time::Interval` resource might contain a 
+    // `tokio::time::Sleep` resource internally.
+    bool is_internal = 7;
+
+    // The kind of resource (e.g. timer, mutex).
+    message Kind {
+        // Every resource is either a known kind or an other (unknown) kind.
+        oneof kind {
+            // `known` signals that this kind of resource is known to the console API.
+            Known known = 1;
+            // `other` signals that this kind of resource is unknown to the console API.
+            string other = 2;
+        }
+        // `Known` collects the kinds of resources that are known in this version of the API.
+        enum Known {
+            // `TIMER` signals that this is a timer resource, e.g. waiting for a sleep to finish.
+            TIMER = 0;
+        }
+    }
+}
+
+// Task runtime stats of a resource.
+message Stats {
+    // Timestamp of when the resource was created.
+    google.protobuf.Timestamp created_at = 1;
+    // Timestamp of when the resource was dropped.
+    google.protobuf.Timestamp dropped_at = 2;
+    // State attributes of the resource. These are dependent on the type of the resource.
+    // For example, a timer resource will have a duration while a semaphore resource may
+    // have permits as an attribute. These values may change over time as the state of
+    // the resource changes. Therefore, they live in the runtime stats rather than the
+    // static data describing the resource.
+    repeated common.Attribute attributes = 3;
+}
+
+// A `PollOp` describes each poll operation that completes within the async
+// application.
+message PollOp {
+    // The numeric ID of the op's `Metadata`.
+    //
+    // This identifies the `Metadata` that describes the `tracing` span
+    // corresponding to this op. The metadata for this ID will have been sent
+    // in a prior `RegisterMetadata` message.
+    common.MetaId metadata = 2;
+    // The resources's ID.
+    common.Id resource_id = 3;
+    // the name of this op (e.g. poll_elapsed, new_timeout, reset, etc.)
+    string name = 4;
+    // Identifies the task context that this poll op has been called from.
+    common.Id task_id = 5;
+    // Identifies the async op ID that this poll op is part of.
+    common.Id async_op_id = 6;
+    // Whether this poll op has returned with ready or pending.
+    bool is_ready = 7;
+}
