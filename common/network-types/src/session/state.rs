@@ -141,7 +141,12 @@ pub enum SessionFeature {
 }
 
 impl SessionFeature {
-    /// Default features.
+    /// Default features
+    ///
+    /// These include:
+    /// - [`SessionFeature::AcknowledgeFrames`]
+    /// - ACK-based ([`SessionFeature::RetransmitFrames`]) and NACK-based ([`SessionFeature::RequestIncompleteFrames`]) retransmission
+    /// - Frame buffering (no [`SessionFeature::NoDelay`])
     fn default_features() -> Vec<SessionFeature> {
         vec![
             SessionFeature::AcknowledgeFrames,
@@ -220,7 +225,7 @@ pub struct SessionConfig {
     ///
     /// Default is 0.05
     #[default(0.05)]
-    #[validate(range(min = 0.0))]
+    #[validate(range(min = 0.0, max = 0.25))]
     pub rto_jitter: f64,
 
     /// Set of [features](SessionFeature) that should be enabled on this Session.

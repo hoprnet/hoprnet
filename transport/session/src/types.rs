@@ -522,7 +522,7 @@ where
     // There are two possibilities for the opposite direction:
     // 1) If Session protocol is used for segmentation,
     //    we need to buffer up data at MAX_WRITE_SIZE.
-    // 2) Otherwise, the bare session implements chunking therefore,
+    // 2) Otherwise, the bare session implements chunking, therefore,
     //    data can be written with arbitrary sizes.
     let into_session_len = if session.capabilities().contains(&Capability::Segmentation) {
         max_buffer.min(SessionSocket::<SESSION_USABLE_MTU_SIZE>::MAX_WRITE_SIZE)
@@ -531,8 +531,10 @@ where
     };
 
     debug!(
-        session_id = tracing::field::debug(session.id()),
-        "session egress buffer: {max_buffer}, session ingress buffer: {into_session_len}"
+        session_id = ?session.id(),
+        egress_buffer = max_buffer,
+        ingress_buffer = into_session_len,
+        "session buffers"
     );
 
     hopr_network_types::utils::copy_duplex(session, stream, max_buffer, into_session_len)

@@ -9,7 +9,8 @@ pub mod keypairs;
 /// Implements low-level cryptographic primitives, such as [SimpleStreamCipher](primitives::SimpleStreamCipher),
 /// [SimpleDigest](primitives::SimpleDigest) and [SimpleMac](primitives::SimpleMac).
 pub mod primitives;
-/// Enables randomized encryption (sealing) and decryption of data using [`OffchainKeypair`](keypairs::OffchainKeypair).
+/// Enables randomized encryption (sealing)
+/// and decryption of data using [`OffchainKeypair`](keypairs::OffchainKeypair).
 pub mod seal;
 /// Implements basic cryptography-related types based on [primitives], such as [Hash](types::Hash),
 /// [PublicKey](types::PublicKey) and [Signature](types::Signature).

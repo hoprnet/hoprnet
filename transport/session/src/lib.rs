@@ -46,7 +46,7 @@ impl IntoIterator for Capability {
             Capability::Retransmission => vec![
                 SessionFeature::AcknowledgeFrames,
                 SessionFeature::RequestIncompleteFrames,
-                SessionFeature::RequestIncompleteFrames,
+                SessionFeature::RetransmitFrames,
             ],
             Capability::RetransmissionAckOnly => {
                 vec![SessionFeature::AcknowledgeFrames, SessionFeature::RetransmitFrames]

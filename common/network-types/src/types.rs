@@ -1,4 +1,3 @@
-use crate::errors::NetworkTypeError;
 use hickory_resolver::name_server::ConnectionProvider;
 use hickory_resolver::AsyncResolver;
 use hopr_primitive_types::bounded::{BoundedSize, BoundedVec};
@@ -6,6 +5,8 @@ use libp2p_identity::PeerId;
 use std::fmt::{Display, Formatter};
 use std::net::SocketAddr;
 use std::str::FromStr;
+
+use crate::errors::NetworkTypeError;
 
 /// Lists some of the IP protocols.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, strum::Display, strum::EnumString)]
@@ -159,7 +160,7 @@ impl IpOrHost {
     }
 }
 
-/// Contains an optionally encrypted [`IpOrHost`].
+/// Contains optionally encrypted [`IpOrHost`].
 ///
 /// This is useful for hiding the [`IpOrHost`] instance from the Entry node.
 /// The client first encrypts the `IpOrHost` instance via [`SealedHost::seal`] using
@@ -169,6 +170,9 @@ impl IpOrHost {
 ///
 /// Sealing is fully randomized and therefore does not leak information about equal `IpOrHost`
 /// instances.
+///
+/// The length of the encrypted host is also obscured by the use of random padding before
+/// encryption.
 ///
 /// ### Example
 /// ```rust
@@ -201,7 +205,7 @@ impl IpOrHost {
 /// # Ok(())
 /// # }
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, strum::EnumTryAs)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum SealedHost {
     /// Plain (not sealed) [`IpOrHost`]
@@ -210,11 +214,27 @@ pub enum SealedHost {
     Sealed(Box<[u8]>),
 }
 
-#[cfg(feature = "serde")] // Serde feature required so that `IpOrHost` is serializable
 impl SealedHost {
+    /// Character that can be appended to the host to obscure its length.
+    ///
+    /// User can add as many of this character to the host, and it will be removed
+    /// during unsealing.
+    pub const PADDING_CHAR: char = '@';
+    const MAX_LEN_WITH_PADDING: usize = 50;
+
     /// Seals the given [`IpOrHost`] using the Exit node's peer ID.
     pub fn seal(host: IpOrHost, peer_id: PeerId) -> crate::errors::Result<Self> {
-        hopr_crypto_types::seal::seal_data(host, peer_id)
+        let mut host_str = host.to_string();
+
+        // Add randomly long padding, so the length of the short hosts is obscured
+        if host_str.len() < Self::MAX_LEN_WITH_PADDING {
+            let pad_len = hopr_crypto_random::random_integer(0, (Self::MAX_LEN_WITH_PADDING as u64).into());
+            for _ in 0..pad_len {
+                host_str.push(Self::PADDING_CHAR);
+            }
+        }
+
+        hopr_crypto_types::seal::seal_data(host_str.as_bytes(), peer_id)
             .map(Self::Sealed)
             .map_err(|e| NetworkTypeError::Other(e.to_string()))
     }
@@ -224,9 +244,13 @@ impl SealedHost {
     pub fn unseal(self, key: &hopr_crypto_types::keypairs::OffchainKeypair) -> crate::errors::Result<IpOrHost> {
         match self {
             SealedHost::Plain(host) => Ok(host),
-            SealedHost::Sealed(enc) => {
-                hopr_crypto_types::seal::unseal_data(&enc, key).map_err(|e| NetworkTypeError::Other(e.to_string()))
-            }
+            SealedHost::Sealed(enc) => hopr_crypto_types::seal::unseal_data(&enc, key)
+                .map_err(|e| NetworkTypeError::Other(e.to_string()))
+                .and_then(|data| {
+                    String::from_utf8(data.into_vec())
+                        .map_err(|e| NetworkTypeError::Other(e.to_string()))
+                        .and_then(|s| IpOrHost::from_str(s.trim_end_matches(Self::PADDING_CHAR)))
+                }),
         }
     }
 }
@@ -295,6 +319,7 @@ impl RoutingOptions {
 mod tests {
     use super::*;
     use anyhow::anyhow;
+    use hopr_crypto_types::prelude::{Keypair, OffchainKeypair};
     use std::net::SocketAddr;
 
     #[cfg(feature = "runtime-async-std")]
@@ -364,5 +389,25 @@ mod tests {
             IpOrHost::from_str("1.2.3.4:1234")?
         );
         Ok(())
+    }
+
+    #[test]
+    fn sealing_adds_padding_to_hide_length() -> anyhow::Result<()> {
+        let peer_id: PeerId = OffchainKeypair::random().public().into();
+        let last_len = SealedHost::seal("127.0.0.1:1234".parse()?, peer_id)?
+            .try_as_sealed()
+            .unwrap()
+            .len();
+        for _ in 0..20 {
+            let current_len = SealedHost::seal("127.0.0.1:1234".parse()?, peer_id)?
+                .try_as_sealed()
+                .unwrap()
+                .len();
+            if current_len != last_len {
+                return Ok(());
+            }
+        }
+
+        anyhow::bail!("sealed length not randomized");
     }
 }

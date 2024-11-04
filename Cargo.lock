@@ -4131,7 +4131,6 @@ name = "hopr-crypto-types"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "bincode",
  "blake2",
  "chacha20",
  "crypto_box",

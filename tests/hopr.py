@@ -1,5 +1,14 @@
 import asyncio
+import base58
+import base64
 import logging
+import nacl.utils
+import nacl.bindings
+import nacl.signing  # Ensure nacl.signing is imported correctly
+import nacl.public
+import random
+
+from nacl.public import SealedBox  # Import SealedBox explicitly
 from typing import Callable, Optional
 
 import requests
@@ -40,6 +49,41 @@ def getlogger():
 log = getlogger()
 
 MESSAGE_TAG = 1234
+
+def seal_with_peerid(peer_id: str, plain_text: bytes, random_padding_len: int = 0) -> bytes:
+    """
+    This function takes a PeerID and plaintext data as inputs,
+    extracts the Ed25519 public key corresponding to the PeerID,
+    converts it to a Curve25519 key (for encryption),
+    and returns a sealed box of the input plaintext encrypted using that public key.
+    If specified, it also adds random padding with `@` character to the plaintext.
+    This can be done to obscure the length of the plaintext.
+    """
+    try:
+        # Step 1: Decode the PeerID from base58
+        decoded_peer_id = base58.b58decode(peer_id)
+
+        # Step 2: Extract the public key (skip the multicodec prefix)
+        ed25519_pubkey = decoded_peer_id[6:]
+
+        # Step 3: Convert the Ed25519 public key to a Curve25519 public key for encryption
+        curve25519_pubkey = nacl.bindings.crypto_sign_ed25519_pk_to_curve25519(ed25519_pubkey)
+
+        # Step 4: Create a PublicKey object from the Curve25519 public key bytes
+        public_key = nacl.public.PublicKey(curve25519_pubkey)
+
+        # Step 5: Create a sealed box for encryption using the public key
+        sealed_box = SealedBox(public_key)
+
+        # Step 6: Append random padding if random_padding_len is greater than 0
+        plain_text += b'@' * random.randint(0, random_padding_len)
+
+        # Step 7: Encrypt the plaintext using the sealed box
+        encrypted_message = sealed_box.encrypt(plain_text)
+
+        return encrypted_message
+    except Exception as e:
+        raise ValueError(f"seal failed: {str(e)}")
 
 
 class HoprdAPI:
@@ -425,9 +469,11 @@ class HoprdAPI:
         :param target: Destination for the session packets.
         :param listen_on: The host to listen on for input packets (default: "127.0.0.1:0")
         :param capabilities: Optional list of capabilities for the session (default: None)
-        :param sealed_target: The target parameter is encrypted (default: False)
+        :param sealed_target: The target parameter will be encrypted (default: False)
         """
-        actual_target = { "Sealed": target } if sealed_target else { "Plain": target }
+        actual_target = {
+            "Sealed": base64.b64encode(seal_with_peerid(destination, bytes(target,'utf-8'), 50)).decode('ascii')
+        } if sealed_target else { "Plain": target }
 
         if capabilities is None:
             body = SessionClientRequest(destination=destination, path=path, target=actual_target, listen_host=listen_on)

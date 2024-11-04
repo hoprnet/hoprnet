@@ -42,7 +42,7 @@ pub enum TransportSessionError {
 pub enum SessionManagerError {
     #[error("manager is not started")]
     NotStarted,
-    #[error("cannot start manager, because it is already started")]
+    #[error("manager is already started")]
     AlreadyStarted,
     #[error("no session backrouting information was given")]
     NoBackRoutingInfo,

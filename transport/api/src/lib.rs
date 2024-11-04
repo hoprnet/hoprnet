@@ -647,13 +647,15 @@ where
 
     #[tracing::instrument(level = "debug", skip(self))]
     pub async fn listening_multiaddresses(&self) -> Vec<Multiaddr> {
-        match self.network.get(&self.me_peerid).await {
-            Ok(addrs) => addrs.map(|peer| peer.multiaddresses).unwrap_or_default(),
-            Err(e) => {
+        self.network
+            .get(&self.me_peerid)
+            .await
+            .unwrap_or_else(|e| {
                 error!(error = %e, "failed to obtain listening multi-addresses");
-                vec![]
-            }
-        }
+                None
+            })
+            .map(|peer| peer.multiaddresses)
+            .unwrap_or_default()
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
