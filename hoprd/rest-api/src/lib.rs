@@ -359,6 +359,7 @@ enum ApiErrorStatus {
     ChannelAlreadyOpen,
     ChannelNotOpen,
     AliasNotFound,
+    AliasOrPeerIdAliasAlreadyExists,
     DatabaseError,
     UnsupportedFeature,
     Timeout,
