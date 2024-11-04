@@ -10,7 +10,7 @@ compile_error!("Must specify the 'testing' feature");
 
 use hopr_network_types::prelude::{FaultyNetwork, FaultyNetworkConfig};
 
-/// This MTU is based of current MTU size in HOPR 2.2
+/// This MTU is based on the current MTU size in HOPR 2.2
 const MTU: usize = 466;
 
 fn setup_network<const MTU: usize>(

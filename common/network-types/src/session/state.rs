@@ -217,7 +217,7 @@ pub struct SessionConfig {
     ///
     /// Default is 2.
     #[default(2.0)]
-    #[validate(range(min = 0.0))]
+    #[validate(range(min = 1.0))]
     pub backoff_base: f64,
 
     /// Standard deviation of a Gaussian jitter applied to `rto_base_receiver` and
@@ -1001,6 +1001,12 @@ impl<const C: usize> AsyncWrite for SessionSocket<C> {
             number_of_bytes = len_to_write,
             "polling write of bytes on socket reader inside session",
         );
+
+        // Zero-length write will always pass
+        if len_to_write == 0 {
+            return Poll::Ready(Ok(0));
+        }
+
         let mut socket_future = self.state.send_frame_data(&buf[..len_to_write]).boxed();
         match Pin::new(&mut socket_future).poll(cx) {
             Poll::Ready(Ok(())) => Poll::Ready(Ok(len_to_write)),
