@@ -59,12 +59,32 @@ pub struct StartEstablished<T> {
     pub session_id: T,
 }
 
+#[cfg_attr(doc, aquamarine::aquamarine)]
 /// Lists all messages of the Start protocol for a session establishment
 /// with `T` as session identifier.
+///
+/// # Diagram of the protocol
+/// ```mermaid
+/// sequenceDiagram
+///     Entry->>Exit: SessionInitiation (Challenge)
+///     alt If Exit can accept a new session
+///     Note right of Exit: SessionID_Exit [Entry PeerID, Tag]
+///     Exit->>Entry: SessionEstablished (Challenge, SessionID_Entry)
+///     Note left of Entry: SessionID_Entry [Exit PeerID, Tag]
+///     Note over Entry,Exit: Data
+///     Entry->>Exit: Close Session (SessionID_Entry)
+///     Exit->>Entry: Close Session (SessionID_Exit)
+///     else If Exit cannot accept a new session
+///     Exit->>Entry: SesssionError (Challenge, Reason)
+///     end
+///     opt If initiation attempt times out
+///     Note left of Entry: Failure
+///     end
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, strum::EnumDiscriminants)]
 // #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] -- enforce serialization via encode/decode
 #[strum_discriminants(vis(pub(crate)))]
-#[strum_discriminants(derive(strum::FromRepr), repr(u8))]
+#[strum_discriminants(derive(strum::FromRepr, strum::EnumCount), repr(u8))]
 pub enum StartProtocol<T> {
     /// Request to initiate a new session.
     StartSession(StartInitiation),
@@ -138,13 +158,14 @@ mod tests {
     use super::*;
     use crate::SessionId;
     use hopr_internal_types::prelude::PAYLOAD_SIZE;
+    use hopr_network_types::prelude::SealedHost;
 
     #[cfg(feature = "serde")]
     #[test]
     fn start_protocol_start_session_message_should_encode_and_decode() -> anyhow::Result<()> {
         let msg_1 = StartProtocol::<i32>::StartSession(StartInitiation {
             challenge: 0,
-            target: SessionTarget::TcpStream("127.0.0.1:1234".parse()?),
+            target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:1234".parse()?)),
             capabilities: Default::default(),
             back_routing: Some((
                 RoutingOptions::IntermediatePath(vec![PeerId::random()].try_into()?),
@@ -214,9 +235,9 @@ mod tests {
     fn start_protocol_messages_must_fit_within_hopr_packet() -> anyhow::Result<()> {
         let msg = StartProtocol::<i32>::StartSession(StartInitiation {
             challenge: StartChallenge::MAX,
-            target: SessionTarget::TcpStream(
+            target: SessionTarget::TcpStream(SealedHost::Plain(
                 "example-of-a-very-very-long-second-level-name.on-a-very-very-long-domain-name.info:65530".parse()?,
-            ),
+            )),
             capabilities: HashSet::from_iter([Capability::Retransmission, Capability::Segmentation]),
             back_routing: Some((
                 RoutingOptions::IntermediatePath(

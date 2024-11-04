@@ -457,7 +457,7 @@ async def test_session_communication_with_an_https_server(
 
     with run_https_server(expected) as dst_sock_port:
         src_sock_port = await src_peer.api.session_client(dest_peer.peer_id, path={"Hops": 0}, protocol='tcp',
-                                                          target=f"localhost:{dst_sock_port}")
+                                                          target=f"localhost:{dst_sock_port}", sealed_target=True)
         assert src_sock_port is not None, "Failed to open session"
         assert len(await src_peer.api.session_list_clients('tcp')) == 1
 

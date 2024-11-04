@@ -185,6 +185,12 @@ impl Segment {
     /// The minimum size of a segment: [`Segment::HEADER_SIZE`] + 1 byte of data.
     pub const MINIMUM_SIZE: usize = Self::HEADER_SIZE + 1;
 
+    /// The maximum size of a segment: [`Segment::HEADER_SIZE`] + data, regardless
+    /// any MTU.
+    /// This number is currently set, so that segment length is expressible
+    /// with just 10-bits and fits typical Ethernet MTU size.
+    pub const MAXIMUM_SIZE: usize = 1500;
+
     /// Returns the [SegmentId] for this segment.
     pub fn id(&self) -> SegmentId {
         SegmentId(self.frame_id, self.seq_idx)
@@ -232,6 +238,10 @@ impl TryFrom<&[u8]> for Segment {
     type Error = SessionError;
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+        if value.len() > Segment::MAXIMUM_SIZE {
+            return Err(SessionError::DataTooLong);
+        }
+
         let (header, data) = value.split_at(Self::HEADER_SIZE);
         let segment = Segment {
             frame_id: FrameId::from_be_bytes(header[0..4].try_into().map_err(|_| SessionError::InvalidSegment)?),
@@ -556,7 +566,7 @@ impl FrameReassembler {
     }
 
     /// Returns [information](FrameInfo) about the incomplete frames.
-    /// The ordered frame IDs are the keys on the returned map.
+    /// The returned collection is ordered by frame IDs.
     pub fn incomplete_frames(&self) -> BinaryHeap<FrameInfo> {
         (self.next_emitted_frame.load(Ordering::SeqCst)..=self.highest_buffered_frame.load(Ordering::SeqCst))
             .filter_map(|frame_id| match self.sequences.get(&frame_id) {

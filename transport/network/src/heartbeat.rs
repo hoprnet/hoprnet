@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use futures::{
     future::{select, Either, FutureExt},
-    pin_mut, TryStreamExt,
+    pin_mut, StreamExt,
 };
 use hopr_db_api::peers::HoprDbPeersOperations;
 use hopr_primitive_types::traits::SaturatingSub;
@@ -118,7 +118,7 @@ where
             .find_peers_to_ping(from_timestamp)
             .await
             .unwrap_or_else(|e| {
-                error!("Failed to generate peers for the heartbeat procedure: {e}");
+                error!(error = %e, "Failed to generate peers for the heartbeat procedure");
                 vec![]
             })
     }
@@ -176,24 +176,29 @@ impl<T: Pinging, API: HeartbeatExternalApi> Heartbeat<T, API> {
             )
         });
 
+        let peers_contacted = peers.len();
         debug!(peers = tracing::field::debug(&peers), "Heartbeat round start");
         let timeout = (self.sleep_fn)(this_round_planned_duration).fuse();
         let ping_stream = self.pinger.ping(peers);
 
         pin_mut!(timeout, ping_stream);
 
-        match select(timeout, ping_stream.try_collect::<Vec<_>>().fuse()).await {
+        match select(timeout, ping_stream.collect::<Vec<_>>().fuse()).await {
             Either::Left(_) => debug!("Heartbeat round interrupted by timeout"),
-            Either::Right(_) => {
+            Either::Right((v, _)) => {
                 // We intentionally ignore any ping errors here
                 let this_round_actual_duration = current_time().saturating_sub(start);
                 let time_to_wait_for_next_round =
                     this_round_planned_duration.saturating_sub(this_round_actual_duration);
 
+                let ping_ok = v.iter().filter(|v| v.is_ok()).count();
                 info!(
                     round_duration_ms = tracing::field::debug(this_round_actual_duration.as_millis()),
                     time_til_next_round_ms = tracing::field::debug(time_to_wait_for_next_round.as_millis()),
-                    "Heartbeat round finished for all peers"
+                    peers_contacted,
+                    ping_ok,
+                    ping_fail = peers_contacted - ping_ok,
+                    "Heartbeat round finished"
                 );
 
                 (self.sleep_fn)(time_to_wait_for_next_round).await

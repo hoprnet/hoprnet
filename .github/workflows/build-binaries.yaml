@@ -35,7 +35,7 @@ concurrency:
   group: ${{ github.ref }}-build-binary-${{ inputs.binary }}-${{ inputs.target }}
   cancel-in-progress: true
 jobs:
-  build-binary:
+  binary:
     if: contains(github.event.pull_request.labels.*.name, format('binary:{0}', inputs.target))
     runs-on: ${{ inputs.runner }}
     timeout-minutes: 60
@@ -47,7 +47,7 @@ jobs:
 
       - name: Install Nix
         if: inputs.runner_needs_nix_setup == true
-        uses: cachix/install-nix-action@v27
+        uses: cachix/install-nix-action@v29
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
           nix_path: nixpkgs=channel:nixos-24.05
@@ -65,7 +65,7 @@ jobs:
 
       - name: Patch ${{ inputs.binary }} binary
         if: ${{ inputs.interpreter != '' }}
-        run: nix-shell -p patchelf --command "patchelf --set-interpreter ${{ inputs.interpreter }} --output ${{ inputs.binary }}-patched ./result/bin/${{ inputs.binary }}"
+        run: nix-shell -I "nixpkgs=https://github.com/NixOS/nixpkgs/archive/refs/heads/nixos-24.05-small.zip" -p patchelf --command "patchelf --set-interpreter ${{ inputs.interpreter }} --output ${{ inputs.binary }}-patched ./result/bin/${{ inputs.binary }}"
 
       - name: Upload ${{ inputs.binary }} binary
         uses: actions/upload-artifact@v4

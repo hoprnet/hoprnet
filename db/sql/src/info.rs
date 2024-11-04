@@ -440,7 +440,13 @@ impl HoprDbInfoOperations for HoprDb {
                         active_model.chain_checksum = Set(Some(new_hash.as_ref().to_vec()));
                         // when a new checksum is computed, we need to update previous_indexed_block_prio_to_checksum_update
                         active_model.previous_indexed_block_prio_to_checksum_update = Set(current_last_indexed_block);
-                        trace!("updating block checksum {current_checksum} @ {current_last_indexed_block} -> {new_hash} @ {block_num}");
+                        trace!(
+                            old_checksum = ?current_checksum,
+                            old_block = current_last_indexed_block,
+                            new_checksum = ?new_hash,
+                            new_block = block_num,
+                            "update block checksum"
+                        );
                     }
 
                     active_model.last_indexed_block = Set(block_num as i32);

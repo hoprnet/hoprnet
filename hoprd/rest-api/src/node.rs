@@ -5,13 +5,14 @@ use axum::{
 };
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
-use hopr_crypto_types::prelude::Hash;
-use hopr_lib::Address;
-use hopr_lib::{AsUnixTimestamp, Health, Multiaddr};
 use libp2p_identity::PeerId;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use std::{collections::HashMap, sync::Arc};
+
+use hopr_crypto_types::prelude::Hash;
+use hopr_lib::Address;
+use hopr_lib::{AsUnixTimestamp, Health, Multiaddr};
 
 use crate::{ApiError, ApiErrorStatus, InternalState, BASE_PATH};
 
@@ -62,6 +63,9 @@ pub(super) async fn configuration(State(state): State<Arc<InternalState>>) -> im
 }
 
 #[derive(Debug, Clone, Deserialize, utoipa::ToSchema, utoipa::IntoParams)]
+#[schema(example = json!({
+        "quality": 0.7
+    }))]
 #[into_params(parameter_in = Query)]
 pub(crate) struct NodePeersQueryRequest {
     #[schema(required = false)]
@@ -70,6 +74,10 @@ pub(crate) struct NodePeersQueryRequest {
 }
 
 #[derive(Debug, Default, Clone, Serialize, utoipa::ToSchema)]
+#[schema(example = json!({
+    "sent": 10,
+    "success": 10
+}))]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct HeartbeatInfo {
     sent: u64,
@@ -100,6 +108,11 @@ pub(crate) struct PeerInfo {
 
 #[serde_as]
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
+#[schema(example = json!({
+    "peerId": "12D3KooWRWeaTozREYHzWTbuCYskdYhED1MXpDwTrmccwzFrd2mEA",
+    "peerAddress": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
+    "multiaddr": "/ip4/178.12.1.9/tcp/19092"
+}))]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct AnnouncedPeer {
     #[serde_as(as = "DisplayFromStr")]
@@ -158,7 +171,8 @@ pub(super) async fn peers(
 
             async move {
                 if let Ok(Some(info)) = hopr.network_peer_info(&peer).await {
-                    if info.get_average_quality() >= quality {
+                    let avg_quality = info.get_average_quality();
+                    if avg_quality >= quality {
                         Some((peer, info))
                     } else {
                         None
@@ -258,6 +272,7 @@ pub(super) async fn metrics() -> impl IntoResponse {
             "/ip4/10.0.2.100/tcp/19092"
         ],
         "chain": "anvil-localhost",
+        "provider": "http://127.0.0.1:8545",
         "channelClosurePeriod": 15,
         "connectivityStatus": "Green",
         "hoprChannels": "0x9a9f2ccfde556a7e9ff0848998aa4a0cfd8863ae",
@@ -285,6 +300,7 @@ pub(crate) struct NodeInfoResponse {
     #[schema(value_type = Vec<String>)]
     listening_address: Vec<Multiaddr>,
     chain: String,
+    provider: String,
     #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String)]
     hopr_token: Address,
@@ -349,6 +365,7 @@ pub(super) async fn info(State(state): State<Arc<InternalState>>) -> Result<impl
                 announced_address: hopr.local_multiaddresses(),
                 listening_address: hopr.local_multiaddresses(),
                 chain: chain_config.id,
+                provider: hopr.get_provider(),
                 hopr_token: chain_config.token,
                 hopr_channels: chain_config.channels,
                 hopr_network_registry: chain_config.network_registry,

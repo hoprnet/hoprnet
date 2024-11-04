@@ -23,8 +23,10 @@ runtime-tokio = [
   "hickory-resolver/tokio-runtime",
 ]
 prometheus = ["dep:lazy_static", "dep:hopr-metrics"]
+testing = []
 
 [dependencies]
+aquamarine = { workspace = true }
 arrayvec = { workspace = true }
 async-std-resolver = { workspace = true, optional = true }
 bitvec = { workspace = true }
@@ -51,9 +53,12 @@ thiserror = { workspace = true }
 tokio = { workspace = true, optional = true }
 tokio-util = { workspace = true, optional = true, features = ["net", "io"] }
 tracing = { workspace = true }
+validator = { workspace = true }
 
 hopr-platform = { workspace = true }
 hopr-primitive-types = { workspace = true }
+hopr-crypto-random = { workspace = true }
+hopr-crypto-types = { workspace = true }
 hopr-async-runtime = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 
@@ -77,4 +82,9 @@ hopr-crypto-random = { workspace = true }
 
 [[bench]]
 name = "frame_reconstructor_bench"
+harness = false
+
+
+[[bench]]
+name = "session"
 harness = false

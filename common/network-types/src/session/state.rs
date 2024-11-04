@@ -83,6 +83,8 @@
 //!
 //! The above protocol features can be enabled by setting [SessionFeature] options in the configuration
 //! during [SessionSocket] construction.
+//!
+//! **For diagrams of individual retransmission situations, see the docs on the [`SessionSocket`] object.**
 use crossbeam_queue::ArrayQueue;
 use crossbeam_skiplist::SkipMap;
 use dashmap::mapref::entry::Entry;
@@ -134,11 +136,18 @@ pub enum SessionFeature {
     RetransmitFrames,
     /// Enable frame acknowledgement by the recipient.
     AcknowledgeFrames,
+    /// Disables small frame buffering.
+    NoDelay,
 }
 
 impl SessionFeature {
-    /// All features
-    fn all() -> Vec<SessionFeature> {
+    /// Default features
+    ///
+    /// These include:
+    /// - [`SessionFeature::AcknowledgeFrames`]
+    /// - ACK-based ([`SessionFeature::RetransmitFrames`]) and NACK-based ([`SessionFeature::RequestIncompleteFrames`]) retransmission
+    /// - Frame buffering (no [`SessionFeature::NoDelay`])
+    fn default_features() -> Vec<SessionFeature> {
         vec![
             SessionFeature::AcknowledgeFrames,
             SessionFeature::RequestIncompleteFrames,
@@ -148,12 +157,14 @@ impl SessionFeature {
 }
 
 /// Configuration of Session protocol.
-#[derive(Debug, Clone, SmartDefault)]
+#[derive(Debug, Clone, SmartDefault, validator::Validate)]
 pub struct SessionConfig {
     /// Maximum number of buffered segments.
     ///
     /// The value should be large enough to accommodate segments for an at least
     /// `frame_expiration_age` period, considering the expected maximum bandwidth.
+    ///
+    /// Default is 50,000.
     #[default = 50_000]
     pub max_buffered_segments: usize,
 
@@ -162,12 +173,15 @@ pub struct SessionConfig {
     /// The value should be large enough so that the buffer can accommodate segments
     /// for an at least `frame_expiration_age` period, given the expected maximum bandwidth.
     ///
-    /// Minimum value is 1.
+    /// The minimum value is 1, default is 1024.
     #[default = 1024]
+    #[validate(range(min = 1))]
     pub acknowledged_frames_buffer: usize,
 
     /// Specifies the maximum period a frame should be kept by the sender and
     /// asked for retransmission by the recipient.
+    ///
+    /// Default is 30 seconds.
     #[default(Duration::from_secs(30))]
     pub frame_expiration_age: Duration,
 
@@ -180,6 +194,8 @@ pub struct SessionConfig {
     /// retransmission requests are interleaved with the sender's retransmissions.
     ///
     /// In *most* cases, you want to 0 < `rto_base_receiver` < `rto_base_sender` < `frame_expiration_age`.
+    ///
+    /// Default is 1 second.
     #[default(Duration::from_millis(1000))]
     pub rto_base_receiver: Duration,
 
@@ -192,20 +208,30 @@ pub struct SessionConfig {
     /// retransmission requests are interleaved with the sender's retransmissions.
     ///
     /// In *most* cases, you want to 0 < `rto_base_receiver` < `rto_base_sender` < `frame_expiration_age`.
+    ///
+    /// Default is 1.5 seconds.
     #[default(Duration::from_millis(1500))]
     pub rto_base_sender: Duration,
 
     /// Base for the exponential backoff on retries.
+    ///
+    /// Default is 2.
     #[default(2.0)]
+    #[validate(range(min = 1.0))]
     pub backoff_base: f64,
 
     /// Standard deviation of a Gaussian jitter applied to `rto_base_receiver` and
     /// `rto_base_sender`. Must be between 0 and 0.25.
+    ///
+    /// Default is 0.05
     #[default(0.05)]
+    #[validate(range(min = 0.0, max = 0.25))]
     pub rto_jitter: f64,
 
     /// Set of [features](SessionFeature) that should be enabled on this Session.
-    #[default(_code = "HashSet::from_iter(SessionFeature::all())")]
+    ///
+    /// Default is [`SessionFeature::default_features`].
+    #[default(_code = "HashSet::from_iter(SessionFeature::default_features())")]
     pub enabled_features: HashSet<SessionFeature>,
 
     /// Allows output Session messages to be buffered first, until they are
@@ -253,7 +279,7 @@ impl<const C: usize> SessionState<C> {
 
         match self.frame_reassembler.push_segment(segment) {
             Ok(_) => {
-                trace!(session_id = self.session_id, "RECEIVED: segment {id:?}");
+                trace!(session_id = self.session_id, segment = %id, "RECEIVED: segment");
                 match self.incoming_frame_retries.entry(id.0) {
                     Entry::Occupied(e) => {
                         // Receiving a frame segment restarts the retry token for this frame
@@ -267,7 +293,7 @@ impl<const C: usize> SessionState<C> {
                 }
             }
             // The error here is intentionally not propagated
-            Err(e) => warn!(session_id = self.session_id, "segment {id:?} not pushed: {e}"),
+            Err(e) => warn!(session_id = self.session_id, ?id, error = %e, "segment not pushed"),
         }
 
         Ok(())
@@ -276,8 +302,8 @@ impl<const C: usize> SessionState<C> {
     fn retransmit_segments(&mut self, request: SegmentRequest<C>) -> crate::errors::Result<()> {
         trace!(
             session_id = self.session_id,
-            "RECEIVED: request for {} segments",
-            request.len()
+            count_of_segments = request.len(),
+            "RECEIVED: request",
         );
 
         let mut count = 0;
@@ -293,13 +319,15 @@ impl<const C: usize> SessionState<C> {
                 if ret.is_some() {
                     trace!(
                         session_id = self.session_id,
-                        "SENDING: retransmitted segment: {segment_id:?}"
+                        %segment_id,
+                        "SENDING: retransmitted segment"
                     );
                     count += 1;
                 } else {
                     warn!(
                         session_id = self.session_id,
-                        "segment {segment_id:?} not in lookbehind buffer anymore",
+                        id = ?segment_id,
+                        "segment not in lookbehind buffer anymore",
                     );
                 }
                 ret
@@ -307,7 +335,7 @@ impl<const C: usize> SessionState<C> {
             .try_for_each(|msg| self.segment_egress_send.unbounded_send(msg))
             .map_err(|e| SessionError::ProcessingError(e.to_string()))?;
 
-        trace!(session_id = self.session_id, "retransmitted {count} requested segments");
+        trace!(session_id = self.session_id, count, "retransmitted requested segments");
 
         Ok(())
     }
@@ -315,8 +343,8 @@ impl<const C: usize> SessionState<C> {
     fn acknowledged_frames(&mut self, acked: FrameAcknowledgements<C>) -> crate::errors::Result<()> {
         trace!(
             session_id = self.session_id,
-            "RECEIVED: acknowledgement of {} frames",
-            acked.len()
+            count = acked.len(),
+            "RECEIVED: acknowledgement frames",
         );
 
         for frame_id in acked {
@@ -325,7 +353,9 @@ impl<const C: usize> SessionState<C> {
                 let to_ack = rt.time_since_creation();
                 trace!(
                     session_id = self.session_id,
-                    "frame {frame_id} took {to_ack:?} to acknowledge"
+                    frame_id,
+                    duration_in_ms = to_ack.as_millis(),
+                    "frame acknowledgement duratin"
                 );
 
                 #[cfg(all(feature = "prometheus", not(test)))]
@@ -349,8 +379,8 @@ impl<const C: usize> SessionState<C> {
         let tracked_incomplete = self.frame_reassembler.incomplete_frames();
         trace!(
             session_id = self.session_id,
-            "tracking {} incomplete frames",
-            tracked_incomplete.len()
+            count = tracked_incomplete.len(),
+            "tracking incomplete frames",
         );
 
         // Filter the frames which we are allowed to retry now
@@ -372,8 +402,8 @@ impl<const C: usize> SessionState<C> {
                             trace!(
                                 session_id = self.session_id,
                                 frame_id = info.frame_id,
-                                "going to perform frame retransmission req. #{}",
-                                next_rto.num_retry
+                                retransmission_number = next_rto.num_retry,
+                                "performing frame retransmission",
                             );
                             e.replace_entry(next_rto);
                             to_retry.push(info);
@@ -390,8 +420,9 @@ impl<const C: usize> SessionState<C> {
                         RetryResult::Wait(d) => trace!(
                             session_id = self.session_id,
                             frame_id = info.frame_id,
-                            "frame needs to wait {d:?} for next retransmission request (#{})",
-                            e.get().num_retry
+                            timeout_in_ms = d.as_millis(),
+                            next_retransmission_request_number = e.get().num_retry,
+                            "frame needs to wait for next retransmission request",
                         ),
                     }
                 }
@@ -413,7 +444,11 @@ impl<const C: usize> SessionState<C> {
             .chunks(SegmentRequest::<C>::MAX_ENTRIES)
             .map(|chunk| Ok(SessionMessage::<C>::Request(chunk.iter().cloned().collect())))
             .inspect(|r| {
-                trace!(session_id = self.session_id, "SENDING: {r:?}");
+                trace!(
+                    session_id = self.session_id,
+                    result = ?r,
+                    "SENDING: retransmission request"
+                );
                 sent += 1;
             })
             .collect::<Vec<_>>();
@@ -425,6 +460,7 @@ impl<const C: usize> SessionState<C> {
 
         trace!(
             session_id = self.session_id,
+            count = sent,
             "RETRANSMISSION BATCH COMPLETE: sent {sent} re-send requests",
         );
         Ok(sent)
@@ -456,8 +492,8 @@ impl<const C: usize> SessionState<C> {
 
             trace!(
                 session_id = self.session_id,
-                "SENDING: acknowledgements of {} frames",
-                ack_frames.len()
+                count = ack_frames.len(),
+                "SENDING: acknowledgements of frames",
             );
             self.segment_egress_send
                 .feed(SessionMessage::Acknowledge(ack_frames))
@@ -472,7 +508,9 @@ impl<const C: usize> SessionState<C> {
 
         trace!(
             session_id = self.session_id,
-            "ACK BATCH COMPLETE: sent {len} acks in {msgs} messages",
+            count = len,
+            messages = msgs,
+            "ACK BATCH COMPLETE: sent acks in messages",
         );
         Ok(len)
     }
@@ -489,7 +527,7 @@ impl<const C: usize> SessionState<C> {
 
         let now = Instant::now();
 
-        // Retain only non-expired frames, collect all of those which are due for re-send
+        // Retain only non-expired frames, collect all of which are due for re-send
         let mut frames_to_resend = BTreeSet::new();
         self.outgoing_frame_resends.retain(|frame_id, retry_log| {
             let check_res = retry_log.check(
@@ -500,7 +538,12 @@ impl<const C: usize> SessionState<C> {
             );
             match check_res {
                 RetryResult::Wait(d) => {
-                    trace!(session_id = self.session_id, frame_id, "frame will retransmit in {d:?}");
+                    trace!(
+                        session_id = self.session_id,
+                        frame_id,
+                        wait_timeout_in_ms = d.as_millis(),
+                        "frame will retransmit"
+                    );
                     true
                 }
                 RetryResult::RetryNow(next_retry) => {
@@ -519,8 +562,8 @@ impl<const C: usize> SessionState<C> {
 
         trace!(
             session_id = self.session_id,
-            "{} frames will auto-resend",
-            frames_to_resend.len()
+            count = frames_to_resend.len(),
+            "frames will auto-resend",
         );
 
         // Find all segments of the frames to resend in the lookbehind buffer,
@@ -530,7 +573,11 @@ impl<const C: usize> SessionState<C> {
             .into_iter()
             .flat_map(|f| self.lookbehind.iter().filter(move |e| e.key().0 == f))
             .inspect(|e| {
-                trace!(session_id = self.session_id, "SENDING: auto-retransmitted {}", e.key());
+                trace!(
+                    session_id = self.session_id,
+                    key = ?e.key(),
+                    "SENDING: auto-retransmitted"
+                );
                 count += 1
             })
             .map(|e| Ok(SessionMessage::<C>::Segment(e.value().clone())))
@@ -543,7 +590,8 @@ impl<const C: usize> SessionState<C> {
 
         trace!(
             session_id = self.session_id,
-            "AUTO-RETRANSMIT BATCH COMPLETE: re-sent {count} segments",
+            count,
+            "AUTO-RETRANSMIT BATCH COMPLETE: re-sent segments",
         );
 
         Ok(count)
@@ -564,7 +612,7 @@ impl<const C: usize> SessionState<C> {
     /// is the expected underlying transport bandwidth (segment/sec) to guarantee the retransmission
     /// can still happen within some time window.
     pub async fn send_frame_data(&mut self, data: &[u8]) -> crate::errors::Result<()> {
-        if !(1..Self::MAX_WRITE_SIZE).contains(&data.len()) {
+        if !(1..=Self::MAX_WRITE_SIZE).contains(&data.len()) {
             return Err(SessionError::IncorrectMessageLength.into());
         }
 
@@ -574,7 +622,7 @@ impl<const C: usize> SessionState<C> {
 
         for segment in segments {
             let msg = SessionMessage::<C>::Segment(segment.clone());
-            trace!(session_id = self.session_id, "SENDING: segment {:?}", segment.id());
+            trace!(session_id = self.session_id, id = ?segment.id(), "SENDING: segment");
             self.segment_egress_send
                 .feed(msg)
                 .await
@@ -597,7 +645,8 @@ impl<const C: usize> SessionState<C> {
         trace!(
             session_id = self.session_id,
             frame_id,
-            "FRAME SEND COMPLETE: sent {count} segments",
+            count,
+            "FRAME SEND COMPLETE: sent segments",
         );
 
         Ok(())
@@ -714,11 +763,105 @@ impl<const C: usize> Sink<SessionMessage<C>> for SessionState<C> {
     }
 }
 
+#[cfg_attr(doc, aquamarine::aquamarine)]
 /// Represents a socket for a session between two nodes bound by the
 /// underlying [network transport](AsyncWrite) and the maximum transmission unit (MTU) of `C`.
 ///
 /// It also implements [`AsyncRead`] and [`AsyncWrite`] so that it can
 /// be used on top of the usual transport stack.
+///
+/// Based on the [configuration](SessionConfig), the `SessionSocket` can support:
+/// - frame segmentation and reassembly
+/// - segment and frame retransmission and reliability
+///
+/// See the module docs for details on retransmission.
+///
+/// # Retransmission driven by the Receiver
+///```mermaid
+/// sequenceDiagram
+///     Note over Sender,Receiver: Frame 1
+///     rect rgb(191, 223, 255)
+///     Note left of Sender: Frame 1 in buffer
+///     Sender->>Receiver: Segment 1/3 of Frame 1
+///     Sender->>Receiver: Segment 2/3 of Frame 1
+///     Sender--xReceiver: Segment 3/3 of Frame 1
+///     Note right of Receiver: RTO_BASE_RECEIVER elapsed
+///     Receiver->>Sender: Request Segment 3 of Frame 1
+///     Sender->>Receiver: Segment 3/3 of Frame 1
+///     Receiver->>Sender: Acknowledge Frame 1
+///     Note left of Sender: Frame 1 dropped from buffer
+///     end
+///     Note over Sender,Receiver: Frame 1 delivered
+///```
+///
+/// # Retransmission driven by the Sender
+/// ```mermaid
+/// sequenceDiagram
+///     Note over Sender,Receiver: Frame 1
+///     rect rgb(191, 223, 255)
+///     Note left of Sender: Frame 1 in buffer
+///     Sender->>Receiver: Segment 1/3 of Frame 1
+///     Sender->>Receiver: Segment 2/3 of Frame 1
+///     Sender--xReceiver: Segment 3/3 of Frame 1
+///     Note right of Receiver: RTO_BASE_RECEIVER elapsed
+///     Receiver--xSender: Request Segment 3 of Frame 1
+///     Note left of Sender: RTO_BASE_SENDER elapsed
+///     Sender->>Receiver: Segment 1/3 of Frame 1
+///     Sender->>Receiver: Segment 2/3 of Frame 1
+///     Sender->>Receiver: Segment 3/3 of Frame 1
+///     Receiver->>Sender: Acknowledge Frame 1
+///     Note left of Sender: Frame 1 dropped from buffer
+///     end
+///     Note over Sender,Receiver: Frame 1 delivered
+/// ```
+///
+/// # Sender-Receiver retransmission handover
+///
+/// ```mermaid
+///    sequenceDiagram
+///     Note over Sender,Receiver: Frame 1
+///     rect rgb(191, 223, 255)
+///     Note left of Sender: Frame 1 in buffer
+///     Sender->>Receiver: Segment 1/3 of Frame 1
+///     Sender--xReceiver: Segment 2/3 of Frame 1
+///     Sender--xReceiver: Segment 3/3 of Frame 1
+///     Note right of Receiver: RTO_BASE_RECEIVER elapsed
+///     Receiver->>Sender: Request Segments 2,3 of Frame 1
+///     Note left of Sender: RTO_BASE_SENDER cancelled
+///     Sender->>Receiver: Segment 2/3 of Frame 1
+///     Sender--xReceiver: Segment 3/3 of Frame 1
+///     Note right of Receiver: RTO_BASE_RECEIVER elapsed
+///     Receiver--xSender: Request Segments 3 of Frame 1
+///     Note right of Receiver: RTO_BASE_RECEIVER elapsed
+///     Receiver->>Sender: Request Segments 3 of Frame 1
+///     Sender->>Receiver: Segment 3/3 of Frame 1
+///     Receiver->>Sender: Acknowledge Frame 1
+///     Note left of Sender: Frame 1 dropped from buffer
+///     end
+///     Note over Sender,Receiver: Frame 1 delivered
+/// ```
+///
+/// # Retransmission failure
+///
+/// ```mermaid
+///    sequenceDiagram
+///     Note over Sender,Receiver: Frame 1
+///     rect rgb(191, 223, 255)
+///     Note left of Sender: Frame 1 in buffer
+///     Sender->>Receiver: Segment 1/3 of Frame 1
+///     Sender->>Receiver: Segment 2/3 of Frame 1
+///     Sender--xReceiver: Segment 3/3 of Frame 1
+///     Note right of Receiver: RTO_BASE_RECEIVER elapsed
+///     Receiver--xSender: Request Segment 3 of Frame 1
+///     Note left of Sender: RTO_BASE_SENDER elapsed
+///     Sender--xReceiver: Segment 1/3 of Frame 1
+///     Sender--xReceiver: Segment 2/3 of Frame 1
+///     Sender--xReceiver: Segment 3/3 of Frame 1
+///     Note left of Sender: FRAME_MAX_AGE elapsed<br/>Frame 1 dropped from buffer
+///     Note right of Receiver: FRAME_MAX_AGE elapsed<br/>Frame 1 dropped from buffer
+///     end
+///     Note over Sender,Receiver: Frame 1 never delivered
+/// ```
 pub struct SessionSocket<const C: usize> {
     state: SessionState<C>,
     frame_egress: Box<dyn AsyncRead + Send + Unpin>,
@@ -736,7 +879,7 @@ impl<const C: usize> SessionSocket<C> {
     pub fn new<T, I>(id: I, transport: T, cfg: SessionConfig) -> Self
     where
         T: AsyncWrite + AsyncRead + Send + 'static,
-        I: Display,
+        I: Display + Send + 'static,
     {
         assert!(
             C >= SessionMessage::<C>::minimum_message_size(),
@@ -751,7 +894,7 @@ impl<const C: usize> SessionSocket<C> {
         let incoming_frame_retries_clone = incoming_frame_retries.clone();
         let id_clone = id.to_string().clone();
         let to_acknowledge_clone = to_acknowledge.clone();
-        let cfg_clone = cfg.clone();
+        let ack_enabled = cfg.enabled_features.contains(&SessionFeature::AcknowledgeFrames);
 
         let frame_egress = Box::new(
             egress
@@ -761,7 +904,7 @@ impl<const C: usize> SessionSocket<C> {
                             trace!(session_id = id_clone, frame_id = frame.frame_id, "frame completed");
                             // The frame has been completed, so remove its retry record
                             incoming_frame_retries_clone.remove(&frame.frame_id);
-                            if cfg_clone.enabled_features.contains(&SessionFeature::AcknowledgeFrames) {
+                            if ack_enabled {
                                 // Acts as a ring buffer, so if the buffer is full, any unsent acknowledgements
                                 // will be discarded.
                                 to_acknowledge_clone.force_push(frame.frame_id);
@@ -784,7 +927,18 @@ impl<const C: usize> SessionSocket<C> {
         );
 
         let (segment_egress_send, segment_egress_recv) = futures::channel::mpsc::unbounded();
-        let segment_egress_recv = segment_egress_recv.map(|m: SessionMessage<C>| Ok(m.into_encoded()));
+
+        let (downstream_read, downstream_write) = transport.split();
+
+        // As `segment_egress_recv` terminates `forward` will flush the downstream buffer
+        let downstream_write = futures::io::BufWriter::with_capacity(
+            if !cfg.enabled_features.contains(&SessionFeature::NoDelay) {
+                C
+            } else {
+                0
+            },
+            downstream_write,
+        );
 
         let (downstream_read, downstream_write) = transport.split();
 
@@ -806,10 +960,14 @@ impl<const C: usize> SessionSocket<C> {
 
         // Segment egress to downstream
         spawn(async move {
-            if let Err(e) = segment_egress_recv.forward(downstream_write.into_sink()).await {
-                error!("FINISHED: forwarding to downstream terminated with error {e}")
+            if let Err(e) = segment_egress_recv
+                .map(|m: SessionMessage<C>| Ok(m.into_encoded()))
+                .forward(downstream_write.into_sink())
+                .await
+            {
+                error!(session_id = %id, error = %e, "FINISHED: forwarding to downstream terminated with error")
             } else {
-                debug!("FINISHED: forwarding to downstream done");
+                debug!(session_id = %id, "FINISHED: forwarding to downstream done");
             }
         });
 
@@ -848,14 +1006,21 @@ impl<const C: usize> SessionSocket<C> {
 
 impl<const C: usize> AsyncWrite for SessionSocket<C> {
     fn poll_write(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
+        let len_to_write = Self::MAX_WRITE_SIZE.min(buf.len());
         tracing::trace!(
             session_id = self.state.session_id(),
-            "polling write of {} bytes on socket reader inside session",
-            buf.len()
+            number_of_bytes = len_to_write,
+            "polling write of bytes on socket reader inside session",
         );
-        let mut socket_future = self.state.send_frame_data(buf).boxed();
+
+        // Zero-length write will always pass
+        if len_to_write == 0 {
+            return Poll::Ready(Ok(0));
+        }
+
+        let mut socket_future = self.state.send_frame_data(&buf[..len_to_write]).boxed();
         match Pin::new(&mut socket_future).poll(cx) {
-            Poll::Ready(Ok(())) => Poll::Ready(Ok(buf.len())),
+            Poll::Ready(Ok(())) => Poll::Ready(Ok(len_to_write)),
             Poll::Ready(Err(e)) => Poll::Ready(Err(std::io::Error::other(e))),
             Poll::Pending => Poll::Pending,
         }
@@ -898,104 +1063,23 @@ impl<const C: usize> AsyncRead for SessionSocket<C> {
 mod tests {
     use super::*;
     use crate::utils::DuplexIO;
-    use async_std::prelude::FutureExt;
     use futures::future::Either;
     use futures::io::{AsyncReadExt, AsyncWriteExt};
     use futures::pin_mut;
-    use futures::stream::BoxStream;
     use hex_literal::hex;
     use parameterized::parameterized;
     use rand::rngs::StdRng;
     use rand::{Rng, SeedableRng};
-    use std::fmt::Debug;
     use std::iter::Extend;
     use std::sync::atomic::AtomicUsize;
     use test_log::test;
+
+    use crate::session::utils::{FaultyNetwork, FaultyNetworkConfig, NetworkStats};
 
     const MTU: usize = 466; // MTU used by HOPR
 
     // Using static RNG seed to make tests reproducible between different runs
     const RNG_SEED: [u8; 32] = hex!("d8a471f1c20490a3442b96fdde9d1807428096e1601b0cef0eea7e6d44a24c01");
-
-    #[derive(Debug, Clone)]
-    pub struct FaultyNetworkConfig {
-        pub fault_prob: f64,
-        pub mixing_factor: usize,
-    }
-
-    #[derive(Clone, Debug, Default)]
-    pub struct NetworkStats {
-        packets_sent: Arc<AtomicUsize>,
-        packets_received: Arc<AtomicUsize>,
-        bytes_sent: Arc<AtomicUsize>,
-        bytes_received: Arc<AtomicUsize>,
-    }
-
-    impl Default for FaultyNetworkConfig {
-        fn default() -> Self {
-            Self {
-                fault_prob: 0.0,
-                mixing_factor: 0,
-            }
-        }
-    }
-
-    pub struct FaultyNetwork<'a> {
-        ingress: UnboundedSender<Box<[u8]>>,
-        egress: BoxStream<'a, Box<[u8]>>,
-        stats: Option<NetworkStats>,
-    }
-
-    impl AsyncWrite for FaultyNetwork<'_> {
-        fn poll_write(self: Pin<&mut Self>, _cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
-            if buf.len() > MTU {
-                return Poll::Ready(Err(std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    "data length passed to downstream must be less or equal to MTU",
-                )));
-            }
-
-            self.ingress.unbounded_send(buf.into()).unwrap();
-
-            if let Some(stats) = &self.stats {
-                stats.bytes_sent.fetch_add(buf.len(), Ordering::Relaxed);
-                stats.packets_sent.fetch_add(1, Ordering::Relaxed);
-            }
-
-            debug!("sent {} bytes", buf.len());
-            Poll::Ready(Ok(buf.len()))
-        }
-
-        fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
-            Poll::Ready(Ok(()))
-        }
-
-        fn poll_close(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
-            self.ingress.close_channel();
-            Poll::Ready(Ok(()))
-        }
-    }
-
-    impl AsyncRead for FaultyNetwork<'_> {
-        fn poll_read(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<std::io::Result<usize>> {
-            match self.egress.poll_next_unpin(cx) {
-                Poll::Ready(Some(item)) => {
-                    let len = buf.len().min(item.len());
-                    buf[..len].copy_from_slice(&item.as_ref()[..len]);
-
-                    if let Some(stats) = &self.stats {
-                        stats.bytes_received.fetch_add(len, Ordering::Relaxed);
-                        stats.packets_received.fetch_add(1, Ordering::Relaxed);
-                    }
-
-                    debug!("read {} bytes", len);
-                    Poll::Ready(Ok(item.len()))
-                }
-                Poll::Ready(None) => Poll::Ready(Ok(0)),
-                Poll::Pending => Poll::Pending,
-            }
-        }
-    }
 
     fn setup_alice_bob(
         cfg: SessionConfig,
@@ -1023,34 +1107,13 @@ mod tests {
             })
             .unzip();
 
-        let (alice_reader, alice_writer) = FaultyNetwork::new(network_cfg.clone(), alice_stats).split();
-        let (bob_reader, bob_writer) = FaultyNetwork::new(network_cfg.clone(), bob_stats).split();
+        let (alice_reader, alice_writer) = FaultyNetwork::<MTU>::new(network_cfg.clone(), alice_stats).split();
+        let (bob_reader, bob_writer) = FaultyNetwork::<MTU>::new(network_cfg.clone(), bob_stats).split();
 
         let alice_to_bob = SessionSocket::new("alice", DuplexIO(alice_reader, bob_writer), cfg.clone());
         let bob_to_alice = SessionSocket::new("bob", DuplexIO(bob_reader, alice_writer), cfg.clone());
 
         (alice_to_bob, bob_to_alice)
-    }
-
-    impl FaultyNetwork<'_> {
-        pub fn new(cfg: FaultyNetworkConfig, stats: Option<NetworkStats>) -> Self {
-            let (ingress, egress) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
-
-            let mut rng = StdRng::from_seed(RNG_SEED);
-            let egress = egress.filter(move |_| futures::future::ready(rng.gen_bool(1.0 - cfg.fault_prob)));
-
-            let egress = if cfg.mixing_factor > 0 {
-                let mut rng = StdRng::from_seed(RNG_SEED);
-                egress
-                    .map(move |e| futures::future::ready(e).delay(Duration::from_micros(rng.gen_range(0..=20))))
-                    .buffer_unordered(cfg.mixing_factor)
-                    .boxed()
-            } else {
-                egress.boxed()
-            };
-
-            Self { ingress, egress, stats }
-        }
     }
 
     async fn send_and_recv<S>(
@@ -1157,103 +1220,11 @@ mod tests {
         }
     }
 
-    fn spawn_single_byte_read_write<C>(
-        channel: C,
-        data: Vec<u8>,
-    ) -> (impl Future<Output = Vec<u8>>, impl Future<Output = Vec<u8>>)
-    where
-        C: AsyncRead + AsyncWrite + Unpin + Send + 'static,
-    {
-        let (mut recv, mut send) = channel.split();
-
-        let len = data.len();
-        let read = async_std::task::spawn(async move {
-            let mut out = Vec::with_capacity(len);
-            for _ in 0..len {
-                let mut bytes = [0u8; 1];
-                if recv.read(&mut bytes).await.unwrap() > 0 {
-                    out.push(bytes[0]);
-                } else {
-                    break;
-                }
-            }
-            out
-        });
-
-        let written = async_std::task::spawn(async move {
-            let mut out = Vec::with_capacity(len);
-            for byte in data {
-                send.write(&[byte]).await.unwrap();
-                out.push(byte);
-            }
-            send.close().await.unwrap();
-            out
-        });
-
-        (read, written)
-    }
-
-    #[async_std::test]
-    async fn faulty_network_mixing() {
-        const MIX_FACTOR: usize = 2;
-        const COUNT: usize = 20;
-
-        let net = FaultyNetwork::new(
-            FaultyNetworkConfig {
-                mixing_factor: MIX_FACTOR,
-                ..Default::default()
-            },
-            None,
-        );
-
-        let (read, written) = spawn_single_byte_read_write(net, (0..COUNT as u8).collect());
-        let (read, _) = futures::future::join(read, written).await;
-
-        for (pos, value) in read.into_iter().enumerate() {
-            assert!(
-                pos.abs_diff(value as usize) <= MIX_FACTOR,
-                "packet must not be off from its position by more than then mixing factor"
-            );
-        }
-    }
-
-    #[async_std::test]
-    async fn faulty_network_packet_drop() {
-        const DROP: f64 = 0.3333;
-        const COUNT: usize = 20;
-
-        let net = FaultyNetwork::new(
-            FaultyNetworkConfig {
-                fault_prob: DROP,
-                ..Default::default()
-            },
-            None,
-        );
-
-        let (read, written) = spawn_single_byte_read_write(net, (0..COUNT as u8).collect());
-        let (read, written) = futures::future::join(read, written).await;
-
-        let max_drop = (written.len() as f64 * (1.0 - DROP) - 2.0).floor() as usize;
-        assert!(read.len() >= max_drop, "dropped more than {max_drop}: {}", read.len());
-    }
-
-    #[async_std::test]
-    async fn faulty_network_reliable() {
-        const COUNT: usize = 20;
-
-        let net = FaultyNetwork::new(Default::default(), None);
-
-        let (read, written) = spawn_single_byte_read_write(net, (0..COUNT as u8).collect());
-        let (read, written) = futures::future::join(read, written).await;
-
-        assert_eq!(read, written);
-    }
-
     #[parameterized(num_frames = {10, 100, 1000}, frame_size = {1500, 1500, 1500})]
     #[parameterized_macro(async_std::test)]
     async fn reliable_send_recv_with_no_acks(num_frames: usize, frame_size: usize) {
         let cfg = SessionConfig {
-            acknowledged_frames_buffer: 0,
+            enabled_features: HashSet::new(),
             ..Default::default()
         };
 
@@ -1418,8 +1389,7 @@ mod tests {
         const FRAME_SIZE: usize = 64;
 
         let cfg = SessionConfig {
-            enabled_features: HashSet::new(),
-            allow_output_buffering: false,
+            enabled_features: HashSet::from_iter([SessionFeature::NoDelay]),
             ..Default::default()
         };
 
@@ -1464,7 +1434,6 @@ mod tests {
 
         let cfg = SessionConfig {
             enabled_features: HashSet::new(),
-            allow_output_buffering: true,
             ..Default::default()
         };
 
@@ -1514,6 +1483,7 @@ mod tests {
         let net_cfg = FaultyNetworkConfig {
             fault_prob: 1.0, // throws away 100% of packets
             mixing_factor: 0,
+            ..Default::default()
         };
 
         let (mut alice_to_bob, mut bob_to_alice) = setup_alice_bob(cfg, net_cfg, None, None);
@@ -1545,6 +1515,7 @@ mod tests {
         let net_cfg = FaultyNetworkConfig {
             fault_prob: 0.5, // throws away 50% of packets
             mixing_factor: 0,
+            ..Default::default()
         };
 
         let (mut alice_to_bob, mut bob_to_alice) = setup_alice_bob(cfg, net_cfg, None, None);

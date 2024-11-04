@@ -27,6 +27,9 @@ mod utils;
 
 pub use frame::{Frame, FrameId, FrameInfo, FrameReassembler, Segment, SegmentId};
 
+#[cfg(feature = "testing")]
+pub use utils::{FaultyNetwork, FaultyNetworkConfig};
+
 pub use utils::linear_half_normal_shuffle;
 
 fn build_reconstructor(reassembler: reassembly::Reassembler, sequencer: sequencer::Sequencer<Frame>)

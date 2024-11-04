@@ -40,7 +40,7 @@ impl<Db: HoprDbProtocolOperations> AcknowledgementProcessor<Db> {
         };
 
         self.db.handle_acknowledgement(ack, &self.chain_key).await.map_err(|e| {
-            trace!("Failed to process a received acknowledgement: {e}");
+            trace!(error = %e, "Failed to process a received acknowledgement");
             let error: ProtocolError = e.into();
             error
         })

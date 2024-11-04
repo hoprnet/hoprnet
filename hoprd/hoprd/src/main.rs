@@ -15,21 +15,23 @@ use {
 
 use signal_hook::low_level;
 use tracing::{error, info, trace, warn};
-use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
+use tracing_subscriber::prelude::*;
 
 use hopr_async_runtime::prelude::{cancel_join_handle, spawn, JoinHandle};
 use hopr_lib::{ApplicationData, AsUnixTimestamp, HoprLibProcesses, ToHex};
+use hopr_platform::file::native::join;
 use hoprd::cli::CliArgs;
 use hoprd::errors::HoprdError;
 use hoprd_api::{serve_api, ListenerJoinHandles, RestApiParameters};
+use hoprd_db_api::aliases::{HoprdDbAliasesOperations, ME_AS_ALIAS};
 use hoprd_keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
 
-use hoprd::HoprServerIpForwardingReactor;
+use hoprd::exit::HoprServerIpForwardingReactor;
+
+const WEBSOCKET_EVENT_BROADCAST_CAPACITY: usize = 10000;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleHistogram;
-
-const WEBSOCKET_EVENT_BROADCAST_CAPACITY: usize = 10000;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -56,13 +58,34 @@ fn init_logger() -> Result<(), Box<dyn std::error::Error>> {
             .add_directive("hyper_util=warn".parse()?),
     };
 
+    #[cfg(feature = "prof")]
+    let registry = tracing_subscriber::Registry::default()
+        .with(
+            env_filter
+                .add_directive("tokio=trace".parse()?)
+                .add_directive("runtime=trace".parse()?),
+        )
+        .with(console_subscriber::spawn());
+
+    #[cfg(not(feature = "prof"))]
+    let registry = tracing_subscriber::Registry::default().with(env_filter);
+
     let format = tracing_subscriber::fmt::layer()
         .with_level(true)
         .with_target(true)
         .with_thread_ids(true)
         .with_thread_names(false);
 
-    let registry = tracing_subscriber::Registry::default().with(env_filter).with(format);
+    let format = if std::env::var("HOPRD_LOG_FORMAT")
+        .map(|v| v.to_lowercase() == "json")
+        .unwrap_or(false)
+    {
+        format.json().boxed()
+    } else {
+        format.boxed()
+    };
+
+    let registry = registry.with(format);
 
     let mut telemetry = None;
 
@@ -109,7 +132,7 @@ fn init_logger() -> Result<(), Box<dyn std::error::Error>> {
 
 enum HoprdProcesses {
     HoprLib(HoprLibProcesses, JoinHandle<()>),
-    WebSocket(JoinHandle<()>),
+    Inbox(JoinHandle<()>),
     ListenerSockets(ListenerJoinHandles),
     RestApi(JoinHandle<()>),
 }
@@ -119,7 +142,7 @@ impl std::fmt::Display for HoprdProcesses {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             HoprdProcesses::HoprLib(p, _) => write!(f, "HoprLib process: {p}"),
-            HoprdProcesses::WebSocket(_) => write!(f, "WebSocket"),
+            HoprdProcesses::Inbox(_) => write!(f, "Inbox"),
             HoprdProcesses::ListenerSockets(_) => write!(f, "SessionListenerSockets"),
             HoprdProcesses::RestApi(_) => write!(f, "RestApi"),
         }
@@ -137,6 +160,10 @@ impl std::fmt::Debug for HoprdProcesses {
 #[cfg_attr(all(feature = "runtime-tokio", not(feature = "runtime-async-std")), tokio::main)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     init_logger()?;
+
+    if hopr_crypto_random::is_rng_fixed() {
+        warn!("!! FOR TESTING ONLY !! THIS BUILD IS USING AN INSECURE FIXED RNG !!")
+    }
 
     let args = <CliArgs as clap::Parser>::parse();
     let cfg = hoprd::config::HoprdConfig::from_cli_args(args, false)?;
@@ -205,6 +232,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }),
     ));
 
+    // Create the metadata database
+    let db_path: String = join(&[&cfg.hopr.db.data, "db"]).expect("Could not create a db storage path");
+
+    let hoprd_db = match hoprd_db_api::db::HoprdDb::new(db_path.clone()).await {
+        Ok(db) => {
+            info!("Metadata database created successfully");
+            Arc::new(db)
+        }
+        Err(e) => {
+            error!(error = %e, "Failed to create the metadata database");
+            return Err(e.into());
+        }
+    };
+
+    // Ensures that "OWN_ALIAS" is set as alias
+    if let Err(e) = hoprd_db
+        .set_alias(node.me_peer_id().to_string(), ME_AS_ALIAS.to_string())
+        .await
+    {
+        error!(error = %e, "Failed to set the alias for the node");
+    }
+
     let (mut ws_events_tx, ws_events_rx) =
         async_broadcast::broadcast::<ApplicationData>(WEBSOCKET_EVENT_BROADCAST_CAPACITY);
     let ws_events_rx = ws_events_rx.deactivate(); // No need to copy the data unless the websocket is opened, but leaves the channel open
@@ -245,6 +294,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 hoprd_cfg: node_cfg_str,
                 cfg: api_cfg,
                 hopr: node_clone,
+                hoprd_db,
                 inbox,
                 session_listener_sockets,
                 websocket_rx: ws_events_rx,
@@ -252,16 +302,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             })
             .await
             {
-                error!("the REST API server could not start: {e}")
+                error!(error = %e, "the REST API server could not start")
             }
         })));
     }
 
-    let (hopr_socket, hopr_processes) = node.run(HoprServerIpForwardingReactor).await?;
+    let (hopr_socket, hopr_processes) = node
+        .run(HoprServerIpForwardingReactor::new(
+            hopr_keys.packet_key.clone(),
+            Default::default(),
+        ))
+        .await?;
 
     // process extracting the received data from the socket
     let mut ingress = hopr_socket.reader();
-    processes.push(HoprdProcesses::WebSocket(spawn(async move {
+    processes.push(HoprdProcesses::Inbox(spawn(async move {
         while let Some(data) = ingress.next().await {
             let recv_at = SystemTime::now();
 
@@ -271,10 +326,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let latency = recv_at.as_unix_timestamp().saturating_sub(sent);
 
                     trace!(
-                        app_tag = data.application_tag.unwrap_or(0),
+                        tag = ?data.application_tag,
                         latency_in_ms = latency.as_millis(),
-                        "## NODE RECEIVED MESSAGE [@{}] ##",
-                        DateTime::<Utc>::from(recv_at).to_rfc3339(),
+                        receiged_at = DateTime::<Utc>::from(recv_at).to_rfc3339(),
+                        "received message"
                     );
 
                     #[cfg(all(feature = "prometheus", not(test)))]
@@ -285,7 +340,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             application_tag: data.application_tag,
                             plain_text: msg.clone(),
                         }) {
-                            error!("Failed to notify websockets about a new message: {e}");
+                            error!(error = %e, "Failed to notify websockets about a new message");
                         }
                     }
 
@@ -304,7 +359,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         )
                     }
                 }
-                Err(e) => error!("RLP decoding failed: {e}"),
+                Err(e) => error!(error = %e, "RLP decoding failed"),
             }
         }
     })));
@@ -325,7 +380,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         info!("Stopping process '{process}'");
                         match process {
                             HoprdProcesses::HoprLib(_, jh)
-                            | HoprdProcesses::WebSocket(jh)
+                            | HoprdProcesses::Inbox(jh)
                             | HoprdProcesses::RestApi(jh) => join_handles.push(jh),
                             HoprdProcesses::ListenerSockets(jhs) => {
                                 join_handles.extend(jhs.write().await.drain().map(|(_, (_, jh))| jh));

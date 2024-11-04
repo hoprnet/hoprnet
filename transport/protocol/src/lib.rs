@@ -172,6 +172,7 @@ where
 
                     async move { tbf_clone.save().await }
                 },
+                "persisting the bloom filter to disk".into(),
             ))),
         );
         tbf
@@ -286,10 +287,7 @@ where
 
                     async move {
                         let random_delay = cfg.random_delay();
-                        trace!(
-                            delay_in_ms = random_delay.as_millis(),
-                            "Mixer created a random packet delay",
-                        );
+                        trace!(delay_in_ms = random_delay.as_millis(), "Created random mixer delay",);
 
                         sleep(random_delay).await;
 
@@ -339,7 +337,7 @@ where
                                         METRIC_PACKET_COUNT.increment(&["received"]);
                                     }
                                     internal_ack_send.send((ack.peer, ack.ack)).await.unwrap_or_else(|e| {
-                                        error!("Failed to forward an acknowledgement to the transport layer: {e}");
+                                        error!(error = %e, "Failed to forward an acknowledgement to the transport layer");
                                     });
                                     Some(data)
                                 }
@@ -355,7 +353,7 @@ where
                                         error!("Failed to forward a message to the transport layer");
                                     });
                                     internal_ack_send.send((ack.peer, ack.ack)).await.unwrap_or_else(|e| {
-                                        error!("Failed to forward an acknowledgement to the transport layer: {e}");
+                                        error!(error = %e, "Failed to forward an acknowledgement to the transport layer");
                                     });
                                     None
                                 }
@@ -381,7 +379,7 @@ where
                                     ))
                                     .await
                                     .unwrap_or_else(|e| {
-                                        error!("Failed to forward an acknowledgement for a failed packet recv to the transport layer: {e}");
+                                        error!(error = %e, "Failed to forward an acknowledgement for a failed packet recv to the transport layer");
                                     });
 
                                 None

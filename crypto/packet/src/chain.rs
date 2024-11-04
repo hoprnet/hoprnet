@@ -7,8 +7,9 @@ use hopr_primitive_types::prelude::*;
 
 use crate::{
     errors::{PacketError::PacketDecodingError, Result},
-    packet::{CurrentSphinxSuite, ForwardedMetaPacket, MetaPacket, PACKET_LENGTH},
+    packet::{ForwardedMetaPacket, MetaPacket},
     por::{pre_verify, ProofOfRelayString, ProofOfRelayValues, POR_SECRET_LENGTH},
+    CurrentSphinxSuite,
 };
 
 /// Indicates the packet type.
@@ -56,10 +57,10 @@ impl Display for ChainPacketComponents {
 }
 
 impl ChainPacketComponents {
-    /// Size of the packet including header, payload, ticket and ack challenge.
-    pub const SIZE: usize = PACKET_LENGTH + Ticket::SIZE;
+    /// Size of the packet including header, padded payload, ticket and ack challenge.
+    pub const SIZE: usize = MetaPacket::<CurrentSphinxSuite>::PACKET_LEN + Ticket::SIZE;
 
-    /// Constructs new outgoing packet with the given path.
+    /// Constructs a new outgoing packet with the given path.
     /// # Arguments
     /// * `msg` packet payload
     /// * `public_keys_path` public keys of a complete path for the packet to take
@@ -103,10 +104,9 @@ impl ChainPacketComponents {
     /// packet can be further delivered (relayed to the next hop or read).
     pub fn from_incoming(data: &[u8], node_keypair: &OffchainKeypair, previous_hop: OffchainPublicKey) -> Result<Self> {
         if data.len() == Self::SIZE {
-            let (pre_packet, pre_ticket) = data.split_at(PACKET_LENGTH);
+            let (pre_packet, pre_ticket) = data.split_at(MetaPacket::<CurrentSphinxSuite>::PACKET_LEN);
 
-            let mp: MetaPacket<hopr_crypto_sphinx::ec_groups::X25519Suite> =
-                MetaPacket::<CurrentSphinxSuite>::try_from(pre_packet)?;
+            let mp: MetaPacket<CurrentSphinxSuite> = MetaPacket::try_from(pre_packet)?;
 
             match mp.into_forwarded(node_keypair, INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0)? {
                 ForwardedMetaPacket::Relayed {

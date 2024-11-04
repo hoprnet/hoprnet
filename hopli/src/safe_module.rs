@@ -94,7 +94,6 @@
 //!     --module-address 0x5d46d0c5279fd85ce7365e4d668f415685922839 \
 //!     --provider-url "http://localhost:8545"
 //! ```
-//! ```
 use crate::key_pair::{ArgEnvReader, ManagerPrivateKeyArgs};
 use crate::methods::{debug_node_safe_module_setup_main, debug_node_safe_module_setup_on_balance_and_registries};
 use crate::{

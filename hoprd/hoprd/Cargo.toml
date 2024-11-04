@@ -44,6 +44,13 @@ telemetry = [
   "dep:opentelemetry_sdk",
   "dep:tracing-opentelemetry",
 ]
+transport-quic = ["hopr-lib/transport-quic"]
+# To use profiling:
+# 1. Set RUSTFLAGS="--cfg tokio_unstable" before building
+# 2. Enable the 'prof' feature: cargo build --feature prof
+prof = [
+  "dep:console-subscriber",
+] # must be build with 'tokio_unstable': https://github.com/tokio-rs/console/tree/main/console-subscriber
 
 [dependencies]
 anyhow = { workspace = true }
@@ -62,17 +69,21 @@ home = "0.5.9"
 lazy_static = { workspace = true, optional = true }
 proc-macro-regex = { workspace = true }
 serde = { workspace = true }
+serde_with = { workspace = true }
 serde_yaml = { workspace = true }
 serde_json = { workspace = true }
 signal-hook = { workspace = true }
+smart-default = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, optional = true }
 tokio-retry = { workspace = true, optional = true }
 tokio-util = { workspace = true, optional = true }
 tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["fmt", "json"] }
 validator = { workspace = true }
+
+console-subscriber = { workspace = true, optional = true }
 
 opentelemetry = { workspace = true, optional = true }
 opentelemetry-otlp = { workspace = true, default-features = false, features = [
@@ -90,6 +101,7 @@ hopr-lib = { workspace = true, features = [
   "session-client",
   "session-server",
 ] }
+hoprd-db-api = { workspace = true }
 hoprd-api = { workspace = true }
 hoprd-inbox = { workspace = true }
 hoprd-keypair = { workspace = true }
@@ -97,6 +109,7 @@ hopr-platform = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-network-types = { workspace = true }
 hopr-async-runtime = { workspace = true }
+hopr-crypto-random = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

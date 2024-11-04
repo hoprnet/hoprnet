@@ -134,17 +134,17 @@ pub fn to_active_ping(
     let replier = PingQueryReplier::new(tx);
 
     if let Err(e) = sender.unbounded_send((peer, replier)) {
-        warn!("Failed to initiate a ping request to '{peer}': {e}");
+        warn!(%peer, error = %e, "Failed to initiate a ping request");
     }
 
     async move {
         match timeout_fut(timeout, rx).await {
             Ok(Ok(Ok((latency, version)))) => {
-                debug!(latency = latency.as_millis(), "Ping to '{peer}' ({version}) succeeded",);
+                debug!(latency = latency.as_millis(), %peer, %version, "Ping succeeded",);
                 (peer, Ok(latency), version)
             }
             _ => {
-                debug!("Ping to '{peer}' failed");
+                debug!(%peer, "Ping failed");
                 (peer, Err(()), "unknown".into())
             }
         }
@@ -197,7 +197,7 @@ where
     /// # Arguments
     ///
     /// * `peers` - A vector of PeerId objects referencing the peers to be pinged
-    #[tracing::instrument(level = "info", skip(self, peers))]
+    #[tracing::instrument(level = "info", skip(self, peers), fields(peers.count = peers.len()))]
     fn ping(&self, mut peers: Vec<PeerId>) -> impl Stream<Item = crate::errors::Result<std::time::Duration>> {
         let start_all_peers = current_time();
 

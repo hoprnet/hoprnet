@@ -10,13 +10,13 @@ use crate::AppState;
         get,
         path = "/startedz",
         responses(
-            (status = 200, description = "The node is stared and running"),
+            (status = 200, description = "The node is started and running"),
             (status = 412, description = "The node is not started and running"),
         ),
         tag = "Checks"
     )]
 pub(super) async fn startedz(State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    is_running(state)
+    is_running(state) // FIXME: improve this once node state granularity is improved
 }
 
 /// Check whether the node is ready to accept connections.
@@ -30,7 +30,7 @@ pub(super) async fn startedz(State(state): State<Arc<AppState>>) -> impl IntoRes
         tag = "Checks"
     )]
 pub(super) async fn readyz(State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    is_running(state)
+    is_running(state) // FIXME: improve this once node state granularity is improved
 }
 
 /// Check whether the node is healthy.
@@ -44,7 +44,7 @@ pub(super) async fn readyz(State(state): State<Arc<AppState>>) -> impl IntoRespo
         tag = "Checks"
     )]
 pub(super) async fn healthyz(State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    is_running(state)
+    is_running(state) // FIXME: improve this once node state granularity is improved
 }
 
 fn is_running(state: Arc<AppState>) -> impl IntoResponse {
@@ -53,7 +53,6 @@ fn is_running(state: Arc<AppState>) -> impl IntoResponse {
         _ => (StatusCode::PRECONDITION_FAILED, "").into_response(),
     }
 }
-
 /// Check whether the node is eligible in the network.
 #[utoipa::path(
         get,

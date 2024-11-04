@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use futures::{stream, StreamExt};
-use tracing::{debug, error, info, trace};
+use tracing::{error, info, trace};
 
 use chain_rpc::{HoprIndexerRpcOperations, LogFilter};
 use chain_types::chain_events::SignificantChainEvent;
@@ -99,7 +99,7 @@ where
             ));
         }
 
-        info!("Starting indexer...");
+        info!("Starting chain indexing");
 
         let rpc = self.rpc.take().expect("rpc should be present");
         let db_processor = self.db_processor.take().expect("db_processor should be present");
@@ -108,8 +108,9 @@ where
 
         let described_block = self.db.get_last_indexed_block(None).await?;
         info!(
-            "Loaded indexer state at block #{0} with checksum: {1}",
-            described_block.latest_block_number, described_block.checksum
+            block = described_block.latest_block_number,
+            checksum = %described_block.checksum,
+            "Loaded indexer state at block",
         );
 
         let next_block_to_process = if self.cfg.start_block_number < described_block.latest_block_number as u64 {
@@ -120,8 +121,8 @@ where
         };
 
         info!(
-            "DB latest processed block: {0}, next block to process {next_block_to_process}",
-            described_block.latest_block_number
+            block = described_block.latest_block_number,
+            next_block_to_process, "latest processed block and next block to process",
         );
 
         // we skip on addresses which have no topics
@@ -158,7 +159,7 @@ where
                     let is_synced = is_synced.clone();
 
                     async move {
-                        trace!("Processed block number: {}", block_with_logs.block_id);
+                        trace!(block_id=block_with_logs.block_id, "Processed block");
 
                         let current_block = block_with_logs.block_id;
                         #[cfg(all(feature = "prometheus", not(test)))]
@@ -172,6 +173,7 @@ where
                             }
                             Err(error) => {
                                 error!(
+                                    %error,
                                     "Failed to fetch block number from RPC, cannot continue indexing due to {error}"
                                 );
                                 panic!("Failed to fetch block number from RPC, cannot continue indexing due to {error}")
@@ -194,10 +196,10 @@ where
                             METRIC_INDEXER_SYNC_PROGRESS.set(progress);
 
                             if current_block >= head {
-                                info!("Indexer sync successfully completed");
+                                info!("Index fully synced with chain");
                                 is_synced.store(true, std::sync::atomic::Ordering::Relaxed);
                                 if let Err(e) = tx.try_send(()) {
-                                    error!("failed to notify about achieving index synchronization: {e}")
+                                    error!(error = %e, "failed to notify about achieving index synchronization")
                                 }
                             }
                         }
@@ -206,18 +208,17 @@ where
                     }
                 })
                 .filter_map(|block_with_logs| async {
-                    debug!("processing events in {block_with_logs} ...");
                     let block_description = block_with_logs.to_string();
                     let block_id = block_with_logs.block_id;
                     let log_count = block_with_logs.logs.len();
 
                     let outgoing_events = match db_processor.collect_block_events(block_with_logs).await {
                         Ok(events) => {
-                            trace!("retrieved {} significant chain events from {block_description}", events.len());
+                            trace!(event_count=events.len(), block_id, "retrieved significant chain events");
                             Some(events)
                         }
                         Err(e) => {
-                            error!("failed to process logs in {block_description} into events: {e}");
+                            error!(error = %e, block = block_description, "failed to process logs into events");
                             None
                         }
                     };
@@ -242,7 +243,7 @@ where
                                 METRIC_INDEXER_CHECKSUM.set(low_4_bytes.into());
                             }
                         }
-                        Err(e) => error!("Cannot retrieve indexer state: {e}"),
+                        Err(e) => error!(error = %e, "Cannot retrieve indexer state"),
                     }
 
                     outgoing_events
@@ -251,11 +252,11 @@ where
 
                 futures::pin_mut!(event_stream);
                 while let Some(event) = event_stream.next().await {
-                    trace!("Processing an onchain event: {event:?}");
+                    trace!(event=%event, "Processing onchain event");
                     // Pass the events further only once we're fully synced
                     if is_synced.load(std::sync::atomic::Ordering::Relaxed) {
                         if let Err(e) = tx_significant_events.try_send(event) {
-                            error!("failed to pass a significant chain event further: {e}");
+                            error!(error = %e,"failed to pass a significant chain event further");
                         }
                     }
                 }

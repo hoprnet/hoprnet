@@ -339,9 +339,7 @@ impl<const C: usize> TryFrom<&[u8]> for SessionMessage<C> {
 
 impl<const C: usize> From<SessionMessage<C>> for Vec<u8> {
     fn from(value: SessionMessage<C>) -> Self {
-        let mut ret = Vec::with_capacity(C);
-        ret.push(SessionMessage::<C>::VERSION);
-        ret.push(SessionMessageDiscriminants::from(&value) as u8);
+        let disc = SessionMessageDiscriminants::from(&value) as u8;
 
         let msg = match value {
             SessionMessage::Segment(s) => Vec::from(s),
@@ -349,13 +347,121 @@ impl<const C: usize> From<SessionMessage<C>> for Vec<u8> {
             SessionMessage::Acknowledge(a) => Vec::from(a),
         };
 
-        ret.extend((msg.len() as u16).to_be_bytes());
-        ret.extend(msg);
+        let msg_len = msg.len() as u16;
 
-        ret.shrink_to_fit();
+        let mut ret = Vec::with_capacity(SessionMessage::<C>::HEADER_SIZE + msg_len as usize);
+        ret.push(SessionMessage::<C>::VERSION);
+        ret.push(disc);
+        ret.extend(msg_len.to_be_bytes());
+        ret.extend(msg);
         ret
     }
 }
+
+/// Allows parsing of multiple [`SessionMessages`](SessionMessage)
+/// from a borrowed or an owned binary chunk.
+///
+/// The iterator will yield [`SessionMessages`](SessionMessage) until all the messages from
+/// the underlying data chunk are completely parsed or an error occurs.
+///
+/// In other words, it keeps yielding `Some(Ok(_))` until it yields either `None`
+/// or `Some(Err(_))` immediately followed by `None`.
+///
+/// This iterator is [fused](std::iter::FusedIterator).
+#[derive(Debug, Clone)]
+pub struct SessionMessageIter<'a, const C: usize> {
+    data: Cow<'a, [u8]>,
+    offset: usize,
+    last_err: Option<SessionError>,
+}
+
+impl<'a, const C: usize> SessionMessageIter<'a, C> {
+    /// Determines if there was an error reading the last message.
+    ///
+    /// If this function returns some error value, the iterator will not
+    /// yield any more messages.
+    pub fn last_error(&self) -> Option<&SessionError> {
+        self.last_err.as_ref()
+    }
+
+    /// Check if this iterator can yield any more messages.
+    ///
+    /// Returns `true` only if a [prior error](SessionMessageIter::last_error) occurred or all useful bytes
+    /// from the underlying chunk were consumed and all messages were parsed.
+    pub fn is_done(&self) -> bool {
+        self.last_err.is_some() || self.data.len() - self.offset < SessionMessage::<C>::minimum_message_size()
+    }
+
+    /// Attempts to parse the current message and moves the offset if successful.
+    fn try_next(&mut self) -> Result<SessionMessage<C>, SessionError> {
+        let mut offset = self.offset;
+
+        // Protocol version
+        if self.data[offset] != SessionMessage::<C>::VERSION {
+            return Err(SessionError::WrongVersion);
+        }
+        offset += 1;
+
+        // Message discriminant
+        let disc = self.data[offset];
+        offset += 1;
+
+        // Message length
+        let len = u16::from_be_bytes(
+            self.data[offset..offset + mem::size_of::<u16>()]
+                .try_into()
+                .map_err(|_| SessionError::IncorrectMessageLength)?,
+        ) as usize;
+        offset += mem::size_of::<u16>();
+
+        // Read the message
+        let res = match SessionMessageDiscriminants::from_repr(disc).ok_or(SessionError::UnknownMessageTag)? {
+            SessionMessageDiscriminants::Segment => {
+                SessionMessage::Segment(self.data[offset..offset + len].try_into()?)
+            }
+            SessionMessageDiscriminants::Request => {
+                SessionMessage::Request(self.data[offset..offset + len].try_into()?)
+            }
+            SessionMessageDiscriminants::Acknowledge => {
+                SessionMessage::Acknowledge(self.data[offset..offset + len].try_into()?)
+            }
+        };
+
+        ret.extend((msg.len() as u16).to_be_bytes());
+        ret.extend(msg);
+
+        // Move the internal offset only once the message has been fully parsed
+        self.offset = offset + len;
+        Ok(res)
+    }
+}
+
+impl<'a, const C: usize, T: Into<Cow<'a, [u8]>>> From<T> for SessionMessageIter<'a, C> {
+    fn from(value: T) -> Self {
+        Self {
+            data: value.into(),
+            offset: 0,
+            last_err: None,
+        }
+    }
+}
+
+impl<'a, const C: usize> Iterator for SessionMessageIter<'a, C> {
+    type Item = Result<SessionMessage<C>, NetworkTypeError>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if !self.is_done() {
+            self.try_next()
+                .inspect_err(|e| self.last_err = Some(e.clone()))
+                .map_err(NetworkTypeError::SessionProtocolError)
+                .into()
+        } else {
+            None
+        }
+    }
+}
+
+impl<'a, const C: usize> std::iter::FusedIterator for SessionMessageIter<'a, C> {}
 
 /// Allows parsing of multiple [`SessionMessages`](SessionMessage)
 /// from a borrowed or an owned binary chunk.
@@ -470,6 +576,15 @@ mod tests {
     use rand::prelude::IteratorRandom;
     use rand::{thread_rng, Rng};
     use std::time::SystemTime;
+
+    #[test]
+    fn ensure_session_protocol_version_1_values() {
+        // All of these values are independent of C, so we can set C = 0
+        assert_eq!(1, SessionMessage::<0>::VERSION);
+        assert_eq!(4, SessionMessage::<0>::HEADER_SIZE);
+        assert_eq!(10, SessionMessage::<0>::SEGMENT_OVERHEAD);
+        assert_eq!(8, SessionMessage::<0>::MAX_SEGMENTS_PER_FRAME);
+    }
 
     #[test]
     fn segment_request_should_be_constructible_from_frame_info() {

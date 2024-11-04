@@ -22,7 +22,7 @@ pub(crate) fn random_group_element() -> ([u8; 32], crate::types::CurvePoint) {
     let mut scalar = k256::NonZeroScalar::from_uint(1u32.into()).unwrap();
     let mut point = k256::ProjectivePoint::IDENTITY;
     while point.is_identity().into() {
-        scalar = k256::NonZeroScalar::random(&mut hopr_crypto_random::OsRng);
+        scalar = k256::NonZeroScalar::random(&mut hopr_crypto_random::rng());
         point = k256::ProjectivePoint::GENERATOR * scalar.as_ref();
     }
     (scalar.to_bytes().into(), point.to_affine().into())

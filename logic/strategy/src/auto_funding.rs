@@ -85,9 +85,8 @@ impl<A: ChannelActions + Send + Sync> SingularStrategy for AutoFundingStrategy<A
 
         if let ChannelChange::CurrentBalance { right: new, .. } = change {
             if new.lt(&self.cfg.min_stake_threshold) && channel.status == ChannelStatus::Open {
-                info!(
-                    "stake on {channel} is below threshold {} < {}",
-                    channel.balance, self.cfg.min_stake_threshold
+                info!(%channel, balance = %channel.balance, threshold = %self.cfg.min_stake_threshold,
+                    "stake on channel is below threshold",
                 );
 
                 #[cfg(all(feature = "prometheus", not(test)))]
@@ -98,7 +97,7 @@ impl<A: ChannelActions + Send + Sync> SingularStrategy for AutoFundingStrategy<A
                     .fund_channel(channel.get_id(), self.cfg.funding_amount)
                     .await?;
                 std::mem::drop(rx); // The Receiver is not intentionally awaited here and the oneshot Sender can fail safely
-                info!("issued re-staking of {channel} with {}", self.cfg.funding_amount);
+                info!(%channel, amount = %self.cfg.funding_amount, "issued re-staking of channel", );
             }
             Ok(())
         } else {

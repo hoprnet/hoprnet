@@ -8,6 +8,7 @@ pub use hopr_transport::config::{
 };
 
 use hopr_primitive_types::prelude::*;
+use hopr_transport::config::SessionGlobalConfig;
 
 pub const DEFAULT_SAFE_TRANSACTION_SERVICE_PROVIDER: &str = "https://safe-transaction.prod.hoprtech.net/";
 pub const DEFAULT_HOST: &str = "0.0.0.0";
@@ -140,7 +141,11 @@ pub struct HoprLibConfig {
     #[validate(nested)]
     #[serde(default)]
     pub protocol: ProtocolConfig,
-    /// Blockchain specific configuration
+    /// Configuration specific to Session management.
+    #[validate(nested)]
+    #[serde(default)]
+    pub session: SessionGlobalConfig,
+    /// Blockchain-specific configuration
     #[validate(nested)]
     #[serde(default)]
     pub chain: Chain,

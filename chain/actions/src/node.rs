@@ -54,7 +54,7 @@ where
 
         // TODO: should we check native/token balance here before withdrawing ?
 
-        info!("initiating withdrawal of {amount} to {recipient}");
+        info!(%amount, %recipient, "initiating withdrawal");
         self.tx_sender.send(Action::Withdraw(recipient, amount)).await
     }
 
@@ -72,7 +72,7 @@ where
                     .get_multiaddr()
                     .is_some_and(|ma| decapsulate_multiaddress(ma).eq(announcement_data.multiaddress()))
         }) {
-            info!("initiating announcement {announcement_data}");
+            info!(%announcement_data, "initiating announcement");
             self.tx_sender.send(Action::Announce(announcement_data)).await
         } else {
             Err(AlreadyAnnounced)
@@ -81,7 +81,7 @@ where
 
     #[tracing::instrument(level = "debug", skip(self))]
     async fn register_safe_by_node(&self, safe_address: Address) -> Result<PendingAction> {
-        info!("initiating safe address registration of {safe_address}");
+        info!(%safe_address, "initiating safe address registration");
         self.tx_sender.send(Action::RegisterSafe(safe_address)).await
     }
 }

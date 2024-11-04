@@ -214,9 +214,9 @@ impl ChannelGraph {
             .map(|c| self.update_channel(c).map(|v| v.len()).unwrap_or(0))
             .sum();
         info!(
-            "synced {} channels to the graph: {} changes total",
-            self.graph.edge_count(),
-            changes
+            edge_count = self.graph.edge_count(),
+            total_changes = changes,
+            "channel graph synced",
         );
         Ok(())
     }

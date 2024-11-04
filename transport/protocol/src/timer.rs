@@ -10,7 +10,7 @@ use hopr_primitive_types::prelude::AsUnixTimestamp;
 
 /// Construct an infinitely running background loop producing ticks with a given period
 /// with the maximum tick duration at most the period.
-pub async fn execute_on_tick<F>(cycle: Duration, action: impl Fn() -> F)
+pub async fn execute_on_tick<F>(cycle: Duration, action: impl Fn() -> F, operation: String)
 where
     F: std::future::Future<Output = ()> + Send,
 {
@@ -23,13 +23,16 @@ where
         pin_mut!(timeout, todo);
 
         match select(timeout, todo).await {
-            Either::Left(_) => warn!("Timer tick interrupted by timeout"),
+            Either::Left(_) => warn!(operation, "Timer tick interrupted by timeout"),
             Either::Right(_) => {
-                trace!("Timer tick finished");
+                trace!(operation, "Timer tick finished");
 
                 let action_duration = current_time().as_unix_timestamp().saturating_sub(start);
                 if let Some(remaining) = cycle.checked_sub(action_duration) {
-                    trace!("Universal timer sleeping for: {}ms", remaining.as_millis());
+                    trace!(
+                        remaining_time_in_ms = remaining.as_millis(),
+                        "Universal timer sleeping for",
+                    );
                     sleep(remaining).await
                 }
             }

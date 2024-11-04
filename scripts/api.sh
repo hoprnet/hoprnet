@@ -124,7 +124,7 @@ api_set_alias() {
   local peer_id="${2}"
   local alias="${3}"
 
-  api_call "${node_api}" "/aliases" "POST" "{\"peerId\": \"${peer_id}\", \"alias\": \"${alias}\"}" "" 600
+  api_call "${node_api}" "/aliases" "POST" "{\"destination\": \"${peer_id}\", \"alias\": \"${alias}\"}" "" 600
 }
 
 # $1 = node api endpoint
@@ -277,7 +277,7 @@ api_send_message(){
   local expected_code="${6:-202}"
 
   local path=$(echo "${peers}" | tr -d '\n' | jq -R -s 'split(" ")')
-  local payload='{"body":"'${msg}'","path":'${path}',"peerId":"'${peer_address}'","tag":'${tag}'}'
+  local payload='{"body":"'${msg}'","path":'${path}',"destination":"'${peer_address}'","tag":'${tag}'}'
   # Node might need some time once commitment is set on-chain
   api_call "${source_api}" "/messages" "POST" "${payload}" "${expected_code}" 90 15 "" true
 }
@@ -349,7 +349,7 @@ api_open_channel() {
   log "Safe balance of node ${source_api} before opening new channel: ${hopr_balance} weiHOPR, need ${amount} weiHOPR"
 
   #log "Node ${source_id} open channel to Node ${destination_id}"
-  api_call "${source_api}" "/channels" "POST" "{ \"peerAddress\": \"${destination_address}\", \"amount\": \"${amount}\" }" 'channelId|CHANNEL_ALREADY_OPEN' 600 30
+  api_call "${source_api}" "/channels" "POST" "{ \"destination\": \"${destination_address}\", \"amount\": \"${amount}\" }" 'channelId|CHANNEL_ALREADY_OPEN' 600 30
   #log "Node ${source_id} open channel to Node ${destination_id} result -- ${result}"
 }
 

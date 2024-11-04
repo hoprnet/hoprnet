@@ -98,7 +98,7 @@ where
             })
             .map(|channel| async {
                 let channel_cpy = *channel;
-                info!("channel closure finalizer: finalizing closure of {channel_cpy}");
+                info!(channel = %channel_cpy, "channel closure finalizer: finalizing closure");
                 match self
                     .chain_actions
                     .close_channel(channel_cpy.destination, ChannelDirection::Outgoing, false)
@@ -108,7 +108,7 @@ where
                         // Currently, we're not interested in awaiting the Close transactions to confirmation
                         debug!("channel closure finalizer: finalizing closure of {channel_cpy}");
                     }
-                    Err(e) => error!("channel closure finalizer: failed to finalize closure of {channel_cpy}: {e}"),
+                    Err(e) => error!(%channel_cpy, error = %e, "channel closure finalizer: failed to finalize closure"),
                 }
             })
             .collect::<FuturesUnordered<_>>()

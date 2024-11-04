@@ -22,6 +22,7 @@
   - [Install via Docker](#install-via-docker)
   - [Install via Nix package manager](#install-via-nix-package-manager)
 - [Usage](#usage)
+  - [Environment variables](#environment-variables)
   - [Example execution](#example-execution)
   - [Using Docker Compose with extended HOPR node monitoring](#using-docker-compose-with-extended-hopr-node-monitoring)
 - [Testnet accessibility](#testnet-accessibility)
@@ -192,11 +193,23 @@ Options:
           Print version
 ```
 
+### Environment variables
+
+On top of the default configuration options generated for the command line, the following environment variables can be used in order to tweak the node functionality:
+
+- `HOPRD_LOG_FORMAT` - override for the default stdout log formatter (follows tracing formatting options)
+- `HOPRD_USE_OPENTELEMETRY` - enable the opentelemetry output for this node
+- `OTEL_SERVICE_NAME` - the name of this node for the opentelemetry service
+- `HOPR_INTERNAL_LIBP2P_MAX_CONCURRENTLY_DIALED_PEER_COUNT` - the maximum number of concurrently dialed peers in libp2p
+- `HOPR_INTERNAL_LIBP2P_MAX_NEGOTIATING_INBOUND_STREAM_COUNT` - the maximum number of negotiating inbound streams
+- `ENV_WORKER_THREADS` - the number of environment worker threads for the tokio executor
+- `HOPRD_SESSION_PORT_RANGE` - allows restricting the port range (syntax: `start:end` inclusive) of Session listener automatic port selection (when port 0 is specified).
+
 ### Example execution
 
 Running the node without any command-line argument might not work depending on the installation method used. Some command line arguments are required.
 
-A basic reasonable setup is that uses a custom identity and enabels a REST API of the `hoprd` could look like:
+Some basic reasonable setup uses a custom identity and enables the REST API of the `hoprd`:
 
 ```sh
 hoprd --identity /app/hoprd-db/.hopr-identity --password switzerland --init --announce --host "0.0.0.0:9091" --apiToken <MY_TOKEN> --network doufur
@@ -226,18 +239,7 @@ Special care needs to given to the `network` argument, which defines the specifi
 
 ### Using Docker Compose with extended HOPR node monitoring
 
-An optional `docker compose` setup can be used to run the above containerized `hoprd` along with extension to observe the node's metrics using Prometheus + Grafana dashboard:
-
-```shell
-docker compose --file scripts/compose/docker-compose.yml up -d
-```
-
-Copy the `scripts/compose/default.env` to `scripts/compose/.env` and change the variables as desired.
-
-The composite setup will publish multiple additional services alongside the `hoprd`:
-
-- Admin UI at `localhost:3000`
-- Grafana with `hoprd` dashboards at `localhost:3030` (default user: `admin` and pass `hopr`)
+Please follow the documentation for [`docker compose` based deployment](./deploy/compose/README.md).
 
 ## Testnet accessibility
 
@@ -452,7 +454,18 @@ With the environment activated, execute the tests locally:
 make smoke-tests
 ```
 
-####
+## Profiling & Instrumentation
+
+Multiple layers of profiling and instrumentation can be used to debug the `hoprd`:
+
+### `tokio` executor instrumentation
+
+Requires a special build:
+
+1. Set `RUSTFLAGS="--cfg tokio_unstable"` before building
+2. Enable the `prof` feature on the `hoprd` package: `cargo build --feature prof`
+
+Once an instrumented tokio is built into hoprd, the application can be instrumented by `tokio_console` as described in the [official crate documentation](https://docs.rs/tokio-console/latest/tokio_console/#instrumenting-the-application).
 
 ## Contact
 

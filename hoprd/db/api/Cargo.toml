@@ -1,0 +1,47 @@
+[package]
+name = "hoprd-db-api"
+version = "0.1.0"
+edition = "2021"
+description = "HOPRd-only DB functionality"
+homepage = "https://hoprnet.org/"
+repository = "https://github.com/hoprnet/hoprnet"
+license = "GPL-3.0-only"
+
+[features]
+default = []
+prometheus = ["dep:lazy_static", "dep:hopr-metrics"]
+runtime-async-std = [
+  "hopr-async-runtime/runtime-async-std",
+  "sea-orm/runtime-async-std",
+  "sqlx/runtime-async-std-rustls",
+]
+runtime-tokio = [
+  "hopr-async-runtime/runtime-tokio",
+  "sea-orm/runtime-tokio",
+  "sqlx/runtime-tokio-rustls",
+]
+
+[dependencies]
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+lazy_static = { workspace = true, optional = true }
+libp2p-identity = { workspace = true }
+sea-orm = { workspace = true }
+sqlx = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+hoprd-db-entity = { workspace = true, features = ["serde"] }
+hoprd-db-migration = { workspace = true }
+hopr-metrics = { workspace = true, optional = true }
+
+[dev-dependencies]
+async-std = { workspace = true }
+hopr-async-runtime = { workspace = true }
+env_logger = { workspace = true }
+lazy_static = { workspace = true }
+hopr-crypto-random = { workspace = true }
+hex-literal = { workspace = true }
+tracing-test = { workspace = true }
+sea-orm = { workspace = true, features = ["runtime-async-std-rustls"] }
+sqlx = { workspace = true, features = ["runtime-async-std-rustls"] }

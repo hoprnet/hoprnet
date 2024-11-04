@@ -76,7 +76,7 @@ where
                         .clone()
                         .try_send(NetworkTriggeredEvent::CloseConnection(peer))
                     {
-                        error!("Failed to emit a network event 'close connection': {}", e)
+                        error!(error = %e, "Failed to emit a network event 'close connection'")
                     }
                 }
                 NetworkTriggeredEvent::UpdateQuality(peer, quality) => {
@@ -89,15 +89,15 @@ where
                             g.update_channel_quality(self_addr, chain_key, quality);
                             debug!("update channel {self_addr} -> {chain_key} with quality {quality}");
                         } else {
-                            error!("could not resolve chain key for '{peer}'");
+                            error!(%peer, "could not resolve chain key ");
                         }
                     } else {
-                        error!("encountered invalid peer id: '{peer}'");
+                        error!(%peer, "encountered invalid peer id:");
                     }
                 }
             },
             Ok(None) => debug!("No update necessary"),
-            Err(e) => error!("Encountered error on on updating the collected ping data: {e}"),
+            Err(e) => error!(error = %e, "Encountered error on on updating the collected ping data"),
         }
     }
 }

@@ -56,9 +56,7 @@ pub async fn can_register_with_safe<Rpc: HoprRpcOperations>(
     rpc: &Rpc,
 ) -> Result<bool> {
     let target_address = rpc.get_module_target_address().await?;
-    debug!("-- node address: {me}");
-    debug!("-- safe address: {safe_address}");
-    debug!("-- module target address: {target_address}");
+    debug!(node_address = %me, %safe_address, %target_address, "can register with safe");
 
     if target_address != safe_address {
         // cannot proceed when the safe address is not the target/owner of given module
@@ -66,7 +64,7 @@ pub async fn can_register_with_safe<Rpc: HoprRpcOperations>(
     }
 
     let registered_address = rpc.get_safe_from_node_safe_registry(me).await?;
-    info!("currently registered Safe address in NodeSafeRegistry = {registered_address}");
+    info!(%registered_address, "currently registered Safe address in NodeSafeRegistry");
 
     if registered_address.is_zero() {
         info!("Node is not associated with a Safe in NodeSafeRegistry yet");
@@ -96,7 +94,7 @@ pub async fn wait_for_funds<Rpc: HoprRpcOperations>(
     while current_delay <= max_delay {
         match rpc.get_balance(address, min_balance.balance_type()).await {
             Ok(current_balance) => {
-                info!("current balance is {}", current_balance.to_formatted_string());
+                info!(balance = %current_balance, "balance status");
                 if current_balance.ge(&min_balance) {
                     info!("node is funded");
                     return Ok(());
@@ -104,7 +102,7 @@ pub async fn wait_for_funds<Rpc: HoprRpcOperations>(
                     warn!("still unfunded, trying again soon");
                 }
             }
-            Err(e) => error!("failed to fetch balance from the chain: {e}"),
+            Err(e) => error!(error = %e, "failed to fetch balance from the chain"),
         }
 
         sleep(current_delay).await;
@@ -183,6 +181,7 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
             chain_id: chain_config.chain.chain_id as u64,
             contract_addrs: contract_addresses,
             module_address,
+            safe_address,
             expected_block_time: Duration::from_millis(chain_config.chain.block_time),
             tx_polling_interval: Duration::from_millis(chain_config.tx_polling_interval),
             finality: chain_config.confirmations,

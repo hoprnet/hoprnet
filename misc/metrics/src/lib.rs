@@ -10,14 +10,14 @@
 //! - Gauge (floating point only)
 //! - Histogram (floating point only)
 //!
-//! The above 3 types are wrapped using the following structs:
+//! The above three types are wrapped using the following structs:
 //!
-//! - [SimpleCounter](crate::metrics::SimpleCounter)
-//! - [MultiCounter](crate::metrics::MultiCounter)
-//! - [SimpleGauge](crate::metrics::SimpleGauge)
-//! - [MultiGauge](crate::metrics::MultiGauge)
-//! - [SimpleHistogram](crate::metrics::SimpleHistogram)
-//! - [MultiHistogram](crate::metrics::MultiHistogram)
+//! - [SimpleCounter]
+//! - [MultiCounter]
+//! - [SimpleGauge]
+//! - [MultiGauge]
+//! - [SimpleHistogram]
+//! - [MultiHistogram]
 //!
 //! The "simple" types represent a singular named metrics, whereas the "multi" metrics represent a
 //! vector extension.
@@ -26,7 +26,7 @@
 //! entity. This makes it possible to have categorized metric values within a single metric, e.g.
 //! counter of successful HTTP requests categorized by HTTP method.
 //!
-//! The metrics are registered within global metrics registry (singleton).
+//! The metrics are registered within the global metrics registry (singleton).
 //! Currently, the crate does not support additional individual registries apart from the global one.
 //!
 //! ### Usage in Rust code
