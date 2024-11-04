@@ -1,12 +1,17 @@
 use std::str::FromStr;
 
-use proc_macro_regex::regex;
-use serde::{Deserialize, Serialize};
-use validator::{Validate, ValidationError};
-
 use hopr_lib::{config::HoprLibConfig, Address, HostConfig, ProtocolsConfig};
+use hopr_platform::file::native::read_to_string;
 use hoprd_api::config::{Api, Auth};
 use hoprd_inbox::config::MessageInboxConfiguration;
+
+use proc_macro_regex::regex;
+use serde::{Deserialize, Serialize};
+use tracing::{debug, warn};
+use validator::{Validate, ValidationError};
+
+use crate::errors::HoprdError;
+use crate::exit::IpForwardingReactorConfig;
 
 pub const DEFAULT_HOST: &str = "0.0.0.0";
 pub const DEFAULT_PORT: u16 = 9091;
@@ -105,6 +110,10 @@ pub struct HoprdConfig {
     #[validate(nested)]
     #[serde(default)]
     pub api: Api,
+    /// Configuration of the Session exit node.
+    #[validate(nested)]
+    #[serde(default)]
+    pub exit: IpForwardingReactorConfig,
 }
 
 impl From<HoprdConfig> for HoprLibConfig {
@@ -112,12 +121,6 @@ impl From<HoprdConfig> for HoprLibConfig {
         val.hopr
     }
 }
-
-use hopr_platform::file::native::read_to_string;
-
-use tracing::{debug, warn};
-
-use crate::errors::HoprdError;
 
 impl HoprdConfig {
     pub fn from_cli_args(cli_args: crate::cli::CliArgs, skip_validation: bool) -> crate::errors::Result<HoprdConfig> {

@@ -205,12 +205,13 @@ On top of the default configuration options generated for the command line, the 
 - `HOPR_INTERNAL_LIBP2P_MAX_CONCURRENTLY_DIALED_PEER_COUNT` - the maximum number of concurrently dialed peers in libp2p
 - `HOPR_INTERNAL_LIBP2P_MAX_NEGOTIATING_INBOUND_STREAM_COUNT` - the maximum number of negotiating inbound streams
 - `ENV_WORKER_THREADS` - the number of environment worker threads for the tokio executor
+- `HOPRD_SESSION_PORT_RANGE` - allows restricting the port range (syntax: `start:end` inclusive) of Session listener automatic port selection (when port 0 is specified).
 
 ### Example execution
 
 Running the node without any command-line argument might not work depending on the installation method used. Some command line arguments are required.
 
-A basic reasonable setup is that uses a custom identity and enabels a REST API of the `hoprd` could look like:
+Some basic reasonable setup uses a custom identity and enables the REST API of the `hoprd`:
 
 ```sh
 hoprd --identity /app/hoprd-db/.hopr-identity --password switzerland --init --announce --host "0.0.0.0:9091" --apiToken <MY_TOKEN> --network doufur

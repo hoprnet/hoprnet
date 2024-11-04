@@ -1,7 +1,7 @@
 use crate::prelude::FrameId;
 use thiserror::Error;
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone)]
 pub enum SessionError {
     #[error("error while processing frame or segment: {0}")]
     ProcessingError(String),
@@ -24,7 +24,7 @@ pub enum SessionError {
     #[error("attempt to insert invalid frame id")]
     InvalidFrameId,
 
-    #[error("frame cannot be segmented because it is too long")]
+    #[error("input data exceeds the maximum allowed size of segment")]
     DataTooLong,
 
     #[error("cannot reassemble frame {0}, because it is not complete")]
