@@ -940,12 +940,6 @@ impl<const C: usize> SessionSocket<C> {
             downstream_write,
         );
 
-        let (downstream_read, downstream_write) = transport.split();
-
-        // As `segment_egress_recv` terminates `forward` will flush the downstream buffer
-        let downstream_write =
-            futures::io::BufWriter::with_capacity(if cfg.allow_output_buffering { C } else { 0 }, downstream_write);
-
         let state = SessionState {
             lookbehind: Arc::new(SkipMap::new()),
             outgoing_frame_id: Arc::new(AtomicU32::new(1)),

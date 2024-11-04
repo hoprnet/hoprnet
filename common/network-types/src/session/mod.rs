@@ -32,8 +32,10 @@ pub use utils::{FaultyNetwork, FaultyNetworkConfig};
 
 pub use utils::linear_half_normal_shuffle;
 
-fn build_reconstructor(reassembler: reassembly::Reassembler, sequencer: sequencer::Sequencer<Frame>)
--> (
+fn build_reconstructor(
+    reassembler: reassembly::Reassembler,
+    sequencer: sequencer::Sequencer<Frame>,
+) -> (
     impl futures::Sink<Segment, Error = errors::SessionError>,
     impl futures::Stream<Item = Result<Frame, errors::SessionError>>,
 ) {
@@ -76,7 +78,7 @@ pub fn frame_reconstructor(
             timeout: frame_timeout,
             capacity,
             ..Default::default()
-        })
+        }),
     )
 }
 
@@ -87,7 +89,7 @@ pub fn frame_reconstructor_with_inspector(
 ) -> (
     impl futures::Sink<Segment, Error = errors::SessionError>,
     impl futures::Stream<Item = Result<Frame, errors::SessionError>>,
-    reassembly::FrameInspector
+    reassembly::FrameInspector,
 ) {
     let reassembler = reassembly::Reassembler::new(frame_timeout, capacity);
     let inspector = reassembler.inspect();
@@ -98,7 +100,7 @@ pub fn frame_reconstructor_with_inspector(
             timeout: frame_timeout,
             capacity,
             ..Default::default()
-        })
+        }),
     );
 
     (sink, stream, inspector)

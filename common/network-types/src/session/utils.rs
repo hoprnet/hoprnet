@@ -237,6 +237,9 @@ pub fn sample_index<T: Distribution<f64>, R: Rng>(dist: &mut T, rng: &mut R, len
     (f.max(0.0).round() as usize).min(len - 1)
 }
 
+use rand_distr::Normal;
+use std::collections::VecDeque;
+
 /// Shuffles the given `vec` by taking the next element with index `|N(0,factor^2)`|, where
 /// `N` denotes normal distribution.
 /// When used on frame segments vector, it will shuffle the segments in a controlled manner;

@@ -1,10 +1,9 @@
+use bitvec::prelude::BitVec;
 use std::cmp::Ordering;
 use std::collections::VecDeque;
 use std::pin::Pin;
 use std::task::{Context, Poll, Waker};
 use std::time::{Duration, Instant};
-use bitvec::bitvec;
-use bitvec::prelude::BitVec;
 
 use crate::prelude::errors::SessionError;
 use crate::prelude::{Frame, FrameId, Segment};
@@ -19,7 +18,8 @@ struct FrameBuilder {
 impl From<Segment> for FrameBuilder {
     fn from(value: Segment) -> Self {
         let mut segments = vec![None; value.seq_len as usize];
-        segments[value.seq_idx] = Some(value);
+        let idx = value.seq_idx as usize;
+        segments[idx] = Some(value);
         Self {
             last_recv: Instant::now(),
             segments,
@@ -30,7 +30,7 @@ impl From<Segment> for FrameBuilder {
 impl TryFrom<FrameBuilder> for Frame {
     type Error = SessionError;
 
-    fn try_from(mut value: FrameBuilder) -> Result<Self, Self::Error> {
+    fn try_from(value: FrameBuilder) -> Result<Self, Self::Error> {
         let frame_id = value.frame_id();
 
         if value.remaining() > 0 {
@@ -42,21 +42,21 @@ impl TryFrom<FrameBuilder> for Frame {
             data: value
                 .segments
                 .into_iter()
-                .flat_map(|s| s.ok_or(SessionError::IncompleteFrame(frame_id)).map(|s| s.data.into_vec()))
-                .collect::<Result<Vec<_>, Self::Error>>()?
+                .flat_map(|s| s.unwrap().data.into_vec())
+                .collect::<Vec<_>>()
                 .into_boxed_slice(),
         })
     }
 }
 
 impl FrameBuilder {
-    pub fn add_segment(&mut self, segment: Segment) -> Result<(), SessionError>{
+    pub fn add_segment(&mut self, segment: Segment) -> Result<(), SessionError> {
         let idx = segment.seq_idx;
         if segment.frame_id != self.frame_id() || segment.seq_idx >= self.seq_len() {
-            return Err(SessionError::InvalidSegment)
+            return Err(SessionError::InvalidSegment);
         }
 
-        self.segments[idx] = Some(segment);
+        self.segments[idx as usize] = Some(segment);
         self.last_recv = Instant::now();
         Ok(())
     }
@@ -78,7 +78,7 @@ impl FrameBuilder {
 
     #[inline]
     pub fn remaining(&self) -> SeqNum {
-        self.seq_len() - self.segments.iter().filter(Option::is_some).count() as SeqNum
+        self.seq_len() - self.segments.iter().filter(|s| s.is_some()).count() as SeqNum
     }
 }
 #[cfg(feature = "frame-inspector")]
@@ -88,7 +88,6 @@ pub struct FrameInfo {
     pub missing_segments: BitVec,
     pub updated: Instant,
 }
-
 
 impl PartialOrd<Self> for FrameInfo {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
@@ -113,14 +112,14 @@ impl FrameInspector {
     pub fn pending_frames(&self, next_frame: FrameId) -> Vec<FrameInfo> {
         // TODO: add missing frames between next_frame and highest buffered
         let mut latest_buffered = next_frame;
-        self.incomplete_frames.iter().map(|e| {
-
-            FrameInfo {
+        self.incomplete_frames
+            .iter()
+            .map(|e| FrameInfo {
                 frame_id: e.frame_id(),
                 missing_segments: e.as_missing(),
                 updated: e.last_recv,
-            }
-        }).collect()
+            })
+            .collect()
     }
 }
 
@@ -244,7 +243,7 @@ impl futures::Sink<Segment> for Reassembler {
         let maybe_frame = match self.incomplete_frames.entry(item.frame_id) {
             Entry::Occupied(mut e) => {
                 let builder = e.get_mut();
-                builder.add_segment(item);
+                builder.add_segment(item)?;
                 if builder.remaining() == 0 {
                     tracing::trace!("Reassembler::start_send frame {} is complete", e.key());
                     Some(e.remove().try_into())
