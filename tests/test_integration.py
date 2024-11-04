@@ -2,7 +2,7 @@ import asyncio
 import random
 import re
 import string
-from contextlib import AsyncExitStack
+from contextlib import AsyncExitStack, asynccontextmanager
 
 import pytest
 
@@ -85,26 +85,6 @@ async def test_hoprd_protocol_check_balances_without_prior_tests(swarm7: dict[st
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
-async def test_hoprd_should_not_be_able_to_set_multiple_aliases_to_a_single_peerid(peer: str, swarm7: dict[str, Node]):
-    other_peers = barebone_nodes()
-    other_peers.remove(peer)
-
-    rufus_peer_id = swarm7[random.choice(other_peers)].peer_id
-    my_peer_id = swarm7[peer].peer_id
-    assert rufus_peer_id != my_peer_id
-
-    assert await swarm7[peer].api.aliases_set_alias("Rufus", rufus_peer_id) is True
-    assert await swarm7[peer].api.aliases_set_alias("Simon", rufus_peer_id) is False
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
-async def test_hoprd_node_should_contain_self_alias_automatically(peer: str, swarm7: dict[str, Node]):
-    assert await swarm7[peer].api.aliases_get_alias("me") == swarm7[peer].peer_id
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
 async def test_hoprd_should_be_able_to_remove_existing_aliases(peer: str, swarm7: dict[str, Node]):
     other_peers = barebone_nodes()
     other_peers.remove(peer)
@@ -119,6 +99,36 @@ async def test_hoprd_should_be_able_to_remove_existing_aliases(peer: str, swarm7
 
     assert await swarm7[peer].api.aliases_remove_alias("Alice")
     assert await swarm7[peer].api.aliases_get_alias("Alice") is None
+
+
+@asynccontextmanager
+async def create_alias(alias, peer, api):
+    """Ensure that the created alias is also released at the end of the test."""
+    assert await api.aliases_set_alias(alias, peer) is True
+    try:
+        yield api
+    finally:
+        assert await api.aliases_remove_alias(alias)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
+async def test_hoprd_should_not_be_able_to_set_multiple_aliases_to_a_single_peerid(peer: str, swarm7: dict[str, Node]):
+    other_peers = barebone_nodes()
+    other_peers.remove(peer)
+
+    rufus_peer_id = swarm7[random.choice(other_peers)].peer_id
+    my_peer_id = swarm7[peer].peer_id
+    assert rufus_peer_id != my_peer_id
+
+    async with create_alias("Rufus", rufus_peer_id, swarm7[peer].api) as api:
+        assert await api.aliases_set_alias("Simon", rufus_peer_id) is False
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
+async def test_hoprd_should_contain_self_alias_automatically(peer: str, swarm7: dict[str, Node]):
+    assert await swarm7[peer].api.aliases_get_alias("me") == swarm7[peer].peer_id
 
 
 @pytest.mark.asyncio
