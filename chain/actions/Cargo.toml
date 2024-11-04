@@ -23,14 +23,14 @@ runtime-tokio = [
 ]
 prometheus = [
   "dep:hopr-metrics",
-  "chain-rpc/prometheus",
+  "hopr-chain-rpc/prometheus",
   "hopr-db-sql/prometheus",
 ]
 
 [dependencies]
 async-channel = { workspace = true }
-async-trait = { workspace = true }
 async-lock = { workspace = true }
+async-trait = { workspace = true }
 ethers = { workspace = true, default-features = false }
 futures = { workspace = true }
 futures-timer = { workspace = true }
@@ -39,17 +39,17 @@ multiaddr = { workspace = true }
 serde = { workspace = true }
 smart-default = { workspace = true }
 thiserror = { workspace = true }
+tracing = { workspace = true }
 
 bindings = { workspace = true }
+chain-types = { workspace = true }
+hopr-async-runtime = { workspace = true }
+hopr-chain-rpc = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-db-sql = { workspace = true }
-chain-rpc = { workspace = true }
-chain-types = { workspace = true }
+hopr-internal-types = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-platform = { workspace = true }
-hopr-async-runtime = { workspace = true }
-tracing = { workspace = true }
-hopr-internal-types = { workspace = true }
 hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]

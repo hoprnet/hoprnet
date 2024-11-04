@@ -1,6 +1,6 @@
 [package]
-name = "chain-rpc"
-version = "0.2.4"
+name = "hopr-chain-rpc"
+version = "0.3.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Abstraction over Ethereum RPC provider client"

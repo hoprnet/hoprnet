@@ -193,13 +193,13 @@ bindings = { path = "ethereum/bindings", default-features = false }
 chain-actions = { path = "chain/actions", default-features = false }
 chain-api = { path = "chain/api", default-features = false }
 chain-indexer = { path = "chain/indexer", default-features = false }
-chain-rpc = { path = "chain/rpc", default-features = false }
 chain-types = { path = "chain/types", default-features = false }
 core-network = { path = "transport/network", default-features = false }
 core-path = { path = "logic/path", default-features = false }
 hopr-transport-protocol = { path = "transport/protocol", default-features = false }
 hopr-transport = { path = "transport/api", default-features = false }
 hopr-async-runtime = { path = "common/async-runtime" }
+hopr-chain-rpc = { path = "chain/rpc", default-features = false }
 hopr-crypto-packet = { path = "crypto/packet", default-features = false }
 hopr-crypto-random = { path = "crypto/random", default-features = false }
 hopr-crypto-sphinx = { path = "crypto/sphinx", default-features = false, features = [

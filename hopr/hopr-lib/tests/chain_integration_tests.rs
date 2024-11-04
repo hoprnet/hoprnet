@@ -14,17 +14,17 @@ use chain_actions::redeem::TicketRedeemActions;
 use chain_actions::ChainActions;
 use chain_api::executors::{EthereumTransactionExecutor, RpcEthereumClient, RpcEthereumClientConfig};
 use chain_indexer::{block::Indexer, handlers::ContractEventHandlers, IndexerConfig};
-use chain_rpc::client::surf_client::SurfRequestor;
-use chain_rpc::client::{
-    create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy, SnapshotRequestor,
-};
-use chain_rpc::rpc::{RpcOperations, RpcOperationsConfig};
 use chain_types::chain_events::ChainEventType;
 use chain_types::utils::{
     add_announcement_as_target, approve_channel_transfer_from_safe, create_anvil, include_node_to_module_by_safe,
 };
 use chain_types::{ContractAddresses, ContractInstances};
 use hopr_async_runtime::prelude::{cancel_join_handle, sleep, spawn, JoinHandle};
+use hopr_chain_rpc::client::surf_client::SurfRequestor;
+use hopr_chain_rpc::client::{
+    create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy, SnapshotRequestor,
+};
+use hopr_chain_rpc::rpc::{RpcOperations, RpcOperationsConfig};
 use hopr_crypto_types::prelude::*;
 use hopr_db_sql::{api::info::DomainSeparator, prelude::*};
 use hopr_internal_types::prelude::*;
@@ -352,7 +352,10 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
         max_action_confirmation_wait: Duration::from_secs(60), // lower action confirmation limit
     };
 
-    let indexer_cfg = IndexerConfig { start_block_number: 1 };
+    let indexer_cfg = IndexerConfig {
+        start_block_number: 1,
+        fast_sync: false,
+    };
 
     // Setup ALICE
     info!("Starting up ALICE");
@@ -874,8 +877,16 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
 
     info!("--> successfully initiated channel closure for Alice -> Bob");
 
-    let alice_checksum = alice_node.db.get_last_indexed_block(None).await?;
-    let bob_checksum = bob_node.db.get_last_indexed_block(None).await?;
+    let alice_checksum = alice_node
+        .db
+        .get_last_checksummed_log()
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("alice must have a checksum"))?;
+    let bob_checksum = bob_node
+        .db
+        .get_last_checksummed_log()
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("bob must have a checksum"))?;
     info!("alice completed at {:?}", alice_checksum);
     info!("bob completed at {:?}", bob_checksum);
 

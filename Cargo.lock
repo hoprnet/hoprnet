@@ -1239,13 +1239,13 @@ dependencies = [
  "async-std",
  "async-trait",
  "bindings",
- "chain-rpc",
  "chain-types",
  "ethers",
  "futures",
  "futures-timer",
  "hex-literal",
  "hopr-async-runtime",
+ "hopr-chain-rpc",
  "hopr-crypto-random",
  "hopr-crypto-types",
  "hopr-db-sql",
@@ -1272,10 +1272,10 @@ dependencies = [
  "async-trait",
  "chain-actions",
  "chain-indexer",
- "chain-rpc",
  "chain-types",
  "futures",
  "hopr-async-runtime",
+ "hopr-chain-rpc",
  "hopr-crypto-types",
  "hopr-db-sql",
  "hopr-internal-types",
@@ -1293,21 +1293,22 @@ dependencies = [
 
 [[package]]
 name = "chain-indexer"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "async-channel 2.3.1",
  "async-std",
  "async-trait",
  "bindings",
- "chain-rpc",
  "chain-types",
  "ethers",
  "futures",
  "hex-literal",
  "hopr-async-runtime",
+ "hopr-chain-rpc",
  "hopr-crypto-random",
  "hopr-crypto-types",
+ "hopr-db-api",
  "hopr-db-entity",
  "hopr-db-sql",
  "hopr-internal-types",
@@ -1322,48 +1323,6 @@ dependencies = [
  "test-log",
  "thiserror",
  "tracing",
-]
-
-[[package]]
-name = "chain-rpc"
-version = "0.2.4"
-dependencies = [
- "anyhow",
- "async-std",
- "async-stream",
- "async-trait",
- "bindings",
- "chain-types",
- "env_logger",
- "ethers",
- "futures",
- "futures-timer",
- "governor",
- "hex-literal",
- "hopr-async-runtime",
- "hopr-crypto-types",
- "hopr-metrics",
- "hopr-primitive-types",
- "http-types",
- "lazy_static",
- "mockall",
- "mockito",
- "moka",
- "primitive-types",
- "reqwest 0.12.7",
- "serde",
- "serde_json",
- "serde_with",
- "serde_yaml",
- "smart-default",
- "surf",
- "surf-governor",
- "tempfile",
- "test-log",
- "thiserror",
- "tokio",
- "tracing",
- "validator",
 ]
 
 [[package]]
@@ -4087,13 +4046,13 @@ dependencies = [
  "async-std",
  "bindings",
  "chain-api",
- "chain-rpc",
  "chain-types",
  "clap",
  "env_logger",
  "ethers",
  "hex",
  "hex-literal",
+ "hopr-chain-rpc",
  "hopr-crypto-random",
  "hopr-crypto-types",
  "hopr-internal-types",
@@ -4117,6 +4076,48 @@ version = "0.1.0"
 dependencies = [
  "async-std",
  "tokio",
+]
+
+[[package]]
+name = "hopr-chain-rpc"
+version = "0.3.0"
+dependencies = [
+ "anyhow",
+ "async-std",
+ "async-stream",
+ "async-trait",
+ "bindings",
+ "chain-types",
+ "env_logger",
+ "ethers",
+ "futures",
+ "futures-timer",
+ "governor",
+ "hex-literal",
+ "hopr-async-runtime",
+ "hopr-crypto-types",
+ "hopr-metrics",
+ "hopr-primitive-types",
+ "http-types",
+ "lazy_static",
+ "mockall",
+ "mockito",
+ "moka",
+ "primitive-types",
+ "reqwest 0.12.7",
+ "serde",
+ "serde_json",
+ "serde_with",
+ "serde_yaml",
+ "smart-default",
+ "surf",
+ "surf-governor",
+ "tempfile",
+ "test-log",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "validator",
 ]
 
 [[package]]
@@ -4210,7 +4211,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-api"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "async-trait",
  "futures",
@@ -4228,7 +4229,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-entity"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "async-std",
@@ -4248,7 +4249,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-migration"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "async-std",
  "hopr-internal-types",
@@ -4258,7 +4259,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-sql"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "async-lock 3.4.0",
@@ -4340,7 +4341,6 @@ dependencies = [
  "chain-actions",
  "chain-api",
  "chain-indexer",
- "chain-rpc",
  "chain-types",
  "const_format",
  "core-path",
@@ -4350,8 +4350,10 @@ dependencies = [
  "futures-timer",
  "hex-literal",
  "hopr-async-runtime",
+ "hopr-chain-rpc",
  "hopr-crypto-random",
  "hopr-crypto-types",
+ "hopr-db-api",
  "hopr-db-sql",
  "hopr-internal-types",
  "hopr-metrics",
@@ -4450,9 +4452,10 @@ dependencies = [
 
 [[package]]
 name = "hopr-primitive-types"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "anyhow",
+ "chrono",
  "float-cmp",
  "hex",
  "hex-literal",
@@ -4651,7 +4654,7 @@ dependencies = [
 
 [[package]]
 name = "hoprd"
-version = "2.2.0"
+version = "2.2.0-rc.1"
 dependencies = [
  "anyhow",
  "async-broadcast",

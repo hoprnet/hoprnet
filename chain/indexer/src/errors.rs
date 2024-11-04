@@ -1,6 +1,7 @@
 use ethers::core::abi::Error as AbiError;
-use hopr_primitive_types::{errors::GeneralError, primitives::Address};
 use thiserror::Error;
+
+use hopr_primitive_types::{errors::GeneralError, primitives::Address};
 
 #[derive(Error, Debug)]
 pub enum CoreEthereumIndexerError {
@@ -53,7 +54,7 @@ pub enum CoreEthereumIndexerError {
     MultiaddrParseError(#[from] multiaddr::Error),
 
     #[error(transparent)]
-    RpcError(#[from] chain_rpc::errors::RpcError),
+    RpcError(#[from] hopr_chain_rpc::errors::RpcError),
 }
 
 pub type Result<T> = core::result::Result<T, CoreEthereumIndexerError>;

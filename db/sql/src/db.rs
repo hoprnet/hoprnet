@@ -6,7 +6,7 @@ use hopr_crypto_types::prelude::ChainKeypair;
 use hopr_db_entity::ticket;
 use hopr_internal_types::prelude::AcknowledgedTicketStatus;
 use hopr_primitive_types::primitives::Address;
-use migration::{MigratorIndex, MigratorPeers, MigratorTickets, MigratorTrait};
+use migration::{MigratorChainLogs, MigratorIndex, MigratorPeers, MigratorTickets, MigratorTrait};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, SqlxSqliteConnector};
 use sea_query::Expr;
 use sqlx::pool::PoolOptions;
@@ -33,9 +33,10 @@ pub struct HoprDbConfig {
 
 #[derive(Debug, Clone)]
 pub struct HoprDb {
-    pub(crate) db: sea_orm::DatabaseConnection,
+    pub(crate) index_db: sea_orm::DatabaseConnection,
     pub(crate) tickets_db: sea_orm::DatabaseConnection,
     pub(crate) peers_db: sea_orm::DatabaseConnection,
+    pub(crate) logs_db: sea_orm::DatabaseConnection,
     pub(crate) ticket_manager: Arc<TicketManager>,
     pub(crate) chain_key: ChainKeypair,
     pub(crate) me_onchain: Address,
@@ -45,6 +46,7 @@ pub struct HoprDb {
 pub const SQL_DB_INDEX_FILE_NAME: &str = "hopr_index.db";
 pub const SQL_DB_PEERS_FILE_NAME: &str = "hopr_peers.db";
 pub const SQL_DB_TICKETS_FILE_NAME: &str = "hopr_tickets.db";
+pub const SQL_DB_LOGS_FILE_NAME: &str = "hopr_logs.db";
 
 impl HoprDb {
     pub async fn new(directory: &Path, chain_key: ChainKeypair, cfg: HoprDbConfig) -> Result<Self> {
@@ -93,12 +95,21 @@ impl HoprDb {
             .await
             .map_err(|e| crate::errors::DbSqlError::Construction(e.to_string()))?;
 
-        Self::new_sqlx_sqlite(chain_key, index, peers, tickets).await
+        let logs = PoolOptions::new()
+            .min_connections(0)
+            .connect_with(cfg_template.clone().filename(directory.join(SQL_DB_LOGS_FILE_NAME)))
+            .await
+            .unwrap_or_else(|e| panic!("failed to create logs database: {e}"));
+
+        Self::new_sqlx_sqlite(chain_key, index, peers, tickets, logs).await
     }
 
     pub async fn new_in_memory(chain_key: ChainKeypair) -> Result<Self> {
         Self::new_sqlx_sqlite(
             chain_key,
+            SqlitePool::connect(":memory:")
+                .await
+                .map_err(|e| crate::errors::DbSqlError::Construction(e.to_string()))?,
             SqlitePool::connect(":memory:")
                 .await
                 .map_err(|e| crate::errors::DbSqlError::Construction(e.to_string()))?,
@@ -117,6 +128,7 @@ impl HoprDb {
         index_db: SqlitePool,
         peers_db: SqlitePool,
         tickets_db: SqlitePool,
+        logs_db: SqlitePool,
     ) -> Result<Self> {
         let index_db = SqlxSqliteConnector::from_sqlx_sqlite_pool(index_db);
 
@@ -133,6 +145,12 @@ impl HoprDb {
         let peers_db = SqlxSqliteConnector::from_sqlx_sqlite_pool(peers_db);
 
         MigratorPeers::up(&peers_db, None)
+            .await
+            .map_err(|e| crate::errors::DbSqlError::Construction(format!("cannot apply database migration: {e}")))?;
+
+        let logs_db = SqlxSqliteConnector::from_sqlx_sqlite_pool(logs_db);
+
+        MigratorChainLogs::up(&logs_db, None)
             .await
             .map_err(|e| crate::errors::DbSqlError::Construction(format!("cannot apply database migration: {e}")))?;
 
@@ -160,8 +178,9 @@ impl HoprDb {
         Ok(Self {
             me_onchain: chain_key.public().to_address(),
             chain_key,
-            db: index_db,
+            index_db,
             peers_db,
+            logs_db,
             ticket_manager: Arc::new(TicketManager::new(tickets_db.clone(), caches.clone())),
             tickets_db,
             caches,
@@ -179,7 +198,7 @@ mod tests {
     use hopr_crypto_types::prelude::Keypair;
     use hopr_db_api::peers::{HoprDbPeersOperations, PeerOrigin};
     use libp2p_identity::PeerId;
-    use migration::{MigratorIndex, MigratorPeers, MigratorTickets, MigratorTrait};
+    use migration::{MigratorChainLogs, MigratorIndex, MigratorPeers, MigratorTickets, MigratorTrait};
     use multiaddr::Multiaddr;
     use rand::{distributions::Alphanumeric, Rng}; // 0.8
 
@@ -191,6 +210,7 @@ mod tests {
         MigratorIndex::status(db.conn(TargetDb::Index)).await?;
         MigratorTickets::status(db.conn(TargetDb::Tickets)).await?;
         MigratorPeers::status(db.conn(TargetDb::Peers)).await?;
+        MigratorChainLogs::status(db.conn(TargetDb::Logs)).await?;
 
         Ok(())
     }

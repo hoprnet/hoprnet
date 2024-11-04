@@ -42,6 +42,8 @@
     - [Running Tests Locally](#running-tests-locally)
       - [Testing environment](#testing-environment)
       - [Test execution](#test-execution)
+- [Using Fast Sync](#using-fast-sync)
+- [Profiling & Instrumentation](#profiling--instrumentation)
 - [Contact](#contact)
 - [License](#license)
 
@@ -453,6 +455,43 @@ With the environment activated, execute the tests locally:
 ```shell
 make smoke-tests
 ```
+
+## Using Fast Sync
+
+Fast sync is a feature that allows the node to sync the blockchain state faster
+than the default sync mode by using a pre-built logs database.
+
+### Prerequisites
+
+To generate the logs database, you need:
+
+- A fully synced node
+- Node configured to keep logs in the database (enabled by default)
+  - Set `hopr -> chain -> keep_logs` in the configuration file
+
+### Database Files
+
+The following files in the node's database folder are required:
+
+- `hopr_logs.db` - Main logs database
+- `hopr_logs.db-shm` - Auxiliary file
+- `hopr_logs.db-wal` - Auxiliary file
+
+### Configuration Steps
+
+1. Place the pre-built logs database files in the node's database folder
+2. Enable fast sync mode (enabled by default):
+   - Set `hopr -> chain -> fast_sync` to `true` in the configuration file
+3. Remove any existing index data:
+
+   ```shell
+   rm hopr_index.db*
+   ```
+
+### Post-sync Behavior
+
+- If index data exists, the node will skip fast sync and start in normal sync mode
+- After fast sync completes, the node automatically switches to normal sync mode
 
 ## Profiling & Instrumentation
 

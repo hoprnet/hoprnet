@@ -13,8 +13,7 @@ use ethers::providers::{JsonRpcClient, Middleware};
 use futures::stream::BoxStream;
 use futures::{Stream, StreamExt, TryStreamExt};
 use std::pin::Pin;
-use tracing::{debug, warn};
-use tracing::{error, trace};
+use tracing::{debug, error, trace, warn};
 
 use crate::errors::{Result, RpcError, RpcError::FilterIsEmpty};
 use crate::rpc::RpcOperations;
@@ -167,7 +166,7 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                                     }
 
                                     debug!("retrieved {log}");
-                                    current_block_log.logs.insert(log);
+                                    current_block_log.logs.insert(log.into());
                                 },
                                 Ok(None) => {
                                     trace!(from_block, to_block=latest_block, "done processing batch");
@@ -186,8 +185,8 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                                     } else {
                                         panic!("!!! Cannot advance the chain indexing due to unrecoverable RPC errors.
 
-                                        The RPC provider does not seem to be working correctly. 
-                                        
+                                        The RPC provider does not seem to be working correctly.
+
                                         The last encountered error was: {e}");
                                     }
                                 }
@@ -217,13 +216,13 @@ mod tests {
     use ethers::contract::EthEvent;
     use futures::StreamExt;
     use std::time::Duration;
+    use tracing::debug;
 
     use bindings::hopr_channels::*;
     use bindings::hopr_token::{ApprovalFilter, TransferFilter};
     use chain_types::{ContractAddresses, ContractInstances};
     use hopr_async_runtime::prelude::{sleep, spawn};
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
-    use tracing::debug;
 
     use crate::client::surf_client::SurfRequestor;
     use crate::client::{create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy};
@@ -399,31 +398,55 @@ mod tests {
 
         // The last block must contain all 4 events
         let last_block_logs = retrieved_logs.last().context("a log should be present")?.clone().logs;
+        let channel_open_filter = ChannelOpenedFilter::signature();
+        let channel_balance_filter = ChannelBalanceIncreasedFilter::signature();
+        let approval_filter = ApprovalFilter::signature();
+        let transfer_filter = TransferFilter::signature();
+
+        debug!(
+            "channel_open_filter: {:?} - {:?}",
+            channel_open_filter,
+            channel_open_filter.as_ref().to_vec()
+        );
+        debug!(
+            "channel_balance_filter: {:?} - {:?}",
+            channel_balance_filter,
+            channel_balance_filter.as_ref().to_vec()
+        );
+        debug!(
+            "approval_filter: {:?} - {:?}",
+            approval_filter,
+            approval_filter.as_ref().to_vec()
+        );
+        debug!(
+            "transfer_filter: {:?} - {:?}",
+            transfer_filter,
+            transfer_filter.as_ref().to_vec()
+        );
+        debug!("logs: {:#?}", last_block_logs);
 
         assert!(
-            last_block_logs.iter().any(|log| log.address == contract_addrs.channels
-                && log.topics.contains(&ChannelOpenedFilter::signature().0.into())),
+            last_block_logs
+                .iter()
+                .any(|log| log.address == contract_addrs.channels && log.topics.contains(&channel_open_filter.into())),
             "must contain channel open"
         );
         assert!(
-            last_block_logs.iter().any(|log| log.address == contract_addrs.channels
-                && log
-                    .topics
-                    .contains(&ChannelBalanceIncreasedFilter::signature().0.into())),
+            last_block_logs.iter().any(
+                |log| log.address == contract_addrs.channels && log.topics.contains(&channel_balance_filter.into())
+            ),
             "must contain channel balance increase"
         );
         assert!(
             last_block_logs
                 .iter()
-                .any(|log| log.address == contract_addrs.token
-                    && log.topics.contains(&ApprovalFilter::signature().0.into())),
+                .any(|log| log.address == contract_addrs.token && log.topics.contains(&approval_filter.into())),
             "must contain token approval"
         );
         assert!(
             last_block_logs
                 .iter()
-                .any(|log| log.address == contract_addrs.token
-                    && log.topics.contains(&TransferFilter::signature().0.into())),
+                .any(|log| log.address == contract_addrs.token && log.topics.contains(&transfer_filter.into())),
             "must contain token transfer"
         );
 
@@ -514,17 +537,19 @@ mod tests {
             .context("a value should be present")?
             .clone()
             .logs;
+        let channel_open_filter: [u8; 32] = ChannelOpenedFilter::signature().into();
+        let channel_balance_filter: [u8; 32] = ChannelBalanceIncreasedFilter::signature().into();
 
         assert!(
-            last_block_logs.iter().any(|log| log.address == contract_addrs.channels
-                && log.topics.contains(&ChannelOpenedFilter::signature().0.into())),
+            last_block_logs
+                .iter()
+                .any(|log| log.address == contract_addrs.channels && log.topics.contains(&channel_open_filter)),
             "must contain channel open"
         );
         assert!(
-            last_block_logs.iter().any(|log| log.address == contract_addrs.channels
-                && log
-                    .topics
-                    .contains(&ChannelBalanceIncreasedFilter::signature().0.into())),
+            last_block_logs
+                .iter()
+                .any(|log| log.address == contract_addrs.channels && log.topics.contains(&channel_balance_filter)),
             "must contain channel balance increase"
         );
 
