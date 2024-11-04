@@ -289,7 +289,7 @@ impl HoprDbChannelOperations for HoprDb {
 #[cfg(test)]
 mod tests {
     use crate::channels::HoprDbChannelOperations;
-    use crate::db::HoprDb;
+    use crate::db::{HoprDb, HoprDbConfig};
     use crate::HoprDbGeneralModelOperations;
     use anyhow::Context;
     use hopr_crypto_random::random_bytes;
@@ -298,6 +298,7 @@ mod tests {
     use hopr_internal_types::channels::ChannelStatus;
     use hopr_internal_types::prelude::{ChannelDirection, ChannelEntry};
     use hopr_primitive_types::prelude::{Address, BalanceType};
+    use rand::seq::SliceRandom;
 
     #[async_std::test]
     async fn test_insert_get_by_id() -> anyhow::Result<()> {
