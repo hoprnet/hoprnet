@@ -84,7 +84,7 @@ pub(super) async fn aliases(State(state): State<Arc<InternalState>>) -> impl Int
             (status = 201, description = "Alias set successfully.", body = PeerIdResponse),
             (status = 400, description = "Invalid PeerId: The format or length of the peerId is incorrect.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
-            (status = 409, description = "Given PeerId is already aliased.", body = ApiError),
+            (status = 409, description = "Either alias exists or the peer_id is already aliased.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
@@ -118,6 +118,9 @@ pub(super) async fn set_alias(
         )
             .into_response(),
         Err(DbError::LogicalError(_)) => (StatusCode::BAD_REQUEST, ApiErrorStatus::PeerNotFound).into_response(),
+        Err(DbError::AliasOrPeerIdAlreadyExists) => {
+            (StatusCode::CONFLICT, ApiErrorStatus::AliasOrPeerIdAliasAlreadyExists).into_response()
+        }
         Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
     }
 }
