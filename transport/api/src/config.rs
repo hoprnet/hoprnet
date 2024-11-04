@@ -6,6 +6,7 @@ use std::str::FromStr;
 use libp2p::Multiaddr;
 use proc_macro_regex::regex;
 use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
 use validator::{Validate, ValidationError};
 
 pub use core_network::{config::NetworkConfig, heartbeat::HeartbeatConfig};
@@ -162,6 +163,59 @@ pub struct TransportConfig {
     /// or in the same private IPv4 network
     #[serde(default)]
     pub prefer_local_addresses: bool,
+}
+
+fn just_three() -> u32 {
+    3
+}
+
+fn two_minutes() -> std::time::Duration {
+    std::time::Duration::from_secs(120)
+}
+
+fn two_seconds() -> std::time::Duration {
+    std::time::Duration::from_secs(2)
+}
+
+fn validate_session_idle_timeout(value: &std::time::Duration) -> Result<(), ValidationError> {
+    let min_idle = std::time::Duration::from_secs(60);
+    if min_idle <= *value {
+        Ok(())
+    } else {
+        Err(ValidationError::new("session idle timeout is too low"))
+    }
+}
+
+/// Global configuration of Sessions.
+#[serde_as]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Validate, smart_default::SmartDefault)]
+#[serde(deny_unknown_fields)]
+pub struct SessionGlobalConfig {
+    /// Maximum time before an idle Session is closed.
+    ///
+    /// Defaults to 2 minutes.
+    #[validate(custom(function = "validate_session_idle_timeout"))]
+    #[default(std::time::Duration::from_secs(120))]
+    #[serde(default = "two_minutes")]
+    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    pub idle_timeout: std::time::Duration,
+
+    /// Maximum retries to attempt to establish the Session
+    /// Set 0 for no retries.
+    ///
+    /// Defaults to 3, maximum is 20.
+    #[validate(range(min = 0, max = 20))]
+    #[default(3)]
+    #[serde(default = "just_three")]
+    pub establish_max_retries: u32,
+
+    /// Delay between Session establishment retries.
+    ///
+    /// Default is 2 seconds.
+    #[default(std::time::Duration::from_secs(2))]
+    #[serde(default = "two_seconds")]
+    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    pub establish_retry_timeout: std::time::Duration,
 }
 
 #[cfg(test)]

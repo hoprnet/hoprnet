@@ -8,6 +8,9 @@ pub enum NetworkTypeError {
     #[error("io error: {0}")]
     IoError(#[from] std::io::Error),
 
+    #[error("the target is sealed")]
+    SealedTarget,
+
     #[error("{0}")]
     Other(String),
 }

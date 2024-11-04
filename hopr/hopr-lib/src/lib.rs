@@ -3,7 +3,7 @@
 //!
 //! The [`Hopr`] object is standalone, meaning that once it is constructed and run,
 //! it will perform its functionality autonomously. The API it offers serves as a
-//! high level integration point for other applications and utilities, but offers
+//! high-level integration point for other applications and utilities, but offers
 //! a complete and fully featured HOPR node stripped from top level functionality
 //! such as the REST API, key management...
 //!
@@ -13,11 +13,11 @@
 //! For most of the practical use cases, the `hoprd` application should be a preferable
 //! choice.
 
-/// Configuration related public types
+/// Configuration-related public types
 pub mod config;
 /// Various public constants.
 pub mod constants;
-/// Enumerates all errors thrown from this library.
+/// Lists all errors thrown from this library.
 pub mod errors;
 
 use async_lock::RwLock;
@@ -36,7 +36,7 @@ use std::{
     fmt::{Display, Formatter},
     path::PathBuf,
 };
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info, trace, warn};
 
 use chain_actions::{
     action_state::{ActionState, IndexerActionTracker},
@@ -175,12 +175,8 @@ pub enum HoprLibProcesses {
     ProtocolMsgIn,
     #[strum(to_string = "HOPR protocol processing: msg egress")]
     ProtocolMsgOut,
-    #[strum(to_string = "session router pairing the session streams based on the PeerId and ApplicationTag")]
-    SessionsRouter,
-    #[strum(to_string = "graceful session on stream close")]
-    SessionsTerminator,
-    #[strum(to_string = "gracefully session terminator upon expiration")]
-    SessionsExpiration,
+    #[strum(to_string = "session manager sub-process #{0}")]
+    SessionsManagement(usize),
     #[cfg(feature = "session-server")]
     #[strum(to_string = "session server providing the exit node session stream functionality")]
     SessionServer,
@@ -219,9 +215,9 @@ impl From<HoprTransportProcess> for HoprLibProcesses {
             hopr_transport::HoprTransportProcess::ProtocolMsgIn => HoprLibProcesses::ProtocolMsgIn,
             hopr_transport::HoprTransportProcess::ProtocolMsgOut => HoprLibProcesses::ProtocolMsgOut,
             hopr_transport::HoprTransportProcess::Heartbeat => HoprLibProcesses::Heartbeat,
-            hopr_transport::HoprTransportProcess::SessionsManagement => HoprLibProcesses::SessionsRouter,
-            hopr_transport::HoprTransportProcess::SessionsTerminator => HoprLibProcesses::SessionsTerminator,
-            hopr_transport::HoprTransportProcess::SessionsExpiration => HoprLibProcesses::SessionsExpiration,
+            hopr_transport::HoprTransportProcess::SessionsManagement(kind) => {
+                HoprLibProcesses::SessionsManagement(kind)
+            }
             hopr_transport::HoprTransportProcess::BloomFilterSave => HoprLibProcesses::BloomFilterSave,
         }
     }
@@ -446,8 +442,6 @@ impl HoprSocket {
 /// As such, the `hopr_lib` serves mainly as an integration point into Rust programs.
 pub struct Hopr {
     me: OffchainKeypair,
-    // onchain keypair is necessary, because the ack interaction needs it to be constructable in runtime
-    me_onchain: ChainKeypair,
     cfg: config::HoprLibConfig,
     state: Arc<AtomicHoprState>,
     transport_api: HoprTransport<HoprDb>,
@@ -534,6 +528,7 @@ impl Hopr {
                 network: cfg.network_options.clone(),
                 protocol: cfg.protocol,
                 heartbeat: cfg.heartbeat,
+                session: cfg.session,
             },
             db.clone(),
             channel_graph.clone(),
@@ -596,7 +591,6 @@ impl Hopr {
 
         Ok(Self {
             me: me.clone(),
-            me_onchain: me_onchain.clone(),
             cfg,
             state: Arc::new(AtomicHoprState::new(HoprState::Uninitialized)),
             transport_api: hopr_transport_api,
@@ -827,7 +821,7 @@ impl Hopr {
                 }
 
                 // Self-reference is not needed in the network storage
-                if &peer != self.transport_api.me() {
+                if peer != self.me_peer_id() {
                     if let Err(e) = self
                         .transport_api
                         .network()
@@ -1000,8 +994,6 @@ impl Hopr {
         for (id, proc) in self
             .transport_api
             .run(
-                &self.me,
-                &self.me_onchain,
                 String::from(constants::APP_VERSION),
                 self.transport_api.network(),
                 join(&[&self.cfg.db.data, "tbf"]).map_err(|e| {
@@ -1050,9 +1042,9 @@ impl Hopr {
                         let multi_strategy = multi_strategy.clone();
 
                         async move {
-                            debug!(state = "started", "strategy tick");
+                            trace!(state = "started", "strategy tick");
                             let _ = multi_strategy.on_tick().await;
-                            debug!(state = "finished", "strategy tick");
+                            trace!(state = "finished", "strategy tick");
                         }
                     },
                     "run strategies".into(),
@@ -1064,7 +1056,7 @@ impl Hopr {
         self.state.store(HoprState::Running, Ordering::Relaxed);
 
         info!(
-            id = self.transport_api.me().to_string(),
+            id = %self.me_peer_id(),
             version = constants::APP_VERSION,
             "NODE STARTED AND RUNNING"
         );
@@ -1115,7 +1107,29 @@ impl Hopr {
     pub async fn connect_to(&self, cfg: SessionClientConfig) -> errors::Result<HoprSession> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
-        Ok(self.transport_api.new_session(cfg).await?)
+        let backoff = backon::ConstantBuilder::default()
+            .with_max_times(self.cfg.session.establish_max_retries as usize)
+            .with_delay(self.cfg.session.establish_retry_timeout)
+            .with_jitter();
+
+        struct Sleeper;
+        impl backon::Sleeper for Sleeper {
+            type Sleep = futures_timer::Delay;
+
+            fn sleep(&self, dur: Duration) -> Self::Sleep {
+                futures_timer::Delay::new(dur)
+            }
+        }
+
+        use backon::Retryable;
+
+        Ok((|| {
+            let cfg = cfg.clone();
+            async { self.transport_api.new_session(cfg).await }
+        })
+        .retry(backoff)
+        .sleep(Sleeper)
+        .await?)
     }
 
     /// Send a message to another peer in the network

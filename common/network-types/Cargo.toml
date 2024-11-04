@@ -1,6 +1,6 @@
 [package]
 name = "hopr-network-types"
-version = "0.4.0"
+version = "0.5.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Contains types used for networking over the HOPR protocol"
 edition = "2021"
@@ -22,6 +22,7 @@ runtime-tokio = [
   "hickory-resolver/tokio-runtime",
 ]
 prometheus = ["dep:lazy_static", "dep:hopr-metrics"]
+testing = []
 
 [dependencies]
 aquamarine = { workspace = true }
@@ -50,9 +51,12 @@ thiserror = { workspace = true }
 tokio = { workspace = true, optional = true }
 tokio-util = { workspace = true, optional = true, features = ["net", "io"] }
 tracing = { workspace = true }
+validator = { workspace = true }
 
 hopr-platform = { workspace = true }
 hopr-primitive-types = { workspace = true }
+hopr-crypto-random = { workspace = true }
+hopr-crypto-types = { workspace = true }
 hopr-async-runtime = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 
@@ -61,6 +65,7 @@ anyhow = { workspace = true }
 async-std = { workspace = true, features = ["attributes", "unstable"] }
 async-stream = { workspace = true }
 ctor = "0.2.8"
+criterion = { workspace = true }
 hex-literal = { workspace = true }
 lazy_static = { workspace = true }
 parameterized = { workspace = true }
@@ -72,3 +77,8 @@ tokio = { workspace = true }
 tokio-util = { workspace = true }
 
 hopr-crypto-random = { workspace = true }
+
+
+[[bench]]
+name = "session"
+harness = false

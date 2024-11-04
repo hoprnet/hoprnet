@@ -1,3 +1,7 @@
+use std::fmt::Formatter;
+use std::future::Future;
+use std::str::FromStr;
+
 use axum::extract::Path;
 use axum::Error;
 use axum::{
@@ -9,12 +13,12 @@ use axum::{
     response::IntoResponse,
 };
 use axum_extra::extract::Query;
+use base64::Engine;
 use futures::{AsyncReadExt, AsyncWriteExt, SinkExt, StreamExt, TryStreamExt};
 use futures_concurrency::stream::Merge;
 use libp2p_identity::PeerId;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
-use std::io::ErrorKind;
 use std::net::IpAddr;
 use std::sync::Arc;
 use tokio::net::TcpListener;
@@ -25,7 +29,7 @@ use tracing::{debug, error, info, trace};
 use hopr_lib::errors::HoprLibError;
 use hopr_lib::transfer_session;
 use hopr_lib::{HoprSession, IpProtocol, RoutingOptions, SessionCapability, SessionClientConfig};
-use hopr_network_types::prelude::ConnectedUdpStream;
+use hopr_network_types::prelude::{ConnectedUdpStream, IpOrHost, SealedHost, UdpStreamParallelism};
 use hopr_network_types::udp::ForeignDataMode;
 
 use crate::types::PeerOrAddress;
@@ -53,6 +57,51 @@ lazy_static::lazy_static! {
 }
 
 #[serde_as]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum SessionTargetSpec {
+    Plain(String),
+    Sealed(#[serde_as(as = "serde_with::base64::Base64")] Vec<u8>),
+}
+
+impl std::fmt::Display for SessionTargetSpec {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SessionTargetSpec::Plain(t) => write!(f, "{t}"),
+            SessionTargetSpec::Sealed(t) => write!(f, "$${}", base64::prelude::BASE64_URL_SAFE.encode(t)),
+        }
+    }
+}
+
+impl std::str::FromStr for SessionTargetSpec {
+    type Err = HoprLibError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if let Some(stripped) = s.strip_prefix("$$") {
+            Ok(Self::Sealed(
+                base64::prelude::BASE64_URL_SAFE
+                    .decode(stripped)
+                    .map_err(|e| HoprLibError::GeneralError(e.to_string()))?,
+            ))
+        } else {
+            Ok(Self::Plain(s.to_owned()))
+        }
+    }
+}
+
+impl TryFrom<SessionTargetSpec> for SealedHost {
+    type Error = HoprLibError;
+
+    fn try_from(value: SessionTargetSpec) -> Result<Self, Self::Error> {
+        match value {
+            SessionTargetSpec::Plain(plain) => IpOrHost::from_str(&plain)
+                .map(SealedHost::from)
+                .map_err(|e| HoprLibError::GeneralError(e.to_string())),
+            SessionTargetSpec::Sealed(enc) => Ok(SealedHost::Sealed(enc.into_boxed_slice())),
+        }
+    }
+}
+
+#[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::IntoParams, utoipa::ToSchema)]
 #[into_params(parameter_in = Query)]
 #[serde(rename_all = "camelCase")]
@@ -65,9 +114,9 @@ pub(crate) struct SessionWebsocketClientQueryRequest {
     #[schema(required = true)]
     #[serde_as(as = "Vec<DisplayFromStr>")]
     pub capabilities: Vec<SessionCapability>,
-    // NOTE: the following fields should be removed from the session client request, they contain knowledge of server they should not have
     #[schema(required = false)]
-    pub target: Option<String>,
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    pub target: Option<SessionTargetSpec>,
     #[schema(required = false)]
     #[serde(default = "default_protocol")]
     pub protocol: IpProtocol,
@@ -84,11 +133,11 @@ impl SessionWebsocketClientQueryRequest {
             peer: self.destination,
             path_options: RoutingOptions::Hops((self.hops as u32).try_into()?),
             target_protocol: self.protocol,
-            target: self
-                .target
-                .unwrap_or("127.0.0.1:4677".to_owned())
-                .parse()
-                .map_err(|e| HoprLibError::GeneralError(format!("target host parse error: {e}")))?,
+            target: self.target.map(SealedHost::try_from).unwrap_or(
+                IpOrHost::from_str("127.0.0.1:4677")
+                    .map(SealedHost::Plain)
+                    .map_err(|e| HoprLibError::GeneralError(e.to_string())),
+            )?,
             capabilities: self.capabilities,
         })
     }
@@ -216,7 +265,7 @@ async fn websocket_connection(socket: WebSocket, session: HoprSession) {
         "path": {
             "Hops": 1
         },
-        "target": "localhost:8080",
+        "target": {"Plain": "localhost:8080"},
         "listenHost": "127.0.0.1:10000",
         "capabilities": ["Retransmission", "Segmentation"]
     }))]
@@ -225,7 +274,7 @@ pub(crate) struct SessionClientRequest {
     #[serde_as(as = "DisplayFromStr")]
     pub destination: PeerOrAddress,
     pub path: RoutingOptions,
-    pub target: String,
+    pub target: SessionTargetSpec,
     pub listen_host: Option<String>,
     #[serde_as(as = "Option<Vec<DisplayFromStr>>")]
     pub capabilities: Option<Vec<SessionCapability>>,
@@ -240,10 +289,7 @@ impl SessionClientRequest {
             peer: self.destination.peer_id.unwrap(),
             path_options: self.path,
             target_protocol,
-            target: self
-                .target
-                .parse()
-                .map_err(|e| HoprLibError::GeneralError(format!("target host parse error: {e}")))?,
+            target: self.target.try_into()?,
             capabilities: self.capabilities.unwrap_or_else(|| match target_protocol {
                 IpProtocol::TCP => {
                     vec![SessionCapability::Retransmission, SessionCapability::Segmentation]
@@ -346,16 +392,13 @@ pub(crate) async fn create_client(
         )
     })?;
 
-    // TODO: make this retry strategy configurable
-    let session_init_retry_strategy = tokio_retry::strategy::ExponentialBackoff::from_millis(1000).take(3);
-
     // TODO: consider pooling the sessions on a listener, so that the negotiation is amortized
 
     debug!("binding {protocol} session listening socket to {bind_host}");
     let bound_host = match protocol {
         IpProtocol::TCP => {
             let (bound_host, tcp_listener) = tcp_listen_on(bind_host).await.map_err(|e| {
-                if e.kind() == ErrorKind::AddrInUse {
+                if e.kind() == std::io::ErrorKind::AddrInUse {
                     (StatusCode::CONFLICT, ApiErrorStatus::InvalidInput)
                 } else {
                     (
@@ -373,21 +416,11 @@ pub(crate) async fn create_client(
                     .for_each_concurrent(None, move |accepted_client| {
                         let data = data.clone();
                         let hopr = hopr.clone();
-                        let session_init_retry_strategy = session_init_retry_strategy.clone();
                         async move {
                             match accepted_client {
                                 Ok((sock_addr, stream)) => {
-                                    debug!(socket = %sock_addr, "incoming TCP connection");
-                                    let session_init =
-                                        tokio_retry::Retry::spawn(session_init_retry_strategy, move || {
-                                            let hopr = hopr.clone();
-                                            let data = data.clone();
-                                            async move {
-                                                debug!("trying TCP session establishment");
-                                                hopr.connect_to(data).await
-                                            }
-                                        });
-                                    let session = match session_init.await {
+                                    debug!(socket = ?sock_addr, "incoming TCP connection");
+                                    let session = match hopr.connect_to(data).await {
                                         Ok(s) => s,
                                         Err(e) => {
                                             error!(error = %e, "failed to establish session");
@@ -424,15 +457,7 @@ pub(crate) async fn create_client(
         }
         IpProtocol::UDP => {
             let hopr = state.hopr.clone();
-            let session_init = tokio_retry::Retry::spawn(session_init_retry_strategy.clone(), move || {
-                let hopr = hopr.clone();
-                let data = data.clone();
-                async move {
-                    debug!("trying udp session establishment");
-                    hopr.connect_to(data).await
-                }
-            });
-            let session = session_init.await.map_err(|e| {
+            let session = hopr.connect_to(data).await.map_err(|e| {
                 (
                     StatusCode::UNPROCESSABLE_ENTITY,
                     ApiErrorStatus::UnknownFailure(e.to_string()),
@@ -440,7 +465,7 @@ pub(crate) async fn create_client(
             })?;
 
             let (bound_host, udp_socket) = udp_bind_to(bind_host).await.map_err(|e| {
-                if e.kind() == ErrorKind::AddrInUse {
+                if e.kind() == std::io::ErrorKind::AddrInUse {
                     (
                         StatusCode::CONFLICT,
                         ApiErrorStatus::UnknownFailure(format!("cannot bind to: {bind_host}: {e}")),
@@ -479,7 +504,7 @@ pub(crate) async fn create_client(
             StatusCode::OK,
             Json(SessionClientResponse {
                 protocol,
-                target,
+                target: target.to_string(),
                 ip: bound_host.ip().to_string(),
                 port: bound_host.port(),
             }),
@@ -519,7 +544,7 @@ pub(crate) async fn list_clients(
         .filter(|(id, _)| id.0 == protocol)
         .map(|(id, (target, _))| SessionClientResponse {
             protocol,
-            target: target.clone(),
+            target: target.to_string(),
             ip: id.1.ip().to_string(),
             port: id.1.port(),
         })
@@ -605,22 +630,93 @@ pub(crate) async fn close_client(
     Ok::<_, (StatusCode, ApiErrorStatus)>((StatusCode::NO_CONTENT, "").into_response())
 }
 
-async fn tcp_listen_on<A: std::net::ToSocketAddrs>(address: A) -> std::io::Result<(std::net::SocketAddr, TcpListener)> {
-    let tcp_listener = TcpListener::bind(address.to_socket_addrs()?.collect::<Vec<_>>().as_slice()).await?;
+async fn try_restricted_bind<'a, F, S, Fut>(
+    addrs: Vec<std::net::SocketAddr>,
+    range_str: &str,
+    binder: F,
+) -> std::io::Result<S>
+where
+    F: Fn(Vec<std::net::SocketAddr>) -> Fut,
+    Fut: Future<Output = std::io::Result<S>>,
+{
+    if addrs.is_empty() {
+        return Err(std::io::Error::other("no valid socket addresses found"));
+    }
 
+    let range = range_str
+        .split_once(":")
+        .and_then(
+            |(a, b)| match u16::from_str(a).and_then(|a| Ok((a, u16::from_str(b)?))) {
+                Ok((a, b)) if a <= b => Some(a..=b),
+                _ => None,
+            },
+        )
+        .ok_or(std::io::Error::other(format!("invalid port range {range_str}")))?;
+
+    for port in range {
+        let addrs = addrs
+            .iter()
+            .map(|addr| std::net::SocketAddr::new(addr.ip(), port))
+            .collect::<Vec<_>>();
+        match binder(addrs).await {
+            Ok(listener) => return Ok(listener),
+            Err(e) => debug!("listen address not usable: {e}"),
+        }
+    }
+
+    Err(std::io::Error::new(
+        std::io::ErrorKind::AddrNotAvailable,
+        format!("no valid socket addresses found within range: {range_str}"),
+    ))
+}
+
+async fn tcp_listen_on<A: std::net::ToSocketAddrs>(address: A) -> std::io::Result<(std::net::SocketAddr, TcpListener)> {
+    let addrs = address.to_socket_addrs()?.collect::<Vec<_>>();
+
+    // If automatic port allocation is requested and there's a restriction on the port range
+    // (via HOPRD_SESSION_PORT_RANGE), try to find an address within that range.
+    if addrs.iter().all(|a| a.port() == 0) {
+        if let Ok(range_str) = std::env::var(crate::env::HOPRD_SESSION_PORT_RANGE) {
+            let tcp_listener =
+                try_restricted_bind(
+                    addrs,
+                    &range_str,
+                    |a| async move { TcpListener::bind(a.as_slice()).await },
+                )
+                .await?;
+            return Ok((tcp_listener.local_addr()?, tcp_listener));
+        }
+    }
+
+    let tcp_listener = TcpListener::bind(addrs.as_slice()).await?;
     Ok((tcp_listener.local_addr()?, tcp_listener))
 }
 
 async fn udp_bind_to<A: std::net::ToSocketAddrs>(
     address: A,
 ) -> std::io::Result<(std::net::SocketAddr, ConnectedUdpStream)> {
-    let udp_socket = ConnectedUdpStream::builder()
+    let addrs = address.to_socket_addrs()?.collect::<Vec<_>>();
+
+    let builder = ConnectedUdpStream::builder()
         .with_buffer_size(HOPR_UDP_BUFFER_SIZE)
         .with_foreign_data_mode(ForeignDataMode::Discard) // discard data from UDP clients other than the first one served
         .with_queue_size(HOPR_UDP_QUEUE_SIZE)
-        .with_parallelism(0)
-        .build(address)?;
+        .with_receiver_parallelism(UdpStreamParallelism::Auto);
 
+    // If automatic port allocation is requested and there's a restriction on the port range
+    // (via HOPRD_SESSION_PORT_RANGE), try to find an address within that range.
+    if addrs.iter().all(|a| a.port() == 0) {
+        if let Ok(range_str) = std::env::var(crate::env::HOPRD_SESSION_PORT_RANGE) {
+            let udp_listener = try_restricted_bind(addrs, &range_str, |addrs| {
+                futures::future::ready(builder.clone().build(addrs.as_slice()))
+            })
+            .await?;
+
+            return Ok((*udp_listener.bound_address(), udp_listener));
+        }
+    }
+
+    let udp_socket = builder.build(address)?;
     Ok((*udp_socket.bound_address(), udp_socket))
 }
 
@@ -680,8 +776,6 @@ mod tests {
 
             Ok(())
         }
-
-        fn close(&self) {}
     }
 
     #[tokio::test]
