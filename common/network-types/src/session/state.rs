@@ -233,11 +233,6 @@ pub struct SessionConfig {
     /// Default is [`SessionFeature::default_features`].
     #[default(_code = "HashSet::from_iter(SessionFeature::default_features())")]
     pub enabled_features: HashSet<SessionFeature>,
-
-    /// Allows output Session messages to be buffered first, until they are
-    /// forwarded to the underlying transport.
-    #[default(true)]
-    pub allow_output_buffering: bool,
 }
 
 /// Contains the cloneable state of the session bound to a [`SessionSocket`].
