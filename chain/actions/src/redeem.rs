@@ -594,20 +594,21 @@ mod tests {
     async fn test_redeem_must_not_work_for_tickets_of_previous_epoch_being_aggregated_and_being_redeemed(
     ) -> anyhow::Result<()> {
         let ticket_count = 3;
-        let ticket_from_previous_epoch_count = 1;
+        let ticket_from_previous_epoch_count = 2;
         let db = HoprDb::new_in_memory(ALICE.clone()).await?;
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
 
-        // Create 4 tickets in Epoch
-        let (channel_from_bob, mut tickets) =
-            create_channel_with_ack_tickets(db.clone(), ticket_count, &BOB, 4u32).await?;
+        // Create 3 tickets in Epoch 4
+        let (channel_from_bob, mut tickets) = create_channel_with_ack_tickets(db.clone(), 1, &BOB, 4u32).await?;
 
         // Update the first 2 tickets to be in Epoch 3
-        tickets[0] = generate_random_ack_ticket(0, &BOB, 3)?;
-        db.upsert_ticket(None, tickets[0].clone()).await?;
+        let ticket = generate_random_ack_ticket(0, &BOB, 3)?;
+        db.upsert_ticket(None, ticket.clone()).await?;
+        tickets.insert(0, ticket);
 
-        tickets[1] = generate_random_ack_ticket(1, &BOB, 3)?;
-        db.upsert_ticket(None, tickets[1].clone()).await?;
+        let ticket = generate_random_ack_ticket(1, &BOB, 3)?;
+        db.upsert_ticket(None, ticket.clone()).await?;
+        tickets.insert(1, ticket);
 
         let tickets_clone = tickets.clone();
         let mut tx_exec = MockTransactionExecutor::new();
@@ -668,15 +669,16 @@ mod tests {
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
 
         // Create 4 tickets in Epoch
-        let (channel_from_bob, mut tickets) =
-            create_channel_with_ack_tickets(db.clone(), ticket_count, &BOB, 4u32).await?;
+        let (channel_from_bob, mut tickets) = create_channel_with_ack_tickets(db.clone(), 1, &BOB, 4u32).await?;
 
-        // Update the first 2 to be in Epoch 5
-        tickets[0] = generate_random_ack_ticket(0, &BOB, 4)?;
-        db.upsert_ticket(None, tickets[0].clone()).await?;
+        // Update the first 2 tickets to be in Epoch 3
+        let ticket = generate_random_ack_ticket(0, &BOB, 5)?;
+        db.upsert_ticket(None, ticket.clone()).await?;
+        tickets.insert(0, ticket);
 
-        tickets[1] = generate_random_ack_ticket(1, &BOB, 4)?;
-        db.upsert_ticket(None, tickets[1].clone()).await?;
+        let ticket = generate_random_ack_ticket(1, &BOB, 5)?;
+        db.upsert_ticket(None, ticket.clone()).await?;
+        tickets.insert(1, ticket);
 
         let tickets_clone = tickets.clone();
         let mut tx_exec = MockTransactionExecutor::new();
