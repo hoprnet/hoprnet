@@ -671,7 +671,7 @@ mod tests {
         // Create 1 ticket in Epoch 4
         let (channel_from_bob, mut tickets) = create_channel_with_ack_tickets(db.clone(), 1, &BOB, 4u32).await?;
 
-        // Insert another 2 tickets in Epoch 3
+        // Insert another 2 tickets in Epoch 5
         let ticket = generate_random_ack_ticket(0, &BOB, 5)?;
         db.upsert_ticket(None, ticket.clone()).await?;
         tickets.insert(0, ticket);
