@@ -598,10 +598,10 @@ mod tests {
         let db = HoprDb::new_in_memory(ALICE.clone()).await?;
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
 
-        // Create 3 tickets in Epoch 4
+        // Create 1 ticket in Epoch 4
         let (channel_from_bob, mut tickets) = create_channel_with_ack_tickets(db.clone(), 1, &BOB, 4u32).await?;
 
-        // Update the first 2 tickets to be in Epoch 3
+        // Insert another 2 tickets in Epoch 3
         let ticket = generate_random_ack_ticket(0, &BOB, 3)?;
         db.upsert_ticket(None, ticket.clone()).await?;
         tickets.insert(0, ticket);
@@ -668,10 +668,10 @@ mod tests {
         let db = HoprDb::new_in_memory(ALICE.clone()).await?;
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
 
-        // Create 4 tickets in Epoch
+        // Create 1 ticket in Epoch 4
         let (channel_from_bob, mut tickets) = create_channel_with_ack_tickets(db.clone(), 1, &BOB, 4u32).await?;
 
-        // Update the first 2 tickets to be in Epoch 3
+        // Insert another 2 tickets in Epoch 3
         let ticket = generate_random_ack_ticket(0, &BOB, 5)?;
         db.upsert_ticket(None, ticket.clone()).await?;
         tickets.insert(0, ticket);
