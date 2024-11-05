@@ -285,8 +285,15 @@ impl SessionClientRequest {
         self,
         target_protocol: IpProtocol,
     ) -> Result<SessionClientConfig, HoprLibError> {
+        let peer = match self.destination {
+            PeerOrAddress::PeerId(peer_id) => peer_id,
+            PeerOrAddress::Address(address) => {
+                return Err(HoprLibError::GeneralError(format!("invalid destination: {}", address)))
+            }
+        };
+
         Ok(SessionClientConfig {
-            peer: self.destination.peer_id.unwrap(),
+            peer,
             path_options: self.path,
             target_protocol,
             target: self.target.try_into()?,

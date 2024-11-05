@@ -1,6 +1,6 @@
 [package]
 name = "hoprd-api"
-version = "3.5.0"
+version = "3.5.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "This Rest API enables developers to interact with a hoprd node programatically through HTTP."
@@ -58,8 +58,8 @@ utoipa-scalar = { version = "0.1.0", features = ["axum"] }
 utoipa-swagger-ui = { version = "7.1.0", features = ["axum", "vendored"] }
 validator = { workspace = true }
 
-hopr-db-sql = { workspace = true }
 hopr-lib = { workspace = true, features = ["runtime-tokio", "session-client"] }
+hopr-db-api = { workspace = true }
 hoprd-db-api = { workspace = true }
 hoprd-db-entity = { workspace = true }
 hoprd-db-migration = { workspace = true }

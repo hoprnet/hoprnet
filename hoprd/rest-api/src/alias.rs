@@ -10,7 +10,10 @@ use std::{collections::HashMap, sync::Arc};
 use hoprd_db_api::aliases::HoprdDbAliasesOperations;
 use hoprd_db_api::errors::DbError;
 
-use crate::{types::PeerOrAddress, ApiErrorStatus, InternalState, BASE_PATH};
+use crate::{
+    types::{HoprIdentifier, PeerOrAddress},
+    ApiErrorStatus, InternalState, BASE_PATH,
+};
 
 #[serde_as]
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
@@ -33,9 +36,12 @@ pub(crate) struct PeerIdResponse {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct AliasDestinationBodyRequest {
     pub alias: String,
-    #[serde_as(as = "DisplayFromStr")]
+    #[serde_as(as = "Option<DisplayFromStr>")]
     #[schema(value_type = String)]
-    pub destination: PeerOrAddress,
+    destination: Option<PeerOrAddress>,
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    #[schema(value_type = String)]
+    peer_id: Option<hopr_lib::PeerId>,
 }
 
 /// (deprecated, will be removed in v3.0) Get each previously set alias and its corresponding PeerId as a hashmap.
@@ -99,29 +105,34 @@ pub(super) async fn set_alias(
 ) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
-    let destination = args.destination.fulfill(hopr.peer_resolver()).await;
-
-    let peer_id = match destination {
-        Ok(destination) => match destination.peer_id {
-            Some(peer_id) => peer_id,
-            None => return (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidInput).into_response(),
-        },
-        Err(e) => return (StatusCode::NOT_FOUND, e).into_response(),
+    let destination = if let Some(destination) = args.destination {
+        destination
+    } else if let Some(peer_id) = args.peer_id {
+        PeerOrAddress::PeerId(peer_id)
+    } else {
+        return (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidInput).into_response();
     };
 
-    match state.hoprd_db.set_alias(peer_id.to_string(), args.alias).await {
-        Ok(()) => (
-            StatusCode::CREATED,
-            Json(PeerIdResponse {
-                peer_id: peer_id.to_string(),
-            }),
-        )
-            .into_response(),
-        Err(DbError::LogicalError(_)) => (StatusCode::BAD_REQUEST, ApiErrorStatus::PeerNotFound).into_response(),
-        Err(DbError::AliasOrPeerIdAlreadyExists) => {
-            (StatusCode::CONFLICT, ApiErrorStatus::AliasOrPeerIdAliasAlreadyExists).into_response()
-        }
-        Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
+    match HoprIdentifier::new_with(destination, hopr.peer_resolver()).await {
+        Ok(destination) => match state
+            .hoprd_db
+            .set_alias(destination.peer_id.to_string(), args.alias)
+            .await
+        {
+            Ok(()) => (
+                StatusCode::CREATED,
+                Json(PeerIdResponse {
+                    peer_id: destination.peer_id.to_string(),
+                }),
+            )
+                .into_response(),
+            Err(DbError::LogicalError(_)) => (StatusCode::BAD_REQUEST, ApiErrorStatus::PeerNotFound).into_response(),
+            Err(DbError::AliasOrPeerIdAlreadyExists) => {
+                (StatusCode::CONFLICT, ApiErrorStatus::AliasOrPeerIdAliasAlreadyExists).into_response()
+            }
+            Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
+        },
+        Err(e) => (StatusCode::NOT_FOUND, e).into_response(),
     }
 }
 

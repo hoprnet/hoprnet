@@ -16,7 +16,10 @@ use hopr_lib::{
     Address, AsUnixTimestamp, Balance, BalanceType, ChainActionsError, ChannelEntry, ChannelStatus, Hopr, ToHex,
 };
 
-use crate::{types::PeerOrAddress, ApiErrorStatus, InternalState, BASE_PATH};
+use crate::{
+    types::{HoprIdentifier, PeerOrAddress},
+    ApiErrorStatus, InternalState, BASE_PATH,
+};
 
 #[serde_as]
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
@@ -176,7 +179,7 @@ pub(super) async fn list_channels(
         let hopr_clone = hopr.clone();
         let topology = hopr
             .all_channels()
-            .and_then(|channels| async move {
+            .and_then(move |channels| async move {
                 futures::future::try_join_all(channels.iter().map(|c| query_topology_info(c, hopr_clone.as_ref())))
                     .await
             })
@@ -245,9 +248,13 @@ pub(super) async fn list_channels(
     }))]
 pub(crate) struct OpenChannelBodyRequest {
     /// On-chain address of the counterparty.
-    #[serde_as(as = "DisplayFromStr")]
+    #[serde_as(as = "Option<DisplayFromStr>")]
     #[schema(value_type = String)]
-    destination: PeerOrAddress,
+    destination: Option<PeerOrAddress>,
+    /// Deprecated: PeerId of the counterparty.
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    #[schema(value_type = String)]
+    peer_id: Option<hopr_lib::PeerId>,
     /// Initial amount of stake in HOPR tokens.
     amount: String,
 }
@@ -299,14 +306,17 @@ pub(super) async fn open_channel(
 ) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
-    let destination = open_req.destination.fulfill(hopr.peer_resolver()).await;
+    let destination = if let Some(destination) = open_req.destination {
+        destination
+    } else if let Some(peer_id) = open_req.peer_id {
+        PeerOrAddress::PeerId(peer_id)
+    } else {
+        return (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidInput).into_response();
+    };
 
-    let address = match destination {
-        Ok(destination) => match destination.address {
-            Some(address) => address,
-            None => return (StatusCode::NOT_FOUND, ApiErrorStatus::InvalidInput).into_response(),
-        },
-        Err(e) => return (StatusCode::NOT_FOUND, e).into_response(),
+    let address = match HoprIdentifier::new_with(destination, hopr.peer_resolver()).await {
+        Ok(destination) => destination.address,
+        Err(e) => return (StatusCode::UNPROCESSABLE_ENTITY, e).into_response(),
     };
 
     match hopr
