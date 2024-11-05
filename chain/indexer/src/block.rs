@@ -57,7 +57,7 @@ lazy_static::lazy_static! {
 pub struct Indexer<T, U, Db>
 where
     T: HoprIndexerRpcOperations + Send + 'static,
-    U: ChainLogHandler + Clone + Send + 'static,
+    U: ChainLogHandler + Send + 'static,
     Db: HoprDbGeneralModelOperations + Clone + Send + Sync + 'static,
 {
     rpc: Option<T>,
@@ -73,7 +73,7 @@ where
 impl<T, U, Db> Indexer<T, U, Db>
 where
     T: HoprIndexerRpcOperations + Sync + Send + 'static,
-    U: ChainLogHandler + Clone + Send + Sync + 'static,
+    U: ChainLogHandler + Send + Sync + 'static,
     Db: HoprDbGeneralModelOperations + Clone + Send + Sync + 'static,
 {
     pub fn new(
@@ -114,7 +114,7 @@ where
         info!("Starting chain indexing");
 
         let rpc = self.rpc.take().expect("rpc should be present");
-        let db_processor = self.db_processor.take().expect("db_processor should be present");
+        let db_processor = Arc::new(self.db_processor.take().expect("db_processor should be present"));
         let db = self.db.clone();
         let tx_significant_events = self.egress.clone();
         let panic_on_completion = self.panic_on_completion;
