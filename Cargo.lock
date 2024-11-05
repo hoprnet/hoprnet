@@ -4673,7 +4673,7 @@ dependencies = [
 
 [[package]]
 name = "hoprd-api"
-version = "3.5.1"
+version = "3.5.2"
 dependencies = [
  "anyhow",
  "async-broadcast",
@@ -4699,6 +4699,7 @@ dependencies = [
  "lazy_static",
  "libp2p-identity",
  "mime",
+ "regex",
  "serde",
  "serde_json",
  "serde_with",

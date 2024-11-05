@@ -1,6 +1,6 @@
 [package]
 name = "hoprd-api"
-version = "3.5.1"
+version = "3.5.2"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "This Rest API enables developers to interact with a hoprd node programatically through HTTP."
@@ -13,7 +13,12 @@ crate-type = ["rlib"]
 
 [features]
 default = ["prometheus"]
-prometheus = ["hopr-lib/prometheus", "dep:hopr-metrics", "dep:lazy_static"]
+prometheus = [
+  "hopr-lib/prometheus",
+  "dep:hopr-metrics",
+  "dep:lazy_static",
+  "dep:regex",
+]
 # placeholder feature so we can enable it globally during tests
 runtime-async-std = []
 
@@ -34,6 +39,7 @@ libp2p-identity = { workspace = true, features = [
   "serde",
 ] }
 mime = "0.3.17"
+regex = { workspace = true, optional = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_with = { workspace = true }

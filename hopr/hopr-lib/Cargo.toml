@@ -42,6 +42,7 @@ prometheus = [
   "hopr-db-sql/prometheus",
   "hopr-transport/prometheus",
   "hopr-network-types/prometheus",
+  "hopr-strategy/prometheus",
 ]
 
 [dependencies]
