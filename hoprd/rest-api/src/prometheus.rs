@@ -39,7 +39,7 @@ pub(crate) async fn record(
 
     let status = response.status();
 
-    // We're not interested in metrics for non-functional
+    // We're not interested in metrics for other than our own API endpoints
     if path.starts_with("/api/v3/") && !path.contains("node/metrics") {
         let path = ID_REGEX.replace(&path, "<id>");
         METRIC_COUNT_API_CALLS.increment(&[&path, method.as_str(), &status.to_string()]);
