@@ -16,7 +16,10 @@ use hopr_lib::{
     Address, AsUnixTimestamp, Balance, BalanceType, ChainActionsError, ChannelEntry, ChannelStatus, Hopr, ToHex,
 };
 
-use crate::{types::PeerOrAddress, ApiErrorStatus, InternalState, BASE_PATH};
+use crate::{
+    types::{HoprIdentifier, PeerOrAddress},
+    ApiErrorStatus, InternalState, BASE_PATH,
+};
 
 #[serde_as]
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
@@ -299,14 +302,9 @@ pub(super) async fn open_channel(
 ) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
-    let destination = open_req.destination.fulfill(hopr.peer_resolver()).await;
-
-    let address = match destination {
-        Ok(destination) => match destination.address {
-            Some(address) => address,
-            None => return (StatusCode::NOT_FOUND, ApiErrorStatus::InvalidInput).into_response(),
-        },
-        Err(e) => return (StatusCode::NOT_FOUND, e).into_response(),
+    let address = match HoprIdentifier::new_with(open_req.destination, hopr.peer_resolver()).await {
+        Ok(destination) => destination.address,
+        Err(e) => return (StatusCode::UNPROCESSABLE_ENTITY, e).into_response(),
     };
 
     match hopr
