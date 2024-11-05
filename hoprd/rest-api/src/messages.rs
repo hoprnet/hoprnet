@@ -64,13 +64,9 @@ pub(crate) struct SendMessageBodyRequest {
     #[serde_as(as = "Bytes")]
     body: Vec<u8>,
     /// The recipient HOPR PeerId or address
-    #[serde_as(as = "Option<DisplayFromStr>")]
+    #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String)]
-    destination: Option<PeerOrAddress>,
-    /// Deprecated: PeerId of the target node
-    #[serde_as(as = "Option<DisplayFromStr>")]
-    #[schema(value_type = String)]
-    peer_id: Option<hopr_lib::PeerId>,
+    destination: PeerOrAddress,
     #[serde_as(as = "Option<Vec<DisplayFromStr>>")]
     #[validate(length(min = 0, max = 3))]
     #[schema(value_type = Option<Vec<String>>)]
@@ -144,15 +140,7 @@ pub(super) async fn send_message(
             .into_response()
     })?;
 
-    let destination = if let Some(destination) = args.destination {
-        destination
-    } else if let Some(peer_id) = args.peer_id {
-        PeerOrAddress::PeerId(peer_id)
-    } else {
-        return Ok((StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidInput).into_response());
-    };
-
-    let peer_id = match HoprIdentifier::new_with(destination, hopr.peer_resolver()).await {
+    let peer_id = match HoprIdentifier::new_with(args.destination, hopr.peer_resolver()).await {
         Ok(destination) => destination.peer_id,
         Err(e) => return Err(e.into_response()),
     };
@@ -348,15 +336,7 @@ async fn handle_send_message(input: &str, state: Arc<InternalState>) -> Result<(
         Ok(msg) => {
             let hopr = state.hopr.clone();
 
-            let destination = if let Some(destination) = msg.destination {
-                destination
-            } else if let Some(peer_id) = msg.peer_id {
-                PeerOrAddress::PeerId(peer_id)
-            } else {
-                return Err("missing destination".to_string());
-            };
-
-            let destination = match HoprIdentifier::new_with(destination, hopr.peer_resolver()).await {
+            let destination = match HoprIdentifier::new_with(msg.destination, hopr.peer_resolver()).await {
                 Ok(destination) => destination.peer_id,
                 Err(_e) => return Err("invalid destination".to_string()),
             };
@@ -725,8 +705,7 @@ mod tests {
         let expected = SendMessageBodyRequest {
             tag: 5,
             body: test_sequence.to_vec(),
-            destination: Some(destination),
-            peer_id: None,
+            destination: destination,
             path: None,
             hops: None,
         };
@@ -753,8 +732,7 @@ mod tests {
         let expected = SendMessageBodyRequest {
             tag: 5,
             body: test_sequence.to_vec(),
-            destination: Some(destination),
-            peer_id: None,
+            destination: destination,
             path: None,
             hops: None,
         };
