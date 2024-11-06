@@ -345,7 +345,7 @@ pub(crate) struct SessionClientResponse {
         post,
         path = const_format::formatcp!("{BASE_PATH}/session/{{protocol}}"),
         params(
-                ("protocol" = String, Path, description = "IP transport protocol")
+            ("protocol" = String, Path, description = "IP transport protocol")
         ),
         request_body(
             content = SessionClientRequest,
