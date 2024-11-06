@@ -124,7 +124,7 @@ async fn build_p2p_network(
             .with_idle_connection_timeout(
                 std::env::var("HOPR_INTERNAL_LIBP2P_SWARM_IDLE_TIMEOUT")
                     .and_then(|v| v.parse::<u64>().map_err(|_e| std::env::VarError::NotPresent))
-                    .map(|v| std::time::Duration::from_secs(v))
+                    .map(std::time::Duration::from_secs)
                     .unwrap_or(constants::HOPR_SWARM_IDLE_CONNECTION_TIMEOUT),
             )
         })
