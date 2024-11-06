@@ -47,7 +47,7 @@ members = [
 
 [workspace.dependencies]
 aes = "0.8"
-anyhow = "1.0.92"
+anyhow = "1.0.93"
 aquamarine = "0.6.0"
 arrayvec = { version = "0.7.6", features = ["serde"] }
 async-broadcast = "0.7.1"
@@ -64,7 +64,7 @@ base64 = "0.22.1"
 bimap = "0.6.3"
 bincode = "1.3.3"
 bitvec = "1.0.1"
-bloomfilter = { version = "1.0.15", features = ["serde"] }
+bloomfilter = { version = "2.0.0", features = ["serde"] }
 chrono = { version = "0.4.38", default-features = false }
 clap = { version = "4.5.20", features = ["derive", "env", "string"] }
 const_format = "0.2.33"
