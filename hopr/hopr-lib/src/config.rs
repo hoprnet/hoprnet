@@ -53,6 +53,12 @@ pub struct Chain {
     #[serde(default = "just_true")]
     #[default = true]
     pub check_unrealized_balance: bool,
+    #[serde(default = "just_true")]
+    #[default = true]
+    pub keep_logs: bool,
+    #[serde(default = "just_true")]
+    #[default = true]
+    pub fast_sync: bool,
 }
 
 #[inline]

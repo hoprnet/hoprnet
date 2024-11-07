@@ -273,6 +273,14 @@ impl HoprdConfig {
             cfg.hopr.chain.check_unrealized_balance = true;
         }
 
+        if cli_args.no_fast_sync == 0 {
+            cfg.hopr.chain.fast_sync = false;
+        }
+
+        if cli_args.no_keep_logs == 0 {
+            cfg.hopr.chain.keep_logs = false;
+        }
+
         // safe module
         if let Some(x) = cli_args.safe_transaction_service_provider {
             cfg.hopr.safe_module.safe_transaction_service_provider = x

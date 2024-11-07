@@ -42,6 +42,13 @@
     - [Running Tests Locally](#running-tests-locally)
       - [Testing environment](#testing-environment)
       - [Test execution](#test-execution)
+- [Using Fast Sync](#using-fast-sync)
+  - [Prerequisites](#prerequisites)
+  - [Database Files](#database-files)
+  - [Configuration Steps](#configuration-steps)
+  - [Post-sync Behavior](#post-sync-behavior)
+- [Profiling \& Instrumentation](#profiling--instrumentation)
+  - [`tokio` executor instrumentation](#tokio-executor-instrumentation)
 - [Contact](#contact)
 - [License](#license)
 
@@ -202,6 +209,8 @@ On top of the default configuration options generated for the command line, the 
 - `OTEL_SERVICE_NAME` - the name of this node for the opentelemetry service
 - `HOPR_INTERNAL_LIBP2P_MAX_CONCURRENTLY_DIALED_PEER_COUNT` - the maximum number of concurrently dialed peers in libp2p
 - `HOPR_INTERNAL_LIBP2P_MAX_NEGOTIATING_INBOUND_STREAM_COUNT` - the maximum number of negotiating inbound streams
+- `HOPR_INTERNAL_LIBP2P_YAMUX_MAX_NUM_STREAMS` - the maximum number of used yamux streams
+- `HOPR_INTERNAL_LIBP2P_SWARM_IDLE_TIMEOUT` - timeout for all idle libp2p swarm connections in seconds
 - `ENV_WORKER_THREADS` - the number of environment worker threads for the tokio executor
 - `HOPRD_SESSION_PORT_RANGE` - allows restricting the port range (syntax: `start:end` inclusive) of Session listener automatic port selection (when port 0 is specified).
 
@@ -453,6 +462,43 @@ With the environment activated, execute the tests locally:
 ```shell
 make smoke-tests
 ```
+
+## Using Fast Sync
+
+Fast sync is a feature that allows the node to sync the blockchain state faster
+than the default sync mode by using a pre-built logs database.
+
+### Prerequisites
+
+To generate the logs database, you need:
+
+- A fully synced node
+- Node configured to keep logs in the database (enabled by default)
+  - Set `hopr -> chain -> keep_logs` in the configuration file
+
+### Database Files
+
+The following files in the node's database folder are required:
+
+- `hopr_logs.db` - Main logs database
+- `hopr_logs.db-shm` - Auxiliary file
+- `hopr_logs.db-wal` - Auxiliary file
+
+### Configuration Steps
+
+1. Place the pre-built logs database files in the node's database folder
+2. Enable fast sync mode (enabled by default):
+   - Set `hopr -> chain -> fast_sync` to `true` in the configuration file
+3. Remove any existing index data:
+
+   ```shell
+   rm hopr_index.db*
+   ```
+
+### Post-sync Behavior
+
+- If index data exists, the node will skip fast sync and start in normal sync mode
+- After fast sync completes, the node automatically switches to normal sync mode
 
 ## Profiling & Instrumentation
 

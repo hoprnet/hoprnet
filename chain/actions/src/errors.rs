@@ -1,7 +1,8 @@
-use chain_rpc::errors::RpcError;
+use thiserror::Error;
+
+use hopr_chain_rpc::errors::RpcError;
 use hopr_internal_types::prelude::CoreTypesError;
 use hopr_primitive_types::errors::GeneralError;
-use thiserror::Error;
 
 /// Enumerates all Chain Actions related errors.
 #[derive(Debug, Error)]

@@ -10,7 +10,11 @@ crate-type = ["rlib"]
 
 [features]
 default = []
-prometheus = ["dep:lazy_static", "dep:hopr-metrics"]
+prometheus = [
+  "dep:lazy_static",
+  "dep:hopr-metrics",
+  "hopr-transport-protocol/prometheus",
+]
 runtime-async-std = ["libp2p/async-std"]
 runtime-tokio = ["libp2p/tokio"]
 

@@ -1,3 +1,5 @@
+use chrono::serde::ts_seconds_option;
+use chrono::{DateTime, Utc};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
@@ -403,6 +405,74 @@ impl UnitaryFloatOps for U256 {
 
             Ok(nom / denom)
         }
+    }
+}
+
+/// A type containing selected fields from  the `eth_getLogs` RPC calls.
+///
+/// This is further restricted to already mined blocks.
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
+pub struct SerializableLog {
+    /// Contract address
+    pub address: Address,
+    /// Topics
+    pub topics: Vec<[u8; 32]>,
+    /// Raw log data
+    pub data: Vec<u8>,
+    /// Transaction index
+    pub tx_index: u64,
+    /// Corresponding block number
+    pub block_number: u64,
+    /// Corresponding block hash
+    pub block_hash: [u8; 32],
+    /// Corresponding transaction hash
+    pub tx_hash: [u8; 32],
+    /// Log index
+    pub log_index: u64,
+    /// Removed flag
+    pub removed: bool,
+    /// Processed flag
+    pub processed: Option<bool>,
+    /// Processed time
+    #[serde(with = "ts_seconds_option")]
+    pub processed_at: Option<DateTime<Utc>>,
+    /// Log hashes checksum
+    pub checksum: Option<String>,
+}
+
+impl Display for SerializableLog {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "log #{} in tx #{} in block #{} of address {} with {} topics",
+            self.log_index,
+            self.tx_index,
+            self.block_number,
+            self.address,
+            self.topics.len()
+        )
+    }
+}
+
+impl Ord for SerializableLog {
+    fn cmp(&self, other: &Self) -> Ordering {
+        let block_number_order = self.block_number.cmp(&other.block_number);
+        if block_number_order == Ordering::Equal {
+            let tx_index_order = self.tx_index.cmp(&other.tx_index);
+            if tx_index_order == Ordering::Equal {
+                self.log_index.cmp(&other.log_index)
+            } else {
+                tx_index_order
+            }
+        } else {
+            block_number_order
+        }
+    }
+}
+
+impl PartialOrd<Self> for SerializableLog {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
     }
 }
 

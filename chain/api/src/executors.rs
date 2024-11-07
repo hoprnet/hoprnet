@@ -7,10 +7,10 @@ use std::time::Duration;
 
 use chain_actions::action_queue::TransactionExecutor;
 use chain_actions::payload::PayloadGenerator;
-use chain_rpc::errors::RpcError;
-use chain_rpc::{HoprRpcOperations, PendingTransaction};
 use chain_types::TypedTransaction;
 use hopr_async_runtime::prelude::sleep;
+use hopr_chain_rpc::errors::RpcError;
+use hopr_chain_rpc::{HoprRpcOperations, PendingTransaction};
 use hopr_crypto_types::types::Hash;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
@@ -22,13 +22,13 @@ pub trait EthereumClient<T: Into<TypedTransaction>> {
     /// Sends transaction to the blockchain and returns its hash.
     ///
     /// Does not poll for transaction completion.
-    async fn post_transaction(&self, tx: T) -> chain_rpc::errors::Result<Hash>;
+    async fn post_transaction(&self, tx: T) -> hopr_chain_rpc::errors::Result<Hash>;
 
     /// Sends transaction to the blockchain and awaits the required number
     /// of confirmations by polling the underlying provider periodically.
     ///
     /// Returns the TX hash.
-    async fn post_transaction_and_await_confirmation(&self, tx: T) -> chain_rpc::errors::Result<Hash>;
+    async fn post_transaction_and_await_confirmation(&self, tx: T) -> hopr_chain_rpc::errors::Result<Hash>;
 }
 
 #[derive(Clone, Debug, PartialEq, smart_default::SmartDefault, Serialize, Deserialize)]
@@ -58,7 +58,7 @@ impl<Rpc: HoprRpcOperations> RpcEthereumClient<Rpc> {
     ///
     /// If the transaction yields a result before the timeout, the result value is returned.
     /// Otherwise, an [RpcError::Timeout] is returned and the transaction sending is aborted.
-    async fn post_tx_with_timeout(&self, tx: TypedTransaction) -> chain_rpc::errors::Result<PendingTransaction> {
+    async fn post_tx_with_timeout(&self, tx: TypedTransaction) -> hopr_chain_rpc::errors::Result<PendingTransaction> {
         let submit_tx = self.rpc.send_transaction(tx).fuse();
         let timeout = sleep(self.cfg.max_tx_submission_wait).fuse();
         pin_mut!(submit_tx, timeout);
@@ -72,14 +72,17 @@ impl<Rpc: HoprRpcOperations> RpcEthereumClient<Rpc> {
 
 #[async_trait]
 impl<Rpc: HoprRpcOperations + Send + Sync> EthereumClient<TypedTransaction> for RpcEthereumClient<Rpc> {
-    async fn post_transaction(&self, tx: TypedTransaction) -> chain_rpc::errors::Result<Hash> {
+    async fn post_transaction(&self, tx: TypedTransaction) -> hopr_chain_rpc::errors::Result<Hash> {
         self.post_tx_with_timeout(tx).await.map(|t| t.tx_hash())
     }
 
     /// Post a transaction and wait for its completion.
     ///
     /// The mechanism uses an internal timeout and retry mechanism (set to `3`)
-    async fn post_transaction_and_await_confirmation(&self, tx: TypedTransaction) -> chain_rpc::errors::Result<Hash> {
+    async fn post_transaction_and_await_confirmation(
+        &self,
+        tx: TypedTransaction,
+    ) -> hopr_chain_rpc::errors::Result<Hash> {
         Ok(self.post_tx_with_timeout(tx).await?.await?.tx_hash)
     }
 }

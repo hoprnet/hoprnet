@@ -1,7 +1,7 @@
 {
   "enabled": true,
   "prCreation": "not-pending",
-  "extends": ["config:base"],
+  "extends": ["config:base", ":disableDependencyDashboard"],
   "docker": {
     "enabled": true,
     "pinDigests": true

@@ -88,7 +88,7 @@ pub enum HelperErrors {
 
     /// Error with HTTP Json RPC provider
     #[error(transparent)]
-    RpcError(#[from] chain_rpc::errors::RpcError),
+    RpcError(#[from] hopr_chain_rpc::errors::RpcError),
 
     /// Error with signer wallet error
     #[error(transparent)]

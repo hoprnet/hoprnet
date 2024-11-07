@@ -7,6 +7,7 @@ pub mod channels;
 pub mod db;
 pub mod errors;
 pub mod info;
+pub mod logs;
 pub mod peers;
 pub mod protocol;
 pub mod registry;
@@ -29,6 +30,7 @@ use crate::db::HoprDb;
 use crate::errors::{DbSqlError, Result};
 use crate::info::HoprDbInfoOperations;
 use crate::registry::HoprDbRegistryOperations;
+use hopr_db_api::logs::HoprDbLogOperations;
 use hopr_db_api::peers::HoprDbPeersOperations;
 use hopr_db_api::protocol::HoprDbProtocolOperations;
 use hopr_db_api::resolver::HoprDbResolverOperations;
@@ -94,7 +96,7 @@ impl From<OpenTransaction> for DatabaseTransaction {
 pub type OptTx<'a> = Option<&'a OpenTransaction>;
 
 /// When Sqlite is used as a backend, model needs to be split
-/// into 3 different databases to avoid locking the database.
+/// into 4 different databases to avoid locking the database.
 /// On Postgres backend, these should actually point to the same database.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Default)]
 pub enum TargetDb {
@@ -105,6 +107,8 @@ pub enum TargetDb {
     Tickets,
     /// Network peers database
     Peers,
+    /// RPC logs database
+    Logs,
 }
 
 #[async_trait]
@@ -152,16 +156,20 @@ impl HoprDbGeneralModelOperations for HoprDb {
     /// Retrieves raw database connection to the given [DB](TargetDb).
     fn conn(&self, target_db: TargetDb) -> &DatabaseConnection {
         match target_db {
-            TargetDb::Index => &self.db,
+            TargetDb::Index => &self.index_db,
             TargetDb::Tickets => &self.tickets_db,
             TargetDb::Peers => &self.peers_db,
+            TargetDb::Logs => &self.logs_db,
         }
     }
 
     /// Starts a new transaction in the given [DB](TargetDb).
     async fn begin_transaction_in_db(&self, target_db: TargetDb) -> Result<OpenTransaction> {
         match target_db {
-            TargetDb::Index => Ok(OpenTransaction(self.db.begin_with_config(None, None).await?, target_db)),
+            TargetDb::Index => Ok(OpenTransaction(
+                self.index_db.begin_with_config(None, None).await?,
+                target_db,
+            )),
             // TODO: when adding Postgres support, redirect `Tickets` and `Peers` into `self.db`
             TargetDb::Tickets => Ok(OpenTransaction(
                 self.tickets_db.begin_with_config(None, None).await?,
@@ -169,6 +177,10 @@ impl HoprDbGeneralModelOperations for HoprDb {
             )),
             TargetDb::Peers => Ok(OpenTransaction(
                 self.peers_db.begin_with_config(None, None).await?,
+                target_db,
+            )),
+            TargetDb::Logs => Ok(OpenTransaction(
+                self.logs_db.begin_with_config(None, None).await?,
                 target_db,
             )),
         }
@@ -186,6 +198,7 @@ pub trait HoprDbAllOperations:
     + HoprDbPeersOperations
     + HoprDbResolverOperations
     + HoprDbProtocolOperations
+    + HoprDbLogOperations
 {
 }
 
@@ -198,6 +211,7 @@ pub mod prelude {
     pub use crate::errors::*;
     pub use crate::info::*;
     pub use crate::registry::*;
+    pub use hopr_db_api::logs::*;
     pub use hopr_db_api::peers::*;
     pub use hopr_db_api::protocol::*;
     pub use hopr_db_api::resolver::*;
