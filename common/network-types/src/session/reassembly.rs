@@ -4,7 +4,7 @@ use std::collections::VecDeque;
 use std::pin::Pin;
 use std::task::{Context, Poll, Waker};
 use std::time::{Duration, Instant};
-
+use bitvec::bitvec;
 use crate::prelude::errors::SessionError;
 use crate::prelude::{Frame, FrameId, Segment};
 use crate::session::frame::SeqNum;
@@ -109,17 +109,39 @@ pub struct FrameInspector {
 
 #[cfg(feature = "frame-inspector")]
 impl FrameInspector {
-    pub fn pending_frames(&self, next_frame: FrameId) -> Vec<FrameInfo> {
-        // TODO: add missing frames between next_frame and highest buffered
-        let mut latest_buffered = next_frame;
-        self.incomplete_frames
+    pub fn pending_frames(&self, next_frame: FrameId, max_segments_per_frame: usize) -> Vec<FrameInfo> {
+        let mut missing_segments = self.incomplete_frames
             .iter()
             .map(|e| FrameInfo {
                 frame_id: e.frame_id(),
                 missing_segments: e.as_missing(),
                 updated: e.last_recv,
             })
-            .collect()
+            .collect::<Vec<_>>();
+
+        // If there are gaps, fill them as if the entire frames were missing
+        if !missing_segments.is_empty() {
+            missing_segments.sort_unstable_by(|a, b| b.frame_id.cmp(&a.frame_id));
+
+            let mut last_frame = &missing_segments[0];
+            for i in 1..missing_segments.len() {
+                let last_frame_id = last_frame.frame_id;
+                if last_frame_id + 1 < missing_segments[i].frame_id {
+                    let diff = missing_segments[i].frame_id - last_frame_id;
+                    for j in i + 1.. i + diff as usize {
+                        missing_segments.insert(j, FrameInfo {
+                                frame_id: last_frame_id + j as FrameId,
+                                missing_segments: bitvec![1; max_segments_per_frame],
+                                updated: last_frame.updated,
+                            }
+                        )
+                    }
+                }
+                last_frame = &missing_segments[i];
+            }
+
+        }
+        missing_segments
     }
 }
 
@@ -141,7 +163,7 @@ pub struct Reassembler {
 }
 
 impl Reassembler {
-    /// Indicates how many incomplete frames there could be per a complete/discarded frame.
+    /// Indicates how many incomplete frames there could be per one complete/discarded frame.
     const INCOMPLETE_FRAME_RATIO: usize = 2;
 
     pub fn new(max_age: Duration, capacity: usize) -> Self {
@@ -203,10 +225,9 @@ impl futures::Sink<Segment> for Reassembler {
 
         // If we're at the capacity of incomplete frames,
         // check if we can expire more than the amount that's over the capacity.
-        if self.incomplete_frames.len() >= self.capacity * Self::INCOMPLETE_FRAME_RATIO {
-            if self.expire_frames() <= self.incomplete_frames.len() - self.capacity {
+        if self.incomplete_frames.len() >= self.capacity * Self::INCOMPLETE_FRAME_RATIO &&
+            self.expire_frames() <= self.incomplete_frames.len() - self.capacity {
                 return Poll::Ready(Err(SessionError::TooManyIncompleteFrames));
-            }
         }
 
         if self.complete_frames.len() >= self.capacity {
