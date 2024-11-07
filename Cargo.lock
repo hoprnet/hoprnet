@@ -1262,7 +1262,6 @@ dependencies = [
  "smart-default",
  "thiserror",
  "tracing",
- "tracing-test",
 ]
 
 [[package]]
