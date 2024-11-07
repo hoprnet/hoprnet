@@ -57,7 +57,7 @@ lazy_static::lazy_static! {
 pub struct Indexer<T, U, Db>
 where
     T: HoprIndexerRpcOperations + Send + 'static,
-    U: ChainLogHandler + Clone + Send + 'static,
+    U: ChainLogHandler + Send + 'static,
     Db: HoprDbGeneralModelOperations + Clone + Send + Sync + 'static,
 {
     rpc: Option<T>,
@@ -73,7 +73,7 @@ where
 impl<T, U, Db> Indexer<T, U, Db>
 where
     T: HoprIndexerRpcOperations + Sync + Send + 'static,
-    U: ChainLogHandler + Clone + Send + Sync + 'static,
+    U: ChainLogHandler + Send + Sync + 'static,
     Db: HoprDbGeneralModelOperations + Clone + Send + Sync + 'static,
 {
     pub fn new(
@@ -114,7 +114,7 @@ where
         info!("Starting chain indexing");
 
         let rpc = self.rpc.take().expect("rpc should be present");
-        let db_processor = self.db_processor.take().expect("db_processor should be present");
+        let logs_handler = Arc::new(self.db_processor.take().expect("db_processor should be present"));
         let db = self.db.clone();
         let tx_significant_events = self.egress.clone();
         let panic_on_completion = self.panic_on_completion;
@@ -122,8 +122,8 @@ where
         // we skip on addresses which have no topics
         let mut addresses = vec![];
         let mut topics = vec![];
-        db_processor.contract_addresses().iter().for_each(|address| {
-            let contract_topics = db_processor.contract_address_topics(*address);
+        logs_handler.contract_addresses().iter().for_each(|address| {
+            let contract_topics = logs_handler.contract_address_topics(*address);
             if !contract_topics.is_empty() {
                 addresses.push(*address);
                 topics.extend(contract_topics);
@@ -159,7 +159,7 @@ where
 
                 // Now fast-sync can start
                 while let Some(block_number) = self.db.get_logs_block_numbers(None, None).await?.next().await {
-                    Self::process_block_by_id(&db, &db_processor, block_number).await?;
+                    Self::process_block_by_id(&db, &logs_handler, block_number).await?;
                 }
             }
         }
@@ -234,10 +234,10 @@ where
                 })
                 .filter_map(|block| {
                     let db = db.clone();
-                    let db_processor = db_processor.clone();
+                    let logs_handler = logs_handler.clone();
 
                     async move {
-                        match Self::process_block_by_id(&db, &db_processor, block.block_id).await {
+                        match Self::process_block_by_id(&db, &logs_handler, block.block_id).await {
                             Ok(events) => events,
                             Err(e) => {
                                 error!("Failed to process logs from {block}: {e}");
@@ -283,7 +283,7 @@ where
     /// # Arguments
     ///
     /// * `db` - The database operations handler.
-    /// * `db_processor` - The database log handler.
+    /// * `logs_handler` - The database log handler.
     /// * `block_id` - The ID of the block to process.
     ///
     /// # Returns
@@ -291,7 +291,7 @@ where
     /// A `Result` containing an optional vector of significant chain events if the operation succeeds or an error if it fails.
     async fn process_block_by_id(
         db: &Db,
-        db_processor: &U,
+        logs_handler: &U,
         block_id: u64,
     ) -> crate::errors::Result<Option<Vec<SignificantChainEvent>>>
     where
@@ -315,7 +315,7 @@ where
             }
         }
 
-        Ok(Self::process_block(db, db_processor, block).await)
+        Ok(Self::process_block(db, logs_handler, block).await)
     }
 
     /// Processes a block and its logs.
@@ -325,13 +325,13 @@ where
     /// # Arguments
     ///
     /// * `db` - The database operations handler.
-    /// * `db_processor` - The database log handler.
+    /// * `logs_handler` - The database log handler.
     /// * `block` - The block with logs to process.
     ///
     /// # Returns
     ///
     /// An optional vector of significant chain events if the operation succeeds.
-    async fn process_block(db: &Db, db_processor: &U, block: BlockWithLogs) -> Option<Vec<SignificantChainEvent>>
+    async fn process_block(db: &Db, logs_handler: &U, block: BlockWithLogs) -> Option<Vec<SignificantChainEvent>>
     where
         U: ChainLogHandler + 'static,
         Db: HoprDbLogOperations + 'static,
@@ -339,7 +339,7 @@ where
         let block_id = block.block_id;
         debug!("Processing events from block #{block_id}");
 
-        match db_processor.collect_block_events(block.clone()).await {
+        match logs_handler.collect_block_events(block.clone()).await {
             Ok(events) => {
                 match db.set_logs_processed(Some(block_id), Some(0)).await {
                     Ok(_) => match db.update_logs_checksums().await {
@@ -740,26 +740,18 @@ mod tests {
             assert!(tx.start_send(block.clone()).is_ok());
         }
 
-        handlers.expect_clone().times(blocks.len()).returning(move || {
-            let block_numbers = block_numbers.clone();
-            let mut handlers2 = MockChainLogHandler::new();
-
-            // Generate the expected events to be able to process the blocks
-            handlers2.expect_contract_addresses().return_const(vec![]);
-            handlers2
-                .expect_collect_block_events()
-                .times(1)
-                .withf(move |b| block_numbers.contains(&b.block_id))
-                .returning(|b| {
-                    let block_id = b.block_id;
-                    Ok(vec![SignificantChainEvent {
-                        tx_hash: Hash::create(&[format!("my tx hash {block_id}").as_bytes()]),
-                        event_type: RANDOM_ANNOUNCEMENT_CHAIN_EVENT.clone(),
-                    }])
-                });
-
-            handlers2
-        });
+        // Generate the expected events to be able to process the blocks
+        handlers
+            .expect_collect_block_events()
+            .times(1)
+            .withf(move |b| block_numbers.contains(&b.block_id))
+            .returning(|b| {
+                let block_id = b.block_id;
+                Ok(vec![SignificantChainEvent {
+                    tx_hash: Hash::create(&[format!("my tx hash {block_id}").as_bytes()]),
+                    event_type: RANDOM_ANNOUNCEMENT_CHAIN_EVENT.clone(),
+                }])
+            });
 
         let (tx_events, rx_events) = async_channel::unbounded();
         let mut indexer = Indexer::new(rpc, handlers, db.clone(), cfg, tx_events).without_panic_on_completion();
