@@ -28,8 +28,11 @@ lazy_static::lazy_static! {
         SimpleCounter::new("hopr_strategy_auto_redeem_redeem_count", "Count of initiated automatic redemptions").unwrap();
 }
 
-fn thirty_hopr() -> Balance {
-    Balance::new_from_str("30000000000000000000", BalanceType::HOPR)
+fn single_ticket_redeem() -> Balance {
+    Balance::new_from_str("2000000000000000000", BalanceType::HOPR)
+}
+fn min_redeem_hopr() -> Balance {
+    Balance::new_from_str("90000000000000000", BalanceType::HOPR)
 }
 
 /// Configuration object for the `AutoRedeemingStrategy`
@@ -37,17 +40,30 @@ fn thirty_hopr() -> Balance {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, smart_default::SmartDefault, Validate, Serialize, Deserialize)]
 pub struct AutoRedeemingStrategyConfig {
     /// If set, the strategy will redeem only aggregated tickets.
+    /// Otherwise, it redeems all acknowledged winning tickets.
+    ///
+    /// Default is true.
     #[default = true]
     pub redeem_only_aggregated: bool,
+
+    /// The strategy will only redeem an acknowledged winning ticket if it has at least this value of HOPR.
+    /// If 0 is given, the strategy will redeem tickets regardless of their value.
+    /// This is not used for cases where `on_close_redeem_single_tickets_value_min` applies.
+    ///
+    /// Default is 0.09 HOPR.
+    #[serde(default = "min_redeem_hopr")]
+    #[serde_as(as = "DisplayFromStr")]
+    #[default(Balance::new_from_str("90000000000000000", BalanceType::HOPR))]
+    pub minimum_redeem_ticket_value: Balance,
 
     /// The strategy will automatically redeem if there's a single ticket left when a channel
     /// transitions to `PendingToClose` and it has at least this value of HOPR.
     /// This happens regardless of the `redeem_only_aggregated` setting.
     ///
     /// Default is 2 HOPR.
-    #[serde(default = "thirty_hopr")]
+    #[serde(default = "single_ticket_redeem")]
     #[serde_as(as = "DisplayFromStr")]
-    #[default(thirty_hopr())]
+    #[default(Balance::new_from_str("2000000000000000000", BalanceType::HOPR))]
     pub on_close_redeem_single_tickets_value_min: Balance,
 }
 
@@ -85,7 +101,9 @@ where
     Db: HoprDbTicketOperations + Send + Sync,
 {
     async fn on_acknowledged_winning_ticket(&self, ack: &AcknowledgedTicket) -> crate::errors::Result<()> {
-        if !self.cfg.redeem_only_aggregated || ack.verified_ticket().is_aggregated() {
+        if (!self.cfg.redeem_only_aggregated || ack.verified_ticket().is_aggregated())
+            && ack.verified_ticket().amount.ge(&self.cfg.minimum_redeem_ticket_value)
+        {
             info!(%ack, "redeeming");
 
             #[cfg(all(feature = "prometheus", not(test)))]
@@ -264,6 +282,7 @@ mod tests {
 
         let cfg = AutoRedeemingStrategyConfig {
             redeem_only_aggregated: false,
+            minimum_redeem_ticket_value: BalanceType::HOPR.zero(),
             ..Default::default()
         };
 
@@ -294,6 +313,7 @@ mod tests {
 
         let cfg = AutoRedeemingStrategyConfig {
             redeem_only_aggregated: true,
+            minimum_redeem_ticket_value: BalanceType::HOPR.zero(),
             ..Default::default()
         };
 
@@ -302,6 +322,40 @@ mod tests {
             .await
             .expect_err("non-agg ticket should not satisfy");
         ars.on_acknowledged_winning_ticket(&ack_ticket_agg).await?;
+
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn test_auto_redeeming_strategy_redeem_minimum_ticket_amount() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ALICE.clone()).await?;
+        db.set_domain_separator(None, DomainSeparator::Channel, Default::default())
+            .await?;
+
+        let ack_ticket_below = generate_random_ack_ticket(1, 1, 4)?;
+        let ack_ticket_at = generate_random_ack_ticket(1, 1, 5)?;
+
+        let ack_clone_at = ack_ticket_at.clone();
+        let ack_clone_at_2 = ack_ticket_at.clone();
+        let mock_confirm = mock_action_confirmation(ack_clone_at_2)?;
+        let mut actions = MockTicketRedeemAct::new();
+        actions
+            .expect_redeem_ticket()
+            .once()
+            .withf(move |ack| ack_clone_at.ticket.eq(&ack.ticket))
+            .return_once(|_| Ok(ok(mock_confirm).boxed()));
+
+        let cfg = AutoRedeemingStrategyConfig {
+            redeem_only_aggregated: false,
+            minimum_redeem_ticket_value: BalanceType::HOPR.balance(*PRICE_PER_PACKET * 5),
+            ..Default::default()
+        };
+
+        let ars = AutoRedeemingStrategy::new(cfg, db, actions);
+        ars.on_acknowledged_winning_ticket(&ack_ticket_below)
+            .await
+            .expect_err("ticket below threshold should not satisfy");
+        ars.on_acknowledged_winning_ticket(&ack_ticket_at).await?;
 
         Ok(())
     }
@@ -340,6 +394,7 @@ mod tests {
 
         let cfg = AutoRedeemingStrategyConfig {
             redeem_only_aggregated: true,
+            minimum_redeem_ticket_value: BalanceType::HOPR.zero(),
             on_close_redeem_single_tickets_value_min: BalanceType::HOPR.balance(*PRICE_PER_PACKET * 5),
         };
 
@@ -383,6 +438,7 @@ mod tests {
         actions.expect_redeem_ticket().never();
 
         let cfg = AutoRedeemingStrategyConfig {
+            minimum_redeem_ticket_value: BalanceType::HOPR.zero(),
             redeem_only_aggregated: false,
             on_close_redeem_single_tickets_value_min: BalanceType::HOPR.balance(*PRICE_PER_PACKET * 5),
         };
@@ -436,6 +492,7 @@ mod tests {
         actions.expect_redeem_ticket().never();
 
         let cfg = AutoRedeemingStrategyConfig {
+            minimum_redeem_ticket_value: BalanceType::HOPR.zero(),
             redeem_only_aggregated: false,
             on_close_redeem_single_tickets_value_min: BalanceType::HOPR.balance(*PRICE_PER_PACKET * 5),
         };
