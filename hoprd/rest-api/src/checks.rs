@@ -77,7 +77,7 @@ pub(super) async fn eligiblez(State(state): State<Arc<AppState>>) -> impl IntoRe
                     if chain_api_err.to_string().contains("division by zero") {
                         (StatusCode::PRECONDITION_FAILED, "Node not eligible").into_response()
                     } else {
-                        (StatusCode::INTERNAL_SERVER_ERROR, format!("Error: {}", e)).into_response()
+                        (StatusCode::INTERNAL_SERVER_ERROR, format!("Error: {}", chain_api_err)).into_response()
                     }
                 }
                 _ => (StatusCode::INTERNAL_SERVER_ERROR, format!("Error: {}", e)).into_response(),
