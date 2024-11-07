@@ -16,10 +16,12 @@ default = []
 runtime-async-std = [
   "hopr-db-sql/runtime-async-std",
   "hopr-async-runtime/runtime-async-std",
+  "hopr-chain-rpc/runtime-async-std",
 ]
 runtime-tokio = [
   "hopr-db-sql/runtime-tokio",
   "hopr-async-runtime/runtime-tokio",
+  "hopr-chain-rpc/runtime-tokio",
 ]
 prometheus = [
   "dep:hopr-metrics",
@@ -58,4 +60,3 @@ async-std = { workspace = true }
 mockall = { workspace = true }
 hex-literal = { workspace = true }
 hopr-crypto-random = { workspace = true }
-tracing-test = { workspace = true }
