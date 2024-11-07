@@ -200,7 +200,7 @@ fn validate_session_idle_timeout(value: &std::time::Duration) -> Result<(), Vali
 pub struct SessionGlobalConfig {
     /// Maximum time before an idle Session is closed.
     ///
-    /// Defaults to 2 minutes.
+    /// Defaults to 3 minutes.
     #[validate(custom(function = "validate_session_idle_timeout"))]
     #[default(DEFAULT_SESSION_IDLE_TIMEOUT)]
     #[serde(default = "default_session_idle_timeout")]
