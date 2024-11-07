@@ -70,6 +70,18 @@ pub(super) async fn eligiblez(State(state): State<Arc<AppState>>) -> impl IntoRe
     match hopr.get_eligibility_status().await {
         Ok(true) => (StatusCode::OK, "").into_response(),
         Ok(false) => (StatusCode::PRECONDITION_FAILED, "Node not eligible").into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("Error: {}", e)).into_response(),
+        Err(e) => {
+            match e {
+                // when the error is deivision by zero, it's caused by the self-registration is forbidden to the public, and thus returns false.
+                hopr_lib::errors::HoprLibError::ChainApi(chain_api_err) => {
+                    if chain_api_err.to_string().contains("division by zero") {
+                        (StatusCode::PRECONDITION_FAILED, "Node not eligible").into_response()
+                    } else {
+                        (StatusCode::INTERNAL_SERVER_ERROR, format!("Error: {}", e)).into_response()
+                    }
+                }
+                _ => (StatusCode::INTERNAL_SERVER_ERROR, format!("Error: {}", e)).into_response(),
+            }
+        }
     }
 }
