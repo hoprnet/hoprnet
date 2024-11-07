@@ -310,8 +310,8 @@ impl<const C: usize> SessionMessage<C> {
 
     /// Maximum size of the Session protocol message.
     ///
-    /// This is directly the maximum size of a [`Segment`].
-    pub const MAX_MESSAGE_SIZE: usize = Segment::MAXIMUM_SIZE;
+    /// This is equal to the typical Ethernet MTU size minus [`Self::SEGMENT_OVERHEAD`].
+    pub const MAX_MESSAGE_SIZE: usize = 1492 - Self::SEGMENT_OVERHEAD;
 
     /// Current version of the protocol.
     pub const VERSION: u8 = 1;
