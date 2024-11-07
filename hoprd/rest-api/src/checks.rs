@@ -72,7 +72,7 @@ pub(super) async fn eligiblez(State(state): State<Arc<AppState>>) -> impl IntoRe
         Ok(false) => (StatusCode::PRECONDITION_FAILED, "Node not eligible").into_response(),
         Err(e) => {
             match e {
-                // when the error is deivision by zero, it's caused by the self-registration is forbidden to the public, and thus returns false.
+                // division by zero error is caused by the self-registration forbidden to the public, and thus returns false
                 hopr_lib::errors::HoprLibError::ChainApi(chain_api_err) => {
                     if chain_api_err.to_string().contains("division by zero") {
                         (StatusCode::PRECONDITION_FAILED, "Node not eligible").into_response()
