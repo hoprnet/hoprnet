@@ -9,7 +9,7 @@ use std::sync::Arc;
 
 use hopr_lib::{
     errors::{HoprLibError, HoprStatusError},
-    Address, Balance, BalanceType,
+    Address, Balance, BalanceType, U256,
 };
 
 use crate::{ApiErrorStatus, InternalState, BASE_PATH};
@@ -121,8 +121,17 @@ pub(super) async fn balances(State(state): State<Arc<InternalState>>) -> impl In
     (StatusCode::OK, Json(account_balances)).into_response()
 }
 
+fn deserialize_u256_value_from_str<'de, D>(deserializer: D) -> Result<U256, D::Error>
+where
+    D: serde::de::Deserializer<'de>,
+{
+    let s: &str = serde::de::Deserialize::deserialize(deserializer)?;
+    let v: u128 = s.parse().map_err(serde::de::Error::custom)?;
+    Ok(U256::from(v))
+}
+
 #[serde_as]
-#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, utoipa::ToSchema)]
 #[schema(example = json!({
         "address": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
         "amount": "20000",
@@ -133,9 +142,9 @@ pub(crate) struct WithdrawBodyRequest {
     #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String)]
     currency: BalanceType,
-    #[serde_as(as = "DisplayFromStr")]
+    #[serde(deserialize_with = "deserialize_u256_value_from_str")]
     #[schema(value_type = String)]
-    amount: String,
+    amount: U256,
     #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String)]
     address: Address,
@@ -177,10 +186,7 @@ pub(super) async fn withdraw(
 ) -> impl IntoResponse {
     match state
         .hopr
-        .withdraw(
-            req_data.address,
-            Balance::new_from_str(&req_data.amount, req_data.currency),
-        )
+        .withdraw(req_data.address, Balance::new(req_data.amount, req_data.currency))
         .await
     {
         Ok(receipt) => (
@@ -195,5 +201,34 @@ pub(super) async fn withdraw(
         }
 
         Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::str::FromStr;
+
+    use hopr_lib::Address;
+
+    use crate::account::WithdrawBodyRequest;
+
+    #[test]
+    fn withdraw_input_data_should_be_convertible_from_string() -> anyhow::Result<()> {
+        let expected = WithdrawBodyRequest {
+            currency: "HOPR".parse().unwrap(),
+            amount: 20000.into(),
+            address: Address::from_str("0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe")?,
+        };
+
+        let actual: WithdrawBodyRequest = serde_json::from_str(
+            r#"{
+            "currency": "HOPR",
+            "amount": "20000",
+            "address": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe"}"#,
+        )?;
+
+        assert_eq!(actual, expected);
+
+        Ok(())
     }
 }

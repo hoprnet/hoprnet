@@ -43,7 +43,12 @@
       - [Testing environment](#testing-environment)
       - [Test execution](#test-execution)
 - [Using Fast Sync](#using-fast-sync)
-- [Profiling & Instrumentation](#profiling--instrumentation)
+  - [Prerequisites](#prerequisites)
+  - [Database Files](#database-files)
+  - [Configuration Steps](#configuration-steps)
+  - [Post-sync Behavior](#post-sync-behavior)
+- [Profiling \& Instrumentation](#profiling--instrumentation)
+  - [`tokio` executor instrumentation](#tokio-executor-instrumentation)
 - [Contact](#contact)
 - [License](#license)
 
@@ -204,6 +209,8 @@ On top of the default configuration options generated for the command line, the 
 - `OTEL_SERVICE_NAME` - the name of this node for the opentelemetry service
 - `HOPR_INTERNAL_LIBP2P_MAX_CONCURRENTLY_DIALED_PEER_COUNT` - the maximum number of concurrently dialed peers in libp2p
 - `HOPR_INTERNAL_LIBP2P_MAX_NEGOTIATING_INBOUND_STREAM_COUNT` - the maximum number of negotiating inbound streams
+- `HOPR_INTERNAL_LIBP2P_YAMUX_MAX_NUM_STREAMS` - the maximum number of used yamux streams
+- `HOPR_INTERNAL_LIBP2P_SWARM_IDLE_TIMEOUT` - timeout for all idle libp2p swarm connections in seconds
 - `ENV_WORKER_THREADS` - the number of environment worker threads for the tokio executor
 - `HOPRD_SESSION_PORT_RANGE` - allows restricting the port range (syntax: `start:end` inclusive) of Session listener automatic port selection (when port 0 is specified).
 
