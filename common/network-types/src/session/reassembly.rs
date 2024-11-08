@@ -1,10 +1,13 @@
-use bitvec::prelude::BitVec;
-use std::cmp::Ordering;
 use std::collections::VecDeque;
+use std::ops::Sub;
 use std::pin::Pin;
+use std::sync::atomic::AtomicU32;
 use std::task::{Context, Poll, Waker};
 use std::time::{Duration, Instant};
+
 use bitvec::bitvec;
+use bitvec::prelude::BitVec;
+
 use crate::prelude::errors::SessionError;
 use crate::prelude::{Frame, FrameId, Segment};
 use crate::session::frame::SeqNum;
@@ -12,17 +15,19 @@ use crate::session::frame::SeqNum;
 #[derive(Debug)]
 struct FrameBuilder {
     segments: Vec<Option<Segment>>,
+    set: usize,
     last_recv: Instant,
 }
 
 impl From<Segment> for FrameBuilder {
     fn from(value: Segment) -> Self {
         let mut segments = vec![None; value.seq_len as usize];
-        let idx = value.seq_idx as usize;
-        segments[idx] = Some(value);
+        let set = value.seq_idx as usize;
+        segments[set] = Some(value);
         Self {
             last_recv: Instant::now(),
             segments,
+            set,
         }
     }
 }
@@ -63,17 +68,17 @@ impl FrameBuilder {
 
     #[cfg(feature = "frame-inspector")]
     pub fn as_missing(&self) -> BitVec {
-        self.segments.iter().map(Option::is_some).collect()
+        self.segments.iter().map(Option::is_none).collect()
     }
 
     #[inline]
     pub fn frame_id(&self) -> FrameId {
-        self.segments[0].as_ref().unwrap().frame_id
+        self.segments[self.set].as_ref().unwrap().frame_id
     }
 
     #[inline]
     pub fn seq_len(&self) -> SeqNum {
-        self.segments[0].as_ref().unwrap().seq_len
+        self.segments[self.set].as_ref().unwrap().seq_len
     }
 
     #[inline]
@@ -89,59 +94,40 @@ pub struct FrameInfo {
     pub updated: Instant,
 }
 
-impl PartialOrd<Self> for FrameInfo {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for FrameInfo {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.updated.cmp(&other.updated)
-    }
-}
-
 #[cfg(feature = "frame-inspector")]
 #[derive(Clone, Debug)]
 pub struct FrameInspector {
     incomplete_frames: std::sync::Arc<dashmap::DashMap<FrameId, FrameBuilder>>,
+    highest_frame_id: std::sync::Arc<AtomicU32>,
 }
 
 #[cfg(feature = "frame-inspector")]
 impl FrameInspector {
-    pub fn pending_frames(&self, next_frame: FrameId, max_segments_per_frame: usize) -> Vec<FrameInfo> {
-        let mut missing_segments = self.incomplete_frames
-            .iter()
-            .map(|e| FrameInfo {
-                frame_id: e.frame_id(),
-                missing_segments: e.as_missing(),
-                updated: e.last_recv,
-            })
-            .collect::<Vec<_>>();
-
-        // If there are gaps, fill them as if the entire frames were missing
-        if !missing_segments.is_empty() {
-            missing_segments.sort_unstable_by(|a, b| b.frame_id.cmp(&a.frame_id));
-
-            let mut last_frame = &missing_segments[0];
-            for i in 1..missing_segments.len() {
-                let last_frame_id = last_frame.frame_id;
-                if last_frame_id + 1 < missing_segments[i].frame_id {
-                    let diff = missing_segments[i].frame_id - last_frame_id;
-                    for j in i + 1.. i + diff as usize {
-                        missing_segments.insert(j, FrameInfo {
-                                frame_id: last_frame_id + j as FrameId,
-                                missing_segments: bitvec![1; max_segments_per_frame],
-                                updated: last_frame.updated,
-                            }
-                        )
+    pub fn pending_frames(
+        &self,
+        next_frame: FrameId,
+        last_emit: Instant,
+        max_segments_per_frame: usize,
+    ) -> Vec<FrameInfo> {
+        let mut updated = last_emit;
+        (next_frame..=self.highest_frame_id.load(std::sync::atomic::Ordering::SeqCst))
+            .map(|frame_id| {
+                if let Some(e) = self.incomplete_frames.get(&frame_id) {
+                    updated = e.last_recv;
+                    FrameInfo {
+                        frame_id: e.frame_id(),
+                        missing_segments: e.as_missing(),
+                        updated,
+                    }
+                } else {
+                    FrameInfo {
+                        missing_segments: bitvec![1; max_segments_per_frame],
+                        frame_id,
+                        updated,
                     }
                 }
-                last_frame = &missing_segments[i];
-            }
-
-        }
-        missing_segments
+            })
+            .collect()
     }
 }
 
@@ -151,6 +137,8 @@ impl FrameInspector {
 pub struct Reassembler {
     #[cfg(feature = "frame-inspector")]
     incomplete_frames: std::sync::Arc<dashmap::DashMap<FrameId, FrameBuilder>>,
+    #[cfg(feature = "frame-inspector")]
+    highest_frame_id: std::sync::Arc<AtomicU32>,
     #[cfg(not(feature = "frame-inspector"))]
     incomplete_frames: std::collections::HashMap<FrameId, FrameBuilder>,
     complete_frames: VecDeque<Result<Frame, SessionError>>,
@@ -170,6 +158,8 @@ impl Reassembler {
         Self {
             #[cfg(feature = "frame-inspector")]
             incomplete_frames: dashmap::DashMap::with_capacity(Self::INCOMPLETE_FRAME_RATIO * capacity + 1).into(),
+            #[cfg(feature = "frame-inspector")]
+            highest_frame_id: std::sync::Arc::new(AtomicU32::new(0)),
             #[cfg(not(feature = "frame-inspector"))]
             incomplete_frames: std::collections::HashMap::with_capacity(Self::INCOMPLETE_FRAME_RATIO * capacity + 1),
             complete_frames: VecDeque::with_capacity(capacity),
@@ -186,6 +176,7 @@ impl Reassembler {
     pub fn inspect(&self) -> FrameInspector {
         FrameInspector {
             incomplete_frames: self.incomplete_frames.clone(),
+            highest_frame_id: self.highest_frame_id.clone(),
         }
     }
 
@@ -194,7 +185,7 @@ impl Reassembler {
 
         // Since the retaining operation is potentially expensive,
         // we do it actually only if there's a real chance that a frame is expired
-        // or if the reassembler is closing (= in such case everything is expired right away).
+        // or if the reassembler is closing (= in such a case everything is expired right away).
         if self.is_closed || self.last_expiration.elapsed() >= self.max_age {
             self.incomplete_frames.retain(|id, b| {
                 if b.last_recv.elapsed() >= self.max_age || self.is_closed {
@@ -225,9 +216,10 @@ impl futures::Sink<Segment> for Reassembler {
 
         // If we're at the capacity of incomplete frames,
         // check if we can expire more than the amount that's over the capacity.
-        if self.incomplete_frames.len() >= self.capacity * Self::INCOMPLETE_FRAME_RATIO &&
-            self.expire_frames() <= self.incomplete_frames.len() - self.capacity {
-                return Poll::Ready(Err(SessionError::TooManyIncompleteFrames));
+        if self.incomplete_frames.len() >= self.capacity * Self::INCOMPLETE_FRAME_RATIO
+            && self.expire_frames() <= self.incomplete_frames.len() - self.capacity
+        {
+            return Poll::Ready(Err(SessionError::TooManyIncompleteFrames));
         }
 
         if self.complete_frames.len() >= self.capacity {
@@ -281,6 +273,10 @@ impl futures::Sink<Segment> for Reassembler {
                     );
                     Some(builder.try_into())
                 } else {
+                    #[cfg(feature = "frame-inspector")]
+                    self.highest_frame_id
+                        .fetch_max(builder.frame_id(), std::sync::atomic::Ordering::AcqRel);
+
                     e.insert(builder);
                     None
                 }
@@ -371,11 +367,14 @@ impl futures::Stream for Reassembler {
 mod tests {
     use super::*;
     use async_std::prelude::FutureExt;
+    use bitvec::bits;
+    use dashmap::DashMap;
     use futures::{pin_mut, SinkExt, StreamExt, TryStreamExt};
     use hex_literal::hex;
     use rand::prelude::SliceRandom;
     use rand::rngs::StdRng;
     use rand::SeedableRng;
+    use std::sync::Arc;
 
     const RNG_SEED: [u8; 32] = hex!("d8a471f1c20490a3442b96fdde9d1807428096e1601b0cef0eea7e6d44a24c01");
 
@@ -627,5 +626,98 @@ mod tests {
         ));
 
         Ok(())
+    }
+
+    #[cfg(feature = "frame-inspector")]
+    #[test]
+    fn frame_inspector_should_include_missing_frames() {
+        let incomplete_frames = Arc::new(DashMap::new());
+        let now = Instant::now();
+
+        incomplete_frames.insert(
+            1,
+            FrameBuilder {
+                segments: vec![
+                    Segment {
+                        frame_id: 1,
+                        seq_idx: 0,
+                        seq_len: 3,
+                        data: Box::new([]),
+                    }
+                    .into(),
+                    None,
+                    None,
+                ],
+                set: 0,
+                last_recv: now.sub(Duration::from_secs(3)),
+            },
+        );
+
+        incomplete_frames.insert(
+            3,
+            FrameBuilder {
+                segments: vec![
+                    None,
+                    Segment {
+                        frame_id: 3,
+                        seq_idx: 1,
+                        seq_len: 3,
+                        data: Box::new([]),
+                    }
+                    .into(),
+                    None,
+                ],
+                set: 1,
+                last_recv: now.sub(Duration::from_secs(2)),
+            },
+        );
+
+        incomplete_frames.insert(
+            5,
+            FrameBuilder {
+                segments: vec![
+                    Segment {
+                        frame_id: 5,
+                        seq_idx: 0,
+                        seq_len: 3,
+                        data: Box::new([]),
+                    }
+                    .into(),
+                    None,
+                    Segment {
+                        frame_id: 5,
+                        seq_idx: 2,
+                        seq_len: 3,
+                        data: Box::new([]),
+                    }
+                    .into(),
+                ],
+                set: 0,
+                last_recv: now.sub(Duration::from_secs(1)),
+            },
+        );
+
+        let inspector = FrameInspector {
+            incomplete_frames,
+            highest_frame_id: Arc::new(AtomicU32::new(5)),
+        };
+
+        let pending = inspector.pending_frames(2, now, 5);
+
+        use bitvec::prelude::Lsb0;
+
+        assert_eq!(pending.len(), 4);
+
+        assert_eq!(pending[0].frame_id, 2);
+        assert_eq!(pending[0].missing_segments, bits![1; 5]);
+
+        assert_eq!(pending[1].frame_id, 3);
+        assert_eq!(pending[1].missing_segments, bits![1, 0, 1]);
+
+        assert_eq!(pending[2].frame_id, 4);
+        assert_eq!(pending[2].missing_segments, bits![1; 5]);
+
+        assert_eq!(pending[3].frame_id, 5);
+        assert_eq!(pending[3].missing_segments, bits![0, 1, 0]);
     }
 }

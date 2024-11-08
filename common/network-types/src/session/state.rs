@@ -1060,7 +1060,6 @@ mod tests {
     use rand::rngs::StdRng;
     use rand::{Rng, SeedableRng};
     use std::iter::Extend;
-    use std::sync::atomic::AtomicUsize;
     use test_log::test;
 
     use crate::session::utils::{FaultyNetwork, FaultyNetworkConfig, NetworkStats};
