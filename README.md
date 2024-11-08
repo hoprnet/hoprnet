@@ -515,7 +515,7 @@ Once an instrumented tokio is built into hoprd, the application can be instrumen
 
 ## Contact
 
-- [Twitter](https://twitter.com/hoprnet)
+- [X (formerly Twitter)](https://x.com/hoprnet)
 - [Telegram](https://t.me/hoprnet)
 - [Medium](https://medium.com/hoprnet)
 - [Reddit](https://www.reddit.com/r/HOPR/)
