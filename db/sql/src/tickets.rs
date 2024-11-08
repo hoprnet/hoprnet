@@ -2,7 +2,7 @@ use async_stream::stream;
 use hopr_db_api::resolver::HoprDbResolverOperations;
 use hopr_db_api::tickets::AggregationPrerequisites;
 use std::cmp;
-use std::ops::Add;
+use std::ops::{Add, Bound};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
@@ -90,8 +90,17 @@ impl IntoCondition for WrappedTicketSelector {
             TicketIndexSelector::Multiple(idxs) => {
                 expr = expr.and(ticket::Column::Index.is_in(idxs.into_iter().map(|i| i.to_be_bytes().to_vec())));
             }
-            TicketIndexSelector::LessThan(bound) => {
-                expr = expr.and(ticket::Column::Index.lt(bound.to_be_bytes().to_vec()))
+            TicketIndexSelector::Range((lb, ub)) => {
+                expr = match lb {
+                    Bound::Included(gte) => expr.and(ticket::Column::Index.gte(gte.to_be_bytes().to_vec())),
+                    Bound::Excluded(gt) => expr.and(ticket::Column::Index.gt(gt.to_be_bytes().to_vec())),
+                    Bound::Unbounded => expr,
+                };
+                expr = match ub {
+                    Bound::Included(lte) => expr.and(ticket::Column::Index.lte(lte.to_be_bytes().to_vec())),
+                    Bound::Excluded(lt) => expr.and(ticket::Column::Index.lt(lt.to_be_bytes().to_vec())),
+                    Bound::Unbounded => expr,
+                };
             }
         }
 
@@ -103,9 +112,34 @@ impl IntoCondition for WrappedTicketSelector {
             expr = expr.and(ticket::Column::IndexOffset.gt(1));
         }
 
-        if let Some(prob) = self.0.win_prob_lt {
-            expr = expr.and(ticket::Column::WinningProbability.lt(prob.to_vec()));
-        }
+        // Win prob lower bound
+        expr = match self.0.win_prob.0 {
+            Bound::Included(gte) => expr.and(ticket::Column::WinningProbability.gte(gte.to_vec())),
+            Bound::Excluded(gt) => expr.and(ticket::Column::WinningProbability.gt(gt.to_vec())),
+            Bound::Unbounded => expr,
+        };
+
+        // Win prob upper bound
+        expr = match self.0.win_prob.1 {
+            Bound::Included(lte) => expr.and(ticket::Column::WinningProbability.lte(lte.to_vec())),
+            Bound::Excluded(lt) => expr.and(ticket::Column::WinningProbability.lt(lt.to_vec())),
+            Bound::Unbounded => expr,
+        };
+
+        // Amount lower bound
+        expr = match self.0.amount.0 {
+            Bound::Included(gte) => expr.and(ticket::Column::Amount.gte(gte.amount().to_be_bytes().to_vec())),
+            Bound::Excluded(gt) => expr.and(ticket::Column::Amount.gt(gt.amount().to_be_bytes().to_vec())),
+            Bound::Unbounded => expr,
+        };
+
+        // Amount upper bound
+        expr = match self.0.amount.1 {
+            Bound::Included(lte) => expr.and(ticket::Column::Amount.lte(lte.amount().to_be_bytes().to_vec())),
+            Bound::Excluded(lt) => expr.and(ticket::Column::Amount.lt(lt.amount().to_be_bytes().to_vec())),
+            Bound::Unbounded => expr,
+        };
+
         expr.into_condition()
     }
 }

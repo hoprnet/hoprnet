@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 use std::fmt::{Display, Formatter};
+use std::ops::{Bound, RangeBounds};
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 
@@ -23,8 +24,8 @@ pub enum TicketIndexSelector {
     Single(u64),
     /// Selects multiple tickets with the given indices.
     Multiple(HashSet<u64>),
-    /// Selects multiple tickets with indices strictly less than the given bound.
-    LessThan(u64),
+    /// Selects multiple tickets with indices within the given range.
+    Range((Bound<u64>, Bound<u64>)),
 }
 
 impl Display for TicketIndexSelector {
@@ -33,7 +34,7 @@ impl Display for TicketIndexSelector {
             TicketIndexSelector::None => write!(f, ""),
             TicketIndexSelector::Single(idx) => write!(f, "with index {idx}"),
             TicketIndexSelector::Multiple(indices) => write!(f, "with indices {indices:?}"),
-            TicketIndexSelector::LessThan(bound) => write!(f, "with indices less than {bound}"),
+            TicketIndexSelector::Range((lb, ub)) => write!(f, "with indices in {lb:?}..{ub:?}"),
         }
     }
 }
@@ -50,8 +51,11 @@ pub struct TicketSelector {
     /// See [TicketIndexSelector] for possible options.
     pub index: TicketIndexSelector,
     /// If given, the tickets are further restricted to the ones with a winning probability
-    /// less than this value.
-    pub win_prob_lt: Option<EncodedWinProb>,
+    /// in this range.
+    pub win_prob: (Bound<EncodedWinProb>, Bound<EncodedWinProb>),
+    /// If given, the tickets are further restricted to the ones with an amount
+    /// in this range.
+    pub amount: (Bound<Balance>, Bound<Balance>),
     /// Further restriction to tickets with the given state.
     pub state: Option<AcknowledgedTicketStatus>,
     /// Further restrict to only aggregated tickets.
@@ -67,7 +71,7 @@ impl Display for TicketSelector {
             self.state
                 .map(|state| format!(" in state {state}"))
                 .unwrap_or("".into()),
-            if self.only_aggregated { " only aggregated" } else { "" }
+            if self.only_aggregated { " only aggregated" } else { "" },
         );
         write!(f, "{}", out.trim())
     }
@@ -79,7 +83,8 @@ impl TicketSelector {
         Self {
             channel_identifiers: vec![(channel_id, epoch.into())],
             index: TicketIndexSelector::None,
-            win_prob_lt: None,
+            win_prob: (Bound::Unbounded, Bound::Unbounded),
+            amount: (Bound::Unbounded, Bound::Unbounded),
             state: None,
             only_aggregated: false,
         }
@@ -89,7 +94,7 @@ impl TicketSelector {
     /// `channel_id` and `epoch` to the selector.
     ///
     /// This also nullifies any prior effect of any prior calls to [`TicketSelector::with_index`] or
-    /// [`TicketSelector::with_index_lt`]
+    /// [`TicketSelector::with_index_range`]
     /// as ticket indices cannot be matched over multiple channels.
     pub fn also_on_channel<T: Into<U256>>(self, channel_id: Hash, epoch: T) -> Self {
         let mut ret = self.clone();
@@ -109,7 +114,7 @@ impl TicketSelector {
     /// Checks if this selector operates only on a single channel.
     ///
     /// This will return `false` if [`TicketSelector::also_on_channel`] was called, and neither
-    /// the [`TicketSelector::with_index`] nor [`TicketSelector::with_index_lt`] were
+    /// the [`TicketSelector::with_index`] nor [`TicketSelector::with_index_range`] were
     /// called subsequently.
     pub fn is_single_channel(&self) -> bool {
         self.channel_identifiers.len() == 1
@@ -124,12 +129,12 @@ impl TicketSelector {
 
     /// Returns this instance with a ticket index set.
     /// This method can be called multiple times to select multiple tickets.
-    /// If [`TicketSelector::with_index_lt`] was previously called, it will be replaced.
+    /// If [`TicketSelector::with_index_range`] was previously called, it will be replaced.
     /// If [`TicketSelector::also_on_channel`] was previously called, its effect will be nullified.
     pub fn with_index(mut self, index: u64) -> Self {
         self.channel_identifiers.truncate(1);
         self.index = match self.index {
-            TicketIndexSelector::None | TicketIndexSelector::LessThan(_) => TicketIndexSelector::Single(index),
+            TicketIndexSelector::None | TicketIndexSelector::Range(_) => TicketIndexSelector::Single(index),
             TicketIndexSelector::Single(existing) => {
                 TicketIndexSelector::Multiple(HashSet::from_iter([existing, index]))
             }
@@ -144,9 +149,9 @@ impl TicketSelector {
     /// Returns this instance with a ticket index upper bound set.
     /// If [`TicketSelector::with_index`] was previously called, it will be replaced.
     /// If [`TicketSelector::also_on_channel`] was previously called, its effect will be nullified.
-    pub fn with_index_lt(mut self, index_bound: u64) -> Self {
+    pub fn with_index_range<T: RangeBounds<u64>>(mut self, index_bound: T) -> Self {
         self.channel_identifiers.truncate(1);
-        self.index = TicketIndexSelector::LessThan(index_bound);
+        self.index = TicketIndexSelector::Range((index_bound.start_bound().cloned(), index_bound.end_bound().cloned()));
         self
     }
 
@@ -168,9 +173,15 @@ impl TicketSelector {
         self
     }
 
-    /// Returns this instance with a winning probability upper bound set.
-    pub fn with_winning_probability_lt(mut self, win_prob_lt: EncodedWinProb) -> Self {
-        self.win_prob_lt = Some(win_prob_lt);
+    /// Returns this instance with a winning probability range bounds set.
+    pub fn with_winning_probability<T: RangeBounds<EncodedWinProb>>(mut self, range: T) -> Self {
+        self.win_prob = (range.start_bound().cloned(), range.end_bound().cloned());
+        self
+    }
+
+    /// Returns this instance with the ticket amount range bounds set.
+    pub fn with_amount<T: RangeBounds<Balance>>(mut self, range: T) -> Self {
+        self.amount = (range.start_bound().cloned(), range.end_bound().cloned());
         self
     }
 }
@@ -183,7 +194,8 @@ impl From<&AcknowledgedTicket> for TicketSelector {
                 value.verified_ticket().channel_epoch.into(),
             )],
             index: TicketIndexSelector::Single(value.verified_ticket().index),
-            win_prob_lt: None,
+            win_prob: (Bound::Unbounded, Bound::Unbounded),
+            amount: (Bound::Unbounded, Bound::Unbounded),
             state: Some(value.status),
             only_aggregated: value.verified_ticket().index_offset > 1,
         }
@@ -198,7 +210,8 @@ impl From<&RedeemableTicket> for TicketSelector {
                 value.verified_ticket().channel_epoch.into(),
             )],
             index: TicketIndexSelector::Single(value.verified_ticket().index),
-            win_prob_lt: None,
+            win_prob: (Bound::Unbounded, Bound::Unbounded),
+            amount: (Bound::Unbounded, Bound::Unbounded),
             state: None,
             only_aggregated: value.verified_ticket().index_offset > 1,
         }
@@ -210,7 +223,8 @@ impl From<&ChannelEntry> for TicketSelector {
         Self {
             channel_identifiers: vec![(value.get_id(), value.channel_epoch)],
             index: TicketIndexSelector::None,
-            win_prob_lt: None,
+            win_prob: (Bound::Unbounded, Bound::Unbounded),
+            amount: (Bound::Unbounded, Bound::Unbounded),
             state: None,
             only_aggregated: false,
         }
