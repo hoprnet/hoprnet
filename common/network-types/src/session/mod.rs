@@ -19,6 +19,7 @@
 //! Contains errors thrown from this module.
 pub mod errors;
 mod frame;
+mod frames;
 pub mod protocol;
 mod reassembly;
 mod sequencer;

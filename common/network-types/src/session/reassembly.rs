@@ -1,5 +1,4 @@
 use std::collections::VecDeque;
-use std::ops::Sub;
 use std::pin::Pin;
 use std::sync::atomic::AtomicU32;
 use std::task::{Context, Poll, Waker};
@@ -10,82 +9,8 @@ use bitvec::prelude::BitVec;
 
 use crate::prelude::errors::SessionError;
 use crate::prelude::{Frame, FrameId, Segment};
-use crate::session::frame::SeqNum;
+use crate::session::frames::FrameBuilder;
 
-#[derive(Debug)]
-struct FrameBuilder {
-    segments: Vec<Option<Segment>>,
-    set: usize,
-    last_recv: Instant,
-}
-
-impl From<Segment> for FrameBuilder {
-    fn from(value: Segment) -> Self {
-        let mut segments = vec![None; value.seq_len as usize];
-        let set = value.seq_idx as usize;
-        segments[set] = Some(value);
-        Self {
-            last_recv: Instant::now(),
-            segments,
-            set,
-        }
-    }
-}
-
-impl TryFrom<FrameBuilder> for Frame {
-    type Error = SessionError;
-
-    fn try_from(value: FrameBuilder) -> Result<Self, Self::Error> {
-        let frame_id = value.frame_id();
-
-        if value.remaining() > 0 {
-            return Err(SessionError::IncompleteFrame(frame_id));
-        }
-
-        Ok(Frame {
-            frame_id,
-            data: value
-                .segments
-                .into_iter()
-                .flat_map(|s| s.unwrap().data.into_vec())
-                .collect::<Vec<_>>()
-                .into_boxed_slice(),
-        })
-    }
-}
-
-impl FrameBuilder {
-    pub fn add_segment(&mut self, segment: Segment) -> Result<(), SessionError> {
-        let idx = segment.seq_idx;
-        if segment.frame_id != self.frame_id() || segment.seq_idx >= self.seq_len() {
-            return Err(SessionError::InvalidSegment);
-        }
-
-        self.segments[idx as usize] = Some(segment);
-        self.last_recv = Instant::now();
-        Ok(())
-    }
-
-    #[cfg(feature = "frame-inspector")]
-    pub fn as_missing(&self) -> BitVec {
-        self.segments.iter().map(Option::is_none).collect()
-    }
-
-    #[inline]
-    pub fn frame_id(&self) -> FrameId {
-        self.segments[self.set].as_ref().unwrap().frame_id
-    }
-
-    #[inline]
-    pub fn seq_len(&self) -> SeqNum {
-        self.segments[self.set].as_ref().unwrap().seq_len
-    }
-
-    #[inline]
-    pub fn remaining(&self) -> SeqNum {
-        self.seq_len() - self.segments.iter().filter(|s| s.is_some()).count() as SeqNum
-    }
-}
 #[cfg(feature = "frame-inspector")]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FrameInfo {
@@ -115,7 +40,7 @@ impl FrameInspector {
                 if let Some(e) = self.incomplete_frames.get(&frame_id) {
                     updated = e.last_recv;
                     FrameInfo {
-                        frame_id: e.frame_id(),
+                        frame_id: *e.frame_id(),
                         missing_segments: e.as_missing(),
                         updated,
                     }
@@ -185,12 +110,12 @@ impl Reassembler {
 
         // Since the retaining operation is potentially expensive,
         // we do it actually only if there's a real chance that a frame is expired
-        // or if the reassembler is closing (= in such a case everything is expired right away).
+        // or if the reassembler is closing (= everything is expired right away).
         if self.is_closed || self.last_expiration.elapsed() >= self.max_age {
             self.incomplete_frames.retain(|id, b| {
                 if b.last_recv.elapsed() >= self.max_age || self.is_closed {
                     self.complete_frames.push_back(Err(SessionError::FrameDiscarded(*id)));
-                    tracing::trace!("frame {id} discarded");
+                    tracing::trace!(frame_id = id, "frame discarded");
                     expired += 1;
                     false
                 } else {
@@ -234,8 +159,8 @@ impl futures::Sink<Segment> for Reassembler {
             Poll::Pending
         } else {
             tracing::trace!(
-                "Reassembler::poll_ready ready (remaining {})",
-                self.capacity - self.complete_frames.len()
+                remaining = self.capacity - self.complete_frames.len(),
+                "Reassembler::poll_ready ready",
             );
             Poll::Ready(Ok(()))
         }
@@ -256,26 +181,33 @@ impl futures::Sink<Segment> for Reassembler {
         let maybe_frame = match self.incomplete_frames.entry(item.frame_id) {
             Entry::Occupied(mut e) => {
                 let builder = e.get_mut();
-                builder.add_segment(item)?;
-                if builder.remaining() == 0 {
-                    tracing::trace!("Reassembler::start_send frame {} is complete", e.key());
-                    Some(e.remove().try_into())
-                } else {
-                    None
+                match builder.add_segment(item) {
+                    Ok(_) => {
+                        if builder.is_complete() {
+                            tracing::trace!(frame_id = e.key(), "Reassembler::start_send frame is complete");
+                            Some(e.remove().try_into())
+                        } else {
+                            None
+                        }
+                    }
+                    Err(error) => {
+                        tracing::error!(frame_id = e.key(), %error, "encountered invalid segment");
+                        None
+                    }
                 }
             }
             Entry::Vacant(e) => {
                 let builder = FrameBuilder::from(item);
-                if builder.remaining() == 0 {
+                if builder.is_complete() {
                     tracing::trace!(
-                        "Reassembler::start_send single segment frame {} is complete",
-                        builder.frame_id()
+                        frame_id = builder.frame_id(),
+                        "Reassembler::start_send single segment frame is complete",
                     );
                     Some(builder.try_into())
                 } else {
                     #[cfg(feature = "frame-inspector")]
                     self.highest_frame_id
-                        .fetch_max(builder.frame_id(), std::sync::atomic::Ordering::AcqRel);
+                        .fetch_max(*builder.frame_id(), std::sync::atomic::Ordering::AcqRel);
 
                     e.insert(builder);
                     None
@@ -343,8 +275,8 @@ impl futures::Stream for Reassembler {
             }
             Poll::Ready(Some(
                 complete
-                    .inspect(|f| tracing::trace!("Reassembler::poll_next ready {}", f.frame_id))
-                    .inspect_err(|e| tracing::trace!("Reassembler::poll_next ready error ({e})")),
+                    .inspect(|f| tracing::trace!(frame_id = f.frame_id, "Reassembler::poll_next ready"))
+                    .inspect_err(|e| tracing::trace!(error = %e, "Reassembler::poll_next ready error")),
             ))
         } else if !self.is_closed {
             // The next sink operation will wake us up, but only if we give it a chance
@@ -366,14 +298,16 @@ impl futures::Stream for Reassembler {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     use async_std::prelude::FutureExt;
-    use bitvec::bits;
+    use bitvec::prelude::*;
     use dashmap::DashMap;
     use futures::{pin_mut, SinkExt, StreamExt, TryStreamExt};
     use hex_literal::hex;
     use rand::prelude::SliceRandom;
     use rand::rngs::StdRng;
     use rand::SeedableRng;
+    use std::ops::Sub;
     use std::sync::Arc;
 
     const RNG_SEED: [u8; 32] = hex!("d8a471f1c20490a3442b96fdde9d1807428096e1601b0cef0eea7e6d44a24c01");
@@ -634,68 +568,34 @@ mod tests {
         let incomplete_frames = Arc::new(DashMap::new());
         let now = Instant::now();
 
-        incomplete_frames.insert(
-            1,
-            FrameBuilder {
-                segments: vec![
-                    Segment {
-                        frame_id: 1,
-                        seq_idx: 0,
-                        seq_len: 3,
-                        data: Box::new([]),
-                    }
-                    .into(),
-                    None,
-                    None,
-                ],
-                set: 0,
-                last_recv: now.sub(Duration::from_secs(3)),
-            },
-        );
+        let mut frame_1 = FrameBuilder::from(Segment {
+            frame_id: 1,
+            seq_idx: 0,
+            seq_len: 3,
+            data: Box::new([]),
+        });
+        frame_1.last_recv = now.sub(Duration::from_secs(3));
 
-        incomplete_frames.insert(
-            3,
-            FrameBuilder {
-                segments: vec![
-                    None,
-                    Segment {
-                        frame_id: 3,
-                        seq_idx: 1,
-                        seq_len: 3,
-                        data: Box::new([]),
-                    }
-                    .into(),
-                    None,
-                ],
-                set: 1,
-                last_recv: now.sub(Duration::from_secs(2)),
-            },
-        );
+        incomplete_frames.insert(1, frame_1);
 
-        incomplete_frames.insert(
-            5,
-            FrameBuilder {
-                segments: vec![
-                    Segment {
-                        frame_id: 5,
-                        seq_idx: 0,
-                        seq_len: 3,
-                        data: Box::new([]),
-                    }
-                    .into(),
-                    None,
-                    Segment {
-                        frame_id: 5,
-                        seq_idx: 2,
-                        seq_len: 3,
-                        data: Box::new([]),
-                    }
-                    .into(),
-                ],
-                set: 0,
-                last_recv: now.sub(Duration::from_secs(1)),
-            },
-        );
+        let mut frame_3 = FrameBuilder::from(Segment {
+            frame_id: 3,
+            seq_idx: 1,
+            seq_len: 3,
+            data: Box::new([]),
+        });
+        frame_3.last_recv = now.sub(Duration::from_secs(2));
+        incomplete_frames.insert(3, frame_3);
+
+        let mut frame_5 = FrameBuilder::from(Segment {
+            frame_id: 5,
+            seq_idx: 0,
+            seq_len: 3,
+            data: Box::new([]),
+        });
+        frame_5.last_recv = now.sub(Duration::from_secs(1));
+
+        incomplete_frames.insert(5, frame_5);
 
         let inspector = FrameInspector {
             incomplete_frames,
@@ -703,8 +603,6 @@ mod tests {
         };
 
         let pending = inspector.pending_frames(2, now, 5);
-
-        use bitvec::prelude::Lsb0;
 
         assert_eq!(pending.len(), 4);
 
@@ -718,6 +616,6 @@ mod tests {
         assert_eq!(pending[2].missing_segments, bits![1; 5]);
 
         assert_eq!(pending[3].frame_id, 5);
-        assert_eq!(pending[3].missing_segments, bits![0, 1, 0]);
+        assert_eq!(pending[3].missing_segments, bits![0, 1, 1]);
     }
 }

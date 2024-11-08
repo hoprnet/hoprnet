@@ -62,7 +62,7 @@ where
             return Poll::Ready(Err(SessionError::ReassemblerClosed));
         }
 
-        tracing::trace!("Sequencer::poll_ready buffer {}", self.buffer.len());
+        tracing::trace!(len = self.buffer.len(), "Sequencer::poll_ready buffer");
 
         if self.buffer.len() >= self.cfg.capacity {
             self.rx_waker = Some(cx.waker().clone());
@@ -76,8 +76,8 @@ where
             Poll::Pending
         } else {
             tracing::trace!(
-                "Sequencer::poll_ready ready (remaining {})",
-                self.cfg.capacity - self.buffer.len()
+                len = self.cfg.capacity - self.buffer.len(),
+                "Sequencer::poll_ready ready"
             );
             Poll::Ready(Ok(()))
         }
@@ -98,7 +98,7 @@ where
                 }
             }
         } else {
-            tracing::warn!("cannot accept frame older than {}", self.next_id);
+            tracing::warn!(next_id = self.next_id, "cannot accept old frame");
         }
 
         Ok(())
@@ -162,12 +162,13 @@ where
                         waker.wake();
                     }
                     tracing::trace!(
-                        "Sequencer::poll_next ready {current_to_emit} (len = {})",
-                        self.buffer.len()
+                        frame_id = current_to_emit,
+                        len = self.buffer.len(),
+                        "Sequencer::poll_next ready"
                     );
                     Poll::Ready(popped)
                 } else {
-                    tracing::trace!("Sequencer::poll_next discard {current_to_emit}");
+                    tracing::trace!(frame_id = current_to_emit, "Sequencer::poll_next discard");
                     Poll::Ready(Some(Err(SessionError::FrameDiscarded(current_to_emit))))
                 };
             }
@@ -177,7 +178,7 @@ where
                 // we emit the missing ones as discarded frames until we
                 // catch up with the rest of the buffered frames to flush out.
                 self.next_id += 1;
-                tracing::trace!("Sequencer::poll_next discard {current_to_emit}");
+                tracing::trace!(frame_id = current_to_emit, "Sequencer::poll_next discard");
                 return Poll::Ready(Some(Err(SessionError::FrameDiscarded(current_to_emit))));
             }
         }
