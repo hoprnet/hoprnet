@@ -3,21 +3,21 @@
 //! It can be configured to automatically redeem all tickets or only aggregated tickets (which results in far fewer on-chain transactions being issued).
 //!
 //! For details on default parameters, see [AutoRedeemingStrategyConfig].
+use crate::errors::StrategyError::CriteriaNotSatisfied;
+use crate::strategy::SingularStrategy;
+use crate::Strategy;
 use async_trait::async_trait;
 use chain_actions::redeem::TicketRedeemActions;
 use hopr_db_sql::api::tickets::HoprDbTicketOperations;
+use hopr_db_sql::prelude::TicketSelector;
 use hopr_internal_types::prelude::*;
 use hopr_internal_types::tickets::{AcknowledgedTicket, AcknowledgedTicketStatus};
 use hopr_primitive_types::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use std::fmt::{Debug, Display, Formatter};
-use tracing::{debug, info};
+use tracing::{debug, error, info};
 use validator::Validate;
-
-use crate::errors::StrategyError::CriteriaNotSatisfied;
-use crate::strategy::SingularStrategy;
-use crate::Strategy;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleCounter;
@@ -28,9 +28,10 @@ lazy_static::lazy_static! {
         SimpleCounter::new("hopr_strategy_auto_redeem_redeem_count", "Count of initiated automatic redemptions").unwrap();
 }
 
-fn single_ticket_redeem() -> Balance {
-    Balance::new_from_str("2000000000000000000", BalanceType::HOPR)
+fn just_true() -> bool {
+    true
 }
+
 fn min_redeem_hopr() -> Balance {
     Balance::new_from_str("90000000000000000", BalanceType::HOPR)
 }
@@ -43,8 +44,17 @@ pub struct AutoRedeemingStrategyConfig {
     /// Otherwise, it redeems all acknowledged winning tickets.
     ///
     /// Default is true.
+    #[serde(default = "just_true")]
     #[default = true]
     pub redeem_only_aggregated: bool,
+
+    /// If set to true, will redeem all tickets in the channel (which are over the
+    /// `minimum_redeem_ticket_value` threshold) once it transitions to `PendingToClose`.
+    ///
+    /// Default is true.
+    #[serde(default = "just_true")]
+    #[default = true]
+    pub redeem_all_on_close: bool,
 
     /// The strategy will only redeem an acknowledged winning ticket if it has at least this value of HOPR.
     /// If 0 is given, the strategy will redeem tickets regardless of their value.
@@ -55,16 +65,6 @@ pub struct AutoRedeemingStrategyConfig {
     #[serde_as(as = "DisplayFromStr")]
     #[default(Balance::new_from_str("90000000000000000", BalanceType::HOPR))]
     pub minimum_redeem_ticket_value: Balance,
-
-    /// The strategy will automatically redeem if there's a single ticket left when a channel
-    /// transitions to `PendingToClose` and it has at least this value of HOPR.
-    /// This happens regardless of the `redeem_only_aggregated` setting.
-    ///
-    /// Default is 2 HOPR.
-    #[serde(default = "single_ticket_redeem")]
-    #[serde_as(as = "DisplayFromStr")]
-    #[default(Balance::new_from_str("2000000000000000000", BalanceType::HOPR))]
-    pub on_close_redeem_single_tickets_value_min: Balance,
 }
 
 /// The `AutoRedeemingStrategy` automatically sends an acknowledged ticket
@@ -123,46 +123,49 @@ where
         direction: ChannelDirection,
         change: ChannelChange,
     ) -> crate::errors::Result<()> {
-        if direction != ChannelDirection::Incoming {
+        if direction != ChannelDirection::Incoming || !self.cfg.redeem_all_on_close {
             return Ok(());
         }
 
         if let ChannelChange::Status { left: old, right: new } = change {
             if old != ChannelStatus::Open || !matches!(new, ChannelStatus::PendingToClose(_)) {
-                debug!("ignoring channel {channel} state change that's not in PendingToClose");
+                debug!(?channel, "ignoring channel state change that's not in PendingToClose");
                 return Ok(());
             }
-            info!(%channel, "checking to redeem a singular ticket in because it's now PendingToClose");
+            info!(%channel, "channel transitioned to PendingToClose, checking if it has tickets to redeem");
 
-            let mut ack_ticket_in_db = self
-                .db
-                .get_tickets(channel.into())
-                .await?
+            let selector = TicketSelector::from(channel)
+                .with_state(AcknowledgedTicketStatus::Untouched)
+                .with_amount(self.cfg.minimum_redeem_ticket_value..);
+
+            let (redeem_sent_ok, redeem_sent_failed) =
+                futures::future::join_all(self.db.get_tickets(selector).await?.into_iter().map(|ack| {
+                    info!(%ack, worth = %ack.verified_ticket().amount, "redeeming ticket on channel close");
+
+                    #[cfg(all(feature = "prometheus", not(test)))]
+                    METRIC_COUNT_AUTO_REDEEMS.increment();
+
+                    self.chain_actions.redeem_ticket(ack.clone())
+                }))
+                .await
                 .into_iter()
-                .filter(|t| {
-                    t.status == AcknowledgedTicketStatus::Untouched
-                        && t.verified_ticket().amount >= self.cfg.on_close_redeem_single_tickets_value_min
+                .map(|submission_res| {
+                    if let Err(err) = submission_res {
+                        error!(%err, "error while submitting ticket for redemption");
+                        (0_usize, 1_usize)
+                    } else {
+                        // We intentionally do not await the ticket redemption until confirmation
+                        (1, 0)
+                    }
                 })
-                .collect::<Vec<_>>();
+                .reduce(|(sum_ok, sum_fail), (ok, fail)| (sum_ok + ok, sum_fail + fail))
+                .unwrap_or((0, 0));
 
-            if ack_ticket_in_db.len() == 1 {
-                let ack = ack_ticket_in_db
-                    .pop()
-                    .expect("should be unwrappable due to previous check");
-                info!(%ack, worth = %ack.verified_ticket().amount, "redeeming single ticket", );
-
-                #[cfg(all(feature = "prometheus", not(test)))]
-                METRIC_COUNT_AUTO_REDEEMS.increment();
-
-                let rx = self.chain_actions.redeem_ticket(ack.clone()).await?;
-                std::mem::drop(rx); // The Receiver is not intentionally awaited here and the oneshot Sender can fail safely
+            if redeem_sent_ok > 0 || redeem_sent_failed > 0 {
+                info!(redeem_sent_ok, redeem_sent_failed, %channel, "tickets channel being closed sent for redemption");
                 Ok(())
             } else {
-                debug!(
-                    "not auto-redeeming single ticket in {channel}: there are {} redeemable tickets worth >= {}",
-                    ack_ticket_in_db.len(),
-                    self.cfg.on_close_redeem_single_tickets_value_min
-                );
+                debug!(%channel, "no redeemable tickets with minimum amount in channel being closed");
                 Err(CriteriaNotSatisfied)
             }
         } else {
@@ -394,8 +397,8 @@ mod tests {
 
         let cfg = AutoRedeemingStrategyConfig {
             redeem_only_aggregated: true,
-            minimum_redeem_ticket_value: BalanceType::HOPR.zero(),
-            on_close_redeem_single_tickets_value_min: BalanceType::HOPR.balance(*PRICE_PER_PACKET * 5),
+            redeem_all_on_close: true,
+            minimum_redeem_ticket_value: BalanceType::HOPR.balance(*PRICE_PER_PACKET * 5),
         };
 
         let ars = AutoRedeemingStrategy::new(cfg, db, actions);
@@ -438,9 +441,9 @@ mod tests {
         actions.expect_redeem_ticket().never();
 
         let cfg = AutoRedeemingStrategyConfig {
-            minimum_redeem_ticket_value: BalanceType::HOPR.zero(),
+            minimum_redeem_ticket_value: BalanceType::HOPR.balance(*PRICE_PER_PACKET * 5),
             redeem_only_aggregated: false,
-            on_close_redeem_single_tickets_value_min: BalanceType::HOPR.balance(*PRICE_PER_PACKET * 5),
+            redeem_all_on_close: true,
         };
 
         let ars = AutoRedeemingStrategy::new(cfg, db, actions);
@@ -458,7 +461,7 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn test_auto_redeeming_strategy_should_not_redeem_non_singular_tickets_on_close() -> anyhow::Result<()> {
+    async fn test_auto_redeeming_strategy_should_not_redeem_unworthy_tickets_on_close() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ALICE.clone()).await?;
         db.set_domain_separator(None, DomainSeparator::Channel, Default::default())
             .await?;
@@ -469,14 +472,16 @@ mod tests {
             BalanceType::HOPR.balance(10),
             0.into(),
             ChannelStatus::PendingToClose(SystemTime::now().add(Duration::from_secs(100))),
-            0.into(),
+            4.into(),
         );
 
         db.upsert_channel(None, channel).await?;
 
         let db_clone = db.clone();
-        let ack_ticket_1 = generate_random_ack_ticket(1, 1, 5)?;
+        let ack_ticket_1 = generate_random_ack_ticket(1, 1, 3)?;
         let ack_ticket_2 = generate_random_ack_ticket(2, 1, 5)?;
+
+        let ack_ticket_2_clone = ack_ticket_2.clone();
 
         db.begin_transaction_in_db(TargetDb::Tickets)
             .await?
@@ -489,12 +494,17 @@ mod tests {
             .await?;
 
         let mut actions = MockTicketRedeemAct::new();
-        actions.expect_redeem_ticket().never();
+        let mock_confirm = mock_action_confirmation(ack_ticket_2_clone.clone())?;
+        actions
+            .expect_redeem_ticket()
+            .once()
+            .withf(move |ack| ack_ticket_2_clone.ticket.eq(&ack.ticket))
+            .return_once(move |_| Ok(ok(mock_confirm).boxed()));
 
         let cfg = AutoRedeemingStrategyConfig {
-            minimum_redeem_ticket_value: BalanceType::HOPR.zero(),
+            minimum_redeem_ticket_value: BalanceType::HOPR.balance(*PRICE_PER_PACKET * 5),
             redeem_only_aggregated: false,
-            on_close_redeem_single_tickets_value_min: BalanceType::HOPR.balance(*PRICE_PER_PACKET * 5),
+            redeem_all_on_close: true,
         };
 
         let ars = AutoRedeemingStrategy::new(cfg, db, actions);
@@ -506,8 +516,8 @@ mod tests {
                 right: channel.status,
             },
         )
-        .await
-        .expect_err("event should not satisfy criteria");
+        .await?;
+
         Ok(())
     }
 }
