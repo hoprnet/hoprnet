@@ -65,13 +65,21 @@ pub struct TicketSelector {
 impl Display for TicketSelector {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let out = format!(
-            "ticket selector in {:?} {}{}{}",
+            "ticket selector in {:?} {}{}{}{}{}",
             self.channel_identifiers,
             self.index,
             self.state
                 .map(|state| format!(" in state {state}"))
                 .unwrap_or("".into()),
             if self.only_aggregated { " only aggregated" } else { "" },
+            match &self.win_prob {
+                (Bound::Unbounded, Bound::Unbounded) => "".to_string(),
+                bounds => format!(" with winning probability in {bounds:?}"),
+            },
+            match &self.amount {
+                (Bound::Unbounded, Bound::Unbounded) => "".to_string(),
+                bounds => format!(" with amount in {bounds:?}"),
+            },
         );
         write!(f, "{}", out.trim())
     }
