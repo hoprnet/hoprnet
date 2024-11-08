@@ -132,7 +132,7 @@ where
                 debug!(?channel, "ignoring channel state change that's not in PendingToClose");
                 return Ok(());
             }
-            info!(%channel, "checking to redeem a tickets in channel because it's now PendingToClose");
+            info!(%channel, "channel transitioned to PendingToClose, checking if it has tickets to redeem");
 
             let selector = TicketSelector::from(channel)
                 .with_state(AcknowledgedTicketStatus::Untouched)
