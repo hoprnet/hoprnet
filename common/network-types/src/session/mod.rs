@@ -22,11 +22,11 @@ mod frame;
 mod frames;
 pub mod protocol;
 mod reassembly;
+mod segmenter;
 mod sequencer;
+mod socket;
 pub mod state;
 mod utils;
-mod socket;
-mod segmentor;
 
 pub use frame::{Frame, FrameId, FrameInfo, FrameReassembler, Segment, SegmentId};
 

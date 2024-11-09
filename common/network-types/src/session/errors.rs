@@ -49,7 +49,7 @@ pub enum SessionError {
     InvalidSegmentSize,
 
     #[error(transparent)]
-    IoError(#[from] std::io::Error)
+    IoError(#[from] std::io::Error),
 }
 
 pub type Result<T> = std::result::Result<T, SessionError>;
