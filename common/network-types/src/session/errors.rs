@@ -1,7 +1,7 @@
 use crate::prelude::FrameId;
 use thiserror::Error;
 
-#[derive(Error, Debug, Clone)]
+#[derive(Error, Debug)]
 pub enum SessionError {
     #[error("error while processing frame or segment: {0}")]
     ProcessingError(String),
@@ -47,6 +47,9 @@ pub enum SessionError {
 
     #[error("invalid size of a segment was specified")]
     InvalidSegmentSize,
+
+    #[error(transparent)]
+    IoError(#[from] std::io::Error)
 }
 
 pub type Result<T> = std::result::Result<T, SessionError>;

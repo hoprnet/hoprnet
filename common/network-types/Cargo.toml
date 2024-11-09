@@ -29,12 +29,15 @@ testing = []
 aquamarine = { workspace = true }
 arrayvec = { workspace = true }
 async-std-resolver = { workspace = true, optional = true }
+asynchronous-codec = "0.7.0"
 bitvec = { workspace = true }
+bytes = "1"
 crossbeam-queue = { workspace = true }
 crossbeam-skiplist = { workspace = true }
 dashmap = { workspace = true }
 flume = { workspace = true }
 futures = { workspace = true }
+futures-concurrency = { workspace = true }
 governor = { workspace = true }
 hex = { workspace = true }
 hickory-resolver = { workspace = true }
