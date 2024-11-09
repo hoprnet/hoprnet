@@ -24,7 +24,7 @@ pub struct Segmenter<const C: usize> {
 impl<const C: usize> Segmenter<C> {
     const PAYLOAD_CAPACITY: usize = C - SessionMessage::<C>::SEGMENT_OVERHEAD;
 
-    pub fn new(frame_size: usize, capacity: usize) -> (Self, impl futures::Stream<Item = Segment>) {
+    pub fn new(frame_size: usize, capacity: usize) -> (Self, impl futures::Stream<Item = Segment> + Send) {
         assert!(frame_size >= C, "frame size must be at least MTU");
         assert!(
             frame_size <= C * SessionMessage::<C>::MAX_SEGMENTS_PER_FRAME,

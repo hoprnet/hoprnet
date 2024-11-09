@@ -1,55 +1,61 @@
-/*use std::pin::Pin;
+use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::Duration;
 use asynchronous_codec::Framed;
-use futures::{pin_mut, Sink, StreamExt, TryStreamExt};
+use futures::{pin_mut, Sink, StreamExt, TryStreamExt, AsyncReadExt, AsyncWriteExt, SinkExt};
 use futures_concurrency::stream::Merge;
+use pin_project::pin_project;
 use crate::prelude::errors::SessionError;
-use crate::prelude::{frame_reconstructor, Frame};
-use crate::prelude::protocol::{SessionCodec, SessionMessage};
+use crate::prelude::{frame_reconstructor, Segment, SegmentId};
+use crate::prelude::protocol::{FrameAcknowledgements, SessionCodec, SessionMessage};
+use crate::session::protocol::SegmentRequest;
+use crate::session::segmenter::Segmenter;
 
 #[derive(Clone)]
 struct SocketState<const C: usize> {
-    data_tx: futures::channel::mpsc::Sender<SessionMessage<C>>,
-    ctl_tx: futures::channel::mpsc::Sender<SessionMessage<C>>,
-    seg_in: Arc<dyn Sink<SessionMessage<C>, Error = SessionError> + Send>,
+    ctl_tx: futures::channel::mpsc::UnboundedSender<SessionMessage<C>>,
 }
+
+impl<const C: usize> SocketState<C> {
+    pub fn notify_segment(&self, id: SegmentId) {
+        todo!()
+    }
+
+    pub fn acknowledge_frames(&mut self, ack: FrameAcknowledgements<C>) -> Result<(), SessionError>{
+        todo!()
+    }
+
+    pub fn retransmit_frames(&mut self, retransmit: SegmentRequest<C>) -> Result<(), SessionError> {
+        todo!()
+    }
+
+    pub fn close(&mut self) {
+        self.ctl_tx.close_channel();
+    }
+}
+
 
 pub struct SessionSocket<const C: usize> {
     state: SocketState<C>,
-    frames_out: Box<dyn futures::io::AsyncRead + Send + Unpin>
+    upstream_frames_in: Pin<Box<dyn futures::io::AsyncWrite + Send>>,
+    downstream_frames_out: Pin<Box<dyn futures::io::AsyncRead + Send>>
 }
 
 impl<const C: usize> SessionSocket<C> {
-    pub fn new<T, I>(id: I, transport: T) -> Self
-    where T: futures::io::AsyncRead + futures::io::AsyncWrite + Send + 'static{
-        let (segment_in, frames_out) = frame_reconstructor(Duration::from_secs(10), 1024);
+    pub fn new<T, I>(_id: I, transport: T) -> Self
+    where T: futures::io::AsyncRead + futures::io::AsyncWrite + Send + Unpin + 'static, I: std::fmt::Display {
+        let (downstream_segment_in, downstream_frames_out) = frame_reconstructor(Duration::from_secs(10), 1024);
 
-        let (packets_out, packets_in) = Framed::new(transport, SessionCodec::<C>).split();
-
-        let (data_tx, data_rx) = futures::channel::mpsc::unbounded::<SessionMessage<C>>();
+        let (upstream_frames_in, data_rx) = Segmenter::<C>::new(1024, 1024);
         let (ctl_tx, ctl_rx) = futures::channel::mpsc::unbounded::<SessionMessage<C>>();
 
         let state = SocketState {
-            data_tx,
             ctl_tx,
-            seg_in: Arc::new(segment_in)
         };
 
-        // Data coming out from the `state` go downstream as packets
-        hopr_async_runtime::prelude::spawn(async move {
-            (ctl_rx, data_rx).merge().forward(packets_out)
-        });
-
-        // Data coming in from downstream go into the `state`
-        let state_clone = state.clone();
-        hopr_async_runtime::prelude::spawn(async move {
-            packets_in.forward(state_clone);
-        });
-
         // Frames coming out from the Reconstructor can be read upstream
-        let frames_out = Box::new(frames_out
+        let downstream_frames_out = Box::pin(downstream_frames_out
             .filter_map(move |maybe_frame| {
                 // TODO
                 match maybe_frame {
@@ -62,29 +68,79 @@ impl<const C: usize> SessionSocket<C> {
                 }
             }).into_async_read());
 
-        Self { state, frames_out }
+        let (packets_out, packets_in) = StreamExt::split::<SessionMessage<C>>(Framed::new(transport, SessionCodec::<C>));
+
+        // Messages coming from Upstream and from the State go downstream as Packets
+        hopr_async_runtime::prelude::spawn(async move {
+            // TODO: save outgoing segments into the State after sending them out
+            (ctl_rx, data_rx.map(SessionMessage::<C>::Segment)).merge().map(Ok).forward(packets_out)
+        });
+
+        // Packets coming in from Downstream
+        let state_clone = state.clone();
+        hopr_async_runtime::prelude::spawn(async move {
+            pin_mut!(packets_in);
+            pin_mut!(downstream_segment_in);
+            pin_mut!(state_clone);
+            while let Some(in_packet) = packets_in.next().await {
+                let res = match in_packet {
+                    // Received Segments go straight to the Reassembler,
+                    // but the State is also notified about them
+                    Ok(SessionMessage::Segment(segment)) => {
+                        let id = segment.id();
+                        let res = downstream_segment_in.send(segment).await;
+                        if res.is_ok() {
+                            state_clone.notify_segment(id);
+                        }
+                        res
+                    },
+                    // Other Session messages go into the State only
+                    Ok(SessionMessage::Acknowledge(ack)) => {
+                        state_clone.acknowledge_frames(ack)
+                    },
+                    Ok(SessionMessage::Request(request)) => {
+                        state_clone.retransmit_frames(request)
+                    }
+                    // Errors are simply propagated
+                    Err(e) => Err(e)
+                };
+                if let Err(e) = res {
+                    tracing::error!(error = %e, "failed to process incoming packet");
+                }
+            }
+            tracing::trace!("incoming downstream completed");
+        });
+
+        Self { state, upstream_frames_in: Box::pin(upstream_frames_in), downstream_frames_out }
     }
 
 }
 
 impl<const C: usize> futures::io::AsyncRead for SessionSocket<C> {
     fn poll_read(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<std::io::Result<usize>> {
-        let inner = &mut self.frames_out;
+        let inner = &mut self.downstream_frames_out;
         pin_mut!(inner);
         inner.poll_read(cx, buf)
     }
 }
 
 impl<const C: usize> futures::io::AsyncWrite for SessionSocket<C> {
-    fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
-        todo!()
+    fn poll_write(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
+        let inner = &mut self.upstream_frames_in;
+        pin_mut!(inner);
+        inner.poll_write(cx, buf)
     }
 
-    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
-        todo!()
+    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+        let inner = &mut self.upstream_frames_in;
+        pin_mut!(inner);
+        inner.poll_flush(cx)
     }
 
-    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
-        todo!()
+    fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+        self.state.close();
+        let inner = &mut self.upstream_frames_in;
+        pin_mut!(inner);
+        inner.poll_close(cx)
     }
-}*/
+}
