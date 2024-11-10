@@ -1,46 +1,57 @@
-use crate::prelude::errors::SessionError;
-use crate::prelude::protocol::{FrameAcknowledgements, SessionCodec, SessionMessage};
-use crate::prelude::{frame_reconstructor, Segment, SegmentId};
-use crate::session::protocol::SegmentRequest;
-use crate::session::segmenter::Segmenter;
 use asynchronous_codec::Framed;
-use futures::{pin_mut, AsyncReadExt, AsyncWriteExt, Sink, SinkExt, StreamExt, TryStreamExt};
+use futures::{pin_mut, Sink, SinkExt, StreamExt, TryStreamExt};
 use futures_concurrency::stream::Merge;
-use pin_project::pin_project;
 use std::pin::Pin;
-use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::Duration;
 
-#[derive(Clone)]
+use crate::session::utils::{offloaded_ringbuffer, OffloadedRbConsumer};
+use crate::prelude::errors::SessionError;
+use crate::prelude::protocol::{FrameAcknowledgements, SessionCodec, SessionMessage};
+use crate::prelude::{frame_reconstructor, Segment};
+use crate::session::protocol::SegmentRequest;
+use crate::session::segmenter::Segmenter;
+
 struct SocketState<const C: usize> {
+    rb: OffloadedRbConsumer<Segment>,
     ctl_tx: futures::channel::mpsc::UnboundedSender<SessionMessage<C>>,
+    downstream_segment_in: Pin<Box<dyn Sink<Segment, Error = SessionError> + Send>>
 }
 
 impl<const C: usize> SocketState<C> {
-    pub fn register_segment(&self, segment: Segment) {
+
+    async fn incoming_segment(&mut self, segment: Segment) -> Result<(), SessionError>{
+        self.downstream_segment_in
+            .send(segment)
+            .await
+            .map_err(|e| SessionError::ProcessingError(e.to_string()))?;
+
         todo!()
     }
 
-    pub fn notify_segment(&self, id: SegmentId) {
+    fn incoming_acknowledged_frames(&mut self, ack: FrameAcknowledgements<C>) -> Result<(), SessionError> {
         todo!()
     }
 
-    pub fn acknowledge_frames(&mut self, ack: FrameAcknowledgements<C>) -> Result<(), SessionError> {
-        todo!()
+    async fn incoming_retransmission_request(&mut self, retransmit: SegmentRequest<C>) -> Result<(), SessionError> {
+        let missing = retransmit.into_iter().collect::<Vec<_>>();
+        let segments = self.rb.find(|s| missing.contains(&s.id()));
+
+        // TODO:
+
+        self.downstream_segment_in.send_all(&mut futures::stream::iter(segments).map(Ok)).await
     }
 
-    pub fn retransmit_frames(&mut self, retransmit: SegmentRequest<C>) -> Result<(), SessionError> {
-        todo!()
-    }
-
-    pub fn close(&mut self) {
-        self.ctl_tx.close_channel();
+    pub async fn handle_incoming_message(&mut self, message: SessionMessage<C>) -> Result<(), SessionError> {
+        match message {
+            SessionMessage::Segment(s) => self.incoming_segment(s).await,
+            SessionMessage::Request(r) => self.incoming_retransmission_request(r).await,
+            SessionMessage::Acknowledge(a) => self.incoming_acknowledged_frames(a),
+        }
     }
 }
 
 pub struct SessionSocket<const C: usize> {
-    state: SocketState<C>,
     upstream_frames_in: Pin<Box<dyn futures::io::AsyncWrite + Send>>,
     downstream_frames_out: Pin<Box<dyn futures::io::AsyncRead + Send>>,
 }
@@ -56,13 +67,11 @@ impl<const C: usize> SessionSocket<C> {
         let (upstream_frames_in, data_rx) = Segmenter::<C>::new(1024, 1024);
         let (ctl_tx, ctl_rx) = futures::channel::mpsc::unbounded::<SessionMessage<C>>();
 
-        let state = SocketState { ctl_tx };
-
         // Frames coming out from the Reconstructor can be read upstream
         let downstream_frames_out = Box::pin(
             downstream_frames_out
                 .filter_map(move |maybe_frame| {
-                    // TODO
+                    // TODO: acknowledge received frames
                     match maybe_frame {
                         Ok(frame) => futures::future::ready(Some(Ok(frame))),
                         Err(err) => futures::future::ready(Some(Err(std::io::Error::other(err)))),
@@ -74,38 +83,30 @@ impl<const C: usize> SessionSocket<C> {
         let (packets_out, packets_in) =
             StreamExt::split::<SessionMessage<C>>(Framed::new(transport, SessionCodec::<C>));
 
-        // Messages coming from Upstream and from the State go downstream as Packets
-        hopr_async_runtime::prelude::spawn(async move {
-            // TODO: save outgoing segments into the State after sending them out
-            (ctl_rx, data_rx.map(SessionMessage::<C>::Segment))
-                .merge()
-                .map(Ok)
-                .forward(packets_out)
-        });
+        let (rb_tx, rb_rx) = offloaded_ringbuffer(1024);
 
-        // Packets coming in from Downstream
-        let state_clone = state.clone();
+        // Messages incoming from Upstream and from the State go downstream as Packets
+        hopr_async_runtime::prelude::spawn(
+            (ctl_rx, data_rx
+                    .inspect(move |s| { rb_tx.push(s.clone()); })
+                    .map(SessionMessage::<C>::Segment)
+            )
+            .merge()
+            .map(Ok)
+            .forward(packets_out)
+        );
+
+        let mut state = SocketState { rb: rb_rx, ctl_tx, downstream_segment_in: Box::pin(downstream_segment_in) };
+
+        // Packets incoming from Downstream
         hopr_async_runtime::prelude::spawn(async move {
             pin_mut!(packets_in);
-            pin_mut!(downstream_segment_in);
-            pin_mut!(state_clone);
+
+            // TODO: refactor
             while let Some(in_packet) = packets_in.next().await {
                 let res = match in_packet {
-                    // Received Segments go straight to the Reassembler,
-                    // but the State is also notified about them
-                    Ok(SessionMessage::Segment(segment)) => {
-                        let id = segment.id();
-                        let res = downstream_segment_in.send(segment).await;
-                        if res.is_ok() {
-                            state_clone.notify_segment(id);
-                        }
-                        res
-                    }
-                    // Other Session messages go into the State only
-                    Ok(SessionMessage::Acknowledge(ack)) => state_clone.acknowledge_frames(ack),
-                    Ok(SessionMessage::Request(request)) => state_clone.retransmit_frames(request),
-                    // Errors are simply propagated
-                    Err(e) => Err(e),
+                    Ok(msg) => state.handle_incoming_message(msg).await,
+                    Err(e) => Err(e), // errors are simply propagated
                 };
                 if let Err(e) = res {
                     tracing::error!(error = %e, "failed to process incoming packet");
@@ -115,7 +116,6 @@ impl<const C: usize> SessionSocket<C> {
         });
 
         Self {
-            state,
             upstream_frames_in: Box::pin(upstream_frames_in),
             downstream_frames_out,
         }
@@ -144,7 +144,6 @@ impl<const C: usize> futures::io::AsyncWrite for SessionSocket<C> {
     }
 
     fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
-        self.state.close();
         let inner = &mut self.upstream_frames_in;
         pin_mut!(inner);
         inner.poll_close(cx)

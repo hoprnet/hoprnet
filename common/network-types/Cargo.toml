@@ -46,6 +46,7 @@ libp2p-identity = { workspace = true }
 pin-project = "1.1.3"
 rand = { workspace = true }
 rand_distr = { workspace = true }
+ringbuffer = "0.15.0"
 serde = { workspace = true, optional = true }
 serde_with = { workspace = true, optional = true }
 serde_bytes = { workspace = true, optional = true }

@@ -4393,6 +4393,7 @@ dependencies = [
  "rand 0.8.5",
  "rand_distr",
  "rayon",
+ "ringbuffer",
  "serde",
  "serde_bytes",
  "serde_with",
