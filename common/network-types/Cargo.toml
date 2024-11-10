@@ -84,7 +84,7 @@ tokio-util = { workspace = true }
 hopr-crypto-random = { workspace = true }
 
 [[bench]]
-name = "frame_reconstructor_bench"
+name = "reconstructor_bench"
 harness = false
 
 

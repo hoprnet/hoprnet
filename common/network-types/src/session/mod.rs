@@ -30,6 +30,8 @@ mod utils;
 
 pub use frame::{Frame, FrameId, FrameInfo, FrameReassembler, Segment, SegmentId};
 
+pub use segmenter::Segmenter;
+
 #[cfg(feature = "testing")]
 pub use utils::{FaultyNetwork, FaultyNetworkConfig};
 

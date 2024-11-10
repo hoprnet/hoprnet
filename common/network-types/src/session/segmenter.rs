@@ -15,7 +15,7 @@ pub struct Segmenter<const C: usize> {
     seg_buffer: Vec<u8>,
     ready_segments: Vec<Segment>,
     next_frame_id: FrameId,
-    seq_len_bytes: usize,
+    current_frame_len: usize,
     closed: bool,
     #[pin]
     tx: futures::channel::mpsc::Sender<Segment>,
@@ -39,7 +39,7 @@ impl<const C: usize> Segmenter<C> {
                 seg_buffer: Vec::with_capacity(Self::PAYLOAD_CAPACITY),
                 ready_segments: Vec::with_capacity(frame_size / C + 1),
                 next_frame_id: 1,
-                seq_len_bytes: 0,
+                current_frame_len: 0,
                 closed: false,
                 tx,
             },
@@ -49,19 +49,35 @@ impl<const C: usize> Segmenter<C> {
 
     fn poll_flush_segments(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), SendError>> {
         let mut this = self.project();
-        let num_seg = this.ready_segments.len();
+        let seq_len = this.ready_segments.len();
+        tracing::trace!(
+            frame_id = *this.next_frame_id,
+            seq_len,
+            "Segmenter::poll_flush_segments"
+        );
 
         for (i, mut seg) in this.ready_segments.drain(..).enumerate() {
             seg.seq_idx = i as SeqNum;
-            seg.seq_len = num_seg as SeqNum;
+            seg.seq_len = seq_len as SeqNum;
 
             let _ = ready!(this.tx.as_mut().poll_ready(cx))?;
+
+            tracing::trace!(
+                frame_id = seg.frame_id,
+                seq_idx = seg.seq_idx,
+                "Segmenter::poll_flush_segments segment out"
+            );
             this.tx.as_mut().start_send(seg)?;
         }
 
         let _ = ready!(this.tx.as_mut().poll_flush(cx))?;
+        tracing::trace!(
+            frame_id = *this.next_frame_id,
+            "Segmenter::poll_flush_segments frame flushed out"
+        );
+
         *this.next_frame_id += 1;
-        *this.seq_len_bytes = 0;
+        *this.current_frame_len = 0;
 
         Poll::Ready(Ok(()))
     }
@@ -74,53 +90,93 @@ impl<const C: usize> Segmenter<C> {
             data: self.seg_buffer.clone().into_boxed_slice(),
         };
         self.seg_buffer.clear();
+
+        let seg_len = new_segment.data.len();
+        self.current_frame_len += seg_len;
+
+        tracing::trace!(
+            frame_id = self.next_frame_id,
+            seq_idx = self.seg_buffer.len(),
+            bytes_added = seg_len,
+            remaining_in_frame = self.frame_size - self.current_frame_len,
+            "Segmenter::complete_segment"
+        );
+
         self.ready_segments.push(new_segment);
-        self.seq_len_bytes += Self::PAYLOAD_CAPACITY;
     }
 }
 
 impl<const C: usize> futures::io::AsyncWrite for Segmenter<C> {
     fn poll_write(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
+        tracing::trace!("Segmenter::poll_write");
         if self.closed {
+            tracing::trace!("Segmenter::poll_write error closed");
             return Poll::Ready(Err(std::io::ErrorKind::BrokenPipe.into()));
         }
 
         if buf.len() == 0 {
+            tracing::trace!("Segmenter::poll_write ready empty buffer");
             return Poll::Ready(Ok(0));
         }
 
         let len_to_write = buf.len().min(Self::PAYLOAD_CAPACITY - self.seg_buffer.len());
         self.seg_buffer.extend_from_slice(&buf[..len_to_write]);
+        tracing::trace!(
+            len = len_to_write,
+            remaining = Self::PAYLOAD_CAPACITY - self.seg_buffer.len(),
+            "Segmenter::poll_write add segment data"
+        );
 
         if self.seg_buffer.len() == Self::PAYLOAD_CAPACITY {
+            if self.current_frame_len + len_to_write > self.frame_size {
+                tracing::trace!("Segmenter::poll_write frame full");
+                ready!(self.as_mut().poll_flush_segments(cx)).map_err(std::io::Error::other)?;
+            }
+
             self.complete_segment();
-            if self.seq_len_bytes == self.frame_size {
+
+            if self.current_frame_len == self.frame_size {
                 ready!(self.as_mut().poll_flush_segments(cx)).map_err(std::io::Error::other)?;
             }
         }
 
+        tracing::trace!(len = len_to_write, "Segmenter::poll_write ready");
         Poll::Ready(Ok(len_to_write))
     }
 
     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+        tracing::trace!("Segmenter::poll_flush");
         if self.closed {
+            tracing::trace!("Segmenter::poll_flush error closed");
             return Poll::Ready(Err(std::io::ErrorKind::BrokenPipe.into()));
         }
 
         if !self.seg_buffer.is_empty() {
+            tracing::trace!(
+                frame_id = self.next_frame_id,
+                len = self.seg_buffer.len(),
+                "Segmenter::poll_flush partial frame"
+            );
             self.complete_segment();
         }
         self.as_mut().poll_flush_segments(cx).map_err(std::io::Error::other)
     }
 
     fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+        tracing::trace!("Segmenter::poll_close");
         if self.closed {
+            tracing::trace!("Segmenter::poll_close error closed");
             return Poll::Ready(Err(std::io::ErrorKind::BrokenPipe.into()));
         }
 
         self.closed = true;
 
         if !self.seg_buffer.is_empty() {
+            tracing::trace!(
+                frame_id = self.next_frame_id,
+                len = self.seg_buffer.len(),
+                "Segmenter::poll_close partial frame"
+            );
             self.complete_segment();
         }
 
@@ -176,28 +232,57 @@ mod tests {
 
         pin_mut!(segments);
 
-        let seg = segments.next().await.ok_or(anyhow!("no more segments"))?;
-        assert_eq!(1, seg.frame_id);
-        assert_eq!(0, seg.seq_idx);
-        assert_eq!(3, seg.seq_len);
-        assert_eq!(500, seg.data.len());
-        assert_eq!(&data[..500], seg.data.as_ref());
-
-        let seg = segments.next().await.ok_or(anyhow!("no more segments"))?;
-        assert_eq!(1, seg.frame_id);
-        assert_eq!(1, seg.seq_idx);
-        assert_eq!(3, seg.seq_len);
-        assert_eq!(500, seg.data.len());
-        assert_eq!(&data[500..1000], seg.data.as_ref());
-
-        let seg = segments.next().await.ok_or(anyhow!("no more segments"))?;
-        assert_eq!(1, seg.frame_id);
-        assert_eq!(2, seg.seq_idx);
-        assert_eq!(3, seg.seq_len);
-        assert_eq!(500, seg.data.len());
-        assert_eq!(&data[1000..], seg.data.as_ref());
+        for i in 0..3 {
+            let seg = segments.next().await.ok_or(anyhow!("no more segments"))?;
+            assert_eq!(1, seg.frame_id);
+            assert_eq!(i as SeqNum, seg.seq_idx);
+            assert_eq!(3, seg.seq_len);
+            assert_eq!(500, seg.data.len());
+            assert_eq!(&data[i * 500..i * 500 + 500], seg.data.as_ref());
+        }
 
         writer.close().await?;
+
+        assert_eq!(None, segments.next().await);
+        Ok(())
+    }
+
+    #[test_log::test(async_std::test)]
+    async fn segmenter_should_segment_complete_frame_with_misaligned_mtu() -> anyhow::Result<()> {
+        const MTU: usize = 462;
+        const SMTU: usize = MTU - SessionMessage::<MTU>::SEGMENT_OVERHEAD;
+
+        let (mut writer, segments) = Segmenter::<MTU>::new(1500, 1024);
+
+        let mut offset = 0;
+        let data = hopr_crypto_random::random_bytes::<1500>();
+
+        while offset < data.len() {
+            let written = writer.write(&data[offset..]).await?;
+            let expected_written = SMTU.min(data.len() - offset);
+            assert_eq!(expected_written, written);
+            offset += written;
+        }
+
+        writer.close().await?;
+
+        pin_mut!(segments);
+
+        for i in 0..(1500 / MTU) {
+            let seg = segments.next().await.ok_or(anyhow!("no more segments"))?;
+            assert_eq!(1, seg.frame_id);
+            assert_eq!(i as SeqNum, seg.seq_idx);
+            assert_eq!(((1500 / SMTU) + 1) as SeqNum, seg.seq_len);
+            assert_eq!(SMTU, seg.data.len());
+            assert_eq!(&data[i * SMTU..i * SMTU + SMTU], seg.data.as_ref());
+        }
+
+        let seg = segments.next().await.ok_or(anyhow!("no more segments"))?;
+        assert_eq!(1, seg.frame_id);
+        assert_eq!(3, seg.seq_idx);
+        assert_eq!(((1500 / SMTU) + 1) as SeqNum, seg.seq_len);
+        assert_eq!(1500 % SMTU, seg.data.len());
+        assert_eq!(&data[1500 - 1500 % SMTU..], seg.data.as_ref());
 
         assert_eq!(None, segments.next().await);
         Ok(())

@@ -114,12 +114,33 @@ pub fn segment(data: &[u8], max_segment_size: usize, frame_id: u32) -> crate::se
 /// Data frame of arbitrary length.
 /// The frame can be segmented into [segments](Segment) and reassembled back
 /// via [FrameReassembler].
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct Frame {
     /// Identifier of this frame.
     pub frame_id: FrameId,
     /// Frame data.
     pub data: Box<[u8]>,
+}
+
+impl Debug for Frame {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        const DBG_LEN: usize = 16;
+        let excerpt = if self.data.len() > DBG_LEN {
+            format!(
+                "{}..{}",
+                hex::encode(&self.data[0..DBG_LEN / 2]),
+                hex::encode(&self.data[self.data.len() - DBG_LEN / 2..])
+            )
+        } else {
+            hex::encode(&self.data)
+        };
+
+        f.debug_struct("Frame")
+            .field("frame_id", &self.frame_id)
+            .field("len", &self.data.len())
+            .field("data", &excerpt)
+            .finish()
+    }
 }
 
 impl Frame {
@@ -188,6 +209,11 @@ impl Segment {
     /// Returns the [SegmentId] for this segment.
     pub fn id(&self) -> SegmentId {
         SegmentId(self.frame_id, self.seq_idx)
+    }
+
+    /// Length of the segment data plus header.
+    pub fn len(&self) -> usize {
+        Self::HEADER_SIZE + self.data.len()
     }
 }
 

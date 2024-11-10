@@ -1,16 +1,16 @@
+use crate::prelude::errors::SessionError;
+use crate::prelude::protocol::{FrameAcknowledgements, SessionCodec, SessionMessage};
+use crate::prelude::{frame_reconstructor, Segment, SegmentId};
+use crate::session::protocol::SegmentRequest;
+use crate::session::segmenter::Segmenter;
+use asynchronous_codec::Framed;
+use futures::{pin_mut, AsyncReadExt, AsyncWriteExt, Sink, SinkExt, StreamExt, TryStreamExt};
+use futures_concurrency::stream::Merge;
+use pin_project::pin_project;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::Duration;
-use asynchronous_codec::Framed;
-use futures::{pin_mut, Sink, StreamExt, TryStreamExt, AsyncReadExt, AsyncWriteExt, SinkExt};
-use futures_concurrency::stream::Merge;
-use pin_project::pin_project;
-use crate::prelude::errors::SessionError;
-use crate::prelude::{frame_reconstructor, Segment, SegmentId};
-use crate::prelude::protocol::{FrameAcknowledgements, SessionCodec, SessionMessage};
-use crate::session::protocol::SegmentRequest;
-use crate::session::segmenter::Segmenter;
 
 #[derive(Clone)]
 struct SocketState<const C: usize> {
@@ -18,11 +18,15 @@ struct SocketState<const C: usize> {
 }
 
 impl<const C: usize> SocketState<C> {
+    pub fn register_segment(&self, segment: Segment) {
+        todo!()
+    }
+
     pub fn notify_segment(&self, id: SegmentId) {
         todo!()
     }
 
-    pub fn acknowledge_frames(&mut self, ack: FrameAcknowledgements<C>) -> Result<(), SessionError>{
+    pub fn acknowledge_frames(&mut self, ack: FrameAcknowledgements<C>) -> Result<(), SessionError> {
         todo!()
     }
 
@@ -35,45 +39,48 @@ impl<const C: usize> SocketState<C> {
     }
 }
 
-
 pub struct SessionSocket<const C: usize> {
     state: SocketState<C>,
     upstream_frames_in: Pin<Box<dyn futures::io::AsyncWrite + Send>>,
-    downstream_frames_out: Pin<Box<dyn futures::io::AsyncRead + Send>>
+    downstream_frames_out: Pin<Box<dyn futures::io::AsyncRead + Send>>,
 }
 
 impl<const C: usize> SessionSocket<C> {
     pub fn new<T, I>(_id: I, transport: T) -> Self
-    where T: futures::io::AsyncRead + futures::io::AsyncWrite + Send + Unpin + 'static, I: std::fmt::Display {
+    where
+        T: futures::io::AsyncRead + futures::io::AsyncWrite + Send + Unpin + 'static,
+        I: std::fmt::Display,
+    {
         let (downstream_segment_in, downstream_frames_out) = frame_reconstructor(Duration::from_secs(10), 1024);
 
         let (upstream_frames_in, data_rx) = Segmenter::<C>::new(1024, 1024);
         let (ctl_tx, ctl_rx) = futures::channel::mpsc::unbounded::<SessionMessage<C>>();
 
-        let state = SocketState {
-            ctl_tx,
-        };
+        let state = SocketState { ctl_tx };
 
         // Frames coming out from the Reconstructor can be read upstream
-        let downstream_frames_out = Box::pin(downstream_frames_out
-            .filter_map(move |maybe_frame| {
-                // TODO
-                match maybe_frame {
-                    Ok(frame) => {
-                        futures::future::ready(Some(Ok(frame)))
+        let downstream_frames_out = Box::pin(
+            downstream_frames_out
+                .filter_map(move |maybe_frame| {
+                    // TODO
+                    match maybe_frame {
+                        Ok(frame) => futures::future::ready(Some(Ok(frame))),
+                        Err(err) => futures::future::ready(Some(Err(std::io::Error::other(err)))),
                     }
-                    Err(err) => {
-                        futures::future::ready(Some(Err(std::io::Error::other(err))))
-                    }
-                }
-            }).into_async_read());
+                })
+                .into_async_read(),
+        );
 
-        let (packets_out, packets_in) = StreamExt::split::<SessionMessage<C>>(Framed::new(transport, SessionCodec::<C>));
+        let (packets_out, packets_in) =
+            StreamExt::split::<SessionMessage<C>>(Framed::new(transport, SessionCodec::<C>));
 
         // Messages coming from Upstream and from the State go downstream as Packets
         hopr_async_runtime::prelude::spawn(async move {
             // TODO: save outgoing segments into the State after sending them out
-            (ctl_rx, data_rx.map(SessionMessage::<C>::Segment)).merge().map(Ok).forward(packets_out)
+            (ctl_rx, data_rx.map(SessionMessage::<C>::Segment))
+                .merge()
+                .map(Ok)
+                .forward(packets_out)
         });
 
         // Packets coming in from Downstream
@@ -93,16 +100,12 @@ impl<const C: usize> SessionSocket<C> {
                             state_clone.notify_segment(id);
                         }
                         res
-                    },
-                    // Other Session messages go into the State only
-                    Ok(SessionMessage::Acknowledge(ack)) => {
-                        state_clone.acknowledge_frames(ack)
-                    },
-                    Ok(SessionMessage::Request(request)) => {
-                        state_clone.retransmit_frames(request)
                     }
+                    // Other Session messages go into the State only
+                    Ok(SessionMessage::Acknowledge(ack)) => state_clone.acknowledge_frames(ack),
+                    Ok(SessionMessage::Request(request)) => state_clone.retransmit_frames(request),
                     // Errors are simply propagated
-                    Err(e) => Err(e)
+                    Err(e) => Err(e),
                 };
                 if let Err(e) = res {
                     tracing::error!(error = %e, "failed to process incoming packet");
@@ -111,9 +114,12 @@ impl<const C: usize> SessionSocket<C> {
             tracing::trace!("incoming downstream completed");
         });
 
-        Self { state, upstream_frames_in: Box::pin(upstream_frames_in), downstream_frames_out }
+        Self {
+            state,
+            upstream_frames_in: Box::pin(upstream_frames_in),
+            downstream_frames_out,
+        }
     }
-
 }
 
 impl<const C: usize> futures::io::AsyncRead for SessionSocket<C> {
