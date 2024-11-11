@@ -238,8 +238,8 @@ pub fn sample_index<T: Distribution<f64>, R: Rng>(dist: &mut T, rng: &mut R, len
 }
 
 use rand_distr::Normal;
-use std::collections::VecDeque;
 use ringbuffer::{AllocRingBuffer, RingBuffer};
+use std::collections::VecDeque;
 
 /// Shuffles the given `vec` by taking the next element with index `|N(0,factor^2)`|, where
 /// `N` denotes normal distribution.
@@ -276,21 +276,27 @@ pub(crate) struct OffloadedRbConsumer<T>(Arc<std::sync::Mutex<AllocRingBuffer<T>
 
 impl<T: Clone> OffloadedRbConsumer<T> {
     pub fn find<F: Fn(&T) -> bool>(&self, predicate: F) -> Vec<T> {
-        self.0.lock().unwrap().iter().filter(|item| predicate(item)).cloned().collect()
+        self.0
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|item| predicate(item))
+            .cloned()
+            .collect()
     }
 }
 
-pub(crate) fn offloaded_ringbuffer<T: Send + 'static>(capacity: usize) -> (OffloadedRbProducer<T>, OffloadedRbConsumer<T>) {
+pub(crate) fn offloaded_ringbuffer<T: Send + 'static>(
+    capacity: usize,
+) -> (OffloadedRbProducer<T>, OffloadedRbConsumer<T>) {
     let (rb_tx, rb_rx) = futures::channel::mpsc::unbounded();
     let rb = Arc::new(std::sync::Mutex::new(AllocRingBuffer::new(capacity)));
 
     let rb_clone = rb.clone();
-    hopr_async_runtime::prelude::spawn(
-        rb_rx.for_each(move |item| {
-            rb_clone.lock().unwrap().push(item);
-            futures::future::ready(())
-        })
-    );
+    hopr_async_runtime::prelude::spawn(rb_rx.for_each(move |item| {
+        rb_clone.lock().unwrap().push(item);
+        futures::future::ready(())
+    }));
 
     (OffloadedRbProducer(rb_tx), OffloadedRbConsumer(rb))
 }

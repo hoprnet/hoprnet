@@ -5,22 +5,21 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
 
-use crate::session::utils::{offloaded_ringbuffer, OffloadedRbConsumer};
 use crate::prelude::errors::SessionError;
 use crate::prelude::protocol::{FrameAcknowledgements, SessionCodec, SessionMessage};
 use crate::prelude::{frame_reconstructor, Segment};
 use crate::session::protocol::SegmentRequest;
 use crate::session::segmenter::Segmenter;
+use crate::session::utils::{offloaded_ringbuffer, OffloadedRbConsumer};
 
 struct SocketState<const C: usize> {
     rb: OffloadedRbConsumer<Segment>,
     ctl_tx: futures::channel::mpsc::UnboundedSender<SessionMessage<C>>,
-    downstream_segment_in: Pin<Box<dyn Sink<Segment, Error = SessionError> + Send>>
+    downstream_segment_in: Pin<Box<dyn Sink<Segment, Error = SessionError> + Send>>,
 }
 
 impl<const C: usize> SocketState<C> {
-
-    async fn incoming_segment(&mut self, segment: Segment) -> Result<(), SessionError>{
+    async fn incoming_segment(&mut self, segment: Segment) -> Result<(), SessionError> {
         self.downstream_segment_in
             .send(segment)
             .await
@@ -39,7 +38,9 @@ impl<const C: usize> SocketState<C> {
 
         // TODO:
 
-        self.downstream_segment_in.send_all(&mut futures::stream::iter(segments).map(Ok)).await
+        self.downstream_segment_in
+            .send_all(&mut futures::stream::iter(segments).map(Ok))
+            .await
     }
 
     pub async fn handle_incoming_message(&mut self, message: SessionMessage<C>) -> Result<(), SessionError> {
@@ -64,7 +65,7 @@ impl<const C: usize> SessionSocket<C> {
     {
         let (downstream_segment_in, downstream_frames_out) = frame_reconstructor(Duration::from_secs(10), 1024);
 
-        let (upstream_frames_in, data_rx) = Segmenter::<C>::new(1024, 1024);
+        let (upstream_frames_in, data_rx) = Segmenter::<C, 1500>::new(1024);
         let (ctl_tx, ctl_rx) = futures::channel::mpsc::unbounded::<SessionMessage<C>>();
 
         // Frames coming out from the Reconstructor can be read upstream
@@ -87,16 +88,24 @@ impl<const C: usize> SessionSocket<C> {
 
         // Messages incoming from Upstream and from the State go downstream as Packets
         hopr_async_runtime::prelude::spawn(
-            (ctl_rx, data_rx
-                    .inspect(move |s| { rb_tx.push(s.clone()); })
-                    .map(SessionMessage::<C>::Segment)
+            (
+                ctl_rx,
+                data_rx
+                    .inspect(move |s| {
+                        rb_tx.push(s.clone());
+                    })
+                    .map(SessionMessage::<C>::Segment),
             )
-            .merge()
-            .map(Ok)
-            .forward(packets_out)
+                .merge()
+                .map(Ok)
+                .forward(packets_out),
         );
 
-        let mut state = SocketState { rb: rb_rx, ctl_tx, downstream_segment_in: Box::pin(downstream_segment_in) };
+        let mut state = SocketState {
+            rb: rb_rx,
+            ctl_tx,
+            downstream_segment_in: Box::pin(downstream_segment_in),
+        };
 
         // Packets incoming from Downstream
         hopr_async_runtime::prelude::spawn(async move {

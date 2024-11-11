@@ -1,33 +1,29 @@
-use futures::channel::mpsc::SendError;
-use futures::{ready, Sink};
-use pin_project::pin_project;
+use futures::{ready, Sink, SinkExt};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use crate::prelude::protocol::SessionMessage;
+use crate::session::errors::SessionError;
 use crate::session::frame::FrameId;
 use crate::session::frame::SeqNum;
 use crate::session::Segment;
 
-#[pin_project]
-pub struct Segmenter<const C: usize> {
-    frame_size: usize,
+pub struct Segmenter<const C: usize, const F: usize> {
     seg_buffer: Vec<u8>,
     ready_segments: Vec<Segment>,
     next_frame_id: FrameId,
     current_frame_len: usize,
     closed: bool,
-    #[pin]
-    tx: futures::channel::mpsc::Sender<Segment>,
+    tx: Pin<Box<dyn Sink<Segment, Error = SessionError> + Send>>,
 }
 
-impl<const C: usize> Segmenter<C> {
+impl<const C: usize, const F: usize> Segmenter<C, F> {
     const PAYLOAD_CAPACITY: usize = C - SessionMessage::<C>::SEGMENT_OVERHEAD;
 
-    pub fn new(frame_size: usize, capacity: usize) -> (Self, impl futures::Stream<Item = Segment> + Send) {
-        assert!(frame_size >= C, "frame size must be at least MTU");
+    pub fn new(capacity: usize) -> (Self, impl futures::Stream<Item = Segment> + Send) {
+        assert!(F >= C, "frame size must be at least MTU");
         assert!(
-            frame_size <= C * SessionMessage::<C>::MAX_SEGMENTS_PER_FRAME,
+            F <= C * SessionMessage::<C>::MAX_SEGMENTS_PER_FRAME,
             "frame size too big for the given MTU"
         );
 
@@ -35,49 +31,44 @@ impl<const C: usize> Segmenter<C> {
 
         (
             Self {
-                frame_size,
                 seg_buffer: Vec::with_capacity(Self::PAYLOAD_CAPACITY),
-                ready_segments: Vec::with_capacity(frame_size / C + 1),
+                ready_segments: Vec::with_capacity(F / C + 1),
                 next_frame_id: 1,
                 current_frame_len: 0,
                 closed: false,
-                tx,
+                tx: Box::pin(tx.sink_map_err(|e| SessionError::ProcessingError(e.to_string()))),
             },
             rx,
         )
     }
 
-    fn poll_flush_segments(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), SendError>> {
-        let mut this = self.project();
-        let seq_len = this.ready_segments.len();
-        tracing::trace!(
-            frame_id = *this.next_frame_id,
-            seq_len,
-            "Segmenter::poll_flush_segments"
-        );
+    fn poll_flush_segments(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), SessionError>> {
+        let seq_len = self.ready_segments.len();
+        tracing::trace!(frame_id = self.next_frame_id, seq_len, "Segmenter::poll_flush_segments");
 
-        for (i, mut seg) in this.ready_segments.drain(..).enumerate() {
+        let all_segments = self.ready_segments.drain(..).collect::<Vec<_>>();
+        for (i, mut seg) in all_segments.into_iter().enumerate() {
             seg.seq_idx = i as SeqNum;
             seg.seq_len = seq_len as SeqNum;
 
-            let _ = ready!(this.tx.as_mut().poll_ready(cx))?;
+            let _ = ready!(self.tx.as_mut().poll_ready(cx))?;
 
             tracing::trace!(
                 frame_id = seg.frame_id,
                 seq_idx = seg.seq_idx,
                 "Segmenter::poll_flush_segments segment out"
             );
-            this.tx.as_mut().start_send(seg)?;
+            self.tx.as_mut().start_send(seg)?;
         }
 
-        let _ = ready!(this.tx.as_mut().poll_flush(cx))?;
+        let _ = ready!(self.tx.as_mut().poll_flush(cx))?;
         tracing::trace!(
-            frame_id = *this.next_frame_id,
+            frame_id = self.next_frame_id,
             "Segmenter::poll_flush_segments frame flushed out"
         );
 
-        *this.next_frame_id += 1;
-        *this.current_frame_len = 0;
+        self.next_frame_id += 1;
+        self.current_frame_len = 0;
 
         Poll::Ready(Ok(()))
     }
@@ -98,7 +89,7 @@ impl<const C: usize> Segmenter<C> {
             frame_id = self.next_frame_id,
             seq_idx = self.seg_buffer.len(),
             bytes_added = seg_len,
-            remaining_in_frame = self.frame_size - self.current_frame_len,
+            remaining_in_frame = F - self.current_frame_len,
             "Segmenter::complete_segment"
         );
 
@@ -106,7 +97,7 @@ impl<const C: usize> Segmenter<C> {
     }
 }
 
-impl<const C: usize> futures::io::AsyncWrite for Segmenter<C> {
+impl<const C: usize, const F: usize> futures::io::AsyncWrite for Segmenter<C, F> {
     fn poll_write(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
         tracing::trace!("Segmenter::poll_write");
         if self.closed {
@@ -128,14 +119,14 @@ impl<const C: usize> futures::io::AsyncWrite for Segmenter<C> {
         );
 
         if self.seg_buffer.len() == Self::PAYLOAD_CAPACITY {
-            if self.current_frame_len + len_to_write > self.frame_size {
+            if self.current_frame_len + len_to_write > F {
                 tracing::trace!("Segmenter::poll_write frame full");
                 ready!(self.as_mut().poll_flush_segments(cx)).map_err(std::io::Error::other)?;
             }
 
             self.complete_segment();
 
-            if self.current_frame_len == self.frame_size {
+            if self.current_frame_len == F {
                 ready!(self.as_mut().poll_flush_segments(cx)).map_err(std::io::Error::other)?;
             }
         }
@@ -181,7 +172,7 @@ impl<const C: usize> futures::io::AsyncWrite for Segmenter<C> {
         }
 
         let _ = ready!(self.as_mut().poll_flush_segments(cx).map_err(std::io::Error::other))?;
-        self.project().tx.poll_close(cx).map_err(std::io::Error::other)
+        self.tx.as_mut().poll_close(cx).map_err(std::io::Error::other)
     }
 }
 
@@ -196,7 +187,7 @@ mod tests {
 
     #[async_std::test]
     async fn segmenter_should_not_segment_small_data_unless_flushed() -> anyhow::Result<()> {
-        let (mut writer, segments) = Segmenter::<510>::new(1500, 1024);
+        let (mut writer, segments) = Segmenter::<510, 1500>::new(1024);
         writer.write_all(b"test").await?;
 
         pin_mut!(segments);
@@ -219,7 +210,7 @@ mod tests {
 
     #[async_std::test]
     async fn segmenter_should_segment_complete_frame() -> anyhow::Result<()> {
-        let (mut writer, segments) = Segmenter::<510>::new(1500, 1024);
+        let (mut writer, segments) = Segmenter::<510, 1500>::new(1024);
 
         let mut offset = 0;
         let data = hopr_crypto_random::random_bytes::<1500>();
@@ -252,7 +243,7 @@ mod tests {
         const MTU: usize = 462;
         const SMTU: usize = MTU - SessionMessage::<MTU>::SEGMENT_OVERHEAD;
 
-        let (mut writer, segments) = Segmenter::<MTU>::new(1500, 1024);
+        let (mut writer, segments) = Segmenter::<MTU, 1500>::new(1024);
 
         let mut offset = 0;
         let data = hopr_crypto_random::random_bytes::<1500>();
@@ -290,7 +281,7 @@ mod tests {
 
     #[async_std::test]
     async fn segmenter_should_segment_multiple_complete_frames() -> anyhow::Result<()> {
-        let (mut writer, segments) = Segmenter::<510>::new(1500, 1024);
+        let (mut writer, segments) = Segmenter::<510, 1500>::new(1024);
 
         let data = hopr_crypto_random::random_bytes::<4500>();
 
@@ -316,7 +307,7 @@ mod tests {
 
     #[async_std::test]
     async fn segmenter_should_segment_multiple_complete_frames_and_incomplete_frame_on_close() -> anyhow::Result<()> {
-        let (mut writer, segments) = Segmenter::<510>::new(1500, 1024);
+        let (mut writer, segments) = Segmenter::<510, 1500>::new(1024);
 
         let data = hopr_crypto_random::random_bytes::<4504>();
 
@@ -355,7 +346,7 @@ mod tests {
 
     #[async_std::test]
     async fn segmenter_should_segment_multiple_complete_frames_and_incomplete_frame_on_flush() -> anyhow::Result<()> {
-        let (mut writer, segments) = Segmenter::<510>::new(1500, 1024);
+        let (mut writer, segments) = Segmenter::<510, 1500>::new(1024);
 
         let data = hopr_crypto_random::random_bytes::<4504>();
 
