@@ -416,7 +416,7 @@ where
                     // which have a lower ticket index than `ticket_redeemed.new_ticket_index`
                     self.db
                         .mark_tickets_as(
-                            TicketSelector::from(&channel).with_index_lt(ticket_redeemed.new_ticket_index),
+                            TicketSelector::from(&channel).with_index_range(..ticket_redeemed.new_ticket_index),
                             TicketMarker::Neglected,
                         )
                         .await?;
@@ -701,10 +701,7 @@ where
                     if let Some(selector) = selector {
                         let num_rejected = self
                             .db
-                            .mark_tickets_as(
-                                selector.with_winning_probability_lt(encoded_new),
-                                TicketMarker::Rejected,
-                            )
+                            .mark_tickets_as(selector.with_winning_probability(..encoded_new), TicketMarker::Rejected)
                             .await?;
                         info!(count = num_rejected, "unredeemed tickets were rejected, because the minimum winning probability has been increased");
                     }

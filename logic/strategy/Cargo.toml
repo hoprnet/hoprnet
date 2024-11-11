@@ -1,6 +1,6 @@
 [package]
 name = "hopr-strategy"
-version = "0.11.2"
+version = "0.12.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Contains implementations of different HOPR strategies"
 edition = "2021"
@@ -67,3 +67,4 @@ mockall = { workspace = true }
 hex-literal = { workspace = true }
 hopr-crypto-random = { workspace = true }
 futures = { workspace = true }
+test-log = { workspace = true }
