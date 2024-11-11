@@ -132,6 +132,7 @@ fn default_protocol() -> IpProtocol {
 
 impl SessionWebsocketClientQueryRequest {
     pub(crate) fn into_protocol_session_config(self) -> Result<SessionClientConfig, HoprLibError> {
+        #[cfg(not(feature = "explicit-path"))]
         let path_options = RoutingOptions::Hops((self.hops as u32).try_into()?);
 
         #[cfg(feature = "explicit-path")]
@@ -145,7 +146,7 @@ impl SessionWebsocketClientQueryRequest {
                     .try_into()?,
             )
         } else {
-            path_options
+            RoutingOptions::Hops((self.hops as u32).try_into()?)
         };
 
         Ok(SessionClientConfig {
