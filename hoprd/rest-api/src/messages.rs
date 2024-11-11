@@ -164,6 +164,14 @@ pub(super) async fn send_message(
         .map(|enc| enc(&args.body))
         .unwrap_or_else(|| args.body.into_boxed_slice());
 
+    #[cfg(not(feature = "explicit-path"))]
+    if args.path.is_some() {
+        return Err((
+            StatusCode::UNPROCESSABLE_ENTITY,
+            ApiErrorStatus::InvalidPath("explicit paths are not allowed".into()),
+        ));
+    }
+
     let options = if let Some(intermediate_path) = args.path {
         let peer_ids_future = intermediate_path
             .into_iter()
