@@ -4674,7 +4674,7 @@ dependencies = [
 
 [[package]]
 name = "hoprd-api"
-version = "3.5.2"
+version = "3.6.2"
 dependencies = [
  "anyhow",
  "async-broadcast",
