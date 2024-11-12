@@ -224,6 +224,8 @@ enum WebSocketInput {
 
 #[tracing::instrument(level = "debug", skip(socket, session))]
 async fn websocket_connection(socket: WebSocket, session: HoprSession) {
+    let session_id = *session.id();
+
     let (rx, mut tx) = session.split();
     let (mut sender, receiver) = socket.split();
 
@@ -233,10 +235,13 @@ async fn websocket_connection(socket: WebSocket, session: HoprSession) {
     )
         .merge();
 
+    let (mut bytes_to_session, mut bytes_from_session) = (0, 0);
+
     while let Some(v) = queue.next().await {
         match v {
             WebSocketInput::Network(bytes) => match bytes {
                 Ok(bytes) => {
+                    let len = bytes.len();
                     if let Err(e) = sender.send(Message::Binary(bytes.into())).await {
                         error!(
                             error = %e,
@@ -244,6 +249,7 @@ async fn websocket_connection(socket: WebSocket, session: HoprSession) {
                         );
                         break;
                     };
+                    bytes_from_session += len;
                 }
                 Err(e) => {
                     error!(
@@ -255,10 +261,12 @@ async fn websocket_connection(socket: WebSocket, session: HoprSession) {
             },
             WebSocketInput::WsInput(ws_in) => match ws_in {
                 Ok(Message::Binary(data)) => {
+                    let len = data.len();
                     if let Err(e) = tx.write(data.as_ref()).await {
                         error!(error = %e, "Failed to write data to the session, closing connection");
                         break;
                     }
+                    bytes_to_session += len;
                 }
                 Ok(Message::Text(_)) => {
                     error!("Received string instead of binary data, closing connection");
@@ -276,6 +284,8 @@ async fn websocket_connection(socket: WebSocket, session: HoprSession) {
             },
         }
     }
+
+    info!(%session_id, bytes_from_session, bytes_to_session, "WS session connection ended");
 }
 
 #[serde_as]
