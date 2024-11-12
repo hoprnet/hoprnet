@@ -36,11 +36,14 @@ pub(crate) async fn authenticate(
                 .collect::<Vec<_>>();
 
             // We have multiple websocket routes that need authentication checks
-            let is_ws_auth = if uri.path().contains("/websocket") {
-                uri.query().unwrap_or("").contains(&format!("apiToken={}", expected_token))
-            } else {
-                false
-            };
+            let is_ws_auth =
+                if (uri.path().starts_with("/messages/websocket") || uri.path().starts_with("/session/websocket")) {
+                    uri.query()
+                        .unwrap_or("")
+                        .contains(&format!("apiToken={}", expected_token))
+                } else {
+                    false
+                };
             // Use "Authorization Bearer <token>" and "X-Auth-Token <token>" headers and "Sec-Websocket-Protocol"
             (!auth_headers.is_empty()
                     && (auth_headers.contains(&(&AUTHORIZATION, &format!("Bearer {}", expected_token)))
