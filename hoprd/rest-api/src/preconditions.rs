@@ -35,9 +35,9 @@ pub(crate) async fn authenticate(
                 })
                 .collect::<Vec<_>>();
 
-            let is_ws_auth = if let Some(s) = uri.path_and_query() {
-                s.as_str()
-                    .contains(format!("messages/websocket?apiToken={expected_token}").as_str())
+            // We have multiple websocket routes that need authentication checks
+            let is_ws_auth = if uri.path().contains("/websocket") {
+                uri.query().unwrap_or("").contains(&format!("apiToken={}", expected_token))
             } else {
                 false
             };
