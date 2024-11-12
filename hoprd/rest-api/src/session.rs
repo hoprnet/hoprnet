@@ -204,6 +204,8 @@ enum WebSocketInput {
 
 #[tracing::instrument(level = "debug", skip(socket, session))]
 async fn websocket_connection(socket: WebSocket, session: HoprSession) {
+    let session_id = *session.id();
+
     let (rx, mut tx) = session.split();
     let (mut sender, receiver) = socket.split();
 
@@ -251,10 +253,7 @@ async fn websocket_connection(socket: WebSocket, session: HoprSession) {
                     break;
                 }
                 Ok(Message::Close(_)) => {
-                    info!(
-                        bytes_from_session,
-                        bytes_to_session, "WS connection closed by the other party"
-                    );
+                    debug!("Received close frame, closing connection");
                     break;
                 }
                 Ok(m) => trace!(message = ?m, "skipping an unsupported websocket message"),
@@ -265,6 +264,8 @@ async fn websocket_connection(socket: WebSocket, session: HoprSession) {
             },
         }
     }
+
+    info!(%session_id, bytes_from_session, bytes_to_session, "WS session connection ended");
 }
 
 #[serde_as]
