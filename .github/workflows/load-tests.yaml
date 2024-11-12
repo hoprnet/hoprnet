@@ -20,7 +20,10 @@ on:
         type: number
         required: true
       rate:
-        type: string
+        type: number
+        required: true
+      vu:
+        type: number
         required: true
   workflow_dispatch:
     inputs:
@@ -31,11 +34,11 @@ on:
       nodes:
         type: choice
         options:
-          - rotsee
-          - dufour
-          - team
-          - relayer
+          - many2many
           - sender
+          - relayer
+          - receiver
+          - team
         required: true
         description: 'hoprd nodes setup'
       workload:
@@ -54,10 +57,15 @@ on:
         required: true
         description: 'Test duration in minutes'
       rate:
-        type: string
-        default: "200"
+        type: number
+        default: 50
         required: true
-        description: 'Number of messages per seconds'
+        description: 'Number of messages per seconds per virtual user'
+      vu:
+        type: number
+        default: 1
+        required: true
+        description: 'Number of virtual user per node'
 
 concurrency:
   group: load-tests
@@ -76,18 +84,20 @@ jobs:
             {
               echo "NODES=${{ inputs.nodes }}"
               echo "WORKLOAD_NAME=${{ inputs.workload }}"
-              echo "SCENARIO_ITERATIONS=${{ github.event.inputs.rate }}"
+              echo "REQUESTS_PER_SECOND_PER_VU=${{ github.event.inputs.rate }}"
               echo "TESTID=${{ inputs.test_id }}"
-              echo "SCENARIO_DURATION=${{ inputs.duration }}"
+              echo "DURATION=${{ inputs.duration }}"
+              echo "VU_PER_ROUTE=${{ inputs.vu }}"
             } >> $GITHUB_OUTPUT
           else
             echo "The workflow is triggered manually"
             {
               echo "NODES=${{ github.event.inputs.nodes }}"
               echo "WORKLOAD_NAME=${{ github.event.inputs.workload }}"
-              echo "SCENARIO_ITERATIONS=${{ github.event.inputs.rate }}"
+              echo "REQUESTS_PER_SECOND_PER_VU=${{ github.event.inputs.rate }}"
               echo "TESTID=${{ github.event.inputs.test_id }}"
-              echo "SCENARIO_DURATION=${{ github.event.inputs.duration }}"
+              echo "DURATION=${{ github.event.inputs.duration }}"
+              echo "VU_PER_ROUTE=${{ github.event.inputs.vu }}"
             } >> $GITHUB_OUTPUT
           fi
 
@@ -129,7 +139,8 @@ jobs:
           WORKLOAD_NAME: ${{ steps.vars.outputs.WORKLOAD_NAME }}
           SCENARIO_ITERATIONS: ${{ steps.vars.outputs.SCENARIO_ITERATIONS }}
           TESTID: ${{ steps.vars.outputs.TESTID }}
-          SCENARIO_DURATION: ${{ steps.vars.outputs.SCENARIO_DURATION }}
+          DURATION: ${{ steps.vars.outputs.DURATION }}
+          VU_PER_ROUTE: ${{ steps.vars.outputs.VU_PER_ROUTE }}
 
       - name: Run Load test
         run: |
@@ -138,7 +149,7 @@ jobs:
           echo "Waiting for test to bootstrap..."
           sleep 2m # Wait for test to bootstrap
           echo "Waiting for test to finish..."
-          sleep ${{ steps.vars.outputs.SCENARIO_DURATION }}m # wait for the test to finish
+          sleep ${{ steps.vars.outputs.DURATION }}m # wait for the test to finish
         working-directory: "./k6"
 
       - name: Parse results
