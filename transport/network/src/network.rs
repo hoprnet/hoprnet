@@ -2,7 +2,6 @@ use std::collections::hash_set::HashSet;
 use std::time::{Duration, SystemTime};
 
 use futures::StreamExt;
-use hopr_primitive_types::traits::SaturatingSub;
 use libp2p_identity::PeerId;
 
 use multiaddr::Multiaddr;
@@ -123,11 +122,16 @@ where
 
     /// Check whether the PeerId is present in the network
     pub async fn has(&self, peer: &PeerId) -> bool {
-        peer == &self.me
-            || self.db.get_network_peer(peer).await.is_ok_and(|p| {
-                p.map(|peer_status| !self.should_still_be_ignored(&peer_status))
-                    .unwrap_or(false)
-            })
+        peer == &self.me || self.db.get_network_peer(peer).await.is_ok_and(|p| p.is_some())
+    }
+
+    /// Checks if the peer is present in the network, but it is being currently ignored.
+    pub async fn is_ignored(&self, peer: &PeerId) -> bool {
+        peer != &self.me
+            && self
+                .get(peer)
+                .await
+                .is_ok_and(|ps| ps.is_some_and(|p| p.is_ignored(self.cfg.ignore_timeframe)))
     }
 
     /// Add a new peer into the network
@@ -139,7 +143,7 @@ where
         }
 
         if let Some(mut peer_status) = self.db.get_network_peer(peer).await? {
-            if !self.should_still_be_ignored(&peer_status) {
+            if !peer_status.is_ignored(self.cfg.ignore_timeframe) {
                 peer_status.ignored = None;
                 peer_status.multiaddresses.append(&mut addrs);
                 peer_status.multiaddresses = peer_status
@@ -181,11 +185,7 @@ where
                 ps
             }))
         } else {
-            Ok(self
-                .db
-                .get_network_peer(peer)
-                .await?
-                .filter(|peer_status| !self.should_still_be_ignored(peer_status)))
+            Ok(self.db.get_network_peer(peer).await?)
         }
     }
 
@@ -218,7 +218,7 @@ where
         }
 
         if let Some(mut entry) = self.db.get_network_peer(peer).await? {
-            if !self.should_still_be_ignored(&entry) {
+            if !entry.is_ignored(self.cfg.ignore_timeframe) {
                 entry.ignored = None;
             }
 
@@ -350,12 +350,6 @@ where
 
         Ok(data.into_iter().map(|peer| peer.id.1).collect())
     }
-
-    pub(crate) fn should_still_be_ignored(&self, peer: &PeerStatus) -> bool {
-        peer.ignored
-            .map(|t| current_time().saturating_sub(t) < self.cfg.ignore_timeframe)
-            .unwrap_or(false)
-    }
 }
 
 #[cfg(test)]
@@ -468,7 +462,7 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn test_network_should_ingore_heartbeat_updates_for_peers_that_were_not_registered() -> anyhow::Result<()> {
+    async fn test_network_should_ignore_heartbeat_updates_for_peers_that_were_not_registered() -> anyhow::Result<()> {
         let peer: PeerId = OffchainKeypair::random().public().into();
         let me: PeerId = OffchainKeypair::random().public().into();
 
@@ -570,12 +564,12 @@ mod tests {
 
         peers.update(&peer, Err(()), None).await.expect("no error should occur"); // should drop from network
 
-        assert!(!peers.has(&peer).await);
+        assert!(peers.is_ignored(&peer).await);
 
         // peer should remain ignored and not be added
         peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await?;
 
-        assert!(!peers.has(&peer).await);
+        assert!(peers.is_ignored(&peer).await);
 
         Ok(())
     }
@@ -746,7 +740,7 @@ mod tests {
             Some(NetworkTriggeredEvent::CloseConnection(peer))
         );
 
-        assert!(!peers.has(&public).await);
+        assert!(peers.is_ignored(&public).await);
 
         Ok(())
     }

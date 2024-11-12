@@ -14,8 +14,6 @@ declare HOPR_LOG_ID="setup-local-cluster"
 # shellcheck disable=SC1090
 source "${mydir}/utils.sh"
 
-PATH="${mydir}/../.foundry/bin:${mydir}/../.cargo/bin:${PATH}"
-
 # verify and set parameters
 declare api_token="^^LOCAL-testing-123^^"
 declare init_script=""
@@ -150,10 +148,6 @@ function setup_node() {
   log "Additional args: \"${additional_args}\""
 
   env \
-    HOPRD_HEARTBEAT_INTERVAL=3 \
-    HOPRD_HEARTBEAT_THRESHOLD=3 \
-    HOPRD_HEARTBEAT_VARIANCE=1 \
-    HOPRD_NETWORK_QUALITY_THRESHOLD="0.3" \
     TOKIO_CONSOLE_BIND=localhost:$((api_port + 100)) \
     RUST_LOG="debug,libp2p_mplex=info,multistream_select=info,isahc=error,sea_orm=warn,sqlx=warn,hyper_util=warn,libp2p_tcp=info,libp2p_dns=info" \
     RUST_BACKTRACE=1 \
