@@ -37,7 +37,7 @@ pub(crate) async fn authenticate(
 
             // We have multiple websocket routes that need authentication checks
             let is_ws_auth =
-                if (uri.path().starts_with("/messages/websocket") || uri.path().starts_with("/session/websocket")) {
+                if uri.path().starts_with("/messages/websocket") || uri.path().starts_with("/session/websocket") {
                     uri.query()
                         .unwrap_or("")
                         .contains(&format!("apiToken={}", expected_token))
