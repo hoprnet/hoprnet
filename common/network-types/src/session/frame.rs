@@ -215,6 +215,12 @@ impl Segment {
     pub fn len(&self) -> usize {
         Self::HEADER_SIZE + self.data.len()
     }
+
+    /// Indicates whether this segment is the last one from the frame.
+    #[inline]
+    pub fn is_last(&self) -> bool {
+        self.seq_idx == self.seq_len - 1
+    }
 }
 
 impl Debug for Segment {

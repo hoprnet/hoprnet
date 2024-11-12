@@ -26,7 +26,11 @@ pub(crate) enum RetryResult {
 }
 
 impl RetryToken {
-    pub fn new(now: Instant, backoff_base: f64) -> Self {
+    pub fn new(backoff_base: f64) -> Self {
+        Self::from_instant(Instant::now(), backoff_base)
+    }
+
+    pub fn from_instant(now: Instant, backoff_base: f64) -> Self {
         Self {
             num_retry: 0,
             started_at: now,
@@ -35,12 +39,12 @@ impl RetryToken {
         }
     }
 
-    pub fn replenish(self, now: Instant, backoff_base: f64) -> Self {
+    pub fn replenish(self) -> Self {
         Self {
             num_retry: 0,
-            started_at: now,
+            started_at: Instant::now(),
             created_at: self.created_at,
-            backoff_base,
+            backoff_base: self.backoff_base,
         }
     }
 

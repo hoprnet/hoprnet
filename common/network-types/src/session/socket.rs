@@ -2,15 +2,16 @@ use asynchronous_codec::Framed;
 use futures::{pin_mut, Sink, SinkExt, StreamExt, TryStreamExt};
 use futures_concurrency::stream::Merge;
 use std::pin::Pin;
+use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::Duration;
-
+use dashmap::DashMap;
 use crate::prelude::errors::SessionError;
 use crate::prelude::protocol::{FrameAcknowledgements, SessionCodec, SessionMessage};
 use crate::prelude::{frame_reconstructor, Segment};
 use crate::session::protocol::SegmentRequest;
 use crate::session::segmenter::Segmenter;
-use crate::session::utils::{offloaded_ringbuffer, OffloadedRbConsumer};
+use crate::session::utils::{offloaded_ringbuffer, OffloadedRbConsumer, RetryToken};
 
 struct SocketState<const C: usize> {
     rb: OffloadedRbConsumer<Segment>,
@@ -68,7 +69,9 @@ impl<const C: usize> SessionSocket<C> {
         let (upstream_frames_in, data_rx) = Segmenter::<C, 1500>::new(1024);
         let (ctl_tx, ctl_rx) = futures::channel::mpsc::unbounded::<SessionMessage<C>>();
 
-        // Frames coming out from the Reconstructor can be read upstream
+        let outgoing_frame_retries = Arc::new(DashMap::new());
+
+        // Frames coming out from the Reconstructor can be read Upstream
         let downstream_frames_out = Box::pin(
             downstream_frames_out
                 .filter_map(move |maybe_frame| {
@@ -87,11 +90,17 @@ impl<const C: usize> SessionSocket<C> {
         let (rb_tx, rb_rx) = offloaded_ringbuffer(1024);
 
         // Messages incoming from Upstream and from the State go downstream as Packets
+        let outgoing_frame_retries_clone = outgoing_frame_retries.clone();
         hopr_async_runtime::prelude::spawn(
             (
                 ctl_rx,
                 data_rx
                     .inspect(move |s| {
+                        // When the last segment of a frame has been sent,
+                        // add it to outgoing retries
+                        if s.is_last() {
+                            outgoing_frame_retries_clone.insert(s.frame_id, RetryToken::new(1.0));
+                        }
                         rb_tx.push(s.clone());
                     })
                     .map(SessionMessage::<C>::Segment),
