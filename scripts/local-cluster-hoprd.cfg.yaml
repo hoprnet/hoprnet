@@ -4,13 +4,10 @@ hopr:
     on_fail_continue: true
     allow_recursive: true
     strategies:
-      - !Aggregating
-        aggregation_threshold: 10000
-        unrealized_balance_ratio: 0.95
-        aggregation_timeout: 60
-        aggregate_on_channel_close: true
       - !AutoRedeeming
-        redeem_only_aggregated: true
-        minimum_redeem_ticket_value: "10000 HOPR"
+        redeem_only_aggregated: false
+        minimum_redeem_ticket_value: "1000000 HOPR"
       - !ClosureFinalizer
         max_closure_overdue: 60
+  protocol:
+    outgoing_ticket_winning_prob: 0.00001

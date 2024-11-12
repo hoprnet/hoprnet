@@ -213,6 +213,22 @@ function create_local_safes() {
   done
 }
 
+function set_minimum_win_prob() {
+  local win_prob=${1:-"0.00001"}
+
+  log "Decreasing minimum winning probability to ${win_prob}"
+
+  env \
+    ETHERSCAN_API_KEY="" \
+    IDENTITY_PASSWORD="${password}" \
+    PRIVATE_KEY="${deployer_private_key}" \
+    MANAGER_PRIVATE_KEY="${deployer_private_key}" \
+    hopli win-prob set \
+      --network anvil-localhost \
+      --winning-probability "${win_prob}" \
+      --provider-url "http://localhost:8545" \
+      --contracts-root "./ethereum/contracts"
+}
 
 function fund_all_local_identities() {
   log "Funding nodes"
@@ -282,6 +298,9 @@ generate_local_identities
 # create safe and modules for all the ids, store them in args files
 #  each node has its own pair of safe and module
 create_local_safes
+
+# decrease minimum winning probability
+set_minimum_win_prob "0.00001"
 
 #  --- Run nodes --- {{{
 for node_id in ${!id_files[@]}; do
