@@ -7,7 +7,6 @@ use multiaddr::Multiaddr;
 use tracing::warn;
 
 use hopr_crypto_types::prelude::OffchainPublicKey;
-use hopr_platform::time::native::current_time;
 use hopr_primitive_types::prelude::*;
 
 use crate::errors::Result;
@@ -153,9 +152,9 @@ impl PeerStatus {
     }
 
     /// Determines if this peer is still ignored.
-    pub fn is_ignored(&self, max_ignore: Duration) -> bool {
-        self.ignored
-            .map_or(false, |t| current_time().saturating_sub(t) <= max_ignore)
+    #[inline]
+    pub fn is_ignored(&self, now: SystemTime, max_ignore: Duration) -> bool {
+        self.ignored.map_or(false, |t| now.saturating_sub(t) <= max_ignore)
     }
 }
 

@@ -131,7 +131,7 @@ where
             && self
                 .get(peer)
                 .await
-                .is_ok_and(|ps| ps.is_some_and(|p| p.is_ignored(self.cfg.ignore_timeframe)))
+                .is_ok_and(|ps| ps.is_some_and(|p| p.is_ignored(current_time(), self.cfg.ignore_timeframe)))
     }
 
     /// Add a new peer into the network
@@ -143,7 +143,7 @@ where
         }
 
         if let Some(mut peer_status) = self.db.get_network_peer(peer).await? {
-            if !peer_status.is_ignored(self.cfg.ignore_timeframe) {
+            if !peer_status.is_ignored(current_time(), self.cfg.ignore_timeframe) {
                 peer_status.ignored = None;
                 peer_status.multiaddresses.append(&mut addrs);
                 peer_status.multiaddresses = peer_status
@@ -218,7 +218,7 @@ where
         }
 
         if let Some(mut entry) = self.db.get_network_peer(peer).await? {
-            if !entry.is_ignored(self.cfg.ignore_timeframe) {
+            if !entry.is_ignored(current_time(), self.cfg.ignore_timeframe) {
                 entry.ignored = None;
             }
 

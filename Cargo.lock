@@ -4160,7 +4160,6 @@ dependencies = [
  "futures",
  "hopr-crypto-types",
  "hopr-internal-types",
- "hopr-platform",
  "hopr-primitive-types",
  "libp2p-identity",
  "multiaddr",
