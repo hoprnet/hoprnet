@@ -111,6 +111,9 @@ pub(crate) struct SessionWebsocketClientQueryRequest {
     pub destination: PeerId,
     #[schema(required = true)]
     pub hops: u8,
+    #[cfg(feature = "explicit-path")]
+    #[schema(required = false)]
+    pub path: Option<String>,
     #[schema(required = true)]
     #[serde_as(as = "Vec<DisplayFromStr>")]
     pub capabilities: Vec<SessionCapability>,
@@ -129,9 +132,26 @@ fn default_protocol() -> IpProtocol {
 
 impl SessionWebsocketClientQueryRequest {
     pub(crate) fn into_protocol_session_config(self) -> Result<SessionClientConfig, HoprLibError> {
+        #[cfg(not(feature = "explicit-path"))]
+        let path_options = RoutingOptions::Hops((self.hops as u32).try_into()?);
+
+        #[cfg(feature = "explicit-path")]
+        let path_options = if let Some(path) = self.path {
+            // Explicit `path` will override `hops`
+            RoutingOptions::IntermediatePath(
+                path.split(',')
+                    .map(PeerId::from_str)
+                    .collect::<Result<Vec<PeerId>, _>>()
+                    .map_err(|e| HoprLibError::GeneralError(format!("invalid peer id on path: {e}")))?
+                    .try_into()?,
+            )
+        } else {
+            RoutingOptions::Hops((self.hops as u32).try_into()?)
+        };
+
         Ok(SessionClientConfig {
             peer: self.destination,
-            path_options: RoutingOptions::Hops((self.hops as u32).try_into()?),
+            path_options,
             target_protocol: self.protocol,
             target: self.target.map(SealedHost::try_from).unwrap_or(
                 IpOrHost::from_str("127.0.0.1:4677")
@@ -301,6 +321,11 @@ impl SessionClientRequest {
                 return Err(HoprLibError::GeneralError(format!("invalid destination: {}", address)))
             }
         };
+
+        #[cfg(not(feature = "explicit-path"))]
+        if matches!(&self.path, RoutingOptions::IntermediatePath(_)) {
+            return Err(HoprLibError::GeneralError("explicit paths are not allowed".into()));
+        }
 
         Ok(SessionClientConfig {
             peer,
