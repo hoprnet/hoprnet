@@ -39,10 +39,10 @@ enum LogStatus {
     TransactionIndex,
     LogIndex,
     // Indicates whether the log has been processed.
-    #[warn(dead_code)]
+    #[allow(dead_code)]
     Processed,
     // Time when the log was processed.
-    #[warn(dead_code)]
+    #[allow(dead_code)]
     ProcessedAt,
     // Computed checksum of this log and previous logs
     Checksum,
