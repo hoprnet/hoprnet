@@ -14,7 +14,8 @@ default = [
   "runtime-tokio",
   "prometheus",
   "telemetry",
-  "transport-quic",
+  "explicit-path",
+  # "transport-quic", # TODO: re-enable this once properly tested
 ] # uses tokio by default because of axum
 prometheus = [
   "dep:hopr-metrics",
@@ -46,12 +47,13 @@ telemetry = [
   "dep:tracing-opentelemetry",
 ]
 transport-quic = ["hopr-lib/transport-quic"]
+explicit-path = ["hoprd-api/explicit-path"]
 # To use profiling:
 # 1. Set RUSTFLAGS="--cfg tokio_unstable" before building
 # 2. Enable the 'prof' feature: cargo build --feature prof
 prof = [
   "dep:console-subscriber",
-] # must be build with 'tokio_unstable': https://github.com/tokio-rs/console/tree/main/console-subscriber
+] # must be built with 'tokio_unstable': https://github.com/tokio-rs/console/tree/main/console-subscriber
 
 [dependencies]
 anyhow = { workspace = true }
