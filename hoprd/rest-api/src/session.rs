@@ -253,7 +253,7 @@ async fn websocket_connection(socket: WebSocket, session: HoprSession) {
                 Ok(Message::Close(_)) => {
                     info!(
                         bytes_from_session,
-                        bytes_to_session, "Received close frame, closing connection"
+                        bytes_to_session, "WS connection closed by the other party"
                     );
                     break;
                 }
