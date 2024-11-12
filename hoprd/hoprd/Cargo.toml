@@ -14,7 +14,7 @@ default = [
   "runtime-tokio",
   "prometheus",
   "telemetry",
-  "transport-quic",
+  # "transport-quic", # TODO: re-enable this once properly tested
 ] # uses tokio by default because of axum
 prometheus = [
   "dep:hopr-metrics",
