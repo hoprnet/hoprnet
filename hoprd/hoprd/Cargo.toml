@@ -14,7 +14,7 @@ default = [
   "runtime-tokio",
   "prometheus",
   "telemetry",
-  "transport-quic",
+  #"transport-quic",
   "explicit-path",
 ] # uses tokio by default because of axum
 prometheus = [
