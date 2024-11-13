@@ -1644,7 +1644,7 @@ checksum = "773648b94d0e5d620f64f280777445740e61fe701025087ec8b57f45c791888b"
 
 [[package]]
 name = "core-network"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "anyhow",
  "async-std",
@@ -4154,7 +4154,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-api"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "async-trait",
  "futures",
