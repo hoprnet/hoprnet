@@ -312,7 +312,7 @@ impl<S: SphinxSuite> TryFrom<&[u8]> for MetaPacket<S> {
                 _s: PhantomData,
             })
         } else {
-            Err(GeneralError::ParseError)
+            Err(GeneralError::ParseError("MetaPacket".into()))
         }
     }
 }
