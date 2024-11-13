@@ -151,7 +151,8 @@ impl PeerStatus {
         self.quality
     }
 
-    /// Determines if this peer is still ignored.
+    /// Determines if this peer is still ignored, given the current time
+    /// and maximum peer ignore period.
     #[inline]
     pub fn is_ignored(&self, now: SystemTime, max_ignore: Duration) -> bool {
         self.ignored.map_or(false, |t| now.saturating_sub(t) <= max_ignore)
