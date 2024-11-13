@@ -25,8 +25,8 @@ hopr:
   network_options:
     min_delay: 1
     max_delay: 300
-    quality_bad_threshold: 0.2
-    quality_offline_threshold: 0.5
+    quality_bad_threshold: 0.5
+    quality_offline_threshold: 0.2
     quality_step: 0.1
     quality_avg_window_size: 25
     ignore_timeframe: 600
