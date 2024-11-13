@@ -221,7 +221,7 @@ impl ApplicationData {
                 plain_text: (&data[2..]).into(),
             })
         } else {
-            Err(GeneralError::ParseError)
+            Err(GeneralError::ParseError("ApplicationData".into()))
         }
     }
 
