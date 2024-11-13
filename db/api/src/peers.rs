@@ -151,7 +151,7 @@ impl PeerStatus {
         self.quality
     }
 
-    /// Determines if this peer is still ignored, given the current time
+    /// Determines whether the peer is ignored due to quality concerns, given the current time
     /// and maximum peer ignore period.
     #[inline]
     pub fn is_ignored(&self, now: SystemTime, max_ignore: Duration) -> bool {
