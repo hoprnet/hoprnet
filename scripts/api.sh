@@ -349,7 +349,7 @@ api_open_channel() {
   log "Safe balance of node ${source_api} before opening new channel: ${hopr_balance} weiHOPR, need ${amount} weiHOPR"
 
   #log "Node ${source_id} open channel to Node ${destination_id}"
-  api_call "${source_api}" "/channels" "POST" "{ \"peerAddress\": \"${destination_address}\", \"amount\": \"${amount}\" }" 'channelId|CHANNEL_ALREADY_OPEN' 600 30
+  api_call "${source_api}" "/channels" "POST" "{ \"destination\": \"${destination_address}\", \"amount\": \"${amount}\" }" 'channelId|CHANNEL_ALREADY_OPEN' 600 30
   #log "Node ${source_id} open channel to Node ${destination_id} result -- ${result}"
 }
 
