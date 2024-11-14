@@ -4251,6 +4251,7 @@ dependencies = [
  "bindings",
  "bloomfilter",
  "cbor4ii",
+ "criterion",
  "ethers",
  "hex-literal",
  "hopr-crypto-random",
