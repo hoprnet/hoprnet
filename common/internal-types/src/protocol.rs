@@ -139,24 +139,22 @@ impl TagBloomFilter {
     pub fn check_and_set(&mut self, tag: &PacketTag) -> bool {
         // If we're at full capacity, we do only "check" and conditionally reset with the new entry
         if self.count == self.capacity {
-            if !self.bloom.check(tag) {
+            let is_present = self.bloom.check(tag);
+            if !is_present {
                 // There cannot be false negatives, so we can reset the filter
                 warn!("maximum number of items in the Bloom filter reached!");
                 self.bloom.clear();
                 self.bloom.set(tag);
                 self.count = 1;
-                false
-            } else {
-                true
             }
+            is_present
         } else {
             // If not at full capacity, we can do check_and_set
-            if self.bloom.check_and_set(tag) {
-                true
-            } else {
+            let was_present = self.bloom.check_and_set(tag);
+            if !was_present {
                 self.count += 1;
-                false
             }
+            was_present
         }
     }
 
@@ -283,6 +281,9 @@ mod tests {
         Ok(())
     }
 
+    const ZEROS_TAG: [u8; PACKET_TAG_LENGTH] = [0; PACKET_TAG_LENGTH];
+    const ONES_TAG: [u8; PACKET_TAG_LENGTH] = [1; PACKET_TAG_LENGTH];
+
     #[test]
     fn test_packet_tag_bloom_filter() -> anyhow::Result<()> {
         let mut filter1 = TagBloomFilter::default();
@@ -316,9 +317,9 @@ mod tests {
         );
         assert_eq!(filter1.count(), filter2.count(), "the number of items must be equal");
 
-        // All zeroes must not be present in neither BF, we ensured we never insert a zero tag
-        assert!(!filter1.check(&[0u8; 16]), "bf 1 must not contain zero tag");
-        assert!(!filter2.check(&[0u8; 16]), "bf 2 must not contain zero tag");
+        // All zeroes must be present in neither BF; we ensured we never insert a zero tag
+        assert!(!filter1.check(&ZEROS_TAG), "bf 1 must not contain zero tag");
+        assert!(!filter2.check(&ZEROS_TAG), "bf 2 must not contain zero tag");
 
         Ok(())
     }
@@ -326,16 +327,16 @@ mod tests {
     #[test]
     fn tag_bloom_filter_count() {
         let mut filter = TagBloomFilter::default();
-        assert!(!filter.check_and_set(&[0u8; 16]));
+        assert!(!filter.check_and_set(&ZEROS_TAG));
         assert_eq!(1, filter.count());
 
-        assert!(filter.check_and_set(&[0u8; 16]));
+        assert!(filter.check_and_set(&ZEROS_TAG));
         assert_eq!(1, filter.count());
 
-        assert!(!filter.check_and_set(&[1u8; 16]));
+        assert!(!filter.check_and_set(&ONES_TAG));
         assert_eq!(2, filter.count());
 
-        assert!(filter.check_and_set(&[1u8; 16]));
+        assert!(filter.check_and_set(&ZEROS_TAG));
         assert_eq!(2, filter.count());
     }
 
@@ -351,19 +352,19 @@ mod tests {
         assert_eq!(filter.capacity() - 1, filter.count());
 
         // This entry is not there yet
-        assert!(!filter.check_and_set(&[0u8; 16]));
+        assert!(!filter.check_and_set(&ZEROS_TAG));
 
         // Now the filter is at capacity and contains the previously inserted entry
         assert_eq!(filter.capacity(), filter.count());
-        assert!(filter.check(&[0u8; 16]));
+        assert!(filter.check(&ZEROS_TAG));
 
         // This will not clear out the filter, since the entry is there
-        assert!(filter.check_and_set(&[0u8; 16]));
+        assert!(filter.check_and_set(&ZEROS_TAG));
         assert_eq!(filter.capacity(), filter.count());
 
         // This will clear out the filter, since this other entry is definitely not there
-        assert!(!filter.check_and_set(&[1u8; 16]));
+        assert!(!filter.check_and_set(&ONES_TAG));
         assert_eq!(1, filter.count());
-        assert!(filter.check(&[1u8; 16]));
+        assert!(filter.check(&ONES_TAG));
     }
 }
