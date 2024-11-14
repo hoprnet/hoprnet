@@ -48,6 +48,8 @@ jobs:
           else
             echo "The workflow is triggered manually"
             echo "GITHUB_REF_NAME=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+            commit_hash=$(gh api repos/${{ github.repository }}/commits/${{ inputs.branch }} --jq '.sha')
+            echo "commit_hash=${commit_hash}" >> $GITHUB_ENV
             if [[ "${{ github.event.inputs.network }}" == "rotsee" ]]; then
               echo "DAPPNODE_REPOSITORY=DAppNodePackage-Hopr-testnet" >> "$GITHUB_OUTPUT"
             else
@@ -106,8 +108,7 @@ jobs:
             elif [[ "${base_branch}" =~ ^"release" ]]; then
               echo "current_version=${{ vars.BRANCH_RELEASE_RELEASE_NAME }}-latest" >> "$GITHUB_OUTPUT"
             else
-              echo "Cannot generate a dAppNode package from branch ${base_branch}"
-              exit 1
+              echo "current_version=${current_version}-commit.${{ steps.vars.outputs.commit_hash }}" >> "$GITHUB_OUTPUT"
             fi
           else
             echo "Invoked from a pull request"
