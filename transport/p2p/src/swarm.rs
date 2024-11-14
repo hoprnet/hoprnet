@@ -76,7 +76,8 @@ async fn build_p2p_network(
         )
         .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?
         .with_quic()
-        .with_dns();
+        .with_dns()
+        .await;
 
     // Both features could be enabled during testing, therefore we only use tokio when its
     // exclusively enabled.
