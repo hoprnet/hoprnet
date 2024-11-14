@@ -148,9 +148,9 @@ function setup_node() {
   log "Additional args: \"${additional_args}\""
 
   # we can only provide apiToken param if we want authentication
-  local api_token_param=""
+  local api_token_params="--api"
   if [[ "${HOPRD_DISABLE_API_AUTHENTICATION:-1}" == 0 ]]; then
-      api_token_param="--apiToken ${api_token}"
+      api_token_params="${api_token_params} --apiToken ${api_token}"
   fi
   env \
     TOKIO_CONSOLE_BIND=localhost:$((api_port + 100)) \
@@ -164,10 +164,9 @@ function setup_node() {
       --identity="${id_file}" \
       --init \
       --password="${password}" \
-      --api \
+      "${api_token_params}" \
       --apiHost "${host}" \
       --apiPort "${api_port}" \
-      "${api_token_param}" \
       --testAnnounceLocalAddresses \
       --testPreferLocalAddresses \
       --protocolConfig ${protocol_config} \
