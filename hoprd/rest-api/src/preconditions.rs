@@ -43,7 +43,7 @@ pub(crate) async fn authenticate(
                 uri.query()
                     .map(|q| match decode(q) {
                         Ok(decoded) => decoded.into_owned().contains(&format!("apiToken={}", expected_token)),
-                        Err(x) => false,
+                        Err(_) => false,
                     })
                     .unwrap_or(false)
             } else {
