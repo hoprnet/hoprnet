@@ -147,6 +147,11 @@ function setup_node() {
 
   log "Additional args: \"${additional_args}\""
 
+  # we can only provide apiToken param if we want authentication
+  local api_token_param=""
+  if [[ "${HOPRD_DISABLE_API_AUTHENTICATION:-1}" == 0 ]]; then
+      api_token_param="--apiToken ${api_token}"
+  fi
   env \
     TOKIO_CONSOLE_BIND=localhost:$((api_port + 100)) \
     RUST_LOG="debug,libp2p_mplex=info,multistream_select=info,isahc=error,sea_orm=warn,sqlx=warn,hyper_util=warn,libp2p_tcp=info,libp2p_dns=info" \
@@ -162,7 +167,7 @@ function setup_node() {
       --api \
       --apiHost "${host}" \
       --apiPort "${api_port}" \
-      --apiToken "${api_token}" \
+      "${api_token_param}" \
       --testAnnounceLocalAddresses \
       --testPreferLocalAddresses \
       --protocolConfig ${protocol_config} \
