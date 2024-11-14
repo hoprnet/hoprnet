@@ -162,6 +162,7 @@ function setup_node() {
       --api \
       --apiHost "${host}" \
       --apiPort "${api_port}" \
+      --apiToken "${api_token}" \
       --testAnnounceLocalAddresses \
       --testPreferLocalAddresses \
       --protocolConfig ${protocol_config} \
