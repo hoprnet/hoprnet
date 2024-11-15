@@ -31,16 +31,18 @@ pub mod rlp {
 
     pub fn decode(data: &[u8]) -> crate::errors::Result<(Box<[u8]>, Duration)> {
         let rlp_data = rlp::Rlp::new(data);
-        let mut list = rlp_data.as_list::<Vec<u8>>().map_err(|_| GeneralError::ParseError)?;
+        let mut list = rlp_data
+            .as_list::<Vec<u8>>()
+            .map_err(|_| GeneralError::ParseError("invalid rlp structure".into()))?;
 
         if list.len() != 2 {
-            return Err(GeneralError::ParseError);
+            return Err(GeneralError::ParseError("invalid rlp length".into()));
         }
 
         let enc_ts = list.remove(1);
         let ts_len = enc_ts.len();
         if ts_len > 8 {
-            return Err(GeneralError::ParseError);
+            return Err(GeneralError::ParseError("invalid rlp list length".into()));
         }
 
         let mut ts = [0u8; 8];

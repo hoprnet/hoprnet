@@ -8,6 +8,11 @@ use hopr_primitive_types::prelude::{Address, BytesEncodable};
 const SAMPLE_SIZE: usize = 100_000;
 
 pub fn packet_sending_bench(c: &mut Criterion) {
+    assert!(
+        !hopr_crypto_random::is_rng_fixed(),
+        "RNG must not be fixed for bench tests"
+    );
+
     let chain_key = ChainKeypair::random();
     let destination = Address::new(&hopr_crypto_random::random_bytes::<20>());
 
@@ -35,6 +40,11 @@ pub fn packet_sending_bench(c: &mut Criterion) {
 }
 
 pub fn packet_forwarding_bench(c: &mut Criterion) {
+    assert!(
+        !hopr_crypto_random::is_rng_fixed(),
+        "RNG must not be fixed for bench tests"
+    );
+
     let chain_key = ChainKeypair::random();
     let destination = Address::new(&hopr_crypto_random::random_bytes::<20>());
 
@@ -72,6 +82,11 @@ pub fn packet_forwarding_bench(c: &mut Criterion) {
 }
 
 pub fn packet_receiving_bench(c: &mut Criterion) {
+    assert!(
+        !hopr_crypto_random::is_rng_fixed(),
+        "RNG must not be fixed for bench tests"
+    );
+
     let chain_key = ChainKeypair::random();
     let destination = Address::new(&hopr_crypto_random::random_bytes::<20>());
 

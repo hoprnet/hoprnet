@@ -111,6 +111,9 @@ pub(crate) struct SessionWebsocketClientQueryRequest {
     pub destination: PeerId,
     #[schema(required = true)]
     pub hops: u8,
+    #[cfg(feature = "explicit-path")]
+    #[schema(required = false)]
+    pub path: Option<String>,
     #[schema(required = true)]
     #[serde_as(as = "Vec<DisplayFromStr>")]
     pub capabilities: Vec<SessionCapability>,
@@ -129,9 +132,26 @@ fn default_protocol() -> IpProtocol {
 
 impl SessionWebsocketClientQueryRequest {
     pub(crate) fn into_protocol_session_config(self) -> Result<SessionClientConfig, HoprLibError> {
+        #[cfg(not(feature = "explicit-path"))]
+        let path_options = RoutingOptions::Hops((self.hops as u32).try_into()?);
+
+        #[cfg(feature = "explicit-path")]
+        let path_options = if let Some(path) = self.path {
+            // Explicit `path` will override `hops`
+            RoutingOptions::IntermediatePath(
+                path.split(',')
+                    .map(PeerId::from_str)
+                    .collect::<Result<Vec<PeerId>, _>>()
+                    .map_err(|e| HoprLibError::GeneralError(format!("invalid peer id on path: {e}")))?
+                    .try_into()?,
+            )
+        } else {
+            RoutingOptions::Hops((self.hops as u32).try_into()?)
+        };
+
         Ok(SessionClientConfig {
             peer: self.destination,
-            path_options: RoutingOptions::Hops((self.hops as u32).try_into()?),
+            path_options,
             target_protocol: self.protocol,
             target: self.target.map(SealedHost::try_from).unwrap_or(
                 IpOrHost::from_str("127.0.0.1:4677")
@@ -204,6 +224,8 @@ enum WebSocketInput {
 
 #[tracing::instrument(level = "debug", skip(socket, session))]
 async fn websocket_connection(socket: WebSocket, session: HoprSession) {
+    let session_id = *session.id();
+
     let (rx, mut tx) = session.split();
     let (mut sender, receiver) = socket.split();
 
@@ -213,10 +235,13 @@ async fn websocket_connection(socket: WebSocket, session: HoprSession) {
     )
         .merge();
 
+    let (mut bytes_to_session, mut bytes_from_session) = (0, 0);
+
     while let Some(v) = queue.next().await {
         match v {
             WebSocketInput::Network(bytes) => match bytes {
                 Ok(bytes) => {
+                    let len = bytes.len();
                     if let Err(e) = sender.send(Message::Binary(bytes.into())).await {
                         error!(
                             error = %e,
@@ -224,6 +249,7 @@ async fn websocket_connection(socket: WebSocket, session: HoprSession) {
                         );
                         break;
                     };
+                    bytes_from_session += len;
                 }
                 Err(e) => {
                     error!(
@@ -235,10 +261,12 @@ async fn websocket_connection(socket: WebSocket, session: HoprSession) {
             },
             WebSocketInput::WsInput(ws_in) => match ws_in {
                 Ok(Message::Binary(data)) => {
+                    let len = data.len();
                     if let Err(e) = tx.write(data.as_ref()).await {
                         error!(error = %e, "Failed to write data to the session, closing connection");
                         break;
                     }
+                    bytes_to_session += len;
                 }
                 Ok(Message::Text(_)) => {
                     error!("Received string instead of binary data, closing connection");
@@ -256,6 +284,8 @@ async fn websocket_connection(socket: WebSocket, session: HoprSession) {
             },
         }
     }
+
+    info!(%session_id, bytes_from_session, bytes_to_session, "WS session connection ended");
 }
 
 #[serde_as]
@@ -291,6 +321,11 @@ impl SessionClientRequest {
                 return Err(HoprLibError::GeneralError(format!("invalid destination: {}", address)))
             }
         };
+
+        #[cfg(not(feature = "explicit-path"))]
+        if matches!(&self.path, RoutingOptions::IntermediatePath(_)) {
+            return Err(HoprLibError::GeneralError("explicit paths are not allowed".into()));
+        }
 
         Ok(SessionClientConfig {
             peer,

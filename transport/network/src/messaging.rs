@@ -91,7 +91,7 @@ impl TryFrom<&[u8]> for PingMessage {
             ret.nonce.copy_from_slice(&value[0..Self::SIZE]);
             Ok(ret)
         } else {
-            Err(hopr_primitive_types::errors::GeneralError::ParseError)
+            Err(GeneralError::ParseError("PingMessage".into()))
         }
     }
 }

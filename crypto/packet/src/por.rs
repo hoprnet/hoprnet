@@ -81,7 +81,7 @@ impl TryFrom<&[u8]> for ProofOfRelayString {
                 hint: HalfKeyChallenge::new(hint),
             })
         } else {
-            Err(GeneralError::ParseError)
+            Err(GeneralError::ParseError("ProofOfRelayString".into()))
         }
     }
 }

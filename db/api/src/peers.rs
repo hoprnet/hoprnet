@@ -150,6 +150,13 @@ impl PeerStatus {
     pub fn get_quality(&self) -> f64 {
         self.quality
     }
+
+    /// Determines whether the peer is ignored due to quality concerns, given the current time
+    /// and maximum peer ignore period.
+    #[inline]
+    pub fn is_ignored(&self, now: SystemTime, max_ignore: Duration) -> bool {
+        self.ignored.map_or(false, |t| now.saturating_sub(t) <= max_ignore)
+    }
 }
 
 impl std::fmt::Display for PeerStatus {

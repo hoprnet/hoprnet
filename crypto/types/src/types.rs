@@ -237,7 +237,9 @@ impl FromStr for CurvePoint {
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         Ok(CurvePoint::try_from(
-            hex::decode(s).map_err(|_| GeneralError::ParseError)?.as_slice(),
+            hex::decode(s)
+                .map_err(|_| GeneralError::ParseError("CurvePoint".into()))?
+                .as_slice(),
         )?)
     }
 }
@@ -258,11 +260,12 @@ impl TryFrom<&[u8]> for CurvePoint {
     type Error = GeneralError;
 
     fn try_from(value: &[u8]) -> std::result::Result<Self, Self::Error> {
-        let ep =
-            elliptic_curve::sec1::EncodedPoint::<Secp256k1>::from_bytes(value).map_err(|_| GeneralError::ParseError)?;
+        let ep = elliptic_curve::sec1::EncodedPoint::<Secp256k1>::from_bytes(value)
+            .map_err(|_| GeneralError::ParseError("invalid secp256k1 encoded point".into()))?;
         Ok(Self {
-            affine: Option::from(AffinePoint::from_encoded_point(&ep)).ok_or(GeneralError::ParseError)?,
-            // Compressing an uncompressed EC point is cheap
+            affine: Option::from(AffinePoint::from_encoded_point(&ep))
+                .ok_or(GeneralError::ParseError("invalid secp256k1 encoded point".into()))?,
+            // Compressing an uncompressed EC point is inexpensive
             compressed: if ep.is_compressed() { ep } else { ep.compress() },
             // If not directly uncompressed, defer the expensive operation for later
             uncompressed: if !ep.is_compressed() {
@@ -392,7 +395,7 @@ impl TryFrom<&[u8]> for HalfKey {
     type Error = GeneralError;
 
     fn try_from(value: &[u8]) -> std::result::Result<Self, Self::Error> {
-        Ok(Self(value.try_into().map_err(|_| ParseError)?))
+        Ok(Self(value.try_into().map_err(|_| ParseError("HalfKey".into()))?))
     }
 }
 
@@ -448,7 +451,9 @@ impl TryFrom<&[u8]> for HalfKeyChallenge {
     type Error = GeneralError;
 
     fn try_from(value: &[u8]) -> std::result::Result<Self, Self::Error> {
-        Ok(Self(value.try_into().map_err(|_| ParseError)?))
+        Ok(Self(
+            value.try_into().map_err(|_| ParseError("HalfKeyChallenge".into()))?,
+        ))
     }
 }
 
@@ -530,7 +535,7 @@ impl TryFrom<&[u8]> for Hash {
     type Error = GeneralError;
 
     fn try_from(value: &[u8]) -> std::result::Result<Self, Self::Error> {
-        Ok(Self(value.try_into().map_err(|_| ParseError)?))
+        Ok(Self(value.try_into().map_err(|_| ParseError("Hash".into()))?))
     }
 }
 
@@ -583,7 +588,9 @@ impl TryFrom<&[u8]> for OffchainPublicKey {
     type Error = GeneralError;
 
     fn try_from(value: &[u8]) -> std::result::Result<Self, Self::Error> {
-        Ok(Self(CompressedEdwardsY::from_slice(value).map_err(|_| ParseError)?))
+        Ok(Self(
+            CompressedEdwardsY::from_slice(value).map_err(|_| ParseError("OffchainPublicKey".into()))?,
+        ))
     }
 }
 
@@ -608,16 +615,19 @@ impl TryFrom<&PeerId> for OffchainPublicKey {
         let mh = value.as_ref();
         if mh.code() == 0 {
             libp2p_identity::PublicKey::try_decode_protobuf(mh.digest())
-                .map_err(|_| GeneralError::ParseError)
+                .map_err(|_| GeneralError::ParseError("invalid ed25519 peer id".into()))
                 .and_then(|pk| {
                     pk.try_into_ed25519()
                         .map(|p| p.to_bytes())
-                        .map_err(|_| GeneralError::ParseError)
+                        .map_err(|_| GeneralError::ParseError("invalid ed25519 peer id".into()))
                 })
-                .and_then(|pk| CompressedEdwardsY::from_slice(&pk).map_err(|_| GeneralError::ParseError))
+                .and_then(|pk| {
+                    CompressedEdwardsY::from_slice(&pk)
+                        .map_err(|_| GeneralError::ParseError("invalid ed25519 peerid".into()))
+                })
                 .map(Self)
         } else {
-            Err(GeneralError::ParseError)
+            Err(GeneralError::ParseError("invalid ed25519 peer id".into()))
         }
     }
 }
@@ -657,7 +667,8 @@ impl OffchainPublicKey {
         let sk = libp2p_identity::ed25519::SecretKey::try_from_bytes(&mut pk).map_err(|_| InvalidInputValue)?;
         let kp: libp2p_identity::ed25519::Keypair = sk.into();
         Ok(Self(
-            CompressedEdwardsY::from_slice(&kp.public().to_bytes()).map_err(|_| GeneralError::ParseError)?,
+            CompressedEdwardsY::from_slice(&kp.public().to_bytes())
+                .map_err(|_| GeneralError::ParseError("OffchainPublicKey".into()))?,
         ))
     }
 
@@ -743,7 +754,8 @@ impl PublicKey {
 
     pub fn from_privkey(private_key: &[u8]) -> Result<PublicKey> {
         // This verifies that it is indeed a non-zero scalar, and thus represents a valid public key
-        let secret_scalar = NonZeroScalar::<Secp256k1>::try_from(private_key).map_err(|_| GeneralError::ParseError)?;
+        let secret_scalar = NonZeroScalar::<Secp256k1>::try_from(private_key)
+            .map_err(|_| GeneralError::ParseError("PublicKey".into()))?;
 
         let key = elliptic_curve::PublicKey::<Secp256k1>::from_secret_scalar(&secret_scalar);
         Ok(key.into())
@@ -753,10 +765,10 @@ impl PublicKey {
     where
         R: Fn(&[u8], &ECDSASignature, RecoveryId) -> std::result::Result<VerifyingKey, ecdsa::Error>,
     {
-        let recid = RecoveryId::try_from(v).map_err(|_| GeneralError::ParseError)?;
+        let recid = RecoveryId::try_from(v).map_err(|_| GeneralError::ParseError("Signature".into()))?;
         let signature =
             ECDSASignature::from_scalars(GenericArray::clone_from_slice(r), GenericArray::clone_from_slice(s))
-                .map_err(|_| GeneralError::ParseError)?;
+                .map_err(|_| GeneralError::ParseError("Signature".into()))?;
 
         let recovered_key = *recovery_method(msg, &signature, recid)
             .map_err(|_| CalculationError)?
@@ -857,28 +869,28 @@ impl TryFrom<&[u8]> for PublicKey {
             Self::SIZE_UNCOMPRESSED => {
                 // already has 0x04 prefix
                 let key = elliptic_curve::PublicKey::<Secp256k1>::from_sec1_bytes(value)
-                    .map_err(|_| GeneralError::ParseError)?;
+                    .map_err(|_| GeneralError::ParseError("invalid secp256k1 point".into()))?;
 
-                // Already verified this is a valid public key
+                // Already verified, this is a valid public key
                 Ok(key.into())
             }
             Self::SIZE_UNCOMPRESSED_PLAIN => {
                 // add 0x04 prefix
                 let key = elliptic_curve::PublicKey::<Secp256k1>::from_sec1_bytes(&[&[4u8], value].concat())
-                    .map_err(|_| GeneralError::ParseError)?;
+                    .map_err(|_| GeneralError::ParseError("invalid secp256k1 point".into()))?;
 
-                // Already verified this is a valid public key
+                // Already verified, this is a valid public key
                 Ok(key.into())
             }
             Self::SIZE_COMPRESSED => {
                 // has either 0x02 or 0x03 prefix
                 let key = elliptic_curve::PublicKey::<Secp256k1>::from_sec1_bytes(value)
-                    .map_err(|_| GeneralError::ParseError)?;
+                    .map_err(|_| GeneralError::ParseError("invalid secp256k1 point".into()))?;
 
-                // Already verified this is a valid public key
+                // Already verified, this is a valid public key
                 Ok(key.into())
             }
-            _ => Err(GeneralError::ParseError),
+            _ => Err(GeneralError::ParseError("invalid secp256k1 point".into())),
         }
     }
 }
@@ -1012,7 +1024,7 @@ impl TryFrom<&[u8]> for Response {
     type Error = GeneralError;
 
     fn try_from(value: &[u8]) -> std::result::Result<Self, Self::Error> {
-        Ok(Self(value.try_into().map_err(|_| ParseError)?))
+        Ok(Self(value.try_into().map_err(|_| ParseError("Response".into()))?))
     }
 }
 
@@ -1065,7 +1077,7 @@ impl TryFrom<&[u8]> for OffchainSignature {
 
     fn try_from(value: &[u8]) -> std::result::Result<Self, Self::Error> {
         Ok(ed25519_dalek::Signature::from_slice(value)
-            .map_err(|_| ParseError)?
+            .map_err(|_| ParseError("OffchainSignature".into()))?
             .into())
     }
 }
@@ -1188,7 +1200,7 @@ impl TryFrom<&[u8]> for Signature {
     type Error = GeneralError;
 
     fn try_from(value: &[u8]) -> std::result::Result<Self, Self::Error> {
-        Ok(Self(value.try_into().map_err(|_| ParseError)?))
+        Ok(Self(value.try_into().map_err(|_| ParseError("Signature".into()))?))
     }
 }
 

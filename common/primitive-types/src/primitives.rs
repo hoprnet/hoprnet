@@ -61,12 +61,12 @@ impl TryFrom<&[u8]> for Address {
     type Error = GeneralError;
 
     fn try_from(value: &[u8]) -> std::result::Result<Self, Self::Error> {
-        Ok(Self(value.try_into().map_err(|_| ParseError)?))
+        Ok(Self(value.try_into().map_err(|_| ParseError("Address".into()))?))
     }
 }
 
 impl BytesRepresentable for Address {
-    /// Fixed size of the address when encoded as bytes (e.g. via `as_ref()`).
+    /// Fixed size of the address when encoded as bytes (e.g., via `as_ref()`).
     const SIZE: usize = 20;
 }
 
@@ -304,15 +304,15 @@ impl FromStr for Balance {
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         let regex = Regex::new(r"^\s*(\d+)\s*([A-z]+)\s*$").expect("should use valid regex pattern");
-        let cap = regex.captures(s).ok_or(ParseError)?;
+        let cap = regex.captures(s).ok_or(ParseError("Balance".into()))?;
 
         if cap.len() == 3 {
             Ok(Self::new_from_str(
                 &cap[1],
-                BalanceType::from_str(&cap[2]).map_err(|_| ParseError)?,
+                BalanceType::from_str(&cap[2]).map_err(|_| ParseError("Balance".into()))?,
             ))
         } else {
-            Err(ParseError)
+            Err(ParseError("Balance".into()))
         }
     }
 }
@@ -342,7 +342,9 @@ impl TryFrom<&[u8]> for EthereumChallenge {
     type Error = GeneralError;
 
     fn try_from(value: &[u8]) -> std::result::Result<Self, Self::Error> {
-        Ok(Self(value.try_into().map_err(|_| ParseError)?))
+        Ok(Self(
+            value.try_into().map_err(|_| ParseError("EthereumChallenge".into()))?,
+        ))
     }
 }
 

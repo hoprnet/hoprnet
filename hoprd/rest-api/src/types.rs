@@ -39,11 +39,11 @@ impl FromStr for PeerOrAddress {
         if value.starts_with("0x") {
             Address::from_str(value)
                 .map(PeerOrAddress::from)
-                .map_err(|_e| GeneralError::ParseError)
+                .map_err(|_e| GeneralError::ParseError("PeerOrAddress".into()))
         } else {
             PeerId::from_str(value)
                 .map(PeerOrAddress::from)
-                .map_err(|_e| GeneralError::ParseError)
+                .map_err(|_e| GeneralError::ParseError("PeerOrAddress".into()))
         }
     }
 }

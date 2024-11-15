@@ -36,6 +36,7 @@ hopr-primitive-types = { workspace = true }
 anyhow = { workspace = true }
 async-std = { workspace = true }
 bincode = { workspace = true }
+criterion = { workspace = true }
 cbor4ii = { version = "0.3.2", features = ["serde1", "use_std"] }
 lazy_static = { workspace = true }
 rand = { workspace = true }
@@ -43,3 +44,7 @@ rayon = { workspace = true }
 
 [features]
 default = []
+
+[[bench]]
+name = "bloom_filter"
+harness = false
