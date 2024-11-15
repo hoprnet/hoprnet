@@ -326,10 +326,32 @@ mod tokio_utils {
     }
 }
 
+/// Converts a [`AsyncRead`] into [`Stream`] by reading at most `S` bytes
+/// in each call to [`Stream::poll_next`].
+pub struct AsyncReadStreamer<const S: usize, R>(pub R);
+
+impl<const S: usize, R: AsyncRead + Unpin> futures::Stream for AsyncReadStreamer<S, R> {
+    type Item = std::io::Result<Box<[u8]>>;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let mut buffer = vec![0u8; S];
+
+        match futures::ready!(Pin::new(&mut self.0).poll_read(cx, &mut buffer)) {
+            Ok(0) => Poll::Ready(None),
+            Ok(size) => {
+                buffer.truncate(size);
+                Poll::Ready(Some(Ok(buffer.into_boxed_slice())))
+            }
+            Err(err) => Poll::Ready(Some(Err(err))),
+        }
+    }
+}
+
 #[cfg(all(feature = "runtime-tokio", test))]
 mod tests {
     use super::*;
     use crate::utils::DuplexIO;
+    use futures::TryStreamExt;
     use tokio::io::AsyncWriteExt;
 
     #[tokio::test]
@@ -429,6 +451,58 @@ mod tests {
         let (client_to_server_count, server_to_client_count) = result;
         assert_eq!(server_to_client_count, 5); // 'hello' was transferred
         assert!(client_to_server_count <= 8); // response only partially transferred or not at all
+
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn test_async_read_streamer_complete_chunk() {
+        let data = b"Hello, World!!";
+        let mut streamer = AsyncReadStreamer::<14, _>(&data[..]);
+        let mut results = Vec::new();
+
+        while let Some(res) = streamer.try_next().await.unwrap() {
+            results.push(res);
+        }
+
+        assert_eq!(results, vec![Box::from(*data)]);
+    }
+
+    #[async_std::test]
+    async fn test_async_read_streamer_complete_more_chunks() {
+        let data = b"Hello, World and do it twice";
+        let mut streamer = AsyncReadStreamer::<14, _>(&data[..]);
+        let mut results = Vec::new();
+
+        while let Some(res) = streamer.try_next().await.unwrap() {
+            results.push(res);
+        }
+
+        let (data1, data2) = data.split_at(14);
+        assert_eq!(results, vec![Box::from(data1), Box::from(data2)]);
+    }
+
+    #[async_std::test]
+    async fn test_async_read_streamer_complete_more_chunks_with_incomplete() -> anyhow::Result<()> {
+        let data = b"Hello, World and do it twice, ...";
+        let streamer = AsyncReadStreamer::<14, _>(&data[..]);
+
+        let results = streamer.try_collect::<Vec<_>>().await?;
+
+        let (data1, rest) = data.split_at(14);
+        let (data2, data3) = rest.split_at(14);
+        assert_eq!(results, vec![Box::from(data1), Box::from(data2), Box::from(data3)]);
+
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn test_async_read_streamer_incomplete_chunk() -> anyhow::Result<()> {
+        let data = b"Hello, World!!";
+        let reader = &data[0..8]; // An incomplete chunk
+        let mut streamer = AsyncReadStreamer::<14, _>(reader);
+
+        assert_eq!(Some(Box::from(reader)), streamer.try_next().await?);
 
         Ok(())
     }
