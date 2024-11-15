@@ -22,18 +22,16 @@ use serde_with::{serde_as, DisplayFromStr};
 use std::net::IpAddr;
 use std::sync::Arc;
 use tokio::net::TcpListener;
-use tokio_util::compat::FuturesAsyncReadCompatExt;
-use tokio_util::io::ReaderStream;
 use tracing::{debug, error, info, trace};
 
+use crate::types::PeerOrAddress;
+use crate::{ApiErrorStatus, InternalState, ListenerId, BASE_PATH};
 use hopr_lib::errors::HoprLibError;
 use hopr_lib::transfer_session;
 use hopr_lib::{HoprSession, IpProtocol, RoutingOptions, SessionCapability, SessionClientConfig};
 use hopr_network_types::prelude::{ConnectedUdpStream, IpOrHost, SealedHost, UdpStreamParallelism};
 use hopr_network_types::udp::ForeignDataMode;
-
-use crate::types::PeerOrAddress;
-use crate::{ApiErrorStatus, InternalState, ListenerId, BASE_PATH};
+use hopr_network_types::utils::AsyncReadStreamer;
 
 /// Default listening host the session listener socket binds to.
 pub const DEFAULT_LISTEN_HOST: &str = "127.0.0.1:0";
@@ -218,9 +216,12 @@ pub(crate) async fn websocket(
 }
 
 enum WebSocketInput {
-    Network(Result<tokio_util::bytes::Bytes, std::io::Error>),
-    WsInput(core::result::Result<Message, Error>),
+    Network(Result<Box<[u8]>, std::io::Error>),
+    WsInput(Result<Message, Error>),
 }
+
+/// The maximum number of bytes read from a Session that WS can transfer within a single message.
+const WS_MAX_SESSION_READ_SIZE: usize = 4096;
 
 #[tracing::instrument(level = "debug", skip(socket, session))]
 async fn websocket_connection(socket: WebSocket, session: HoprSession) {
@@ -231,7 +232,7 @@ async fn websocket_connection(socket: WebSocket, session: HoprSession) {
 
     let mut queue = (
         receiver.map(WebSocketInput::WsInput),
-        ReaderStream::new(rx.compat()).map(WebSocketInput::Network),
+        AsyncReadStreamer::<WS_MAX_SESSION_READ_SIZE, _>(rx).map(WebSocketInput::Network),
     )
         .merge();
 

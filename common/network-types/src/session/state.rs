@@ -113,7 +113,8 @@ use crate::prelude::protocol::SessionMessageIter;
 use crate::session::errors::SessionError;
 use crate::session::frame::{segment, FrameId, FrameReassembler, Segment, SegmentId};
 use crate::session::protocol::{FrameAcknowledgements, SegmentRequest, SessionMessage};
-use crate::session::utils::{AsyncReadStreamer, RetryResult, RetryToken};
+use crate::session::utils::{RetryResult, RetryToken};
+use crate::utils::AsyncReadStreamer;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -962,7 +963,7 @@ impl<const C: usize> SessionSocket<C> {
 
         // Segment ingress from downstream
         spawn(
-            AsyncReadStreamer::<_, C>::new(downstream_read)
+            AsyncReadStreamer::<C, _>(downstream_read)
                 .map_err(|e| NetworkTypeError::SessionProtocolError(SessionError::ProcessingError(e.to_string())))
                 .and_then(|m| futures::future::ok(futures::stream::iter(SessionMessageIter::from(m.into_vec()))))
                 .try_flatten()
