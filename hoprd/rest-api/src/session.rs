@@ -205,11 +205,11 @@ pub(crate) async fn websocket(
     })?;
 
     let hopr = state.hopr.clone();
-    let session: HoprSession = hopr.connect_to(data).await.map_err(|e| {
-        error!(error = %e, "Failed to establish session");
+    let session: HoprSession = hopr.connect_to(data).await.map_err(|error| {
+        error!(%error, "Failed to establish session");
         (
             StatusCode::UNPROCESSABLE_ENTITY,
-            ApiErrorStatus::UnknownFailure(e.to_string()),
+            ApiErrorStatus::UnknownFailure(error.to_string()),
         )
     })?;
 
@@ -244,18 +244,18 @@ async fn websocket_connection(socket: WebSocket, session: HoprSession) {
             WebSocketInput::Network(bytes) => match bytes {
                 Ok(bytes) => {
                     let len = bytes.len();
-                    if let Err(e) = sender.send(Message::Binary(bytes.into())).await {
+                    if let Err(error) = sender.send(Message::Binary(bytes.into())).await {
                         error!(
-                            error = %e,
+                            %error,
                             "Failed to emit read data onto the websocket, closing connection"
                         );
                         break;
                     };
                     bytes_from_session += len;
                 }
-                Err(e) => {
+                Err(error) => {
                     error!(
-                        error = %e,
+                        %error,
                         "Failed to push data from network to socket, closing connection"
                     );
                     break;
@@ -264,8 +264,8 @@ async fn websocket_connection(socket: WebSocket, session: HoprSession) {
             WebSocketInput::WsInput(ws_in) => match ws_in {
                 Ok(Message::Binary(data)) => {
                     let len = data.len();
-                    if let Err(e) = tx.write(data.as_ref()).await {
-                        error!(error = %e, "Failed to write data to the session, closing connection");
+                    if let Err(error) = tx.write(data.as_ref()).await {
+                        error!(%error, "Failed to write data to the session, closing connection");
                         break;
                     }
                     bytes_to_session += len;
@@ -279,8 +279,8 @@ async fn websocket_connection(socket: WebSocket, session: HoprSession) {
                     break;
                 }
                 Ok(m) => trace!(message = ?m, "skipping an unsupported websocket message"),
-                Err(e) => {
-                    error!(error = %e, "Failed to get a valid websocket message, closing connection");
+                Err(error) => {
+                    error!(%error, "Failed to get a valid websocket message, closing connection");
                     break;
                 }
             },
@@ -477,7 +477,7 @@ pub(crate) async fn create_client(
 
                                     debug!(
                                         socket = ?sock_addr,
-                                        session_id = tracing::field::debug(*session.id()),
+                                        session_id = ?session.id(),
                                         "new session for incoming TCP connection",
                                     );
 
