@@ -21,6 +21,26 @@ use {
     serde_with::{As, DisplayFromStr},
 };
 
+/// Expected maximum time it takes for a packet to get delivered over a single hop.
+/// At MSS = 462, this would amount to the minimum expected throughput of 300 bytes per second.
+///
+/// This will be made dynamic in the future versions.
+pub(crate) const MAX_PACKET_TIME: std::time::Duration = std::time::Duration::from_millis(1100);
+
+/// Expected average size of a frame.
+/// This is currently set to be equal to the MTU of an IP packet.
+///
+/// This will be made dynamic in the future versions.
+pub(crate) const AVG_FRAME_SIZE: usize = 1492;
+
+/// Expected maximum throughput of Frames per second
+/// Max frame size = 462 (MSS) * 8 (max seg/frame) = 3696 bytes
+/// Expected maximum throughput: 3000 * 3696 ~ 10.5 MB/s
+/// Expected average throughput: 3000 * 1492 ~ 4.2 MB/s
+///
+/// This will be made dynamic in the future versions.
+pub(crate) const EXPECTED_MAX_FRAMES_PER_SEC: usize = 3000;
+
 /// Capabilities of a session.
 #[repr(u8)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, strum::EnumIter, strum::Display, strum::EnumString)]

@@ -9,7 +9,6 @@ use std::collections::HashSet;
 use std::fmt::{Debug, Formatter};
 use std::hash::{Hash, Hasher};
 use std::task::Context;
-use std::time::Duration;
 use std::{
     fmt::Display,
     io::{Error, ErrorKind},
@@ -19,7 +18,10 @@ use std::{
 };
 use tracing::{debug, error};
 
-use crate::{errors::TransportSessionError, traits::SendMsg, Capability};
+use crate::{
+    errors::TransportSessionError, traits::SendMsg, Capability, AVG_FRAME_SIZE, EXPECTED_MAX_FRAMES_PER_SEC,
+    MAX_PACKET_TIME,
+};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -27,7 +29,7 @@ lazy_static::lazy_static! {
         hopr_metrics::MultiHistogram::new(
             "hopr_session_inner_sizes",
             "Sizes of data chunks fed from inner session to HOPR protocol",
-            vec![20.0, 40.0, 80.0, 160.0, 320.0, 640.0, 1280.0],
+            vec![20.0, 40.0, 80.0, 160.0, 320.0, 640.0, 1280.0, 1500.0, 2048.0],
             &["session_id"]
     ).unwrap();
 }
@@ -47,7 +49,7 @@ pub struct SessionId {
     peer: PeerId,
     // Since this SessionId is commonly represented as a string,
     // we cache its string representation here.
-    // Also by using a statically allocated ArrayString, we allow the SessionId to remain Copy.
+    // Also, by using a statically allocated ArrayString, we allow the SessionId to remain Copy.
     // This representation is possibly truncated to MAX_SESSION_ID_STR_LEN.
     cached: arrayvec::ArrayString<MAX_SESSION_ID_STR_LEN>,
 }
@@ -139,7 +141,8 @@ pub struct IncomingSession {
     pub target: SessionTarget,
 }
 
-// TODO: missing docs
+/// Contains the main abstraction of arbitrary data sent over the HOPR protocol
+/// in a stream-like Socket fashion.
 pub struct Session {
     id: SessionId,
     inner: Pin<Box<dyn AsyncReadWrite>>,
@@ -162,16 +165,30 @@ impl Session {
 
         // If we request any capability, we need to use Session protocol
         if !capabilities.is_empty() {
-            // This is a very coarse assumption, that it takes max 2 seconds for each hop one way.
-            let rto_base = 2 * Duration::from_secs(2) * (routing_options.count_hops() + 1) as u32;
+            let segments_per_avg_frame = (AVG_FRAME_SIZE as f32 / SESSION_USABLE_MTU_SIZE as f32).ceil() as u32;
+            let expected_time_to_frame_delivery =
+                segments_per_avg_frame * MAX_PACKET_TIME * (routing_options.count_hops() + 1) as u32;
+
+            // Conditionally allow frames to stay longer if the Retransmission capability is enabled.
+            let (frame_expiration_age, backoff_base) = if capabilities.contains(&Capability::Retransmission) {
+                // 0.....RTOr.....RTOs...RTOr...EXP
+                (expected_time_to_frame_delivery * 3, 1.5)
+            } else if capabilities.contains(&Capability::RetransmissionAckOnly) {
+                // 0.....RTOs.....EXP
+                (expected_time_to_frame_delivery * 2, 2.0)
+            } else {
+                // Backoff-base does not matter here, because there will be no retransmissions
+                (expected_time_to_frame_delivery, 2.0)
+            };
 
             // TODO: tweak the default Session protocol config
             let cfg = SessionConfig {
                 enabled_features: capabilities.iter().cloned().flatten().collect(),
-                acknowledged_frames_buffer: 100_000, // Can hold frames for > 40 sec at 2000 frames/sec
-                frame_expiration_age: rto_base * 10,
-                rto_base_receiver: rto_base, // Ask for segment resend, if not yet complete after this period
-                rto_base_sender: rto_base * 2, // Resend frame if not acknowledged after this period
+                acknowledged_frames_buffer: EXPECTED_MAX_FRAMES_PER_SEC * frame_expiration_age.as_secs() as usize,
+                rto_base_receiver: frame_expiration_age / 3, // Ask for segment resend, if not yet complete after this period
+                rto_base_sender: frame_expiration_age / 2,   // Resend frame if not acknowledged after this period
+                backoff_base,
+                frame_expiration_age,
                 ..Default::default()
             };
             debug!(

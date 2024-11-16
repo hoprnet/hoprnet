@@ -231,7 +231,7 @@ pub struct SessionConfig {
 
     /// Set of [features](SessionFeature) that should be enabled on this Session.
     ///
-    /// Default is [`SessionFeature::default_features`].
+    /// The default is [`SessionFeature::default_features`].
     #[default(_code = "HashSet::from_iter(SessionFeature::default_features())")]
     pub enabled_features: HashSet<SessionFeature>,
 }

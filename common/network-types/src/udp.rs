@@ -29,34 +29,6 @@ lazy_static::lazy_static! {
     ).unwrap();
 }
 
-/// Mimics TCP-like stream functionality on a UDP socket by restricting it to a single
-/// counterparty and implements [`tokio::io::AsyncRead`] and [`tokio::io::AsyncWrite`].
-/// The instance is always constructed using a [`UdpStreamBuilder`].
-///
-/// To set a counterparty, one of the following must happen:
-/// 1) setting it during build via [`UdpStreamBuilder::with_counterparty`]
-/// 2) receiving some data from the other side.
-///
-/// Whatever of the above happens first, sets the counterparty.
-/// Once the counterparty is set, all data sent and received will be sent or filtered by this
-/// counterparty address.
-///
-/// If data from another party is received, an error is raised, unless the object has been constructed
-/// with [`ForeignDataMode::Discard`] or [`ForeignDataMode::Accept`] setting.
-///
-/// This object is also capable of parallel processing on a UDP socket.
-/// If [parallelism](UdpStreamBuilder::with_receiver_parallelism) is set, the instance will create
-/// multiple sockets with `SO_REUSEADDR` and spin parallel tasks that will coordinate data and
-/// transmission retrieval using these sockets. This is driven by RX/TX MPMC queues, which are
-/// per-default unbounded (see [queue size](UdpStreamBuilder::with_queue_size) for details).
-pub struct ConnectedUdpStream {
-    socket_handles: Vec<tokio::task::JoinHandle<()>>,
-    ingress_rx: Box<dyn tokio::io::AsyncRead + Send + Unpin>,
-    egress_tx: Option<BoxIoSink<Box<[u8]>>>,
-    counterparty: Arc<OnceLock<SocketAddrStr>>,
-    bound_to: std::net::SocketAddr,
-}
-
 /// Defines what happens when data from another [`SocketAddr`](std::net::SocketAddr) arrives
 /// into the [`ConnectedUdpStream`] (other than the one that is considered a counterparty for that
 /// instance).
@@ -89,7 +61,7 @@ pub enum ForeignDataMode {
 pub enum UdpStreamParallelism {
     /// Bind as many sender or receiver sockets as given by [`std::thread::available_parallelism`].
     Auto,
-    /// Bind specific number of sender or receiver sockets.
+    /// Bind a specific number of sender or receiver sockets.
     Specific(NonZeroUsize),
 }
 
@@ -139,6 +111,13 @@ impl UdpStreamParallelism {
         }
     }
 
+    /// Convenience function that returns the maximum of number of sockets
+    /// when split by [`split_evenly_with`](UdpStreamParallelism::split_evenly_with).
+    pub fn num_tasks_when_split(self, other: UdpStreamParallelism) -> usize {
+        let (a, b) = self.split_evenly_with(other);
+        a.max(b)
+    }
+
     /// Calculates the actual number of tasks for this instance.
     ///
     /// The returned value is never more than the maximum available CPU parallelism.
@@ -163,30 +142,125 @@ impl From<Option<usize>> for UdpStreamParallelism {
     }
 }
 
+/// Represents multiple sockets all bound to the same address and port.
+#[derive(Debug, Clone)]
+pub struct MultiUdpSocket {
+    socks: Vec<Arc<UdpSocket>>,
+    bound_addr: std::net::SocketAddr,
+}
+
+impl MultiUdpSocket {
+    /// Binds the given number of sockets to the specified address.
+    ///
+    /// If `bind_addr` yields multiple addresses, binding will be attempted with each of the addresses
+    /// until one succeeds.
+    /// If none of the addresses succeed in binding the socket(s),
+    /// the `AddrNotAvailable` error is returned.
+    ///
+    /// Note that wildcard addresses (such as `0.0.0.0`) are *not* considered as multiple addresses,
+    /// and such socket(s) will bind to all available interfaces at the system level.
+    pub fn bind<A: std::net::ToSocketAddrs>(bind_addr: A, num_socks_to_bind: usize) -> std::io::Result<Self> {
+        if num_socks_to_bind == 0 {
+            return Err(std::io::ErrorKind::InvalidInput.into());
+        }
+
+        let mut bound_addr: Option<std::net::SocketAddr> = None;
+        let mut socks = Vec::with_capacity(num_socks_to_bind);
+
+        for binding_to in bind_addr.to_socket_addrs()? {
+            debug!(%binding_to, num_socks_to_bind, "binding UDP stream");
+
+            // Try to bind sockets on the current network interface address
+            (0..num_socks_to_bind)
+                .map(|sock_id| {
+                    let domain = match &binding_to {
+                        std::net::SocketAddr::V4(_) => socket2::Domain::IPV4,
+                        std::net::SocketAddr::V6(_) => socket2::Domain::IPV6,
+                    };
+
+                    // Bind a new non-blocking UDP socket
+                    let sock = socket2::Socket::new(domain, socket2::Type::DGRAM, None)?;
+                    if num_socks_to_bind > 1 {
+                        sock.set_reuse_address(true)?; // Needed for every next socket with non-wildcard IP
+                        sock.set_reuse_port(true)?; // Needed on Linux to evenly distribute datagrams
+                    }
+                    sock.set_nonblocking(true)?;
+                    sock.bind(&bound_addr.unwrap_or(binding_to).into())?;
+
+                    // Determine the address we bound this socket to, so we can also bind the others
+                    let socket_bound_addr = sock
+                        .local_addr()?
+                        .as_socket()
+                        .ok_or(std::io::Error::other("invalid socket type"))?;
+
+                    match bound_addr {
+                        None => bound_addr = Some(socket_bound_addr),
+                        Some(addr) if addr != socket_bound_addr => {
+                            return Err(std::io::Error::other(format!(
+                                "inconsistent binding address {addr} != {socket_bound_addr} on socket id {sock_id}"
+                            )))
+                        }
+                        _ => {}
+                    }
+
+                    let sock = Arc::new(UdpSocket::from_std(sock.into())?);
+                    debug!(
+                        socket_id = sock_id,
+                        addr = %socket_bound_addr,
+                        "bound UDP socket"
+                    );
+                    Ok(sock)
+                })
+                .for_each(|res| match res {
+                    Ok(sock) => socks.push(sock),
+                    Err(error) => error!(%error, "failed to bind UDP socket"),
+                });
+
+            // If we are already successfully bound to some address, stop here
+            if bound_addr.is_some() {
+                trace!(bound_addr = %bound_addr.unwrap(), count = socks.len(), "binding completed");
+                break;
+            }
+        }
+
+        bound_addr
+            .ok_or(std::io::Error::from(std::io::ErrorKind::AddrNotAvailable))
+            .map(|bound_addr| Self { socks, bound_addr })
+    }
+
+    /// Number of bound sockets.
+    pub fn count_sockets(&self) -> usize {
+        self.socks.len()
+    }
+
+    /// Address all the sockets are bound to.
+    pub fn bound_address(&self) -> &std::net::SocketAddr {
+        &self.bound_addr
+    }
+}
+
+impl IntoIterator for MultiUdpSocket {
+    type Item = Arc<UdpSocket>;
+    type IntoIter = std::vec::IntoIter<Arc<UdpSocket>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.socks.into_iter()
+    }
+}
+
 /// Builder object for the [`ConnectedUdpStream`].
 ///
 /// If you wish to use defaults, do `UdpStreamBuilder::default().build(addr)`.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, smart_default::SmartDefault)]
 pub struct UdpStreamBuilder {
-    foreign_data_mode: ForeignDataMode,
+    #[default(2048)]
     buffer_size: usize,
+    foreign_data_mode: ForeignDataMode,
     queue_size: Option<usize>,
     receiver_parallelism: UdpStreamParallelism,
     sender_parallelism: UdpStreamParallelism,
+    bound_socket: Option<MultiUdpSocket>,
     counterparty: Option<std::net::SocketAddr>,
-}
-
-impl Default for UdpStreamBuilder {
-    fn default() -> Self {
-        Self {
-            buffer_size: 2048,
-            foreign_data_mode: Default::default(),
-            queue_size: None,
-            receiver_parallelism: Default::default(),
-            sender_parallelism: Default::default(),
-            counterparty: None,
-        }
-    }
 }
 
 impl UdpStreamBuilder {
@@ -260,6 +334,19 @@ impl UdpStreamBuilder {
         self
     }
 
+    /// Use [`MultiUdpSocket`] that has been already bound.
+    ///
+    /// This is useful when building an instance that should use already pre-bound sockets.
+    /// If not specified, a new [`MultiUdpSocket`] will be bound.
+    ///
+    /// [`MultiUdpSocket::count_sockets`] must be at least
+    /// the maximum of [receiver parallelism](UdpStreamBuilder::with_receiver_parallelism)
+    /// and [sender parallelism](UdpStreamBuilder::with_sender_parallelism).
+    pub fn with_bound_socket(mut self, bound_socket: MultiUdpSocket) -> Self {
+        self.bound_socket = Some(bound_socket);
+        self
+    }
+
     /// Builds the [`ConnectedUdpStream`] with UDP socket(s) bound to `bind_addr`.
     ///
     /// The number of RX sockets bound is determined by [receiver parallelism](UdpStreamBuilder::with_receiver_parallelism),
@@ -270,12 +357,10 @@ impl UdpStreamBuilder {
     /// It is also ready to send data
     /// if the [counterparty](UdpStreamBuilder::with_counterparty) has been set.
     ///
-    /// If `bind_addr` yields multiple addresses, binding will be attempted with each of the addresses
-    /// until one succeeds. If none of the addresses succeed in binding the socket(s),
-    /// the `AddrNotAvailable` error is returned.
-    ///
-    /// Note that wildcard addresses (such as `0.0.0.0`) are *not* considered as multiple addresses,
-    /// and such socket(s) will bind to all available interfaces at the system level.
+    /// This function internally binds [`MultiUdpSocket`](MultiUdpSocket::bind) with the number of sockets
+    /// that's required by the given parallelism, unless it was already given via [`UdpStreamBuilder::with_bound_socket`].
+    /// In that case, the [number of sockets](MultiUdpSocket::count_sockets) in that instance
+    /// must be less or equal to the maximum of the given parallelisms.
     pub fn build<A: std::net::ToSocketAddrs>(self, bind_addr: A) -> std::io::Result<ConnectedUdpStream> {
         let (num_rx_socks, num_tx_socks) = self.receiver_parallelism.split_evenly_with(self.sender_parallelism);
 
@@ -284,6 +369,7 @@ impl UdpStreamBuilder {
                 .map(|s| OnceLock::from(SocketAddrStr::from(s)))
                 .unwrap_or_default(),
         );
+
         let ((ingress_tx, ingress_rx), (egress_tx, egress_rx)) = if let Some(q) = self.queue_size {
             (flume::bounded(q), flume::bounded(q))
         } else {
@@ -291,91 +377,39 @@ impl UdpStreamBuilder {
         };
 
         let num_socks_to_bind = num_rx_socks.max(num_tx_socks);
-        let mut socket_handles = Vec::with_capacity(num_socks_to_bind);
-        let mut bound_addr: Option<std::net::SocketAddr> = None;
+        let bound_socket = self
+            .bound_socket
+            .map(Ok)
+            .unwrap_or_else(|| MultiUdpSocket::bind(bind_addr, num_socks_to_bind))?;
 
-        // Try binding on all network addresses in `bind_addr`
-        for binding_to in bind_addr.to_socket_addrs()? {
-            debug!(
-                %binding_to,
-                num_socks_to_bind, num_rx_socks, num_tx_socks, "binding UDP stream"
-            );
-
-            // TODO: split bound sockets into a separate cloneable object
-
-            // Try to bind sockets on the current network interface address
-            (0..num_socks_to_bind)
-                .map(|sock_id| {
-                    let domain = match &binding_to {
-                        std::net::SocketAddr::V4(_) => socket2::Domain::IPV4,
-                        std::net::SocketAddr::V6(_) => socket2::Domain::IPV6,
-                    };
-
-                    // Bind a new non-blocking UDP socket
-                    let sock = socket2::Socket::new(domain, socket2::Type::DGRAM, None)?;
-                    if num_socks_to_bind > 1 {
-                        sock.set_reuse_address(true)?; // Needed for every next socket with non-wildcard IP
-                        sock.set_reuse_port(true)?; // Needed on Linux to evenly distribute datagrams
-                    }
-                    sock.set_nonblocking(true)?;
-                    sock.bind(&bound_addr.unwrap_or(binding_to).into())?;
-
-                    // Determine the address we bound this socket to, so we can also bind the others
-                    let socket_bound_addr = sock
-                        .local_addr()?
-                        .as_socket()
-                        .ok_or(std::io::Error::other("invalid socket type"))?;
-
-                    match bound_addr {
-                        None => bound_addr = Some(socket_bound_addr),
-                        Some(addr) if addr != socket_bound_addr => {
-                            return Err(std::io::Error::other(format!(
-                                "inconsistent binding address {addr} != {socket_bound_addr} on socket id {sock_id}"
-                            )))
-                        }
-                        _ => {}
-                    }
-
-                    let sock = Arc::new(UdpSocket::from_std(sock.into())?);
-                    debug!(
-                        socket_id = sock_id,
-                        addr = %socket_bound_addr,
-                        "bound UDP socket"
-                    );
-
-                    Ok((sock_id, sock))
-                })
-                .filter_map(|result| match result {
-                    Ok(bound) => Some(bound),
-                    Err(e) => {
-                        error!(
-                            %binding_to,
-                            "failed to bind udp socket: {e}"
-                        );
-                        None
-                    }
-                })
-                .for_each(|(sock_id, sock)| {
-                    if sock_id < num_tx_socks {
-                        socket_handles.push(tokio::task::spawn(ConnectedUdpStream::setup_tx_queue(
-                            sock_id,
-                            sock.clone(),
-                            egress_rx.clone(),
-                            counterparty.clone(),
-                        )));
-                    }
-                    if sock_id < num_rx_socks {
-                        socket_handles.push(tokio::task::spawn(ConnectedUdpStream::setup_rx_queue(
-                            sock_id,
-                            sock.clone(),
-                            ingress_tx.clone(),
-                            counterparty.clone(),
-                            self.foreign_data_mode,
-                            self.buffer_size,
-                        )));
-                    }
-                });
+        if num_socks_to_bind > bound_socket.count_sockets() {
+            return Err(std::io::ErrorKind::InvalidInput.into());
         }
+
+        let mut socket_handles = Vec::with_capacity(num_socks_to_bind);
+        let bound_to = *bound_socket.bound_address();
+        debug!(num_tx_socks, num_tx_socks, %bound_to, "binding queues");
+
+        bound_socket.into_iter().enumerate().for_each(|(sock_id, sock)| {
+            if sock_id < num_tx_socks {
+                socket_handles.push(tokio::task::spawn(ConnectedUdpStream::setup_tx_queue(
+                    sock_id,
+                    sock.clone(),
+                    egress_rx.clone(),
+                    counterparty.clone(),
+                )));
+            }
+            if sock_id < num_rx_socks {
+                socket_handles.push(tokio::task::spawn(ConnectedUdpStream::setup_rx_queue(
+                    sock_id,
+                    sock.clone(),
+                    ingress_tx.clone(),
+                    counterparty.clone(),
+                    self.foreign_data_mode,
+                    self.buffer_size,
+                )));
+            }
+        });
 
         Ok(ConnectedUdpStream {
             ingress_rx: Box::new(tokio_util::io::StreamReader::new(ingress_rx.into_stream())),
@@ -386,9 +420,37 @@ impl UdpStreamBuilder {
             )),
             socket_handles,
             counterparty,
-            bound_to: bound_addr.ok_or(ErrorKind::AddrNotAvailable)?,
+            bound_to,
         })
     }
+}
+
+/// Mimics TCP-like stream functionality on a UDP socket by restricting it to a single
+/// counterparty and implements [`tokio::io::AsyncRead`] and [`tokio::io::AsyncWrite`].
+/// The instance is always constructed using a [`UdpStreamBuilder`].
+///
+/// To set a counterparty, one of the following must happen:
+/// 1) setting it during build via [`UdpStreamBuilder::with_counterparty`]
+/// 2) receiving some data from the other side.
+///
+/// Whatever of the above happens first, sets the counterparty.
+/// Once the counterparty is set, all data sent and received will be sent or filtered by this
+/// counterparty address.
+///
+/// If data from another party is received, an error is raised, unless the object has been constructed
+/// with [`ForeignDataMode::Discard`] or [`ForeignDataMode::Accept`] setting.
+///
+/// This object is also capable of parallel processing on a UDP socket.
+/// If [parallelism](UdpStreamBuilder::with_receiver_parallelism) is set, the instance will create
+/// multiple sockets with `SO_REUSEADDR` and spin parallel tasks that will coordinate data and
+/// transmission retrieval using these sockets. This is driven by RX/TX MPMC queues, which are
+/// per-default unbounded (see [queue size](UdpStreamBuilder::with_queue_size) for details).
+pub struct ConnectedUdpStream {
+    socket_handles: Vec<tokio::task::JoinHandle<()>>,
+    ingress_rx: Box<dyn tokio::io::AsyncRead + Send + Unpin>,
+    egress_tx: Option<BoxIoSink<Box<[u8]>>>,
+    counterparty: Arc<OnceLock<SocketAddrStr>>,
+    bound_to: std::net::SocketAddr,
 }
 
 impl ConnectedUdpStream {
@@ -772,5 +834,20 @@ mod tests {
             }
             _ => Err(anyhow::anyhow!("timeout or invalid data")),
         }
+    }
+
+    #[cfg(target_os = "linux")]
+    #[tokio::test]
+    async fn udp_stream_should_not_build_with_bound_multi_socket_with_smaller_number_of_sockets() -> anyhow::Result<()>
+    {
+        let ms = MultiUdpSocket::bind(("127.0.0.1", 0), 1)?;
+
+        assert!(UdpStreamBuilder::default()
+            .with_sender_parallelism(UdpStreamParallelism::Specific(3.try_into()?))
+            .with_bound_socket(ms)
+            .build(("127.0.0.1", 0))
+            .is_err());
+
+        Ok(())
     }
 }
