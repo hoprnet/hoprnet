@@ -4331,7 +4331,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-network-types"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "anyhow",
  "aquamarine",
@@ -4569,7 +4569,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-session"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "anyhow",
  "aquamarine",
@@ -4653,7 +4653,7 @@ dependencies = [
 
 [[package]]
 name = "hoprd-api"
-version = "3.6.0"
+version = "3.6.1"
 dependencies = [
  "anyhow",
  "async-broadcast",

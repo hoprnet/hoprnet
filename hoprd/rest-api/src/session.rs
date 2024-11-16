@@ -22,18 +22,16 @@ use serde_with::{serde_as, DisplayFromStr};
 use std::net::IpAddr;
 use std::sync::Arc;
 use tokio::net::TcpListener;
-use tokio_util::compat::FuturesAsyncReadCompatExt;
-use tokio_util::io::ReaderStream;
 use tracing::{debug, error, info, trace};
 
+use crate::types::PeerOrAddress;
+use crate::{ApiErrorStatus, InternalState, ListenerId, BASE_PATH};
 use hopr_lib::errors::HoprLibError;
 use hopr_lib::transfer_session;
 use hopr_lib::{HoprSession, IpProtocol, RoutingOptions, SessionCapability, SessionClientConfig};
 use hopr_network_types::prelude::{ConnectedUdpStream, IpOrHost, SealedHost, UdpStreamParallelism};
 use hopr_network_types::udp::ForeignDataMode;
-
-use crate::types::PeerOrAddress;
-use crate::{ApiErrorStatus, InternalState, ListenerId, BASE_PATH};
+use hopr_network_types::utils::AsyncReadStreamer;
 
 /// Default listening host the session listener socket binds to.
 pub const DEFAULT_LISTEN_HOST: &str = "127.0.0.1:0";
@@ -218,9 +216,12 @@ pub(crate) async fn websocket(
 }
 
 enum WebSocketInput {
-    Network(Result<tokio_util::bytes::Bytes, std::io::Error>),
-    WsInput(core::result::Result<Message, Error>),
+    Network(Result<Box<[u8]>, std::io::Error>),
+    WsInput(Result<Message, Error>),
 }
+
+/// The maximum number of bytes read from a Session that WS can transfer within a single message.
+const WS_MAX_SESSION_READ_SIZE: usize = 4096;
 
 #[tracing::instrument(level = "debug", skip(socket, session))]
 async fn websocket_connection(socket: WebSocket, session: HoprSession) {
@@ -231,7 +232,7 @@ async fn websocket_connection(socket: WebSocket, session: HoprSession) {
 
     let mut queue = (
         receiver.map(WebSocketInput::WsInput),
-        ReaderStream::new(rx.compat()).map(WebSocketInput::Network),
+        AsyncReadStreamer::<WS_MAX_SESSION_READ_SIZE, _>(rx).map(WebSocketInput::Network),
     )
         .merge();
 
@@ -439,6 +440,7 @@ pub(crate) async fn create_client(
     debug!("binding {protocol} session listening socket to {bind_host}");
     let bound_host = match protocol {
         IpProtocol::TCP => {
+            // Bind the TCP socket first
             let (bound_host, tcp_listener) = tcp_listen_on(bind_host).await.map_err(|e| {
                 if e.kind() == std::io::ErrorKind::AddrInUse {
                     (StatusCode::CONFLICT, ApiErrorStatus::InvalidInput)
@@ -451,6 +453,8 @@ pub(crate) async fn create_client(
             })?;
             info!(%bound_host, "TCP session listener bound");
 
+            // For each new TCP connection coming to the listener,
+            // open a Session with the same parameters
             let hopr = state.hopr.clone();
             let jh = hopr_async_runtime::prelude::spawn(
                 tokio_stream::wrappers::TcpListenerStream::new(tcp_listener)
@@ -498,14 +502,7 @@ pub(crate) async fn create_client(
             bound_host
         }
         IpProtocol::UDP => {
-            let hopr = state.hopr.clone();
-            let session = hopr.connect_to(data).await.map_err(|e| {
-                (
-                    StatusCode::UNPROCESSABLE_ENTITY,
-                    ApiErrorStatus::UnknownFailure(e.to_string()),
-                )
-            })?;
-
+            // Bind the UDP socket first
             let (bound_host, udp_socket) = udp_bind_to(bind_host).await.map_err(|e| {
                 if e.kind() == std::io::ErrorKind::AddrInUse {
                     (
@@ -522,8 +519,21 @@ pub(crate) async fn create_client(
 
             info!(%bound_host, "UDP session listener bound");
 
+            let hopr = state.hopr.clone();
+
+            // Create a single session for the UDP socket
+            let session = hopr.connect_to(data).await.map_err(|e| {
+                (
+                    StatusCode::UNPROCESSABLE_ENTITY,
+                    ApiErrorStatus::UnknownFailure(e.to_string()),
+                )
+            })?;
+
+            let open_listeners_clone = state.open_listeners.clone();
+            let listener_id = ListenerId(protocol, bound_host);
+
             state.open_listeners.write().await.insert(
-                ListenerId(protocol, bound_host),
+                listener_id,
                 (
                     target.clone(),
                     hopr_async_runtime::prelude::spawn(async move {
@@ -534,6 +544,9 @@ pub(crate) async fn create_client(
 
                         #[cfg(all(feature = "prometheus", not(test)))]
                         METRIC_ACTIVE_CLIENTS.decrement(&["udp"], 1.0);
+
+                        // Once the Session closes, remove it from the list
+                        open_listeners_clone.write().await.remove(&listener_id);
                     }),
                 ),
             );
@@ -702,7 +715,7 @@ where
             .collect::<Vec<_>>();
         match binder(addrs).await {
             Ok(listener) => return Ok(listener),
-            Err(e) => debug!("listen address not usable: {e}"),
+            Err(error) => debug!(%error, "listen address not usable"),
         }
     }
 
@@ -772,10 +785,10 @@ where
             session_id = ?session_id,
             session_to_stream_bytes, stream_to_session_bytes, "client session ended",
         ),
-        Err(e) => error!(
+        Err(error) => error!(
             session_id = ?session_id,
-            error = %e,
-            "error during data transfer: {e}"
+            %error,
+            "error during data transfer"
         ),
     }
 }

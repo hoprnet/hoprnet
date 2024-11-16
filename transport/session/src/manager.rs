@@ -356,7 +356,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
         self.session_notifiers.get().is_some()
     }
 
-    /// Initiates new outgoing Session with the given configuration.
+    /// Initiates a new outgoing Session with the given configuration.
     ///
     /// If the Session's counterparty does not respond within
     /// the [configured](SessionManagerConfig) period,
@@ -416,11 +416,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
             Either::Left((Ok(Some(est)), _)) => {
                 // Session has been established, construct it
                 let session_id = est.session_id;
-                debug!(
-                    challenge = est.orig_challenge,
-                    session_id = tracing::field::debug(session_id),
-                    "started a new session"
-                );
+                debug!(challenge = est.orig_challenge, ?session_id, "started a new session");
 
                 // Insert the Session object, forcibly overwrite any other session with the same ID
                 let (tx, rx) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
@@ -495,10 +491,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                 let session_id = SessionId::new(*app_tag, peer);
 
                 return if let Some(session_data) = self.sessions.get(&session_id).await {
-                    trace!(
-                        session_id = tracing::field::debug(session_id),
-                        "received data for a registered session"
-                    );
+                    trace!(?session_id, "received data for a registered session");
 
                     Ok(session_data
                         .session_tx
@@ -506,10 +499,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                         .map(|_| DispatchResult::Processed)
                         .map_err(|e| SessionManagerError::Other(e.to_string()))?)
                 } else {
-                    error!(
-                        session_id = tracing::field::debug(session_id),
-                        "received data from an unestablished session"
-                    );
+                    error!(%session_id, "received data from an unestablished session");
                     Err(TransportSessionError::UnknownData)
                 };
             }
@@ -526,10 +516,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                 // Back-routing information is mandatory until the Return Path is introduced
                 let (route, peer) = session_req.back_routing.ok_or(SessionManagerError::NoBackRoutingInfo)?;
 
-                debug!(
-                    peer = tracing::field::display(peer),
-                    "got new session request, searching for a free session slot"
-                );
+                debug!(%peer, "got new session request, searching for a free session slot");
 
                 let msg_sender = self.msg_sender.get().ok_or(SessionManagerError::NotStarted)?;
 
@@ -600,10 +587,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                             SessionManagerError::Other(format!("failed to send session establishment message: {e}"))
                         })?;
 
-                    info!(
-                        %session_id,
-                        "new session established"
-                    );
+                    info!(%session_id, "new session established");
 
                     #[cfg(all(feature = "prometheus", not(test)))]
                     {
@@ -632,10 +616,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                             ))
                         })?;
 
-                    trace!(
-                        %peer,
-                        "session establishment failure message sent"
-                    );
+                    trace!(%peer, "session establishment failure message sent");
 
                     #[cfg(all(feature = "prometheus", not(test)))]
                     METRIC_SENT_SESSION_ERRS.increment(&[&reason.to_string()])
