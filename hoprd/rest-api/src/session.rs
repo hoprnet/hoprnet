@@ -20,6 +20,7 @@ use libp2p_identity::PeerId;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use std::net::IpAddr;
+use std::num::NonZeroUsize;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tracing::{debug, error, info, trace};
@@ -29,7 +30,7 @@ use crate::{ApiErrorStatus, InternalState, ListenerId, BASE_PATH};
 use hopr_lib::errors::HoprLibError;
 use hopr_lib::transfer_session;
 use hopr_lib::{HoprSession, IpProtocol, RoutingOptions, SessionCapability, SessionClientConfig};
-use hopr_network_types::prelude::{ConnectedUdpStream, IpOrHost, SealedHost, UdpStreamParallelism};
+use hopr_network_types::prelude::{ConnectedUdpStream, IpOrHost, MultiUdpSocket, SealedHost, UdpStreamParallelism};
 use hopr_network_types::udp::ForeignDataMode;
 use hopr_network_types::utils::AsyncReadStreamer;
 
@@ -468,8 +469,8 @@ pub(crate) async fn create_client(
                                     debug!(socket = ?sock_addr, "incoming TCP connection");
                                     let session = match hopr.connect_to(data).await {
                                         Ok(s) => s,
-                                        Err(e) => {
-                                            error!(error = %e, "failed to establish session");
+                                        Err(error) => {
+                                            error!(%error, "failed to establish session");
                                             return;
                                         }
                                     };
@@ -488,7 +489,7 @@ pub(crate) async fn create_client(
                                     #[cfg(all(feature = "prometheus", not(test)))]
                                     METRIC_ACTIVE_CLIENTS.decrement(&["tcp"], 1.0);
                                 }
-                                Err(e) => error!(error = %e, "failed to accept connection"),
+                                Err(error) => error!(%error, "failed to accept connection"),
                             }
                         }
                     }),
@@ -503,7 +504,10 @@ pub(crate) async fn create_client(
         }
         IpProtocol::UDP => {
             // Bind the UDP socket first
-            let (bound_host, udp_socket) = udp_bind_to(bind_host).await.map_err(|e| {
+            let num_socks =
+                UdpStreamParallelism::Auto.num_tasks_when_split(UdpStreamParallelism::Specific(NonZeroUsize::MIN));
+
+            let (bound_host, udp_socket) = udp_bind_to(bind_host, num_socks).await.map_err(|e| {
                 if e.kind() == std::io::ErrorKind::AddrInUse {
                     (
                         StatusCode::CONFLICT,
@@ -519,37 +523,60 @@ pub(crate) async fn create_client(
 
             info!(%bound_host, "UDP session listener bound");
 
-            let hopr = state.hopr.clone();
-
-            // Create a single session for the UDP socket
-            let session = hopr.connect_to(data).await.map_err(|e| {
-                (
-                    StatusCode::UNPROCESSABLE_ENTITY,
-                    ApiErrorStatus::UnknownFailure(e.to_string()),
-                )
-            })?;
+            let quit_when_session_closes = true; // TODO: make this configurable
 
             let open_listeners_clone = state.open_listeners.clone();
             let listener_id = ListenerId(protocol, bound_host);
 
-            state.open_listeners.write().await.insert(
-                listener_id,
-                (
-                    target.clone(),
-                    hopr_async_runtime::prelude::spawn(async move {
-                        #[cfg(all(feature = "prometheus", not(test)))]
-                        METRIC_ACTIVE_CLIENTS.increment(&["udp"], 1.0);
+            let hopr = state.hopr.clone();
+            let jh = hopr_async_runtime::prelude::spawn(async move {
+                loop {
+                    match ConnectedUdpStream::builder()
+                        .with_buffer_size(HOPR_UDP_BUFFER_SIZE)
+                        .with_foreign_data_mode(ForeignDataMode::Discard) // discard data from UDP clients other than the first one served
+                        .with_queue_size(HOPR_UDP_QUEUE_SIZE)
+                        .with_receiver_parallelism(UdpStreamParallelism::Auto)
+                        .build_from_socket(udp_socket.clone())
+                    {
+                        Ok(udp_socket) => {
+                            // Create a session for the UDP socket
+                            let session = match hopr.connect_to(data.clone()).await {
+                                Ok(s) => s,
+                                Err(error) => {
+                                    error!(%error, "failed to establish session");
+                                    break;
+                                }
+                            };
 
-                        bind_session_to_stream(session, udp_socket, HOPR_UDP_BUFFER_SIZE).await;
+                            #[cfg(all(feature = "prometheus", not(test)))]
+                            METRIC_ACTIVE_CLIENTS.increment(&["udp"], 1.0);
 
-                        #[cfg(all(feature = "prometheus", not(test)))]
-                        METRIC_ACTIVE_CLIENTS.decrement(&["udp"], 1.0);
+                            bind_session_to_stream(session, udp_socket, HOPR_UDP_BUFFER_SIZE).await;
 
-                        // Once the Session closes, remove it from the list
-                        open_listeners_clone.write().await.remove(&listener_id);
-                    }),
-                ),
-            );
+                            #[cfg(all(feature = "prometheus", not(test)))]
+                            METRIC_ACTIVE_CLIENTS.decrement(&["udp"], 1.0);
+
+                            // Check if a session re-establishment is required
+                            if quit_when_session_closes {
+                                break;
+                            }
+                        }
+                        Err(error) => {
+                            error!(%error, "failed to create udp stream");
+                            break;
+                        }
+                    }
+                }
+
+                open_listeners_clone.write().await.remove(&listener_id);
+                info!(?listener_id, "udp session done");
+            });
+
+            state
+                .open_listeners
+                .write()
+                .await
+                .insert(listener_id, (target.clone(), jh));
             bound_host
         }
     };
@@ -749,21 +776,16 @@ async fn tcp_listen_on<A: std::net::ToSocketAddrs>(address: A) -> std::io::Resul
 
 async fn udp_bind_to<A: std::net::ToSocketAddrs>(
     address: A,
-) -> std::io::Result<(std::net::SocketAddr, ConnectedUdpStream)> {
+    num_sockets: usize,
+) -> std::io::Result<(std::net::SocketAddr, MultiUdpSocket)> {
     let addrs = address.to_socket_addrs()?.collect::<Vec<_>>();
-
-    let builder = ConnectedUdpStream::builder()
-        .with_buffer_size(HOPR_UDP_BUFFER_SIZE)
-        .with_foreign_data_mode(ForeignDataMode::Discard) // discard data from UDP clients other than the first one served
-        .with_queue_size(HOPR_UDP_QUEUE_SIZE)
-        .with_receiver_parallelism(UdpStreamParallelism::Auto);
 
     // If automatic port allocation is requested and there's a restriction on the port range
     // (via HOPRD_SESSION_PORT_RANGE), try to find an address within that range.
     if addrs.iter().all(|a| a.port() == 0) {
         if let Ok(range_str) = std::env::var(crate::env::HOPRD_SESSION_PORT_RANGE) {
             let udp_listener = try_restricted_bind(addrs, &range_str, |addrs| {
-                futures::future::ready(builder.clone().build(addrs.as_slice()))
+                futures::future::ready(MultiUdpSocket::bind(addrs.as_slice(), num_sockets))
             })
             .await?;
 
@@ -771,7 +793,7 @@ async fn udp_bind_to<A: std::net::ToSocketAddrs>(
         }
     }
 
-    let udp_socket = builder.build(address)?;
+    let udp_socket = MultiUdpSocket::bind(address, num_sockets)?;
     Ok((*udp_socket.bound_address(), udp_socket))
 }
 
@@ -892,7 +914,18 @@ mod tests {
             None,
         );
 
-        let (listen_addr, udp_listener) = udp_bind_to(("127.0.0.1", 0)).await.context("udp_bind_to failed")?;
+        let num_socks = UdpStreamParallelism::Auto.num_tasks_when_split(UdpStreamParallelism::default());
+
+        let (listen_addr, udp_listener) = udp_bind_to(("127.0.0.1", 0), num_socks)
+            .await
+            .context("udp_bind_to failed")?;
+
+        let udp_listener = ConnectedUdpStream::builder()
+            .with_buffer_size(HOPR_UDP_BUFFER_SIZE)
+            .with_foreign_data_mode(ForeignDataMode::Discard) // discard data from UDP clients other than the first one served
+            .with_queue_size(HOPR_UDP_QUEUE_SIZE)
+            .with_receiver_parallelism(UdpStreamParallelism::Auto)
+            .build_from_socket(udp_listener)?;
 
         tokio::task::spawn(bind_session_to_stream(
             session,
