@@ -259,7 +259,6 @@ pub struct UdpStreamBuilder {
     queue_size: Option<usize>,
     receiver_parallelism: UdpStreamParallelism,
     sender_parallelism: UdpStreamParallelism,
-    bound_socket: Option<MultiUdpSocket>,
     counterparty: Option<std::net::SocketAddr>,
 }
 
@@ -334,19 +333,6 @@ impl UdpStreamBuilder {
         self
     }
 
-    /// Use [`MultiUdpSocket`] that has been already bound.
-    ///
-    /// This is useful when building an instance that should use already pre-bound sockets.
-    /// If not specified, a new [`MultiUdpSocket`] will be bound.
-    ///
-    /// [`MultiUdpSocket::count_sockets`] must be at least
-    /// the maximum of [receiver parallelism](UdpStreamBuilder::with_receiver_parallelism)
-    /// and [sender parallelism](UdpStreamBuilder::with_sender_parallelism).
-    pub fn with_bound_socket(mut self, bound_socket: MultiUdpSocket) -> Self {
-        self.bound_socket = Some(bound_socket);
-        self
-    }
-
     /// Builds the [`ConnectedUdpStream`] with UDP socket(s) bound to `bind_addr`.
     ///
     /// The number of RX sockets bound is determined by [receiver parallelism](UdpStreamBuilder::with_receiver_parallelism),
@@ -358,12 +344,18 @@ impl UdpStreamBuilder {
     /// if the [counterparty](UdpStreamBuilder::with_counterparty) has been set.
     ///
     /// This function internally binds [`MultiUdpSocket`](MultiUdpSocket::bind) with the number of sockets
-    /// that's required by the given parallelism, unless it was already given via [`UdpStreamBuilder::with_bound_socket`].
-    /// In that case, the [number of sockets](MultiUdpSocket::count_sockets) in that instance
-    /// must be less or equal to the maximum of the given parallelisms.
+    /// that's required by the given parallelism.
     pub fn build<A: std::net::ToSocketAddrs>(self, bind_addr: A) -> std::io::Result<ConnectedUdpStream> {
-        let (num_rx_socks, num_tx_socks) = self.receiver_parallelism.split_evenly_with(self.sender_parallelism);
+        let num_socks = self.receiver_parallelism.num_tasks_when_split(self.sender_parallelism);
+        self.build_from_socket(MultiUdpSocket::bind(bind_addr, num_socks)?)
+    }
 
+    /// Behaves exactly as [`UdpStreamBuilder::build`] but uses a pre-bound socket.
+    ///
+    /// The [number of sockets](MultiUdpSocket::count_sockets) in the given instance
+    /// must be greater or equal to the maximum of [receiver parallelism](UdpStreamBuilder::with_receiver_parallelism)
+    /// and [sender parallelism](UdpStreamBuilder::with_sender_parallelism).
+    pub fn build_from_socket(self, bound_socket: MultiUdpSocket) -> std::io::Result<crate::udp::ConnectedUdpStream> {
         let counterparty = Arc::new(
             self.counterparty
                 .map(|s| OnceLock::from(SocketAddrStr::from(s)))
@@ -376,11 +368,8 @@ impl UdpStreamBuilder {
             (flume::unbounded(), flume::unbounded())
         };
 
+        let (num_rx_socks, num_tx_socks) = self.receiver_parallelism.split_evenly_with(self.sender_parallelism);
         let num_socks_to_bind = num_rx_socks.max(num_tx_socks);
-        let bound_socket = self
-            .bound_socket
-            .map(Ok)
-            .unwrap_or_else(|| MultiUdpSocket::bind(bind_addr, num_socks_to_bind))?;
 
         if num_socks_to_bind > bound_socket.count_sockets() {
             return Err(std::io::ErrorKind::InvalidInput.into());
