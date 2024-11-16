@@ -440,6 +440,7 @@ pub(crate) async fn create_client(
     debug!("binding {protocol} session listening socket to {bind_host}");
     let bound_host = match protocol {
         IpProtocol::TCP => {
+            // Bind the TCP socket first
             let (bound_host, tcp_listener) = tcp_listen_on(bind_host).await.map_err(|e| {
                 if e.kind() == std::io::ErrorKind::AddrInUse {
                     (StatusCode::CONFLICT, ApiErrorStatus::InvalidInput)
@@ -452,6 +453,8 @@ pub(crate) async fn create_client(
             })?;
             info!(%bound_host, "TCP session listener bound");
 
+            // For each new TCP connection coming to the listener,
+            // open a Session with the same parameters
             let hopr = state.hopr.clone();
             let jh = hopr_async_runtime::prelude::spawn(
                 tokio_stream::wrappers::TcpListenerStream::new(tcp_listener)
@@ -499,14 +502,7 @@ pub(crate) async fn create_client(
             bound_host
         }
         IpProtocol::UDP => {
-            let hopr = state.hopr.clone();
-            let session = hopr.connect_to(data).await.map_err(|e| {
-                (
-                    StatusCode::UNPROCESSABLE_ENTITY,
-                    ApiErrorStatus::UnknownFailure(e.to_string()),
-                )
-            })?;
-
+            // Bind the UDP socket first
             let (bound_host, udp_socket) = udp_bind_to(bind_host).await.map_err(|e| {
                 if e.kind() == std::io::ErrorKind::AddrInUse {
                     (
@@ -523,8 +519,21 @@ pub(crate) async fn create_client(
 
             info!(%bound_host, "UDP session listener bound");
 
+            let hopr = state.hopr.clone();
+
+            // Create a single session for the UDP socket
+            let session = hopr.connect_to(data).await.map_err(|e| {
+                (
+                    StatusCode::UNPROCESSABLE_ENTITY,
+                    ApiErrorStatus::UnknownFailure(e.to_string()),
+                )
+            })?;
+
+            let open_listeners_clone = state.open_listeners.clone();
+            let listener_id = ListenerId(protocol, bound_host);
+
             state.open_listeners.write().await.insert(
-                ListenerId(protocol, bound_host),
+                listener_id,
                 (
                     target.clone(),
                     hopr_async_runtime::prelude::spawn(async move {
@@ -535,6 +544,9 @@ pub(crate) async fn create_client(
 
                         #[cfg(all(feature = "prometheus", not(test)))]
                         METRIC_ACTIVE_CLIENTS.decrement(&["udp"], 1.0);
+
+                        // Once the Session closes, remove it from the list
+                        open_listeners_clone.write().await.remove(&listener_id);
                     }),
                 ),
             );
@@ -703,7 +715,7 @@ where
             .collect::<Vec<_>>();
         match binder(addrs).await {
             Ok(listener) => return Ok(listener),
-            Err(e) => debug!("listen address not usable: {e}"),
+            Err(error) => debug!(%error, "listen address not usable"),
         }
     }
 
@@ -773,10 +785,10 @@ where
             session_id = ?session_id,
             session_to_stream_bytes, stream_to_session_bytes, "client session ended",
         ),
-        Err(e) => error!(
+        Err(error) => error!(
             session_id = ?session_id,
-            error = %e,
-            "error during data transfer: {e}"
+            %error,
+            "error during data transfer"
         ),
     }
 }
