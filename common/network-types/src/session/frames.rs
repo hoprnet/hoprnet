@@ -58,11 +58,8 @@ impl FrameBuilder {
             || idx as usize >= self.segments.len()
             || segment.seq_len as usize != self.segments.len()
             || self.seg_remaining == 0
+            || self.segments[idx as usize].is_some()
         {
-            return Err(SessionError::InvalidSegment);
-        }
-
-        if self.segments[idx as usize].is_some() {
             return Err(SessionError::InvalidSegment);
         }
 
