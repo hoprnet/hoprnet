@@ -106,7 +106,7 @@ jobs:
             elif [[ "${base_branch}" =~ ^"release" ]]; then
               echo "current_version=${{ vars.BRANCH_RELEASE_RELEASE_NAME }}-latest" >> "$GITHUB_OUTPUT"
             else
-              last_commit=$(git rev-parse HEAD)
+              last_commit=$(git rev-parse --short HEAD)
               echo "current_version=${current_version}-commit.${last_commit}" >> "$GITHUB_OUTPUT"
             fi
           else
