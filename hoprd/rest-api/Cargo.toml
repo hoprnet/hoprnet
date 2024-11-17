@@ -1,6 +1,6 @@
 [package]
 name = "hoprd-api"
-version = "3.5.2"
+version = "3.6.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "This Rest API enables developers to interact with a hoprd node programatically through HTTP."
@@ -19,6 +19,7 @@ prometheus = [
   "dep:lazy_static",
   "dep:regex",
 ]
+explicit-path = []
 # placeholder feature so we can enable it globally during tests
 runtime-async-std = []
 

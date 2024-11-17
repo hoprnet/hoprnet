@@ -1644,7 +1644,7 @@ checksum = "773648b94d0e5d620f64f280777445740e61fe701025087ec8b57f45c791888b"
 
 [[package]]
 name = "core-network"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "anyhow",
  "async-std",
@@ -4154,7 +4154,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-api"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "async-trait",
  "futures",
@@ -4251,6 +4251,7 @@ dependencies = [
  "bindings",
  "bloomfilter",
  "cbor4ii",
+ "criterion",
  "ethers",
  "hex-literal",
  "hopr-crypto-random",
@@ -4330,7 +4331,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-network-types"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "anyhow",
  "aquamarine",
@@ -4563,7 +4564,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-session"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "anyhow",
  "aquamarine",
@@ -4647,7 +4648,7 @@ dependencies = [
 
 [[package]]
 name = "hoprd-api"
-version = "3.5.2"
+version = "3.6.1"
 dependencies = [
  "anyhow",
  "async-broadcast",
