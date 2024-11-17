@@ -25,7 +25,7 @@ on:
           - dufour
         required: true
         description: 'Package network (rotsee: testnet, dufour: mainnet)'
-        default: dufour
+        default: rotsee
 
 concurrency:
   group: dappnode-${{ inputs.repository }}
@@ -48,16 +48,12 @@ jobs:
           else
             echo "The workflow is triggered manually"
             echo "GITHUB_REF_NAME=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
-            # commit_hash=$(gh api repos/${{ github.repository }}/commits/${{ github.ref_name }} --jq '.sha')
-            # echo "commit_hash=${commit_hash}" >> $GITHUB_OUTPUT
             if [[ "${{ github.event.inputs.network }}" == "rotsee" ]]; then
               echo "DAPPNODE_REPOSITORY=DAppNodePackage-Hopr-testnet" >> "$GITHUB_OUTPUT"
             else
               echo "DAPPNODE_REPOSITORY=DAppNodePackage-Hopr" >> "$GITHUB_OUTPUT"
             fi
           fi
-        # env:
-        #   GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
 
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4
