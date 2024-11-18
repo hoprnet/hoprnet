@@ -135,12 +135,12 @@ where
             topics: topics.into_iter().map(Hash::from).collect(),
         };
 
-        // First check whether fast sync is enabled and can be performed.
+        // First, check whether fast sync is enabled and can be performed.
         // If so:
-        //   1. delete the existing indexed data
-        //   2. reset the fast sync progress
-        //   3. run the fast sync process until completion
-        //   4. finally starting the rpc indexer.
+        //   1. Delete the existing indexed data
+        //   2. Reset fast sync progress
+        //   3. Run the fast sync process until completion
+        //   4. Finally starting the rpc indexer.
         let fast_sync_configured = self.cfg.fast_sync;
         let index_empty = self.db.index_is_empty().await?;
 
@@ -153,7 +153,7 @@ where
             }
             (true, true) => {
                 info!("Fast sync is enabled, starting the fast sync process");
-                // To ensure a proper state, we reset any auxiliary data in the database
+                // To ensure a proper state, reset any auxiliary data in the database
                 self.db.clear_index_db(None).await?;
                 self.db.set_logs_unprocessed(None, None).await?;
 
@@ -184,7 +184,7 @@ where
             self.cfg.start_block_number
         };
 
-        info!("Indexer next block to process #{next_block_to_process}");
+        info!(next_block_to_process, "indexer next block to process");
 
         let indexing_proc = spawn(async move {
             let is_synced = Arc::new(AtomicBool::new(false));
@@ -208,25 +208,25 @@ where
                     let db = db.clone();
 
                     async move {
-                        debug!("Storing logs from {}", &block);
+                        debug!(%block, "storing logs from block");
                         let logs = block.logs.clone();
                         let logs_vec = logs.into_iter().map(SerializableLog::from).collect();
                         match db.store_logs(logs_vec).await {
                             Ok(store_results) => {
-                                if let Some(err) = store_results
+                                if let Some(error) = store_results
                                     .into_iter()
                                     .filter(|r| r.is_err())
                                     .map(|r| r.unwrap_err())
                                     .next()
                                 {
-                                    error!("Failed to store logs from {block}: {err}");
+                                    error!(%block, %error, "failed to processed stored logs from block");
                                     None
                                 } else {
                                     Some(block)
                                 }
                             }
-                            Err(e) => {
-                                error!("Failed to store logs from {block}: {e}");
+                            Err(error) => {
+                                error!(%block, %error, "failed to store logs from block");
                                 None
                             }
                         }
@@ -239,8 +239,8 @@ where
                     async move {
                         match Self::process_block_by_id(&db, &logs_handler, block.block_id).await {
                             Ok(events) => events,
-                            Err(e) => {
-                                error!("Failed to process logs from {block}: {e}");
+                            Err(error) => {
+                                error!(%block, %error, "failed to process logs from block");
                                 None
                             }
                         }
@@ -250,11 +250,11 @@ where
 
             futures::pin_mut!(event_stream);
             while let Some(event) = event_stream.next().await {
-                trace!(event=%event, "Processing onchain event");
+                trace!(%event, "processing on-chain event");
                 // Pass the events further only once we're fully synced
                 if is_synced.load(Ordering::Relaxed) {
-                    if let Err(e) = tx_significant_events.try_send(event) {
-                        error!(error = %e,"failed to pass a significant chain event further");
+                    if let Err(error) = tx_significant_events.try_send(event) {
+                        error!(%error, "failed to pass a significant chain event further");
                     }
                 }
             }
@@ -309,8 +309,8 @@ where
                 block.logs.insert(log);
             } else {
                 error!(
-                    "block number mismatch in logs stream, expected {block_id} but got {}",
-                    log.block_number
+                    expected = block_id, actual = log.block_number,
+                    "block number mismatch in logs stream"
                 )
             }
         }
@@ -344,19 +344,20 @@ where
                 match db.set_logs_processed(Some(block_id), Some(0)).await {
                     Ok(_) => match db.update_logs_checksums().await {
                         Ok(_) => Self::print_indexer_state(db).await,
-                        Err(e) => error!("Failed to update checksums for logs from block #{block_id}: {e}"),
+                        Err(error) => error!(block_id, %error, "failed to update checksums for logs from block"),
                     },
-                    Err(e) => error!("Failed to mark logs from block #{block_id} as processed: {e}"),
+                    Err(error) => error!(block_id, %error, "failed to mark logs from block as processed"),
                 }
+
                 info!(
-                    "Processed {} significant chain events from block #{}",
-                    events.len(),
-                    block_id
+                    block_id,
+                    num_events = events.len(),
+                    "processed significant chain events from block",
                 );
                 Some(events)
             }
-            Err(e) => {
-                error!("Failed to process logs from block #{block_id} into events: {e}");
+            Err(error) => {
+                error!(block_id, %error, "failed to process logs from block into events");
                 None
             }
         }

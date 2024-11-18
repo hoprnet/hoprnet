@@ -839,12 +839,18 @@ where
                     // Process all logs in the block
                     for log in block_with_logs.logs {
                         let tx_hash = Hash::from(log.tx_hash);
+                        let log_id = log.log_index;
+                        let block_id = log.block_number;
 
-                        // If a significant chain event can be extracted from the log, push it
-                        if let Some(event_type) = myself.process_log_event(tx, log).await? {
-                            let significant_event = SignificantChainEvent { tx_hash, event_type };
-                            debug!(?significant_event, "indexer got significant_event");
-                            ret.push(significant_event);
+                        match myself.process_log_event(tx, log).await {
+                            // If a significant chain event can be extracted from the log, push it
+                            Ok(Some(event_type)) => {
+                                let significant_event = SignificantChainEvent { tx_hash, event_type };
+                                debug!(block_id, %tx_hash, log_id, ?significant_event, "indexer got significant_event");
+                                ret.push(significant_event);
+                            }
+                            Ok(None) => debug!(block_id, %tx_hash, log_id, "no significant event in log"),
+                            Err(error) => error!(block_id, %tx_hash, log_id, %error, "error processing log in tx"),
                         }
                     }
 
