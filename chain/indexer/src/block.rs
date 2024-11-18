@@ -140,7 +140,7 @@ where
         //   1. Delete the existing indexed data
         //   2. Reset fast sync progress
         //   3. Run the fast sync process until completion
-        //   4. Finally starting the rpc indexer.
+        //   4. Finally, starting the rpc indexer.
         let fast_sync_configured = self.cfg.fast_sync;
         let index_empty = self.db.index_is_empty().await?;
 
@@ -158,7 +158,8 @@ where
                 self.db.set_logs_unprocessed(None, None).await?;
 
                 // Now fast-sync can start
-                while let Some(block_number) = self.db.get_logs_block_numbers(None, None).await?.next().await {
+                let mut stream = self.db.get_logs_block_numbers(None, None).await?;
+                while let Some(block_number) = stream.next().await {
                     Self::process_block_by_id(&db, &logs_handler, block_number).await?;
                 }
             }
@@ -309,7 +310,8 @@ where
                 block.logs.insert(log);
             } else {
                 error!(
-                    expected = block_id, actual = log.block_number,
+                    expected = block_id,
+                    actual = log.block_number,
                     "block number mismatch in logs stream"
                 )
             }

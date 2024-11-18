@@ -267,8 +267,9 @@ where
                     // Check that we're not receiving the Open event without the channel being Close prior
                     if channel_edits.entry().status != ChannelStatus::Closed {
                         return Err(CoreEthereumIndexerError::ProcessError(format!(
-                            "trying to re-open channel {} which is not closed",
-                            channel_edits.entry().get_id()
+                            "trying to re-open channel {} which is not closed, but {}",
+                            channel_edits.entry().get_id(),
+                            channel_edits.entry().status,
                         )));
                     }
 
