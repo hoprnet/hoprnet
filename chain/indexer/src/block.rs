@@ -169,9 +169,9 @@ where
 
         let next_block_to_process = if let Some(last_log) = self.db.get_last_checksummed_log().await? {
             info!(
-                "Loaded indexer state at block #{0} with checksum: {1}",
-                last_log.block_number,
-                last_log.checksum.unwrap()
+                start_block = last_log.block_number,
+                start_checksum = last_log.checksum.unwrap(),
+                "Loaded indexer state",
             );
 
             if self.cfg.start_block_number < last_log.block_number {
@@ -184,7 +184,7 @@ where
             self.cfg.start_block_number
         };
 
-        info!("Indexer next block to process #{next_block_to_process}");
+        info!(next_block_to_process, "Indexer start point");
 
         let indexing_proc = spawn(async move {
             let is_synced = Arc::new(AtomicBool::new(false));
@@ -208,7 +208,7 @@ where
                     let db = db.clone();
 
                     async move {
-                        debug!("Storing logs from {}", &block);
+                        debug!(%block, "Storing logs");
                         let logs = block.logs.clone();
                         let logs_vec = logs.into_iter().map(SerializableLog::from).collect();
                         match db.store_logs(logs_vec).await {
@@ -219,14 +219,14 @@ where
                                     .map(|r| r.unwrap_err())
                                     .next()
                                 {
-                                    error!("Failed to store logs from {block}: {err}");
+                                    error!(%block, error = %err, "Failed to store logs");
                                     None
                                 } else {
                                     Some(block)
                                 }
                             }
                             Err(e) => {
-                                error!("Failed to store logs from {block}: {e}");
+                                error!(%block, error = %e, "Failed to store logs");
                                 None
                             }
                         }
@@ -240,7 +240,7 @@ where
                         match Self::process_block_by_id(&db, &logs_handler, block.block_id).await {
                             Ok(events) => events,
                             Err(e) => {
-                                error!("Failed to process logs from {block}: {e}");
+                                error!(%block, error = %e, "Failed to process logs");
                                 None
                             }
                         }
@@ -309,8 +309,9 @@ where
                 block.logs.insert(log);
             } else {
                 error!(
-                    "block number mismatch in logs stream, expected {block_id} but got {}",
-                    log.block_number
+                    expected_block_id = block_id,
+                    received_block_id = log.block_number,
+                    "block number mismatch in logs stream",
                 )
             }
         }
@@ -337,26 +338,30 @@ where
         Db: HoprDbLogOperations + 'static,
     {
         let block_id = block.block_id;
-        debug!("Processing events from block #{block_id}");
+        debug!(block_id, "Processing events");
 
         match logs_handler.collect_block_events(block.clone()).await {
             Ok(events) => {
                 match db.set_logs_processed(Some(block_id), Some(0)).await {
                     Ok(_) => match db.update_logs_checksums().await {
                         Ok(_) => Self::print_indexer_state(db).await,
-                        Err(e) => error!("Failed to update checksums for logs from block #{block_id}: {e}"),
+                        Err(e) => {
+                            error!(block_id, error = %e, "Failed to update checksums for logs")
+                        }
                     },
-                    Err(e) => error!("Failed to mark logs from block #{block_id} as processed: {e}"),
+                    Err(e) => error!(block_id, error = %e, "Failed to mark logs as processed"),
                 }
-                info!(
-                    "Processed {} significant chain events from block #{}",
-                    events.len(),
-                    block_id
+
+                debug!(
+                    block_id,
+                    event_count = events.len(),
+                    "Processed significant chain events",
                 );
+
                 Some(events)
             }
             Err(e) => {
-                error!("Failed to process logs from block #{block_id} into events: {e}");
+                error!(block_id, error = %e, "Failed to process logs into events");
                 None
             }
         }
@@ -392,12 +397,12 @@ where
                         METRIC_INDEXER_CHECKSUM.set(low_4_bytes.into());
                     }
                 }
-                Err(e) => error!("Cannot retrieve log count: {e}"),
+                Err(e) => error!(error = %e, "Cannot retrieve log count"),
             },
             Ok(None) => {
                 debug!("No logs have been checksummed yet");
             }
-            Err(e) => error!("Cannot retrieve last checksummed log: {e}"),
+            Err(e) => error!(error = %e, "Cannot retrieve last checksummed log"),
         }
     }
 
@@ -430,8 +435,6 @@ where
     where
         T: HoprIndexerRpcOperations + 'static,
     {
-        info!("Processing block number: {}", block.block_id);
-
         let current_block = block.block_id;
         #[cfg(all(feature = "prometheus", not(test)))]
         {
@@ -441,7 +444,7 @@ where
         match rpc.block_number().await {
             Ok(current_chain_block_number) => chain_head.store(current_chain_block_number, Ordering::Relaxed),
             Err(error) => {
-                error!("Failed to fetch block number from RPC, cannot continue indexing due to {error}");
+                error!(%error, "Failed to fetch block number from RPC, cannot continue indexing");
                 panic!("Failed to fetch block number from RPC, cannot continue indexing due to {error}")
             }
         };
@@ -467,10 +470,10 @@ where
             METRIC_INDEXER_SYNC_PROGRESS.set(progress);
 
             if current_block >= head {
-                info!("indexer {prefix} sync successfully completed");
+                info!(prefix, "indexer sync completed successfully");
                 is_synced.store(true, Ordering::Relaxed);
                 if let Err(e) = tx.try_send(()) {
-                    error!("failed to notify about achieving indexer {prefix} synchronization: {e}")
+                    error!(prefix, error = %e, "failed to notify about achieving indexer synchronization")
                 }
             }
         }
