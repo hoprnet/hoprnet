@@ -99,7 +99,7 @@ jobs:
               echo "K6_WORKLOAD_NAME=${{ inputs.workload }}"
               echo "K6_TEST_DURATION=${{ inputs.duration }}"
               echo "K6_VU_PER_ROUTE=${{ inputs.vu }}"
-              echo "K6_REQUESTS_PER_SECOND_PER_VU=${{ github.event.inputs.rate }}"
+              echo "K6_REQUESTS_PER_SECOND_PER_VU=${{inputs.rate }}"
             } >> $GITHUB_ENV
           else
             echo "The workflow is triggered manually"
@@ -138,13 +138,13 @@ jobs:
       - name: Get Hoprd Api token
         id: token
         run: |
-          hoprdApiToken=$(kubectl get secret -n k6-operator-system -o json hoprd-api-tokens | jq -r '.data.${{ steps.vars.outputs.NODES }}' | base64 -d)
+          hoprdApiToken=$(kubectl get secret -n k6-operator-system -o json hoprd-api-tokens | jq -r '.data.${{ steps.vars.outputs.K6_CLUSTER_NODES }}' | base64 -d)
           echo "HOPRD_API_TOKEN=${hoprdApiToken}" >> $GITHUB_ENV
 
       - name: Setup Load Testing environment
         run: |
           npm install
-          npm run setup:${{ steps.vars.outputs.topology }}:
+          npm run setup:${{ steps.vars.outputs.topology }}
         working-directory: "./k6"
 
       - name: Run Load test
