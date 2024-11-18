@@ -7,7 +7,7 @@
 //!
 //! The processing itself transforms the on-chain data into hoprd specific data, while also
 //! triggering specific actions for each event, ensuring finality, storing the data in the
-//! local storage and further reactively triggering higher level components of the business
+//! local storage, and further reactively triggering higher level components of the business
 //! logic.
 
 pub mod block;
