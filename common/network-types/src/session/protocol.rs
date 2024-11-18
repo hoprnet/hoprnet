@@ -308,6 +308,11 @@ impl<const C: usize> SessionMessage<C> {
     /// This amounts to [`SessionMessage::HEADER_SIZE`] + [`Segment::HEADER_SIZE`].
     pub const SEGMENT_OVERHEAD: usize = Self::HEADER_SIZE + Segment::HEADER_SIZE;
 
+    /// Maximum size of the Session protocol message.
+    ///
+    /// This is equal to the typical Ethernet MTU size minus [`Self::SEGMENT_OVERHEAD`].
+    pub const MAX_MESSAGE_SIZE: usize = 1492 - Self::SEGMENT_OVERHEAD;
+
     /// Current version of the protocol.
     pub const VERSION: u8 = 1;
 
@@ -414,6 +419,19 @@ impl<'a, const C: usize> SessionMessageIter<'a, C> {
         ) as usize;
         offset += mem::size_of::<u16>();
 
+        if len > SessionMessage::<C>::MAX_MESSAGE_SIZE {
+            return Err(SessionError::IncorrectMessageLength);
+        }
+
+        // The upper 6 bits of the size are reserved for future use,
+        // since MAX_MESSAGE_SIZE always fits within 10 bits (<= MAX_MESSAGE_SIZE = 1500)
+        let reserved = len & 0b111111_0000000000;
+
+        // In version 1 check that the reserved bits are all 0
+        if reserved != 0 {
+            return Err(SessionError::ParseError);
+        }
+
         // Read the message
         let res = match SessionMessageDiscriminants::from_repr(disc).ok_or(SessionError::UnknownMessageTag)? {
             SessionMessageDiscriminants::Segment => {
@@ -479,6 +497,8 @@ mod tests {
         assert_eq!(4, SessionMessage::<0>::HEADER_SIZE);
         assert_eq!(10, SessionMessage::<0>::SEGMENT_OVERHEAD);
         assert_eq!(8, SessionMessage::<0>::MAX_SEGMENTS_PER_FRAME);
+
+        assert!(SessionMessage::<0>::MAX_MESSAGE_SIZE < 2048);
     }
 
     #[test]

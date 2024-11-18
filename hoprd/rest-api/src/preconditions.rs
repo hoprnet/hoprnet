@@ -9,6 +9,7 @@ use axum::{
     response::IntoResponse,
 };
 use std::str::FromStr;
+use urlencoding::decode;
 
 use crate::{ApiErrorStatus, Auth, InternalState};
 
@@ -35,9 +36,22 @@ pub(crate) async fn authenticate(
                 })
                 .collect::<Vec<_>>();
 
-            let is_ws_auth = if let Some(s) = uri.path_and_query() {
-                s.as_str()
-                    .contains(format!("messages/websocket?apiToken={expected_token}").as_str())
+            // We have multiple websocket routes that need authentication checks
+            let is_ws_auth = if uri.path().starts_with("/api/v3/messages/websocket")
+                || uri.path().starts_with("/api/v3/session/websocket")
+            {
+                uri.query()
+                    .map(|q| {
+                        // Reasonable limit for query string
+                        if q.len() > 2048 {
+                            return false;
+                        }
+                        match decode(q) {
+                            Ok(decoded) => decoded.into_owned().contains(&format!("apiToken={}", expected_token)),
+                            Err(_) => false,
+                        }
+                    })
+                    .unwrap_or(false)
             } else {
                 false
             };

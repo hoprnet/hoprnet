@@ -1,4 +1,4 @@
-use tracing::{debug, trace};
+use tracing::debug;
 
 use hopr_crypto_types::types::Hash;
 use hopr_internal_types::prelude::*;
@@ -16,7 +16,7 @@ pub fn validate_unacknowledged_ticket(
     unrealized_balance: Balance,
     domain_separator: &Hash,
 ) -> Result<VerifiedTicket, TicketValidationError> {
-    debug!("validating unack ticket from {}", channel.source);
+    debug!(source = %channel.source, "validating unack ticket");
 
     // ticket signer MUST be the sender
     let verified_ticket = ticket
@@ -88,7 +88,6 @@ pub fn validate_unacknowledged_ticket(
         });
     }
 
-    trace!("ticket validation done");
     Ok(verified_ticket)
 }
 

@@ -47,7 +47,15 @@ async fn build_p2p_network(
     protocol_cfg: ProtocolConfig,
 ) -> Result<libp2p::Swarm<HoprNetworkBehavior>> {
     let tcp_upgrade = libp2p::core::upgrade::SelectUpgrade::new(
-        libp2p::yamux::Config::default(),
+        if let Ok(num_streams) = std::env::var("HOPR_INTERNAL_LIBP2P_YAMUX_MAX_NUM_STREAMS")
+            .and_then(|v| v.parse::<usize>().map_err(|_e| std::env::VarError::NotPresent))
+        {
+            let mut cfg = libp2p::yamux::Config::default();
+            cfg.set_max_num_streams(num_streams);
+            cfg
+        } else {
+            libp2p::yamux::Config::default()
+        },
         libp2p_mplex::MplexConfig::new()
             .set_max_num_streams(1024)
             .set_max_buffer_size(32)
@@ -68,8 +76,7 @@ async fn build_p2p_network(
         )
         .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?
         .with_quic()
-        .with_dns()
-        .await;
+        .with_dns();
 
     // Both features could be enabled during testing, therefore we only use tokio when its
     // exclusively enabled.
@@ -113,7 +120,12 @@ async fn build_p2p_network(
                     .map(|v| v.trim().parse::<usize>().unwrap_or(128))
                     .unwrap_or(constants::HOPR_SWARM_CONCURRENTLY_NEGOTIATING_INBOUND_PEER_COUNT),
             )
-            .with_idle_connection_timeout(constants::HOPR_SWARM_IDLE_CONNECTION_TIMEOUT)
+            .with_idle_connection_timeout(
+                std::env::var("HOPR_INTERNAL_LIBP2P_SWARM_IDLE_TIMEOUT")
+                    .and_then(|v| v.parse::<u64>().map_err(|_e| std::env::VarError::NotPresent))
+                    .map(std::time::Duration::from_secs)
+                    .unwrap_or(constants::HOPR_SWARM_IDLE_CONNECTION_TIMEOUT),
+            )
         })
         .build())
 }
@@ -489,10 +501,7 @@ impl HoprSwarmWithProcessors {
                         match event {
                             crate::behavior::discovery::Event::NewPeerMultiddress(peer, multiaddress) => {
                                 info!(%peer, address = %multiaddress, "New record");
-                                swarm.behaviour_mut().heartbeat.add_address(&peer, multiaddress.clone());
-                                swarm.behaviour_mut().msg.add_address(&peer, multiaddress.clone());
-                                swarm.behaviour_mut().ack.add_address(&peer, multiaddress.clone());
-                                swarm.behaviour_mut().ticket_aggregation.add_address(&peer, multiaddress.clone());
+                                swarm.add_peer_address(peer, multiaddress.clone());
 
                                 if let Err(e) = swarm.dial(peer) {
                                     error!(%peer, address = %multiaddress, error = %e, "Failed to dial the peer");

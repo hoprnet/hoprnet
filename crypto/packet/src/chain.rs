@@ -18,7 +18,6 @@ use crate::{
 pub enum ChainPacketComponents {
     /// Packet is intended for us
     Final {
-        ticket: Ticket,
         packet_tag: PacketTag,
         ack_key: HalfKey,
         previous_hop: OffchainPublicKey,
@@ -142,10 +141,8 @@ impl ChainPacketComponents {
                     additional_data: _,
                 } => {
                     let ack_key = derive_ack_key_share(&derived_secret);
-
-                    let ticket = Ticket::try_from(pre_ticket)?;
+                    // This ticket is not parsed nor verified on the final hop
                     Ok(Self::Final {
-                        ticket,
                         packet_tag,
                         ack_key,
                         previous_hop,
@@ -232,15 +229,22 @@ mod tests {
 
     impl ChainPacketComponents {
         pub fn to_bytes(&self) -> Box<[u8]> {
+            let dummy_ticket = hex!("67f0ca18102feec505e5bfedcc25963e9c64a6f8a250adcad7d2830dd607585700000000000000000000000000000000000000000000000000000000000000003891bf6fd4a78e868fc7ad477c09b16fc70dd01ea67e18264d17e3d04f6d8576de2e6472b0072e510df6e9fa1dfcc2727cc7633edfeb9ec13860d9ead29bee71d68de3736c2f7a9f42de76ccd57a5f5847bc7349");
             let (packet, ticket) = match self {
-                Self::Final { plain_text, ticket, .. } => (plain_text.clone(), ticket),
-                Self::Forwarded { packet, ticket, .. } => (Vec::from(packet.as_ref()).into_boxed_slice(), ticket),
-                Self::Outgoing { packet, ticket, .. } => (Vec::from(packet.as_ref()).into_boxed_slice(), ticket),
+                Self::Final { plain_text, .. } => (plain_text.clone(), dummy_ticket.as_ref().into()),
+                Self::Forwarded { packet, ticket, .. } => (
+                    Vec::from(packet.as_ref()).into_boxed_slice(),
+                    ticket.clone().into_boxed(),
+                ),
+                Self::Outgoing { packet, ticket, .. } => (
+                    Vec::from(packet.as_ref()).into_boxed_slice(),
+                    ticket.clone().into_boxed(),
+                ),
             };
 
             let mut ret = Vec::with_capacity(Self::SIZE);
             ret.extend_from_slice(packet.as_ref());
-            ret.extend_from_slice(&ticket.clone().into_encoded());
+            ret.extend_from_slice(&ticket);
             ret.into_boxed_slice()
         }
     }

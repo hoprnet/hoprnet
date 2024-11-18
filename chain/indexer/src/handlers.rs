@@ -267,8 +267,9 @@ where
                     // Check that we're not receiving the Open event without the channel being Close prior
                     if channel_edits.entry().status != ChannelStatus::Closed {
                         return Err(CoreEthereumIndexerError::ProcessError(format!(
-                            "trying to re-open channel {} which is not closed",
-                            channel_edits.entry().get_id()
+                            "trying to re-open channel {} which is not closed, but {}",
+                            channel_edits.entry().get_id(),
+                            channel_edits.entry().status,
                         )));
                     }
 
@@ -416,7 +417,7 @@ where
                     // which have a lower ticket index than `ticket_redeemed.new_ticket_index`
                     self.db
                         .mark_tickets_as(
-                            TicketSelector::from(&channel).with_index_lt(ticket_redeemed.new_ticket_index),
+                            TicketSelector::from(&channel).with_index_range(..ticket_redeemed.new_ticket_index),
                             TicketMarker::Neglected,
                         )
                         .await?;
@@ -701,10 +702,7 @@ where
                     if let Some(selector) = selector {
                         let num_rejected = self
                             .db
-                            .mark_tickets_as(
-                                selector.with_winning_probability_lt(encoded_new),
-                                TicketMarker::Rejected,
-                            )
+                            .mark_tickets_as(selector.with_winning_probability(..encoded_new), TicketMarker::Rejected)
                             .await?;
                         info!(count = num_rejected, "unredeemed tickets were rejected, because the minimum winning probability has been increased");
                     }
@@ -842,12 +840,18 @@ where
                     // Process all logs in the block
                     for log in block_with_logs.logs {
                         let tx_hash = Hash::from(log.tx_hash);
+                        let log_id = log.log_index;
+                        let block_id = log.block_number;
 
-                        // If a significant chain event can be extracted from the log, push it
-                        if let Some(event_type) = myself.process_log_event(tx, log).await? {
-                            let significant_event = SignificantChainEvent { tx_hash, event_type };
-                            debug!(?significant_event, "indexer got significant_event");
-                            ret.push(significant_event);
+                        match myself.process_log_event(tx, log).await {
+                            // If a significant chain event can be extracted from the log, push it
+                            Ok(Some(event_type)) => {
+                                let significant_event = SignificantChainEvent { tx_hash, event_type };
+                                debug!(block_id, %tx_hash, log_id, ?significant_event, "indexer got significant_event");
+                                ret.push(significant_event);
+                            }
+                            Ok(None) => debug!(block_id, %tx_hash, log_id, "no significant event in log"),
+                            Err(error) => error!(block_id, %tx_hash, log_id, %error, "error processing log in tx"),
                         }
                     }
 

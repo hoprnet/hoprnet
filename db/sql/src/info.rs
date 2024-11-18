@@ -1,6 +1,9 @@
 use async_trait::async_trait;
 use futures::TryFutureExt;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set};
+use sea_orm::{
+    ActiveModelBehavior, ActiveModelTrait, ColumnTrait, EntityOrSelect, EntityTrait, IntoActiveModel, PaginatorTrait,
+    QueryFilter, Set,
+};
 
 use hopr_crypto_types::prelude::Hash;
 use hopr_db_api::info::*;
@@ -116,7 +119,8 @@ impl HoprDbInfoOperations for HoprDb {
     async fn index_is_empty(&self) -> Result<bool> {
         let c = self.conn(TargetDb::Index);
 
-        if Account::find().one(c).await?.is_some() {
+        // There is always at least the node's own AccountEntry
+        if Account::find().select().count(c).await? > 1 {
             return Ok(false);
         }
 
@@ -151,6 +155,17 @@ impl HoprDbInfoOperations for HoprDb {
                     NetworkRegistry::delete_many().exec(tx.as_ref()).await?;
                     ChainInfo::delete_many().exec(tx.as_ref()).await?;
                     NodeInfo::delete_many().exec(tx.as_ref()).await?;
+
+                    // Initial rows are needed in the ChainInfo and NodeInfo tables
+                    // See the m20240226_000007_index_initial_seed.rs migration
+
+                    let mut initial_row = chain_info::ActiveModel::new();
+                    initial_row.id = Set(1);
+                    ChainInfo::insert(initial_row).exec(tx.as_ref()).await?;
+
+                    let mut initial_row = node_info::ActiveModel::new();
+                    initial_row.id = Set(1);
+                    NodeInfo::insert(initial_row).exec(tx.as_ref()).await?;
 
                     Ok::<(), DbSqlError>(())
                 })

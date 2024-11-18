@@ -95,14 +95,14 @@ impl TryFrom<&[u8]> for VrfParameters {
             Ok(VrfParameters {
                 V: CurvePoint::try_from(&value[..CurvePoint::SIZE_COMPRESSED])?,
                 h: k256_scalar_from_bytes(&value[CurvePoint::SIZE_COMPRESSED..CurvePoint::SIZE_COMPRESSED + 32])
-                    .map_err(|_| GeneralError::ParseError)?,
+                    .map_err(|_| GeneralError::ParseError("VrfParameters".into()))?,
                 s: k256_scalar_from_bytes(
                     &value[CurvePoint::SIZE_COMPRESSED + 32..CurvePoint::SIZE_COMPRESSED + 32 + 32],
                 )
-                .map_err(|_| GeneralError::ParseError)?,
+                .map_err(|_| GeneralError::ParseError("VrfParameters".into()))?,
             })
         } else {
-            Err(GeneralError::ParseError)
+            Err(GeneralError::ParseError("VrfParameters".into()))
         }
     }
 }

@@ -71,10 +71,10 @@ impl<T: BytesRepresentable> ToHex for T {
             };
 
             hex::decode(data)
-                .map_err(|_| ParseError)
+                .map_err(|e| ParseError(e.to_string()))
                 .and_then(|bytes| T::try_from(&bytes))
         } else {
-            Err(ParseError)
+            Err(ParseError("invalid hex length".into()))
         }
     }
 }
