@@ -170,9 +170,9 @@ where
 
         let next_block_to_process = if let Some(last_log) = self.db.get_last_checksummed_log().await? {
             info!(
-                "Loaded indexer state at block #{0} with checksum: {1}",
-                last_log.block_number,
-                last_log.checksum.unwrap()
+                start_block = last_log.block_number,
+                start_checksum = last_log.checksum.unwrap(),
+                "Loaded indexer state",
             );
 
             if self.cfg.start_block_number < last_log.block_number {
@@ -185,7 +185,7 @@ where
             self.cfg.start_block_number
         };
 
-        info!(next_block_to_process, "indexer next block to process");
+        info!(next_block_to_process, "Indexer start point");
 
         let indexing_proc = spawn(async move {
             let is_synced = Arc::new(AtomicBool::new(false));
@@ -339,7 +339,7 @@ where
         Db: HoprDbLogOperations + 'static,
     {
         let block_id = block.block_id;
-        debug!("Processing events from block #{block_id}");
+        debug!(block_id, "Processing events");
 
         match logs_handler.collect_block_events(block.clone()).await {
             Ok(events) => {
@@ -356,6 +356,7 @@ where
                     num_events = events.len(),
                     "processed significant chain events from block",
                 );
+
                 Some(events)
             }
             Err(error) => {
@@ -395,12 +396,12 @@ where
                         METRIC_INDEXER_CHECKSUM.set(low_4_bytes.into());
                     }
                 }
-                Err(e) => error!("Cannot retrieve log count: {e}"),
+                Err(e) => error!(error = %e, "Cannot retrieve log count"),
             },
             Ok(None) => {
                 debug!("No logs have been checksummed yet");
             }
-            Err(e) => error!("Cannot retrieve last checksummed log: {e}"),
+            Err(e) => error!(error = %e, "Cannot retrieve last checksummed log"),
         }
     }
 
@@ -433,8 +434,6 @@ where
     where
         T: HoprIndexerRpcOperations + 'static,
     {
-        info!("Processing block number: {}", block.block_id);
-
         let current_block = block.block_id;
         #[cfg(all(feature = "prometheus", not(test)))]
         {
@@ -444,7 +443,7 @@ where
         match rpc.block_number().await {
             Ok(current_chain_block_number) => chain_head.store(current_chain_block_number, Ordering::Relaxed),
             Err(error) => {
-                error!("Failed to fetch block number from RPC, cannot continue indexing due to {error}");
+                error!(%error, "Failed to fetch block number from RPC, cannot continue indexing");
                 panic!("Failed to fetch block number from RPC, cannot continue indexing due to {error}")
             }
         };
@@ -470,10 +469,10 @@ where
             METRIC_INDEXER_SYNC_PROGRESS.set(progress);
 
             if current_block >= head {
-                info!("indexer {prefix} sync successfully completed");
+                info!(prefix, "indexer sync completed successfully");
                 is_synced.store(true, Ordering::Relaxed);
                 if let Err(e) = tx.try_send(()) {
-                    error!("failed to notify about achieving indexer {prefix} synchronization: {e}")
+                    error!(prefix, error = %e, "failed to notify about achieving indexer synchronization")
                 }
             }
         }
