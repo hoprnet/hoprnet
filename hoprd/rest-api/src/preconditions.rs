@@ -41,9 +41,15 @@ pub(crate) async fn authenticate(
                 || uri.path().starts_with("/api/v3/session/websocket")
             {
                 uri.query()
-                    .map(|q| match decode(q) {
-                        Ok(decoded) => decoded.into_owned().contains(&format!("apiToken={}", expected_token)),
-                        Err(_) => false,
+                    .map(|q| {
+                        // Reasonable limit for query string
+                        if q.len() > 2048 {
+                            return false;
+                        }
+                        match decode(q) {
+                            Ok(decoded) => decoded.into_owned().contains(&format!("apiToken={}", expected_token)),
+                            Err(_) => false,
+                        }
                     })
                     .unwrap_or(false)
             } else {
