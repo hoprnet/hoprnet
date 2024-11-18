@@ -254,7 +254,7 @@ pub(crate) struct OpenChannelBodyRequest {
     /// Deprecated: PeerId of the counterparty.
     #[serde_as(as = "Option<DisplayFromStr>")]
     #[schema(value_type = String)]
-    peer_id: Option<hopr_lib::PeerId>,
+    peer_address: Option<hopr_lib::Address>,
     /// Initial amount of stake in HOPR tokens.
     amount: String,
 }
@@ -308,8 +308,8 @@ pub(super) async fn open_channel(
 
     let destination = if let Some(destination) = open_req.destination {
         destination
-    } else if let Some(peer_id) = open_req.peer_id {
-        PeerOrAddress::PeerId(peer_id)
+    } else if let Some(peer_address) = open_req.peer_address {
+        PeerOrAddress::Address(peer_address)
     } else {
         return (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidInput).into_response();
     };
