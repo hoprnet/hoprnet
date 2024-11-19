@@ -1281,7 +1281,7 @@ dependencies = [
 
 [[package]]
 name = "chain-indexer"
-version = "0.5.0"
+version = "0.5.2"
 dependencies = [
  "anyhow",
  "async-channel 2.3.1",
@@ -4202,7 +4202,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-sql"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "anyhow",
  "async-lock 3.4.0",
