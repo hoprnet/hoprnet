@@ -191,6 +191,7 @@ where
 
                     Ok(Some(ChainEventType::ChannelBalanceDecreased(updated_channel, diff)))
                 } else {
+                    error!(channel_id = %Hash::from(balance_decreased.channel_id), "observed balance decreased event for a channel that does not exist");
                     Err(CoreEthereumIndexerError::ChannelDoesNotExist)
                 }
             }
@@ -211,6 +212,7 @@ where
 
                     Ok(Some(ChainEventType::ChannelBalanceIncreased(updated_channel, diff)))
                 } else {
+                    error!(channel_id = %Hash::from(balance_increased.channel_id), "observed balance increased event for a channel that does not exist");
                     Err(CoreEthereumIndexerError::ChannelDoesNotExist)
                 }
             }
@@ -253,6 +255,7 @@ where
 
                     Ok(Some(ChainEventType::ChannelClosed(updated_channel)))
                 } else {
+                    error!(channel_id = %Hash::from(channel_closed.channel_id), "observed closure finalization event for a channel that does not exist");
                     Err(CoreEthereumIndexerError::ChannelDoesNotExist)
                 }
             }
@@ -424,7 +427,7 @@ where
 
                     Ok(Some(ChainEventType::TicketRedeemed(channel, ack_ticket)))
                 } else {
-                    error!("observed ticket redeem on a channel that we don't have in the DB");
+                    error!(channel_id = %Hash::from(ticket_redeemed.channel_id), "observed ticket redeem on a channel that we don't have in the DB");
                     Err(CoreEthereumIndexerError::ChannelDoesNotExist)
                 }
             }
@@ -445,6 +448,7 @@ where
                         .await?;
                     Ok(Some(ChainEventType::ChannelClosureInitiated(channel)))
                 } else {
+                    error!(channel_id = %Hash::from(closure_initiated.channel_id), "observed channel closure initiation on a channel that we don't have in the DB");
                     Err(CoreEthereumIndexerError::ChannelDoesNotExist)
                 }
             }
