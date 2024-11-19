@@ -150,7 +150,7 @@ pub struct CliArgs {
         help = "Disables checking of unrealized balance before validating unacknowledged tickets.",
         action = ArgAction::Count
     )]
-    pub check_unrealized_balance: u8,
+    pub no_check_unrealized_balance: u8,
 
     #[arg(
         long = "noKeepLogs",

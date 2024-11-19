@@ -263,23 +263,19 @@ impl HoprdConfig {
         }
 
         if let Some(x) = cli_args.max_block_range {
-            // Override all max_block_range setting in all networks
+            // Override all max_block_range settings in all networks
             for (_, n) in cfg.hopr.chain.protocols.networks.iter_mut() {
                 n.max_block_range = x;
             }
         }
 
-        if cli_args.check_unrealized_balance == 0 {
-            cfg.hopr.chain.check_unrealized_balance = true;
-        }
+        // The --no*/--disable* CLI flags are Count-based, therefore, if they equal to 0,
+        // it means they have not been specified on the CLI and thus the
+        // corresponding config value should be enabled.
 
-        if cli_args.no_fast_sync == 0 {
-            cfg.hopr.chain.fast_sync = false;
-        }
-
-        if cli_args.no_keep_logs == 0 {
-            cfg.hopr.chain.keep_logs = false;
-        }
+        cfg.hopr.chain.check_unrealized_balance = cli_args.no_check_unrealized_balance == 0;
+        cfg.hopr.chain.fast_sync = cli_args.no_fast_sync == 0;
+        cfg.hopr.chain.keep_logs = cli_args.no_keep_logs == 0;
 
         // safe module
         if let Some(x) = cli_args.safe_transaction_service_provider {

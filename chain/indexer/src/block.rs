@@ -148,8 +148,14 @@ where
             (true, false) => {
                 warn!("Fast sync is enabled, but the index database is not empty. In order to use fast-sync again you must stop this node and remove the index database manually.");
             }
-            (false, _) => {
-                info!("Fast sync is disabled");
+            (false, true) => {
+                info!("Fast sync is disabled, but the index database is empty. Doing a full re-sync.");
+                // Clean the last processed log from the Log DB, to allow full resync
+                self.db.clear_index_db(None).await?;
+                self.db.set_logs_unprocessed(None, None).await?;
+            }
+            (false, false) => {
+                info!("Fast sync is disabled and the index database is not empty. Continuing normal sync.")
             }
             (true, true) => {
                 info!("Fast sync is enabled, starting the fast sync process");
