@@ -1281,7 +1281,7 @@ dependencies = [
 
 [[package]]
 name = "chain-indexer"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "anyhow",
  "async-channel 2.3.1",
