@@ -129,7 +129,7 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                                 from_block = latest_block;
                             } else if past_diff <= MAX_RPC_PAST_BLOCKS as u64 {
                                 // If we came here early (we tolerate only off-by MAX_RPC_PAST_BLOCKS), wait some more
-                                warn!(last_block = latest_block, start_block = start_block_number, blocks_diff = past_diff, "Indexer premature request. Block not found yet in RPC provider.");
+                                trace!(last_block = latest_block, start_block = start_block_number, blocks_diff = past_diff, "Indexer premature request. Block not found yet in RPC provider.");
                                 futures_timer::Delay::new(past_diff as u32 * self.cfg.expected_block_time / 3).await;
                                 continue;
                             } else {
