@@ -4,7 +4,10 @@ use futures::{stream, StreamExt, TryStreamExt};
 use sea_orm::entity::Set;
 use sea_orm::query::QueryTrait;
 use sea_orm::sea_query::{Expr, OnConflict, Value};
-use sea_orm::{ColumnTrait, EntityTrait, FromQueryResult, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, EntityTrait, FromQueryResult, IntoActiveModel, PaginatorTrait, QueryFilter,
+    QueryOrder, QuerySelect,
+};
 use tracing::{error, trace};
 
 use hopr_crypto_types::prelude::Hash;
@@ -321,12 +324,13 @@ impl HoprDbLogOperations for HoprDb {
                                     log_entry.transaction_hash.as_slice(),
                                     log_entry.log_index.as_slice(),
                                 ]);
+
                                 let next_checksum = Hash::create(&[last_checksum.as_ref(), log_hash.as_ref()]);
-                                let updated_status = log_status::ActiveModel {
-                                    checksum: Set(Some(next_checksum.as_ref().to_vec())),
-                                    ..status.into()
-                                };
-                                match LogStatus::update(updated_status).exec(tx.as_ref()).await {
+
+                                let mut updated_status = status.into_active_model();
+                                updated_status.checksum = Set(Some(next_checksum.as_ref().to_vec()));
+
+                                match updated_status.update(tx.as_ref()).await {
                                     Ok(_) => {
                                         last_checksum = next_checksum;
                                         trace!("Generated log checksum {next_checksum} @ {slog}");
