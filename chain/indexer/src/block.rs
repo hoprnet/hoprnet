@@ -357,7 +357,7 @@ where
                     Err(error) => error!(block_id, %error, "failed to mark logs from block as processed"),
                 }
 
-                info!(
+                debug!(
                     block_id,
                     num_events = events.len(),
                     "processed significant chain events from block",
