@@ -300,8 +300,7 @@ impl HoprDbLogOperations for HoprDb {
                         .await
                         .map_err(|e| DbError::from(DbSqlError::from(e)))?
                         .and_then(|m| m.checksum)
-                        .map(|h| Hash::try_from(h.as_slice()).ok())
-                        .flatten()
+                        .and_then(|h| Hash::try_from(h.as_slice()).ok())
                         .unwrap_or_default();
 
                     let query = LogStatus::find()
