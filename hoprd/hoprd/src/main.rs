@@ -247,11 +247,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     // Ensures that "OWN_ALIAS" is set as alias
-    if let Err(e) = hoprd_db
-        .set_alias(node.me_peer_id().to_string(), ME_AS_ALIAS.to_string())
-        .await
-    {
-        error!(error = %e, "Failed to set the alias for the node");
+    if hoprd_db.resolve_alias(ME_AS_ALIAS.to_string()).await?.is_none() {
+        if let Err(e) = hoprd_db
+            .set_alias(node.me_peer_id().to_string(), ME_AS_ALIAS.to_string())
+            .await
+        {
+            error!(error = %e, "Failed to set the alias for the node");
+        }
     }
 
     let (mut ws_events_tx, ws_events_rx) =
