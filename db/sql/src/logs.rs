@@ -286,9 +286,8 @@ impl HoprDbLogOperations for HoprDb {
     }
 
     async fn update_logs_checksums(&self) -> Result<()> {
-        let db_tx = self.nest_transaction_in_db(None, TargetDb::Logs).await?;
-
-        db_tx
+        self.nest_transaction_in_db(None, TargetDb::Logs)
+            .await?
             .perform(|tx| {
                 Box::pin(async move {
                     let mut last_checksum = LogStatus::find()
@@ -300,7 +299,7 @@ impl HoprDbLogOperations for HoprDb {
                         .await
                         .map_err(|e| DbError::from(DbSqlError::from(e)))?
                         .and_then(|m| m.checksum)
-                        .and_then(|h| Hash::try_from(h.as_slice()).ok())
+                        .and_then(|c| Hash::try_from(c.as_slice()).ok())
                         .unwrap_or_default();
 
                     let query = LogStatus::find()
