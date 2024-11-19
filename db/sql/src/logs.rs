@@ -292,8 +292,6 @@ impl HoprDbLogOperations for HoprDb {
             .perform(|tx| {
                 Box::pin(async move {
                     let mut last_checksum = LogStatus::find()
-                        .select_only()
-                        .column(log_status::Column::Checksum)
                         .filter(log_status::Column::Checksum.is_not_null())
                         .order_by_desc(log_status::Column::BlockNumber)
                         .order_by_desc(log_status::Column::TransactionIndex)
