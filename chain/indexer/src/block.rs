@@ -827,9 +827,13 @@ mod tests {
         let mut handlers = MockChainLogHandler::new();
         handlers.expect_contract_addresses().return_const(vec![]);
 
+        let indexer_cfg = IndexerConfig {
+            start_block_number: 0,
+            fast_sync: false,
+        };
+
         let (tx_events, _) = async_channel::unbounded();
-        let mut indexer =
-            Indexer::new(rpc, handlers, db.clone(), IndexerConfig::default(), tx_events).without_panic_on_completion();
+        let mut indexer = Indexer::new(rpc, handlers, db.clone(), indexer_cfg, tx_events).without_panic_on_completion();
         indexer.start().await?;
 
         Ok(())
