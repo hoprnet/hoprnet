@@ -48,8 +48,8 @@ pub struct NetworkConfig {
     pub quality_avg_window_size: u32,
 
     #[serde_as(as = "DurationSeconds<u64>")]
-    #[serde(default = "duration_10_min")]
-    #[default(duration_10_min())]
+    #[serde(default = "duration_1_sec")]
+    #[default(duration_1_sec())]
     pub ignore_timeframe: Duration,
 
     #[serde(default = "backoff_exponent")]
@@ -160,9 +160,10 @@ fn quality_average_window_size() -> u32 {
     DEFAULT_NETWORK_QUALITY_AVERAGE_WINDOW_SIZE
 }
 
+/// Enforcing backwards compatibility with the "no ignore behaviour" of the previous release
 #[inline]
-fn duration_10_min() -> Duration {
-    Duration::from_secs(600)
+fn duration_1_sec() -> Duration {
+    Duration::from_secs(1)
 }
 
 #[inline]
