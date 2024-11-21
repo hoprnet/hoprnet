@@ -160,7 +160,6 @@ fn quality_average_window_size() -> u32 {
     DEFAULT_NETWORK_QUALITY_AVERAGE_WINDOW_SIZE
 }
 
-/// Enforcing backwards compatibility with the "no ignore behaviour" of the previous release
 #[inline]
 fn duration_4_min() -> Duration {
     Duration::from_secs(4 * 60)
