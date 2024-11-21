@@ -1,9 +1,9 @@
 use std::collections::HashSet;
-use std::net::SocketAddr;
+use std::net::{IpAddr, SocketAddr};
 use std::str::FromStr;
 use std::time::Duration;
 
-use hopr_lib::{config::HoprLibConfig, Address, HostConfig, ProtocolsConfig};
+use hopr_lib::{config::HoprLibConfig, Address, HostConfig, HostType, ProtocolsConfig};
 use hopr_platform::file::native::read_to_string;
 use hoprd_api::config::{Api, Auth};
 use hoprd_inbox::config::MessageInboxConfiguration;
@@ -149,6 +149,15 @@ impl HoprdConfig {
         }
         if cli_args.test_prefer_local_addresses > 0 {
             cfg.hopr.transport.prefer_local_addresses = true;
+        }
+
+        if let Some(host) = cli_args.default_session_listen_host {
+            cfg.session_ip_forwarding.default_entry_listen_host = match host.address {
+                HostType::IPv4(addr) => IpAddr::from_str(&addr)
+                    .map(|ip| std::net::SocketAddr::new(ip, host.port))
+                    .map_err(|_| HoprdError::ConfigError("invalid default session listen IP address".into())),
+                HostType::Domain(_) => Err(HoprdError::ConfigError("default session listen must be an IP".into())),
+            }?;
         }
 
         // db
