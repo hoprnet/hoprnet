@@ -164,8 +164,8 @@ where
                 self.db.set_logs_unprocessed(None, None).await?;
 
                 // Now fast-sync can start
-                let mut stream = self.db.get_logs_block_numbers(None, None).await?;
-                while let Some(block_number) = stream.next().await {
+                let log_block_numbers = self.db.get_logs_block_numbers(None, None).await?;
+                for block_number in log_block_numbers {
                     Self::process_block_by_id(&db, &logs_handler, block_number).await?;
                 }
             }
@@ -305,20 +305,20 @@ where
         U: ChainLogHandler + 'static,
         Db: HoprDbLogOperations + 'static,
     {
-        let mut log_stream = db.get_logs(Some(block_id), Some(0)).await?;
+        let logs = db.get_logs(Some(block_id), Some(0)).await?;
         let mut block = BlockWithLogs {
             block_id,
             ..Default::default()
         };
 
-        while let Some(log) = log_stream.next().await {
+        for log in logs {
             if log.block_number == block_id {
                 block.logs.insert(log);
             } else {
                 error!(
                     expected = block_id,
                     actual = log.block_number,
-                    "block number mismatch in logs stream"
+                    "block number mismatch in logs from database"
                 )
             }
         }

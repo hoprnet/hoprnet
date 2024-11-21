@@ -81,6 +81,7 @@ let
     buildInputs = [ openssl ] ++ stdenv.extraBuildInputs ++ darwinBuildInputs;
 
     CARGO_HOME = ".cargo";
+    RUST_MIN_STACK = "16777216"; # 16MB required to run the tests and compilation
     cargoExtraArgs = "--offline -p ${pname} ${cargoExtraArgs}";
     # this env var is used by utoipa-swagger-ui to prevent internet access
     CARGO_FEATURE_VENDORED = "true";

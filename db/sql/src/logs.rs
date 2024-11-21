@@ -1,6 +1,5 @@
 use async_trait::async_trait;
-use futures::stream::BoxStream;
-use futures::{stream, StreamExt, TryStreamExt};
+use futures::{stream, StreamExt};
 use sea_orm::entity::Set;
 use sea_orm::query::QueryTrait;
 use sea_orm::sea_query::{Expr, OnConflict, Value};
@@ -120,7 +119,7 @@ impl HoprDbLogOperations for HoprDb {
         &'a self,
         block_number: Option<u64>,
         block_offset: Option<u64>,
-    ) -> Result<BoxStream<'a, SerializableLog>> {
+    ) -> Result<Vec<SerializableLog>> {
         let min_block_number = block_number.unwrap_or(0);
         let max_block_number = block_offset.map(|v| min_block_number + v + 1);
 
@@ -134,28 +133,23 @@ impl HoprDbLogOperations for HoprDb {
             .order_by_asc(log::Column::TransactionIndex)
             .order_by_asc(log::Column::LogIndex);
 
-        Ok(Box::pin(async_stream::stream! {
-            match query.stream(self.conn(TargetDb::Logs)).await {
-                Ok(mut stream) => {
-                    while let Ok(Some(object)) = stream.try_next().await {
-                        match object {
-                            (log, Some(log_status)) => {
-                                if let Ok(slog) = create_log(log, log_status) {
-                                    yield slog
-                                }
-                            },
-                            (log, None) => {
-                                error!("Missing log status for log in db: {:?}", log);
-                                if let Ok(slog) = SerializableLog::try_from(log) {
-                                    yield slog
-                                }
-                            }
-                        }
+        match query.all(self.conn(TargetDb::Logs)).await {
+            Ok(logs) => Ok(logs
+                .into_iter()
+                .map(|(log, status)| {
+                    if let Some(status) = status {
+                        create_log(log, status).unwrap()
+                    } else {
+                        error!("Missing log status for log in db: {:?}", log);
+                        SerializableLog::try_from(log).unwrap()
                     }
-                },
-                Err(e) => error!("Failed to get logs from db: {:?}", e),
+                })
+                .collect()),
+            Err(e) => {
+                error!("Failed to get logs from db: {:?}", e);
+                Err(DbError::from(DbSqlError::from(e)))
             }
-        }))
+        }
     }
 
     async fn get_logs_count(&self, block_number: Option<u64>, block_offset: Option<u64>) -> Result<u64> {
@@ -176,11 +170,11 @@ impl HoprDbLogOperations for HoprDb {
         &'a self,
         block_number: Option<u64>,
         block_offset: Option<u64>,
-    ) -> Result<BoxStream<'a, u64>> {
+    ) -> Result<Vec<u64>> {
         let min_block_number = block_number.unwrap_or(0);
         let max_block_number = block_offset.map(|v| min_block_number + v + 1);
 
-        let query = Log::find()
+        Log::find()
             .select_only()
             .column(log::Column::BlockNumber)
             .distinct()
@@ -189,17 +183,18 @@ impl HoprDbLogOperations for HoprDb {
                 q.filter(log::Column::BlockNumber.lt(v.to_be_bytes().to_vec()))
             })
             .order_by_asc(log::Column::BlockNumber)
-            .into_model::<BlockNumber>();
-
-        Ok(Box::pin(async_stream::stream! {
-            match query.stream(self.conn(TargetDb::Logs)).await {
-                Ok(mut stream) => {
-                    while let Some(Ok(object)) = stream.next().await {
-                        yield U256::from_be_bytes(object.block_number).as_u64()
-                }},
-                Err(e) => error!("Failed to get logs block numbers from db: {:?}", e),
-            }
-        }))
+            .into_model::<BlockNumber>()
+            .all(self.conn(TargetDb::Logs))
+            .await
+            .map(|res| {
+                res.into_iter()
+                    .map(|b| U256::from_be_bytes(b.block_number).as_u64())
+                    .collect()
+            })
+            .map_err(|e| {
+                error!("Failed to get logs block numbers from db: {:?}", e);
+                DbError::from(DbSqlError::from(e))
+            })
     }
 
     async fn set_logs_processed(&self, block_number: Option<u64>, block_offset: Option<u64>) -> Result<()> {
@@ -415,12 +410,7 @@ mod tests {
 
         db.store_log(log.clone()).await.unwrap();
 
-        let logs = db
-            .get_logs(None, None)
-            .await
-            .unwrap()
-            .collect::<Vec<SerializableLog>>()
-            .await;
+        let logs = db.get_logs(None, None).await.unwrap();
 
         assert_eq!(logs.len(), 1);
         assert_eq!(logs[0], log);
@@ -461,12 +451,7 @@ mod tests {
         db.store_log(log_1.clone()).await.unwrap();
         db.store_log(log_2.clone()).await.unwrap();
 
-        let logs = db
-            .get_logs(None, None)
-            .await
-            .unwrap()
-            .collect::<Vec<SerializableLog>>()
-            .await;
+        let logs = db.get_logs(None, None).await.unwrap();
 
         assert_eq!(logs.len(), 2);
         assert_eq!(logs[0], log_1);
@@ -503,12 +488,7 @@ mod tests {
             .await
             .expect_err("Expected error due to duplicate log insertion");
 
-        let logs = db
-            .get_logs(None, None)
-            .await
-            .unwrap()
-            .collect::<Vec<SerializableLog>>()
-            .await;
+        let logs = db.get_logs(None, None).await.unwrap();
 
         assert_eq!(logs.len(), 1);
     }
@@ -584,12 +564,7 @@ mod tests {
         let mut next_block = start_block;
 
         while next_block <= start_block + blocks {
-            let ordered_logs = db
-                .get_logs(Some(next_block), Some(block_fetch_interval))
-                .await
-                .unwrap()
-                .collect::<Vec<SerializableLog>>()
-                .await;
+            let ordered_logs = db.get_logs(Some(next_block), Some(block_fetch_interval)).await.unwrap();
 
             assert!(ordered_logs.len() > 0);
 
@@ -660,12 +635,7 @@ mod tests {
             .into_iter()
             .for_each(|r| assert!(r.is_ok()));
 
-        let logs = db
-            .get_logs(Some(1), Some(0))
-            .await
-            .unwrap()
-            .collect::<Vec<SerializableLog>>()
-            .await;
+        let logs = db.get_logs(Some(1), Some(0)).await.unwrap();
 
         assert_eq!(logs.len(), 1);
         assert_eq!(logs[0], log_1);
@@ -738,12 +708,7 @@ mod tests {
             .into_iter()
             .for_each(|r| assert!(r.is_ok()));
 
-        let block_numbers = db
-            .get_logs_block_numbers(Some(1), Some(0))
-            .await
-            .unwrap()
-            .collect::<Vec<u64>>()
-            .await;
+        let block_numbers = db.get_logs_block_numbers(Some(1), Some(0)).await.unwrap();
 
         assert_eq!(block_numbers.len(), 1);
         assert_eq!(block_numbers[0], 1);
@@ -802,15 +767,9 @@ mod tests {
 
         let updated_log_3 = db.get_last_checksummed_log().await.unwrap().unwrap();
 
-        db.get_logs(None, None)
-            .await
-            .unwrap()
-            .collect::<Vec<SerializableLog>>()
-            .await
-            .into_iter()
-            .for_each(|log| {
-                assert!(log.checksum.is_some());
-            });
+        db.get_logs(None, None).await.unwrap().into_iter().for_each(|log| {
+            assert!(log.checksum.is_some());
+        });
 
         // ensure the first log is not the last updated anymore
         assert_ne!(
