@@ -1,6 +1,6 @@
 [package]
 name = "core-network"
-version = "0.6.3"
+version = "0.6.4"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 license = "GPL-3.0-only"
@@ -22,6 +22,7 @@ futures = { workspace = true }
 lazy_static = { workspace = true }
 libp2p-identity = { workspace = true }
 multiaddr = { workspace = true }
+rand = { workspace = true }
 serde = { workspace = true }
 serde_with = { workspace = true }
 smart-default = { workspace = true }
