@@ -81,6 +81,7 @@ pub(crate) struct InternalState {
     pub websocket_rx: async_broadcast::InactiveReceiver<ApplicationData>,
     pub msg_encoder: Option<MessageEncoder>,
     pub open_listeners: ListenerJoinHandles,
+    pub default_listen_host: std::net::SocketAddr,
 }
 
 #[derive(OpenApi)]
@@ -198,6 +199,7 @@ pub struct RestApiParameters {
     pub session_listener_sockets: ListenerJoinHandles,
     pub websocket_rx: async_broadcast::InactiveReceiver<ApplicationData>,
     pub msg_encoder: Option<MessageEncoder>,
+    pub default_session_listen_host: std::net::SocketAddr,
 }
 
 /// Starts the Rest API listener and router.
@@ -212,6 +214,7 @@ pub async fn serve_api(params: RestApiParameters) -> Result<(), std::io::Error> 
         session_listener_sockets,
         websocket_rx,
         msg_encoder,
+        default_session_listen_host,
     } = params;
 
     let router = build_api(
@@ -223,6 +226,7 @@ pub async fn serve_api(params: RestApiParameters) -> Result<(), std::io::Error> 
         session_listener_sockets,
         websocket_rx,
         msg_encoder,
+        default_session_listen_host,
     )
     .await;
     axum::serve(listener, router).await
@@ -238,6 +242,7 @@ async fn build_api(
     open_listeners: ListenerJoinHandles,
     websocket_rx: async_broadcast::InactiveReceiver<ApplicationData>,
     msg_encoder: Option<MessageEncoder>,
+    default_listen_host: std::net::SocketAddr,
 ) -> Router {
     let state = AppState { hopr };
     let inner_state = InternalState {
@@ -249,6 +254,7 @@ async fn build_api(
         hoprd_db,
         websocket_rx,
         open_listeners,
+        default_listen_host,
     };
 
     Router::new()

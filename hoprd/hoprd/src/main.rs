@@ -307,6 +307,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 session_listener_sockets,
                 websocket_rx: ws_events_rx,
                 msg_encoder: Some(msg_encoder),
+                default_session_listen_host: cfg.session_ip_forwarding.default_entry_listen_host,
             })
             .await
             {
