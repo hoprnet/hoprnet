@@ -6,6 +6,7 @@ use futures::{
 use hopr_db_api::peers::HoprDbPeersOperations;
 use hopr_primitive_types::traits::SaturatingSub;
 use libp2p_identity::PeerId;
+use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DurationSeconds};
 use validator::Validate;
@@ -171,13 +172,17 @@ impl<T: Pinging, API: HeartbeatExternalApi> Heartbeat<T, API> {
 
     #[tracing::instrument(level = "info", skip(self), fields(from_timestamp = tracing::field::debug(current_time())))]
     async fn perform_heartbeat_round(&mut self) {
-        #[cfg(all(feature = "prometheus", not(test)))]
-        let heartbeat_round_timer = histogram_start_measure!(METRIC_TIME_TO_HEARTBEAT);
-
         let start = current_time();
         let from_timestamp = start.checked_sub(self.config.threshold).unwrap_or(start);
 
-        let peers = self.external_api.get_peers(from_timestamp).await;
+        let mut peers = self.external_api.get_peers(from_timestamp).await;
+
+        // shuffle the peers to make sure that the order is different each heartbeat round
+        let mut rng = hopr_crypto_random::rng();
+        peers.shuffle(&mut rng);
+
+        #[cfg(all(feature = "prometheus", not(test)))]
+        let heartbeat_round_timer = histogram_start_measure!(METRIC_TIME_TO_HEARTBEAT);
 
         // random timeout to avoid network sync:
         let this_round_planned_duration = std::time::Duration::from_millis({
