@@ -296,7 +296,7 @@ where
 
         let ping_cfg = PingConfig {
             timeout: self.cfg.protocol.heartbeat.timeout,
-            ..PingConfig::default()
+            max_parallel_pings: self.cfg.heartbeat.max_parallel_probes,
         };
 
         let ping: Pinger<network_notifier::PingExternalInteractions<T>> = Pinger::new(

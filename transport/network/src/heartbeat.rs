@@ -27,7 +27,10 @@ lazy_static::lazy_static! {
 
 use hopr_platform::time::native::current_time;
 
-use crate::constants::{DEFAULT_HEARTBEAT_INTERVAL, DEFAULT_HEARTBEAT_INTERVAL_VARIANCE, DEFAULT_HEARTBEAT_THRESHOLD};
+use crate::constants::{
+    DEFAULT_HEARTBEAT_INTERVAL, DEFAULT_HEARTBEAT_INTERVAL_VARIANCE, DEFAULT_HEARTBEAT_THRESHOLD,
+    DEFAULT_MAX_PARALLEL_PINGS,
+};
 use crate::network::Network;
 use crate::ping::Pinging;
 
@@ -36,6 +39,12 @@ use crate::ping::Pinging;
 #[derive(Debug, Clone, Copy, PartialEq, smart_default::SmartDefault, Validate, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct HeartbeatConfig {
+    /// Maximum number of parallel probes performed by the heartbeat mechanism
+    #[validate(range(min = 0))]
+    #[default(default_max_parallel_pings())]
+    #[serde(default = "default_max_parallel_pings")]
+    pub max_parallel_probes: usize,
+
     /// Round-to-round variance to complicate network sync in seconds
     #[serde_as(as = "DurationSeconds<u64>")]
     #[serde(default = "default_heartbeat_variance")]
@@ -51,6 +60,11 @@ pub struct HeartbeatConfig {
     #[serde(default = "default_heartbeat_threshold")]
     #[default(default_heartbeat_threshold())]
     pub threshold: std::time::Duration,
+}
+
+#[inline]
+fn default_max_parallel_pings() -> usize {
+    DEFAULT_MAX_PARALLEL_PINGS
 }
 
 #[inline]
@@ -235,6 +249,7 @@ mod tests {
             variance: std::time::Duration::from_millis(0u64),
             interval: std::time::Duration::from_millis(5u64),
             threshold: std::time::Duration::from_millis(0u64),
+            max_parallel_probes: 14,
         }
     }
 
