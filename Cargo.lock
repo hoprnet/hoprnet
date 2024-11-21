@@ -4224,6 +4224,7 @@ dependencies = [
  "hopr-internal-types",
  "hopr-metrics",
  "hopr-parallelize",
+ "hopr-platform",
  "hopr-primitive-types",
  "lazy_static",
  "libp2p-identity",

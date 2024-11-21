@@ -21,6 +21,8 @@ use crate::errors::Result;
 use crate::ticket_manager::TicketManager;
 use crate::HoprDbAllOperations;
 
+pub const DEFAULT_PEERS_DB_PERSISTENCE_AFTER_RESTART_IN_SECONDS: u64 = 5 * 60; // 5 minutes
+
 #[derive(Debug, Clone, PartialEq, Eq, smart_default::SmartDefault)]
 pub struct HoprDbConfig {
     #[default(true)]
@@ -156,7 +158,22 @@ impl HoprDb {
 
         // Reset the peer network information
         let res = hopr_db_entity::network_peer::Entity::delete_many()
-            .filter(sea_orm::Condition::all())
+            .filter(
+                sea_orm::Condition::all().add(
+                    hopr_db_entity::network_peer::Column::LastSeen.lt(chrono::DateTime::<chrono::Utc>::from(
+                        hopr_platform::time::native::current_time()
+                            .checked_sub(std::time::Duration::from_secs(
+                                std::env::var("HOPR_INTERNAL_DB_PEERS_PERSISTENCE_AFTER_RESTART_IN_SECONDS")
+                                    .unwrap_or_else(|_| {
+                                        DEFAULT_PEERS_DB_PERSISTENCE_AFTER_RESTART_IN_SECONDS.to_string()
+                                    })
+                                    .parse::<u64>()
+                                    .unwrap_or(DEFAULT_PEERS_DB_PERSISTENCE_AFTER_RESTART_IN_SECONDS),
+                            ))
+                            .unwrap_or_else(|| hopr_platform::time::native::current_time()),
+                    )),
+                ),
+            )
             .exec(&peers_db)
             .await
             .map_err(|e| crate::errors::DbSqlError::Construction(format!("must reset peers on init: {e}")))?;
@@ -197,6 +214,7 @@ mod tests {
     use hopr_crypto_types::keypairs::{ChainKeypair, OffchainKeypair};
     use hopr_crypto_types::prelude::Keypair;
     use hopr_db_api::peers::{HoprDbPeersOperations, PeerOrigin};
+    use hopr_primitive_types::sma::SingleSumSMA;
     use libp2p_identity::PeerId;
     use migration::{MigratorChainLogs, MigratorIndex, MigratorPeers, MigratorTickets, MigratorTrait};
     use multiaddr::Multiaddr;
@@ -216,7 +234,7 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn test_peer_cleanup_on_database_start() -> anyhow::Result<()> {
+    async fn peers_without_any_recent_updates_should_be_discarded_on_restarts() -> anyhow::Result<()> {
         let random_filename: String = rand::thread_rng()
             .sample_iter(&Alphanumeric)
             .take(15)
@@ -248,6 +266,64 @@ mod tests {
             let not_found_peer = db.get_network_peer(&peer_id).await?;
 
             assert_eq!(not_found_peer, None);
+        }
+
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn peers_with_a_recent_update_should_be_retained_in_the_database() -> anyhow::Result<()> {
+        let random_filename: String = rand::thread_rng()
+            .sample_iter(&Alphanumeric)
+            .take(15)
+            .map(char::from)
+            .collect();
+        let random_tmp_file = format!("/tmp/{random_filename}.sqlite");
+
+        let ofk = OffchainKeypair::random();
+        let peer_id: PeerId = ofk.public().clone().into();
+        let ma_1: Multiaddr = format!("/ip4/127.0.0.1/tcp/10000/p2p/{peer_id}").parse()?;
+        let ma_2: Multiaddr = format!("/ip4/127.0.0.1/tcp/10002/p2p/{peer_id}").parse()?;
+
+        let path = std::path::Path::new(&random_tmp_file);
+
+        {
+            let db = HoprDb::new(&path, ChainKeypair::random(), crate::db::HoprDbConfig::default()).await?;
+
+            db.add_network_peer(
+                &peer_id,
+                PeerOrigin::IncomingConnection,
+                vec![ma_1.clone(), ma_2.clone()],
+                0.0,
+                25,
+            )
+            .await?;
+
+            let ten_seconds_ago = std::time::SystemTime::now() - std::time::Duration::from_secs(10);
+
+            db.update_network_peer(hopr_db_api::peers::PeerStatus {
+                id: (ofk.public().clone(), peer_id),
+                origin: PeerOrigin::Initialization,
+                is_public: true,
+                last_seen: ten_seconds_ago,
+                last_seen_latency: std::time::Duration::from_millis(10),
+                heartbeats_sent: 1,
+                heartbeats_succeeded: 1,
+                backoff: 1.0,
+                ignored: None,
+                peer_version: None,
+                multiaddresses: vec![ma_1.clone(), ma_2.clone()],
+                quality: 1.0,
+                quality_avg: SingleSumSMA::new(2),
+            })
+            .await?;
+        }
+        {
+            let db = HoprDb::new(&path, ChainKeypair::random(), crate::db::HoprDbConfig::default()).await?;
+
+            let found_peer = db.get_network_peer(&peer_id).await?.map(|p| p.id.1);
+
+            assert_eq!(found_peer, Some(peer_id));
         }
 
         Ok(())
