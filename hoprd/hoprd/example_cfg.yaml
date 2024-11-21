@@ -310,16 +310,24 @@ inbox:
   max_age: 900
   # Tags which are not allowed into the Inbox
   excluded_tags: [0]
-# Session Exit configuration for this node
+# Session Entry/Exit IP forwarding configuration for this node
 # This applies whenever the node is an Exit node of a Session.
-# exit:
+# session_ip_forwarding:
+#
 # List of IP address and port tuples (written as e.g.: "127.0.0.1:8080") which are allowed
 # to be targets of incoming Sessions.
 # If the value is not set, all targets are allowed (default).
 # For targets specifying a DNS name, the DNS resolution is performed first before the list is matched.
 # Production configuration should always use this allowlist, e.g.: target_allow_list: ["127.0.0.1:8080"]
 # target_allow_list:
+#
 # If the target is on TCP protocol, the Exit node can try to reach it this number of times.
 # max_tcp_target_retries: 10
+#
 # If a target on TCP protocol is retried to be reached, this is the delay in seconds between retries.
 # tcp_target_retry_delay: 2
+#
+# Specifies the default listen host for Session IP forwarding sockets.
+# This value is also used when the Session is opened with a partially specified listening host
+# to fill in the missing part.
+# default_entry_listen_host: 127.0.0.1:0
