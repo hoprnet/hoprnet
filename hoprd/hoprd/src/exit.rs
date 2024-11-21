@@ -3,10 +3,9 @@ use hopr_lib::{transfer_session, HoprOffchainKeypair};
 use hopr_network_types::prelude::ForeignDataMode;
 use hopr_network_types::udp::UdpStreamParallelism;
 use hoprd_api::{HOPR_TCP_BUFFER_SIZE, HOPR_UDP_BUFFER_SIZE, HOPR_UDP_QUEUE_SIZE};
-use serde_with::serde_as;
-use std::collections::HashSet;
 use std::net::SocketAddr;
-use std::time::Duration;
+
+use crate::config::SessionIpForwardingConfig;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -17,56 +16,16 @@ lazy_static::lazy_static! {
     ).unwrap();
 }
 
-fn ten() -> u32 {
-    10
-}
-
-fn default_target_retry_delay() -> Duration {
-    Duration::from_secs(2)
-}
-
-/// Configuration of [`HoprServerIpForwardingReactor`].
-#[serde_as]
-#[derive(
-    Clone, Debug, Eq, PartialEq, smart_default::SmartDefault, serde::Deserialize, serde::Serialize, validator::Validate,
-)]
-pub struct IpForwardingReactorConfig {
-    /// If specified, enforces only the given target addresses (after DNS resolution).
-    /// If `None` is specified, allows all targets.
-    ///
-    /// Defaults to `None`.
-    #[serde(default)]
-    #[default(None)]
-    #[serde_as(as = "Option<HashSet<serde_with::DisplayFromStr>>")]
-    pub target_allow_list: Option<HashSet<SocketAddr>>,
-
-    /// Delay between retries in seconds to reach a TCP target.
-    ///
-    /// Defaults to 2 seconds.
-    #[serde(default = "default_target_retry_delay")]
-    #[default(Duration::from_secs(2))]
-    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
-    pub tcp_target_retry_delay: Duration,
-
-    /// Maximum number of retries to reach a TCP target before giving up.
-    ///
-    /// Default is 10.
-    #[serde(default = "ten")]
-    #[default(10)]
-    #[validate(range(min = 1))]
-    pub max_tcp_target_retries: u32,
-}
-
 /// Implementation of [`hopr_lib::HoprSessionReactor`] that facilitates
 /// bridging of TCP or UDP sockets from the Session Exit node to a destination.
 #[derive(Debug, Clone)]
 pub struct HoprServerIpForwardingReactor {
     keypair: HoprOffchainKeypair,
-    cfg: IpForwardingReactorConfig,
+    cfg: SessionIpForwardingConfig,
 }
 
 impl HoprServerIpForwardingReactor {
-    pub fn new(keypair: HoprOffchainKeypair, cfg: IpForwardingReactorConfig) -> Self {
+    pub fn new(keypair: HoprOffchainKeypair, cfg: SessionIpForwardingConfig) -> Self {
         Self { keypair, cfg }
     }
 

@@ -118,6 +118,14 @@ pub struct CliArgs {
     pub api_port: Option<u16>,
 
     #[arg(
+        long,
+        env = "HOPRD_DEFAULT_SESSION_LISTEN_HOST",
+        help = "Default Session listening host for Session IP forwarding",
+        value_parser = ValueParser::new(parse_host),
+    )]
+    pub default_session_listen_host: Option<HostConfig>,
+
+    #[arg(
         long = "disableApiAuthentication",
         help = "Completely disables the token authentication for the API, overrides any apiToken if set",
         env = "HOPRD_DISABLE_API_AUTHENTICATION",
