@@ -186,6 +186,8 @@ hopr:
   # Configuration of the heartbeat mechanism for probing
   # other nodes in the HOPR network.
   heartbeat:
+    # The maximum number of concurrent heartbeat probes
+    max_parallel_probes: 14
     # Interval in which the heartbeat is triggered in seconds
     interval: 60
     # The time interval for which to consider peer heartbeat renewal in seconds
@@ -209,7 +211,7 @@ hopr:
     # Size of the quality moving average window.
     quality_avg_window_size: 25
     # Indicates how long (in seconds) a node is considered "ignored"
-    ignore_timeframe: 1
+    ignore_timeframe: 240
     # Backoff exponent when probing nodes
     backoff_exponent: 1.5
     # Minimum backoff (in seconds) when probing nodes
