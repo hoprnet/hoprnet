@@ -4203,7 +4203,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-sql"
-version = "0.8.1"
+version = "0.8.2"
 dependencies = [
  "anyhow",
  "async-lock 3.4.0",
@@ -4224,6 +4224,7 @@ dependencies = [
  "hopr-internal-types",
  "hopr-metrics",
  "hopr-parallelize",
+ "hopr-platform",
  "hopr-primitive-types",
  "lazy_static",
  "libp2p-identity",
