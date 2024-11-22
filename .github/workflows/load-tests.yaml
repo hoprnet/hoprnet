@@ -73,7 +73,7 @@ on:
         description: 'Virtual Users per route'
       rate:
         type: number
-        default: 50
+        default: 20
         required: true
         description: 'Messages per seconds per Virtual User per routes'
 
