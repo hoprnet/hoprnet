@@ -138,7 +138,7 @@ jobs:
       - name: Get Hoprd Api token
         id: token
         run: |
-          hoprdApiToken=$(kubectl get secret -n k6-operator-system -o json hoprd-api-tokens | jq --arg entry "${K6_CLUSTER_NODES}" -r '.data.${entry}' | base64 -d)
+          hoprdApiToken=$(kubectl get secret -n k6-operator-system -o json hoprd-api-tokens | jq --arg entry "${K6_CLUSTER_NODES}" -r '.data.[$entry]' | base64 -d)
           echo "HOPRD_API_TOKEN=${hoprdApiToken}" >> $GITHUB_ENV
 
       - name: Setup Load Testing environment
