@@ -10,7 +10,7 @@
 The `docker compose` deployment is multi-faceted, allowing different combinations of tooling and extensions and different types of usage for the deployment.
 
 - Clone this repository
-- Follow the guide to run a [Hopr node](https://docs.hoprnet.org/node/start-here)
+- Follow the guide to run a [Hopr node](https://docs.hoprnet.org/node/run-a-node-overview)
 - Copy the `.env.sample` file to `.env`, replacing placeholder values with your specific configurations.
 - Similarly, copy `.env-secrets.sample` to `.env-secrets` and ensure all sensitive configurations are securely set.
 - Update `./hoprd_data/hoprd.cfg.yaml` with your node configuration as guided by the onboarding process at [HOPR Staking Hub](https://hub.hoprnet.org).

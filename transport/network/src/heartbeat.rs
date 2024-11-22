@@ -6,6 +6,7 @@ use futures::{
 use hopr_db_api::peers::HoprDbPeersOperations;
 use hopr_primitive_types::traits::SaturatingSub;
 use libp2p_identity::PeerId;
+use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DurationSeconds};
 use validator::Validate;
@@ -27,7 +28,10 @@ lazy_static::lazy_static! {
 
 use hopr_platform::time::native::current_time;
 
-use crate::constants::{DEFAULT_HEARTBEAT_INTERVAL, DEFAULT_HEARTBEAT_INTERVAL_VARIANCE, DEFAULT_HEARTBEAT_THRESHOLD};
+use crate::constants::{
+    DEFAULT_HEARTBEAT_INTERVAL, DEFAULT_HEARTBEAT_INTERVAL_VARIANCE, DEFAULT_HEARTBEAT_THRESHOLD,
+    DEFAULT_MAX_PARALLEL_PINGS,
+};
 use crate::network::Network;
 use crate::ping::Pinging;
 
@@ -36,6 +40,12 @@ use crate::ping::Pinging;
 #[derive(Debug, Clone, Copy, PartialEq, smart_default::SmartDefault, Validate, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct HeartbeatConfig {
+    /// Maximum number of parallel probes performed by the heartbeat mechanism
+    #[validate(range(min = 0))]
+    #[default(default_max_parallel_pings())]
+    #[serde(default = "default_max_parallel_pings")]
+    pub max_parallel_probes: usize,
+
     /// Round-to-round variance to complicate network sync in seconds
     #[serde_as(as = "DurationSeconds<u64>")]
     #[serde(default = "default_heartbeat_variance")]
@@ -51,6 +61,11 @@ pub struct HeartbeatConfig {
     #[serde(default = "default_heartbeat_threshold")]
     #[default(default_heartbeat_threshold())]
     pub threshold: std::time::Duration,
+}
+
+#[inline]
+fn default_max_parallel_pings() -> usize {
+    DEFAULT_MAX_PARALLEL_PINGS
 }
 
 #[inline]
@@ -157,13 +172,17 @@ impl<T: Pinging, API: HeartbeatExternalApi> Heartbeat<T, API> {
 
     #[tracing::instrument(level = "info", skip(self), fields(from_timestamp = tracing::field::debug(current_time())))]
     async fn perform_heartbeat_round(&mut self) {
-        #[cfg(all(feature = "prometheus", not(test)))]
-        let heartbeat_round_timer = histogram_start_measure!(METRIC_TIME_TO_HEARTBEAT);
-
         let start = current_time();
         let from_timestamp = start.checked_sub(self.config.threshold).unwrap_or(start);
 
-        let peers = self.external_api.get_peers(from_timestamp).await;
+        let mut peers = self.external_api.get_peers(from_timestamp).await;
+
+        // shuffle the peers to make sure that the order is different each heartbeat round
+        let mut rng = hopr_crypto_random::rng();
+        peers.shuffle(&mut rng);
+
+        #[cfg(all(feature = "prometheus", not(test)))]
+        let heartbeat_round_timer = histogram_start_measure!(METRIC_TIME_TO_HEARTBEAT);
 
         // random timeout to avoid network sync:
         let this_round_planned_duration = std::time::Duration::from_millis({
@@ -235,6 +254,7 @@ mod tests {
             variance: std::time::Duration::from_millis(0u64),
             interval: std::time::Duration::from_millis(5u64),
             threshold: std::time::Duration::from_millis(0u64),
+            max_parallel_probes: 14,
         }
     }
 

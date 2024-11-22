@@ -27,10 +27,6 @@ on:
       target:
         required: true
         type: string
-      interpreter:
-        required: false
-        type: string
-        default: ''
 concurrency:
   group: ${{ github.ref }}-build-binary-${{ inputs.binary }}-${{ inputs.target }}
   cancel-in-progress: true
@@ -60,23 +56,11 @@ jobs:
         env:
           USER: runner
 
-      - name: Build ${{ inputs.binary }} binary
+      - name: Build ${{ inputs.binary }} binaries
         run: nix build .#${{inputs.binary}}${{ inputs.package_suffix }} -L
 
-      - name: Patch ${{ inputs.binary }} binary
-        if: ${{ inputs.interpreter != '' }}
-        run: nix-shell -I "nixpkgs=https://github.com/NixOS/nixpkgs/archive/refs/heads/nixos-24.05-small.zip" -p patchelf --command "patchelf --set-interpreter ${{ inputs.interpreter }} --output ${{ inputs.binary }}-patched ./result/bin/${{ inputs.binary }}"
-
-      - name: Upload ${{ inputs.binary }} binary
+      - name: Upload ${{ inputs.binary }} binaries
         uses: actions/upload-artifact@v4
-        if: ${{ inputs.interpreter == '' }}
         with:
           name: ${{ inputs.binary }}-${{ inputs.target }}
-          path: ${{ github.workspace }}/result/bin/${{ inputs.binary }}
-
-      - name: Upload ${{ inputs.binary }} patched binary
-        uses: actions/upload-artifact@v4
-        if: ${{ inputs.interpreter != '' }}
-        with:
-          name: ${{ inputs.binary }}-${{ inputs.target }}
-          path: ${{ github.workspace }}/${{ inputs.binary }}-patched
+          path: ${{ github.workspace }}/result/bin/*
