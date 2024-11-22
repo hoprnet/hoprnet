@@ -21,7 +21,7 @@ use crate::errors::Result;
 use crate::ticket_manager::TicketManager;
 use crate::HoprDbAllOperations;
 
-pub const DEFAULT_PEERS_DB_PERSISTENCE_AFTER_RESTART_IN_SECONDS: u64 = 5 * 60; // 5 minutes
+pub const HOPR_INTERNAL_DB_PEERS_PERSISTENCE_AFTER_RESTART_IN_SECONDS: u64 = 5 * 60; // 5 minutes
 
 #[derive(Debug, Clone, PartialEq, Eq, smart_default::SmartDefault)]
 pub struct HoprDbConfig {
@@ -165,10 +165,10 @@ impl HoprDb {
                             .checked_sub(std::time::Duration::from_secs(
                                 std::env::var("HOPR_INTERNAL_DB_PEERS_PERSISTENCE_AFTER_RESTART_IN_SECONDS")
                                     .unwrap_or_else(|_| {
-                                        DEFAULT_PEERS_DB_PERSISTENCE_AFTER_RESTART_IN_SECONDS.to_string()
+                                        HOPR_INTERNAL_DB_PEERS_PERSISTENCE_AFTER_RESTART_IN_SECONDS.to_string()
                                     })
                                     .parse::<u64>()
-                                    .unwrap_or(DEFAULT_PEERS_DB_PERSISTENCE_AFTER_RESTART_IN_SECONDS),
+                                    .unwrap_or(HOPR_INTERNAL_DB_PEERS_PERSISTENCE_AFTER_RESTART_IN_SECONDS),
                             ))
                             .unwrap_or_else(|| hopr_platform::time::native::current_time()),
                     )),
