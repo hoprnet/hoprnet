@@ -118,7 +118,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: hoprnet/hoprd-test
-          ref: main
+          ref: ausias/weboscket-bidirectional # main
 
       - name: Setup GCP
         id: gcp
