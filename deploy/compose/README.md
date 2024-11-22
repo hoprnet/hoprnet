@@ -30,6 +30,7 @@ The supported profiles are:
 - `metrics`: utilites exporting system, docker and node metrics
 - `metrics-push`: a utility cronjob to publish metrics to an external prometheus push gateway
 - `metrics-vis`: visualization tools for the metrics (containing the prometheus and grafana setup with default dashboards)
+- `tracing`: Enable Jaeger tracing to forward hopr traces to Jaeger
 
 Profiles should be specified as a list of `,` separated values in the `COMPOSE_PROFILES` environment variable.
 
