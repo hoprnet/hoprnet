@@ -170,7 +170,7 @@ impl HoprDb {
                                     .parse::<u64>()
                                     .unwrap_or(HOPR_INTERNAL_DB_PEERS_PERSISTENCE_AFTER_RESTART_IN_SECONDS),
                             ))
-                            .unwrap_or_else(|| hopr_platform::time::native::current_time()),
+                            .unwrap_or_else(hopr_platform::time::native::current_time),
                     )),
                 ),
             )
