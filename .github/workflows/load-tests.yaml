@@ -138,13 +138,13 @@ jobs:
       - name: Get Hoprd Api token
         id: token
         run: |
-          hoprdApiToken=$(kubectl get secret -n k6-operator-system -o json hoprd-api-tokens | jq -r '.data.${{ steps.vars.outputs.K6_CLUSTER_NODES }}' | base64 -d)
+          hoprdApiToken=$(kubectl get secret -n k6-operator-system -o json hoprd-api-tokens | jq -r '.data.${K6_CLUSTER_NODES}' | base64 -d)
           echo "HOPRD_API_TOKEN=${hoprdApiToken}" >> $GITHUB_ENV
 
       - name: Setup Load Testing environment
         run: |
           npm install
-          npm run setup:${{ steps.vars.outputs.topology }}
+          npm run setup:${K6_TOPOLOGY_NAME}
         working-directory: "./k6"
 
       - name: Run Load test
@@ -154,7 +154,7 @@ jobs:
           echo "Waiting for test to bootstrap..."
           sleep 2m # Wait for test to bootstrap
           echo "Waiting for test to finish..."
-          sleep ${{ steps.vars.outputs.DURATION }}m # wait for the test to finish
+          sleep ${K6_TEST_DURATION}m # wait for the test to finish
         working-directory: "./k6"
 
       - name: Collect Load test results
