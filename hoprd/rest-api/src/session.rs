@@ -71,15 +71,15 @@ impl std::str::FromStr for SessionTargetSpec {
     type Err = HoprLibError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if let Some(stripped) = s.strip_prefix("$$") {
-            Ok(Self::Sealed(
+        Ok(if let Some(stripped) = s.strip_prefix("$$") {
+            Self::Sealed(
                 base64::prelude::BASE64_URL_SAFE
                     .decode(stripped)
                     .map_err(|e| HoprLibError::GeneralError(e.to_string()))?,
-            ))
+            )
         } else {
-            Ok(Self::Plain(s.to_owned()))
-        }
+            Self::Plain(s.to_owned())
+        })
     }
 }
 
@@ -112,9 +112,9 @@ pub(crate) struct SessionWebsocketClientQueryRequest {
     #[schema(required = true)]
     #[serde_as(as = "Vec<DisplayFromStr>")]
     pub capabilities: Vec<SessionCapability>,
-    #[schema(required = false)]
-    #[serde_as(as = "Option<DisplayFromStr>")]
-    pub target: Option<SessionTargetSpec>,
+    #[schema(required = true)]
+    #[serde_as(as = "DisplayFromStr")]
+    pub target: SessionTargetSpec,
     #[schema(required = false)]
     #[serde(default = "default_protocol")]
     pub protocol: IpProtocol,
@@ -148,11 +148,7 @@ impl SessionWebsocketClientQueryRequest {
             peer: self.destination,
             path_options,
             target_protocol: self.protocol,
-            target: self.target.map(SealedHost::try_from).unwrap_or(
-                IpOrHost::from_str("127.0.0.1:4677")
-                    .map(SealedHost::Plain)
-                    .map_err(|e| HoprLibError::GeneralError(e.to_string())),
-            )?,
+            target: self.target.try_into()?,
             capabilities: self.capabilities,
         })
     }

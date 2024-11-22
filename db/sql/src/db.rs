@@ -177,7 +177,7 @@ impl HoprDb {
             .exec(&peers_db)
             .await
             .map_err(|e| crate::errors::DbSqlError::Construction(format!("must reset peers on init: {e}")))?;
-        debug!("Cleaned up {} rows from the 'peers' table", res.rows_affected);
+        debug!(rows = res.rows_affected, "Cleaned up rows from the 'peers' table");
 
         // Reset all BeingAggregated ticket states to Untouched
         ticket::Entity::update_many()
