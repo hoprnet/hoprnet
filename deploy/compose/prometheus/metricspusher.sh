@@ -1,13 +1,5 @@
 #!/bin/sh
 
-
-METRICS_PUSH_URL=${1}
-
-# Run the loop
-while true; do 
-    echo Publishing metrics ...
-#!/bin/sh
-
 # Validate required environment variables
 if [ -z "${HOPRD_API_TOKEN}" ]; then
     echo "Error: HOPRD_API_TOKEN is not set"
@@ -39,7 +31,5 @@ while true; do
     if ! echo "${metrics}" | curl -s --max-time 10 --data-binary @- "${METRICS_PUSH_URL}"; then
         echo "Error: Failed to push metrics to ${METRICS_PUSH_URL}"
     fi
-    sleep 15
-done
     sleep 15
 done
