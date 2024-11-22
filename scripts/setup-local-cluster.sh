@@ -152,6 +152,7 @@ function setup_node() {
   if [[ "${HOPRD_DISABLE_API_AUTHENTICATION:-1}" == 0 ]]; then
       api_token_params="${api_token_params} --apiToken ${api_token}"
   fi
+  # shellcheck disable=SC2086
   env \
     TOKIO_CONSOLE_BIND=localhost:$((api_port + 100)) \
     RUST_LOG="debug,libp2p_mplex=info,multistream_select=info,isahc=error,sea_orm=warn,sqlx=warn,hyper_util=warn,libp2p_tcp=info,libp2p_dns=info" \
@@ -164,7 +165,7 @@ function setup_node() {
       --identity="${id_file}" \
       --init \
       --password="${password}" \
-      "${api_token_params}" \
+      ${api_token_params} \
       --apiHost "${host}" \
       --apiPort "${api_port}" \
       --testAnnounceLocalAddresses \

@@ -46,7 +46,7 @@ impl Default for HostType {
 ///
 /// This is used for the P2P and REST API listeners.
 ///
-/// Intentionally has no default, because it depends on the use case.
+/// Intentionally has no default because it depends on the use case.
 #[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct HostConfig {

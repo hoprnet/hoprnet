@@ -47,14 +47,14 @@ async fn build_p2p_network(
     protocol_cfg: ProtocolConfig,
 ) -> Result<libp2p::Swarm<HoprNetworkBehavior>> {
     let tcp_upgrade = libp2p::core::upgrade::SelectUpgrade::new(
-        if let Ok(num_streams) = std::env::var("HOPR_INTERNAL_LIBP2P_YAMUX_MAX_NUM_STREAMS")
-            .and_then(|v| v.parse::<usize>().map_err(|_e| std::env::VarError::NotPresent))
         {
+            let num_streams = std::env::var("HOPR_INTERNAL_LIBP2P_YAMUX_MAX_NUM_STREAMS")
+                .and_then(|v| v.parse::<usize>().map_err(|_e| std::env::VarError::NotPresent))
+                .unwrap_or(1024);
+
             let mut cfg = libp2p::yamux::Config::default();
             cfg.set_max_num_streams(num_streams);
             cfg
-        } else {
-            libp2p::yamux::Config::default()
         },
         libp2p_mplex::MplexConfig::new()
             .set_max_num_streams(1024)

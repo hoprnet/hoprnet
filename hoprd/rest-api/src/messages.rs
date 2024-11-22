@@ -169,7 +169,8 @@ pub(super) async fn send_message(
         return Err((
             StatusCode::UNPROCESSABLE_ENTITY,
             ApiErrorStatus::InvalidPath("explicit paths are not allowed".into()),
-        ));
+        )
+            .into_response());
     }
 
     let options = if let Some(intermediate_path) = args.path {
