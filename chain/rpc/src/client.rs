@@ -22,7 +22,7 @@ use std::io::{BufWriter, Write};
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
-use tracing::{debug, trace, warn};
+use tracing::{debug, error, trace, warn};
 use validator::Validate;
 
 use hopr_async_runtime::prelude::sleep;
@@ -174,7 +174,7 @@ impl RetryPolicy<JsonRpcProviderClientError> for SimpleJsonRpcRetryPolicy {
             return NoRetry;
         }
 
-        debug!("retry queue size is {retry_queue_size}");
+        debug!(size = retry_queue_size, "checking retryable error retry queue size");
 
         if retry_queue_size > self.max_retry_queue_size {
             warn!(
@@ -192,14 +192,14 @@ impl RetryPolicy<JsonRpcProviderClientError> for SimpleJsonRpcRetryPolicy {
 
         // Retry if a global minimum of number of retries was given and wasn't yet attained
         if self.min_retries.is_some_and(|min| num_retries <= min) {
-            debug!("retrying because {num_retries} is not yet minimum number of retries");
+            debug!(num_retries, min_retries = ?self.min_retries,  "retrying because minimum number of retries not yet reached");
             return RetryAfter(backoff);
         }
 
         match err {
             // Retryable JSON RPC errors are retries with backoff
             JsonRpcProviderClientError::JsonRpcError(e) if self.is_retryable_json_rpc_error(e) => {
-                debug!("encountered retryable JSON RPC error code: {e}");
+                debug!(error = ?e, "encountered retryable JSON RPC error code");
                 RetryAfter(backoff)
             }
 
@@ -207,7 +207,7 @@ impl RetryPolicy<JsonRpcProviderClientError> for SimpleJsonRpcRetryPolicy {
             JsonRpcProviderClientError::BackendError(HttpRequestError::HttpError(e))
                 if self.is_retryable_http_error(e) =>
             {
-                debug!("encountered retryable HTTP error code: {e}");
+                debug!(error = ?e, "encountered retryable HTTP error code");
                 RetryAfter(backoff)
             }
 
@@ -215,7 +215,7 @@ impl RetryPolicy<JsonRpcProviderClientError> for SimpleJsonRpcRetryPolicy {
             JsonRpcProviderClientError::BackendError(e @ HttpRequestError::Timeout)
             | JsonRpcProviderClientError::BackendError(e @ HttpRequestError::TransportError(_))
             | JsonRpcProviderClientError::BackendError(e @ HttpRequestError::UnknownError(_)) => {
-                debug!("encountered retryable transport error: {e}");
+                debug!(error = ?e, "encountered retryable transport error");
                 RetryAfter(if self.backoff_on_transport_errors {
                     backoff
                 } else {
@@ -232,11 +232,11 @@ impl RetryPolicy<JsonRpcProviderClientError> for SimpleJsonRpcRetryPolicy {
 
                 match serde_json::from_str::<Resp>(text) {
                     Ok(Resp { error }) if self.is_retryable_json_rpc_error(&error) => {
-                        debug!("encountered retryable JSON RPC error: {error}");
+                        debug!(%error, "encountered retryable JSON RPC error");
                         RetryAfter(backoff)
                     }
                     _ => {
-                        debug!("unparseable JSON RPC error: {text}");
+                        debug!(error = ?text, "unparseable JSON RPC error");
                         NoRetry
                     }
                 }
@@ -420,14 +420,17 @@ where
                         #[cfg(all(feature = "prometheus", not(test)))]
                         METRIC_RETRIES_PER_RPC_CALL.observe(&[method], num_retries as f64);
 
-                        debug!(
-                            elapsed_in_ms = start.elapsed().as_millis(),
-                            "request {method} succeeded",
-                        );
+                        debug!(method, elapsed_in_ms = start.elapsed().as_millis(), "request succeeded",);
                         return Ok(ret);
                     }
                     Err(req_err) => {
                         err = req_err;
+                        error!(
+                            method,
+                            elapsed_in_ms = start.elapsed().as_millis(),
+                            error = ?err,
+                            "request failed",
+                        );
                         num_retries += 1;
                     }
                 }
@@ -452,7 +455,7 @@ where
                     return Err(err);
                 }
                 RetryAfter(backoff) => {
-                    warn!(method, backoff_in_ms = backoff.as_millis(), "RPC call will retry",);
+                    warn!(method, backoff_in_ms = backoff.as_millis(), "request will retry",);
                     sleep(backoff).await
                 }
             }

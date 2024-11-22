@@ -11,7 +11,7 @@ use async_stream::stream;
 use async_trait::async_trait;
 use ethers::providers::{JsonRpcClient, Middleware};
 use futures::stream::BoxStream;
-use futures::{Stream, StreamExt, TryStreamExt};
+use futures::{Stream, StreamExt};
 use std::pin::Pin;
 use tracing::{debug, error, trace, warn};
 
@@ -140,25 +140,34 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                             }
                         }
 
+
                         #[cfg(all(feature = "prometheus", not(test)))]
                         METRIC_RPC_CHAIN_HEAD.set(latest_block as f64);
 
                         let mut retrieved_logs = self.stream_logs(filter.clone(), from_block, latest_block);
 
-                        let mut current_block_log = BlockWithLogs { block_id: from_block, ..Default::default()};
                         trace!(from_block, to_block = latest_block, "processing batch");
+
+                        let mut current_block_log = BlockWithLogs { block_id: from_block, ..Default::default()};
+
                         loop {
-                            match retrieved_logs.try_next().await {
-                                Ok(Some(log)) => {
+                            match retrieved_logs.next().await {
+                                Some(Ok(log)) => {
                                     // This in general should not happen, but handle such a case to be safe
                                     if log.block_number > latest_block {
                                         warn!(%log, latest_block, "got log that has not yet reached the finalized tip");
                                         break;
                                     }
 
+                                    // This should not happen, thus panic.
+                                    if current_block_log.block_id > log.block_number {
+                                        error!(log_block_id = log.block_number, current_block_log.block_id, "received log from a previous block");
+                                        panic!("The on-chain logs are not ordered by block number. This is a critical error.");
+                                    }
+
                                     // This assumes the logs are arriving ordered by blocks when fetching a range
-                                    if current_block_log.block_id != log.block_number {
-                                        debug!("completed {current_block_log}");
+                                    if current_block_log.block_id < log.block_number {
+                                        debug!(block = %current_block_log, "completed block, moving to next");
                                         yield current_block_log;
 
                                         current_block_log = BlockWithLogs::default();
@@ -168,11 +177,10 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                                     debug!("retrieved {log}");
                                     current_block_log.logs.insert(log.into());
                                 },
-                                Ok(None) => {
-                                    trace!(from_block, to_block=latest_block, "done processing batch");
+                                None => {
                                     break;
                                 },
-                                Err(e) => {
+                                Some(Err(e)) => {
                                     error!(error=%e, "failed to process blocks");
                                     count_failures += 1;
 
@@ -194,7 +202,7 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                         }
 
                         // Yield everything we've collected until this point
-                        debug!("completed {current_block_log}");
+                        debug!(block = %current_block_log, "completed block, processing batch finished");
                         yield current_block_log;
                         from_block = latest_block + 1;
                         count_failures = 0;
