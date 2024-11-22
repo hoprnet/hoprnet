@@ -535,8 +535,8 @@ fn to_api_message(data: hopr_lib::ApplicationData, received_at: Duration) -> Res
         tag = "Messages"
     )]
 pub(super) async fn pop(
-    Query(TagQueryRequest { tag }): Query<TagQueryRequest>,
     State(state): State<Arc<InternalState>>,
+    Json(TagQueryRequest { tag }): Json<TagQueryRequest>,
 ) -> impl IntoResponse {
     if let Some(tag) = tag {
         if tag < RESERVED_TAG_UPPER_LIMIT {
@@ -586,8 +586,8 @@ pub(crate) struct MessagePopAllResponse {
         tag = "Messages"
     )]
 pub(super) async fn pop_all(
-    Query(TagQueryRequest { tag }): Query<TagQueryRequest>,
     State(state): State<Arc<InternalState>>,
+    Json(TagQueryRequest { tag }): Json<TagQueryRequest>,
 ) -> impl IntoResponse {
     if let Some(tag) = tag {
         if tag < RESERVED_TAG_UPPER_LIMIT {
@@ -638,8 +638,8 @@ pub(super) async fn pop_all(
         tag = "Messages"
     )]
 pub(super) async fn peek(
-    Query(TagQueryRequest { tag }): Query<TagQueryRequest>,
     State(state): State<Arc<InternalState>>,
+    Json(TagQueryRequest { tag }): Json<TagQueryRequest>,
 ) -> impl IntoResponse {
     if let Some(tag) = tag {
         if tag < RESERVED_TAG_UPPER_LIMIT {
