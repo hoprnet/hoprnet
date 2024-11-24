@@ -215,7 +215,7 @@ impl RetryPolicy<JsonRpcProviderClientError> for SimpleJsonRpcRetryPolicy {
             JsonRpcProviderClientError::BackendError(e @ HttpRequestError::Timeout)
             | JsonRpcProviderClientError::BackendError(e @ HttpRequestError::TransportError(_))
             | JsonRpcProviderClientError::BackendError(e @ HttpRequestError::UnknownError(_)) => {
-                debug!(error = ?e, "encountered retryable transport error");
+                debug!(error = %e, "encountered retryable transport error");
                 RetryAfter(if self.backoff_on_transport_errors {
                     backoff
                 } else {
@@ -236,7 +236,7 @@ impl RetryPolicy<JsonRpcProviderClientError> for SimpleJsonRpcRetryPolicy {
                         RetryAfter(backoff)
                     }
                     _ => {
-                        debug!(error = ?text, "unparseable JSON RPC error");
+                        debug!(error = %text, "unparseable JSON RPC error");
                         NoRetry
                     }
                 }
@@ -428,7 +428,7 @@ where
                         error!(
                             method,
                             elapsed_in_ms = start.elapsed().as_millis(),
-                            error = ?err,
+                            error = %err,
                             "request failed",
                         );
                         num_retries += 1;
