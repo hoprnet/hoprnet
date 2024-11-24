@@ -21,7 +21,8 @@ EXTRA_HEADERS = [("X-Auth-Token", API_TOKEN)]
 DEFAULT_ARGS = [
     ("hops", 0),
     ("capabilities", "Segmentation"),
-    ("capabilities", "Retransmission")
+    ("capabilities", "Retransmission"),
+    ("target", "127.0.0.1:4677")
 ]
 
 

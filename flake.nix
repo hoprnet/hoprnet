@@ -36,6 +36,7 @@
       ];
       perSystem = { config, lib, self', inputs', system, ... }:
         let
+          rev = toString (self.shortRev or self.dirtyShortRev);
           fs = lib.fileset;
           localSystem = system;
           overlays = [ (import rust-overlay) foundry.overlay solc.overlay ];
@@ -118,7 +119,7 @@
           };
 
           hoprdBuildArgs = {
-            inherit src depsSrc;
+            inherit src depsSrc rev;
             cargoExtraArgs = "-p hoprd-api";
             cargoToml = ./hoprd/hoprd/Cargo.toml;
           };
@@ -147,7 +148,7 @@
           });
 
           hopliBuildArgs = {
-            inherit src depsSrc;
+            inherit src depsSrc rev;
             cargoToml = ./hopli/Cargo.toml;
             postInstall = ''
               mkdir -p $out/ethereum/contracts

@@ -1281,7 +1281,7 @@ dependencies = [
 
 [[package]]
 name = "chain-indexer"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "anyhow",
  "async-channel 2.3.1",
@@ -1644,7 +1644,7 @@ checksum = "773648b94d0e5d620f64f280777445740e61fe701025087ec8b57f45c791888b"
 
 [[package]]
 name = "core-network"
-version = "0.6.2"
+version = "0.6.4"
 dependencies = [
  "anyhow",
  "async-std",
@@ -1665,6 +1665,7 @@ dependencies = [
  "mockall",
  "more-asserts",
  "multiaddr",
+ "rand 0.8.5",
  "serde",
  "serde_with",
  "smart-default",
@@ -4202,7 +4203,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-sql"
-version = "0.8.1"
+version = "0.8.2"
 dependencies = [
  "anyhow",
  "async-lock 3.4.0",
@@ -4223,6 +4224,7 @@ dependencies = [
  "hopr-internal-types",
  "hopr-metrics",
  "hopr-parallelize",
+ "hopr-platform",
  "hopr-primitive-types",
  "lazy_static",
  "libp2p-identity",
@@ -4465,7 +4467,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "async-lock 3.4.0",
  "async-std",
@@ -4503,7 +4505,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-p2p"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "anyhow",
  "async-std",
@@ -4527,7 +4529,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-protocol"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "anyhow",
  "async-lock 3.4.0",
@@ -4648,7 +4650,7 @@ dependencies = [
 
 [[package]]
 name = "hoprd-api"
-version = "3.6.1"
+version = "3.7.1"
 dependencies = [
  "anyhow",
  "async-broadcast",

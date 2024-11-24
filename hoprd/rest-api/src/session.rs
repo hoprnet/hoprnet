@@ -33,9 +33,6 @@ use hopr_network_types::prelude::{ConnectedUdpStream, IpOrHost, SealedHost, UdpS
 use hopr_network_types::udp::ForeignDataMode;
 use hopr_network_types::utils::AsyncReadStreamer;
 
-/// Default listening host the session listener socket binds to.
-pub const DEFAULT_LISTEN_HOST: &str = "127.0.0.1:0";
-
 /// Size of the buffer for forwarding data to/from a TCP stream.
 pub const HOPR_TCP_BUFFER_SIZE: usize = 4096;
 
@@ -74,15 +71,15 @@ impl std::str::FromStr for SessionTargetSpec {
     type Err = HoprLibError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if let Some(stripped) = s.strip_prefix("$$") {
-            Ok(Self::Sealed(
+        Ok(if let Some(stripped) = s.strip_prefix("$$") {
+            Self::Sealed(
                 base64::prelude::BASE64_URL_SAFE
                     .decode(stripped)
                     .map_err(|e| HoprLibError::GeneralError(e.to_string()))?,
-            ))
+            )
         } else {
-            Ok(Self::Plain(s.to_owned()))
-        }
+            Self::Plain(s.to_owned())
+        })
     }
 }
 
@@ -115,9 +112,9 @@ pub(crate) struct SessionWebsocketClientQueryRequest {
     #[schema(required = true)]
     #[serde_as(as = "Vec<DisplayFromStr>")]
     pub capabilities: Vec<SessionCapability>,
-    #[schema(required = false)]
-    #[serde_as(as = "Option<DisplayFromStr>")]
-    pub target: Option<SessionTargetSpec>,
+    #[schema(required = true)]
+    #[serde_as(as = "DisplayFromStr")]
+    pub target: SessionTargetSpec,
     #[schema(required = false)]
     #[serde(default = "default_protocol")]
     pub protocol: IpProtocol,
@@ -151,11 +148,7 @@ impl SessionWebsocketClientQueryRequest {
             peer: self.destination,
             path_options,
             target_protocol: self.protocol,
-            target: self.target.map(SealedHost::try_from).unwrap_or(
-                IpOrHost::from_str("127.0.0.1:4677")
-                    .map(SealedHost::Plain)
-                    .map_err(|e| HoprLibError::GeneralError(e.to_string())),
-            )?,
+            target: self.target.try_into()?,
             capabilities: self.capabilities,
         })
     }
@@ -302,12 +295,22 @@ async fn websocket_connection(socket: WebSocket, session: HoprSession) {
     }))]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct SessionClientRequest {
+    /// Peer ID of the Exit node.
     #[serde_as(as = "DisplayFromStr")]
     pub destination: PeerOrAddress,
+    /// HOPR routing options for the Session.
     pub path: RoutingOptions,
+    /// Session target specification.
     pub target: SessionTargetSpec,
+    /// Listen host (`ip:port`) for the Session socket at the Entry node.
+    ///
+    /// Supports also partial specification (only `ip` or only `:port`) with the
+    /// respective part replaced by the node's configured default.
     pub listen_host: Option<String>,
     #[serde_as(as = "Option<Vec<DisplayFromStr>>")]
+    /// Capabilities for the Session protocol.
+    ///
+    /// Defaults to `Segmentation` and `Retransmission` for TCP and nothing for UDP.
     pub capabilities: Option<Vec<SessionCapability>>,
 }
 
@@ -361,7 +364,35 @@ pub(crate) struct SessionClientResponse {
     pub port: u16,
 }
 
-/// Creates a new client session returning the given session listening host & port over TCP or UDP.
+/// This function first tries to parse `requested` as the `ip:port` host pair.
+/// If that does not work, it tries to parse `requested` as a single IP address
+/// and as a `:` prefixed port number. Whichever of those fails, is replaced by the corresponding
+/// part from the given `default`.
+fn build_binding_host(requested: Option<&str>, default: std::net::SocketAddr) -> std::net::SocketAddr {
+    match requested.map(|r| std::net::SocketAddr::from_str(r).map_err(|_| r)) {
+        Some(Err(requested)) => {
+            // If the requested host is not parseable as a whole as `SocketAddr`, try only its parts
+            debug!(requested, %default, "using partially default listen host");
+            std::net::SocketAddr::new(
+                requested.parse().unwrap_or(default.ip()),
+                requested
+                    .strip_prefix(":")
+                    .and_then(|p| u16::from_str(p).ok())
+                    .unwrap_or(default.port()),
+            )
+        }
+        Some(Ok(requested)) => {
+            debug!(%requested, "using requested listen host");
+            requested
+        }
+        None => {
+            debug!(%default, "using default listen host");
+            default
+        }
+    }
+}
+
+/// Creates a new client session returning the given session listening host and port over TCP or UDP.
 /// If no listening port is given in the request, the socket will be bound to a random free
 /// port and returned in the response.
 /// Different capabilities can be configured for the session, such as data segmentation or
@@ -405,17 +436,7 @@ pub(crate) async fn create_client(
     Path(protocol): Path<IpProtocol>,
     Json(args): Json<SessionClientRequest>,
 ) -> Result<impl IntoResponse, impl IntoResponse> {
-    let bind_host: std::net::SocketAddr = args
-        .listen_host
-        .clone()
-        .unwrap_or(DEFAULT_LISTEN_HOST.to_string())
-        .parse()
-        .map_err(|_| {
-            (
-                StatusCode::UNPROCESSABLE_ENTITY,
-                ApiErrorStatus::UnknownFailure("invalid listening host".into()),
-            )
-        })?;
+    let bind_host: std::net::SocketAddr = build_binding_host(args.listen_host.as_deref(), state.default_listen_host);
 
     if bind_host.port() > 0
         && state
@@ -919,5 +940,28 @@ mod tests {
         }
 
         Ok(())
+    }
+
+    #[test]
+    fn test_build_binding_address() {
+        let default = "10.0.0.1:10000".parse().unwrap();
+
+        let result = build_binding_host(Some("127.0.0.1:10000"), default);
+        assert_eq!(result, "127.0.0.1:10000".parse::<std::net::SocketAddr>().unwrap());
+
+        let result = build_binding_host(None, default);
+        assert_eq!(result, "10.0.0.1:10000".parse::<std::net::SocketAddr>().unwrap());
+
+        let result = build_binding_host(Some("127.0.0.1"), default);
+        assert_eq!(result, "127.0.0.1:10000".parse::<std::net::SocketAddr>().unwrap());
+
+        let result = build_binding_host(Some(":1234"), default);
+        assert_eq!(result, "10.0.0.1:1234".parse::<std::net::SocketAddr>().unwrap());
+
+        let result = build_binding_host(Some(":"), default);
+        assert_eq!(result, "10.0.0.1:10000".parse::<std::net::SocketAddr>().unwrap());
+
+        let result = build_binding_host(Some(""), default);
+        assert_eq!(result, "10.0.0.1:10000".parse::<std::net::SocketAddr>().unwrap());
     }
 }

@@ -160,6 +160,20 @@ where
 {
     let mut processes = HashMap::new();
 
+    #[cfg(all(feature = "prometheus", not(test)))]
+    {
+        // Initialize the lazy statics here
+        lazy_static::initialize(&METRIC_RECEIVED_ACKS);
+        lazy_static::initialize(&METRIC_SENT_ACKS);
+        lazy_static::initialize(&METRIC_TICKETS_COUNT);
+        lazy_static::initialize(&METRIC_PACKET_COUNT);
+        lazy_static::initialize(&METRIC_PACKET_COUNT_PER_PEER);
+        lazy_static::initialize(&METRIC_REPLAYED_PACKET_COUNT);
+        lazy_static::initialize(&METRIC_REJECTED_TICKETS_COUNT);
+        lazy_static::initialize(&METRIC_QUEUE_SIZE);
+        lazy_static::initialize(&METRIC_MIXER_AVERAGE_DELAY);
+    }
+
     let tbf = if let Some(bloom_filter_persistent_path) = bloom_filter_persistent_path {
         let tbf = bloom::WrappedTagBloomFilter::new(bloom_filter_persistent_path);
         let tbf_2 = tbf.clone();
@@ -210,7 +224,6 @@ where
                             METRIC_TICKETS_COUNT.increment(&["losing"]);
                         }
                         Err(_e) => {
-                            #[cfg(all(feature = "prometheus", not(test)))]
                             METRIC_RECEIVED_ACKS.increment(&["false"]);
                         }
                     }

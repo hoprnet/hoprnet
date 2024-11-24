@@ -4,7 +4,10 @@ use futures::{stream, StreamExt, TryStreamExt};
 use sea_orm::entity::Set;
 use sea_orm::query::QueryTrait;
 use sea_orm::sea_query::{Expr, OnConflict, Value};
-use sea_orm::{ColumnTrait, EntityTrait, FromQueryResult, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, EntityTrait, FromQueryResult, IntoActiveModel, PaginatorTrait, QueryFilter,
+    QueryOrder, QuerySelect,
+};
 use tracing::{error, trace};
 
 use hopr_crypto_types::prelude::Hash;
@@ -159,19 +162,14 @@ impl HoprDbLogOperations for HoprDb {
         let min_block_number = block_number.unwrap_or(0);
         let max_block_number = block_offset.map(|v| min_block_number + v + 1);
 
-        let query = Log::find()
+        Log::find()
             .filter(log::Column::BlockNumber.gte(min_block_number.to_be_bytes().to_vec()))
             .apply_if(max_block_number, |q, v| {
                 q.filter(log::Column::BlockNumber.lt(v.to_be_bytes().to_vec()))
             })
-            .order_by_asc(log::Column::BlockNumber)
-            .order_by_asc(log::Column::TransactionIndex)
-            .order_by_asc(log::Column::LogIndex);
-
-        match query.count(self.conn(TargetDb::Logs)).await {
-            Ok(count) => Ok(count),
-            Err(e) => Err(DbError::from(DbSqlError::from(e))),
-        }
+            .count(self.conn(TargetDb::Logs))
+            .await
+            .map_err(|e| DbSqlError::from(e).into())
     }
 
     async fn get_logs_block_numbers<'a>(
@@ -277,7 +275,7 @@ impl HoprDbLogOperations for HoprDb {
             .order_by_desc(log_status::Column::LogIndex)
             .find_also_related(Log);
 
-        match query.clone().one(self.conn(TargetDb::Logs)).await {
+        match query.one(self.conn(TargetDb::Logs)).await {
             Ok(Some((status, Some(log)))) => {
                 if let Ok(slog) = create_log(log, status) {
                     Ok(Some(slog))
@@ -291,15 +289,22 @@ impl HoprDbLogOperations for HoprDb {
     }
 
     async fn update_logs_checksums(&self) -> Result<()> {
-        let last_log = self.get_last_checksummed_log().await?;
-        let mut last_checksum = last_log.map_or(Hash::default(), |log| {
-            Hash::from_hex(log.checksum.unwrap().as_str()).unwrap()
-        });
-        let db_tx = self.nest_transaction_in_db(None, TargetDb::Logs).await?;
-
-        db_tx
+        self.nest_transaction_in_db(None, TargetDb::Logs)
+            .await?
             .perform(|tx| {
                 Box::pin(async move {
+                    let mut last_checksum = LogStatus::find()
+                        .filter(log_status::Column::Checksum.is_not_null())
+                        .order_by_desc(log_status::Column::BlockNumber)
+                        .order_by_desc(log_status::Column::TransactionIndex)
+                        .order_by_desc(log_status::Column::LogIndex)
+                        .one(tx.as_ref())
+                        .await
+                        .map_err(|e| DbError::from(DbSqlError::from(e)))?
+                        .and_then(|m| m.checksum)
+                        .and_then(|c| Hash::try_from(c.as_slice()).ok())
+                        .unwrap_or_default();
+
                     let query = LogStatus::find()
                         .filter(log_status::Column::Checksum.is_null())
                         .order_by_asc(log_status::Column::BlockNumber)
@@ -312,19 +317,20 @@ impl HoprDbLogOperations for HoprDb {
                             let mut entries = entries.into_iter();
                             while let Some((status, Some(log_entry))) = entries.next() {
                                 let slog = create_log(log_entry.clone(), status.clone())?;
-                                // we compute the has of a single log as a combination of the block
-                                // hash, tx hash and log index
+                                // we compute the hash of a single log as a combination of the block
+                                // hash, TX hash, and the log index
                                 let log_hash = Hash::create(&[
                                     log_entry.block_hash.as_slice(),
                                     log_entry.transaction_hash.as_slice(),
                                     log_entry.log_index.as_slice(),
                                 ]);
+
                                 let next_checksum = Hash::create(&[last_checksum.as_ref(), log_hash.as_ref()]);
-                                let updated_status = log_status::ActiveModel {
-                                    checksum: Set(Some(next_checksum.as_ref().to_vec())),
-                                    ..status.into()
-                                };
-                                match LogStatus::update(updated_status).exec(tx.as_ref()).await {
+
+                                let mut updated_status = status.into_active_model();
+                                updated_status.checksum = Set(Some(next_checksum.as_ref().to_vec()));
+
+                                match updated_status.update(tx.as_ref()).await {
                                     Ok(_) => {
                                         last_checksum = next_checksum;
                                         trace!("Generated log checksum {next_checksum} @ {slog}");
