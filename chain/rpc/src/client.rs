@@ -174,7 +174,10 @@ impl RetryPolicy<JsonRpcProviderClientError> for SimpleJsonRpcRetryPolicy {
             return NoRetry;
         }
 
-        debug!(size = retry_queue_size, "checking retryable error retry queue size");
+        debug!(
+            size = retry_queue_size,
+            "checking retry queue size after retryable error"
+        );
 
         if retry_queue_size > self.max_retry_queue_size {
             warn!(
@@ -199,7 +202,7 @@ impl RetryPolicy<JsonRpcProviderClientError> for SimpleJsonRpcRetryPolicy {
         match err {
             // Retryable JSON RPC errors are retries with backoff
             JsonRpcProviderClientError::JsonRpcError(e) if self.is_retryable_json_rpc_error(e) => {
-                debug!(error = ?e, "encountered retryable JSON RPC error code");
+                debug!(error = %e, "encountered retryable JSON RPC error code");
                 RetryAfter(backoff)
             }
 
