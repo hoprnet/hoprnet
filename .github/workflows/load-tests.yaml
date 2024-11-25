@@ -10,7 +10,10 @@ on:
       test_id:
         type: string
         required: true
-      nodes:
+      cluster_nodes:
+        type: string
+        required: true
+      topology:
         type: string
         required: true
       workload:
@@ -20,7 +23,10 @@ on:
         type: number
         required: true
       rate:
-        type: string
+        type: number
+        required: true
+      vu:
+        type: number
         required: true
   workflow_dispatch:
     inputs:
@@ -28,16 +34,23 @@ on:
         type: string
         required: true
         description: 'Test name'
-      nodes:
+      cluster_nodes:
         type: choice
         options:
-          - rotsee
-          - dufour
+          - core
+          - uhttp
           - team
-          - relayer
-          - sender
         required: true
-        description: 'hoprd nodes setup'
+        description: 'Cluster of nodes to test'
+      topology:
+        type: choice
+        options:
+          - many2many
+          - sender
+          - relayer
+          - receiver
+        required: true
+        description: 'Nodes channel topology'
       workload:
         type: choice
         options:
@@ -53,11 +66,17 @@ on:
         default: 30
         required: true
         description: 'Test duration in minutes'
-      rate:
-        type: string
-        default: "200"
+      vu:
+        type: number
+        default: 1
         required: true
-        description: 'Number of messages per seconds'
+        description: 'Virtual Users per route'
+      rate:
+        type: number
+        default: 20
+        required: true
+        description: 'Messages per seconds per Virtual User per routes'
+
 
 concurrency:
   group: load-tests
@@ -74,28 +93,32 @@ jobs:
           if [ -z "${{ github.event.inputs.test_id }}" ]; then
             echo "The workflow is triggered by other pipeline"
             {
-              echo "NODES=${{ inputs.nodes }}"
-              echo "WORKLOAD_NAME=${{ inputs.workload }}"
-              echo "SCENARIO_ITERATIONS=${{ github.event.inputs.rate }}"
               echo "TESTID=${{ inputs.test_id }}"
-              echo "SCENARIO_DURATION=${{ inputs.duration }}"
-            } >> $GITHUB_OUTPUT
+              echo "K6_CLUSTER_NODES=${{ inputs.cluster_nodes }}"
+              echo "K6_TOPOLOGY_NAME=${{ inputs.topology }}"
+              echo "K6_WORKLOAD_NAME=${{ inputs.workload }}"
+              echo "K6_TEST_DURATION=${{ inputs.duration }}"
+              echo "K6_VU_PER_ROUTE=${{ inputs.vu }}"
+              echo "K6_REQUESTS_PER_SECOND_PER_VU=${{inputs.rate }}"
+            } >> $GITHUB_ENV
           else
             echo "The workflow is triggered manually"
             {
-              echo "NODES=${{ github.event.inputs.nodes }}"
-              echo "WORKLOAD_NAME=${{ github.event.inputs.workload }}"
-              echo "SCENARIO_ITERATIONS=${{ github.event.inputs.rate }}"
               echo "TESTID=${{ github.event.inputs.test_id }}"
-              echo "SCENARIO_DURATION=${{ github.event.inputs.duration }}"
-            } >> $GITHUB_OUTPUT
+              echo "K6_CLUSTER_NODES=${{ github.event.inputs.cluster_nodes }}"
+              echo "K6_TOPOLOGY_NAME=${{ github.event.inputs.topology }}"
+              echo "K6_WORKLOAD_NAME=${{ github.event.inputs.workload }}"
+              echo "K6_TEST_DURATION=${{ github.event.inputs.duration }}"
+              echo "K6_VU_PER_ROUTE=${{ github.event.inputs.vu }}"
+              echo "K6_REQUESTS_PER_SECOND_PER_VU=${{ github.event.inputs.rate }}"
+            } >> $GITHUB_ENV
           fi
 
       - name: Checkout hoprd-test repository
         uses: actions/checkout@v4
         with:
           repository: hoprnet/hoprd-test
-          ref: main
+          ref: main # Use different branch if needed to test a new development
 
       - name: Setup GCP
         id: gcp
@@ -115,21 +138,14 @@ jobs:
       - name: Get Hoprd Api token
         id: token
         run: |
-          hoprdApiToken=$(kubectl get secret -n k6-operator-system -o json hoprd-api-tokens | jq -r '.data.${{ steps.vars.outputs.NODES }}' | base64 -d)
-          echo "HOPRD_API_TOKEN=${hoprdApiToken}" >> $GITHUB_OUTPUT
+          hoprdApiToken=$(kubectl get secret -n k6-operator-system -o json hoprd-api-tokens | jq --arg entry "${K6_CLUSTER_NODES}" -r '.data[$entry]' | base64 -d)
+          echo "HOPRD_API_TOKEN=${hoprdApiToken}" >> $GITHUB_ENV
 
       - name: Setup Load Testing environment
         run: |
           npm install
-          npm run test:${{ steps.vars.outputs.NODES }}:setup
+          npm run setup:${K6_TOPOLOGY_NAME}
         working-directory: "./k6"
-        env:
-          HOPRD_API_TOKEN: ${{ steps.token.outputs.HOPRD_API_TOKEN }}
-          NODES: ${{ steps.vars.outputs.NODES }}
-          WORKLOAD_NAME: ${{ steps.vars.outputs.WORKLOAD_NAME }}
-          SCENARIO_ITERATIONS: ${{ steps.vars.outputs.SCENARIO_ITERATIONS }}
-          TESTID: ${{ steps.vars.outputs.TESTID }}
-          SCENARIO_DURATION: ${{ steps.vars.outputs.SCENARIO_DURATION }}
 
       - name: Run Load test
         run: |
@@ -138,10 +154,10 @@ jobs:
           echo "Waiting for test to bootstrap..."
           sleep 2m # Wait for test to bootstrap
           echo "Waiting for test to finish..."
-          sleep ${{ steps.vars.outputs.SCENARIO_DURATION }}m # wait for the test to finish
+          sleep ${K6_TEST_DURATION}m # wait for the test to finish
         working-directory: "./k6"
 
-      - name: Parse results
+      - name: Collect Load test results
         run: |
           kubectl delete -f k6-test-results.yaml 2> /dev/null || true
           kubectl apply -f k6-test-results.yaml
