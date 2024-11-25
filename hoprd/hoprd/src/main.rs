@@ -160,7 +160,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     #[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
-        .thread_stack_size(8 * 1024 * 1024)
+        .thread_stack_size(2 * 1024 * 1024)
         .build()
         .unwrap()
         .block_on(Box::pin(inner_main()))
