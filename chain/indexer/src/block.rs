@@ -164,8 +164,8 @@ where
                 self.db.set_logs_unprocessed(None, None).await?;
 
                 // Now fast-sync can start
-                let mut stream = self.db.get_logs_block_numbers(None, None).await?;
-                while let Some(block_number) = stream.next().await {
+                let log_block_numbers = self.db.get_logs_block_numbers(None, None).await?;
+                for block_number in log_block_numbers {
                     Self::process_block_by_id(&db, &logs_handler, block_number).await?;
                 }
             }
@@ -196,6 +196,11 @@ where
         let indexing_proc = spawn(async move {
             let is_synced = Arc::new(AtomicBool::new(false));
             let chain_head = Arc::new(AtomicU64::new(0));
+
+            // update the chain head once at startup to get a reference for initial synching
+            // progress calculation
+            debug!("Updating chain head at indexer startup");
+            Self::update_chain_head(&rpc, chain_head.clone()).await;
 
             let event_stream = rpc
                 .try_stream_logs(next_block_to_process, log_filter)
@@ -305,20 +310,20 @@ where
         U: ChainLogHandler + 'static,
         Db: HoprDbLogOperations + 'static,
     {
-        let mut log_stream = db.get_logs(Some(block_id), Some(0)).await?;
+        let logs = db.get_logs(Some(block_id), Some(0)).await?;
         let mut block = BlockWithLogs {
             block_id,
             ..Default::default()
         };
 
-        while let Some(log) = log_stream.next().await {
+        for log in logs {
             if log.block_number == block_id {
                 block.logs.insert(log);
             } else {
                 error!(
                     expected = block_id,
                     actual = log.block_number,
-                    "block number mismatch in logs stream"
+                    "block number mismatch in logs from database"
                 )
             }
         }
@@ -345,13 +350,13 @@ where
         Db: HoprDbLogOperations + 'static,
     {
         let block_id = block.block_id;
-        debug!(block_id, "Processing events");
+        debug!(block_id, "processing events");
 
         match logs_handler.collect_block_events(block.clone()).await {
             Ok(events) => {
                 match db.set_logs_processed(Some(block_id), Some(0)).await {
                     Ok(_) => match db.update_logs_checksums().await {
-                        Ok(_) => Self::print_indexer_state(db).await,
+                        Ok(_) => Self::print_indexer_state(db, block_id).await,
                         Err(error) => error!(block_id, %error, "failed to update checksums for logs from block"),
                     },
                     Err(error) => error!(block_id, %error, "failed to mark logs from block as processed"),
@@ -379,35 +384,49 @@ where
     /// # Arguments
     ///
     /// * `db` - The database operations handler.
-    async fn print_indexer_state(db: &Db)
+    /// * `block_number` - The block number to print the indexer state for.
+    async fn print_indexer_state(db: &Db, block_number: u64)
     where
         Db: HoprDbLogOperations + 'static,
     {
-        match db.get_last_checksummed_log().await {
-            Ok(Some(log)) => match db.get_logs_count(Some(log.block_number), Some(0)).await {
-                Ok(count) => {
-                    let checksum = log.checksum.unwrap();
-                    info!(
-                        block_number = log.block_number,
-                        log_count = count,
-                        last_log_checksum = checksum,
-                        "Indexer state update",
-                    );
-
-                    #[cfg(all(feature = "prometheus", not(test)))]
-                    {
-                        let checksum_hash = Hash::from_hex(checksum.as_str()).expect("Invalid checksum");
-                        let low_4_bytes =
-                            hopr_primitive_types::prelude::U256::from_big_endian(checksum_hash.as_ref()).low_u32();
-                        METRIC_INDEXER_CHECKSUM.set(low_4_bytes.into());
-                    }
+        match db.get_logs(Some(block_number), Some(0)).await {
+            Ok(logs) => {
+                let log_count = logs.len();
+                if log_count == 0 {
+                    // return early, no indexer state update to print
+                    return;
                 }
-                Err(e) => error!(error = %e, "Cannot retrieve log count"),
-            },
-            Ok(None) => {
-                debug!("No logs have been checksummed yet");
+                let last_log_checksum = logs
+                    .last()
+                    .map_or_else(|| "".to_string(), |log| log.checksum.clone().unwrap_or_default());
+                info!(block_number, log_count, last_log_checksum, "Indexer state update",);
+
+                #[cfg(all(feature = "prometheus", not(test)))]
+                {
+                    let checksum_hash = Hash::from_hex(last_log_checksum.as_str()).expect("Invalid checksum");
+                    let low_4_bytes =
+                        hopr_primitive_types::prelude::U256::from_big_endian(checksum_hash.as_ref()).low_u32();
+                    METRIC_INDEXER_CHECKSUM.set(low_4_bytes.into());
+                }
             }
-            Err(e) => error!(error = %e, "Cannot retrieve last checksummed log"),
+            Err(e) => error!(error = %e, "Cannot retrieve logs"),
+        }
+    }
+
+    async fn update_chain_head(rpc: &T, chain_head: Arc<AtomicU64>) -> u64
+    where
+        T: HoprIndexerRpcOperations + 'static,
+    {
+        match rpc.block_number().await {
+            Ok(head) => {
+                chain_head.store(head, Ordering::Relaxed);
+                debug!(head, "Updated chain head");
+                head
+            }
+            Err(error) => {
+                error!(%error, "Failed to fetch block number from RPC");
+                panic!("Failed to fetch block number from RPC, cannot continue indexing due to {error}")
+            }
         }
     }
 
@@ -446,20 +465,23 @@ where
             METRIC_INDEXER_CURRENT_BLOCK.set(current_block as f64);
         }
 
-        match rpc.block_number().await {
-            Ok(current_chain_block_number) => chain_head.store(current_chain_block_number, Ordering::Relaxed),
-            Err(error) => {
-                error!(%error, "Failed to fetch block number from RPC, cannot continue indexing");
-                panic!("Failed to fetch block number from RPC, cannot continue indexing due to {error}")
-            }
-        };
+        let mut head = chain_head.load(Ordering::Relaxed);
 
-        let head = chain_head.load(Ordering::Relaxed);
-
+        // We only print out sync progress if we are not yet synced. Once synched, we don't print
+        // out progress anymore.
         if !is_synced.load(Ordering::Relaxed) {
-            let block_difference = head.saturating_sub(next_block_to_process);
+            let mut block_difference = head.saturating_sub(next_block_to_process);
+
             let progress = if block_difference == 0 {
-                1_f64
+                // Before we call the sync complete, we check the chain again.
+                head = Self::update_chain_head(rpc, chain_head.clone()).await;
+                block_difference = head.saturating_sub(next_block_to_process);
+
+                if block_difference == 0 {
+                    1_f64
+                } else {
+                    (current_block - next_block_to_process) as f64 / block_difference as f64
+                }
             } else {
                 (current_block - next_block_to_process) as f64 / block_difference as f64
             };
@@ -468,7 +490,8 @@ where
                 indexer = prefix,
                 progress = progress * 100_f64,
                 block = current_block,
-                "Sync progress"
+                head,
+                "Sync progress to last known head"
             );
 
             #[cfg(all(feature = "prometheus", not(test)))]
@@ -809,8 +832,8 @@ mod tests {
             .return_once(move |_, _| Ok(Box::pin(rx)));
 
         rpc.expect_block_number()
-            .once()
-            .return_once(move || Ok(last_processed_block + 1));
+            .times(2)
+            .returning(move || Ok(last_processed_block + 1));
 
         let block = BlockWithLogs {
             block_id: last_processed_block + 1,
