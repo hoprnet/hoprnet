@@ -71,7 +71,7 @@ impl<P: JsonRpcClient + 'static> RpcOperations<P> {
             .then(|subrange| {
                 let prov_clone = self.provider.clone();
                 async move {
-                    debug!(
+                    trace!(
                         from = ?subrange.get_from_block(),
                         to = ?subrange.get_to_block(),
                         "fetching logs in block subrange"
