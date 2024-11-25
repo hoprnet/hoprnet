@@ -199,6 +199,7 @@ where
 
             // update the chain head once at startup to get a reference for initial synching
             // progress calculation
+            debug!("Updating chain head at indexer startup");
             Self::update_chain_head(&rpc, chain_head.clone()).await;
 
             let event_stream = rpc
@@ -831,8 +832,8 @@ mod tests {
             .return_once(move |_, _| Ok(Box::pin(rx)));
 
         rpc.expect_block_number()
-            .once()
-            .return_once(move || Ok(last_processed_block + 1));
+            .times(2)
+            .returning(move || Ok(last_processed_block + 1));
 
         let block = BlockWithLogs {
             block_id: last_processed_block + 1,
