@@ -244,7 +244,7 @@ where
                         }
                     }
                 })
-                .filter_map(|block| Self::process_block(&db, &logs_handler, block))
+                .filter_map(|block| Self::process_block(&db, &logs_handler, block, false))
                 .flat_map(stream::iter);
 
             futures::pin_mut!(event_stream);
@@ -316,7 +316,7 @@ where
             }
         }
 
-        Ok(Self::process_block(db, logs_handler, block).await)
+        Ok(Self::process_block(db, logs_handler, block, true).await)
     }
 
     /// Processes a block and its logs.
@@ -328,11 +328,17 @@ where
     /// * `db` - The database operations handler.
     /// * `logs_handler` - The database log handler.
     /// * `block` - The block with logs to process.
+    /// * `fetch_checksum_from_db` - A boolean indicating whether to fetch the checksum from the database.
     ///
     /// # Returns
     ///
     /// An optional vector of significant chain events if the operation succeeds.
-    async fn process_block(db: &Db, logs_handler: &U, block: BlockWithLogs) -> Option<Vec<SignificantChainEvent>>
+    async fn process_block(
+        db: &Db,
+        logs_handler: &U,
+        block: BlockWithLogs,
+        fetch_checksum_from_db: bool,
+    ) -> Option<Vec<SignificantChainEvent>>
     where
         U: ChainLogHandler + 'static,
         Db: HoprDbLogOperations + 'static,
@@ -346,7 +352,14 @@ where
                 match db.set_logs_processed(Some(block_id), Some(0)).await {
                     Ok(_) => match db.update_logs_checksums().await {
                         Ok(last_log_checksum) => {
-                            Self::print_indexer_state(block_id, log_count, last_log_checksum.to_string()).await
+                            if fetch_checksum_from_db {
+                                let last_log = block.logs.into_iter().last().unwrap();
+                                let log = db.get_log(block_id, last_log.tx_index, last_log.log_index).await.ok()?;
+
+                                Self::print_indexer_state(block_id, log_count, log.checksum.unwrap()).await
+                            } else {
+                                Self::print_indexer_state(block_id, log_count, last_log_checksum.to_string()).await
+                            }
                         }
                         Err(error) => error!(block_id, %error, "failed to update checksums for logs from block"),
                     },

@@ -387,7 +387,6 @@ fn create_log(raw_log: log::Model, status: log_status::Model) -> crate::errors::
 mod tests {
     use super::*;
 
-    use futures::StreamExt;
     use hopr_crypto_types::prelude::{ChainKeypair, Hash, Keypair};
 
     #[async_std::test]
