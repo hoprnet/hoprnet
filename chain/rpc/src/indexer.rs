@@ -43,19 +43,18 @@ fn split_range<'a>(
     assert!(from_block <= to_block, "invalid block range");
     assert!(max_chunk_size > 0, "chunk size must be greater than 0");
 
-    let mut start = from_block;
-    let mut filters = Vec::new();
-
-    while start <= to_block {
-        let end = to_block.min(start + max_chunk_size - 1);
-        let filter = ethers::types::Filter::from(filter.clone())
-            .from_block(start)
-            .to_block(end);
-        filters.push(filter);
-        start = end + 1;
-    }
-
-    futures::stream::iter(filters).boxed()
+    futures::stream::unfold((from_block, to_block), move |(start, to)| {
+        if start <= to {
+            let end = to_block.min(start + max_chunk_size - 1);
+            let filter = ethers::types::Filter::from(filter.clone())
+                .from_block(start)
+                .to_block(end);
+            futures::future::ready(Some((filter, (end + 1, to))))
+        } else {
+            futures::future::ready(None)
+        }
+    })
+    .boxed()
 }
 
 impl<P: JsonRpcClient + 'static> RpcOperations<P> {
@@ -69,15 +68,26 @@ impl<P: JsonRpcClient + 'static> RpcOperations<P> {
         );
 
         fetch_ranges
-            .then(move |subrange| async move { self.provider.get_logs(&subrange).await })
-            .map(|result| match result {
-                Ok(logs) => Ok(logs),
-                Err(error) => {
-                    error!(
-                        %error,
-                        "failed to fetch logs in block subrange"
+            .then(|subrange| {
+                let prov_clone = self.provider.clone();
+                async move {
+                    trace!(
+                        from = ?subrange.get_from_block(),
+                        to = ?subrange.get_to_block(),
+                        "fetching logs in block subrange"
                     );
-                    Err(error)
+                    match prov_clone.get_logs(&subrange).await {
+                        Ok(logs) => Ok(logs),
+                        Err(e) => {
+                            error!(
+                                from = ?subrange.get_from_block(),
+                                to = ?subrange.get_to_block(),
+                                error = %e,
+                                "failed to fetch logs in block subrange"
+                            );
+                            Err(e)
+                        }
+                    }
                 }
             })
             .flat_map(|result| {

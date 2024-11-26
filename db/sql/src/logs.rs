@@ -28,7 +28,7 @@ struct BlockNumber {
 
 #[async_trait]
 impl HoprDbLogOperations for HoprDb {
-    async fn store_log<'a>(&'a self, log: SerializableLog) -> Result<SerializableLog> {
+    async fn store_log<'a>(&'a self, log: SerializableLog) -> Result<()> {
         match self.store_logs([log].to_vec()).await {
             Ok(results) => {
                 if let Some(result) = results.into_iter().next() {
@@ -41,15 +41,15 @@ impl HoprDbLogOperations for HoprDb {
         }
     }
 
-    async fn store_logs(&self, logs: Vec<SerializableLog>) -> Result<Vec<Result<SerializableLog>>> {
+    async fn store_logs(&self, logs: Vec<SerializableLog>) -> Result<Vec<Result<()>>> {
         self.nest_transaction_in_db(None, TargetDb::Logs)
             .await?
             .perform(|tx| {
                 Box::pin(async move {
                     let results = stream::iter(logs).then(|log| async {
                         let model = log::ActiveModel::from(log.clone());
-                        let status_model = log_status::ActiveModel::from(log.clone());
-                        let log_status_query = LogStatus::insert(status_model.clone()).on_conflict(
+                        let status_model = log_status::ActiveModel::from(log);
+                        let log_status_query = LogStatus::insert(status_model).on_conflict(
                             OnConflict::columns([
                                 log_status::Column::LogIndex,
                                 log_status::Column::TransactionIndex,
@@ -70,15 +70,15 @@ impl HoprDbLogOperations for HoprDb {
 
                         match log_status_query.exec(tx.as_ref()).await {
                             Ok(_) => match log_query.exec(tx.as_ref()).await {
-                                Ok(_) => Ok(log),
-                                Err(error) => {
-                                    error!(%log, %error, "Failed to insert log into db");
-                                    Err(DbError::General(error.to_string()))
+                                Ok(_) => Ok(()),
+                                Err(e) => {
+                                    error!("Failed to insert log into db: {:?}", e);
+                                    Err(DbError::General(e.to_string()))
                                 }
                             },
-                            Err(error) => {
-                                error!(?status_model, %error, "Failed to insert log status into db");
-                                Err(DbError::General(error.to_string()))
+                            Err(e) => {
+                                error!("Failed to insert log status into db: {:?}", e);
+                                Err(DbError::General(e.to_string()))
                             }
                         }
                     });
