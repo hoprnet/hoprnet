@@ -77,10 +77,10 @@ jobs:
           if [[ "${target}" == "x86_64-linux" ]]; then
             package_suffix="-x86_64-linux"
             runner_needs_nix_setup=false
-          else if [[ "${target}" == "aarch64-linux" ]]; then
+          elif [[ "${target}" == "aarch64-linux" ]]; then
             package_suffix="-aarch64-linux"
             runner_needs_nix_setup=false
-          else if [[ "${target}" == "armv7l-linux" ]]; then
+          elif [[ "${target}" == "armv7l-linux" ]]; then
             package_suffix="-armv7l-linux"
             runner_needs_nix_setup=false
           fi
