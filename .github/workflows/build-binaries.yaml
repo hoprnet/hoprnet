@@ -4,6 +4,7 @@
 #################################################################################
 name: Build binaries
 
+
 on:
   workflow_call:
     inputs:
@@ -16,30 +17,82 @@ on:
       runner:
         required: true
         type: string
-      runner_needs_nix_setup:
-        required: false
-        type: boolean
-        default: true
-      package_suffix:
-        required: false
-        type: string
-        default: ''
       target:
         required: true
         type: string
+  workflow_dispatch:
+    inputs:
+      binary:
+        required: true
+        description: 'Binary to build'
+        type: choice
+        options:
+          - hoprd
+          - hopli
+      runner:
+        type: choice
+        options:
+          - self-hosted-hoprnet-bigger
+          - macos-13
+          - macos-14
+        required: true
+        description: 'GH Runner to use: macos-13=x86_64-darwin and macos-14=aarch64-darwin'
+      target:
+        type: choice
+        options:
+          - x86_64-linux
+          - aarch64-linux
+          - aarch64-darwin
+          - x86_64-darwin
+          - armv7l-linux
+        required: true
+        description: 'Architecture to build for'
+
 concurrency:
   group: ${{ github.ref }}-build-binary-${{ inputs.binary }}-${{ inputs.target }}
   cancel-in-progress: true
+
 jobs:
   binary:
-    if: contains(github.event.pull_request.labels.*.name, format('binary:{0}', inputs.target))
-    runs-on: ${{ inputs.runner }}
+    runs-on: ${{ inputs.runner || github.event.inputs.runner }}
     timeout-minutes: 60
     steps:
+      - name: Set environment variables
+        id: vars
+        run: |
+          if [ -z "${{ github.event.inputs.test_id }}" ]; then
+            echo "The workflow is triggered by other pipeline"
+            {
+              echo "GH_BRANCH=${{ inputs.branch }}"
+              echo "HOPRD_BINARY=${{ inputs.binary }}"
+              echo "TARGET=${{ inputs.target }}"
+            } >> $GITHUB_ENV
+          else
+            echo "The workflow is triggered manually"
+            {
+              echo "GH_BRANCH=${{ github.ref_name }}"
+              echo "HOPRD_BINARY=${{ github.event.inputs.binary }}"
+              echo "TARGET=${{ github.event.inputs.target }}"
+            } >> $GITHUB_ENV
+          fi
+          {
+            if [[ ${{ github.event.inputs.target }} == "x86_64-linux" ]]; then
+              echo "HOPRD_PACKAGE_SUFFIX=-x86_64-linux"
+              echo "GH_RUNNER_NEEDS_NIX_SETUP=false"
+            else if [[ ${{ github.event.inputs.target }} == "aarch64-linux" ]]; then
+              echo "HOPRD_PACKAGE_SUFFIX=-aarch64-linux"
+              echo "GH_RUNNER_NEEDS_NIX_SETUP=false"
+            else if [[ ${{ github.event.inputs.target }} == "armv7l-linux" ]]; then
+              echo "HOPRD_PACKAGE_SUFFIX=-armv7l-linux"
+              echo "GH_RUNNER_NEEDS_NIX_SETUP=false"
+            fi
+          } >> $GITHUB_ENV
+
+
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.branch }}
+          ref: ${{ env.GH_BRANCH }}
 
       - name: Install Nix
         if: inputs.runner_needs_nix_setup == true
@@ -49,18 +102,18 @@ jobs:
           nix_path: nixpkgs=channel:nixos-24.05
 
       - uses: cachix/cachix-action@v15
-        if: inputs.runner_needs_nix_setup == true
+        if: env.GH_RUNNER_NEEDS_NIX_SETUP == true
         with:
           name: hoprnet
           authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
         env:
           USER: runner
 
-      - name: Build ${{ inputs.binary }} binaries
-        run: nix build .#${{inputs.binary}}${{ inputs.package_suffix }} -L
+      - name: Build ${{ env.HOPRD_BINARY }} binaries
+        run: nix build .#${{ env.HOPRD_BINARY }}${{ env.HOPRD_PACKAGE_SUFFIX }} -L
 
-      - name: Upload ${{ inputs.binary }} binaries
+      - name: Upload ${{ env.HOPRD_BINARY }} binaries
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ inputs.binary }}-${{ inputs.target }}
+          name: ${{ env.HOPRD_BINARY }}-${{ env.TARGET }}
           path: ${{ github.workspace }}/result/bin/*
