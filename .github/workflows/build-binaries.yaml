@@ -54,8 +54,10 @@ concurrency:
 
 jobs:
   binary:
-    if: contains(github.event.pull_request.labels.*.name, format('binary:{0}', inputs.target)) || github.event.inputs.binary
-    runs-on: ${{ inputs.runner || github.event.inputs.runner }}
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_call' && inputs.target != '' && contains(github.event.pull_request.labels.*.name, format('binary:{0}', inputs.target)))
+    runs-on: ${{ github.event.inputs.runner || inputs.runner }}
     timeout-minutes: 60
     steps:
       - name: Set environment variables
@@ -63,7 +65,7 @@ jobs:
         run: |
           set -x
           declare branch binary target package_suffix runner_needs_nix_setup
-          if [ -z "${{ github.event.inputs.binary }}" ]; then
+          if [[ "${{ github.event_name }}" == "workflow_call" ]]; then
             echo "The workflow is triggered by other pipeline"
             branch=${{ inputs.branch }}
             binary=${{ inputs.binary }}
@@ -74,19 +76,24 @@ jobs:
             binary=${{ github.event.inputs.binary }}
             target=${{ github.event.inputs.target }}
           fi
-          if [[ "${target}" == "x86_64-linux" ]]; then
-            package_suffix="-x86_64-linux"
-            runner_needs_nix_setup=false
-          elif [[ "${target}" == "aarch64-linux" ]]; then
+          case "${target}" in
+            "x86_64-linux")
+              package_suffix="-x86_64-linux"
+              runner_needs_nix_setup=false
+              ;;
+          "aarch64-linux")
             package_suffix="-aarch64-linux"
             runner_needs_nix_setup=false
-          elif [[ "${target}" == "armv7l-linux" ]]; then
+            ;;
+          "armv7l-linux")
             package_suffix="-armv7l-linux"
             runner_needs_nix_setup=false
-          else
+            ;;
+          *)
             package_suffix=""
             runner_needs_nix_setup=true
-          fi
+            ;;
+          esac
           echo "Invocation parameters:"
           echo "branch=${branch}" | tee -a $GITHUB_OUTPUT
           echo "binary=${binary}" | tee -a $GITHUB_OUTPUT
