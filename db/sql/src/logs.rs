@@ -170,19 +170,21 @@ impl HoprDbLogOperations for HoprDb {
         &'a self,
         block_number: Option<u64>,
         block_offset: Option<u64>,
+        processed: Option<bool>,
     ) -> Result<Vec<u64>> {
         let min_block_number = block_number.unwrap_or(0);
         let max_block_number = block_offset.map(|v| min_block_number + v + 1);
 
-        Log::find()
+        LogStatus::find()
             .select_only()
-            .column(log::Column::BlockNumber)
+            .column(log_status::Column::BlockNumber)
             .distinct()
-            .filter(log::Column::BlockNumber.gte(min_block_number.to_be_bytes().to_vec()))
+            .filter(log_status::Column::BlockNumber.gte(min_block_number.to_be_bytes().to_vec()))
             .apply_if(max_block_number, |q, v| {
-                q.filter(log::Column::BlockNumber.lt(v.to_be_bytes().to_vec()))
+                q.filter(log_status::Column::BlockNumber.lt(v.to_be_bytes().to_vec()))
             })
-            .order_by_asc(log::Column::BlockNumber)
+            .apply_if(processed, |q, v| q.filter(log_status::Column::Processed.eq(v)))
+            .order_by_asc(log_status::Column::BlockNumber)
             .into_model::<BlockNumber>()
             .all(self.conn(TargetDb::Logs))
             .await
@@ -683,7 +685,7 @@ mod tests {
             tx_hash: Hash::create(&[b"tx_hash1"]).into(),
             log_index: 1,
             removed: false,
-            processed: Some(false),
+            processed: Some(true),
             ..Default::default()
         };
 
@@ -701,16 +703,45 @@ mod tests {
             ..Default::default()
         };
 
-        db.store_logs(vec![log_1.clone(), log_2.clone()])
+        let log_3 = SerializableLog {
+            address: Address::new(b"my address 323456789"),
+            topics: [Hash::create(&[b"topic3"]).into()].into(),
+            data: [1, 2, 3, 4].into(),
+            tx_index: 3,
+            block_number: 3,
+            block_hash: Hash::create(&[b"block_hash3"]).into(),
+            tx_hash: Hash::create(&[b"tx_hash3"]).into(),
+            log_index: 3,
+            removed: false,
+            processed: Some(false),
+            ..Default::default()
+        };
+
+        db.store_logs(vec![log_1.clone(), log_2.clone(), log_3.clone()])
             .await
             .unwrap()
             .into_iter()
             .for_each(|r| assert!(r.is_ok()));
 
-        let block_numbers = db.get_logs_block_numbers(Some(1), Some(0)).await.unwrap();
+        let block_numbers_all = db.get_logs_block_numbers(None, None, None).await.unwrap();
+        assert_eq!(block_numbers_all.len(), 3);
+        assert_eq!(block_numbers_all, [1, 2, 3]);
 
-        assert_eq!(block_numbers.len(), 1);
-        assert_eq!(block_numbers[0], 1);
+        let block_numbers_first_only = db.get_logs_block_numbers(Some(1), Some(0), None).await.unwrap();
+        assert_eq!(block_numbers_first_only.len(), 1);
+        assert_eq!(block_numbers_first_only[0], 1);
+
+        let block_numbers_last_only = db.get_logs_block_numbers(Some(3), Some(0), None).await.unwrap();
+        assert_eq!(block_numbers_last_only.len(), 1);
+        assert_eq!(block_numbers_last_only[0], 3);
+
+        let block_numbers_processed = db.get_logs_block_numbers(None, None, Some(true)).await.unwrap();
+        assert_eq!(block_numbers_processed.len(), 1);
+        assert_eq!(block_numbers_processed[0], 1);
+
+        let block_numbers_unprocessed_second = db.get_logs_block_numbers(Some(2), Some(0), Some(false)).await.unwrap();
+        assert_eq!(block_numbers_unprocessed_second.len(), 1);
+        assert_eq!(block_numbers_unprocessed_second[0], 2);
     }
 
     #[async_std::test]

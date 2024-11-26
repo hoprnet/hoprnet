@@ -498,7 +498,9 @@ The following files in the node's database folder are required:
 
 ### Post-sync Behavior
 
-- If index data exists, the node will skip fast sync and start in normal sync mode
+- If index data exists but is incomplete, the node will resume fast sync at the
+last processed log
+- If index data exists and is complete, the node will skip fast sync and start in normal sync mode
 - After fast sync completes, the node automatically switches to normal sync mode
 
 ## Profiling & Instrumentation
