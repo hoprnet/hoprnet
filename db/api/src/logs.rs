@@ -14,8 +14,8 @@ pub trait HoprDbLogOperations {
     ///
     /// # Returns
     ///
-    /// A `Result` which is `Ok(())` if the operation succeeds or an error if it fails.
-    async fn store_log<'a>(&'a self, log: SerializableLog) -> Result<()>;
+    /// A `Result` which is `Ok(SerializableLog)` if the operation succeeds or an error if it fails.
+    async fn store_log<'a>(&'a self, log: SerializableLog) -> Result<SerializableLog>;
 
     /// Stores multiple log entries in the database.
     ///
@@ -25,8 +25,8 @@ pub trait HoprDbLogOperations {
     ///
     /// # Returns
     ///
-    /// A `Result` containing a vector of `Result<()>`, each representing the result of storing an individual log entry.
-    async fn store_logs(&self, logs: Vec<SerializableLog>) -> Result<Vec<Result<()>>>;
+    /// A `Result` containing a vector of `Result<SerializableLog>`, each representing the result of storing an individual log entry.
+    async fn store_logs(&self, logs: Vec<SerializableLog>) -> Result<Vec<Result<SerializableLog>>>;
 
     /// Retrieves a specific log entry from the database.
     ///

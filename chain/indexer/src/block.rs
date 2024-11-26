@@ -193,7 +193,7 @@ where
 
         info!(next_block_to_process, "Indexer start point");
 
-        let indexing_proc = spawn(Box::pin(async move {
+        let indexing_proc = spawn(async move {
             let is_synced = Arc::new(AtomicBool::new(false));
             let chain_head = Arc::new(AtomicU64::new(0));
 
@@ -216,47 +216,41 @@ where
                         tx.clone(),
                     )
                 })
-                .filter_map(|block| {
-                    let db = db.clone();
-
-                    Box::pin(async move {
-                        debug!(%block, "storing logs from block");
-                        let logs = block.logs.clone();
-                        let logs_vec = logs.into_iter().map(SerializableLog::from).collect();
-                        match db.store_logs(logs_vec).await {
-                            Ok(store_results) => {
-                                if let Some(error) = store_results
-                                    .into_iter()
-                                    .filter(|r| r.is_err())
-                                    .map(|r| r.unwrap_err())
-                                    .next()
-                                {
-                                    error!(%block, %error, "failed to processed stored logs from block");
-                                    None
+                .then(|block| {
+                    debug!(%block, "storing logs from block");
+                    let logs = block.logs.clone();
+                    let logs_vec = logs.into_iter().map(SerializableLog::from).collect();
+                    db.store_logs(logs_vec)
+                })
+                .filter_map(|results| async move {
+                    match results {
+                        Ok(store_results) => {
+                            let mut store_results_iter = store_results.into_iter();
+                            if store_results_iter.any(|r| r.is_err()) {
+                                None
+                            } else {
+                                if let Some(log) = store_results_iter.filter(|r| r.is_ok()).map(|r| r.unwrap()).next() {
+                                    Some(log.block_number)
                                 } else {
-                                    Some(block)
+                                    None
                                 }
                             }
-                            Err(error) => {
-                                error!(%block, %error, "failed to store logs from block");
-                                None
-                            }
                         }
-                    })
+                        Err(error) => {
+                            error!(%error, "failed to store logs");
+                            None
+                        }
+                    }
                 })
-                .filter_map(|block| {
-                    let db = db.clone();
-                    let logs_handler = logs_handler.clone();
-
-                    Box::pin(async move {
-                        match Self::process_block_by_id(&db, &logs_handler, block.block_id).await {
-                            Ok(events) => events,
-                            Err(error) => {
-                                error!(%block, %error, "failed to process logs from block");
-                                None
-                            }
+                .then(|block_id| Self::process_block_by_id(&db, &logs_handler, block_id))
+                .filter_map(|res| async move {
+                    match res {
+                        Ok(events) => events,
+                        Err(error) => {
+                            error!(%error, "failed to process logs from block");
+                            None
                         }
-                    })
+                    }
                 })
                 .flat_map(stream::iter);
 
@@ -276,7 +270,7 @@ where
                     "Indexer event stream has been terminated. This error may be caused by a failed RPC connection."
                 );
             }
-        }));
+        });
 
         if rx.next().await.is_some() {
             Ok(indexing_proc)
