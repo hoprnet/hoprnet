@@ -83,6 +83,9 @@ jobs:
           elif [[ "${target}" == "armv7l-linux" ]]; then
             package_suffix="-armv7l-linux"
             runner_needs_nix_setup=false
+          else
+            package_suffix=""
+            runner_needs_nix_setup=true
           fi
           echo "Invocation parameters:"
           echo "branch=${branch}" | tee -a $GITHUB_OUTPUT
