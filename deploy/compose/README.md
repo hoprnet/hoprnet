@@ -25,7 +25,7 @@ For detailed instructions, follow [this guide](https://github.com/hoprnet/hoprne
 
 Start by downloading the "compose" folder from the HOPR repository to your local machine: 
 
-```md
+```shell
 wget https://github.com/hoprnet/hoprnet/archive/refs/heads/master.zip && unzip master.zip "hoprnet-master/deploy/compose/*" -d extracted_files && mv extracted_files/hoprnet-master/deploy/compose . && rm -rf master.zip extracted_files
 ```
 
@@ -60,7 +60,13 @@ Adjust the following secrets:
 
 - `HOPRD_API_TOKEN`: Replace `<YOUR HOPRD API TOKEN>` with your own security token to connect via HOPR Admin UI or REST API.
 
-#### 5. Configure the Configuration File
+#### 5. Edit docker compose yml file
+
+To test GnosisVPN, you need to have an open session with a node. Follow these steps to make the necessary changes:
+
+- `services.hoprd.ports`: Add an additional UDP port under the ports variable to open a session. For example: `11111:11111/udp`
+
+#### 6. Configure the Configuration File
 
 Inside the `compose` folder, navigate to the `hoprd_data` folder and edit the `hoprd.cfg.yaml` file. Update the following fields:
 
@@ -71,11 +77,11 @@ Inside the `compose` folder, navigate to the `hoprd_data` folder and edit the `h
 - `safe_module.safe_address`: Enter the safe address created in a [1st step](#1-create-identity-and-make-it-eligible-for-rotsee-network).
 - `safe_module.module_address`: Enter the module address created in a [1st step](#1-create-identity-and-make-it-eligible-for-rotsee-network).
 
-#### 6. Upload the identity file
+#### 7. Upload the identity file
 
 After creating the identity file in [1st step](#1-create-identity-and-make-it-eligible-for-rotsee-network), rename the file to `hopr.id` and copy it to the `/compose/hoprd_data/` folder.
 
-#### 7. Launch the node
+#### 8. Launch the node
 
 The Docker Compose setup uses profiles. To start a node, ensure you are inside the compose folder so the profile functionality can be recognized. In this case we will start Docker compose using the `hoprd` profile (HOPR node) and the `metrics-push` profile (to push metrics to prometheus).
 
