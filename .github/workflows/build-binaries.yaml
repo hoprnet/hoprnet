@@ -61,12 +61,14 @@ jobs:
       - name: Set environment variables
         id: vars
         run: |
+          declare target
           if [ -z "${{ github.event.inputs.binary }}" ]; then
             echo "The workflow is triggered by other pipeline"
             {
               echo "GH_BRANCH=${{ inputs.branch }}"
               echo "HOPRD_BINARY=${{ inputs.binary }}"
               echo "TARGET=${{ inputs.target }}"
+              target=${{ inputs.target }}
             } >> $GITHUB_ENV
           else
             echo "The workflow is triggered manually"
@@ -74,16 +76,17 @@ jobs:
               echo "GH_BRANCH=${{ github.ref_name }}"
               echo "HOPRD_BINARY=${{ github.event.inputs.binary }}"
               echo "TARGET=${{ github.event.inputs.target }}"
+              target=${{ github.event.inputs.target }}
             } >> $GITHUB_ENV
           fi
           {
-            if [[ ${{ env.target }} == "x86_64-linux" ]]; then
+            if [[ "${target}" == "x86_64-linux" ]]; then
               echo "HOPRD_PACKAGE_SUFFIX=-x86_64-linux"
               echo "GH_RUNNER_NEEDS_NIX_SETUP=false"
-            else if [[ ${{ env.target }} == "aarch64-linux" ]]; then
+            else if [[ "${target}" == "aarch64-linux" ]]; then
               echo "HOPRD_PACKAGE_SUFFIX=-aarch64-linux"
               echo "GH_RUNNER_NEEDS_NIX_SETUP=false"
-            else if [[ ${{ env.target }} == "armv7l-linux" ]]; then
+            else if [[ "${target}" == "armv7l-linux" ]]; then
               echo "HOPRD_PACKAGE_SUFFIX=-armv7l-linux"
               echo "GH_RUNNER_NEEDS_NIX_SETUP=false"
             fi
