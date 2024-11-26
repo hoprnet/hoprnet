@@ -244,20 +244,7 @@ where
                         }
                     }
                 })
-                .filter_map(|block| {
-                    let db = db.clone();
-                    let logs_handler = logs_handler.clone();
-
-                    async move {
-                        match Self::process_block_by_id(&db, &logs_handler, block.block_id).await {
-                            Ok(events) => events,
-                            Err(error) => {
-                                error!(%block, %error, "failed to process logs from block");
-                                None
-                            }
-                        }
-                    }
-                })
+                .filter_map(|block| Self::process_block(&db, &logs_handler, block))
                 .flat_map(stream::iter);
 
             futures::pin_mut!(event_stream);
@@ -350,13 +337,16 @@ where
         Db: HoprDbLogOperations + 'static,
     {
         let block_id = block.block_id;
+        let log_count = block.logs.len();
         debug!(block_id, "processing events");
 
         match logs_handler.collect_block_events(block.clone()).await {
             Ok(events) => {
                 match db.set_logs_processed(Some(block_id), Some(0)).await {
                     Ok(_) => match db.update_logs_checksums().await {
-                        Ok(_) => Self::print_indexer_state(db, block_id).await,
+                        Ok(last_log_checksum) => {
+                            Self::print_indexer_state(block_id, log_count, last_log_checksum.to_string()).await
+                        }
                         Err(error) => error!(block_id, %error, "failed to update checksums for logs from block"),
                     },
                     Err(error) => error!(block_id, %error, "failed to mark logs from block as processed"),
@@ -385,31 +375,23 @@ where
     ///
     /// * `db` - The database operations handler.
     /// * `block_number` - The block number to print the indexer state for.
-    async fn print_indexer_state(db: &Db, block_number: u64)
+    /// * `log_count` - The count of logs processed.
+    /// * `last_log_checksum` - The checksum of the last log processed.
+    async fn print_indexer_state(block_number: u64, log_count: usize, last_log_checksum: String)
     where
         Db: HoprDbLogOperations + 'static,
     {
-        match db.get_logs(Some(block_number), Some(0)).await {
-            Ok(logs) => {
-                let log_count = logs.len();
-                if log_count == 0 {
-                    // return early, no indexer state update to print
-                    return;
-                }
-                let last_log_checksum = logs
-                    .last()
-                    .map_or_else(|| "".to_string(), |log| log.checksum.clone().unwrap_or_default());
-                info!(block_number, log_count, last_log_checksum, "Indexer state update",);
+        if log_count == 0 {
+            // return early, no indexer state update to print
+            return;
+        }
+        info!(block_number, log_count, last_log_checksum, "Indexer state update",);
 
-                #[cfg(all(feature = "prometheus", not(test)))]
-                {
-                    let checksum_hash = Hash::from_hex(last_log_checksum.as_str()).expect("Invalid checksum");
-                    let low_4_bytes =
-                        hopr_primitive_types::prelude::U256::from_big_endian(checksum_hash.as_ref()).low_u32();
-                    METRIC_INDEXER_CHECKSUM.set(low_4_bytes.into());
-                }
-            }
-            Err(e) => error!(error = %e, "Cannot retrieve logs"),
+        #[cfg(all(feature = "prometheus", not(test)))]
+        {
+            let checksum_hash = Hash::from_hex(last_log_checksum.as_str()).expect("Invalid checksum");
+            let low_4_bytes = hopr_primitive_types::prelude::U256::from_big_endian(checksum_hash.as_ref()).low_u32();
+            METRIC_INDEXER_CHECKSUM.set(low_4_bytes.into());
         }
     }
 

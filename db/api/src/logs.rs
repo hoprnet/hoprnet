@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 
+use hopr_crypto_types::prelude::Hash;
 use hopr_primitive_types::prelude::SerializableLog;
 
 use crate::errors::Result;
@@ -131,6 +132,6 @@ pub trait HoprDbLogOperations {
     ///
     /// # Returns
     ///
-    /// A `Result` which is `Ok(())` if the operation succeeds or an error if it fails.
-    async fn update_logs_checksums(&self) -> Result<()>;
+    /// A `Result` which is `Ok(Hash)` if the operation succeeds or an error if it fails.
+    async fn update_logs_checksums(&self) -> Result<Hash>;
 }

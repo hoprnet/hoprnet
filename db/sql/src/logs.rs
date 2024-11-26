@@ -283,7 +283,7 @@ impl HoprDbLogOperations for HoprDb {
         }
     }
 
-    async fn update_logs_checksums(&self) -> Result<()> {
+    async fn update_logs_checksums(&self) -> Result<Hash> {
         self.nest_transaction_in_db(None, TargetDb::Logs)
             .await?
             .perform(|tx| {
@@ -328,15 +328,15 @@ impl HoprDbLogOperations for HoprDb {
                                 match updated_status.update(tx.as_ref()).await {
                                     Ok(_) => {
                                         last_checksum = next_checksum;
-                                        trace!("Generated log checksum {next_checksum} @ {slog}");
+                                        trace!(log=%slog, checksum=%next_checksum, "Generated log checksum");
                                     }
-                                    Err(e) => {
-                                        error!("Failed to update log status checksum in db: {:?}", e);
+                                    Err(error) => {
+                                        error!(%error, "Failed to update log status checksum in db");
                                         break;
                                     }
                                 }
                             }
-                            Ok(())
+                            Ok(last_checksum)
                         }
                         Err(e) => Err(DbError::from(DbSqlError::from(e))),
                     }
