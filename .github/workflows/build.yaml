@@ -49,7 +49,7 @@ jobs:
     secrets: inherit
 
   build-binaries:
-    if: contains(github.event.pull_request.labels.*.name, 'binary:')
+    if: contains(github.event.pull_request.labels.*.name, 'binary')
     strategy:
       matrix:
         binary:
