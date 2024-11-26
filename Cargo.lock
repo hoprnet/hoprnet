@@ -1281,7 +1281,7 @@ dependencies = [
 
 [[package]]
 name = "chain-indexer"
-version = "0.5.3"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "async-channel 2.3.1",
@@ -4024,7 +4024,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-rpc"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "anyhow",
  "async-std",
@@ -4155,7 +4155,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-api"
-version = "0.5.2"
+version = "0.5.3"
 dependencies = [
  "async-trait",
  "futures",
@@ -4203,7 +4203,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-sql"
-version = "0.8.3"
+version = "0.8.4"
 dependencies = [
  "anyhow",
  "async-lock 3.4.0",
