@@ -85,11 +85,11 @@ jobs:
             runner_needs_nix_setup=false
           fi
           echo "Invocation parameters:"
-          echo "branch=${branch}" | tee --append $GITHUB_OUTPUT
-          echo "binary=${binary}" | tee --append $GITHUB_OUTPUT
-          echo "target=${target}" | tee --append $GITHUB_OUTPUT
-          echo "package_suffix=${package_suffix}" | tee --append $GITHUB_OUTPUT
-          echo "runner_needs_nix_setup=${runner_needs_nix_setup}" | tee --append $GITHUB_OUTPUT
+          echo "branch=${branch}" | tee -a $GITHUB_OUTPUT
+          echo "binary=${binary}" | tee -a $GITHUB_OUTPUT
+          echo "target=${target}" | tee -a $GITHUB_OUTPUT
+          echo "package_suffix=${package_suffix}" | tee -a $GITHUB_OUTPUT
+          echo "runner_needs_nix_setup=${runner_needs_nix_setup}" | tee -a $GITHUB_OUTPUT
           echo "runner=${{ inputs.runner || github.event.inputs.runner }}"
 
 
