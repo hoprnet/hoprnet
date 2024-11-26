@@ -163,7 +163,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .thread_stack_size(2 * 1024 * 1024)
         .build()
         .expect("The tokio runtime must be buildable")
-        .block_on(Box::pin(inner_main()));
+        // .block_on(Box::pin(inner_main()));
+        .block_on(inner_main());
 
     #[cfg(feature = "runtime-async-std")]
     let res = async_std::task::block_on(async { inner_main().await });
