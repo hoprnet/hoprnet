@@ -54,13 +54,14 @@ concurrency:
 
 jobs:
   binary:
+    if: contains(github.event.pull_request.labels.*.name, format('binary:{0}', inputs.target)) || github.event.inputs.binary
     runs-on: ${{ inputs.runner || github.event.inputs.runner }}
     timeout-minutes: 60
     steps:
       - name: Set environment variables
         id: vars
         run: |
-          if [ -z "${{ github.event.inputs.test_id }}" ]; then
+          if [ -z "${{ github.event.inputs.binary }}" ]; then
             echo "The workflow is triggered by other pipeline"
             {
               echo "GH_BRANCH=${{ inputs.branch }}"
