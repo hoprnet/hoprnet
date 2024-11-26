@@ -311,7 +311,8 @@ where
                     expected = block_id,
                     actual = log.block_number,
                     "block number mismatch in logs from database"
-                )
+                );
+                panic!("block number mismatch in logs from database")
             }
         }
 
