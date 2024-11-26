@@ -63,7 +63,6 @@ jobs:
       - name: Set environment variables
         id: vars
         run: |
-          set -x
           declare branch binary target package_suffix runner_needs_nix_setup
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             echo "The workflow is triggered by other pipeline"
