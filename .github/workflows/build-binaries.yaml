@@ -77,17 +77,24 @@ jobs:
             } >> $GITHUB_ENV
           fi
           {
-            if [[ ${{ github.event.inputs.target }} == "x86_64-linux" ]]; then
+            if [[ ${{ env.target }} == "x86_64-linux" ]]; then
               echo "HOPRD_PACKAGE_SUFFIX=-x86_64-linux"
               echo "GH_RUNNER_NEEDS_NIX_SETUP=false"
-            else if [[ ${{ github.event.inputs.target }} == "aarch64-linux" ]]; then
+            else if [[ ${{ env.target }} == "aarch64-linux" ]]; then
               echo "HOPRD_PACKAGE_SUFFIX=-aarch64-linux"
               echo "GH_RUNNER_NEEDS_NIX_SETUP=false"
-            else if [[ ${{ github.event.inputs.target }} == "armv7l-linux" ]]; then
+            else if [[ ${{ env.target }} == "armv7l-linux" ]]; then
               echo "HOPRD_PACKAGE_SUFFIX=-armv7l-linux"
               echo "GH_RUNNER_NEEDS_NIX_SETUP=false"
             fi
           } >> $GITHUB_ENV
+          echo "Invocation parameters:"
+          echo "GH_BRANCH=${{ env.GH_BRANCH }}"
+          echo "HOPRD_BINARY=${{ env.HOPRD_BINARY }}"
+          echo "TARGET=${{ env.TARGET }}"
+          echo "HOPRD_PACKAGE_SUFFIX=${{ env.HOPRD_PACKAGE_SUFFIX }}"
+          echo "GH_RUNNER_NEEDS_NIX_SETUP=${{ env.GH_RUNNER_NEEDS_NIX_SETUP }}"
+          echo "RUNNER=${{ inputs.runner || github.event.inputs.runner }}"
 
 
       - name: Checkout hoprnet repository
