@@ -160,10 +160,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     #[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
     let res = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
-        .thread_stack_size(2 * 1024 * 1024)
+        .max_blocking_threads(1024)
         .build()
         .expect("The tokio runtime must be buildable")
-        // .block_on(Box::pin(inner_main()));
         .block_on(inner_main());
 
     #[cfg(feature = "runtime-async-std")]

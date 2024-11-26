@@ -193,7 +193,7 @@ where
 
         info!(next_block_to_process, "Indexer start point");
 
-        let indexing_proc = spawn(Box::pin(async move {
+        let indexing_proc = spawn(async move {
             let is_synced = Arc::new(AtomicBool::new(false));
             let chain_head = Arc::new(AtomicU64::new(0));
 
@@ -219,7 +219,7 @@ where
                 .filter_map(|block| {
                     let db = db.clone();
 
-                    Box::pin(async move {
+                    async move {
                         debug!(%block, "storing logs from block");
                         let logs = block.logs.clone();
                         let logs_vec = logs.into_iter().map(SerializableLog::from).collect();
@@ -242,13 +242,13 @@ where
                                 None
                             }
                         }
-                    })
+                    }
                 })
                 .filter_map(|block| {
                     let db = db.clone();
                     let logs_handler = logs_handler.clone();
 
-                    Box::pin(async move {
+                    async move {
                         match Self::process_block_by_id(&db, &logs_handler, block.block_id).await {
                             Ok(events) => events,
                             Err(error) => {
@@ -256,7 +256,7 @@ where
                                 None
                             }
                         }
-                    })
+                    }
                 })
                 .flat_map(stream::iter);
 
@@ -276,7 +276,7 @@ where
                     "Indexer event stream has been terminated. This error may be caused by a failed RPC connection."
                 );
             }
-        }));
+        });
 
         if rx.next().await.is_some() {
             Ok(indexing_proc)
