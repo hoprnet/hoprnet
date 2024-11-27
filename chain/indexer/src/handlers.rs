@@ -809,6 +809,14 @@ where
         ]
     }
 
+    fn contract_addresses_map(&self) -> Arc<ContractAddresses> {
+        self.addresses.clone()
+    }
+
+    fn safe_address(&self) -> Address {
+        self.safe_address
+    }
+
     fn contract_address_topics(&self, contract: Address) -> Vec<H256> {
         if contract.eq(&self.addresses.announcements) {
             crate::constants::topics::announcement()
@@ -824,8 +832,6 @@ where
             crate::constants::topics::winning_prob_oracle()
         } else if contract.eq(&self.addresses.safe_registry) {
             crate::constants::topics::node_safe_registry()
-        } else if contract.eq(&self.addresses.token) {
-            crate::constants::topics::token()
         } else {
             vec![]
         }

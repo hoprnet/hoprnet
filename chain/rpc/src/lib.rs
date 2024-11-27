@@ -163,47 +163,6 @@ impl PartialOrd<Self> for Log {
     }
 }
 
-/// Represents a filter to extract logs containing specific contract events from a block.
-#[derive(Debug, Clone, Default)]
-pub struct LogFilter {
-    /// Contract addresses
-    pub address: Vec<Address>,
-    /// Event topics
-    pub topics: Vec<Hash>,
-}
-
-impl LogFilter {
-    /// Indicates if this filter filters anything.
-    pub fn is_empty(&self) -> bool {
-        self.address.is_empty() && self.topics.is_empty()
-    }
-}
-
-impl Display for LogFilter {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "filter of {} contracts with {} topics",
-            self.address.len(),
-            self.topics.len()
-        )
-    }
-}
-
-impl From<LogFilter> for ethers::types::Filter {
-    fn from(value: LogFilter) -> Self {
-        ethers::types::Filter::new()
-            .address(
-                value
-                    .address
-                    .into_iter()
-                    .map(ethers::types::Address::from)
-                    .collect::<Vec<_>>(),
-            )
-            .topic0(value.topics)
-    }
-}
-
 /// Indicates what retry action should be taken, as result of a `RetryPolicy` implementation.
 pub enum RetryAction {
     /// Request should not be retried
@@ -434,6 +393,6 @@ pub trait HoprIndexerRpcOperations {
     fn try_stream_logs<'a>(
         &'a self,
         start_block_number: u64,
-        filter: LogFilter,
+        filters: Vec<ethers::types::Filter>,
     ) -> Result<Pin<Box<dyn Stream<Item = BlockWithLogs> + Send + 'a>>>;
 }
