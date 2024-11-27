@@ -359,13 +359,35 @@ where
                 match db.set_logs_processed(Some(block_id), Some(0)).await {
                     Ok(_) => match db.update_logs_checksums().await {
                         Ok(last_log_checksum) => {
-                            if fetch_checksum_from_db {
+                            let checksum = if fetch_checksum_from_db {
                                 let last_log = block.logs.into_iter().last().unwrap();
                                 let log = db.get_log(block_id, last_log.tx_index, last_log.log_index).await.ok()?;
 
-                                Self::print_indexer_state(block_id, log_count, log.checksum.unwrap()).await
+                                log.checksum
                             } else {
-                                Self::print_indexer_state(block_id, log_count, last_log_checksum.to_string()).await
+                                Some(last_log_checksum.to_string())
+                            };
+
+                            if log_count != 0 {
+                                info!(
+                                    block_number = block_id,
+                                    log_count, last_log_checksum = ?checksum, "Indexer state update",
+                                );
+
+                                #[cfg(all(feature = "prometheus", not(test)))]
+                                {
+                                    if let Some(last_log_checksum) = checksum {
+                                        if let Ok(checksum_hash) = Hash::from_hex(last_log_checksum.as_str()) {
+                                            let low_4_bytes = hopr_primitive_types::prelude::U256::from_big_endian(
+                                                checksum_hash.as_ref(),
+                                            )
+                                            .low_u32();
+                                            METRIC_INDEXER_CHECKSUM.set(low_4_bytes.into());
+                                        } else {
+                                            error!("Invalid checksum generated from logs");
+                                        }
+                                    }
+                                }
                             }
                         }
                         Err(error) => error!(block_id, %error, "failed to update checksums for logs from block"),
@@ -385,34 +407,6 @@ where
                 error!(block_id, %error, "failed to process logs from block into events");
                 None
             }
-        }
-    }
-
-    /// Prints the current state of the indexer.
-    ///
-    /// This function retrieves and logs the last checksummed log entry and the count of logs.
-    ///
-    /// # Arguments
-    ///
-    /// * `db` - The database operations handler.
-    /// * `block_number` - The block number to print the indexer state for.
-    /// * `log_count` - The count of logs processed.
-    /// * `last_log_checksum` - The checksum of the last log processed.
-    async fn print_indexer_state(block_number: u64, log_count: usize, last_log_checksum: String)
-    where
-        Db: HoprDbLogOperations + 'static,
-    {
-        if log_count == 0 {
-            // return early, no indexer state update to print
-            return;
-        }
-        info!(block_number, log_count, last_log_checksum, "Indexer state update",);
-
-        #[cfg(all(feature = "prometheus", not(test)))]
-        {
-            let checksum_hash = Hash::from_hex(last_log_checksum.as_str()).expect("Invalid checksum");
-            let low_4_bytes = hopr_primitive_types::prelude::U256::from_big_endian(checksum_hash.as_ref()).low_u32();
-            METRIC_INDEXER_CHECKSUM.set(low_4_bytes.into());
         }
     }
 
