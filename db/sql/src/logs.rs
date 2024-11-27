@@ -330,7 +330,7 @@ impl HoprDbLogOperations for HoprDb {
                                 match updated_status.update(tx.as_ref()).await {
                                     Ok(_) => {
                                         last_checksum = next_checksum;
-                                        trace!(log=%slog, checksum=%next_checksum, "Generated log checksum");
+                                        trace!(log = %slog, checksum = %next_checksum, "Generated log checksum");
                                     }
                                     Err(error) => {
                                         error!(%error, "Failed to update log status checksum in db");
