@@ -21,17 +21,17 @@ Before running a node on the Rotsee network, ensure you complete these steps: cr
 
 For detailed instructions, follow [this guide](https://github.com/hoprnet/hoprnet/blob/master/hopli/README.md#create-read-identity-and-make-it-eligible-for-rotsee-network).
 
-#### 2. Download the compose folder
+#### 2. Clone hoprnet repository
 
-Start by downloading the "compose" folder from the HOPR repository to your local machine: 
+Start by cloning `hoprnet` repository:
 
 ```shell
-wget https://github.com/hoprnet/hoprnet/archive/refs/heads/master.zip && unzip master.zip "hoprnet-master/deploy/compose/*" -d extracted_files && mv extracted_files/hoprnet-master/deploy/compose . && rm -rf master.zip extracted_files
+git clone https://github.com/hoprnet/hoprnet.git
 ```
 
 #### 3. Set up environment variables
 
-Navigate to the `compose` folder and rename `.env.sample` to `.env`.
+Navigate to the `/deploy/compose` folder and rename `.env.sample` to `.env`.
 
 Adjust the following environment variables as needed:
 
@@ -110,6 +110,8 @@ Profiles should be specified as a list of `,` separated values in the `COMPOSE_P
 
 ### Examples
 
+#### Starting services
+
 Commands needs to be executed inside the `compose` directory:
 
 1. Run only the hopr node
@@ -152,10 +154,36 @@ COMPOSE_PROFILES=hoprd,metrics-push docker compose up -d
 COMPOSE_PROFILES=hoprd,admin-ui,metrics,metrics-vis docker compose up -d
 ```
 
-The same list of `COMPOSE_PROFILES` should be supplied for the `docker compose down` command.
+#### Stopping services
 
-6. Stop only the hopr node
+The same list of `COMPOSE_PROFILES` should be supplied for the `docker compose down` command. To stop the services you started, ensure you specify the same profiles.
+
+1. Stop only the hopr node
 
 ```shell
 COMPOSE_PROFILES=hoprd docker compose down
+```
+
+2. Stop the `hopr-admin` and a hopr node
+
+```shell
+COMPOSE_PROFILES=hoprd,admin-ui docker compose down
+```
+
+3. Stop hopr node with a full internal monitoring system (Prometheus and Grafana)
+
+```shell
+COMPOSE_PROFILES=hoprd,metrics-vis docker compose down
+```
+
+4. Stop hopr node with an external monitoring system using Prometheus pushgateway
+
+```shell
+COMPOSE_PROFILES=hoprd,metrics-push docker compose down
+```
+
+5. Stop everything
+
+```shell
+COMPOSE_PROFILES=hoprd,admin-ui,metrics,metrics-vis docker compose down
 ```
