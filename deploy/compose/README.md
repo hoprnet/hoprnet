@@ -156,7 +156,20 @@ COMPOSE_PROFILES=hoprd,admin-ui,metrics,metrics-vis docker compose up -d
 
 #### Stopping services
 
-The same list of `COMPOSE_PROFILES` should be supplied for the `docker compose down` command. To stop the services you started, ensure you specify the same profiles.
+Important: You must use exactly the same `COMPOSE_PROFILES` values for the `docker compose down` command as you used for `up`. Using different profiles may leave containers running or fail to clean up resources properly.
+
+For example, if you started with:
+
+```shell
+COMPOSE_PROFILES=hoprd,metrics-push docker compose up -d
+```
+
+You must stop with:
+```shell
+COMPOSE_PROFILES=hoprd,metrics-push docker compose down
+```
+
+Below are examples of specifying specific profiles to stop services.
 
 1. Stop only the hopr node
 
