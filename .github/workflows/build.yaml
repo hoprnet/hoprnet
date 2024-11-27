@@ -39,6 +39,8 @@ jobs:
           - DAppNodePackage-Hopr
           - DAppNodePackage-Hopr-testnet
     name: ${{ matrix.repository }}
+    needs: 
+      - build-docker
     uses: ./.github/workflows/build-dappnode.yaml
     with:
       branch: ${{ github.event.pull_request.head.ref }}
@@ -54,29 +56,22 @@ jobs:
           - hoprd
         target:
           - name: x86_64-linux
-            package_suffix: -x86_64-linux
             runner: self-hosted-hoprnet-bigger
-            runner_needs_nix_setup: false
           - name: aarch64-linux
-            package_suffix: -aarch64-linux
             runner: self-hosted-hoprnet-bigger
-            runner_needs_nix_setup: false
           - name: aarch64-darwin
             runner: macos-14 # M1 machine
           - name: x86_64-darwin
             runner: macos-13 # Intel machine
           - name: armv7l-linux
-            package_suffix: -armv7l-linux
             runner: self-hosted-hoprnet-bigger
-            runner_needs_nix_setup: false
     name: ${{ matrix.binary }}-${{ matrix.target.name }}
     uses: ./.github/workflows/build-binaries.yaml
     with:
       branch: ${{ github.event.pull_request.head.ref }}
       binary: ${{ matrix.binary }}
-      target: ${{ matrix.target.name }}
-      package_suffix: ${{ matrix.target.package_suffix }}
       runner: ${{ matrix.target.runner }}
+      target: ${{ matrix.target.name }}
     secrets: inherit
 
   label:

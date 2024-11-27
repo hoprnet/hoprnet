@@ -481,7 +481,11 @@ impl HoprSwarmWithProcessors {
                                 peer, request_id, error,
                             } => {
                                 active_pings.invalidate(&request_id).await;
-                                error!(%peer, %request_id, %error,  "Failed heartbeat protocol on outbound");
+                                if matches!(error, libp2p::request_response::OutboundFailure::DialFailure) {
+                                    trace!(%peer, %request_id, %error, "Peer is offline");
+                                } else {
+                                    error!(%peer, %request_id, %error, "Failed heartbeat protocol on outbound");
+                                }
                             },
                             libp2p::request_response::Event::<Ping,Pong>::InboundFailure {
                                 peer, request_id, error

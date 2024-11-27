@@ -248,8 +248,8 @@ pub trait HttpPostRequestor: Send + Sync {
 pub struct HttpPostRequestorConfig {
     /// Timeout for HTTP POST request
     ///
-    /// Defaults to 5 seconds.
-    #[default(Duration::from_secs(5))]
+    /// Defaults to 30 seconds.
+    #[default(Duration::from_secs(30))]
     pub http_request_timeout: Duration,
 
     /// Maximum number of HTTP redirects to follow
