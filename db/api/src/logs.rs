@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 
+use hopr_crypto_types::prelude::Hash;
 use hopr_primitive_types::prelude::SerializableLog;
 
 use crate::errors::Result;
@@ -75,6 +76,7 @@ pub trait HoprDbLogOperations {
     ///
     /// * `block_number` - An optional block number filter.
     /// * `block_offset` - An optional block offset filter.
+    /// * `processed` - An optional processed filter.
     ///
     /// # Returns
     ///
@@ -83,6 +85,7 @@ pub trait HoprDbLogOperations {
         &'a self,
         block_number: Option<u64>,
         block_offset: Option<u64>,
+        processed: Option<bool>,
     ) -> Result<Vec<u64>>;
 
     /// Marks a specific log entry as processed.
@@ -131,6 +134,6 @@ pub trait HoprDbLogOperations {
     ///
     /// # Returns
     ///
-    /// A `Result` which is `Ok(())` if the operation succeeds or an error if it fails.
-    async fn update_logs_checksums(&self) -> Result<()>;
+    /// A `Result` which is `Ok(Hash)` if the operation succeeds or an error if it fails.
+    async fn update_logs_checksums(&self) -> Result<Hash>;
 }

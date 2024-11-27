@@ -486,6 +486,8 @@ pub mod surf_client {
 
     impl SurfRequestor {
         pub fn new(cfg: HttpPostRequestorConfig) -> Self {
+            info!(?cfg, "creating surf client");
+
             let mut client = surf::client().with(surf::middleware::Redirect::new(cfg.max_redirects));
 
             // Rate limit of 0 also means unlimited as if None was given
@@ -494,7 +496,6 @@ pub mod surf_client {
                     surf_governor::GovernorMiddleware::per_second(max)
                         .expect("cannot setup http rate limiter middleware"),
                 );
-                info!("client will be limited to {max} HTTP requests per second");
             }
 
             Self { client, cfg }
@@ -533,12 +534,15 @@ pub mod surf_client {
 
 #[cfg(any(test, feature = "runtime-tokio"))]
 pub mod reqwest_client {
-    use crate::errors::HttpRequestError;
-    use crate::{HttpPostRequestor, HttpPostRequestorConfig};
     use async_trait::async_trait;
     use http_types::StatusCode;
     use serde::Serialize;
     use std::sync::Arc;
+    use std::time::Duration;
+    use tracing::info;
+
+    use crate::errors::HttpRequestError;
+    use crate::{HttpPostRequestor, HttpPostRequestorConfig};
 
     /// HTTP client that uses a Tokio runtime-based HTTP client library, such as `reqwest`.
     #[derive(Clone, Debug, Default)]
@@ -549,10 +553,19 @@ pub mod reqwest_client {
 
     impl ReqwestRequestor {
         pub fn new(cfg: HttpPostRequestorConfig) -> Self {
+            info!(?cfg, "creating reqwest client");
+
             Self {
                 client: reqwest::Client::builder()
                     .timeout(cfg.http_request_timeout)
                     .redirect(reqwest::redirect::Policy::limited(cfg.max_redirects as usize))
+                    // 30 seconds is longer than the normal interval between RPC requests, thus the
+                    // connection should remain available
+                    .tcp_keepalive(Some(Duration::from_secs(30)))
+                    // Enable all supported encodings to reduce the amount of data transferred
+                    // in responses. This is relevant for large eth_getLogs responses.
+                    .zstd(true)
+                    .brotli(true)
                     .build()
                     .expect("could not build reqwest client"),
                 limiter: cfg

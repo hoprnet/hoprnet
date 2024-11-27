@@ -156,22 +156,9 @@ impl std::fmt::Debug for HoprdProcesses {
     }
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    #[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
-    let res = tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .thread_stack_size(2 * 1024 * 1024)
-        .build()
-        .expect("The tokio runtime must be buildable")
-        .block_on(Box::pin(inner_main()));
-
-    #[cfg(feature = "runtime-async-std")]
-    let res = async_std::task::block_on(async { inner_main().await });
-
-    res
-}
-
-async fn inner_main() -> Result<(), Box<dyn std::error::Error>> {
+#[cfg_attr(all(feature = "runtime-tokio", not(feature = "runtime-async-std")), tokio::main)]
+#[cfg_attr(feature = "runtime-async-std", async_std::main)]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     init_logger()?;
 
     if hopr_crypto_random::is_rng_fixed() {
