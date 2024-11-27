@@ -1,11 +1,14 @@
+use ethers::contract::EthEvent;
+use ethers::types::{Filter, H256};
 use futures::{stream, StreamExt};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use tracing::{debug, error, info, trace};
 
+use bindings::hopr_token::{ApprovalFilter, TransferFilter};
 use chain_types::chain_events::SignificantChainEvent;
 use hopr_async_runtime::prelude::{spawn, JoinHandle};
-use hopr_chain_rpc::{BlockWithLogs, HoprIndexerRpcOperations, LogFilter};
+use hopr_chain_rpc::{BlockWithLogs, HoprIndexerRpcOperations};
 use hopr_crypto_types::types::Hash;
 use hopr_db_api::logs::HoprDbLogOperations;
 use hopr_db_sql::info::HoprDbInfoOperations;
@@ -119,21 +122,7 @@ where
         let tx_significant_events = self.egress.clone();
         let panic_on_completion = self.panic_on_completion;
 
-        // we skip on addresses which have no topics
-        let mut addresses = vec![];
-        let mut topics = vec![];
-        logs_handler.contract_addresses().iter().for_each(|address| {
-            let contract_topics = logs_handler.contract_address_topics(*address);
-            if !contract_topics.is_empty() {
-                addresses.push(*address);
-                topics.extend(contract_topics);
-            }
-        });
-
-        let log_filter = LogFilter {
-            address: addresses,
-            topics: topics.into_iter().map(Hash::from).collect(),
-        };
+        let log_filters = Self::generate_log_filters(&logs_handler);
 
         // First, check whether fast sync is enabled and can be performed.
         // If so:
@@ -208,7 +197,7 @@ where
             Self::update_chain_head(&rpc, chain_head.clone()).await;
 
             let event_stream = rpc
-                .try_stream_logs(next_block_to_process, log_filter)
+                .try_stream_logs(next_block_to_process, log_filters)
                 .expect("block stream should be constructible")
                 .then(|block| {
                     Self::calculate_sync_process(
@@ -277,6 +266,56 @@ where
                 "Error during indexing start".into(),
             ))
         }
+    }
+
+    // We are setting up 4 filters.
+    // (1) for all contract addresses, except the token contract, which have topics.
+    // (2) for the token contract which filters transfer events from our safe.
+    // (3) for the token contract which filters transfer events to our safe.
+    // (4) for the token contract which filters approval events involving our safe and the channels
+    // contract.
+    fn generate_log_filters(logs_handler: &U) -> Vec<Filter> {
+        let safe_address = logs_handler.safe_address();
+        let addresses_no_token = logs_handler
+            .contract_addresses()
+            .into_iter()
+            .filter(|a| *a != logs_handler.contract_addresses_map().token)
+            .collect::<Vec<_>>();
+        let mut filter_base_addresses = vec![];
+        let mut filter_base_topics = vec![];
+
+        addresses_no_token.iter().for_each(|address| {
+            let topics = logs_handler.contract_address_topics(*address);
+            if !topics.is_empty() {
+                filter_base_addresses.push(ethers::types::Address::from(*address));
+                filter_base_topics.extend(topics);
+            }
+        });
+
+        let filter_base = Filter::new().address(filter_base_addresses).topic0(filter_base_topics);
+        let filter_token = Filter::new().address(ethers::types::Address::from(
+            logs_handler.contract_addresses_map().token,
+        ));
+
+        let filter_transfer_to = filter_token
+            .clone()
+            .topic0(TransferFilter::signature())
+            .topic2(H256::from_slice(safe_address.to_bytes32().as_ref()));
+
+        let filter_transfer_from = Filter::new()
+            .clone()
+            .topic0(TransferFilter::signature())
+            .topic1(H256::from_slice(safe_address.to_bytes32().as_ref()));
+
+        let filter_approval = Filter::new()
+            .clone()
+            .topic0(ApprovalFilter::signature())
+            .topic1(H256::from_slice(safe_address.to_bytes32().as_ref()))
+            .topic2(H256::from_slice(
+                logs_handler.contract_addresses_map().channels.to_bytes32().as_ref(),
+            ));
+
+        vec![filter_base, filter_transfer_from, filter_transfer_to, filter_approval]
     }
 
     /// Processes a block by its ID.
@@ -591,7 +630,7 @@ mod tests {
             fn try_stream_logs<'a>(
                 &'a self,
                 start_block_number: u64,
-                filter: LogFilter,
+                filters: Vec<ethers::types::Filter>,
             ) -> hopr_chain_rpc::errors::Result<Pin<Box<dyn Stream<Item = BlockWithLogs> + Send + 'a>>>;
         }
     }

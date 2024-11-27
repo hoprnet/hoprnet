@@ -1,4 +1,10 @@
 //! This crate contains various on-chain related modules and types.
+use ethers::abi::Token;
+use ethers::prelude::*;
+use hex_literal::hex;
+use serde::{Deserialize, Serialize};
+use std::str::FromStr;
+use std::sync::Arc;
 
 use bindings::hopr_announcements::HoprAnnouncements;
 use bindings::hopr_channels::HoprChannels;
@@ -11,14 +17,8 @@ use bindings::hopr_safe_proxy_for_network_registry::HoprSafeProxyForNetworkRegis
 use bindings::hopr_ticket_price_oracle::HoprTicketPriceOracle;
 use bindings::hopr_token::HoprToken;
 use bindings::hopr_winning_probability_oracle::HoprWinningProbabilityOracle;
-use ethers::abi::Token;
-use ethers::prelude::*;
-use hex_literal::hex;
 use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
 use hopr_primitive_types::primitives::Address;
-use serde::{Deserialize, Serialize};
-use std::str::FromStr;
-use std::sync::Arc;
 
 pub mod actions;
 pub mod chain_events;

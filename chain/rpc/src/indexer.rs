@@ -17,7 +17,7 @@ use tracing::{debug, error, trace, warn};
 
 use crate::errors::{Result, RpcError, RpcError::FilterIsEmpty};
 use crate::rpc::RpcOperations;
-use crate::{BlockWithLogs, HoprIndexerRpcOperations, Log, LogFilter};
+use crate::{BlockWithLogs, HoprIndexerRpcOperations, Log};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleGauge;
@@ -33,23 +33,25 @@ lazy_static::lazy_static! {
 
 /// Splits the range between `from_block` and `to_block` (inclusive)
 /// to chunks of maximum size `max_chunk_size` and creates [ethers::types::Filter] for each chunk
-/// using the given [LogFilter].
+/// using the given list of [Filter].
 fn split_range<'a>(
-    filter: LogFilter,
+    filters: Vec<ethers::types::Filter>,
     from_block: u64,
     to_block: u64,
     max_chunk_size: u64,
-) -> BoxStream<'a, ethers::types::Filter> {
+) -> BoxStream<'a, Vec<ethers::types::Filter>> {
     assert!(from_block <= to_block, "invalid block range");
     assert!(max_chunk_size > 0, "chunk size must be greater than 0");
 
     futures::stream::unfold((from_block, to_block), move |(start, to)| {
         if start <= to {
             let end = to_block.min(start + max_chunk_size - 1);
-            let filter = ethers::types::Filter::from(filter.clone())
-                .from_block(start)
-                .to_block(end);
-            futures::future::ready(Some((filter, (end + 1, to))))
+            let ranged_filters = filters
+                .clone()
+                .into_iter()
+                .map(|f| f.from_block(start).to_block(end))
+                .collect::<Vec<_>>();
+            futures::future::ready(Some((ranged_filters, (end + 1, to))))
         } else {
             futures::future::ready(None)
         }
@@ -59,8 +61,13 @@ fn split_range<'a>(
 
 impl<P: JsonRpcClient + 'static> RpcOperations<P> {
     /// Retrieves logs in the given range (`from_block` and `to_block` are inclusive).
-    fn stream_logs(&self, filter: LogFilter, from_block: u64, to_block: u64) -> BoxStream<Result<Log>> {
-        let fetch_ranges = split_range(filter, from_block, to_block, self.cfg.max_block_range_fetch_size);
+    fn stream_logs(
+        &self,
+        filters: Vec<ethers::types::Filter>,
+        from_block: u64,
+        to_block: u64,
+    ) -> BoxStream<Result<Log>> {
+        let fetch_ranges = split_range(filters, from_block, to_block, self.cfg.max_block_range_fetch_size);
 
         debug!(
             "polling logs from blocks #{from_block} - #{to_block} (via {:?} chunks)",
@@ -68,35 +75,50 @@ impl<P: JsonRpcClient + 'static> RpcOperations<P> {
         );
 
         fetch_ranges
-            .then(|subrange| {
-                let prov_clone = self.provider.clone();
+            .then(move |subrange_filters| async move {
+                let mut results = futures::stream::iter(subrange_filters)
+                    .then(|filter| async move {
+                        let prov_clone = self.provider.clone();
 
-                async move {
-                    trace!(
-                        from = ?subrange.get_from_block(),
-                        to = ?subrange.get_to_block(),
-                        "fetching logs in block subrange"
-                    );
-                    match prov_clone.get_logs(&subrange).await {
-                        Ok(logs) => Ok(logs),
-                        Err(e) => {
-                            error!(
-                                from = ?subrange.get_from_block(),
-                                to = ?subrange.get_to_block(),
-                                error = %e,
-                                "failed to fetch logs in block subrange"
-                            );
-                            Err(e)
+                        match prov_clone.get_logs(&filter).await {
+                            Ok(logs) => Ok(logs),
+                            Err(e) => {
+                                error!(
+                                    from = ?filter.get_from_block(),
+                                    to = ?filter.get_to_block(),
+                                    error = %e,
+                                    "failed to fetch logs in block subrange"
+                                );
+                                Err(e)
+                            }
                         }
+                    })
+                    .flat_map(|result| {
+                        futures::stream::iter(match result {
+                            Ok(logs) => logs.into_iter().map(|log| Ok(Log::from(log))).collect::<Vec<_>>(),
+                            Err(e) => vec![Err(RpcError::from(e))],
+                        })
+                    })
+                    .collect::<Vec<_>>()
+                    .await;
+
+                // at this point we need to ensure logs are ordered by block number since that is
+                // expected by the indexer
+                results.sort_by(|a, b| {
+                    if let Ok(a) = a {
+                        if let Ok(b) = b {
+                            return a.block_number.cmp(&b.block_number);
+                        } else {
+                            return std::cmp::Ordering::Greater;
+                        }
+                    } else {
+                        return std::cmp::Ordering::Less;
                     }
-                }
+                });
+
+                futures::stream::iter(results)
             })
-            .flat_map(|result| {
-                futures::stream::iter(match result {
-                    Ok(logs) => logs.into_iter().map(|log| Ok(Log::from(log))).collect::<Vec<_>>(),
-                    Err(e) => vec![Err(RpcError::from(e))],
-                })
-            })
+            .flatten()
             .boxed()
     }
 }
@@ -110,9 +132,9 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
     fn try_stream_logs<'a>(
         &'a self,
         start_block_number: u64,
-        filter: LogFilter,
+        filters: Vec<ethers::types::Filter>,
     ) -> Result<Pin<Box<dyn Stream<Item = BlockWithLogs> + Send + 'a>>> {
-        if filter.is_empty() {
+        if filters.is_empty() {
             return Err(FilterIsEmpty);
         }
 
@@ -150,7 +172,7 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                         #[cfg(all(feature = "prometheus", not(test)))]
                         METRIC_RPC_CHAIN_HEAD.set(latest_block as f64);
 
-                        let mut retrieved_logs = self.stream_logs(filter.clone(), from_block, latest_block);
+                        let mut retrieved_logs = self.stream_logs(filters.clone(), from_block, latest_block);
 
                         trace!(from_block, to_block = latest_block, "processing batch");
 
@@ -243,7 +265,7 @@ mod tests {
     use crate::errors::RpcError;
     use crate::indexer::split_range;
     use crate::rpc::{RpcOperations, RpcOperationsConfig};
-    use crate::{BlockWithLogs, HoprIndexerRpcOperations, LogFilter};
+    use crate::{BlockWithLogs, HoprIndexerRpcOperations};
 
     fn filter_bounds(filter: &ethers::types::Filter) -> anyhow::Result<(u64, u64)> {
         Ok((
