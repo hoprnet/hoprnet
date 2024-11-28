@@ -183,6 +183,7 @@
 
             # if the default listen host has not been set by the user,
             # we will set it to the container's ip address
+            # defaulting to port 50000
 
             listen_host="''${HOPRD_DEFAULT_SESSION_LISTEN_HOST:-}"
             listen_host_preset_ip="''${listen_host%%:*}"
@@ -192,7 +193,7 @@
               listen_host_ip="$(hostname -i)"
 
               if [ -z "''${listen_host_preset_port:-}" ]; then
-                listen_host="''${listen_host_ip}"
+                listen_host="''${listen_host_ip}:50000"
               else
                 listen_host="''${listen_host_ip}:''${listen_host_preset_port}"
               fi
