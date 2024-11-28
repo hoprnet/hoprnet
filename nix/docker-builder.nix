@@ -1,4 +1,4 @@
-{ Cmd
+{ Cmd ? [ ]
 , Entrypoint
 , env ? [ ]
 , extraContents ? [ ]
