@@ -127,14 +127,26 @@ impl HoprNetworkBehavior {
                     StreamProtocol::new(HOPR_MESSAGE_PROTOCOL_V_0_1_0),
                     libp2p::request_response::ProtocolSupport::Full,
                 )],
-                libp2p::request_response::Config::default().with_request_timeout(MSG_ACK_TIMEOUT),
+                libp2p::request_response::Config::default()
+                    .with_request_timeout(MSG_ACK_TIMEOUT)
+                    .with_max_concurrent_streams(
+                        std::env::var("HOPR_INTERNAL_LIBP2P_MSG_ACK_MAX_TOTAL_STREAMS")
+                            .and_then(|v| v.parse::<usize>().map_err(|_e| std::env::VarError::NotPresent))
+                            .unwrap_or(1024),
+                    ),
             ),
             ack: libp2p::request_response::cbor::Behaviour::<Acknowledgement, ()>::new(
                 [(
                     StreamProtocol::new(HOPR_ACKNOWLEDGE_PROTOCOL_V_0_1_0),
                     libp2p::request_response::ProtocolSupport::Full,
                 )],
-                libp2p::request_response::Config::default().with_request_timeout(MSG_ACK_TIMEOUT),
+                libp2p::request_response::Config::default()
+                    .with_request_timeout(MSG_ACK_TIMEOUT)
+                    .with_max_concurrent_streams(
+                        std::env::var("HOPR_INTERNAL_LIBP2P_MSG_ACK_MAX_TOTAL_STREAMS")
+                            .and_then(|v| v.parse::<usize>().map_err(|_e| std::env::VarError::NotPresent))
+                            .unwrap_or(1024),
+                    ),
             ),
             ticket_aggregation: libp2p::request_response::cbor::Behaviour::<
                 Vec<legacy::AcknowledgedTicket>,
