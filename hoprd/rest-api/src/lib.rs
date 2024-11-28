@@ -33,10 +33,10 @@ use axum::{
     Router,
 };
 use serde::Serialize;
-use std::collections::HashMap;
 use std::error::Error;
 use std::iter::once;
 use std::sync::Arc;
+use std::{collections::HashMap, sync::atomic::AtomicU16};
 use tokio::net::TcpListener;
 use tower::ServiceBuilder;
 use tower_http::{
@@ -79,6 +79,7 @@ pub(crate) struct InternalState {
     pub inbox: Arc<RwLock<hoprd_inbox::Inbox>>,
     pub hoprd_db: Arc<hoprd_db_api::db::HoprdDb>,
     pub websocket_rx: async_broadcast::InactiveReceiver<ApplicationData>,
+    pub websocket_active_count: Arc<AtomicU16>,
     pub msg_encoder: Option<MessageEncoder>,
     pub open_listeners: ListenerJoinHandles,
     pub default_listen_host: std::net::SocketAddr,
@@ -253,6 +254,7 @@ async fn build_api(
         inbox,
         hoprd_db,
         websocket_rx,
+        websocket_active_count: Arc::new(AtomicU16::new(0)),
         open_listeners,
         default_listen_host,
     };
@@ -325,7 +327,14 @@ async fn build_api(
                 .route("/session/:protocol", get(session::list_clients))
                 .route("/session/:protocol", delete(session::close_client))
                 .with_state(inner_state.clone().into())
-                .layer(middleware::from_fn_with_state(inner_state, preconditions::authenticate)),
+                .layer(middleware::from_fn_with_state(
+                    inner_state.clone(),
+                    preconditions::authenticate,
+                ))
+                .layer(middleware::from_fn_with_state(
+                    inner_state,
+                    preconditions::cap_websockets,
+                )),
         )
         .layer(
             ServiceBuilder::new()
@@ -377,6 +386,7 @@ enum ApiErrorStatus {
     UnsupportedFeature,
     Timeout,
     Unauthorized,
+    TooManyOpenWebsocketConnections,
     InvalidQuality,
     NotReady,
     #[strum(serialize = "INVALID_PATH")]
