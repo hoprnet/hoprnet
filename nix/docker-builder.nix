@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 { Cmd ? [ ]
+=======
+{ Cmd
+>>>>>>> c78db0b608 (docker: Preset session list host)
 , Entrypoint
 , env ? [ ]
 , extraContents ? [ ]
