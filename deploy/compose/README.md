@@ -168,35 +168,3 @@ You must stop with:
 ```shell
 COMPOSE_PROFILES=hoprd,metrics-push docker compose down
 ```
-
-Below are examples of specifying specific profiles to stop services.
-
-1. Stop only the hopr node
-
-```shell
-COMPOSE_PROFILES=hoprd docker compose down
-```
-
-2. Stop the `hopr-admin` and a hopr node
-
-```shell
-COMPOSE_PROFILES=hoprd,admin-ui docker compose down
-```
-
-3. Stop hopr node with a full internal monitoring system (Prometheus and Grafana)
-
-```shell
-COMPOSE_PROFILES=hoprd,metrics-vis docker compose down
-```
-
-4. Stop hopr node with an external monitoring system using Prometheus pushgateway
-
-```shell
-COMPOSE_PROFILES=hoprd,metrics-push docker compose down
-```
-
-5. Stop everything
-
-```shell
-COMPOSE_PROFILES=hoprd,admin-ui,metrics,metrics-vis docker compose down
-```
