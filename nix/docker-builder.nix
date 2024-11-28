@@ -1,4 +1,5 @@
-{ Entrypoint
+{ Cmd
+, Entrypoint
 , env ? [ ]
 , extraContents ? [ ]
 , name
@@ -6,11 +7,12 @@
 }:
 let
   contents = with pkgs; [
-    iana-etc
-    cacert
     bash
-    findutils
+    cacert
     coreutils
+    findutils
+    iana-etc
+    nettools
   ] ++ extraContents;
   Env = [
     "NO_COLOR=true" # suppress colored log output
@@ -24,6 +26,6 @@ pkgs.dockerTools.buildLayeredImage {
   # breaks binary reproducibility, but makes usage easier
   created = "now";
   config = {
-    inherit Entrypoint Env;
+    inherit Cmd Entrypoint Env;
   };
 }
