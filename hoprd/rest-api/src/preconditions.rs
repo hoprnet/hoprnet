@@ -38,7 +38,7 @@ pub(crate) async fn cap_websockets(
             ws_count.fetch_sub(1, Relaxed);
 
             return (
-                StatusCode::NOT_ACCEPTABLE,
+                StatusCode::TOO_MANY_REQUESTS,
                 ApiErrorStatus::TooManyOpenWebsocketConnections,
             )
                 .into_response();

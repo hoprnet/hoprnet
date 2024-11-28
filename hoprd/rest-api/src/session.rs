@@ -175,8 +175,8 @@ struct WssData(Vec<u8>);
         responses(
             (status = 200, description = "Successfully created a new client websocket session."),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
-            (status = 406, description = "Too many open websocket connections.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError),
+            (status = 429, description = "Too many open websocket connections.", body = ApiError),
         ),
         security(
             ("api_token" = []),
