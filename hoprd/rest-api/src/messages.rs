@@ -293,7 +293,8 @@ impl From<hopr_lib::ApplicationData> for WebSocketReadMsg {
         responses(
             (status = 206, description = "Incoming data", body = Text, content_type = "application/text"),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
-            (status = 422, description = "Unknown failure", body = ApiError)
+            (status = 422, description = "Unknown failure", body = ApiError),
+            (status = 429, description = "Too many open websocket connections.", body = ApiError),
         ),
         security(
             ("api_token" = []),
