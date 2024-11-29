@@ -258,7 +258,7 @@ In this guide, you will create an identity, retrieve its peerID and node address
 export PATH="./target/release:${PATH}"
 export RUST_BACKTRACE=full
 export HOPRD_NETWORK=rotsee
-export IDENTITY_PASSWORD=15D5w7WlT3rY0x8tmAoCDG # Replace with your own identity password
+export IDENTITY_PASSWORD=<your-secure-password-here> # Replace with your own secure password
 export PRIVATE_KEY=0x0000000 # Replace with Deployer Private Key
 export MANAGER_PRIVATE_KEY=0x0000000 # Replace with Deployer Private Key
 ```
