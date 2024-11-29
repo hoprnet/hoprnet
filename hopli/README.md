@@ -259,8 +259,8 @@ export PATH="./target/release:${PATH}"
 export RUST_BACKTRACE=full
 export HOPRD_NETWORK=rotsee
 export IDENTITY_PASSWORD=<your-secure-password-here> # Replace with your own secure password
-export PRIVATE_KEY=0x0000000 # Replace with Deployer Private Key
-export MANAGER_PRIVATE_KEY=0x0000000 # Replace with Deployer Private Key
+export PRIVATE_KEY=0x0000000000000000000000000000000000000000000000000000000000000000 # Replace with Deployer Private Key
+export MANAGER_PRIVATE_KEY=0x0000000000000000000000000000000000000000000000000000000000000000 # Replace with Manager Private Key
 ```
 
 After making the necessary adjustments, copy the entire block of code and execute it in your terminal.
