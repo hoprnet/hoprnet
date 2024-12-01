@@ -48,11 +48,9 @@ assignees: ''
 
 (Write your answer here.)
 
-## Detailed Description
+## Environment Details (Required)
 
 <!--- Provide a detailed description of the change or addition you are proposing -->
-<!-- For example:
-### Environment Details (Required)
 
 **Version:** <!-- e.g., v1.2.3 -->
 
@@ -61,6 +59,8 @@ assignees: ''
 **Network:** <!-- Select one: [dufour|rotsee|anvil] -->
 
 **Nodes Impacted:** <!-- List the affected node IDs or 'all' if system-wide -->
+
+**Configuration file**: <!-- Any remarkable configuration file attribute -->
 
 (Write your answer here.)
 
