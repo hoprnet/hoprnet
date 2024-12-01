@@ -116,6 +116,13 @@ pub const SESSION_USABLE_MTU_SIZE: usize =
 trait AsyncReadWrite: futures::AsyncWrite + futures::AsyncRead + Send {}
 impl<T: futures::AsyncWrite + futures::AsyncRead + Send> AsyncReadWrite for T {}
 
+/// Describes a node service target.
+/// These are specialized [`SessionTargets`](SessionTarget::ExitNode)
+/// that are local to the Exit node and have different purposes, such as Cover Traffic.
+///
+/// These targets cannot be [sealed](SealedHost) from the Entry node.
+pub type ServiceId = u32;
+
 /// Defines what should happen with the data at the recipient where the
 /// data from the established session are supposed to be forwarded to some `target`.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -125,8 +132,8 @@ pub enum SessionTarget {
     UdpStream(SealedHost),
     /// Target is running over TCP with the given address and port.
     TcpStream(SealedHost),
-    /// Target is a service directly at the exit node with a given service ID.
-    ExitNode(u32),
+    /// Target is a service directly at the exit node with the given service ID.
+    ExitNode(ServiceId),
 }
 
 /// Wrapper for incoming [Session] along with other information
