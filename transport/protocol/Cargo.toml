@@ -44,8 +44,13 @@ hopr-async-runtime = { workspace = true }
 [dev-dependencies]
 anyhow = { workspace = true }
 async-std = { workspace = true }
+criterion = { workspace = true }
 hopr-db-sql = { workspace = true, features = ["runtime-async-std"] }
 more-asserts = { workspace = true }
 parameterized = { workspace = true }
 serial_test = { workspace = true }
 tracing-test = { workspace = true }
+
+[[bench]]
+name = "mixer_throughput"
+harness = false

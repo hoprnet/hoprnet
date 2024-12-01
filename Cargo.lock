@@ -4535,6 +4535,7 @@ dependencies = [
  "async-std",
  "async-trait",
  "core-path",
+ "criterion",
  "futures",
  "hex-literal",
  "hopr-async-runtime",
