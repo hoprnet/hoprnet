@@ -177,6 +177,39 @@
             rust-bin.stable.latest.minimal
             valgrind
           ];
+
+          dockerHoprdEntrypoint = pkgs.writeShellScriptBin "docker-entrypoint.sh" ''
+            set -euo pipefail
+
+            # if the default listen host has not been set by the user,
+            # we will set it to the container's ip address
+            # defaulting to port 50000
+
+            listen_host="''${HOPRD_DEFAULT_SESSION_LISTEN_HOST:-}"
+            listen_host_preset_ip="''${listen_host%%:*}"
+            listen_host_preset_port="''${listen_host#*:}"
+
+            if [ -z "''${listen_host_preset_ip:-}" ]; then
+              listen_host_ip="$(hostname -i)"
+
+              if [ -z "''${listen_host_preset_port:-}" ]; then
+                listen_host="''${listen_host_ip}:50000"
+              else
+                listen_host="''${listen_host_ip}:''${listen_host_preset_port}"
+              fi
+            fi
+
+            export HOPRD_DEFAULT_SESSION_LISTEN_HOST="''${listen_host}"
+
+            if [ -x "/bin/''${1:-}" ]; then
+              # allow execution of auxiliary commands
+              exec "''$@"
+            else
+              # default to hoprd
+              exec /bin/hoprd "''$@"
+            fi
+          '';
+
           # FIXME: the docker image built is not working on macOS arm platforms
           # and will simply lead to a non-working image. Likely, some form of
           # cross-compilation or distributed build is required.
@@ -184,11 +217,13 @@
             inherit pkgs;
             name = "hoprd";
             extraContents = [
+              dockerHoprdEntrypoint
               package
             ] ++ deps;
             Entrypoint = [
-              "/bin/hoprd"
+              "/bin/docker-entrypoint.sh"
             ];
+            Cmd = [ "hoprd" ];
           };
           hoprd-docker = import ./nix/docker-builder.nix (hoprdDockerArgs hoprd [ ]);
           hoprd-debug-docker = import ./nix/docker-builder.nix (hoprdDockerArgs hoprd-debug [ ]);
