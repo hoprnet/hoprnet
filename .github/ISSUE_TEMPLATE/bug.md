@@ -52,10 +52,15 @@ assignees: ''
 
 <!--- Provide a detailed description of the change or addition you are proposing -->
 <!-- For example:
-- Version: 
-- Distribution: binary, docker, docker-compose, dappNode 
-- Network [dufour|rotsee|anvil]
-- Nodes impacted: -->
+### Environment Details (Required)
+
+**Version:** <!-- e.g., v1.2.3 -->
+
+**Distribution:** <!-- Select one: [binary|docker|docker-compose|dappNode] -->
+
+**Network:** <!-- Select one: [dufour|rotsee|anvil] -->
+
+**Nodes Impacted:** <!-- List the affected node IDs or 'all' if system-wide -->
 
 (Write your answer here.)
 
