@@ -7,17 +7,18 @@ assignees: ''
 ---
 
 <!--- Please DO NOT remove the automatically added 'new issue' label -->
-<!--- Provide a general summary of the issue in the Title above -->
+<!--- Provide a general summary of the issue in the Title -->
 
-## Expected Behavior
-
-<!--- Tell us what should happen -->
-
-(Write your answer here.)
 
 ## Current Behavior
 
 <!--- Tell us what happens instead of the expected behavior -->
+
+(Write your answer here.)
+
+## Expected Behavior
+
+<!--- Tell us what should happen -->
 
 (Write your answer here.)
 
@@ -51,16 +52,14 @@ assignees: ''
 
 <!--- Provide a detailed description of the change or addition you are proposing -->
 <!-- For example:
-- Device: [e.g. iPhone6]
-- OS: [e.g. iOS8.1]
-- Browser [e.g. stock browser, safari]
-- Version [e.g. 22] -->
+- Version: 
+- Distribution: binary, docker, docker-compose, dappNode 
+- Network [dufour|rotsee|anvil]
+- Nodes impacted: -->
 
 (Write your answer here.)
 
 ## Logs
-
-<!--- Obligatory if the bug occurred while running HOPR Chat, please attach to this issue the file named "log" or "log.txt" produced in your "hopr-chat" folder. -->
 
 (Write your answer here.)
 
