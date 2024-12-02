@@ -209,6 +209,7 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                 #[cfg(all(feature = "prometheus", not(test)))]
                 METRIC_ACTIVE_TARGETS.increment(&["loopback"], 1.0);
 
+                // Uses 4 kB buffer for copying
                 match tokio::io::copy(&mut reader, &mut writer).await {
                     Ok(copied) => tracing::info!(?session_id, copied, "server loopback session service ended"),
                     Err(error) => tracing::error!(
