@@ -956,11 +956,14 @@ impl Hopr {
             HoprLibProcesses::OnReceivedAcknowledgement,
             spawn(async move {
                 while let Some(ack) = on_ack_tkt_rx.next().await {
-                    let _ = hopr_strategy::strategy::SingularStrategy::on_acknowledged_winning_ticket(
+                    if let Err(error) = hopr_strategy::strategy::SingularStrategy::on_acknowledged_winning_ticket(
                         &*multi_strategy_ack_ticket,
                         &ack,
                     )
-                    .await;
+                    .await
+                    {
+                        error!(%error, "failed to process acknowledged winning ticket with the strategy");
+                    }
                 }
             }),
         );
