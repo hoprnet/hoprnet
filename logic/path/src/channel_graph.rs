@@ -6,7 +6,7 @@ use petgraph::graphmap::DiGraphMap;
 use petgraph::visit::{EdgeFiltered, EdgeRef};
 use petgraph::Direction;
 use serde::{Deserialize, Serialize};
-use std::fmt::Debug;
+use std::fmt::{Debug, Formatter};
 use tracing::{debug, info};
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -38,6 +38,18 @@ pub struct ChannelEdge {
     /// Network quality of this channel at the transport level (if any).
     /// This value is currently present only for *own channels*.
     pub quality: Option<f64>,
+}
+
+impl std::fmt::Display for ChannelEdge {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}; stake {}; quality: {}",
+            self.channel,
+            self.channel.balance,
+            self.quality.unwrap_or(-1_f64)
+        )
+    }
 }
 
 /// Implements a HOPR payment channel graph (directed) cached in-memory.
@@ -224,6 +236,14 @@ impl ChannelGraph {
     /// Checks whether the given channel is in the graph already.
     pub fn contains_channel(&self, channel: &ChannelEntry) -> bool {
         self.graph.contains_edge(channel.source, channel.destination)
+    }
+
+    /// Outputs the channel graph in the DOT (graphviz) format.
+    pub fn as_graphviz(&self) -> String {
+        petgraph::dot::Dot::with_attr_getters(&self.graph, &[], &|_, (_, _, e)| e.to_string(), &|_, (_, n)| {
+            n.to_string()
+        })
+        .to_string()
     }
 }
 

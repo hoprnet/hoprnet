@@ -1495,4 +1495,8 @@ impl Hopr {
             .await
             .map(|pk| pk.map(|v| v.into()))?)
     }
+
+    pub async fn export_channel_graph(&self) -> String {
+        self.channel_graph.read().await.as_graphviz()
+    }
 }

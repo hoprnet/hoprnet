@@ -264,6 +264,24 @@ pub(super) async fn metrics() -> impl IntoResponse {
     }
 }
 
+/// Retrieve node's channel graph in DOT (graphviz) format.
+#[utoipa::path(
+    get,
+    path = const_format::formatcp!("{BASE_PATH}/node/graph"),
+    responses(
+            (status = 200, description = "Fetched channel graph", body = String),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
+    ),
+    security(
+            ("api_token" = []),
+            ("bearer_token" = [])
+    ),
+    tag = "Node"
+)]
+pub(super) async fn channel_graph(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
+    (StatusCode::OK, state.hopr.export_channel_graph().await).into_response()
+}
+
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 #[schema(example = json!({
