@@ -57,7 +57,7 @@ impl std::fmt::Display for ChannelEdge {
 /// This structure is useful for tracking channel state changes and
 /// packet path finding.
 /// The structure is updated only from the Indexer and therefore contains only
-/// the channels that were *seen* on-chain. The network qualities are also
+/// the channels *seen* on-chain. The network qualities are also
 /// added to the graph on the fly.
 /// Using this structure is much faster than querying the DB and therefore
 /// is preferred for per-packet path-finding computations.
@@ -70,7 +70,7 @@ pub struct ChannelGraph {
 }
 
 impl ChannelGraph {
-    /// Maximum number of intermediate hops the automatic path finding algorithm will look for.
+    /// The maximum number of intermediate hops the automatic path finding algorithm will look for.
     pub const INTERMEDIATE_HOPS: usize = 3;
 
     /// Creates a new instance with the given self `Address`.
@@ -221,8 +221,12 @@ impl ChannelGraph {
     where
         I: IntoIterator<Item = ChannelEntry>,
     {
+        self.graph.clear();
+
+        let now = hopr_platform::time::native::current_time();
         let changes: usize = channels
             .into_iter()
+            .filter(|c| !c.closure_time_passed(now))
             .map(|c| self.update_channel(c).map(|v| v.len()).unwrap_or(0))
             .sum();
         info!(
@@ -253,7 +257,7 @@ mod tests {
     use hopr_internal_types::channels::{ChannelChange, ChannelEntry, ChannelStatus};
     use hopr_primitive_types::prelude::*;
     use lazy_static::lazy_static;
-    use std::ops::Add;
+    use std::ops::{Add, Sub};
     use std::str::FromStr;
     use std::time::{Duration, SystemTime};
 
@@ -476,8 +480,24 @@ mod tests {
             last_addr = *current_addr;
         }
 
-        // Add a pending to close channel between 4 -> 0
+        // Add a closed channel between 4 -> 0
         let channel = dummy_channel(ADDRESSES[4], ADDRESSES[0], ChannelStatus::Closed);
+        db.upsert_channel(None, channel).await?;
+
+        // Add an expired "pending to close" channel between 3 -> 0
+        let channel = dummy_channel(
+            ADDRESSES[3],
+            ADDRESSES[0],
+            ChannelStatus::PendingToClose(SystemTime::now().sub(Duration::from_secs(20))),
+        );
+        db.upsert_channel(None, channel).await?;
+
+        // Add a not-expired "pending to close" channel between 2 -> 0
+        let channel = dummy_channel(
+            ADDRESSES[2],
+            ADDRESSES[0],
+            ChannelStatus::PendingToClose(SystemTime::now().add(Duration::from_secs(20))),
+        );
         db.upsert_channel(None, channel).await?;
 
         let mut cg = ChannelGraph::new(ADDRESSES[0]);
@@ -489,12 +509,21 @@ mod tests {
             "must not sync closed channel"
         );
         assert!(
+            cg.get_channel(ADDRESSES[3], ADDRESSES[0]).is_none(),
+            "must not sync expired pending to close channel"
+        );
+        assert!(
+            cg.get_channel(ADDRESSES[2], ADDRESSES[0])
+                .is_some_and(|c| c.status != ChannelStatus::Open && !c.closure_time_passed(SystemTime::now())),
+            "must sync non-expired pending to close channel"
+        );
+        assert!(
             db.get_all_channels(None)
                 .await?
                 .into_iter()
-                .filter(|c| c.status != ChannelStatus::Closed)
+                .filter(|c| !c.closure_time_passed(SystemTime::now()))
                 .all(|c| cg.contains_channel(&c)),
-            "must contain all non-closed channels"
+            "must contain all non-closed channels with non-expired grace period"
         );
 
         Ok(())

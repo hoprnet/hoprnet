@@ -1690,6 +1690,7 @@ dependencies = [
  "hopr-db-sql",
  "hopr-internal-types",
  "hopr-metrics",
+ "hopr-platform",
  "hopr-primitive-types",
  "lazy_static",
  "libp2p-identity",
