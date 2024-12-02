@@ -240,10 +240,7 @@ impl ChannelGraph {
 
     /// Outputs the channel graph in the DOT (graphviz) format.
     pub fn as_graphviz(&self) -> String {
-        petgraph::dot::Dot::with_attr_getters(&self.graph, &[], &|_, (_, _, e)| e.to_string(), &|_, (_, n)| {
-            n.to_string()
-        })
-        .to_string()
+        petgraph::dot::Dot::with_config(&self.graph, &[]).to_string()
     }
 }
 
