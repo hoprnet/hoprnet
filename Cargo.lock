@@ -1220,7 +1220,7 @@ dependencies = [
 
 [[package]]
 name = "chain-actions"
-version = "0.7.2"
+version = "0.7.3"
 dependencies = [
  "anyhow",
  "async-channel 2.3.1",

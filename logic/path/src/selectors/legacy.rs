@@ -296,6 +296,7 @@ mod tests {
     }
 
     /// Quickly define a graph with edge weights.
+    ///
     /// Syntax:
     /// `0 [1] -> 1` => edge from `0` to `1` with edge weight `1`
     /// `0 <- [1] 1` => edge from `1` to `0` with edge weight `1`
@@ -412,8 +413,30 @@ mod tests {
     }
 
     #[test]
-    fn test_should_not_find_zero_path() {
+    fn test_should_not_find_zero_weight_path() {
         let isolated = define_graph("0 [0] -> 1", ADDRESSES[0], |_, _| 1_f64);
+
+        let selector = DfsPathSelector::<TestWeights>::default();
+
+        selector
+            .select_path(&isolated, ADDRESSES[0], ADDRESSES[5], 1, 1)
+            .expect_err("should not find a path");
+    }
+
+    #[test]
+    fn test_should_not_find_one_hop_path_when_unrelated_channels_are_in_the_graph() {
+        let isolated = define_graph("1 [1] -> 2", ADDRESSES[0], |_, _| 1_f64);
+
+        let selector = DfsPathSelector::<TestWeights>::default();
+
+        selector
+            .select_path(&isolated, ADDRESSES[0], ADDRESSES[5], 1, 1)
+            .expect_err("should not find a path");
+    }
+
+    #[test]
+    fn test_should_not_find_one_hop_path_in_empty_graph() {
+        let isolated = define_graph("", ADDRESSES[0], |_, _| 1_f64);
 
         let selector = DfsPathSelector::<TestWeights>::default();
 
