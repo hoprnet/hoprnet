@@ -6,11 +6,6 @@ if [ -z "${HOPRD_API_TOKEN}" ]; then
     exit 1
 fi
 
-if [ -z "${HOPRD_API_PORT}" ]; then
-    echo "Error: HOPRD_API_PORT is not set"
-    exit 1
-fi
-
 METRICS_PUSH_URL=${1}
 if [ -z "${METRICS_PUSH_URL}" ]; then
     echo "Error: METRICS_PUSH_URL argument is required"
@@ -21,7 +16,7 @@ fi
 while true; do 
     echo Publishing metrics ...
     # Add timeout and retry with backoff
-    if ! metrics=$(curl -s --max-time 10 -H "X-Auth-Token: ${HOPRD_API_TOKEN}" "http://hoprd:${HOPRD_API_PORT}/api/v3/node/metrics"); then
+    if ! metrics=$(curl -s --max-time 10 -H "X-Auth-Token: ${HOPRD_API_TOKEN}" "http://hoprd:3001/api/v3/node/metrics"); then
         echo "Error: Failed to fetch metrics from Hoprd API"
         sleep 5
         continue
