@@ -118,6 +118,7 @@ pub(crate) struct InternalState {
         node::entry_nodes,
         node::info,
         node::metrics,
+        node::channel_graph,
         node::peers,
         node::version,
         peers::ping_peer,
