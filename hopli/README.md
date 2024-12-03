@@ -254,7 +254,7 @@ In this guide, you will create an identity, retrieve its peerID and node address
 3. Build the package: `cargo build --release`.
 4. Modify the following variables to suit your setup `IDENTITY_PASSWORD`, `PRIVATE_KEY` & `MANAGER_PRIVATE_KEY`:
 
-```shell
+```
 export PATH="./target/release:${PATH}"
 export RUST_BACKTRACE=full
 export HOPRD_NETWORK=rotsee
@@ -267,18 +267,18 @@ After making the necessary adjustments, copy the entire block of code and execut
 
 5. Execute the following command to create an identity file in the `new_identities` folder:
 
-```shell
+```
 hopli identity create --identity-directory "./new_identities" --identity-prefix nodes_ --number 1
 ```
 
 6. Create a safe, module instances and link the recently created identity by executing the following command:
 
-```shell
+```
 hopli safe-module create --network ${HOPRD_NETWORK} --contracts-root "./ethereum/contracts"  --provider-url https://gnosis.rpc-provider.prod.hoprnet.link --identity-directory "./new_identities" --allowance 10.5 --hopr-amount 1 --native-amount 0.1
 ```
 
 7. Read the identity file to retrieve the PeerID and native address by executing the following command (OPTIONAL):
 
-```shell
+```
 hopli identity read --identity-directory "./new_identities" --identity-prefix nodes_
 ```

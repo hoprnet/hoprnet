@@ -25,7 +25,7 @@ For detailed instructions, follow [this guide](https://github.com/hoprnet/hoprne
 
 Start by cloning `hoprnet` repository:
 
-```shell
+```
 git clone https://github.com/hoprnet/hoprnet.git
 ```
 
@@ -116,13 +116,13 @@ Commands needs to be executed inside the `compose` directory:
 
 1. Run only the hopr node
 
-```shell
+```
 COMPOSE_PROFILES=hoprd docker compose up -d
 ```
 
 2. Run the `hopr-admin` and a hopr node
 
-```shell
+```
 COMPOSE_PROFILES=hoprd,admin-ui docker compose up -d
 ```
 
@@ -131,7 +131,7 @@ The default hoprd API endpoint is available at [http://localhost:3001](http://lo
 
 3. Run hopr node with a full internal monitoring system (Prometheus and Grafana)
 
-```shell
+```
 COMPOSE_PROFILES=hoprd,metrics-vis docker compose up -d
 ```
 
@@ -144,13 +144,13 @@ Navigate to the Dashboards page and open the desired dashboard
 
 Before running this profile, make sure that you modify the variable `METRICS_PUSH_URL` to point to your prometheus pushgateway instance and that you name your hoprd node accordingly among other nodes. Modify the variable `METRICS_PUSH_KEY` to set the user and password available for the Prometheus Pushgateway. Get it from Bitwarden Secret 'Prometheus Pushgateway Hoprd Node'.
 
-```shell
+```
 COMPOSE_PROFILES=hoprd,metrics-push docker compose up -d
 ```
 
 5. Run everything
 
-```shell
+```
 COMPOSE_PROFILES=hoprd,admin-ui,metrics,metrics-vis docker compose up -d
 ```
 
@@ -160,11 +160,11 @@ Important: You must use exactly the same `COMPOSE_PROFILES` values for the `dock
 
 For example, if you started with:
 
-```shell
+```
 COMPOSE_PROFILES=hoprd,metrics-push docker compose up -d
 ```
 
 You must stop with:
-```shell
+```
 COMPOSE_PROFILES=hoprd,metrics-push docker compose down
 ```
