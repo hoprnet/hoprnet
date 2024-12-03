@@ -163,13 +163,16 @@ where
 
         let selector_id = selector.to_string();
 
-        let mut redeem_stream = self
+        // Collect here, so we don't hold-up the stream open for too long
+        let redeem_stream = self
             .db
             .update_ticket_states_and_fetch(selector, AcknowledgedTicketStatus::BeingRedeemed)
-            .await?;
+            .await?
+            .collect::<Vec<_>>()
+            .await;
 
         let mut receivers: Vec<PendingAction> = vec![];
-        while let Some(ack_ticket) = redeem_stream.next().await {
+        for ack_ticket in redeem_stream {
             let ticket_id = ack_ticket.to_string();
 
             if let Ok(redeemable) = ack_ticket.into_redeemable(&self.chain_key, &channel_dst) {
@@ -213,13 +216,15 @@ where
                 .with_index(ack_ticket.verified_ticket().index)
                 .with_state(AcknowledgedTicketStatus::Untouched);
 
-            if let Some(ticket) = self
+            // Do not hold up the stream open for too long
+            let maybe_ticket = self
                 .db
                 .update_ticket_states_and_fetch(selector, AcknowledgedTicketStatus::BeingRedeemed)
                 .await?
                 .next()
-                .await
-            {
+                .await;
+
+            if let Some(ticket) = maybe_ticket {
                 let channel_dst = self
                     .db
                     .get_indexer_data(None)
