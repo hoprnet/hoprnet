@@ -73,6 +73,7 @@ pub use {
     chain_api::config::{
         Addresses as NetworkContractAddresses, EnvironmentType, Network as ChainNetwork, ProtocolsConfig,
     },
+    core_path::channel_graph::GraphExportConfig,
     hopr_internal_types::prelude::*,
     hopr_network_types::prelude::{IpProtocol, RoutingOptions},
     hopr_primitive_types::prelude::*,
@@ -1496,7 +1497,7 @@ impl Hopr {
             .map(|pk| pk.map(|v| v.into()))?)
     }
 
-    pub async fn export_channel_graph(&self) -> String {
-        self.channel_graph.read().await.as_graphviz()
+    pub async fn export_channel_graph(&self, cfg: GraphExportConfig) -> String {
+        self.channel_graph.read().await.as_dot(cfg)
     }
 }

@@ -11,7 +11,7 @@ use serde_with::{serde_as, DisplayFromStr};
 use std::{collections::HashMap, sync::Arc};
 
 use hopr_crypto_types::prelude::Hash;
-use hopr_lib::{Address, AsUnixTimestamp, Health, Multiaddr, ToHex};
+use hopr_lib::{Address, AsUnixTimestamp, GraphExportConfig, Health, Multiaddr, ToHex};
 
 use crate::{ApiError, ApiErrorStatus, InternalState, BASE_PATH};
 
@@ -23,7 +23,7 @@ pub(crate) struct NodeVersionResponse {
     version: String,
 }
 
-/// Get release version of the running node.
+/// Get the release version of the running node.
 #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/node/version"),
@@ -264,10 +264,38 @@ pub(super) async fn metrics() -> impl IntoResponse {
     }
 }
 
+#[serde_as]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+#[schema(example = json!({
+        "ignore_disconnected_components": true,
+        "ignore_non_opened_channels": true
+    }))]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct GraphExportRequest {
+    /// If set, nodes that are not connected to this node (via open channels) will not be exported.
+    /// This setting automatically implies `ignore_non_opened_channels`.
+    pub ignore_disconnected_components: bool,
+    /// Do not export channels that are not in the `Open` state.
+    pub ignore_non_opened_channels: bool,
+}
+
+impl From<GraphExportRequest> for GraphExportConfig {
+    fn from(value: GraphExportRequest) -> Self {
+        Self {
+            ignore_disconnected_components: value.ignore_disconnected_components,
+            ignore_non_opened_channels: value.ignore_non_opened_channels,
+        }
+    }
+}
+
 /// Retrieve node's channel graph in DOT (graphviz) format.
 #[utoipa::path(
     get,
     path = const_format::formatcp!("{BASE_PATH}/node/graph"),
+    request_body(
+            content = GraphExportRequest,
+            description = "Graph export configuration",
+            content_type = "application/json"),
     responses(
             (status = 200, description = "Fetched channel graph", body = String),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
@@ -278,8 +306,11 @@ pub(super) async fn metrics() -> impl IntoResponse {
     ),
     tag = "Node"
 )]
-pub(super) async fn channel_graph(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
-    (StatusCode::OK, state.hopr.export_channel_graph().await).into_response()
+pub(super) async fn channel_graph(
+    State(state): State<Arc<InternalState>>,
+    Json(args): Json<GraphExportRequest>,
+) -> impl IntoResponse {
+    (StatusCode::OK, state.hopr.export_channel_graph(args.into()).await).into_response()
 }
 
 #[serde_as]

@@ -1,9 +1,10 @@
 use crate::errors::Result;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::primitives::Address;
-use petgraph::algo::has_path_connecting;
+use petgraph::algo::{has_path_connecting, DfsSpace};
+use petgraph::dot::Dot;
 use petgraph::graphmap::DiGraphMap;
-use petgraph::visit::{EdgeFiltered, EdgeRef};
+use petgraph::visit::{EdgeFiltered, EdgeRef, NodeFiltered};
 use petgraph::Direction;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Formatter};
@@ -242,10 +243,48 @@ impl ChannelGraph {
         self.graph.contains_edge(channel.source, channel.destination)
     }
 
-    /// Outputs the channel graph in the DOT (graphviz) format.
-    pub fn as_graphviz(&self) -> String {
-        petgraph::dot::Dot::with_config(&self.graph, &[]).to_string()
+    /// Outputs the channel graph in the DOT (graphviz) format with the given `config`.
+    pub fn as_dot(&self, cfg: GraphExportConfig) -> String {
+        if cfg.ignore_non_opened_channels {
+            Dot::new(&NodeFiltered::from_fn(&self.graph, |a| {
+                self.graph.neighbors_directed(a, Direction::Outgoing).any(|b| {
+                    self.graph
+                        .edge_weight(a, b)
+                        .is_some_and(|w| w.channel.status == ChannelStatus::Open)
+                }) || self.graph.neighbors_directed(a, Direction::Incoming).any(|b| {
+                    self.graph
+                        .edge_weight(a, b)
+                        .is_some_and(|w| w.channel.status == ChannelStatus::Open)
+                })
+            }))
+            .to_string()
+        } else if cfg.ignore_disconnected_components {
+            let only_open_graph =
+                EdgeFiltered::from_fn(&self.graph, |e| e.weight().channel.status == ChannelStatus::Open);
+
+            Dot::new(&NodeFiltered::from_fn(&self.graph, |n| {
+                let mut dfs_state = DfsSpace::new(&only_open_graph);
+                has_path_connecting(&only_open_graph, self.me, n, Some(&mut dfs_state))
+                    || has_path_connecting(&only_open_graph, n, self.me, Some(&mut dfs_state))
+            }))
+            .to_string()
+        } else {
+            Dot::new(&self.graph).to_string()
+        }
     }
+}
+
+/// Configuration for the DOT export of the [`ChannelGraph`].
+///
+/// See [`ChannelGraph::as_dot`].
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct GraphExportConfig {
+    /// If set, nodes that are not connected to this node (via open channels) will not be exported.
+    ///
+    /// This setting automatically implies `ignore_non_opened_channels`.
+    pub ignore_disconnected_components: bool,
+    /// Do not export channels that are not in the [`ChannelStatus::Open`] state.
+    pub ignore_non_opened_channels: bool,
 }
 
 #[cfg(test)]
