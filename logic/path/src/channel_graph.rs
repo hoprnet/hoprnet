@@ -259,9 +259,11 @@ impl ChannelGraph {
             }))
             .to_string()
         } else if cfg.ignore_disconnected_components {
+            // Create a filtered graph with only Opened channels edges
             let only_open_graph =
                 EdgeFiltered::from_fn(&self.graph, |e| e.weight().channel.status == ChannelStatus::Open);
 
+            // Filter out nodes that are not connected to this node
             Dot::new(&NodeFiltered::from_fn(&self.graph, |n| {
                 let mut dfs_state = DfsSpace::new(&only_open_graph);
                 has_path_connecting(&only_open_graph, self.me, n, Some(&mut dfs_state))
