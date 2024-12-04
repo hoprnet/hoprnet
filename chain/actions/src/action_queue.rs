@@ -355,7 +355,6 @@ where
     /// Consumes self and runs the main queue processing loop until the queue is closed.
     ///
     /// The method will panic if the Channel Domain Separator is not yet populated in the DB.
-    //#[allow(clippy::async_yields_async)]
     #[tracing::instrument(level = "debug", skip(self))]
     pub async fn start(self) {
         let queue_recv = self.queue_recv.clone();
