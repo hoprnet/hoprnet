@@ -21,7 +21,7 @@ use tracing::{debug, error, info, trace, warn};
 
 use crate::action_state::{ActionState, IndexerExpectation};
 use crate::errors::ChainActionsError::{ChannelAlreadyClosed, InvalidState, Timeout, TransactionSubmissionFailed};
-use crate::errors::{ChainActionsError, Result};
+use crate::errors::Result;
 
 use hopr_async_runtime::prelude::spawn;
 use hopr_db_sql::api::tickets::HoprDbTicketOperations;
@@ -165,7 +165,7 @@ where
     TxExec: TransactionExecutor,
 {
     #[tracing::instrument(level = "debug", skip(self))]
-    pub async fn execute_action(self, action: Action, channel_dst: Hash) -> Result<ActionConfirmation> {
+    pub async fn execute_action(self, action: Action) -> Result<ActionConfirmation> {
         let expectation = match action.clone() {
             Action::RedeemTicket(ack) => {
                 let ticket_channel_id = ack.verified_ticket().channel_id;
@@ -241,9 +241,9 @@ where
             },
 
             Action::Withdraw(recipient, amount) => {
-                // Withdrawal is not awaited via the Indexer, but polled for completion
+                // Withdrawal is not awaited via the Indexer, but polled for completion,
                 // so no indexer event stream expectation awaiting is needed.
-                // So simply return once the future completes
+                // So return once the future completes
                 return Ok(ActionConfirmation {
                     tx_hash: self.tx_exec.withdraw(recipient, amount).await?,
                     event: None,
@@ -347,8 +347,8 @@ where
 
     /// Consumes self and runs the main queue processing loop until the queue is closed.
     ///
-    /// The method will panic if Channel Domain Separator is not yet populated in the DB.
-    #[allow(clippy::async_yields_async)]
+    /// The method will panic if the Channel Domain Separator is not yet populated in the DB.
+    //#[allow(clippy::async_yields_async)]
     #[tracing::instrument(level = "debug", skip(self))]
     pub async fn start(self) {
         let queue_recv = self.queue_recv.clone();
@@ -359,13 +359,6 @@ where
 
             let exec_context = self.ctx.clone();
             let db_clone = self.db.clone();
-            let channel_dst = self
-                .db
-                .get_indexer_data(None)
-                .await
-                .map_err(ChainActionsError::from)
-                .and_then(|data| data.channels_dst.ok_or(InvalidState("missing channels dst".into())))
-                .expect("Channel domain separator is not yet populated in the DB");
 
             // NOTE: the process is "daemonized" and not awaited, so it will run in the background
             spawn(async move {
@@ -373,7 +366,7 @@ where
                 let act_name: &'static str = (&act).into();
                 trace!(act_id, act_name, "executing");
 
-                let tx_result = exec_context.execute_action(act.clone(), channel_dst).await;
+                let tx_result = exec_context.execute_action(act.clone()).await;
                 match &tx_result {
                     Ok(confirmation) => {
                         info!(%confirmation, "successful confirmation");
@@ -394,7 +387,7 @@ where
                             }
                         }
 
-                        // Timeout are accounted in different metric
+                        // Timeouts are accounted in different metric
                         if let Timeout = err {
                             error!(act_id, "timeout while waiting for confirmation");
 

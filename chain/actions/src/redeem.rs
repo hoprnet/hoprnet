@@ -212,6 +212,8 @@ where
                 return Err(OldTicket);
             }
 
+            debug!(%ack_ticket, %channel, "redeeming single ticket");
+
             let selector = TicketSelector::from(&channel)
                 .with_index(ack_ticket.verified_ticket().index)
                 .with_state(AcknowledgedTicketStatus::Untouched);
@@ -233,6 +235,8 @@ where
                     .ok_or(InvalidState("missing channel dst".into()))?;
 
                 let redeemable = ticket.into_redeemable(&self.chain_key, &channel_dst)?;
+
+                debug!(%ack_ticket, "ticket is redeemable");
                 Ok(self.tx_sender.send(Action::RedeemTicket(redeemable)).await?)
             } else {
                 Err(WrongTicketState(ack_ticket.to_string()))
