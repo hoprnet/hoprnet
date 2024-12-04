@@ -167,9 +167,10 @@ where
     #[tracing::instrument(level = "debug", skip(self))]
     pub async fn execute_action(self, action: Action) -> Result<ActionConfirmation> {
         let expectation = match action.clone() {
-            Action::RedeemTicket(ack) => {
-                let ticket_channel_id = ack.verified_ticket().channel_id;
-                let tx_hash = self.tx_exec.redeem_ticket(ack).await?;
+            Action::RedeemTicket(ticket) => {
+                debug!(%ticket, "redeeming ticket");
+                let ticket_channel_id = ticket.verified_ticket().channel_id;
+                let tx_hash = self.tx_exec.redeem_ticket(ticket).await?;
                 IndexerExpectation::new(
                     tx_hash,
                     move |event| matches!(event, ChainEventType::TicketRedeemed(channel, _) if ticket_channel_id == channel.get_id()),
@@ -177,6 +178,7 @@ where
             }
 
             Action::OpenChannel(address, stake) => {
+                debug!(%address, %stake, "opening channel");
                 let tx_hash = self.tx_exec.fund_channel(address, stake).await?;
                 IndexerExpectation::new(
                     tx_hash,
@@ -186,6 +188,7 @@ where
 
             Action::FundChannel(channel, amount) => {
                 if channel.status == ChannelStatus::Open {
+                    debug!(%channel, "funding channel");
                     let tx_hash = self.tx_exec.fund_channel(channel.destination, amount).await?;
                     IndexerExpectation::new(
                         tx_hash,
@@ -199,6 +202,7 @@ where
             Action::CloseChannel(channel, direction) => match direction {
                 ChannelDirection::Incoming => match channel.status {
                     ChannelStatus::Open | ChannelStatus::PendingToClose(_) => {
+                        debug!(%channel, "closing incoming channel");
                         let tx_hash = self.tx_exec.close_incoming_channel(channel.source).await?;
                         IndexerExpectation::new(
                             tx_hash,
@@ -244,6 +248,7 @@ where
                 // Withdrawal is not awaited via the Indexer, but polled for completion,
                 // so no indexer event stream expectation awaiting is needed.
                 // So return once the future completes
+                debug!(%recipient, %amount, "withdrawing funds");
                 return Ok(ActionConfirmation {
                     tx_hash: self.tx_exec.withdraw(recipient, amount).await?,
                     event: None,
@@ -251,6 +256,7 @@ where
                 });
             }
             Action::Announce(data) => {
+                debug!(mutliaddress = %data.multiaddress(), "announcing node");
                 let tx_hash = self.tx_exec.announce(data.clone()).await?;
                 IndexerExpectation::new(
                     tx_hash,
@@ -258,6 +264,7 @@ where
                 )
             }
             Action::RegisterSafe(safe_address) => {
+                debug!(%safe_address, "registering safe");
                 let tx_hash = self.tx_exec.register_safe(safe_address).await?;
                 IndexerExpectation::new(
                     tx_hash,
