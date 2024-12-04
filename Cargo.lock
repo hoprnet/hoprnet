@@ -4516,9 +4516,9 @@ dependencies = [
  "more-asserts",
  "rust-stream-ext-concurrent",
  "smart-default",
- "test-log",
  "thiserror",
  "tracing",
+ "tracing-test",
 ]
 
 [[package]]

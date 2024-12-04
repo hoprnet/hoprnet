@@ -34,6 +34,6 @@ futures = { workspace = true }
 mockall = { workspace = true }
 more-asserts = { workspace = true }
 rust-stream-ext-concurrent = { workspace = true }
-test-log = { workspace = true }
+tracing-test = { workspace = true }
 
 

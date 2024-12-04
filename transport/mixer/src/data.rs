@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+
 /// Data structure holding the data alongside a release timemestamp.
 ///
 /// The ordering functionality is defined only over the release timestamp
@@ -14,16 +16,26 @@ impl<T> PartialEq for DelayedData<T> {
 }
 
 impl<T> PartialOrd for DelayedData<T> {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.release.partial_cmp(&other.release)
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        // self.release.partial_cmp(&other.release)
+        self.release.partial_cmp(&other.release).map(|v| match v {
+            Ordering::Less => Ordering::Greater,
+            Ordering::Greater => Ordering::Less,
+            Ordering::Equal => Ordering::Equal,
+        })
     }
 }
 
 impl<T> Eq for DelayedData<T> {}
 
 impl<T> Ord for DelayedData<T> {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.release.cmp(&other.release)
+    fn cmp(&self, other: &Self) -> Ordering {
+        // self.release.cmp(&other.release)
+        match self.release.cmp(&other.release) {
+            Ordering::Less => Ordering::Greater,
+            Ordering::Greater => Ordering::Less,
+            Ordering::Equal => Ordering::Equal,
+        }
     }
 }
 
