@@ -1,82 +1,43 @@
-//! [`Session`] object providing the session functionality over the HOPR transport
-//!
-//! The session proxies the user interactions with the transport in order to hide the
-//! advanced interactions and functionality.
-
+pub mod channel;
+pub mod data;
+pub mod delay;
 pub mod errors;
-pub mod initiation;
-mod manager;
-pub mod traits;
-pub mod types;
+pub mod mixer;
 
-pub use manager::{DispatchResult, SessionManager, SessionManagerConfig};
+// Notes
+//
+// recv() in std channels is the only function that blocks, blocking in ccoperative concurrency
+// block all other execution paths.
+//
+// ## Context usage
+// - contains waker
+// ```rust
+//     let waker = cx.waker();
+//     waker.wake();
+// ```
 
-use hopr_network_types::prelude::state::SessionFeature;
-pub use hopr_network_types::types::*;
-use libp2p_identity::PeerId;
-pub use types::{IncomingSession, Session, SessionId, SESSION_USABLE_MTU_SIZE};
-#[cfg(feature = "serde")]
-use {
-    serde::{Deserialize, Serialize},
-    serde_with::{As, DisplayFromStr},
-};
+// #[tokio::main]
+// async fn main() {
+//     let (tx, mut rx) = channel();
+//     // let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
 
-/// Capabilities of a session.
-#[repr(u8)]
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, strum::EnumIter, strum::Display, strum::EnumString)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub enum Capability {
-    /// Frame segmentation
-    Segmentation,
-    /// Frame retransmission (ACK and NACK-based)
-    Retransmission,
-    /// Frame retransmission (only ACK-based)
-    RetransmissionAckOnly,
-    /// Disable packet buffering
-    NoDelay,
-}
+//     let tx1 = tx.clone();
+//     tokio::spawn(async move {
+//         tokio::time::sleep(Duration::from_secs(4)).await;
+//         tx1.send(1).expect("channel should be open");
+//     });
 
-impl IntoIterator for Capability {
-    type Item = SessionFeature;
-    type IntoIter = std::vec::IntoIter<Self::Item>;
+//     let tx2 = tx;
+//     tokio::spawn(async move {
+//         tokio::time::sleep(Duration::from_secs(2)).await;
+//         tx2.send(2).expect("channel should be open");
+//     });
 
-    fn into_iter(self) -> Self::IntoIter {
-        match self {
-            Capability::Segmentation => vec![],
-            Capability::Retransmission => vec![
-                SessionFeature::AcknowledgeFrames,
-                SessionFeature::RequestIncompleteFrames,
-                SessionFeature::RetransmitFrames,
-            ],
-            Capability::RetransmissionAckOnly => {
-                vec![SessionFeature::AcknowledgeFrames, SessionFeature::RetransmitFrames]
-            }
-            Capability::NoDelay => vec![SessionFeature::NoDelay],
-        }
-        .into_iter()
-    }
-}
+//     let now = Instant::now();
+//     while let Some(x) = rx.recv().await {
+//         println!("Received msg {x:?} after {dur:?}", dur = now.elapsed());
+//     }
+//     println!("Shutting down after {dur:?}", dur = now.elapsed());
+// }
 
-/// Configuration for the session.
-///
-/// Relevant primarily for the client, since the server is only
-/// a reactive component in regard to the session concept.
-#[derive(Debug, PartialEq, Clone)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct SessionClientConfig {
-    /// The peer to which the session should be established.
-    #[cfg_attr(feature = "serde", serde(with = "As::<DisplayFromStr>"))]
-    pub peer: PeerId,
 
-    /// The fixed path options for the session.
-    pub path_options: RoutingOptions,
-
-    /// Protocol to be used to connect to the target
-    pub target_protocol: IpProtocol,
-
-    /// Optionally encrypted target of the session.
-    pub target: SealedHost,
-
-    /// Capabilities offered by the session.
-    pub capabilities: Vec<Capability>,
-}

@@ -4503,6 +4503,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "hopr-transport-mixer"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-std",
+ "futures",
+ "futures-timer",
+ "hopr-async-runtime",
+ "hopr-crypto-random",
+ "mockall",
+ "more-asserts",
+ "rust-stream-ext-concurrent",
+ "smart-default",
+ "test-log",
+ "thiserror",
+ "tracing",
+]
+
+[[package]]
 name = "hopr-transport-p2p"
 version = "0.5.2"
 dependencies = [

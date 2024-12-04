@@ -13,21 +13,27 @@ crate-type = ["rlib"]
 
 [features]
 default = []
-runtime-async-std = ["hopr-network-types/runtime-async-std"]
-runtime-tokio = [
-  "hopr-network-types/runtime-tokio",
-  "dep:tokio",
-  "dep:tokio-util",
-]
-prometheus = ["dep:hopr-metrics", "dep:lazy_static"]
+runtime-async-std = ["hopr-async-runtime/runtime-async-std"]
+runtime-tokio = ["hopr-async-runtime/runtime-tokio"]
 
 [dependencies]
+futures = { workspace = true }
+futures-timer = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
-tokio = { workspace = true, optional = true }
+smart-default = { workspace = true }
+
+hopr-async-runtime = { workspace = true }
+hopr-crypto-random = { workspace = true }
+
 
 [dev-dependencies]
 anyhow = { workspace = true }
-async-std = { workspace = true }
+async-std = { workspace = true, features = ["attributes"] }
+futures = { workspace = true }
 mockall = { workspace = true }
+more-asserts = { workspace = true }
+rust-stream-ext-concurrent = { workspace = true }
 test-log = { workspace = true }
+
+
