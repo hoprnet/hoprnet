@@ -1,6 +1,6 @@
 [package]
 name = "core-path"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Contains mixnet path construction and path selection logic"
@@ -33,6 +33,7 @@ hopr-db-api = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-internal-types = { workspace = true }
 hopr-primitive-types = { workspace = true }
+hopr-platform = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
