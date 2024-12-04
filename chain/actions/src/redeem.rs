@@ -38,6 +38,8 @@ use crate::errors::ChainActionsError::{ChannelDoesNotExist, InvalidState};
 use crate::errors::{ChainActionsError::WrongTicketState, Result};
 use crate::ChainActions;
 
+// Hi!
+
 lazy_static::lazy_static! {
     /// Used as a placeholder when the redeem transaction has not yet been published on-chain
     static ref EMPTY_TX_HASH: Hash = Hash::default();
