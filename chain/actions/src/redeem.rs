@@ -201,13 +201,14 @@ where
                 .with_index(ack_ticket.verified_ticket().index)
                 .with_state(AcknowledgedTicketStatus::Untouched);
 
-            if let Some(ticket) = self
+            let maybe_ticket = self
                 .db
                 .update_ticket_states_and_fetch(selector, AcknowledgedTicketStatus::BeingRedeemed)
                 .await?
                 .next()
-                .await
-            {
+                .await;
+
+            if let Some(ticket) = maybe_ticket {
                 let channel_dst = self
                     .db
                     .get_indexer_data(None)
