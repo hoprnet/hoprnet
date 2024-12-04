@@ -245,7 +245,26 @@ impl ChannelGraph {
 
     /// Outputs the channel graph in the DOT (graphviz) format with the given `config`.
     pub fn as_dot(&self, cfg: GraphExportConfig) -> String {
-        if cfg.ignore_non_opened_channels {
+        if cfg.ignore_disconnected_components {
+            let only_open_graph =
+                EdgeFiltered::from_fn(&self.graph, |e| e.weight().channel.status == ChannelStatus::Open);
+
+            Dot::new(&NodeFiltered::from_fn(&self.graph, |n| {
+                let mut dfs_state = DfsSpace::new(&only_open_graph);
+
+                (has_path_connecting(&only_open_graph, self.me, n, Some(&mut dfs_state))
+                    && self
+                        .graph
+                        .edge_weight(self.me, n)
+                        .is_some_and(|v| v.quality.unwrap_or(-1f64) > 0_f64))
+                    || (has_path_connecting(&only_open_graph, n, self.me, Some(&mut dfs_state))
+                        && self
+                            .graph
+                            .edge_weight(n, self.me)
+                            .is_some_and(|v| v.quality.unwrap_or(-1f64) > 0_f64))
+            }))
+            .to_string()
+        } else if cfg.ignore_non_opened_channels {
             Dot::new(&NodeFiltered::from_fn(&self.graph, |a| {
                 self.graph.neighbors_directed(a, Direction::Outgoing).any(|b| {
                     self.graph
@@ -256,16 +275,6 @@ impl ChannelGraph {
                         .edge_weight(a, b)
                         .is_some_and(|w| w.channel.status == ChannelStatus::Open)
                 })
-            }))
-            .to_string()
-        } else if cfg.ignore_disconnected_components {
-            let only_open_graph =
-                EdgeFiltered::from_fn(&self.graph, |e| e.weight().channel.status == ChannelStatus::Open);
-
-            Dot::new(&NodeFiltered::from_fn(&self.graph, |n| {
-                let mut dfs_state = DfsSpace::new(&only_open_graph);
-                has_path_connecting(&only_open_graph, self.me, n, Some(&mut dfs_state))
-                    || has_path_connecting(&only_open_graph, n, self.me, Some(&mut dfs_state))
             }))
             .to_string()
         } else {
