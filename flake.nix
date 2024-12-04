@@ -96,26 +96,31 @@
           rust-builder-x86_64-linux = import ./nix/rust-builder.nix {
             inherit nixpkgs rust-overlay crane foundry solc localSystem;
             crossSystem = pkgs.lib.systems.examples.gnu64;
+            isCross = true;
           };
 
           rust-builder-x86_64-darwin = import ./nix/rust-builder.nix {
             inherit nixpkgs rust-overlay crane foundry solc localSystem;
             crossSystem = pkgs.lib.systems.examples.x86_64-darwin;
+            isCross = true;
           };
 
           rust-builder-aarch64-linux = import ./nix/rust-builder.nix {
             inherit nixpkgs rust-overlay crane foundry solc localSystem;
             crossSystem = pkgs.lib.systems.examples.aarch64-multiplatform;
+            isCross = true;
           };
 
           rust-builder-aarch64-darwin = import ./nix/rust-builder.nix {
             inherit nixpkgs rust-overlay crane foundry solc localSystem;
             crossSystem = pkgs.lib.systems.examples.aarch64-darwin;
+            isCross = true;
           };
 
           rust-builder-armv7l-linux = import ./nix/rust-builder.nix {
             inherit nixpkgs rust-overlay crane foundry solc localSystem;
             crossSystem = pkgs.lib.systems.examples.armv7l-hf-multiplatform;
+            isCross = true;
           };
 
           hoprdBuildArgs = {
