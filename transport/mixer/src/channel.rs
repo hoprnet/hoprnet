@@ -271,6 +271,7 @@ pub fn channel<T>() -> (Sender<T>, Receiver<T>) {
 
 #[cfg(test)]
 mod tests {
+    use async_std::prelude::FutureExt;
     use futures::StreamExt;
 
     use super::*;
@@ -337,5 +338,28 @@ mod tests {
         Ok(assert!(
             elapsed > Duration::from_millis(crate::delay::HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS)
         ))
+    }
+
+    #[async_std::test]
+    // #[tracing_test::traced_test]
+    async fn mixer_channel_should_produce_mixed_output_from_the_supplied_input() -> anyhow::Result<()> {
+        const ITERATIONS: usize = 20; // highly unlikely that this produces the same order on the input given the size
+
+        let (tx, rx) = channel();
+
+        let input = (0..ITERATIONS).collect::<Vec<_>>();
+
+        for i in input.iter() {
+            tx.send(*i)?;
+        }
+
+        let mixed_output = rx
+            .take(ITERATIONS)
+            .collect::<Vec<_>>()
+            .timeout(std::time::Duration::from_millis(400))
+            .await?;
+
+        tracing::info!(?input, ?mixed_output, "asserted data");
+        Ok(assert_ne!(input, mixed_output))
     }
 }
