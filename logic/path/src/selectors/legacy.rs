@@ -133,7 +133,7 @@ where
 
         if destination.eq(&channel.channel.destination) {
             // We cannot use destination as last intermediate hop as
-            // this would be a loopback which does not give any privacy
+            // this would be a loopback that does not give any privacy
             return false;
         }
 
@@ -166,7 +166,7 @@ where
     /// that goes from `source` to `destination`. There does not need to be
     /// a payment channel to `destination`, so the path only includes intermediate hops.
     ///
-    /// Implements a randomized best-first search through the path space. The graph
+    /// The function implements a randomized best-first search through the path space. The graph
     /// traversal is bounded by `self.max_iterations` to prevent from long-running path
     /// selection runs.
     fn select_path(
@@ -207,15 +207,15 @@ where
                     );
                 }
 
-                if current_len >= min_hops && current_len <= max_hops {
-                    return Ok(ChannelPath::new_valid(current.path));
+                return if current_len >= min_hops && current_len <= max_hops {
+                    Ok(ChannelPath::new_valid(current.path))
                 } else {
-                    return Err(PathError::PathNotFound(
+                    Err(PathError::PathNotFound(
                         max_hops,
                         source.to_string(),
                         destination.to_string(),
-                    ));
-                }
+                    ))
+                };
             }
 
             let last_peer = *current.path.last().unwrap();
