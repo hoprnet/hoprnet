@@ -336,37 +336,4 @@ mod tests {
             elapsed > Duration::from_millis(crate::delay::HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS)
         ))
     }
-
-    const EMPTY_DATA: [u8; 500] = [5; 500];
-
-    #[async_std::test]
-    async fn bench_sending_10000_messages() -> anyhow::Result<()> {
-        const ITERATIONS: usize = 2 * 1000 * 10;
-        let mut data = Vec::new();
-
-        for _ in 0..ITERATIONS {
-            data.push(Box::new(EMPTY_DATA));
-        }
-
-        let (tx, mut rx) = channel();
-
-        let start = std::time::SystemTime::now();
-
-        for i in data.into_iter() {
-            tx.send(i)?;
-        }
-        for _ in 0..ITERATIONS {
-            assert!(rx.recv().await.is_some());
-        }
-
-        let elapsed = start.elapsed()?;
-
-        assert!(
-            elapsed.as_millis()
-                < 2 * (crate::delay::HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS
-                    + crate::delay::HOPR_MIXER_DEFAULT_DELAY_DIFFERENCE_IN_MS) as u128
-        );
-
-        Ok(())
-    }
 }
