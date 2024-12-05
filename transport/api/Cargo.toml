@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport"
-version = "0.8.1"
+version = "0.9.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Implements the main HOPR interface for the core library"
 edition = "2021"

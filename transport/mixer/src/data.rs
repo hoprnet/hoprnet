@@ -5,7 +5,7 @@ use std::cmp::Ordering;
 /// The ordering functionality is defined only over the release timestamp
 /// to ensure proper mixing.
 pub struct DelayedData<T> {
-    pub release_at: std::time::SystemTime,
+    pub release_at: std::time::Instant,
     pub item: T,
 }
 
@@ -29,8 +29,8 @@ impl<T> Ord for DelayedData<T> {
     }
 }
 
-impl<T> From<(std::time::SystemTime, T)> for DelayedData<T> {
-    fn from(value: (std::time::SystemTime, T)) -> Self {
+impl<T> From<(std::time::Instant, T)> for DelayedData<T> {
+    fn from(value: (std::time::Instant, T)) -> Self {
         Self {
             release_at: value.0,
             item: value.1,

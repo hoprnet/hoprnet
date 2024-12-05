@@ -117,7 +117,7 @@ impl<T> futures::sink::Sink<T> for Sender<T> {
 
             trace!(delay_in_ms = random_delay.as_millis(), "generated mixer delay",);
 
-            let delayed_data: DelayedData<T> = (std::time::SystemTime::now() + random_delay, item).into();
+            let delayed_data: DelayedData<T> = (std::time::Instant::now() + random_delay, item).into();
             channel.buffer.push(Reverse(delayed_data));
 
             if let Some(waker) = channel.waker.as_ref() {
@@ -175,7 +175,7 @@ impl<T> Stream for Receiver<T> {
 
     fn poll_next(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Option<Self::Item>> {
         let mut channel = self.channel.lock().unwrap();
-        let now = std::time::SystemTime::now();
+        let now = std::time::Instant::now();
         if channel.sender_count > 0 {
             if channel.buffer.peek().map(|x| x.0.release_at < now).unwrap_or(false) {
                 let data = channel
@@ -193,35 +193,38 @@ impl<T> Stream for Receiver<T> {
                 return Poll::Ready(Some(data));
             }
 
-            let waker = cx.waker().clone();
-            channel.waker = Some(waker);
+            if let Some(waker) = channel.waker.as_mut() {
+                waker.clone_from(cx.waker());
+            } else {
+                let waker = cx.waker().clone();
+                channel.waker = Some(waker);
+            }
 
             if let Some(next) = channel.buffer.peek() {
-                if let Ok(remaining) = next.0.release_at.duration_since(now) {
-                    trace!("reseting the timer");
-                    channel.timer.reset(remaining);
-                    let timer = std::pin::pin!(&mut channel.timer);
-                    let res = timer.poll(cx);
+                let remaining = next.0.release_at.duration_since(now);
 
-                    return match res {
-                        Poll::Ready(_) => {
-                            #[cfg(all(feature = "prometheus", not(test)))]
-                            METRIC_QUEUE_SIZE.decrement(1.0f64);
+                trace!("reseting the timer");
+                channel.timer.reset(remaining);
 
-                            Poll::Ready(Some(
-                                channel
-                                    .buffer
-                                    .pop()
-                                    .expect("The value should be present within the locked access")
-                                    .0
-                                    .item,
-                            ))
-                        }
-                        Poll::Pending => Poll::Pending,
-                    };
-                } else {
-                    unreachable!("the previous block would've yielded the value");
-                }
+                let timer = std::pin::pin!(&mut channel.timer);
+                let res = timer.poll(cx);
+
+                return match res {
+                    Poll::Ready(_) => {
+                        #[cfg(all(feature = "prometheus", not(test)))]
+                        METRIC_QUEUE_SIZE.decrement(1.0f64);
+
+                        Poll::Ready(Some(
+                            channel
+                                .buffer
+                                .pop()
+                                .expect("The value should be present within the locked access")
+                                .0
+                                .item,
+                        ))
+                    }
+                    Poll::Pending => Poll::Pending,
+                };
             }
 
             Poll::Pending
@@ -329,6 +332,35 @@ mod tests {
         Ok(assert!(
             elapsed > Duration::from_millis(crate::delay::HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS)
         ))
+    }
+
+    #[async_std::test]
+    // #[tracing_test::traced_test]
+    async fn mixer_channel_should_work_concurrently_and_properly_closed_channels() -> anyhow::Result<()> {
+        const ITERATIONS: usize = 1000;
+
+        let (tx, mut rx) = channel();
+
+        let recv_task = async_std::task::spawn(async move {
+            while let Some(_item) = rx
+                .next()
+                .timeout(2 * MAXIMUM_SINGLE_DELAY_DURATION)
+                .await
+                .expect("receiver should not fail")
+            {}
+        });
+
+        let send_task =
+            async_std::task::spawn(async move { futures::stream::iter(0..ITERATIONS).map(Ok).forward(tx).await });
+
+        let (_recv, send) = futures::try_join!(
+            recv_task.timeout(MAXIMUM_SINGLE_DELAY_DURATION),
+            send_task.timeout(MAXIMUM_SINGLE_DELAY_DURATION)
+        )?;
+
+        send?;
+
+        Ok(())
     }
 
     #[async_std::test]
