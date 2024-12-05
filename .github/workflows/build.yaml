@@ -39,7 +39,7 @@ jobs:
           - DAppNodePackage-Hopr
           - DAppNodePackage-Hopr-testnet
     name: ${{ matrix.repository }}
-    needs: 
+    needs:
       - build-docker
     uses: ./.github/workflows/build-dappnode.yaml
     with:
