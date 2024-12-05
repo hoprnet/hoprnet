@@ -18,7 +18,6 @@ use hopr_primitive_types::prelude::*;
 
 use super::packet::OutgoingPacket;
 use crate::bloom;
-use crate::msg::mixer::MixerConfig;
 
 lazy_static::lazy_static! {
     /// Fixed price per packet to 0.01 HOPR
@@ -284,7 +283,6 @@ pub struct PacketInteractionConfig {
     pub check_unrealized_balance: bool,
     pub packet_keypair: OffchainKeypair,
     pub chain_keypair: ChainKeypair,
-    pub mixer: MixerConfig,
     pub outgoing_ticket_win_prob: f64,
 }
 
@@ -294,7 +292,6 @@ impl PacketInteractionConfig {
             packet_keypair: packet_keypair.clone(),
             chain_keypair: chain_keypair.clone(),
             check_unrealized_balance: true,
-            mixer: MixerConfig::default(),
             outgoing_ticket_win_prob,
         }
     }

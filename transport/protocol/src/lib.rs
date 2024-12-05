@@ -71,7 +71,7 @@ use libp2p::PeerId;
 use msg::processor::{PacketSendFinalizer, PacketUnwrapping, PacketWrapping};
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use std::collections::HashMap;
-use tracing::{error, trace};
+use tracing::error;
 
 use hopr_async_runtime::prelude::{sleep, spawn};
 use hopr_crypto_types::prelude::*;
@@ -113,12 +113,19 @@ lazy_static::lazy_static! {
         SimpleCounter::new("hopr_rejected_tickets_count", "Number of rejected tickets").unwrap();
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, strum::Display)]
 pub enum ProtocolProcesses {
+    #[strum(to_string = "HOPR [ack] - ingress")]
     AckIn,
+    #[strum(to_string = "HOPR [ack] - egress")]
     AckOut,
+    #[strum(to_string = "HOPR [msg] - ingress")]
     MsgIn,
+    #[strum(to_string = "HOPR [msg] - egress")]
     MsgOut,
+    #[strum(to_string = "HOPR [msg] - mixer")]
+    Mixer,
+    #[strum(to_string = "bloom filter persistence")]
     BloomPersist,
 }
 
@@ -237,7 +244,17 @@ where
         }),
     );
 
+    // TODO: mixer strictly does not have to be here, but a better abstraction of the transport layer is needed to lift it
     let msg_to_send_tx = wire_msg.0.clone();
+    let (mixer_channel_tx, mixer_channel_rx) = hopr_transport_mixer::channel::<(PeerId, Box<[u8]>)>();
+
+    processes.insert(
+        ProtocolProcesses::Mixer,
+        spawn(async move {
+            let _neverending = mixer_channel_rx.map(Ok).forward(wire_msg.0).await;
+        }),
+    );
+
     processes.insert(
         ProtocolProcesses::MsgOut,
         spawn(async move {
@@ -265,21 +282,8 @@ where
                     }
                 })
                 .filter_map(|v| async move { v })
-                // delay purposefully isolated into a separate concurrent task
-                .then_concurrent(|v| {
-                    let cfg = msg::mixer::MixerConfig::default();
-
-                    async move {
-                        let random_delay = cfg.random_delay();
-                        trace!(delay_in_ms = random_delay.as_millis(), "Created random mixer delay",);
-
-                        sleep(random_delay).await;
-
-                        v
-                    }
-                })
                 .map(Ok)
-                .forward(wire_msg.0)
+                .forward(mixer_channel_tx)
                 .await;
         }),
     );

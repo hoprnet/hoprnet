@@ -122,16 +122,16 @@ lazy_static::lazy_static! {
     ).unwrap();
 }*/
 
-#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, strum::Display)]
 pub enum HoprTransportProcess {
+    #[strum(to_string = "protocol [{0}]")]
+    Protocol(hopr_transport_protocol::ProtocolProcesses),
+    #[strum(to_string = "protocol [HOPR [heartbeat]]")]
     Heartbeat,
+    #[strum(to_string = "swarm libp2p")]
     Swarm,
-    ProtocolAckIn,
-    ProtocolAckOut,
-    ProtocolMsgIn,
-    ProtocolMsgOut,
+    #[strum(to_string = "session management [#{0}]")]
     SessionsManagement(usize),
-    BloomFilterSave,
 }
 
 #[derive(Debug, Clone)]
@@ -390,16 +390,7 @@ where
         .await
         .into_iter()
         {
-            processes.insert(
-                match k {
-                    hopr_transport_protocol::ProtocolProcesses::AckIn => HoprTransportProcess::ProtocolAckIn,
-                    hopr_transport_protocol::ProtocolProcesses::AckOut => HoprTransportProcess::ProtocolAckOut,
-                    hopr_transport_protocol::ProtocolProcesses::MsgIn => HoprTransportProcess::ProtocolMsgIn,
-                    hopr_transport_protocol::ProtocolProcesses::MsgOut => HoprTransportProcess::ProtocolMsgOut,
-                    hopr_transport_protocol::ProtocolProcesses::BloomPersist => HoprTransportProcess::BloomFilterSave,
-                },
-                v,
-            );
+            processes.insert(HoprTransportProcess::Protocol(k), v);
         }
 
         let msg_sender = helpers::MessageSender::new(self.process_packet_send.clone(), self.path_planner.clone());

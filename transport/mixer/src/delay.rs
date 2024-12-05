@@ -15,13 +15,7 @@ pub fn random_delay() -> Duration {
         .unwrap_or(HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS);
 
     let random_delay = hopr_crypto_random::random_integer(
-        std::env::var("HOPR_INTERNAL_MIXER_MINIMUM_DELAY_IN_MS")
-            .map(|v| {
-                v.trim()
-                    .parse::<u64>()
-                    .unwrap_or(HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS)
-            })
-            .unwrap_or(HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS),
+        minimum,
         Some(
             std::env::var("HOPR_INTERNAL_MIXER_MAXIMUM_DELAY_IN_MS")
                 .map(|v| {

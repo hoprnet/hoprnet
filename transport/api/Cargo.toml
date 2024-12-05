@@ -53,6 +53,7 @@ rust-stream-ext-concurrent = { workspace = true }
 serde = { workspace = true }
 serde_with = { workspace = true }
 smart-default = { workspace = true }
+strum = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 uuid = { workspace = true, features = ["v4", "fast-rng"] }
@@ -79,5 +80,7 @@ hopr-async-runtime = { workspace = true }
 async-std = { workspace = true }
 hopr-db-sql = { workspace = true, features = ["runtime-async-std"] }
 core-network = { workspace = true, features = ["runtime-async-std"] }
+hopr-transport-mixer = { workspace = true }
 hopr-transport-protocol = { workspace = true, features = ["runtime-async-std"] }
 hopr-transport-p2p = { workspace = true, features = ["runtime-async-std"] }
+

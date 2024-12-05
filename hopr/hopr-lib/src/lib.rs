@@ -165,27 +165,13 @@ pub struct CloseChannelResult {
 /// by tagging it as an enum.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, strum::Display)]
 pub enum HoprLibProcesses {
-    #[strum(to_string = "libp2p component responsible for the handling of the p2p communication")]
-    Swarm,
-    #[strum(to_string = "HOPR protocol processing: ack ingress")]
-    ProtocolAckIn,
-    #[strum(to_string = "HOPR protocol processing: ack egress")]
-    ProtocolAckOut,
-    #[strum(to_string = "HOPR protocol processing: msg ingress")]
-    ProtocolMsgIn,
-    #[strum(to_string = "HOPR protocol processing: msg egress")]
-    ProtocolMsgOut,
-    #[strum(to_string = "session manager sub-process #{0}")]
-    SessionsManagement(usize),
     #[cfg(feature = "session-server")]
     #[strum(to_string = "session server providing the exit node session stream functionality")]
     SessionServer,
-    #[strum(to_string = "heartbeat component responsible for maintaining the network quality measurements")]
-    Heartbeat,
+    #[strum(to_string = "transport process: {0}")]
+    Transport(HoprTransportProcess),
     #[strum(to_string = "tick wake up the strategies to perform an action")]
     StrategyTick,
-    #[strum(to_string = "save operation for the bloom filter")]
-    BloomFilterSave,
     #[strum(to_string = "initial indexing operation into the DB")]
     Indexing,
     #[strum(to_string = "processing of indexed operations in internal components")]
@@ -208,18 +194,7 @@ impl HoprLibProcesses {
 
 impl From<HoprTransportProcess> for HoprLibProcesses {
     fn from(value: HoprTransportProcess) -> Self {
-        match value {
-            hopr_transport::HoprTransportProcess::Swarm => HoprLibProcesses::Swarm,
-            hopr_transport::HoprTransportProcess::ProtocolAckIn => HoprLibProcesses::ProtocolAckIn,
-            hopr_transport::HoprTransportProcess::ProtocolAckOut => HoprLibProcesses::ProtocolAckOut,
-            hopr_transport::HoprTransportProcess::ProtocolMsgIn => HoprLibProcesses::ProtocolMsgIn,
-            hopr_transport::HoprTransportProcess::ProtocolMsgOut => HoprLibProcesses::ProtocolMsgOut,
-            hopr_transport::HoprTransportProcess::Heartbeat => HoprLibProcesses::Heartbeat,
-            hopr_transport::HoprTransportProcess::SessionsManagement(kind) => {
-                HoprLibProcesses::SessionsManagement(kind)
-            }
-            hopr_transport::HoprTransportProcess::BloomFilterSave => HoprLibProcesses::BloomFilterSave,
-        }
+        HoprLibProcesses::Transport(value)
     }
 }
 
