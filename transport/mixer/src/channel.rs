@@ -277,6 +277,9 @@ mod tests {
     use super::*;
 
     const PROCESSING_LEEWAY: Duration = Duration::from_millis(20);
+    const MAXIMUM_SINGLE_DELAY_DURATION: Duration = Duration::from_millis(
+        crate::delay::HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS + crate::delay::HOPR_MIXER_DEFAULT_DELAY_DIFFERENCE_IN_MS,
+    );
 
     #[async_std::test]
     async fn mixer_channel_should_pass_an_element() -> anyhow::Result<()> {
@@ -297,13 +300,7 @@ mod tests {
 
         let elapsed = start.elapsed()?;
 
-        assert!(
-            elapsed
-                < Duration::from_millis(
-                    crate::delay::HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS
-                        + crate::delay::HOPR_MIXER_DEFAULT_DELAY_DIFFERENCE_IN_MS
-                ) + PROCESSING_LEEWAY
-        );
+        assert!(elapsed < MAXIMUM_SINGLE_DELAY_DURATION + PROCESSING_LEEWAY);
         Ok(assert!(
             elapsed > Duration::from_millis(crate::delay::HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS)
         ))
@@ -322,19 +319,13 @@ mod tests {
             tx.send(i)?;
         }
         for _ in 0..ITERATIONS {
-            let data = rx.next().await;
+            let data = rx.next().timeout(MAXIMUM_SINGLE_DELAY_DURATION).await?;
             assert!(data.is_some());
         }
 
         let elapsed = start.elapsed()?;
 
-        assert!(
-            elapsed
-                < Duration::from_millis(
-                    crate::delay::HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS
-                        + crate::delay::HOPR_MIXER_DEFAULT_DELAY_DIFFERENCE_IN_MS
-                ) + PROCESSING_LEEWAY
-        );
+        assert!(elapsed < MAXIMUM_SINGLE_DELAY_DURATION + PROCESSING_LEEWAY);
         Ok(assert!(
             elapsed > Duration::from_millis(crate::delay::HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS)
         ))
@@ -356,7 +347,7 @@ mod tests {
         let mixed_output = rx
             .take(ITERATIONS)
             .collect::<Vec<_>>()
-            .timeout(std::time::Duration::from_millis(400))
+            .timeout(2 * MAXIMUM_SINGLE_DELAY_DURATION)
             .await?;
 
         tracing::info!(?input, ?mixed_output, "asserted data");
