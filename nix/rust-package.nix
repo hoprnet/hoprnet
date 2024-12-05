@@ -8,6 +8,7 @@
 , foundryBin
 , git
 , html-tidy
+, isCross ? false
 , lib
 , libiconv
 , makeSetupHook
@@ -30,8 +31,6 @@ let
   hostPlatform = stdenv.hostPlatform;
 
   # The target interpreter is used to patch the interpreter in the binary
-  isCross = buildPlatform != hostPlatform;
-
   targetInterpreter =
     if hostPlatform.isLinux && hostPlatform.isx86_64 then "/lib64/ld-linux-x86-64.so.2"
     else if hostPlatform.isLinux && hostPlatform.isAarch64 then "/lib64/ld-linux-aarch64.so.1"

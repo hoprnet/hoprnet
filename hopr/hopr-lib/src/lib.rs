@@ -73,6 +73,7 @@ pub use {
     chain_api::config::{
         Addresses as NetworkContractAddresses, EnvironmentType, Network as ChainNetwork, ProtocolsConfig,
     },
+    core_path::channel_graph::GraphExportConfig,
     hopr_internal_types::prelude::*,
     hopr_network_types::prelude::{IpProtocol, RoutingOptions},
     hopr_primitive_types::prelude::*,
@@ -956,11 +957,14 @@ impl Hopr {
             HoprLibProcesses::OnReceivedAcknowledgement,
             spawn(async move {
                 while let Some(ack) = on_ack_tkt_rx.next().await {
-                    let _ = hopr_strategy::strategy::SingularStrategy::on_acknowledged_winning_ticket(
+                    if let Err(error) = hopr_strategy::strategy::SingularStrategy::on_acknowledged_winning_ticket(
                         &*multi_strategy_ack_ticket,
                         &ack,
                     )
-                    .await;
+                    .await
+                    {
+                        error!(%error, "failed to process acknowledged winning ticket with the strategy");
+                    }
                 }
             }),
         );
@@ -1491,5 +1495,9 @@ impl Hopr {
             .resolve_packet_key(address)
             .await
             .map(|pk| pk.map(|v| v.into()))?)
+    }
+
+    pub async fn export_channel_graph(&self, cfg: GraphExportConfig) -> String {
+        self.channel_graph.read().await.as_dot(cfg)
     }
 }
