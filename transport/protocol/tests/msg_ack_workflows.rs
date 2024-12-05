@@ -25,10 +25,7 @@ use hopr_db_sql::{
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use hopr_transport_protocol::{
-    msg::{
-        mixer::MixerConfig,
-        processor::{MsgSender, PacketInteractionConfig, PacketSendFinalizer},
-    },
+    msg::processor::{MsgSender, PacketInteractionConfig, PacketSendFinalizer},
     DEFAULT_PRICE_PER_PACKET,
 };
 use tracing::debug;
@@ -209,7 +206,6 @@ async fn peer_setup_for(count: usize) -> anyhow::Result<(Vec<WireChannels>, Vec<
             check_unrealized_balance: true,
             packet_keypair: opk.clone(),
             chain_keypair: ock.clone(),
-            mixer: MixerConfig::default(), // TODO: unnecessary, can be removed
             outgoing_ticket_win_prob: 1.0,
         };
 

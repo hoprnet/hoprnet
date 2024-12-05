@@ -235,7 +235,7 @@ impl<T> Stream for Receiver<T> {
 impl<T> Receiver<T> {
     /// Receive a single delayed mixed item.
     pub async fn recv(&mut self) -> Option<T> {
-        return poll_fn(|cx| self.poll_next_unpin(cx)).await;
+        poll_fn(|cx| self.poll_next_unpin(cx)).await
     }
 }
 
@@ -275,6 +275,8 @@ mod tests {
 
     use super::*;
 
+    const PROCESSING_LEEWAY: Duration = Duration::from_millis(20);
+
     #[async_std::test]
     async fn mixer_channel_should_pass_an_element() -> anyhow::Result<()> {
         let (tx, mut rx) = channel();
@@ -299,7 +301,7 @@ mod tests {
                 < Duration::from_millis(
                     crate::delay::HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS
                         + crate::delay::HOPR_MIXER_DEFAULT_DELAY_DIFFERENCE_IN_MS
-                )
+                ) + PROCESSING_LEEWAY
         );
         Ok(assert!(
             elapsed > Duration::from_millis(crate::delay::HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS)
@@ -328,9 +330,9 @@ mod tests {
         assert!(
             elapsed
                 < Duration::from_millis(
-                    2 * crate::delay::HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS
+                    crate::delay::HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS
                         + crate::delay::HOPR_MIXER_DEFAULT_DELAY_DIFFERENCE_IN_MS
-                )
+                ) + PROCESSING_LEEWAY
         );
         Ok(assert!(
             elapsed > Duration::from_millis(crate::delay::HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS)

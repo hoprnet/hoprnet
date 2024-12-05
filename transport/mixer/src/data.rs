@@ -17,7 +17,7 @@ impl<T> PartialEq for DelayedData<T> {
 
 impl<T> PartialOrd for DelayedData<T> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.release_at.partial_cmp(&other.release_at)
+        Some(self.cmp(other))
     }
 }
 

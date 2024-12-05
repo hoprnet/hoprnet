@@ -1,7 +1,7 @@
 use std::time::Duration;
 
-pub const HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS: u64 = 20;
-pub const HOPR_MIXER_DEFAULT_DELAY_DIFFERENCE_IN_MS: u64 = 180;
+pub const HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS: u64 = 0;
+pub const HOPR_MIXER_DEFAULT_DELAY_DIFFERENCE_IN_MS: u64 = 200;
 
 /// Get a random delay duration from the specified minimum and maximum delay specified in milliseconds
 /// by the environment variables `HOPR_INTERNAL_MIXER_MINIMUM_DELAY_IN_MS` and `HOPR_INTERNAL_MIXER_MAXIMUM_DELAY_IN_MS`.
