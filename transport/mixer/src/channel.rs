@@ -110,6 +110,7 @@ impl<T> futures::sink::Sink<T> for Sender<T> {
         }
     }
 
+    #[tracing::instrument(level = "trace", skip(self, item))]
     fn start_send(self: std::pin::Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
         let mut channel = self.channel.lock().map_err(|_| SenderError::Lock)?;
         if channel.receiver_active {
@@ -173,6 +174,7 @@ pub struct Receiver<T> {
 impl<T> Stream for Receiver<T> {
     type Item = T;
 
+    #[tracing::instrument(level = "trace", skip(self, cx))]
     fn poll_next(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Option<Self::Item>> {
         let mut channel = self.channel.lock().unwrap();
         let now = std::time::Instant::now();
@@ -185,7 +187,7 @@ impl<T> Stream for Receiver<T> {
                     .0
                     .item;
 
-                trace!("yielding a value");
+                trace!(from = "direct", "yield item");
 
                 #[cfg(all(feature = "prometheus", not(test)))]
                 METRIC_QUEUE_SIZE.decrement(1.0f64);
@@ -211,6 +213,8 @@ impl<T> Stream for Receiver<T> {
 
                 return match res {
                     Poll::Ready(_) => {
+                        trace!(from = "timer", "yield item");
+
                         #[cfg(all(feature = "prometheus", not(test)))]
                         METRIC_QUEUE_SIZE.decrement(1.0f64);
 
@@ -223,10 +227,14 @@ impl<T> Stream for Receiver<T> {
                                 .item,
                         ))
                     }
-                    Poll::Pending => Poll::Pending,
+                    Poll::Pending => {
+                        trace!(from = "timer", "pending");
+                        Poll::Pending
+                    }
                 };
             }
 
+            trace!(from = "direct", "pending");
             Poll::Pending
         } else {
             channel.receiver_active = false;
