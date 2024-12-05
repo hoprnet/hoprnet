@@ -32,6 +32,9 @@ craneLib.devShell {
     gnumake
     which
 
+    # docs utilities
+    graphviz
+
     # github integration
     gh
 

@@ -118,6 +118,7 @@ pub(crate) struct InternalState {
         node::entry_nodes,
         node::info,
         node::metrics,
+        node::channel_graph,
         node::peers,
         node::version,
         peers::ping_peer,
@@ -145,7 +146,7 @@ pub(crate) struct InternalState {
             network::TicketPriceResponse,
             network::TicketProbabilityResponse,
             node::EntryNode, node::NodeInfoResponse, node::NodePeersQueryRequest,
-            node::HeartbeatInfo, node::PeerInfo, node::AnnouncedPeer, node::NodePeersResponse, node::NodeVersionResponse,
+            node::HeartbeatInfo, node::PeerInfo, node::AnnouncedPeer, node::NodePeersResponse, node::NodeVersionResponse, node::GraphExportRequest,
             peers::NodePeerInfoResponse, peers::PingResponse,
             session::SessionClientRequest, session::SessionClientResponse, session::SessionCloseClientRequest,
             tickets::NodeTicketStatisticsResponse, tickets::ChannelTicket,
@@ -321,6 +322,7 @@ async fn build_api(
                 .route("/node/peers", get(node::peers))
                 .route("/node/entryNodes", get(node::entry_nodes))
                 .route("/node/metrics", get(node::metrics))
+                .route("/node/graph", get(node::channel_graph))
                 .route("/peers/:destination/ping", post(peers::ping_peer))
                 .route("/session/websocket", get(session::websocket))
                 .route("/session/:protocol", post(session::create_client))
