@@ -1,4 +1,5 @@
 use async_lock::RwLock;
+use futures::channel::mpsc::Sender;
 use libp2p::{Multiaddr, PeerId};
 use std::sync::{Arc, OnceLock};
 use tracing::trace;
@@ -12,7 +13,7 @@ use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_db_sql::HoprDbAllOperations;
 use hopr_internal_types::protocol::ApplicationData;
 use hopr_primitive_types::primitives::Address;
-use hopr_transport_protocol::msg::processor::MsgSender;
+use hopr_transport_protocol::msg::processor::{MsgSender, SendMsgInput};
 use hopr_transport_session::{errors::TransportSessionError, traits::SendMsg};
 
 use hopr_network_types::prelude::RoutingOptions;
@@ -140,7 +141,7 @@ where
 
 #[derive(Clone)]
 pub(crate) struct MessageSender<T> {
-    pub process_packet_send: Arc<OnceLock<MsgSender>>,
+    pub process_packet_send: Arc<OnceLock<MsgSender<Sender<SendMsgInput>>>>,
     pub resolver: PathPlanner<T>,
 }
 
@@ -148,7 +149,7 @@ impl<T> MessageSender<T>
 where
     T: HoprDbAllOperations + std::fmt::Debug + Send + Sync + 'static,
 {
-    pub fn new(process_packet_send: Arc<OnceLock<MsgSender>>, resolver: PathPlanner<T>) -> Self {
+    pub fn new(process_packet_send: Arc<OnceLock<MsgSender<Sender<SendMsgInput>>>>, resolver: PathPlanner<T>) -> Self {
         Self {
             process_packet_send,
             resolver,

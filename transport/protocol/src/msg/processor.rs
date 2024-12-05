@@ -1,5 +1,5 @@
-use futures::pin_mut;
 use futures::{future::Either, SinkExt};
+use futures::{pin_mut, Sink};
 use hopr_crypto_packet::errors::PacketError;
 use hopr_db_api::protocol::TransportPacketWithChainData;
 use libp2p_identity::PeerId;
@@ -251,12 +251,18 @@ impl PacketSendAwaiter {
 pub type SendMsgInput = (ApplicationData, TransportPath, PacketSendFinalizer);
 
 #[derive(Debug)]
-pub struct MsgSender {
-    tx: futures::channel::mpsc::UnboundedSender<SendMsgInput>,
+pub struct MsgSender<T>
+where
+    T: Sink<SendMsgInput> + Send + Sync + Clone + 'static + std::marker::Unpin,
+{
+    tx: T,
 }
 
-impl MsgSender {
-    pub fn new(tx: futures::channel::mpsc::UnboundedSender<SendMsgInput>) -> Self {
+impl<T> MsgSender<T>
+where
+    T: Sink<SendMsgInput> + Send + Sync + Clone + 'static + std::marker::Unpin,
+{
+    pub fn new(tx: T) -> Self {
         Self { tx }
     }
 

@@ -23,8 +23,9 @@ pub mod helpers;
 pub mod network_notifier;
 
 use async_lock::RwLock;
+use constants::{MAXIMUM_ACK_INCOMING_BUFFER_SIZE, MAXIMUM_MSG_INCOMING_BUFFER_SIZE, MAXIMUM_MSG_OUTGOING_BUFFER_SIZE};
 use futures::{
-    channel::mpsc::{UnboundedReceiver, UnboundedSender},
+    channel::mpsc::{self, Sender, UnboundedReceiver, UnboundedSender},
     future::{select, Either},
     pin_mut, FutureExt, StreamExt,
 };
@@ -56,7 +57,7 @@ use hopr_transport_p2p::{
 };
 use hopr_transport_protocol::{
     errors::ProtocolError,
-    msg::processor::{MsgSender, PacketInteractionConfig, PacketSendFinalizer},
+    msg::processor::{MsgSender, PacketInteractionConfig, PacketSendFinalizer, SendMsgInput},
     ticket_aggregation::processor::{
         AwaitingAggregator, TicketAggregationActions, TicketAggregationInteraction, TicketAggregatorTrait,
     },
@@ -206,7 +207,7 @@ where
     db: T,
     ping: Arc<OnceLock<Pinger<network_notifier::PingExternalInteractions<T>>>>,
     network: Arc<Network<T>>,
-    process_packet_send: Arc<OnceLock<MsgSender>>,
+    process_packet_send: Arc<OnceLock<MsgSender<Sender<SendMsgInput>>>>,
     path_planner: PathPlanner<T>,
     my_multiaddresses: Vec<Multiaddr>,
     process_ticket_aggregate:
@@ -286,12 +287,11 @@ where
         let mut processes: HashMap<HoprTransportProcess, JoinHandle<()>> = HashMap::new();
 
         // network event processing channel
-        let (network_events_tx, network_events_rx) = futures::channel::mpsc::channel::<NetworkTriggeredEvent>(
-            constants::MAXIMUM_NETWORK_UPDATE_EVENT_QUEUE_SIZE,
-        );
+        let (network_events_tx, network_events_rx) =
+            mpsc::channel::<NetworkTriggeredEvent>(constants::MAXIMUM_NETWORK_UPDATE_EVENT_QUEUE_SIZE);
 
         // manual ping
-        let (ping_tx, ping_rx) = futures::channel::mpsc::unbounded::<(PeerId, PingQueryReplier)>();
+        let (ping_tx, ping_rx) = mpsc::unbounded::<(PeerId, PingQueryReplier)>();
 
         let ping_cfg = PingConfig {
             timeout: self.cfg.protocol.heartbeat.timeout,
@@ -329,7 +329,7 @@ where
         .await;
 
         let (external_msg_send, external_msg_rx) =
-            futures::channel::mpsc::unbounded::<(ApplicationData, TransportPath, PacketSendFinalizer)>();
+            mpsc::channel::<(ApplicationData, TransportPath, PacketSendFinalizer)>(MAXIMUM_MSG_OUTGOING_BUFFER_SIZE);
 
         self.process_packet_send
             .clone()
@@ -353,11 +353,12 @@ where
         );
 
         // initiate the libp2p transport layer
-        let (ack_to_send_tx, ack_to_send_rx) = futures::channel::mpsc::unbounded::<(PeerId, Acknowledgement)>();
-        let (ack_received_tx, ack_received_rx) = futures::channel::mpsc::unbounded::<(PeerId, Acknowledgement)>();
+        let (ack_to_send_tx, ack_to_send_rx) = mpsc::unbounded::<(PeerId, Acknowledgement)>();
+        let (ack_received_tx, ack_received_rx) =
+            mpsc::channel::<(PeerId, Acknowledgement)>(MAXIMUM_ACK_INCOMING_BUFFER_SIZE);
 
-        let (msg_to_send_tx, msg_to_send_rx) = futures::channel::mpsc::unbounded::<(PeerId, Box<[u8]>)>();
-        let (msg_received_tx, msg_received_rx) = futures::channel::mpsc::unbounded::<(PeerId, Box<[u8]>)>();
+        let (msg_to_send_tx, msg_to_send_rx) = mpsc::unbounded::<(PeerId, Box<[u8]>)>();
+        let (msg_received_tx, msg_received_rx) = mpsc::channel::<(PeerId, Box<[u8]>)>(MAXIMUM_MSG_INCOMING_BUFFER_SIZE);
 
         let transport_layer = transport_layer.with_processors(
             ack_to_send_rx,
@@ -376,7 +377,7 @@ where
             self.cfg.protocol.outgoing_ticket_winning_prob,
         );
 
-        let (tx_from_protocol, rx_from_protocol) = futures::channel::mpsc::unbounded::<ApplicationData>();
+        let (tx_from_protocol, rx_from_protocol) = mpsc::unbounded::<ApplicationData>();
         for (k, v) in hopr_transport_protocol::run_msg_ack_protocol(
             packet_cfg,
             self.db.clone(),
