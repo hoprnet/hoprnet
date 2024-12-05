@@ -73,7 +73,7 @@ use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use std::collections::HashMap;
 use tracing::error;
 
-use hopr_async_runtime::prelude::{sleep, spawn};
+use hopr_async_runtime::prelude::spawn;
 use hopr_crypto_types::prelude::*;
 use hopr_db_api::protocol::HoprDbProtocolOperations;
 use hopr_internal_types::protocol::{Acknowledgement, ApplicationData};
