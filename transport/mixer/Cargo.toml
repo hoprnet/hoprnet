@@ -15,25 +15,30 @@ crate-type = ["rlib"]
 default = []
 runtime-async-std = ["hopr-async-runtime/runtime-async-std"]
 runtime-tokio = ["hopr-async-runtime/runtime-tokio"]
+prometheus = ["dep:hopr-metrics", "dep:lazy_static"]
 
 [dependencies]
 futures = { workspace = true }
 futures-timer = { workspace = true }
+lazy_static = { workspace = true, optional = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 smart-default = { workspace = true }
 
 hopr-async-runtime = { workspace = true }
 hopr-crypto-random = { workspace = true }
-
+hopr-metrics = { workspace = true, optional = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
 async-std = { workspace = true, features = ["attributes"] }
+criterion = { workspace = true }
 futures = { workspace = true }
 mockall = { workspace = true }
 more-asserts = { workspace = true }
 rust-stream-ext-concurrent = { workspace = true }
 tracing-test = { workspace = true }
 
-
+[[bench]]
+name = "mixer_throughput"
+harness = false

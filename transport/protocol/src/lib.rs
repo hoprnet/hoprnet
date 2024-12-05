@@ -79,7 +79,7 @@ use hopr_db_api::protocol::HoprDbProtocolOperations;
 use hopr_internal_types::protocol::{Acknowledgement, ApplicationData};
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use hopr_metrics::metrics::{MultiCounter, SimpleCounter, SimpleGauge};
+use hopr_metrics::metrics::{MultiCounter, SimpleCounter};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -111,14 +111,6 @@ lazy_static::lazy_static! {
     ).unwrap();
     static ref METRIC_REJECTED_TICKETS_COUNT: SimpleCounter =
         SimpleCounter::new("hopr_rejected_tickets_count", "Number of rejected tickets").unwrap();
-    // mixer
-    static ref METRIC_QUEUE_SIZE: SimpleGauge =
-        SimpleGauge::new("hopr_mixer_queue_size", "Current mixer queue size").unwrap();
-    static ref METRIC_MIXER_AVERAGE_DELAY: SimpleGauge = SimpleGauge::new(
-        "hopr_mixer_average_packet_delay",
-        "Average mixer packet delay averaged over a packet window"
-    )
-    .unwrap();
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
@@ -165,8 +157,6 @@ where
         lazy_static::initialize(&METRIC_PACKET_COUNT_PER_PEER);
         lazy_static::initialize(&METRIC_REPLAYED_PACKET_COUNT);
         lazy_static::initialize(&METRIC_REJECTED_TICKETS_COUNT);
-        lazy_static::initialize(&METRIC_QUEUE_SIZE);
-        lazy_static::initialize(&METRIC_MIXER_AVERAGE_DELAY);
     }
 
     let tbf = if let Some(bloom_filter_persistent_path) = bloom_filter_persistent_path {
@@ -256,9 +246,6 @@ where
                 .then_concurrent(|(data, path, finalizer)| {
                     let msg_processor = msg_processor_write.clone();
 
-                    #[cfg(all(feature = "prometheus", not(test)))]
-                    METRIC_QUEUE_SIZE.increment(1.0f64);
-
                     async move {
                         match PacketWrapping::send(&msg_processor, data, path).await {
                             Ok(v) => {
@@ -271,9 +258,6 @@ where
                                 Some(v)
                             }
                             Err(e) => {
-                                #[cfg(all(feature = "prometheus", not(test)))]
-                                METRIC_QUEUE_SIZE.decrement(1.0f64);
-
                                 finalizer.finalize(Err(e));
                                 None
                             }
@@ -290,17 +274,6 @@ where
                         trace!(delay_in_ms = random_delay.as_millis(), "Created random mixer delay",);
 
                         sleep(random_delay).await;
-
-                        #[cfg(all(feature = "prometheus", not(test)))]
-                        {
-                            METRIC_QUEUE_SIZE.decrement(1.0f64);
-
-                            let weight = 1.0f64 / cfg.metric_delay_window as f64;
-                            METRIC_MIXER_AVERAGE_DELAY.set(
-                                (weight * random_delay.as_millis() as f64)
-                                    + ((1.0f64 - weight) * METRIC_MIXER_AVERAGE_DELAY.get()),
-                            );
-                        }
 
                         v
                     }
