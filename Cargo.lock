@@ -4529,6 +4529,7 @@ dependencies = [
  "mockall",
  "more-asserts",
  "rust-stream-ext-concurrent",
+ "smart-default",
  "thiserror",
  "tracing",
  "tracing-test",

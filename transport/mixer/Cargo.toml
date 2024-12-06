@@ -19,6 +19,7 @@ prometheus = ["dep:hopr-metrics", "dep:lazy_static"]
 futures = { workspace = true }
 futures-timer = { workspace = true }
 lazy_static = { workspace = true, optional = true }
+smart-default = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 

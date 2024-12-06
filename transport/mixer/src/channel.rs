@@ -10,7 +10,7 @@ use std::{
 };
 use tracing::trace;
 
-use crate::data::DelayedData;
+use crate::{config::MixerConfig, data::DelayedData};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleGauge;
@@ -25,9 +25,6 @@ lazy_static::lazy_static! {
     )
     .unwrap();
 }
-
-pub const METRIC_DELAY_WINDOW: usize = 100;
-pub const HOPR_MIXER_CAPACITY: usize = 10000;
 
 /// Mixing and delaying channel using random delay function.
 ///
@@ -50,6 +47,7 @@ struct Channel<T> {
     waker: Option<std::task::Waker>,
     sender_count: usize,
     receiver_active: bool,
+    cfg: MixerConfig,
 }
 
 /// Error returned by the [`Sender`].
@@ -114,7 +112,7 @@ impl<T> futures::sink::Sink<T> for Sender<T> {
     fn start_send(self: std::pin::Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
         let mut channel = self.channel.lock().map_err(|_| SenderError::Lock)?;
         if channel.receiver_active {
-            let random_delay = crate::delay::random_delay();
+            let random_delay = channel.cfg.random_delay();
 
             trace!(delay_in_ms = random_delay.as_millis(), "generated mixer delay",);
 
@@ -129,7 +127,7 @@ impl<T> futures::sink::Sink<T> for Sender<T> {
             {
                 METRIC_QUEUE_SIZE.increment(1.0f64);
 
-                let weight = 1.0f64 / METRIC_DELAY_WINDOW as f64;
+                let weight = 1.0f64 / channel.cfg.metric_delay_window as f64;
                 METRIC_MIXER_AVERAGE_DELAY.set(
                     (weight * random_delay.as_millis() as f64) + ((1.0f64 - weight) * METRIC_MIXER_AVERAGE_DELAY.get()),
                 );
@@ -251,7 +249,7 @@ impl<T> Receiver<T> {
 }
 
 /// Instantiate a mixing channel and return the sender and receiver end of the channel.
-pub fn channel<T>() -> (Sender<T>, Receiver<T>) {
+pub fn channel<T>(cfg: crate::config::MixerConfig) -> (Sender<T>, Receiver<T>) {
     #[cfg(all(feature = "prometheus", not(test)))]
     {
         // Initialize the lazy statics here
@@ -260,10 +258,7 @@ pub fn channel<T>() -> (Sender<T>, Receiver<T>) {
     }
 
     let mut buffer = BinaryHeap::new();
-    let mixer_capacity = std::env::var("HOPR_INTERNAL_MIXER_CAPACITY")
-        .map(|v| v.trim().parse::<usize>().unwrap_or(10_000))
-        .unwrap_or(10_000);
-    buffer.reserve(mixer_capacity);
+    buffer.reserve(cfg.capacity);
 
     let channel = Arc::new(Mutex::new(Channel::<T> {
         buffer,
@@ -271,6 +266,7 @@ pub fn channel<T>() -> (Sender<T>, Receiver<T>) {
         waker: None,
         sender_count: 1,
         receiver_active: true,
+        cfg,
     }));
     (
         Sender {
@@ -289,12 +285,12 @@ mod tests {
 
     const PROCESSING_LEEWAY: Duration = Duration::from_millis(20);
     const MAXIMUM_SINGLE_DELAY_DURATION: Duration = Duration::from_millis(
-        crate::delay::HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS + crate::delay::HOPR_MIXER_DEFAULT_DELAY_DIFFERENCE_IN_MS,
+        crate::config::HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS + crate::config::HOPR_MIXER_DEFAULT_DELAY_RANGE_IN_MS,
     );
 
     #[async_std::test]
     async fn mixer_channel_should_pass_an_element() -> anyhow::Result<()> {
-        let (tx, mut rx) = channel();
+        let (tx, mut rx) = channel(MixerConfig::default());
         tx.send(1)?;
         assert_eq!(rx.recv().await, Some(1));
 
@@ -305,7 +301,7 @@ mod tests {
     async fn mixer_channel_should_introduce_random_delay() -> anyhow::Result<()> {
         let start = std::time::SystemTime::now();
 
-        let (tx, mut rx) = channel();
+        let (tx, mut rx) = channel(MixerConfig::default());
         tx.send(1)?;
         assert_eq!(rx.recv().await, Some(1));
 
@@ -313,7 +309,7 @@ mod tests {
 
         assert!(elapsed < MAXIMUM_SINGLE_DELAY_DURATION + PROCESSING_LEEWAY);
         Ok(assert!(
-            elapsed > Duration::from_millis(crate::delay::HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS)
+            elapsed > Duration::from_millis(crate::config::HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS)
         ))
     }
 
@@ -322,7 +318,7 @@ mod tests {
     async fn mixer_channel_should_batch_on_sending_emulating_concurrency() -> anyhow::Result<()> {
         const ITERATIONS: usize = 10;
 
-        let (tx, mut rx) = channel();
+        let (tx, mut rx) = channel(MixerConfig::default());
 
         let start = std::time::SystemTime::now();
 
@@ -338,7 +334,7 @@ mod tests {
 
         assert!(elapsed < MAXIMUM_SINGLE_DELAY_DURATION + PROCESSING_LEEWAY);
         Ok(assert!(
-            elapsed > Duration::from_millis(crate::delay::HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS)
+            elapsed > Duration::from_millis(crate::config::HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS)
         ))
     }
 
@@ -347,7 +343,7 @@ mod tests {
     async fn mixer_channel_should_work_concurrently_and_properly_closed_channels() -> anyhow::Result<()> {
         const ITERATIONS: usize = 1000;
 
-        let (tx, mut rx) = channel();
+        let (tx, mut rx) = channel(MixerConfig::default());
 
         let recv_task = async_std::task::spawn(async move {
             while let Some(_item) = rx
@@ -376,7 +372,7 @@ mod tests {
     async fn mixer_channel_should_produce_mixed_output_from_the_supplied_input() -> anyhow::Result<()> {
         const ITERATIONS: usize = 20; // highly unlikely that this produces the same order on the input given the size
 
-        let (tx, rx) = channel();
+        let (tx, rx) = channel(MixerConfig::default());
 
         let input = (0..ITERATIONS).collect::<Vec<_>>();
 
@@ -392,5 +388,32 @@ mod tests {
 
         tracing::info!(?input, ?mixed_output, "asserted data");
         Ok(assert_ne!(input, mixed_output))
+    }
+
+    #[async_std::test]
+    // #[tracing_test::traced_test]
+    async fn mixer_channel_should_not_mix_the_order_if_the_min_delay_and_delay_range_is_0() -> anyhow::Result<()> {
+        const ITERATIONS: usize = 20; // highly unlikely that this produces the same order on the input given the size
+
+        let (tx, rx) = channel(MixerConfig {
+            min_delay: Duration::from_millis(0),
+            delay_range: Duration::from_millis(0),
+            ..MixerConfig::default()
+        });
+
+        let input = (0..ITERATIONS).collect::<Vec<_>>();
+
+        for i in input.iter() {
+            tx.send(*i)?;
+        }
+
+        let mixed_output = rx
+            .take(ITERATIONS)
+            .collect::<Vec<_>>()
+            .timeout(2 * MAXIMUM_SINGLE_DELAY_DURATION)
+            .await?;
+
+        tracing::info!(?input, ?mixed_output, "asserted data");
+        Ok(assert_eq!(input, mixed_output))
     }
 }
