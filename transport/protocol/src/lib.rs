@@ -61,7 +61,6 @@ pub mod msg;
 pub mod ticket_aggregation;
 
 pub mod timer;
-
 pub use timer::execute_on_tick;
 
 pub use msg::processor::DEFAULT_PRICE_PER_PACKET;
@@ -78,7 +77,6 @@ use hopr_async_runtime::prelude::spawn;
 use hopr_crypto_types::prelude::*;
 use hopr_db_api::protocol::HoprDbProtocolOperations;
 use hopr_internal_types::protocol::{Acknowledgement, ApplicationData};
-use hopr_transport_mixer::config::MixerConfig;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::{MultiCounter, SimpleCounter};
@@ -248,34 +246,35 @@ where
 
     // TODO: mixer strictly does not have to be here, but a better abstraction of the transport layer is needed to lift it
     let msg_to_send_tx = wire_msg.0.clone();
-    let (mixer_channel_tx, mixer_channel_rx) = hopr_transport_mixer::channel::<(PeerId, Box<[u8]>)>(MixerConfig {
-        min_delay: std::time::Duration::from_millis(
-            std::env::var("HOPR_INTERNAL_MIXER_MINIMUM_DELAY_IN_MS")
+    let (mixer_channel_tx, mixer_channel_rx) =
+        hopr_transport_mixer::channel::<(PeerId, Box<[u8]>)>(hopr_transport_mixer::MixerConfig {
+            min_delay: std::time::Duration::from_millis(
+                std::env::var("HOPR_INTERNAL_MIXER_MINIMUM_DELAY_IN_MS")
+                    .map(|v| {
+                        v.trim()
+                            .parse::<u64>()
+                            .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS)
+                    })
+                    .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS),
+            ),
+            delay_range: std::time::Duration::from_millis(
+                std::env::var("HOPR_INTERNAL_MIXER_DELAY_RANGE_IN_MS")
+                    .map(|v| {
+                        v.trim()
+                            .parse::<u64>()
+                            .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_DEFAULT_DELAY_RANGE_IN_MS)
+                    })
+                    .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_DEFAULT_DELAY_RANGE_IN_MS),
+            ),
+            capacity: std::env::var("HOPR_INTERNAL_MIXER_CAPACITY")
                 .map(|v| {
                     v.trim()
-                        .parse::<u64>()
-                        .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS)
+                        .parse::<usize>()
+                        .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_CAPACITY)
                 })
-                .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS),
-        ),
-        delay_range: std::time::Duration::from_millis(
-            std::env::var("HOPR_INTERNAL_MIXER_DELAY_RANGE_IN_MS")
-                .map(|v| {
-                    v.trim()
-                        .parse::<u64>()
-                        .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_DEFAULT_DELAY_RANGE_IN_MS)
-                })
-                .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_DEFAULT_DELAY_RANGE_IN_MS),
-        ),
-        capacity: std::env::var("HOPR_INTERNAL_MIXER_CAPACITY")
-            .map(|v| {
-                v.trim()
-                    .parse::<usize>()
-                    .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_CAPACITY)
-            })
-            .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_CAPACITY),
-        ..MixerConfig::default()
-    });
+                .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_CAPACITY),
+            ..hopr_transport_mixer::MixerConfig::default()
+        });
 
     processes.insert(
         ProtocolProcesses::Mixer,
