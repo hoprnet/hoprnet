@@ -4,7 +4,7 @@ use hopr_db_entity::ticket;
 use hopr_primitive_types::primitives::{Balance, BalanceType};
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, TransactionTrait};
 use std::sync::{Arc, OnceLock};
-use tracing::error;
+use tracing::{debug, error};
 
 use hopr_async_runtime::prelude::spawn;
 use hopr_internal_types::tickets::AcknowledgedTicket;
@@ -68,7 +68,7 @@ impl TicketManager {
         spawn(async move {
             pin_mut!(ticket_notifier);
             while let Some(acknowledged_ticket) = rx.next().await {
-                match db_clone
+                let ticket_inserted = match db_clone
                     .begin_with_config(None, None)
                     .await
                     .map_err(crate::errors::DbSqlError::BackendError)
@@ -113,12 +113,24 @@ impl TicketManager {
                             })
                             .await
                         {
-                            error!(%error, "failed to insert the winning ticket and update the ticket stats")
-                        } else if let Err(error) = ticket_notifier.send(acknowledged_ticket).await {
-                            error!(%error, "failed to notify the ticket notifier about the winning ticket");
+                            error!(%error, "failed to insert the winning ticket and update the ticket stats");
+                            false
+                        } else {
+                            debug!(%acknowledged_ticket, "ticket persisted into the ticket db");
+                            true
                         }
                     }
-                    Err(error) => error!(%error, "Failed to create a transaction for ticket insertion"),
+                    Err(error) => {
+                        error!(%error, "failed to create a transaction for ticket insertion");
+                        false
+                    }
+                };
+
+                // Notify about the ticket once successfully inserted into the Tickets DB
+                if ticket_inserted {
+                    if let Err(error) = ticket_notifier.send(acknowledged_ticket).await {
+                        error!(%error, "failed to notify the ticket notifier about the winning ticket");
+                    }
                 }
             }
         });
