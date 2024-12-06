@@ -172,11 +172,19 @@ impl Session {
             // This is a very coarse assumption, that it takes max 2 seconds for each hop one way.
             let rto_base = 2 * Duration::from_secs(2) * (routing_options.count_hops() + 1) as u32;
 
+            let expiration_coefficient = if capabilities.contains(&Capability::Retransmission)
+                || capabilities.contains(&Capability::RetransmissionAckOnly)
+            {
+                4
+            } else {
+                1
+            };
+
             // TODO: tweak the default Session protocol config
             let cfg = SessionConfig {
                 enabled_features: capabilities.iter().cloned().flatten().collect(),
                 acknowledged_frames_buffer: 100_000, // Can hold frames for > 40 sec at 2000 frames/sec
-                frame_expiration_age: rto_base * 10,
+                frame_expiration_age: rto_base * expiration_coefficient,
                 rto_base_receiver: rto_base, // Ask for segment resend, if not yet complete after this period
                 rto_base_sender: rto_base * 2, // Resend frame if not acknowledged after this period
                 ..Default::default()
