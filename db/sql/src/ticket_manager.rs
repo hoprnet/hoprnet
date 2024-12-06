@@ -139,6 +139,9 @@ impl TicketManager {
     }
 
     /// Sends a new acknowledged ticket into the FIFO queue.
+    ///
+    /// The [`start_ticket_processing`](TicketManager::start_ticket_processing) method
+    /// must be called before calling this method.
     pub async fn insert_ticket(&self, ticket: AcknowledgedTicket) -> Result<()> {
         let channel = ticket.verified_ticket().channel_id;
         let value = ticket.verified_ticket().amount;
