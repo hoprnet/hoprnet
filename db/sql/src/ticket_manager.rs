@@ -1,9 +1,9 @@
-use futures::{future::BoxFuture, StreamExt, TryStreamExt};
+use futures::{future::BoxFuture, pin_mut, Sink, SinkExt, StreamExt, TryStreamExt};
 use hopr_db_api::tickets::TicketSelector;
 use hopr_db_entity::ticket;
 use hopr_primitive_types::primitives::{Balance, BalanceType};
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, TransactionTrait};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use tracing::error;
 
 use hopr_async_runtime::prelude::spawn;
@@ -32,24 +32,41 @@ use crate::{errors::Result, OpenTransaction};
 pub(crate) struct TicketManager {
     pub(crate) tickets_db: sea_orm::DatabaseConnection,
     pub(crate) mutex: Arc<async_lock::Mutex<()>>,
-    pub(crate) incoming_ack_tickets_tx: futures::channel::mpsc::Sender<AcknowledgedTicket>,
+    pub(crate) incoming_ack_tickets_tx: Arc<OnceLock<futures::channel::mpsc::Sender<AcknowledgedTicket>>>,
     caches: Arc<HoprDbCaches>,
 }
 
 impl TicketManager {
     pub fn new(tickets_db: sea_orm::DatabaseConnection, caches: Arc<HoprDbCaches>) -> Self {
+        Self {
+            tickets_db,
+            mutex: Arc::new(async_lock::Mutex::new(())),
+            incoming_ack_tickets_tx: Arc::new(OnceLock::new()),
+            caches,
+        }
+    }
+
+    /// Must be called to start processing tickets into the DB.
+    pub fn start_ticket_processing<S, E>(&self, ticket_notifier: S) -> Result<()>
+    where
+        S: Sink<AcknowledgedTicket, Error = E> + Send + 'static,
+        E: std::error::Error,
+    {
         let (tx, mut rx) = futures::channel::mpsc::channel::<AcknowledgedTicket>(100_000);
 
-        let mutex = Arc::new(async_lock::Mutex::new(()));
+        self.incoming_ack_tickets_tx
+            .set(tx)
+            .map_err(|_| DbSqlError::LogicalError("ticket processing already started".into()))?;
 
         // Creates a process to desynchronize storing of the ticket into the database
         // and the processing calls triggering such an operation.
-        let db_clone = tickets_db.clone();
-        let mutex_clone = mutex.clone();
+        let db_clone = self.tickets_db.clone();
+        let mutex_clone = self.mutex.clone();
 
         // NOTE: This spawned task does not need to be explicitly canceled, since it will
         // be automatically dropped when the event sender object is dropped.
         spawn(async move {
+            pin_mut!(ticket_notifier);
             while let Some(acknowledged_ticket) = rx.next().await {
                 match db_clone
                     .begin_with_config(None, None)
@@ -60,13 +77,14 @@ impl TicketManager {
                         let transaction = OpenTransaction(transaction, crate::TargetDb::Tickets);
 
                         let _quard = mutex_clone.lock().await;
+                        let ack_ticket = acknowledged_ticket.clone();
 
-                        if let Err(e) = transaction
+                        if let Err(error) = transaction
                             .perform(|tx| {
                                 Box::pin(async move {
-                                    let channel_id = acknowledged_ticket.verified_ticket().channel_id.to_hex();
+                                    let channel_id = ack_ticket.verified_ticket().channel_id.to_hex();
 
-                                    hopr_db_entity::ticket::ActiveModel::from(acknowledged_ticket)
+                                    hopr_db_entity::ticket::ActiveModel::from(ack_ticket)
                                         .insert(tx.as_ref())
                                         .await?;
 
@@ -95,20 +113,17 @@ impl TicketManager {
                             })
                             .await
                         {
-                            error!(error = %e, "failed to insert the winning ticket and update the ticket stats")
-                        };
+                            error!(%error, "failed to insert the winning ticket and update the ticket stats")
+                        } else if let Err(error) = ticket_notifier.send(acknowledged_ticket).await {
+                            error!(%error, "failed to notify the ticket notifier about the winning ticket");
+                        }
                     }
-                    Err(e) => error!(error = %e, "Failed to create a transaction for ticket insertion"),
+                    Err(error) => error!(%error, "Failed to create a transaction for ticket insertion"),
                 }
             }
         });
 
-        Self {
-            tickets_db,
-            mutex,
-            incoming_ack_tickets_tx: tx,
-            caches,
-        }
+        Ok(())
     }
 
     /// Sends a new acknowledged ticket into the FIFO queue.
@@ -117,13 +132,18 @@ impl TicketManager {
         let value = ticket.verified_ticket().amount;
         let epoch = ticket.verified_ticket().channel_epoch;
 
-        let unrealized_value = self.unrealized_value(TicketSelector::new(channel, epoch)).await?;
+        self.incoming_ack_tickets_tx
+            .get()
+            .ok_or(DbSqlError::LogicalError("ticket processing not started".into()))?
+            .clone()
+            .try_send(ticket)
+            .map_err(|e| {
+                DbSqlError::LogicalError(format!(
+                    "failed to enqueue acknowledged ticket processing into the DB: {e}"
+                ))
+            })?;
 
-        self.incoming_ack_tickets_tx.clone().try_send(ticket).map_err(|e| {
-            crate::errors::DbSqlError::LogicalError(format!(
-                "failed to enqueue acknowledged ticket processing into the DB: {e}"
-            ))
-        })?;
+        let unrealized_value = self.unrealized_value(TicketSelector::new(channel, epoch)).await?;
 
         #[cfg(all(feature = "prometheus", not(test)))]
         {
@@ -209,6 +229,7 @@ impl TicketManager {
 
 #[cfg(test)]
 mod tests {
+    use futures::StreamExt;
     use hex_literal::hex;
     use hopr_crypto_types::prelude::*;
     use hopr_db_api::info::DomainSeparator;
@@ -300,12 +321,19 @@ mod tests {
         let ticket = generate_random_ack_ticket(1)?;
         let ticket_value = ticket.verified_ticket().amount;
 
-        db.ticket_manager.insert_ticket(ticket).await?;
+        let (tx, mut rx) = futures::channel::mpsc::unbounded();
+
+        db.ticket_manager.start_ticket_processing(tx)?;
+
+        db.ticket_manager.insert_ticket(ticket.clone()).await?;
 
         assert_eq!(
             ticket_value,
             db.ticket_manager.unrealized_value((&channel).into()).await?
         );
+
+        let recv_ticket = rx.next().await.ok_or(anyhow::anyhow!("no ticket received"))?;
+        assert_eq!(recv_ticket, ticket);
 
         Ok(())
     }
