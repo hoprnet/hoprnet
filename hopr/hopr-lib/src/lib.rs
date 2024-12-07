@@ -953,6 +953,7 @@ impl Hopr {
         // notifier on acknowledged ticket reception
         let multi_strategy_ack_ticket = self.multistrategy.clone();
         let (on_ack_tkt_tx, mut on_ack_tkt_rx) = unbounded::<AcknowledgedTicket>();
+        self.db.start_ticket_processing(Some(on_ack_tkt_tx))?;
         processes.insert(
             HoprLibProcesses::OnReceivedAcknowledgement,
             spawn(async move {
@@ -1004,7 +1005,6 @@ impl Hopr {
                     errors::HoprLibError::GeneralError(format!("Failed to construct the bloom filter: {e}"))
                 })?,
                 transport_output_tx,
-                on_ack_tkt_tx,
                 indexer_peer_update_rx,
                 session_tx,
             )

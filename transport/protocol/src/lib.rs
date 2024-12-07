@@ -61,26 +61,22 @@ pub mod msg;
 pub mod ticket_aggregation;
 
 pub mod timer;
-use ack::processor::AckResult;
-use core_path::path::TransportPath;
-use hopr_crypto_types::keypairs::{ChainKeypair, OffchainKeypair};
 pub use timer::execute_on_tick;
 
-use futures::{SinkExt, StreamExt};
 pub use msg::processor::DEFAULT_PRICE_PER_PACKET;
-use msg::processor::{PacketSendFinalizer, PacketUnwrapping, PacketWrapping};
 
+use core_path::path::TransportPath;
+use futures::{SinkExt, StreamExt};
 use libp2p::PeerId;
+use msg::processor::{PacketSendFinalizer, PacketUnwrapping, PacketWrapping};
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use std::collections::HashMap;
 use tracing::{error, trace};
 
 use hopr_async_runtime::prelude::{sleep, spawn};
+use hopr_crypto_types::prelude::*;
 use hopr_db_api::protocol::HoprDbProtocolOperations;
-use hopr_internal_types::{
-    protocol::{Acknowledgement, ApplicationData},
-    tickets::AcknowledgedTicket,
-};
+use hopr_internal_types::protocol::{Acknowledgement, ApplicationData};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::{MultiCounter, SimpleCounter, SimpleGauge};
@@ -141,7 +137,6 @@ pub async fn run_msg_ack_protocol<Db>(
     me: &OffchainKeypair,
     me_onchain: &ChainKeypair,
     bloom_filter_persistent_path: Option<String>,
-    on_ack_ticket: impl futures::Sink<AcknowledgedTicket> + Send + Sync + 'static,
     wire_ack: (
         impl futures::Sink<(PeerId, Acknowledgement)> + Send + Sync + 'static,
         impl futures::Stream<Item = (PeerId, Acknowledgement)> + Send + Sync + 'static,
@@ -204,38 +199,30 @@ where
         spawn(async move {
             let _neverending = wire_ack
                 .1
-                .then_concurrent(move |(peer, ack)| {
+                .for_each_concurrent(None, move |(peer, ack)| {
                     let ack_processor = ack_processor_read.clone();
 
-                    async move { ack_processor.recv(&peer, ack).await }
-                })
-                .filter_map(|v| async move {
-                    #[cfg(all(feature = "prometheus", not(test)))]
-                    match &v {
-                        Ok(AckResult::Sender(_)) => {
-                            METRIC_RECEIVED_ACKS.increment(&["true"]);
-                        }
-                        Ok(AckResult::RelayerWinning(_)) => {
-                            METRIC_RECEIVED_ACKS.increment(&["true"]);
-                            METRIC_TICKETS_COUNT.increment(&["winning"]);
-                        }
-                        Ok(AckResult::RelayerLosing) => {
-                            METRIC_RECEIVED_ACKS.increment(&["true"]);
-                            METRIC_TICKETS_COUNT.increment(&["losing"]);
-                        }
-                        Err(_e) => {
-                            METRIC_RECEIVED_ACKS.increment(&["false"]);
+                    async move {
+                        let _ack_result = ack_processor.recv(&peer, ack).await;
+                        #[cfg(all(feature = "prometheus", not(test)))]
+                        match &_ack_result {
+                            Ok(hopr_db_api::prelude::AckResult::Sender(_)) => {
+                                METRIC_RECEIVED_ACKS.increment(&["true"]);
+                            }
+                            Ok(hopr_db_api::prelude::AckResult::RelayerWinning(_)) => {
+                                METRIC_RECEIVED_ACKS.increment(&["true"]);
+                                METRIC_TICKETS_COUNT.increment(&["winning"]);
+                            }
+                            Ok(hopr_db_api::prelude::AckResult::RelayerLosing) => {
+                                METRIC_RECEIVED_ACKS.increment(&["true"]);
+                                METRIC_TICKETS_COUNT.increment(&["losing"]);
+                            }
+                            Err(_) => {
+                                METRIC_RECEIVED_ACKS.increment(&["false"]);
+                            }
                         }
                     }
-
-                    if let Ok(AckResult::RelayerWinning(acknowledged_ticket)) = v {
-                        Some(acknowledged_ticket)
-                    } else {
-                        None
-                    }
                 })
-                .map(Ok)
-                .forward(on_ack_ticket)
                 .await;
         }),
     );
