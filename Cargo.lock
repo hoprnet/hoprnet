@@ -4203,7 +4203,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-sql"
-version = "0.8.4"
+version = "0.9.0"
 dependencies = [
  "anyhow",
  "async-lock 3.4.0",
@@ -4239,7 +4239,6 @@ dependencies = [
  "strum",
  "thiserror",
  "tracing",
- "tracing-test",
 ]
 
 [[package]]

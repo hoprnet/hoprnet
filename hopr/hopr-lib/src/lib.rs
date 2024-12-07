@@ -953,7 +953,7 @@ impl Hopr {
         // notifier on acknowledged ticket reception
         let multi_strategy_ack_ticket = self.multistrategy.clone();
         let (on_ack_tkt_tx, mut on_ack_tkt_rx) = unbounded::<AcknowledgedTicket>();
-        self.db.start_ticket_processing(on_ack_tkt_tx)?;
+        self.db.start_ticket_processing(Some(on_ack_tkt_tx))?;
         processes.insert(
             HoprLibProcesses::OnReceivedAcknowledgement,
             spawn(async move {

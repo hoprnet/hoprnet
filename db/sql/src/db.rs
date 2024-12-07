@@ -205,10 +205,17 @@ impl HoprDb {
         })
     }
 
-    /// Starts ticket processing by the [TicketManager].
+    /// Starts ticket processing by the [TicketManager] with an optional new ticket notifier.
     /// Without calling this method, tickets will not be persisted into the DB.
-    pub fn start_ticket_processing(&self, ticket_notifier: UnboundedSender<AcknowledgedTicket>) -> Result<()> {
-        self.ticket_manager.start_ticket_processing(ticket_notifier)
+    ///
+    /// If the notifier is given, it will receive notifications once new ticket has been
+    /// persisted into the Tickets DB.
+    pub fn start_ticket_processing(&self, ticket_notifier: Option<UnboundedSender<AcknowledgedTicket>>) -> Result<()> {
+        if let Some(notifier) = ticket_notifier {
+            self.ticket_manager.start_ticket_processing(notifier)
+        } else {
+            self.ticket_manager.start_ticket_processing(futures::sink::drain())
+        }
     }
 }
 

@@ -213,7 +213,7 @@ async fn peer_setup_for(count: usize) -> anyhow::Result<(Vec<WireChannels>, Vec<
             outgoing_ticket_win_prob: 1.0,
         };
 
-        db.start_ticket_processing(received_ack_tickets_tx)?;
+        db.start_ticket_processing(Some(received_ack_tickets_tx))?;
 
         hopr_transport_protocol::run_msg_ack_protocol(
             cfg,
