@@ -1,4 +1,4 @@
-use futures::{channel::mpsc::UnboundedSender, pin_mut, select, StreamExt};
+use futures::{pin_mut, select, StreamExt};
 use futures_concurrency::stream::Merge;
 use libp2p::{request_response::OutboundRequestId, PeerId};
 use std::{num::NonZeroU8, sync::Arc};
@@ -280,7 +280,7 @@ impl HoprSwarmWithProcessors {
     /// The function represents the entirety of the business logic of the hopr daemon related to core operations.
     ///
     /// This future can only be resolved by an unrecoverable error or a panic.
-    pub async fn run(self, version: String, on_ack_received: UnboundedSender<AcknowledgedTicket>) {
+    pub async fn run(self, version: String) {
         let mut swarm: libp2p::Swarm<HoprNetworkBehavior> = self.swarm.into();
 
         // NOTE: an improvement would be a forgetting cache for the active requests
@@ -530,11 +530,7 @@ impl HoprSwarmWithProcessors {
                                     error!(%peer, "Failed to enqueue response");
                                 }
                             },
-                            TicketAggregationProcessed::Receive(peer, acked_ticket, request) => {
-                                on_ack_received.unbounded_send(acked_ticket).unwrap_or_else(|e| {
-                                    error!(%peer, request_id = %request, error = %e, "Failed to process an aggregated acknowledgement");
-                                });
-
+                            TicketAggregationProcessed::Receive(peer, _, request) => {
                                 match active_aggregation_requests.remove(&request).await {
                                     Some(finalizer) => {
                                         active_aggregation_requests.run_pending_tasks().await;     // needed to remove the invalidated, but still present instance of Arc inside

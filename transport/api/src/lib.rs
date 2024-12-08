@@ -280,7 +280,6 @@ where
         network: Arc<Network<T>>,
         tbf_path: String,
         on_transport_output: UnboundedSender<ApplicationData>,
-        on_acknowledged_ticket: UnboundedSender<AcknowledgedTicket>,
         transport_updates: UnboundedReceiver<PeerDiscovery>,
         new_session_notifier: UnboundedSender<IncomingSession>,
     ) -> HashMap<HoprTransportProcess, JoinHandle<()>> {
@@ -368,10 +367,7 @@ where
             tkt_agg_writer,
         );
 
-        processes.insert(
-            HoprTransportProcess::Swarm,
-            spawn(transport_layer.run(version, on_acknowledged_ticket.clone())),
-        );
+        processes.insert(HoprTransportProcess::Swarm, spawn(transport_layer.run(version)));
 
         // initiate the msg-ack protocol stack over the wire transport
         let packet_cfg = PacketInteractionConfig::new(
@@ -387,7 +383,6 @@ where
             &self.me,
             &self.me_onchain,
             Some(tbf_path),
-            on_acknowledged_ticket,
             (ack_to_send_tx, ack_received_rx),
             (msg_to_send_tx, msg_received_rx),
             (tx_from_protocol, external_msg_rx),

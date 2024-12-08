@@ -89,8 +89,7 @@ where
         let path = match options {
             RoutingOptions::IntermediatePath(path) => {
                 let complete_path = Vec::from_iter(path.into_iter().chain([destination]));
-
-                trace!(full_path = format!("{complete_path:?}"), "Resolved a specific path");
+                trace!(full_path = ?complete_path, "resolved a specific path");
 
                 let cg = self.channel_graph.read().await;
 
@@ -99,11 +98,11 @@ where
                     .map(|(p, _)| p)?
             }
             RoutingOptions::Hops(hops) if u32::from(hops) == 0 => {
-                trace!(hops = 0, %destination, "Resolved zero-hop path");
+                trace!(hops = 0, %destination, "resolved zero-hop path");
                 TransportPath::direct(destination)
             }
             RoutingOptions::Hops(hops) => {
-                trace!(hops = tracing::field::display(hops), "Resolved path using hop count");
+                trace!(%hops, "resolved path using hop count");
 
                 let pk = OffchainPublicKey::try_from(destination)?;
 
@@ -120,7 +119,10 @@ where
                         selector.select_path(&cg, cg.my_address(), target_chain_key, hops.into(), hops.into())?
                     };
 
-                    cp.into_path(&self.db, target_chain_key).await?
+                    let full_path = cp.into_path(&self.db, target_chain_key).await?;
+                    trace!(%full_path, "resolved automatic path");
+
+                    full_path
                 } else {
                     return Err(HoprTransportError::Api(
                         "send msg: unknown destination peer id encountered".to_owned(),
