@@ -39,7 +39,8 @@ lazy_static::lazy_static! {
 /// 3. The heap maintains ordering so items with earliest release time are at the top
 ///
 /// The channel uses a single timer thread that is instantiated on the first
-/// timer reset and shared across all operations.
+/// timer reset and shared across all operations. This channel is **unbounded** by nature
+/// using the `capacity` in the configuration to solely pre-allocate the buffer.
 struct Channel<T> {
     /// Buffer holding the data with a timestamp ordering to ensure the min heap behavior.
     buffer: BinaryHeap<Reverse<DelayedData<T>>>,
