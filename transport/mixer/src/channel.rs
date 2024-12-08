@@ -369,7 +369,7 @@ mod tests {
 
     #[async_std::test]
     // #[tracing_test::traced_test]
-    async fn mixer_channel_should_produce_mixed_output_from_the_supplied_input() -> anyhow::Result<()> {
+    async fn mixer_channel_should_produce_mixed_output_from_the_supplied_input_using_sync_send() -> anyhow::Result<()> {
         const ITERATIONS: usize = 20; // highly unlikely that this produces the same order on the input given the size
 
         let (tx, rx) = channel(MixerConfig::default());
@@ -379,6 +379,55 @@ mod tests {
         for i in input.iter() {
             tx.send(*i)?;
         }
+
+        let mixed_output = rx
+            .take(ITERATIONS)
+            .collect::<Vec<_>>()
+            .timeout(2 * MAXIMUM_SINGLE_DELAY_DURATION)
+            .await?;
+
+        tracing::info!(?input, ?mixed_output, "asserted data");
+        Ok(assert_ne!(input, mixed_output))
+    }
+
+    #[async_std::test]
+    // #[tracing_test::traced_test]
+    async fn mixer_channel_should_produce_mixed_output_from_the_supplied_input_using_async_send() -> anyhow::Result<()>
+    {
+        const ITERATIONS: usize = 20; // highly unlikely that this produces the same order on the input given the size
+
+        let (mut tx, rx) = channel(MixerConfig::default());
+
+        let input = (0..ITERATIONS).collect::<Vec<_>>();
+
+        for i in input.iter() {
+            SinkExt::send(&mut tx, *i).await?;
+        }
+
+        let mixed_output = rx
+            .take(ITERATIONS)
+            .collect::<Vec<_>>()
+            .timeout(2 * MAXIMUM_SINGLE_DELAY_DURATION)
+            .await?;
+
+        tracing::info!(?input, ?mixed_output, "asserted data");
+        Ok(assert_ne!(input, mixed_output))
+    }
+
+    #[async_std::test]
+    // #[tracing_test::traced_test]
+    async fn mixer_channel_should_produce_mixed_output_from_the_supplied_input_using_async_feed() -> anyhow::Result<()>
+    {
+        const ITERATIONS: usize = 20; // highly unlikely that this produces the same order on the input given the size
+
+        let (mut tx, rx) = channel(MixerConfig::default());
+
+        let input = (0..ITERATIONS).collect::<Vec<_>>();
+
+        for i in input.iter() {
+            SinkExt::feed(&mut tx, *i).await?;
+        }
+        SinkExt::flush(&mut tx).await?;
 
         let mixed_output = rx
             .take(ITERATIONS)
