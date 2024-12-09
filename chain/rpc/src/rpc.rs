@@ -186,6 +186,23 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
         }
     }
 
+    async fn get_allowance(&self, owner: Address, spender: Address) -> Result<Balance> {
+        match self
+            .contract_instances
+            .token
+            .allowance(owner.into(), spender.into())
+            .call()
+            .await
+        {
+            Ok(token_allowance) => Ok(Balance::new(token_allowance, BalanceType::HOPR)),
+            Err(e) => Err(ContractError(
+                "HoprToken".to_string(),
+                "allowance".to_string(),
+                e.to_string(),
+            )),
+        }
+    }
+
     async fn get_eligibility_status(&self, address: Address) -> Result<bool> {
         match self
             .contract_instances

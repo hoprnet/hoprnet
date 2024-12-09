@@ -197,7 +197,7 @@ where
             Self::update_chain_head(&rpc, chain_head.clone()).await;
 
             let event_stream = rpc
-                .try_stream_logs(next_block_to_process, log_filters)
+                .try_stream_logs(next_block_to_process, log_filters, is_synced.load(Ordering::Relaxed))
                 .expect("block stream should be constructible")
                 .then(|block| {
                     Self::calculate_sync_process(
@@ -212,11 +212,20 @@ where
                 })
                 .filter_map(|block| {
                     let db = db.clone();
+                    let logs_handler = logs_handler.clone();
 
                     async move {
                         debug!(%block, "storing logs from block");
                         let logs = block.logs.clone();
-                        let logs_vec = logs.into_iter().map(SerializableLog::from).collect();
+
+                        // Filter out the token contract logs because we do not need to store these
+                        // in the database.
+                        let logs_vec = logs
+                            .into_iter()
+                            .map(SerializableLog::from)
+                            .filter(|log| log.address != logs_handler.contract_addresses_map().token)
+                            .collect();
+
                         match db.store_logs(logs_vec).await {
                             Ok(store_results) => {
                                 if let Some(error) = store_results
@@ -393,38 +402,49 @@ where
 
         // FIXME: The block indexing and marking as processed should be done in a single
         // transaction. This is difficult since currently this would be across databases.
-        match logs_handler.collect_block_events(block.clone()).await {
-            Ok(events) => {
-                match db.set_logs_processed(Some(block_id), Some(0)).await {
-                    Ok(_) => match db.update_logs_checksums().await {
-                        Ok(last_log_checksum) => {
-                            if fetch_checksum_from_db {
-                                let last_log = block.logs.into_iter().last().unwrap();
-                                let log = db.get_log(block_id, last_log.tx_index, last_log.log_index).await.ok()?;
 
-                                Self::print_indexer_state(block_id, log_count, log.checksum.unwrap()).await
-                            } else {
-                                Self::print_indexer_state(block_id, log_count, last_log_checksum.to_string()).await
-                            }
+        let events = stream::iter(block.logs.clone())
+            .filter_map(|log| async move {
+                match logs_handler.collect_log_event(log.clone()).await {
+                    Ok(Some(event)) => match db.set_log_processed(log).await {
+                        Ok(_) => Some(event),
+                        Err(error) => {
+                            error!(block_id, %error, "failed to mark log as processed, panicking to prevent data loss");
+                            panic!("failed to mark log as processed, panicking to prevent data loss")
                         }
-                        Err(error) => error!(block_id, %error, "failed to update checksums for logs from block"),
                     },
-                    Err(error) => error!(block_id, %error, "failed to mark logs from block as processed"),
+                    Ok(None) => None,
+                    Err(error) => {
+                        error!(block_id, %error, "failed to process log into event, panicking to prevent data loss");
+                        panic!("failed to process log into event, panicking to prevent data loss")
+                    }
                 }
+            })
+            .collect::<Vec<SignificantChainEvent>>()
+            .await;
 
-                debug!(
-                    block_id,
-                    num_events = events.len(),
-                    "processed significant chain events from block",
-                );
+        // if we made it this far, no errors occurred and we can update checksums and indexer state
+        match db.update_logs_checksums().await {
+            Ok(last_log_checksum) => {
+                if fetch_checksum_from_db {
+                    let last_log = block.logs.into_iter().last().unwrap();
+                    let log = db.get_log(block_id, last_log.tx_index, last_log.log_index).await.ok()?;
 
-                Some(events)
+                    Self::print_indexer_state(block_id, log_count, log.checksum.unwrap()).await
+                } else {
+                    Self::print_indexer_state(block_id, log_count, last_log_checksum.to_string()).await
+                }
             }
-            Err(error) => {
-                error!(block_id, %error, "failed to process logs from block into events");
-                None
-            }
+            Err(error) => error!(block_id, %error, "failed to update checksums for logs from block"),
         }
+
+        debug!(
+            block_id,
+            num_events = events.len(),
+            "processed significant chain events from block",
+        );
+
+        Some(events)
     }
 
     /// Prints the current state of the indexer.
@@ -637,6 +657,7 @@ mod tests {
                 &'a self,
                 start_block_number: u64,
                 filters: Vec<ethers::types::Filter>,
+                is_synced: bool,
             ) -> hopr_chain_rpc::errors::Result<Pin<Box<dyn Stream<Item = BlockWithLogs> + Send + 'a>>>;
         }
     }

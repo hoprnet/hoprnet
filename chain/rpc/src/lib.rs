@@ -33,6 +33,7 @@ pub mod errors;
 mod helper;
 pub mod indexer;
 pub mod rpc;
+pub mod types;
 
 /// A type containing selected fields from  the `eth_getLogs` RPC calls.
 ///
@@ -330,6 +331,9 @@ pub trait HoprRpcOperations {
     /// Retrieves the node's account balance of the given type.
     async fn get_balance(&self, address: Address, balance_type: BalanceType) -> Result<Balance>;
 
+    /// Retrieves the HOPR token allowance for the given owner and spender.
+    async fn get_allowance(&self, owner: Address, spender: Address) -> Result<Balance>;
+
     /// Retrieves the node's eligibility status
     async fn get_eligibility_status(&self, address: Address) -> Result<bool>;
 
@@ -394,5 +398,6 @@ pub trait HoprIndexerRpcOperations {
         &'a self,
         start_block_number: u64,
         filters: Vec<ethers::types::Filter>,
+        is_synced: bool,
     ) -> Result<Pin<Box<dyn Stream<Item = BlockWithLogs> + Send + 'a>>>;
 }
