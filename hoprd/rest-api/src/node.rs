@@ -277,6 +277,11 @@ pub(crate) struct GraphExportRequest {
     pub ignore_disconnected_components: bool,
     /// Do not export channels that are not in the `Open` state.
     pub ignore_non_opened_channels: bool,
+    /// Export the entire graph in raw bincode format, that can be later
+    /// used to load the graph into e.g. a unit test.
+    ///
+    /// Note that `ignore_disconnected_components` and `ignore_non_opened_channels` are ignored.
+    pub raw_graph: bool,
 }
 
 impl From<GraphExportRequest> for GraphExportConfig {
@@ -310,7 +315,18 @@ pub(super) async fn channel_graph(
     State(state): State<Arc<InternalState>>,
     Json(args): Json<GraphExportRequest>,
 ) -> impl IntoResponse {
-    (StatusCode::OK, state.hopr.export_channel_graph(args.into()).await).into_response()
+    if args.raw_graph {
+        match state.hopr.export_raw_channel_graph().await {
+            Ok(raw_graph) => (StatusCode::OK, raw_graph).into_response(),
+            Err(error) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                ApiErrorStatus::UnknownFailure(error.to_string()),
+            )
+                .into_response(),
+        }
+    } else {
+        (StatusCode::OK, state.hopr.export_channel_graph(args.into()).await).into_response()
+    }
 }
 
 #[serde_as]

@@ -26,6 +26,7 @@ use futures::{
     Stream, StreamExt,
 };
 use futures_concurrency::stream::StreamExt as _;
+use std::ops::Deref;
 use std::{
     collections::HashMap,
     fmt::{Display, Formatter},
@@ -1499,5 +1500,11 @@ impl Hopr {
 
     pub async fn export_channel_graph(&self, cfg: GraphExportConfig) -> String {
         self.channel_graph.read().await.as_dot(cfg)
+    }
+
+    pub async fn export_raw_channel_graph(&self) -> errors::Result<Box<[u8]>> {
+        bincode::serialize(self.channel_graph.read().await.deref())
+            .map(|bytes| bytes.into_boxed_slice())
+            .map_err(|e| HoprLibError::GeneralError(e.to_string()))
     }
 }

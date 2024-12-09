@@ -51,6 +51,7 @@ async-lock = { workspace = true }
 async-trait = { workspace = true }
 atomic_enum = { workspace = true }
 backon = { version = "1.2.0", default-features = false }
+bincode = { workspace = true }
 const_format = { workspace = true }
 futures = { workspace = true }
 futures-concurrency = { workspace = true }

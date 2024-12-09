@@ -576,4 +576,30 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn graph_must_serialize_and_deserialize() -> anyhow::Result<()> {
+        let mut cg = ChannelGraph::new(ADDRESSES[0]);
+
+        let c = dummy_channel(ADDRESSES[0], ADDRESSES[1], ChannelStatus::Open);
+        cg.update_channel(c);
+        cg.update_channel_quality(ADDRESSES[0], ADDRESSES[1], 0.5);
+
+        let c = dummy_channel(ADDRESSES[1], ADDRESSES[2], ChannelStatus::Open);
+        cg.update_channel(c);
+        cg.update_channel_quality(ADDRESSES[1], ADDRESSES[2], 0.1);
+
+        let c = dummy_channel(ADDRESSES[3], ADDRESSES[4], ChannelStatus::Open);
+        cg.update_channel(c);
+
+        let serialized = bincode::serialize(&cg)?;
+        let cg2 = bincode::deserialize::<ChannelGraph>(serialized.as_ref())?;
+
+        assert_eq!(cg.me, cg2.me);
+        for (src, dst, weight) in cg.graph.all_edges() {
+            assert_eq!(cg2.graph.edge_weight(src, dst), Some(weight));
+        }
+
+        Ok(())
+    }
 }
