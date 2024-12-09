@@ -1,10 +1,11 @@
 use std::sync::Arc;
 
 use crate::cache::HoprDbCaches;
+use futures::channel::mpsc::UnboundedSender;
 use hopr_crypto_types::keypairs::Keypair;
 use hopr_crypto_types::prelude::ChainKeypair;
 use hopr_db_entity::ticket;
-use hopr_internal_types::prelude::AcknowledgedTicketStatus;
+use hopr_internal_types::prelude::{AcknowledgedTicket, AcknowledgedTicketStatus};
 use hopr_primitive_types::primitives::Address;
 use migration::{MigratorChainLogs, MigratorIndex, MigratorPeers, MigratorTickets, MigratorTrait};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, SqlxSqliteConnector};
@@ -202,6 +203,19 @@ impl HoprDb {
             tickets_db,
             caches,
         })
+    }
+
+    /// Starts ticket processing by the [TicketManager] with an optional new ticket notifier.
+    /// Without calling this method, tickets will not be persisted into the DB.
+    ///
+    /// If the notifier is given, it will receive notifications once new ticket has been
+    /// persisted into the Tickets DB.
+    pub fn start_ticket_processing(&self, ticket_notifier: Option<UnboundedSender<AcknowledgedTicket>>) -> Result<()> {
+        if let Some(notifier) = ticket_notifier {
+            self.ticket_manager.start_ticket_processing(notifier)
+        } else {
+            self.ticket_manager.start_ticket_processing(futures::sink::drain())
+        }
     }
 }
 
