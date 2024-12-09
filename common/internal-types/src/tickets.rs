@@ -26,10 +26,10 @@ const ENCODED_WIN_PROB_LENGTH: usize = 7;
 pub type EncodedWinProb = [u8; ENCODED_WIN_PROB_LENGTH];
 
 /// Encodes 100% winning probability
-const ALWAYS_WINNING: EncodedWinProb = hex!("ffffffffffffff");
+pub const ALWAYS_WINNING: EncodedWinProb = hex!("ffffffffffffff");
 
 /// Encodes 0% winning probability
-const NEVER_WINNING: EncodedWinProb = hex!("00000000000000");
+pub const NEVER_WINNING: EncodedWinProb = hex!("00000000000000");
 
 /// Helper function checks if the given ticket values belong to a winning ticket.
 pub(crate) fn check_ticket_win(
@@ -48,7 +48,7 @@ pub(crate) fn check_ticket_win(
     computed_ticket_luck[1..].copy_from_slice(
         &Hash::create(&[
             ticket_hash.as_ref(),
-            &vrf_params.v.as_uncompressed().as_bytes()[1..], // skip prefix
+            &vrf_params.V.as_uncompressed().as_bytes()[1..], // skip prefix
             response.as_ref(),
             ticket_signature.as_ref(),
         ])
@@ -83,7 +83,7 @@ pub struct TicketBuilder {
 }
 
 impl TicketBuilder {
-    /// Initializes the builder for a zero hop ticket.
+    /// Initializes the builder for a zero-hop ticket.
     #[must_use]
     pub fn zero_hop() -> Self {
         Self {
@@ -488,31 +488,38 @@ impl TryFrom<&[u8]> for Ticket {
 
     fn try_from(value: &[u8]) -> std::result::Result<Self, Self::Error> {
         if value.len() == Self::SIZE {
-            // TODO: not necessary to transmit over the wire, only the counterparty is sufficient
-            let channel_id = Hash::try_from(&value[0..32])?;
+            let mut offset = 0;
+
+            // TODO: not necessary to the ChannelId over the wire, only the counterparty is sufficient
+            let channel_id = Hash::try_from(&value[offset..offset + Hash::SIZE])?;
+            offset += Hash::SIZE;
+
             let mut amount = [0u8; 32];
-            amount[20..32].copy_from_slice(&value[Hash::SIZE..Hash::SIZE + 12]);
+            amount[20..32].copy_from_slice(&value[offset..offset + 12]);
+            offset += 12;
 
             let mut index = [0u8; 8];
-            index[2..8].copy_from_slice(&value[Hash::SIZE + 12..Hash::SIZE + 12 + 6]);
+            index[2..8].copy_from_slice(&value[offset..offset + 6]);
+            offset += 6;
 
             let mut index_offset = [0u8; 4];
-            index_offset.copy_from_slice(&value[Hash::SIZE + 12 + 6..Hash::SIZE + 12 + 6 + 4]);
+            index_offset.copy_from_slice(&value[offset..offset + 4]);
+            offset += 4;
 
             let mut channel_epoch = [0u8; 4];
-            channel_epoch[1..4].copy_from_slice(&value[Hash::SIZE + 12 + 6 + 4..Hash::SIZE + 12 + 6 + 4 + 3]);
+            channel_epoch[1..4].copy_from_slice(&value[offset..offset + 3]);
+            offset += 3;
 
             let mut encoded_win_prob = [0u8; 7];
-            encoded_win_prob.copy_from_slice(&value[Hash::SIZE + 12 + 6 + 4 + 3..Hash::SIZE + 12 + 6 + 4 + 3 + 7]);
+            encoded_win_prob.copy_from_slice(&value[offset..offset + 7]);
+            offset += 7;
 
-            let challenge = EthereumChallenge::try_from(
-                &value[ENCODED_TICKET_LENGTH..ENCODED_TICKET_LENGTH + EthereumChallenge::SIZE],
-            )?;
+            debug_assert_eq!(offset, ENCODED_TICKET_LENGTH);
 
-            let signature = Signature::try_from(
-                &value[ENCODED_TICKET_LENGTH + EthereumChallenge::SIZE
-                    ..ENCODED_TICKET_LENGTH + EthereumChallenge::SIZE + Signature::SIZE],
-            )?;
+            let challenge = EthereumChallenge::try_from(&value[offset..offset + EthereumChallenge::SIZE])?;
+            offset += EthereumChallenge::SIZE;
+
+            let signature = Signature::try_from(&value[offset..offset + Signature::SIZE])?;
 
             // Validate the boundaries of the parsed values
             TicketBuilder::default()
@@ -525,9 +532,9 @@ impl TryFrom<&[u8]> for Ticket {
                 .challenge(challenge)
                 .signature(signature)
                 .build()
-                .map_err(|_| GeneralError::ParseError)
+                .map_err(|e| GeneralError::ParseError(format!("ticket build failed: {e}")))
         } else {
-            Err(GeneralError::ParseError)
+            Err(GeneralError::ParseError("Ticket".into()))
         }
     }
 }
@@ -813,7 +820,7 @@ impl AcknowledgedTicket {
         chain_keypair: &ChainKeypair,
         domain_separator: &Hash,
     ) -> crate::errors::Result<RedeemableTicket> {
-        // This function must be called by ticket recipient, and not the issuer
+        // This function must be called by ticket recipient and not the issuer
         if chain_keypair.public().to_address().eq(self.ticket.verified_issuer()) {
             return Err(errors::CoreTypesError::LoopbackTicket);
         }
@@ -1274,7 +1281,7 @@ pub mod tests {
         let redeemable_2 = transferable.into_redeemable(&ALICE.public().to_address(), &Hash::default())?;
 
         assert_eq!(redeemable_1, redeemable_2);
-        assert_eq!(redeemable_1.vrf_params.v, redeemable_2.vrf_params.v);
+        assert_eq!(redeemable_1.vrf_params.V, redeemable_2.vrf_params.V);
         Ok(())
     }
 }

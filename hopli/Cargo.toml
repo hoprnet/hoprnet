@@ -14,22 +14,22 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 serde_with = { workspace = true }
 hex = { workspace = true }
-hopr-crypto-types = { workspace = true }
-hoprd-keypair = { features = ["hopli"], workspace = true }
-hopr-primitive-types = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 uuid = { workspace = true }
-chain-rpc = { workspace = true }
-chain-api = { workspace = true }
-hopr-internal-types = { workspace = true }
-hopr-lib = { workspace = true, features = ["runtime-async-std"] }
-chain-types = { workspace = true }
 async-std = { workspace = true, features = ["attributes"] }
 hex-literal = { workspace = true }
-bindings = { workspace = true }
 rpassword = { workspace = true }
+
+bindings = { workspace = true }
+chain-api = { workspace = true, features = ["runtime-async-std"] }
+chain-types = { workspace = true }
+hopr-chain-rpc = { workspace = true }
+hopr-crypto-types = { workspace = true }
+hopr-internal-types = { workspace = true }
+hopr-primitive-types = { workspace = true }
+hoprd-keypair = { workspace = true, features = ["hopli"] }
 
 [dev-dependencies]
 anyhow = { workspace = true }

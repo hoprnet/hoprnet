@@ -11,10 +11,9 @@ use async_stream::stream;
 use async_trait::async_trait;
 use ethers::providers::{JsonRpcClient, Middleware};
 use futures::stream::BoxStream;
-use futures::{Stream, StreamExt, TryStreamExt};
+use futures::{Stream, StreamExt};
 use std::pin::Pin;
-use tracing::{debug, warn};
-use tracing::{error, trace};
+use tracing::{debug, error, trace, warn};
 
 use crate::errors::{Result, RpcError, RpcError::FilterIsEmpty};
 use crate::rpc::RpcOperations;
@@ -71,14 +70,21 @@ impl<P: JsonRpcClient + 'static> RpcOperations<P> {
         fetch_ranges
             .then(|subrange| {
                 let prov_clone = self.provider.clone();
+
                 async move {
+                    trace!(
+                        from = ?subrange.get_from_block(),
+                        to = ?subrange.get_to_block(),
+                        "fetching logs in block subrange"
+                    );
                     match prov_clone.get_logs(&subrange).await {
                         Ok(logs) => Ok(logs),
                         Err(e) => {
                             error!(
-                                "failed to fetch logs in block subrange {:?}-{:?}: {e}",
-                                subrange.get_from_block(),
-                                subrange.get_to_block()
+                                from = ?subrange.get_from_block(),
+                                to = ?subrange.get_to_block(),
+                                error = %e,
+                                "failed to fetch logs in block subrange"
                             );
                             Err(e)
                         }
@@ -129,7 +135,7 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                                 from_block = latest_block;
                             } else if past_diff <= MAX_RPC_PAST_BLOCKS as u64 {
                                 // If we came here early (we tolerate only off-by MAX_RPC_PAST_BLOCKS), wait some more
-                                warn!("too early query, RPC provider still at block {latest_block}, diff to DB: {past_diff}");
+                                debug!(last_block = latest_block, start_block = start_block_number, blocks_diff = past_diff, "Indexer premature request. Block not found yet in RPC provider.");
                                 futures_timer::Delay::new(past_diff as u32 * self.cfg.expected_block_time / 3).await;
                                 continue;
                             } else {
@@ -140,25 +146,34 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                             }
                         }
 
+
                         #[cfg(all(feature = "prometheus", not(test)))]
                         METRIC_RPC_CHAIN_HEAD.set(latest_block as f64);
 
                         let mut retrieved_logs = self.stream_logs(filter.clone(), from_block, latest_block);
 
+                        trace!(from_block, to_block = latest_block, "processing batch");
+
                         let mut current_block_log = BlockWithLogs { block_id: from_block, ..Default::default()};
-                        trace!("begin processing batch #{from_block} - #{latest_block}");
+
                         loop {
-                            match retrieved_logs.try_next().await {
-                                Ok(Some(log)) => {
+                            match retrieved_logs.next().await {
+                                Some(Ok(log)) => {
                                     // This in general should not happen, but handle such a case to be safe
                                     if log.block_number > latest_block {
-                                        warn!("got {log} that has not yet reached the finalized tip at {latest_block}");
+                                        warn!(%log, latest_block, "got log that has not yet reached the finalized tip");
                                         break;
                                     }
 
+                                    // This should not happen, thus panic.
+                                    if current_block_log.block_id > log.block_number {
+                                        error!(log_block_id = log.block_number, current_block_log.block_id, "received log from a previous block");
+                                        panic!("The on-chain logs are not ordered by block number. This is a critical error.");
+                                    }
+
                                     // This assumes the logs are arriving ordered by blocks when fetching a range
-                                    if current_block_log.block_id != log.block_number {
-                                        debug!("completed {current_block_log}");
+                                    if current_block_log.block_id < log.block_number {
+                                        debug!(block = %current_block_log, "completed block, moving to next");
                                         yield current_block_log;
 
                                         current_block_log = BlockWithLogs::default();
@@ -166,14 +181,13 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                                     }
 
                                     debug!("retrieved {log}");
-                                    current_block_log.logs.insert(log);
+                                    current_block_log.logs.insert(log.into());
                                 },
-                                Ok(None) => {
-                                    trace!("done processing batch #{from_block} - #{latest_block}");
+                                None => {
                                     break;
                                 },
-                                Err(e) => {
-                                    error!("failure when processing blocks from RPC: {e}");
+                                Some(Err(e)) => {
+                                    error!(error=%e, "failed to process blocks");
                                     count_failures += 1;
 
                                     if count_failures < MAX_LOOP_FAILURES {
@@ -185,8 +199,8 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                                     } else {
                                         panic!("!!! Cannot advance the chain indexing due to unrecoverable RPC errors.
 
-                                        The RPC provider does not seem to be working correctly. 
-                                        
+                                        The RPC provider does not seem to be working correctly.
+
                                         The last encountered error was: {e}");
                                     }
                                 }
@@ -194,13 +208,13 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                         }
 
                         // Yield everything we've collected until this point
-                        debug!("completed {current_block_log}");
+                        debug!(block = %current_block_log, "completed block, processing batch finished");
                         yield current_block_log;
                         from_block = latest_block + 1;
                         count_failures = 0;
                     }
 
-                    Err(e) => error!("failed to obtain current block number from chain: {e}")
+                    Err(e) => error!(error = %e, "failed to obtain current block number from chain")
                 }
 
                 futures_timer::Delay::new(self.cfg.expected_block_time).await;
@@ -216,13 +230,13 @@ mod tests {
     use ethers::contract::EthEvent;
     use futures::StreamExt;
     use std::time::Duration;
+    use tracing::debug;
 
     use bindings::hopr_channels::*;
     use bindings::hopr_token::{ApprovalFilter, TransferFilter};
     use chain_types::{ContractAddresses, ContractInstances};
     use hopr_async_runtime::prelude::{sleep, spawn};
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
-    use tracing::debug;
 
     use crate::client::surf_client::SurfRequestor;
     use crate::client::{create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy};
@@ -398,31 +412,55 @@ mod tests {
 
         // The last block must contain all 4 events
         let last_block_logs = retrieved_logs.last().context("a log should be present")?.clone().logs;
+        let channel_open_filter = ChannelOpenedFilter::signature();
+        let channel_balance_filter = ChannelBalanceIncreasedFilter::signature();
+        let approval_filter = ApprovalFilter::signature();
+        let transfer_filter = TransferFilter::signature();
+
+        debug!(
+            "channel_open_filter: {:?} - {:?}",
+            channel_open_filter,
+            channel_open_filter.as_ref().to_vec()
+        );
+        debug!(
+            "channel_balance_filter: {:?} - {:?}",
+            channel_balance_filter,
+            channel_balance_filter.as_ref().to_vec()
+        );
+        debug!(
+            "approval_filter: {:?} - {:?}",
+            approval_filter,
+            approval_filter.as_ref().to_vec()
+        );
+        debug!(
+            "transfer_filter: {:?} - {:?}",
+            transfer_filter,
+            transfer_filter.as_ref().to_vec()
+        );
+        debug!("logs: {:#?}", last_block_logs);
 
         assert!(
-            last_block_logs.iter().any(|log| log.address == contract_addrs.channels
-                && log.topics.contains(&ChannelOpenedFilter::signature().0.into())),
+            last_block_logs
+                .iter()
+                .any(|log| log.address == contract_addrs.channels && log.topics.contains(&channel_open_filter.into())),
             "must contain channel open"
         );
         assert!(
-            last_block_logs.iter().any(|log| log.address == contract_addrs.channels
-                && log
-                    .topics
-                    .contains(&ChannelBalanceIncreasedFilter::signature().0.into())),
+            last_block_logs.iter().any(
+                |log| log.address == contract_addrs.channels && log.topics.contains(&channel_balance_filter.into())
+            ),
             "must contain channel balance increase"
         );
         assert!(
             last_block_logs
                 .iter()
-                .any(|log| log.address == contract_addrs.token
-                    && log.topics.contains(&ApprovalFilter::signature().0.into())),
+                .any(|log| log.address == contract_addrs.token && log.topics.contains(&approval_filter.into())),
             "must contain token approval"
         );
         assert!(
             last_block_logs
                 .iter()
-                .any(|log| log.address == contract_addrs.token
-                    && log.topics.contains(&TransferFilter::signature().0.into())),
+                .any(|log| log.address == contract_addrs.token && log.topics.contains(&transfer_filter.into())),
             "must contain token transfer"
         );
 
@@ -513,17 +551,19 @@ mod tests {
             .context("a value should be present")?
             .clone()
             .logs;
+        let channel_open_filter: [u8; 32] = ChannelOpenedFilter::signature().into();
+        let channel_balance_filter: [u8; 32] = ChannelBalanceIncreasedFilter::signature().into();
 
         assert!(
-            last_block_logs.iter().any(|log| log.address == contract_addrs.channels
-                && log.topics.contains(&ChannelOpenedFilter::signature().0.into())),
+            last_block_logs
+                .iter()
+                .any(|log| log.address == contract_addrs.channels && log.topics.contains(&channel_open_filter)),
             "must contain channel open"
         );
         assert!(
-            last_block_logs.iter().any(|log| log.address == contract_addrs.channels
-                && log
-                    .topics
-                    .contains(&ChannelBalanceIncreasedFilter::signature().0.into())),
+            last_block_logs
+                .iter()
+                .any(|log| log.address == contract_addrs.channels && log.topics.contains(&channel_balance_filter)),
             "must contain channel balance increase"
         );
 

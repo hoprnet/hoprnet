@@ -8,9 +8,46 @@ use axum::{
     middleware::Next,
     response::IntoResponse,
 };
-use std::str::FromStr;
+use std::{str::FromStr, sync::atomic::Ordering::Relaxed};
+use urlencoding::decode;
 
-use crate::{ApiErrorStatus, Auth, InternalState};
+use crate::{ApiErrorStatus, Auth, InternalState, BASE_PATH};
+
+fn is_a_websocket_uri(uri: &OriginalUri) -> bool {
+    const MESSAGES_PATH: &str = const_format::formatcp!("{BASE_PATH}/messages/websocket");
+    const SESSION_PATH: &str = const_format::formatcp!("{BASE_PATH}/session/websocket");
+
+    uri.path().starts_with(MESSAGES_PATH) || uri.path().starts_with(SESSION_PATH)
+}
+
+pub(crate) async fn cap_websockets(
+    State(state): State<InternalState>,
+    uri: OriginalUri,
+    _headers: HeaderMap,
+    request: Request,
+    next: Next,
+) -> impl IntoResponse {
+    let max_websocket_count = std::env::var("HOPR_INTERNAL_REST_API_MAX_CONCURRENT_WEBSOCKET_COUNT")
+        .and_then(|v| v.parse::<u16>().map_err(|_e| std::env::VarError::NotPresent))
+        .unwrap_or(10);
+
+    if is_a_websocket_uri(&uri) {
+        let ws_count = state.websocket_active_count;
+
+        if ws_count.fetch_add(1, Relaxed) > max_websocket_count {
+            ws_count.fetch_sub(1, Relaxed);
+
+            return (
+                StatusCode::TOO_MANY_REQUESTS,
+                ApiErrorStatus::TooManyOpenWebsocketConnections,
+            )
+                .into_response();
+        }
+    }
+
+    // Go forward to the next middleware or request handler
+    next.run(request).await
+}
 
 pub(crate) async fn authenticate(
     State(state): State<InternalState>,
@@ -35,9 +72,19 @@ pub(crate) async fn authenticate(
                 })
                 .collect::<Vec<_>>();
 
-            let is_ws_auth = if let Some(s) = uri.path_and_query() {
-                s.as_str()
-                    .contains(format!("messages/websocket?apiToken={expected_token}").as_str())
+            let is_ws_auth = if is_a_websocket_uri(&uri) {
+                uri.query()
+                    .map(|q| {
+                        // Reasonable limit for query string
+                        if q.len() > 2048 {
+                            return false;
+                        }
+                        match decode(q) {
+                            Ok(decoded) => decoded.into_owned().contains(&format!("apiToken={}", expected_token)),
+                            Err(_) => false,
+                        }
+                    })
+                    .unwrap_or(false)
             } else {
                 false
             };

@@ -33,8 +33,6 @@ impl SendMsg for BufferingMsgSender {
         tracing::debug!("wrote {len} bytes");
         Ok(())
     }
-
-    fn close(&self) {}
 }
 
 #[test_log::test(tokio::test)]
@@ -57,7 +55,7 @@ async fn udp_session_bridging() -> anyhow::Result<()> {
     let mut listener = ConnectedUdpStream::builder()
         .with_buffer_size(BUF_LEN)
         .with_queue_size(512)
-        .with_parallelism(0)
+        .with_receiver_parallelism(UdpStreamParallelism::Auto)
         .build(("127.0.0.1", 0))?;
 
     let addr = *listener.bound_address();
@@ -111,11 +109,11 @@ async fn udp_session_bridging_with_segmentation() -> anyhow::Result<()> {
         None,
     );
 
-    const BUF_LEN: usize = 16384;
+    const BUF_LEN: usize = 1638;
     let mut listener = ConnectedUdpStream::builder()
         .with_buffer_size(BUF_LEN)
         .with_queue_size(512)
-        .with_parallelism(0)
+        .with_receiver_parallelism(UdpStreamParallelism::Auto)
         .build(("127.0.0.1", 0))?;
 
     let addr = *listener.bound_address();
@@ -126,14 +124,14 @@ async fn udp_session_bridging_with_segmentation() -> anyhow::Result<()> {
             .expect("transfer must not fail")
     });
 
-    let msg = [1u8; 9183];
+    let msg = [1u8; 918];
     let sender = UdpSocket::bind(("127.0.0.1", 0)).await?;
 
-    let w = sender.send_to(&msg[..8192], addr).await?;
-    assert_eq!(8192, w);
+    let w = sender.send_to(&msg[..819], addr).await?;
+    assert_eq!(819, w);
 
-    let w = sender.send_to(&msg[8192..], addr).await?;
-    assert_eq!(991, w);
+    let w = sender.send_to(&msg[819..], addr).await?;
+    assert_eq!(99, w);
 
     let mut recv_buf = Vec::with_capacity(msg.len());
     loop {

@@ -6,6 +6,12 @@ pub enum DbError {
     #[error("alias not found: {0}")]
     AliasNotFound(String),
 
+    #[error("re-aliasing self is not allowed")]
+    ReAliasingSelfNotAllowed,
+
+    #[error("alias or peer id already exists")]
+    AliasOrPeerIdAlreadyExists,
+
     #[error("transaction error: {0}")]
     TransactionError(Box<dyn std::error::Error + Send + Sync>),
 

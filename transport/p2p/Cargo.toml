@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport-p2p"
-version = "0.5.0"
+version = "0.5.2"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 license = "GPL-3.0-only"
@@ -10,7 +10,11 @@ crate-type = ["rlib"]
 
 [features]
 default = []
-prometheus = ["dep:lazy_static", "dep:hopr-metrics"]
+prometheus = [
+  "dep:lazy_static",
+  "dep:hopr-metrics",
+  "hopr-transport-protocol/prometheus",
+]
 runtime-async-std = ["libp2p/async-std"]
 runtime-tokio = ["libp2p/tokio"]
 

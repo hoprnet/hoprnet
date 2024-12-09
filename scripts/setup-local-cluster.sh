@@ -14,8 +14,6 @@ declare HOPR_LOG_ID="setup-local-cluster"
 # shellcheck disable=SC1090
 source "${mydir}/utils.sh"
 
-PATH="${mydir}/../.foundry/bin:${mydir}/../.cargo/bin:${PATH}"
-
 # verify and set parameters
 declare api_token="^^LOCAL-testing-123^^"
 declare init_script=""
@@ -89,8 +87,8 @@ node_prefix="local"
 password="local"
 anvil_rpc_log="${tmp_dir}/hopr-local-anvil-rpc.log"
 env_file="${tmp_dir}/local-cluster.env"
-node_api_base_port=13301
-node_p2p_base_port=19091
+node_api_base_port=19091
+node_p2p_base_port=13301
 cluster_size=5
 
 function cleanup {
@@ -149,22 +147,25 @@ function setup_node() {
 
   log "Additional args: \"${additional_args}\""
 
+  # we can only provide apiToken param if we want authentication
+  local api_token_params="--api"
+  if [[ "${HOPRD_DISABLE_API_AUTHENTICATION:-1}" == 0 ]]; then
+      api_token_params="${api_token_params} --apiToken ${api_token}"
+  fi
+  # shellcheck disable=SC2086
   env \
-    HOPRD_HEARTBEAT_INTERVAL=3 \
-    HOPRD_HEARTBEAT_THRESHOLD=3 \
-    HOPRD_HEARTBEAT_VARIANCE=1 \
-    HOPRD_NETWORK_QUALITY_THRESHOLD="0.3" \
+    TOKIO_CONSOLE_BIND=localhost:$((api_port + 100)) \
     RUST_LOG="debug,libp2p_mplex=info,multistream_select=info,isahc=error,sea_orm=warn,sqlx=warn,hyper_util=warn,libp2p_tcp=info,libp2p_dns=info" \
     RUST_BACKTRACE=1 \
+    HOPRD_DISABLE_API_AUTHENTICATION="${HOPRD_DISABLE_API_AUTHENTICATION:-1}" \
     ${hoprd_command} \
       --announce \
-      --disableApiAuthentication \
       --data="${dir}" \
       --host="${host}:${p2p_port}" \
       --identity="${id_file}" \
       --init \
       --password="${password}" \
-      --api \
+      ${api_token_params} \
       --apiHost "${host}" \
       --apiPort "${api_port}" \
       --testAnnounceLocalAddresses \
@@ -218,6 +219,22 @@ function create_local_safes() {
   done
 }
 
+function set_minimum_win_prob() {
+  local win_prob=${1:-"0.00001"}
+
+  log "Decreasing minimum winning probability to ${win_prob}"
+
+  env \
+    ETHERSCAN_API_KEY="" \
+    IDENTITY_PASSWORD="${password}" \
+    PRIVATE_KEY="${deployer_private_key}" \
+    MANAGER_PRIVATE_KEY="${deployer_private_key}" \
+    hopli win-prob set \
+      --network anvil-localhost \
+      --winning-probability "${win_prob}" \
+      --provider-url "http://localhost:8545" \
+      --contracts-root "./ethereum/contracts"
+}
 
 function fund_all_local_identities() {
   log "Funding nodes"
@@ -287,6 +304,9 @@ generate_local_identities
 # create safe and modules for all the ids, store them in args files
 #  each node has its own pair of safe and module
 create_local_safes
+
+# decrease minimum winning probability
+set_minimum_win_prob "0.00001"
 
 #  --- Run nodes --- {{{
 for node_id in ${!id_files[@]}; do

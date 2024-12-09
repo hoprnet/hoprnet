@@ -1,6 +1,6 @@
 [package]
 name = "hopr-crypto-packet"
-version = "0.7.2"
+version = "0.8.0"
 description = "Contains high-level HOPR protocol building blocks for packet interaction"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
@@ -30,7 +30,7 @@ hopr-primitive-types = { workspace = true }
 anyhow = { workspace = true }
 async-std = { workspace = true }
 async-trait = { workspace = true }
-divan = { workspace = true }
+criterion = { workspace = true }
 hex-literal = { workspace = true }
 libp2p-identity = { workspace = true }
 mockall = { workspace = true }

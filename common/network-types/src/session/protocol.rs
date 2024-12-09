@@ -18,7 +18,10 @@
 //! MTU size `C` (which is a generic const argument of the `SessionMessage` type).
 //! The header of the `SessionMessage` encoding consists of the [`version`](SessionMessage::VERSION)
 //! byte, followed by the discriminator byte of one of the above messages and then followed by
-//! the message's encoding itself.
+//! the message length and message's encoding itself.
+//!
+//! Multiple [`SessionMessages`](SessionMessage) can be read from a binary blob using the
+//! [`SessionMessageIter`].
 //!
 //! ## Segment message ([`Segment`](SessionMessage::Segment))
 //! The Segment message contains the payload [`Segment`] of some [`Frame`](crate::session::Frame).
@@ -47,10 +50,12 @@
 //! per message. If more frames need to be acknowledged, more messages need to be sent.
 //! If the message contains fewer entries, it is padded with zeros (0 is not a valid frame ID).
 //!
+use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::{Display, Formatter};
 use std::mem;
 
+use crate::errors::NetworkTypeError;
 use crate::session::errors::SessionError;
 use crate::session::frame::{FrameId, FrameInfo, Segment, SegmentId, SeqNum};
 
@@ -269,6 +274,8 @@ impl<const C: usize> From<FrameAcknowledgements<C>> for Vec<u8> {
 }
 
 /// Contains all messages of the Session sub-protocol.
+///
+/// The maximum size of the Session sub-protocol message is given by `C`.
 #[derive(Debug, Clone, PartialEq, Eq, strum::EnumDiscriminants, strum::EnumTryAs)]
 #[strum_discriminants(derive(strum::FromRepr), repr(u8))]
 pub enum SessionMessage<const C: usize> {
@@ -292,11 +299,22 @@ impl<const C: usize> Display for SessionMessage<C> {
 
 impl<const C: usize> SessionMessage<C> {
     /// Header size of the session message.
-    /// This is currently the version byte and the size of [SessionMessageDiscriminants] representation.
-    pub const HEADER_SIZE: usize = 1 + mem::size_of::<SessionMessageDiscriminants>();
+    /// This is currently the version byte, the size of [SessionMessageDiscriminants] representation
+    /// and two bytes for the message length.
+    pub const HEADER_SIZE: usize = 1 + mem::size_of::<SessionMessageDiscriminants>() + mem::size_of::<u16>();
+
+    /// Size of the overhead that's added to the raw payload of each [`Segment`].
+    ///
+    /// This amounts to [`SessionMessage::HEADER_SIZE`] + [`Segment::HEADER_SIZE`].
+    pub const SEGMENT_OVERHEAD: usize = Self::HEADER_SIZE + Segment::HEADER_SIZE;
+
+    /// Maximum size of the Session protocol message.
+    ///
+    /// This is equal to the typical Ethernet MTU size minus [`Self::SEGMENT_OVERHEAD`].
+    pub const MAX_MESSAGE_SIZE: usize = 1492 - Self::SEGMENT_OVERHEAD;
 
     /// Current version of the protocol.
-    pub const VERSION: u8 = 0;
+    pub const VERSION: u8 = 1;
 
     /// Maximum number of segments per frame.
     pub const MAX_SEGMENTS_PER_FRAME: usize = SegmentRequest::<C>::MAX_MISSING_SEGMENTS_PER_FRAME;
@@ -304,9 +322,10 @@ impl<const C: usize> SessionMessage<C> {
     /// Returns the minimum size of a [SessionMessage].
     pub fn minimum_message_size() -> usize {
         // Make this a "const fn" once "min" is const fn too
-        (Self::HEADER_SIZE + Segment::HEADER_SIZE + 1)
-            .min(SegmentRequest::<C>::SIZE)
-            .min(FrameAcknowledgements::<C>::SIZE)
+        Self::HEADER_SIZE
+            + Segment::MINIMUM_SIZE
+                .min(SegmentRequest::<C>::SIZE)
+                .min(FrameAcknowledgements::<C>::SIZE)
     }
 
     /// Convenience method to encode the session message.
@@ -319,41 +338,145 @@ impl<const C: usize> TryFrom<&[u8]> for SessionMessage<C> {
     type Error = SessionError;
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
-        if value.len() < Self::minimum_message_size() || value.len() > C {
-            return Err(SessionError::IncorrectMessageLength);
-        }
-
-        let version = value[0];
-        if version != Self::VERSION {
-            return Err(SessionError::WrongVersion);
-        }
-
-        match SessionMessageDiscriminants::from_repr(value[1]).ok_or(SessionError::UnknownMessageTag)? {
-            SessionMessageDiscriminants::Segment => Ok(SessionMessage::Segment(
-                (&value[2..]).try_into().map_err(|_| SessionError::ParseError)?,
-            )),
-            SessionMessageDiscriminants::Request => Ok(SessionMessage::Request((&value[2..]).try_into()?)),
-            SessionMessageDiscriminants::Acknowledge => Ok(SessionMessage::Acknowledge((&value[2..]).try_into()?)),
-        }
+        SessionMessageIter::from(value).try_next()
     }
 }
 
 impl<const C: usize> From<SessionMessage<C>> for Vec<u8> {
     fn from(value: SessionMessage<C>) -> Self {
-        let mut ret = Vec::with_capacity(C);
-        ret.push(SessionMessage::<C>::VERSION);
-        ret.push(SessionMessageDiscriminants::from(&value) as u8);
+        let disc = SessionMessageDiscriminants::from(&value) as u8;
 
-        match value {
-            SessionMessage::Segment(s) => ret.extend(Vec::from(s)),
-            SessionMessage::Request(b) => ret.extend(Vec::from(b)),
-            SessionMessage::Acknowledge(f) => ret.extend(Vec::from(f)),
+        let msg = match value {
+            SessionMessage::Segment(s) => Vec::from(s),
+            SessionMessage::Request(r) => Vec::from(r),
+            SessionMessage::Acknowledge(a) => Vec::from(a),
         };
 
-        ret.shrink_to_fit();
+        let msg_len = msg.len() as u16;
+
+        let mut ret = Vec::with_capacity(SessionMessage::<C>::HEADER_SIZE + msg_len as usize);
+        ret.push(SessionMessage::<C>::VERSION);
+        ret.push(disc);
+        ret.extend(msg_len.to_be_bytes());
+        ret.extend(msg);
         ret
     }
 }
+
+/// Allows parsing of multiple [`SessionMessages`](SessionMessage)
+/// from a borrowed or an owned binary chunk.
+///
+/// The iterator will yield [`SessionMessages`](SessionMessage) until all the messages from
+/// the underlying data chunk are completely parsed or an error occurs.
+///
+/// In other words, it keeps yielding `Some(Ok(_))` until it yields either `None`
+/// or `Some(Err(_))` immediately followed by `None`.
+///
+/// This iterator is [fused](std::iter::FusedIterator).
+#[derive(Debug, Clone)]
+pub struct SessionMessageIter<'a, const C: usize> {
+    data: Cow<'a, [u8]>,
+    offset: usize,
+    last_err: Option<SessionError>,
+}
+
+impl<'a, const C: usize> SessionMessageIter<'a, C> {
+    /// Determines if there was an error reading the last message.
+    ///
+    /// If this function returns some error value, the iterator will not
+    /// yield any more messages.
+    pub fn last_error(&self) -> Option<&SessionError> {
+        self.last_err.as_ref()
+    }
+
+    /// Check if this iterator can yield any more messages.
+    ///
+    /// Returns `true` only if a [prior error](SessionMessageIter::last_error) occurred or all useful bytes
+    /// from the underlying chunk were consumed and all messages were parsed.
+    pub fn is_done(&self) -> bool {
+        self.last_err.is_some() || self.data.len() - self.offset < SessionMessage::<C>::minimum_message_size()
+    }
+
+    /// Attempts to parse the current message and moves the offset if successful.
+    fn try_next(&mut self) -> Result<SessionMessage<C>, SessionError> {
+        let mut offset = self.offset;
+
+        // Protocol version
+        if self.data[offset] != SessionMessage::<C>::VERSION {
+            return Err(SessionError::WrongVersion);
+        }
+        offset += 1;
+
+        // Message discriminant
+        let disc = self.data[offset];
+        offset += 1;
+
+        // Message length
+        let len = u16::from_be_bytes(
+            self.data[offset..offset + mem::size_of::<u16>()]
+                .try_into()
+                .map_err(|_| SessionError::IncorrectMessageLength)?,
+        ) as usize;
+        offset += mem::size_of::<u16>();
+
+        if len > SessionMessage::<C>::MAX_MESSAGE_SIZE {
+            return Err(SessionError::IncorrectMessageLength);
+        }
+
+        // The upper 6 bits of the size are reserved for future use,
+        // since MAX_MESSAGE_SIZE always fits within 10 bits (<= MAX_MESSAGE_SIZE = 1500)
+        let reserved = len & 0b111111_0000000000;
+
+        // In version 1 check that the reserved bits are all 0
+        if reserved != 0 {
+            return Err(SessionError::ParseError);
+        }
+
+        // Read the message
+        let res = match SessionMessageDiscriminants::from_repr(disc).ok_or(SessionError::UnknownMessageTag)? {
+            SessionMessageDiscriminants::Segment => {
+                SessionMessage::Segment(self.data[offset..offset + len].try_into()?)
+            }
+            SessionMessageDiscriminants::Request => {
+                SessionMessage::Request(self.data[offset..offset + len].try_into()?)
+            }
+            SessionMessageDiscriminants::Acknowledge => {
+                SessionMessage::Acknowledge(self.data[offset..offset + len].try_into()?)
+            }
+        };
+
+        // Move the internal offset only once the message has been fully parsed
+        self.offset = offset + len;
+        Ok(res)
+    }
+}
+
+impl<'a, const C: usize, T: Into<Cow<'a, [u8]>>> From<T> for SessionMessageIter<'a, C> {
+    fn from(value: T) -> Self {
+        Self {
+            data: value.into(),
+            offset: 0,
+            last_err: None,
+        }
+    }
+}
+
+impl<'a, const C: usize> Iterator for SessionMessageIter<'a, C> {
+    type Item = Result<SessionMessage<C>, NetworkTypeError>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if !self.is_done() {
+            self.try_next()
+                .inspect_err(|e| self.last_err = Some(e.clone()))
+                .map_err(NetworkTypeError::SessionProtocolError)
+                .into()
+        } else {
+            None
+        }
+    }
+}
+
+impl<'a, const C: usize> std::iter::FusedIterator for SessionMessageIter<'a, C> {}
 
 #[cfg(test)]
 mod tests {
@@ -366,6 +489,17 @@ mod tests {
     use rand::prelude::IteratorRandom;
     use rand::{thread_rng, Rng};
     use std::time::SystemTime;
+
+    #[test]
+    fn ensure_session_protocol_version_1_values() {
+        // All of these values are independent of C, so we can set C = 0
+        assert_eq!(1, SessionMessage::<0>::VERSION);
+        assert_eq!(4, SessionMessage::<0>::HEADER_SIZE);
+        assert_eq!(10, SessionMessage::<0>::SEGMENT_OVERHEAD);
+        assert_eq!(8, SessionMessage::<0>::MAX_SEGMENTS_PER_FRAME);
+
+        assert!(SessionMessage::<0>::MAX_MESSAGE_SIZE < 2048);
+    }
 
     #[test]
     fn segment_request_should_be_constructible_from_frame_info() {
@@ -484,5 +618,141 @@ mod tests {
         assert_eq!(iter.next(), Some(SegmentId(10, 2)));
         assert_eq!(iter.next(), Some(SegmentId(10, 5)));
         assert_eq!(iter.next(), None);
+    }
+
+    #[test]
+    fn session_message_iter_should_be_empty_if_slice_has_no_messages() {
+        const MTU: usize = 462;
+
+        let mut iter = SessionMessageIter::<MTU>::from(Vec::<u8>::new());
+        assert!(iter.next().is_none());
+        assert!(iter.is_done());
+
+        let mut iter = SessionMessageIter::<MTU>::from(&[0u8; 2]);
+        assert!(iter.next().is_none());
+        assert!(iter.is_done());
+    }
+
+    #[test]
+    fn session_message_iter_should_deserialize_multiple_messages() -> anyhow::Result<()> {
+        const MTU: usize = 462;
+
+        let mut messages_1 = Frame {
+            frame_id: 10,
+            data: hopr_crypto_random::random_bytes::<1500>().into(),
+        }
+        .segment(MTU - SessionMessage::<MTU>::HEADER_SIZE - Segment::HEADER_SIZE)?
+        .into_iter()
+        .map(|s| SessionMessage::<MTU>::Segment(s))
+        .collect::<Vec<_>>();
+
+        let frame_info = FrameInfo {
+            frame_id: 10,
+            total_segments: 255,
+            missing_segments: bitarr![1; 256],
+            last_update: SystemTime::now(),
+        };
+
+        messages_1.push(SessionMessage::<MTU>::Request(SegmentRequest::from_iter(vec![
+            frame_info,
+        ])));
+
+        let mut rng = thread_rng();
+        let frame_ids: Vec<u32> = (0..100).map(|_| rng.gen()).collect();
+        messages_1.push(SessionMessage::<MTU>::Acknowledge(frame_ids.into()));
+
+        let iter = SessionMessageIter::<MTU>::from(
+            messages_1
+                .iter()
+                .cloned()
+                .map(|m| m.into_encoded().into_vec())
+                .flatten()
+                .chain(std::iter::repeat(0).take(10))
+                .collect::<Vec<u8>>(),
+        );
+
+        let messages_2 = iter.collect::<Result<Vec<_>, _>>()?;
+        assert_eq!(messages_1, messages_2);
+
+        Ok(())
+    }
+
+    #[test]
+    fn session_message_iter_should_not_contain_error_when_consuming_everything() -> anyhow::Result<()> {
+        const MTU: usize = 462;
+
+        let messages = Frame {
+            frame_id: 10,
+            data: hopr_crypto_random::random_bytes::<{ 3 * MTU }>().into(),
+        }
+        .segment(MTU - SessionMessage::<MTU>::HEADER_SIZE - Segment::HEADER_SIZE)?
+        .into_iter()
+        .map(|s| SessionMessage::<MTU>::Segment(s))
+        .collect::<Vec<_>>();
+
+        assert_eq!(4, messages.len());
+
+        let data = messages
+            .iter()
+            .cloned()
+            .map(|m| m.into_encoded().into_vec())
+            .flatten()
+            .chain(std::iter::repeat(0u8).take(10))
+            .collect::<Vec<_>>();
+
+        let mut iter = SessionMessageIter::<MTU>::from(data);
+        assert!(matches!(iter.next(), Some(Ok(m)) if m == messages[0]));
+        assert!(matches!(iter.next(), Some(Ok(m)) if m == messages[1]));
+        assert!(matches!(iter.next(), Some(Ok(m)) if m == messages[2]));
+        assert!(matches!(iter.next(), Some(Ok(m)) if m == messages[3]));
+
+        assert!(iter.next().is_none());
+        assert!(iter.last_error().is_none());
+        assert!(iter.is_done());
+
+        Ok(())
+    }
+
+    #[test]
+    fn session_message_iter_should_not_yield_more_after_error() -> anyhow::Result<()> {
+        const MTU: usize = 462;
+
+        let messages = Frame {
+            frame_id: 10,
+            data: hopr_crypto_random::random_bytes::<{ 3 * MTU }>().into(),
+        }
+        .segment(MTU - SessionMessage::<MTU>::HEADER_SIZE - Segment::HEADER_SIZE)?
+        .into_iter()
+        .map(|s| SessionMessage::<MTU>::Segment(s))
+        .collect::<Vec<_>>();
+
+        assert_eq!(4, messages.len());
+
+        let data = messages
+            .iter()
+            .cloned()
+            .enumerate()
+            .map(|(i, m)| {
+                if i == 2 {
+                    Vec::from(hopr_crypto_random::random_bytes::<MTU>())
+                } else {
+                    m.into_encoded().into_vec()
+                }
+            })
+            .flatten()
+            .collect::<Vec<_>>();
+
+        let mut iter = SessionMessageIter::<MTU>::from(data);
+        assert!(matches!(iter.next(), Some(Ok(m)) if m == messages[0]));
+        assert!(matches!(iter.next(), Some(Ok(m)) if m == messages[1]));
+
+        let err = iter.next();
+        assert!(matches!(err, Some(Err(_))));
+        assert!(iter.is_done());
+        assert!(iter.last_error().is_some());
+
+        assert!(iter.next().is_none());
+
+        Ok(())
     }
 }

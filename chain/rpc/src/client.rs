@@ -10,15 +10,19 @@
 //! to make the underlying HTTP client implementation easily replaceable. This is needed to make it possible
 //! for `ethers` to work with different async runtimes, since the HTTP client is typically not agnostic to
 //! async runtimes (the default HTTP client in `ethers` is using `reqwest`, which is `tokio` specific).
-//! Secondly, this abstraction also allows to implement WASM-compatible HTTP client if needed at some point.
+//! Secondly, this abstraction also allows implementing WASM-compatible HTTP client if needed at some point.
+
 use async_trait::async_trait;
 use ethers::providers::{JsonRpcClient, JsonRpcError};
+use futures::StreamExt;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Formatter};
-use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
+use std::io::{BufWriter, Write};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, Ordering};
+use std::sync::Arc;
 use std::time::Duration;
-use tracing::{debug, trace, warn};
+use tracing::{debug, error, trace, warn};
 use validator::Validate;
 
 use hopr_async_runtime::prelude::sleep;
@@ -127,6 +131,7 @@ pub struct SimpleJsonRpcRetryPolicy {
     /// Default is \[429, -32005, -32016\]
     #[default(_code = "vec![-32005, -32016, 429]")]
     pub retryable_json_rpc_errors: Vec<i64>,
+
     /// List of HTTP errors that should be retried with backoff.
     ///
     /// Default is \[429, 504, 503\]
@@ -163,18 +168,21 @@ impl RetryPolicy<JsonRpcProviderClientError> for SimpleJsonRpcRetryPolicy {
     ) -> RetryAction {
         if self.max_retries.is_some_and(|max| num_retries > max) {
             warn!(
-                "max number of retries {} has been reached",
-                self.max_retries.expect("max_retries must be set")
+                count = self.max_retries.expect("max_retries must be set"),
+                "max number of retries has been reached"
             );
             return NoRetry;
         }
 
-        debug!("retry queue size is {retry_queue_size}");
+        debug!(
+            size = retry_queue_size,
+            "checking retry queue size after retryable error"
+        );
 
         if retry_queue_size > self.max_retry_queue_size {
             warn!(
-                "maximum size of retry queue {} has been reached",
-                self.max_retry_queue_size
+                size = self.max_retry_queue_size,
+                "maximum size of retry queue has been reached"
             );
             return NoRetry;
         }
@@ -187,14 +195,14 @@ impl RetryPolicy<JsonRpcProviderClientError> for SimpleJsonRpcRetryPolicy {
 
         // Retry if a global minimum of number of retries was given and wasn't yet attained
         if self.min_retries.is_some_and(|min| num_retries <= min) {
-            debug!("retrying because {num_retries} is not yet minimum number of retries");
+            debug!(num_retries, min_retries = ?self.min_retries,  "retrying because minimum number of retries not yet reached");
             return RetryAfter(backoff);
         }
 
         match err {
             // Retryable JSON RPC errors are retries with backoff
             JsonRpcProviderClientError::JsonRpcError(e) if self.is_retryable_json_rpc_error(e) => {
-                debug!("encountered retryable JSON RPC error code: {e}");
+                debug!(error = %e, "encountered retryable JSON RPC error code");
                 RetryAfter(backoff)
             }
 
@@ -202,7 +210,7 @@ impl RetryPolicy<JsonRpcProviderClientError> for SimpleJsonRpcRetryPolicy {
             JsonRpcProviderClientError::BackendError(HttpRequestError::HttpError(e))
                 if self.is_retryable_http_error(e) =>
             {
-                debug!("encountered retryable HTTP error code: {e}");
+                debug!(error = ?e, "encountered retryable HTTP error code");
                 RetryAfter(backoff)
             }
 
@@ -210,7 +218,7 @@ impl RetryPolicy<JsonRpcProviderClientError> for SimpleJsonRpcRetryPolicy {
             JsonRpcProviderClientError::BackendError(e @ HttpRequestError::Timeout)
             | JsonRpcProviderClientError::BackendError(e @ HttpRequestError::TransportError(_))
             | JsonRpcProviderClientError::BackendError(e @ HttpRequestError::UnknownError(_)) => {
-                debug!("encountered retryable transport error: {e}");
+                debug!(error = %e, "encountered retryable transport error");
                 RetryAfter(if self.backoff_on_transport_errors {
                     backoff
                 } else {
@@ -227,11 +235,11 @@ impl RetryPolicy<JsonRpcProviderClientError> for SimpleJsonRpcRetryPolicy {
 
                 match serde_json::from_str::<Resp>(text) {
                     Ok(Resp { error }) if self.is_retryable_json_rpc_error(&error) => {
-                        debug!("encountered retryable JSON RPC error: {error}");
+                        debug!(%error, "encountered retryable JSON RPC error");
                         RetryAfter(backoff)
                     }
                     _ => {
-                        debug!("unparseable JSON RPC error: {text}");
+                        debug!(error = %text, "unparseable JSON RPC error");
                         NoRetry
                     }
                 }
@@ -276,10 +284,11 @@ impl<Req: HttpPostRequestor, R: RetryPolicy<JsonRpcProviderClientError>> JsonRpc
         let next_id = self.id.fetch_add(1, Ordering::SeqCst);
         let payload = Request::new(next_id, method, params);
 
-        debug!("sending rpc {method} request");
+        debug!(method, "sending rpc request");
         trace!(
-            "sending rpc {method} request: {}",
-            serde_json::to_string(&payload).expect("request must be serializable")
+            method,
+            request = serde_json::to_string(&payload).expect("request must be serializable"),
+            "sending rpc request",
         );
 
         // Perform the actual request
@@ -287,7 +296,7 @@ impl<Req: HttpPostRequestor, R: RetryPolicy<JsonRpcProviderClientError>> JsonRpc
         let body = self.requestor.http_post(self.url.as_ref(), payload).await?;
         let req_duration = start.elapsed();
 
-        trace!("rpc {method} request took {}ms", req_duration.as_millis());
+        trace!(method, duration_in_ms = req_duration.as_millis(), "rpc request took");
 
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_RPC_CALLS_TIMING.observe(&[method], req_duration.as_secs_f64());
@@ -324,7 +333,7 @@ impl<Req: HttpPostRequestor, R: RetryPolicy<JsonRpcProviderClientError>> JsonRpc
 
         // Next, deserialize the data out of the Response object
         let json_str = raw.get();
-        trace!("rpc {method} request got response: {json_str}");
+        trace!(method, response = &json_str, "rpc request response received");
 
         let res = serde_json::from_str(json_str).map_err(|err| JsonRpcProviderClientError::SerdeJson {
             err,
@@ -414,14 +423,17 @@ where
                         #[cfg(all(feature = "prometheus", not(test)))]
                         METRIC_RETRIES_PER_RPC_CALL.observe(&[method], num_retries as f64);
 
-                        debug!(
-                            elapsed_in_ms = start.elapsed().as_millis(),
-                            "request {method} succeeded",
-                        );
+                        debug!(method, elapsed_in_ms = start.elapsed().as_millis(), "request succeeded",);
                         return Ok(ret);
                     }
                     Err(req_err) => {
                         err = req_err;
+                        error!(
+                            method,
+                            elapsed_in_ms = start.elapsed().as_millis(),
+                            error = %err,
+                            "request failed",
+                        );
                         num_retries += 1;
                     }
                 }
@@ -433,19 +445,20 @@ where
             {
                 NoRetry => {
                     self.requests_enqueued.fetch_sub(1, Ordering::SeqCst);
-                    warn!("no more retries for RPC call {method}");
+                    warn!(method, "no more retries for RPC call");
 
                     #[cfg(all(feature = "prometheus", not(test)))]
                     METRIC_RETRIES_PER_RPC_CALL.observe(&[method], num_retries as f64);
 
                     debug!(
-                        "failed request {method} spent {}ms in the retry queue",
-                        start.elapsed().as_millis()
+                        method,
+                        duration_in_ms = start.elapsed().as_millis(),
+                        "failed request duration in the retry queue",
                     );
                     return Err(err);
                 }
                 RetryAfter(backoff) => {
-                    warn!("RPC call {method} will retry in {}ms", backoff.as_millis());
+                    warn!(method, backoff_in_ms = backoff.as_millis(), "request will retry",);
                     sleep(backoff).await
                 }
             }
@@ -473,6 +486,8 @@ pub mod surf_client {
 
     impl SurfRequestor {
         pub fn new(cfg: HttpPostRequestorConfig) -> Self {
+            info!(?cfg, "creating surf client");
+
             let mut client = surf::client().with(surf::middleware::Redirect::new(cfg.max_redirects));
 
             // Rate limit of 0 also means unlimited as if None was given
@@ -481,7 +496,6 @@ pub mod surf_client {
                     surf_governor::GovernorMiddleware::per_second(max)
                         .expect("cannot setup http rate limiter middleware"),
                 );
-                info!("client will be limited to {max} HTTP requests per second");
             }
 
             Self { client, cfg }
@@ -520,12 +534,15 @@ pub mod surf_client {
 
 #[cfg(any(test, feature = "runtime-tokio"))]
 pub mod reqwest_client {
-    use crate::errors::HttpRequestError;
-    use crate::{HttpPostRequestor, HttpPostRequestorConfig};
     use async_trait::async_trait;
     use http_types::StatusCode;
     use serde::Serialize;
     use std::sync::Arc;
+    use std::time::Duration;
+    use tracing::info;
+
+    use crate::errors::HttpRequestError;
+    use crate::{HttpPostRequestor, HttpPostRequestorConfig};
 
     /// HTTP client that uses a Tokio runtime-based HTTP client library, such as `reqwest`.
     #[derive(Clone, Debug, Default)]
@@ -536,10 +553,19 @@ pub mod reqwest_client {
 
     impl ReqwestRequestor {
         pub fn new(cfg: HttpPostRequestorConfig) -> Self {
+            info!(?cfg, "creating reqwest client");
+
             Self {
                 client: reqwest::Client::builder()
                     .timeout(cfg.http_request_timeout)
                     .redirect(reqwest::redirect::Policy::limited(cfg.max_redirects as usize))
+                    // 30 seconds is longer than the normal interval between RPC requests, thus the
+                    // connection should remain available
+                    .tcp_keepalive(Some(Duration::from_secs(30)))
+                    // Enable all supported encodings to reduce the amount of data transferred
+                    // in responses. This is relevant for large eth_getLogs responses.
+                    .zstd(true)
+                    .brotli(true)
                     .build()
                     .expect("could not build reqwest client"),
                 limiter: cfg
@@ -603,6 +629,214 @@ pub mod reqwest_client {
     }
 }
 
+/// Snapshot of a response cached by the [`SnapshotRequestor`].
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
+pub struct RequestorResponseSnapshot {
+    id: usize,
+    request: String,
+    response: String,
+}
+
+/// Replays an RPC response to a request if it is found in the snapshot YAML file.
+/// If no such request has been seen before,
+/// it captures the new request/response pair obtained from the inner [`HttpPostRequestor`]
+/// and stores it into the snapshot file.
+///
+/// This is useful for snapshot testing only and should **NOT** be used in production.
+#[derive(Debug, Clone)]
+pub struct SnapshotRequestor<T> {
+    inner: T,
+    next_id: Arc<AtomicUsize>,
+    entries: moka::future::Cache<String, RequestorResponseSnapshot>,
+    file: String,
+    aggressive_save: bool,
+    fail_on_miss: bool,
+    ignore_snapshot: bool,
+}
+
+impl<T> SnapshotRequestor<T> {
+    /// Creates a new instance by wrapping an existing [`HttpPostRequestor`] and capturing
+    /// the request/response pairs.
+    ///
+    /// The constructor does not load any [snapshot entries](SnapshotRequestor) from
+    /// the `snapshot_file`.
+    /// The [`SnapshotRequestor::load`] method must be used after construction to do that.
+    pub fn new(inner: T, snapshot_file: &str) -> Self {
+        Self {
+            inner,
+            next_id: Arc::new(AtomicUsize::new(1)),
+            entries: moka::future::Cache::builder().build(),
+            file: snapshot_file.to_owned(),
+            aggressive_save: false,
+            fail_on_miss: false,
+            ignore_snapshot: false,
+        }
+    }
+
+    /// Gets the path to the snapshot disk file.
+    pub fn snapshot_path(&self) -> &str {
+        &self.file
+    }
+
+    /// Clears all entries from the snapshot in memory.
+    /// The snapshot file is not changed.
+    pub fn clear(&self) {
+        self.entries.invalidate_all();
+        self.next_id.store(1, Ordering::Relaxed);
+    }
+
+    /// Clears all entries and loads them from the snapshot file.
+    /// If `fail_on_miss` is set and the data is successfully loaded, all later
+    /// requests that miss the loaded snapshot will result in HTTP error 404.
+    pub async fn try_load(&mut self, fail_on_miss: bool) -> Result<(), std::io::Error> {
+        if self.ignore_snapshot {
+            return Ok(());
+        }
+
+        let loaded = serde_yaml::from_reader::<_, Vec<RequestorResponseSnapshot>>(std::fs::File::open(&self.file)?)
+            .map_err(std::io::Error::other)?;
+
+        self.clear();
+
+        let loaded_len = futures::stream::iter(loaded)
+            .then(|entry| {
+                self.next_id.fetch_max(entry.id, Ordering::Relaxed);
+                self.entries.insert(entry.request.clone(), entry)
+            })
+            .collect::<Vec<_>>()
+            .await
+            .len();
+
+        if loaded_len > 0 {
+            self.fail_on_miss = fail_on_miss;
+        }
+
+        tracing::debug!("snapshot with {loaded_len} entries has been loaded from {}", &self.file);
+        Ok(())
+    }
+
+    /// Similar as [`SnapshotRequestor::try_load`], except that no entries are cleared if the load fails.
+    ///
+    /// This method consumes and returns self for easier call chaining.
+    pub async fn load(mut self, fail_on_miss: bool) -> Self {
+        let _ = self.try_load(fail_on_miss).await;
+        self
+    }
+
+    /// Forces saving to disk on each newly inserted entry.
+    ///
+    /// Use this only when the expected number of entries in the snapshot is small.
+    pub fn with_aggresive_save(mut self) -> Self {
+        self.aggressive_save = true;
+        self
+    }
+
+    /// If set, the snapshot data will be ignored and resolution
+    /// will always be done with the inner requestor.
+    ///
+    /// This will inhibit any attempts to [`load`](SnapshotRequestor::try_load) or
+    /// [`save`](SnapshotRequestor::save) snapshot data.
+    pub fn with_ignore_snapshot(mut self, ignore_snapshot: bool) -> Self {
+        self.ignore_snapshot = ignore_snapshot;
+        self
+    }
+
+    /// Save the currently cached entries to the snapshot file on disk.
+    ///
+    /// Note that this method is automatically called on Drop, so usually it is unnecessary
+    /// to call it explicitly.
+    pub fn save(&self) -> Result<(), std::io::Error> {
+        if self.ignore_snapshot {
+            return Ok(());
+        }
+
+        let mut values: Vec<RequestorResponseSnapshot> = self.entries.iter().map(|(_, r)| r).collect();
+        values.sort_unstable_by_key(|a| a.id);
+
+        let mut writer = BufWriter::new(std::fs::File::create(&self.file)?);
+
+        serde_yaml::to_writer(&mut writer, &values).map_err(std::io::Error::other)?;
+
+        writer.flush()?;
+
+        tracing::debug!("snapshot with {} entries saved to file {}", values.len(), self.file);
+        Ok(())
+    }
+}
+
+impl<R: HttpPostRequestor> SnapshotRequestor<R> {
+    async fn http_post_with_snapshot<In>(&self, url: &str, data: In) -> Result<Box<[u8]>, HttpRequestError>
+    where
+        In: Serialize + Send + Sync,
+    {
+        let request = serde_json::to_string(&data)
+            .map_err(|e| HttpRequestError::UnknownError(format!("serialize error: {e}")))?;
+
+        let inserted = AtomicBool::new(false);
+        let result = self
+            .entries
+            .entry(request.clone())
+            .or_try_insert_with(async {
+                if self.fail_on_miss {
+                    tracing::error!("{request} is missing in {}", &self.file);
+                    return Err(HttpRequestError::HttpError(http_types::StatusCode::NotFound));
+                }
+
+                let response = self.inner.http_post(url, data).await?;
+                let id = self.next_id.fetch_add(1, Ordering::SeqCst);
+                inserted.store(true, Ordering::Relaxed);
+
+                tracing::debug!("saved new snapshot entry #{id}");
+                Ok(RequestorResponseSnapshot {
+                    id,
+                    request: request.clone(),
+                    response: String::from_utf8(response.into_vec())
+                        .map_err(|e| HttpRequestError::UnknownError(format!("unparseable data: {e}")))?,
+                })
+            })
+            .await
+            .map(|e| e.into_value().response.into_bytes().into_boxed_slice())
+            .map_err(|e: Arc<HttpRequestError>| e.as_ref().clone())?;
+
+        if inserted.load(Ordering::Relaxed) && self.aggressive_save {
+            tracing::debug!("{request} was NOT found and was resolved");
+            self.save().map_err(|e| HttpRequestError::UnknownError(e.to_string()))?;
+        } else {
+            tracing::debug!("{request} was found");
+        }
+
+        Ok(result)
+    }
+}
+
+impl<T> Drop for SnapshotRequestor<T> {
+    fn drop(&mut self) {
+        if let Err(e) = self.save() {
+            tracing::error!("failed to save snapshot: {e}");
+        }
+    }
+}
+
+#[async_trait::async_trait]
+impl<R: HttpPostRequestor> HttpPostRequestor for SnapshotRequestor<R> {
+    async fn http_post<T>(&self, url: &str, data: T) -> Result<Box<[u8]>, HttpRequestError>
+    where
+        T: Serialize + Send + Sync,
+    {
+        self.http_post_with_snapshot(url, data).await
+    }
+}
+
+#[async_trait]
+impl<R: HttpPostRequestor> HttpPostRequestor for &SnapshotRequestor<R> {
+    async fn http_post<T>(&self, url: &str, data: T) -> Result<Box<[u8]>, HttpRequestError>
+    where
+        T: Serialize + Send + Sync,
+    {
+        self.http_post_with_snapshot(url, data).await
+    }
+}
+
 type AnvilRpcClient<R> = std::sync::Arc<
     ethers::middleware::SignerMiddleware<
         ethers::providers::Provider<JsonRpcProviderClient<R, SimpleJsonRpcRetryPolicy>>,
@@ -612,7 +846,7 @@ type AnvilRpcClient<R> = std::sync::Arc<
 
 /// Used for testing. Creates Ethers RPC client to the local Anvil instance.
 #[cfg(not(target_arch = "wasm32"))]
-pub fn create_rpc_client_to_anvil<R: HttpPostRequestor + Debug>(
+pub fn create_rpc_client_to_anvil<R: HttpPostRequestor>(
     backend: R,
     anvil: &ethers::utils::AnvilInstance,
     signer: &hopr_crypto_types::keypairs::ChainKeypair,
@@ -633,22 +867,26 @@ pub fn create_rpc_client_to_anvil<R: HttpPostRequestor + Debug>(
 
 #[cfg(test)]
 mod tests {
+    use async_trait::async_trait;
+    use chain_types::utils::create_anvil;
+    use chain_types::{ContractAddresses, ContractInstances};
     use ethers::providers::JsonRpcClient;
+    use hopr_async_runtime::prelude::sleep;
+    use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
+    use hopr_primitive_types::primitives::Address;
+    use serde::Serialize;
     use serde_json::json;
     use std::fmt::Debug;
     use std::sync::atomic::Ordering;
     use std::time::Duration;
-
-    use chain_types::utils::create_anvil;
-    use chain_types::{ContractAddresses, ContractInstances};
-    use hopr_async_runtime::prelude::sleep;
-    use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
-    use hopr_primitive_types::primitives::Address;
+    use tempfile::NamedTempFile;
 
     use crate::client::reqwest_client::ReqwestRequestor;
     use crate::client::surf_client::SurfRequestor;
-    use crate::client::{create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy};
-    use crate::errors::JsonRpcProviderClientError;
+    use crate::client::{
+        create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy, SnapshotRequestor,
+    };
+    use crate::errors::{HttpRequestError, JsonRpcProviderClientError};
     use crate::{HttpPostRequestor, ZeroRetryPolicy};
 
     async fn deploy_contracts<R: HttpPostRequestor + Debug>(req: R) -> anyhow::Result<ContractAddresses> {
@@ -1014,5 +1252,67 @@ mod tests {
             client.requests_enqueued.load(Ordering::SeqCst),
             "retry queue should be zero when policy says no more retries"
         );
+    }
+
+    // Requires manual implementation, because mockall does not work well with generic methods
+    // in non-generic traits.
+    struct NullHttpPostRequestor;
+
+    #[async_trait]
+    impl HttpPostRequestor for NullHttpPostRequestor {
+        async fn http_post<T>(&self, _: &str, _: T) -> Result<Box<[u8]>, HttpRequestError>
+        where
+            T: Serialize + Send + Sync,
+        {
+            Err(HttpRequestError::UnknownError("use of NullHttpPostRequestor".into()))
+        }
+    }
+
+    #[test_log::test(async_std::test)]
+    async fn test_client_from_file() -> anyhow::Result<()> {
+        let block_time = Duration::from_secs(1);
+        let snapshot_file = NamedTempFile::new()?;
+
+        let anvil = create_anvil(Some(block_time));
+        {
+            let client = JsonRpcProviderClient::new(
+                &anvil.endpoint(),
+                SnapshotRequestor::new(SurfRequestor::default(), snapshot_file.path().to_str().unwrap()),
+                SimpleJsonRpcRetryPolicy::default(),
+            );
+
+            let mut last_number = 0;
+
+            for _ in 0..3 {
+                sleep(block_time).await;
+
+                let number: ethers::types::U64 = client.request("eth_blockNumber", ()).await?;
+
+                assert!(number.as_u64() > last_number, "next block number must be greater");
+                last_number = number.as_u64();
+            }
+        }
+
+        {
+            let client = JsonRpcProviderClient::new(
+                &anvil.endpoint(),
+                SnapshotRequestor::new(NullHttpPostRequestor, snapshot_file.path().to_str().unwrap())
+                    .load(true)
+                    .await,
+                SimpleJsonRpcRetryPolicy::default(),
+            );
+
+            let mut last_number = 0;
+            for _ in 0..3 {
+                sleep(block_time).await;
+
+                let number: ethers::types::U64 = client.request("eth_blockNumber", ()).await?;
+
+                assert!(number.as_u64() > last_number, "next block number must be greater");
+                last_number = number.as_u64();
+            }
+        }
+
+        Ok(())
     }
 }

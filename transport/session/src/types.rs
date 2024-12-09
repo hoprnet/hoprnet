@@ -1,14 +1,14 @@
 use futures::{channel::mpsc::UnboundedReceiver, pin_mut, StreamExt};
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_internal_types::protocol::{ApplicationData, PAYLOAD_SIZE};
-use hopr_network_types::prelude::state::SessionFeature;
-use hopr_network_types::prelude::{IpOrHost, RoutingOptions};
+use hopr_network_types::prelude::{RoutingOptions, SealedHost};
 use hopr_network_types::session::state::{SessionConfig, SessionSocket};
 use hopr_primitive_types::traits::BytesRepresentable;
 use libp2p_identity::PeerId;
 use std::collections::HashSet;
 use std::fmt::{Debug, Formatter};
 use std::hash::{Hash, Hasher};
+use std::task::Context;
 use std::time::Duration;
 use std::{
     fmt::Display,
@@ -17,7 +17,6 @@ use std::{
     sync::Arc,
     task::Poll,
 };
-use strum::IntoEnumIterator;
 use tracing::{debug, error};
 
 use crate::{errors::TransportSessionError, traits::SendMsg, Capability};
@@ -109,13 +108,9 @@ impl Hash for SessionId {
     }
 }
 
-const PADDING_HEADER_SIZE: usize = 4;
-
 /// Inner MTU size of what the HOPR payload can take (payload - peer_id - application_tag)
-pub const SESSION_USABLE_MTU_SIZE: usize = PAYLOAD_SIZE
-    - OffchainPublicKey::SIZE
-    - std::mem::size_of::<hopr_internal_types::protocol::Tag>()
-    - PADDING_HEADER_SIZE;
+pub const SESSION_USABLE_MTU_SIZE: usize =
+    PAYLOAD_SIZE - OffchainPublicKey::SIZE - std::mem::size_of::<hopr_internal_types::protocol::Tag>();
 
 /// Helper trait to allow Box aliasing
 trait AsyncReadWrite: futures::AsyncWrite + futures::AsyncRead + Send {}
@@ -127,9 +122,9 @@ impl<T: futures::AsyncWrite + futures::AsyncRead + Send> AsyncReadWrite for T {}
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum SessionTarget {
     /// Target is running over UDP with the given IP address and port.
-    UdpStream(IpOrHost),
+    UdpStream(SealedHost),
     /// Target is running over TCP with the given address and port.
-    TcpStream(IpOrHost),
+    TcpStream(SealedHost),
     /// Target is a service directly at the exit node with a given service ID.
     ExitNode(u32),
 }
@@ -166,33 +161,31 @@ impl Session {
         let inner_session = InnerSession::new(id, me, routing_options.clone(), tx, rx);
 
         // If we request any capability, we need to use Session protocol
-        if Capability::iter().any(|c| capabilities.contains(&c)) {
-            // In addition, if retransmission is requested,
-            // we need to enable more Session protocol features.
-            let mut enabled_features = HashSet::new();
-            if capabilities.contains(&Capability::Retransmission) {
-                enabled_features.extend([
-                    SessionFeature::AcknowledgeFrames,
-                    SessionFeature::RequestIncompleteFrames,
-                    SessionFeature::RetransmitFrames,
-                ]);
-            }
-
+        if !capabilities.is_empty() {
             // This is a very coarse assumption, that it takes max 2 seconds for each hop one way.
             let rto_base = 2 * Duration::from_secs(2) * (routing_options.count_hops() + 1) as u32;
 
+            let expiration_coefficient = if capabilities.contains(&Capability::Retransmission)
+                || capabilities.contains(&Capability::RetransmissionAckOnly)
+            {
+                4
+            } else {
+                1
+            };
+
             // TODO: tweak the default Session protocol config
             let cfg = SessionConfig {
-                enabled_features,
+                enabled_features: capabilities.iter().cloned().flatten().collect(),
                 acknowledged_frames_buffer: 100_000, // Can hold frames for > 40 sec at 2000 frames/sec
-                frame_expiration_age: rto_base * 10,
+                frame_expiration_age: rto_base * expiration_coefficient,
                 rto_base_receiver: rto_base, // Ask for segment resend, if not yet complete after this period
                 rto_base_sender: rto_base * 2, // Resend frame if not acknowledged after this period
                 ..Default::default()
             };
             debug!(
-                session_id = tracing::field::debug(id),
-                "opening new session socket with {cfg:?}"
+                session_id = ?id,
+                ?cfg,
+                "opening new session socket"
             );
 
             Self {
@@ -240,11 +233,7 @@ impl std::fmt::Debug for Session {
 }
 
 impl futures::AsyncRead for Session {
-    fn poll_read(
-        mut self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-        buf: &mut [u8],
-    ) -> Poll<std::io::Result<usize>> {
+    fn poll_read(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<std::io::Result<usize>> {
         let inner = self.inner.as_mut();
         pin_mut!(inner);
         inner.poll_read(cx, buf)
@@ -252,17 +241,13 @@ impl futures::AsyncRead for Session {
 }
 
 impl futures::AsyncWrite for Session {
-    fn poll_write(
-        mut self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-        buf: &[u8],
-    ) -> Poll<std::io::Result<usize>> {
+    fn poll_write(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
         let inner = &mut self.inner;
         pin_mut!(inner);
         inner.poll_write(cx, buf)
     }
 
-    fn poll_flush(mut self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<std::io::Result<()>> {
+    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
         let inner = &mut self.inner;
         pin_mut!(inner);
         inner.poll_flush(cx)
@@ -289,6 +274,35 @@ impl futures::AsyncWrite for Session {
     }
 }
 
+#[cfg(feature = "runtime-tokio")]
+impl tokio::io::AsyncRead for Session {
+    fn poll_read(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut tokio::io::ReadBuf<'_>,
+    ) -> Poll<std::io::Result<()>> {
+        let slice = buf.initialize_unfilled();
+        let n = std::task::ready!(futures::AsyncRead::poll_read(self.as_mut(), cx, slice))?;
+        buf.advance(n);
+        Poll::Ready(Ok(()))
+    }
+}
+
+#[cfg(feature = "runtime-tokio")]
+impl tokio::io::AsyncWrite for Session {
+    fn poll_write(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<Result<usize, Error>> {
+        futures::AsyncWrite::poll_write(self.as_mut(), cx, buf)
+    }
+
+    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Error>> {
+        futures::AsyncWrite::poll_flush(self.as_mut(), cx)
+    }
+
+    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Error>> {
+        futures::AsyncWrite::poll_close(self.as_mut(), cx)
+    }
+}
+
 type FuturesBuffer = futures::stream::FuturesUnordered<
     Pin<Box<dyn std::future::Future<Output = Result<(), TransportSessionError>> + Send>>,
 >;
@@ -302,6 +316,7 @@ pub struct InnerSession {
     tx_buffer: FuturesBuffer,
     rx_buffer: [u8; PAYLOAD_SIZE],
     rx_buffer_range: (usize, usize),
+    closed: bool,
 }
 
 impl InnerSession {
@@ -322,6 +337,7 @@ impl InnerSession {
             tx_buffer: futures::stream::FuturesUnordered::new(),
             rx_buffer: [0; PAYLOAD_SIZE],
             rx_buffer_range: (0, 0),
+            closed: false,
         }
     }
 
@@ -336,6 +352,10 @@ impl futures::AsyncWrite for InnerSession {
         cx: &mut std::task::Context<'_>,
         buf: &[u8],
     ) -> Poll<std::io::Result<usize>> {
+        if self.closed {
+            return Poll::Ready(Err(Error::new(ErrorKind::BrokenPipe, "session closed")));
+        }
+
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_SESSION_INNER_SIZES.observe(&[self.id.as_str()], buf.len() as f64);
 
@@ -346,7 +366,7 @@ impl futures::AsyncWrite for InnerSession {
                         continue;
                     }
                     Poll::Ready(Some(Err(e))) => {
-                        error!("failed to send the message chunk inside a session: {e}");
+                        error!(error = %e, "failed to send the message chunk inside a session");
                         return Poll::Ready(Err(Error::from(ErrorKind::BrokenPipe)));
                     }
                     Poll::Ready(None) => {
@@ -371,12 +391,12 @@ impl futures::AsyncWrite for InnerSession {
 
             let payload = wrap_with_offchain_key(&self.me, buf[start..end].to_vec().into_boxed_slice())
                 .map_err(|e| {
-                    error!("failed to wrap the payload with offchain key: {e}");
+                    error!(error = %e, "failed to wrap the payload with offchain key");
                     Error::new(ErrorKind::InvalidData, e)
                 })
                 .and_then(move |payload| {
                     ApplicationData::new_from_owned(Some(tag), payload.into_boxed_slice()).map_err(|e| {
-                        error!("failed to extract application data from the payload: {e}");
+                        error!(error = %e, "failed to extract application data from the payload");
                         Error::new(ErrorKind::InvalidData, e)
                     })
                 })?;
@@ -398,7 +418,7 @@ impl futures::AsyncWrite for InnerSession {
                     continue;
                 }
                 Poll::Ready(Some(Err(e))) => {
-                    error!("failed to send the message chunk inside a session: {e}");
+                    error!(error = %e, "failed to send the message chunk inside a session");
                     break Poll::Ready(Err(Error::from(ErrorKind::BrokenPipe)));
                 }
                 Poll::Ready(None) => {
@@ -416,8 +436,8 @@ impl futures::AsyncWrite for InnerSession {
         Poll::Ready(Ok(()))
     }
 
-    fn poll_close(self: std::pin::Pin<&mut Self>, _cx: &mut std::task::Context<'_>) -> Poll<std::io::Result<()>> {
-        self.tx.close();
+    fn poll_close(mut self: std::pin::Pin<&mut Self>, _cx: &mut std::task::Context<'_>) -> Poll<std::io::Result<()>> {
+        self.closed = true;
         Poll::Ready(Ok(()))
     }
 }
@@ -467,7 +487,7 @@ impl futures::AsyncRead for InnerSession {
 
 // TODO: 3.0 remove once return path is implemented
 pub fn wrap_with_offchain_key(peer: &PeerId, data: Box<[u8]>) -> crate::errors::Result<Vec<u8>> {
-    if data.len() > PAYLOAD_SIZE.saturating_sub(OffchainPublicKey::SIZE + PADDING_HEADER_SIZE) {
+    if data.len() > PAYLOAD_SIZE.saturating_sub(OffchainPublicKey::SIZE) {
         return Err(TransportSessionError::PayloadSize);
     }
 
@@ -510,7 +530,7 @@ where
     // There are two possibilities for the opposite direction:
     // 1) If Session protocol is used for segmentation,
     //    we need to buffer up data at MAX_WRITE_SIZE.
-    // 2) Otherwise, the bare session implements chunking therefore,
+    // 2) Otherwise, the bare session implements chunking, therefore,
     //    data can be written with arbitrary sizes.
     let into_session_len = if session.capabilities().contains(&Capability::Segmentation) {
         max_buffer.min(SessionSocket::<SESSION_USABLE_MTU_SIZE>::MAX_WRITE_SIZE)
@@ -519,13 +539,13 @@ where
     };
 
     debug!(
-        session_id = tracing::field::debug(session.id()),
-        "session egress buffer: {max_buffer}, session ingress buffer: {into_session_len}"
+        session_id = ?session.id(),
+        egress_buffer = max_buffer,
+        ingress_buffer = into_session_len,
+        "session buffers"
     );
 
-    let mut session = tokio_util::compat::FuturesAsyncReadCompatExt::compat(session);
-
-    hopr_network_types::utils::copy_duplex(&mut session, stream, max_buffer, into_session_len)
+    hopr_network_types::utils::copy_duplex(session, stream, max_buffer, into_session_len)
         .await
         .map(|(a, b)| (a as usize, b as usize))
 }

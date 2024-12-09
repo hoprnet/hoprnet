@@ -1,5 +1,14 @@
 import asyncio
+import base58
+import base64
 import logging
+import nacl.utils
+import nacl.bindings
+import nacl.signing  # Ensure nacl.signing is imported correctly
+import nacl.public
+import random
+
+from nacl.public import SealedBox  # Import SealedBox explicitly
 from typing import Callable, Optional
 
 import requests
@@ -16,7 +25,7 @@ from hoprd_sdk.api import (
     TicketsApi,
 )
 from hoprd_sdk.models import (
-    AliasPeerIdBodyRequest,
+    AliasDestinationBodyRequest,
     FundBodyRequest,
     GetMessageBodyRequest,
     OpenChannelBodyRequest,
@@ -40,6 +49,41 @@ def getlogger():
 log = getlogger()
 
 MESSAGE_TAG = 1234
+
+def seal_with_peerid(peer_id: str, plain_text: bytes, random_padding_len: int = 0) -> bytes:
+    """
+    This function takes a PeerID and plaintext data as inputs,
+    extracts the Ed25519 public key corresponding to the PeerID,
+    converts it to a Curve25519 key (for encryption),
+    and returns a sealed box of the input plaintext encrypted using that public key.
+    If specified, it also adds random padding with `@` character to the plaintext.
+    This can be done to obscure the length of the plaintext.
+    """
+    try:
+        # Step 1: Decode the PeerID from base58
+        decoded_peer_id = base58.b58decode(peer_id)
+
+        # Step 2: Extract the public key (skip the multicodec prefix)
+        ed25519_pubkey = decoded_peer_id[6:]
+
+        # Step 3: Convert the Ed25519 public key to a Curve25519 public key for encryption
+        curve25519_pubkey = nacl.bindings.crypto_sign_ed25519_pk_to_curve25519(ed25519_pubkey)
+
+        # Step 4: Create a PublicKey object from the Curve25519 public key bytes
+        public_key = nacl.public.PublicKey(curve25519_pubkey)
+
+        # Step 5: Create a sealed box for encryption using the public key
+        sealed_box = SealedBox(public_key)
+
+        # Step 6: Append random padding if random_padding_len is greater than 0
+        plain_text += b'@' * random.randint(0, random_padding_len)
+
+        # Step 7: Encrypt the plaintext using the sealed box
+        encrypted_message = sealed_box.encrypt(plain_text)
+
+        return encrypted_message
+    except Exception as e:
+        raise ValueError(f"seal failed: {str(e)}")
 
 
 class HoprdAPI:
@@ -93,12 +137,12 @@ class HoprdAPI:
         status, response = self.__call_api(AliasApi, "get_alias", alias)
         return response.peer_id if status else None
 
-    async def aliases_set_alias(self, alias: str, peer_id: str):
+    async def aliases_set_alias(self, alias: str, destination: str):
         """
         Returns the aliases recognized by the node.
         :return: bool
         """
-        body = AliasPeerIdBodyRequest(alias, peer_id)
+        body = AliasDestinationBodyRequest(alias, destination)
         status, _ = self.__call_api(AliasApi, "set_alias", body=body)
         return status
 
@@ -145,14 +189,14 @@ class HoprdAPI:
         status, response = self.__call_api(AccountApi, "balances")
         return response if status else None
 
-    async def open_channel(self, peer_address: str, amount: str):
+    async def open_channel(self, destination: str, amount: str):
         """
-        Opens a channel with the given peer_address and amount.
-        :param: peer_address: str
+        Opens a channel with the given destination and amount.
+        :param: destination: str
         :param: amount: str
         :return: channel id: str | undefined
         """
-        body = OpenChannelBodyRequest(amount, peer_address)
+        body = OpenChannelBodyRequest(amount, destination=destination)
 
         status, response = self.__call_api(ChannelsApi, "open_channel", body=body)
         return response.channel_id if status else None
@@ -271,13 +315,13 @@ class HoprdAPI:
         )
         return response if status else []
 
-    async def ping(self, peer_id: str):
+    async def ping(self, destination: str):
         """
-        Pings the given peer_id and returns the measure.
-        :param: peer_id: str
+        Pings the given destination and returns the measure.
+        :param: destination: str
         :return: response: dict
         """
-        _, response = self.__call_api(PeersApi, "ping_peer", peer_id)
+        _, response = self.__call_api(PeersApi, "ping_peer", destination)
         return response
 
     async def peers(self, params: list or str = "peer_id", status: str = "connected"):
@@ -320,6 +364,14 @@ class HoprdAPI:
         _, response = self.__call_api(TicketsApi, "show_ticket_statistics")
         return response
 
+    async def reset_tickets_statistics(self):
+        """
+        Resets the ticket statistics of the node.
+        :return: bool
+        """
+        status, _ = self.__call_api(TicketsApi, "reset_ticket_statistics")
+        return status
+
     async def send_message(self, destination: str, message: str, hops: list[str], tag: int = MESSAGE_TAG) -> bool:
         """
         Sends a message to the given destination.
@@ -329,7 +381,7 @@ class HoprdAPI:
         :param: tag: int = 0x0320
         :return: bool
         """
-        body = SendMessageBodyRequest(message, None, hops, destination, tag)
+        body = SendMessageBodyRequest(body=message, hops=None, path=hops, destination=destination, tag=tag)
         _, response = self.__call_api(MessagesApi, "send_message", body=body)
         return response
 
@@ -342,6 +394,17 @@ class HoprdAPI:
 
         body = TagQueryRequest(tag=tag)
         _, response = self.__call_api(MessagesApi, "pop", body=body)
+        return response
+
+    async def messages_pop_all(self, tag: int = MESSAGE_TAG) -> dict:
+        """
+        Pop all messages from the inbox
+        :param: tag = 0x0320
+        :return: dict
+        """
+        body = GetMessageBodyRequest(tag=tag)
+
+        _, response = self.__call_api(MessagesApi, "pop_all", body=body)
         return response
 
     async def messages_peek(self, tag: int = MESSAGE_TAG) -> dict:
@@ -395,7 +458,9 @@ class HoprdAPI:
         _, response = self.__call_api(NetworkApi, "price")
         return int(response.price) if hasattr(response, "price") else None
 
-    async def session_client(self, destination: str, path: str, protocol: str, target: str, listen_on: str = "127.0.0.1:0", capabilities=None):
+    async def session_client(
+        self, destination: str, path: str, protocol: str, target: str, listen_on: str = "127.0.0.1:0", capabilities=None, sealed_target=False
+    ):
         """
         Returns the port of the client session.
         :param destination: Peer ID of the session exit node.
@@ -404,11 +469,18 @@ class HoprdAPI:
         :param target: Destination for the session packets.
         :param listen_on: The host to listen on for input packets (default: "127.0.0.1:0")
         :param capabilities: Optional list of capabilities for the session (default: None)
+        :param sealed_target: The target parameter will be encrypted (default: False)
         """
+        actual_target = {
+            "Sealed": base64.b64encode(seal_with_peerid(destination, bytes(target,'utf-8'), 50)).decode('ascii')
+        } if sealed_target else { "Plain": target }
+
         if capabilities is None:
-            body = SessionClientRequest(destination=destination, path=path, target=target, listen_host=listen_on)
+            body = SessionClientRequest(destination=destination, path=path, target=actual_target, listen_host=listen_on)
         else:
-            body = SessionClientRequest(destination=destination, path=path, target=target, listen_host=listen_on, capabilities=capabilities)
+            body = SessionClientRequest(
+                destination=destination, path=path, target=actual_target, listen_host=listen_on, capabilities=capabilities
+            )
 
         _, response = self.__call_api(SessionApi, "create_client", body=body, protocol=protocol)
         return int(response.port) if hasattr(response, "port") else None
@@ -421,7 +493,7 @@ class HoprdAPI:
         _, response = self.__call_api(SessionApi, "list_clients", protocol=protocol)
         return response
 
-    async def session_close_client(self, protocol: str, bound_port: int, bound_ip: str = '127.0.0.1'):
+    async def session_close_client(self, protocol: str, bound_port: int, bound_ip: str = "127.0.0.1"):
         """
         Closes a previously opened and bound session
         """
@@ -450,34 +522,36 @@ class HoprdAPI:
         status, response = self.__call_api(AccountApi, "withdraw", body=body)
         return status, response
 
-    async def startedz(self):
+    async def metrics(self):
+        _, response = self.__call_api(NodeApi, "metrics")
+        return response
+
+    async def startedz(self, timeout: int = 20):
         """
         Checks if the node is started.
         """
-        return await is_url_returning_200(f"{self.configuration.host}/startedz")
+        return await is_url_returning_200(f"{self.configuration.host}/startedz", timeout)
 
-    async def readyz(self):
+    async def readyz(self, timeout: int = 20):
         """
         Checks if the node is ready to accept connections.
         """
-        return await is_url_returning_200(f"{self.configuration.host}/readyz")
+        return await is_url_returning_200(f"{self.configuration.host}/readyz", timeout)
 
 
-def query_url(url):
-    return requests.get(url, timeout=0.3)
-
-
-async def is_url_returning_200(url, timeout=20):
+async def is_url_returning_200(url, timeout):
     async def check_url():
-        while True:
+        ready = False
+
+        while not ready:
             try:
-                query_url(url)
-                break
+                ready = requests.get(url, timeout=0.3).status_code == 200
             except Exception:
                 await asyncio.sleep(0.2)
 
+        return ready
+
     try:
-        await asyncio.wait_for(check_url(), timeout=timeout)
-        return query_url(url).status_code == 200
+        return await asyncio.wait_for(check_url(), timeout=timeout)
     except Exception:
         return False

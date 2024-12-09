@@ -1,9 +1,10 @@
 import asyncio
-import pytest
 import random
 import re
 import string
-from contextlib import AsyncExitStack
+from contextlib import AsyncExitStack, asynccontextmanager
+
+import pytest
 
 from .conftest import (
     OPEN_CHANNEL_FUNDING_VALUE_HOPR,
@@ -12,18 +13,31 @@ from .conftest import (
     TICKET_PRICE_PER_HOP,
     barebone_nodes,
     default_nodes,
-    random_distinct_pairs_from
+    random_distinct_pairs_from,
 )
 from .hopr import HoprdAPI
 from .node import Node
-
-from .utils import PARAMETERIZED_SAMPLE_SIZE, balance_str_to_int, gen_random_tag, send_and_receive_packets_with_pop, \
-    shuffled, create_channel, check_native_balance_below, check_safe_balance, check_all_tickets_redeemed, \
-    check_unredeemed_tickets_value, check_rejected_tickets_value, check_min_incoming_win_prob_eq, \
-    check_received_packets_with_peek, MULTIHOP_MESSAGE_SEND_TIMEOUT
+from .utils import (
+    AGGREGATED_TICKET_PRICE,
+    MULTIHOP_MESSAGE_SEND_TIMEOUT,
+    PARAMETERIZED_SAMPLE_SIZE,
+    balance_str_to_int,
+    check_all_tickets_redeemed,
+    check_min_incoming_win_prob_eq,
+    check_native_balance_below,
+    check_received_packets_with_peek,
+    check_rejected_tickets_value,
+    check_safe_balance,
+    check_unredeemed_tickets_value,
+    create_channel,
+    gen_random_tag,
+    send_and_receive_packets_with_pop,
+    shuffled,
+)
 
 # used by nodes to get unique port assignments
 PORT_BASE = 19000
+
 
 # NOTE: this test is first, ensuring that all tests following it have ensured connectivity and
 # correct ticket price from api
@@ -71,22 +85,50 @@ async def test_hoprd_protocol_check_balances_without_prior_tests(swarm7: dict[st
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
-async def test_hoprd_node_should_be_able_to_alias_other_peers(peer: str, swarm7: dict[str, Node]):
+async def test_hoprd_should_be_able_to_remove_existing_aliases(peer: str, swarm7: dict[str, Node]):
     other_peers = barebone_nodes()
     other_peers.remove(peer)
 
-    alice_peer_id = swarm7[random.choice(other_peers)].peer_id
-    my_peer_id = swarm7[peer].peer_id
-    assert alice_peer_id != my_peer_id
+    alice = swarm7[random.choice(other_peers)]
 
-    assert await swarm7[peer].api.aliases_set_alias("Alice", alice_peer_id) is True
+    assert alice.address != swarm7[peer].address
 
-    assert await swarm7[peer].api.aliases_get_alias("Alice") == alice_peer_id
-    assert await swarm7[peer].api.aliases_set_alias("Alice New", alice_peer_id) is True
-
-    assert await swarm7[peer].api.aliases_remove_alias("Alice New") is True
-    assert await swarm7[peer].api.aliases_get_alias("Alice New") is None
     assert await swarm7[peer].api.aliases_get_alias("Alice") is None
+    assert await swarm7[peer].api.aliases_set_alias("Alice", alice.address) is True
+    assert await swarm7[peer].api.aliases_get_alias("Alice") == alice.peer_id
+
+    assert await swarm7[peer].api.aliases_remove_alias("Alice")
+    assert await swarm7[peer].api.aliases_get_alias("Alice") is None
+
+
+@asynccontextmanager
+async def create_alias(alias, peer, api):
+    """Ensure that the created alias is also released at the end of the test."""
+    assert await api.aliases_set_alias(alias, peer) is True
+    try:
+        yield api
+    finally:
+        assert await api.aliases_remove_alias(alias)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
+async def test_hoprd_should_not_be_able_to_set_multiple_aliases_to_a_single_peerid(peer: str, swarm7: dict[str, Node]):
+    other_peers = barebone_nodes()
+    other_peers.remove(peer)
+
+    rufus_peer_id = swarm7[random.choice(other_peers)].peer_id
+    my_peer_id = swarm7[peer].peer_id
+    assert rufus_peer_id != my_peer_id
+
+    async with create_alias("Rufus", rufus_peer_id, swarm7[peer].api) as api:
+        assert await api.aliases_set_alias("Simon", rufus_peer_id) is False
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
+async def test_hoprd_should_contain_self_alias_automatically(peer: str, swarm7: dict[str, Node]):
+    assert await swarm7[peer].api.aliases_get_alias("me") == swarm7[peer].peer_id
 
 
 @pytest.mark.asyncio
@@ -120,6 +162,7 @@ async def test_hoprd_ping_should_not_be_able_to_ping_nodes_not_present_in_the_re
     # log "-- ${result}"
     """
     assert True
+
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("src, dest", random_distinct_pairs_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
@@ -182,6 +225,32 @@ async def test_hoprd_api_channel_should_register_fund_increase_using_fund_endpoi
         ) == balance_str_to_int(hopr_amount)
 
         await asyncio.wait_for(check_native_balance_below(swarm7[src], balance_str_to_int(balance_before.native)), 20.0)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("src,dest", [tuple(shuffled(barebone_nodes())[:2]) for _ in range(PARAMETERIZED_SAMPLE_SIZE)])
+async def test_reset_ticket_statistics_from_metrics(src: Node, dest: Node, swarm7: dict[str, Node]):
+    def count_metrics(metrics: str):
+        types = ["neglected", "redeemed", "rejected"]
+        count = 0
+        for line in metrics.split("\\n"):
+            count += (
+                line.startswith("hopr_tickets_incoming_statistics")
+                and any(t in line for t in types)
+                and line.split(" ")[-1] != "0"
+            )
+        return count
+
+    async with create_channel(swarm7[src], swarm7[dest], funding=TICKET_PRICE_PER_HOP, close_from_dest=False):
+        await send_and_receive_packets_with_pop(
+            ["1 hop message to self"], src=swarm7[src], dest=swarm7[src], path=[swarm7[dest].peer_id]
+        )
+
+    assert count_metrics(await swarm7[dest].api.metrics()) != 0
+
+    await swarm7[dest].api.reset_tickets_statistics()
+
+    assert count_metrics(await swarm7[dest].api.metrics()) == 0
 
 
 @pytest.mark.asyncio
@@ -263,7 +332,11 @@ async def test_hoprd_should_be_able_to_open_and_close_channel_without_tickets(
     src: str, dest: str, swarm7: dict[str, Node]
 ):
     async with create_channel(swarm7[src], swarm7[dest], OPEN_CHANNEL_FUNDING_VALUE_HOPR):
-        # the context manager handles opening and closing of the channel with verification
+        # the context manager handles opening and closing of the channel with verification, using counter-party address
+        assert True
+
+    async with create_channel(swarm7[src], swarm7[dest], OPEN_CHANNEL_FUNDING_VALUE_HOPR, use_peer_id=True):
+        # the context manager handles opening and closing of the channel with verification using counter-party peerID
         assert True
 
 
@@ -288,7 +361,7 @@ async def test_hoprd_default_strategy_automatic_ticket_aggregation_and_redeeming
     channel_funding = ticket_count * TICKET_PRICE_PER_HOP
 
     # create channel from src to mid, mid to dest does not need a channel
-    async with create_channel(swarm7[src], swarm7[mid], funding=channel_funding) as channel:
+    async with create_channel(swarm7[src], swarm7[mid], funding=channel_funding):
         statistics_before = await swarm7[mid].api.get_tickets_statistics()
         assert statistics_before is not None
 
@@ -312,7 +385,7 @@ async def test_hoprd_default_strategy_automatic_ticket_aggregation_and_redeeming
                 else:
                     await asyncio.sleep(0.1)
 
-        await asyncio.wait_for(check_aggregate_and_redeem_tickets(swarm7[mid].api), 60.0)
+        await asyncio.wait_for(check_aggregate_and_redeem_tickets(swarm7[mid].api), 120.0)
 
 
 # FIXME: This test depends on side-effects and cannot be run on its own. It
@@ -389,6 +462,7 @@ async def test_hoprd_check_ticket_price_is_default(peer, swarm7: dict[str, Node]
 
     assert isinstance(price, int)
     assert price > 0
+
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("tag", [random.randint(0, RESERVED_TAG_UPPER_BOUND) for _ in range(5)])
@@ -476,3 +550,23 @@ async def test_send_message_return_timestamp(src: str, dest: str, swarm7: dict[s
 
     assert len(timestamps) == message_count
     assert timestamps == sorted(timestamps)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("src,dest", random_distinct_pairs_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
+async def test_send_message_with_address_or_peer_id(src: str, dest: str, swarm7: dict[str, Node]):
+    message_count = int(TICKET_AGGREGATION_THRESHOLD / 10)
+    random_tag = gen_random_tag()
+
+    src_peer = swarm7[src]
+    dest_peer = swarm7[dest]
+
+    packets = [f"0 hop message #{i:08d}" for i in range(message_count)]
+    for packet in packets:
+        res = await src_peer.api.send_message(
+            random.choice([dest_peer.peer_id, dest_peer.address]), packet, [], random_tag
+        )
+        assert res is not None
+
+    # Remove all messages so they do not interfere with the later tests
+    await dest_peer.api.messages_pop_all(random_tag)

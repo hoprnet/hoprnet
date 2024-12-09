@@ -1,7 +1,8 @@
-use chain_rpc::errors::RpcError;
+use thiserror::Error;
+
+use hopr_chain_rpc::errors::RpcError;
 use hopr_internal_types::prelude::CoreTypesError;
 use hopr_primitive_types::errors::GeneralError;
-use thiserror::Error;
 
 /// Enumerates all Chain Actions related errors.
 #[derive(Debug, Error)]
@@ -26,6 +27,9 @@ pub enum ChainActionsError {
 
     #[error("acknowledged {0} is in a wrong state for the operation")]
     WrongTicketState(String),
+
+    #[error("given ticket has a superseded ticket index")]
+    OldTicket,
 
     #[error("ticket is not a win")]
     NotAWinningTicket,

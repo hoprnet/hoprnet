@@ -1,16 +1,22 @@
-use crate::errors::{CoreEthereumIndexerError, Result};
 use async_trait::async_trait;
+use ethers::contract::EthLogDecode;
+use ethers::types::H256;
+use std::cmp::Ordering;
+use std::fmt::Formatter;
+use std::ops::{Add, Sub};
+use std::sync::Arc;
+use std::time::{Duration, SystemTime};
+use tracing::{debug, error, info, trace, warn};
+
 use bindings::{
     hopr_announcements::HoprAnnouncementsEvents, hopr_channels::HoprChannelsEvents,
     hopr_network_registry::HoprNetworkRegistryEvents, hopr_node_management_module::HoprNodeManagementModuleEvents,
     hopr_node_safe_registry::HoprNodeSafeRegistryEvents, hopr_ticket_price_oracle::HoprTicketPriceOracleEvents,
     hopr_token::HoprTokenEvents, hopr_winning_probability_oracle::HoprWinningProbabilityOracleEvents,
 };
-use chain_rpc::{BlockWithLogs, Log};
 use chain_types::chain_events::{ChainEventType, NetworkRegistryStatus, SignificantChainEvent};
 use chain_types::ContractAddresses;
-use ethers::contract::EthLogDecode;
-use ethers::types::TxHash;
+use hopr_chain_rpc::{BlockWithLogs, Log};
 use hopr_crypto_types::keypairs::ChainKeypair;
 use hopr_crypto_types::prelude::{Hash, Keypair};
 use hopr_crypto_types::types::OffchainSignature;
@@ -21,12 +27,8 @@ use hopr_db_sql::prelude::TicketMarker;
 use hopr_db_sql::{HoprDbAllOperations, OpenTransaction};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use std::cmp::Ordering;
-use std::fmt::Formatter;
-use std::ops::{Add, Sub};
-use std::sync::Arc;
-use std::time::{Duration, SystemTime};
-use tracing::{debug, error, info, trace, warn};
+
+use crate::errors::{CoreEthereumIndexerError, Result};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -91,15 +93,15 @@ where
         match event {
             HoprAnnouncementsEvents::AddressAnnouncementFilter(address_announcement) => {
                 trace!(
-                    "on_announcement_event - multiaddr: {} - node: {}",
-                    &address_announcement.base_multiaddr,
-                    &address_announcement.node.to_string()
+                    multiaddress = &address_announcement.base_multiaddr,
+                    address = &address_announcement.node.to_string(),
+                    "on_announcement_event",
                 );
                 // safeguard against empty multiaddrs, skip
                 if address_announcement.base_multiaddr.is_empty() {
                     warn!(
-                        "encountered empty multiaddress announcement for account {}",
-                        address_announcement.node
+                        address = ?address_announcement.node,
+                        "encountered empty multiaddress announcement",
                     );
                     return Ok(None);
                 }
@@ -138,10 +140,12 @@ where
                             )
                             .await?;
                     }
-                    Err(_) => {
+                    Err(e) => {
                         warn!(
-                            "Filtering announcement from {} with invalid signature.",
-                            key_binding.chain_key
+                            address = ?key_binding.chain_key,
+                            error = %e,
+                            "Filtering announcement with invalid signature",
+
                         )
                     }
                 }
@@ -187,6 +191,7 @@ where
 
                     Ok(Some(ChainEventType::ChannelBalanceDecreased(updated_channel, diff)))
                 } else {
+                    error!(channel_id = %Hash::from(balance_decreased.channel_id), "observed balance decreased event for a channel that does not exist");
                     Err(CoreEthereumIndexerError::ChannelDoesNotExist)
                 }
             }
@@ -207,6 +212,7 @@ where
 
                     Ok(Some(ChainEventType::ChannelBalanceIncreased(updated_channel, diff)))
                 } else {
+                    error!(channel_id = %Hash::from(balance_increased.channel_id), "observed balance increased event for a channel that does not exist");
                     Err(CoreEthereumIndexerError::ChannelDoesNotExist)
                 }
             }
@@ -249,6 +255,7 @@ where
 
                     Ok(Some(ChainEventType::ChannelClosed(updated_channel)))
                 } else {
+                    error!(channel_id = %Hash::from(channel_closed.channel_id), "observed closure finalization event for a channel that does not exist");
                     Err(CoreEthereumIndexerError::ChannelDoesNotExist)
                 }
             }
@@ -263,14 +270,13 @@ where
                     // Check that we're not receiving the Open event without the channel being Close prior
                     if channel_edits.entry().status != ChannelStatus::Closed {
                         return Err(CoreEthereumIndexerError::ProcessError(format!(
-                            "trying to re-open channel {} which is not closed",
-                            channel_edits.entry().get_id()
+                            "trying to re-open channel {} which is not closed, but {}",
+                            channel_edits.entry().get_id(),
+                            channel_edits.entry().status,
                         )));
                     }
 
-                    trace!(
-                        "on_channel_reopened_event - source: {source} - destination: {destination} - channel_id: {channel_id}"
-                    );
+                    trace!(%source, %destination, %channel_id, "on_channel_reopened_event");
 
                     let current_epoch = channel_edits.entry().channel_epoch;
 
@@ -296,9 +302,7 @@ where
                         )
                         .await?
                 } else {
-                    trace!(
-                        "on_channel_opened_event - source: {source} - destination: {destination} - channel_id: {channel_id}"
-                    );
+                    trace!(%source, %destination, %channel_id, "on_channel_opened_event");
 
                     let new_channel = ChannelEntry::new(
                         source,
@@ -352,14 +356,14 @@ where
                                     self.db
                                         .mark_tickets_as((&ack_ticket).into(), TicketMarker::Redeemed)
                                         .await?;
-                                    info!("{ack_ticket} has been marked as redeemed");
+                                    info!(%ack_ticket, "ticket marked as redeemed");
                                     Some(ack_ticket)
                                 }
                                 Ordering::Less => {
                                     error!(
-                                        "could not find acknowledged 'BeingRedeemed' ticket with idx {} in {}",
-                                        ticket_redeemed.new_ticket_index - 1,
-                                        channel_edits.entry()
+                                        idx = %ticket_redeemed.new_ticket_index - 1,
+                                        entry = %channel_edits.entry(),
+                                        "could not find acknowledged 'BeingRedeemed' ticket",
                                     );
                                     // This is not an error, because the ticket might've become neglected before
                                     // the ticket redemption could finish
@@ -367,10 +371,10 @@ where
                                 }
                                 Ordering::Greater => {
                                     error!(
-                                        "found {} tickets matching 'BeingRedeemed' index {} in {}",
-                                        matching_tickets.len(),
-                                        ticket_redeemed.new_ticket_index - 1,
-                                        channel_edits.entry()
+                                        count = matching_tickets.len(),
+                                        index = %ticket_redeemed.new_ticket_index - 1,
+                                        entry = %channel_edits.entry(),
+                                        "found tickets matching 'BeingRedeemed'",
                                     );
                                     return Err(CoreEthereumIndexerError::ProcessError(format!(
                                         "multiple tickets matching idx {} found in {}",
@@ -386,7 +390,7 @@ where
                         // index value in the cache is at least the index of the redeemed ticket
                         Some(ChannelDirection::Outgoing) => {
                             // We need to ensure the outgoing ticket index is at least this new value
-                            debug!("observed redeem event on an outgoing {}", channel_edits.entry());
+                            debug!(channel = %channel_edits.entry(), "observed redeem event on an outgoing channel");
                             self.db
                                 .compare_and_set_outgoing_ticket_index(
                                     channel_edits.entry().get_id(),
@@ -398,7 +402,7 @@ where
                         // For a channel where neither source nor destination is us, we don't care
                         None => {
                             // Not our redeem event
-                            debug!("observed redeem event on a foreign {}", channel_edits.entry());
+                            debug!(channel = %channel_edits.entry(), "observed redeem event on a foreign channel");
                             None
                         }
                     };
@@ -416,14 +420,14 @@ where
                     // which have a lower ticket index than `ticket_redeemed.new_ticket_index`
                     self.db
                         .mark_tickets_as(
-                            TicketSelector::from(&channel).with_index_lt(ticket_redeemed.new_ticket_index),
+                            TicketSelector::from(&channel).with_index_range(..ticket_redeemed.new_ticket_index),
                             TicketMarker::Neglected,
                         )
                         .await?;
 
                     Ok(Some(ChainEventType::TicketRedeemed(channel, ack_ticket)))
                 } else {
-                    error!("observed ticket redeem on a channel that we don't have in the DB");
+                    error!(channel_id = %Hash::from(ticket_redeemed.channel_id), "observed ticket redeem on a channel that we don't have in the DB");
                     Err(CoreEthereumIndexerError::ChannelDoesNotExist)
                 }
             }
@@ -444,6 +448,7 @@ where
                         .await?;
                     Ok(Some(ChainEventType::ChannelClosureInitiated(channel)))
                 } else {
+                    error!(channel_id = %Hash::from(closure_initiated.channel_id), "observed channel closure initiation on a channel that we don't have in the DB");
                     Err(CoreEthereumIndexerError::ChannelDoesNotExist)
                 }
             }
@@ -482,8 +487,8 @@ where
                 let to: Address = transferred.to.into();
 
                 trace!(
-                    "on_token_transfer_event - address_to_monitor: {:?} - to: {to} - from: {from}",
-                    &self.safe_address,
+                    safe_address = %&self.safe_address, %from, %to,
+                    "on_token_transfer_event"
                 );
 
                 let mut current_balance = self.db.get_safe_hopr_balance(Some(tx)).await?;
@@ -493,11 +498,11 @@ where
                     return Ok(None);
                 } else if to.eq(&self.safe_address) {
                     // This + is internally defined as saturating add
-                    info!("Safe balance {current_balance} increased by {transferred_value}");
+                    info!(?current_balance, added_value = %transferred_value, "Safe balance increased ");
                     current_balance = current_balance + transferred_value;
                 } else if from.eq(&self.safe_address) {
                     // This - is internally defined as saturating sub
-                    info!("Safe balance {current_balance} decreased by {transferred_value}");
+                    info!(?current_balance, removed_value = %transferred_value, "Safe balance decreased");
                     current_balance = current_balance - transferred_value;
                 }
 
@@ -508,8 +513,9 @@ where
                 let spender: Address = approved.spender.into();
 
                 trace!(
-                    "on_token_approval_event - address_to_monitor: {:?} - owner: {owner} - spender: {spender}, allowance: {:?}",
-                    &self.safe_address, approved.value
+                    address = %&self.safe_address, %owner, %spender, allowance = %approved.value,
+                    "on_token_approval_event",
+
                 );
 
                 // if approval is for tokens on Safe contract to be spent by HoprChannels
@@ -565,7 +571,7 @@ where
                     .await?;
 
                 if node_address == self.chain_key.public().to_address() {
-                    info!("Your node has been added to the registry and you can now continue the node activation process on http://hub.hoprnet.org/.");
+                    info!("This node has been added to the registry, node activation process continues on: http://hub.hoprnet.org/.");
                 }
 
                 return Ok(Some(ChainEventType::NetworkRegistryUpdate(
@@ -580,7 +586,7 @@ where
                     .await?;
 
                 if node_address == self.chain_key.public().to_address() {
-                    info!("Your node has been added to the registry and you can now continue the node activation process on http://hub.hoprnet.org/.");
+                    info!("This node has been added to the registry, node can now continue the node activation process on: http://hub.hoprnet.org/.");
                 }
 
                 return Ok(Some(ChainEventType::NetworkRegistryUpdate(
@@ -616,7 +622,7 @@ where
         match event {
             HoprNodeSafeRegistryEvents::RegisteredNodeSafeFilter(registered) => {
                 if self.chain_key.public().to_address() == registered.node_address.into() {
-                    info!("Node safe registered: {}", registered.safe_address);
+                    info!(safe_address = %registered.safe_address, "Node safe registered", );
                     // NOTE: we don't store this state in the DB
                     return Ok(Some(ChainEventType::NodeSafeRegistered(registered.safe_address.into())));
                 }
@@ -672,14 +678,20 @@ where
                 let new_minimum_win_prob = win_prob_to_f64(&encoded_new);
 
                 trace!(
-                    "on_ticket_minimum_win_prob_updated - old: {old_minimum_win_prob} - new: {new_minimum_win_prob}",
+                    old = old_minimum_win_prob,
+                    new = new_minimum_win_prob,
+                    "on_ticket_minimum_win_prob_updated",
                 );
 
                 self.db
                     .set_minimum_incoming_ticket_win_prob(Some(tx), new_minimum_win_prob)
                     .await?;
 
-                info!("minimum ticket winning probability has been updated {old_minimum_win_prob} -> {new_minimum_win_prob}");
+                info!(
+                    old = old_minimum_win_prob,
+                    new = new_minimum_win_prob,
+                    "minimum ticket winning probability updated"
+                );
 
                 // If the old minimum was less strict, we need to mark of all the
                 // tickets below the new higher minimum as rejected
@@ -694,12 +706,9 @@ where
                     if let Some(selector) = selector {
                         let num_rejected = self
                             .db
-                            .mark_tickets_as(
-                                selector.with_winning_probability_lt(encoded_new),
-                                TicketMarker::Rejected,
-                            )
+                            .mark_tickets_as(selector.with_winning_probability(..encoded_new), TicketMarker::Rejected)
                             .await?;
-                        info!("{num_rejected} unredeemed tickets were rejected because the minimum winning probability has been increased");
+                        info!(count = num_rejected, "unredeemed tickets were rejected, because the minimum winning probability has been increased");
                     }
                 }
             }
@@ -721,16 +730,16 @@ where
         match event {
             HoprTicketPriceOracleEvents::TicketPriceUpdatedFilter(update) => {
                 trace!(
-                    "on_ticket_price_updated - old: {:?} - new: {:?}",
-                    update.0.to_string(),
-                    update.1.to_string()
+                    old = update.0.to_string(),
+                    new = update.1.to_string(),
+                    "on_ticket_price_updated",
                 );
 
                 self.db
                     .update_ticket_price(Some(tx), BalanceType::HOPR.balance(update.1))
                     .await?;
 
-                info!("ticket price has been set to {}", update.1);
+                info!(price = %update.1, "ticket price updated");
             }
             HoprTicketPriceOracleEvents::OwnershipTransferredFilter(_event) => {
                 // ignore ownership transfer event
@@ -740,8 +749,9 @@ where
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
-    async fn process_log_event(&self, tx: &OpenTransaction, log: Log) -> Result<Option<ChainEventType>> {
-        trace!("processing events in {log}");
+    async fn process_log_event(&self, tx: &OpenTransaction, slog: SerializableLog) -> Result<Option<ChainEventType>> {
+        trace!(log = %slog, "log content");
+        let log = Log::from(slog);
 
         if log.address.eq(&self.addresses.announcements) {
             let bn = log.block_number as u32;
@@ -773,8 +783,8 @@ where
             METRIC_INDEXER_LOG_COUNTERS.increment(&["unknown"]);
 
             error!(
-                "on_event error - unknown contract address: {} - received log: {log:?}",
-                log.address
+                address = %log.address, log = ?log,
+                "on_event error - unknown contract address, received log"
             );
             return Err(CoreEthereumIndexerError::UnknownContract(log.address));
         }
@@ -799,7 +809,7 @@ where
         ]
     }
 
-    fn contract_address_topics(&self, contract: Address) -> Vec<TxHash> {
+    fn contract_address_topics(&self, contract: Address) -> Vec<H256> {
         if contract.eq(&self.addresses.announcements) {
             crate::constants::topics::announcement()
         } else if contract.eq(&self.addresses.channels) {
@@ -831,38 +841,24 @@ where
                     // In the worst case, each log contains a single event
                     let mut ret = Vec::with_capacity(block_with_logs.logs.len());
 
-                    let mut log_tx_hashes = Vec::with_capacity(block_with_logs.logs.len());
-                    let block_id = block_with_logs.to_string();
-
                     // Process all logs in the block
                     for log in block_with_logs.logs {
-                        let tx_hash = log.tx_hash;
+                        let tx_hash = Hash::from(log.tx_hash);
+                        let log_id = log.log_index;
+                        let block_id = log.block_number;
 
-                        // If a significant chain event can be extracted from the log, push it
-                        if let Some(event_type) = myself.process_log_event(tx, log).await? {
-                            let significant_event = SignificantChainEvent { tx_hash, event_type };
-                            debug!("indexer got {significant_event}");
-                            ret.push(significant_event);
+                        match myself.process_log_event(tx, log).await {
+                            // If a significant chain event can be extracted from the log, push it
+                            Ok(Some(event_type)) => {
+                                let significant_event = SignificantChainEvent { tx_hash, event_type };
+                                debug!(block_id, %tx_hash, log_id, ?significant_event, "indexer got significant_event");
+                                ret.push(significant_event);
+                            }
+                            Ok(None) => debug!(block_id, %tx_hash, log_id, "no significant event in log"),
+                            Err(error) => error!(block_id, %tx_hash, log_id, %error, "error processing log in tx"),
                         }
-
-                        log_tx_hashes.push(tx_hash);
                     }
 
-                    // Update the hash only if any logs were processed in this block
-                    let block_hash = if !log_tx_hashes.is_empty() {
-                        debug!("block {block_id} has hashes {:?}", log_tx_hashes);
-                        let h = Hash::create(log_tx_hashes.iter().map(|h| h.as_ref()).collect::<Vec<_>>().as_ref());
-                        debug!("block hash of {block_id} is {h}");
-                        Some(h)
-                    } else {
-                        None
-                    };
-
-                    // Once we're done with the block, update the DB
-                    myself
-                        .db
-                        .set_last_indexed_block(Some(tx), block_with_logs.block_id as u32, block_hash)
-                        .await?;
                     Ok(ret)
                 })
             })
@@ -953,20 +949,8 @@ mod tests {
         }
     }
 
-    fn test_log() -> ethers::prelude::Log {
-        ethers::prelude::Log {
-            address: Default::default(),
-            topics: vec![],
-            data: Default::default(),
-            block_hash: Some(H256::zero()),
-            block_number: Some(0.into()),
-            transaction_hash: Some(H256::zero()),
-            transaction_index: Some(0.into()),
-            log_index: Some(0.into()),
-            transaction_log_index: None,
-            log_type: None,
-            removed: None,
-        }
+    fn test_log() -> SerializableLog {
+        SerializableLog { ..Default::default() }
     }
 
     #[async_std::test]
@@ -977,9 +961,9 @@ mod tests {
 
         let keybinding = KeyBinding::new(*SELF_CHAIN_ADDRESS, &SELF_PRIV_KEY);
 
-        let keybinding_log = ethers::prelude::Log {
+        let keybinding_log = SerializableLog {
             address: handlers.addresses.announcements.into(),
-            topics: vec![KeyBindingFilter::signature()],
+            topics: vec![KeyBindingFilter::signature().into()],
             data: encode(&[
                 Token::FixedBytes(keybinding.signature.as_ref().to_vec()),
                 Token::FixedBytes(keybinding.packet_key.as_ref().to_vec()),
@@ -1022,9 +1006,9 @@ mod tests {
 
         let test_multiaddr_empty: Multiaddr = "".parse()?;
 
-        let address_announcement_empty_log = ethers::prelude::Log {
+        let address_announcement_empty_log = SerializableLog {
             address: handlers.addresses.announcements.into(),
-            topics: vec![AddressAnnouncementFilter::signature()],
+            topics: vec![AddressAnnouncementFilter::signature().into()],
             data: encode(&[
                 Token::Address(EthereumAddress::from_slice(&SELF_CHAIN_ADDRESS.as_ref())),
                 Token::String(test_multiaddr_empty.to_string()),
@@ -1060,10 +1044,10 @@ mod tests {
 
         let test_multiaddr: Multiaddr = "/ip4/1.2.3.4/tcp/56".parse()?;
 
-        let address_announcement_log = ethers::prelude::Log {
+        let address_announcement_log = SerializableLog {
             address: handlers.addresses.announcements.into(),
-            block_number: Some(1.into()),
-            topics: vec![AddressAnnouncementFilter::signature()],
+            block_number: 1,
+            topics: vec![AddressAnnouncementFilter::signature().into()],
             data: encode(&[
                 Token::Address(EthereumAddress::from_slice(&SELF_CHAIN_ADDRESS.as_ref())),
                 Token::String(test_multiaddr.to_string()),
@@ -1120,10 +1104,10 @@ mod tests {
 
         let test_multiaddr_dns: Multiaddr = "/dns4/useful.domain/tcp/56".parse()?;
 
-        let address_announcement_dns_log = ethers::prelude::Log {
+        let address_announcement_dns_log = SerializableLog {
             address: handlers.addresses.announcements.into(),
-            block_number: Some(2.into()),
-            topics: vec![AddressAnnouncementFilter::signature()],
+            block_number: 2,
+            topics: vec![AddressAnnouncementFilter::signature().into()],
             data: encode(&[
                 Token::Address(EthereumAddress::from_slice(&SELF_CHAIN_ADDRESS.as_ref())),
                 Token::String(test_multiaddr_dns.to_string()),
@@ -1197,9 +1181,9 @@ mod tests {
         );
         db.insert_account(None, announced_account_entry).await?;
 
-        let revoke_announcement_log = ethers::prelude::Log {
+        let revoke_announcement_log = SerializableLog {
             address: handlers.addresses.announcements.into(),
-            topics: vec![RevokeAnnouncementFilter::signature()],
+            topics: vec![RevokeAnnouncementFilter::signature().into()],
             data: encode(&[Token::Address(EthereumAddress::from_slice(
                 &SELF_CHAIN_ADDRESS.as_ref(),
             ))])
@@ -1237,12 +1221,12 @@ mod tests {
 
         let value = U256::max_value();
 
-        let transferred_log = ethers::prelude::Log {
+        let transferred_log = SerializableLog {
             address: handlers.addresses.token.into(),
             topics: vec![
-                TransferFilter::signature(),
-                H256::from_slice(&Address::default().to_bytes32()),
-                H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()),
+                TransferFilter::signature().into(),
+                H256::from_slice(&Address::default().to_bytes32()).into(),
+                H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()).into(),
             ],
             data: encode(&[Token::Uint(value)]).into(),
             ..test_log()
@@ -1274,12 +1258,12 @@ mod tests {
 
         db.set_safe_hopr_balance(None, BalanceType::HOPR.balance(value)).await?;
 
-        let transferred_log = ethers::prelude::Log {
+        let transferred_log = SerializableLog {
             address: handlers.addresses.token.into(),
             topics: vec![
-                TransferFilter::signature(),
-                H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()),
-                H256::from_slice(&Address::default().to_bytes32()),
+                TransferFilter::signature().into(),
+                H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()).into(),
+                H256::from_slice(&Address::default().to_bytes32()).into(),
             ],
             data: encode(&[Token::Uint(value)]).into(),
             ..test_log()
@@ -1304,12 +1288,12 @@ mod tests {
 
         let handlers = init_handlers(db.clone());
 
-        let approval_log = ethers::prelude::Log {
+        let approval_log = SerializableLog {
             address: handlers.addresses.token.into(),
             topics: vec![
-                ApprovalFilter::signature(),
-                H256::from_slice(&handlers.safe_address.to_bytes32()),
-                H256::from_slice(&handlers.addresses.channels.to_bytes32()),
+                ApprovalFilter::signature().into(),
+                H256::from_slice(&handlers.safe_address.to_bytes32()).into(),
+                H256::from_slice(&handlers.addresses.channels.to_bytes32()).into(),
             ],
             data: encode(&[Token::Uint(EthU256::from(1000u64))]).into(),
             ..test_log()
@@ -1368,12 +1352,12 @@ mod tests {
 
         let handlers = init_handlers(db.clone());
 
-        let registered_log = ethers::prelude::Log {
+        let registered_log = SerializableLog {
             address: handlers.addresses.network_registry.into(),
             topics: vec![
-                RegisteredFilter::signature(),
-                H256::from_slice(&STAKE_ADDRESS.to_bytes32()),
-                H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()),
+                RegisteredFilter::signature().into(),
+                H256::from_slice(&STAKE_ADDRESS.to_bytes32()).into(),
+                H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()).into(),
             ],
             data: encode(&[]).into(),
             ..test_log()
@@ -1405,12 +1389,12 @@ mod tests {
 
         let handlers = init_handlers(db.clone());
 
-        let registered_log = ethers::prelude::Log {
+        let registered_log = SerializableLog {
             address: handlers.addresses.network_registry.into(),
             topics: vec![
-                RegisteredByManagerFilter::signature(),
-                H256::from_slice(&STAKE_ADDRESS.to_bytes32()),
-                H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()),
+                RegisteredByManagerFilter::signature().into(),
+                H256::from_slice(&STAKE_ADDRESS.to_bytes32()).into(),
+                H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()).into(),
             ],
             data: encode(&[]).into(),
             ..test_log()
@@ -1445,12 +1429,12 @@ mod tests {
         db.set_access_in_network_registry(None, *SELF_CHAIN_ADDRESS, true)
             .await?;
 
-        let registered_log = ethers::prelude::Log {
+        let registered_log = SerializableLog {
             address: handlers.addresses.network_registry.into(),
             topics: vec![
-                DeregisteredFilter::signature(),
-                H256::from_slice(&STAKE_ADDRESS.to_bytes32()),
-                H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()),
+                DeregisteredFilter::signature().into(),
+                H256::from_slice(&STAKE_ADDRESS.to_bytes32()).into(),
+                H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()).into(),
             ],
             data: encode(&[]).into(),
             ..test_log()
@@ -1485,12 +1469,12 @@ mod tests {
         db.set_access_in_network_registry(None, *SELF_CHAIN_ADDRESS, true)
             .await?;
 
-        let registered_log = ethers::prelude::Log {
+        let registered_log = SerializableLog {
             address: handlers.addresses.network_registry.into(),
             topics: vec![
-                DeregisteredByManagerFilter::signature(),
-                H256::from_slice(&STAKE_ADDRESS.to_bytes32()),
-                H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()),
+                DeregisteredByManagerFilter::signature().into(),
+                H256::from_slice(&STAKE_ADDRESS.to_bytes32()).into(),
+                H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()).into(),
             ],
             data: encode(&[]).into(),
             ..test_log()
@@ -1522,11 +1506,11 @@ mod tests {
 
         let handlers = init_handlers(db.clone());
 
-        let nr_enabled = ethers::prelude::Log {
+        let nr_enabled = SerializableLog {
             address: handlers.addresses.network_registry.into(),
             topics: vec![
-                NetworkRegistryStatusUpdatedFilter::signature(),
-                H256::from_low_u64_be(1),
+                NetworkRegistryStatusUpdatedFilter::signature().into(),
+                H256::from_low_u64_be(1).into(),
             ],
             data: encode(&[]).into(),
             ..test_log()
@@ -1552,11 +1536,11 @@ mod tests {
 
         db.set_network_registry_enabled(None, true).await?;
 
-        let nr_disabled = ethers::prelude::Log {
+        let nr_disabled = SerializableLog {
             address: handlers.addresses.network_registry.into(),
             topics: vec![
-                NetworkRegistryStatusUpdatedFilter::signature(),
-                H256::from_low_u64_be(0),
+                NetworkRegistryStatusUpdatedFilter::signature().into(),
+                H256::from_low_u64_be(0).into(),
             ],
             data: encode(&[]).into(),
             ..test_log()
@@ -1580,12 +1564,12 @@ mod tests {
 
         let handlers = init_handlers(db.clone());
 
-        let set_eligible = ethers::prelude::Log {
+        let set_eligible = SerializableLog {
             address: handlers.addresses.network_registry.into(),
             topics: vec![
-                EligibilityUpdatedFilter::signature(),
-                H256::from_slice(&STAKE_ADDRESS.to_bytes32()),
-                H256::from_low_u64_be(1),
+                EligibilityUpdatedFilter::signature().into(),
+                H256::from_slice(&STAKE_ADDRESS.to_bytes32()).into(),
+                H256::from_low_u64_be(1).into(),
             ],
             data: encode(&[]).into(),
             ..test_log()
@@ -1615,12 +1599,12 @@ mod tests {
 
         db.set_safe_eligibility(None, *STAKE_ADDRESS, false).await?;
 
-        let set_eligible = ethers::prelude::Log {
+        let set_eligible = SerializableLog {
             address: handlers.addresses.network_registry.into(),
             topics: vec![
-                EligibilityUpdatedFilter::signature(),
-                H256::from_slice(&STAKE_ADDRESS.to_bytes32()),
-                H256::from_low_u64_be(0),
+                EligibilityUpdatedFilter::signature().into(),
+                H256::from_slice(&STAKE_ADDRESS.to_bytes32()).into(),
+                H256::from_low_u64_be(0).into(),
             ],
             data: encode(&[]).into(),
             ..test_log()
@@ -1662,11 +1646,11 @@ mod tests {
         let solidity_balance = BalanceType::HOPR.balance(U256::from((1u128 << 96) - 1));
         let diff = solidity_balance - channel.balance;
 
-        let balance_increased_log = ethers::prelude::Log {
+        let balance_increased_log = SerializableLog {
             address: handlers.addresses.channels.into(),
             topics: vec![
-                ChannelBalanceIncreasedFilter::signature(),
-                H256::from_slice(channel.get_id().as_ref()),
+                ChannelBalanceIncreasedFilter::signature().into(),
+                H256::from_slice(channel.get_id().as_ref()).into(),
             ],
             data: Vec::from(solidity_balance.amount().to_be_bytes()).into(),
             ..test_log()
@@ -1700,11 +1684,11 @@ mod tests {
 
         let separator = Hash::from(hopr_crypto_random::random_bytes());
 
-        let channels_dst_updated = ethers::prelude::Log {
+        let channels_dst_updated = SerializableLog {
             address: handlers.addresses.channels.into(),
             topics: vec![
-                DomainSeparatorUpdatedFilter::signature(),
-                H256::from_slice(separator.as_ref()),
+                DomainSeparatorUpdatedFilter::signature().into(),
+                H256::from_slice(separator.as_ref()).into(),
             ],
             data: encode(&[]).into(),
             ..test_log()
@@ -1754,11 +1738,11 @@ mod tests {
         let solidity_balance = U256::from((1u128 << 96) - 2);
         let diff = channel.balance - solidity_balance;
 
-        let balance_decreased_log = ethers::prelude::Log {
+        let balance_decreased_log = SerializableLog {
             address: handlers.addresses.channels.into(),
             topics: vec![
-                ChannelBalanceDecreasedFilter::signature(),
-                H256::from_slice(channel.get_id().as_ref()),
+                ChannelBalanceDecreasedFilter::signature().into(),
+                H256::from_slice(channel.get_id().as_ref()).into(),
             ],
             data: Vec::from(solidity_balance.to_be_bytes()).into(),
             ..test_log()
@@ -1803,11 +1787,11 @@ mod tests {
 
         db.upsert_channel(None, channel).await?;
 
-        let channel_closed_log = ethers::prelude::Log {
+        let channel_closed_log = SerializableLog {
             address: handlers.addresses.channels.into(),
             topics: vec![
-                ChannelClosedFilter::signature(),
-                H256::from_slice(channel.get_id().as_ref()),
+                ChannelClosedFilter::signature().into(),
+                H256::from_slice(channel.get_id().as_ref()).into(),
             ],
             data: encode(&[]).into(),
             ..test_log()
@@ -1850,12 +1834,12 @@ mod tests {
 
         let channel_id = generate_channel_id(&SELF_CHAIN_ADDRESS, &COUNTERPARTY_CHAIN_ADDRESS);
 
-        let channel_opened_log = ethers::prelude::Log {
+        let channel_opened_log = SerializableLog {
             address: handlers.addresses.channels.into(),
             topics: vec![
-                ChannelOpenedFilter::signature(),
-                H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()),
-                H256::from_slice(&COUNTERPARTY_CHAIN_ADDRESS.to_bytes32()),
+                ChannelOpenedFilter::signature().into(),
+                H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()).into(),
+                H256::from_slice(&COUNTERPARTY_CHAIN_ADDRESS.to_bytes32()).into(),
             ],
             data: encode(&[]).into(),
             ..test_log()
@@ -1906,12 +1890,12 @@ mod tests {
 
         db.upsert_channel(None, channel).await?;
 
-        let channel_opened_log = ethers::prelude::Log {
+        let channel_opened_log = SerializableLog {
             address: handlers.addresses.channels.into(),
             topics: vec![
-                ChannelOpenedFilter::signature(),
-                H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()),
-                H256::from_slice(&COUNTERPARTY_CHAIN_ADDRESS.to_bytes32()),
+                ChannelOpenedFilter::signature().into(),
+                H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()).into(),
+                H256::from_slice(&COUNTERPARTY_CHAIN_ADDRESS.to_bytes32()).into(),
             ],
             data: encode(&[]).into(),
             ..test_log()
@@ -1963,12 +1947,12 @@ mod tests {
 
         db.upsert_channel(None, channel).await?;
 
-        let channel_opened_log = ethers::prelude::Log {
+        let channel_opened_log = SerializableLog {
             address: handlers.addresses.channels.into(),
             topics: vec![
-                ChannelOpenedFilter::signature(),
-                H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()),
-                H256::from_slice(&COUNTERPARTY_CHAIN_ADDRESS.to_bytes32()),
+                ChannelOpenedFilter::signature().into(),
+                H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()).into(),
+                H256::from_slice(&COUNTERPARTY_CHAIN_ADDRESS.to_bytes32()).into(),
             ],
             data: encode(&[]).into(),
             ..test_log()
@@ -2040,11 +2024,11 @@ mod tests {
         db.upsert_channel(None, channel).await?;
         db.upsert_ticket(None, ticket.clone()).await?;
 
-        let ticket_redeemed_log = ethers::prelude::Log {
+        let ticket_redeemed_log = SerializableLog {
             address: handlers.addresses.channels.into(),
             topics: vec![
-                TicketRedeemedFilter::signature(),
-                H256::from_slice(channel.get_id().as_ref()),
+                TicketRedeemedFilter::signature().into(),
+                H256::from_slice(channel.get_id().as_ref()).into(),
             ],
             data: Vec::from(next_ticket_index.to_be_bytes()).into(),
             ..test_log()
@@ -2147,11 +2131,11 @@ mod tests {
             mock_acknowledged_ticket(&COUNTERPARTY_CHAIN_KEY, &SELF_CHAIN_KEY, ticket_index.as_u64() - 1, 1.0)?;
         db.upsert_ticket(None, old_ticket.clone()).await?;
 
-        let ticket_redeemed_log = ethers::prelude::Log {
+        let ticket_redeemed_log = SerializableLog {
             address: handlers.addresses.channels.into(),
             topics: vec![
-                TicketRedeemedFilter::signature(),
-                H256::from_slice(&channel.get_id().as_ref()),
+                TicketRedeemedFilter::signature().into(),
+                H256::from_slice(&channel.get_id().as_ref()).into(),
             ],
             data: Vec::from(next_ticket_index.to_be_bytes()).into(),
             ..test_log()
@@ -2242,11 +2226,11 @@ mod tests {
 
         db.upsert_channel(None, channel).await?;
 
-        let ticket_redeemed_log = ethers::prelude::Log {
+        let ticket_redeemed_log = SerializableLog {
             address: handlers.addresses.channels.into(),
             topics: vec![
-                TicketRedeemedFilter::signature(),
-                H256::from_slice(channel.get_id().as_ref()),
+                TicketRedeemedFilter::signature().into(),
+                H256::from_slice(channel.get_id().as_ref()).into(),
             ],
             data: Vec::from(next_ticket_index.to_be_bytes()).into(),
             ..test_log()
@@ -2312,11 +2296,11 @@ mod tests {
 
         let next_ticket_index = U256::from((1u128 << 48) - 1);
 
-        let ticket_redeemed_log = ethers::prelude::Log {
+        let ticket_redeemed_log = SerializableLog {
             address: handlers.addresses.channels.into(),
             topics: vec![
-                TicketRedeemedFilter::signature(),
-                H256::from_slice(channel.get_id().as_ref()),
+                TicketRedeemedFilter::signature().into(),
+                H256::from_slice(channel.get_id().as_ref()).into(),
             ],
             data: Vec::from(next_ticket_index.to_be_bytes()).into(),
             ..test_log()
@@ -2364,11 +2348,11 @@ mod tests {
 
         let next_ticket_index = U256::from((1u128 << 48) - 1);
 
-        let ticket_redeemed_log = ethers::prelude::Log {
+        let ticket_redeemed_log = SerializableLog {
             address: handlers.addresses.channels.into(),
             topics: vec![
-                TicketRedeemedFilter::signature(),
-                H256::from_slice(channel.get_id().as_ref()),
+                TicketRedeemedFilter::signature().into(),
+                H256::from_slice(channel.get_id().as_ref()).into(),
             ],
             data: Vec::from(next_ticket_index.to_be_bytes()).into(),
             ..test_log()
@@ -2416,11 +2400,11 @@ mod tests {
 
         let timestamp = SystemTime::now();
 
-        let closure_initiated_log = ethers::prelude::Log {
+        let closure_initiated_log = SerializableLog {
             address: handlers.addresses.channels.into(),
             topics: vec![
-                OutgoingChannelClosureInitiatedFilter::signature(),
-                H256::from_slice(channel.get_id().as_ref()),
+                OutgoingChannelClosureInitiatedFilter::signature().into(),
+                H256::from_slice(channel.get_id().as_ref()).into(),
             ],
             data: Vec::from(U256::from(timestamp.as_unix_timestamp().as_secs()).to_be_bytes()).into(),
             ..test_log()
@@ -2456,12 +2440,12 @@ mod tests {
 
         let handlers = init_handlers(db.clone());
 
-        let safe_registered_log = ethers::prelude::Log {
+        let safe_registered_log = SerializableLog {
             address: handlers.addresses.safe_registry.into(),
             topics: vec![
-                RegisteredNodeSafeFilter::signature(),
-                H256::from_slice(&SAFE_INSTANCE_ADDR.to_bytes32()),
-                H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()),
+                RegisteredNodeSafeFilter::signature().into(),
+                H256::from_slice(&SAFE_INSTANCE_ADDR.to_bytes32()).into(),
+                H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()).into(),
             ],
             data: encode(&[]).into(),
             ..test_log()
@@ -2487,12 +2471,12 @@ mod tests {
 
         // Nothing to write to the DB here, since we do not track this
 
-        let safe_registered_log = ethers::prelude::Log {
+        let safe_registered_log = SerializableLog {
             address: handlers.addresses.safe_registry.into(),
             topics: vec![
-                DergisteredNodeSafeFilter::signature(),
-                H256::from_slice(&SAFE_INSTANCE_ADDR.to_bytes32()),
-                H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()),
+                DergisteredNodeSafeFilter::signature().into(),
+                H256::from_slice(&SAFE_INSTANCE_ADDR.to_bytes32()).into(),
+                H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()).into(),
             ],
             data: encode(&[]).into(),
             ..test_log()
@@ -2519,9 +2503,9 @@ mod tests {
 
         let handlers = init_handlers(db.clone());
 
-        let price_change_log = ethers::prelude::Log {
+        let price_change_log = SerializableLog {
             address: handlers.addresses.price_oracle.into(),
-            topics: vec![TicketPriceUpdatedFilter::signature()],
+            topics: vec![TicketPriceUpdatedFilter::signature().into()],
             data: encode(&[Token::Uint(EthU256::from(1u64)), Token::Uint(EthU256::from(123u64))]).into(),
             ..test_log()
         };
@@ -2552,9 +2536,9 @@ mod tests {
 
         let handlers = init_handlers(db.clone());
 
-        let win_prob_change_log = ethers::prelude::Log {
+        let win_prob_change_log = SerializableLog {
             address: handlers.addresses.win_prob_oracle.into(),
-            topics: vec![WinProbUpdatedFilter::signature()],
+            topics: vec![WinProbUpdatedFilter::signature().into()],
             data: encode(&[
                 Token::Uint(EthU256::from(f64_to_win_prob(1.0)?.as_ref())),
                 Token::Uint(EthU256::from(f64_to_win_prob(0.5)?.as_ref())),
@@ -2642,9 +2626,9 @@ mod tests {
 
         let handlers = init_handlers(db.clone());
 
-        let win_prob_change_log = ethers::prelude::Log {
+        let win_prob_change_log = SerializableLog {
             address: handlers.addresses.win_prob_oracle.into(),
-            topics: vec![WinProbUpdatedFilter::signature()],
+            topics: vec![WinProbUpdatedFilter::signature().into()],
             data: encode(&[
                 Token::Uint(EthU256::from(f64_to_win_prob(0.1)?.as_ref())),
                 Token::Uint(EthU256::from(f64_to_win_prob(new_minimum)?.as_ref())),

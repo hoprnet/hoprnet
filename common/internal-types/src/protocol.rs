@@ -14,7 +14,7 @@ use crate::errors::{CoreTypesError, CoreTypesError::PayloadSizeExceeded, Result}
 pub const INTERMEDIATE_HOPS: usize = 3;
 
 /// Maximum size of the packet payload in bytes.
-pub const PAYLOAD_SIZE: usize = 500;
+pub const PAYLOAD_SIZE: usize = 496;
 
 /// Default required minimum incoming ticket winning probability
 pub const DEFAULT_MINIMUM_INCOMING_TICKET_WIN_PROB: f64 = 1.0;
@@ -97,24 +97,29 @@ pub enum PendingAcknowledgement {
 pub struct TagBloomFilter {
     bloom: Bloom<PacketTag>,
     count: usize,
+    capacity: usize,
 }
 
 impl TagBloomFilter {
-    // Allowed false positive rate. This amounts to 0.01% chance
-    const FALSE_POSITIVE_RATE: f64 = 0.0001_f64;
+    // Allowed false positive rate. This amounts to 0.001% chance
+    const FALSE_POSITIVE_RATE: f64 = 0.00001_f64;
 
-    // Maximum number of packet tags this Bloom filter can hold.
-    // After this many packets, the Bloom filter resets and packet replays are possible.
-    const MAX_ITEMS: usize = 10_000_000;
+    // The default maximum number of packet tags this Bloom filter can hold.
+    // After these many packets, the Bloom filter resets and packet replays are possible.
+    const DEFAULT_MAX_ITEMS: usize = 10_000_000;
 
     /// Returns the current number of items in this Bloom filter.
     pub fn count(&self) -> usize {
         self.count
     }
 
+    pub fn capacity(&self) -> usize {
+        self.capacity
+    }
+
     /// Puts a packet tag into the Bloom filter
     pub fn set(&mut self, tag: &PacketTag) {
-        if self.count == Self::MAX_ITEMS {
+        if self.count == self.capacity {
             warn!("maximum number of items in the Bloom filter reached!");
             self.bloom.clear();
             self.count = 0;
@@ -124,7 +129,7 @@ impl TagBloomFilter {
         self.count += 1;
     }
 
-    /// Check if packet tag is in the Bloom filter.
+    /// Check if the packet tag is in the Bloom filter.
     /// False positives are possible.
     pub fn check(&self, tag: &PacketTag) -> bool {
         self.bloom.check(tag)
@@ -132,31 +137,51 @@ impl TagBloomFilter {
 
     /// Checks and sets a packet tag (if not present) in a single operation.
     pub fn check_and_set(&mut self, tag: &PacketTag) -> bool {
-        if self.bloom.check_and_set(tag) {
-            self.count += 1;
-            true
+        // If we're at full capacity, we do only "check" and conditionally reset with the new entry
+        if self.count == self.capacity {
+            let is_present = self.bloom.check(tag);
+            if !is_present {
+                // There cannot be false negatives, so we can reset the filter
+                warn!("maximum number of items in the Bloom filter reached!");
+                self.bloom.clear();
+                self.bloom.set(tag);
+                self.count = 1;
+            }
+            is_present
         } else {
-            false
+            // If not at full capacity, we can do check_and_set
+            let was_present = self.bloom.check_and_set(tag);
+            if !was_present {
+                self.count += 1;
+            }
+            was_present
         }
     }
 
+    /// Deserializes the filter from the given byte array.
     pub fn from_bytes(data: &[u8]) -> Result<Self> {
         bincode::deserialize(data).map_err(|e| CoreTypesError::ParseError(e.to_string()))
     }
 
+    /// Serializes the filter to the given byte array.
     pub fn to_bytes(&self) -> Box<[u8]> {
         bincode::serialize(&self)
             .expect("serialization must not fail")
             .into_boxed_slice()
     }
+
+    fn with_capacity(size: usize) -> Self {
+        Self {
+            bloom: Bloom::new_for_fp_rate_with_seed(size, Self::FALSE_POSITIVE_RATE, &random_bytes()),
+            count: 0,
+            capacity: size,
+        }
+    }
 }
 
 impl Default for TagBloomFilter {
     fn default() -> Self {
-        Self {
-            bloom: Bloom::new_for_fp_rate_with_seed(Self::MAX_ITEMS, Self::FALSE_POSITIVE_RATE, &random_bytes()),
-            count: 0,
-        }
+        Self::with_capacity(Self::DEFAULT_MAX_ITEMS)
     }
 }
 
@@ -221,7 +246,7 @@ impl ApplicationData {
                 plain_text: (&data[2..]).into(),
             })
         } else {
-            Err(GeneralError::ParseError)
+            Err(GeneralError::ParseError("ApplicationData".into()))
         }
     }
 
@@ -256,6 +281,9 @@ mod tests {
         Ok(())
     }
 
+    const ZEROS_TAG: [u8; PACKET_TAG_LENGTH] = [0; PACKET_TAG_LENGTH];
+    const ONES_TAG: [u8; PACKET_TAG_LENGTH] = [1; PACKET_TAG_LENGTH];
+
     #[test]
     fn test_packet_tag_bloom_filter() -> anyhow::Result<()> {
         let mut filter1 = TagBloomFilter::default();
@@ -275,12 +303,12 @@ mod tests {
 
         //let len = filter1.to_bytes().len();
 
-        // Count number of items in the BF (incl. false positives)
+        // Count the number of items in the BF (incl. false positives)
         let match_count_1 = items.iter().filter(|item| filter1.check(item)).count();
 
         let filter2 = TagBloomFilter::from_bytes(&filter1.to_bytes())?;
 
-        // Count number of items in the BF (incl. false positives)
+        // Count the number of items in the BF (incl. false positives)
         let match_count_2 = items.iter().filter(|item| filter2.check(item)).count();
 
         assert_eq!(
@@ -289,16 +317,54 @@ mod tests {
         );
         assert_eq!(filter1.count(), filter2.count(), "the number of items must be equal");
 
-        // All zeroes must not be present in neither BF, we ensured we never insert a zero tag
-        assert!(
-            !filter1.check(&[0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8]),
-            "bf 1 must not contain zero tag"
-        );
-        assert!(
-            !filter2.check(&[0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8]),
-            "bf 2 must not contain zero tag"
-        );
+        // All zeroes must be present in neither BF; we ensured we never insert a zero tag
+        assert!(!filter1.check(&ZEROS_TAG), "bf 1 must not contain zero tag");
+        assert!(!filter2.check(&ZEROS_TAG), "bf 2 must not contain zero tag");
 
         Ok(())
+    }
+
+    #[test]
+    fn tag_bloom_filter_count() {
+        let mut filter = TagBloomFilter::default();
+        assert!(!filter.check_and_set(&ZEROS_TAG));
+        assert_eq!(1, filter.count());
+
+        assert!(filter.check_and_set(&ZEROS_TAG));
+        assert_eq!(1, filter.count());
+
+        assert!(!filter.check_and_set(&ONES_TAG));
+        assert_eq!(2, filter.count());
+
+        assert!(filter.check_and_set(&ZEROS_TAG));
+        assert_eq!(2, filter.count());
+    }
+
+    #[test]
+    fn tag_bloom_filter_wrap_around() {
+        let mut filter = TagBloomFilter::with_capacity(1000);
+        for _ in 1..filter.capacity() {
+            let mut tag: PacketTag = hopr_crypto_random::random_bytes();
+            tag[0] = 0xaa; // ensure it's not all zeroes
+            assert!(!filter.check_and_set(&tag));
+        }
+        // Not yet at full capacity
+        assert_eq!(filter.capacity() - 1, filter.count());
+
+        // This entry is not there yet
+        assert!(!filter.check_and_set(&ZEROS_TAG));
+
+        // Now the filter is at capacity and contains the previously inserted entry
+        assert_eq!(filter.capacity(), filter.count());
+        assert!(filter.check(&ZEROS_TAG));
+
+        // This will not clear out the filter, since the entry is there
+        assert!(filter.check_and_set(&ZEROS_TAG));
+        assert_eq!(filter.capacity(), filter.count());
+
+        // This will clear out the filter, since this other entry is definitely not there
+        assert!(!filter.check_and_set(&ONES_TAG));
+        assert_eq!(1, filter.count());
+        assert!(filter.check(&ONES_TAG));
     }
 }

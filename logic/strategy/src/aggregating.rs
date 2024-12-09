@@ -191,7 +191,7 @@ where
             self.agg_tasks.write().await.insert(channel_id, (false, task));
             let _ = can_remove_tx.send(()); // Allow the task to mark itself as done
         } else {
-            warn!("this strategy already aggregates in channel {channel_id}");
+            warn!(channel = %channel_id, "this strategy already aggregates in channel");
         }
 
         Ok(())
@@ -261,7 +261,7 @@ where
                 return Ok(());
             }
 
-            info!("going to aggregate tickets in {channel} because it transitioned to PendingToClose");
+            info!(%channel, "going to aggregate tickets in channel because it transitioned to PendingToClose");
 
             // On closing there must be at least 2 tickets to justify aggregation
             let on_close_agg_prerequisites = AggregationPrerequisites {
@@ -283,7 +283,7 @@ mod tests {
     use crate::strategy::SingularStrategy;
     use anyhow::Context;
     use async_std::prelude::FutureExt as AsyncStdFutureExt;
-    use futures::{FutureExt, StreamExt};
+    use futures::{pin_mut, FutureExt, StreamExt};
     use hex_literal::hex;
     use hopr_crypto_types::prelude::*;
     use hopr_db_sql::accounts::HoprDbAccountOperations;
@@ -454,7 +454,7 @@ mod tests {
                         (),
                     ) {
                         Ok(_) => {}
-                        Err(e) => error!("{e}"),
+                        Err(e) => error!(error = %e, "Failed to received aggregation ticket"),
                     }
                 }
                 //  alice.ack_event_queue.0.start_send(super::TicketAggregationToProcess::ToProcess(destination, acked_tickets)),
@@ -468,7 +468,7 @@ mod tests {
                         .receive_ticket(PEERS[0].public().into(), aggregated_ticket, ())
                     {
                         Ok(_) => {}
-                        Err(e) => error!("{e}"),
+                        Err(e) => error!(error = %e, "Failed to receive a ticket"),
                     }
                 }
 
@@ -500,6 +500,9 @@ mod tests {
         init_db(db_alice.clone()).await?;
         init_db(db_bob.clone()).await?;
 
+        let (bob_notify_tx, bob_notify_rx) = futures::channel::mpsc::unbounded();
+        db_bob.start_ticket_processing(bob_notify_tx.into())?;
+
         let (_, channel) = populate_db_with_ack_tickets(db_bob.clone(), 5).await?;
 
         db_alice.upsert_channel(None, channel).await?;
@@ -524,8 +527,12 @@ mod tests {
         let f2 = pin!(async_std::task::sleep(Duration::from_secs(5)).fuse());
         let _ = futures::future::select(f1, f2).await;
 
+        pin_mut!(bob_notify_rx);
+        let notified_ticket = bob_notify_rx.next().await.expect("should have a ticket");
+
         let tickets = db_bob.get_tickets((&channel).into()).await?;
         assert_eq!(tickets.len(), 1, "there should be a single aggregated ticket");
+        assert_eq!(notified_ticket, tickets[0]);
 
         Ok(())
     }
@@ -539,6 +546,9 @@ mod tests {
 
         init_db(db_alice.clone()).await?;
         init_db(db_bob.clone()).await?;
+
+        let (bob_notify_tx, bob_notify_rx) = futures::channel::mpsc::unbounded();
+        db_bob.start_ticket_processing(bob_notify_tx.into())?;
 
         let (_, channel) = populate_db_with_ack_tickets(db_bob.clone(), 4).await?;
 
@@ -564,8 +574,12 @@ mod tests {
         let f2 = pin!(async_std::task::sleep(Duration::from_secs(5)));
         let _ = futures::future::select(f1, f2).await;
 
+        pin_mut!(bob_notify_rx);
+        let notified_ticket = bob_notify_rx.next().await.expect("should have a ticket");
+
         let tickets = db_bob.get_tickets((&channel).into()).await?;
         assert_eq!(tickets.len(), 1, "there should be a single aggregated ticket");
+        assert_eq!(notified_ticket, tickets[0]);
 
         Ok(())
     }
@@ -580,6 +594,8 @@ mod tests {
 
         init_db(db_alice.clone()).await?;
         init_db(db_bob.clone()).await?;
+
+        db_bob.start_ticket_processing(None)?;
 
         const NUM_TICKETS: usize = 4;
         let (mut acked_tickets, mut channel) = populate_db_with_ack_tickets(db_bob.clone(), NUM_TICKETS).await?;
@@ -629,6 +645,9 @@ mod tests {
         init_db(db_alice.clone()).await?;
         init_db(db_bob.clone()).await?;
 
+        let (bob_notify_tx, bob_notify_rx) = futures::channel::mpsc::unbounded();
+        db_bob.start_ticket_processing(bob_notify_tx.into())?;
+
         let (_, mut channel) = populate_db_with_ack_tickets(db_bob.clone(), 5).await?;
 
         let cfg = super::AggregatingStrategyConfig {
@@ -661,8 +680,13 @@ mod tests {
         // Wait until aggregation has finished
         awaiter.timeout(Duration::from_secs(5)).await.context("Timeout")??;
 
+        pin_mut!(bob_notify_rx);
+        let notified_ticket = bob_notify_rx.next().await.expect("should have a ticket");
+
         let tickets = db_bob.get_tickets((&channel).into()).await?;
         assert_eq!(tickets.len(), 1, "there should be a single aggregated ticket");
+        assert_eq!(notified_ticket, tickets[0]);
+
         Ok(())
     }
 
@@ -676,6 +700,8 @@ mod tests {
 
         init_db(db_alice.clone()).await?;
         init_db(db_bob.clone()).await?;
+
+        db_bob.start_ticket_processing(None)?;
 
         const NUM_TICKETS: usize = 1;
         let (_, channel) = populate_db_with_ack_tickets(db_bob.clone(), NUM_TICKETS).await?;

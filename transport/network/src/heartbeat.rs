@@ -1,11 +1,12 @@
 use async_trait::async_trait;
 use futures::{
     future::{select, Either, FutureExt},
-    pin_mut, TryStreamExt,
+    pin_mut, StreamExt,
 };
 use hopr_db_api::peers::HoprDbPeersOperations;
 use hopr_primitive_types::traits::SaturatingSub;
 use libp2p_identity::PeerId;
+use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DurationSeconds};
 use validator::Validate;
@@ -27,7 +28,10 @@ lazy_static::lazy_static! {
 
 use hopr_platform::time::native::current_time;
 
-use crate::constants::{DEFAULT_HEARTBEAT_INTERVAL, DEFAULT_HEARTBEAT_INTERVAL_VARIANCE, DEFAULT_HEARTBEAT_THRESHOLD};
+use crate::constants::{
+    DEFAULT_HEARTBEAT_INTERVAL, DEFAULT_HEARTBEAT_INTERVAL_VARIANCE, DEFAULT_HEARTBEAT_THRESHOLD,
+    DEFAULT_MAX_PARALLEL_PINGS,
+};
 use crate::network::Network;
 use crate::ping::Pinging;
 
@@ -36,6 +40,12 @@ use crate::ping::Pinging;
 #[derive(Debug, Clone, Copy, PartialEq, smart_default::SmartDefault, Validate, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct HeartbeatConfig {
+    /// Maximum number of parallel probes performed by the heartbeat mechanism
+    #[validate(range(min = 0))]
+    #[default(default_max_parallel_pings())]
+    #[serde(default = "default_max_parallel_pings")]
+    pub max_parallel_probes: usize,
+
     /// Round-to-round variance to complicate network sync in seconds
     #[serde_as(as = "DurationSeconds<u64>")]
     #[serde(default = "default_heartbeat_variance")]
@@ -51,6 +61,11 @@ pub struct HeartbeatConfig {
     #[serde(default = "default_heartbeat_threshold")]
     #[default(default_heartbeat_threshold())]
     pub threshold: std::time::Duration,
+}
+
+#[inline]
+fn default_max_parallel_pings() -> usize {
+    DEFAULT_MAX_PARALLEL_PINGS
 }
 
 #[inline]
@@ -118,7 +133,7 @@ where
             .find_peers_to_ping(from_timestamp)
             .await
             .unwrap_or_else(|e| {
-                error!("Failed to generate peers for the heartbeat procedure: {e}");
+                error!(error = %e, "Failed to generate peers for the heartbeat procedure");
                 vec![]
             })
     }
@@ -157,13 +172,17 @@ impl<T: Pinging, API: HeartbeatExternalApi> Heartbeat<T, API> {
 
     #[tracing::instrument(level = "info", skip(self), fields(from_timestamp = tracing::field::debug(current_time())))]
     async fn perform_heartbeat_round(&mut self) {
-        #[cfg(all(feature = "prometheus", not(test)))]
-        let heartbeat_round_timer = histogram_start_measure!(METRIC_TIME_TO_HEARTBEAT);
-
         let start = current_time();
         let from_timestamp = start.checked_sub(self.config.threshold).unwrap_or(start);
 
-        let peers = self.external_api.get_peers(from_timestamp).await;
+        let mut peers = self.external_api.get_peers(from_timestamp).await;
+
+        // shuffle the peers to make sure that the order is different each heartbeat round
+        let mut rng = hopr_crypto_random::rng();
+        peers.shuffle(&mut rng);
+
+        #[cfg(all(feature = "prometheus", not(test)))]
+        let heartbeat_round_timer = histogram_start_measure!(METRIC_TIME_TO_HEARTBEAT);
 
         // random timeout to avoid network sync:
         let this_round_planned_duration = std::time::Duration::from_millis({
@@ -176,24 +195,29 @@ impl<T: Pinging, API: HeartbeatExternalApi> Heartbeat<T, API> {
             )
         });
 
+        let peers_contacted = peers.len();
         debug!(peers = tracing::field::debug(&peers), "Heartbeat round start");
         let timeout = (self.sleep_fn)(this_round_planned_duration).fuse();
         let ping_stream = self.pinger.ping(peers);
 
         pin_mut!(timeout, ping_stream);
 
-        match select(timeout, ping_stream.try_collect::<Vec<_>>().fuse()).await {
+        match select(timeout, ping_stream.collect::<Vec<_>>().fuse()).await {
             Either::Left(_) => debug!("Heartbeat round interrupted by timeout"),
-            Either::Right(_) => {
+            Either::Right((v, _)) => {
                 // We intentionally ignore any ping errors here
                 let this_round_actual_duration = current_time().saturating_sub(start);
                 let time_to_wait_for_next_round =
                     this_round_planned_duration.saturating_sub(this_round_actual_duration);
 
+                let ping_ok = v.iter().filter(|v| v.is_ok()).count();
                 info!(
                     round_duration_ms = tracing::field::debug(this_round_actual_duration.as_millis()),
                     time_til_next_round_ms = tracing::field::debug(time_to_wait_for_next_round.as_millis()),
-                    "Heartbeat round finished for all peers"
+                    peers_contacted,
+                    ping_ok,
+                    ping_fail = peers_contacted - ping_ok,
+                    "Heartbeat round finished"
                 );
 
                 (self.sleep_fn)(time_to_wait_for_next_round).await
@@ -230,6 +254,7 @@ mod tests {
             variance: std::time::Duration::from_millis(0u64),
             interval: std::time::Duration::from_millis(5u64),
             threshold: std::time::Duration::from_millis(0u64),
+            max_parallel_probes: 14,
         }
     }
 

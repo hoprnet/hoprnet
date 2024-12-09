@@ -133,7 +133,7 @@ where
 
         if destination.eq(&channel.channel.destination) {
             // We cannot use destination as last intermediate hop as
-            // this would be a loopback which does not give any privacy
+            // this would be a loopback that does not give any privacy
             return false;
         }
 
@@ -166,7 +166,7 @@ where
     /// that goes from `source` to `destination`. There does not need to be
     /// a payment channel to `destination`, so the path only includes intermediate hops.
     ///
-    /// Implements a randomized best-first search through the path space. The graph
+    /// The function implements a randomized best-first search through the path space. The graph
     /// traversal is bounded by `self.max_iterations` to prevent from long-running path
     /// selection runs.
     fn select_path(
@@ -207,15 +207,15 @@ where
                     );
                 }
 
-                if current_len >= min_hops && current_len <= max_hops {
-                    return Ok(ChannelPath::new_valid(current.path));
+                return if current_len >= min_hops && current_len <= max_hops {
+                    Ok(ChannelPath::new_valid(current.path))
                 } else {
-                    return Err(PathError::PathNotFound(
+                    Err(PathError::PathNotFound(
                         max_hops,
                         source.to_string(),
                         destination.to_string(),
-                    ));
-                }
+                    ))
+                };
             }
 
             let last_peer = *current.path.last().unwrap();
@@ -296,6 +296,7 @@ mod tests {
     }
 
     /// Quickly define a graph with edge weights.
+    ///
     /// Syntax:
     /// `0 [1] -> 1` => edge from `0` to `1` with edge weight `1`
     /// `0 <- [1] 1` => edge from `1` to `0` with edge weight `1`
@@ -412,8 +413,30 @@ mod tests {
     }
 
     #[test]
-    fn test_should_not_find_zero_path() {
+    fn test_should_not_find_zero_weight_path() {
         let isolated = define_graph("0 [0] -> 1", ADDRESSES[0], |_, _| 1_f64);
+
+        let selector = DfsPathSelector::<TestWeights>::default();
+
+        selector
+            .select_path(&isolated, ADDRESSES[0], ADDRESSES[5], 1, 1)
+            .expect_err("should not find a path");
+    }
+
+    #[test]
+    fn test_should_not_find_one_hop_path_when_unrelated_channels_are_in_the_graph() {
+        let isolated = define_graph("1 [1] -> 2", ADDRESSES[0], |_, _| 1_f64);
+
+        let selector = DfsPathSelector::<TestWeights>::default();
+
+        selector
+            .select_path(&isolated, ADDRESSES[0], ADDRESSES[5], 1, 1)
+            .expect_err("should not find a path");
+    }
+
+    #[test]
+    fn test_should_not_find_one_hop_path_in_empty_graph() {
+        let isolated = define_graph("", ADDRESSES[0], |_, _| 1_f64);
 
         let selector = DfsPathSelector::<TestWeights>::default();
 

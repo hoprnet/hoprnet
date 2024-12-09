@@ -5,13 +5,13 @@ use axum::{
 };
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
-use hopr_crypto_types::prelude::Hash;
-use hopr_lib::Address;
-use hopr_lib::{AsUnixTimestamp, Health, Multiaddr};
 use libp2p_identity::PeerId;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use std::{collections::HashMap, sync::Arc};
+
+use hopr_crypto_types::prelude::Hash;
+use hopr_lib::{Address, AsUnixTimestamp, GraphExportConfig, Health, Multiaddr, ToHex};
 
 use crate::{ApiError, ApiErrorStatus, InternalState, BASE_PATH};
 
@@ -23,7 +23,7 @@ pub(crate) struct NodeVersionResponse {
     version: String,
 }
 
-/// Get release version of the running node.
+/// Get the release version of the running node.
 #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/node/version"),
@@ -62,6 +62,9 @@ pub(super) async fn configuration(State(state): State<Arc<InternalState>>) -> im
 }
 
 #[derive(Debug, Clone, Deserialize, utoipa::ToSchema, utoipa::IntoParams)]
+#[schema(example = json!({
+        "quality": 0.7
+    }))]
 #[into_params(parameter_in = Query)]
 pub(crate) struct NodePeersQueryRequest {
     #[schema(required = false)]
@@ -70,6 +73,10 @@ pub(crate) struct NodePeersQueryRequest {
 }
 
 #[derive(Debug, Default, Clone, Serialize, utoipa::ToSchema)]
+#[schema(example = json!({
+    "sent": 10,
+    "success": 10
+}))]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct HeartbeatInfo {
     sent: u64,
@@ -100,6 +107,11 @@ pub(crate) struct PeerInfo {
 
 #[serde_as]
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
+#[schema(example = json!({
+    "peerId": "12D3KooWRWeaTozREYHzWTbuCYskdYhED1MXpDwTrmccwzFrd2mEA",
+    "peerAddress": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
+    "multiaddr": "/ip4/178.12.1.9/tcp/19092"
+}))]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct AnnouncedPeer {
     #[serde_as(as = "DisplayFromStr")]
@@ -158,7 +170,8 @@ pub(super) async fn peers(
 
             async move {
                 if let Ok(Some(info)) = hopr.network_peer_info(&peer).await {
-                    if info.get_average_quality() >= quality {
+                    let avg_quality = info.get_average_quality();
+                    if avg_quality >= quality {
                         Some((peer, info))
                     } else {
                         None
@@ -254,10 +267,60 @@ pub(super) async fn metrics() -> impl IntoResponse {
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 #[schema(example = json!({
+        "ignore_disconnected_components": true,
+        "ignore_non_opened_channels": true
+    }))]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct GraphExportRequest {
+    /// If set, nodes that are not connected to this node (via open channels) will not be exported.
+    /// This setting automatically implies `ignore_non_opened_channels`.
+    pub ignore_disconnected_components: bool,
+    /// Do not export channels that are not in the `Open` state.
+    pub ignore_non_opened_channels: bool,
+}
+
+impl From<GraphExportRequest> for GraphExportConfig {
+    fn from(value: GraphExportRequest) -> Self {
+        Self {
+            ignore_disconnected_components: value.ignore_disconnected_components,
+            ignore_non_opened_channels: value.ignore_non_opened_channels,
+        }
+    }
+}
+
+/// Retrieve node's channel graph in DOT (graphviz) format.
+#[utoipa::path(
+    get,
+    path = const_format::formatcp!("{BASE_PATH}/node/graph"),
+    request_body(
+            content = GraphExportRequest,
+            description = "Graph export configuration",
+            content_type = "application/json"),
+    responses(
+            (status = 200, description = "Fetched channel graph", body = String),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
+    ),
+    security(
+            ("api_token" = []),
+            ("bearer_token" = [])
+    ),
+    tag = "Node"
+)]
+pub(super) async fn channel_graph(
+    State(state): State<Arc<InternalState>>,
+    Json(args): Json<GraphExportRequest>,
+) -> impl IntoResponse {
+    (StatusCode::OK, state.hopr.export_channel_graph(args.into()).await).into_response()
+}
+
+#[serde_as]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+#[schema(example = json!({
         "announcedAddress": [
             "/ip4/10.0.2.100/tcp/19092"
         ],
         "chain": "anvil-localhost",
+        "provider": "http://127.0.0.1:8545",
         "channelClosurePeriod": 15,
         "connectivityStatus": "Green",
         "hoprChannels": "0x9a9f2ccfde556a7e9ff0848998aa4a0cfd8863ae",
@@ -285,6 +348,7 @@ pub(crate) struct NodeInfoResponse {
     #[schema(value_type = Vec<String>)]
     listening_address: Vec<Multiaddr>,
     chain: String,
+    provider: String,
     #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String)]
     hopr_token: Address,
@@ -337,8 +401,15 @@ pub(super) async fn info(State(state): State<Arc<InternalState>>) -> Result<impl
     let safe_config = hopr.get_safe_config();
     let network = hopr.network();
 
-    let (indexer_block, indexer_checksum, index_block_prev_checksum) = match hopr.get_indexer_state().await {
-        Ok(p) => (p.latest_block_number, p.checksum, p.block_prior_to_checksum_update),
+    let (indexer_block, indexer_checksum) = match hopr.get_indexer_state().await {
+        Ok(Some(slog)) => (
+            slog.block_number as u32,
+            match slog.checksum {
+                Some(checksum) => Hash::from_hex(checksum.as_str())?,
+                None => Hash::default(),
+            },
+        ),
+        Ok(None) => (0u32, Hash::default()),
         Err(error) => return Ok((StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(error)).into_response()),
     };
 
@@ -349,6 +420,7 @@ pub(super) async fn info(State(state): State<Arc<InternalState>>) -> Result<impl
                 announced_address: hopr.local_multiaddresses(),
                 listening_address: hopr.local_multiaddresses(),
                 chain: chain_config.id,
+                provider: hopr.get_provider(),
                 hopr_token: chain_config.token,
                 hopr_channels: chain_config.channels,
                 hopr_network_registry: chain_config.network_registry,
@@ -360,7 +432,9 @@ pub(super) async fn info(State(state): State<Arc<InternalState>>) -> Result<impl
                 channel_closure_period: channel_closure_notice_period.as_secs(),
                 indexer_block,
                 indexer_checksum,
-                index_block_prev_checksum,
+                // FIXME: this is only done for backwards-compatibility, ideally we don't return
+                // this value
+                index_block_prev_checksum: indexer_block,
             };
 
             Ok((StatusCode::OK, Json(body)).into_response())

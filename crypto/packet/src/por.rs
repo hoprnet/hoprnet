@@ -27,7 +27,9 @@ impl ProofOfRelayValues {
         let s1 = derive_ack_key_share(secret_c.unwrap_or(&SharedSecret::random()));
 
         Self {
+            // ack_challenge = s0_ack * G
             ack_challenge: derive_ack_key_share(secret_b).to_challenge(),
+            // ticket challenge (s0_own + s1_ack) * G
             ticket_challenge: Response::from_half_keys(&s0, &s1)
                 .expect("failed to derive response")
                 .to_challenge(),
@@ -45,17 +47,17 @@ pub struct ProofOfRelayString {
 }
 
 impl ProofOfRelayString {
-    /// Creates instance from the shared secrets with node+2 and node+3
+    /// Creates an instance from the shared secrets with node+2 and node+3
     pub fn new(secret_c: &SharedSecret, secret_d: Option<&SharedSecret>) -> Self {
-        let s0 = derive_ack_key_share(secret_c);
-        let s1 = derive_own_key_share(secret_c);
-        let s2 = derive_ack_key_share(secret_d.unwrap_or(&SharedSecret::random()));
+        let s0 = derive_ack_key_share(secret_c); // s0_ack
+        let s1 = derive_own_key_share(secret_c); // s1_own
+        let s2 = derive_ack_key_share(secret_d.unwrap_or(&SharedSecret::random())); // s2_ack
 
         Self {
-            next_ticket_challenge: Response::from_half_keys(&s1, &s2)
+            next_ticket_challenge: Response::from_half_keys(&s1, &s2) // (s1_own + s2_ack) * G
                 .expect("failed to derive response")
                 .to_challenge(),
-            hint: s0.to_challenge(),
+            hint: s0.to_challenge(), // s0_ack * G
         }
     }
 
@@ -79,7 +81,7 @@ impl TryFrom<&[u8]> for ProofOfRelayString {
                 hint: HalfKeyChallenge::new(hint),
             })
         } else {
-            Err(GeneralError::ParseError)
+            Err(GeneralError::ParseError("ProofOfRelayString".into()))
         }
     }
 }
@@ -144,7 +146,7 @@ pub fn validate_por_half_keys(ethereum_challenge: &EthereumChallenge, own_key: &
     Response::from_half_keys(own_key, ack)
         .map(|response| validate_por_response(ethereum_challenge, &response))
         .unwrap_or_else(|e| {
-            error!("failed to validate por half keys: {e}");
+            error!(error = %e, "failed to validate por half keys");
             false
         })
 }
@@ -159,7 +161,7 @@ pub fn validate_por_hint(ethereum_challenge: &EthereumChallenge, own_share: &Hal
     Challenge::from_own_share_and_half_key(own_share, ack)
         .map(|c| c.to_ethereum_challenge().eq(ethereum_challenge))
         .unwrap_or_else(|e| {
-            error!("failed to validate por hint: {e}");
+            error!(error = %e,"failed to validate por hint");
             false
         })
 }

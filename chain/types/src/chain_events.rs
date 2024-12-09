@@ -60,7 +60,7 @@ pub enum ChainEventType {
     /// Channel balance has decreased by an amount.
     ChannelBalanceDecreased(ChannelEntry, Balance),
     /// Ticket has been redeemed on a channel.
-    /// If the channel is node's own, also contains the ticket that has been redeemed.
+    /// If the channel is a node's own, it also contains the ticket that has been redeemed.
     TicketRedeemed(ChannelEntry, Option<AcknowledgedTicket>),
     /// Safe has been registered with the node.
     NodeSafeRegistered(Address),

@@ -6,6 +6,13 @@ use std::fmt::{Display, Formatter};
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash, serde::Serialize, serde::Deserialize)]
 pub struct BoundedSize<const B: usize>(usize);
 
+impl<const B: usize> BoundedSize<B> {
+    /// Minimum value - evaluates to 0.
+    pub const MIN: Self = Self(0);
+    /// Maximum value - evaluates to `B`.
+    pub const MAX: Self = Self(B);
+}
+
 impl<const B: usize> TryFrom<u8> for BoundedSize<B> {
     type Error = GeneralError;
 
@@ -131,7 +138,7 @@ impl<const B: usize> From<BoundedSize<B>> for usize {
 }
 
 /// Wrapper for [`Vec`] that has an explicit upper bound on the number of elements.
-/// Structure remains heap-allocated to avoid blowing up the size of types where it is used.
+/// The Structure remains heap-allocated to avoid blowing up the size of types where it is used.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct BoundedVec<T, const N: usize>(Vec<T>);
 
@@ -200,6 +207,9 @@ mod tests {
 
     #[test]
     fn bounded_size_should_not_allow_bigger_numbers() {
+        assert_eq!(0usize, BoundedSize::<10>::MIN.into());
+        assert_eq!(10usize, BoundedSize::<10>::MAX.into());
+
         assert!(BoundedSize::<10>::try_from(5).is_ok_and(|b| u8::from(b) == 5));
         assert!(BoundedSize::<10>::try_from(11).is_err());
     }

@@ -1,6 +1,6 @@
 [package]
 name = "hopr-primitive-types"
-version = "0.4.0"
+version = "0.5.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Generic types used through the entire code base"
@@ -15,11 +15,13 @@ crate-type = ["rlib"]
 float-cmp = { workspace = true }
 hex = { workspace = true }
 primitive-types = { workspace = true }
-rlp = "0.5.2"                          # TODO: remove in 3.0
+# TODO: remove rlp in 3.0
+rlp = "0.5.2"
 regex = { workspace = true }
 strum = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
+chrono = { workspace = true, features = ["serde"] }
 
 hopr-crypto-random = { workspace = true }
 

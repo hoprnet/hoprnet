@@ -1,12 +1,20 @@
+use std::collections::HashSet;
+use std::net::{IpAddr, SocketAddr};
 use std::str::FromStr;
+use std::time::Duration;
+
+use hopr_lib::{config::HoprLibConfig, Address, HostConfig, HostType, ProtocolsConfig};
+use hopr_platform::file::native::read_to_string;
+use hoprd_api::config::{Api, Auth};
+use hoprd_inbox::config::MessageInboxConfiguration;
 
 use proc_macro_regex::regex;
 use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
+use tracing::{debug, warn};
 use validator::{Validate, ValidationError};
 
-use hopr_lib::{config::HoprLibConfig, Address, HostConfig, ProtocolsConfig};
-use hoprd_api::config::{Api, Auth};
-use hoprd_inbox::config::MessageInboxConfiguration;
+use crate::errors::HoprdError;
 
 pub const DEFAULT_HOST: &str = "0.0.0.0";
 pub const DEFAULT_PORT: u16 = 9091;
@@ -15,8 +23,8 @@ pub const DEFAULT_SAFE_TRANSACTION_SERVICE_PROVIDER: &str = "https://safe-transa
 
 // Validate that the path is a valid UTF-8 path.
 //
-// Also used to perform the identitify file existence check on the
-// specified path, which is now circumvented, but could
+// Also used to perform the identity file existence check on the
+// specified path, which is now circumvented but could
 // return in the future workflows of setting up a node.
 fn validate_file_path(_s: &str) -> Result<(), ValidationError> {
     Ok(())
@@ -105,6 +113,10 @@ pub struct HoprdConfig {
     #[validate(nested)]
     #[serde(default)]
     pub api: Api,
+    /// Configuration of the Session entry/exit node IP protocol forwarding.
+    #[validate(nested)]
+    #[serde(default)]
+    pub session_ip_forwarding: SessionIpForwardingConfig,
 }
 
 impl From<HoprdConfig> for HoprLibConfig {
@@ -112,12 +124,6 @@ impl From<HoprdConfig> for HoprLibConfig {
         val.hopr
     }
 }
-
-use hopr_platform::file::native::read_to_string;
-
-use tracing::{debug, warn};
-
-use crate::errors::HoprdError;
 
 impl HoprdConfig {
     pub fn from_cli_args(cli_args: crate::cli::CliArgs, skip_validation: bool) -> crate::errors::Result<HoprdConfig> {
@@ -143,6 +149,15 @@ impl HoprdConfig {
         }
         if cli_args.test_prefer_local_addresses > 0 {
             cfg.hopr.transport.prefer_local_addresses = true;
+        }
+
+        if let Some(host) = cli_args.default_session_listen_host {
+            cfg.session_ip_forwarding.default_entry_listen_host = match host.address {
+                HostType::IPv4(addr) => IpAddr::from_str(&addr)
+                    .map(|ip| std::net::SocketAddr::new(ip, host.port))
+                    .map_err(|_| HoprdError::ConfigError("invalid default session listen IP address".into())),
+                HostType::Domain(_) => Err(HoprdError::ConfigError("default session listen must be an IP".into())),
+            }?;
         }
 
         // db
@@ -260,15 +275,19 @@ impl HoprdConfig {
         }
 
         if let Some(x) = cli_args.max_block_range {
-            // Override all max_block_range setting in all networks
+            // Override all max_block_range settings in all networks
             for (_, n) in cfg.hopr.chain.protocols.networks.iter_mut() {
                 n.max_block_range = x;
             }
         }
 
-        if cli_args.check_unrealized_balance == 0 {
-            cfg.hopr.chain.check_unrealized_balance = true;
-        }
+        // The --no*/--disable* CLI flags are Count-based, therefore, if they equal to 0,
+        // it means they have not been specified on the CLI and thus the
+        // corresponding config value should be enabled.
+
+        cfg.hopr.chain.check_unrealized_balance = cli_args.no_check_unrealized_balance == 0;
+        cfg.hopr.chain.fast_sync = cli_args.no_fast_sync == 0;
+        cfg.hopr.chain.keep_logs = cli_args.no_keep_logs == 0;
 
         // safe module
         if let Some(x) = cli_args.safe_transaction_service_provider {
@@ -345,6 +364,57 @@ impl HoprdConfig {
 
         serde_json::to_string(&redacted_cfg).map_err(|e| crate::errors::HoprdError::SerializationError(e.to_string()))
     }
+}
+
+fn default_target_retry_delay() -> Duration {
+    Duration::from_secs(2)
+}
+
+fn default_entry_listen_host() -> SocketAddr {
+    "127.0.0.1:0".parse().unwrap()
+}
+
+fn default_max_tcp_target_retries() -> u32 {
+    10
+}
+
+/// Configuration of the Exit node (see [`HoprServerIpForwardingReactor`]) and the Entry node.
+#[serde_as]
+#[derive(
+    Clone, Debug, Eq, PartialEq, smart_default::SmartDefault, serde::Deserialize, serde::Serialize, validator::Validate,
+)]
+pub struct SessionIpForwardingConfig {
+    /// If specified, enforces only the given target addresses (after DNS resolution).
+    /// If `None` is specified, allows all targets.
+    ///
+    /// Defaults to `None`.
+    #[serde(default)]
+    #[default(None)]
+    #[serde_as(as = "Option<HashSet<serde_with::DisplayFromStr>>")]
+    pub target_allow_list: Option<HashSet<SocketAddr>>,
+
+    /// Delay between retries in seconds to reach a TCP target.
+    ///
+    /// Defaults to 2 seconds.
+    #[serde(default = "default_target_retry_delay")]
+    #[default(default_target_retry_delay())]
+    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    pub tcp_target_retry_delay: Duration,
+
+    /// Maximum number of retries to reach a TCP target before giving up.
+    ///
+    /// Default is 10.
+    #[serde(default = "default_max_tcp_target_retries")]
+    #[default(default_max_tcp_target_retries())]
+    #[validate(range(min = 1))]
+    pub max_tcp_target_retries: u32,
+
+    /// Specifies the default `listen_host` for Session listening sockets
+    /// at an Entry node.
+    #[serde(default = "default_entry_listen_host")]
+    #[default(default_entry_listen_host())]
+    #[serde_as(as = "serde_with::DisplayFromStr")]
+    pub default_entry_listen_host: SocketAddr,
 }
 
 #[cfg(test)]

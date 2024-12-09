@@ -1,27 +1,37 @@
-use std::io::ErrorKind;
-use std::net::IpAddr;
-use std::sync::Arc;
+use std::fmt::Formatter;
+use std::future::Future;
+use std::str::FromStr;
 
-use crate::{ApiErrorStatus, InternalState, ListenerId, BASE_PATH};
 use axum::extract::Path;
+use axum::Error;
 use axum::{
-    extract::{Json, State},
+    extract::{
+        ws::{Message, WebSocket, WebSocketUpgrade},
+        Json, State,
+    },
     http::status::StatusCode,
     response::IntoResponse,
 };
-use futures::{StreamExt, TryStreamExt};
-use hopr_lib::errors::HoprLibError;
-use hopr_lib::transfer_session;
-use hopr_lib::{HoprSession, IpProtocol, PeerId, RoutingOptions, SessionCapability, SessionClientConfig};
-use hopr_network_types::prelude::ConnectedUdpStream;
-use hopr_network_types::udp::ForeignDataMode;
+use axum_extra::extract::Query;
+use base64::Engine;
+use futures::{AsyncReadExt, AsyncWriteExt, SinkExt, StreamExt, TryStreamExt};
+use futures_concurrency::stream::Merge;
+use libp2p_identity::PeerId;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
+use std::net::IpAddr;
+use std::sync::Arc;
 use tokio::net::TcpListener;
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, trace};
 
-/// Default listening host the session listener socket binds to.
-pub const DEFAULT_LISTEN_HOST: &str = "127.0.0.1:0";
+use crate::types::PeerOrAddress;
+use crate::{ApiErrorStatus, InternalState, ListenerId, BASE_PATH};
+use hopr_lib::errors::HoprLibError;
+use hopr_lib::transfer_session;
+use hopr_lib::{HoprSession, IpProtocol, RoutingOptions, SessionCapability, SessionClientConfig};
+use hopr_network_types::prelude::{ConnectedUdpStream, IpOrHost, SealedHost, UdpStreamParallelism};
+use hopr_network_types::udp::ForeignDataMode;
+use hopr_network_types::utils::AsyncReadStreamer;
 
 /// Size of the buffer for forwarding data to/from a TCP stream.
 pub const HOPR_TCP_BUFFER_SIZE: usize = 4096;
@@ -42,24 +52,266 @@ lazy_static::lazy_static! {
 }
 
 #[serde_as]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum SessionTargetSpec {
+    Plain(String),
+    Sealed(#[serde_as(as = "serde_with::base64::Base64")] Vec<u8>),
+}
+
+impl std::fmt::Display for SessionTargetSpec {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SessionTargetSpec::Plain(t) => write!(f, "{t}"),
+            SessionTargetSpec::Sealed(t) => write!(f, "$${}", base64::prelude::BASE64_URL_SAFE.encode(t)),
+        }
+    }
+}
+
+impl std::str::FromStr for SessionTargetSpec {
+    type Err = HoprLibError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(if let Some(stripped) = s.strip_prefix("$$") {
+            Self::Sealed(
+                base64::prelude::BASE64_URL_SAFE
+                    .decode(stripped)
+                    .map_err(|e| HoprLibError::GeneralError(e.to_string()))?,
+            )
+        } else {
+            Self::Plain(s.to_owned())
+        })
+    }
+}
+
+impl TryFrom<SessionTargetSpec> for SealedHost {
+    type Error = HoprLibError;
+
+    fn try_from(value: SessionTargetSpec) -> Result<Self, Self::Error> {
+        match value {
+            SessionTargetSpec::Plain(plain) => IpOrHost::from_str(&plain)
+                .map(SealedHost::from)
+                .map_err(|e| HoprLibError::GeneralError(e.to_string())),
+            SessionTargetSpec::Sealed(enc) => Ok(SealedHost::Sealed(enc.into_boxed_slice())),
+        }
+    }
+}
+
+#[serde_as]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::IntoParams, utoipa::ToSchema)]
+#[into_params(parameter_in = Query)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct SessionWebsocketClientQueryRequest {
+    #[schema(required = true)]
+    #[serde_as(as = "DisplayFromStr")]
+    pub destination: PeerId,
+    #[schema(required = true)]
+    pub hops: u8,
+    #[cfg(feature = "explicit-path")]
+    #[schema(required = false)]
+    pub path: Option<String>,
+    #[schema(required = true)]
+    #[serde_as(as = "Vec<DisplayFromStr>")]
+    pub capabilities: Vec<SessionCapability>,
+    #[schema(required = true)]
+    #[serde_as(as = "DisplayFromStr")]
+    pub target: SessionTargetSpec,
+    #[schema(required = false)]
+    #[serde(default = "default_protocol")]
+    pub protocol: IpProtocol,
+}
+
+#[inline]
+fn default_protocol() -> IpProtocol {
+    IpProtocol::TCP
+}
+
+impl SessionWebsocketClientQueryRequest {
+    pub(crate) fn into_protocol_session_config(self) -> Result<SessionClientConfig, HoprLibError> {
+        #[cfg(not(feature = "explicit-path"))]
+        let path_options = RoutingOptions::Hops((self.hops as u32).try_into()?);
+
+        #[cfg(feature = "explicit-path")]
+        let path_options = if let Some(path) = self.path {
+            // Explicit `path` will override `hops`
+            RoutingOptions::IntermediatePath(
+                path.split(',')
+                    .map(PeerId::from_str)
+                    .collect::<Result<Vec<PeerId>, _>>()
+                    .map_err(|e| HoprLibError::GeneralError(format!("invalid peer id on path: {e}")))?
+                    .try_into()?,
+            )
+        } else {
+            RoutingOptions::Hops((self.hops as u32).try_into()?)
+        };
+
+        Ok(SessionClientConfig {
+            peer: self.destination,
+            path_options,
+            target_protocol: self.protocol,
+            target: self.target.try_into()?,
+            capabilities: self.capabilities,
+        })
+    }
+}
+
+#[derive(Debug, Default, Clone, Deserialize, utoipa::ToSchema)]
+#[schema(value_type = String, format = Binary)]
+#[allow(dead_code)] // not dead code, just for codegen
+struct WssData(Vec<u8>);
+
+/// Websocket endpoint exposing a binary socket-like connection to a peer through websockets using underlying HOPR sessions.
+///
+/// Once configured, the session represents and automatically managed connection to a target peer through a network routing
+/// configuration. The session can be used to send and receive binary data over the network.
+///
+/// Authentication (if enabled) is done by cookie `X-Auth-Token`.
+///
+/// Connect to the endpoint by using a WS client. No preview available. Example: `ws://127.0.0.1:3001/api/v3/session/websocket
+#[allow(dead_code)] // not dead code, just for documentation
+#[utoipa::path(
+        get,
+        path = const_format::formatcp!("{BASE_PATH}/session/websocket"),
+        params(SessionWebsocketClientQueryRequest),
+        responses(
+            (status = 200, description = "Successfully created a new client websocket session."),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
+            (status = 422, description = "Unknown failure", body = ApiError),
+            (status = 429, description = "Too many open websocket connections.", body = ApiError),
+        ),
+        security(
+            ("api_token" = []),
+            ("bearer_token" = [])
+        ),
+        tag = "Session",
+    )]
+
+pub(crate) async fn websocket(
+    ws: WebSocketUpgrade,
+    Query(query): Query<SessionWebsocketClientQueryRequest>,
+    State(state): State<Arc<InternalState>>,
+) -> Result<impl IntoResponse, impl IntoResponse> {
+    let data = query.into_protocol_session_config().map_err(|e| {
+        (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            ApiErrorStatus::UnknownFailure(e.to_string()),
+        )
+    })?;
+
+    let hopr = state.hopr.clone();
+    let session: HoprSession = hopr.connect_to(data).await.map_err(|e| {
+        error!(error = %e, "Failed to establish session");
+        (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            ApiErrorStatus::UnknownFailure(e.to_string()),
+        )
+    })?;
+
+    Ok::<_, (StatusCode, ApiErrorStatus)>(ws.on_upgrade(move |socket| websocket_connection(socket, session)))
+}
+
+enum WebSocketInput {
+    Network(Result<Box<[u8]>, std::io::Error>),
+    WsInput(Result<Message, Error>),
+}
+
+/// The maximum number of bytes read from a Session that WS can transfer within a single message.
+const WS_MAX_SESSION_READ_SIZE: usize = 4096;
+
+#[tracing::instrument(level = "debug", skip(socket, session))]
+async fn websocket_connection(socket: WebSocket, session: HoprSession) {
+    let session_id = *session.id();
+
+    let (rx, mut tx) = session.split();
+    let (mut sender, receiver) = socket.split();
+
+    let mut queue = (
+        receiver.map(WebSocketInput::WsInput),
+        AsyncReadStreamer::<WS_MAX_SESSION_READ_SIZE, _>(rx).map(WebSocketInput::Network),
+    )
+        .merge();
+
+    let (mut bytes_to_session, mut bytes_from_session) = (0, 0);
+
+    while let Some(v) = queue.next().await {
+        match v {
+            WebSocketInput::Network(bytes) => match bytes {
+                Ok(bytes) => {
+                    let len = bytes.len();
+                    if let Err(e) = sender.send(Message::Binary(bytes.into())).await {
+                        error!(
+                            error = %e,
+                            "Failed to emit read data onto the websocket, closing connection"
+                        );
+                        break;
+                    };
+                    bytes_from_session += len;
+                }
+                Err(e) => {
+                    error!(
+                        error = %e,
+                        "Failed to push data from network to socket, closing connection"
+                    );
+                    break;
+                }
+            },
+            WebSocketInput::WsInput(ws_in) => match ws_in {
+                Ok(Message::Binary(data)) => {
+                    let len = data.len();
+                    if let Err(e) = tx.write(data.as_ref()).await {
+                        error!(error = %e, "Failed to write data to the session, closing connection");
+                        break;
+                    }
+                    bytes_to_session += len;
+                }
+                Ok(Message::Text(_)) => {
+                    error!("Received string instead of binary data, closing connection");
+                    break;
+                }
+                Ok(Message::Close(_)) => {
+                    debug!("Received close frame, closing connection");
+                    break;
+                }
+                Ok(m) => trace!(message = ?m, "skipping an unsupported websocket message"),
+                Err(e) => {
+                    error!(error = %e, "Failed to get a valid websocket message, closing connection");
+                    break;
+                }
+            },
+        }
+    }
+
+    info!(%session_id, bytes_from_session, bytes_to_session, "WS session connection ended");
+}
+
+#[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 #[schema(example = json!({
         "destination": "12D3KooWR4uwjKCDCAY1xsEFB4esuWLF9Q5ijYvCjz5PNkTbnu33",
         "path": {
             "Hops": 1
         },
-        "target": "localhost:8080",
+        "target": {"Plain": "localhost:8080"},
         "listenHost": "127.0.0.1:10000",
         "capabilities": ["Retransmission", "Segmentation"]
     }))]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct SessionClientRequest {
+    /// Peer ID of the Exit node.
     #[serde_as(as = "DisplayFromStr")]
-    pub destination: PeerId,
+    pub destination: PeerOrAddress,
+    /// HOPR routing options for the Session.
     pub path: RoutingOptions,
-    pub target: String,
+    /// Session target specification.
+    pub target: SessionTargetSpec,
+    /// Listen host (`ip:port`) for the Session socket at the Entry node.
+    ///
+    /// Supports also partial specification (only `ip` or only `:port`) with the
+    /// respective part replaced by the node's configured default.
     pub listen_host: Option<String>,
     #[serde_as(as = "Option<Vec<DisplayFromStr>>")]
+    /// Capabilities for the Session protocol.
+    ///
+    /// Defaults to `Segmentation` and `Retransmission` for TCP and nothing for UDP.
     pub capabilities: Option<Vec<SessionCapability>>,
 }
 
@@ -68,14 +320,23 @@ impl SessionClientRequest {
         self,
         target_protocol: IpProtocol,
     ) -> Result<SessionClientConfig, HoprLibError> {
+        let peer = match self.destination {
+            PeerOrAddress::PeerId(peer_id) => peer_id,
+            PeerOrAddress::Address(address) => {
+                return Err(HoprLibError::GeneralError(format!("invalid destination: {}", address)))
+            }
+        };
+
+        #[cfg(not(feature = "explicit-path"))]
+        if matches!(&self.path, RoutingOptions::IntermediatePath(_)) {
+            return Err(HoprLibError::GeneralError("explicit paths are not allowed".into()));
+        }
+
         Ok(SessionClientConfig {
-            peer: self.destination,
+            peer,
             path_options: self.path,
             target_protocol,
-            target: self
-                .target
-                .parse()
-                .map_err(|e| HoprLibError::GeneralError(format!("target host parse error: {e}")))?,
+            target: self.target.try_into()?,
             capabilities: self.capabilities.unwrap_or_else(|| match target_protocol {
                 IpProtocol::TCP => {
                     vec![SessionCapability::Retransmission, SessionCapability::Segmentation]
@@ -104,7 +365,35 @@ pub(crate) struct SessionClientResponse {
     pub port: u16,
 }
 
-/// Creates a new client session returning the given session listening host & port over TCP or UDP.
+/// This function first tries to parse `requested` as the `ip:port` host pair.
+/// If that does not work, it tries to parse `requested` as a single IP address
+/// and as a `:` prefixed port number. Whichever of those fails, is replaced by the corresponding
+/// part from the given `default`.
+fn build_binding_host(requested: Option<&str>, default: std::net::SocketAddr) -> std::net::SocketAddr {
+    match requested.map(|r| std::net::SocketAddr::from_str(r).map_err(|_| r)) {
+        Some(Err(requested)) => {
+            // If the requested host is not parseable as a whole as `SocketAddr`, try only its parts
+            debug!(requested, %default, "using partially default listen host");
+            std::net::SocketAddr::new(
+                requested.parse().unwrap_or(default.ip()),
+                requested
+                    .strip_prefix(":")
+                    .and_then(|p| u16::from_str(p).ok())
+                    .unwrap_or(default.port()),
+            )
+        }
+        Some(Ok(requested)) => {
+            debug!(%requested, "using requested listen host");
+            requested
+        }
+        None => {
+            debug!(%default, "using default listen host");
+            default
+        }
+    }
+}
+
+/// Creates a new client session returning the given session listening host and port over TCP or UDP.
 /// If no listening port is given in the request, the socket will be bound to a random free
 /// port and returned in the response.
 /// Different capabilities can be configured for the session, such as data segmentation or
@@ -124,7 +413,7 @@ pub(crate) struct SessionClientResponse {
         post,
         path = const_format::formatcp!("{BASE_PATH}/session/{{protocol}}"),
         params(
-                ("protocol" = String, Path, description = "IP transport protocol")
+            ("protocol" = String, Path, description = "IP transport protocol")
         ),
         request_body(
             content = SessionClientRequest,
@@ -148,17 +437,7 @@ pub(crate) async fn create_client(
     Path(protocol): Path<IpProtocol>,
     Json(args): Json<SessionClientRequest>,
 ) -> Result<impl IntoResponse, impl IntoResponse> {
-    let bind_host: std::net::SocketAddr = args
-        .listen_host
-        .clone()
-        .unwrap_or(DEFAULT_LISTEN_HOST.to_string())
-        .parse()
-        .map_err(|_| {
-            (
-                StatusCode::UNPROCESSABLE_ENTITY,
-                ApiErrorStatus::UnknownFailure("invalid listening host".into()),
-            )
-        })?;
+    let bind_host: std::net::SocketAddr = build_binding_host(args.listen_host.as_deref(), state.default_listen_host);
 
     if bind_host.port() > 0
         && state
@@ -178,16 +457,14 @@ pub(crate) async fn create_client(
         )
     })?;
 
-    // TODO: make this retry strategy configurable
-    let session_init_retry_strategy = tokio_retry::strategy::ExponentialBackoff::from_millis(1000).take(3);
-
     // TODO: consider pooling the sessions on a listener, so that the negotiation is amortized
 
     debug!("binding {protocol} session listening socket to {bind_host}");
     let bound_host = match protocol {
         IpProtocol::TCP => {
+            // Bind the TCP socket first
             let (bound_host, tcp_listener) = tcp_listen_on(bind_host).await.map_err(|e| {
-                if e.kind() == ErrorKind::AddrInUse {
+                if e.kind() == std::io::ErrorKind::AddrInUse {
                     (StatusCode::CONFLICT, ApiErrorStatus::InvalidInput)
                 } else {
                     (
@@ -196,8 +473,10 @@ pub(crate) async fn create_client(
                     )
                 }
             })?;
-            info!("TCP session listener bound to {bound_host}");
+            info!(%bound_host, "TCP session listener bound");
 
+            // For each new TCP connection coming to the listener,
+            // open a Session with the same parameters
             let hopr = state.hopr.clone();
             let jh = hopr_async_runtime::prelude::spawn(
                 tokio_stream::wrappers::TcpListenerStream::new(tcp_listener)
@@ -205,31 +484,22 @@ pub(crate) async fn create_client(
                     .for_each_concurrent(None, move |accepted_client| {
                         let data = data.clone();
                         let hopr = hopr.clone();
-                        let session_init_retry_strategy = session_init_retry_strategy.clone();
                         async move {
                             match accepted_client {
                                 Ok((sock_addr, stream)) => {
-                                    debug!("incoming TCP connection {sock_addr}");
-                                    let session_init =
-                                        tokio_retry::Retry::spawn(session_init_retry_strategy, move || {
-                                            let hopr = hopr.clone();
-                                            let data = data.clone();
-                                            async move {
-                                                debug!("trying tcp session establishment");
-                                                hopr.connect_to(data).await
-                                            }
-                                        });
-                                    let session = match session_init.await {
+                                    debug!(socket = ?sock_addr, "incoming TCP connection");
+                                    let session = match hopr.connect_to(data).await {
                                         Ok(s) => s,
                                         Err(e) => {
-                                            error!("failed to establish session: {e}");
+                                            error!(error = %e, "failed to establish session");
                                             return;
                                         }
                                     };
 
                                     debug!(
+                                        socket = ?sock_addr,
                                         session_id = tracing::field::debug(*session.id()),
-                                        "new session for incoming TCP connection from {sock_addr}",
+                                        "new session for incoming TCP connection",
                                     );
 
                                     #[cfg(all(feature = "prometheus", not(test)))]
@@ -240,7 +510,7 @@ pub(crate) async fn create_client(
                                     #[cfg(all(feature = "prometheus", not(test)))]
                                     METRIC_ACTIVE_CLIENTS.decrement(&["tcp"], 1.0);
                                 }
-                                Err(e) => error!("failed to accept connection: {e}"),
+                                Err(e) => error!(error = %e, "failed to accept connection"),
                             }
                         }
                     }),
@@ -254,24 +524,9 @@ pub(crate) async fn create_client(
             bound_host
         }
         IpProtocol::UDP => {
-            let hopr = state.hopr.clone();
-            let session_init = tokio_retry::Retry::spawn(session_init_retry_strategy.clone(), move || {
-                let hopr = hopr.clone();
-                let data = data.clone();
-                async move {
-                    debug!("trying udp session establishment");
-                    hopr.connect_to(data).await
-                }
-            });
-            let session = session_init.await.map_err(|e| {
-                (
-                    StatusCode::UNPROCESSABLE_ENTITY,
-                    ApiErrorStatus::UnknownFailure(e.to_string()),
-                )
-            })?;
-
+            // Bind the UDP socket first
             let (bound_host, udp_socket) = udp_bind_to(bind_host).await.map_err(|e| {
-                if e.kind() == ErrorKind::AddrInUse {
+                if e.kind() == std::io::ErrorKind::AddrInUse {
                     (
                         StatusCode::CONFLICT,
                         ApiErrorStatus::UnknownFailure(format!("cannot bind to: {bind_host}: {e}")),
@@ -284,10 +539,23 @@ pub(crate) async fn create_client(
                 }
             })?;
 
-            info!("UDP session listener bound to {bound_host}");
+            info!(%bound_host, "UDP session listener bound");
+
+            let hopr = state.hopr.clone();
+
+            // Create a single session for the UDP socket
+            let session = hopr.connect_to(data).await.map_err(|e| {
+                (
+                    StatusCode::UNPROCESSABLE_ENTITY,
+                    ApiErrorStatus::UnknownFailure(e.to_string()),
+                )
+            })?;
+
+            let open_listeners_clone = state.open_listeners.clone();
+            let listener_id = ListenerId(protocol, bound_host);
 
             state.open_listeners.write().await.insert(
-                ListenerId(protocol, bound_host),
+                listener_id,
                 (
                     target.clone(),
                     hopr_async_runtime::prelude::spawn(async move {
@@ -298,6 +566,9 @@ pub(crate) async fn create_client(
 
                         #[cfg(all(feature = "prometheus", not(test)))]
                         METRIC_ACTIVE_CLIENTS.decrement(&["udp"], 1.0);
+
+                        // Once the Session closes, remove it from the list
+                        open_listeners_clone.write().await.remove(&listener_id);
                     }),
                 ),
             );
@@ -310,7 +581,7 @@ pub(crate) async fn create_client(
             StatusCode::OK,
             Json(SessionClientResponse {
                 protocol,
-                target,
+                target: target.to_string(),
                 ip: bound_host.ip().to_string(),
                 port: bound_host.port(),
             }),
@@ -350,7 +621,7 @@ pub(crate) async fn list_clients(
         .filter(|(id, _)| id.0 == protocol)
         .map(|(id, (target, _))| SessionClientResponse {
             protocol,
-            target: target.clone(),
+            target: target.to_string(),
             ip: id.1.ip().to_string(),
             port: id.1.port(),
         })
@@ -436,22 +707,93 @@ pub(crate) async fn close_client(
     Ok::<_, (StatusCode, ApiErrorStatus)>((StatusCode::NO_CONTENT, "").into_response())
 }
 
-async fn tcp_listen_on<A: std::net::ToSocketAddrs>(address: A) -> std::io::Result<(std::net::SocketAddr, TcpListener)> {
-    let tcp_listener = TcpListener::bind(address.to_socket_addrs()?.collect::<Vec<_>>().as_slice()).await?;
+async fn try_restricted_bind<'a, F, S, Fut>(
+    addrs: Vec<std::net::SocketAddr>,
+    range_str: &str,
+    binder: F,
+) -> std::io::Result<S>
+where
+    F: Fn(Vec<std::net::SocketAddr>) -> Fut,
+    Fut: Future<Output = std::io::Result<S>>,
+{
+    if addrs.is_empty() {
+        return Err(std::io::Error::other("no valid socket addresses found"));
+    }
 
+    let range = range_str
+        .split_once(":")
+        .and_then(
+            |(a, b)| match u16::from_str(a).and_then(|a| Ok((a, u16::from_str(b)?))) {
+                Ok((a, b)) if a <= b => Some(a..=b),
+                _ => None,
+            },
+        )
+        .ok_or(std::io::Error::other(format!("invalid port range {range_str}")))?;
+
+    for port in range {
+        let addrs = addrs
+            .iter()
+            .map(|addr| std::net::SocketAddr::new(addr.ip(), port))
+            .collect::<Vec<_>>();
+        match binder(addrs).await {
+            Ok(listener) => return Ok(listener),
+            Err(error) => debug!(%error, "listen address not usable"),
+        }
+    }
+
+    Err(std::io::Error::new(
+        std::io::ErrorKind::AddrNotAvailable,
+        format!("no valid socket addresses found within range: {range_str}"),
+    ))
+}
+
+async fn tcp_listen_on<A: std::net::ToSocketAddrs>(address: A) -> std::io::Result<(std::net::SocketAddr, TcpListener)> {
+    let addrs = address.to_socket_addrs()?.collect::<Vec<_>>();
+
+    // If automatic port allocation is requested and there's a restriction on the port range
+    // (via HOPRD_SESSION_PORT_RANGE), try to find an address within that range.
+    if addrs.iter().all(|a| a.port() == 0) {
+        if let Ok(range_str) = std::env::var(crate::env::HOPRD_SESSION_PORT_RANGE) {
+            let tcp_listener =
+                try_restricted_bind(
+                    addrs,
+                    &range_str,
+                    |a| async move { TcpListener::bind(a.as_slice()).await },
+                )
+                .await?;
+            return Ok((tcp_listener.local_addr()?, tcp_listener));
+        }
+    }
+
+    let tcp_listener = TcpListener::bind(addrs.as_slice()).await?;
     Ok((tcp_listener.local_addr()?, tcp_listener))
 }
 
 async fn udp_bind_to<A: std::net::ToSocketAddrs>(
     address: A,
 ) -> std::io::Result<(std::net::SocketAddr, ConnectedUdpStream)> {
-    let udp_socket = ConnectedUdpStream::builder()
+    let addrs = address.to_socket_addrs()?.collect::<Vec<_>>();
+
+    let builder = ConnectedUdpStream::builder()
         .with_buffer_size(HOPR_UDP_BUFFER_SIZE)
         .with_foreign_data_mode(ForeignDataMode::Discard) // discard data from UDP clients other than the first one served
         .with_queue_size(HOPR_UDP_QUEUE_SIZE)
-        .with_parallelism(0)
-        .build(address)?;
+        .with_receiver_parallelism(UdpStreamParallelism::Auto);
 
+    // If automatic port allocation is requested and there's a restriction on the port range
+    // (via HOPRD_SESSION_PORT_RANGE), try to find an address within that range.
+    if addrs.iter().all(|a| a.port() == 0) {
+        if let Ok(range_str) = std::env::var(crate::env::HOPRD_SESSION_PORT_RANGE) {
+            let udp_listener = try_restricted_bind(addrs, &range_str, |addrs| {
+                futures::future::ready(builder.clone().build(addrs.as_slice()))
+            })
+            .await?;
+
+            return Ok((*udp_listener.bound_address(), udp_listener));
+        }
+    }
+
+    let udp_socket = builder.build(address)?;
     Ok((*udp_socket.bound_address(), udp_socket))
 }
 
@@ -462,12 +804,13 @@ where
     let session_id = *session.id();
     match transfer_session(&mut session, &mut stream, max_buf).await {
         Ok((session_to_stream_bytes, stream_to_session_bytes)) => info!(
-            session_id = tracing::field::debug(session_id),
+            session_id = ?session_id,
             session_to_stream_bytes, stream_to_session_bytes, "client session ended",
         ),
-        Err(e) => error!(
-            session_id = tracing::field::debug(session_id),
-            "error during data transfer: {e}"
+        Err(error) => error!(
+            session_id = ?session_id,
+            %error,
+            "error during data transfer"
         ),
     }
 }
@@ -510,8 +853,6 @@ mod tests {
 
             Ok(())
         }
-
-        fn close(&self) {}
     }
 
     #[tokio::test]
@@ -600,5 +941,28 @@ mod tests {
         }
 
         Ok(())
+    }
+
+    #[test]
+    fn test_build_binding_address() {
+        let default = "10.0.0.1:10000".parse().unwrap();
+
+        let result = build_binding_host(Some("127.0.0.1:10000"), default);
+        assert_eq!(result, "127.0.0.1:10000".parse::<std::net::SocketAddr>().unwrap());
+
+        let result = build_binding_host(None, default);
+        assert_eq!(result, "10.0.0.1:10000".parse::<std::net::SocketAddr>().unwrap());
+
+        let result = build_binding_host(Some("127.0.0.1"), default);
+        assert_eq!(result, "127.0.0.1:10000".parse::<std::net::SocketAddr>().unwrap());
+
+        let result = build_binding_host(Some(":1234"), default);
+        assert_eq!(result, "10.0.0.1:1234".parse::<std::net::SocketAddr>().unwrap());
+
+        let result = build_binding_host(Some(":"), default);
+        assert_eq!(result, "10.0.0.1:10000".parse::<std::net::SocketAddr>().unwrap());
+
+        let result = build_binding_host(Some(""), default);
+        assert_eq!(result, "10.0.0.1:10000".parse::<std::net::SocketAddr>().unwrap());
     }
 }

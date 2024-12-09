@@ -20,6 +20,7 @@ craneLib.devShell {
   packages = with pkgs; [
     openssl
     pkg-config
+    patchelf
     foundry-bin
     solcDefault
 
@@ -36,6 +37,9 @@ craneLib.devShell {
     which
     findutils
     time
+
+    # docs utilities
+    graphviz
     
     # github integration
     gh
@@ -86,5 +90,5 @@ craneLib.devShell {
     ${pre-commit-check.shellHook}
   '';
   LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [ pkgs.pkgsBuildHost.openssl ];
-  RUST_MIN_STACK = "4194304"; # 4MB required to run the tests
+  RUST_MIN_STACK = "16777216"; # 16MB required to run the tests and compilation
 }

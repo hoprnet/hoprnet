@@ -55,6 +55,7 @@ fn main() -> anyhow::Result<()> {
                 .to_str()
                 .context("must be convertible to string")?,
             "--module",
+            "--ethers",
             "--overwrite",
             "--select",
             "^Hopr.*?(Boost|[^t])$"

@@ -9,6 +9,7 @@ on:
     types: [checks_requested]
   pull_request:
     types:
+      - opened
       - synchronize
       - ready_for_review
 
@@ -28,6 +29,7 @@ jobs:
     with:
       branch: ${{ github.event.pull_request.head.ref }}
       package: ${{ matrix.package }}
+      production: false
     secrets: inherit
 
   build-dappnode:
@@ -37,10 +39,13 @@ jobs:
           - DAppNodePackage-Hopr
           - DAppNodePackage-Hopr-testnet
     name: ${{ matrix.repository }}
+    needs:
+      - build-docker
     uses: ./.github/workflows/build-dappnode.yaml
     with:
       branch: ${{ github.event.pull_request.head.ref }}
       repository: ${{ matrix.repository }}
+      labels: ${{ format('{0},', join(github.event.pull_request.labels.*.name, ',')) }}
     secrets: inherit
 
   build-binaries:
@@ -51,37 +56,39 @@ jobs:
           - hoprd
         target:
           - name: x86_64-linux
-            package_suffix: -x86_64-linux
             runner: self-hosted-hoprnet-bigger
-            runner_needs_nix_setup: false
-            interpreter: /lib64/ld-linux-x86-64.so.2
           - name: aarch64-linux
-            package_suffix: -aarch64-linux
             runner: self-hosted-hoprnet-bigger
-            runner_needs_nix_setup: false
-            interpreter: /lib64/ld-linux-aarch64.so.1
           - name: aarch64-darwin
             runner: macos-14 # M1 machine
           - name: x86_64-darwin
             runner: macos-13 # Intel machine
           - name: armv7l-linux
-            package_suffix: -armv7l-linux
             runner: self-hosted-hoprnet-bigger
-            runner_needs_nix_setup: false
-            interpreter: /lib/ld-linux-armhf.so.3
     name: ${{ matrix.binary }}-${{ matrix.target.name }}
     uses: ./.github/workflows/build-binaries.yaml
     with:
       branch: ${{ github.event.pull_request.head.ref }}
       binary: ${{ matrix.binary }}
-      target: ${{ matrix.target.name }}
-      package_suffix: ${{ matrix.target.package_suffix }}
       runner: ${{ matrix.target.runner }}
-      interpreter: ${{ matrix.target.interpreter }}
+      target: ${{ matrix.target.name }}
     secrets: inherit
+
+  label:
+    name: Add PR labels
+    runs-on: self-hosted-hoprnet-small
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/labeler@v5
+        with:
+          repo-token: "${{ secrets.GITHUB_TOKEN }}"
+          sync-labels: true
 
   docs:
     name: Docs
-    if: github.event.pull_request.draft == false
     uses: ./.github/workflows/build-docs.yaml
     secrets: inherit
+    with:
+      publish: false

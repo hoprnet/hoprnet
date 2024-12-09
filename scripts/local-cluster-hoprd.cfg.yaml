@@ -4,40 +4,12 @@ hopr:
     on_fail_continue: true
     allow_recursive: true
     strategies:
-      - !AutoFunding
-        funding_amount: "1000000 HOPR"
-        min_stake_threshold: "100000 HOPR"
-      - !Aggregating
-        aggregation_threshold: 5
-        unrealized_balance_ratio: 0.95
-        aggregation_timeout: 60
-        aggregate_on_channel_close: true
       - !AutoRedeeming
-        redeem_only_aggregated: true
-        on_close_redeem_single_tickets_value_min: "90000000000000000 HOPR"
-        minimum_redeem_ticket_value: "10000 HOPR"
+        redeem_only_aggregated: false
+        minimum_redeem_ticket_value: "1000000 HOPR"
       - !ClosureFinalizer
         max_closure_overdue: 60
-  heartbeat:
-    variance: 1
-    interval: 20
-    threshold: 60
+  protocol:
+    outgoing_ticket_winning_prob: 0.00001
   network_options:
-    min_delay: 1
-    max_delay: 300
-    quality_bad_threshold: 0.2
-    quality_offline_threshold: 0.5
-    quality_step: 0.1
-    quality_avg_window_size: 25
-    ignore_timeframe: 600
-    backoff_exponent: 1.5
-    backoff_min: 2.0
-    backoff_max: 300.0
-  transport:
-    announce_local_addresses: false
-    prefer_local_addresses: false
-inbox:
-  capacity: 512
-  max_age: 900
-  excluded_tags:
-    - 0
+    ignore_timeframe: 0

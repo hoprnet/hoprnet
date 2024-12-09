@@ -13,6 +13,13 @@ mod preconditions;
 mod prometheus;
 mod session;
 mod tickets;
+mod types;
+
+pub(crate) mod env {
+    /// Name of the environment variable specifying automatic port range selection for Sessions.
+    /// Expected format: "<start_port>:<end_port>" (e.g., "9091:9099")
+    pub const HOPRD_SESSION_PORT_RANGE: &str = "HOPRD_SESSION_PORT_RANGE";
+}
 
 pub use session::{HOPR_TCP_BUFFER_SIZE, HOPR_UDP_BUFFER_SIZE, HOPR_UDP_QUEUE_SIZE};
 
@@ -26,10 +33,10 @@ use axum::{
     Router,
 };
 use serde::Serialize;
-use std::collections::HashMap;
 use std::error::Error;
 use std::iter::once;
 use std::sync::Arc;
+use std::{collections::HashMap, sync::atomic::AtomicU16};
 use tokio::net::TcpListener;
 use tower::ServiceBuilder;
 use tower_http::{
@@ -41,9 +48,11 @@ use tower_http::{
 };
 use utoipa::openapi::security::{ApiKey, ApiKeyValue, HttpAuthScheme, HttpBuilder, SecurityScheme};
 use utoipa::{Modify, OpenApi};
-use utoipa_scalar::{Scalar, Servable};
+use utoipa_scalar::{Scalar, Servable as ScalarServable};
+use utoipa_swagger_ui::SwaggerUi;
 
 use crate::config::Auth;
+use crate::session::SessionTargetSpec;
 use hopr_lib::{errors::HoprLibError, ApplicationData, Hopr};
 use hopr_network_types::prelude::IpProtocol;
 
@@ -59,7 +68,8 @@ pub type MessageEncoder = fn(&[u8]) -> Box<[u8]>;
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct ListenerId(pub IpProtocol, pub std::net::SocketAddr);
 
-pub type ListenerJoinHandles = Arc<RwLock<HashMap<ListenerId, (String, hopr_async_runtime::prelude::JoinHandle<()>)>>>;
+pub type ListenerJoinHandles =
+    Arc<RwLock<HashMap<ListenerId, (SessionTargetSpec, hopr_async_runtime::prelude::JoinHandle<()>)>>>;
 
 #[derive(Clone)]
 pub(crate) struct InternalState {
@@ -69,8 +79,10 @@ pub(crate) struct InternalState {
     pub inbox: Arc<RwLock<hoprd_inbox::Inbox>>,
     pub hoprd_db: Arc<hoprd_db_api::db::HoprdDb>,
     pub websocket_rx: async_broadcast::InactiveReceiver<ApplicationData>,
+    pub websocket_active_count: Arc<AtomicU16>,
     pub msg_encoder: Option<MessageEncoder>,
     pub open_listeners: ListenerJoinHandles,
+    pub default_listen_host: std::net::SocketAddr,
 }
 
 #[derive(OpenApi)]
@@ -106,6 +118,7 @@ pub(crate) struct InternalState {
         node::entry_nodes,
         node::info,
         node::metrics,
+        node::channel_graph,
         node::peers,
         node::version,
         peers::ping_peer,
@@ -118,13 +131,14 @@ pub(crate) struct InternalState {
         tickets::redeem_tickets_in_channel,
         tickets::show_all_tickets,
         tickets::show_channel_tickets,
-        tickets::show_ticket_statistics
+        tickets::show_ticket_statistics,
+        tickets::reset_ticket_statistics,
     ),
     components(
         schemas(
             ApiError,
             account::AccountAddressesResponse, account::AccountBalancesResponse, account::WithdrawBodyRequest, account::WithdrawResponse,
-            alias::PeerIdResponse, alias::AliasPeerIdBodyRequest,
+            alias::PeerIdResponse, alias::AliasDestinationBodyRequest,
             channels::ChannelsQueryRequest,channels::CloseChannelResponse, channels::OpenChannelBodyRequest, channels::OpenChannelResponse,
             channels::NodeChannel, channels::NodeChannelsResponse, channels::ChannelInfoResponse, channels::FundBodyRequest,
             messages::MessagePopAllResponse,
@@ -132,7 +146,7 @@ pub(crate) struct InternalState {
             network::TicketPriceResponse,
             network::TicketProbabilityResponse,
             node::EntryNode, node::NodeInfoResponse, node::NodePeersQueryRequest,
-            node::HeartbeatInfo, node::PeerInfo, node::AnnouncedPeer, node::NodePeersResponse, node::NodeVersionResponse,
+            node::HeartbeatInfo, node::PeerInfo, node::AnnouncedPeer, node::NodePeersResponse, node::NodeVersionResponse, node::GraphExportRequest,
             peers::NodePeerInfoResponse, peers::PingResponse,
             session::SessionClientRequest, session::SessionClientResponse, session::SessionCloseClientRequest,
             tickets::NodeTicketStatisticsResponse, tickets::ChannelTicket,
@@ -187,6 +201,7 @@ pub struct RestApiParameters {
     pub session_listener_sockets: ListenerJoinHandles,
     pub websocket_rx: async_broadcast::InactiveReceiver<ApplicationData>,
     pub msg_encoder: Option<MessageEncoder>,
+    pub default_session_listen_host: std::net::SocketAddr,
 }
 
 /// Starts the Rest API listener and router.
@@ -201,6 +216,7 @@ pub async fn serve_api(params: RestApiParameters) -> Result<(), std::io::Error> 
         session_listener_sockets,
         websocket_rx,
         msg_encoder,
+        default_session_listen_host,
     } = params;
 
     let router = build_api(
@@ -212,6 +228,7 @@ pub async fn serve_api(params: RestApiParameters) -> Result<(), std::io::Error> 
         session_listener_sockets,
         websocket_rx,
         msg_encoder,
+        default_session_listen_host,
     )
     .await;
     axum::serve(listener, router).await
@@ -227,6 +244,7 @@ async fn build_api(
     open_listeners: ListenerJoinHandles,
     websocket_rx: async_broadcast::InactiveReceiver<ApplicationData>,
     msg_encoder: Option<MessageEncoder>,
+    default_listen_host: std::net::SocketAddr,
 ) -> Router {
     let state = AppState { hopr };
     let inner_state = InternalState {
@@ -237,12 +255,18 @@ async fn build_api(
         inbox,
         hoprd_db,
         websocket_rx,
+        websocket_active_count: Arc::new(AtomicU16::new(0)),
         open_listeners,
+        default_listen_host,
     };
 
     Router::new()
-        // FIXME: Remove API UIs which are not going to be used.
-        .nest("/", Router::new().merge(Scalar::with_url("/scalar", ApiDoc::openapi())))
+        .nest(
+            "/",
+            Router::new()
+                .merge(SwaggerUi::new("/swagger-ui").url("/api-docs2/openapi.json", ApiDoc::openapi()))
+                .merge(Scalar::with_url("/scalar", ApiDoc::openapi())),
+        )
         .nest(
             "/",
             Router::new()
@@ -263,7 +287,7 @@ async fn build_api(
                 .route("/account/addresses", get(account::addresses))
                 .route("/account/balances", get(account::balances))
                 .route("/account/withdraw", post(account::withdraw))
-                .route("/peers/:peerId", get(peers::show_peer_info))
+                .route("/peers/:destination", get(peers::show_peer_info))
                 .route("/channels", get(channels::list_channels))
                 .route("/channels", post(channels::open_channel))
                 .route("/channels/:channelId", get(channels::show_channel))
@@ -281,6 +305,7 @@ async fn build_api(
                 .route("/tickets", get(tickets::show_all_tickets))
                 .route("/tickets/redeem", post(tickets::redeem_all_tickets))
                 .route("/tickets/statistics", get(tickets::show_ticket_statistics))
+                .route("/tickets/statistics", delete(tickets::reset_ticket_statistics))
                 .route("/messages", delete(messages::delete_messages))
                 .route("/messages", post(messages::send_message))
                 .route("/messages/pop", post(messages::pop))
@@ -297,12 +322,21 @@ async fn build_api(
                 .route("/node/peers", get(node::peers))
                 .route("/node/entryNodes", get(node::entry_nodes))
                 .route("/node/metrics", get(node::metrics))
-                .route("/peers/:peerId/ping", post(peers::ping_peer))
+                .route("/node/graph", get(node::channel_graph))
+                .route("/peers/:destination/ping", post(peers::ping_peer))
+                .route("/session/websocket", get(session::websocket))
                 .route("/session/:protocol", post(session::create_client))
                 .route("/session/:protocol", get(session::list_clients))
                 .route("/session/:protocol", delete(session::close_client))
                 .with_state(inner_state.clone().into())
-                .layer(middleware::from_fn_with_state(inner_state, preconditions::authenticate)),
+                .layer(middleware::from_fn_with_state(
+                    inner_state.clone(),
+                    preconditions::authenticate,
+                ))
+                .layer(middleware::from_fn_with_state(
+                    inner_state,
+                    preconditions::cap_websockets,
+                )),
         )
         .layer(
             ServiceBuilder::new()
@@ -341,7 +375,6 @@ enum ApiErrorStatus {
     /// An invalid application tag from the reserved range was provided.
     InvalidApplicationTag,
     InvalidChannelId,
-    InvalidPeerId,
     PeerNotFound,
     ChannelNotFound,
     TicketsNotFound,
@@ -350,12 +383,16 @@ enum ApiErrorStatus {
     ChannelAlreadyOpen,
     ChannelNotOpen,
     AliasNotFound,
+    AliasOrPeerIdAliasAlreadyExists,
     DatabaseError,
     UnsupportedFeature,
     Timeout,
     Unauthorized,
+    TooManyOpenWebsocketConnections,
     InvalidQuality,
     NotReady,
+    #[strum(serialize = "INVALID_PATH")]
+    InvalidPath(String),
     #[strum(serialize = "UNKNOWN_FAILURE")]
     UnknownFailure(String),
 }

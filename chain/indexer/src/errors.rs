@@ -1,6 +1,7 @@
 use ethers::core::abi::Error as AbiError;
-use hopr_primitive_types::{errors::GeneralError, primitives::Address};
 use thiserror::Error;
+
+use hopr_primitive_types::{errors::GeneralError, primitives::Address};
 
 #[derive(Error, Debug)]
 pub enum CoreEthereumIndexerError {
@@ -40,10 +41,10 @@ pub enum CoreEthereumIndexerError {
     #[error("Could not verify account entry signature. Maybe a cross-signing issue?")]
     AccountEntrySignatureVerification,
 
-    #[error("Received an event for a channel that is closed or for which we haven't seen an OPEN even.")]
+    #[error("Received an event for a channel that is closed or for which we haven't seen an OPEN event.")]
     ChannelDoesNotExist,
 
-    #[error("Cannot deregister inexistent MFA module")]
+    #[error("Cannot deregister non-existent MFA module")]
     MFAModuleDoesNotExist,
 
     #[error("Unknown smart contract. Received event from {0}")]
@@ -53,7 +54,7 @@ pub enum CoreEthereumIndexerError {
     MultiaddrParseError(#[from] multiaddr::Error),
 
     #[error(transparent)]
-    RpcError(#[from] chain_rpc::errors::RpcError),
+    RpcError(#[from] hopr_chain_rpc::errors::RpcError),
 }
 
 pub type Result<T> = core::result::Result<T, CoreEthereumIndexerError>;

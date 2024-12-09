@@ -12,6 +12,4 @@ pub trait SendMsg {
         destination: PeerId,
         options: RoutingOptions,
     ) -> std::result::Result<(), TransportSessionError>;
-
-    fn close(&self);
 }

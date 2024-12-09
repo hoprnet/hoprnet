@@ -9,20 +9,24 @@ use axum::{
 };
 use futures::{sink::SinkExt, stream::StreamExt};
 use futures_concurrency::stream::Merge;
-use libp2p_identity::PeerId;
 use serde::Deserialize;
 use serde_json::json;
 use serde_with::{serde_as, Bytes, DisplayFromStr, DurationMilliSeconds};
 use std::{sync::Arc, time::Duration};
-use tracing::{debug, error, trace};
+use tracing::error;
+use tracing::{debug, trace};
 use validator::Validate;
 
+use hopr_lib::ApplicationData;
 use hopr_lib::{
     errors::{HoprLibError, HoprStatusError},
-    ApplicationData, AsUnixTimestamp, RoutingOptions, RESERVED_TAG_UPPER_LIMIT,
+    AsUnixTimestamp, RoutingOptions, RESERVED_TAG_UPPER_LIMIT,
 };
 
-use crate::{ApiErrorStatus, InternalState, BASE_PATH};
+use crate::{
+    types::{HoprIdentifier, PeerOrAddress},
+    ApiErrorStatus, InternalState, BASE_PATH,
+};
 
 #[derive(Debug, Default, Clone, Deserialize, utoipa::ToSchema, utoipa::IntoParams)]
 #[into_params(parameter_in = Query)]
@@ -41,27 +45,36 @@ pub(crate) struct SizeResponse {
 #[serde(rename_all = "camelCase")]
 #[schema(example = json!({
         "body": "Test message",
-        "hops": 1,
         "path": [
             "12D3KooWR4uwjKCDCAY1xsEFB4esuWLF9Q5ijYvCjz5PNkTbnu33"
         ],
-        "peerId": "12D3KooWEDc1vGJevww48trVDDf6pr1f6N3F86sGJfQrKCyc8kJ1",
+        "destination": "12D3KooWEDc1vGJevww48trVDDf6pr1f6N3F86sGJfQrKCyc8kJ1",
         "tag": 2000
     }))]
+#[schema(example = json!({
+    "body": "Test message",
+    "hops": 1,
+    "peerId": "12D3KooWEDc1vGJevww48trVDDf6pr1f6N3F86sGJfQrKCyc8kJ1",
+    "tag": 2000
+}))]
 pub(crate) struct SendMessageBodyRequest {
     /// The message tag used to filter messages based on application
     tag: u16,
     /// Message to be transmitted over the network
     #[serde_as(as = "Bytes")]
     body: Vec<u8>,
-    /// The recipient HOPR PeerId
-    #[serde_as(as = "DisplayFromStr")]
+    /// The recipient HOPR PeerId or address
+    #[serde_as(as = "Option<DisplayFromStr>")]
     #[schema(value_type = String)]
-    peer_id: PeerId,
+    destination: Option<PeerOrAddress>,
+    /// Deprecated: PeerId of the target node
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    #[schema(value_type = String)]
+    peer_id: Option<hopr_lib::PeerId>,
     #[serde_as(as = "Option<Vec<DisplayFromStr>>")]
     #[validate(length(min = 0, max = 3))]
     #[schema(value_type = Option<Vec<String>>)]
-    path: Option<Vec<PeerId>>,
+    path: Option<Vec<PeerOrAddress>>,
     #[validate(range(min = 0, max = 3))]
     hops: Option<u16>,
 }
@@ -69,7 +82,7 @@ pub(crate) struct SendMessageBodyRequest {
 #[serde_as]
 #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
 #[schema(example = json!({
-        "challenge": "031916ee5bfc0493f40c353a670fc586a3a28f9fce9cd065ff9d1cbef19b46eeba"
+        "timestamp": 2147483647
     }))]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct SendMessageResponse {
@@ -80,6 +93,10 @@ pub(crate) struct SendMessageResponse {
 
 #[serde_as]
 #[derive(Debug, Default, Clone, Deserialize, utoipa::ToSchema)]
+#[schema(example = json!({
+    "tag": 801,
+    "timestamp": 2147483647
+}))]
 pub(crate) struct GetMessageBodyRequest {
     /// The message tag used to filter messages based on application
     #[schema(required = false)]
@@ -127,6 +144,19 @@ pub(super) async fn send_message(
             .into_response()
     })?;
 
+    let destination = if let Some(destination) = args.destination {
+        destination
+    } else if let Some(peer_id) = args.peer_id {
+        PeerOrAddress::PeerId(peer_id)
+    } else {
+        return Ok((StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidInput).into_response());
+    };
+
+    let peer_id = match HoprIdentifier::new_with(destination, hopr.peer_resolver()).await {
+        Ok(destination) => destination.peer_id,
+        Err(e) => return Err(e.into_response()),
+    };
+
     // Use the message encoder, if any
     let msg_body = state
         .msg_encoder
@@ -134,22 +164,49 @@ pub(super) async fn send_message(
         .map(|enc| enc(&args.body))
         .unwrap_or_else(|| args.body.into_boxed_slice());
 
+    #[cfg(not(feature = "explicit-path"))]
+    if args.path.is_some() {
+        return Err((
+            StatusCode::UNPROCESSABLE_ENTITY,
+            ApiErrorStatus::InvalidPath("explicit paths are not allowed".into()),
+        )
+            .into_response());
+    }
+
     let options = if let Some(intermediate_path) = args.path {
-        RoutingOptions::IntermediatePath(intermediate_path.try_into().map_err(|_| {
-            (
-                StatusCode::UNPROCESSABLE_ENTITY,
-                ApiErrorStatus::UnknownFailure(format!(
-                    "Intermediate path cannot be longer than {}",
-                    RoutingOptions::MAX_INTERMEDIATE_HOPS
-                )),
-            )
-                .into_response()
-        })?)
+        let peer_ids_future = intermediate_path
+            .into_iter()
+            .map(|address| HoprIdentifier::new_with(address, hopr.peer_resolver()))
+            .collect::<Vec<_>>();
+
+        let path = futures::future::try_join_all(peer_ids_future)
+            .await
+            .map_err(|e: ApiErrorStatus| {
+                (
+                    StatusCode::UNPROCESSABLE_ENTITY,
+                    ApiErrorStatus::UnknownFailure(format!("Failed to fulfill path: {e}")),
+                )
+                    .into_response()
+            })?
+            .into_iter()
+            .map(|v| v.peer_id)
+            .collect::<Vec<_>>();
+
+        RoutingOptions::IntermediatePath(
+            // get a vec of peer ids from the intermediate path
+            path.try_into().map_err(|_| {
+                (
+                    StatusCode::UNPROCESSABLE_ENTITY,
+                    ApiErrorStatus::InvalidPath("Invalid number of hops".into()),
+                )
+                    .into_response()
+            })?,
+        )
     } else if let Some(hops) = args.hops {
         RoutingOptions::Hops((hops as u8).try_into().map_err(|_| {
             (
                 StatusCode::UNPROCESSABLE_ENTITY,
-                ApiErrorStatus::UnknownFailure(format!(
+                ApiErrorStatus::InvalidPath(format!(
                     "Number of hops cannot be larger than {}",
                     RoutingOptions::MAX_INTERMEDIATE_HOPS
                 )),
@@ -159,14 +216,14 @@ pub(super) async fn send_message(
     } else {
         return Err((
             StatusCode::UNPROCESSABLE_ENTITY,
-            ApiErrorStatus::UnknownFailure("One of either hops or intermediate path must be specified".to_string()),
+            ApiErrorStatus::InvalidPath("One of either hops or intermediate path must be specified".into()),
         )
             .into_response());
     };
 
     let timestamp = std::time::SystemTime::now().as_unix_timestamp();
 
-    match hopr.send_message(msg_body, args.peer_id, options, Some(args.tag)).await {
+    match hopr.send_message(msg_body, peer_id, options, Some(args.tag)).await {
         Ok(_) => Ok((StatusCode::ACCEPTED, Json(SendMessageResponse { timestamp })).into_response()),
         Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(_, _))) => {
             Err((StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response())
@@ -236,7 +293,8 @@ impl From<hopr_lib::ApplicationData> for WebSocketReadMsg {
         responses(
             (status = 206, description = "Incoming data", body = Text, content_type = "application/text"),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
-            (status = 422, description = "Unknown failure", body = ApiError)
+            (status = 422, description = "Unknown failure", body = ApiError),
+            (status = 429, description = "Too many open websocket connections.", body = ApiError),
         ),
         security(
             ("api_token" = []),
@@ -272,22 +330,22 @@ async fn websocket_connection(socket: WebSocket, state: Arc<InternalState>) {
                     .send(Message::Text(json!(WebSocketReadMsg::from(net_in)).to_string()))
                     .await
                 {
-                    error!("Failed to emit read data onto the websocket: {e}");
+                    error!(error = %e, "Failed to emit read data onto the websocket");
                 };
             }
             WebSocketInput::WsInput(ws_in) => match ws_in {
                 Ok(Message::Text(input)) => {
                     if let Err(e) = handle_send_message(&input, state.clone()).await {
-                        error!("Failed to send message: {e}");
+                        error!(error = %e, "Failed to send message");
                     }
                 }
                 Ok(Message::Close(_)) => {
                     debug!("Received close frame, closing connection");
                     break;
                 }
-                Ok(m) => trace!("skipping an unsupported websocket message: {m:?}"),
+                Ok(m) => trace!(message = ?m, "Skipping unsupported websocket message"),
                 Err(e) => {
-                    error!("Failed to get a valid websocket message: {e}, closing connection");
+                    error!(error = %e, "Failed to get a valid websocket message, closing connection");
                     break;
                 }
             },
@@ -300,6 +358,19 @@ async fn handle_send_message(input: &str, state: Arc<InternalState>) -> Result<(
         Ok(msg) => {
             let hopr = state.hopr.clone();
 
+            let destination = if let Some(destination) = msg.destination {
+                destination
+            } else if let Some(peer_id) = msg.peer_id {
+                PeerOrAddress::PeerId(peer_id)
+            } else {
+                return Err("missing destination".to_string());
+            };
+
+            let destination = match HoprIdentifier::new_with(destination, hopr.peer_resolver()).await {
+                Ok(destination) => destination.peer_id,
+                Err(_e) => return Err("invalid destination".to_string()),
+            };
+
             // Use the message encoder, if any
             // TODO: remove RLP in 3.0
             let msg_body = state
@@ -309,10 +380,22 @@ async fn handle_send_message(input: &str, state: Arc<InternalState>) -> Result<(
                 .unwrap_or_else(|| msg.body.into_boxed_slice());
 
             let options = if let Some(intermediate_path) = msg.path {
+                let peer_ids_future = intermediate_path
+                    .into_iter()
+                    .map(|address| HoprIdentifier::new_with(address, hopr.peer_resolver()))
+                    .collect::<Vec<_>>();
+
+                let path = match futures::future::try_join_all(peer_ids_future).await {
+                    Ok(fullfilled_path) => fullfilled_path.into_iter().map(|v| v.peer_id).collect::<Vec<_>>(),
+                    Err(e) => {
+                        return Err(format!("failed to fulfill path: {e}"));
+                    }
+                };
+
                 RoutingOptions::IntermediatePath(
-                    intermediate_path
-                        .try_into()
-                        .map_err(|_| "invalid number of intermediate hops".to_string())?,
+                    // get a vec of peer ids from the intermediate path
+                    path.try_into()
+                        .map_err(|_| "Invalid number of intermediate hops".to_string())?,
                 )
             } else if let Some(hops) = msg.hops {
                 RoutingOptions::Hops(
@@ -324,7 +407,7 @@ async fn handle_send_message(input: &str, state: Arc<InternalState>) -> Result<(
                 return Err("one of hops or intermediate path must be provided".to_string());
             };
 
-            if let Err(e) = hopr.send_message(msg_body, msg.peer_id, options, Some(msg.tag)).await {
+            if let Err(e) = hopr.send_message(msg_body, destination, options, Some(msg.tag)).await {
                 return Err(e.to_string());
             }
 
@@ -453,8 +536,8 @@ fn to_api_message(data: hopr_lib::ApplicationData, received_at: Duration) -> Res
         tag = "Messages"
     )]
 pub(super) async fn pop(
-    Query(TagQueryRequest { tag }): Query<TagQueryRequest>,
     State(state): State<Arc<InternalState>>,
+    Json(TagQueryRequest { tag }): Json<TagQueryRequest>,
 ) -> impl IntoResponse {
     if let Some(tag) = tag {
         if tag < RESERVED_TAG_UPPER_LIMIT {
@@ -504,8 +587,8 @@ pub(crate) struct MessagePopAllResponse {
         tag = "Messages"
     )]
 pub(super) async fn pop_all(
-    Query(TagQueryRequest { tag }): Query<TagQueryRequest>,
     State(state): State<Arc<InternalState>>,
+    Json(TagQueryRequest { tag }): Json<TagQueryRequest>,
 ) -> impl IntoResponse {
     if let Some(tag) = tag {
         if tag < RESERVED_TAG_UPPER_LIMIT {
@@ -522,7 +605,7 @@ pub(super) async fn pop_all(
         .filter_map(|(data, ts)| match to_api_message(data, ts) {
             Ok(msg) => Some(msg),
             Err(e) => {
-                error!("failed to pop message: {e}");
+                error!(error = %e, "failed to pop message");
                 None
             }
         })
@@ -556,8 +639,8 @@ pub(super) async fn pop_all(
         tag = "Messages"
     )]
 pub(super) async fn peek(
-    Query(TagQueryRequest { tag }): Query<TagQueryRequest>,
     State(state): State<Arc<InternalState>>,
+    Json(TagQueryRequest { tag }): Json<TagQueryRequest>,
 ) -> impl IntoResponse {
     if let Some(tag) = tag {
         if tag < RESERVED_TAG_UPPER_LIMIT {
@@ -621,7 +704,7 @@ pub(super) async fn peek_all(
         .filter_map(|(data, ts)| match to_api_message(data, ts) {
             Ok(msg) => Some(msg),
             Err(e) => {
-                error!("failed to peek message: {e}");
+                error!(error = %e, "failed to peek message:");
                 None
             }
         })
@@ -634,23 +717,26 @@ pub(super) async fn peek_all(
 mod tests {
     use super::*;
 
-    use serde_json::from_value;
+    use libp2p_identity::PeerId;
+    use serde_json::{from_value, json};
 
     #[test]
     fn send_message_accepts_bytes_in_body() -> anyhow::Result<()> {
-        let peer = PeerId::random();
+        let peer_id = PeerId::random();
+        let destination = PeerOrAddress::from(peer_id);
         let test_sequence = b"wow, this actually works";
 
         let json_value = json!({
             "tag": 5,
             "body": test_sequence.to_vec(),
-            "peerId": peer.to_string()
+            "destination": peer_id,
         });
 
         let expected = SendMessageBodyRequest {
             tag: 5,
             body: test_sequence.to_vec(),
-            peer_id: peer,
+            destination: Some(destination),
+            peer_id: None,
             path: None,
             hops: None,
         };
@@ -664,19 +750,21 @@ mod tests {
 
     #[test]
     fn send_message_accepts_utf8_string_in_body() -> anyhow::Result<()> {
-        let peer = PeerId::random();
+        let peer_id = PeerId::random();
+        let destination = PeerOrAddress::from(peer_id);
         let test_sequence = b"wow, this actually works";
 
         let json_value = json!({
             "tag": 5,
+            "destination": peer_id,
             "body": String::from_utf8(test_sequence.to_vec())?,
-            "peerId": peer.to_string()
         });
 
         let expected = SendMessageBodyRequest {
             tag: 5,
             body: test_sequence.to_vec(),
-            peer_id: peer,
+            destination: Some(destination),
+            peer_id: None,
             path: None,
             hops: None,
         };

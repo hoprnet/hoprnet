@@ -1,4 +1,3 @@
-use crate::errors::NetworkTypeError;
 use hickory_resolver::name_server::ConnectionProvider;
 use hickory_resolver::AsyncResolver;
 use hopr_primitive_types::bounded::{BoundedSize, BoundedVec};
@@ -6,6 +5,8 @@ use libp2p_identity::PeerId;
 use std::fmt::{Display, Formatter};
 use std::net::SocketAddr;
 use std::str::FromStr;
+
+use crate::errors::NetworkTypeError;
 
 /// Lists some of the IP protocols.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, strum::Display, strum::EnumString)]
@@ -159,6 +160,127 @@ impl IpOrHost {
     }
 }
 
+/// Contains optionally encrypted [`IpOrHost`].
+///
+/// This is useful for hiding the [`IpOrHost`] instance from the Entry node.
+/// The client first encrypts the `IpOrHost` instance via [`SealedHost::seal`] using
+/// the Exit node's public key.
+/// Upon receiving the `SealedHost` instance by the Exit node, it can call
+/// [`SealedHost::unseal`] using its private key to get the original `IpOrHost` instance.
+///
+/// Sealing is fully randomized and therefore does not leak information about equal `IpOrHost`
+/// instances.
+///
+/// The length of the encrypted host is also obscured by the use of random padding before
+/// encryption.
+///
+/// ### Example
+/// ```rust
+/// use libp2p_identity::PeerId;
+/// use hopr_crypto_types::prelude::{Keypair, OffchainKeypair};
+/// use hopr_network_types::prelude::{IpOrHost, SealedHost};
+///
+/// # fn main() -> anyhow::Result<()> {
+/// let keypair = OffchainKeypair::random();
+///
+/// let exit_node_peer_id: PeerId = keypair.public().into();
+/// let host: IpOrHost = "127.0.0.1:1000".parse()?;
+///
+/// // On the Client
+/// let encrypted = SealedHost::seal(host.clone(), keypair.public().into())?;
+///
+/// // On the Exit node
+/// let decrypted = encrypted.unseal(&keypair)?;
+/// assert_eq!(host, decrypted);
+///
+/// // Plain SealedHost unseals trivially
+/// let plain_sealed: SealedHost = host.clone().into();
+/// assert_eq!(host, plain_sealed.try_into()?);
+///
+/// // The same host sealing is randomized
+/// let encrypted_1 = SealedHost::seal(host.clone(), keypair.public().into())?;
+/// let encrypted_2 = SealedHost::seal(host.clone(), keypair.public().into())?;
+/// assert_ne!(encrypted_1, encrypted_2);
+///
+/// # Ok(())
+/// # }
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq, Hash, strum::EnumTryAs)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum SealedHost {
+    /// Plain (not sealed) [`IpOrHost`]
+    Plain(IpOrHost),
+    /// Encrypted [`IpOrHost`]
+    Sealed(Box<[u8]>),
+}
+
+impl SealedHost {
+    /// Character that can be appended to the host to obscure its length.
+    ///
+    /// User can add as many of this character to the host, and it will be removed
+    /// during unsealing.
+    pub const PADDING_CHAR: char = '@';
+    const MAX_LEN_WITH_PADDING: usize = 50;
+
+    /// Seals the given [`IpOrHost`] using the Exit node's peer ID.
+    pub fn seal(host: IpOrHost, peer_id: PeerId) -> crate::errors::Result<Self> {
+        let mut host_str = host.to_string();
+
+        // Add randomly long padding, so the length of the short hosts is obscured
+        if host_str.len() < Self::MAX_LEN_WITH_PADDING {
+            let pad_len = hopr_crypto_random::random_integer(0, (Self::MAX_LEN_WITH_PADDING as u64).into());
+            for _ in 0..pad_len {
+                host_str.push(Self::PADDING_CHAR);
+            }
+        }
+
+        hopr_crypto_types::seal::seal_data(host_str.as_bytes(), peer_id)
+            .map(Self::Sealed)
+            .map_err(|e| NetworkTypeError::Other(e.to_string()))
+    }
+
+    /// Tries to unseal the sealed [`IpOrHost`] using the private key as Exit node.
+    /// No-op, if the data is already unsealed.
+    pub fn unseal(self, key: &hopr_crypto_types::keypairs::OffchainKeypair) -> crate::errors::Result<IpOrHost> {
+        match self {
+            SealedHost::Plain(host) => Ok(host),
+            SealedHost::Sealed(enc) => hopr_crypto_types::seal::unseal_data(&enc, key)
+                .map_err(|e| NetworkTypeError::Other(e.to_string()))
+                .and_then(|data| {
+                    String::from_utf8(data.into_vec())
+                        .map_err(|e| NetworkTypeError::Other(e.to_string()))
+                        .and_then(|s| IpOrHost::from_str(s.trim_end_matches(Self::PADDING_CHAR)))
+                }),
+        }
+    }
+}
+
+impl From<IpOrHost> for SealedHost {
+    fn from(value: IpOrHost) -> Self {
+        Self::Plain(value)
+    }
+}
+
+impl TryFrom<SealedHost> for IpOrHost {
+    type Error = NetworkTypeError;
+
+    fn try_from(value: SealedHost) -> Result<Self, Self::Error> {
+        match value {
+            SealedHost::Plain(host) => Ok(host),
+            SealedHost::Sealed(_) => Err(NetworkTypeError::SealedTarget),
+        }
+    }
+}
+
+impl std::fmt::Display for SealedHost {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SealedHost::Plain(h) => write!(f, "{h}"),
+            SealedHost::Sealed(_) => write!(f, "<redacted host>"),
+        }
+    }
+}
+
 /// Represents routing options in a mixnet with a maximum number of hops.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -197,6 +319,7 @@ impl RoutingOptions {
 mod tests {
     use super::*;
     use anyhow::anyhow;
+    use hopr_crypto_types::prelude::{Keypair, OffchainKeypair};
     use std::net::SocketAddr;
 
     #[cfg(feature = "runtime-async-std")]
@@ -245,14 +368,13 @@ mod tests {
     #[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
     #[tokio::test]
     async fn ip_or_host_must_resolve_ip_address() -> anyhow::Result<()> {
-        assert_eq!(
-            *IpOrHost::Ip("127.0.0.1:1000".parse()?)
-                .resolve_tokio()
-                .await?
-                .first()
-                .ok_or(anyhow!("must resolve"))?,
-            "127.0.0.1:1000".parse()?
-        );
+        let actual = IpOrHost::Ip("127.0.0.1:1000".parse()?).resolve_tokio().await?;
+
+        let actual = actual.first().ok_or(anyhow!("must resolve"))?;
+
+        let expected: SocketAddr = "127.0.0.1:1000".parse()?;
+
+        assert_eq!(*actual, expected);
         Ok(())
     }
 
@@ -267,5 +389,25 @@ mod tests {
             IpOrHost::from_str("1.2.3.4:1234")?
         );
         Ok(())
+    }
+
+    #[test]
+    fn sealing_adds_padding_to_hide_length() -> anyhow::Result<()> {
+        let peer_id: PeerId = OffchainKeypair::random().public().into();
+        let last_len = SealedHost::seal("127.0.0.1:1234".parse()?, peer_id)?
+            .try_as_sealed()
+            .unwrap()
+            .len();
+        for _ in 0..20 {
+            let current_len = SealedHost::seal("127.0.0.1:1234".parse()?, peer_id)?
+                .try_as_sealed()
+                .unwrap()
+                .len();
+            if current_len != last_len {
+                return Ok(());
+            }
+        }
+
+        anyhow::bail!("sealed length not randomized");
     }
 }

@@ -130,7 +130,7 @@ where
         let awaiter = self.writer.clone().aggregate_tickets(channel, prerequisites)?;
 
         if let Err(e) = awaiter.consume_and_wait(self.agg_timeout).await {
-            warn!("Error occured on ticket aggregation for '{channel}', performing a rollback: {e}");
+            warn!(%channel, error = %e, "Error during ticket aggregation, performing a rollback");
             self.db.rollback_aggregation_in_channel(*channel).await?;
         }
 
@@ -297,45 +297,46 @@ where
                             destination.try_into();
                         match opk {
                             Ok(opk) => match db.aggregate_tickets(opk, acked_tickets, &chain_key).await {
-                                Ok(ticket) => {
-                                    Some(TicketAggregationProcessed::Reply(destination, Ok(ticket.leak()), response))
-                                }
+                                Ok(ticket) => Some(TicketAggregationProcessed::Reply(
+                                    destination,
+                                    Ok(ticket.leak()),
+                                    response,
+                                )),
                                 Err(DbError::TicketAggregationError(e)) => {
                                     // forward error to counterparty
                                     Some(TicketAggregationProcessed::Reply(destination, Err(e), response))
                                 }
                                 Err(e) => {
-                                    error!("Dropping tickets aggregation request due unexpected error {e}");
+                                    error!(error = %e, "Dropping tickets aggregation request due to an error");
                                     None
                                 }
                             },
                             Err(e) => {
                                 error!(
-                                    "Failed to deserialize the destination '{destination}' to an offchain public key: {e}"
+                                    ?destination, error = %e,
+                                    "Failed to deserialize the destination to an offchain public key"
                                 );
                                 None
                             }
                         }
                     }
                     TicketAggregationToProcess::ToReceive(destination, aggregated_ticket, request) => {
-                            match aggregated_ticket {
-                                Ok(ticket) => match db
-                                    .process_received_aggregated_ticket(ticket.clone(), &chain_key)
-                                    .await
-                                {
-                                    Ok(acked_ticket) => {
-                                        Some(TicketAggregationProcessed::Receive(destination, acked_ticket, request))
-                                    }
-                                    Err(e) => {
-                                        error!("Error while handling aggregated ticket: {e}");
-                                        None
-                                    }
-                                },
+                        match aggregated_ticket {
+                            Ok(ticket) => match db.process_received_aggregated_ticket(ticket.clone(), &chain_key).await
+                            {
+                                Ok(acked_ticket) => {
+                                    Some(TicketAggregationProcessed::Receive(destination, acked_ticket, request))
+                                }
                                 Err(e) => {
-                                    warn!("Counterparty refused to aggregate tickets: {e}");
+                                    error!(error = %e, "Error while handling aggregated ticket");
                                     None
                                 }
+                            },
+                            Err(e) => {
+                                warn!(error = %e, "Counterparty refused to aggregate tickets");
+                                None
                             }
+                        }
                     }
                     TicketAggregationToProcess::ToSend(channel, prerequsites, finalizer) => {
                         match db.prepare_aggregation_in_channel(&channel, prerequsites).await {
@@ -348,17 +349,19 @@ where
 
                                 // TODO: remove this transformation in 3.0 once proper aggregation protocol format is introduced
                                 let addr = chain_key.public().to_address();
-                                let tickets = tickets.into_iter()
+                                let tickets = tickets
+                                    .into_iter()
                                     .map(|t| hopr_internal_types::legacy::AcknowledgedTicket::new(t, &addr, &dst))
                                     .collect::<Vec<_>>();
                                 Some(TicketAggregationProcessed::Send(source.into(), tickets, finalizer))
                             }
                             Err(e) => {
-                                error!("An error occured when preparing the channel aggregation: {e}");
+                                error!(error = %e, "An error occured when preparing the channel aggregation");
                                 None
-                            },
+                            }
                             _ => {
-                                finalizer.finalize(); None
+                                finalizer.finalize();
+                                None
                             }
                         }
                     }
@@ -368,10 +371,10 @@ where
                     match poll_fn(|cx| Pin::new(&mut processed_tx).poll_ready(cx)).await {
                         Ok(_) => match processed_tx.start_send(event) {
                             Ok(_) => {}
-                            Err(e) => error!("Failed to pass a processed ack message: {}", e),
+                            Err(e) => error!(error = %e, "Failed to pass a processed ack message"),
                         },
                         Err(e) => {
-                            warn!("The receiver for processed ack no longer exists: {}", e);
+                            warn!(error = %e, "The receiver for processed ack no longer exists");
                         }
                     };
                 }
@@ -411,7 +414,9 @@ where
 
 #[cfg(test)]
 mod tests {
+    use super::TicketAggregationProcessed;
     use async_std::prelude::FutureExt;
+    use futures::pin_mut;
     use futures::stream::StreamExt;
     use hex_literal::hex;
     use hopr_crypto_types::{
@@ -429,8 +434,6 @@ mod tests {
     use lazy_static::lazy_static;
     use std::ops::{Add, Mul};
     use std::time::Duration;
-
-    use super::TicketAggregationProcessed;
 
     lazy_static! {
         static ref PEERS: Vec<OffchainKeypair> = [
@@ -559,6 +562,9 @@ mod tests {
             db_bob.upsert_ticket(None, ticket).await?;
         }
 
+        let (bob_notify_tx, bob_notify_rx) = futures::channel::mpsc::unbounded();
+        db_bob.start_ticket_processing(bob_notify_tx.into())?;
+
         let mut alice = super::TicketAggregationInteraction::<(), ()>::new(db_alice.clone(), &PEERS_CHAIN[0]);
         let mut bob = super::TicketAggregationInteraction::<(), ()>::new(db_bob.clone(), &PEERS_CHAIN[1]);
 
@@ -598,6 +604,12 @@ mod tests {
             _ => panic!("unexpected action happened while awaiting agg response at Bob"),
         }
 
+        pin_mut!(bob_notify_rx);
+        bob_notify_rx
+            .next()
+            .await
+            .expect("bob should have received the ticket notification");
+
         let stored_acked_tickets = db_bob.get_tickets((&channel_alice_bob).into()).await?;
 
         assert_eq!(
@@ -609,7 +621,7 @@ mod tests {
         assert_eq!(
             AcknowledgedTicketStatus::BeingRedeemed,
             stored_acked_tickets[0].status,
-            "first ticket must being redeemed"
+            "first ticket must be being redeemed"
         );
         assert!(
             stored_acked_tickets[1].verified_ticket().is_aggregated(),
@@ -635,6 +647,9 @@ mod tests {
         let db_bob = HoprDb::new_in_memory(PEERS_CHAIN[1].clone()).await?;
         init_db(db_alice.clone()).await?;
         init_db(db_bob.clone()).await?;
+
+        let (bob_notify_tx, bob_notify_rx) = futures::channel::mpsc::unbounded();
+        db_bob.start_ticket_processing(bob_notify_tx.into())?;
 
         const NUM_TICKETS: u64 = 30;
         const CHANNEL_TICKET_IDX: u64 = 20;
@@ -710,6 +725,12 @@ mod tests {
             }
             _ => panic!("unexpected action happened while awaiting agg response at Bob"),
         }
+
+        pin_mut!(bob_notify_rx);
+        bob_notify_rx
+            .next()
+            .await
+            .expect("bob should have received the ticket notification");
 
         let stored_acked_tickets = db_bob.get_tickets((&channel_alice_bob).into()).await?;
 
