@@ -27,7 +27,6 @@ def gen_random_tag():
 
 @asynccontextmanager
 async def create_channel(src: Node, dest: Node, funding: int, close_from_dest: bool = True, use_peer_id: bool = False):
-
     channel = await src.api.open_channel(dest.peer_id if use_peer_id else dest.address, str(int(funding)))
     assert channel is not None
     await asyncio.wait_for(check_channel_status(src, dest, status="Open"), 10.0)

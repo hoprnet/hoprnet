@@ -398,9 +398,23 @@
           treefmt = {
             inherit (config.flake-root) projectRootFile;
 
+            settings.global.excludes = [
+              "vendor/*"
+              "target/*"
+              "ethereum/bindings/src/codegen/*"
+              "db/entity/src/codegen/*"
+              "ethereum/contracts/src/static/*"
+              "**/.gitignore"
+              "**/.cargo-ok"
+              "**/*.id"
+              "tests/pytest.ini"
+              "tests/requirements.txt"
+              "docs/yellowpaper/"
+              "hopr/hopr-lib/snapshots/"
+            ];
+
             programs.yamlfmt.enable = true;
             settings.formatter.yamlfmt.includes = [ ".github/labeler.yml" ".github/workflows/*.yaml" ];
-            settings.formatter.yamlfmt.excludes = [ "vendor/*" ];
             # trying setting from https://github.com/google/yamlfmt/blob/main/docs/config-file.md
             settings.formatter.yamlfmt.settings = {
               formatter.type = "basic";
@@ -412,20 +426,16 @@
 
             programs.prettier.enable = true;
             settings.formatter.prettier.includes = [ "*.md" "*.json" "ethereum/contracts/README.md" ];
-            settings.formatter.prettier.excludes = [ "vendor/*" "ethereum/contracts/*" "*.yml" "*.yaml" ];
+            settings.formatter.prettier.excludes = [ "ethereum/contracts/*" "*.yml" "*.yaml" ];
 
             programs.rustfmt.enable = true;
-            settings.formatter.rustfmt.excludes = [ "vendor/*" "db/entity/src/codegen/*" "ethereum/bindings/src/codegen/*" ];
 
             programs.nixpkgs-fmt.enable = true;
-            settings.formatter.nixpkgs-fmt.excludes = [ "vendor/*" ];
 
             programs.taplo.enable = true;
-            settings.formatter.taplo.excludes = [ "vendor/*" "ethereum/contracts/*" ];
+            settings.formatter.taplo.excludes = [ "ethereum/contracts/*" ];
 
-            # FIXME: currently broken in treefmt
-            # programs.ruff.check = true;
-            # settings.formatter.ruff.check.excludes = [ "vendor/*" ];
+            programs.ruff-format.enable = true;
 
             settings.formatter.solc = {
               command = "sh";
@@ -452,7 +462,6 @@
                 "--"
               ];
               includes = [ "*.sol" ];
-              excludes = [ "vendor/*" "ethereum/contracts/src/static/*" ];
             };
           };
 
