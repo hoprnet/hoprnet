@@ -401,6 +401,10 @@
             programs.yamlfmt.enable = true;
             settings.formatter.yamlfmt.includes = [ ".github/labeler.yml" ".github/workflows/*.yaml" ];
             settings.formatter.yamlfmt.excludes = [ "vendor/*" ];
+            # trying setting from https://github.com/google/yamlfmt/blob/main/docs/config-file.md
+            settings.formatter.yamlfmt.settings = {
+              max_line_length = 120;
+            };
 
             programs.prettier.enable = true;
             settings.formatter.prettier.includes = [ "*.md" "*.json" "ethereum/contracts/README.md" ];
