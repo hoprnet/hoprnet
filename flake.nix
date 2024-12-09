@@ -444,7 +444,7 @@
                 "--"
               ];
               includes = [ "*.sol" ];
-              excludes = [ "./vendor/*" "./ethereum/contracts/src/static/*" ];
+              excludes = [ "vendor/*" "ethereum/contracts/src/static/*" ];
             };
           };
 
