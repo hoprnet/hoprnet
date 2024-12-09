@@ -403,7 +403,11 @@
             settings.formatter.yamlfmt.excludes = [ "vendor/*" ];
             # trying setting from https://github.com/google/yamlfmt/blob/main/docs/config-file.md
             settings.formatter.yamlfmt.settings = {
-              max_line_length = 120;
+              formatter.type = "basic";
+              formatter.max_line_length = 120;
+              formatter.trim_trailing_whitespace = true;
+              formatter.scan_folded_as_literal = true;
+              formatter.include_document_start = true;
             };
 
             programs.prettier.enable = true;
