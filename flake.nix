@@ -74,7 +74,7 @@
               ./README.md
               ./hopr/hopr-lib/data
               ./ethereum/contracts/contracts-addresses.json
-              ./ethereum/contracts/foundry.toml.in
+              ./ethereum/contracts/foundry.in.toml
               ./ethereum/contracts/remappings.txt
               ./hoprd/hoprd/example_cfg.yaml
               (fs.fileFilter (file: file.hasExt "rs") ./.)
@@ -323,7 +323,7 @@
                 (fs.fileFilter (file: file.hasExt "sol") ./ethereum/contracts/src)
                 ./tests
                 ./scripts
-                ./ethereum/contracts/foundry.toml.in
+                ./ethereum/contracts/foundry.in.toml
                 ./ethereum/contracts/remappings.txt
               ];
             };
@@ -399,18 +399,42 @@
             inherit (config.flake-root) projectRootFile;
 
             settings.global.excludes = [
-              "vendor/*"
-              "target/*"
-              "ethereum/bindings/src/codegen/*"
-              "db/entity/src/codegen/*"
-              "ethereum/contracts/src/static/*"
-              "**/.gitignore"
-              "**/.cargo-ok"
               "**/*.id"
+              "**/.cargo-ok"
+              "**/.gitignore"
+              ".actrc"
+              ".dockerignore"
+              ".editorconfig"
+              ".gcloudignore"
+              ".gitattributes"
+              ".yamlfmt"
+              "LICENSE"
+              "Makefile"
+              "db/entity/src/codegen/*"
+              "deploy/compose/grafana/config.monitoring"
+              "docs/*"
+              "ethereum/bindings/src/codegen/*"
+              "ethereum/contracts/Makefile"
+              "ethereum/contracts/broadcast/*"
+              "ethereum/contracts/contracts-addresses.json"
+              "ethereum/contracts/remappings.txt"
+              "ethereum/contracts/src/static/*"
+              "hopr/hopr-lib/tests/snapshots/*"
+              "hoprd/.dockerignore"
+              "hoprd/rest-api/.cargo/config"
+              "nix/setup-hook-darwin.sh"
+              "target/*"
               "tests/pytest.ini"
               "tests/requirements.txt"
-              "docs/yellowpaper/"
-              "hopr/hopr-lib/snapshots/"
+              "vendor/*"
+            ];
+
+            programs.shfmt.enable = true;
+            settings.formatter.shfmt.includes = [
+              "*.sh"
+              "deploy/compose/.env.sample"
+              "deploy/compose/.env-secrets.sample"
+              "ethereum/contracts/.env.example"
             ];
 
             programs.yamlfmt.enable = true;
@@ -433,7 +457,6 @@
             programs.nixpkgs-fmt.enable = true;
 
             programs.taplo.enable = true;
-            settings.formatter.taplo.excludes = [ "ethereum/contracts/*" ];
 
             programs.ruff-format.enable = true;
 
@@ -448,7 +471,7 @@
                     echo "solc = \"${solcDefault}/bin/solc\""
                     echo "Generating foundry.toml file!"
                     sed "s|# solc = .*|solc = \"${solcDefault}/bin/solc\"|g" \
-                      ethereum/contracts/foundry.toml.in >| \
+                      ethereum/contracts/foundry.in.toml >| \
                       ethereum/contracts/foundry.toml
                   else
                     echo "foundry.toml file already exists!"

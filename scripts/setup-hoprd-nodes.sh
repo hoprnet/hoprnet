@@ -3,7 +3,10 @@
 # prevent sourcing of this script, only allow execution
 # shellcheck disable=SC2091
 $(return >/dev/null 2>&1)
-test "$?" -eq "0" && { echo "This script should only be executed." >&2; exit 1; }
+test "$?" -eq "0" && {
+  echo "This script should only be executed." >&2
+  exit 1
+}
 
 # exit on errors, undefined variables, ensure errors in pipes are not hidden
 set -Eeuo pipefail
@@ -19,13 +22,13 @@ declare identities_path="${2?"missing parameter <identities_path>"}"
 identities=($(ls ${identities_path}))
 instances=($(gcloud compute instance-groups list-instances ${cluster_template_name} ${gcloud_region} --format=json | jq 'map(.instance)' | sed 's/.*zones\//"/' | sed 's/\/instances\//;/' | jq -r '@csv' | tr -d '\"' | sed 's/,/ /g'))
 
-setup_node(){
+setup_node() {
   zone=${1}
   instance=${2}
   identity=${3}
   echo "Setting up ${instance} with $identities_path/$identity"
   gcloud compute ssh --zone ${zone} ${instance} --command 'sudo rm -rf /opt/hoprd/{.hoprd.id,.env,db}'
-  gcloud compute scp --zone ${zone}  $identities_path/$identity/{.hoprd.id,.env} ${instance}:/opt/hoprd/
+  gcloud compute scp --zone ${zone} $identities_path/$identity/{.hoprd.id,.env} ${instance}:/opt/hoprd/
   echo "Ensure host ip is set in environment file"
   gcloud compute ssh --zone ${zone} ${instance} --command '
     ip=$(curl -s -H "Metadata-Flavor:Google" http://metadata/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip)
