@@ -4,7 +4,6 @@ use std::sync::Arc;
 
 use chain_types::chain_events::SignificantChainEvent;
 use chain_types::ContractAddresses;
-use hopr_chain_rpc::BlockWithLogs;
 use hopr_primitive_types::prelude::*;
 
 use crate::errors::Result;
@@ -19,7 +18,7 @@ pub trait ChainLogHandler {
 
     fn safe_address(&self) -> Address;
 
-    async fn collect_block_events(&self, block_with_logs: BlockWithLogs) -> Result<Vec<SignificantChainEvent>>;
+    async fn collect_log_event(&self, log: SerializableLog) -> Result<Option<SignificantChainEvent>>;
 }
 
 #[cfg(test)]
@@ -33,8 +32,8 @@ mock! {
     /// ```
     /// use mockall::predicate::*;
     /// let mut mock = MockChainLogHandler::new();
-    /// mock.expect_collect_block_events()
-    ///     .returning(|_| Ok(vec![]));
+    /// mock.expect_collect_log_event()
+    ///     .returning(|_| Ok(None));
     /// ```
     pub ChainLogHandler {}
 
@@ -48,6 +47,6 @@ mock! {
         fn contract_addresses_map(&self) -> Arc<ContractAddresses>;
         fn contract_address_topics(&self, contract: Address) -> Vec<TxHash>;
         fn safe_address(&self) -> Address;
-        async fn collect_block_events(&self, block_with_logs: BlockWithLogs) -> Result<Vec<SignificantChainEvent>>;
+        async fn collect_log_event(&self, log: SerializableLog) -> Result<Option<SignificantChainEvent>>;
     }
 }
