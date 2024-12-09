@@ -27,11 +27,8 @@ use std::{
 };
 
 use chain_api::config::{Addresses as ContractAddresses, EnvironmentType};
-use hopr_chain_rpc::{
-    client::{surf_client::SurfRequestor as DefaultHttpPostRequestor, SimpleJsonRpcRetryPolicy},
-    errors::RpcError,
-    rpc::RpcOperationsConfig,
-};
+use hopr_chain_rpc::types::{DefaultHttpPostRequestor, JsonRpcClient};
+use hopr_chain_rpc::{client::SimpleJsonRpcRetryPolicy, errors::RpcError, rpc::RpcOperationsConfig};
 use hopr_crypto_types::keypairs::ChainKeypair;
 use hopr_crypto_types::keypairs::Keypair;
 

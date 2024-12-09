@@ -21,6 +21,7 @@ use executors::{EthereumTransactionExecutor, RpcEthereumClient, RpcEthereumClien
 use hopr_async_runtime::prelude::{sleep, spawn, JoinHandle};
 use hopr_chain_rpc::client::SimpleJsonRpcRetryPolicy;
 use hopr_chain_rpc::rpc::{RpcOperations, RpcOperationsConfig};
+use hopr_chain_rpc::types::{DefaultHttpPostRequestor, JsonRpcClient};
 use hopr_chain_rpc::HoprRpcOperations;
 use hopr_crypto_types::prelude::*;
 use hopr_db_sql::HoprDbAllOperations;
@@ -30,23 +31,6 @@ use hopr_internal_types::prelude::ChannelDirection;
 use hopr_primitive_types::prelude::*;
 
 use crate::errors::{HoprChainError, Result};
-
-/// The default HTTP request engine
-///
-/// TODO: Should be an internal type, `hopr_lib::chain` must be moved to this package
-#[cfg(feature = "runtime-async-std")]
-pub type DefaultHttpPostRequestor = hopr_chain_rpc::client::surf_client::SurfRequestor;
-
-// Both features could be enabled during testing, therefore we only use tokio when its
-// exclusively enabled.
-#[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
-pub type DefaultHttpPostRequestor = hopr_chain_rpc::client::reqwest_client::ReqwestRequestor;
-
-/// The default JSON RPC provider client
-///
-/// TODO: Should be an internal type, `hopr_lib::chain` must be moved to this package
-pub type JsonRpcClient =
-    hopr_chain_rpc::client::JsonRpcProviderClient<DefaultHttpPostRequestor, SimpleJsonRpcRetryPolicy>;
 
 /// Checks whether the node can be registered with the Safe in the NodeSafeRegistry
 pub async fn can_register_with_safe<Rpc: HoprRpcOperations>(
@@ -122,11 +106,7 @@ type ActionQueueType<T> = ActionQueue<
     IndexerActionTracker,
     EthereumTransactionExecutor<
         hopr_chain_rpc::TypedTransaction,
-        RpcEthereumClient<
-            RpcOperations<
-                hopr_chain_rpc::client::JsonRpcProviderClient<DefaultHttpPostRequestor, SimpleJsonRpcRetryPolicy>,
-            >,
-        >,
+        RpcEthereumClient<RpcOperations<JsonRpcClient>>,
         SafePayloadGenerator,
     >,
 >;
@@ -261,6 +241,7 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
                     self.safe_address,
                     self.me_onchain.clone(),
                     self.db.clone(),
+                    self.rpc_operations.clone(),
                 ),
                 self.db.clone(),
                 self.indexer_cfg,
@@ -336,6 +317,13 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
 
     pub async fn get_safe_balance(&self, safe_address: Address, balance_type: BalanceType) -> errors::Result<Balance> {
         Ok(self.rpc_operations.get_balance(safe_address, balance_type).await?)
+    }
+
+    pub async fn get_safe_hopr_allowance(&self) -> Result<Balance> {
+        Ok(self
+            .rpc_operations
+            .get_allowance(self.safe_address, self.contract_addresses.channels)
+            .await?)
     }
 
     pub async fn get_channel_closure_notice_period(&self) -> errors::Result<Duration> {

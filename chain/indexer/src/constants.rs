@@ -1,8 +1,4 @@
 pub mod topics {
-    use ethers::types::H256;
-
-    use hopr_primitive_types::prelude::Address;
-
     use bindings::{
         hopr_announcements::{AddressAnnouncementFilter, KeyBindingFilter, RevokeAnnouncementFilter},
         hopr_channels::{

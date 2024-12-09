@@ -132,10 +132,17 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
     fn try_stream_logs<'a>(
         &'a self,
         start_block_number: u64,
-        filters: Vec<ethers::types::Filter>,
+        mut filters: Vec<ethers::types::Filter>,
+        is_synced: bool,
     ) -> Result<Pin<Box<dyn Stream<Item = BlockWithLogs> + Send + 'a>>> {
         if filters.is_empty() {
             return Err(FilterIsEmpty);
+        }
+
+        if !is_synced {
+            // Because we are not synced yet, we will not get logs for the token contract.
+            // These are only relevant for the indexer if we are synced.
+            filters.retain(|f| f.address != ethers::types::Address::from(self.cfg.contract_addrs.token));
         }
 
         Ok(Box::pin(stream! {
