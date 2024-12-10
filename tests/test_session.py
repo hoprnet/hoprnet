@@ -252,8 +252,8 @@ async def test_session_communication_with_a_tcp_echo_server(
 
     assert ''.join(expected) == actual
 
-    assert await src_peer.api.session_close_client(protocol='tcp', bound_ip='127.0.0.1', bound_port=src_sock_port) is True
-    assert len(await src_peer.api.session_list_clients('tcp')) == 0
+    assert await src_peer.api.session_close_client(protocol='tcp', bound_ip='127.0.0.1', bound_port=src_sock_port)
+    assert await src_peer.api.session_list_clients('tcp') == []
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
@@ -315,8 +315,8 @@ async def test_session_communication_over_n_hop_with_a_tcp_echo_server(
 
         assert ''.join(expected) == actual
 
-        assert await src_peer.api.session_close_client(protocol='tcp', bound_ip='127.0.0.1', bound_port=src_sock_port) is True
-        assert len(await src_peer.api.session_list_clients('tcp')) == 0
+        assert await src_peer.api.session_close_client(protocol='tcp', bound_ip='127.0.0.1', bound_port=src_sock_port)
+        assert await src_peer.api.session_list_clients('tcp') == []
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("src,dest", random_distinct_pairs_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
@@ -366,11 +366,10 @@ async def test_session_communication_with_a_udp_echo_server(
     actual.sort()
     expected.sort()
 
-    assert len(actual) == len(expected)
     assert actual == expected
 
-    assert await src_peer.api.session_close_client(protocol='udp', bound_ip='127.0.0.1', bound_port=src_sock_port) is True
-    assert len(await src_peer.api.session_list_clients('udp')) == 0
+    assert await src_peer.api.session_close_client(protocol='udp', bound_ip='127.0.0.1', bound_port=src_sock_port)
+    assert await src_peer.api.session_list_clients('udp') == []
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("src,dest", random_distinct_pairs_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
@@ -419,11 +418,10 @@ async def test_session_communication_with_udp_loopback_service(
     actual.sort()
     expected.sort()
 
-    assert len(actual) == len(expected)
     assert actual == expected
 
-    assert await src_peer.api.session_close_client(protocol='udp', bound_ip='127.0.0.1', bound_port=src_sock_port) is True
-    assert len(await src_peer.api.session_list_clients('udp')) == 0
+    assert await src_peer.api.session_close_client(protocol='udp', bound_ip='127.0.0.1', bound_port=src_sock_port)
+    assert await src_peer.api.session_list_clients('udp') == []
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
@@ -490,11 +488,10 @@ async def test_session_communication_over_n_hop_with_a_udp_echo_server(
         actual.sort()
         expected.sort()
 
-        assert len(actual) == len(expected)
         assert actual == expected
 
-        assert await src_peer.api.session_close_client(protocol='udp', bound_ip='127.0.0.1', bound_port=src_sock_port) is True
-        assert len(await src_peer.api.session_list_clients('udp')) == 0
+        assert await src_peer.api.session_close_client(protocol='udp', bound_ip='127.0.0.1', bound_port=src_sock_port)
+        assert await src_peer.api.session_list_clients('udp') == []
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("src,dest", random_distinct_pairs_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
@@ -518,8 +515,8 @@ async def test_session_communication_with_an_https_server(
         assert response is not None
         assert response.text == expected
 
-        assert await src_peer.api.session_close_client(protocol='tcp', bound_ip='127.0.0.1', bound_port=src_sock_port) is True
-        assert len(await src_peer.api.session_list_clients('tcp')) == 0
+        assert await src_peer.api.session_close_client(protocol='tcp', bound_ip='127.0.0.1', bound_port=src_sock_port)
+        assert await src_peer.api.session_list_clients('tcp') == []
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
@@ -565,8 +562,8 @@ async def test_session_communication_over_n_hop_with_an_https_server(
             assert response is not None
             assert response.text == expected
 
-            assert await src_peer.api.session_close_client(protocol='tcp', bound_ip='127.0.0.1', bound_port=src_sock_port) is True
-            assert len(await src_peer.api.session_list_clients('tcp')) == 0
+            assert await src_peer.api.session_close_client(protocol='tcp', bound_ip='127.0.0.1', bound_port=src_sock_port)
+            assert await src_peer.api.session_list_clients('tcp') == []
 
 
 @pytest.mark.skipif(
