@@ -264,38 +264,38 @@ pub(super) async fn metrics() -> impl IntoResponse {
     }
 }
 
-#[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 #[schema(example = json!({
         "ignore_disconnected_components": true,
-        "ignore_non_opened_channels": true
+        "ignore_non_opened_channels": true,
+        "raw_graph": false,
     }))]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct GraphExportRequest {
     /// If set, nodes that are not connected to this node (via open channels) will not be exported.
     /// This setting automatically implies `ignore_non_opened_channels`.
-    pub ignore_disconnected_components: bool,
+    pub ignore_disconnected_components: Option<bool>,
     /// Do not export channels that are not in the `Open` state.
-    pub ignore_non_opened_channels: bool,
-    /// Export the entire graph in raw bincode format, that can be later
+    pub ignore_non_opened_channels: Option<bool>,
+    /// Export the entire graph in raw JSON format, that can be later
     /// used to load the graph into e.g. a unit test.
     ///
     /// Note that `ignore_disconnected_components` and `ignore_non_opened_channels` are ignored.
-    pub raw_graph: bool,
+    pub raw_graph: Option<bool>,
 }
 
 impl From<GraphExportRequest> for GraphExportConfig {
     fn from(value: GraphExportRequest) -> Self {
         Self {
-            ignore_disconnected_components: value.ignore_disconnected_components,
-            ignore_non_opened_channels: value.ignore_non_opened_channels,
+            ignore_disconnected_components: value.ignore_disconnected_components.unwrap_or(true),
+            ignore_non_opened_channels: value.ignore_non_opened_channels.unwrap_or(false),
         }
     }
 }
 
-/// Retrieve node's channel graph in DOT (graphviz) format.
+/// Retrieve node's channel graph in DOT or JSON format.
 #[utoipa::path(
-    get,
+    post,
     path = const_format::formatcp!("{BASE_PATH}/node/graph"),
     request_body(
             content = GraphExportRequest,
@@ -315,7 +315,7 @@ pub(super) async fn channel_graph(
     State(state): State<Arc<InternalState>>,
     Json(args): Json<GraphExportRequest>,
 ) -> impl IntoResponse {
-    if args.raw_graph {
+    if args.raw_graph.unwrap_or(false) {
         match state.hopr.export_raw_channel_graph().await {
             Ok(raw_graph) => (StatusCode::OK, raw_graph).into_response(),
             Err(error) => (

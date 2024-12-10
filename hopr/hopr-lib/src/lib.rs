@@ -1502,9 +1502,8 @@ impl Hopr {
         self.channel_graph.read().await.as_dot(cfg)
     }
 
-    pub async fn export_raw_channel_graph(&self) -> errors::Result<Box<[u8]>> {
-        bincode::serialize(self.channel_graph.read().await.deref())
-            .map(|bytes| bytes.into_boxed_slice())
+    pub async fn export_raw_channel_graph(&self) -> errors::Result<String> {
+        serde_json::to_string(self.channel_graph.read().await.deref())
             .map_err(|e| HoprLibError::GeneralError(e.to_string()))
     }
 }
