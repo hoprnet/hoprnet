@@ -44,9 +44,8 @@
             inherit localSystem overlays;
           };
           solcDefault = solc.mkDefault pkgs pkgs.solc_0_8_19;
-          rustNightly = pkgs.rust-bin.selectLatestNightlyWith (toolchain: toolchain.default);
-          craneLibNightly = (crane.mkLib pkgs).overrideToolchain rustNightly;
-          hoprdCrateInfoOriginal = craneLibNightly.crateNameFromCargoToml {
+          craneLib = (crane.mkLib pkgs).overrideToolchain (p: p.rust-bin.stable.latest.default);
+          hoprdCrateInfoOriginal = craneLib.crateNameFromCargoToml {
             cargoToml = ./hopr/hopr-lib/Cargo.toml;
           };
           hoprdCrateInfo = {
