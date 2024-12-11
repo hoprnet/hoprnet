@@ -924,14 +924,17 @@ impl Hopr {
 
         {
             let channel_graph = self.channel_graph.clone();
-            let mut cg = channel_graph.write().await;
 
             info!("Syncing channels from the previous runs");
-            let channels = self.db.get_all_channels(None).await?;
-
-            cg.sync_channels(channels).map_err(|e| {
-                HoprLibError::GeneralError(format!("failed to initialize channel graph from the DB: {e}"))
-            })?;
+            self.db
+                .for_each_active_channel(None, move |channel| {
+                    let channel_graph = channel_graph.clone();
+                    async move {
+                        let mut cg = channel_graph.write().await;
+                        cg.update_channel(channel);
+                    }
+                })
+                .await?;
 
             // Sync all the qualities there too
             let mut peer_stream = self
@@ -939,6 +942,9 @@ impl Hopr {
                 .get_network_peers(Default::default(), false)
                 .await
                 .map_err(hopr_db_sql::api::errors::DbError::from)?;
+
+            let channel_graph = self.channel_graph.clone();
+            let mut cg = channel_graph.write().await;
             while let Some(peer) = peer_stream.next().await {
                 if let Some(ChainKey(key)) = self.db.translate_key(None, peer.id.0).await? {
                     cg.update_node_quality(&key, peer.get_quality());
@@ -1503,7 +1509,7 @@ impl Hopr {
     }
 
     pub async fn export_raw_channel_graph(&self) -> errors::Result<String> {
-        serde_json::to_string(self.channel_graph.read().await.deref())
-            .map_err(|e| HoprLibError::GeneralError(e.to_string()))
+        let cg = self.channel_graph.read().await;
+        serde_json::to_string(cg.deref()).map_err(|e| HoprLibError::GeneralError(e.to_string()))
     }
 }

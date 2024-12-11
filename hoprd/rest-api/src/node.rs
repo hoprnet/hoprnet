@@ -263,44 +263,42 @@ pub(super) async fn metrics() -> impl IntoResponse {
     }
 }
 
-#[serde_as]
-#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
-#[schema(example = json!({
-        "ignoreDisconnectedComponents": true,
-        "ignoreNonOpenedChannels": true,
-        "rawGraph": false,
-    }))]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct GraphExportRequest {
+#[derive(Debug, Clone, Serialize, Deserialize, Default, utoipa::IntoParams, utoipa::ToSchema)]
+#[into_params(parameter_in = Query)]
+#[serde(default, rename_all = "camelCase")]
+pub(crate) struct GraphExportQuery {
     /// If set, nodes that are not connected to this node (via open channels) will not be exported.
     /// This setting automatically implies `ignore_non_opened_channels`.
-    pub ignore_disconnected_components: Option<bool>,
+    #[schema(required = false)]
+    #[serde(default)]
+    pub ignore_disconnected_components: bool,
     /// Do not export channels that are not in the `Open` state.
-    pub ignore_non_opened_channels: Option<bool>,
+    #[schema(required = false)]
+    #[serde(default)]
+    pub ignore_non_opened_channels: bool,
     /// Export the entire graph in raw JSON format, that can be later
     /// used to load the graph into e.g. a unit test.
     ///
     /// Note that `ignore_disconnected_components` and `ignore_non_opened_channels` are ignored.
-    pub raw_graph: Option<bool>,
+    #[schema(required = false)]
+    #[serde(default)]
+    pub raw_graph: bool,
 }
 
-impl From<GraphExportRequest> for GraphExportConfig {
-    fn from(value: GraphExportRequest) -> Self {
+impl From<GraphExportQuery> for GraphExportConfig {
+    fn from(value: GraphExportQuery) -> Self {
         Self {
-            ignore_disconnected_components: value.ignore_disconnected_components.unwrap_or(true),
-            ignore_non_opened_channels: value.ignore_non_opened_channels.unwrap_or(false),
+            ignore_disconnected_components: value.ignore_disconnected_components,
+            ignore_non_opened_channels: value.ignore_non_opened_channels,
         }
     }
 }
 
 /// Retrieve node's channel graph in DOT or JSON format.
 #[utoipa::path(
-    post,
+    get,
     path = const_format::formatcp!("{BASE_PATH}/node/graph"),
-    request_body(
-            content = GraphExportRequest,
-            description = "Graph export configuration",
-            content_type = "application/json"),
+    params(GraphExportQuery),
     responses(
             (status = 200, description = "Fetched channel graph", body = String),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
@@ -313,9 +311,9 @@ impl From<GraphExportRequest> for GraphExportConfig {
 )]
 pub(super) async fn channel_graph(
     State(state): State<Arc<InternalState>>,
-    Json(args): Json<GraphExportRequest>,
+    Query(args): Query<GraphExportQuery>,
 ) -> impl IntoResponse {
-    if args.raw_graph.unwrap_or(false) {
+    if args.raw_graph {
         match state.hopr.export_raw_channel_graph().await {
             Ok(raw_graph) => (StatusCode::OK, raw_graph).into_response(),
             Err(error) => (

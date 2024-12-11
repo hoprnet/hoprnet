@@ -1,9 +1,5 @@
-use crate::cache::ChannelParties;
-use crate::db::HoprDb;
-use crate::errors::{DbSqlError, Result};
-use crate::{HoprDbGeneralModelOperations, OptTx};
 use async_trait::async_trait;
-use futures::TryStreamExt;
+use futures::{FutureExt, TryStreamExt};
 use hopr_crypto_types::prelude::*;
 use hopr_db_entity::channel;
 use hopr_db_entity::conversions::channels::ChannelStatusUpdate;
@@ -12,6 +8,12 @@ use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use sea_orm::ActiveValue::Set;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter};
+use std::future::Future;
+
+use crate::cache::ChannelParties;
+use crate::db::HoprDb;
+use crate::errors::{DbSqlError, Result};
+use crate::{HoprDbGeneralModelOperations, OptTx};
 
 /// API for editing [ChannelEntry] in the DB.
 pub struct ChannelEditor {
@@ -96,6 +98,12 @@ pub trait HoprDbChannelOperations {
 
     /// Retrieves all channel information from the DB.
     async fn get_all_channels<'a>(&'a self, tx: OptTx<'a>) -> Result<Vec<ChannelEntry>>;
+
+    /// Perform an operation for each channel that is `Open` or `PendingToClose` with an active grace period.
+    async fn for_each_active_channel<'a, F, Fut>(&'a self, tx: OptTx<'a>, action: F) -> Result<()>
+    where
+        F: FnMut(ChannelEntry) -> Fut + Send + 'static,
+        Fut: Future<Output = ()> + Send;
 
     /// Inserts or updates the given channel entry.
     async fn upsert_channel<'a>(&'a self, tx: OptTx<'a>, channel_entry: ChannelEntry) -> Result<()>;
@@ -255,6 +263,37 @@ impl HoprDbChannelOperations for HoprDb {
                         .map_err(DbSqlError::from)
                         .try_filter_map(|m| async move { Ok(Some(ChannelEntry::try_from(m)?)) })
                         .try_collect()
+                        .await
+                })
+            })
+            .await
+    }
+
+    async fn for_each_active_channel<'a, F, Fut>(&'a self, tx: OptTx<'a>, mut action: F) -> Result<()>
+    where
+        F: FnMut(ChannelEntry) -> Fut + Send + 'static,
+        Fut: Future<Output = ()> + Send,
+    {
+        self.nest_transaction(tx)
+            .await?
+            .perform(|tx| {
+                Box::pin(async move {
+                    let now = chrono::Utc::now();
+                    Channel::find()
+                        .filter(
+                            channel::Column::Status
+                                .eq(1) // Open
+                                .or(channel::Column::Status
+                                    .eq(2) // PendingToClose
+                                    .and(channel::Column::ClosureTime.gt(now))),
+                        )
+                        .stream(tx.as_ref())
+                        .await?
+                        .map_err(DbSqlError::from)
+                        .try_for_each(|model| match ChannelEntry::try_from(model) {
+                            Ok(entry) => action(entry).map(Ok).boxed(),
+                            Err(e) => futures::future::err(e.into()).boxed(),
+                        })
                         .await
                 })
             })

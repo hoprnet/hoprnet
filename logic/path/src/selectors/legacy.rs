@@ -79,7 +79,7 @@ pub struct DfsPathSelector<CW>
 where
     CW: EdgeWeighting<U256>,
 {
-    /// Maximum number of iterations before a path selection fails
+    /// The maximum number of iterations before a path selection fails
     /// Default is 100
     pub max_iterations: usize,
     /// Peer quality threshold for a channel to be taken into account.
