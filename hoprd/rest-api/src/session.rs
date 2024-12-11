@@ -26,7 +26,7 @@ use tracing::{debug, error, info, trace};
 
 use hopr_lib::errors::HoprLibError;
 use hopr_lib::transfer_session;
-use hopr_lib::{HoprSession, IpProtocol, SessionClientConfig};
+use hopr_lib::{HoprSession, SessionClientConfig};
 use hopr_network_types::prelude::{ConnectedUdpStream, IpOrHost, SealedHost, UdpStreamParallelism};
 use hopr_network_types::udp::ForeignDataMode;
 use hopr_network_types::utils::AsyncReadStreamer;
@@ -174,7 +174,7 @@ impl SessionWebsocketClientQueryRequest {
         Ok(SessionClientConfig {
             peer: self.destination,
             path_options,
-            target_protocol: self.protocol,
+            target_protocol: self.protocol.into(),
             target: self.target.try_into()?,
             capabilities: self.capabilities.into_iter().map(|v| v.into()).collect(),
         })
@@ -313,6 +313,7 @@ async fn websocket_connection(socket: WebSocket, session: HoprSession) {
 #[serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub enum RoutingOptions {
+    #[cfg(feature = "explicit-path")]
     #[schema(value_type = Vec<String>)]
     IntermediatePath(#[serde_as(as = "Vec<DisplayFromStr>")] Vec<PeerId>),
     Hops(usize),
@@ -384,7 +385,7 @@ impl SessionClientRequest {
         Ok(SessionClientConfig {
             peer,
             path_options: self.path.try_into()?,
-            target_protocol,
+            target_protocol: target_protocol.into(),
             target: self.target.try_into()?,
             capabilities: self
                 .capabilities
@@ -503,7 +504,7 @@ pub(crate) async fn create_client(
             .open_listeners
             .read()
             .await
-            .contains_key(&ListenerId(protocol, bind_host))
+            .contains_key(&ListenerId(protocol.into(), bind_host))
     {
         return Err((StatusCode::CONFLICT, ApiErrorStatus::InvalidInput));
     }
@@ -579,7 +580,7 @@ pub(crate) async fn create_client(
                 .open_listeners
                 .write()
                 .await
-                .insert(ListenerId(protocol, bound_host), (target.clone(), jh));
+                .insert(ListenerId(protocol.into(), bound_host), (target.clone(), jh));
             bound_host
         }
         IpProtocol::UDP => {
@@ -611,7 +612,7 @@ pub(crate) async fn create_client(
             })?;
 
             let open_listeners_clone = state.open_listeners.clone();
-            let listener_id = ListenerId(protocol, bound_host);
+            let listener_id = ListenerId(protocol.into(), bound_host);
 
             state.open_listeners.write().await.insert(
                 listener_id,
@@ -677,7 +678,7 @@ pub(crate) async fn list_clients(
         .read()
         .await
         .iter()
-        .filter(|(id, _)| id.0 == protocol)
+        .filter(|(id, _)| id.0 == protocol.into())
         .map(|(id, (target, _))| SessionClientResponse {
             protocol,
             target: target.to_string(),
@@ -689,6 +690,33 @@ pub(crate) async fn list_clients(
     Ok::<_, (StatusCode, ApiErrorStatus)>((StatusCode::OK, Json(response)).into_response())
 }
 
+#[derive(
+    Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, strum::Display, strum::EnumString, utoipa::ToSchema,
+)]
+#[strum(serialize_all = "lowercase", ascii_case_insensitive)]
+#[serde(rename_all = "lowercase")]
+pub enum IpProtocol {
+    TCP,
+    UDP,
+}
+
+impl From<IpProtocol> for hopr_lib::IpProtocol {
+    fn from(protocol: IpProtocol) -> hopr_lib::IpProtocol {
+        match protocol {
+            IpProtocol::TCP => hopr_lib::IpProtocol::TCP,
+            IpProtocol::UDP => hopr_lib::IpProtocol::UDP,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, utoipa::IntoParams, utoipa::ToSchema)]
+pub struct SessionCloseClientQuery {
+    #[schema(value_type = String)]
+    pub protocol: IpProtocol,
+    pub ip: String,
+    pub port: u16,
+}
+
 /// Closes an existing Session listener.
 /// The listener must've been previously created and bound for the given IP protocol.
 /// Once a listener is closed, no more socket connections can be made to it.
@@ -697,11 +725,7 @@ pub(crate) async fn list_clients(
 #[utoipa::path(
     delete,
     path = const_format::formatcp!("{BASE_PATH}/session/{{protocol}}/{{ip}}/{{port}}"),
-    params(
-            ("protocol" = String, Path, description = "IP transport protocol"),
-            ("ip" = String, Path, description = "Listening IP address"),
-            ("port" = u16, Path, description = "Listening port"),
-    ),
+    params(SessionCloseClientQuery),
     responses(
             (status = 204, description = "Listener closed successfully"),
             (status = 400, description = "Invalid IP protocol or port.", body = ApiError),
@@ -717,10 +741,7 @@ pub(crate) async fn list_clients(
 )]
 pub(crate) async fn close_client(
     State(state): State<Arc<InternalState>>,
-    // Query(SessionCloseClientRequest { listening_ip, port }): Query<SessionCloseClientRequest>,
-    Path(protocol): Path<IpProtocol>,
-    Path(ip): Path<String>,
-    Path(port): Path<u16>,
+    Path(SessionCloseClientQuery { protocol, ip, port }): Path<SessionCloseClientQuery>,
 ) -> Result<impl IntoResponse, impl IntoResponse> {
     let listening_ip: IpAddr = ip
         .parse()
@@ -735,6 +756,7 @@ pub(crate) async fn close_client(
         open_listeners
             .iter()
             .filter(|(ListenerId(proto, addr), _)| {
+                let protocol: hopr_lib::IpProtocol = protocol.into();
                 protocol == *proto && addr.ip() == listening_ip && (addr.port() == port || port == 0)
             })
             .for_each(|(id, _)| to_remove.push(*id));
