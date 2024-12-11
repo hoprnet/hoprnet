@@ -88,6 +88,8 @@ where
                             let self_addr = g.my_address();
                             g.update_channel_quality(self_addr, chain_key, quality);
                             debug!("update channel {self_addr} -> {chain_key} with quality {quality}");
+                            let q = g.get_channel_quality(self_addr, chain_key);
+                            debug!("channel now has quality {q:?}");
                         } else {
                             error!(%peer, "could not resolve chain key ");
                         }

@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+use std::collections::HashMap;
 use crate::errors::Result;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::primitives::Address;
@@ -8,6 +10,9 @@ use petgraph::visit::{EdgeFiltered, EdgeRef, NodeFiltered};
 use petgraph::Direction;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Formatter};
+use futures::sink::drain;
+use petgraph::graph::{EdgeReference, IndexType};
+use petgraph::prelude::{NodeIndex, StableDiGraph};
 use tracing::{debug, info};
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -37,7 +42,6 @@ pub struct ChannelEdge {
     /// Underlying channel
     pub channel: ChannelEntry,
     /// Network quality of this channel at the transport level (if any).
-    /// This value is currently present only for *own channels*.
     pub quality: Option<f64>,
 }
 
@@ -53,6 +57,18 @@ impl std::fmt::Display for ChannelEdge {
     }
 }
 
+/// Represents a node in the Channel Graph.
+/// This is typically represented by an on-chain address and ping quality, which
+/// represents some kind of node's liveness as perceived by us.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+pub struct Node {
+    /// Node's on-chain address.
+    pub address: Address,
+    /// Liveness of the node.
+    pub quality: f64,
+}
+
+
 /// Implements a HOPR payment channel graph (directed) cached in-memory.
 ///
 /// This structure is useful for tracking channel state changes and
@@ -67,7 +83,8 @@ impl std::fmt::Display for ChannelEdge {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ChannelGraph {
     me: Address,
-    graph: DiGraphMap<Address, ChannelEdge>,
+    indices: HashMap<Address, NodeIndex>,
+    graph: StableDiGraph<Node, ChannelEdge>,
 }
 
 impl ChannelGraph {
@@ -84,7 +101,8 @@ impl ChannelGraph {
 
         Self {
             me,
-            graph: DiGraphMap::default(),
+            indices: HashMap::new(),
+            graph: StableDiGraph::default(),
         }
     }
 
@@ -98,17 +116,31 @@ impl ChannelGraph {
         self.me
     }
 
+    fn get_edge(&self, src: Address, dst: Address) -> Option<petgraph::stable_graph::EdgeReference<ChannelEdge>> {
+        let (src_idx, dst_idx) = self.indices.get(&src)
+            .and_then(|src| self.indices.get(&dst).map(|dst| (*src, *dst)))?;
+        self.graph
+            .edges_connecting(src_idx, dst_idx)
+            .next()
+    }
+
     /// Looks up an `Open` or `PendingToClose` channel given the source and destination.
     /// Returns `None` if no such edge exists in the graph.
     pub fn get_channel(&self, source: Address, destination: Address) -> Option<&ChannelEntry> {
-        self.graph.edge_weight(source, destination).map(|w| &w.channel)
+        self.get_edge(source, destination)
+            .map(|e| &e.weight().channel)
+        // self.graph.edge_weight(src_idx, dst_idx).map(|w| &w.channel)
     }
 
     /// Gets all `Open` outgoing channels going from the given `Address`
-    pub fn open_channels_from(&self, source: Address) -> impl Iterator<Item = (Address, Address, &ChannelEdge)> {
-        self.graph
-            .edges_directed(source, Direction::Outgoing)
-            .filter(|c| c.weight().channel.status == ChannelStatus::Open)
+    pub fn open_channels_from(&self, source: Address) -> impl Iterator<Item = (Node, Node, &ChannelEdge)> {
+        if let Some(idx) = self.indices.get(&source) {
+            self.graph
+                .edges_directed(*idx, Direction::Outgoing)
+                .filter(|c| c.weight().channel.status == ChannelStatus::Open)
+        } else {
+            vec![].into_iter()
+        }
     }
 
     /// Checks whether there's any path via Open channels that connects `source` and `destination`
@@ -168,9 +200,8 @@ impl ChannelGraph {
 
         // Remove the edge since we don't allow Closed channels
         if channel.status == ChannelStatus::Closed {
-            let ret = self
-                .graph
-                .remove_edge(channel.source, channel.destination)
+            let ret = self.get_edge(channel.source, channel.destination)
+                .and_then(|e| self.graph.remove_edge(e.id()))
                 .map(|old_value| ChannelChange::diff_channels(&old_value.channel, &channel));
 
             debug!("removed {channel}");
@@ -178,7 +209,8 @@ impl ChannelGraph {
             return ret;
         }
 
-        if let Some(old_value) = self.graph.edge_weight_mut(channel.source, channel.destination) {
+        if let Some(old_value) = self.get_edge(channel.destination, channel.destination)
+            .and_then(|e| self.graph.edge_weight_mut(e.id())) {
             let old_channel = old_value.channel;
             old_value.channel = channel;
 
@@ -189,19 +221,40 @@ impl ChannelGraph {
             );
             Some(ret)
         } else {
+            let src = *self.indices.entry(channel.source)
+                .or_insert_with(|| self.graph.add_node(Node { address: channel.source, quality: 0.0 }));
+
+            let dst = *self.indices.entry(channel.destination)
+                .or_insert_with(|| self.graph.add_node(Node { address: channel.destination, quality: 0.0 }));
+
             let weighted = ChannelEdge { channel, quality: None };
-            self.graph.add_edge(channel.source, channel.destination, weighted);
+
+            self.graph.add_edge(src, dst, weighted);
             debug!("new {channel}");
 
             None
         }
     }
 
+    /// Updates the quality of a node.
+    /// The given quality value must be always non-negative
+    pub fn update_node_quality(&mut self, address: Address, quality: f64) {
+        assert!(quality >= 0_f64, "quality must be non-negative");
+        if let Some(node) = self.indices.get(&address).and_then(|node| self.graph.node_weight_mut(*node)) {
+            node.quality = quality;
+        } else {
+            self.indices.insert(address, self.graph.add_node(Node { address, quality }));
+        }
+        debug!("updated quality of {address} to {quality}");
+    }
+
     /// Updates the quality value of network connection between `source` and `destination`
     /// The given quality value must be always non-negative
     pub fn update_channel_quality(&mut self, source: Address, destination: Address, quality: f64) {
         assert!(quality >= 0_f64, "quality must be non-negative");
-        if let Some(channel) = self.graph.edge_weight_mut(source, destination) {
+        if let Some(channel) = self
+            .get_edge(source, destination)
+            .and_then(|e| self.graph.edge_weight_mut(e.id())) {
             if quality != channel.quality.unwrap_or(-1_f64) {
                 channel.quality = Some(quality);
                 debug!("updated quality of {} to {quality}", channel.channel);
@@ -212,7 +265,9 @@ impl ChannelGraph {
     /// Gets quality of the given channel. Returns `None` if no such channel exists or no
     /// quality has been set for that channel.
     pub fn get_channel_quality(&self, source: Address, destination: Address) -> Option<f64> {
-        self.graph.edge_weight(source, destination).and_then(|w| w.quality)
+        self.get_edge(source, destination)
+            .and_then(|e| self.graph.edge_weight(e.id()))
+            .and_then(|e| e.quality)
     }
 
     /// Synchronizes the channel entries in this graph with the database.
@@ -240,7 +295,7 @@ impl ChannelGraph {
 
     /// Checks whether the given channel is in the graph already.
     pub fn contains_channel(&self, channel: &ChannelEntry) -> bool {
-        self.graph.contains_edge(channel.source, channel.destination)
+        self.get_channel(channel.source, channel.destination).is_some()
     }
 
     /// Outputs the channel graph in the DOT (graphviz) format with the given `config`.
