@@ -689,7 +689,7 @@ pub(crate) async fn list_clients(
     Ok::<_, (StatusCode, ApiErrorStatus)>((StatusCode::OK, Json(response)).into_response())
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema, utoipa::IntoParams)]
 #[schema(example = json!({
         "listeningIp": "127.0.0.1",
         "port": 5542
@@ -711,10 +711,7 @@ pub(crate) struct SessionCloseClientRequest {
     params(
             ("protocol" = String, Path, description = "IP transport protocol")
     ),
-    request_body(
-            content = SessionCloseClientRequest,
-            description = "Closes the listener on the given bound IP address and port.",
-            content_type = "application/json"),
+    params(SessionCloseClientRequest),
     responses(
             (status = 204, description = "Listener closed successfully"),
             (status = 400, description = "Invalid IP protocol or port.", body = ApiError),
@@ -731,7 +728,7 @@ pub(crate) struct SessionCloseClientRequest {
 pub(crate) async fn close_client(
     State(state): State<Arc<InternalState>>,
     Path(protocol): Path<IpProtocol>,
-    Json(SessionCloseClientRequest { listening_ip, port }): Json<SessionCloseClientRequest>,
+    Query(SessionCloseClientRequest { listening_ip, port }): Query<SessionCloseClientRequest>,
 ) -> Result<impl IntoResponse, impl IntoResponse> {
     let listening_ip: IpAddr = listening_ip
         .parse()
