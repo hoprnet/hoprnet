@@ -1,4 +1,3 @@
-use crate::errors::Result;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::primitives::Address;
 use petgraph::algo::has_path_connecting;
@@ -11,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
-use tracing::{debug, info, warn};
+use tracing::{debug, warn};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use {
@@ -329,30 +328,6 @@ impl ChannelGraph {
             .and_then(|e| e.score)
     }
 
-    // TODO: remove this method
-    /// Synchronizes the channel entries in this graph with the database.
-    ///
-    /// The synchronization is one-way from DB to the graph, not vice versa.
-    pub fn sync_channels<I>(&mut self, channels: I) -> Result<()>
-    where
-        I: IntoIterator<Item = ChannelEntry>,
-    {
-        self.graph.clear();
-
-        let now = hopr_platform::time::native::current_time();
-        let changes: usize = channels
-            .into_iter()
-            .filter(|c| !c.closure_time_passed(now))
-            .map(|c| self.update_channel(c).map(|v| v.len()).unwrap_or(0))
-            .sum();
-        info!(
-            edge_count = self.graph.edge_count(),
-            total_changes = changes,
-            "channel graph synced",
-        );
-        Ok(())
-    }
-
     /// Checks whether the given channel is in the graph already.
     pub fn contains_channel(&self, channel: &ChannelEntry) -> bool {
         self.get_channel(&channel.source, &channel.destination).is_some()
@@ -415,12 +390,10 @@ mod tests {
 
     use crate::channel_graph::ChannelGraph;
     use anyhow::Context;
-    use hopr_crypto_types::prelude::{ChainKeypair, Keypair};
-    use hopr_db_sql::channels::HoprDbChannelOperations;
     use hopr_internal_types::channels::{ChannelChange, ChannelEntry, ChannelStatus};
     use hopr_primitive_types::prelude::*;
     use lazy_static::lazy_static;
-    use std::ops::{Add, Sub};
+    use std::ops::Add;
     use std::str::FromStr;
     use std::time::{Duration, SystemTime};
 
@@ -716,68 +689,6 @@ mod tests {
 
         cg.get_channel(&ADDRESSES[0], &ADDRESSES[1])
             .context("must allow PendingToClose channels")?;
-
-        Ok(())
-    }
-
-    #[async_std::test]
-    async fn channel_graph_sync() -> anyhow::Result<()> {
-        let mut last_addr = ADDRESSES[0];
-        let db = hopr_db_sql::db::HoprDb::new_in_memory(ChainKeypair::random()).await?;
-
-        for current_addr in ADDRESSES.iter().skip(1) {
-            // Open channel from last node to us
-            let channel = dummy_channel(last_addr, *current_addr, ChannelStatus::Open);
-            db.upsert_channel(None, channel).await?;
-
-            last_addr = *current_addr;
-        }
-
-        // Add a closed channel between 4 -> 0
-        let channel = dummy_channel(ADDRESSES[4], ADDRESSES[0], ChannelStatus::Closed);
-        db.upsert_channel(None, channel).await?;
-
-        // Add an expired "pending to close" channel between 3 -> 0
-        let channel = dummy_channel(
-            ADDRESSES[3],
-            ADDRESSES[0],
-            ChannelStatus::PendingToClose(SystemTime::now().sub(Duration::from_secs(20))),
-        );
-        db.upsert_channel(None, channel).await?;
-
-        // Add a not-expired "pending to close" channel between 2 -> 0
-        let channel = dummy_channel(
-            ADDRESSES[2],
-            ADDRESSES[0],
-            ChannelStatus::PendingToClose(SystemTime::now().add(Duration::from_secs(20))),
-        );
-        db.upsert_channel(None, channel).await?;
-
-        let mut cg = ChannelGraph::new(ADDRESSES[0]);
-        cg.sync_channels(db.get_all_channels(None).await?)?;
-
-        assert!(cg.has_path(&ADDRESSES[0], &ADDRESSES[4]), "must have path from 0 -> 4");
-        assert!(
-            cg.get_channel(&ADDRESSES[4], &ADDRESSES[0]).is_none(),
-            "must not sync closed channel"
-        );
-        assert!(
-            cg.get_channel(&ADDRESSES[3], &ADDRESSES[0]).is_none(),
-            "must not sync expired pending to close channel"
-        );
-        assert!(
-            cg.get_channel(&ADDRESSES[2], &ADDRESSES[0])
-                .is_some_and(|c| c.status != ChannelStatus::Open && !c.closure_time_passed(SystemTime::now())),
-            "must sync non-expired pending to close channel"
-        );
-        assert!(
-            db.get_all_channels(None)
-                .await?
-                .into_iter()
-                .filter(|c| !c.closure_time_passed(SystemTime::now()))
-                .all(|c| cg.contains_channel(&c)),
-            "must contain all non-closed channels with non-expired grace period"
-        );
 
         Ok(())
     }
