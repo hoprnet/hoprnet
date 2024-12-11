@@ -324,9 +324,9 @@ impl TryFrom<RoutingOptions> for hopr_lib::RoutingOptions {
 
     fn try_from(value: RoutingOptions) -> Result<Self, Self::Error> {
         match value {
-            RoutingOptions::IntermediatePath(path) => Ok(hopr_lib::RoutingOptions::IntermediatePath(
-                path.into_iter().map(|p| p.into()).collect(),
-            )),
+            RoutingOptions::IntermediatePath(path) => {
+                Ok(hopr_lib::RoutingOptions::IntermediatePath(path.into_iter().collect()))
+            }
             RoutingOptions::Hops(hops) => Ok(hopr_lib::RoutingOptions::Hops(hops.try_into()?)),
         }
     }
@@ -696,7 +696,9 @@ pub(crate) async fn list_clients(
 #[strum(serialize_all = "lowercase", ascii_case_insensitive)]
 #[serde(rename_all = "lowercase")]
 pub enum IpProtocol {
+    #[allow(clippy::upper_case_acronyms)]
     TCP,
+    #[allow(clippy::upper_case_acronyms)]
     UDP,
 }
 

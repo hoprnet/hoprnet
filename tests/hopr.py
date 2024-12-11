@@ -31,7 +31,6 @@ from hoprd_sdk.models import (
     OpenChannelBodyRequest,
     SendMessageBodyRequest,
     SessionClientRequest,
-    SessionCloseClientRequest,
     TagQueryRequest,
     WithdrawBodyRequest,
 )
