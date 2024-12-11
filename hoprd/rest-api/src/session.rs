@@ -689,17 +689,6 @@ pub(crate) async fn list_clients(
     Ok::<_, (StatusCode, ApiErrorStatus)>((StatusCode::OK, Json(response)).into_response())
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema, utoipa::IntoParams)]
-#[schema(example = json!({
-        "listeningIp": "127.0.0.1",
-        "port": 5542
-    }))]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct SessionCloseClientRequest {
-    pub listening_ip: String,
-    pub port: u16,
-}
-
 /// Closes an existing Session listener.
 /// The listener must've been previously created and bound for the given IP protocol.
 /// Once a listener is closed, no more socket connections can be made to it.
@@ -707,11 +696,12 @@ pub(crate) struct SessionCloseClientRequest {
 /// will be closed.
 #[utoipa::path(
     delete,
-    path = const_format::formatcp!("{BASE_PATH}/session/{{protocol}}"),
+    path = const_format::formatcp!("{BASE_PATH}/session/{{protocol}}/{{ip}}/{{port}}"),
     params(
-            ("protocol" = String, Path, description = "IP transport protocol")
+            ("protocol" = String, Path, description = "IP transport protocol"),
+            ("ip" = String, Path, description = "Listening IP address"),
+            ("port" = u16, Path, description = "Listening port"),
     ),
-    params(SessionCloseClientRequest),
     responses(
             (status = 204, description = "Listener closed successfully"),
             (status = 400, description = "Invalid IP protocol or port.", body = ApiError),
@@ -727,10 +717,12 @@ pub(crate) struct SessionCloseClientRequest {
 )]
 pub(crate) async fn close_client(
     State(state): State<Arc<InternalState>>,
+    // Query(SessionCloseClientRequest { listening_ip, port }): Query<SessionCloseClientRequest>,
     Path(protocol): Path<IpProtocol>,
-    Query(SessionCloseClientRequest { listening_ip, port }): Query<SessionCloseClientRequest>,
+    Path(ip): Path<String>,
+    Path(port): Path<u16>,
 ) -> Result<impl IntoResponse, impl IntoResponse> {
-    let listening_ip: IpAddr = listening_ip
+    let listening_ip: IpAddr = ip
         .parse()
         .map_err(|_| (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidInput))?;
 
