@@ -150,7 +150,6 @@ pub(crate) struct InternalState {
             peers::NodePeerInfoResponse, peers::PingResponse,
             session::SessionClientRequest, session::SessionCapability, session::RoutingOptions, session::SessionTargetSpec, session::SessionClientResponse, session::SessionCloseClientRequest,
             tickets::NodeTicketStatisticsResponse, tickets::ChannelTicket,
-            types::PeerOrAddress,
         )
     ),
     modifiers(&SecurityAddon),

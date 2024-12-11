@@ -313,7 +313,8 @@ async fn websocket_connection(socket: WebSocket, session: HoprSession) {
 #[serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub enum RoutingOptions {
-    IntermediatePath(Vec<PeerId>),
+    #[schema(value_type = Vec<String>)]
+    IntermediatePath(#[serde_as(as = "Vec<DisplayFromStr>")] Vec<PeerId>),
     Hops(usize),
 }
 
@@ -345,6 +346,7 @@ impl TryFrom<RoutingOptions> for hopr_lib::RoutingOptions {
 pub(crate) struct SessionClientRequest {
     /// Peer ID of the Exit node.
     #[serde_as(as = "DisplayFromStr")]
+    #[schema(value_type = String)]
     pub destination: PeerOrAddress,
     /// HOPR routing options for the Session.
     pub path: RoutingOptions,
