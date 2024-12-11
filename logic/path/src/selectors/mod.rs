@@ -23,7 +23,7 @@ where
 
         for hop in path.hops() {
             let w = graph
-                .get_channel(initial_addr, *hop)
+                .get_channel(&initial_addr, hop)
                 .ok_or(MissingChannel(initial_addr.to_string(), hop.to_string()))?;
 
             if w.status != ChannelStatus::Open {

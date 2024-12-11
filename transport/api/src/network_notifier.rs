@@ -85,11 +85,8 @@ where
                         let maybe_chain_key = self.resolver.resolve_chain_key(&pk).await;
                         if let Ok(Some(chain_key)) = maybe_chain_key {
                             let mut g = self.channel_graph.write().await;
-                            let self_addr = g.my_address();
-                            g.update_channel_quality(self_addr, chain_key, quality);
-                            debug!("update channel {self_addr} -> {chain_key} with quality {quality}");
-                            let q = g.get_channel_quality(self_addr, chain_key);
-                            debug!("channel now has quality {q:?}");
+                            g.update_node_quality(&chain_key, quality);
+                            debug!("update node {chain_key} with quality {quality}");
                         } else {
                             error!(%peer, "could not resolve chain key ");
                         }

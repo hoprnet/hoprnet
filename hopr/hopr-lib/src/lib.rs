@@ -941,7 +941,7 @@ impl Hopr {
                 .map_err(hopr_db_sql::api::errors::DbError::from)?;
             while let Some(peer) = peer_stream.next().await {
                 if let Some(ChainKey(key)) = self.db.translate_key(None, peer.id.0).await? {
-                    cg.update_channel_quality(self.me_onchain(), key, peer.get_quality());
+                    cg.update_node_quality(&key, peer.get_quality());
                 } else {
                     error!(peer = %peer.id.1, "could not translate peer info:");
                 }
