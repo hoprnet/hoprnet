@@ -24,14 +24,15 @@ use std::sync::Arc;
 use tokio::net::TcpListener;
 use tracing::{debug, error, info, trace};
 
-use crate::types::PeerOrAddress;
-use crate::{ApiErrorStatus, InternalState, ListenerId, BASE_PATH};
 use hopr_lib::errors::HoprLibError;
 use hopr_lib::transfer_session;
-use hopr_lib::{HoprSession, IpProtocol, RoutingOptions, SessionCapability, SessionClientConfig};
+use hopr_lib::{HoprSession, IpProtocol, SessionClientConfig};
 use hopr_network_types::prelude::{ConnectedUdpStream, IpOrHost, SealedHost, UdpStreamParallelism};
 use hopr_network_types::udp::ForeignDataMode;
 use hopr_network_types::utils::AsyncReadStreamer;
+
+use crate::types::PeerOrAddress;
+use crate::{ApiErrorStatus, InternalState, ListenerId, BASE_PATH};
 
 /// Size of the buffer for forwarding data to/from a TCP stream.
 pub const HOPR_TCP_BUFFER_SIZE: usize = 4096;
@@ -52,7 +53,7 @@ lazy_static::lazy_static! {
 }
 
 #[serde_as]
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub enum SessionTargetSpec {
     Plain(String),
     Sealed(#[serde_as(as = "serde_with::base64::Base64")] Vec<u8>),
@@ -96,6 +97,32 @@ impl TryFrom<SessionTargetSpec> for SealedHost {
     }
 }
 
+#[repr(u8)]
+#[derive(
+    Debug, Clone, strum::EnumIter, strum::Display, strum::EnumString, Serialize, Deserialize, utoipa::ToSchema,
+)]
+pub enum SessionCapability {
+    /// Frame segmentation
+    Segmentation,
+    /// Frame retransmission (ACK and NACK-based)
+    Retransmission,
+    /// Frame retransmission (only ACK-based)
+    RetransmissionAckOnly,
+    /// Disable packet buffering
+    NoDelay,
+}
+
+impl From<SessionCapability> for hopr_lib::SessionCapability {
+    fn from(cap: SessionCapability) -> hopr_lib::SessionCapability {
+        match cap {
+            SessionCapability::Segmentation => hopr_lib::SessionCapability::Segmentation,
+            SessionCapability::Retransmission => hopr_lib::SessionCapability::Retransmission,
+            SessionCapability::RetransmissionAckOnly => hopr_lib::SessionCapability::RetransmissionAckOnly,
+            SessionCapability::NoDelay => hopr_lib::SessionCapability::NoDelay,
+        }
+    }
+}
+
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::IntoParams, utoipa::ToSchema)]
 #[into_params(parameter_in = Query)]
@@ -128,12 +155,12 @@ fn default_protocol() -> IpProtocol {
 impl SessionWebsocketClientQueryRequest {
     pub(crate) fn into_protocol_session_config(self) -> Result<SessionClientConfig, HoprLibError> {
         #[cfg(not(feature = "explicit-path"))]
-        let path_options = RoutingOptions::Hops((self.hops as u32).try_into()?);
+        let path_options = hopr_lib::RoutingOptions::Hops((self.hops as u32).try_into()?);
 
         #[cfg(feature = "explicit-path")]
         let path_options = if let Some(path) = self.path {
             // Explicit `path` will override `hops`
-            RoutingOptions::IntermediatePath(
+            hopr_lib::RoutingOptions::IntermediatePath(
                 path.split(',')
                     .map(PeerId::from_str)
                     .collect::<Result<Vec<PeerId>, _>>()
@@ -141,7 +168,7 @@ impl SessionWebsocketClientQueryRequest {
                     .try_into()?,
             )
         } else {
-            RoutingOptions::Hops((self.hops as u32).try_into()?)
+            hopr_lib::RoutingOptions::Hops((self.hops as u32).try_into()?)
         };
 
         Ok(SessionClientConfig {
@@ -149,7 +176,7 @@ impl SessionWebsocketClientQueryRequest {
             path_options,
             target_protocol: self.protocol,
             target: self.target.try_into()?,
-            capabilities: self.capabilities,
+            capabilities: self.capabilities.into_iter().map(|v| v.into()).collect(),
         })
     }
 }
@@ -284,6 +311,26 @@ async fn websocket_connection(socket: WebSocket, session: HoprSession) {
 }
 
 #[serde_as]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub enum RoutingOptions {
+    IntermediatePath(Vec<PeerId>),
+    Hops(usize),
+}
+
+impl TryFrom<RoutingOptions> for hopr_lib::RoutingOptions {
+    type Error = HoprLibError;
+
+    fn try_from(value: RoutingOptions) -> Result<Self, Self::Error> {
+        match value {
+            RoutingOptions::IntermediatePath(path) => Ok(hopr_lib::RoutingOptions::IntermediatePath(
+                path.into_iter().map(|p| p.into()).collect(),
+            )),
+            RoutingOptions::Hops(hops) => Ok(hopr_lib::RoutingOptions::Hops(hops.try_into()?)),
+        }
+    }
+}
+
+#[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 #[schema(example = json!({
         "destination": "12D3KooWR4uwjKCDCAY1xsEFB4esuWLF9Q5ijYvCjz5PNkTbnu33",
@@ -334,15 +381,25 @@ impl SessionClientRequest {
 
         Ok(SessionClientConfig {
             peer,
-            path_options: self.path,
+            path_options: self.path.try_into()?,
             target_protocol,
             target: self.target.try_into()?,
-            capabilities: self.capabilities.unwrap_or_else(|| match target_protocol {
-                IpProtocol::TCP => {
-                    vec![SessionCapability::Retransmission, SessionCapability::Segmentation]
-                }
-                _ => vec![], // no default capabilities for UDP, etc.
-            }),
+            capabilities: self
+                .capabilities
+                .map(|v| {
+                    v.into_iter()
+                        .map(|vv| vv.into())
+                        .collect::<Vec<hopr_lib::SessionCapability>>()
+                })
+                .unwrap_or_else(|| match target_protocol {
+                    IpProtocol::TCP => {
+                        vec![
+                            hopr_lib::SessionCapability::Retransmission,
+                            hopr_lib::SessionCapability::Segmentation,
+                        ]
+                    }
+                    _ => vec![], // no default capabilities for UDP, etc.
+                }),
         })
     }
 }
@@ -842,7 +899,7 @@ mod tests {
             &self,
             data: ApplicationData,
             _destination: PeerId,
-            _options: RoutingOptions,
+            _options: hopr_lib::RoutingOptions,
         ) -> std::result::Result<(), TransportSessionError> {
             let (_peer, data) = hopr_transport_session::types::unwrap_offchain_key(data.plain_text)?;
 
@@ -864,7 +921,7 @@ mod tests {
         let session = hopr_lib::HoprSession::new(
             hopr_lib::HoprSessionId::new(4567, peer),
             peer,
-            RoutingOptions::IntermediatePath(Default::default()),
+            hopr_lib::RoutingOptions::IntermediatePath(Default::default()),
             HashSet::default(),
             Arc::new(SendMsgResender::new(tx)),
             rx,
@@ -907,7 +964,7 @@ mod tests {
         let session = hopr_lib::HoprSession::new(
             hopr_lib::HoprSessionId::new(4567, peer),
             peer,
-            RoutingOptions::IntermediatePath(Default::default()),
+            hopr_lib::RoutingOptions::IntermediatePath(Default::default()),
             HashSet::default(),
             Arc::new(SendMsgResender::new(tx)),
             rx,
