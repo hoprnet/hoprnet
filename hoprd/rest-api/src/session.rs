@@ -324,6 +324,7 @@ impl TryFrom<RoutingOptions> for hopr_lib::RoutingOptions {
 
     fn try_from(value: RoutingOptions) -> Result<Self, Self::Error> {
         match value {
+            #[cfg(feature = "explicit-path")]
             RoutingOptions::IntermediatePath(path) => {
                 Ok(hopr_lib::RoutingOptions::IntermediatePath(path.into_iter().collect()))
             }
@@ -376,11 +377,6 @@ impl SessionClientRequest {
                 return Err(HoprLibError::GeneralError(format!("invalid destination: {}", address)))
             }
         };
-
-        #[cfg(not(feature = "explicit-path"))]
-        if matches!(&self.path, RoutingOptions::IntermediatePath(_)) {
-            return Err(HoprLibError::GeneralError("explicit paths are not allowed".into()));
-        }
 
         Ok(SessionClientConfig {
             peer,
