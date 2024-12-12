@@ -164,6 +164,17 @@ impl PartialOrd<Self> for Log {
     }
 }
 
+/// A type containing filters from the `eth_getLogs` RPC calls.
+#[derive(Debug, Clone, Default)]
+pub struct FilterSet {
+    /// holds all filters for the indexer
+    pub all: Vec<ethers::types::Filter>,
+    /// holds only the token contract related filters
+    pub token: Vec<ethers::types::Filter>,
+    /// holds only filters not related to the token contract
+    pub no_token: Vec<ethers::types::Filter>,
+}
+
 /// Indicates what retry action should be taken, as result of a `RetryPolicy` implementation.
 pub enum RetryAction {
     /// Request should not be retried
@@ -390,6 +401,12 @@ pub trait HoprIndexerRpcOperations {
     /// Retrieves the latest block number.
     async fn block_number(&self) -> Result<u64>;
 
+    /// Retrieves token allowance for the given owner and spender.
+    async fn get_allowance(&self, owner: Address, spender: Address) -> Result<Balance>;
+
+    /// Retrieves on-chain token balance of the given address.
+    async fn get_balance(&self, address: Address, balance_type: BalanceType) -> Result<Balance>;
+
     /// Starts streaming logs from the given `start_block_number`.
     /// If no `start_block_number` is given, the stream starts from the latest block.
     /// The given `filter` are applied to retrieve the logs, the function fails if the filter is empty.
@@ -397,7 +414,7 @@ pub trait HoprIndexerRpcOperations {
     fn try_stream_logs<'a>(
         &'a self,
         start_block_number: u64,
-        filters: Vec<ethers::types::Filter>,
+        filters: FilterSet,
         is_synced: bool,
     ) -> Result<Pin<Box<dyn Stream<Item = BlockWithLogs> + Send + 'a>>>;
 }
