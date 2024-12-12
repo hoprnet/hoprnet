@@ -191,6 +191,12 @@ where
                     .begin_channel_update(tx.into(), &balance_decreased.channel_id.into())
                     .await?;
 
+                trace!(
+                    channel_id = %Hash::from(balance_decreased.channel_id),
+                    is_channel = maybe_channel.is_some(),
+                    "on_channel_balance_decreased_event",
+                );
+
                 if let Some(channel_edits) = maybe_channel {
                     let new_balance = Balance::new(balance_decreased.new_balance, BalanceType::HOPR);
                     let diff = channel_edits.entry().balance.sub(&new_balance);
@@ -211,6 +217,12 @@ where
                     .db
                     .begin_channel_update(tx.into(), &balance_increased.channel_id.into())
                     .await?;
+
+                trace!(
+                    channel_id = %Hash::from(balance_increased.channel_id),
+                    is_channel = maybe_channel.is_some(),
+                    "on_channel_balance_increased_event",
+                );
 
                 if let Some(channel_edits) = maybe_channel {
                     let new_balance = Balance::new(balance_increased.new_balance, BalanceType::HOPR);
@@ -234,9 +246,9 @@ where
                     .await?;
 
                 trace!(
-                    "on_channel_closed_event - channel_id: {:?} - channel known: {:?}",
-                    channel_closed.channel_id,
-                    maybe_channel.is_some()
+                    channel_id = %Hash::from(channel_closed.channel_id),
+                    is_channel = maybe_channel.is_some(),
+                    "on_channel_closed_event",
                 );
 
                 if let Some(channel_edits) = maybe_channel {
@@ -898,12 +910,21 @@ where
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
+    use anyhow::{anyhow, Context};
+    use ethers::contract::EthEvent;
+    use ethers::{
+        abi::{encode, Address as EthereumAddress, Token},
+        types::U256 as EthU256,
+    };
+    use hex_literal::hex;
+    use multiaddr::Multiaddr;
+    use primitive_types::H256;
     use std::sync::atomic::Ordering;
     use std::sync::Arc;
     use std::time::SystemTime;
 
-    use super::ContractEventHandlers;
-    use anyhow::{anyhow, Context};
     use bindings::hopr_winning_probability_oracle_events::WinProbUpdatedFilter;
     use bindings::{
         hopr_announcements::{AddressAnnouncementFilter, KeyBindingFilter, RevokeAnnouncementFilter},
@@ -921,12 +942,7 @@ mod tests {
     };
     use chain_types::chain_events::{ChainEventType, NetworkRegistryStatus};
     use chain_types::ContractAddresses;
-    use ethers::contract::EthEvent;
-    use ethers::{
-        abi::{encode, Address as EthereumAddress, Token},
-        types::U256 as EthU256,
-    };
-    use hex_literal::hex;
+    use hopr_chain_rpc::rpc::MockRpcOperations;
     use hopr_crypto_types::prelude::*;
     use hopr_db_sql::accounts::{ChainOrPacketKey, HoprDbAccountOperations};
     use hopr_db_sql::api::{info::DomainSeparator, tickets::HoprDbTicketOperations};
@@ -936,10 +952,6 @@ mod tests {
     use hopr_db_sql::prelude::HoprDbResolverOperations;
     use hopr_db_sql::registry::HoprDbRegistryOperations;
     use hopr_db_sql::{HoprDbAllOperations, HoprDbGeneralModelOperations};
-    use hopr_internal_types::prelude::*;
-    use hopr_primitive_types::prelude::*;
-    use multiaddr::Multiaddr;
-    use primitive_types::H256;
 
     lazy_static::lazy_static! {
         static ref SELF_PRIV_KEY: OffchainKeypair = OffchainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).expect("lazy static keypair should be constructible");
@@ -960,6 +972,8 @@ mod tests {
     }
 
     fn init_handlers<Db: HoprDbAllOperations + Clone>(db: Db) -> ContractEventHandlers<Db> {
+        let rpc_operations = MockRpcOperations::new(None, SELF_CHAIN_KEY.clone(), None);
+
         ContractEventHandlers {
             addresses: Arc::new(ContractAddresses {
                 channels: *CHANNELS_ADDR,
@@ -976,6 +990,7 @@ mod tests {
             chain_key: SELF_CHAIN_KEY.clone(),
             safe_address: SELF_CHAIN_KEY.public().to_address(),
             db,
+            rpc_operations,
         }
     }
 
