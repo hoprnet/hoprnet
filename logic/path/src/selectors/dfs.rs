@@ -72,7 +72,7 @@ impl Ord for WeightedChannelPath {
 /// The weight is randomized such that not always the same
 /// nodes get selected. This is necessary to achieve privacy.
 /// It also favors nodes with higher stake.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct RandomizedEdgeWeighting;
 
 impl EdgeWeighting<U256> for RandomizedEdgeWeighting {
@@ -432,6 +432,7 @@ mod tests {
         graph
     }
 
+    #[derive(Default)]
     pub struct TestWeights;
     impl EdgeWeighting<U256> for TestWeights {
         fn calculate_weight(edge: &ChannelEdge) -> U256 {
