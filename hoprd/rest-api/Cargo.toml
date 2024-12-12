@@ -79,3 +79,4 @@ hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
 [dev-dependencies]
 anyhow = { workspace = true }
 hopr-transport-session = { workspace = true }
+tempfile = { workspace = true }
