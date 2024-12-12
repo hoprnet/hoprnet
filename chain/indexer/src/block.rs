@@ -8,7 +8,7 @@ use tracing::{debug, error, info, trace};
 use bindings::hopr_token::{ApprovalFilter, TransferFilter};
 use chain_types::chain_events::SignificantChainEvent;
 use hopr_async_runtime::prelude::{spawn, JoinHandle};
-use hopr_chain_rpc::{BlockWithLogs, HoprIndexerRpcOperations};
+use hopr_chain_rpc::{BlockWithLogs, FilterSet, HoprIndexerRpcOperations};
 use hopr_crypto_types::types::Hash;
 use hopr_db_api::logs::HoprDbLogOperations;
 use hopr_db_sql::info::HoprDbInfoOperations;
@@ -200,14 +200,19 @@ where
                 .try_stream_logs(next_block_to_process, log_filters, is_synced.load(Ordering::Relaxed))
                 .expect("block stream should be constructible")
                 .then(|block| {
+                    let db = db.clone();
+
                     Self::calculate_sync_process(
                         "rpc",
                         block.clone(),
                         &rpc,
+                        db,
                         chain_head.clone(),
                         is_synced.clone(),
                         next_block_to_process,
                         tx.clone(),
+                        logs_handler.safe_address(),
+                        logs_handler.contract_addresses_map().channels,
                     )
                 })
                 .filter_map(|block| {
@@ -277,13 +282,13 @@ where
         }
     }
 
-    // We are setting up 4 filters.
+    // We are setting up the logs filters.
     // (1) for all contract addresses, except the token contract, which have topics.
     // (2) for the token contract which filters transfer events from our safe.
     // (3) for the token contract which filters transfer events to our safe.
     // (4) for the token contract which filters approval events involving our safe and the channels
     // contract.
-    fn generate_log_filters(logs_handler: &U) -> Vec<Filter> {
+    fn generate_log_filters(logs_handler: &U) -> FilterSet {
         let safe_address = logs_handler.safe_address();
         let addresses_no_token = logs_handler
             .contract_addresses()
@@ -324,7 +329,16 @@ where
                 logs_handler.contract_addresses_map().channels.to_bytes32().as_ref(),
             ));
 
-        vec![filter_base, filter_transfer_from, filter_transfer_to, filter_approval]
+        FilterSet {
+            all: vec![
+                filter_base.clone(),
+                filter_transfer_from.clone(),
+                filter_transfer_to.clone(),
+                filter_approval.clone(),
+            ],
+            token: vec![filter_transfer_from, filter_transfer_to, filter_approval],
+            no_token: vec![filter_base],
+        }
     }
 
     /// Processes a block by its ID.
@@ -484,13 +498,17 @@ where
         prefix: &str,
         block: BlockWithLogs,
         rpc: &T,
+        db: Db,
         chain_head: Arc<AtomicU64>,
         is_synced: Arc<AtomicBool>,
         next_block_to_process: u64,
         mut tx: futures::channel::mpsc::Sender<()>,
+        safe_address: Address,
+        channels_address: Address,
     ) -> BlockWithLogs
     where
         T: HoprIndexerRpcOperations + 'static,
+        Db: HoprDbInfoOperations + Clone + Send + Sync + 'static,
     {
         let current_block = block.block_id;
         #[cfg(all(feature = "prometheus", not(test)))]
@@ -533,8 +551,33 @@ where
             if current_block >= head {
                 info!(prefix, "indexer sync completed successfully");
                 is_synced.store(true, Ordering::Relaxed);
-                if let Err(e) = tx.try_send(()) {
-                    error!(prefix, error = %e, "failed to notify about achieving indexer synchronization")
+
+                info!(prefix, "updating safe balance from chain after indexer sync completed");
+                match rpc.get_balance(safe_address, BalanceType::HOPR).await {
+                    Ok(balance) => {
+                        if let Err(error) = db.set_safe_hopr_balance(None, balance).await {
+                            error!(prefix, %error, "failed to update safe balance from chain after indexer sync completed");
+                        }
+                    }
+                    Err(error) => {
+                        error!(prefix, %error, "failed to fetch safe balance from chain after indexer sync completed");
+                    }
+                }
+
+                info!("updating safe allowance from chain after indexer sync completed");
+                match rpc.get_allowance(channels_address, safe_address).await {
+                    Ok(allowance) => {
+                        if let Err(error) = db.set_safe_hopr_allowance(None, allowance).await {
+                            error!(prefix, %error, "failed to update safe allowance from chain after indexer sync completed");
+                        }
+                    }
+                    Err(error) => {
+                        error!(prefix, %error, "failed to fetch safe allowance from chain after indexer sync completed");
+                    }
+                }
+
+                if let Err(error) = tx.try_send(()) {
+                    error!(prefix, %error, "failed to notify about achieving indexer synchronization")
                 }
             }
         }
@@ -623,11 +666,13 @@ mod tests {
         #[async_trait]
         impl HoprIndexerRpcOperations for HoprIndexerOps {
             async fn block_number(&self) -> hopr_chain_rpc::errors::Result<u64>;
+            async fn get_allowance(&self, owner: Address, spender: Address) -> hopr_chain_rpc::errors::Result<Balance>;
+            async fn get_balance(&self, address: Address, balance_type: BalanceType) -> hopr_chain_rpc::errors::Result<Balance>;
 
             fn try_stream_logs<'a>(
                 &'a self,
                 start_block_number: u64,
-                filters: Vec<ethers::types::Filter>,
+                filters: FilterSet,
                 is_synced: bool,
             ) -> hopr_chain_rpc::errors::Result<Pin<Box<dyn Stream<Item = BlockWithLogs> + Send + 'a>>>;
         }
@@ -647,8 +692,8 @@ mod tests {
 
         let (tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
         rpc.expect_try_stream_logs()
-            .withf(move |x: &u64, _y: &hopr_chain_rpc::LogFilter| *x == 0)
-            .return_once(move |_, _| Ok(Box::pin(rx)));
+            .withf(move |x: &u64, _y: &FilterSet, _: &bool| *x == 0)
+            .return_once(move |_, _, _| Ok(Box::pin(rx)));
 
         let mut indexer = Indexer::new(
             rpc,
@@ -684,8 +729,8 @@ mod tests {
         let (tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
         rpc.expect_try_stream_logs()
             .once()
-            .withf(move |x: &u64, _y: &hopr_chain_rpc::LogFilter| *x == latest_block + 1)
-            .return_once(move |_, _| Ok(Box::pin(rx)));
+            .withf(move |x: &u64, _y: &FilterSet, _: &bool| *x == latest_block + 1)
+            .return_once(move |_, _, _| Ok(Box::pin(rx)));
 
         // insert and process latest block
         let log_1 = SerializableLog {
@@ -739,8 +784,8 @@ mod tests {
         let (mut tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
         rpc.expect_try_stream_logs()
             .times(1)
-            .withf(move |x: &u64, _y: &hopr_chain_rpc::LogFilter| *x == 0)
-            .return_once(move |_, _| Ok(Box::pin(rx)));
+            .withf(move |x: &u64, _y: &FilterSet, _: &bool| *x == 0)
+            .return_once(move |_, _, _| Ok(Box::pin(rx)));
 
         let head_block = 1000;
         rpc.expect_block_number().returning(move || Ok(head_block));
@@ -755,9 +800,9 @@ mod tests {
         };
 
         handlers
-            .expect_collect_block_events()
+            .expect_collect_log_event()
             .times(finalized_block.logs.len())
-            .returning(|_| Ok(vec![]));
+            .returning(|_| Ok(None));
 
         assert!(tx.start_send(finalized_block.clone()).is_ok());
         assert!(tx.start_send(head_allowing_finalization.clone()).is_ok());
@@ -801,16 +846,16 @@ mod tests {
             rpc.expect_block_number().returning(move || Ok(head_block));
             rpc.expect_try_stream_logs()
                 .times(1)
-                .withf(move |x: &u64, _y: &hopr_chain_rpc::LogFilter| *x == 3)
-                .return_once(move |_, _| Ok(Box::pin(rx)));
+                .withf(move |x: &u64, _y: &FilterSet, _: &bool| *x == 3)
+                .return_once(move |_, _, _| Ok(Box::pin(rx)));
 
             let mut handlers = MockChainLogHandler::new();
             handlers.expect_contract_addresses().return_const(vec![]);
             handlers
-                .expect_collect_block_events()
+                .expect_collect_log_event()
                 .times(2)
-                .withf(move |b| [1, 2].contains(&b.block_id))
-                .returning(|_| Ok(vec![]));
+                .withf(move |l| [1, 2].contains(&l.block_number))
+                .returning(|_| Ok(None));
 
             let indexer_cfg = IndexerConfig {
                 start_block_number: 0,
@@ -866,16 +911,16 @@ mod tests {
             rpc.expect_block_number().returning(move || Ok(head_block));
             rpc.expect_try_stream_logs()
                 .times(1)
-                .withf(move |x: &u64, _y: &hopr_chain_rpc::LogFilter| *x == 5)
-                .return_once(move |_, _| Ok(Box::pin(rx)));
+                .withf(move |x: &u64, _y: &FilterSet, _: &bool| *x == 5)
+                .return_once(move |_, _, _| Ok(Box::pin(rx)));
 
             let mut handlers = MockChainLogHandler::new();
             handlers.expect_contract_addresses().return_const(vec![]);
             handlers
-                .expect_collect_block_events()
+                .expect_collect_log_event()
                 .times(2)
-                .withf(move |b| [3, 4].contains(&b.block_id))
-                .returning(|_| Ok(vec![]));
+                .withf(move |l| [3, 4].contains(&l.block_number))
+                .returning(|_| Ok(None));
 
             let indexer_cfg = IndexerConfig {
                 start_block_number: 0,
@@ -911,8 +956,8 @@ mod tests {
         // Expected to be called once starting at 0 and yield the respective blocks
         rpc.expect_try_stream_logs()
             .times(1)
-            .withf(move |x: &u64, _y: &hopr_chain_rpc::LogFilter| *x == 0)
-            .return_once(move |_, _| Ok(Box::pin(rx)));
+            .withf(move |x: &u64, _y: &FilterSet, _: &bool| *x == 0)
+            .return_once(move |_, _, _| Ok(Box::pin(rx)));
 
         let head_block = 1000;
         let block_numbers = vec![head_block - 1, head_block, head_block + 1];
@@ -935,15 +980,15 @@ mod tests {
 
         // Generate the expected events to be able to process the blocks
         handlers
-            .expect_collect_block_events()
+            .expect_collect_log_event()
             .times(1)
-            .withf(move |b| block_numbers.contains(&b.block_id))
-            .returning(|b| {
-                let block_id = b.block_id;
-                Ok(vec![SignificantChainEvent {
-                    tx_hash: Hash::create(&[format!("my tx hash {block_id}").as_bytes()]),
+            .withf(move |l| block_numbers.contains(&l.block_number))
+            .returning(|l| {
+                let block_number = l.block_number;
+                Ok(Some(SignificantChainEvent {
+                    tx_hash: Hash::create(&[format!("my tx hash {block_number}").as_bytes()]),
                     event_type: RANDOM_ANNOUNCEMENT_CHAIN_EVENT.clone(),
-                }])
+                }))
             });
 
         let (tx_events, rx_events) = async_channel::unbounded();
@@ -990,8 +1035,8 @@ mod tests {
         let mut rpc = MockHoprIndexerOps::new();
         rpc.expect_try_stream_logs()
             .once()
-            .withf(move |x: &u64, _y: &hopr_chain_rpc::LogFilter| *x == last_processed_block + 1)
-            .return_once(move |_, _| Ok(Box::pin(rx)));
+            .withf(move |x: &u64, _y: &FilterSet, _: &bool| *x == last_processed_block + 1)
+            .return_once(move |_, _, _| Ok(Box::pin(rx)));
 
         rpc.expect_block_number()
             .times(2)

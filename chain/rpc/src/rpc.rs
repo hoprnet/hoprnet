@@ -109,6 +109,7 @@ impl<P: JsonRpcClient> Clone for RpcOperations<P> {
     }
 }
 
+#[cfg_attr(test, mockall::automock)]
 impl<P: JsonRpcClient + 'static> RpcOperations<P> {
     pub fn new(json_rpc: P, chain_key: &ChainKeypair, cfg: RpcOperationsConfig) -> Result<Self> {
         let wallet = LocalWallet::from_bytes(chain_key.secret().as_ref())?.with_chain_id(cfg.chain_id);

@@ -15,9 +15,11 @@ use futures::{Stream, StreamExt};
 use std::pin::Pin;
 use tracing::{debug, error, trace, warn};
 
+use hopr_primitive_types::prelude::*;
+
 use crate::errors::{Result, RpcError, RpcError::FilterIsEmpty};
 use crate::rpc::RpcOperations;
-use crate::{BlockWithLogs, HoprIndexerRpcOperations, Log};
+use crate::{BlockWithLogs, FilterSet, HoprIndexerRpcOperations, Log};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleGauge;
@@ -129,21 +131,31 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
         self.get_block_number().await
     }
 
+    async fn get_allowance(&self, owner: Address, spender: Address) -> Result<Balance> {
+        self.get_allowance(owner, spender).await
+    }
+
+    async fn get_balance(&self, address: Address, balance_type: BalanceType) -> Result<Balance> {
+        self.get_balance(address, balance_type).await
+    }
+
     fn try_stream_logs<'a>(
         &'a self,
         start_block_number: u64,
-        mut filters: Vec<ethers::types::Filter>,
+        filters: FilterSet,
         is_synced: bool,
     ) -> Result<Pin<Box<dyn Stream<Item = BlockWithLogs> + Send + 'a>>> {
-        if filters.is_empty() {
+        if filters.all.is_empty() {
             return Err(FilterIsEmpty);
         }
 
-        if !is_synced {
+        let log_filters = if !is_synced {
             // Because we are not synced yet, we will not get logs for the token contract.
             // These are only relevant for the indexer if we are synced.
-            filters.retain(|f| f.address != ethers::types::Address::from(self.cfg.contract_addrs.token));
-        }
+            filters.no_token
+        } else {
+            filters.all
+        };
 
         Ok(Box::pin(stream! {
             // On first iteration use the given block number as start
@@ -179,7 +191,7 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                         #[cfg(all(feature = "prometheus", not(test)))]
                         METRIC_RPC_CHAIN_HEAD.set(latest_block as f64);
 
-                        let mut retrieved_logs = self.stream_logs(filters.clone(), from_block, latest_block);
+                        let mut retrieved_logs = self.stream_logs(log_filters.clone(), from_block, latest_block);
 
                         trace!(from_block, to_block = latest_block, "processing batch");
 
