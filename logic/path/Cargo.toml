@@ -24,6 +24,7 @@ lazy_static = { workspace = true }
 libp2p-identity = { workspace = true }
 petgraph = { workspace = true, features = ["serde-1"] }
 serde = { workspace = true }
+serde_with = { workspace = true }
 smart-default = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }

@@ -7,6 +7,7 @@ use petgraph::stable_graph::NodeIndex;
 use petgraph::visit::{EdgeFiltered, EdgeRef, NodeFiltered};
 use petgraph::Direction;
 use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
@@ -85,10 +86,12 @@ impl std::fmt::Display for Node {
 ///
 /// When a node reaches zero [quality](Node) and there are no edges (channels) containing this node,
 /// it is removed from the graph entirely.
+#[serde_as]
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ChannelGraph {
     me: Address,
-    indices: HashMap<Address, NodeIndex>,
+    #[serde_as(as = "Vec<(_, _)>")]
+    indices: HashMap<Address, u32>,
     graph: StableDiGraph<Node, ChannelEdge>,
 }
 
@@ -110,17 +113,19 @@ impl ChannelGraph {
         };
         ret.indices.insert(
             me,
-            ret.graph.add_node(Node {
-                address: me,
-                quality: 1.0,
-            }),
+            ret.graph
+                .add_node(Node {
+                    address: me,
+                    quality: 1.0,
+                })
+                .index() as u32,
         );
         ret
     }
 
     /// Number of channels (edges) in the graph.
     pub fn count_channels(&self) -> usize {
-        self.graph.node_count()
+        self.graph.edge_count()
     }
 
     /// Number of nodes in the graph.
@@ -143,7 +148,7 @@ impl ChannelGraph {
             .indices
             .get(src)
             .and_then(|src| self.indices.get(dst).map(|dst| (*src, *dst)))?;
-        self.graph.edges_connecting(src_idx, dst_idx).next()
+        self.graph.edges_connecting(src_idx.into(), dst_idx.into()).next()
     }
 
     /// Looks up an `Open` or `PendingToClose` channel given the source and destination.
@@ -155,7 +160,9 @@ impl ChannelGraph {
     /// Gets the node information.
     /// Returns `None` if no such node exists in the graph.
     pub fn get_node(&self, node: &Address) -> Option<&Node> {
-        self.indices.get(node).and_then(|index| self.graph.node_weight(*index))
+        self.indices
+            .get(node)
+            .and_then(|index| self.graph.node_weight((*index).into()))
     }
 
     /// Gets all `Open` outgoing channels going from the given [source](Address).
@@ -165,9 +172,9 @@ impl ChannelGraph {
             .indices
             .get(&source)
             .cloned()
-            .unwrap_or((self.graph.node_count() as u32).into());
+            .unwrap_or(self.graph.node_count() as u32);
         self.graph
-            .edges_directed(idx, Direction::Outgoing)
+            .edges_directed(idx.into(), Direction::Outgoing)
             .filter(|c| c.weight().channel.status == ChannelStatus::Open)
             .map(|e| (&self.graph[e.target()], e.weight()))
     }
@@ -181,7 +188,7 @@ impl ChannelGraph {
             .get(source)
             .and_then(|src| self.indices.get(destination).map(|dst| (*src, *dst)))
         {
-            has_path_connecting(&only_open_graph, src_idx, dst_idx, None)
+            has_path_connecting(&only_open_graph, src_idx.into(), dst_idx.into(), None)
         } else {
             false
         }
@@ -259,22 +266,26 @@ impl ChannelGraph {
         } else {
             // Otherwise, create a new edge and add the nodes with 0 quality if they don't yet exist
             let src = *self.indices.entry(channel.source).or_insert_with(|| {
-                self.graph.add_node(Node {
-                    address: channel.source,
-                    quality: 0.0,
-                })
+                self.graph
+                    .add_node(Node {
+                        address: channel.source,
+                        quality: 0.0,
+                    })
+                    .index() as u32
             });
 
             let dst = *self.indices.entry(channel.destination).or_insert_with(|| {
-                self.graph.add_node(Node {
-                    address: channel.destination,
-                    quality: 0.0,
-                })
+                self.graph
+                    .add_node(Node {
+                        address: channel.destination,
+                        quality: 0.0,
+                    })
+                    .index() as u32
             });
 
             let weighted = ChannelEdge { channel, score: None };
 
-            self.graph.add_edge(src, dst, weighted);
+            self.graph.add_edge(src.into(), dst.into(), weighted);
             debug!("new {channel}");
 
             None
@@ -289,8 +300,9 @@ impl ChannelGraph {
             match self.indices.entry(*address) {
                 // The node exists and we're updating to greater-than-zero quality
                 Entry::Occupied(existing) => {
-                    if quality > 0.0 || self.graph.neighbors_undirected(*existing.get()).count() > 0 {
-                        if let Some(node) = self.graph.node_weight_mut(*existing.get()) {
+                    let existing_idx: NodeIndex = (*existing.get()).into();
+                    if quality > 0.0 || self.graph.neighbors_undirected(existing_idx).count() > 0 {
+                        if let Some(node) = self.graph.node_weight_mut(existing_idx) {
                             node.quality = quality;
                             debug!("updated quality of {address} to {quality}");
                         } else {
@@ -299,16 +311,20 @@ impl ChannelGraph {
                         }
                     } else {
                         // If the node has no neighbors and 0 quality, remove it from the graph
-                        self.graph.remove_node(existing.remove());
+                        self.graph.remove_node(existing.remove().into());
                         debug!("removed solitary node {address} with zero quality");
                     }
                 }
                 // The node does not exist, and we're updating to greater-than-zero quality
                 Entry::Vacant(new_node) if quality > 0_f64 => {
-                    new_node.insert(self.graph.add_node(Node {
-                        address: *address,
-                        quality,
-                    }));
+                    new_node.insert(
+                        self.graph
+                            .add_node(Node {
+                                address: *address,
+                                quality,
+                            })
+                            .index() as u32,
+                    );
                     debug!("added node {address} with {quality}");
                 }
                 // Do nothing otherwise.
@@ -354,13 +370,13 @@ impl ChannelGraph {
             let only_open_graph =
                 EdgeFiltered::from_fn(&self.graph, |e| e.weight().channel.status == ChannelStatus::Open);
 
-            let me_idx = self.indices.get(&self.me).expect("graph must contain self");
+            let me_idx: NodeIndex = (*self.indices.get(&self.me).expect("graph must contain self")).into();
 
             Dot::new(&NodeFiltered::from_fn(&self.graph, |n| {
                 // Include only nodes that have non-zero quality,
                 // and there is a path to them in an Open channel graph
                 self.graph.node_weight(n).is_some_and(|n| n.quality > 0_f64)
-                    && has_path_connecting(&only_open_graph, *me_idx, n, None)
+                    && has_path_connecting(&only_open_graph, me_idx, n, None)
             }))
             .to_string()
         } else if cfg.ignore_non_opened_channels {

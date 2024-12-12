@@ -263,7 +263,7 @@ pub(super) async fn metrics() -> impl IntoResponse {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default, utoipa::IntoParams, utoipa::ToSchema)]
+#[derive(Debug, Clone, Deserialize, Default, utoipa::IntoParams, utoipa::ToSchema)]
 #[into_params(parameter_in = Query)]
 #[serde(default, rename_all = "camelCase")]
 pub(crate) struct GraphExportQuery {

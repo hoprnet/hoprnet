@@ -72,6 +72,7 @@ impl Ord for WeightedChannelPath {
 /// The weight is randomized such that not always the same
 /// nodes get selected. This is necessary to achieve privacy.
 /// It also favors nodes with higher stake.
+#[derive(Clone, Copy, Debug)]
 pub struct RandomizedEdgeWeighting;
 
 impl EdgeWeighting<U256> for RandomizedEdgeWeighting {
@@ -93,19 +94,15 @@ impl EdgeWeighting<U256> for RandomizedEdgeWeighting {
     }
 }
 
-/// Path selector using depth-first search of the channel graph.
-#[derive(Clone, Debug, smart_default::SmartDefault)]
-pub struct DfsPathSelector<CW>
-where
-    CW: EdgeWeighting<U256>,
-{
+#[derive(Clone, Copy, Debug, PartialEq, smart_default::SmartDefault)]
+pub struct DfsPathSelectorConfig {
     /// The maximum number of iterations before a path selection fails
     /// Default is 100
     #[default(100)]
     pub max_iterations: usize,
     /// Peer quality threshold for a node to be taken into account.
-    /// Default is 0.5
-    #[default(0.5)]
+    /// Default is 0.2
+    #[default(0.2)]
     pub quality_threshold: f64,
     /// Channel score threshold for a channel to be taken into account.
     /// Default is 0
@@ -117,13 +114,21 @@ where
     /// Defaults to false.
     #[default(false)]
     pub allow_zero_edge_weight: bool,
+}
+
+/// Path selector using depth-first search of the channel graph.
+#[derive(Clone, Debug, Default)]
+pub struct DfsPathSelector<CW> {
+    cfg: DfsPathSelectorConfig,
     _cw: PhantomData<CW>,
 }
 
-impl<CW> DfsPathSelector<CW>
-where
-    CW: EdgeWeighting<U256>,
-{
+impl<CW: EdgeWeighting<U256>> DfsPathSelector<CW> {
+    /// Creates new path selector with the given [config](DfsPathSelectorConfig).
+    pub fn new(cfg: DfsPathSelectorConfig) -> Self {
+        Self { cfg, _cw: PhantomData }
+    }
+
     /// Determines whether a `next_hop` node is considered "interesting".
     ///
     /// To achieve privacy, we need at least one honest node along
@@ -162,13 +167,13 @@ where
         }
 
         // Only use nodes that have shown to be somewhat reliable
-        if next_hop.quality < self.quality_threshold {
+        if next_hop.quality < self.cfg.quality_threshold {
             trace!(%next_hop, "node quality threshold not satisfied");
             return false;
         }
 
         // Edges which have score below the threshold won't be considered
-        if edge.score.unwrap_or(1.0) < self.score_threshold {
+        if edge.score.unwrap_or(1.0) < self.cfg.score_threshold {
             trace!(%next_hop, "channel score threshold not satisfied");
             return false;
         }
@@ -181,7 +186,7 @@ where
         }
 
         // We cannot use channels with zero stake, if configure so
-        if !self.allow_zero_edge_weight && edge.channel.balance.is_zero() {
+        if !self.cfg.allow_zero_edge_weight && edge.channel.balance.is_zero() {
             trace!(%next_hop, "zero stake channels not allowed");
             return false;
         }
@@ -238,7 +243,7 @@ where
                 max_hops,
                 "testing next path in queue"
             );
-            if current_len == max_hops || current.fully_explored || iters > self.max_iterations {
+            if current_len == max_hops || current.fully_explored || iters > self.cfg.max_iterations {
                 return if current_len >= min_hops && current_len <= max_hops {
                     Ok(ChannelPath::new_valid(current.path))
                 } else {
@@ -284,9 +289,9 @@ where
     }
 }
 
-/// Legacy DFS path selector with channel weighting function
+/// DFS path selector with channel weighting function
 /// that uses randomized channel stakes as edge weights.
-pub type LegacyPathSelector = DfsPathSelector<RandomizedEdgeWeighting>;
+pub type DefaultPathSelector = DfsPathSelector<RandomizedEdgeWeighting>;
 
 #[cfg(test)]
 mod tests {
