@@ -32,7 +32,7 @@ use hopr_network_types::udp::ForeignDataMode;
 use hopr_network_types::utils::AsyncReadStreamer;
 
 use crate::types::PeerOrAddress;
-use crate::{ApiErrorStatus, InternalState, ListenerId, BASE_PATH};
+use crate::{ApiError, ApiErrorStatus, InternalState, ListenerId, BASE_PATH};
 
 /// Size of the buffer for forwarding data to/from a TCP stream.
 pub const HOPR_TCP_BUFFER_SIZE: usize = 4096;
@@ -128,9 +128,9 @@ impl From<SessionCapability> for hopr_lib::SessionCapability {
 #[into_params(parameter_in = Query)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct SessionWebsocketClientQueryRequest {
-    #[schema(required = true)]
     #[serde_as(as = "DisplayFromStr")]
-    pub destination: PeerId,
+    #[schema(required = true, value_type = String)]
+    pub destination: String, //PeerId,  // issue in utoipa on overriding the type
     #[schema(required = true)]
     pub hops: u8,
     #[cfg(feature = "explicit-path")]
@@ -172,7 +172,8 @@ impl SessionWebsocketClientQueryRequest {
         };
 
         Ok(SessionClientConfig {
-            peer: self.destination,
+            peer: PeerId::from_str(self.destination.as_str())
+                .map_err(|_e| HoprLibError::GeneralError(format!("invalid destination: {}", self.destination)))?,
             path_options,
             target_protocol: self.protocol.into(),
             target: self.target.try_into()?,
@@ -707,8 +708,10 @@ impl From<IpProtocol> for hopr_lib::IpProtocol {
     }
 }
 
+#[serde_as]
 #[derive(Debug, Serialize, Deserialize, utoipa::IntoParams, utoipa::ToSchema)]
 pub struct SessionCloseClientQuery {
+    #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String)]
     pub protocol: IpProtocol,
     pub ip: String,

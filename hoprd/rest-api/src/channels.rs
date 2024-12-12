@@ -18,7 +18,7 @@ use hopr_lib::{
 
 use crate::{
     types::{HoprIdentifier, PeerOrAddress},
-    ApiErrorStatus, InternalState, BASE_PATH,
+    ApiError, ApiErrorStatus, InternalState, BASE_PATH,
 };
 
 #[serde_as]
