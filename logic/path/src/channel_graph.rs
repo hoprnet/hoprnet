@@ -118,6 +118,16 @@ impl ChannelGraph {
         ret
     }
 
+    /// Number of channels (edges) in the graph.
+    pub fn count_channels(&self) -> usize {
+        self.graph.node_count()
+    }
+
+    /// Number of nodes in the graph.
+    pub fn count_nodes(&self) -> usize {
+        self.graph.node_count()
+    }
+
     /// Checks if the channel is incoming to or outgoing from this node
     pub fn is_own_channel(&self, channel: &ChannelEntry) -> bool {
         channel.destination == self.me || channel.source == self.me

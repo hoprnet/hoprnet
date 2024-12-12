@@ -924,27 +924,32 @@ impl Hopr {
 
         {
             let channel_graph = self.channel_graph.clone();
+            let mut cg = channel_graph.write().await;
 
             info!("Syncing channels from the previous runs");
-            self.db
-                .for_each_active_channel(None, move |channel| {
-                    let channel_graph = channel_graph.clone();
-                    async move {
-                        let mut cg = channel_graph.write().await;
+            let mut channel_stream = self
+                .db
+                .stream_active_channels()
+                .await
+                .map_err(hopr_db_sql::api::errors::DbError::from)?;
+
+            while let Some(maybe_channel) = channel_stream.next().await {
+                match maybe_channel {
+                    Ok(channel) => {
                         cg.update_channel(channel);
                     }
-                })
-                .await?;
+                    Err(error) => error!(%error, "failed to sync channel into the graph"),
+                }
+            }
 
             // Sync all the qualities there too
+            info!("Syncing peer qualities from the previous runs");
             let mut peer_stream = self
                 .db
                 .get_network_peers(Default::default(), false)
                 .await
                 .map_err(hopr_db_sql::api::errors::DbError::from)?;
 
-            let channel_graph = self.channel_graph.clone();
-            let mut cg = channel_graph.write().await;
             while let Some(peer) = peer_stream.next().await {
                 if let Some(ChainKey(key)) = self.db.translate_key(None, peer.id.0).await? {
                     cg.update_node_quality(&key, peer.get_quality());
@@ -952,6 +957,12 @@ impl Hopr {
                     error!(peer = %peer.id.1, "could not translate peer info:");
                 }
             }
+
+            info!(
+                channels = cg.count_channels(),
+                nodes = cg.count_nodes(),
+                "channel graph sync complete"
+            );
         }
 
         let socket = HoprSocket::new();
