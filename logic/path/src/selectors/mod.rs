@@ -1,41 +1,20 @@
-pub mod legacy;
+pub mod dfs;
 
-use crate::channel_graph::ChannelGraph;
-use crate::errors::PathError::ChannelNotOpened;
-use crate::errors::{PathError::MissingChannel, Result};
-use crate::path::{ChannelPath, Path};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::primitives::{Address, U256};
 use std::ops::Add;
 
-/// Computes weights of edges corresponding to `ChannelEntry`.
+use crate::channel_graph::{ChannelEdge, ChannelGraph};
+use crate::errors::Result;
+use crate::path::ChannelPath;
+
+/// Computes weights of edges corresponding to [`ChannelEdge`].
 pub trait EdgeWeighting<W>
 where
     W: Default + Add<W, Output = W>,
 {
     /// Edge weighting function.
-    fn calculate_weight(channel: &ChannelEntry) -> W;
-
-    /// Calculates the total weight of the given outgoing channel path.
-    fn total_path_weight(graph: &ChannelGraph, path: ChannelPath) -> Result<W> {
-        let mut initial_addr = graph.my_address();
-        let mut weight = W::default();
-
-        for hop in path.hops() {
-            let w = graph
-                .get_channel(&initial_addr, hop)
-                .ok_or(MissingChannel(initial_addr.to_string(), hop.to_string()))?;
-
-            if w.status != ChannelStatus::Open {
-                return Err(ChannelNotOpened(initial_addr.to_string(), hop.to_string()));
-            }
-
-            weight = weight.add(Self::calculate_weight(w));
-            initial_addr = *hop;
-        }
-
-        Ok(weight)
-    }
+    fn calculate_weight(channel: &ChannelEdge) -> W;
 }
 
 /// Trait for implementing custom path selection algorithm from the channel graph.

@@ -6,7 +6,7 @@ use tracing::trace;
 use chain_types::chain_events::NetworkRegistryStatus;
 use core_path::{
     path::TransportPath,
-    selectors::{legacy::LegacyPathSelector, PathSelector},
+    selectors::{dfs::LegacyPathSelector, PathSelector},
 };
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_db_sql::HoprDbAllOperations;

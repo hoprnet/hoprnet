@@ -4,7 +4,7 @@ use hopr_primitive_types::prelude::*;
 use std::cmp::{max, Ordering};
 use std::collections::BinaryHeap;
 use std::marker::PhantomData;
-use tracing::{trace, warn};
+use tracing::trace;
 
 use crate::channel_graph::{ChannelEdge, ChannelGraph, Node};
 use crate::errors::{PathError, Result};
@@ -17,6 +17,26 @@ struct WeightedChannelPath {
     path: Vec<Address>,
     weight: U256,
     fully_explored: bool,
+}
+
+impl WeightedChannelPath {
+    pub fn extend<CW: EdgeWeighting<U256>>(mut self, edge: &ChannelEdge) -> Self {
+        if !self.fully_explored {
+            self.path.push(edge.channel.destination);
+            self.weight += CW::calculate_weight(edge);
+        }
+        self
+    }
+}
+
+impl Default for WeightedChannelPath {
+    fn default() -> Self {
+        Self {
+            path: Vec::with_capacity(INTERMEDIATE_HOPS),
+            weight: U256::zero(),
+            fully_explored: false,
+        }
+    }
 }
 
 impl PartialOrd for WeightedChannelPath {
@@ -55,16 +75,16 @@ impl Ord for WeightedChannelPath {
 pub struct RandomizedEdgeWeighting;
 
 impl EdgeWeighting<U256> for RandomizedEdgeWeighting {
-    /// Multiply all channel stake with a random float in the interval [0,1).
+    /// Multiply channel stake with a random float in the interval [0,1).
     /// Given that the floats are uniformly distributed, nodes with higher
     /// stake have a higher probability of reaching a higher value.
     ///
     /// Sorting the list of weights thus moves nodes with higher stakes more
     /// often to the front.
-    fn calculate_weight(channel: &ChannelEntry) -> U256 {
+    fn calculate_weight(edge: &ChannelEdge) -> U256 {
         max(
             U256::one(),
-            channel
+            edge.channel
                 .balance
                 .amount()
                 .mul_f64(random_float())
@@ -73,38 +93,31 @@ impl EdgeWeighting<U256> for RandomizedEdgeWeighting {
     }
 }
 
-/// Legacy path selector using depth-first search of the channel graph.
-#[derive(Clone, Debug)]
+/// Path selector using depth-first search of the channel graph.
+#[derive(Clone, Debug, smart_default::SmartDefault)]
 pub struct DfsPathSelector<CW>
 where
     CW: EdgeWeighting<U256>,
 {
     /// The maximum number of iterations before a path selection fails
     /// Default is 100
+    #[default(100)]
     pub max_iterations: usize,
-    /// Peer quality threshold for a channel to be taken into account.
+    /// Peer quality threshold for a node to be taken into account.
     /// Default is 0.5
+    #[default(0.5)]
     pub quality_threshold: f64,
+    /// Channel score threshold for a channel to be taken into account.
+    /// Default is 0
+    #[default(0.0)]
+    pub score_threshold: f64,
     /// If true, include paths with payment channels, which have no
     /// funds in it. By default, that option is set to `false` to
-    /// prevent from tickets being dropped immediately.
+    /// prevent tickets being dropped immediately.
     /// Defaults to false.
+    #[default(false)]
     pub allow_zero_edge_weight: bool,
-    cw: PhantomData<CW>,
-}
-
-impl<CW> Default for DfsPathSelector<CW>
-where
-    CW: EdgeWeighting<U256>,
-{
-    fn default() -> Self {
-        Self {
-            max_iterations: 100,
-            quality_threshold: 0.5_f64,
-            allow_zero_edge_weight: false,
-            cw: PhantomData,
-        }
-    }
+    _cw: PhantomData<CW>,
 }
 
 impl<CW> DfsPathSelector<CW>
@@ -125,7 +138,7 @@ where
     /// * `initial_source`: the initial node on the path
     /// * `final_destination`: the desired destination node (will not be part of the path)
     /// * `current_path`: currently selected relayers
-    fn next_hop_usable(
+    fn is_next_hop_usable(
         &self,
         next_hop: &Node,
         edge: &ChannelEdge,
@@ -148,10 +161,15 @@ where
             return false;
         }
 
-        // Check next hop reliability
+        // Only use nodes that have shown to be somewhat reliable
         if next_hop.quality < self.quality_threshold {
-            // Only use nodes that have shown to be somewhat reliable
-            trace!(%next_hop, "quality threshold not satisfied");
+            trace!(%next_hop, "node quality threshold not satisfied");
+            return false;
+        }
+
+        // Edges which have score below the threshold won't be considered
+        if edge.score.unwrap_or(1.0) < self.score_threshold {
+            trace!(%next_hop, "channel score threshold not satisfied");
             return false;
         }
 
@@ -167,8 +185,6 @@ where
             trace!(%next_hop, "zero stake channels not allowed");
             return false;
         }
-
-        // TODO: use edge scoring as well for filtering?
 
         trace!(%next_hop, ?current_path, "usable node");
         true
@@ -200,14 +216,11 @@ where
             return Err(GeneralError::InvalidInput.into());
         }
 
+        // Populate the queue with possible initial path offsprings
         let mut queue = graph
             .open_channels_from(source)
-            .filter(|(next_hop, edge)| self.next_hop_usable(next_hop, edge, &source, &destination, &[]))
-            .map(|(next_hop, edge)| WeightedChannelPath {
-                path: vec![next_hop.address],
-                weight: CW::calculate_weight(&edge.channel),
-                fully_explored: false,
-            })
+            .filter(|(node, edge)| self.is_next_hop_usable(node, edge, &source, &destination, &[]))
+            .map(|(_, edge)| WeightedChannelPath::default().extend::<CW>(edge))
             .collect::<BinaryHeap<_>>();
 
         trace!(last_peer = %source, queue_len = queue.len(), "got next possible steps");
@@ -226,17 +239,10 @@ where
                 "testing next path in queue"
             );
             if current_len == max_hops || current.fully_explored || iters > self.max_iterations {
-                if iters > self.max_iterations {
-                    warn!(
-                        %source, %destination, max_hops, max_iterations = self.max_iterations,
-                        "could not find path",
-                    );
-                }
-
                 return if current_len >= min_hops && current_len <= max_hops {
                     Ok(ChannelPath::new_valid(current.path))
                 } else {
-                    trace!(current_len, min_hops, max_hops, "path not found");
+                    trace!(current_len, min_hops, max_hops, iters, "path not found");
                     Err(PathError::PathNotFound(
                         max_hops,
                         source.to_string(),
@@ -245,32 +251,25 @@ where
                 };
             }
 
+            // Check for any acceptable path continuations
             let last_peer = *current.path.last().unwrap();
             let mut new_channels = graph
                 .open_channels_from(last_peer)
-                .filter(|(next_hop, edge)| self.next_hop_usable(next_hop, edge, &source, &destination, &current.path))
+                .filter(|(next_hop, edge)| {
+                    self.is_next_hop_usable(next_hop, edge, &source, &destination, &current.path)
+                })
                 .peekable();
 
+            // If there are more usable path continuations, add them all to the queue
             if new_channels.peek().is_some() {
-                queue.extend(new_channels.map(|(next_hop, edge)| {
-                    debug_assert_eq!(next_hop.address, edge.channel.destination);
-
-                    let mut next_path_variant = WeightedChannelPath {
-                        path: Vec::with_capacity(current_len + 1),
-                        weight: current.weight + CW::calculate_weight(&edge.channel),
-                        fully_explored: false,
-                    };
-                    next_path_variant.path.extend(&current.path);
-                    next_path_variant.path.push(next_hop.address);
-
-                    next_path_variant
-                }));
-
+                queue.extend(new_channels.map(|(_, edge)| current.clone().extend::<CW>(edge)));
                 trace!(%last_peer, queue_len = queue.len(), "got next possible steps");
             } else {
+                // No more possible continuations, mark this path as fully explored,
+                // but push it into the queue
+                // if we don't manage to find anything better
                 current.fully_explored = true;
                 trace!(path = ?current, "fully explored");
-                // Keep the current path in case we do not find anything better
                 queue.push(current);
             }
 
@@ -291,19 +290,15 @@ pub type LegacyPathSelector = DfsPathSelector<RandomizedEdgeWeighting>;
 
 #[cfg(test)]
 mod tests {
-    use crate::channel_graph::ChannelGraph;
-    use crate::path::{ChannelPath, Path};
-    use crate::selectors::legacy::DfsPathSelector;
-    use crate::selectors::legacy::RandomizedEdgeWeighting;
-    use crate::selectors::{EdgeWeighting, PathSelector};
+    use super::*;
+
     use core::panic;
-    use hopr_internal_types::prelude::*;
-    use hopr_primitive_types::prelude::*;
-    use lazy_static::lazy_static;
     use regex::Regex;
     use std::str::FromStr;
 
-    lazy_static! {
+    use crate::path::Path;
+
+    lazy_static::lazy_static! {
         static ref ADDRESSES: [Address; 6] = [
             Address::from_str("0x0000c178cf70d966be0a798e666ce2782c7b2288").unwrap(),
             Address::from_str("0x1000d5786d9e6799b3297da1ad55605b91e2c882").unwrap(),
@@ -434,8 +429,8 @@ mod tests {
 
     pub struct TestWeights;
     impl EdgeWeighting<U256> for TestWeights {
-        fn calculate_weight(channel: &ChannelEntry) -> U256 {
-            channel.balance.amount() + 1u32
+        fn calculate_weight(edge: &ChannelEdge) -> U256 {
+            edge.channel.balance.amount() + 1u32
         }
     }
 
@@ -484,7 +479,7 @@ mod tests {
     }
 
     #[test]
-    fn test_should_not_find_unreliable_path() {
+    fn test_should_not_find_path_with_unreliable_node() {
         let isolated = define_graph("0 [1] -> 1", ADDRESSES[0], |_| 0_f64, |_, _| 0.0);
 
         let selector = DfsPathSelector::<TestWeights>::default();
@@ -517,7 +512,7 @@ mod tests {
     }
 
     #[test]
-    fn test_dfs_should_find_path_in_reliable_star() -> anyhow::Result<()> {
+    fn test_should_find_path_in_reliable_star() -> anyhow::Result<()> {
         let star = define_graph(
             "0 [1] <-> [2] 1, 0 [1] <-> [3] 2, 0 [1] <-> [4] 3, 0 [1] <-> [5] 4",
             ADDRESSES[1],
@@ -534,8 +529,8 @@ mod tests {
         Ok(())
     }
 
-    #[test_log::test]
-    fn test_dfs_should_find_path_in_reliable_arrow_with_lower_weight() -> anyhow::Result<()> {
+    #[test]
+    fn test_should_find_path_in_reliable_arrow_with_lower_weight() -> anyhow::Result<()> {
         let arrow = define_graph(
             "0 [1] -> 1, 1 [1] -> 2, 2 [1] -> 3, 1 [1] -> 3",
             ADDRESSES[0],
@@ -551,8 +546,8 @@ mod tests {
         Ok(())
     }
 
-    #[test_log::test]
-    fn test_dfs_should_find_path_in_reliable_arrow_with_higher_weight() -> anyhow::Result<()> {
+    #[test]
+    fn test_should_find_path_in_reliable_arrow_with_higher_weight() -> anyhow::Result<()> {
         let arrow = define_graph(
             "0 [1] -> 1, 1 [2] -> 2, 2 [3] -> 3, 1 [2] -> 3",
             ADDRESSES[0],
@@ -568,8 +563,8 @@ mod tests {
         Ok(())
     }
 
-    #[test_log::test]
-    fn test_dfs_should_find_path_in_reliable_arrow_with_random_weight() -> anyhow::Result<()> {
+    #[test]
+    fn test_should_find_path_in_reliable_arrow_with_random_weight() -> anyhow::Result<()> {
         let arrow = define_graph(
             "0 [29] -> 1, 1 [5] -> 2, 2 [31] -> 3, 1 [2] -> 3",
             ADDRESSES[0],

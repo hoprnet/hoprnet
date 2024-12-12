@@ -1691,6 +1691,7 @@ dependencies = [
  "petgraph",
  "regex",
  "serde",
+ "smart-default",
  "test-log",
  "thiserror",
  "tracing",
