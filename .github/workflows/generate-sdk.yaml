@@ -27,7 +27,7 @@ jobs:
           ref: ${{ inputs.base_branch }}
 
       - name: Sccache Setup
-        uses: mozilla-actions/sccache-action@v0.0.6
+        uses: mozilla-actions/sccache-action@v0.0.7
         with:
           version: "v0.4.0"
 
