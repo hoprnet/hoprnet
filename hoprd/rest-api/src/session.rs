@@ -26,9 +26,7 @@ use tracing::{debug, error, info, trace};
 
 use hopr_lib::errors::HoprLibError;
 use hopr_lib::transfer_session;
-use hopr_lib::{
-    HoprSession, IpProtocol, RoutingOptions, ServiceId, SessionCapability, SessionClientConfig, SessionTarget,
-};
+use hopr_lib::{HoprSession, ServiceId, SessionClientConfig, SessionTarget};
 use hopr_network_types::prelude::{ConnectedUdpStream, IpOrHost, SealedHost, UdpStreamParallelism};
 use hopr_network_types::udp::ForeignDataMode;
 use hopr_network_types::utils::AsyncReadStreamer;
@@ -196,8 +194,8 @@ impl SessionWebsocketClientQueryRequest {
             peer: PeerId::from_str(self.destination.as_str())
                 .map_err(|_e| HoprLibError::GeneralError(format!("invalid destination: {}", self.destination)))?,
             path_options,
-            target: self.target.into_target(self.protocol.into())?,
-            capabilities: self.capabilities,
+            target: self.target.into_target(self.protocol)?,
+            capabilities: self.capabilities.into_iter().map(SessionCapability::into).collect(),
         })
     }
 }
@@ -403,20 +401,33 @@ impl SessionClientRequest {
         let peer = match self.destination {
             PeerOrAddress::PeerId(peer_id) => peer_id,
             PeerOrAddress::Address(address) => {
-                return Err(HoprLibError::GeneralError(format!("invalid destination: {}", address)))
+                return Err(HoprLibError::GeneralError(format!("invalid destination: {address}")))
             }
         };
 
         Ok(SessionClientConfig {
             peer,
-            path_options: self.path,
-            target: self.target.into_target(target_protocol.into())?,
-            capabilities: self.capabilities.unwrap_or_else(|| match target_protocol {
-                IpProtocol::TCP => {
-                    vec![SessionCapability::Retransmission, SessionCapability::Segmentation]
-                }
-                _ => vec![], // no default capabilities for UDP, etc.
-            }),
+            path_options: self.path.try_into()?,
+            target: self.target.into_target(target_protocol)?,
+            capabilities: self
+                .capabilities
+                .map(|vs| {
+                    vs.into_iter()
+                        .map(|v| {
+                            let cap: hopr_lib::SessionCapability = v.into();
+                            cap
+                        })
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_else(|| match target_protocol {
+                    IpProtocol::TCP => {
+                        vec![
+                            hopr_lib::SessionCapability::Retransmission,
+                            hopr_lib::SessionCapability::Segmentation,
+                        ]
+                    }
+                    _ => vec![], // no default capabilities for UDP, etc.
+                }),
         })
     }
 }
