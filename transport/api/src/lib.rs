@@ -444,9 +444,14 @@ where
         );
 
         // initiate the network telemetry
+        let half_the_hearbeat_interval = self.cfg.heartbeat.interval / 4;
         processes.insert(
             HoprTransportProcess::Heartbeat,
-            spawn(async move { heartbeat.heartbeat_loop().await }),
+            spawn(async move {
+                // present to make sure that the heartbeat does not start immediately
+                hopr_async_runtime::prelude::sleep(half_the_hearbeat_interval).await;
+                heartbeat.heartbeat_loop().await
+            }),
         );
 
         processes
