@@ -270,9 +270,11 @@ impl HoprDbChannelOperations for HoprDb {
         Ok(Channel::find()
             .filter(
                 channel::Column::Status
-                    .eq(1) // Open
+                    .eq(i8::from(ChannelStatus::Open))
                     .or(channel::Column::Status
-                        .eq(2) // PendingToClose
+                        .eq(i8::from(ChannelStatus::PendingToClose(
+                            hopr_platform::time::native::current_time(), // irrelevant
+                        )))
                         .and(channel::Column::ClosureTime.gt(Utc::now()))),
             )
             .stream(&self.index_db)
