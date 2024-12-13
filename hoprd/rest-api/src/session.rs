@@ -343,17 +343,9 @@ impl TryFrom<RoutingOptions> for hopr_lib::RoutingOptions {
 
     fn try_from(value: RoutingOptions) -> Result<Self, Self::Error> {
         match value {
+            #[cfg(feature = "explicit-path")]
             RoutingOptions::IntermediatePath(path) => {
-                #[cfg(feature = "explicit-path")]
-                {
-                    Ok(hopr_lib::RoutingOptions::IntermediatePath(path.into_iter().collect()))
-                }
-                #[cfg(not(feature = "explicit-path"))]
-                {
-                    Err(HoprLibError::GeneralError(
-                        "explicit-path feature not enabled".to_string(),
-                    ))
-                }
+                Ok(hopr_lib::RoutingOptions::IntermediatePath(path.into_iter().collect()))
             }
             RoutingOptions::Hops(hops) => Ok(hopr_lib::RoutingOptions::Hops(hops.try_into()?)),
         }
@@ -377,9 +369,7 @@ pub(crate) struct SessionClientRequest {
     #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String)]
     pub destination: PeerOrAddress,
-    /// HOPR routing options for the Session.
     pub path: RoutingOptions,
-    /// Session target specification.
     pub target: SessionTargetSpec,
     /// Listen host (`ip:port`) for the Session socket at the Entry node.
     ///
