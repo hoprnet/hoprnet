@@ -899,12 +899,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bimap"
-version = "0.6.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "230c5f1ca6a325a32553f8640d31ac9b49f2411e901e427570154868b46da4f7"
-
-[[package]]
 name = "bincode"
 version = "1.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4472,7 +4466,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.8.1"
+version = "0.8.2"
 dependencies = [
  "async-lock 3.4.0",
  "async-std",
@@ -4571,7 +4565,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-session"
-version = "0.3.1"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "aquamarine",
@@ -4663,7 +4657,6 @@ dependencies = [
  "axum",
  "axum-extra",
  "base64 0.22.1",
- "bimap",
  "const_format",
  "futures",
  "futures-concurrency",
@@ -4675,12 +4668,9 @@ dependencies = [
  "hopr-network-types",
  "hopr-transport-session",
  "hoprd-db-api",
- "hoprd-db-entity",
- "hoprd-db-migration",
  "hoprd-inbox",
  "lazy_static",
  "libp2p-identity",
- "mime",
  "regex",
  "serde",
  "serde_json",
@@ -4689,9 +4679,7 @@ dependencies = [
  "strum",
  "tempfile",
  "tokio",
- "tokio-retry",
  "tokio-stream",
- "tokio-util",
  "tower 0.5.1",
  "tower-http",
  "tracing",

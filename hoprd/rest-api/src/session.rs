@@ -26,7 +26,9 @@ use tracing::{debug, error, info, trace};
 
 use hopr_lib::errors::HoprLibError;
 use hopr_lib::transfer_session;
-use hopr_lib::{HoprSession, SessionClientConfig};
+use hopr_lib::{
+    HoprSession, IpProtocol, RoutingOptions, ServiceId, SessionCapability, SessionClientConfig, SessionTarget,
+};
 use hopr_network_types::prelude::{ConnectedUdpStream, IpOrHost, SealedHost, UdpStreamParallelism};
 use hopr_network_types::udp::ForeignDataMode;
 use hopr_network_types::utils::AsyncReadStreamer;
@@ -57,6 +59,7 @@ lazy_static::lazy_static! {
 pub enum SessionTargetSpec {
     Plain(String),
     Sealed(#[serde_as(as = "serde_with::base64::Base64")] Vec<u8>),
+    Service(ServiceId),
 }
 
 impl std::fmt::Display for SessionTargetSpec {
@@ -64,6 +67,7 @@ impl std::fmt::Display for SessionTargetSpec {
         match self {
             SessionTargetSpec::Plain(t) => write!(f, "{t}"),
             SessionTargetSpec::Sealed(t) => write!(f, "$${}", base64::prelude::BASE64_URL_SAFE.encode(t)),
+            SessionTargetSpec::Service(t) => write!(f, "#{t}"),
         }
     }
 }
@@ -78,22 +82,39 @@ impl std::str::FromStr for SessionTargetSpec {
                     .decode(stripped)
                     .map_err(|e| HoprLibError::GeneralError(e.to_string()))?,
             )
+        } else if let Some(stripped) = s.strip_prefix("#") {
+            Self::Service(
+                stripped
+                    .parse()
+                    .map_err(|_| HoprLibError::GeneralError("cannot parse service id".into()))?,
+            )
         } else {
             Self::Plain(s.to_owned())
         })
     }
 }
 
-impl TryFrom<SessionTargetSpec> for SealedHost {
-    type Error = HoprLibError;
-
-    fn try_from(value: SessionTargetSpec) -> Result<Self, Self::Error> {
-        match value {
-            SessionTargetSpec::Plain(plain) => IpOrHost::from_str(&plain)
-                .map(SealedHost::from)
-                .map_err(|e| HoprLibError::GeneralError(e.to_string())),
-            SessionTargetSpec::Sealed(enc) => Ok(SealedHost::Sealed(enc.into_boxed_slice())),
-        }
+impl SessionTargetSpec {
+    pub fn into_target(self, protocol: IpProtocol) -> Result<SessionTarget, HoprLibError> {
+        Ok(match (protocol, self) {
+            (IpProtocol::TCP, SessionTargetSpec::Plain(plain)) => SessionTarget::TcpStream(
+                IpOrHost::from_str(&plain)
+                    .map(SealedHost::from)
+                    .map_err(|e| HoprLibError::GeneralError(e.to_string()))?,
+            ),
+            (IpProtocol::UDP, SessionTargetSpec::Plain(plain)) => SessionTarget::UdpStream(
+                IpOrHost::from_str(&plain)
+                    .map(SealedHost::from)
+                    .map_err(|e| HoprLibError::GeneralError(e.to_string()))?,
+            ),
+            (IpProtocol::TCP, SessionTargetSpec::Sealed(enc)) => {
+                SessionTarget::TcpStream(SealedHost::Sealed(enc.into_boxed_slice()))
+            }
+            (IpProtocol::UDP, SessionTargetSpec::Sealed(enc)) => {
+                SessionTarget::UdpStream(SealedHost::Sealed(enc.into_boxed_slice()))
+            }
+            (_, SessionTargetSpec::Service(id)) => SessionTarget::ExitNode(id),
+        })
     }
 }
 
@@ -175,9 +196,8 @@ impl SessionWebsocketClientQueryRequest {
             peer: PeerId::from_str(self.destination.as_str())
                 .map_err(|_e| HoprLibError::GeneralError(format!("invalid destination: {}", self.destination)))?,
             path_options,
-            target_protocol: self.protocol.into(),
-            target: self.target.try_into()?,
-            capabilities: self.capabilities.into_iter().map(|v| v.into()).collect(),
+            target: self.target.into_target(self.protocol.into())?,
+            capabilities: self.capabilities,
         })
     }
 }
@@ -389,25 +409,14 @@ impl SessionClientRequest {
 
         Ok(SessionClientConfig {
             peer,
-            path_options: self.path.try_into()?,
-            target_protocol: target_protocol.into(),
-            target: self.target.try_into()?,
-            capabilities: self
-                .capabilities
-                .map(|v| {
-                    v.into_iter()
-                        .map(|vv| vv.into())
-                        .collect::<Vec<hopr_lib::SessionCapability>>()
-                })
-                .unwrap_or_else(|| match target_protocol {
-                    IpProtocol::TCP => {
-                        vec![
-                            hopr_lib::SessionCapability::Retransmission,
-                            hopr_lib::SessionCapability::Segmentation,
-                        ]
-                    }
-                    _ => vec![], // no default capabilities for UDP, etc.
-                }),
+            path_options: self.path,
+            target: self.target.into_target(target_protocol.into())?,
+            capabilities: self.capabilities.unwrap_or_else(|| match target_protocol {
+                IpProtocol::TCP => {
+                    vec![SessionCapability::Retransmission, SessionCapability::Segmentation]
+                }
+                _ => vec![], // no default capabilities for UDP, etc.
+            }),
         })
     }
 }
