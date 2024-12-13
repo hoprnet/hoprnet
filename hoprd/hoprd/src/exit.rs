@@ -1,5 +1,5 @@
 use hopr_lib::errors::HoprLibError;
-use hopr_lib::{transfer_session, HoprOffchainKeypair};
+use hopr_lib::{transfer_session, HoprOffchainKeypair, ServiceId};
 use hopr_network_types::prelude::ForeignDataMode;
 use hopr_network_types::udp::UdpStreamParallelism;
 use hoprd_api::{HOPR_TCP_BUFFER_SIZE, HOPR_UDP_BUFFER_SIZE, HOPR_UDP_QUEUE_SIZE};
@@ -38,6 +38,8 @@ impl HoprServerIpForwardingReactor {
         })
     }
 }
+
+pub const SERVICE_ID_LOOPBACK: ServiceId = 0;
 
 #[hopr_lib::async_trait]
 impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
@@ -186,10 +188,10 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                             %tcp_target,
                             "server bridged session to TCP ended"
                         ),
-                        Err(e) => tracing::error!(
+                        Err(error) => tracing::error!(
                             ?session_id,
                             %tcp_target,
-                            error = %e,
+                            %error,
                             "TCP server stream is closed"
                         ),
                     }
@@ -197,6 +199,28 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                     #[cfg(all(feature = "prometheus", not(test)))]
                     METRIC_ACTIVE_TARGETS.decrement(&["tcp"], 1.0);
                 });
+
+                Ok(())
+            }
+            hopr_lib::SessionTarget::ExitNode(SERVICE_ID_LOOPBACK) => {
+                tracing::debug!(?session_id, "bridging the session to the loopback service");
+                let (mut reader, mut writer) = tokio::io::split(session.session);
+
+                #[cfg(all(feature = "prometheus", not(test)))]
+                METRIC_ACTIVE_TARGETS.increment(&["loopback"], 1.0);
+
+                // Uses 4 kB buffer for copying
+                match tokio::io::copy(&mut reader, &mut writer).await {
+                    Ok(copied) => tracing::info!(?session_id, copied, "server loopback session service ended"),
+                    Err(error) => tracing::error!(
+                        ?session_id,
+                        %error,
+                        "server loopback session service ended with an error"
+                    ),
+                }
+
+                #[cfg(all(feature = "prometheus", not(test)))]
+                METRIC_ACTIVE_TARGETS.decrement(&["loopback"], 1.0);
 
                 Ok(())
             }

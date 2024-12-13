@@ -38,7 +38,6 @@ libp2p-identity = { workspace = true, features = [
   "ed25519",
   "serde",
 ] }
-mime = "0.3.17"
 regex = { workspace = true, optional = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

@@ -4460,7 +4460,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.8.1"
+version = "0.8.2"
 dependencies = [
  "async-lock 3.4.0",
  "async-std",
@@ -4559,7 +4559,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-session"
-version = "0.3.1"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "aquamarine",
@@ -4665,7 +4665,6 @@ dependencies = [
  "hoprd-inbox",
  "lazy_static",
  "libp2p-identity",
- "mime",
  "regex",
  "serde",
  "serde_json",
