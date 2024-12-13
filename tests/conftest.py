@@ -99,8 +99,10 @@ def anvil_state_file(parent_dir: Path):
     return parent_dir.joinpath("anvil.state.json")
 
 
-INPUT_PROTOCOL_CONFIG_FILE = PWD.parent.joinpath("scripts/protocol-config-anvil.json")
-INPUT_DEPLOYMENTS_SUMMARY_FILE = PWD.parent.joinpath("ethereum/contracts/contracts-addresses.json")
+INPUT_PROTOCOL_CONFIG_FILE = PWD.parent.joinpath(
+    "scripts/protocol-config-anvil.json")
+INPUT_DEPLOYMENTS_SUMMARY_FILE = PWD.parent.joinpath(
+    "ethereum/contracts/contracts-addresses.json")
 PREGENERATED_IDENTITIES_DIR = PWD.joinpath("identities")
 
 NODES = {
@@ -252,11 +254,15 @@ def snapshot_reuse(parent_dir: Path, nodes):
         shutil.rmtree(node_target_dir, ignore_errors=True)
         node_target_dir.mkdir(parents=True, exist_ok=False)
 
-        shutil.copy(node_snapshot_dir.joinpath("hopr_index.db"), node_target_dir)
-        shutil.copy(node_snapshot_dir.joinpath("hopr_index.db-shm"), node_target_dir)
-        shutil.copy(node_snapshot_dir.joinpath("hopr_index.db-wal"), node_target_dir)
+        shutil.copy(node_snapshot_dir.joinpath(
+            "hopr_index.db"), node_target_dir)
+        shutil.copy(node_snapshot_dir.joinpath(
+            "hopr_index.db-shm"), node_target_dir)
+        shutil.copy(node_snapshot_dir.joinpath(
+            "hopr_index.db-wal"), node_target_dir)
 
-        parent_dir.joinpath(f"{NODE_NAME_PREFIX}_{i+1}.env").unlink(missing_ok=True)
+        parent_dir.joinpath(
+            f"{NODE_NAME_PREFIX}_{i+1}.env").unlink(missing_ok=True)
         shutil.copy(sdir.joinpath(f"{NODE_NAME_PREFIX}_{i+1}.env"), parent_dir)
 
 
@@ -271,7 +277,8 @@ def snapshot_create(anvil_port, parent_dir: Path, nodes):
 
     # stop anvil and nodes
     [node.clean_up() for node in nodes.values()]
-    run(["make", "kill-anvil", f"port={anvil_port}"], cwd=PWD.parent, check=True)
+    run(["make", "kill-anvil",
+        f"port={anvil_port}"], cwd=PWD.parent, check=True)
 
     # copy anvil state
     shutil.copy(anvil_state_file(parent_dir), sdir)
@@ -422,8 +429,10 @@ async def shared_nodes_bringup(
 
     tasks = []
     for node in nodes.values():
-        required_peers = [n.peer_id for n in nodes.values() if n != node and n.network == node.network]
-        tasks.append(asyncio.create_task(all_peers_connected(node, required_peers)))
+        required_peers = [n.peer_id for n in nodes.values(
+        ) if n != node and n.network == node.network]
+        tasks.append(asyncio.create_task(
+            all_peers_connected(node, required_peers)))
 
     nodes_connectivity = await asyncio.wait_for(asyncio.gather(*tasks), timeout)
     for node, res in zip(nodes.values(), nodes_connectivity):
@@ -433,7 +442,8 @@ async def shared_nodes_bringup(
             logging.error(f"Node {node} did not connect to all peers")
 
     if not all(nodes_connectivity):
-        logging.critical("Not all nodes are connected to all peers, interrupting setup")
+        logging.critical(
+            "Not all nodes are connected to all peers, interrupting setup")
         raise RuntimeError
 
 
@@ -475,7 +485,8 @@ async def swarm7(request):
     test_dir = fixtures_dir(test_suite_name)
     test_dir.mkdir(parents=True, exist_ok=True)
     anvil_port = test_suite.PORT_BASE
-    logging.info(f"Setting test suite {test_suite_name} up: test_dir={test_dir}, anvil_port={anvil_port}")
+    logging.info(
+        f"Setting test suite {test_suite_name} up: test_dir={test_dir}, anvil_port={anvil_port}")
 
     nodes: dict[str, Node] = deepcopy(NODES)
     for node in nodes.values():
@@ -483,7 +494,8 @@ async def swarm7(request):
 
     # STOP OLD LOCAL ANVIL SERVER
     logging.info("Ensure local anvil server is not running")
-    run(["make", "kill-anvil", f"port={anvil_port}"], cwd=PWD.parent, check=True)
+    run(["make", "kill-anvil",
+        f"port={anvil_port}"], cwd=PWD.parent, check=True)
 
     use_snapshot = snapshot_usable(test_dir, nodes)
 
@@ -493,7 +505,8 @@ async def swarm7(request):
         logging.info("Snapshot not usable")
 
         # START NEW LOCAL ANVIL SERVER
-        logging.info("Starting and waiting for local anvil server to be up (dump state enabled)")
+        logging.info(
+            "Starting and waiting for local anvil server to be up (dump state enabled)")
         run(
             f"""
             ./run-local-anvil.sh
@@ -507,16 +520,20 @@ async def swarm7(request):
             cwd=PWD.parent.joinpath("scripts"),
         )
 
-        logging.info("Mirror contract data because of anvil-deploy node only writing to localhost")
-        shutil.copy(INPUT_PROTOCOL_CONFIG_FILE, protocol_config_file(test_suite_name))
-        mirror_contract_data(protocol_config_file(test_suite_name), INPUT_DEPLOYMENTS_SUMMARY_FILE, NETWORK1, NETWORK1)
+        logging.info(
+            "Mirror contract data because of anvil-deploy node only writing to localhost")
+        shutil.copy(INPUT_PROTOCOL_CONFIG_FILE,
+                    protocol_config_file(test_suite_name))
+        mirror_contract_data(protocol_config_file(
+            test_suite_name), INPUT_DEPLOYMENTS_SUMMARY_FILE, NETWORK1, NETWORK1)
 
         # SETUP NODES USING STORED IDENTITIES
         logging.info("Using pre-generated identities and configs")
         copy_identities(test_dir)
 
         # CREATE LOCAL SAFES AND MODULES FOR ALL THE IDS
-        logging.info("Creating safe and modules for all the ids, store them in args files")
+        logging.info(
+            "Creating safe and modules for all the ids, store them in args files")
 
         private_key = load_private_key(test_suite_name)
 
@@ -544,7 +561,8 @@ async def swarm7(request):
         logging.info("Re-using snapshot")
         snapshot_reuse(test_dir, nodes)
 
-    logging.info("Starting and waiting for local anvil server to be up (load state enabled)")
+    logging.info(
+        "Starting and waiting for local anvil server to be up (load state enabled)")
 
     run(
         f"""./run-local-anvil.sh 
@@ -575,7 +593,8 @@ async def swarm7(request):
     # POST TEST CLEANUP
     logging.info(f"Tearing down the {len(nodes)} nodes cluster")
     [node.clean_up() for node in nodes.values()]
-    run(["make", "kill-anvil", f"port={anvil_port}"], cwd=PWD.parent, check=True)
+    run(["make", "kill-anvil",
+        f"port={anvil_port}"], cwd=PWD.parent, check=True)
 
 
 @pytest.fixture(autouse=True)
@@ -604,7 +623,8 @@ def run_hopli_cmd(cmd: list[str], custom_env):
     color_regex = re.compile(r"\x1b\[\d{,3}m")
     with proc.stdout:
         for line in iter(proc.stdout.readline, b""):
-            logging.info("[Hopli] %r", color_regex.sub("", line.decode("utf-8")[:-1]))
+            logging.info("[Hopli] %r", color_regex.sub(
+                "", line.decode("utf-8")[:-1]))
     retcode = proc.wait()
     if retcode:
         raise CalledProcessError(retcode, cmd)

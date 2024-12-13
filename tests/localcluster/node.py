@@ -1,8 +1,11 @@
+import asyncio
 import logging
 import os
 from pathlib import Path
 from subprocess import STDOUT, Popen, run
 
+from . import utils
+from .constants import MAIN_DIR, NODE_NAME_PREFIX, PASSWORD, PORT_BASE, PWD
 from .hopr import HoprdAPI
 
 
@@ -54,16 +57,18 @@ class Node:
         self.p2p_port: int = 0
         self.anvil_port: int = 0
 
+        self.prepare()
+
     @property
     def api(self):
         return HoprdAPI(f"http://{self.host_addr}:{self.api_port}", self.api_token)
 
-    def prepare(self, port_base: int, parent_dir: Path, prefix: str):
-        self.anvil_port = port_base
-        self.dir = parent_dir.joinpath(f"{prefix}_{self.id}")
-        self.cfg_file_path = parent_dir.joinpath(self.cfg_file)
-        self.api_port = port_base + (self.id * 10) + 1
-        self.p2p_port = port_base + (self.id * 10) + 2
+    def prepare(self):
+        self.anvil_port = PORT_BASE
+        self.dir = MAIN_DIR.joinpath(f"{NODE_NAME_PREFIX}_{self.id}")
+        self.cfg_file_path = MAIN_DIR.joinpath(self.cfg_file)
+        self.api_port = PORT_BASE + (self.id * 10) + 1
+        self.p2p_port = PORT_BASE + (self.id * 10) + 2
 
     def load_addresses(self):
         loaded_env = load_env_file(f"{self.dir}.env")
@@ -73,7 +78,19 @@ class Node:
             raise ValueError(
                 "Critical addresses are missing in the environment file.")
 
-    def create_local_safe(self, custom_env: dict):
+    def create_local_safe(self, anvil_config: Path):
+        logging.debug(f"Creating safe and module for {self}")
+
+        private_key = utils.load_private_key(anvil_config)
+
+        safe_custom_env = {
+            "ETHERSCAN_API_KEY": "anykey",
+            "IDENTITY_PASSWORD": PASSWORD,
+            "MANAGER_PRIVATE_KEY": private_key,
+            "PRIVATE_KEY": private_key,
+            "PATH": os.environ["PATH"],
+        }
+
         res = run(
             [
                 "hopli",
@@ -96,11 +113,13 @@ class Node:
                 "--provider-url",
                 f"http://127.0.0.1:{self.anvil_port}",
             ],
-            env=os.environ | custom_env,
+            env=os.environ | safe_custom_env,
             check=True,
             capture_output=True,
             text=True,
+            cwd=PWD.parent,
         )
+
         for el in res.stdout.split("\n"):
             if el.startswith("safe 0x"):
                 self.safe_address = el.split()[-1]
@@ -145,7 +164,7 @@ class Node:
             "RUST_BACKTRACE": "full",
             "HOPRD_USE_OPENTELEMETRY": trace_telemetry,
             "OTEL_SERVICE_NAME": f"hoprd-{self.p2p_port}",
-            "TOKIO_CONSOLE_BIND": f"localhost:{self.p2p_port+100}",
+            "TOKIO_CONSOLE_BIND": f"localhost:{self.p2p_port+100}"
         }
         loaded_env = load_env_file(f"{self.dir}.env")
 
@@ -180,11 +199,47 @@ class Node:
 
         return self.proc is not None
 
-    def __eq__(self, other):
-        return self.peer_id == other.peer_id
+    async def all_peers_connected(self, required_peers):
+        ready = False
+
+        while not ready:
+            peers = [p["peer_id"] for p in await asyncio.wait_for(self.api.peers(), timeout=20)]
+            missing_peers = [p for p in required_peers if p not in peers]
+            ready = len(missing_peers) == 0
+
+            if not ready:
+                await asyncio.sleep(1)
+
+        return ready
 
     def clean_up(self):
         self.proc.kill()
 
+    @classmethod
+    def fromConfig(cls, index: int, config: dict, api_token: dict, network: dict):
+        token = api_token["default"]
+        network = network["default"]
+
+        if "api_token" in config:
+            token = config["api_token"]
+
+        if "network" in config:
+            network = config["network"]
+
+        return cls(index, token, config["host"], network, config["config_file"])
+
+    async def links(self):
+        addresses = await self.api.addresses()
+        print(f"\t{self}")
+        print(f"\t\tPeer Id:\t{addresses['hopr']}")
+        print(f"\t\tAddress:\t{addresses['native']}")
+        print(
+            f"\t\tRest API:\thttp://{self.host_addr}:{self.api_port}/scalar | http://{self.host_addr}:{self.api_port}/swagger-ui/index.html")
+        print(
+            f"\t\tAdmin UI:\thttp://{self.host_addr}:4677/?apiEndpoint=http://{self.host_addr}:{self.api_port}&apiToken={self.api_token}", end="\n\n")
+
+    def __eq__(self, other):
+        return self.peer_id == other.peer_id
+
     def __str__(self):
-        return f"node@{self.host_addr}:{self.p2p_port}"
+        return f"node@{self.host_addr}:{self.api_port}"
