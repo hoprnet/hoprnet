@@ -325,9 +325,17 @@ impl TryFrom<RoutingOptions> for hopr_lib::RoutingOptions {
 
     fn try_from(value: RoutingOptions) -> Result<Self, Self::Error> {
         match value {
-            #[cfg(feature = "explicit-path")]
             RoutingOptions::IntermediatePath(path) => {
-                Ok(hopr_lib::RoutingOptions::IntermediatePath(path.into_iter().collect()))
+                #[cfg(feature = "explicit-path")]
+                {
+                    Ok(hopr_lib::RoutingOptions::IntermediatePath(path.into_iter().collect()))
+                }
+                #[cfg(not(feature = "explicit-path"))]
+                {
+                    Err(HoprLibError::GeneralError(
+                        "explicit-path feature not enabled".to_string(),
+                    ))
+                }
             }
             RoutingOptions::Hops(hops) => Ok(hopr_lib::RoutingOptions::Hops(hops.try_into()?)),
         }
