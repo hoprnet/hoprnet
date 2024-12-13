@@ -2,7 +2,10 @@
 
 # prevent sourcing of this script, only allow execution
 $(return >/dev/null 2>&1)
-test "$?" -eq "0" && { echo "This script should only be executed." >&2; exit 1; }
+test "$?" -eq "0" && {
+  echo "This script should only be executed." >&2
+  exit 1
+}
 
 # exit on errors, undefined variables, ensure errors in pipes are not hidden
 set -Eeuo pipefail
@@ -34,44 +37,44 @@ usage() {
   msg "-p sets NODE_ENV to 'production'"
 }
 
-while (( "$#" )); do
+while (("$#")); do
   case "$1" in
-    -h|--help)
-      # return early with help info when requested
-      usage
-      exit 0
-      ;;
-    -p|--production)
-      node_env="production"
-      shift
-      ;;
-    -t|--api-token)
-      api_token="${2}"
-      shift
-      shift
-      ;;
-    -i|--init-script)
-      init_script="${2}"
-      shift
-      shift
-      ;;
-    -l|--listen-host)
-      listen_host="${2}"
-      shift
-      shift
-      ;;
-    --hoprd-command)
-      hoprd_command="${2}"
-      shift
-      shift
-      ;;
-    -*|--*=)
-      usage
-      exit 1
-      ;;
-    *)
-      shift
-      ;;
+  -h | --help)
+    # return early with help info when requested
+    usage
+    exit 0
+    ;;
+  -p | --production)
+    node_env="production"
+    shift
+    ;;
+  -t | --api-token)
+    api_token="${2}"
+    shift
+    shift
+    ;;
+  -i | --init-script)
+    init_script="${2}"
+    shift
+    shift
+    ;;
+  -l | --listen-host)
+    listen_host="${2}"
+    shift
+    shift
+    ;;
+  --hoprd-command)
+    hoprd_command="${2}"
+    shift
+    shift
+    ;;
+  -* | --*=)
+    usage
+    exit 1
+    ;;
+  *)
+    shift
+    ;;
   esac
 done
 
@@ -129,15 +132,15 @@ function setup_node() {
   dir="${tmp_dir}/${node_prefix}_${node_id}"
   log="${dir}.log"
   id_file="${dir}.id"
-  api_port=$(( node_api_base_port + node_id ))
-  p2p_port=$(( node_p2p_base_port + node_id ))
+  api_port=$((node_api_base_port + node_id))
+  p2p_port=$((node_p2p_base_port + node_id))
   safe_args="$(<${dir}.safe.args)"
 
   api_endpoints+="${listen_host}:${api_port} "
 
   log "Run node ${node_id} on rest port ${api_port} -> ${log}"
 
-  if [[ "${additional_args}" != *"--network "* ]]; then
+  if [[ ${additional_args} != *"--network "* ]]; then
     additional_args="--network anvil-localhost ${additional_args}"
   fi
 
@@ -149,8 +152,8 @@ function setup_node() {
 
   # we can only provide apiToken param if we want authentication
   local api_token_params="--api"
-  if [[ "${HOPRD_DISABLE_API_AUTHENTICATION:-1}" == 0 ]]; then
-      api_token_params="${api_token_params} --apiToken ${api_token}"
+  if [[ ${HOPRD_DISABLE_API_AUTHENTICATION:-1} == 0 ]]; then
+    api_token_params="${api_token_params} --apiToken ${api_token}"
   fi
   # shellcheck disable=SC2086
   env \
@@ -159,21 +162,21 @@ function setup_node() {
     RUST_BACKTRACE=1 \
     HOPRD_DISABLE_API_AUTHENTICATION="${HOPRD_DISABLE_API_AUTHENTICATION:-1}" \
     ${hoprd_command} \
-      --announce \
-      --data="${dir}" \
-      --host="${host}:${p2p_port}" \
-      --identity="${id_file}" \
-      --init \
-      --password="${password}" \
-      ${api_token_params} \
-      --apiHost "${host}" \
-      --apiPort "${api_port}" \
-      --testAnnounceLocalAddresses \
-      --testPreferLocalAddresses \
-      --protocolConfig ${protocol_config} \
-      --configurationFilePath "${mydir}/local-cluster-hoprd.cfg.yaml" \
-      ${additional_args} \
-      > "${log}" 2>&1 &
+    --announce \
+    --data="${dir}" \
+    --host="${host}:${p2p_port}" \
+    --identity="${id_file}" \
+    --init \
+    --password="${password}" \
+    ${api_token_params} \
+    --apiHost "${host}" \
+    --apiPort "${api_port}" \
+    --testAnnounceLocalAddresses \
+    --testPreferLocalAddresses \
+    --protocolConfig ${protocol_config} \
+    --configurationFilePath "${mydir}/local-cluster-hoprd.cfg.yaml" \
+    ${additional_args} \
+    >"${log}" 2>&1 &
 }
 
 function generate_local_identities() {
@@ -181,7 +184,7 @@ function generate_local_identities() {
 
   # remove existing identity files, .safe.args
   find -L "${tmp_dir}" -maxdepth 1 -type f -name "${node_prefix}_*.safe.args" -exec rm {} \; || true
-  find -L "${tmp_dir}" -maxdepth 1 -type f -name "${node_prefix}_*.id"  -exec rm {} \; || true
+  find -L "${tmp_dir}" -maxdepth 1 -type f -name "${node_prefix}_*.id" -exec rm {} \; || true
 
   env ETHERSCAN_API_KEY="" IDENTITY_PASSWORD="${password}" \
     hopli identity create \
@@ -195,7 +198,7 @@ function generate_local_identities() {
 function create_local_safes() {
   log "Create safe"
 
-  mapfile -t id_files <<< "$(find -L "${tmp_dir}" -maxdepth 1 -type f -name "${node_prefix}_*.id" | sort || true)"
+  mapfile -t id_files <<<"$(find -L "${tmp_dir}" -maxdepth 1 -type f -name "${node_prefix}_*.id" | sort || true)"
 
   # create a loop so safes are created for all the nodes TODO:
   for id_file in "${id_files[@]}"; do
@@ -207,14 +210,14 @@ function create_local_safes() {
       PRIVATE_KEY="${deployer_private_key}" \
       MANAGER_PRIVATE_KEY="${deployer_private_key}" \
       hopli safe-module create \
-        --network anvil-localhost \
-        --identity-from-path "${id_file}" \
-        --hopr-amount 1000 --native-amount 1 \
-        --provider-url "http://localhost:8545" \
-        --contracts-root "./ethereum/contracts" > "${id_file%.id}.safe.log"
+      --network anvil-localhost \
+      --identity-from-path "${id_file}" \
+      --hopr-amount 1000 --native-amount 1 \
+      --provider-url "http://localhost:8545" \
+      --contracts-root "./ethereum/contracts" >"${id_file%.id}.safe.log"
 
     # store safe arguments in separate file for later use
-    grep -E '^(safe|node_module)' "${id_file%.id}.safe.log" | sed -e 's/^safe/--safeAddress/' -e ':a;N;$!ba;s/\nnode_module/ --moduleAddress/' > "${id_file%.id}.safe.args"
+    grep -E '^(safe|node_module)' "${id_file%.id}.safe.log" | sed -e 's/^safe/--safeAddress/' -e ':a;N;$!ba;s/\nnode_module/ --moduleAddress/' >"${id_file%.id}.safe.args"
     rm "${id_file%.id}.safe.log"
   done
 }
@@ -230,10 +233,10 @@ function set_minimum_win_prob() {
     PRIVATE_KEY="${deployer_private_key}" \
     MANAGER_PRIVATE_KEY="${deployer_private_key}" \
     hopli win-prob set \
-      --network anvil-localhost \
-      --winning-probability "${win_prob}" \
-      --provider-url "http://localhost:8545" \
-      --contracts-root "./ethereum/contracts"
+    --network anvil-localhost \
+    --winning-probability "${win_prob}" \
+    --provider-url "http://localhost:8545" \
+    --contracts-root "./ethereum/contracts"
 }
 
 function fund_all_local_identities() {
@@ -244,11 +247,11 @@ function fund_all_local_identities() {
     IDENTITY_PASSWORD="${password}" \
     PRIVATE_KEY="${deployer_private_key}" \
     hopli faucet \
-      --network anvil-localhost \
-      --identity-directory "${tmp_dir}" \
-      --identity-prefix "${node_prefix}" \
-      --provider-url "http://localhost:8545" \
-      --contracts-root "./ethereum/contracts"
+    --network anvil-localhost \
+    --identity-directory "${tmp_dir}" \
+    --identity-prefix "${node_prefix}" \
+    --provider-url "http://localhost:8545" \
+    --contracts-root "./ethereum/contracts"
 }
 
 # --- Log setup info {{{
@@ -256,7 +259,7 @@ log "Node files and directories"
 log "\tanvil"
 log "\t\tlog: ${anvil_rpc_log}"
 
-for node_id in $(seq 0 $(( cluster_size - 1 ))); do
+for node_id in $(seq 0 $((cluster_size - 1))); do
   declare id_file
   id_file="${tmp_dir}/${node_prefix}_${node_id}.id"
   log "\tnode ${node_prefix}_${node_id}"
@@ -391,7 +394,7 @@ log "\tYou may use \`make run-hopr-admin\`"
 log ""
 log "Node port info"
 
-cat <<EOF > "${env_file}"
+cat <<EOF >"${env_file}"
 #!/usr/bin/env bash
 export apiToken="${api_token}"
 EOF
@@ -400,7 +403,7 @@ for node_id in ${!id_files[@]}; do
   declare api_port node_name
 
   node_name="${node_prefix}_${node_id}"
-  api_port=$(( node_api_base_port + node_id ))
+  api_port=$((node_api_base_port + node_id))
 
   log "\t${node_name}"
   log "\t\tPeer Id:\t${peers[$node_id]}"
@@ -409,7 +412,7 @@ for node_id in ${!id_files[@]}; do
   log "\t\tAdmin UI:\thttp://${listen_host}:3000/?apiEndpoint=http://${listen_host}:${api_port}&apiToken=${api_token}"
   log "\t\tWebSocket:\tws://${listen_host}:${api_port}/api/v3/messages/websocket?apiToken=${api_token}"
 
-  cat <<EOF >> "${env_file}"
+  cat <<EOF >>"${env_file}"
 export HOPR_NODE_${node_id}_ADDR=${peers[$node_id]} HOPR_NODE_${node_id}_HTTP_URL=http://${listen_host}:${api_port} HOPR_NODE_${node_id}_WS_URL=ws://${listen_host}:${api_port}/api/v3/messages/websocket"
 echo "---"
 echo "Node ${node_name} REST API URL:  \$HOPR_NODE_${node_id}_HTTP_URL"
@@ -427,7 +430,7 @@ else
 fi
 
 # Needed by the Pluto HealthCheck
-echo "running" > "${tmp_dir}/cluster.status"
+echo "running" >"${tmp_dir}/cluster.status"
 log "Terminating this script will clean up the running local cluster"
 trap - SIGINT SIGTERM ERR
 wait

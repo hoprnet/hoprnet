@@ -1,9 +1,9 @@
 ---
 name: Feature Template
 about: Create a feature request
-title: ''
-labels: 'feature, status:new'
-assignees: ''
+title: ""
+labels: "feature, status:new"
+assignees: ""
 ---
 
 <!--- Please DO NOT remove the automatically added 'new issue' label -->
