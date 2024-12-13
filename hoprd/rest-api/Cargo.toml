@@ -1,6 +1,6 @@
 [package]
 name = "hoprd-api"
-version = "3.8.0"
+version = "3.9.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "This Rest API enables developers to interact with a hoprd node programatically through HTTP."
@@ -28,7 +28,6 @@ async-broadcast = { workspace = true }
 async-lock = { workspace = true }
 axum = { workspace = true, features = ["ws", "http2"] }
 axum-extra = { version = "0.9.4", features = ["query"] }
-bimap = { workspace = true }
 base64 = { workspace = true }
 const_format = { workspace = true }
 futures = { workspace = true }
@@ -47,8 +46,6 @@ serde_with = { workspace = true }
 smart-default = { workspace = true }
 strum = { workspace = true }
 tokio = { workspace = true }
-tokio-util = { workspace = true, features = ["compat"] }
-tokio-retry = { workspace = true }
 tokio-stream = { version = "0.1.15", features = ["net"] }
 tower = "0.5.1"
 tower-http = { version = "0.6.1", features = [
@@ -68,8 +65,6 @@ validator = { workspace = true }
 hopr-lib = { workspace = true, features = ["runtime-tokio", "session-client"] }
 hopr-db-api = { workspace = true }
 hoprd-db-api = { workspace = true }
-hoprd-db-entity = { workspace = true }
-hoprd-db-migration = { workspace = true }
 hoprd-inbox = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-network-types = { workspace = true, features = ["runtime-tokio"] }
