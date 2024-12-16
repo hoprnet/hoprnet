@@ -102,7 +102,7 @@ run-anvil-foreground: ## spinup a local anvil instance
 kill-anvil: port=8545
 kill-anvil: ## kill process running at port 8545 (default port of anvil)
 	# may fail, we can ignore that
-	lsof -i :$(port) -s TCP:LISTEN -t | xargs -I {} -n 1 kill {} || :
+	lsof -i :$(port) -s TCP:LISTEN -t | xargs -I {} -n 1 kill -s INT {} || :
 
 .PHONY: create-local-identity
 create-local-identity: id_dir=/tmp/

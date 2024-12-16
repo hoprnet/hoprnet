@@ -466,7 +466,7 @@ async def test_hopli_create_update_read_identity():
 
 
 @pytest.mark.asyncio
-async def test_hopli_should_be_able_to_create_safe_module(swarm7: dict[str, Node]):
+async def test_hopli_should_be_able_to_create_safe_module():
     test_suite_name = __name__.split(".")[-1]
     test_dir = fixtures_dir(test_suite_name)
     manager_private_key = load_private_key(test_suite_name)
