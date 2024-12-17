@@ -172,8 +172,8 @@ impl<CW: EdgeWeighting<U256>> DfsPathSelector<CW> {
             return false;
         }
 
-        // Edges which have score below the threshold won't be considered
-        if edge.score.unwrap_or(1.0) < self.cfg.score_threshold {
+        // Edges which have score and is below the threshold won't be considered
+        if edge.score.is_some_and(|score| score < self.cfg.score_threshold) {
             trace!(%next_hop, "channel score threshold not satisfied");
             return false;
         }

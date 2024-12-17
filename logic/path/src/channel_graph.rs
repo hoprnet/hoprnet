@@ -301,6 +301,9 @@ impl ChannelGraph {
                 // The node exists and we're updating to greater-than-zero quality
                 Entry::Occupied(existing) => {
                     let existing_idx: NodeIndex = (*existing.get()).into();
+                    // NOTE: we cannot remove bad quality nodes that still have edges,
+                    // as we would lose the ability to track changes on those edges if they
+                    // were removed early.
                     if quality > 0.0 || self.graph.neighbors_undirected(existing_idx).count() > 0 {
                         if let Some(node) = self.graph.node_weight_mut(existing_idx) {
                             node.quality = quality;
