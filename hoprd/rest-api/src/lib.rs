@@ -327,7 +327,7 @@ async fn build_api(
                 .route("/session/websocket", get(session::websocket))
                 .route("/session/:protocol", post(session::create_client))
                 .route("/session/:protocol", get(session::list_clients))
-                .route("/session/:protocol", delete(session::close_client))
+                .route("/session/:protocol/:ip/:port", delete(session::close_client))
                 .with_state(inner_state.clone().into())
                 .layer(middleware::from_fn_with_state(
                     inner_state.clone(),

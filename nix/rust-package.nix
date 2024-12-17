@@ -85,7 +85,7 @@ let
     # this env var is used by utoipa-swagger-ui to prevent internet access
     CARGO_FEATURE_VENDORED = "true";
     cargoVendorDir = "vendor/cargo";
-  # disable running tests automatically for now
+    # disable running tests automatically for now
     doCheck = false;
     # prevent nix from changing config.sub files under vendor/cargo
     dontUpdateAutotoolsGnuConfigScripts = true;

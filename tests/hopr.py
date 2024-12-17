@@ -108,7 +108,7 @@ class HoprdAPI:
                 )
                 return (True, response)
         except ApiException as e:
-            log.debug(
+            log.error(
                 f"ApiException calling {api_callback.__qualname__} with kwargs: {kwargs}, args: {args}, error is: {e}"
             )
             return (False, None)
@@ -514,9 +514,7 @@ class HoprdAPI:
         """
         Closes a previously opened and bound session
         """
-        status, _ = self.__call_api(
-            SessionApi, "close_client", protocol=protocol, ip=bound_ip, port=bound_port
-        )
+        status, _ = self.__call_api(SessionApi, "close_client", protocol=protocol, ip=bound_ip, port=bound_port)
         return status
 
     async def ticket_min_win_prob(self):
