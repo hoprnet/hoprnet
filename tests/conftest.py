@@ -358,7 +358,7 @@ async def all_peers_connected(node: Node, required_peers):
     ready = False
 
     while not ready:
-        peers = [p["peerId"] for p in await asyncio.wait_for(node.api.peers(), timeout=20)]
+        peers = [p["peer_id"] for p in await asyncio.wait_for(node.api.peers(), timeout=20)]
         missing_peers = [p for p in required_peers if p not in peers]
         ready = len(missing_peers) == 0
 

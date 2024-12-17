@@ -132,10 +132,10 @@ class HoprdAPI:
     async def aliases_get_alias(self, alias: str):
         """
         Returns the peer id recognized by the node.
-        :return: peerId: str
+        :return: peer_id: str
         """
         status, response = self.__call_api(AliasApi, "get_alias", alias)
-        return response.peerId if status else None
+        return response.peer_id if status else None
 
     async def aliases_set_alias(self, alias: str, destination: str):
         """
@@ -324,10 +324,10 @@ class HoprdAPI:
         _, response = self.__call_api(PeersApi, "ping_peer", destination)
         return response
 
-    async def peers(self, params: list or str = "peerId", status: str = "connected"):
+    async def peers(self, params: list or str = "peer_id", status: str = "connected"):
         """
         Returns a list of peers.
-        :param: param: list or str = "peerId"
+        :param: param: list or str = "peer_id"
         :param: status: str = "connected"
         :param: quality: int = 0..1
         :return: peers: list
@@ -344,13 +344,13 @@ class HoprdAPI:
 
             params = [params] if isinstance(params, str) else params
             for param in params:
-                if not param in getattr(response, status)[0]:
-                    log.error(f"No param `{param}` in param data '{getattr(response, status)[0]}'")
+                if not hasattr(getattr(response, status)[0], param):
+                    log.error(f"No param `{param}` found for peers")
                     return []
 
             output_list = []
             for peer in getattr(response, status):
-                output_list.append({param: peer[param] for param in params})
+                output_list.append({param: getattr(peer, param) for param in params})
 
             return output_list
         else:
@@ -515,7 +515,7 @@ class HoprdAPI:
         Closes a previously opened and bound session
         """
         status, _ = self.__call_api(
-            SessionApi, "close_client", protocol=protocol, ip=bound_ip, port=bound_port
+            SessionApi, "close_client", body={}, protocol=protocol, ip=bound_ip, port=bound_port
         )
         return status
 

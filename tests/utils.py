@@ -52,7 +52,7 @@ async def get_channel(src: Node, dest: Node, include_closed=False):
     all_channels = await src.api.all_channels(include_closed=include_closed)
 
     channels = [
-        oc for oc in all_channels.all if oc.get('source_address', None) == src.address and oc.get('destination_address', None) == dest.address
+        oc for oc in all_channels.all if oc.source_address == src.address and oc.destination_address == dest.address
     ]
 
     return channels[0] if len(channels) > 0 else None
@@ -61,7 +61,7 @@ async def get_channel(src: Node, dest: Node, include_closed=False):
 async def get_channel_seen_from_dst(src: Node, dest: Node, include_closed=False):
     open_channels = await dest.api.all_channels(include_closed=include_closed)
     channels = [
-        oc for oc in open_channels.all if oc.get('source_address', None) == src.address and oc.get('destination_address', None) == dest.address
+        oc for oc in open_channels.all if oc.source_address == src.address and oc.destination_address == dest.address
     ]
 
     return channels[0] if len(channels) > 0 else None
