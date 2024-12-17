@@ -2,7 +2,10 @@
 
 # prevent execution of this script, only allow sourcing
 $(return >/dev/null 2>&1)
-test "$?" -eq "0" || { echo "This script should only be sourced." >&2; exit 1; }
+test "$?" -eq "0" || {
+  echo "This script should only be sourced." >&2
+  exit 1
+}
 
 # exit on errors, undefined variables, ensure errors in pipes are not hidden
 set -Eeuo pipefail
@@ -50,7 +53,7 @@ get_network() {
 # $1=network id
 get_environment_type() {
   local network="${1}"
-  # use `contracts-addresses.json` because it stores 
+  # use `contracts-addresses.json` because it stores
   jq -r ".networks.\"${network}\".environment_type" "${mydir}/../ethereum/contracts/contracts-addresses.json"
 }
 
@@ -111,7 +114,7 @@ fund_if_empty() {
 
   local faucet_address
   faucet_address=$(funding_wallet_info "${network}" "address")
-  if [[ ! ${faucet_address} =~  ^0x[a-fA-F0-9]{40}$ ]]; then
+  if [[ ! ${faucet_address} =~ ^0x[a-fA-F0-9]{40}$ ]]; then
     log "Failed to retrieve funding wallet address: ${faucet_address}"
     exit 1
   fi
@@ -152,7 +155,7 @@ fund_if_empty() {
   log "Native balance of ${address} is ${address_native_balance}"
   log "HOPR balance of ${address} is ${address_hopr_balance}"
 
-  if (( $(echo "${address_native_balance} < ${min_funds}" | bc -l) )); then
+  if (($(echo "${address_native_balance} < ${min_funds}" | bc -l))); then
     # @TODO: Provide retry by checking balance again.
     log "Hoprd node with address ${address} has not enough native balance. Funding native tokens..."
     local tx_hash tx_error tx_res
@@ -166,7 +169,7 @@ fund_if_empty() {
     log "Funded native tokens, see tx hash ${tx_hash}"
   fi
 
-  if (( $(echo "${address_hopr_balance} < ${min_funds_hopr}" | bc -l) )); then
+  if (($(echo "${address_hopr_balance} < ${min_funds_hopr}" | bc -l))); then
     # @TODO: Provide retry by checking balance again.
     log "${address} has no HOPR tokens. Funding HOPR tokens..."
     local tx_hash tx_error tx_res
@@ -183,10 +186,10 @@ fund_if_empty() {
 
 # $1=vm name
 # Run a VM with an anvil instance
-start_chain_provider(){
+start_chain_provider() {
   gcloud compute instances create-with-container "$1"-provider "$GCLOUD_DEFAULTS" \
-      --create-disk name=$(disk_name "$1"),size=10GB,type=pd-standard,mode=rw \
-      --container-image='hopr-provider'
+    --create-disk name=$(disk_name "$1"),size=10GB,type=pd-standard,mode=rw \
+    --container-image='hopr-provider'
 
   #hardhat node --config ethereum/hardhat.config.ts
 }
@@ -204,9 +207,9 @@ add_keys() {
 disable_network_registry() {
   log "Disabling register"
   PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
-  make -C "../" disable-network-registry \
-  network=anvil-localhost \
-  environment_type=local
+    make -C "../" disable-network-registry \
+    network=anvil-localhost \
+    environment_type=local
 
   log "Register disabled"
 }

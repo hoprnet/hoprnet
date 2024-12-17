@@ -1,9 +1,9 @@
 ---
 name: Epic Template
 about: Create an issue to track other issues
-title: ''
-labels: 'epic'
-assignees: ''
+title: ""
+labels: "epic"
+assignees: ""
 ---
 
 <!--- Please DO NOT remove the automatically added 'new issue' label -->

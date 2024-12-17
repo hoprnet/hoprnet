@@ -70,6 +70,9 @@ use crate::{
 
 use crate::helpers::PathPlanner;
 
+use core_path::selectors::dfs::DfsPathSelectorConfig;
+#[cfg(feature = "runtime-tokio")]
+pub use hopr_transport_session::types::transfer_session;
 pub use {
     core_network::network::{Health, Network, NetworkTriggeredEvent, PeerOrigin, PeerStatus},
     hopr_crypto_types::{
@@ -88,13 +91,10 @@ pub use {
     },
 };
 
-#[cfg(feature = "runtime-tokio")]
-pub use hopr_transport_session::types::transfer_session;
-
 use crate::constants::SESSION_INITIATION_TIMEOUT_BASE;
 pub use crate::helpers::{IndexerTransportEvent, PeerEligibility, TicketStatistics};
 pub use hopr_network_types::prelude::RoutingOptions;
-pub use hopr_transport_session::types::SessionTarget;
+pub use hopr_transport_session::types::{ServiceId, SessionTarget};
 
 /*#[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -247,7 +247,14 @@ where
                 db.clone(),
             )),
             process_packet_send,
-            path_planner: PathPlanner::new(db.clone(), channel_graph.clone()),
+            path_planner: PathPlanner::new(
+                db.clone(),
+                DfsPathSelectorConfig {
+                    quality_threshold: cfg.network.quality_bad_threshold,
+                    ..Default::default()
+                },
+                channel_graph.clone(),
+            ),
             db,
             my_multiaddresses,
             process_ticket_aggregate: Arc::new(OnceLock::new()),
@@ -280,7 +287,6 @@ where
         network: Arc<Network<T>>,
         tbf_path: String,
         on_transport_output: UnboundedSender<ApplicationData>,
-        on_acknowledged_ticket: UnboundedSender<AcknowledgedTicket>,
         transport_updates: UnboundedReceiver<PeerDiscovery>,
         new_session_notifier: UnboundedSender<IncomingSession>,
     ) -> HashMap<HoprTransportProcess, JoinHandle<()>> {
@@ -296,7 +302,7 @@ where
 
         let ping_cfg = PingConfig {
             timeout: self.cfg.protocol.heartbeat.timeout,
-            ..PingConfig::default()
+            max_parallel_pings: self.cfg.heartbeat.max_parallel_probes,
         };
 
         let ping: Pinger<network_notifier::PingExternalInteractions<T>> = Pinger::new(
@@ -368,10 +374,7 @@ where
             tkt_agg_writer,
         );
 
-        processes.insert(
-            HoprTransportProcess::Swarm,
-            spawn(transport_layer.run(version, on_acknowledged_ticket.clone())),
-        );
+        processes.insert(HoprTransportProcess::Swarm, spawn(transport_layer.run(version)));
 
         // initiate the msg-ack protocol stack over the wire transport
         let packet_cfg = PacketInteractionConfig::new(
@@ -387,7 +390,6 @@ where
             &self.me,
             &self.me_onchain,
             Some(tbf_path),
-            on_acknowledged_ticket,
             (ack_to_send_tx, ack_received_rx),
             (msg_to_send_tx, msg_received_rx),
             (tx_from_protocol, external_msg_rx),
@@ -449,9 +451,14 @@ where
         );
 
         // initiate the network telemetry
+        let half_the_hearbeat_interval = self.cfg.heartbeat.interval / 4;
         processes.insert(
             HoprTransportProcess::Heartbeat,
-            spawn(async move { heartbeat.heartbeat_loop().await }),
+            spawn(async move {
+                // present to make sure that the heartbeat does not start immediately
+                hopr_async_runtime::prelude::sleep(half_the_hearbeat_interval).await;
+                heartbeat.heartbeat_loop().await
+            }),
         );
 
         processes

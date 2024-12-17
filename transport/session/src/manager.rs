@@ -13,7 +13,7 @@ use crate::initiation::{
     StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation, StartProtocol,
 };
 use crate::traits::SendMsg;
-use crate::types::{unwrap_offchain_key, SessionTarget};
+use crate::types::unwrap_offchain_key;
 use crate::{IncomingSession, Session, SessionClientConfig, SessionId};
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -385,10 +385,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
         trace!(challenge, ?cfg, "initiating session with config");
         let start_session_msg = StartProtocol::<SessionId>::StartSession(StartInitiation {
             challenge,
-            target: match cfg.target_protocol {
-                IpProtocol::TCP => SessionTarget::TcpStream(cfg.target),
-                IpProtocol::UDP => SessionTarget::UdpStream(cfg.target),
-            },
+            target: cfg.target,
             capabilities: cfg.capabilities.iter().copied().collect(),
             // Back-routing currently uses the same (inverted) route as session initiation
             back_routing: Some((cfg.path_options.clone().invert(), self.me)),
@@ -722,6 +719,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
 mod tests {
     use super::*;
 
+    use crate::types::SessionTarget;
     use crate::Capability;
     use anyhow::anyhow;
     use async_std::prelude::FutureExt;
@@ -859,8 +857,7 @@ mod tests {
             alice_mgr.new_session(SessionClientConfig {
                 peer: bob_peer,
                 path_options: RoutingOptions::Hops(BoundedSize::MIN),
-                target_protocol: IpProtocol::TCP,
-                target: target.clone(),
+                target: SessionTarget::TcpStream(target.clone()),
                 capabilities: vec![Capability::Segmentation],
             }),
             new_session_rx_bob.next(),
@@ -984,8 +981,7 @@ mod tests {
             alice_mgr.new_session(SessionClientConfig {
                 peer: bob_peer,
                 path_options: RoutingOptions::Hops(BoundedSize::MIN),
-                target_protocol: IpProtocol::TCP,
-                target: target.clone(),
+                target: SessionTarget::TcpStream(target.clone()),
                 capabilities: vec![Capability::Segmentation],
             }),
             new_session_rx_bob.next(),
@@ -1080,8 +1076,7 @@ mod tests {
             .new_session(SessionClientConfig {
                 peer: bob_peer,
                 path_options: RoutingOptions::Hops(BoundedSize::MIN),
-                target_protocol: IpProtocol::TCP,
-                target: SealedHost::Plain("127.0.0.1:80".parse()?),
+                target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
                 capabilities: vec![],
             })
             .await;
@@ -1132,8 +1127,7 @@ mod tests {
             .new_session(SessionClientConfig {
                 peer: bob_peer,
                 path_options: RoutingOptions::Hops(BoundedSize::MIN),
-                target_protocol: IpProtocol::TCP,
-                target: SealedHost::Plain("127.0.0.1:80".parse()?),
+                target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
                 capabilities: vec![],
             })
             .await;

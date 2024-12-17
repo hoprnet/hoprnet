@@ -41,10 +41,10 @@ pub enum CoreEthereumIndexerError {
     #[error("Could not verify account entry signature. Maybe a cross-signing issue?")]
     AccountEntrySignatureVerification,
 
-    #[error("Received an event for a channel that is closed or for which we haven't seen an OPEN even.")]
+    #[error("Received an event for a channel that is closed or for which we haven't seen an OPEN event.")]
     ChannelDoesNotExist,
 
-    #[error("Cannot deregister inexistent MFA module")]
+    #[error("Cannot deregister non-existent MFA module")]
     MFAModuleDoesNotExist,
 
     #[error("Unknown smart contract. Received event from {0}")]

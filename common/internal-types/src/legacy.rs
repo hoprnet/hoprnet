@@ -85,7 +85,7 @@ impl Serialize for Ticket {
 
 struct TicketVisitor {}
 
-impl<'de> Visitor<'de> for TicketVisitor {
+impl Visitor<'_> for TicketVisitor {
     type Value = Ticket;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {

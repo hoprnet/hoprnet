@@ -25,7 +25,7 @@ on:
           - dufour
         required: true
         description: 'Package network (rotsee: testnet, dufour: mainnet)'
-        default: dufour
+        default: rotsee
 
 concurrency:
   group: dappnode-${{ inputs.repository }}
@@ -106,8 +106,8 @@ jobs:
             elif [[ "${base_branch}" =~ ^"release" ]]; then
               echo "current_version=${{ vars.BRANCH_RELEASE_RELEASE_NAME }}-latest" >> "$GITHUB_OUTPUT"
             else
-              echo "Cannot generate a dAppNode package from branch ${base_branch}"
-              exit 1
+              last_commit=$(git rev-parse --short HEAD)
+              echo "current_version=${current_version}-commit.${last_commit}" >> "$GITHUB_OUTPUT"
             fi
           else
             echo "Invoked from a pull request"
@@ -132,6 +132,7 @@ jobs:
           DEVELOPER_ADDRESS: "0x7305356ad936A06c4ea5DF45AD5E5C3ff9Db818E"
 
       - name: Create comment
+        if: github.event_name == 'pull_request'
         uses: peter-evans/create-or-update-comment@v4
         with:
           issue-number: ${{ github.event.pull_request.number }}

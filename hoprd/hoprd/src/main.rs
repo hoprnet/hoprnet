@@ -156,8 +156,8 @@ impl std::fmt::Debug for HoprdProcesses {
     }
 }
 
-#[cfg_attr(feature = "runtime-async-std", async_std::main)]
 #[cfg_attr(all(feature = "runtime-tokio", not(feature = "runtime-async-std")), tokio::main)]
+#[cfg_attr(feature = "runtime-async-std", async_std::main)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     init_logger()?;
 
@@ -247,11 +247,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     // Ensures that "OWN_ALIAS" is set as alias
-    if let Err(e) = hoprd_db
+    match hoprd_db
         .set_alias(node.me_peer_id().to_string(), ME_AS_ALIAS.to_string())
         .await
     {
-        error!(error = %e, "Failed to set the alias for the node");
+        Ok(_) => {
+            info!("Own alias set successfully");
+        }
+        Err(hoprd_db_api::errors::DbError::ReAliasingSelfNotAllowed) => {
+            info!("Own alias already set");
+        }
+        Err(e) => {
+            error!(error = %e, "Failed to set the alias for the node");
+        }
     }
 
     let (mut ws_events_tx, ws_events_rx) =
@@ -299,6 +307,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 session_listener_sockets,
                 websocket_rx: ws_events_rx,
                 msg_encoder: Some(msg_encoder),
+                default_session_listen_host: cfg.session_ip_forwarding.default_entry_listen_host,
             })
             .await
             {
@@ -383,7 +392,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             | HoprdProcesses::Inbox(jh)
                             | HoprdProcesses::RestApi(jh) => join_handles.push(jh),
                             HoprdProcesses::ListenerSockets(jhs) => {
-                                join_handles.extend(jhs.write().await.drain().map(|(_, (_, jh))| jh));
+                                join_handles.extend(jhs.write().await.drain().map(|(_, entry)| entry.jh));
                             }
                         }
                         futures::stream::iter(join_handles)

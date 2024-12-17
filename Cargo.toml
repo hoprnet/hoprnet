@@ -94,7 +94,7 @@ hex-literal = "0.4.1"
 hickory-resolver = "0.24.1"
 http-types = "2.12.0"
 lazy_static = "1.4.0"
-libp2p = { version = "0.54.1" } # intentionally kept back due to breaking change in dialing
+libp2p = { version = "0.54.1" }
 libp2p-identity = { version = "0.2.9", features = [
   "peerid",
   "ed25519",
@@ -112,7 +112,7 @@ opentelemetry-otlp = { version = "0.17.0", default-features = false }
 opentelemetry_sdk = { version = "0.24.0" }
 tracing-opentelemetry = { version = "0.25.0" }
 parameterized = "2.0.0"
-petgraph = { version = "0.6.5" }
+petgraph = { version = "0.6.5", features = ["serde-1"] }
 primitive-types = { version = "0.12.2", features = [
   "serde",
 ] } # cannot be updated until the ethers-rs is replaced with alloy-rs

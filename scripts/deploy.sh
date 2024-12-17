@@ -2,7 +2,10 @@
 
 # prevent sourcing of this script, only allow execution
 $(return >/dev/null 2>&1)
-test "$?" -eq "0" && { echo "This script should only be executed." >&2; exit 1; }
+test "$?" -eq "0" && {
+  echo "This script should only be executed." >&2
+  exit 1
+}
 
 # exit on errors, undefined variables, ensure errors in pipes are not hidden
 set -Eeuo pipefail
@@ -16,7 +19,7 @@ declare cluster_template_name=${1?"Missing parameter cluster_template"}
 declare remove_db=${2:-false}
 instances=($(gcloud compute instances list --filter="labels.cluster:${cluster_template_name}" --format="csv[no-heading](zone,name)"))
 
-restart(){
+restart() {
   zone=${1}
   instance=${2}
   echo "Restarting ${instance}"

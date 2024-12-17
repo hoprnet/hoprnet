@@ -6,11 +6,19 @@ from .hopr import HoprdAPI
 from .node import Node
 
 from tests.conftest import barebone_nodes, TICKET_PRICE_PER_HOP, TICKET_AGGREGATION_THRESHOLD
-from tests.utils import balance_str_to_int, shuffled, PARAMETERIZED_SAMPLE_SIZE, create_channel, \
-    send_and_receive_packets_with_pop, check_unredeemed_tickets_value, check_all_tickets_redeemed
+from tests.utils import (
+    balance_str_to_int,
+    shuffled,
+    PARAMETERIZED_SAMPLE_SIZE,
+    create_channel,
+    send_and_receive_packets_with_pop,
+    check_unredeemed_tickets_value,
+    check_all_tickets_redeemed,
+)
 
 # used by nodes to get unique port assignments
 PORT_BASE = 19000
+
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("peer", barebone_nodes())
@@ -23,12 +31,12 @@ async def test_hoprd_should_not_have_unredeemed_tickets_without_sending_messages
 @pytest.mark.asyncio
 @pytest.mark.parametrize("src,dest", [tuple(shuffled(barebone_nodes())[:2]) for _ in range(PARAMETERIZED_SAMPLE_SIZE)])
 async def test_hoprd_api_should_redeem_tickets_in_channel_using_redeem_endpoint(
-        src: str, dest: str, swarm7: dict[str, Node]
+    src: str, dest: str, swarm7: dict[str, Node]
 ):
     message_count = 2
 
     async with create_channel(
-            swarm7[src], swarm7[dest], funding=message_count * TICKET_PRICE_PER_HOP, close_from_dest=False
+        swarm7[src], swarm7[dest], funding=message_count * TICKET_PRICE_PER_HOP, close_from_dest=False
     ) as channel:
         packets = [f"Channel redeem on 1-hop: {src} - {dest} - {src} #{i:08d}" for i in range(message_count)]
 
@@ -49,16 +57,17 @@ async def test_hoprd_api_should_redeem_tickets_in_channel_using_redeem_endpoint(
 
         assert await swarm7[dest].api.channel_get_tickets(channel) == []
 
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize("src,dest", [tuple(shuffled(barebone_nodes())[:2]) for _ in range(PARAMETERIZED_SAMPLE_SIZE)])
 async def test_hoprd_should_create_redeemable_tickets_on_routing_in_1_hop_to_self_scenario(
-        src: str, dest: str, swarm7: dict[str, Node]
+    src: str, dest: str, swarm7: dict[str, Node]
 ):
     # send 90% of messages before ticket aggregation would kick in
     message_count = int(TICKET_AGGREGATION_THRESHOLD / 10 * 9)
 
     async with create_channel(
-            swarm7[src], swarm7[dest], funding=message_count * TICKET_PRICE_PER_HOP, close_from_dest=False
+        swarm7[src], swarm7[dest], funding=message_count * TICKET_PRICE_PER_HOP, close_from_dest=False
     ) as channel_id:
         # ensure ticket stats are what we expect before starting
         statistics_before = await swarm7[dest].api.get_tickets_statistics()
@@ -91,16 +100,16 @@ async def test_hoprd_should_create_redeemable_tickets_on_routing_in_1_hop_to_sel
         # ensure ticket stats are updated after redemption
         statistics_after_redemption = await swarm7[dest].api.get_tickets_statistics()
         assert (
-                       balance_str_to_int(statistics_after_redemption.redeemed_value)
-                       - balance_str_to_int(statistics_after.redeemed_value)
-               ) == (len(packets) * TICKET_PRICE_PER_HOP)
+            balance_str_to_int(statistics_after_redemption.redeemed_value)
+            - balance_str_to_int(statistics_after.redeemed_value)
+        ) == (len(packets) * TICKET_PRICE_PER_HOP)
         assert balance_str_to_int(statistics_after_redemption.unredeemed_value) == 0
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("src,dest", [tuple(shuffled(barebone_nodes())[:2]) for _ in range(PARAMETERIZED_SAMPLE_SIZE)])
 async def test_hoprd_should_aggregate_and_redeem_tickets_in_channel_on_api_request(
-        src: str, dest: str, swarm7: dict[str, Node]
+    src: str, dest: str, swarm7: dict[str, Node]
 ):
     message_count = 2
 
@@ -188,4 +197,3 @@ async def test_hoprd_should_be_able_to_close_open_channels_with_unredeemed_ticke
         )
 
         # NOTE: will be closed on context manager exit
-

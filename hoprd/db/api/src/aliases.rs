@@ -86,9 +86,7 @@ impl HoprdDbAliasesOperations for HoprdDb {
     async fn set_alias(&self, peer: String, alias: String) -> Result<()> {
         if let Ok(Some(me)) = self.resolve_alias(ME_AS_ALIAS.to_string()).await {
             if me == peer {
-                return Err(crate::errors::DbError::LogicalError(
-                    "own alias cannot be modified".into(),
-                ));
+                return Err(crate::errors::DbError::ReAliasingSelfNotAllowed);
             }
         }
 

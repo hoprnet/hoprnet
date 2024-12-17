@@ -14,6 +14,9 @@ pub struct IndexerConfig {
 
     /// Whether to use fast synchronization during indexing.
     /// When enabled, it allows for quicker indexing of existing logs during node startup.
+    ///
+    /// Default is `true`.
+    #[default(true)]
     pub fast_sync: bool,
 }
 

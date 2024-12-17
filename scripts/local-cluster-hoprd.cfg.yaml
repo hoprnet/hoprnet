@@ -11,3 +11,5 @@ hopr:
         max_closure_overdue: 60
   protocol:
     outgoing_ticket_winning_prob: 0.00001
+  network_options:
+    ignore_timeframe: 0

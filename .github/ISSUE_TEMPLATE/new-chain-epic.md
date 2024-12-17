@@ -1,9 +1,9 @@
 ---
 name: New Chain Epic Template
 about: Things to do when switching to a new chain.
-title: ''
-labels: 'epic'
-assignees: ''
+title: ""
+labels: "epic"
+assignees: ""
 ---
 
 <!--- Please DO NOT remove the automatically added 'new issue' label -->

@@ -169,7 +169,8 @@ pub(super) async fn send_message(
         return Err((
             StatusCode::UNPROCESSABLE_ENTITY,
             ApiErrorStatus::InvalidPath("explicit paths are not allowed".into()),
-        ));
+        )
+            .into_response());
     }
 
     let options = if let Some(intermediate_path) = args.path {
@@ -292,7 +293,8 @@ impl From<hopr_lib::ApplicationData> for WebSocketReadMsg {
         responses(
             (status = 206, description = "Incoming data", body = Text, content_type = "application/text"),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
-            (status = 422, description = "Unknown failure", body = ApiError)
+            (status = 422, description = "Unknown failure", body = ApiError),
+            (status = 429, description = "Too many open websocket connections.", body = ApiError),
         ),
         security(
             ("api_token" = []),
@@ -534,8 +536,8 @@ fn to_api_message(data: hopr_lib::ApplicationData, received_at: Duration) -> Res
         tag = "Messages"
     )]
 pub(super) async fn pop(
-    Query(TagQueryRequest { tag }): Query<TagQueryRequest>,
     State(state): State<Arc<InternalState>>,
+    Json(TagQueryRequest { tag }): Json<TagQueryRequest>,
 ) -> impl IntoResponse {
     if let Some(tag) = tag {
         if tag < RESERVED_TAG_UPPER_LIMIT {
@@ -585,8 +587,8 @@ pub(crate) struct MessagePopAllResponse {
         tag = "Messages"
     )]
 pub(super) async fn pop_all(
-    Query(TagQueryRequest { tag }): Query<TagQueryRequest>,
     State(state): State<Arc<InternalState>>,
+    Json(TagQueryRequest { tag }): Json<TagQueryRequest>,
 ) -> impl IntoResponse {
     if let Some(tag) = tag {
         if tag < RESERVED_TAG_UPPER_LIMIT {
@@ -637,8 +639,8 @@ pub(super) async fn pop_all(
         tag = "Messages"
     )]
 pub(super) async fn peek(
-    Query(TagQueryRequest { tag }): Query<TagQueryRequest>,
     State(state): State<Arc<InternalState>>,
+    Json(TagQueryRequest { tag }): Json<TagQueryRequest>,
 ) -> impl IntoResponse {
     if let Some(tag) = tag {
         if tag < RESERVED_TAG_UPPER_LIMIT {

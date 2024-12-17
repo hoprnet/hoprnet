@@ -2,7 +2,10 @@
 
 # prevent execution of this script, only allow sourcing
 $(return >/dev/null 2>&1)
-test "$?" -eq "0" || { echo "This script should only be sourced." >&2; exit 1; }
+test "$?" -eq "0" || {
+  echo "This script should only be sourced." >&2
+  exit 1
+}
 
 # exit on errors, undefined variables, ensure errors in pipes are not hidden
 set -Eeuo pipefail
@@ -74,12 +77,11 @@ gcloud_get_image_running_on_vm() {
   local vm_name="${1}"
 
   gcloud compute instances describe "${vm_name}" $ZONE \
-    --format='value[](metadata.items.gce-container-declaration)' \
-    | grep image \
-    | tr -s ' ' \
-    | cut -f3 -d' '
+    --format='value[](metadata.items.gce-container-declaration)' |
+    grep image |
+    tr -s ' ' |
+    cut -f3 -d' '
 }
-
 
 # $1 - vm name
 # $2 - docker image
@@ -115,22 +117,22 @@ gcloud_create_instance_template() {
   local name="${1}"
 
   log "checking for instance template ${name}"
-  if gcloud compute instance-templates describe "${name}" --quiet 2> /dev/null; then
+  if gcloud compute instance-templates describe "${name}" --quiet 2>/dev/null; then
     log "instance template ${name} already present"
     return 0
   fi
 
   log "creating instance template ${name}"
   eval gcloud compute instance-templates create "${name}" \
-      ${GCLOUD_MACHINE} \
-      --maintenance-policy=MIGRATE \
-      --tags=hopr-node,web-client,rest-client,portainer,healthcheck \
-      --boot-disk-device-name=boot-disk \
-      --boot-disk-size=20GB \
-      --boot-disk-type=pd-balanced \
-      --image-family=debian-11 \
-      --image-project=hoprassociation \
-      --maintenance-policy=MIGRATE
+    ${GCLOUD_MACHINE} \
+    --maintenance-policy=MIGRATE \
+    --tags=hopr-node,web-client,rest-client,portainer,healthcheck \
+    --boot-disk-device-name=boot-disk \
+    --boot-disk-size=20GB \
+    --boot-disk-type=pd-balanced \
+    --image-family=debian-11 \
+    --image-project=hoprassociation \
+    --maintenance-policy=MIGRATE
 }
 
 # $1 - template name
@@ -148,20 +150,20 @@ gcloud_create_or_update_managed_instance_group() {
   local size="${2}"
 
   log "checking for managed instance group ${name}"
-  if gcloud compute instance-groups managed describe "${name}" ${gcloud_region} --quiet 2> /dev/null; then
+  if gcloud compute instance-groups managed describe "${name}" ${gcloud_region} --quiet 2>/dev/null; then
     # get current instance template name
     local first_instance_name="$(gcloud compute instance-groups list-instances \
       "${name}" ${gcloud_region} --format=json | jq -r '.[0].instance')"
     local previous_template="$(gcloud compute instances describe \
-      "${first_instance_name}" --format=json | \
-      jq '.metadata.items[] | select(.key=="instance-template") | .value' | \
+      "${first_instance_name}" --format=json |
+      jq '.metadata.items[] | select(.key=="instance-template") | .value' |
       tr -d '"' | awk -F'/' '{ print $5; }')"
 
     log "managed instance group ${name} already present, updating..."
 
     # ensure instances are not replaced to prevent IP re-assignments
     gcloud beta compute instance-groups managed rolling-action start-update \
-      "${name}"\
+      "${name}" \
       --version=template="${name}" \
       --minimal-action=restart \
       --most-disruptive-allowed-action=restart \
@@ -215,9 +217,9 @@ gcloud_get_managed_instance_group_instances_ips() {
   local name="${1}"
   local nproc_cmd
 
-  if command -v nproc 1> /dev/null ; then
+  if command -v nproc 1>/dev/null; then
     nproc_cmd="nproc"
-  elif command -v sysctl 1> /dev/null ; then
+  elif command -v sysctl 1>/dev/null; then
     nproc_cmd="sysctl -n hw.logicalcpu"
   else
     # Default to single core
@@ -226,7 +228,7 @@ gcloud_get_managed_instance_group_instances_ips() {
 
   export -f gcloud_get_ip
   gcloud compute instance-groups list-instances "${name}" \
-    ${gcloud_region} --sort-by=instance --uri | \
+    ${gcloud_region} --sort-by=instance --uri |
     xargs -P $(${nproc_cmd}) -I '{}' bash -c "gcloud_get_ip '{}'"
 }
 
@@ -290,7 +292,7 @@ gcloud_reserve_static_ip_address() {
   local address="${1}"
   local ip="${2}"
 
-  if gcloud compute addresses describe ${gcloud_region} "${address}" 2> /dev/null; then
+  if gcloud compute addresses describe ${gcloud_region} "${address}" 2>/dev/null; then
     # already reserved, no-op
     :
   else
@@ -315,10 +317,10 @@ gcloud_isset_project_flag() {
 # $1=flag name
 # $2=flag value
 gcloud_set_project_flag() {
-  gcloud compute project-info add-metadata --metadata="${1}=${2}" 2> /dev/null
+  gcloud compute project-info add-metadata --metadata="${1}=${2}" 2>/dev/null
 }
 
 # $1=flag name
 gcloud_unset_project_flag() {
-  gcloud compute project-info remove-metadata --keys="${1}" 2> /dev/null
+  gcloud compute project-info remove-metadata --keys="${1}" 2>/dev/null
 }

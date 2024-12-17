@@ -17,7 +17,9 @@ use crate::ApiErrorStatus;
 
 #[derive(Debug, Clone, Copy, Eq, Hash, Ord, Serialize, Deserialize, PartialEq, PartialOrd, ToSchema)]
 pub enum PeerOrAddress {
+    #[schema(value_type = String)]
     PeerId(PeerId),
+    #[schema(value_type = String)]
     Address(Address),
 }
 

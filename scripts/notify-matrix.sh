@@ -2,7 +2,10 @@
 
 # prevent sourcing of this script, only allow execution
 $(return >/dev/null 2>&1)
-test "$?" -eq "0" && { echo "This script should only be executed." >&2; exit 1; }
+test "$?" -eq "0" && {
+  echo "This script should only be executed." >&2
+  exit 1
+}
 
 # exit on errors, undefined variables, ensure errors in pipes are not hidden
 set -Eeuo pipefail
@@ -25,13 +28,27 @@ usage() {
 }
 
 # return early with help info when requested
-([ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]) && { usage; exit 0; }
+([ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]) && {
+  usage
+  exit 0
+}
 
 # do work
 
-[ -z "${1:-}" ] && { msg "Parameter <room> required"; usage; exit 1; }
-[ -z "${2:-}" ] && { msg "Parameter <message> required"; usage; exit 1; }
-which curl > /dev/null || { msg "Required binary 'curl' not found in PATH"; exit 1; }
+[ -z "${1:-}" ] && {
+  msg "Parameter <room> required"
+  usage
+  exit 1
+}
+[ -z "${2:-}" ] && {
+  msg "Parameter <message> required"
+  usage
+  exit 1
+}
+which curl >/dev/null || {
+  msg "Required binary 'curl' not found in PATH"
+  exit 1
+}
 
 declare room="${1}"
 declare msg="${2}"

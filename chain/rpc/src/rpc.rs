@@ -3,8 +3,6 @@
 //! The purpose of this module is to give implementation of the [HoprRpcOperations] trait:
 //! [RpcOperations] type, which is the main API exposed by this crate.
 use async_trait::async_trait;
-use bindings::hopr_node_management_module::HoprNodeManagementModule;
-use chain_types::{ContractAddresses, ContractInstances};
 use ethers::contract::{abigen, Multicall, MULTICALL_ADDRESS};
 use ethers::middleware::{MiddlewareBuilder, NonceManagerMiddleware, SignerMiddleware};
 use ethers::prelude::k256::ecdsa::SigningKey;
@@ -12,14 +10,17 @@ use ethers::prelude::transaction::eip2718::TypedTransaction;
 use ethers::providers::{JsonRpcClient, Middleware, Provider};
 use ethers::signers::{LocalWallet, Signer, Wallet};
 use ethers::types::{BlockId, NameOrAddress};
-use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
-use hopr_primitive_types::prelude::*;
 use primitive_types::H160;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::debug;
 use validator::Validate;
+
+use bindings::hopr_node_management_module::HoprNodeManagementModule;
+use chain_types::{ContractAddresses, ContractInstances};
+use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
+use hopr_primitive_types::prelude::*;
 
 use crate::errors::RpcError::ContractError;
 use crate::errors::{Result, RpcError};

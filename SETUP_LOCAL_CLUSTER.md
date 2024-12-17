@@ -34,6 +34,12 @@ make -j deps && make -j build
 ./scripts/setup-local-cluster.sh -i topologies/full_interconnected_cluster.sh
 ```
 
+If you want to enable authentication via API token on local cluster, run:
+
+```
+HOPRD_DISABLE_API_AUTHENTICATION=0 ./scripts/setup-local-cluster.sh -i topologies/full_interconnected_cluster.sh
+```
+
 **Important**, make sure to have both `curl` and `jq` installed in your computer before running the script, as both are used.
 Please be aware you also need a version of `bash` of `5.x` or superior, which in most macOS devices require an upgrade, the easiest being via `brew bash`.
 

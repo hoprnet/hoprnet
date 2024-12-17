@@ -12,7 +12,10 @@ usage() {
 }
 
 # return early with help info when requested
-{ [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; } && { usage; exit 0; }
+{ [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; } && {
+  usage
+  exit 0
+}
 
 # set mydir
 declare mydir

@@ -39,7 +39,7 @@ impl Serialize for VrfParameters {
 
 struct VrfParametersVisitor {}
 
-impl<'de> Visitor<'de> for VrfParametersVisitor {
+impl Visitor<'_> for VrfParametersVisitor {
     type Value = VrfParameters;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {

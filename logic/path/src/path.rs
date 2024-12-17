@@ -85,7 +85,7 @@ impl ChannelPath {
 
             // Check if the channel is opened
             let channel = graph
-                .get_channel(ticket_issuer, ticket_receiver)
+                .get_channel(&ticket_issuer, &ticket_receiver)
                 .ok_or(MissingChannel(ticket_issuer.to_hex(), ticket_receiver.to_hex()))?;
 
             if channel.status != ChannelStatus::Open {

@@ -2,7 +2,10 @@
 
 # prevent sourcing of this script, only allow execution
 $(return >/dev/null 2>&1)
-test "$?" -eq "0" && { echo "This script should only be executed." >&2; exit 1; }
+test "$?" -eq "0" && {
+  echo "This script should only be executed." >&2
+  exit 1
+}
 
 # exit on errors, undefined variables, ensure errors in pipes are not hidden
 set -Eeuo pipefail
@@ -34,7 +37,10 @@ usage() {
 }
 
 # return early with help info when requested
-{ [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; } && { usage; exit 0; }
+{ [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; } && {
+  usage
+  exit 0
+}
 
 declare tmp="$(find_tmp_dir)"
 declare log_file="${tmp}/anvil.log"
@@ -46,53 +52,53 @@ declare skip_deploy="false"
 declare dump_state_file=""
 declare load_state_file=""
 
-while (( "$#" )); do
+while (("$#")); do
   case "$1" in
-    -h|--help)
-      # return early with help info when requested
-      usage
-      exit 0
-      ;;
-    -l)
-      log_file="$2"
-      shift
-      shift
-      ;;
-    -c)
-      cfg_file="$2"
-      shift
-      shift
-      ;;
-    -s)
-      skip_deploy="true"
-      shift
-      ;;
-    -f)
-      foreground="true"
-      shift
-      ;;
-    -p)
-      port="$2"
-      shift
-      shift
-      ;;
-    -ds)
-      dump_state_file="$2"
-      shift
-      shift
-      ;;
-    -ls)
-      load_state_file="$2"
-      shift
-      shift
-      ;;
-    -*|--*=)
-      usage
-      exit 1
-      ;;
-    *)
-      shift
-      ;;
+  -h | --help)
+    # return early with help info when requested
+    usage
+    exit 0
+    ;;
+  -l)
+    log_file="$2"
+    shift
+    shift
+    ;;
+  -c)
+    cfg_file="$2"
+    shift
+    shift
+    ;;
+  -s)
+    skip_deploy="true"
+    shift
+    ;;
+  -f)
+    foreground="true"
+    shift
+    ;;
+  -p)
+    port="$2"
+    shift
+    shift
+    ;;
+  -ds)
+    dump_state_file="$2"
+    shift
+    shift
+    ;;
+  -ls)
+    load_state_file="$2"
+    shift
+    shift
+    ;;
+  -* | --*=)
+    usage
+    exit 1
+    ;;
+  *)
+    shift
+    ;;
   esac
 done
 
@@ -133,10 +139,10 @@ if [ -n "${load_state_file}" ]; then
 fi
 
 # prepare PATH if anvil is not present yet
-if ! command -v anvil ; then
+if ! command -v anvil; then
   PATH=${PATH}:${mydir}/../.foundry/bin
 fi
-if ! command -v anvil ; then
+if ! command -v anvil; then
   echo "Error: cannot find anvil"
   exit 1
 fi
@@ -144,11 +150,11 @@ fi
 if ! lsof -i ":${port}" -s TCP:LISTEN; then
   log "Start local anvil chain"
   if [ "${foreground}" = "true" ]; then
-    anvil ${flags} > "${log_file}" 2>&1 &
+    anvil ${flags} >"${log_file}" 2>&1 &
   else
     # ignore hangup signals so the script can complete without anvil taking
     # notice
-    nohup nice anvil ${flags} > "${log_file}" 2>&1 &
+    nohup nice anvil ${flags} >"${log_file}" 2>&1 &
   fi
   get_eth_block_number "http://localhost:${port}"
   log "Anvil chain started (0.0.0.0:${port})"

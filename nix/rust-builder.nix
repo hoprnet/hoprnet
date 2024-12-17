@@ -1,6 +1,7 @@
 { crane
 , crossSystem ? localSystem
 , foundry
+, isCross ? false
 , localSystem
 , nixpkgs
 , rust-overlay
@@ -64,7 +65,12 @@ in
   inherit rustToolchain;
 
   callPackage = (package: args:
-    let crate = pkgs.callPackage package (args // { inherit foundryBin solcDefault craneLib; });
+    let
+      crate = pkgs.callPackage package (args //
+        {
+          inherit foundryBin
+            solcDefault craneLib isCross;
+        });
     in
     # Override the derivation to add cross-compilation environment variables.
     crate.overrideAttrs (previous: buildEnv // {

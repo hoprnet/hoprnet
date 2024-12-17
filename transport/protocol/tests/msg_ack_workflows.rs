@@ -213,13 +213,14 @@ async fn peer_setup_for(count: usize) -> anyhow::Result<(Vec<WireChannels>, Vec<
             outgoing_ticket_win_prob: 1.0,
         };
 
+        db.start_ticket_processing(Some(received_ack_tickets_tx))?;
+
         hopr_transport_protocol::run_msg_ack_protocol(
             cfg,
             db,
             &PEERS[i],
             &PEERS_CHAIN[i],
             None,
-            received_ack_tickets_tx,
             (wire_ack_recv_tx, wire_ack_send_rx),
             (wire_msg_recv_tx, wire_msg_send_rx),
             (api_recv_tx, api_send_rx),
@@ -363,7 +364,7 @@ async fn packet_relayer_workflow_n_peers(peer_count: usize, pending_packets: usi
             .collect(),
     )
     .await;
-    assert_eq!(peer_count - 1, packet_path.length() as usize, "path has invalid length");
+    assert_eq!(peer_count - 1, packet_path.length(), "path has invalid length");
 
     async_std::task::spawn(emulate_channel_communication(pending_packets, wire_apis));
 
@@ -411,6 +412,8 @@ async fn packet_relayer_workflow_n_peers(peer_count: usize, pending_packets: usi
         "test timed out after {} seconds",
         TIMEOUT_SECONDS.as_secs()
     );
+
+    assert_eq!(ticket_channels.len(), peer_count);
 
     for (i, rx) in ticket_channels.into_iter().enumerate() {
         let expected_tickets = if i != 0 && i != peer_count - 1 {

@@ -2,7 +2,10 @@
 
 # prevent execution of this script, only allow execution
 $(return >/dev/null 2>&1)
-test "$?" -eq "0" || { echo "This script should only be sourced." >&2; exit 1; }
+test "$?" -eq "0" || {
+  echo "This script should only be sourced." >&2
+  exit 1
+}
 
 # exit on errors, undefined variables, ensure errors in pipes are not hidden
 set -Eeuo pipefail
@@ -24,7 +27,7 @@ source "${mydir}/../scripts/utils.sh"
 # $7 = OPTIONAL: step time between retries in seconds, defaults to 25 seconds (8 blocks with 1-3 s/block in ganache)
 # $8 = OPTIONAL: end time for busy wait in nanoseconds since epoch, has higher priority than wait time, defaults to 0
 # $9 = OPTIONAL: should assert status code
-api_call(){
+api_call() {
   local result
   local source_api="${1}"
   local api_endpoint="${2}"
@@ -39,14 +42,13 @@ api_call(){
   local response_type
 
   # no timeout set since the test execution environment should cancel the test if it takes too long
-  if [[ "$should_assert_status_code" == true ]]; then
+  if [[ $should_assert_status_code == true ]]; then
     response_type="-o /dev/null -w %{http_code} -d"
   else
     response_type="-d"
   fi
 
-  if [[ $api_endpoint == *readyz ]] || [[ $api_endpoint == *healthyz ]] || [[ $api_endpoint == *startedz ]]
-  then
+  if [[ $api_endpoint == *readyz ]] || [[ $api_endpoint == *healthyz ]] || [[ $api_endpoint == *startedz ]]; then
     api_endpoint=$api_endpoint
   else
     api_endpoint=/api/v3$api_endpoint
@@ -58,17 +60,17 @@ api_call(){
 
   if [[ ${end_time_ns} -eq 0 ]]; then
     # need to calculate in nanoseconds
-    end_time_ns=$((now+wait_time*1000000))
+    end_time_ns=$((now + wait_time * 1000000))
   fi
 
   local done=false
   local attempt=0
 
-  while [[ "${done}" == false ]]; do
+  while [[ ${done} == false ]]; do
     result=$(${cmd} "${request_body}" || true)
 
     # if an assertion was given and has not been fulfilled, we fail
-    if [[ -z "${assertion}" ]] || [[ -n $(echo "${result}" | sed -nE "/${assertion}/p") ]]; then
+    if [[ -z ${assertion} ]] || [[ -n $(echo "${result}" | sed -nE "/${assertion}/p") ]]; then
       done=true
     else
       if [[ ${end_time_ns} -lt ${now} ]]; then
@@ -81,7 +83,7 @@ api_call(){
       sleep "${step_time}"
 
       now=$(date +%s | cut -b1-13)
-      (( ++attempt ))
+      ((++attempt))
     fi
   done
 
@@ -261,14 +263,13 @@ api_get_node_info() {
   api_call "${origin}" "/node/info" "GET" "" "" 600
 }
 
-
 # $1 = source api url
 # $2 = message app tag
 # $3 = peer_address peer id
 # $4 = message
 # $5 = OPTIONAL: peers in the message path
 # $6 = OPTIONAL: expected return code
-api_send_message(){
+api_send_message() {
   local source_api="${1}"
   local tag="${2}"
   local peer_address="${3}"
@@ -299,7 +300,7 @@ api_close_channel() {
 
   # fetch channel id from API
   channels_info="$(api_get_all_channels "${source_api}" false)"
-  channel_id="$(echo "${channels_info}" | jq  -r ".${direction}| map(select(.peerAddress | contains(\"${destination_address}\")))[0].id")"
+  channel_id="$(echo "${channels_info}" | jq -r ".${direction}| map(select(.peerAddress | contains(\"${destination_address}\")))[0].id")"
 
   log "Node ${source_id} close channel ${channel_id} to Node ${destination_id}"
 
@@ -325,7 +326,7 @@ api_get_channel_info() {
   if [ -z "${channel_id}" ] || [ "${channel_id}" = "null" ]; then
     # fetch channel id from API
     channels_info="$(api_get_all_channels "${source_api}" false)"
-    channel_id="$(echo "${channels_info}" | jq  -r ".${direction}| map(select(.peerAddress | contains(\"${destination_address}\")))[0].id")"
+    channel_id="$(echo "${channels_info}" | jq -r ".${direction}| map(select(.peerAddress | contains(\"${destination_address}\")))[0].id")"
   fi
 
   api_call "${source_api}" "/channels/${channel_id}" "GET" "" 'channelId' 60 20
@@ -365,11 +366,11 @@ api_validate_balances_gt0() {
   eth_balance=$(echo "${balance}" | jq -r ".native")
   safe_hopr_balance=$(echo "${balance}" | jq -r ".safeHopr")
 
-  if [[ "$eth_balance" = "0" && "${safe_hopr_balance}" != "0" ]]; then
+  if [[ $eth_balance == "0" && ${safe_hopr_balance} != "0" ]]; then
     log "Error: $1 Node has an invalid native balance: $eth_balance"
     exit 1
   fi
-  if [[ "$safe_hopr_balance" = "0" ]]; then
+  if [[ $safe_hopr_balance == "0" ]]; then
     log "Error: $1 Node Safe has an invalid HOPR balance: $safe_hopr_balance"
     exit 1
   fi

@@ -2,7 +2,10 @@
 
 # prevent sourcing of this script, only allow execution
 $(return >/dev/null 2>&1)
-test "$?" -eq "0" && { echo "This script should only be executed." >&2; exit 1; }
+test "$?" -eq "0" && {
+  echo "This script should only be executed." >&2
+  exit 1
+}
 
 # set log id and use shared log function for readable logs
 declare mydir
@@ -13,20 +16,20 @@ source "${mydir}/utils.sh"
 
 declare exit_code=0
 
-which jq > /dev/null || exit_code=$?
+which jq >/dev/null || exit_code=$?
 
 if [ "${exit_code}" = "0" ]; then
   log "jq already installed"
   exit 0
 fi
 
-declare kernel 
+declare kernel
 
 kernel=$(uname -s)
 
 if [ "${kernel}" = "Linux" ]; then
   exit_code=0
-  which apt-get > /dev/null || exit_code=$?
+  which apt-get >/dev/null || exit_code=$?
   if [ "${exit_code}" != "0" ]; then
     log "⛔️ apt-get not found"
     exit 1
@@ -35,7 +38,7 @@ if [ "${kernel}" = "Linux" ]; then
   sudo apt-get install jq -y
 elif [ "${kernel}" = "Darwin" ]; then
   exit_code=0
-  which brew > /dev/null || exit_code=$?
+  which brew >/dev/null || exit_code=$?
   if [ "${exit_code}" != "0" ]; then
     log "⛔️ Homebrew not found. Please install Homebrew manually first"
     exit 1
@@ -48,5 +51,5 @@ else
 fi
 
 log "Checking jq is installed..."
-which jq > /dev/null
+which jq >/dev/null
 log "jq succesfully installed"

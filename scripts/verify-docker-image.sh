@@ -3,7 +3,10 @@
 # prevent sourcing of this script, only allow execution
 # shellcheck disable=SC2091
 $(return >/dev/null 2>&1)
-test "$?" -eq "0" && { echo "This script should only be executed." >&2; exit 1; }
+test "$?" -eq "0" && {
+  echo "This script should only be executed." >&2
+  exit 1
+}
 
 # exit on errors, undefined variables, ensure errors in pipes are not hidden
 set -Eeuo pipefail
@@ -27,7 +30,10 @@ usage() {
 }
 
 # return early with help info when requested
-{ [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; } && { usage; exit 0; }
+{ [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; } && {
+  usage
+  exit 0
+}
 
 # verify and set parameters
 declare image_version package_version image_name
@@ -48,7 +54,7 @@ version="$(docker run -v /var/run/docker.sock:/var/run/docker.sock "${image}" --
 # Therefore, we check that the package version starts with the reported version
 # as a prefix.
 
-if [[ "${version#hoprd v}*" = "${package_version}" ]]; then
+if [[ "${version#hoprd v}*" == "${package_version}" ]]; then
   log "Docker image ${image} has bundled package version ${version}, expected ${package_version}"
   exit 1
 fi

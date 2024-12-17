@@ -2,7 +2,6 @@ import asyncio
 import json
 import logging
 import os
-import random
 import time
 from contextlib import AsyncExitStack
 
@@ -13,7 +12,6 @@ from .conftest import TICKET_PRICE_PER_HOP, to_ws_url
 from .hopr import HoprdAPI
 from .node import Node
 from .test_integration import create_channel
-from .test_session import STANDARD_MTU_SIZE, EchoServer, SocketType
 
 
 logging.basicConfig(format="%(asctime)s %(message)s")
@@ -93,7 +91,7 @@ async def test_stress_relayed_flood_test_with_sources_performing_1_hop_to_self(s
                     )
                 )
                 for source in api_sources
-            ]
+            ],
         )
 
         async def send_and_receive_all_messages(host, port, token, self_peer_id):
@@ -107,7 +105,7 @@ async def test_stress_relayed_flood_test_with_sources_performing_1_hop_to_self(s
 
                 while len(read) < len(data):
                     read += await reader.read(min(1024, len(data) - len(read)))
-                
+
                 end_time = time.time()
 
                 logging.info(
@@ -119,7 +117,7 @@ async def test_stress_relayed_flood_test_with_sources_performing_1_hop_to_self(s
 
                 event.set()
 
-            server = await asyncio.start_server(compare_data, '127.0.0.1', 0)
+            server = await asyncio.start_server(compare_data, "127.0.0.1", 0)
             assigned_port = server.sockets[0].getsockname()[1]
 
             async with server:
@@ -132,10 +130,10 @@ async def test_stress_relayed_flood_test_with_sources_performing_1_hop_to_self(s
                             ("hops", 1),
                             ("capabilities", "Segmentation"),
                             ("capabilities", "Retransmission"),
-                            ("destination", f"{self_peer_id}")
-                        ]
+                            ("destination", f"{self_peer_id}"),
+                        ],
                     ),
-                    additional_headers=[("X-Auth-Token", token)]
+                    additional_headers=[("X-Auth-Token", token)],
                 ) as ws:
                     await ws.send(data)
                     await asyncio.wait_for(event.wait(), timeout=60.0)

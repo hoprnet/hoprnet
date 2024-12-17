@@ -1,4 +1,4 @@
-use futures::{channel::mpsc::UnboundedSender, pin_mut, select, StreamExt};
+use futures::{pin_mut, select, StreamExt};
 use futures_concurrency::stream::Merge;
 use libp2p::{request_response::OutboundRequestId, PeerId};
 use std::{num::NonZeroU8, sync::Arc};
@@ -47,14 +47,14 @@ async fn build_p2p_network(
     protocol_cfg: ProtocolConfig,
 ) -> Result<libp2p::Swarm<HoprNetworkBehavior>> {
     let tcp_upgrade = libp2p::core::upgrade::SelectUpgrade::new(
-        if let Ok(num_streams) = std::env::var("HOPR_INTERNAL_LIBP2P_YAMUX_MAX_NUM_STREAMS")
-            .and_then(|v| v.parse::<usize>().map_err(|_e| std::env::VarError::NotPresent))
         {
+            let num_streams = std::env::var("HOPR_INTERNAL_LIBP2P_YAMUX_MAX_NUM_STREAMS")
+                .and_then(|v| v.parse::<usize>().map_err(|_e| std::env::VarError::NotPresent))
+                .unwrap_or(1024);
+
             let mut cfg = libp2p::yamux::Config::default();
             cfg.set_max_num_streams(num_streams);
             cfg
-        } else {
-            libp2p::yamux::Config::default()
         },
         libp2p_mplex::MplexConfig::new()
             .set_max_num_streams(1024)
@@ -280,7 +280,7 @@ impl HoprSwarmWithProcessors {
     /// The function represents the entirety of the business logic of the hopr daemon related to core operations.
     ///
     /// This future can only be resolved by an unrecoverable error or a panic.
-    pub async fn run(self, version: String, on_ack_received: UnboundedSender<AcknowledgedTicket>) {
+    pub async fn run(self, version: String) {
         let mut swarm: libp2p::Swarm<HoprNetworkBehavior> = self.swarm.into();
 
         // NOTE: an improvement would be a forgetting cache for the active requests
@@ -481,7 +481,11 @@ impl HoprSwarmWithProcessors {
                                 peer, request_id, error,
                             } => {
                                 active_pings.invalidate(&request_id).await;
-                                error!(%peer, %request_id, %error,  "Failed heartbeat protocol on outbound");
+                                if matches!(error, libp2p::request_response::OutboundFailure::DialFailure) {
+                                    trace!(%peer, %request_id, %error, "Peer is offline");
+                                } else {
+                                    error!(%peer, %request_id, %error, "Failed heartbeat protocol on outbound");
+                                }
                             },
                             libp2p::request_response::Event::<Ping,Pong>::InboundFailure {
                                 peer, request_id, error
@@ -526,11 +530,7 @@ impl HoprSwarmWithProcessors {
                                     error!(%peer, "Failed to enqueue response");
                                 }
                             },
-                            TicketAggregationProcessed::Receive(peer, acked_ticket, request) => {
-                                on_ack_received.unbounded_send(acked_ticket).unwrap_or_else(|e| {
-                                    error!(%peer, request_id = %request, error = %e, "Failed to process an aggregated acknowledgement");
-                                });
-
+                            TicketAggregationProcessed::Receive(peer, _, request) => {
                                 match active_aggregation_requests.remove(&request).await {
                                     Some(finalizer) => {
                                         active_aggregation_requests.run_pending_tasks().await;     // needed to remove the invalidated, but still present instance of Arc inside

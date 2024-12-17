@@ -31,7 +31,6 @@ from hoprd_sdk.models import (
     OpenChannelBodyRequest,
     SendMessageBodyRequest,
     SessionClientRequest,
-    SessionCloseClientRequest,
     TagQueryRequest,
     WithdrawBodyRequest,
 )
@@ -49,6 +48,7 @@ def getlogger():
 log = getlogger()
 
 MESSAGE_TAG = 1234
+
 
 def seal_with_peerid(peer_id: str, plain_text: bytes, random_padding_len: int = 0) -> bytes:
     """
@@ -76,7 +76,7 @@ def seal_with_peerid(peer_id: str, plain_text: bytes, random_padding_len: int = 
         sealed_box = SealedBox(public_key)
 
         # Step 6: Append random padding if random_padding_len is greater than 0
-        plain_text += b'@' * random.randint(0, random_padding_len)
+        plain_text += b"@" * random.randint(0, random_padding_len)
 
         # Step 7: Encrypt the plaintext using the sealed box
         encrypted_message = sealed_box.encrypt(plain_text)
@@ -459,7 +459,15 @@ class HoprdAPI:
         return int(response.price) if hasattr(response, "price") else None
 
     async def session_client(
-        self, destination: str, path: str, protocol: str, target: str, listen_on: str = "127.0.0.1:0", capabilities=None, sealed_target=False
+        self,
+        destination: str,
+        path: str,
+        protocol: str,
+        target: str,
+        listen_on: str = "127.0.0.1:0",
+        capabilities=None,
+        sealed_target=False,
+        service=False,
     ):
         """
         Returns the port of the client session.
@@ -470,16 +478,25 @@ class HoprdAPI:
         :param listen_on: The host to listen on for input packets (default: "127.0.0.1:0")
         :param capabilities: Optional list of capabilities for the session (default: None)
         :param sealed_target: The target parameter will be encrypted (default: False)
+        :param service: If set, the target must be an integer representing Exit node service (default: False)
         """
-        actual_target = {
-            "Sealed": base64.b64encode(seal_with_peerid(destination, bytes(target,'utf-8'), 50)).decode('ascii')
-        } if sealed_target else { "Plain": target }
+        actual_target = (
+            {"Sealed": base64.b64encode(seal_with_peerid(destination, bytes(target, "utf-8"), 50)).decode("ascii")}
+            if sealed_target
+            else {"Service": int(target)}
+            if service
+            else {"Plain": target}
+        )
 
         if capabilities is None:
             body = SessionClientRequest(destination=destination, path=path, target=actual_target, listen_host=listen_on)
         else:
             body = SessionClientRequest(
-                destination=destination, path=path, target=actual_target, listen_host=listen_on, capabilities=capabilities
+                destination=destination,
+                path=path,
+                target=actual_target,
+                listen_host=listen_on,
+                capabilities=capabilities,
             )
 
         _, response = self.__call_api(SessionApi, "create_client", body=body, protocol=protocol)
@@ -497,9 +514,7 @@ class HoprdAPI:
         """
         Closes a previously opened and bound session
         """
-        body = SessionCloseClientRequest(listening_ip=bound_ip, port=bound_port)
-
-        status, _ = self.__call_api(SessionApi, "close_client", body=body, protocol=protocol)
+        status, _ = self.__call_api(SessionApi, "close_client", protocol=protocol, ip=bound_ip, port=bound_port)
         return status
 
     async def ticket_min_win_prob(self):

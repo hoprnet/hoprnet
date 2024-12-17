@@ -21,7 +21,7 @@ use tracing::{debug, error, info, trace, warn};
 
 use crate::action_state::{ActionState, IndexerExpectation};
 use crate::errors::ChainActionsError::{ChannelAlreadyClosed, InvalidState, Timeout, TransactionSubmissionFailed};
-use crate::errors::{ChainActionsError, Result};
+use crate::errors::Result;
 
 use hopr_async_runtime::prelude::spawn;
 use hopr_db_sql::api::tickets::HoprDbTicketOperations;
@@ -165,11 +165,12 @@ where
     TxExec: TransactionExecutor,
 {
     #[tracing::instrument(level = "debug", skip(self))]
-    pub async fn execute_action(self, action: Action, channel_dst: Hash) -> Result<ActionConfirmation> {
+    pub async fn execute_action(self, action: Action) -> Result<ActionConfirmation> {
         let expectation = match action.clone() {
-            Action::RedeemTicket(ack) => {
-                let ticket_channel_id = ack.verified_ticket().channel_id;
-                let tx_hash = self.tx_exec.redeem_ticket(ack).await?;
+            Action::RedeemTicket(ticket) => {
+                debug!(%ticket, "redeeming ticket");
+                let ticket_channel_id = ticket.verified_ticket().channel_id;
+                let tx_hash = self.tx_exec.redeem_ticket(ticket).await?;
                 IndexerExpectation::new(
                     tx_hash,
                     move |event| matches!(event, ChainEventType::TicketRedeemed(channel, _) if ticket_channel_id == channel.get_id()),
@@ -177,6 +178,7 @@ where
             }
 
             Action::OpenChannel(address, stake) => {
+                debug!(%address, %stake, "opening channel");
                 let tx_hash = self.tx_exec.fund_channel(address, stake).await?;
                 IndexerExpectation::new(
                     tx_hash,
@@ -186,6 +188,7 @@ where
 
             Action::FundChannel(channel, amount) => {
                 if channel.status == ChannelStatus::Open {
+                    debug!(%channel, "funding channel");
                     let tx_hash = self.tx_exec.fund_channel(channel.destination, amount).await?;
                     IndexerExpectation::new(
                         tx_hash,
@@ -199,6 +202,7 @@ where
             Action::CloseChannel(channel, direction) => match direction {
                 ChannelDirection::Incoming => match channel.status {
                     ChannelStatus::Open | ChannelStatus::PendingToClose(_) => {
+                        debug!(%channel, "closing incoming channel");
                         let tx_hash = self.tx_exec.close_incoming_channel(channel.source).await?;
                         IndexerExpectation::new(
                             tx_hash,
@@ -241,9 +245,10 @@ where
             },
 
             Action::Withdraw(recipient, amount) => {
-                // Withdrawal is not awaited via the Indexer, but polled for completion
+                // Withdrawal is not awaited via the Indexer, but polled for completion,
                 // so no indexer event stream expectation awaiting is needed.
-                // So simply return once the future completes
+                // So return once the future completes
+                debug!(%recipient, %amount, "withdrawing funds");
                 return Ok(ActionConfirmation {
                     tx_hash: self.tx_exec.withdraw(recipient, amount).await?,
                     event: None,
@@ -251,6 +256,7 @@ where
                 });
             }
             Action::Announce(data) => {
+                debug!(mutliaddress = %data.multiaddress(), "announcing node");
                 let tx_hash = self.tx_exec.announce(data.clone()).await?;
                 IndexerExpectation::new(
                     tx_hash,
@@ -258,6 +264,7 @@ where
                 )
             }
             Action::RegisterSafe(safe_address) => {
+                debug!(%safe_address, "registering safe");
                 let tx_hash = self.tx_exec.register_safe(safe_address).await?;
                 IndexerExpectation::new(
                     tx_hash,
@@ -347,8 +354,7 @@ where
 
     /// Consumes self and runs the main queue processing loop until the queue is closed.
     ///
-    /// The method will panic if Channel Domain Separator is not yet populated in the DB.
-    #[allow(clippy::async_yields_async)]
+    /// The method will panic if the Channel Domain Separator is not yet populated in the DB.
     #[tracing::instrument(level = "debug", skip(self))]
     pub async fn start(self) {
         let queue_recv = self.queue_recv.clone();
@@ -359,13 +365,6 @@ where
 
             let exec_context = self.ctx.clone();
             let db_clone = self.db.clone();
-            let channel_dst = self
-                .db
-                .get_indexer_data(None)
-                .await
-                .map_err(ChainActionsError::from)
-                .and_then(|data| data.channels_dst.ok_or(InvalidState("missing channels dst".into())))
-                .expect("Channel domain separator is not yet populated in the DB");
 
             // NOTE: the process is "daemonized" and not awaited, so it will run in the background
             spawn(async move {
@@ -373,7 +372,7 @@ where
                 let act_name: &'static str = (&act).into();
                 trace!(act_id, act_name, "executing");
 
-                let tx_result = exec_context.execute_action(act.clone(), channel_dst).await;
+                let tx_result = exec_context.execute_action(act.clone()).await;
                 match &tx_result {
                     Ok(confirmation) => {
                         info!(%confirmation, "successful confirmation");
@@ -394,7 +393,7 @@ where
                             }
                         }
 
-                        // Timeout are accounted in different metric
+                        // Timeouts are accounted in different metric
                         if let Timeout = err {
                             error!(act_id, "timeout while waiting for confirmation");
 

@@ -191,6 +191,7 @@ where
 
                     Ok(Some(ChainEventType::ChannelBalanceDecreased(updated_channel, diff)))
                 } else {
+                    error!(channel_id = %Hash::from(balance_decreased.channel_id), "observed balance decreased event for a channel that does not exist");
                     Err(CoreEthereumIndexerError::ChannelDoesNotExist)
                 }
             }
@@ -211,6 +212,7 @@ where
 
                     Ok(Some(ChainEventType::ChannelBalanceIncreased(updated_channel, diff)))
                 } else {
+                    error!(channel_id = %Hash::from(balance_increased.channel_id), "observed balance increased event for a channel that does not exist");
                     Err(CoreEthereumIndexerError::ChannelDoesNotExist)
                 }
             }
@@ -253,6 +255,7 @@ where
 
                     Ok(Some(ChainEventType::ChannelClosed(updated_channel)))
                 } else {
+                    error!(channel_id = %Hash::from(channel_closed.channel_id), "observed closure finalization event for a channel that does not exist");
                     Err(CoreEthereumIndexerError::ChannelDoesNotExist)
                 }
             }
@@ -267,8 +270,9 @@ where
                     // Check that we're not receiving the Open event without the channel being Close prior
                     if channel_edits.entry().status != ChannelStatus::Closed {
                         return Err(CoreEthereumIndexerError::ProcessError(format!(
-                            "trying to re-open channel {} which is not closed",
-                            channel_edits.entry().get_id()
+                            "trying to re-open channel {} which is not closed, but {}",
+                            channel_edits.entry().get_id(),
+                            channel_edits.entry().status,
                         )));
                     }
 
@@ -423,7 +427,7 @@ where
 
                     Ok(Some(ChainEventType::TicketRedeemed(channel, ack_ticket)))
                 } else {
-                    error!("observed ticket redeem on a channel that we don't have in the DB");
+                    error!(channel_id = %Hash::from(ticket_redeemed.channel_id), "observed ticket redeem on a channel that we don't have in the DB");
                     Err(CoreEthereumIndexerError::ChannelDoesNotExist)
                 }
             }
@@ -444,6 +448,7 @@ where
                         .await?;
                     Ok(Some(ChainEventType::ChannelClosureInitiated(channel)))
                 } else {
+                    error!(channel_id = %Hash::from(closure_initiated.channel_id), "observed channel closure initiation on a channel that we don't have in the DB");
                     Err(CoreEthereumIndexerError::ChannelDoesNotExist)
                 }
             }
@@ -839,12 +844,18 @@ where
                     // Process all logs in the block
                     for log in block_with_logs.logs {
                         let tx_hash = Hash::from(log.tx_hash);
+                        let log_id = log.log_index;
+                        let block_id = log.block_number;
 
-                        // If a significant chain event can be extracted from the log, push it
-                        if let Some(event_type) = myself.process_log_event(tx, log).await? {
-                            let significant_event = SignificantChainEvent { tx_hash, event_type };
-                            debug!(?significant_event, "indexer got significant_event");
-                            ret.push(significant_event);
+                        match myself.process_log_event(tx, log).await {
+                            // If a significant chain event can be extracted from the log, push it
+                            Ok(Some(event_type)) => {
+                                let significant_event = SignificantChainEvent { tx_hash, event_type };
+                                debug!(block_id, %tx_hash, log_id, ?significant_event, "indexer got significant_event");
+                                ret.push(significant_event);
+                            }
+                            Ok(None) => debug!(block_id, %tx_hash, log_id, "no significant event in log"),
+                            Err(error) => error!(block_id, %tx_hash, log_id, %error, "error processing log in tx"),
                         }
                     }
 

@@ -6,7 +6,10 @@
 # prevent sourcing of this script, only allow execution
 # shellcheck disable=SC2091
 $(return >/dev/null 2>&1)
-test "$?" -eq "0" && { echo "This script should only be executed." >&2; exit 1; }
+test "$?" -eq "0" && {
+  echo "This script should only be executed." >&2
+  exit 1
+}
 
 # exit on errors, undefined variables, ensure errors in pipes are not hidden
 set -Eeuo pipefail
@@ -43,12 +46,13 @@ usage() {
 }
 
 # return early with help info when requested
-{ [[ "${1:-}" = "-h" ]] || [[ "${1:-}" = "--help" ]]; } && { usage; exit 0; }
-
+{ [[ ${1:-} == "-h" ]] || [[ ${1:-} == "--help" ]]; } && {
+  usage
+  exit 0
+}
 
 declare cluster_template_name="${1}"
 declare cluster_size=${2-6}
-
 
 declare perform_cleanup="${HOPRD_PERFORM_CLEANUP:-false}"
 
@@ -58,7 +62,7 @@ function cleanup {
   trap - SIGINT SIGTERM ERR EXIT
   set +Eeuo pipefail
 
-  if [[ ${EXIT_CODE} -ne 0 ]] || [[ "${perform_cleanup}" = "true" ]] || [[ "${perform_cleanup}" = "1" ]]; then
+  if [[ ${EXIT_CODE} -ne 0 ]] || [[ ${perform_cleanup} == "true" ]] || [[ ${perform_cleanup} == "1" ]]; then
     # Cleaning up everything upon failure
     gcloud_delete_managed_instance_group "${cluster_id}"
     gcloud_delete_instance_template "${cluster_template_name}"
@@ -67,23 +71,19 @@ function cleanup {
   exit $EXIT_CODE
 }
 
-if [[ "${perform_cleanup}" = "1" ]] || [[ "${perform_cleanup}" = "true" ]]; then
+if [[ ${perform_cleanup} == "1" ]] || [[ ${perform_cleanup} == "true" ]]; then
   cleanup
 
   # exit right away
   exit
 fi
 
-
-
 # create instance template
 # announce on-chain with routable address
-gcloud_create_instance_template "${cluster_template_name}" 
+gcloud_create_instance_template "${cluster_template_name}"
 
 # start nodes
-gcloud_create_or_update_managed_instance_group  \
+gcloud_create_or_update_managed_instance_group \
   "${cluster_template_name}" \
   "${cluster_size}" \
   "${cluster_template_name}"
-
-

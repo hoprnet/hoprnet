@@ -81,10 +81,12 @@ jobs:
     uses: ./.github/workflows/load-tests.yaml
     with:
       test_id: pr-${{ github.event.pull_request.number }}
-      nodes: rotsee
-      workload: one-hop
+      cluster_nodes: core
+      topology: many2many
+      workload: constant
       duration: ${{ vars.LOAD_TESTING_DURATION }}
-      rate: "${{ vars.LOAD_TESTING_RATE }}"
+      vu: ${{ vars.LOAD_TESTING_VU }}
+      rate: ${{ vars.LOAD_TESTING_RATE }}
     secrets: inherit
 
   create_release:

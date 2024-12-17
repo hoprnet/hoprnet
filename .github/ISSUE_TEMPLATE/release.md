@@ -1,9 +1,9 @@
 ---
 name: Release Template
 about: Create an issue to track scope and progress of a release
-title: 'Release: [RELEASE NAME]'
-labels: 'release'
-assignees: 'hoprnet/hopr-tech-representatives'
+title: "Release: [RELEASE NAME]"
+labels: "release"
+assignees: "hoprnet/hopr-tech-representatives"
 ---
 
 # Timing
@@ -16,7 +16,7 @@ Phase 4 Testing: tbd
 # Release Checklist
 
 - [ ] create branch
-- [ ] merge back initial release branch to master 
+- [ ] merge back initial release branch to master
 - [ ] create tracking PR to keep track of diff between release branch and `master`
 - [ ] verify HoprChannels contract, see VERIFICATION_GUIDE.md
 - [ ] CD: launch base cluster (including NAT nodes)

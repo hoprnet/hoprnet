@@ -1032,7 +1032,7 @@ impl HoprDbTicketOperations for HoprDb {
             .map(|m| BalanceType::HOPR.balance_bytes(&m.amount))
             .fold(Balance::zero(BalanceType::HOPR), |acc, amount| acc.add(amount));
 
-        // Value of received ticket can be higher (profit for us) but not lower
+        // The value of received ticket can be higher (profit for us) but not lower
         if aggregated_ticket.verified_ticket().amount.lt(&stored_value) {
             error!(channel = %channel_id, "Aggregated ticket value in channel is lower than sum of stored tickets");
             return Err(DbSqlError::LogicalError("Value of received aggregated ticket is too low".into()).into());
@@ -1055,34 +1055,9 @@ impl HoprDbTicketOperations for HoprDb {
         let acked_aggregated_ticket = aggregated_ticket.into_acknowledged(first_stored_ticket.response.clone());
 
         let ticket = acked_aggregated_ticket.clone();
-        self.ticket_manager
-            .with_write_locked_db(|tx| {
-                Box::pin(async move {
-                    let deleted = ticket::Entity::delete_many()
-                        .filter(WrappedTicketSelector::from(
-                            TicketSelector::from(channel_entry).with_state(AcknowledgedTicketStatus::BeingAggregated),
-                        ))
-                        .exec(tx.as_ref())
-                        .await?;
+        self.ticket_manager.replace_tickets(ticket).await?;
 
-                    if deleted.rows_affected as usize != acknowledged_tickets.len() {
-                        return Err(DbSqlError::LogicalError(format!(
-                            "The deleted aggregated ticket count ({}) does not correspond to the expected count: {}",
-                            deleted.rows_affected,
-                            acknowledged_tickets.len(),
-                        )));
-                    }
-
-                    ticket::Entity::insert::<ticket::ActiveModel>(ticket.into())
-                        .exec(tx.as_ref())
-                        .await?;
-
-                    Ok::<(), DbSqlError>(())
-                })
-            })
-            .await?;
-
-        info!("successfully processed received aggregated {acked_aggregated_ticket}");
+        info!(%acked_aggregated_ticket, "successfully processed received aggregated ticket");
         Ok(acked_aggregated_ticket)
     }
 
@@ -1289,7 +1264,7 @@ mod tests {
     };
     use crate::{HoprDbGeneralModelOperations, TargetDb};
     use anyhow::{anyhow, Context};
-    use futures::StreamExt;
+    use futures::{pin_mut, StreamExt};
     use hex_literal::hex;
     use hopr_crypto_types::prelude::*;
     use hopr_db_api::prelude::{DbError, TicketMarker};
@@ -2664,6 +2639,10 @@ mod tests {
         const COUNT_TICKETS: usize = 5;
 
         let (db, channel, tickets) = create_alice_db_with_tickets_from_bob(COUNT_TICKETS).await?;
+
+        let (notifier_tx, notifier_rx) = futures::channel::mpsc::unbounded();
+        db.start_ticket_processing(Some(notifier_tx))?;
+
         let tickets = tickets
             .into_iter()
             .map(|t| t.into_transferable(&ALICE, &Hash::default()).unwrap())
@@ -2699,12 +2678,19 @@ mod tests {
             Some((BOB_OFFCHAIN.public().clone(), tickets, Default::default()))
         );
 
+        let agg_ticket = aggregated_ticket.clone();
+
         let _ = db
             .process_received_aggregated_ticket(aggregated_ticket.leak(), &ALICE)
             .await?;
 
+        pin_mut!(notifier_rx);
+        let notified_ticket = notifier_rx.next().await.ok_or(anyhow!("must have ticket"))?;
+
+        assert_eq!(notified_ticket.verified_ticket(), agg_ticket.verified_ticket());
+
         let actual_being_aggregated_count = hopr_db_entity::ticket::Entity::find()
-            .filter(hopr_db_entity::ticket::Column::State.eq(AcknowledgedTicketStatus::BeingAggregated as u8))
+            .filter(ticket::Column::State.eq(AcknowledgedTicketStatus::BeingAggregated as u8))
             .count(&db.tickets_db)
             .await? as usize;
 

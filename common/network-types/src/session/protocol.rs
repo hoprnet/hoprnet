@@ -451,7 +451,7 @@ pub struct SessionMessageIter<'a, const C: usize> {
     failed: bool,
 }
 
-impl<'a, const C: usize> SessionMessageIter<'a, C> {
+impl<const C: usize> SessionMessageIter<'_, C> {
     /// Check if this iterator can yield any more messages.
     ///
     /// Returns `true` only if a [prior error](SessionMessageIter::last_error) occurred or all useful bytes
@@ -524,7 +524,7 @@ impl<'a, const C: usize, T: Into<Cow<'a, [u8]>>> From<T> for SessionMessageIter<
     }
 }
 
-impl<'a, const C: usize> Iterator for SessionMessageIter<'a, C> {
+impl<const C: usize> Iterator for SessionMessageIter<'_, C> {
     type Item = Result<SessionMessage<C>, NetworkTypeError>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -539,7 +539,7 @@ impl<'a, const C: usize> Iterator for SessionMessageIter<'a, C> {
     }
 }
 
-impl<'a, const C: usize> std::iter::FusedIterator for SessionMessageIter<'a, C> {}
+impl<const C: usize> std::iter::FusedIterator for SessionMessageIter<'_, C> {}
 
 #[cfg(test)]
 mod tests {

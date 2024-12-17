@@ -26,10 +26,7 @@ jobs:
 
       - name: Install dependencies
         run: >
-          sudo apt -y install
-          texlive texlive-latex-extra texlive-science
-          texlive-bibtex-extra latexmk
-
+          sudo apt -y install texlive texlive-latex-extra texlive-science texlive-bibtex-extra latexmk #magic___^_^___line
       - name: Compile LaTeX document
         run: make -j build-yellowpaper
 

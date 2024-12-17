@@ -28,6 +28,9 @@ pub enum ChainActionsError {
     #[error("acknowledged {0} is in a wrong state for the operation")]
     WrongTicketState(String),
 
+    #[error("given ticket has a superseded ticket index")]
+    OldTicket,
+
     #[error("ticket is not a win")]
     NotAWinningTicket,
 

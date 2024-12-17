@@ -1,10 +1,12 @@
 use async_trait::async_trait;
-use futures::stream::BoxStream;
-use futures::{stream, StreamExt, TryStreamExt};
+use futures::{stream, StreamExt};
 use sea_orm::entity::Set;
 use sea_orm::query::QueryTrait;
 use sea_orm::sea_query::{Expr, OnConflict, Value};
-use sea_orm::{ColumnTrait, EntityTrait, FromQueryResult, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, EntityTrait, FromQueryResult, IntoActiveModel, PaginatorTrait, QueryFilter,
+    QueryOrder, QuerySelect,
+};
 use tracing::{error, trace};
 
 use hopr_crypto_types::prelude::Hash;
@@ -117,7 +119,7 @@ impl HoprDbLogOperations for HoprDb {
         &'a self,
         block_number: Option<u64>,
         block_offset: Option<u64>,
-    ) -> Result<BoxStream<'a, SerializableLog>> {
+    ) -> Result<Vec<SerializableLog>> {
         let min_block_number = block_number.unwrap_or(0);
         let max_block_number = block_offset.map(|v| min_block_number + v + 1);
 
@@ -131,77 +133,70 @@ impl HoprDbLogOperations for HoprDb {
             .order_by_asc(log::Column::TransactionIndex)
             .order_by_asc(log::Column::LogIndex);
 
-        Ok(Box::pin(async_stream::stream! {
-            match query.stream(self.conn(TargetDb::Logs)).await {
-                Ok(mut stream) => {
-                    while let Ok(Some(object)) = stream.try_next().await {
-                        match object {
-                            (log, Some(log_status)) => {
-                                if let Ok(slog) = create_log(log, log_status) {
-                                    yield slog
-                                }
-                            },
-                            (log, None) => {
-                                error!("Missing log status for log in db: {:?}", log);
-                                if let Ok(slog) = SerializableLog::try_from(log) {
-                                    yield slog
-                                }
-                            }
-                        }
+        match query.all(self.conn(TargetDb::Logs)).await {
+            Ok(logs) => Ok(logs
+                .into_iter()
+                .map(|(log, status)| {
+                    if let Some(status) = status {
+                        create_log(log, status).unwrap()
+                    } else {
+                        error!("Missing log status for log in db: {:?}", log);
+                        SerializableLog::try_from(log).unwrap()
                     }
-                },
-                Err(e) => error!("Failed to get logs from db: {:?}", e),
+                })
+                .collect()),
+            Err(e) => {
+                error!("Failed to get logs from db: {:?}", e);
+                Err(DbError::from(DbSqlError::from(e)))
             }
-        }))
+        }
     }
 
     async fn get_logs_count(&self, block_number: Option<u64>, block_offset: Option<u64>) -> Result<u64> {
         let min_block_number = block_number.unwrap_or(0);
         let max_block_number = block_offset.map(|v| min_block_number + v + 1);
 
-        let query = Log::find()
+        Log::find()
             .filter(log::Column::BlockNumber.gte(min_block_number.to_be_bytes().to_vec()))
             .apply_if(max_block_number, |q, v| {
                 q.filter(log::Column::BlockNumber.lt(v.to_be_bytes().to_vec()))
             })
-            .order_by_asc(log::Column::BlockNumber)
-            .order_by_asc(log::Column::TransactionIndex)
-            .order_by_asc(log::Column::LogIndex);
-
-        match query.count(self.conn(TargetDb::Logs)).await {
-            Ok(count) => Ok(count),
-            Err(e) => Err(DbError::from(DbSqlError::from(e))),
-        }
+            .count(self.conn(TargetDb::Logs))
+            .await
+            .map_err(|e| DbSqlError::from(e).into())
     }
 
     async fn get_logs_block_numbers<'a>(
         &'a self,
         block_number: Option<u64>,
         block_offset: Option<u64>,
-    ) -> Result<BoxStream<'a, u64>> {
+        processed: Option<bool>,
+    ) -> Result<Vec<u64>> {
         let min_block_number = block_number.unwrap_or(0);
         let max_block_number = block_offset.map(|v| min_block_number + v + 1);
 
-        let query = Log::find()
+        LogStatus::find()
             .select_only()
-            .column(log::Column::BlockNumber)
+            .column(log_status::Column::BlockNumber)
             .distinct()
-            .filter(log::Column::BlockNumber.gte(min_block_number.to_be_bytes().to_vec()))
+            .filter(log_status::Column::BlockNumber.gte(min_block_number.to_be_bytes().to_vec()))
             .apply_if(max_block_number, |q, v| {
-                q.filter(log::Column::BlockNumber.lt(v.to_be_bytes().to_vec()))
+                q.filter(log_status::Column::BlockNumber.lt(v.to_be_bytes().to_vec()))
             })
-            .order_by_asc(log::Column::BlockNumber)
-            .into_model::<BlockNumber>();
-
-        Ok(Box::pin(async_stream::stream! {
-            match query.stream(self.conn(TargetDb::Logs)).await {
-                Ok(mut stream) => {
-                    while let Some(Ok(object)) = stream.next().await {
-                        yield U256::from_be_bytes(object.block_number).as_u64()
-                }},
-                Err(e) => error!("Failed to get logs block numbers from db: {:?}", e),
-            }
-        }))
+            .apply_if(processed, |q, v| q.filter(log_status::Column::Processed.eq(v)))
+            .order_by_asc(log_status::Column::BlockNumber)
+            .into_model::<BlockNumber>()
+            .all(self.conn(TargetDb::Logs))
+            .await
+            .map(|res| {
+                res.into_iter()
+                    .map(|b| U256::from_be_bytes(b.block_number).as_u64())
+                    .collect()
+            })
+            .map_err(|e| {
+                error!("Failed to get logs block numbers from db: {:?}", e);
+                DbError::from(DbSqlError::from(e))
+            })
     }
 
     async fn set_logs_processed(&self, block_number: Option<u64>, block_offset: Option<u64>) -> Result<()> {
@@ -277,7 +272,7 @@ impl HoprDbLogOperations for HoprDb {
             .order_by_desc(log_status::Column::LogIndex)
             .find_also_related(Log);
 
-        match query.clone().one(self.conn(TargetDb::Logs)).await {
+        match query.one(self.conn(TargetDb::Logs)).await {
             Ok(Some((status, Some(log)))) => {
                 if let Ok(slog) = create_log(log, status) {
                     Ok(Some(slog))
@@ -290,16 +285,23 @@ impl HoprDbLogOperations for HoprDb {
         }
     }
 
-    async fn update_logs_checksums(&self) -> Result<()> {
-        let last_log = self.get_last_checksummed_log().await?;
-        let mut last_checksum = last_log.map_or(Hash::default(), |log| {
-            Hash::from_hex(log.checksum.unwrap().as_str()).unwrap()
-        });
-        let db_tx = self.nest_transaction_in_db(None, TargetDb::Logs).await?;
-
-        db_tx
+    async fn update_logs_checksums(&self) -> Result<Hash> {
+        self.nest_transaction_in_db(None, TargetDb::Logs)
+            .await?
             .perform(|tx| {
                 Box::pin(async move {
+                    let mut last_checksum = LogStatus::find()
+                        .filter(log_status::Column::Checksum.is_not_null())
+                        .order_by_desc(log_status::Column::BlockNumber)
+                        .order_by_desc(log_status::Column::TransactionIndex)
+                        .order_by_desc(log_status::Column::LogIndex)
+                        .one(tx.as_ref())
+                        .await
+                        .map_err(|e| DbError::from(DbSqlError::from(e)))?
+                        .and_then(|m| m.checksum)
+                        .and_then(|c| Hash::try_from(c.as_slice()).ok())
+                        .unwrap_or_default();
+
                     let query = LogStatus::find()
                         .filter(log_status::Column::Checksum.is_null())
                         .order_by_asc(log_status::Column::BlockNumber)
@@ -312,30 +314,31 @@ impl HoprDbLogOperations for HoprDb {
                             let mut entries = entries.into_iter();
                             while let Some((status, Some(log_entry))) = entries.next() {
                                 let slog = create_log(log_entry.clone(), status.clone())?;
-                                // we compute the has of a single log as a combination of the block
-                                // hash, tx hash and log index
+                                // we compute the hash of a single log as a combination of the block
+                                // hash, TX hash, and the log index
                                 let log_hash = Hash::create(&[
                                     log_entry.block_hash.as_slice(),
                                     log_entry.transaction_hash.as_slice(),
                                     log_entry.log_index.as_slice(),
                                 ]);
+
                                 let next_checksum = Hash::create(&[last_checksum.as_ref(), log_hash.as_ref()]);
-                                let updated_status = log_status::ActiveModel {
-                                    checksum: Set(Some(next_checksum.as_ref().to_vec())),
-                                    ..status.into()
-                                };
-                                match LogStatus::update(updated_status).exec(tx.as_ref()).await {
+
+                                let mut updated_status = status.into_active_model();
+                                updated_status.checksum = Set(Some(next_checksum.as_ref().to_vec()));
+
+                                match updated_status.update(tx.as_ref()).await {
                                     Ok(_) => {
                                         last_checksum = next_checksum;
-                                        trace!("Generated log checksum {next_checksum} @ {slog}");
+                                        trace!(log = %slog, checksum = %next_checksum, "Generated log checksum");
                                     }
-                                    Err(e) => {
-                                        error!("Failed to update log status checksum in db: {:?}", e);
+                                    Err(error) => {
+                                        error!(%error, "Failed to update log status checksum in db");
                                         break;
                                     }
                                 }
                             }
-                            Ok(())
+                            Ok(last_checksum)
                         }
                         Err(e) => Err(DbError::from(DbSqlError::from(e))),
                     }
@@ -386,7 +389,6 @@ fn create_log(raw_log: log::Model, status: log_status::Model) -> crate::errors::
 mod tests {
     use super::*;
 
-    use futures::StreamExt;
     use hopr_crypto_types::prelude::{ChainKeypair, Hash, Keypair};
 
     #[async_std::test]
@@ -409,12 +411,7 @@ mod tests {
 
         db.store_log(log.clone()).await.unwrap();
 
-        let logs = db
-            .get_logs(None, None)
-            .await
-            .unwrap()
-            .collect::<Vec<SerializableLog>>()
-            .await;
+        let logs = db.get_logs(None, None).await.unwrap();
 
         assert_eq!(logs.len(), 1);
         assert_eq!(logs[0], log);
@@ -455,12 +452,7 @@ mod tests {
         db.store_log(log_1.clone()).await.unwrap();
         db.store_log(log_2.clone()).await.unwrap();
 
-        let logs = db
-            .get_logs(None, None)
-            .await
-            .unwrap()
-            .collect::<Vec<SerializableLog>>()
-            .await;
+        let logs = db.get_logs(None, None).await.unwrap();
 
         assert_eq!(logs.len(), 2);
         assert_eq!(logs[0], log_1);
@@ -497,12 +489,7 @@ mod tests {
             .await
             .expect_err("Expected error due to duplicate log insertion");
 
-        let logs = db
-            .get_logs(None, None)
-            .await
-            .unwrap()
-            .collect::<Vec<SerializableLog>>()
-            .await;
+        let logs = db.get_logs(None, None).await.unwrap();
 
         assert_eq!(logs.len(), 1);
     }
@@ -578,12 +565,7 @@ mod tests {
         let mut next_block = start_block;
 
         while next_block <= start_block + blocks {
-            let ordered_logs = db
-                .get_logs(Some(next_block), Some(block_fetch_interval))
-                .await
-                .unwrap()
-                .collect::<Vec<SerializableLog>>()
-                .await;
+            let ordered_logs = db.get_logs(Some(next_block), Some(block_fetch_interval)).await.unwrap();
 
             assert!(ordered_logs.len() > 0);
 
@@ -654,12 +636,7 @@ mod tests {
             .into_iter()
             .for_each(|r| assert!(r.is_ok()));
 
-        let logs = db
-            .get_logs(Some(1), Some(0))
-            .await
-            .unwrap()
-            .collect::<Vec<SerializableLog>>()
-            .await;
+        let logs = db.get_logs(Some(1), Some(0)).await.unwrap();
 
         assert_eq!(logs.len(), 1);
         assert_eq!(logs[0], log_1);
@@ -708,7 +685,7 @@ mod tests {
             tx_hash: Hash::create(&[b"tx_hash1"]).into(),
             log_index: 1,
             removed: false,
-            processed: Some(false),
+            processed: Some(true),
             ..Default::default()
         };
 
@@ -726,21 +703,45 @@ mod tests {
             ..Default::default()
         };
 
-        db.store_logs(vec![log_1.clone(), log_2.clone()])
+        let log_3 = SerializableLog {
+            address: Address::new(b"my address 323456789"),
+            topics: [Hash::create(&[b"topic3"]).into()].into(),
+            data: [1, 2, 3, 4].into(),
+            tx_index: 3,
+            block_number: 3,
+            block_hash: Hash::create(&[b"block_hash3"]).into(),
+            tx_hash: Hash::create(&[b"tx_hash3"]).into(),
+            log_index: 3,
+            removed: false,
+            processed: Some(false),
+            ..Default::default()
+        };
+
+        db.store_logs(vec![log_1.clone(), log_2.clone(), log_3.clone()])
             .await
             .unwrap()
             .into_iter()
             .for_each(|r| assert!(r.is_ok()));
 
-        let block_numbers = db
-            .get_logs_block_numbers(Some(1), Some(0))
-            .await
-            .unwrap()
-            .collect::<Vec<u64>>()
-            .await;
+        let block_numbers_all = db.get_logs_block_numbers(None, None, None).await.unwrap();
+        assert_eq!(block_numbers_all.len(), 3);
+        assert_eq!(block_numbers_all, [1, 2, 3]);
 
-        assert_eq!(block_numbers.len(), 1);
-        assert_eq!(block_numbers[0], 1);
+        let block_numbers_first_only = db.get_logs_block_numbers(Some(1), Some(0), None).await.unwrap();
+        assert_eq!(block_numbers_first_only.len(), 1);
+        assert_eq!(block_numbers_first_only[0], 1);
+
+        let block_numbers_last_only = db.get_logs_block_numbers(Some(3), Some(0), None).await.unwrap();
+        assert_eq!(block_numbers_last_only.len(), 1);
+        assert_eq!(block_numbers_last_only[0], 3);
+
+        let block_numbers_processed = db.get_logs_block_numbers(None, None, Some(true)).await.unwrap();
+        assert_eq!(block_numbers_processed.len(), 1);
+        assert_eq!(block_numbers_processed[0], 1);
+
+        let block_numbers_unprocessed_second = db.get_logs_block_numbers(Some(2), Some(0), Some(false)).await.unwrap();
+        assert_eq!(block_numbers_unprocessed_second.len(), 1);
+        assert_eq!(block_numbers_unprocessed_second[0], 2);
     }
 
     #[async_std::test]
@@ -796,15 +797,9 @@ mod tests {
 
         let updated_log_3 = db.get_last_checksummed_log().await.unwrap().unwrap();
 
-        db.get_logs(None, None)
-            .await
-            .unwrap()
-            .collect::<Vec<SerializableLog>>()
-            .await
-            .into_iter()
-            .for_each(|log| {
-                assert!(log.checksum.is_some());
-            });
+        db.get_logs(None, None).await.unwrap().into_iter().for_each(|log| {
+            assert!(log.checksum.is_some());
+        });
 
         // ensure the first log is not the last updated anymore
         assert_ne!(

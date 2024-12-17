@@ -142,6 +142,8 @@ services:
       - hoprnet
     env_file:
       - .env-secrets
+    environment:
+      - HOPRD_API_PORT=${HOPRD_API_PORT}
     profiles:
       - metrics-push
 

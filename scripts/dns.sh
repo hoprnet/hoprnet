@@ -2,7 +2,7 @@
 set -e #u
 
 # Get dns entry for a release and node
-# e.g. gcloud_dns_entry master 
+# e.g. gcloud_dns_entry master
 # $1 = release name
 # $2 = role (eg. node-4)
 gcloud_dns_entry() {
@@ -21,11 +21,11 @@ gcloud_dns_txt_record() {
   if [ -z "$txt_record" ]; then
     # echo "log | Dns Entry: $dns_entry"
     # Google takes some time to propagate their DNS entries, so it could be that the record has already been created.
-    local maybe_txt_record=$(gcloud dns record-sets list --zone=hoprnet-link --name="$dns_entry."  --type="TXT")
+    local maybe_txt_record=$(gcloud dns record-sets list --zone=hoprnet-link --name="$dns_entry." --type="TXT")
     if [ -z "$maybe_txt_record" ]; then
       # echo "log | Status: Not created, creating"
       gcloud dns record-sets transaction start --zone="hoprnet-link"
-      
+
       gcloud dns record-sets transaction add "dnsaddr=$3" \
         --name="$dns_entry" \
         --ttl="30" \
@@ -55,5 +55,5 @@ gcloud_dns_txt_record() {
 # - RELEASE_NAME
 gcloud_txt_record() {
   # Workaround with file descriptors to avoid poluting stdout
-  ( gcloud_dns_txt_record "$1" "$2" "$3" 3>&1 1>&2- 2>&3- ) | grep 'dnsaddr'
+  (gcloud_dns_txt_record "$1" "$2" "$3" 3>&1 1>&2- 2>&3-) | grep 'dnsaddr'
 }

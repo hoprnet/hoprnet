@@ -200,6 +200,8 @@ debug-identity
 
 # make sure anything which is vendored is copied
 !/vendor/**/*
+vendor/.DS_Store
+vendor/cargo/.DS_Store
 
 # technical docs
 /docs/*/.structurizr

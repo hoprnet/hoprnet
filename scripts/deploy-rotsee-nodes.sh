@@ -3,7 +3,10 @@
 # prevent sourcing of this script, only allow execution
 # shellcheck disable=SC2091
 $(return >/dev/null 2>&1)
-test "$?" -eq "0" && { echo "This script should only be executed." >&2; exit 1; }
+test "$?" -eq "0" && {
+  echo "This script should only be executed." >&2
+  exit 1
+}
 
 # exit on errors, undefined variables, ensure errors in pipes are not hidden
 set -Eeuo pipefail
@@ -17,8 +20,11 @@ source "${mydir}/testnet.sh"
 declare action docker_image ssh_hosts
 
 : "${1:?"1st parameter <ssh_hosts_file> missing"}"
-[ -f "${1}" ] || { echo "1st parameters <ssh_hosts_file> does not point to a file"; exit 1; }
-mapfile -t ssh_hosts <<< "$(<${1})"
+[ -f "${1}" ] || {
+  echo "1st parameters <ssh_hosts_file> does not point to a file"
+  exit 1
+}
+mapfile -t ssh_hosts <<<"$(<${1})"
 action="${2:-deploy}"
 docker_image="${3:-europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd:latest}"
 
@@ -157,7 +163,7 @@ upload_identities() {
   local dest src identities
   dest="/root/hoprd-db/.hopr-id"
   src="${mydir}/tmp/"
-  mapfile -t identities <<< "$(find "${src}" -maxdepth 1 -type f -name '.hopr-id_*.id' | sort)"
+  mapfile -t identities <<<"$(find "${src}" -maxdepth 1 -type f -name '.hopr-id_*.id' | sort)"
 
   for i in "${!ssh_hosts[@]}"; do
     local host
@@ -190,7 +196,7 @@ deploy_safes() {
 
   local src identities
   src="${mydir}/tmp/"
-  mapfile -t identities <<< "$(find "${src}" -maxdepth 1 -type f -name '.hopr-id_*.id' | sort)"
+  mapfile -t identities <<<"$(find "${src}" -maxdepth 1 -type f -name '.hopr-id_*.id' | sort)"
 
   for i in "${!identities[@]}"; do
     local id_path
@@ -208,10 +214,10 @@ deploy_safes() {
       --network "${NETWORK}" \
       --identity-from-path "${id_path}" \
       --hopr-amount 100 --native-amount 1 \
-      --contracts-root "./ethereum/contracts" > safe.log
+      --contracts-root "./ethereum/contracts" >safe.log
 
     # store safe arguments in separate file for later use
-    grep -oE "(.*)" safe.log > "${id_path}.safe.args"
+    grep -oE "(.*)" safe.log >"${id_path}.safe.args"
     rm safe.log
 
     # upload safe args to host for later use
@@ -228,7 +234,7 @@ deploy_nodes() {
 }
 
 ### Install nodes from scratch
-install_nodes(){
+install_nodes() {
   for host in "${ssh_hosts[@]}"; do
     test_ssh_connection "${host}"
     update_and_restart_host "${host}"
@@ -261,13 +267,11 @@ install_nodes(){
 }
 
 case "$action" in
-  install)
-    # return early with help info when requested
-    install_nodes
-    ;;
-  deploy)
-    deploy_nodes
-    ;;
+install)
+  # return early with help info when requested
+  install_nodes
+  ;;
+deploy)
+  deploy_nodes
+  ;;
 esac
-
-

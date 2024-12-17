@@ -73,9 +73,9 @@ pub fn decapsulate_multiaddress(multiaddr: Multiaddr) -> Multiaddr {
         .collect()
 }
 
-/// Structure containing data used for on-chain announcement.
+/// Structure containing data used for an on-chain announcement.
 /// That is the decapsulated multiaddress (with the /p2p/{peer_id} suffix removed) and
-/// optional `KeyBinding` (announcement can be done with key bindings or without)
+/// optional `KeyBinding` (an announcement can be done with key bindings or without)
 ///
 /// NOTE: This currently supports only announcing of a single multiaddress
 #[derive(Clone, Debug, PartialEq)]
@@ -96,7 +96,7 @@ impl AnnouncementData {
         }
 
         if let Some(binding) = &key_binding {
-            // Encapsulate first (if already encapsulated the operation verifies that peer id matches the given one)
+            // Encapsulate first (if already encapsulated, the operation verifies that peer id matches the given one)
             match multiaddress.with_p2p(binding.packet_key.into()) {
                 Ok(mut multiaddress) => {
                     // Now decapsulate again, because we store decapsulated multiaddress only (without the /p2p/<peer_id> suffix)

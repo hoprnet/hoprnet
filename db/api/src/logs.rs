@@ -1,6 +1,6 @@
 use async_trait::async_trait;
-use futures::stream::BoxStream;
 
+use hopr_crypto_types::prelude::Hash;
 use hopr_primitive_types::prelude::SerializableLog;
 
 use crate::errors::Result;
@@ -51,12 +51,12 @@ pub trait HoprDbLogOperations {
     ///
     /// # Returns
     ///
-    /// A `Result` containing a `BoxStream` of `SerializableLog` entries if the operation succeeds or an error if it fails.
+    /// A `Result` containing a `Vec` of `SerializableLog` entries if the operation succeeds or an error if it fails.
     async fn get_logs<'a>(
         &'a self,
         block_number: Option<u64>,
         block_offset: Option<u64>,
-    ) -> Result<BoxStream<'a, SerializableLog>>;
+    ) -> Result<Vec<SerializableLog>>;
 
     /// Retrieves the count of log entries from the database.
     ///
@@ -76,15 +76,17 @@ pub trait HoprDbLogOperations {
     ///
     /// * `block_number` - An optional block number filter.
     /// * `block_offset` - An optional block offset filter.
+    /// * `processed` - An optional processed filter.
     ///
     /// # Returns
     ///
-    /// A `Result` containing a `BoxStream` of block numbers if the operation succeeds or an error if it fails.
+    /// A `Result` containing a `Vec` of block numbers if the operation succeeds or an error if it fails.
     async fn get_logs_block_numbers<'a>(
         &'a self,
         block_number: Option<u64>,
         block_offset: Option<u64>,
-    ) -> Result<BoxStream<'a, u64>>;
+        processed: Option<bool>,
+    ) -> Result<Vec<u64>>;
 
     /// Marks a specific log entry as processed.
     ///
@@ -132,6 +134,6 @@ pub trait HoprDbLogOperations {
     ///
     /// # Returns
     ///
-    /// A `Result` which is `Ok(())` if the operation succeeds or an error if it fails.
-    async fn update_logs_checksums(&self) -> Result<()>;
+    /// A `Result` which is `Ok(Hash)` if the operation succeeds or an error if it fails.
+    async fn update_logs_checksums(&self) -> Result<Hash>;
 }

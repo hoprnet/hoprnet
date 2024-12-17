@@ -414,7 +414,9 @@ where
 
 #[cfg(test)]
 mod tests {
+    use super::TicketAggregationProcessed;
     use async_std::prelude::FutureExt;
+    use futures::pin_mut;
     use futures::stream::StreamExt;
     use hex_literal::hex;
     use hopr_crypto_types::{
@@ -432,8 +434,6 @@ mod tests {
     use lazy_static::lazy_static;
     use std::ops::{Add, Mul};
     use std::time::Duration;
-
-    use super::TicketAggregationProcessed;
 
     lazy_static! {
         static ref PEERS: Vec<OffchainKeypair> = [
@@ -562,6 +562,9 @@ mod tests {
             db_bob.upsert_ticket(None, ticket).await?;
         }
 
+        let (bob_notify_tx, bob_notify_rx) = futures::channel::mpsc::unbounded();
+        db_bob.start_ticket_processing(bob_notify_tx.into())?;
+
         let mut alice = super::TicketAggregationInteraction::<(), ()>::new(db_alice.clone(), &PEERS_CHAIN[0]);
         let mut bob = super::TicketAggregationInteraction::<(), ()>::new(db_bob.clone(), &PEERS_CHAIN[1]);
 
@@ -601,6 +604,12 @@ mod tests {
             _ => panic!("unexpected action happened while awaiting agg response at Bob"),
         }
 
+        pin_mut!(bob_notify_rx);
+        bob_notify_rx
+            .next()
+            .await
+            .expect("bob should have received the ticket notification");
+
         let stored_acked_tickets = db_bob.get_tickets((&channel_alice_bob).into()).await?;
 
         assert_eq!(
@@ -612,7 +621,7 @@ mod tests {
         assert_eq!(
             AcknowledgedTicketStatus::BeingRedeemed,
             stored_acked_tickets[0].status,
-            "first ticket must being redeemed"
+            "first ticket must be being redeemed"
         );
         assert!(
             stored_acked_tickets[1].verified_ticket().is_aggregated(),
@@ -638,6 +647,9 @@ mod tests {
         let db_bob = HoprDb::new_in_memory(PEERS_CHAIN[1].clone()).await?;
         init_db(db_alice.clone()).await?;
         init_db(db_bob.clone()).await?;
+
+        let (bob_notify_tx, bob_notify_rx) = futures::channel::mpsc::unbounded();
+        db_bob.start_ticket_processing(bob_notify_tx.into())?;
 
         const NUM_TICKETS: u64 = 30;
         const CHANNEL_TICKET_IDX: u64 = 20;
@@ -713,6 +725,12 @@ mod tests {
             }
             _ => panic!("unexpected action happened while awaiting agg response at Bob"),
         }
+
+        pin_mut!(bob_notify_rx);
+        bob_notify_rx
+            .next()
+            .await
+            .expect("bob should have received the ticket notification");
 
         let stored_acked_tickets = db_bob.get_tickets((&channel_alice_bob).into()).await?;
 

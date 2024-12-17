@@ -2,7 +2,10 @@
 
 # prevent sourcing of this script, only allow execution
 $(return >/dev/null 2>&1)
-test "$?" -eq "0" && { echo "This script should only be executed." >&2; exit 1; }
+test "$?" -eq "0" && {
+  echo "This script should only be executed." >&2
+  exit 1
+}
 
 # exit on errors, undefined variables, ensure errors in pipes are not hidden
 set -Eeuo pipefail
@@ -25,28 +28,27 @@ usage() {
 declare branch
 branch="$(git rev-parse --abbrev-ref HEAD)"
 
-while (( "$#" )); do
+while (("$#")); do
   case "$1" in
-    -h|--help)
-      # return early with help info when requested
-      usage
-      exit 0
-      ;;
-    -b|--branch)
-      branch="${2}"
-      : "${branch?"parameter <branch> must not be empty"}"
-      shift 2
-      ;;
-    -*|--*=)
-      usage
-      exit 1
-      ;;
-    *)
-      shift
-      ;;
+  -h | --help)
+    # return early with help info when requested
+    usage
+    exit 0
+    ;;
+  -b | --branch)
+    branch="${2}"
+    : "${branch?"parameter <branch> must not be empty"}"
+    shift 2
+    ;;
+  -* | --*=)
+    usage
+    exit 1
+    ;;
+  *)
+    shift
+    ;;
   esac
 done
-
 
 cd "${mydir}/../"
 
@@ -55,7 +57,7 @@ declare protocol_config="${mydir}/../hopr/hopr-lib/data/protocol-config.json"
 declare deployments_summary="${mydir}/../ethereum/contracts/contracts-addresses.json"
 
 for git_ref in $(cat "${release_config}" | jq -r "to_entries[] | .value.git_ref" | uniq); do
-  if [[ "${branch}" =~ ${git_ref} ]]; then
+  if [[ ${branch} =~ ${git_ref} ]]; then
     for network in $(cat "${release_config}" | jq -r "to_entries[] | select(.value.git_ref==\"${git_ref}\") | .value.network"); do
       declare chain=$(cat "${protocol_config}" | jq -r ".networks.\"${network}\".chain")
       declare environment_type=$(cat "${deployments_summary}" | jq -r ".networks.\"${network}\".environment_type")

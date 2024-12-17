@@ -1,9 +1,9 @@
 ---
 name: Bounty Template
 about: Create a bounty
-title: ''
-labels: 'bounty, status:new, epic'
-assignees: ''
+title: ""
+labels: "bounty, status:new, epic"
+assignees: ""
 ---
 
 <!--- Please DO NOT remove the automatically added 'new issue' label -->

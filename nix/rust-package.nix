@@ -8,6 +8,7 @@
 , foundryBin
 , git
 , html-tidy
+, isCross ? false
 , lib
 , libiconv
 , makeSetupHook
@@ -16,6 +17,7 @@
 , pkg-config
 , pkgs
 , postInstall ? null
+, rev
 , runClippy ? false
 , runTests ? false
 , solcDefault
@@ -27,6 +29,13 @@ let
   # `buildPlatform` is the platform we are compiling on
   buildPlatform = stdenv.buildPlatform;
   hostPlatform = stdenv.hostPlatform;
+
+  # The target interpreter is used to patch the interpreter in the binary
+  targetInterpreter =
+    if hostPlatform.isLinux && hostPlatform.isx86_64 then "/lib64/ld-linux-x86-64.so.2"
+    else if hostPlatform.isLinux && hostPlatform.isAarch64 then "/lib64/ld-linux-aarch64.so.1"
+    else if hostPlatform.isLinux && hostPlatform.isArmv7 then "/lib64/ld-linux-armhf.so.3"
+    else "";
 
   # The hook is used when building on darwin for non-darwin, where the flags
   # need to be cleaned up.
@@ -71,6 +80,7 @@ let
     buildInputs = [ openssl ] ++ stdenv.extraBuildInputs ++ darwinBuildInputs;
 
     CARGO_HOME = ".cargo";
+    RUST_MIN_STACK = "16777216"; # 16MB required to run the tests and compilation
     cargoExtraArgs = "--offline -p ${pname} ${cargoExtraArgs}";
     # this env var is used by utoipa-swagger-ui to prevent internet access
     CARGO_FEATURE_VENDORED = "true";
@@ -79,6 +89,8 @@ let
     doCheck = false;
     # prevent nix from changing config.sub files under vendor/cargo
     dontUpdateAutotoolsGnuConfigScripts = true;
+    # set to the revision because during build the Git info is not available
+    VERGEN_GIT_SHA = rev;
   };
 
   sharedArgs =
@@ -134,7 +146,15 @@ builder (args // {
     export CARGO_BUILD_JOBS=$NIX_BUILD_CORES
     echo "# placeholder" > vendor/cargo/config.toml
     sed "s|# solc = .*|solc = \"${solcDefault}/bin/solc\"|g" \
-      ethereum/contracts/foundry.toml.in > \
+      ethereum/contracts/foundry.in.toml > \
       ethereum/contracts/foundry.toml
+  '';
+
+  preFixup = lib.optionalString (isCross && targetInterpreter != "") ''
+    for f in `find $out/bin/ -type f`; do
+      echo "patching interpreter for $f to ${targetInterpreter}"
+      patchelf --set-interpreter ${targetInterpreter} --output $f.patched $f
+      mv $f.patched $f
+    done
   '';
 })
