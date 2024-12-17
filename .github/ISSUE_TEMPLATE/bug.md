@@ -1,14 +1,13 @@
 ---
 name: Bug Template
 about: Create a bug report to help us improve
-title: ''
-labels: 'bug, status:new'
-assignees: ''
+title: ""
+labels: "bug, status:new"
+assignees: ""
 ---
 
 <!--- Please DO NOT remove the automatically added 'new issue' label -->
 <!--- Provide a general summary of the issue in the Title -->
-
 
 ## Current Behavior
 
@@ -38,7 +37,7 @@ assignees: ''
 3.
 4.
 
-*Were you able to reproduce the bug using the above steps consistently each time?* **YES**/**NO**
+_Were you able to reproduce the bug using the above steps consistently each time?_ **YES**/**NO**
 
 ## Context (Environment)
 

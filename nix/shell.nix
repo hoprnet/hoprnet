@@ -43,6 +43,7 @@ craneLib.devShell {
 
     # documentation utilities
     swagger-codegen3
+    vacuum-go
 
     # docker image inspection and handling
     dive
@@ -74,7 +75,7 @@ craneLib.devShell {
       echo "solc = \"${solcDefault}/bin/solc\""
       echo "Generating foundry.toml file!"
       sed "s|# solc = .*|solc = \"${solcDefault}/bin/solc\"|g" \
-        ethereum/contracts/foundry.toml.in >| \
+        ethereum/contracts/foundry.in.toml >| \
         ethereum/contracts/foundry.toml
     else
       echo "foundry.toml file already exists!"

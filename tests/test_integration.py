@@ -23,7 +23,6 @@ from .utils import (
     PARAMETERIZED_SAMPLE_SIZE,
     balance_str_to_int,
     check_all_tickets_redeemed,
-    check_min_incoming_win_prob_eq,
     check_native_balance_below,
     check_received_packets_with_peek,
     check_rejected_tickets_value,

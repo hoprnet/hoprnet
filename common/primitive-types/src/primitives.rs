@@ -175,6 +175,10 @@ impl Balance {
         self.0
     }
 
+    pub fn is_zero(&self) -> bool {
+        self.0.is_zero()
+    }
+
     pub fn amount_base_units(&self) -> String {
         let val = self.0.to_string();
 
