@@ -1119,6 +1119,8 @@ impl Hopr {
     }
 
     /// Ping another node in the network based on the PeerId
+    ///
+    /// Returns the RTT (round trip time), i.e. how long it took for the ping to return.
     pub async fn ping(&self, peer: &PeerId) -> errors::Result<(std::time::Duration, PeerStatus)> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 

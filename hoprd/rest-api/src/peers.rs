@@ -131,7 +131,7 @@ pub(super) async fn ping_peer(
         Ok(destination) => match hopr.ping(&destination.peer_id).await {
             Ok((latency, status)) => {
                 let resp = Json(PingResponse {
-                    latency,
+                    latency: latency / 2,
                     reported_version: status.peer_version.unwrap_or("unknown".into()),
                 });
                 Ok((StatusCode::OK, resp).into_response())
