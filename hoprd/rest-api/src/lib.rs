@@ -52,7 +52,7 @@ use utoipa_scalar::{Scalar, Servable as ScalarServable};
 use utoipa_swagger_ui::SwaggerUi;
 
 use crate::config::Auth;
-use crate::session::SessionTargetSpec;
+use crate::session::StoredSessionEntry;
 use hopr_lib::{errors::HoprLibError, ApplicationData, Hopr};
 use hopr_network_types::prelude::IpProtocol;
 
@@ -68,8 +68,7 @@ pub type MessageEncoder = fn(&[u8]) -> Box<[u8]>;
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct ListenerId(pub IpProtocol, pub std::net::SocketAddr);
 
-pub type ListenerJoinHandles =
-    Arc<RwLock<HashMap<ListenerId, (SessionTargetSpec, hopr_async_runtime::prelude::JoinHandle<()>)>>>;
+pub type ListenerJoinHandles = Arc<RwLock<HashMap<ListenerId, StoredSessionEntry>>>;
 
 #[derive(Clone)]
 pub(crate) struct InternalState {
@@ -146,9 +145,9 @@ pub(crate) struct InternalState {
             network::TicketPriceResponse,
             network::TicketProbabilityResponse,
             node::EntryNode, node::NodeInfoResponse, node::NodePeersQueryRequest,
-            node::HeartbeatInfo, node::PeerInfo, node::AnnouncedPeer, node::NodePeersResponse, node::NodeVersionResponse, node::GraphExportRequest,
+            node::HeartbeatInfo, node::PeerInfo, node::AnnouncedPeer, node::NodePeersResponse, node::NodeVersionResponse, node::GraphExportQuery,
             peers::NodePeerInfoResponse, peers::PingResponse,
-            session::SessionClientRequest, session::SessionClientResponse, session::SessionCloseClientRequest,
+            session::SessionClientRequest, session::SessionCapability, session::RoutingOptions, session::SessionTargetSpec, session::SessionClientResponse, session::IpProtocol,
             tickets::NodeTicketStatisticsResponse, tickets::ChannelTicket,
         )
     ),
@@ -327,7 +326,7 @@ async fn build_api(
                 .route("/session/websocket", get(session::websocket))
                 .route("/session/:protocol", post(session::create_client))
                 .route("/session/:protocol", get(session::list_clients))
-                .route("/session/:protocol", delete(session::close_client))
+                .route("/session/:protocol/:ip/:port", delete(session::close_client))
                 .with_state(inner_state.clone().into())
                 .layer(middleware::from_fn_with_state(
                     inner_state.clone(),
@@ -391,6 +390,7 @@ enum ApiErrorStatus {
     TooManyOpenWebsocketConnections,
     InvalidQuality,
     NotReady,
+    ListenHostAlreadyUsed,
     #[strum(serialize = "INVALID_PATH")]
     InvalidPath(String),
     #[strum(serialize = "UNKNOWN_FAILURE")]
