@@ -313,8 +313,10 @@
           docs = rust-builder-local-nightly.callPackage ./nix/rust-package.nix (hoprdBuildArgs // {
             buildDocs = true;
           });
-          smoke-tests = pkgs.stdenv.mkDerivation {
-            pname = "hoprd-smoke-tests";
+
+          # set up base smoke test derivation
+          create-smoke-tests = suite: pkgs.stdenv.mkDerivation {
+            pname = "hoprd-smoke-tests-${suite}";
             version = hoprdCrateInfo.version;
             src = fs.toSource {
               root = ./.;
@@ -342,10 +344,22 @@
             '';
             checkPhase = ''
               source .venv/bin/activate
-              python3 -m pytest tests/
+              python3 -m pytest tests/test_${suite}.py
             '';
             doCheck = true;
           };
+
+          # instantiate derivation for each smoke test suite
+          smoke-tests = {
+            smoke-tests-websocket-api = create-smoke-tests "websocket_api";
+            smoke-tests-integration = create-smoke-tests "integration";
+            smoke-tests-redeeming = create-smoke-tests "redeeming";
+            smoke-tests-rest-api = create-smoke-tests "rest_api";
+            smoke-tests-session = create-smoke-tests "session";
+            smoke-tests-win-prob = create-smoke-tests "win_prob";
+            smoke-tests-hopli = create-smoke-tests "hopli";
+          };
+
           pre-commit-check = pre-commit.lib.${system}.run {
             src = ./.;
             hooks = {
@@ -507,7 +521,7 @@
             inherit hopli hopli-debug hopli-docker hopli-debug-docker hopli-profile-docker;
             inherit hopr-test hopr-test-nightly;
             inherit anvil-docker;
-            inherit smoke-tests docs;
+            inherit docs;
             inherit pre-commit-check;
             inherit hoprd-aarch64-linux hoprd-armv7l-linux hoprd-x86_64-linux;
             inherit hopli-aarch64-linux hopli-armv7l-linux hopli-x86_64-linux;
@@ -516,7 +530,7 @@
             inherit hoprd-aarch64-darwin hoprd-x86_64-darwin;
             inherit hopli-aarch64-darwin hopli-x86_64-darwin;
             default = hoprd;
-          };
+          } // smoke-tests;
 
           devShells.default = defaultDevShell;
           devShells.smoke-tests = smoketestsDevShell;
