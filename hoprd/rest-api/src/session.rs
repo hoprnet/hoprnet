@@ -116,6 +116,17 @@ impl SessionTargetSpec {
     }
 }
 
+/// Entry stored in the session registry table.
+#[derive(Debug)]
+pub struct StoredSessionEntry {
+    /// Target of the Session.
+    pub target: SessionTargetSpec,
+    /// Routing used for the Session.
+    pub path: RoutingOptions,
+    /// The join handle for the Session processing.
+    pub jh: hopr_async_runtime::prelude::JoinHandle<()>,
+}
+
 #[repr(u8)]
 #[derive(
     Debug, Clone, strum::EnumIter, strum::Display, strum::EnumString, Serialize, Deserialize, utoipa::ToSchema,
@@ -429,6 +440,7 @@ impl SessionClientRequest {
         "protocol": "tcp",
         "ip": "127.0.0.1",
         "port": 5542,
+        "path": { "Hops": 1 }
     }))]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct SessionClientResponse {
@@ -437,6 +449,7 @@ pub(crate) struct SessionClientResponse {
     #[schema(value_type = String)]
     pub protocol: IpProtocol,
     pub ip: String,
+    pub path: RoutingOptions,
     pub port: u16,
 }
 
@@ -521,10 +534,11 @@ pub(crate) async fn create_client(
             .await
             .contains_key(&ListenerId(protocol.into(), bind_host))
     {
-        return Err((StatusCode::CONFLICT, ApiErrorStatus::InvalidInput));
+        return Err((StatusCode::CONFLICT, ApiErrorStatus::ListenHostAlreadyUsed));
     }
 
     let target = args.target.clone();
+    let path = args.path.clone();
     let data = args.into_protocol_session_config(protocol).map_err(|e| {
         (
             StatusCode::UNPROCESSABLE_ENTITY,
@@ -540,7 +554,7 @@ pub(crate) async fn create_client(
             // Bind the TCP socket first
             let (bound_host, tcp_listener) = tcp_listen_on(bind_host).await.map_err(|e| {
                 if e.kind() == std::io::ErrorKind::AddrInUse {
-                    (StatusCode::CONFLICT, ApiErrorStatus::InvalidInput)
+                    (StatusCode::CONFLICT, ApiErrorStatus::ListenHostAlreadyUsed)
                 } else {
                     (
                         StatusCode::UNPROCESSABLE_ENTITY,
@@ -591,21 +605,21 @@ pub(crate) async fn create_client(
                     }),
             );
 
-            state
-                .open_listeners
-                .write()
-                .await
-                .insert(ListenerId(protocol.into(), bound_host), (target.clone(), jh));
+            state.open_listeners.write().await.insert(
+                ListenerId(protocol.into(), bound_host),
+                StoredSessionEntry {
+                    target: target.clone(),
+                    path: path.clone(),
+                    jh,
+                },
+            );
             bound_host
         }
         IpProtocol::UDP => {
             // Bind the UDP socket first
             let (bound_host, udp_socket) = udp_bind_to(bind_host).await.map_err(|e| {
                 if e.kind() == std::io::ErrorKind::AddrInUse {
-                    (
-                        StatusCode::CONFLICT,
-                        ApiErrorStatus::UnknownFailure(format!("cannot bind to: {bind_host}: {e}")),
-                    )
+                    (StatusCode::CONFLICT, ApiErrorStatus::ListenHostAlreadyUsed)
                 } else {
                     (
                         StatusCode::UNPROCESSABLE_ENTITY,
@@ -631,9 +645,10 @@ pub(crate) async fn create_client(
 
             state.open_listeners.write().await.insert(
                 listener_id,
-                (
-                    target.clone(),
-                    hopr_async_runtime::prelude::spawn(async move {
+                StoredSessionEntry {
+                    target: target.clone(),
+                    path: path.clone(),
+                    jh: hopr_async_runtime::prelude::spawn(async move {
                         #[cfg(all(feature = "prometheus", not(test)))]
                         METRIC_ACTIVE_CLIENTS.increment(&["udp"], 1.0);
 
@@ -645,7 +660,7 @@ pub(crate) async fn create_client(
                         // Once the Session closes, remove it from the list
                         open_listeners_clone.write().await.remove(&listener_id);
                     }),
-                ),
+                },
             );
             bound_host
         }
@@ -656,6 +671,7 @@ pub(crate) async fn create_client(
             StatusCode::OK,
             Json(SessionClientResponse {
                 protocol,
+                path,
                 target: target.to_string(),
                 ip: bound_host.ip().to_string(),
                 port: bound_host.port(),
@@ -694,11 +710,12 @@ pub(crate) async fn list_clients(
         .await
         .iter()
         .filter(|(id, _)| id.0 == protocol.into())
-        .map(|(id, (target, _))| SessionClientResponse {
+        .map(|(id, entry)| SessionClientResponse {
             protocol,
-            target: target.to_string(),
+            target: entry.target.to_string(),
             ip: id.1.ip().to_string(),
             port: id.1.port(),
+            path: entry.path.clone(),
         })
         .collect::<Vec<_>>();
 
@@ -785,11 +802,11 @@ pub(crate) async fn close_client(
         }
 
         for bound_addr in to_remove {
-            let (_, handle) = open_listeners
+            let entry = open_listeners
                 .remove(&bound_addr)
                 .ok_or((StatusCode::NOT_FOUND, ApiErrorStatus::InvalidInput))?;
 
-            hopr_async_runtime::prelude::cancel_join_handle(handle).await;
+            hopr_async_runtime::prelude::cancel_join_handle(entry.jh).await;
         }
     }
 
