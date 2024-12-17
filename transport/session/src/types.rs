@@ -439,7 +439,17 @@ impl futures::AsyncWrite for InnerSession {
         }
     }
 
-    fn poll_flush(self: std::pin::Pin<&mut Self>, _cx: &mut std::task::Context<'_>) -> Poll<std::io::Result<()>> {
+    fn poll_flush(mut self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<std::io::Result<()>> {
+        if self.closed {
+            return Poll::Ready(Err(Error::new(ErrorKind::BrokenPipe, "session closed")));
+        }
+
+        while let Poll::Ready(Some(result)) = self.tx_buffer.poll_next_unpin(cx) {
+            if let Err(e) = result {
+                error!(error = %e, "failed to send message chunk inside session during flush");
+                return Poll::Ready(Err(Error::from(ErrorKind::BrokenPipe)));
+            }
+        }
         Poll::Ready(Ok(()))
     }
 
