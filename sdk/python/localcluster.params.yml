@@ -3,7 +3,7 @@ api_token:
   default: e2e-API-token^^
 
 network:
-  default: 'anvil-localhost'
+  default: anvil-localhost
 
 nodes:
   - config_file: 'barebone.cfg.yaml'

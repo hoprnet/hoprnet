@@ -4,7 +4,7 @@ from enum import Enum, auto
 from pathlib import Path
 from subprocess import run
 
-from .constants import INPUT_PROTOCOL_CONFIG_FILE, MAIN_DIR, PORT_BASE, PWD, logging
+from .constants import INPUT_PROTOCOL_CONFIG_FILE, PORT_BASE, PWD, logging
 
 
 class AnvilState(Enum):

@@ -18,6 +18,8 @@ from .constants import (
 )
 from .node import Node
 
+API_TIMEOUT = 60
+
 
 class Cluster:
     def __init__(self, config: dict, anvil_config: Path, protocol_config: Path):
@@ -27,6 +29,7 @@ class Cluster:
             idx, n, config["api_token"], config["network"]) for idx, n in enumerate(config["nodes"], start=1)}
 
     def clean_up(self):
+        logging.info(f"Tearing down the {self.size} nodes cluster")
         [node.clean_up() for node in self.nodes.values()]
 
     def create_safes(self):
@@ -42,14 +45,14 @@ class Cluster:
             node.setup(PASSWORD, self.protocol_config, PWD.parent)
 
         # WAIT FOR NODES TO BE UP
-        timeout = 60
-        logging.info(f"Waiting up to {timeout}s for nodes to start up")
-        nodes_readyness = await asyncio.gather(*[node.api.startedz(timeout) for node in self.nodes.values()])
+        logging.info(f"Waiting up to {API_TIMEOUT}s for nodes to start up")
+        nodes_readyness = await asyncio.gather(*[node.api.startedz(API_TIMEOUT) for node in self.nodes.values()])
         for node, res in zip(self.nodes.values(), nodes_readyness):
             if res:
                 logging.debug(f"Node {node} up")
             else:
-                logging.error(f"Node {node} not ready after {timeout} seconds")
+                logging.error(
+                    f"Node {node} not started after {API_TIMEOUT} seconds")
 
         if not all(nodes_readyness):
             logging.critical("Not all nodes are started, interrupting setup")
@@ -60,13 +63,14 @@ class Cluster:
             self.fund_nodes()
 
         # WAIT FOR NODES TO BE UP
-        logging.info(f"Waiting up to {timeout}s for nodes to be ready")
-        nodes_readyness = await asyncio.gather(*[node.api.readyz(timeout) for node in self.nodes.values()])
+        logging.info(f"Waiting up to {API_TIMEOUT}s for nodes to be ready")
+        nodes_readyness = await asyncio.gather(*[node.api.readyz(API_TIMEOUT) for node in self.nodes.values()])
         for node, res in zip(self.nodes.values(), nodes_readyness):
             if res:
                 logging.debug(f"Node {node} up")
             else:
-                logging.error(f"Node {node} not ready after {timeout} seconds")
+                logging.error(
+                    f"Node {node} not ready after {API_TIMEOUT} seconds")
 
         if not all(nodes_readyness):
             logging.critical("Not all nodes are ready, interrupting setup")
@@ -74,14 +78,14 @@ class Cluster:
 
         for node in self.nodes.values():
             if addresses := await node.api.addresses():
-                node.peer_id = addresses["hopr"]
-                node.address = addresses["native"]
+                node.peer_id = addresses.hopr
+                node.address = addresses.native
             else:
                 logging.error(f"Node {node} did not return addresses")
 
         # WAIT FOR NODES TO CONNECT TO ALL PEERS
         logging.info(
-            f"Waiting up to {timeout}s for nodes to connect to all peers")
+            f"Waiting up to {API_TIMEOUT}s for nodes to connect to all peers")
 
         tasks = []
         for node in self.nodes.values():
@@ -89,6 +93,7 @@ class Cluster:
             ) if n != node and n.network == node.network]
             tasks.append(asyncio.create_task(
                 node.all_peers_connected(required_peers)))
+            
         nodes_connectivity = await asyncio.gather(*tasks)
         for node, res in zip(self.nodes.values(), nodes_connectivity):
             if res:

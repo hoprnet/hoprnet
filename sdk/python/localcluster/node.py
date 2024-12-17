@@ -4,9 +4,9 @@ import os
 from pathlib import Path
 from subprocess import STDOUT, Popen, run
 
+from ..api import HoprdAPI
 from . import utils
 from .constants import MAIN_DIR, NODE_NAME_PREFIX, PASSWORD, PORT_BASE, PWD
-from .hopr import HoprdAPI
 
 
 def load_env_file(env_file: str) -> dict:
@@ -164,7 +164,7 @@ class Node:
             "RUST_BACKTRACE": "full",
             "HOPRD_USE_OPENTELEMETRY": trace_telemetry,
             "OTEL_SERVICE_NAME": f"hoprd-{self.p2p_port}",
-            "TOKIO_CONSOLE_BIND": f"localhost:{self.p2p_port+100}"
+            "TOKIO_CONSOLE_BIND": f"localhost:{self.p2p_port+100}",
         }
         loaded_env = load_env_file(f"{self.dir}.env")
 
@@ -203,12 +203,12 @@ class Node:
         ready = False
 
         while not ready:
-            peers = [p["peer_id"] for p in await asyncio.wait_for(self.api.peers(), timeout=20)]
+            peers = [p.peer_id for p in await asyncio.wait_for(self.api.peers(), timeout=20)]
             missing_peers = [p for p in required_peers if p not in peers]
             ready = len(missing_peers) == 0
 
             if not ready:
-                await asyncio.sleep(1)
+                await asyncio.sleep(0.2)
 
         return ready
 
@@ -231,8 +231,8 @@ class Node:
     async def links(self):
         addresses = await self.api.addresses()
         print(f"\t{self}")
-        print(f"\t\tPeer Id:\t{addresses['hopr']}")
-        print(f"\t\tAddress:\t{addresses['native']}")
+        print(f"\t\tPeer Id:\t{addresses.hopr}")
+        print(f"\t\tAddress:\t{addresses.native}")
         print(
             f"\t\tRest API:\thttp://{self.host_addr}:{self.api_port}/scalar | http://{self.host_addr}:{self.api_port}/swagger-ui/index.html")
         print(

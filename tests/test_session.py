@@ -3,30 +3,32 @@ import http.server
 import logging
 import multiprocessing
 import os
-import pytest
 import random
 import re
-import requests
 import socket
 import ssl
 import string
 import subprocess
-import urllib3
 import threading
 import time
-
+from contextlib import AsyncExitStack, contextmanager
+from datetime import datetime, timedelta
 from enum import Enum
 from functools import partial
-from contextlib import contextmanager, AsyncExitStack
+
+import pytest
+import requests
+import urllib3
 from cryptography import x509
-from cryptography.x509.oid import NameOID
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
-from datetime import datetime, timedelta
+from cryptography.x509.oid import NameOID
 
-from .conftest import random_distinct_pairs_from, barebone_nodes, TICKET_PRICE_PER_HOP, fixtures_dir
-from .node import Node
-from .utils import shuffled, create_channel, PARAMETERIZED_SAMPLE_SIZE
+from sdk.python.localcluster.constants import MAIN_DIR, TICKET_PRICE_PER_HOP
+from sdk.python.localcluster.node import Node
+
+from .conftest import barebone_nodes, random_distinct_pairs_from
+from .utils import PARAMETERIZED_SAMPLE_SIZE, create_channel, shuffled
 
 HOPR_SESSION_MAX_PAYLOAD_SIZE = 462
 STANDARD_MTU_SIZE = 1500
@@ -61,20 +63,19 @@ class EchoServer:
 
         if self.server_type is SocketType.TCP:
             self.socket.listen()
-            self.process = multiprocessing.Process(target=tcp_echo_server_func, args=(self.socket, self.recv_buf_len))
+            self.process = multiprocessing.Process(
+                target=tcp_echo_server_func, args=(self.socket, self.recv_buf_len))
         else:
-            self.process = multiprocessing.Process(target=udp_echo_server_func, args=(self.socket, self.recv_buf_len))
+            self.process = multiprocessing.Process(
+                target=udp_echo_server_func, args=(self.socket, self.recv_buf_len))
         self.process.start()
 
         # If needed, tcp dump can be started to catch traffic on the local interface
         if self.with_tcpdump:
-            pcap_file = fixtures_dir("test_session").joinpath(f"echo_server_{self.port}.pcap")
+            pcap_file = MAIN_DIR.joinpath(
+                'test_session', f'echo_server_{self.port}.pcap')
             self.tcp_dump_process = subprocess.Popen(
-                ["sudo", "tcpdump", "-i", "lo", "-w", f"{pcap_file}.log"],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-            )
+                ['sudo', 'tcpdump', '-i', 'lo', '-w', f"{pcap_file}.log"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             logging.info(f"running tcpdump, saving to {pcap_file}.log")
 
         return self
@@ -130,7 +131,8 @@ def fetch_data(url: str):
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
     try:
-        response = requests.get(url, verify=False)  # set verify=False for self-signed certs
+        # set verify=False for self-signed certs
+        response = requests.get(url, verify=False)
         response.raise_for_status()
         return response
     except requests.exceptions.RequestException as e:
@@ -190,7 +192,7 @@ class CustomHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-type", "text/plain")
         self.end_headers()
-        self.wfile.write(self.content.encode("utf-8"))
+        self.wfile.write(self.content.encode('utf-8'))
         time.sleep(1)  # add an artificial delay
 
 
@@ -289,13 +291,15 @@ async def test_session_communication_over_n_hop_with_a_tcp_echo_server(route, sw
     async with AsyncExitStack() as channels:
         channels_to = [
             channels.enter_async_context(
-                create_channel(swarm7[route[i]], swarm7[route[i + 1]], funding=20 * packet_count * TICKET_PRICE_PER_HOP)
+                create_channel(swarm7[route[i]], swarm7[route[i + 1]],
+                               funding=20 * packet_count * TICKET_PRICE_PER_HOP)
             )
             for i in range(len(route) - 1)
         ]
         channels_back = [
             channels.enter_async_context(
-                create_channel(swarm7[route[i]], swarm7[route[i - 1]], funding=20 * packet_count * TICKET_PRICE_PER_HOP)
+                create_channel(swarm7[route[i]], swarm7[route[i - 1]],
+                               funding=20 * packet_count * TICKET_PRICE_PER_HOP)
             )
             for i in reversed(range(1, len(route)))
         ]
@@ -341,9 +345,11 @@ async def test_session_communication_with_a_udp_echo_server(src: str, dest: str,
     """
 
     packet_count = 100 if os.getenv("CI", default="false") == "false" else 50
-    expected = [f"{i}".rjust(HOPR_SESSION_MAX_PAYLOAD_SIZE) for i in range(packet_count)]
+    expected = [f"{i}".rjust(HOPR_SESSION_MAX_PAYLOAD_SIZE)
+                for i in range(packet_count)]
 
-    assert [len(x) for x in expected] == packet_count * [HOPR_SESSION_MAX_PAYLOAD_SIZE]
+    assert [len(x) for x in expected] == packet_count * \
+        [HOPR_SESSION_MAX_PAYLOAD_SIZE]
 
     src_peer = swarm7[src]
     dest_peer = swarm7[dest]
@@ -358,7 +364,7 @@ async def test_session_communication_with_a_udp_echo_server(src: str, dest: str,
         )
 
         assert src_sock_port is not None, "Failed to open session"
-        assert len(await src_peer.api.session_list_clients("udp")) == 1
+        assert len(await src_peer.api.session_list_clients('udp')) == 1
         # logging.info(f"session to {dst_sock_port} opened successfully")
 
         addr = ("127.0.0.1", src_sock_port)
@@ -367,13 +373,16 @@ async def test_session_communication_with_a_udp_echo_server(src: str, dest: str,
             total_sent = 0
             for message in expected:
                 total_sent = total_sent + s.sendto(message.encode(), addr)
-                await asyncio.sleep(0.01)  # UDP has no flow-control, so we must insert an artificial gap
+                # UDP has no flow-control, so we must insert an artificial gap
+                await asyncio.sleep(0.01)
 
             while total_sent > 0:
-                chunk, _ = s.recvfrom(min(HOPR_SESSION_MAX_PAYLOAD_SIZE, total_sent))
+                chunk, _ = s.recvfrom(
+                    min(HOPR_SESSION_MAX_PAYLOAD_SIZE, total_sent))
                 total_sent = total_sent - len(chunk)
                 # Adapt for situations when data arrive completely unordered (also within the buffer)
-                actual.extend([m for m in re.split(r"\s+", chunk.decode().strip()) if len(m) > 0])
+                actual.extend([m for m in re.split(
+                    r'\s+', chunk.decode().strip()) if len(m) > 0])
 
     expected = [msg.strip() for msg in expected]
 
@@ -394,9 +403,11 @@ async def test_session_communication_with_udp_loopback_service(src: str, dest: s
     """
 
     packet_count = 100 if os.getenv("CI", default="false") == "false" else 50
-    expected = [f"{i}".rjust(HOPR_SESSION_MAX_PAYLOAD_SIZE) for i in range(packet_count)]
+    expected = [f"{i}".rjust(HOPR_SESSION_MAX_PAYLOAD_SIZE)
+                for i in range(packet_count)]
 
-    assert [len(x) for x in expected] == packet_count * [HOPR_SESSION_MAX_PAYLOAD_SIZE]
+    assert [len(x) for x in expected] == packet_count * \
+        [HOPR_SESSION_MAX_PAYLOAD_SIZE]
 
     src_peer = swarm7[src]
     dest_peer = swarm7[dest]
@@ -419,13 +430,16 @@ async def test_session_communication_with_udp_loopback_service(src: str, dest: s
         total_sent = 0
         for message in expected:
             total_sent = total_sent + s.sendto(message.encode(), addr)
-            await asyncio.sleep(0.01)  # UDP has no flow-control, so we must insert an artificial gap
+            # UDP has no flow-control, so we must insert an artificial gap
+            await asyncio.sleep(0.01)
 
         while total_sent > 0:
-            chunk, _ = s.recvfrom(min(HOPR_SESSION_MAX_PAYLOAD_SIZE, total_sent))
+            chunk, _ = s.recvfrom(
+                min(HOPR_SESSION_MAX_PAYLOAD_SIZE, total_sent))
             total_sent = total_sent - len(chunk)
             # Adapt for situations when data arrive completely unordered (also within the buffer)
-            actual.extend([m for m in re.split(r"\s+", chunk.decode().strip()) if len(m) > 0])
+            actual.extend([m for m in re.split(
+                r"\s+", chunk.decode().strip()) if len(m) > 0])
 
     expected = [msg.strip() for msg in expected]
 
@@ -446,9 +460,11 @@ async def test_session_communication_with_udp_loopback_service(src: str, dest: s
 )
 async def test_session_communication_over_n_hop_with_a_udp_echo_server(route, swarm7: dict[str, Node]):
     packet_count = 100 if os.getenv("CI", default="false") == "false" else 50
-    expected = [f"{i}".rjust(HOPR_SESSION_MAX_PAYLOAD_SIZE) for i in range(packet_count)]
+    expected = [f"{i}".rjust(HOPR_SESSION_MAX_PAYLOAD_SIZE)
+                for i in range(packet_count)]
 
-    assert [len(x) for x in expected] == packet_count * [HOPR_SESSION_MAX_PAYLOAD_SIZE]
+    assert [len(x) for x in expected] == packet_count * \
+        [HOPR_SESSION_MAX_PAYLOAD_SIZE]
 
     src_peer = swarm7[route[0]]
     dest_peer = swarm7[route[-1]]
@@ -457,13 +473,15 @@ async def test_session_communication_over_n_hop_with_a_udp_echo_server(route, sw
     async with AsyncExitStack() as channels:
         channels_to = [
             channels.enter_async_context(
-                create_channel(swarm7[route[i]], swarm7[route[i + 1]], funding=packet_count * TICKET_PRICE_PER_HOP)
+                create_channel(swarm7[route[i]], swarm7[route[i + 1]],
+                               funding=packet_count * TICKET_PRICE_PER_HOP)
             )
             for i in range(len(route) - 1)
         ]
         channels_back = [
             channels.enter_async_context(
-                create_channel(swarm7[route[i]], swarm7[route[i - 1]], funding=packet_count * TICKET_PRICE_PER_HOP)
+                create_channel(swarm7[route[i]], swarm7[route[i - 1]],
+                               funding=packet_count * TICKET_PRICE_PER_HOP)
             )
             for i in reversed(range(1, len(route)))
         ]
@@ -480,7 +498,7 @@ async def test_session_communication_over_n_hop_with_a_udp_echo_server(route, sw
             )
 
             assert src_sock_port is not None, "Failed to open session"
-            assert len(await src_peer.api.session_list_clients("udp")) == 1
+            assert len(await src_peer.api.session_list_clients('udp')) == 1
             # logging.info(f"session to {dst_sock_port} opened successfully")
 
             addr = ("127.0.0.1", src_sock_port)
@@ -489,13 +507,16 @@ async def test_session_communication_over_n_hop_with_a_udp_echo_server(route, sw
                 total_sent = 0
                 for message in expected:
                     total_sent = total_sent + s.sendto(message.encode(), addr)
-                    await asyncio.sleep(0.01)  # UDP has no flow-control, so we must insert an artificial gap
+                    # UDP has no flow-control, so we must insert an artificial gap
+                    await asyncio.sleep(0.01)
 
                 while total_sent > 0:
-                    chunk, _ = s.recvfrom(min(HOPR_SESSION_MAX_PAYLOAD_SIZE, total_sent))
+                    chunk, _ = s.recvfrom(
+                        min(HOPR_SESSION_MAX_PAYLOAD_SIZE, total_sent))
                     total_sent = total_sent - len(chunk)
                     # Adapt for situations when data arrive completely unordered (also within the buffer)
-                    actual.extend([m for m in re.split(r"\s+", chunk.decode().strip()) if len(m) > 0])
+                    actual.extend([m for m in re.split(
+                        r'\s+', chunk.decode().strip()) if len(m) > 0])
 
         expected = [msg.strip() for msg in expected]
 
@@ -516,7 +537,8 @@ async def test_session_communication_with_an_https_server(src: str, dest: str, s
     dest_peer = swarm7[dest]
 
     # Generate random text content to be served
-    expected = "".join(random.choices(string.ascii_letters + string.digits, k=file_len))
+    expected = ''.join(random.choices(
+        string.ascii_letters + string.digits, k=file_len))
 
     with run_https_server(expected) as dst_sock_port:
         src_sock_port = await src_peer.api.session_client(
@@ -539,7 +561,9 @@ async def test_session_communication_with_an_https_server(src: str, dest: str, s
     [shuffled(barebone_nodes())[:3] for _ in range(PARAMETERIZED_SAMPLE_SIZE)],
     # + [shuffled(nodes())[:5] for _ in range(PARAMETERIZED_SAMPLE_SIZE)],
 )
-async def test_session_communication_over_n_hop_with_an_https_server(route, swarm7: dict[str, Node]):
+async def test_session_communication_over_n_hop_with_an_https_server(
+        route, swarm7: dict[str, Node]
+):
     file_len = 500
 
     src_peer = swarm7[route[0]]
@@ -549,13 +573,15 @@ async def test_session_communication_over_n_hop_with_an_https_server(route, swar
     async with AsyncExitStack() as channels:
         channels_to = [
             channels.enter_async_context(
-                create_channel(swarm7[route[i]], swarm7[route[i + 1]], funding=100 * file_len * TICKET_PRICE_PER_HOP)
+                create_channel(swarm7[route[i]], swarm7[route[i + 1]],
+                               funding=100 * file_len * TICKET_PRICE_PER_HOP)
             )
             for i in range(len(route) - 1)
         ]
         channels_back = [
             channels.enter_async_context(
-                create_channel(swarm7[route[i]], swarm7[route[i - 1]], funding=100 * file_len * TICKET_PRICE_PER_HOP)
+                create_channel(swarm7[route[i]], swarm7[route[i - 1]],
+                               funding=100 * file_len * TICKET_PRICE_PER_HOP)
             )
             for i in reversed(range(1, len(route)))
         ]
@@ -563,7 +589,8 @@ async def test_session_communication_over_n_hop_with_an_https_server(route, swar
         await asyncio.gather(*(channels_to + channels_back))
 
         # Generate random text content to be served
-        expected = "".join(random.choices(string.ascii_letters + string.digits, k=file_len))
+        expected = ''.join(random.choices(
+            string.ascii_letters + string.digits, k=file_len))
 
         with run_https_server(expected) as dst_sock_port:
             src_sock_port = await src_peer.api.session_client(
@@ -572,7 +599,8 @@ async def test_session_communication_over_n_hop_with_an_https_server(route, swar
             assert src_sock_port is not None, "Failed to open session"
             assert len(await src_peer.api.session_list_clients("tcp")) == 1
 
-            response = fetch_data(f"https://localhost:{src_sock_port}/random.txt")
+            response = fetch_data(
+                f'https://localhost:{src_sock_port}/random.txt')
             assert response is not None
             assert response.text == expected
 
@@ -588,7 +616,7 @@ async def test_session_communication_over_n_hop_with_an_https_server(route, swar
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "route",
-    [barebone_nodes()[:3]],
+    [barebone_nodes()[:3]]
     # [shuffled(barebone_nodes())[:3] for _ in range(PARAMETERIZED_SAMPLE_SIZE)],
     # + [shuffled(nodes())[:5] for _ in range(PARAMETERIZED_SAMPLE_SIZE)],
 )
@@ -605,13 +633,15 @@ async def test_session_with_wireguard_tunnel(route, swarm7: dict[str, Node]):
     async with AsyncExitStack() as channels:
         channels_to = [
             channels.enter_async_context(
-                create_channel(swarm7[route[i]], swarm7[route[i + 1]], funding=20 * packet_count * TICKET_PRICE_PER_HOP)
+                create_channel(swarm7[route[i]], swarm7[route[i + 1]],
+                               funding=20 * packet_count * TICKET_PRICE_PER_HOP)
             )
             for i in range(len(route) - 1)
         ]
         channels_back = [
             channels.enter_async_context(
-                create_channel(swarm7[route[i]], swarm7[route[i - 1]], funding=20 * packet_count * TICKET_PRICE_PER_HOP)
+                create_channel(swarm7[route[i]], swarm7[route[i - 1]],
+                               funding=20 * packet_count * TICKET_PRICE_PER_HOP)
             )
             for i in reversed(range(1, len(route)))
         ]

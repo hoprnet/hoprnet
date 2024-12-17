@@ -34,7 +34,7 @@ logs.txt
 /.secrets
 
 *.id
-!/tests/identities/*.id
+!/sdk/identities/*.id
 
 # local foundry installation
 /.foundry/

@@ -1,3 +1,4 @@
+aiohttp==3.8.4
 base58==2.1.1
 black==24.10.0
 cryptography==43.0.1

@@ -12,6 +12,7 @@ TICKET_PRICE_PER_HOP = 100
 
 RESERVED_TAG_UPPER_BOUND = 1023
 
+
 FIXTURES_PREFIX = "hopr"
 NODE_NAME_PREFIX = f"{FIXTURES_PREFIX}-node"
 
@@ -23,14 +24,15 @@ PASSWORD = "e2e-test"
 PORT_BASE = 3000
 
 SUITE_NAME = "hopr-localcluster"
-MAIN_DIR = Path("/tmp").joinpath(SUITE_NAME)
+ROOT_DIR = Path("/tmp")
+MAIN_DIR = ROOT_DIR.joinpath(SUITE_NAME)
 
 ANVIL_LOG_FILE = MAIN_DIR.joinpath("anvil.log")
 ANVIL_STATE_FILE = MAIN_DIR.joinpath("anvil.state.json")
 ANVIL_CONFIG_FILE = MAIN_DIR.joinpath("anvil.cfg")
 PROTOCOL_CONFIG_FILE = MAIN_DIR.joinpath("protocol-config.json")
 
-PWD = Path(__file__).parent.parent
+PWD = Path(__file__).parent.parent.parent
 
 INPUT_PROTOCOL_CONFIG_FILE = PWD.parent.joinpath(
     "scripts", "protocol-config-anvil.json")
