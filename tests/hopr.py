@@ -515,7 +515,7 @@ class HoprdAPI:
         Closes a previously opened and bound session
         """
         status, _ = self.__call_api(
-            SessionApi, "close_client", body={}, protocol=protocol, ip=bound_ip, port=bound_port
+            SessionApi, "close_client", protocol=protocol, ip=bound_ip, port=bound_port
         )
         return status
 

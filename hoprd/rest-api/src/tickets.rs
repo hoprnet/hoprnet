@@ -13,7 +13,7 @@ use hopr_lib::{
     HoprTransportError, ProtocolError, Ticket, TicketStatistics, ToHex,
 };
 
-use crate::{ApiError, ApiErrorStatus, InternalState, BASE_PATH};
+use crate::{ApiErrorStatus, InternalState, BASE_PATH};
 
 #[serde_as]
 #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]

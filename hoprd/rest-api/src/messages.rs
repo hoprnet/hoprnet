@@ -25,7 +25,7 @@ use hopr_lib::{
 
 use crate::{
     types::{HoprIdentifier, PeerOrAddress},
-    ApiError, ApiErrorStatus, InternalState, BASE_PATH,
+    ApiErrorStatus, InternalState, BASE_PATH,
 };
 
 #[derive(Debug, Default, Clone, Deserialize, utoipa::ToSchema, utoipa::IntoParams)]
