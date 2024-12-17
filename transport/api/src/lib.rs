@@ -94,7 +94,7 @@ pub use {
 use crate::constants::SESSION_INITIATION_TIMEOUT_BASE;
 pub use crate::helpers::{IndexerTransportEvent, PeerEligibility, TicketStatistics};
 pub use hopr_network_types::prelude::RoutingOptions;
-pub use hopr_transport_session::types::SessionTarget;
+pub use hopr_transport_session::types::{ServiceId, SessionTarget};
 
 /*#[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {

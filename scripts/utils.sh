@@ -2,7 +2,10 @@
 
 # prevent execution of this script, only allow sourcing
 $(return >/dev/null 2>&1)
-test "$?" -eq "0" || { echo "This script should only be sourced." >&2; exit 1; }
+test "$?" -eq "0" || {
+  echo "This script should only be sourced." >&2
+  exit 1
+}
 
 # exit on errors, undefined variables, ensure errors in pipes are not hidden
 set -Eeuo pipefail
@@ -11,7 +14,7 @@ function check_package() {
   local package_name="$1"
   local exit_code=0
 
-  which "$package_name" > /dev/null || exit_code=$?
+  which "$package_name" >/dev/null || exit_code=$?
 
   if [ "${exit_code}" = "0" ]; then
     log "$package_name already installed"
@@ -51,7 +54,7 @@ function ensure_port_is_free() {
 }
 
 setup_colors() {
-  if [[ -t 2 ]] && [[ -z "${NO_COLOR:-}" ]] && [[ "${TERM:-}" != "dumb" ]]; then
+  if [[ -t 2 ]] && [[ -z ${NO_COLOR:-} ]] && [[ ${TERM:-} != "dumb" ]]; then
     # shellcheck disable=SC2034
     NOFORMAT='\033[0m' RED='\033[0;31m' GREEN='\033[0;32m' ORANGE='\033[0;33m'
     # shellcheck disable=SC2034
@@ -101,7 +104,7 @@ try_cmd() {
     output_file="$(mktemp -q)"
     rm -f "${output_file}"
     set +Eeo pipefail
-    if eval "${cmd}" > "${output_file}"; then
+    if eval "${cmd}" >"${output_file}"; then
       # command succeeded, return the output
       set -Eeo pipefail
       result="$(cat "${output_file}")"
@@ -154,8 +157,8 @@ function find_tmp_dir() {
   fi
 
   if [ ! -d "${tmp}" ] || [ ! -w "${tmp}" ]; then
-    msg "Neither /tmp or /var/tmp can be used for writing logs";
-    exit 1;
+    msg "Neither /tmp or /var/tmp can be used for writing logs"
+    exit 1
   fi
 
   echo ${tmp}
@@ -163,7 +166,7 @@ function find_tmp_dir() {
 
 # encode API token
 # $1 = api token
-encode_api_token(){
+encode_api_token() {
   local api_token
 
   api_token=${1}
@@ -173,7 +176,7 @@ encode_api_token(){
 }
 
 # $1 = optional: endpoint, defaults to http://localhost:3001
-get_native_address(){
+get_native_address() {
   local endpoint url cmd
 
   endpoint="${1:-localhost:3001}"
@@ -203,7 +206,7 @@ validate_hopr_address() {
   api_token="${2}"
 
   hopr_address="$(get_hopr_address "${api_token}@${endpoint}")"
-  if [[ -z "${hopr_address}" ]]; then
+  if [[ -z ${hopr_address} ]]; then
     log "-- could not derive hopr address from endpoint ${endpoint}"
     exit 1
   fi
@@ -258,7 +261,7 @@ get_authenticated_curl_cmd() {
   # set default protocol if none was found
   local protocol="http://"
   # extract protocol prefix incl. separator ://
-  if [[ "${full_endpoint}" =~ "://" ]]; then
+  if [[ ${full_endpoint} =~ "://" ]]; then
     protocol="$(echo "${full_endpoint}" | sed -e's,^\(.*://\).*,\1,g')"
   fi
 
@@ -302,7 +305,7 @@ update_protocol_config_addresses() {
 
   # copy all the fields except for the `stake_season`
   source_data="$(jq -r ".networks.\"${source_network}\"" "${source_file}" | jq "{environment_type: .environment_type, indexer_start_block_number: .indexer_start_block_number, addresses: .addresses}")"
-  jq --argjson inputdata "${source_data}" ".networks.\"${destination_network}\" += \$inputdata" "${target_file}" > "${target_file}.new"
+  jq --argjson inputdata "${source_data}" ".networks.\"${destination_network}\" += \$inputdata" "${target_file}" >"${target_file}.new"
   mv "${target_file}.new" "${target_file}"
 
   log "contract addresses are updated in protocol configuration"

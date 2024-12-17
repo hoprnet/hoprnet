@@ -146,7 +146,7 @@ builder (args // {
     export CARGO_BUILD_JOBS=$NIX_BUILD_CORES
     echo "# placeholder" > vendor/cargo/config.toml
     sed "s|# solc = .*|solc = \"${solcDefault}/bin/solc\"|g" \
-      ethereum/contracts/foundry.toml.in > \
+      ethereum/contracts/foundry.in.toml > \
       ethereum/contracts/foundry.toml
   '';
 
