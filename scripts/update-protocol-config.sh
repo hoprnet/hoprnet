@@ -22,28 +22,27 @@ usage() {
   msg
 }
 
-while (( "$#" )); do
+while (("$#")); do
   case "$1" in
-    -h|--help)
-      # return early with help info when requested
-      usage
-      exit 0
-      ;;
-    -n|--network)
-      network="${2}"
-      : "${network?"parameter <network> must not be empty"}"
-      shift 2
-      ;;
-    -*|--*=)
-      usage
-      exit 1
-      ;;
-    *)
-      shift
-      ;;
+  -h | --help)
+    # return early with help info when requested
+    usage
+    exit 0
+    ;;
+  -n | --network)
+    network="${2}"
+    : "${network?"parameter <network> must not be empty"}"
+    shift 2
+    ;;
+  -* | --*=)
+    usage
+    exit 1
+    ;;
+  *)
+    shift
+    ;;
   esac
 done
-
 
 cd "${mydir}/../"
 
