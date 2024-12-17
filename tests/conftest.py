@@ -424,7 +424,8 @@ async def shared_nodes_bringup(
     for node in nodes.values():
         required_peers = [n.peer_id for n in nodes.values() if n != node and n.network == node.network]
         tasks.append(asyncio.create_task(all_peers_connected(node, required_peers)))
-    nodes_connectivity = await asyncio.gather(*tasks)
+
+    nodes_connectivity = await asyncio.wait_for(asyncio.gather(*tasks), timeout)
     for node, res in zip(nodes.values(), nodes_connectivity):
         if res:
             logging.debug(f"Node {node} connected to all peers")

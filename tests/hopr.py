@@ -31,7 +31,6 @@ from hoprd_sdk.models import (
     OpenChannelBodyRequest,
     SendMessageBodyRequest,
     SessionClientRequest,
-    SessionCloseClientRequest,
     TagQueryRequest,
     WithdrawBodyRequest,
 )
@@ -515,9 +514,7 @@ class HoprdAPI:
         """
         Closes a previously opened and bound session
         """
-        body = SessionCloseClientRequest(listening_ip=bound_ip, port=bound_port)
-
-        status, _ = self.__call_api(SessionApi, "close_client", body=body, protocol=protocol)
+        status, _ = self.__call_api(SessionApi, "close_client", protocol=protocol, ip=bound_ip, port=bound_port)
         return status
 
     async def ticket_min_win_prob(self):

@@ -43,6 +43,7 @@ craneLib.devShell {
 
     # documentation utilities
     swagger-codegen3
+    vacuum-go
 
     # docker image inspection and handling
     dive
