@@ -13,4 +13,3 @@ ruff==0.7.0
 waiting==1.4.1
 websocket-client==1.5.1
 websockets==13.1
-./hoprd-sdk-python

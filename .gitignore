@@ -207,9 +207,6 @@ vendor/cargo/.DS_Store
 /docs/*/.structurizr
 /docs/*/workspace.json
 
-# generated SDK
-/hoprd-sdk-python/
-
 # nix generated files
 /result
 .pre-commit-config.yaml
