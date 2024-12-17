@@ -70,6 +70,9 @@ use crate::{
 
 use crate::helpers::PathPlanner;
 
+use core_path::selectors::dfs::DfsPathSelectorConfig;
+#[cfg(feature = "runtime-tokio")]
+pub use hopr_transport_session::types::transfer_session;
 pub use {
     core_network::network::{Health, Network, NetworkTriggeredEvent, PeerOrigin, PeerStatus},
     hopr_crypto_types::{
@@ -87,9 +90,6 @@ pub use {
         SessionClientConfig, SessionId, SESSION_USABLE_MTU_SIZE,
     },
 };
-
-#[cfg(feature = "runtime-tokio")]
-pub use hopr_transport_session::types::transfer_session;
 
 use crate::constants::SESSION_INITIATION_TIMEOUT_BASE;
 pub use crate::helpers::{IndexerTransportEvent, PeerEligibility, TicketStatistics};
@@ -247,7 +247,14 @@ where
                 db.clone(),
             )),
             process_packet_send,
-            path_planner: PathPlanner::new(db.clone(), channel_graph.clone()),
+            path_planner: PathPlanner::new(
+                db.clone(),
+                DfsPathSelectorConfig {
+                    quality_threshold: cfg.network.quality_bad_threshold,
+                    ..Default::default()
+                },
+                channel_graph.clone(),
+            ),
             db,
             my_multiaddresses,
             process_ticket_aggregate: Arc::new(OnceLock::new()),
