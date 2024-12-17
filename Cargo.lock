@@ -1677,7 +1677,7 @@ dependencies = [
 
 [[package]]
 name = "core-path"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "async-std",
@@ -1697,6 +1697,9 @@ dependencies = [
  "petgraph",
  "regex",
  "serde",
+ "serde_with",
+ "smart-default",
+ "test-log",
  "thiserror",
  "tracing",
 ]
@@ -4331,6 +4334,7 @@ dependencies = [
  "hopr-transport-session",
  "lazy_static",
  "serde",
+ "serde_json",
  "serde_with",
  "serde_yaml",
  "smart-default",
