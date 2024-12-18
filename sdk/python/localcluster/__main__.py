@@ -2,8 +2,7 @@ import asyncio
 
 import click
 
-from . import bringup
-from . import utils
+from . import bringup, utils
 
 
 @click.command()
@@ -16,8 +15,8 @@ async def main(config: str, fully_connected: bool):
     cluster.clean_up()
     anvil.kill()
 
-    await asyncio.wait(1) # delay to ensure that the cluster and anvil are down
-
+    # delay to ensure that the cluster and anvil are down
+    await asyncio.sleep(1)
 
 
 if __name__ == "__main__":
