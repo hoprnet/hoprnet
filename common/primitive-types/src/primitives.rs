@@ -63,10 +63,10 @@ impl Address {
 
         for (i, c) in address_hex.chars().enumerate() {
             let nibble = hash[i / 2] >> (((i + 1) % 2) * 4) & 0xf;
-            if nibble >= 8 {
-                ret.push(c.to_ascii_uppercase());
-            } else {
+            if nibble < 8 {
                 ret.push(c);
+            } else {
+                ret.push(c.to_ascii_uppercase());
             }
         }
         ret
@@ -663,7 +663,7 @@ mod tests {
     }
 
     #[test]
-    fn test_address_to_checksum_all_caps() -> anyhow::Result<()> {
+    fn address_to_checksum_all_caps() -> anyhow::Result<()> {
         let addr_1 = Address::from_str("52908400098527886e0f7030069857d2e4169ee7")?;
         let value_1 = addr_1.to_checksum();
         let addr_2 = Address::from_str("8617e340b3d01fa5f11f306f4090fd50e238070d")?;
@@ -682,7 +682,7 @@ mod tests {
     }
 
     #[test]
-    fn test_address_to_checksum_all_lower() -> anyhow::Result<()> {
+    fn address_to_checksum_all_lower() -> anyhow::Result<()> {
         let addr_1 = Address::from_str("de709f2102306220921060314715629080e2fb77")?;
         let value_1 = addr_1.to_checksum();
         let addr_2 = Address::from_str("27b1fdb04752bbc536007a920d24acb045561c26")?;
@@ -701,7 +701,7 @@ mod tests {
     }
 
     #[test]
-    fn test_address_to_checksum_all_normal() -> anyhow::Result<()> {
+    fn address_to_checksum_all_normal() -> anyhow::Result<()> {
         let addr_1 = Address::from_str("5aaeb6053f3e94c9b9a09f33669435e7ef1beaed")?;
         let addr_2 = Address::from_str("fb6916095ca1df60bb79ce92ce3ea74c37c5d359")?;
         let addr_3 = Address::from_str("dbf03b407c01e7cd3cbea99509d93f8dddc8c6fb")?;
