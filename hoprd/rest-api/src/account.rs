@@ -130,6 +130,23 @@ where
     Ok(U256::from(v))
 }
 
+// #[deprecated(
+//     since = "3.2.0",
+//     note = "The `BalanceType` enum deserialization using all capitals is deprecated and will be removed in hoprd v3.0 REST API"
+// )]
+fn deserialize_balance_type<'de, D>(deserializer: D) -> Result<BalanceType, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let buf = <String as serde::Deserialize>::deserialize(deserializer)?;
+
+    match buf.as_str() {
+        "Native" | "NATIVE" => Ok(BalanceType::Native),
+        "HOPR" => Ok(BalanceType::HOPR),
+        _ => Err(serde::de::Error::custom("Unsupported balance type")),
+    }
+}
+
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, utoipa::ToSchema)]
 #[schema(example = json!({
@@ -139,7 +156,8 @@ where
     }))]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct WithdrawBodyRequest {
-    #[serde_as(as = "DisplayFromStr")]
+    // #[serde_as(as = "DisplayFromStr")]
+    #[serde(deserialize_with = "deserialize_balance_type")]
     #[schema(value_type = String)]
     currency: BalanceType,
     #[serde(deserialize_with = "deserialize_u256_value_from_str")]
