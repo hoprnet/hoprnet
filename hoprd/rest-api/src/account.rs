@@ -14,7 +14,7 @@ use hopr_lib::{
 
 use crate::{ApiErrorStatus, InternalState, BASE_PATH};
 
-#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[schema(example = json!({
         "hopr": "12D3KooWJmLm8FnBfvYQ5BAZ5qcYBxQFFBzAAEYUBUNJNE8cRsYS",
         "native": "0x07eaf07d6624f741e04f4092a755a9027aaab7f6"
@@ -44,14 +44,14 @@ pub(crate) struct AccountAddressesResponse {
     )]
 pub(super) async fn addresses(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
     let addresses = AccountAddressesResponse {
-        native: state.hopr.me_onchain().to_string(),
+        native: state.hopr.me_onchain().to_checksum(),
         hopr: state.hopr.me_peer_id().to_string(),
     };
 
     (StatusCode::OK, Json(addresses)).into_response()
 }
 
-#[derive(Debug, Default, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Default, Clone, Serialize, utoipa::ToSchema)]
 #[schema(example = json!({
         "hopr": "2000000000000000000000",
         "native": "9999563581204904000",
@@ -150,7 +150,7 @@ pub(crate) struct WithdrawBodyRequest {
     address: Address,
 }
 
-#[derive(Debug, Default, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Default, Clone, Serialize, utoipa::ToSchema)]
 #[schema(example = json!({
         "receipt": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
     }))]

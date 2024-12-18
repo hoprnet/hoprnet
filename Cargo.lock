@@ -4149,7 +4149,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-crypto-types"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "blake2",
@@ -4422,7 +4422,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-primitive-types"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -4434,6 +4434,7 @@ dependencies = [
  "regex",
  "rlp",
  "serde",
+ "sha3",
  "strum",
  "thiserror",
 ]
@@ -4674,7 +4675,7 @@ dependencies = [
 
 [[package]]
 name = "hoprd-api"
-version = "3.9.0"
+version = "3.9.1"
 dependencies = [
  "anyhow",
  "async-broadcast",

@@ -17,6 +17,7 @@ use hopr_lib::{
 };
 
 use crate::{
+    checksum_address_serializer,
     types::{HoprIdentifier, PeerOrAddress},
     ApiErrorStatus, InternalState, BASE_PATH,
 };
@@ -28,7 +29,7 @@ pub(crate) struct NodeChannel {
     #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String)]
     id: Hash,
-    #[serde_as(as = "DisplayFromStr")]
+    #[serde(serialize_with = "checksum_address_serializer")]
     #[schema(value_type = String)]
     peer_address: Address,
     #[serde_as(as = "DisplayFromStr")]
@@ -56,10 +57,10 @@ pub(crate) struct ChannelInfoResponse {
     #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String)]
     channel_id: Hash,
-    #[serde_as(as = "DisplayFromStr")]
+    #[serde(serialize_with = "checksum_address_serializer")]
     #[schema(value_type = String)]
     source_address: Address,
-    #[serde_as(as = "DisplayFromStr")]
+    #[serde(serialize_with = "checksum_address_serializer")]
     #[schema(value_type = String)]
     destination_address: Address,
     source_peer_id: String,
