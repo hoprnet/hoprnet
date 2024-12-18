@@ -18,15 +18,21 @@ from .constants import (
 )
 from .node import Node
 
-API_TIMEOUT = 60
+GLOBAL_TIMEOUT = 60
 
 
 class Cluster:
     def __init__(self, config: dict, anvil_config: Path, protocol_config: Path):
         self.anvil_config = anvil_config
         self.protocol_config = protocol_config
-        self.nodes = {str(idx): Node.fromConfig(
-            idx, n, config["api_token"], config["network"]) for idx, n in enumerate(config["nodes"], start=1)}
+        self.nodes: dict[str, Node] = {}
+        index = 1
+
+        for network_name, params in config["networks"].items():
+            for alias, node in params["nodes"].items():
+                self.nodes[str(index)] = Node.fromConfig(
+                    index, alias, node, config["api_token"], network_name)
+                index += 1
 
     def clean_up(self):
         logging.info(f"Tearing down the {self.size} nodes cluster")
@@ -45,32 +51,32 @@ class Cluster:
             node.setup(PASSWORD, self.protocol_config, PWD.parent)
 
         # WAIT FOR NODES TO BE UP
-        logging.info(f"Waiting up to {API_TIMEOUT}s for nodes to start up")
-        nodes_readyness = await asyncio.gather(*[node.api.startedz(API_TIMEOUT) for node in self.nodes.values()])
+        logging.info(f"Waiting up to {GLOBAL_TIMEOUT}s for nodes to start up")
+        nodes_readyness = await asyncio.gather(*[node.api.startedz(GLOBAL_TIMEOUT) for node in self.nodes.values()])
         for node, res in zip(self.nodes.values(), nodes_readyness):
             if res:
                 logging.debug(f"Node {node} up")
             else:
                 logging.error(
-                    f"Node {node} not started after {API_TIMEOUT} seconds")
+                    f"Node {node} not started after {GLOBAL_TIMEOUT} seconds")
 
         if not all(nodes_readyness):
             logging.critical("Not all nodes are started, interrupting setup")
             raise RuntimeError
 
         if not skip_funding:
-            # FUND NODES
             self.fund_nodes()
+            return
 
         # WAIT FOR NODES TO BE UP
-        logging.info(f"Waiting up to {API_TIMEOUT}s for nodes to be ready")
-        nodes_readyness = await asyncio.gather(*[node.api.readyz(API_TIMEOUT) for node in self.nodes.values()])
+        logging.info(f"Waiting up to {GLOBAL_TIMEOUT}s for nodes to be ready")
+        nodes_readyness = await asyncio.gather(*[node.api.readyz(GLOBAL_TIMEOUT) for node in self.nodes.values()])
         for node, res in zip(self.nodes.values(), nodes_readyness):
             if res:
                 logging.debug(f"Node {node} up")
             else:
                 logging.error(
-                    f"Node {node} not ready after {API_TIMEOUT} seconds")
+                    f"Node {node} not ready after {GLOBAL_TIMEOUT} seconds")
 
         if not all(nodes_readyness):
             logging.critical("Not all nodes are ready, interrupting setup")
@@ -85,7 +91,7 @@ class Cluster:
 
         # WAIT FOR NODES TO CONNECT TO ALL PEERS
         logging.info(
-            f"Waiting up to {API_TIMEOUT}s for nodes to connect to all peers")
+            f"Waiting up to {2*GLOBAL_TIMEOUT}s for nodes to connect to all peers")
 
         tasks = []
         for node in self.nodes.values():
@@ -93,8 +99,8 @@ class Cluster:
             ) if n != node and n.network == node.network]
             tasks.append(asyncio.create_task(
                 node.all_peers_connected(required_peers)))
-            
-        nodes_connectivity = await asyncio.gather(*tasks)
+
+        nodes_connectivity = await asyncio.wait_for(asyncio.gather(*tasks), 2*GLOBAL_TIMEOUT)
         for node, res in zip(self.nodes.values(), nodes_connectivity):
             if res:
                 logging.debug(f"Node {node} connected to all peers")
@@ -145,22 +151,28 @@ class Cluster:
     def copy_identities(self):
         logging.info("Using pre-generated identities and configs")
 
+        # prepare folders
+        for node_id in range(self.size):
+            MAIN_DIR.joinpath(
+                f"{NODE_NAME_PREFIX}_{node_id+1}").mkdir(parents=True, exist_ok=True)
+
         # Remove old identities
-        for f in MAIN_DIR.glob(f"{NODE_NAME_PREFIX}*.id"):
+        for f in MAIN_DIR.glob(f"{NODE_NAME_PREFIX}/*.id"):
             os.remove(f)
-        logging.info(f"Removed '*.id' files in {MAIN_DIR}")
+        logging.info(f"Removed '*.id' files in {MAIN_DIR} subfolders")
 
         # Remove old logs
-        for f in MAIN_DIR.glob(f"{NODE_NAME_PREFIX}_*.log"):
+        for f in MAIN_DIR.glob(f"{NODE_NAME_PREFIX}/*.log"):
             os.remove(f)
-        logging.info(f"Removed '*.log' files in {MAIN_DIR}")
+        logging.info(f"Removed '*.log' files in {MAIN_DIR} subfolders")
 
         # Copy new identity files
         for node_id in range(self.size):
             f = f"{NODE_NAME_PREFIX}_{node_id+1}.id"
             shutil.copy(
                 PREGENERATED_IDENTITIES_DIR.joinpath(f),
-                MAIN_DIR.joinpath(f),
+                MAIN_DIR.joinpath(
+                    f"{NODE_NAME_PREFIX}_{node_id+1}", "hoprd.id"),
             )
         logging.info(f"Copied '*.id' files to {MAIN_DIR}")
 
@@ -172,6 +184,14 @@ class Cluster:
     def load_addresses(self):
         for node in self.nodes.values():
             node.load_addresses()
+
+    async def alias_peers(self):
+        logging.info("Aliasing every other node")
+        aliases_dict = {
+            node.peer_id: node.alias for node in self.nodes.values()}
+
+        for node in self.nodes.values():
+            await node.alias_peers(aliases_dict)
 
     async def links(self):
         print('')

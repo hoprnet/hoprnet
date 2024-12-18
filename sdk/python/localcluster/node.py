@@ -33,9 +33,11 @@ class Node:
         host_addr: str,
         network: str,
         cfg_file: str,
+        alias: str
     ):
         # initialized
         self.id = id
+        self.alias = alias
         self.host_addr: str = host_addr
         self.api_token: str = api_token
         self.network: str = network
@@ -71,7 +73,7 @@ class Node:
         self.p2p_port = PORT_BASE + (self.id * 10) + 2
 
     def load_addresses(self):
-        loaded_env = load_env_file(f"{self.dir}.env")
+        loaded_env = load_env_file(self.dir.joinpath(".env"))
         self.safe_address = loaded_env.get("HOPRD_SAFE_ADDRESS")
         self.module_address = loaded_env.get("HOPRD_MODULE_ADDRESS")
         if self.safe_address is None or self.module_address is None:
@@ -99,7 +101,7 @@ class Node:
                 "--network",
                 self.network,
                 "--identity-from-path",
-                f"{self.dir}.id",
+                self.dir.joinpath('hoprd.id'),
                 "--contracts-root",
                 "./ethereum/contracts",
                 "--hopr-amount",
@@ -129,7 +131,8 @@ class Node:
 
         # store the addresses in a file which can be loaded later
         if self.safe_address is not None and self.module_address is not None:
-            with open(f"{self.dir}.env", "w") as env_file:
+            self.dir.mkdir(parents=True, exist_ok=True)
+            with open(self.dir.joinpath(".env"), "w") as env_file:
                 env_file.write(f"HOPRD_SAFE_ADDRESS={self.safe_address}\n")
                 env_file.write(f"HOPRD_MODULE_ADDRESS={self.module_address}\n")
             return True
@@ -166,7 +169,7 @@ class Node:
             "OTEL_SERVICE_NAME": f"hoprd-{self.p2p_port}",
             "TOKIO_CONSOLE_BIND": f"localhost:{self.p2p_port+100}",
         }
-        loaded_env = load_env_file(f"{self.dir}.env")
+        loaded_env = load_env_file(self.dir.joinpath(".env"))
 
         cmd = [
             "hoprd",
@@ -178,7 +181,7 @@ class Node:
             f"--apiPort={self.api_port}",
             f"--data={self.dir}",
             f"--host={self.host_addr}:{self.p2p_port}",
-            f"--identity={self.dir}.id",
+            f"--identity={self.dir.joinpath('hoprd.id')}",
             f"--network={self.network}",
             f"--password={password}",
             f"--protocolConfig={config_file}",
@@ -188,7 +191,7 @@ class Node:
         if self.cfg_file_path is not None:
             cmd += [f"--configurationFilePath={self.cfg_file_path}"]
 
-        with open(f"{self.dir}.log", "w") as log_file:
+        with open(self.dir.joinpath('hoprd.log'), "w") as log_file:
             self.proc = Popen(
                 cmd,
                 stdout=log_file,
@@ -208,7 +211,7 @@ class Node:
             ready = len(missing_peers) == 0
 
             if not ready:
-                await asyncio.sleep(0.2)
+                await asyncio.sleep(0.5)
 
         return ready
 
@@ -216,17 +219,19 @@ class Node:
         self.proc.kill()
 
     @classmethod
-    def fromConfig(cls, index: int, config: dict, api_token: dict, network: dict):
+    def fromConfig(cls, index: int, alias: str, config: dict, api_token: dict, network: str):
         token = api_token["default"]
-        network = network["default"]
 
         if "api_token" in config:
             token = config["api_token"]
 
-        if "network" in config:
-            network = config["network"]
+        return cls(index, token, config["host"], network, config["config_file"], alias)
 
-        return cls(index, token, config["host"], network, config["config_file"])
+    async def alias_peers(self, aliases_dict: dict[str, str]):
+        for peer_id, alias in aliases_dict.items():
+            if peer_id == self.peer_id:
+                continue
+            await self.api.aliases_set_alias(alias, peer_id)
 
     async def links(self):
         addresses = await self.api.addresses()
@@ -242,4 +247,4 @@ class Node:
         return self.peer_id == other.peer_id
 
     def __str__(self):
-        return f"node@{self.host_addr}:{self.api_port}"
+        return f"{self.alias} @ {self.host_addr}:{self.api_port}"

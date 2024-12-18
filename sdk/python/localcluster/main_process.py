@@ -21,12 +21,13 @@ from .constants import (
 )
 from .snapshot import Snapshot
 
-SNAPSHOT_FEATURE = False
 SEED = int.from_bytes(os.urandom(8), byteorder="big")
 random.seed(SEED)
 
+# TODO (jean): implement the fully connected switch
 
-async def bringup(config: str, test_mode: bool = False) -> Optional[Tuple[Cluster, Anvil]]:
+
+async def bringup(config: str, test_mode: bool = False, fully_connected: bool = False) -> Optional[Tuple[Cluster, Anvil]]:
     logging.info(f"Using the random seed: {SEED}")
 
     # load node config file
@@ -36,15 +37,12 @@ async def bringup(config: str, test_mode: bool = False) -> Optional[Tuple[Cluste
     cluster = Cluster(config, ANVIL_CONFIG_FILE, PROTOCOL_CONFIG_FILE)
     anvil = Anvil(ANVIL_LOG_FILE, ANVIL_CONFIG_FILE, ANVIL_STATE_FILE)
 
-    if SNAPSHOT_FEATURE:
-        snapshot = Snapshot(PORT_BASE, MAIN_DIR, cluster)
+    snapshot = Snapshot(PORT_BASE, MAIN_DIR, cluster)
 
     # STOP OLD LOCAL ANVIL SERVER
     anvil.kill()
 
-    utils.cleanup_data()
-
-    if not SNAPSHOT_FEATURE or not snapshot.usable:
+    if not snapshot.usable:
         logging.info("Snapshot not usable")
 
         # START NEW LOCAL ANVIL SERVER
@@ -66,33 +64,43 @@ async def bringup(config: str, test_mode: bool = False) -> Optional[Tuple[Cluste
         # BRING UP NODES (with funding)
         await cluster.shared_bringup(skip_funding=False)
 
-        if SNAPSHOT_FEATURE:
-            snapshot.create(ANVIL_STATE_FILE)
-    else:
-        snapshot.reuse()
+        anvil.kill()
+        cluster.clean_up()
 
-        anvil.run(AnvilState.LOAD)
+        await asyncio.sleep(1) # delay to ensure anvil is stopped and state file closed
 
-        # SETUP NODES USING STORED IDENTITIES
-        cluster.copy_identities()
-        cluster.load_addresses()
+        snapshot.create(ANVIL_STATE_FILE)
 
-        # wait before contract deployments are finalized
-        await asyncio.sleep(2.5)
+    snapshot.reuse()
 
-        # BRING UP NODES (without funding)
+    anvil.run(AnvilState.LOAD)
+
+    # SETUP NODES USING STORED IDENTITIES
+    cluster.copy_identities()
+    cluster.load_addresses()
+
+    # wait before contract deployments are finalized
+    await asyncio.sleep(2.5)
+
+    # BRING UP NODES (without funding)
+    try:
         await cluster.shared_bringup(skip_funding=True)
+    except asyncio.TimeoutError as e:
+        logging.error(f"Timeout error: {e}")
+        return cluster, anvil
 
-    # SHOW NODES' INFORMATIONS
+    if not test_mode:
+        await cluster.alias_peers()
+
     logging.info("All nodes ready")
 
     if not test_mode:
+        # SHOW NODES' INFORMATIONS
         await cluster.links()
 
         try:
             utils.wait_for_user_interrupt()
         finally:
-            cluster.clean_up()
-            anvil.kill()
-    else:
-        return cluster, anvil
+            pass
+
+    return cluster, anvil

@@ -104,6 +104,10 @@ kill-anvil: ## kill process running at port 8545 (default port of anvil)
 	# may fail, we can ignore that
 	lsof -i :$(port) -s TCP:LISTEN -t | xargs -I {} -n 1 kill {} || :
 
+.PHONY: localcluster
+localcluster: ## spin up the localcluster using the default configuration file
+	@python -m sdk.python.localcluster --config ./sdk/python/localcluster.params.yml
+
 .PHONY: create-local-identity
 create-local-identity: id_dir=/tmp/
 create-local-identity: id_password=local

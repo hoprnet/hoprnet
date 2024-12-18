@@ -3,14 +3,22 @@ import asyncio
 import click
 
 from . import bringup
-from .utils import coro
+from . import utils
 
 
 @click.command()
 @click.option("--config", default="./localcluster.params.yml", help="Path to node config file")
-@coro
-async def main(config: str):
-    await bringup(config, test_mode=False)
+@click.option("--fully_connected", is_flag=True, show_default=True, default=False, help="Greet the world.")
+@utils.coro
+async def main(config: str, fully_connected: bool):
+    cluster, anvil = await bringup(config, False, fully_connected)
+
+    cluster.clean_up()
+    anvil.kill()
+
+    await asyncio.wait(1) # delay to ensure that the cluster and anvil are down
+
+
 
 if __name__ == "__main__":
     asyncio.run(main())

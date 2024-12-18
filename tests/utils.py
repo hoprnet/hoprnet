@@ -3,6 +3,7 @@ import random
 from contextlib import asynccontextmanager
 
 from sdk.python.api.channelstatus import ChannelStatus
+from sdk.python.api.response_objects import Balances
 from sdk.python.localcluster.constants import (
     RESERVED_TAG_UPPER_BOUND,
     TICKET_AGGREGATION_THRESHOLD,
@@ -141,7 +142,11 @@ async def check_unredeemed_tickets_value(src: Node, value: int):
 
 
 async def check_safe_balance(src: Node, value: int):
-    while (await src.api.balances()).safe_hopr != value:
+    balances = Balances({})
+
+    while balances.safe_hopr != value:
+        balances = await src.api.balances()
+        print(f"{balances=} : {value=}")
         await asyncio.sleep(CHECK_RETRY_INTERVAL)
 
 

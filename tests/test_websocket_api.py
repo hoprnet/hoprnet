@@ -16,9 +16,6 @@ from sdk.python.localcluster.node import Node
 from .conftest import nodes_with_auth, random_distinct_pairs_from, to_ws_url
 from .test_session import STANDARD_MTU_SIZE, EchoServer, SocketType
 
-# used by nodes to get unique port assignments
-PORT_BASE = 19100
-
 EXTRA_HEADERS = [("X-Auth-Token", API_TOKEN)]
 
 DEFAULT_ARGS = [

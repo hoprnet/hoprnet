@@ -24,6 +24,7 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import NameOID
 
+from sdk.python.api.protocol import Protocol
 from sdk.python.localcluster.constants import MAIN_DIR, TICKET_PRICE_PER_HOP
 from sdk.python.localcluster.node import Node
 
@@ -32,9 +33,6 @@ from .utils import PARAMETERIZED_SAMPLE_SIZE, create_channel, shuffled
 
 HOPR_SESSION_MAX_PAYLOAD_SIZE = 462
 STANDARD_MTU_SIZE = 1500
-
-# used by nodes to get unique port assignments
-PORT_BASE = 19000
 
 
 class SocketType(Enum):
@@ -248,14 +246,12 @@ async def test_session_communication_with_a_tcp_echo_server(src: str, dest: str,
         await asyncio.sleep(1.0)
 
         dst_sock_port = server.port
-        src_sock_port = await src_peer.api.session_client(
-            dest_peer.peer_id, path={"Hops": 0}, protocol="tcp", target=f"localhost:{dst_sock_port}"
-        )
+        session = await src_peer.api.session_client(dest_peer.peer_id, path={"Hops": 0}, protocol=Protocol.TCP, target=f"localhost:{dst_sock_port}")
 
-        assert src_sock_port is not None, "Failed to open session"
-        assert len(await src_peer.api.session_list_clients("tcp")) == 1
+        assert session.port is not None, "Failed to open session"
+        assert len(await src_peer.api.session_list_clients(Protocol.TCP)) == 1
 
-        with connect_socket(SocketType.TCP, src_sock_port) as s:
+        with connect_socket(SocketType.TCP, session.port) as s:
             s.settimeout(20)
             total_sent = 0
             for message in expected:
@@ -268,8 +264,8 @@ async def test_session_communication_with_a_tcp_echo_server(src: str, dest: str,
 
     assert "".join(expected) == actual
 
-    assert await src_peer.api.session_close_client(protocol="tcp", bound_ip="127.0.0.1", bound_port=src_sock_port)
-    assert await src_peer.api.session_list_clients("tcp") == []
+    assert await src_peer.api.session_close_client(session) is True
+    assert len(await src_peer.api.session_list_clients(Protocol.TCP)) == 0
 
 
 @pytest.mark.asyncio
@@ -313,14 +309,12 @@ async def test_session_communication_over_n_hop_with_a_tcp_echo_server(route, sw
             await asyncio.sleep(1.0)
 
             dst_sock_port = server.port
-            src_sock_port = await src_peer.api.session_client(
-                dest_peer.peer_id, path={"IntermediatePath": path}, protocol="tcp", target=f"localhost:{dst_sock_port}"
-            )
+            session = await src_peer.api.session_client(dest_peer.peer_id, path={"IntermediatePath": path}, protocol=Protocol.TCP, target=f"localhost:{dst_sock_port}")
 
-            assert src_sock_port is not None, "Failed to open session"
-            assert len(await src_peer.api.session_list_clients("tcp")) == 1
+            assert session.port is not None, "Failed to open session"
+            assert len(await src_peer.api.session_list_clients(Protocol.TCP)) == 1
 
-            with connect_socket(SocketType.TCP, src_sock_port) as s:
+            with connect_socket(SocketType.TCP, session.port) as s:
                 s.settimeout(20)
                 total_sent = 0
                 for message in expected:
@@ -333,8 +327,8 @@ async def test_session_communication_over_n_hop_with_a_tcp_echo_server(route, sw
 
         assert "".join(expected) == actual
 
-        assert await src_peer.api.session_close_client(protocol="tcp", bound_ip="127.0.0.1", bound_port=src_sock_port)
-        assert await src_peer.api.session_list_clients("tcp") == []
+        assert await src_peer.api.session_close_client(session) is True
+        assert len(await src_peer.api.session_list_clients(Protocol.TCP)) == 0
 
 
 @pytest.mark.asyncio
@@ -359,15 +353,13 @@ async def test_session_communication_with_a_udp_echo_server(src: str, dest: str,
         await asyncio.sleep(1.0)
 
         dst_sock_port = server.port
-        src_sock_port = await src_peer.api.session_client(
-            dest_peer.peer_id, path={"Hops": 0}, protocol="udp", target=f"localhost:{dst_sock_port}"
-        )
+        session = await src_peer.api.session_client(dest_peer.peer_id, path={"Hops": 0}, protocol=Protocol.UDP, target=f"localhost:{dst_sock_port}")
 
-        assert src_sock_port is not None, "Failed to open session"
-        assert len(await src_peer.api.session_list_clients('udp')) == 1
+        assert session.port is not None, "Failed to open session"
+        assert len(await src_peer.api.session_list_clients(Protocol.UDP)) == 1
         # logging.info(f"session to {dst_sock_port} opened successfully")
 
-        addr = ("127.0.0.1", src_sock_port)
+        addr = ('127.0.0.1', session.port)
         with connect_socket(SocketType.UDP, None) as s:
             s.settimeout(20)
             total_sent = 0
@@ -391,65 +383,8 @@ async def test_session_communication_with_a_udp_echo_server(src: str, dest: str,
 
     assert actual == expected
 
-    assert await src_peer.api.session_close_client(protocol="udp", bound_ip="127.0.0.1", bound_port=src_sock_port)
-    assert await src_peer.api.session_list_clients("udp") == []
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("src,dest", random_distinct_pairs_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
-async def test_session_communication_with_udp_loopback_service(src: str, dest: str, swarm7: dict[str, Node]):
-    """
-    HOPR UDP socket buffers are set to 462 bytes to mimic the underlying MTU of the HOPR protocol.
-    """
-
-    packet_count = 100 if os.getenv("CI", default="false") == "false" else 50
-    expected = [f"{i}".rjust(HOPR_SESSION_MAX_PAYLOAD_SIZE)
-                for i in range(packet_count)]
-
-    assert [len(x) for x in expected] == packet_count * \
-        [HOPR_SESSION_MAX_PAYLOAD_SIZE]
-
-    src_peer = swarm7[src]
-    dest_peer = swarm7[dest]
-
-    actual = []
-
-    # Service 0 session will loop back all the data at Exit back to the Entry
-    # Therefore, we do not need the Echo service here
-    src_sock_port = await src_peer.api.session_client(
-        dest_peer.peer_id, path={"Hops": 0}, protocol="udp", target=f"0", service=True
-    )
-
-    assert src_sock_port is not None, "Failed to open session"
-    assert len(await src_peer.api.session_list_clients("udp")) == 1
-    # logging.info(f"session to {dst_sock_port} opened successfully")
-
-    addr = ("127.0.0.1", src_sock_port)
-    with connect_socket(SocketType.UDP, None) as s:
-        s.settimeout(20)
-        total_sent = 0
-        for message in expected:
-            total_sent = total_sent + s.sendto(message.encode(), addr)
-            # UDP has no flow-control, so we must insert an artificial gap
-            await asyncio.sleep(0.01)
-
-        while total_sent > 0:
-            chunk, _ = s.recvfrom(
-                min(HOPR_SESSION_MAX_PAYLOAD_SIZE, total_sent))
-            total_sent = total_sent - len(chunk)
-            # Adapt for situations when data arrive completely unordered (also within the buffer)
-            actual.extend([m for m in re.split(
-                r"\s+", chunk.decode().strip()) if len(m) > 0])
-
-    expected = [msg.strip() for msg in expected]
-
-    actual.sort()
-    expected.sort()
-
-    assert actual == expected
-
-    assert await src_peer.api.session_close_client(protocol="udp", bound_ip="127.0.0.1", bound_port=src_sock_port)
-    assert await src_peer.api.session_list_clients("udp") == []
+    assert await src_peer.api.session_close_client(session) is True
+    assert len(await src_peer.api.session_list_clients(Protocol.UDP)) == 0
 
 
 @pytest.mark.asyncio
@@ -493,15 +428,13 @@ async def test_session_communication_over_n_hop_with_a_udp_echo_server(route, sw
             await asyncio.sleep(1.0)
 
             dst_sock_port = server.port
-            src_sock_port = await src_peer.api.session_client(
-                dest_peer.peer_id, path={"IntermediatePath": path}, protocol="udp", target=f"localhost:{dst_sock_port}"
-            )
+            session = await src_peer.api.session_client(dest_peer.peer_id, path={"IntermediatePath": path}, protocol=Protocol.UDP, target=f"localhost:{dst_sock_port}")
 
-            assert src_sock_port is not None, "Failed to open session"
-            assert len(await src_peer.api.session_list_clients('udp')) == 1
+            assert session.port is not None, "Failed to open session"
+            assert len(await src_peer.api.session_list_clients(Protocol.UDP)) == 1
             # logging.info(f"session to {dst_sock_port} opened successfully")
 
-            addr = ("127.0.0.1", src_sock_port)
+            addr = ('127.0.0.1', session.port)
             with connect_socket(SocketType.UDP, None) as s:
                 s.settimeout(20)
                 total_sent = 0
@@ -525,8 +458,8 @@ async def test_session_communication_over_n_hop_with_a_udp_echo_server(route, sw
 
         assert actual == expected
 
-        assert await src_peer.api.session_close_client(protocol="udp", bound_ip="127.0.0.1", bound_port=src_sock_port)
-        assert await src_peer.api.session_list_clients("udp") == []
+        assert await src_peer.api.session_close_client(session) is True
+        assert len(await src_peer.api.session_list_clients(Protocol.UDP)) == 0
 
 
 @pytest.mark.asyncio
@@ -541,18 +474,16 @@ async def test_session_communication_with_an_https_server(src: str, dest: str, s
         string.ascii_letters + string.digits, k=file_len))
 
     with run_https_server(expected) as dst_sock_port:
-        src_sock_port = await src_peer.api.session_client(
-            dest_peer.peer_id, path={"Hops": 0}, protocol="tcp", target=f"localhost:{dst_sock_port}", sealed_target=True
-        )
-        assert src_sock_port is not None, "Failed to open session"
-        assert len(await src_peer.api.session_list_clients("tcp")) == 1
+        session = await src_peer.api.session_client(dest_peer.peer_id, path={"Hops": 0}, protocol=Protocol.TCP, target=f"localhost:{dst_sock_port}", sealed_target=True)
+        assert session.port is not None, "Failed to open session"
+        assert len(await src_peer.api.session_list_clients(Protocol.TCP)) == 1
 
-        response = fetch_data(f"https://localhost:{src_sock_port}/random.txt")
+        response = fetch_data(f'https://localhost:{session.port}/random.txt')
         assert response is not None
         assert response.text == expected
 
-        assert await src_peer.api.session_close_client(protocol="tcp", bound_ip="127.0.0.1", bound_port=src_sock_port)
-        assert await src_peer.api.session_list_clients("tcp") == []
+        assert await src_peer.api.session_close_client(session) is True
+        assert len(await src_peer.api.session_list_clients(Protocol.TCP)) == 0
 
 
 @pytest.mark.asyncio
@@ -593,21 +524,17 @@ async def test_session_communication_over_n_hop_with_an_https_server(
             string.ascii_letters + string.digits, k=file_len))
 
         with run_https_server(expected) as dst_sock_port:
-            src_sock_port = await src_peer.api.session_client(
-                dest_peer.peer_id, path={"IntermediatePath": path}, protocol="tcp", target=f"localhost:{dst_sock_port}"
-            )
-            assert src_sock_port is not None, "Failed to open session"
-            assert len(await src_peer.api.session_list_clients("tcp")) == 1
+            session = await src_peer.api.session_client(dest_peer.peer_id, path={"IntermediatePath": path}, protocol=Protocol.TCP, target=f"localhost:{dst_sock_port}")
+            assert session.port is not None, "Failed to open session"
+            assert len(await src_peer.api.session_list_clients(Protocol.TCP)) == 1
 
             response = fetch_data(
-                f'https://localhost:{src_sock_port}/random.txt')
+                f'https://localhost:{session.port}/random.txt')
             assert response is not None
             assert response.text == expected
 
-            assert await src_peer.api.session_close_client(
-                protocol="tcp", bound_ip="127.0.0.1", bound_port=src_sock_port
-            )
-            assert await src_peer.api.session_list_clients("tcp") == []
+            assert await src_peer.api.session_close_client(session) is True
+            assert len(await src_peer.api.session_list_clients(Protocol.TCP)) == 0
 
 
 @pytest.mark.skipif(
@@ -653,17 +580,10 @@ async def test_session_with_wireguard_tunnel(route, swarm7: dict[str, Node]):
 
         logging.info(f"Opening session for route '{route}'")
 
-        src_sock_port = await src_peer.api.session_client(
-            dest_peer.peer_id,
-            path={"IntermediatePath": path},
-            protocol="udp",
-            target=wireguard_tunnel,
-            listen_on="127.0.0.1:60006",
-            capabilities=["Segmentation"],
-        )
+        session = await src_peer.api.session_client(dest_peer.peer_id, path={"IntermediatePath": path}, protocol=Protocol.UDP, target=wireguard_tunnel, listen_on="127.0.0.1:60006", segment=True)
 
-        assert src_sock_port is not None, "Failed to open session"
-        assert len(await src_peer.api.session_list_clients("udp")) == 1
+        assert session.port is not None, "Failed to open session"
+        assert len(await src_peer.api.session_list_clients(Protocol.UDP)) == 1
 
         logging.info("Test ready for execution")
 

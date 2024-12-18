@@ -77,7 +77,7 @@ def random_distinct_pairs_from(values: list, count: int):
 @pytest.fixture(scope="module")
 async def swarm7(request):
     # path is related to where the test is run. Most likely the root of the repo
-    cluster, anvil = await localcluster.bringup("./sdk/python/localcluster.params.yml", test_mode=True)
+    cluster, anvil = await localcluster.bringup("./sdk/python/localcluster.params.yml", test_mode=True, fully_connected=False)
 
     yield cluster.nodes
 
