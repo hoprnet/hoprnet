@@ -29,11 +29,11 @@ class Anvil:
         run(
             f"""
             ./run-local-anvil.sh
-            {' -s ' if state is AnvilState.LOAD else ''}
+            {'-s' if state is AnvilState.LOAD else ''}
             -l {self.log_file}
             -c {self.cfg_file}
             -p {PORT_BASE}
-            -ds {self.state_file}
+            {'-ls' if state is AnvilState.LOAD else '-ds'} {self.state_file}
             """.split(),
             check=True,
             capture_output=True,

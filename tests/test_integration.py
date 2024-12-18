@@ -6,16 +6,17 @@ from contextlib import AsyncExitStack, asynccontextmanager
 
 import pytest
 
-from .conftest import barebone_nodes, default_nodes, random_distinct_pairs_from
 from sdk.python.api import HoprdAPI
+from sdk.python.api.channelstatus import ChannelStatus
 from sdk.python.localcluster.constants import (
     OPEN_CHANNEL_FUNDING_VALUE_HOPR,
     RESERVED_TAG_UPPER_BOUND,
     TICKET_AGGREGATION_THRESHOLD,
     TICKET_PRICE_PER_HOP,
 )
-from sdk.python.api.channelstatus import ChannelStatus
 from sdk.python.localcluster.node import Node
+
+from .conftest import barebone_nodes, default_nodes, random_distinct_pairs_from
 from .utils import (
     AGGREGATED_TICKET_PRICE,
     MULTIHOP_MESSAGE_SEND_TIMEOUT,
@@ -217,7 +218,8 @@ async def test_hoprd_api_channel_should_register_fund_increase_using_fund_endpoi
 
         # Safe allowance can be checked too at this point
         balance_after = await swarm7[src].api.balances()
-        assert balance_before.safe_hopr_allowance - balance_after.safe_hopr_allowance == hopr_amount
+        assert balance_before.safe_hopr_allowance - \
+            balance_after.safe_hopr_allowance == hopr_amount
 
         await asyncio.wait_for(check_native_balance_below(swarm7[src], balance_before.native), 20.0)
 
@@ -372,7 +374,8 @@ async def test_hoprd_default_strategy_automatic_ticket_aggregation_and_redeeming
                 statistics_now = await api.get_tickets_statistics()
                 assert statistics_now is not None
 
-                redeemed_value_diff = statistics_now.redeemed_value - statistics_before.redeemed_value
+                redeemed_value_diff = statistics_now.redeemed_value - \
+                    statistics_before.redeemed_value
 
                 # break out of the loop if the aggregated value is reached
                 if redeemed_value_diff >= AGGREGATED_TICKET_PRICE:

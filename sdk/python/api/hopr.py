@@ -1,4 +1,5 @@
 import asyncio
+import base64
 from calendar import c
 import json
 import logging
@@ -422,7 +423,7 @@ class HoprdAPI:
         is_ok, response = await self.__call_api(HTTPMethod.POST, "messages", data=data)
         return MessageSent(response) if is_ok else None
 
-    async def get_sessions(self, protocol: Protocol = Protocol.UDP) -> list[Session]:
+    async def session_list_clients(self, protocol: Protocol = Protocol.UDP) -> list[Session]:
         """
         Lists existing Session listeners for the given IP protocol
         :param: protocol: Protocol
@@ -433,32 +434,41 @@ class HoprdAPI:
         )
         return [Session(s) for s in response] if is_ok else None
 
-    async def post_session(
+    async def session_client(
         self,
         destination: str,
-        relayer: str,
-        listen_host: str = ":0",
-        protocol: Protocol = Protocol.UDP
+        path: dict,
+        protocol: Protocol,
+        target: str,
+        listen_on: str = "127.0.0.1:0",
+        retransmit: bool = False,
+        segment: bool = False,
+        sealed_target = False
     ) -> Optional[Session]:
         """
         Creates a new client session returning the given session listening host & port over TCP or UDP.
         :param: destination: PeerID of the recipient
-        :param: relayer: PeerID of the relayer
-        :param: listen_host: str
-        :param: protocol: Protocol (UDP or TCP)
+        :param path: Routing options for the session.
+        :param protocol: Protocol (UDP or TCP)
+        :param target: Destination for the session packets.
+        :param listen_on: The host to listen on for input packets (default: "127.0.0.1:0")
+        :param retransmit: Set if retransmission has to be done
+        :param segment: Set if segmentation has to be done
+        :param sealed_target: The target parameter will be encrypted (default: False)
         :return: Session
         """
-        capabilities_body = SessionCapabilitiesBody(
-            protocol.retransmit, protocol.segment)
-        target_body = SessionTargetBody()
-        path_body = SessionPathBodyRelayers([relayer])
+        actual_target = {
+            "Sealed": base64.b64encode(seal_with_peerid(destination, bytes(target, 'utf-8'), 50)).decode('ascii')
+        } if sealed_target else {"Plain": target}
+
+        capabilities_body = SessionCapabilitiesBody(retransmit, segment)
 
         data = CreateSessionBody(
             capabilities_body.as_array,
             destination,
-            listen_host,
-            path_body.as_dict,
-            target_body.as_dict,
+            listen_on,
+            path,
+            actual_target,
         )
 
         is_ok, response = await self.__call_api(
@@ -467,7 +477,7 @@ class HoprdAPI:
 
         return Session(response) if is_ok else None
 
-    async def close_session(self, session: Session) -> bool:
+    async def session_close_client(self, session: Session) -> bool:
         """
         Closes an existing Sessino listener for the given IP protocol, IP and port.
         :param: session: Session

@@ -29,13 +29,3 @@ def wait_for_user_interrupt():
         signal.pause()
     except KeyboardInterrupt:
         pass
-
-
-def cleanup_data():
-    # Remove old db
-    for f in MAIN_DIR.glob(f"{NODE_NAME_PREFIX}_*"):
-        if not f.is_dir():
-            continue
-        logging.debug(f"Remove db in {f}")
-        shutil.rmtree(f, ignore_errors=True)
-    logging.info(f"Removed all dbs in {MAIN_DIR}")

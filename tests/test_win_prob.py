@@ -68,7 +68,7 @@ async def test_hoprd_check_min_incoming_ticket_win_prob_is_default(peer, swarm7:
         await asyncio.wait_for(check_min_incoming_win_prob_eq(swarm7[peer], new_win_prob), timeout=10.0)
     finally:
         # Restore the winning probability regardless of the outcome
-        set_minimum_winning_probability_in_network(private_key, win_prob)
+        set_minimum_winning_probability_in_network(private_key, win_prob.value)
 
 
 @pytest.mark.asyncio
