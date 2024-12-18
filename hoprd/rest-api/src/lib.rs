@@ -53,7 +53,7 @@ use utoipa_swagger_ui::SwaggerUi;
 
 use crate::config::Auth;
 use crate::session::StoredSessionEntry;
-use hopr_lib::{errors::HoprLibError, ApplicationData, Hopr};
+use hopr_lib::{errors::HoprLibError, Address, ApplicationData, Hopr};
 use hopr_network_types::prelude::IpProtocol;
 
 pub(crate) const BASE_PATH: &str = "/api/v3";
@@ -352,6 +352,18 @@ async fn build_api(
                 .layer(ValidateRequestHeaderLayer::accept("application/json"))
                 .layer(SetSensitiveRequestHeadersLayer::new(once(AUTHORIZATION))),
         )
+}
+
+fn checksum_address_serializer<S: serde::Serializer>(a: &Address, s: S) -> Result<S::Ok, S::Error> {
+    s.serialize_str(&a.to_checksum())
+}
+
+fn option_checksum_address_serializer<S: serde::Serializer>(a: &Option<Address>, s: S) -> Result<S::Ok, S::Error> {
+    if let Some(addr) = a {
+        s.serialize_some(&addr.to_checksum())
+    } else {
+        s.serialize_none()
+    }
 }
 
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]

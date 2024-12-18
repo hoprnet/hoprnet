@@ -486,7 +486,6 @@ impl IdentityFileArgs {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use hopr_crypto_types::types::ToChecksum;
     use tempfile::tempdir;
 
     const DUMMY_PRIVATE_KEY: &str = "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";

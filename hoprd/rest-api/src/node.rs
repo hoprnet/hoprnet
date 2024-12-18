@@ -12,7 +12,9 @@ use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use std::{collections::HashMap, sync::Arc};
 
-use crate::{ApiError, ApiErrorStatus, InternalState, BASE_PATH};
+use crate::{
+    checksum_address_serializer, option_checksum_address_serializer, ApiError, ApiErrorStatus, InternalState, BASE_PATH,
+};
 
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[schema(example = json!({
@@ -89,7 +91,7 @@ pub(crate) struct PeerInfo {
     #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String)]
     peer_id: PeerId,
-    #[serde_as(as = "Option<DisplayFromStr>")]
+    #[serde(serialize_with = "option_checksum_address_serializer")]
     #[schema(value_type = Option<String>)]
     peer_address: Option<Address>,
     #[serde_as(as = "Option<DisplayFromStr>")]
@@ -116,7 +118,7 @@ pub(crate) struct AnnouncedPeer {
     #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String)]
     peer_id: PeerId,
-    #[serde_as(as = "DisplayFromStr")]
+    #[serde(serialize_with = "checksum_address_serializer")]
     #[schema(value_type = String)]
     peer_address: Address,
     #[serde_as(as = "Option<DisplayFromStr>")]
@@ -328,7 +330,7 @@ pub(super) async fn channel_graph(
 }
 
 #[serde_as]
-#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[schema(example = json!({
         "announcedAddress": [
             "/ip4/10.0.2.100/tcp/19092"
@@ -363,22 +365,22 @@ pub(crate) struct NodeInfoResponse {
     listening_address: Vec<Multiaddr>,
     chain: String,
     provider: String,
-    #[serde_as(as = "DisplayFromStr")]
+    #[serde(serialize_with = "checksum_address_serializer")]
     #[schema(value_type = String)]
     hopr_token: Address,
-    #[serde_as(as = "DisplayFromStr")]
+    #[serde(serialize_with = "checksum_address_serializer")]
     #[schema(value_type = String)]
     hopr_channels: Address,
-    #[serde_as(as = "DisplayFromStr")]
+    #[serde(serialize_with = "checksum_address_serializer")]
     #[schema(value_type = String)]
     hopr_network_registry: Address,
-    #[serde_as(as = "DisplayFromStr")]
+    #[serde(serialize_with = "checksum_address_serializer")]
     #[schema(value_type = String)]
     hopr_node_safe_registry: Address,
-    #[serde_as(as = "DisplayFromStr")]
+    #[serde(serialize_with = "checksum_address_serializer")]
     #[schema(value_type = String)]
     hopr_management_module: Address,
-    #[serde_as(as = "DisplayFromStr")]
+    #[serde(serialize_with = "checksum_address_serializer")]
     #[schema(value_type = String)]
     hopr_node_safe: Address,
     is_eligible: bool,
