@@ -14,7 +14,7 @@ use hopr_lib::{
 
 use crate::{ApiErrorStatus, InternalState, BASE_PATH};
 
-#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[schema(example = json!({
         "hopr": "12D3KooWJmLm8FnBfvYQ5BAZ5qcYBxQFFBzAAEYUBUNJNE8cRsYS",
         "native": "0x07eaf07d6624f741e04f4092a755a9027aaab7f6"
@@ -44,14 +44,14 @@ pub(crate) struct AccountAddressesResponse {
     )]
 pub(super) async fn addresses(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
     let addresses = AccountAddressesResponse {
-        native: state.hopr.me_onchain().to_string(),
+        native: state.hopr.me_onchain().to_checksum(),
         hopr: state.hopr.me_peer_id().to_string(),
     };
 
     (StatusCode::OK, Json(addresses)).into_response()
 }
 
-#[derive(Debug, Default, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Default, Clone, Serialize, utoipa::ToSchema)]
 #[schema(example = json!({
         "hopr": "2000000000000000000000",
         "native": "9999563581204904000",
@@ -130,6 +130,23 @@ where
     Ok(U256::from(v))
 }
 
+// #[deprecated(
+//     since = "3.2.0",
+//     note = "The `BalanceType` enum deserialization using all capitals is deprecated and will be removed in hoprd v3.0 REST API"
+// )]
+fn deserialize_balance_type<'de, D>(deserializer: D) -> Result<BalanceType, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let buf = <String as serde::Deserialize>::deserialize(deserializer)?;
+
+    match buf.as_str() {
+        "Native" | "NATIVE" => Ok(BalanceType::Native),
+        "HOPR" => Ok(BalanceType::HOPR),
+        _ => Err(serde::de::Error::custom("Unsupported balance type")),
+    }
+}
+
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, utoipa::ToSchema)]
 #[schema(example = json!({
@@ -139,7 +156,8 @@ where
     }))]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct WithdrawBodyRequest {
-    #[serde_as(as = "DisplayFromStr")]
+    // #[serde_as(as = "DisplayFromStr")]
+    #[serde(deserialize_with = "deserialize_balance_type")]
     #[schema(value_type = String)]
     currency: BalanceType,
     #[serde(deserialize_with = "deserialize_u256_value_from_str")]
@@ -150,7 +168,7 @@ pub(crate) struct WithdrawBodyRequest {
     address: Address,
 }
 
-#[derive(Debug, Default, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Default, Clone, Serialize, utoipa::ToSchema)]
 #[schema(example = json!({
         "receipt": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
     }))]
