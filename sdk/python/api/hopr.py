@@ -1,20 +1,17 @@
 import asyncio
 import base64
-from calendar import c
 import json
 import logging
+import random
 from typing import Optional
+
+import aiohttp
 import base58
 import nacl.bindings
 import nacl.public
 import nacl.signing  # Ensure nacl.signing is imported correctly
 import nacl.utils
 from nacl.public import SealedBox  # Import SealedBox explicitly
-import requests
-
-import aiohttp
-import requests
-import random
 
 from .http_method import HTTPMethod
 from .protocol import Protocol
@@ -24,13 +21,11 @@ from .request_objects import (
     DeleteSessionBody,
     FundChannelBody,
     GetChannelsBody,
-    OpenChannelBody,
     GetMessagesBody,
+    OpenChannelBody,
     PeekAllMessagesBody,
     SendMessageBody,
     SessionCapabilitiesBody,
-    SessionPathBodyRelayers,
-    SessionTargetBody,
     SetAliasBody,
     WithdrawBody,
 )
@@ -65,6 +60,7 @@ def getlogger():
 
 
 log = getlogger()
+
 
 def seal_with_peerid(peer_id: str, plain_text: bytes, random_padding_len: int = 0) -> bytes:
     """
@@ -101,7 +97,8 @@ def seal_with_peerid(peer_id: str, plain_text: bytes, random_padding_len: int = 
         return encrypted_message
     except Exception as e:
         raise ValueError(f"seal failed: {str(e)}")
-    
+
+
 class HoprdAPI:
     """
     HOPRd API helper to handle exceptions and logging.
@@ -170,7 +167,7 @@ class HoprdAPI:
         """
         is_ok, response = await self.__call_api(HTTPMethod.GET, f"aliases/{alias}")
         return Alias(response) if is_ok else None
-    
+
     async def aliases_set_alias(self, alias: str, destination: str):
         """
         Returns the aliases recognized by the node.
@@ -232,7 +229,7 @@ class HoprdAPI:
         """
         is_ok, _ = await self.__call_api(HTTPMethod.DELETE, f"channels/{channel_id}")
         return is_ok
-    
+
     async def channel_redeem_tickets(self, channel_id: str) -> bool:
         """
         Redeems tickets in a specific channel.
@@ -241,7 +238,6 @@ class HoprdAPI:
         """
         is_ok, _ = await self.__call_api(HTTPMethod.POST, f"channels/{channel_id}/tickets/redeem")
         return is_ok
-
 
     async def all_channels(self, include_closed: bool) -> Optional[Channels]:
         """
@@ -254,8 +250,8 @@ class HoprdAPI:
             HTTPMethod.GET, f"channels?{params.as_header_string}"
         )
         return Channels(response, "all") if is_ok else None
-    
-    async def incoming_channels(self, include_closed: bool=False):
+
+    async def incoming_channels(self, include_closed: bool = False):
         """
         Returns all incoming channels.
         :return: channels: list
@@ -287,7 +283,7 @@ class HoprdAPI:
         """
         is_ok, response = await self.__call_api(HTTPMethod.GET, f"channels/{channel_id}")
         return Channel(response) if is_ok else None
-    
+
     async def channels_aggregate_tickets(self, channel_id: str) -> bool:
         """
         Aggregate channel tickets.
@@ -296,7 +292,7 @@ class HoprdAPI:
         """
         is_ok, _ = await self.__call_api(HTTPMethod.POST, f"channels/{channel_id}/tickets/aggregate")
         return is_ok
-    
+
     async def channel_get_tickets(self, channel_id: str) -> Optional[list[Ticket]]:
         """
         Returns all channel tickets.
@@ -304,7 +300,7 @@ class HoprdAPI:
         :return: tickets: response
         """
         is_ok, response = await self.__call_api(HTTPMethod.GET, f"channels/{channel_id}/tickets")
-        return [Ticket(entry) for entry in response ]  if is_ok else []
+        return [Ticket(entry) for entry in response] if is_ok else []
 
     async def tickets_redeem(self):
         """
@@ -342,7 +338,7 @@ class HoprdAPI:
         """
         is_ok, response = await self.__call_api(HTTPMethod.POST, f"peers/{destination}/ping")
         return Ping(response) if is_ok else None
-    
+
     async def addresses(self) -> Optional[Addresses]:
         """
         Returns the address of the node.
@@ -387,11 +383,10 @@ class HoprdAPI:
         data = WithdrawBody(receipient, amount, currency)
         is_ok, _ = await self.__call_api(HTTPMethod.POST, "account/withdraw", data=data)
         return is_ok
-    
+
     async def metrics(self):
         _, response = await self.__call_api(HTTPMethod.GET, "node/metrics")
         return response
-
 
     async def get_tickets_statistics(self) -> Optional[TicketStatistics]:
         """
@@ -400,7 +395,6 @@ class HoprdAPI:
         """
         is_ok, response = await self.__call_api(HTTPMethod.GET, "tickets/statistics")
         return TicketStatistics(response) if is_ok else None
-
 
     async def reset_tickets_statistics(self):
         """
@@ -419,7 +413,8 @@ class HoprdAPI:
         :param: tag: int = 0x0320
         :return: bool
         """
-        data = SendMessageBody(body=message, hops=None, path=hops, destination=destination, tag=tag)
+        data = SendMessageBody(body=message, hops=None,
+                               path=hops, destination=destination, tag=tag)
         is_ok, response = await self.__call_api(HTTPMethod.POST, "messages", data=data)
         return MessageSent(response) if is_ok else None
 
@@ -441,9 +436,9 @@ class HoprdAPI:
         protocol: Protocol,
         target: str,
         listen_on: str = "127.0.0.1:0",
-        retransmit: bool = False,
-        segment: bool = False,
-        sealed_target = False
+        service: bool = False,
+        capabilities: SessionCapabilitiesBody = SessionCapabilitiesBody(),
+        sealed_target=False
     ) -> Optional[Session]:
         """
         Creates a new client session returning the given session listening host & port over TCP or UDP.
@@ -457,14 +452,17 @@ class HoprdAPI:
         :param sealed_target: The target parameter will be encrypted (default: False)
         :return: Session
         """
-        actual_target = {
-            "Sealed": base64.b64encode(seal_with_peerid(destination, bytes(target, 'utf-8'), 50)).decode('ascii')
-        } if sealed_target else {"Plain": target}
-
-        capabilities_body = SessionCapabilitiesBody(retransmit, segment)
+        actual_target = (
+            {
+                "Sealed": base64.b64encode(seal_with_peerid(destination, bytes(target, 'utf-8'), 50)).decode('ascii')
+            }
+            if sealed_target
+            else {"Service": int(target)}
+            if service else {"Plain": target}
+        )
 
         data = CreateSessionBody(
-            capabilities_body.as_array,
+            capabilities.as_array,
             destination,
             listen_on,
             path,
@@ -501,7 +499,6 @@ class HoprdAPI:
         is_ok, response = await self.__call_api(HTTPMethod.POST, "messages/pop", data)
         return Message(response) if is_ok else None
 
-
     async def messages_pop_all(self, tag: int = MESSAGE_TAG) -> Optional[list[Message]]:
         """
         Pop all messages from the inbox
@@ -512,7 +509,7 @@ class HoprdAPI:
 
         is_ok, response = await self.__call_api(HTTPMethod.POST, "messages/pop-all", data)
         return [Message(entry) for entry in response["messages"]] if is_ok else None
-    
+
     async def messages_peek(self, tag: int = MESSAGE_TAG) -> Optional[Message]:
         """
         Peek next message from the inbox
@@ -523,7 +520,6 @@ class HoprdAPI:
         data = GetMessagesBody(tag=tag)
         is_ok, response = await self.__call_api(HTTPMethod.POST, "messages/peek", data)
         return Message(response) if is_ok else None
-
 
     async def messages_peek_all(self, tag: int = MESSAGE_TAG, timestamp: int = 0) -> Optional[list[Message]]:
         """
@@ -538,7 +534,7 @@ class HoprdAPI:
 
         is_ok, response = await self.__call_api(HTTPMethod.POST, "messages/peek-all", data)
         return [Message(entry) for entry in response["messages"]] if is_ok else None
-    
+
     async def readyz(self, timeout: int = 20) -> bool:
         """
         Checks if the node is ready. Return True if `readyz` returns 200 after max `timeout` seconds.
@@ -568,13 +564,14 @@ class HoprdAPI:
         async def check_url():
             ready = False
 
-            while not ready:
-                try:
-                    ready = requests.get(url, timeout=0.3).status_code == 200
-                except Exception:
-                    await asyncio.sleep(0.2)
+            async with aiohttp.ClientSession() as s:
+                while not ready:
+                    try:
+                        ready = (await s.get(url, timeout=0.3)).status == 200
+                    except Exception:
+                        await asyncio.sleep(0.2)
 
-            return ready
+                return ready
 
         try:
             return await asyncio.wait_for(check_url(), timeout=timeout)

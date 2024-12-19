@@ -146,7 +146,6 @@ async def check_safe_balance(src: Node, value: int):
 
     while balances.safe_hopr != value:
         balances = await src.api.balances()
-        print(f"{balances=} : {value=}")
         await asyncio.sleep(CHECK_RETRY_INTERVAL)
 
 

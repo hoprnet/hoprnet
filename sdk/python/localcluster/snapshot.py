@@ -69,7 +69,8 @@ class Snapshot:
             shutil.copy(f, self.parent_dir)
 
         # copy protocol-config.json
-        shutil.copy(self.sdir.joinpath("protocol-config.json"), self.parent_dir)
+        shutil.copy(self.sdir.joinpath(
+            "protocol-config.json"), self.parent_dir)
 
         # copy node data
         for i in range(self.cluster.size):
@@ -78,7 +79,6 @@ class Snapshot:
             target_dir = self.parent_dir.joinpath(
                 f"{NODE_NAME_PREFIX}_{i+1}")
             db_target_dir = target_dir.joinpath("db/")
-
 
             shutil.rmtree(db_target_dir, ignore_errors=True)
             db_target_dir.mkdir(parents=True, exist_ok=True)

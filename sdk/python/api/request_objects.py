@@ -32,14 +32,16 @@ class ApiRequestObject:
     def post_init(self):
         pass
 
+
 class SetAliasBody(ApiRequestObject):
     keys = {
         "alias": "alias",
         "destination": "destination"
     }
-    
+
     def __init__(self, alias: str, destination: str):
         super().__init__(vars())
+
 
 class OpenChannelBody(ApiRequestObject):
     keys = {
@@ -102,9 +104,11 @@ class SessionCapabilitiesBody(ApiRequestObject):
     keys = {
         "retransmission": "Retransmission",
         "segmentation": "Segmentation",
+        "retransmission_ack_only": "RetransmissionAckOnly",
+        "no_delay": "NoDelay",
     }
 
-    def __init__(self, retransmission: bool, segmentation: bool):
+    def __init__(self, retransmission: bool = False, segmentation: bool = False, retransmission_ack_only: bool = False, no_delay: bool = False):
         super().__init__(vars())
 
     @property
@@ -150,6 +154,7 @@ class DeleteSessionBody(ApiRequestObject):
     def __init__(self, ip: str, port: str):
         super().__init__(vars())
 
+
 class GetMessagesBody(ApiRequestObject):
     keys = {
         "tag": "tag",
@@ -158,14 +163,16 @@ class GetMessagesBody(ApiRequestObject):
     def __init__(self, tag: int):
         super().__init__(vars())
 
+
 class PeekAllMessagesBody(ApiRequestObject):
-    keys = { "tag": "tag", "timestamp": "timestamp" }
+    keys = {"tag": "tag", "timestamp": "timestamp"}
 
     def __init__(self, tag: int, timestamp: int = None):
         if timestamp is None:
             del timestamp
-            
+
         super().__init__(vars())
+
 
 class SendMessageBody(ApiRequestObject):
     keys = {
@@ -179,8 +186,9 @@ class SendMessageBody(ApiRequestObject):
     def __init__(self, body: str, hops: int, path: list[str], destination: str, tag: int):
         super().__init__(vars())
 
+
 class WithdrawBody(ApiRequestObject):
-    keys= { "address": "address", "amount": "amount", "currency": "currency" }
-    
+    keys = {"address": "address", "amount": "amount", "currency": "currency"}
+
     def __init__(self, address: str, amount: str, currency: str):
         super().__init__(vars())
