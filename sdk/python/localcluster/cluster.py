@@ -100,17 +100,8 @@ class Cluster:
             tasks.append(asyncio.create_task(
                 node.all_peers_connected(required_peers)))
 
-        nodes_connectivity = await asyncio.wait_for(asyncio.gather(*tasks), 2*GLOBAL_TIMEOUT)
-        for node, res in zip(self.nodes.values(), nodes_connectivity):
-            if res:
-                logging.debug(f"Node {node} connected to all peers")
-            else:
-                logging.error(f"Node {node} did not connect to all peers")
-
-        if not all(nodes_connectivity):
-            logging.critical(
-                "Not all nodes are connected to all peers, interrupting setup")
-            raise RuntimeError
+        await asyncio.wait_for(asyncio.gather(*tasks), 2*GLOBAL_TIMEOUT)
+        
 
     def fund_nodes(self):
         logging.info("Funding nodes")

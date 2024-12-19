@@ -7,18 +7,19 @@ def _convert(value: Any):
     if value is None:
         return None
 
-    try:
-        value = float(value)
-    except ValueError:
-        pass
+    if isinstance(value, int) or isinstance(value, float):
+        return value
 
-    try:
-        integer = int(value)
-        if integer == value:
-            value = integer
+    if isinstance(value, str):
+        try:
+            float_value = float(value)
+        except ValueError:
+            return value
 
-    except ValueError:
-        pass
+        if '.' in value:
+            return float_value
+        else:
+            return int(value)
 
     return value
 
@@ -62,15 +63,18 @@ class ApiResponseObject:
 class Addresses(ApiResponseObject):
     keys = {"hopr": "hopr", "native": "native"}
 
+
 class Alias(ApiResponseObject):
     keys = {"peer_id": "peerId"}
-    
+
+
 class Balances(ApiResponseObject):
     keys = {
         "hopr": "hopr",
         "native": "native",
         "safe_native": "safeNative",
         "safe_hopr": "safeHopr",
+        "safe_hopr_allowance": "safeHoprAllowance"
     }
 
 
@@ -100,6 +104,7 @@ class Channel(ApiResponseObject):
     def post_init(self):
         self.status = ChannelStatus.fromString(self.status)
 
+
 class Ticket(ApiResponseObject):
     keys = {
         "amount": "amount",
@@ -111,6 +116,7 @@ class Ticket(ApiResponseObject):
         "winn_prob": "winProb"
     }
 
+
 class TicketPrice(ApiResponseObject):
     keys = {"value": "price"}
 
@@ -121,14 +127,17 @@ class TicketProbability(ApiResponseObject):
     def post_init(self):
         self.value = float(self.value)
 
+
 class TicketStatistics(ApiResponseObject):
     keys = {
         "neglected_value": "neglectedValue",
-        "redeemed_value": "redeemedValue", 
-        "rejected_value": "rejectedValue", 
-        "unredeemed_value": "unredeemedValue", 
+        "redeemed_value": "redeemedValue",
+        "rejected_value": "rejectedValue",
+        "unredeemed_value": "unredeemedValue",
         "winning_count": "winningCount",
     }
+
+
 class Configuration(ApiResponseObject):
     keys = {"probability": "hopr/protocol/outgoing_ticket_winning_prob"}
 
@@ -136,22 +145,27 @@ class Configuration(ApiResponseObject):
 class OpenedChannel(ApiResponseObject):
     keys = {"id": "channelId", "receipt": "transactionReceipt"}
 
+
 class Ping(ApiResponseObject):
-    keys= {"latency": "latency", "version": "reportedVersion"}
-    
+    keys = {"latency": "latency", "version": "reportedVersion"}
+
+
 class Message(ApiResponseObject):
-    keys= {"body": "body", "received_at": "receivedAt", "tag": "tag"}
+    keys = {"body": "body", "received_at": "receivedAt", "tag": "tag"}
+
 
 class MessageSent(ApiResponseObject):
-    keys = { "timestamp": "timestamp"}
-    
+    keys = {"timestamp": "timestamp"}
+
+
 class Channels:
     def __init__(self, data: dict, category: str = "all"):
         self.all = []
         self.incoming = []
         self.outgoing = []
 
-        setattr(self, category,[Channel(channel) for channel in data.get(category, [])] )
+        setattr(self, category, [Channel(channel)
+                for channel in data.get(category, [])])
 
     def __str__(self):
         return str(self.__dict__)

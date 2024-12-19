@@ -8,6 +8,7 @@ import pytest
 
 from sdk.python.api import HoprdAPI
 from sdk.python.api.channelstatus import ChannelStatus
+from sdk.python.api.response_objects import Balances
 from sdk.python.localcluster.constants import (
     OPEN_CHANNEL_FUNDING_VALUE_HOPR,
     RESERVED_TAG_UPPER_BOUND,
@@ -195,7 +196,7 @@ async def test_hoprd_api_channel_should_register_fund_increase_using_fund_endpoi
     src: str, dest: str, swarm7: dict[str, Node]
 ):
     # convert HOPR to weiHOPR
-    hopr_amount = OPEN_CHANNEL_FUNDING_VALUE_HOPR
+    hopr_amount = OPEN_CHANNEL_FUNDING_VALUE_HOPR * 1e18
 
     async with create_channel(swarm7[src], swarm7[dest], funding=TICKET_PRICE_PER_HOP) as channel:
         balance_before = await swarm7[src].api.balances()

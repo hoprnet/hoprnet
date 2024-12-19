@@ -67,7 +67,8 @@ async def bringup(config: str, test_mode: bool = False, fully_connected: bool = 
         anvil.kill()
         cluster.clean_up()
 
-        await asyncio.sleep(1) # delay to ensure anvil is stopped and state file closed
+        # delay to ensure anvil is stopped and state file closed
+        await asyncio.sleep(1)
 
         snapshot.create(ANVIL_STATE_FILE)
 

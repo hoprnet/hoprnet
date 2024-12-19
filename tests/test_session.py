@@ -16,8 +16,8 @@ from datetime import datetime, timedelta
 from enum import Enum
 from functools import partial
 
-import aiohttp
 import pytest
+import requests
 import urllib3
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
@@ -126,16 +126,16 @@ def connect_socket(sock_type: SocketType, port):
         s.close()
 
 
-async def fetch_data(url: str):
+def fetch_data(url: str):
     # Suppress only the single InsecureRequestWarning from urllib3 needed for self-signed certs
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-    connector = aiohttp.TCPConnector(ssl=False)
+
     try:
         # set verify=False for self-signed certs
-        async with aiohttp.ClientSession(connector=connector) as s:
-            response = await s.get(url, raise_for_status=True)
+        response = requests.get(url, verify=False)
+        response.raise_for_status()
         return response
-    except Exception as e:
+    except requests.exceptions.RequestException as e:
         logging.error(f"HTTP request failed: {e}")
         return None
 
@@ -264,10 +264,10 @@ async def test_session_communication_with_a_tcp_echo_server(src: str, dest: str,
                 total_sent = total_sent - len(chunk)
                 actual = actual + chunk.decode()
 
-    assert "".join(expected) == actual
-
     assert await src_peer.api.session_close_client(session) is True
     assert await src_peer.api.session_list_clients(Protocol.TCP) == []
+
+    assert "".join(expected) == actual
 
 
 @pytest.mark.asyncio
@@ -327,10 +327,10 @@ async def test_session_communication_over_n_hop_with_a_tcp_echo_server(route, sw
                     total_sent = total_sent - len(chunk)
                     actual = actual + chunk.decode()
 
-        assert "".join(expected) == actual
-
         assert await src_peer.api.session_close_client(session) is True
         assert await src_peer.api.session_list_clients(Protocol.TCP) == []
+
+        assert "".join(expected) == actual
 
 
 @pytest.mark.asyncio
@@ -383,10 +383,10 @@ async def test_session_communication_with_a_udp_echo_server(src: str, dest: str,
     actual.sort()
     expected.sort()
 
-    assert actual == expected
-
     assert await src_peer.api.session_close_client(session) is True
     assert await src_peer.api.session_list_clients(Protocol.UDP) == []
+
+    assert actual == expected
 
 
 @pytest.mark.asyncio
@@ -440,10 +440,10 @@ async def test_session_communication_with_udp_loopback_service(src: str, dest: s
     actual.sort()
     expected.sort()
 
-    assert actual == expected
-
     assert await src_peer.api.session_close_client(session)
     assert await src_peer.api.session_list_clients(Protocol.UDP) == []
+
+    assert actual == expected
 
 
 @pytest.mark.asyncio
@@ -515,10 +515,10 @@ async def test_session_communication_over_n_hop_with_a_udp_echo_server(route, sw
         actual.sort()
         expected.sort()
 
-        assert actual == expected
-
         assert await src_peer.api.session_close_client(session) is True
         assert await src_peer.api.session_list_clients(Protocol.UDP) == []
+
+        assert actual == expected
 
 
 @pytest.mark.asyncio
@@ -538,11 +538,12 @@ async def test_session_communication_with_an_https_server(src: str, dest: str, s
         assert len(await src_peer.api.session_list_clients(Protocol.TCP)) == 1
 
         response = fetch_data(f'https://localhost:{session.port}/random.txt')
-        assert response is not None
-        assert response.text == expected
 
         assert await src_peer.api.session_close_client(session) is True
         assert await src_peer.api.session_list_clients(Protocol.TCP) == []
+
+        assert response is not None
+        assert response.text == expected
 
 
 @pytest.mark.asyncio
@@ -589,11 +590,12 @@ async def test_session_communication_over_n_hop_with_an_https_server(
 
             response = fetch_data(
                 f'https://localhost:{session.port}/random.txt')
-            assert response is not None
-            assert response.text == expected
 
             assert await src_peer.api.session_close_client(session) is True
             assert await src_peer.api.session_list_clients(Protocol.TCP) == []
+
+            assert response is not None
+            assert response.text == expected
 
 
 @pytest.mark.skipif(

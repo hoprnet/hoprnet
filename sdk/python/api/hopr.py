@@ -18,7 +18,6 @@ from .protocol import Protocol
 from .request_objects import (
     ApiRequestObject,
     CreateSessionBody,
-    DeleteSessionBody,
     FundChannelBody,
     GetChannelsBody,
     GetMessagesBody,
@@ -480,10 +479,9 @@ class HoprdAPI:
         Closes an existing Sessino listener for the given IP protocol, IP and port.
         :param: session: Session
         """
-        data = DeleteSessionBody(session.ip, session.port)
 
-        is_ok, _ = await self.__call_api(
-            HTTPMethod.DELETE, f"session/{session.protocol}", data
+        is_ok, response = await self.__call_api(
+            HTTPMethod.DELETE, f"session/{session.protocol}/{session.ip}/{session.port}"
         )
 
         return is_ok
