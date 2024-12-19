@@ -6,7 +6,14 @@ from subprocess import STDOUT, Popen, run
 
 from ..api import HoprdAPI
 from . import utils
-from .constants import MAIN_DIR, NODE_NAME_PREFIX, PASSWORD, PORT_BASE, PWD
+from .constants import (
+    MAIN_DIR,
+    NODE_NAME_PREFIX,
+    OPEN_CHANNEL_FUNDING_VALUE_HOPR,
+    PASSWORD,
+    PORT_BASE,
+    PWD,
+)
 
 
 def load_env_file(env_file: str) -> dict:
@@ -232,6 +239,17 @@ class Node:
             if peer_id == self.peer_id:
                 continue
             await self.api.aliases_set_alias(alias, peer_id)
+
+    async def connect_peers(self, peer_ids: list[str]):
+        tasks = []
+
+        for peer_id in peer_ids:
+            if peer_id == self.peer_id:
+                continue
+            tasks.append(asyncio.create_task(self.api.open_channel(
+                peer_id, f"{OPEN_CHANNEL_FUNDING_VALUE_HOPR*1e18:.0f}")))
+
+        await asyncio.gather(*tasks)
 
     async def links(self):
         addresses = await self.api.addresses()

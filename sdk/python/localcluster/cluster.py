@@ -101,7 +101,6 @@ class Cluster:
                 node.all_peers_connected(required_peers)))
 
         await asyncio.wait_for(asyncio.gather(*tasks), 2*GLOBAL_TIMEOUT)
-        
 
     def fund_nodes(self):
         logging.info("Funding nodes")
@@ -183,6 +182,13 @@ class Cluster:
 
         for node in self.nodes.values():
             await node.alias_peers(aliases_dict)
+
+    async def connect_peers(self):
+        logging.info("Creating a channel to every other node")
+        peer_ids = [node.peer_id for node in self.nodes.values()]
+
+        tasks = [node.connect_peers(peer_ids) for node in self.nodes.values()]
+        await asyncio.gather(*tasks)
 
     async def links(self):
         print('')

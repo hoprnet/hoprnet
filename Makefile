@@ -106,7 +106,7 @@ kill-anvil: ## kill process running at port 8545 (default port of anvil)
 
 .PHONY: localcluster
 localcluster: ## spin up the localcluster using the default configuration file
-	@python -m sdk.python.localcluster --config ./sdk/python/localcluster.params.yml
+	@python -m sdk.python.localcluster --config ./sdk/python/localcluster.params.yml --fully_connected
 
 .PHONY: create-local-identity
 create-local-identity: id_dir=/tmp/

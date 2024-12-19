@@ -30,6 +30,10 @@ random.seed(SEED)
 async def bringup(config: str, test_mode: bool = False, fully_connected: bool = False) -> Optional[Tuple[Cluster, Anvil]]:
     logging.info(f"Using the random seed: {SEED}")
 
+    if test_mode and fully_connected:
+        logging.warning(
+            "`fully_connected` feature is not compatible with test mode. Ignore it.")
+
     # load node config file
     with open(config, "r") as f:
         config = yaml.safe_load(f)
@@ -92,6 +96,9 @@ async def bringup(config: str, test_mode: bool = False, fully_connected: bool = 
 
     if not test_mode:
         await cluster.alias_peers()
+
+        if fully_connected:
+            await cluster.connect_peers()
 
     logging.info("All nodes ready")
 
