@@ -1586,7 +1586,9 @@ mod tests {
 
     #[test]
     fn test_half_key() -> anyhow::Result<()> {
-        let hk1 = HalfKey([0u8; HalfKey::SIZE]);
+        let hk1 = HalfKey {
+            hkey: [0u8; HalfKey::SIZE],
+        };
         let hk2 = HalfKey::try_from(hk1.as_ref())?;
 
         assert_eq!(hk1, hk2, "failed to match deserialized half-key");
