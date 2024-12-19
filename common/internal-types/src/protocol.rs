@@ -271,7 +271,7 @@ mod tests {
     #[test]
     fn acknowledgement_binary_compatibility_with_the_v2_format() -> anyhow::Result<()> {
         let offchain_kp = OffchainKeypair::from_secret(&PRIVATE_KEY)?;
-        let mut ack = crate::acknowledgement::Acknowledgement::new(HalfKey::default(), &offchain_kp);
+        let mut ack = Acknowledgement::new(HalfKey::default(), &offchain_kp);
 
         assert!(ack.validate(&offchain_kp.public()));
 
@@ -307,7 +307,9 @@ mod tests {
         // {"ack_signature": {"signature": [89, 36, 190, 72, 162, 195, 203, 105, 96, 39, 2, 57, 83, 108, 255, 224, 181, 217, 123, 121, 0, 130, 218, 78, 105, 117, 236, 40, 27, 8, 33, 119, 187, 12, 186, 244, 51, 18, 234, 124, 128, 35, 214, 159, 159, 215, 20, 118, 106, 144, 107, 133, 151, 167, 185, 144, 252, 188, 38, 9, 227, 165, 42, 0]}, "ack_key_share": {"hkey": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]}, "validated": true}
         // {"ack_signature": [89, 36, 190, 72, 162, 195, 203, 105, 96, 39, 2, 57, 83, 108, 255, 224, 181, 217, 123, 121, 0, 130, 218, 78, 105, 117, 236, 40, 27, 8, 33, 119, 187, 12, 186, 244, 51, 18, 234, 124, 128, 35, 214, 159, 159, 215, 20, 118, 106, 144, 107, 133, 151, 167, 185, 144, 252, 188, 38, 9, 227, 165, 42, 0], "ack_key_share": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1], "validated": true}
 
-        assert_eq!(&serialized, &EXPECTED_BINARY_REPRESENTATION_CBOR);
+        assert_eq!(&serialized, &EXPECTED_V2_BINARY_REPRESENTATION_CBOR);
+
+        Ok(())
     }
 
     #[test]
