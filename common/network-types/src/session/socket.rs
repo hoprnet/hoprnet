@@ -9,7 +9,7 @@ use std::time::Duration;
 use dashmap::{DashMap, Entry};
 use governor::prelude::StreamRateLimitExt;
 use governor::{Quota, RateLimiter};
-use tracing::trace;
+
 use crate::prelude::errors::SessionError;
 use crate::prelude::protocol::{FrameAcknowledgements, SessionCodec, SessionMessage};
 use crate::prelude::{frame_reconstructor, FrameId, Segment};
@@ -57,7 +57,7 @@ impl<const C: usize> SocketState<C> {
             // Frame acknowledged, we won't need to resend it
             if let Some((_, rt)) = self.outgoing_frame_retries.remove(&frame_id) {
                 let to_ack = rt.time_since_creation();
-                trace!(
+                tracing::trace!(
                     //session_id = self.session_id,
                     frame_id,
                     duration_in_ms = to_ack.as_millis(),
@@ -73,10 +73,15 @@ impl<const C: usize> SocketState<C> {
     }
 
     async fn incoming_retransmission_request(&mut self, retransmit: SegmentRequest<C>) -> Result<(), SessionError> {
-        let missing = retransmit.into_iter().collect::<Vec<_>>();
-        let segments = self.rb.find(|s| missing.contains(&s.id()));
+        let missing = retransmit.into_iter()
+            .inspect(|s| {
+                // Frame partially acknowledged, we won't need to resend it
+                self.outgoing_frame_retries.remove(&s.0);
+            })
+            .collect::<Vec<_>>();
 
-        // TODO:
+        // Perform one find to lock only once
+        let segments = self.rb.find(|s| missing.contains(&s.id()));
 
         self.downstream_segment_in
             .send_all(&mut futures::stream::iter(segments).map(Ok))
@@ -121,20 +126,26 @@ impl<const C: usize> SessionSocket<C> {
         let (mut ack_tx, ack_rx) = futures::channel::mpsc::channel(200_000);
 
         // Forward acknowledged frames chunked as a Control messages
-        // TODO: chunk size and rate limit should be configurable
-        let ack_rate_limiter = RateLimiter::direct(Quota::per_second(NonZeroU32::MIN));
-        hopr_async_runtime::prelude::spawn(
+        let ctl_tx_clone = ctl_tx.clone();
+        let id_clone = session_id.clone();
+        hopr_async_runtime::prelude::spawn(async move {
+            // TODO: chunk size and rate limit should be configurable
+            let ack_rate_limiter = RateLimiter::direct(Quota::per_second(NonZeroU32::MIN));
             ack_rx
                 .ready_chunks(FrameAcknowledgements::<C>::MAX_ACK_FRAMES)
                 .map(|v| Ok(SessionMessage::Acknowledge(v.into())))
                 .ratelimit_stream(&ack_rate_limiter)
-                .forward(ctl_tx.clone())
-        );
+                .forward(ctl_tx_clone)
+                .await;
+            tracing::trace!(session_id = id_clone, "acknowledgement forwarding done");
+        });
 
         let outgoing_frame_retries = Arc::new(DashMap::new());
         let incoming_frame_retries = Arc::new(DashMap::new());
 
         // Frames coming out from the Reconstructor can be read Upstream
+        let incoming_frame_retries_clone = incoming_frame_retries.clone();
+        let id_clone = session_id.clone();
         let downstream_frames_out = Box::pin(
             downstream_frames_out
                 .filter_map(move |maybe_frame| {
@@ -142,14 +153,14 @@ impl<const C: usize> SessionSocket<C> {
                         Ok(frame) => {
                             // TODO: ack_tx gets dropped when downstream_frames_out is dropped?
                             if let Err(error) = ack_tx.try_send(frame.frame_id) {
-                                tracing::error!(session_id, frame_id = frame.frame_id, %error, "failed to acknowledge frame");
+                                tracing::error!(session_id = id_clone, frame_id = frame.frame_id, %error, "failed to acknowledge frame");
                             }
-                            incoming_frame_retries.remove(&frame.frame_id);
+                            incoming_frame_retries_clone.remove(&frame.frame_id);
                             futures::future::ready(Some(Ok(frame)))
                         },
                         Err(SessionError::FrameDiscarded(frame_id)) | Err(SessionError::IncompleteFrame(frame_id)) => {
-                            tracing::warn!(session_id, frame_id, "frame discarded");
-                            incoming_frame_retries.remove(&frame_id);
+                            tracing::warn!(session_id = id_clone, frame_id, "frame discarded");
+                            incoming_frame_retries_clone.remove(&frame_id);
                             futures::future::ready(None) // skip discarded frames
                         }
                         Err(err) => {

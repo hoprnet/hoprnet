@@ -1,14 +1,20 @@
+mod skip_queue;
+
 use std::pin::Pin;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
+use std::collections::VecDeque;
 
 use futures::channel::mpsc::UnboundedSender;
 use futures::stream::BoxStream;
-use futures::{AsyncRead, AsyncWrite, StreamExt};
+use futures::{AsyncRead, AsyncWrite, FutureExt, StreamExt};
 use rand::distributions::Bernoulli;
 use rand::prelude::{thread_rng, Distribution, Rng, SeedableRng, StdRng};
+use rand_distr::Normal;
+use ringbuffer::{AllocRingBuffer, RingBuffer};
+
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) struct RetryToken {
@@ -134,8 +140,8 @@ impl<const C: usize> AsyncWrite for FaultyNetwork<'_, C> {
         }
 
         if let Some(stats) = &self.stats {
-            stats.bytes_sent.fetch_add(buf.len(), Ordering::Relaxed);
-            stats.packets_sent.fetch_add(1, Ordering::Relaxed);
+            stats.bytes_sent.fetch_add(buf.len(), std::sync::atomic::Ordering::Relaxed);
+            stats.packets_sent.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         }
 
         tracing::trace!("FaultyNetwork::poll_write {} bytes", buf.len());
@@ -160,8 +166,8 @@ impl<const C: usize> AsyncRead for FaultyNetwork<'_, C> {
                 buf[..len].copy_from_slice(&item.as_ref()[..len]);
 
                 if let Some(stats) = &self.stats {
-                    stats.bytes_received.fetch_add(len, Ordering::Relaxed);
-                    stats.packets_received.fetch_add(1, Ordering::Relaxed);
+                    stats.bytes_received.fetch_add(len, std::sync::atomic::Ordering::Relaxed);
+                    stats.packets_received.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                 }
 
                 tracing::trace!("FaultyNetwork::poll_read: {len} bytes ready");
@@ -207,10 +213,6 @@ pub fn sample_index<T: Distribution<f64>, R: Rng>(dist: &mut T, rng: &mut R, len
     let f: f64 = dist.sample(rng);
     (f.max(0.0).round() as usize).min(len - 1)
 }
-
-use rand_distr::Normal;
-use ringbuffer::{AllocRingBuffer, RingBuffer};
-use std::collections::VecDeque;
 
 /// Shuffles the given `vec` by taking the next element with index `|N(0,factor^2)`|, where
 /// `N` denotes normal distribution.

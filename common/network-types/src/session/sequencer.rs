@@ -224,7 +224,8 @@ mod tests {
         expected.sort();
         assert_eq!(expected, actual);
 
-        Ok(jh.await?)
+        let _ = jh.await?;
+        Ok(())
     }
 
     #[test_log::test(async_std::test)]
@@ -253,7 +254,8 @@ mod tests {
         expected.sort();
         assert_eq!(expected, actual);
 
-        Ok(jh.await?)
+        let _ = jh.await?;
+        Ok(())
     }
 
     #[test_log::test(async_std::test)]
@@ -328,7 +330,8 @@ mod tests {
 
         assert_eq!(None, seq_stream.try_next().await?);
 
-        Ok(jh.await?)
+        let _ = jh.await?;
+        Ok(())
     }
 
     #[test_log::test(async_std::test)]

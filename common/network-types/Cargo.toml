@@ -38,6 +38,7 @@ dashmap = { workspace = true }
 flume = { workspace = true }
 futures = { workspace = true }
 futures-concurrency = { workspace = true }
+futures-time = { workspace = true }
 governor = { workspace = true }
 hex = { workspace = true }
 hickory-resolver = { workspace = true }

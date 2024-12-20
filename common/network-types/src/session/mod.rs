@@ -153,7 +153,8 @@ mod tests {
 
         assert_eq!(actual, expected);
 
-        Ok(jh.await?)
+        let _ = jh.await?;
+        Ok(())
     }
 
     #[test_log::test(async_std::test)]
@@ -190,6 +191,7 @@ mod tests {
             }
         }
 
-        Ok(jh.await?)
+        let _ = jh.await?;
+        Ok(())
     }
 }
