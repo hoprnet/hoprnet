@@ -1,6 +1,5 @@
 import asyncio
 import base64
-import json
 import logging
 import random
 from typing import Optional
@@ -34,7 +33,6 @@ from .response_objects import (
     Balances,
     Channel,
     Channels,
-    Configuration,
     ConnectedPeer,
     Infos,
     Message,

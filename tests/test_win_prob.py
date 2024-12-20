@@ -1,5 +1,4 @@
 import asyncio
-import os
 import random
 
 import pytest
@@ -7,7 +6,6 @@ import pytest
 from sdk.python.localcluster.constants import (
     ANVIL_CONFIG_FILE,
     NETWORK1,
-    PASSWORD,
     PORT_BASE,
     TICKET_PRICE_PER_HOP,
 )
@@ -29,12 +27,7 @@ ANVIL_ENDPOINT = f"http://127.0.0.1:{PORT_BASE}"
 
 
 def set_minimum_winning_probability_in_network(private_key: str, win_prob: float):
-    custom_env = {
-        # "ETHERSCAN_API_KEY": "anykey",
-        # "IDENTITY_PASSWORD": PASSWORD,
-        "PRIVATE_KEY": private_key,
-        # "PATH": os.environ["PATH"],
-    }
+    custom_env = { "PRIVATE_KEY": private_key } 
     cmd = [
         "hopli",
         "win-prob",
