@@ -351,16 +351,22 @@ impl BytesRepresentable for Challenge {
     const SIZE: usize = CurvePoint::SIZE_COMPRESSED;
 }
 
-/// Represents a half-key used for Proof of Relay
+/// Represents a half-key used for the Proof-of-Relay.
+///
 /// Half-key is equivalent to a non-zero scalar in the field used by secp256k1, but the type
-/// itself does not validate nor enforce this fact,
+/// itself does not validate nor enforce this fact.
+// TODO: change this to HalfKey([u8; Self::SIZE]) in 3.0
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub struct HalfKey([u8; Self::SIZE]);
+pub struct HalfKey {
+    hkey: [u8; Self::SIZE],
+}
 
 impl Default for HalfKey {
     fn default() -> Self {
-        let mut ret = Self([0u8; Self::SIZE]);
-        ret.0.copy_from_slice(
+        let mut ret = Self {
+            hkey: [0u8; Self::SIZE],
+        };
+        ret.hkey.copy_from_slice(
             NonZeroScalar::<Secp256k1>::from_uint(1u16.into())
                 .unwrap()
                 .to_bytes()
@@ -371,15 +377,17 @@ impl Default for HalfKey {
 }
 
 impl HalfKey {
-    /// Generates random half key, useful for tests.
+    /// Generates random half-key, useful for tests.
     pub fn random() -> Self {
-        Self(random_group_element().0)
+        Self {
+            hkey: random_group_element().0,
+        }
     }
 
     /// Converts the non-zero scalar represented by this half-key into the half-key challenge.
     /// This operation naturally enforces the underlying scalar to be non-zero.
     pub fn to_challenge(&self) -> HalfKeyChallenge {
-        CurvePoint::from_exponent(&self.0)
+        CurvePoint::from_exponent(&self.hkey)
             .map(|cp| HalfKeyChallenge::new(cp.as_compressed().as_bytes()))
             .expect("invalid public key")
     }
@@ -387,7 +395,7 @@ impl HalfKey {
 
 impl AsRef<[u8]> for HalfKey {
     fn as_ref(&self) -> &[u8] {
-        &self.0
+        &self.hkey
     }
 }
 
@@ -395,7 +403,9 @@ impl TryFrom<&[u8]> for HalfKey {
     type Error = GeneralError;
 
     fn try_from(value: &[u8]) -> std::result::Result<Self, Self::Error> {
-        Ok(Self(value.try_into().map_err(|_| ParseError("HalfKey".into()))?))
+        Ok(Self {
+            hkey: value.try_into().map_err(|_| ParseError("HalfKey".into()))?,
+        })
     }
 }
 
@@ -1040,8 +1050,12 @@ impl From<[u8; Self::SIZE]> for Response {
 }
 
 /// Represents an EdDSA signature using Ed25519 Edwards curve.
+// TODO: change this to OffchainSignature([u8; Self::SIZE]) in 3.0
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct OffchainSignature(#[serde(with = "arrays")] [u8; Self::SIZE]);
+pub struct OffchainSignature {
+    #[serde(with = "arrays")]
+    signature: [u8; Self::SIZE],
+}
 
 impl OffchainSignature {
     /// Sign the given message using the [OffchainKeypair].
@@ -1060,7 +1074,7 @@ impl OffchainSignature {
 
     /// Verify this signature of the given message and [OffchainPublicKey].
     pub fn verify_message(&self, msg: &[u8], public_key: &OffchainPublicKey) -> bool {
-        let sgn = ed25519_dalek::Signature::from_slice(&self.0).expect("corrupted OffchainSignature");
+        let sgn = ed25519_dalek::Signature::from_slice(&self.signature).expect("corrupted OffchainSignature");
         let pk = ed25519_dalek::VerifyingKey::from_bytes(public_key.0.as_bytes()).unwrap();
         pk.verify_strict(msg, &sgn).is_ok()
     }
@@ -1068,7 +1082,7 @@ impl OffchainSignature {
 
 impl AsRef<[u8]> for OffchainSignature {
     fn as_ref(&self) -> &[u8] {
-        &self.0
+        &self.signature
     }
 }
 
@@ -1089,8 +1103,10 @@ impl BytesRepresentable for OffchainSignature {
 
 impl From<ed25519_dalek::Signature> for OffchainSignature {
     fn from(value: ed25519_dalek::Signature) -> Self {
-        let mut ret = Self([0u8; Self::SIZE]);
-        ret.0.copy_from_slice(value.to_bytes().as_ref());
+        let mut ret = Self {
+            signature: [0u8; Self::SIZE],
+        };
+        ret.signature.copy_from_slice(value.to_bytes().as_ref());
         ret
     }
 }
@@ -1103,12 +1119,12 @@ impl TryFrom<([u8; 32], [u8; 32])> for OffchainSignature {
     }
 }
 
-/// Represents an ECDSA signature based on the secp256k1 curve with recoverable public key.
+/// Represents an ECDSA signature based on the secp256k1 curve with a recoverable public key.
 /// This signature encodes the 2-bit recovery information into the
 /// uppermost bits of MSB of the S value, which are never used by this ECDSA
 /// instantiation over secp256k1.
 /// The instance holds the byte array consisting of `R` and `S` values with the recovery bit
-/// alredy embedded in S.
+/// already embedded in S.
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct Signature(#[serde(with = "arrays")] [u8; Self::SIZE]);
 
@@ -1570,7 +1586,9 @@ mod tests {
 
     #[test]
     fn test_half_key() -> anyhow::Result<()> {
-        let hk1 = HalfKey([0u8; HalfKey::SIZE]);
+        let hk1 = HalfKey {
+            hkey: [0u8; HalfKey::SIZE],
+        };
         let hk2 = HalfKey::try_from(hk1.as_ref())?;
 
         assert_eq!(hk1, hk2, "failed to match deserialized half-key");
