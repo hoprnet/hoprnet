@@ -10,9 +10,7 @@ class ApiRequestObject:
         kwargs.pop("self", None)
 
         if set(kwargs.keys()) != set(self.keys.keys()):
-            raise ValueError(
-                f"Keys mismatch: {set(kwargs.keys())} != {set(self.keys.keys())}"
-            )
+            raise ValueError(f"Keys mismatch: {set(kwargs.keys())} != {set(self.keys.keys())}")
 
         for key, value in kwargs.items():
             setattr(self, key, value)
@@ -25,8 +23,7 @@ class ApiRequestObject:
 
     @property
     def as_header_string(self) -> str:
-        attrs_as_dict = {value: getattr(self, key)
-                         for key, value in self.keys.items()}
+        attrs_as_dict = {value: getattr(self, key) for key, value in self.keys.items()}
         return "&".join([f"{k}={v}" for k, v in attrs_as_dict.items()])
 
     def post_init(self):
@@ -34,10 +31,7 @@ class ApiRequestObject:
 
 
 class SetAliasBody(ApiRequestObject):
-    keys = {
-        "alias": "alias",
-        "destination": "destination"
-    }
+    keys = {"alias": "alias", "destination": "destination"}
 
     def __init__(self, alias: str, destination: str):
         super().__init__(vars())
@@ -108,15 +102,18 @@ class SessionCapabilitiesBody(ApiRequestObject):
         "no_delay": "NoDelay",
     }
 
-    def __init__(self, retransmission: bool = False, segmentation: bool = False,
-                 retransmission_ack_only: bool = False, no_delay: bool = False):
+    def __init__(
+        self,
+        retransmission: bool = False,
+        segmentation: bool = False,
+        retransmission_ack_only: bool = False,
+        no_delay: bool = False,
+    ):
         super().__init__(vars())
 
     @property
     def as_array(self) -> list:
-        return [
-            self.keys[var] for var in vars(self) if var in self.keys and vars(self)[var]
-        ]
+        return [self.keys[var] for var in vars(self) if var in self.keys and vars(self)[var]]
 
 
 class SessionPathBodyRelayers(ApiRequestObject):
@@ -169,13 +166,7 @@ class PeekAllMessagesBody(ApiRequestObject):
 
 
 class SendMessageBody(ApiRequestObject):
-    keys = {
-        "body": "body",
-        "hops": "hops",
-        "path": "path",
-        "destination": "destination",
-        "tag": "tag"
-    }
+    keys = {"body": "body", "hops": "hops", "path": "path", "destination": "destination", "tag": "tag"}
 
     def __init__(self, body: str, hops: int, path: list[str], destination: str, tag: int):
         super().__init__(vars())

@@ -60,10 +60,8 @@ async def test_stress_relayed_flood_test_with_sources_performing_1_hop_to_self(s
     STRESS_1_HOP_TO_SELF_MESSAGE_COUNT = stress_fixture["request_count"]
     ROUGH_PAYLOAD_SIZE = 460
 
-    api_sources = [HoprdAPI(f'http://{d["url"]}', d["token"])
-                   for d in stress_fixture["sources"]]
-    api_target = HoprdAPI(
-        f'http://{stress_fixture["target"]["url"]}', stress_fixture["target"]["token"])
+    api_sources = [HoprdAPI(f'http://{d["url"]}', d["token"]) for d in stress_fixture["sources"]]
+    api_target = HoprdAPI(f'http://{stress_fixture["target"]["url"]}', stress_fixture["target"]["token"])
     target_peer_id = (await api_target.addresses()).hopr
 
     async with AsyncExitStack() as channels:

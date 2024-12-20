@@ -54,8 +54,7 @@ async def test_hoprd_swarm_connectivity(swarm7: dict[str, Node]):
     await asyncio.gather(
         *[
             asyncio.wait_for(
-                check_all_connected(
-                    swarm7[k], [swarm7[v].peer_id for v in barebone_nodes() if v != k]), 60.0
+                check_all_connected(swarm7[k], [swarm7[v].peer_id for v in barebone_nodes() if v != k]), 60.0
             )
             for k in barebone_nodes()
         ]
@@ -134,8 +133,7 @@ async def test_hoprd_ping_should_work_between_nodes_in_the_same_network(src: str
     response = await swarm7[src].api.ping(swarm7[dest].peer_id)
 
     assert response is not None
-    assert int(
-        response.latency) > 0, f"Non-0 round trip time expected, actual: '{int(response.latency)}'"
+    assert int(response.latency) > 0, f"Non-0 round trip time expected, actual: '{int(response.latency)}'"
 
 
 @pytest.mark.asyncio
@@ -183,8 +181,7 @@ async def test_hoprd_should_fail_sending_a_message_that_is_too_large(src: str, d
     random_tag = gen_random_tag()
 
     packet = "0 hop message too large: " + "".join(
-        random.choices(string.ascii_uppercase +
-                       string.digits, k=maximum_payload_size)
+        random.choices(string.ascii_uppercase + string.digits, k=maximum_payload_size)
     )
     assert await swarm7[src].api.send_message(swarm7[dest].peer_id, packet, [], random_tag) is None
 
@@ -210,16 +207,13 @@ async def test_hoprd_api_channel_should_register_fund_increase_using_fund_endpoi
 
         # Wait until the safe balance has decreased
         await asyncio.wait_for(
-            check_safe_balance(
-                swarm7[src], balance_before.safe_hopr - hopr_amount
-            ),
+            check_safe_balance(swarm7[src], balance_before.safe_hopr - hopr_amount),
             20.0,
         )
 
         # Safe allowance can be checked too at this point
         balance_after = await swarm7[src].api.balances()
-        assert balance_before.safe_hopr_allowance - \
-            balance_after.safe_hopr_allowance == hopr_amount
+        assert balance_before.safe_hopr_allowance - balance_after.safe_hopr_allowance == hopr_amount
 
         await asyncio.wait_for(check_native_balance_below(swarm7[src], balance_before.native), 20.0)
 
@@ -304,14 +298,12 @@ async def test_hoprd_should_fail_sending_a_message_when_the_channel_is_out_of_fu
             ]
         )
 
-        packets = [
-            f"Channel agg and redeem on 1-hop: {src} - {dest} - {src} #{i:08d}" for i in range(message_count)]
+        packets = [f"Channel agg and redeem on 1-hop: {src} - {dest} - {src} #{i:08d}" for i in range(message_count)]
         await send_and_receive_packets_with_pop(packets, src=swarm7[src], dest=swarm7[src], path=[swarm7[dest].peer_id])
 
         # this message has no funding in the channel, but it still should be sent
         assert await swarm7[src].api.send_message(
-            swarm7[src].peer_id, "THIS MSG IS NOT COVERED", [
-                swarm7[dest].peer_id]
+            swarm7[src].peer_id, "THIS MSG IS NOT COVERED", [swarm7[dest].peer_id]
         )
 
         await asyncio.wait_for(check_unredeemed_tickets_value(swarm7[dest], message_count * TICKET_PRICE_PER_HOP), 30.0)
@@ -364,8 +356,7 @@ async def test_hoprd_default_strategy_automatic_ticket_aggregation_and_redeeming
         statistics_before = await swarm7[mid].api.get_tickets_statistics()
         assert statistics_before is not None
 
-        packets = [
-            f"Ticket aggregation test: #{i:08d}" for i in range(ticket_count)]
+        packets = [f"Ticket aggregation test: #{i:08d}" for i in range(ticket_count)]
         await send_and_receive_packets_with_pop(packets, src=swarm7[src], dest=swarm7[dest], path=[swarm7[mid].peer_id])
 
         # monitor that the node aggregates and redeems tickets until the aggregated value is reached
@@ -374,8 +365,7 @@ async def test_hoprd_default_strategy_automatic_ticket_aggregation_and_redeeming
                 statistics_now = await api.get_tickets_statistics()
                 assert statistics_now is not None
 
-                redeemed_value_diff = statistics_now.redeemed_value - \
-                    statistics_before.redeemed_value
+                redeemed_value_diff = statistics_now.redeemed_value - statistics_before.redeemed_value
 
                 # break out of the loop if the aggregated value is reached
                 if redeemed_value_diff >= AGGREGATED_TICKET_PRICE:
@@ -398,12 +388,12 @@ async def test_hoprd_sanity_check_channel_status(swarm7: dict[str, Node]):
     open_channels = await alice_api.all_channels(include_closed=False)
     open_and_closed_channels = await alice_api.all_channels(include_closed=True)
 
-    assert len(open_and_closed_channels.all) >= len(
-        open_channels.all), "Open and closed channels should be present"
+    assert len(open_and_closed_channels.all) >= len(open_channels.all), "Open and closed channels should be present"
 
     statuses = [c.status for c in open_and_closed_channels.all]
-    assert ChannelStatus.Closed in statuses or ChannelStatus.PendingToClose in statuses, \
-        "Closed channels should be present"
+    assert (
+        ChannelStatus.Closed in statuses or ChannelStatus.PendingToClose in statuses
+    ), "Closed channels should be present"
 
 
 @pytest.mark.asyncio
@@ -508,8 +498,7 @@ async def test_peeking_messages_with_timestamp(src: str, dest: str, swarm7: dict
         await src_peer.api.send_message(dest_peer.peer_id, packet, [], random_tag)
 
     await asyncio.wait_for(
-        check_received_packets_with_peek(
-            dest_peer, packets, tag=random_tag, sort=True), MULTIHOP_MESSAGE_SEND_TIMEOUT
+        check_received_packets_with_peek(dest_peer, packets, tag=random_tag, sort=True), MULTIHOP_MESSAGE_SEND_TIMEOUT
     )
 
     packets = await dest_peer.api.messages_peek_all(random_tag)
@@ -565,8 +554,7 @@ async def test_send_message_with_address_or_peer_id(src: str, dest: str, swarm7:
     packets = [f"0 hop message #{i:08d}" for i in range(message_count)]
     for packet in packets:
         res = await src_peer.api.send_message(
-            random.choice([dest_peer.peer_id, dest_peer.address]
-                          ), packet, [], random_tag
+            random.choice([dest_peer.peer_id, dest_peer.address]), packet, [], random_tag
         )
         assert res is not None
 

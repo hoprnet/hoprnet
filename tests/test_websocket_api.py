@@ -35,8 +35,7 @@ def test_hoprd_websocket_api_should_reject_a_connection_without_a_valid_token(
             url = to_ws_url(
                 swarm7[src].host_addr,
                 swarm7[src].api_port,
-                args=DEFAULT_ARGS +
-                [("destination", f"{swarm7[dest].peer_id}")]
+                args=DEFAULT_ARGS + [("destination", f"{swarm7[dest].peer_id}")],
             )
             ws.connect(url)
         except websocket.WebSocketBadStatusException as e:
@@ -54,8 +53,7 @@ def test_hoprd_websocket_api_should_reject_a_connection_with_an_invalid_token(
             url = to_ws_url(
                 swarm7[src].host_addr,
                 swarm7[src].api_port,
-                args=DEFAULT_ARGS +
-                [("destination", f"{swarm7[dest].peer_id}")]
+                args=DEFAULT_ARGS + [("destination", f"{swarm7[dest].peer_id}")],
             )
             ws.connect(url, header={"X-Auth-Token": "InvAliD_toKeN"})
         except websocket.WebSocketBadStatusException as e:
@@ -73,8 +71,7 @@ def test_hoprd_websocket_api_should_not_accept_a_connection_with_an_invalid_toke
             url = to_ws_url(
                 swarm7[src].host_addr,
                 swarm7[src].api_port,
-                args=[("apiToken", "InvAlid_Token")] + DEFAULT_ARGS +
-                [("destination", f"{swarm7[dest].peer_id}")]
+                args=[("apiToken", "InvAlid_Token")] + DEFAULT_ARGS + [("destination", f"{swarm7[dest].peer_id}")],
             )
             ws.connect(url)
         except websocket.WebSocketBadStatusException as e:
@@ -92,8 +89,7 @@ def test_hoprd_websocket_api_should_reject_a_connection_with_an_invalid_bearer_t
             url = to_ws_url(
                 swarm7[src].host_addr,
                 swarm7[src].api_port,
-                args=DEFAULT_ARGS +
-                [("destination", f"{swarm7[dest].peer_id}")]
+                args=DEFAULT_ARGS + [("destination", f"{swarm7[dest].peer_id}")],
             )
             ws.connect(url, header={"Authorization": "Bearer InvAliD_toKeN"})
         except websocket.WebSocketBadStatusException as e:
@@ -128,8 +124,7 @@ def test_hoprd_websocket_api_should_accept_a_connection_with_a_query_param_passe
         url = to_ws_url(
             swarm7[src].host_addr,
             swarm7[src].api_port,
-            args=[("apiToken", API_TOKEN)] + DEFAULT_ARGS +
-            [("destination", f"{swarm7[dest].peer_id}")]
+            args=[("apiToken", API_TOKEN)] + DEFAULT_ARGS + [("destination", f"{swarm7[dest].peer_id}")],
         )
         ws.connect(url)
 
@@ -177,13 +172,11 @@ async def test_websocket_send_receive_messages(src: str, dest: str, swarm7: dict
             to_ws_url(
                 swarm7[src].host_addr,
                 swarm7[src].api_port,
-                args=[
-                     ("target", f"127.0.0.1:{server.port}")
-                ] + DEFAULT_ARGS + [
-                    ("destination", f"{swarm7[dest].peer_id}")
-                ]
+                args=[("target", f"127.0.0.1:{server.port}")]
+                + DEFAULT_ARGS
+                + [("destination", f"{swarm7[dest].peer_id}")],
             ),
-            additional_headers=EXTRA_HEADERS
+            additional_headers=EXTRA_HEADERS,
         ) as ws:
             for i in range(message_target_count):
                 body = f"hello msg #{i} from peer {swarm7[src].peer_id} to peer {swarm7[dest].peer_id}"
@@ -193,8 +186,7 @@ async def test_websocket_send_receive_messages(src: str, dest: str, swarm7: dict
                 try:
                     msg = await asyncio.wait_for(ws.recv(), timeout=5)
                 except Exception:
-                    pytest.fail(
-                        f"Timeout when receiving msg {i} from {src} to {dest}")
+                    pytest.fail(f"Timeout when receiving msg {i} from {src} to {dest}")
                 assert body == msg.decode(), "sent data content should be identical"
 
 

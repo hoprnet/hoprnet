@@ -79,7 +79,8 @@ def random_distinct_pairs_from(values: list, count: int):
 async def swarm7(request):
     # path is related to where the test is run. Most likely the root of the repo
     cluster, anvil = await localcluster.bringup(
-        "./sdk/python/localcluster.params.yml", test_mode=True, fully_connected=False)
+        "./sdk/python/localcluster.params.yml", test_mode=True, fully_connected=False
+    )
 
     yield cluster.nodes
 
@@ -108,14 +109,12 @@ def to_ws_url(host, port, args: list[tuple[str, str]]):
 
 def run_hopli_cmd(cmd: list[str], custom_env):
     env = os.environ | custom_env
-    proc = Popen(cmd, env=env, stdout=PIPE,
-                 stderr=STDOUT, bufsize=0, cwd=PWD.parent)
+    proc = Popen(cmd, env=env, stdout=PIPE, stderr=STDOUT, bufsize=0, cwd=PWD.parent)
     # filter out ansi color codes
     color_regex = re.compile(r"\x1b\[\d{,3}m")
     with proc.stdout:
         for line in iter(proc.stdout.readline, b""):
-            logging.debug("[Hopli] %r", color_regex.sub(
-                "", line.decode("utf-8")[:-1]))
+            logging.debug("[Hopli] %r", color_regex.sub("", line.decode("utf-8")[:-1]))
     retcode = proc.wait()
     if retcode:
         raise CalledProcessError(retcode, cmd)

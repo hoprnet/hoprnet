@@ -33,15 +33,7 @@ def load_env_file(env_file: str) -> dict:
 
 
 class Node:
-    def __init__(
-        self,
-        id: int,
-        api_token: str,
-        host_addr: str,
-        network: str,
-        cfg_file: str,
-        alias: str
-    ):
+    def __init__(self, id: int, api_token: str, host_addr: str, network: str, cfg_file: str, alias: str):
         # initialized
         self.id = id
         self.alias = alias
@@ -84,8 +76,7 @@ class Node:
         self.safe_address = loaded_env.get("HOPRD_SAFE_ADDRESS")
         self.module_address = loaded_env.get("HOPRD_MODULE_ADDRESS")
         if self.safe_address is None or self.module_address is None:
-            raise ValueError(
-                "Critical addresses are missing in the environment file.")
+            raise ValueError("Critical addresses are missing in the environment file.")
 
     def create_local_safe(self, anvil_config: Path):
         logging.debug(f"Creating safe and module for {self}")
@@ -108,7 +99,7 @@ class Node:
                 "--network",
                 self.network,
                 "--identity-from-path",
-                self.dir.joinpath('hoprd.id'),
+                self.dir.joinpath("hoprd.id"),
                 "--contracts-root",
                 "./ethereum/contracts",
                 "--hopr-amount",
@@ -144,15 +135,12 @@ class Node:
                 env_file.write(f"HOPRD_MODULE_ADDRESS={self.module_address}\n")
             return True
 
-        logging.error(
-            f"Failed to create safe for node {self.id}: {res.stdout} - {res.stderr}")
+        logging.error(f"Failed to create safe for node {self.id}: {res.stdout} - {res.stderr}")
         return False
 
     def setup(self, password: str, config_file: Path, dir: Path):
-        trace_telemetry = "true" if os.getenv(
-            "TRACE_TELEMETRY") is not None else "false"
-        log_level = "trace" if os.getenv(
-            "TRACE_TELEMETRY") is not None else "debug"
+        trace_telemetry = "true" if os.getenv("TRACE_TELEMETRY") is not None else "false"
+        log_level = "trace" if os.getenv("TRACE_TELEMETRY") is not None else "debug"
 
         api_token_param = f"--api-token={self.api_token}" if self.api_token else "--disableApiAuthentication"
         custom_env = {
@@ -198,7 +186,7 @@ class Node:
         if self.cfg_file_path is not None:
             cmd += [f"--configurationFilePath={self.cfg_file_path}"]
 
-        with open(self.dir.joinpath('hoprd.log'), "w") as log_file:
+        with open(self.dir.joinpath("hoprd.log"), "w") as log_file:
             self.proc = Popen(
                 cmd,
                 stdout=log_file,
@@ -246,8 +234,9 @@ class Node:
         for peer_id in peer_ids:
             if peer_id == self.peer_id:
                 continue
-            tasks.append(asyncio.create_task(self.api.open_channel(
-                peer_id, f"{OPEN_CHANNEL_FUNDING_VALUE_HOPR*1e18:.0f}")))
+            tasks.append(
+                asyncio.create_task(self.api.open_channel(peer_id, f"{OPEN_CHANNEL_FUNDING_VALUE_HOPR*1e18:.0f}"))
+            )
 
         await asyncio.gather(*tasks)
 
@@ -258,9 +247,9 @@ class Node:
         print(f"\t\tPeer Id:\t{addresses.hopr}")
         print(f"\t\tAddress:\t{addresses.native}")
         print(
-            f"\t\tRest API:\thttp://{self.host_addr}:{self.api_port}/scalar | http://{self.host_addr}:{self.api_port}/swagger-ui/index.html")
-        print(
-            f"\t\tAdmin UI:\thttp://{self.host_addr}:4677/?{admin_ui_params}", end="\n\n")
+            f"\t\tRest API:\thttp://{self.host_addr}:{self.api_port}/scalar | http://{self.host_addr}:{self.api_port}/swagger-ui/index.html"
+        )
+        print(f"\t\tAdmin UI:\thttp://{self.host_addr}:4677/?{admin_ui_params}", end="\n\n")
 
     def __eq__(self, other):
         return self.peer_id == other.peer_id

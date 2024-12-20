@@ -34,8 +34,6 @@ PROTOCOL_CONFIG_FILE = MAIN_DIR.joinpath("protocol-config.json")
 
 PWD = Path(__file__).parent.parent.parent
 
-INPUT_PROTOCOL_CONFIG_FILE = PWD.parent.joinpath(
-    "scripts", "protocol-config-anvil.json")
-INPUT_DEPLOYMENTS_SUMMARY_FILE = PWD.parent.joinpath(
-    "ethereum", "contracts", "contracts-addresses.json")
+INPUT_PROTOCOL_CONFIG_FILE = PWD.parent.joinpath("scripts", "protocol-config-anvil.json")
+INPUT_DEPLOYMENTS_SUMMARY_FILE = PWD.parent.joinpath("ethereum", "contracts", "contracts-addresses.json")
 PREGENERATED_IDENTITIES_DIR = PWD.joinpath("identities")

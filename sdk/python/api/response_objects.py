@@ -16,7 +16,7 @@ def _convert(value: Any):
         except ValueError:
             return value
 
-        if '.' in value:
+        if "." in value:
             return float_value
         else:
             return int(value)
@@ -55,9 +55,7 @@ class ApiResponseObject:
         return str(self)
 
     def __eq__(self, other):
-        return all(
-            getattr(self, key) == getattr(other, key) for key in self.keys.keys()
-        )
+        return all(getattr(self, key) == getattr(other, key) for key in self.keys.keys())
 
 
 class Addresses(ApiResponseObject):
@@ -74,7 +72,7 @@ class Balances(ApiResponseObject):
         "native": "native",
         "safe_native": "safeNative",
         "safe_hopr": "safeHopr",
-        "safe_hopr_allowance": "safeHoprAllowance"
+        "safe_hopr_allowance": "safeHoprAllowance",
     }
 
 
@@ -83,8 +81,7 @@ class Infos(ApiResponseObject):
 
 
 class ConnectedPeer(ApiResponseObject):
-    keys = {"address": "peerAddress",
-            "peer_id": "peerId", "version": "reportedVersion"}
+    keys = {"address": "peerAddress", "peer_id": "peerId", "version": "reportedVersion"}
 
 
 class Channel(ApiResponseObject):
@@ -98,7 +95,7 @@ class Channel(ApiResponseObject):
         "source_address": "sourceAddress",
         "source_peer_id": "sourcePeerId",
         "status": "status",
-        "ticket_index": "ticketIndex"
+        "ticket_index": "ticketIndex",
     }
 
     def post_init(self):
@@ -113,7 +110,7 @@ class Ticket(ApiResponseObject):
         "index": "index",
         "index_offset": "indexOffset",
         "signature": "signature",
-        "winn_prob": "winProb"
+        "winn_prob": "winProb",
     }
 
 
@@ -164,8 +161,7 @@ class Channels:
         self.incoming = []
         self.outgoing = []
 
-        setattr(self, category, [Channel(channel)
-                for channel in data.get(category, [])])
+        setattr(self, category, [Channel(channel) for channel in data.get(category, [])])
 
     def __str__(self):
         return str(self.__dict__)

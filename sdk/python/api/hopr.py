@@ -76,8 +76,7 @@ def seal_with_peerid(peer_id: str, plain_text: bytes, random_padding_len: int = 
         ed25519_pubkey = decoded_peer_id[6:]
 
         # Step 3: Convert the Ed25519 public key to a Curve25519 public key for encryption
-        curve25519_pubkey = nacl.bindings.crypto_sign_ed25519_pk_to_curve25519(
-            ed25519_pubkey)
+        curve25519_pubkey = nacl.bindings.crypto_sign_ed25519_pk_to_curve25519(ed25519_pubkey)
 
         # Step 4: Create a PublicKey object from the Curve25519 public key bytes
         public_key = nacl.public.PublicKey(curve25519_pubkey)
@@ -86,7 +85,7 @@ def seal_with_peerid(peer_id: str, plain_text: bytes, random_padding_len: int = 
         sealed_box = SealedBox(public_key)
 
         # Step 6: Append random padding if random_padding_len is greater than 0
-        plain_text += b'@' * random.randint(0, random_padding_len)
+        plain_text += b"@" * random.randint(0, random_padding_len)
 
         # Step 7: Encrypt the plaintext using the sealed box
         encrypted_message = sealed_box.encrypt(plain_text)
@@ -135,8 +134,7 @@ class HoprdAPI:
             logging.error(f"OSError calling {method.value} {endpoint}: {e}")
 
         except Exception as e:
-            logging.error(
-                f"Exception calling {method.value} {endpoint}. error is: {e}")
+            logging.error(f"Exception calling {method.value} {endpoint}. error is: {e}")
 
         return (False, None)
 
@@ -190,9 +188,7 @@ class HoprdAPI:
         is_ok, response = await self.__call_api(HTTPMethod.GET, "account/balances")
         return Balances(response) if is_ok else None
 
-    async def open_channel(
-        self, destination: str, amount: str
-    ) -> Optional[OpenedChannel]:
+    async def open_channel(self, destination: str, amount: str) -> Optional[OpenedChannel]:
         """
         Opens a channel with the given peer_address and amount.
         :param: peer_address: str
@@ -213,9 +209,7 @@ class HoprdAPI:
         """
         data = FundChannelBody(amount)
 
-        is_ok, response = await self.__call_api(
-            HTTPMethod.POST, f"channels/{channel_id}/fund", data
-        )
+        is_ok, response = await self.__call_api(HTTPMethod.POST, f"channels/{channel_id}/fund", data)
         return is_ok
 
     async def close_channel(self, channel_id: str) -> bool:
@@ -243,9 +237,7 @@ class HoprdAPI:
         """
         params = GetChannelsBody("true", "true" if include_closed else "false")
 
-        is_ok, response = await self.__call_api(
-            HTTPMethod.GET, f"channels?{params.as_header_string}"
-        )
+        is_ok, response = await self.__call_api(HTTPMethod.GET, f"channels?{params.as_header_string}")
         return Channels(response, "all") if is_ok else None
 
     async def incoming_channels(self, include_closed: bool = False):
@@ -255,9 +247,7 @@ class HoprdAPI:
         """
         params = GetChannelsBody("true", "true" if include_closed else "false")
 
-        is_ok, response = await self.__call_api(
-            HTTPMethod.GET, f"channels?{params.as_header_string}"
-        )
+        is_ok, response = await self.__call_api(HTTPMethod.GET, f"channels?{params.as_header_string}")
         return Channels(response, "incoming") if is_ok else None
 
     async def outgoing_channels(self, include_closed: bool = False):
@@ -267,9 +257,7 @@ class HoprdAPI:
         """
         params = GetChannelsBody("true", "true" if include_closed else "false")
 
-        is_ok, response = await self.__call_api(
-            HTTPMethod.GET, f"channels?{params.as_header_string}"
-        )
+        is_ok, response = await self.__call_api(HTTPMethod.GET, f"channels?{params.as_header_string}")
         return Channels(response, "outgoing") if is_ok else None
 
     async def get_channel(self, channel_id: str) -> Optional[Channel]:
@@ -314,9 +302,7 @@ class HoprdAPI:
         Returns a list of peers.
         :return: peers: list
         """
-        is_ok, response = await self.__call_api(
-            HTTPMethod.GET, "node/peers"
-        )
+        is_ok, response = await self.__call_api(HTTPMethod.GET, "node/peers")
 
         if not is_ok:
             return []
@@ -401,9 +387,9 @@ class HoprdAPI:
         is_ok, _ = await self.__call_api(HTTPMethod.DELETE, "tickets/statistics")
         return is_ok
 
-    async def send_message(self,
-                           destination: str, message: str,
-                           hops: list[str], tag: int = MESSAGE_TAG) -> Optional[MessageSent]:
+    async def send_message(
+        self, destination: str, message: str, hops: list[str], tag: int = MESSAGE_TAG
+    ) -> Optional[MessageSent]:
         """
         Sends a message to the given destination.
         :param: destination: str
@@ -412,8 +398,7 @@ class HoprdAPI:
         :param: tag: int = 0x0320
         :return: bool
         """
-        data = SendMessageBody(body=message, hops=None,
-                               path=hops, destination=destination, tag=tag)
+        data = SendMessageBody(body=message, hops=None, path=hops, destination=destination, tag=tag)
         is_ok, response = await self.__call_api(HTTPMethod.POST, "messages", data=data)
         return MessageSent(response) if is_ok else None
 
@@ -423,9 +408,7 @@ class HoprdAPI:
         :param: protocol: Protocol
         :return: list[Session]
         """
-        is_ok, response = await self.__call_api(
-            HTTPMethod.GET, f"session/{protocol.name.lower()}"
-        )
+        is_ok, response = await self.__call_api(HTTPMethod.GET, f"session/{protocol.name.lower()}")
         return [Session(s) for s in response] if is_ok else None
 
     async def session_client(
@@ -437,7 +420,7 @@ class HoprdAPI:
         listen_on: str = "127.0.0.1:0",
         service: bool = False,
         capabilities: SessionCapabilitiesBody = SessionCapabilitiesBody(),
-        sealed_target=False
+        sealed_target=False,
     ) -> Optional[Session]:
         """
         Creates a new client session returning the given session listening host & port over TCP or UDP.
@@ -452,12 +435,11 @@ class HoprdAPI:
         :return: Session
         """
         actual_target = (
-            {
-                "Sealed": base64.b64encode(seal_with_peerid(destination, bytes(target, 'utf-8'), 50)).decode('ascii')
-            }
+            {"Sealed": base64.b64encode(seal_with_peerid(destination, bytes(target, "utf-8"), 50)).decode("ascii")}
             if sealed_target
             else {"Service": int(target)}
-            if service else {"Plain": target}
+            if service
+            else {"Plain": target}
         )
 
         data = CreateSessionBody(
@@ -468,9 +450,7 @@ class HoprdAPI:
             actual_target,
         )
 
-        is_ok, response = await self.__call_api(
-            HTTPMethod.POST, f"session/{protocol.name.lower()}", data
-        )
+        is_ok, response = await self.__call_api(HTTPMethod.POST, f"session/{protocol.name.lower()}", data)
 
         return Session(response) if is_ok else None
 

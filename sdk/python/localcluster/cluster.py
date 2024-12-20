@@ -30,8 +30,7 @@ class Cluster:
 
         for network_name, params in config["networks"].items():
             for alias, node in params["nodes"].items():
-                self.nodes[str(index)] = Node.fromConfig(
-                    index, alias, node, config["api_token"], network_name)
+                self.nodes[str(index)] = Node.fromConfig(index, alias, node, config["api_token"], network_name)
                 index += 1
 
     def clean_up(self):
@@ -39,8 +38,7 @@ class Cluster:
         [node.clean_up() for node in self.nodes.values()]
 
     def create_safes(self):
-        logging.info(
-            "Creating safe and modules for all the ids, store them in args files")
+        logging.info("Creating safe and modules for all the ids, store them in args files")
         for node in self.nodes.values():
             assert node.create_local_safe(self.anvil_config)
 
@@ -57,8 +55,7 @@ class Cluster:
             if res:
                 logging.debug(f"Node {node} up")
             else:
-                logging.error(
-                    f"Node {node} not started after {GLOBAL_TIMEOUT} seconds")
+                logging.error(f"Node {node} not started after {GLOBAL_TIMEOUT} seconds")
 
         if not all(nodes_readyness):
             logging.critical("Not all nodes are started, interrupting setup")
@@ -75,8 +72,7 @@ class Cluster:
             if res:
                 logging.debug(f"Node {node} up")
             else:
-                logging.error(
-                    f"Node {node} not ready after {GLOBAL_TIMEOUT} seconds")
+                logging.error(f"Node {node} not ready after {GLOBAL_TIMEOUT} seconds")
 
         if not all(nodes_readyness):
             logging.critical("Not all nodes are ready, interrupting setup")
@@ -90,17 +86,14 @@ class Cluster:
                 logging.error(f"Node {node} did not return addresses")
 
         # WAIT FOR NODES TO CONNECT TO ALL PEERS
-        logging.info(
-            f"Waiting up to {2*GLOBAL_TIMEOUT}s for nodes to connect to all peers")
+        logging.info(f"Waiting up to {2*GLOBAL_TIMEOUT}s for nodes to connect to all peers")
 
         tasks = []
         for node in self.nodes.values():
-            required_peers = [n.peer_id for n in self.nodes.values(
-            ) if n != node and n.network == node.network]
-            tasks.append(asyncio.create_task(
-                node.all_peers_connected(required_peers)))
+            required_peers = [n.peer_id for n in self.nodes.values() if n != node and n.network == node.network]
+            tasks.append(asyncio.create_task(node.all_peers_connected(required_peers)))
 
-        await asyncio.wait_for(asyncio.gather(*tasks), 2*GLOBAL_TIMEOUT)
+        await asyncio.wait_for(asyncio.gather(*tasks), 2 * GLOBAL_TIMEOUT)
 
     def fund_nodes(self):
         logging.info("Funding nodes")
@@ -135,7 +128,7 @@ class Cluster:
             env=os.environ | custom_env,
             check=True,
             capture_output=True,
-            cwd=PWD.parent
+            cwd=PWD.parent,
         )
 
     def copy_identities(self):
@@ -143,8 +136,7 @@ class Cluster:
 
         # prepare folders
         for node_id in range(self.size):
-            MAIN_DIR.joinpath(
-                f"{NODE_NAME_PREFIX}_{node_id+1}").mkdir(parents=True, exist_ok=True)
+            MAIN_DIR.joinpath(f"{NODE_NAME_PREFIX}_{node_id+1}").mkdir(parents=True, exist_ok=True)
 
         # Remove old identities
         for f in MAIN_DIR.glob(f"{NODE_NAME_PREFIX}/*.id"):
@@ -161,8 +153,7 @@ class Cluster:
             f = f"{NODE_NAME_PREFIX}_{node_id+1}.id"
             shutil.copy(
                 PREGENERATED_IDENTITIES_DIR.joinpath(f),
-                MAIN_DIR.joinpath(
-                    f"{NODE_NAME_PREFIX}_{node_id+1}", "hoprd.id"),
+                MAIN_DIR.joinpath(f"{NODE_NAME_PREFIX}_{node_id+1}", "hoprd.id"),
             )
         logging.info(f"Copied '*.id' files to {MAIN_DIR}")
 
@@ -177,8 +168,7 @@ class Cluster:
 
     async def alias_peers(self):
         logging.info("Aliasing every other node")
-        aliases_dict = {
-            node.peer_id: node.alias for node in self.nodes.values()}
+        aliases_dict = {node.peer_id: node.alias for node in self.nodes.values()}
 
         for node in self.nodes.values():
             await node.alias_peers(aliases_dict)
@@ -191,7 +181,7 @@ class Cluster:
         await asyncio.gather(*tasks)
 
     async def links(self):
-        print('')
+        print("")
         for node in self.nodes.values():
             await node.links()
 

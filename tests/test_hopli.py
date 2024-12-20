@@ -350,15 +350,13 @@ async def test_hopli_should_be_able_to_fund_nodes(peer: str, swarm7: dict[str, N
     private_key = load_private_key(ANVIL_CONFIG_FILE)
 
     balance_before = await swarm7[peer].api.balances()
-    logging.debug(
-        f"balance_before of {peer} / {swarm7[peer].address}: {balance_before}")
+    logging.debug(f"balance_before of {peer} / {swarm7[peer].address}: {balance_before}")
 
     # fund node with 1 HOPR token and 10 native token
     faucet(private_key, "1.0", "10.0")
 
     balance_after = await swarm7[peer].api.balances()
-    logging.debug(
-        f"balance_after of {peer} / {swarm7[peer].address}: {balance_after}")
+    logging.debug(f"balance_after of {peer} / {swarm7[peer].address}: {balance_after}")
 
     # Check if `hopli faucet` funds node to the desired amount
     # on the native token
@@ -384,13 +382,11 @@ async def test_hopli_should_be_able_to_deregister_nodes_and_register_it(peer: st
         network_registry_contract = address_data["networks"][NETWORK1]["addresses"]["network_registry"]
 
     res_before = run_cast_cmd(
-        "call", [network_registry_contract,
-                 "nodeRegisterdToAccount(address)(address)", swarm7[peer].address]
+        "call", [network_registry_contract, "nodeRegisterdToAccount(address)(address)", swarm7[peer].address]
     )
 
     # check the returned value is address safe
-    assert res_before.stdout.decode(
-        "utf-8").split("\n")[0].lower() == swarm7[peer].safe_address.lower()
+    assert res_before.stdout.decode("utf-8").split("\n")[0].lower() == swarm7[peer].safe_address.lower()
 
     # remove node from the network registry
     manager_deregister(private_key, swarm7[peer].address)
@@ -398,8 +394,7 @@ async def test_hopli_should_be_able_to_deregister_nodes_and_register_it(peer: st
     # Check if nodes are removed from the network
     run_cast_cmd("code", [network_registry_contract])
     res_after_deregster = run_cast_cmd(
-        "call", [network_registry_contract,
-                 "nodeRegisterdToAccount(address)(address)", swarm7[peer].address]
+        "call", [network_registry_contract, "nodeRegisterdToAccount(address)(address)", swarm7[peer].address]
     )
 
     # check the returned value is address zero
@@ -409,19 +404,16 @@ async def test_hopli_should_be_able_to_deregister_nodes_and_register_it(peer: st
     )
 
     # register node to the network registry
-    manager_register(
-        private_key, swarm7[peer].address, swarm7[peer].safe_address)
+    manager_register(private_key, swarm7[peer].address, swarm7[peer].safe_address)
 
     # Check if nodes are removed from the network
     run_cast_cmd("code", [network_registry_contract])
     res_after_register = run_cast_cmd(
-        "call", [network_registry_contract,
-                 "nodeRegisterdToAccount(address)(address)", swarm7[peer].address]
+        "call", [network_registry_contract, "nodeRegisterdToAccount(address)(address)", swarm7[peer].address]
     )
 
     # check the returned value is address safe
-    assert res_after_register.stdout.decode(
-        "utf-8").split("\n")[0].lower() == swarm7[peer].safe_address.lower()
+    assert res_after_register.stdout.decode("utf-8").split("\n")[0].lower() == swarm7[peer].safe_address.lower()
 
 
 @pytest.mark.asyncio
@@ -452,8 +444,7 @@ async def test_hopli_create_update_read_identity():
     assert res_first_read == res_second_read
 
     # Remove the created identity
-    remove_identity(MAIN_DIR.joinpath("test_hopli"),
-                    f"{FIXTURES_PREFIX_NEW}{extra_prefix}0.id")
+    remove_identity(MAIN_DIR.joinpath("test_hopli"), f"{FIXTURES_PREFIX_NEW}{extra_prefix}0.id")
 
 
 @pytest.mark.asyncio
@@ -475,24 +466,20 @@ async def test_hopli_should_be_able_to_create_safe_module(swarm7: dict[str, Node
     new_node = read_identity(extra_prefix, PASSWORD)
 
     # create safe and module
-    safe_address, module_address = create_safe_module(
-        extra_prefix, private_key, manager_private_key)
+    safe_address, module_address = create_safe_module(extra_prefix, private_key, manager_private_key)
     run_cast_cmd("balance", [new_node])
     run_cast_cmd("code", [safe_address])
     run_cast_cmd("code", [module_address])
 
     # Check the node node is registered with the new safe
     res_check_created_safe_registration = run_cast_cmd(
-        "call", [network_registry_contract_1,
-                 "nodeRegisterdToAccount(address)(address)", new_node]
+        "call", [network_registry_contract_1, "nodeRegisterdToAccount(address)(address)", new_node]
     )
-    res_registration = res_check_created_safe_registration.stdout.decode(
-        "utf-8").split("\n")[0].lower()
+    res_registration = res_check_created_safe_registration.stdout.decode("utf-8").split("\n")[0].lower()
     assert res_registration == safe_address.lower()
 
     # Remove the created identity
-    remove_identity(MAIN_DIR.joinpath("test_hopli"),
-                    f"{FIXTURES_PREFIX_NEW}{extra_prefix}0.id")
+    remove_identity(MAIN_DIR.joinpath("test_hopli"), f"{FIXTURES_PREFIX_NEW}{extra_prefix}0.id")
 
 
 @pytest.mark.asyncio
@@ -504,13 +491,10 @@ async def test_hopli_should_be_able_to_set_and_read_win_prob():
 
     # get current win prob
     get_win_prob()
-    old_win_prob = run_cast_cmd(
-        "call", [win_prob_oracle, "currentWinProb()()"])
-    logging.info("old_win_prob %s", old_win_prob.stdout.decode(
-        "utf-8").split("is")[0].split("\n")[0].lower())
+    old_win_prob = run_cast_cmd("call", [win_prob_oracle, "currentWinProb()()"])
+    logging.info("old_win_prob %s", old_win_prob.stdout.decode("utf-8").split("is")[0].split("\n")[0].lower())
     assert (
-        old_win_prob.stdout.decode(
-            "utf-8").split("is")[0].split("\n")[0].lower()
+        old_win_prob.stdout.decode("utf-8").split("is")[0].split("\n")[0].lower()
         == "0x00000000000000000000000000000000000000000000000000ffffffffffffff"
     )
 
@@ -520,12 +504,9 @@ async def test_hopli_should_be_able_to_set_and_read_win_prob():
 
     # get new win prob
     get_win_prob()
-    new_win_prob = run_cast_cmd(
-        "call", [win_prob_oracle, "currentWinProb()()"])
-    logging.info("new_win_prob %s", new_win_prob.stdout.decode(
-        "utf-8").split("is")[0].split("\n")[0].lower())
+    new_win_prob = run_cast_cmd("call", [win_prob_oracle, "currentWinProb()()"])
+    logging.info("new_win_prob %s", new_win_prob.stdout.decode("utf-8").split("is")[0].split("\n")[0].lower())
     assert (
-        new_win_prob.stdout.decode(
-            "utf-8").split("is")[0].split("\n")[0].lower()
+        new_win_prob.stdout.decode("utf-8").split("is")[0].split("\n")[0].lower()
         == "0x000000000000000000000000000000000000000000000000007fffffffffffff"
     )

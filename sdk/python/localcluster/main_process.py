@@ -27,14 +27,13 @@ random.seed(SEED)
 # TODO (jean): implement the fully connected switch
 
 
-async def bringup(config: str,
-                  test_mode: bool = False,
-                  fully_connected: bool = False) -> Optional[Tuple[Cluster, Anvil]]:
+async def bringup(
+    config: str, test_mode: bool = False, fully_connected: bool = False
+) -> Optional[Tuple[Cluster, Anvil]]:
     logging.info(f"Using the random seed: {SEED}")
 
     if test_mode and fully_connected:
-        logging.warning(
-            "`fully_connected` feature is not compatible with test mode. Ignore it.")
+        logging.warning("`fully_connected` feature is not compatible with test mode. Ignore it.")
 
     # load node config file
     with open(config, "r") as f:

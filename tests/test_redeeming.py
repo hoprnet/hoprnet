@@ -42,8 +42,7 @@ async def test_hoprd_api_should_redeem_tickets_in_channel_using_redeem_endpoint(
     async with create_channel(
         swarm7[src], swarm7[dest], funding=message_count * TICKET_PRICE_PER_HOP, close_from_dest=False
     ) as channel:
-        packets = [
-            f"Channel redeem on 1-hop: {src} - {dest} - {src} #{i:08d}" for i in range(message_count)]
+        packets = [f"Channel redeem on 1-hop: {src} - {dest} - {src} #{i:08d}" for i in range(message_count)]
 
         await send_and_receive_packets_with_pop(packets, src=swarm7[src], dest=swarm7[src], path=[swarm7[dest].peer_id])
 
@@ -72,7 +71,7 @@ async def test_hoprd_should_create_redeemable_tickets_on_routing_in_1_hop_to_sel
     message_count = int(TICKET_AGGREGATION_THRESHOLD / 10 * 9)
 
     async with create_channel(
-            swarm7[src], swarm7[dest], funding=message_count * TICKET_PRICE_PER_HOP, close_from_dest=False
+        swarm7[src], swarm7[dest], funding=message_count * TICKET_PRICE_PER_HOP, close_from_dest=False
     ) as channel:
         # ensure ticket stats are what we expect before starting
         statistics_before = await swarm7[dest].api.get_tickets_statistics()
@@ -83,8 +82,7 @@ async def test_hoprd_should_create_redeemable_tickets_on_routing_in_1_hop_to_sel
             for i in range(message_count)
         ]
         await send_and_receive_packets_with_pop(
-            packets, src=swarm7[src], dest=swarm7[src], path=[
-                swarm7[dest].peer_id], timeout=60.0
+            packets, src=swarm7[src], dest=swarm7[src], path=[swarm7[dest].peer_id], timeout=60.0
         )
 
         await asyncio.wait_for(check_unredeemed_tickets_value(swarm7[dest], message_count * TICKET_PRICE_PER_HOP), 30.0)
@@ -92,8 +90,7 @@ async def test_hoprd_should_create_redeemable_tickets_on_routing_in_1_hop_to_sel
         # ensure ticket stats are updated after messages are sent
         statistics_after = await swarm7[dest].api.get_tickets_statistics()
 
-        unredeemed_value = statistics_after.unredeemed_value - \
-            statistics_before.unredeemed_value
+        unredeemed_value = statistics_after.unredeemed_value - statistics_before.unredeemed_value
 
         assert statistics_after.redeemed_value == statistics_before.redeemed_value
         assert unredeemed_value == (len(packets) * TICKET_PRICE_PER_HOP)
@@ -104,9 +101,9 @@ async def test_hoprd_should_create_redeemable_tickets_on_routing_in_1_hop_to_sel
 
         # ensure ticket stats are updated after redemption
         statistics_after_redemption = await swarm7[dest].api.get_tickets_statistics()
-        assert (
-            statistics_after_redemption.redeemed_value - statistics_after.redeemed_value
-        ) == (len(packets) * TICKET_PRICE_PER_HOP)
+        assert (statistics_after_redemption.redeemed_value - statistics_after.redeemed_value) == (
+            len(packets) * TICKET_PRICE_PER_HOP
+        )
         assert statistics_after_redemption.unredeemed_value == 0
 
 
@@ -118,8 +115,7 @@ async def test_hoprd_should_aggregate_and_redeem_tickets_in_channel_on_api_reque
     message_count = 2
 
     async with create_channel(swarm7[src], swarm7[dest], funding=message_count * TICKET_PRICE_PER_HOP) as channel:
-        packets = [
-            f"Channel agg and redeem on 1-hop: {src} - {dest} - {src} #{i:08d}" for i in range(message_count)]
+        packets = [f"Channel agg and redeem on 1-hop: {src} - {dest} - {src} #{i:08d}" for i in range(message_count)]
         await send_and_receive_packets_with_pop(packets, src=swarm7[src], dest=swarm7[src], path=[swarm7[dest].peer_id])
 
         await asyncio.wait_for(check_unredeemed_tickets_value(swarm7[dest], message_count * TICKET_PRICE_PER_HOP), 30.0)
@@ -153,15 +149,13 @@ async def test_hoprd_should_create_redeemable_tickets_on_routing_in_general_n_ho
         await asyncio.gather(
             *[
                 channels.enter_async_context(
-                    create_channel(swarm7[route[i]], swarm7[route[i + 1]],
-                                   funding=message_count * TICKET_PRICE_PER_HOP)
+                    create_channel(swarm7[route[i]], swarm7[route[i + 1]], funding=message_count * TICKET_PRICE_PER_HOP)
                 )
                 for i in range(len(route) - 1)
             ]
         )
 
-        packets = [
-            f"General n-hop over {route} message #{i:08d}" for i in range(message_count)]
+        packets = [f"General n-hop over {route} message #{i:08d}" for i in range(message_count)]
         await send_and_receive_packets_with_pop(
             packets,
             src=swarm7[route[0]],
@@ -170,8 +164,7 @@ async def test_hoprd_should_create_redeemable_tickets_on_routing_in_general_n_ho
         )
 
         await asyncio.wait_for(
-            check_unredeemed_tickets_value(
-                swarm7[route[1]], message_count * TICKET_PRICE_PER_HOP), 30.0
+            check_unredeemed_tickets_value(swarm7[route[1]], message_count * TICKET_PRICE_PER_HOP), 30.0
         )
 
         # wait for aggregation to finish before redeeming
@@ -190,23 +183,19 @@ async def test_hoprd_should_be_able_to_close_open_channels_with_unredeemed_ticke
         await asyncio.gather(
             *[
                 channels.enter_async_context(
-                    create_channel(
-                        swarm7[route[i]], swarm7[route[i + 1]], funding=ticket_count * TICKET_PRICE_PER_HOP)
+                    create_channel(swarm7[route[i]], swarm7[route[i + 1]], funding=ticket_count * TICKET_PRICE_PER_HOP)
                 )
                 for i in range(len(route) - 1)
             ]
         )
 
-        packets = [
-            f"Channel unredeemed check: #{i:08d}" for i in range(ticket_count)]
+        packets = [f"Channel unredeemed check: #{i:08d}" for i in range(ticket_count)]
         await send_and_receive_packets_with_pop(
-            packets, src=swarm7[route[0]], dest=swarm7[route[-1]
-                                                       ], path=[swarm7[route[1]].peer_id]
+            packets, src=swarm7[route[0]], dest=swarm7[route[-1]], path=[swarm7[route[1]].peer_id]
         )
 
         await asyncio.wait_for(
-            check_unredeemed_tickets_value(
-                swarm7[route[1]], ticket_count * TICKET_PRICE_PER_HOP), 30.0
+            check_unredeemed_tickets_value(swarm7[route[1]], ticket_count * TICKET_PRICE_PER_HOP), 30.0
         )
 
         # NOTE: will be closed on context manager exit

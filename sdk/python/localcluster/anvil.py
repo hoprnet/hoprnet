@@ -23,8 +23,7 @@ class Anvil:
         self.state_file.parent.mkdir(parents=True, exist_ok=True)
 
     def run(self, state=AnvilState.DUMP):
-        logging.info(
-            f"Starting and waiting for local anvil server to be up ({state.name.lower()} state enabled)")
+        logging.info(f"Starting and waiting for local anvil server to be up ({state.name.lower()} state enabled)")
 
         run(
             f"""
@@ -41,8 +40,7 @@ class Anvil:
         )
 
     def mirror_contracts(self, src_file: Path, dest_file: Path, src_network: str, dest_network: str):
-        logging.info(
-            "Mirror contract data because of anvil-deploy node only writing to localhost")
+        logging.info("Mirror contract data because of anvil-deploy node only writing to localhost")
         shutil.copy(INPUT_PROTOCOL_CONFIG_FILE, dest_file)
 
         with open(src_file, "r") as file:
@@ -66,5 +64,4 @@ class Anvil:
     @classmethod
     def kill(cls):
         logging.info("Stop any local anvil server running")
-        run(f"make -s kill-anvil port={PORT_BASE}".split(),
-            cwd=PWD.parent, check=True)
+        run(f"make -s kill-anvil port={PORT_BASE}".split(), cwd=PWD.parent, check=True)
