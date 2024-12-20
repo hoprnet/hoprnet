@@ -1,7 +1,6 @@
 import shutil
 from pathlib import Path
 
-from .anvil import Anvil
 from .cluster import Cluster
 from .constants import NODE_NAME_PREFIX, logging
 

@@ -108,7 +108,8 @@ class SessionCapabilitiesBody(ApiRequestObject):
         "no_delay": "NoDelay",
     }
 
-    def __init__(self, retransmission: bool = False, segmentation: bool = False, retransmission_ack_only: bool = False, no_delay: bool = False):
+    def __init__(self, retransmission: bool = False, segmentation: bool = False,
+                 retransmission_ack_only: bool = False, no_delay: bool = False):
         super().__init__(vars())
 
     @property

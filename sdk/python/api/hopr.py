@@ -317,7 +317,7 @@ class HoprdAPI:
         :return: peers: list
         """
         is_ok, response = await self.__call_api(
-            HTTPMethod.GET, f"node/peers"
+            HTTPMethod.GET, "node/peers"
         )
 
         if not is_ok:
@@ -365,11 +365,11 @@ class HoprdAPI:
 
     async def ticket_min_win_prob(self) -> Optional[TicketProbability]:
         """
-        Gets the winning probability set in the HOPRd node configuration file.
+        Gets the minimum ticket winning probability set by the oracle.
         :return: TicketProbability
         """
-        is_ok, response = await self.__call_api(HTTPMethod.GET, "node/configuration")
-        return TicketProbability(Configuration(json.loads(response)).as_dict) if is_ok else None
+        is_ok, response = await self.__call_api(HTTPMethod.GET, "network/probability")
+        return TicketProbability(response) if is_ok else None
 
     async def withdraw(self, amount: str, receipient: str, currency: str):
         """
@@ -403,7 +403,9 @@ class HoprdAPI:
         is_ok, _ = await self.__call_api(HTTPMethod.DELETE, "tickets/statistics")
         return is_ok
 
-    async def send_message(self, destination: str, message: str, hops: list[str], tag: int = MESSAGE_TAG) -> Optional[MessageSent]:
+    async def send_message(self,
+                           destination: str, message: str,
+                           hops: list[str], tag: int = MESSAGE_TAG) -> Optional[MessageSent]:
         """
         Sends a message to the given destination.
         :param: destination: str

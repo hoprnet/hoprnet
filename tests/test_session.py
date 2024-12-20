@@ -75,7 +75,8 @@ class EchoServer:
             pcap_file = MAIN_DIR.joinpath(
                 'test_session', f'echo_server_{self.port}.pcap')
             self.tcp_dump_process = subprocess.Popen(
-                ['sudo', 'tcpdump', '-i', 'lo', '-w', f"{pcap_file}.log"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                ['sudo', 'tcpdump', '-i', 'lo', '-w', f"{pcap_file}.log"],
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             logging.info(f"running tcpdump, saving to {pcap_file}.log")
 
         return self
@@ -248,7 +249,9 @@ async def test_session_communication_with_a_tcp_echo_server(src: str, dest: str,
         await asyncio.sleep(1.0)
 
         dst_sock_port = server.port
-        session = await src_peer.api.session_client(dest_peer.peer_id, path={"Hops": 0}, protocol=Protocol.TCP, target=f"localhost:{dst_sock_port}")
+        session = await src_peer.api.session_client(
+            dest_peer.peer_id, path={"Hops": 0}, protocol=Protocol.TCP,
+            target=f"localhost:{dst_sock_port}")
 
         assert session.port is not None, "Failed to open session"
         assert len(await src_peer.api.session_list_clients(Protocol.TCP)) == 1
@@ -311,7 +314,9 @@ async def test_session_communication_over_n_hop_with_a_tcp_echo_server(route, sw
             await asyncio.sleep(1.0)
 
             dst_sock_port = server.port
-            session = await src_peer.api.session_client(dest_peer.peer_id, path={"IntermediatePath": path}, protocol=Protocol.TCP, target=f"localhost:{dst_sock_port}")
+            session = await src_peer.api.session_client(
+                dest_peer.peer_id, path={"IntermediatePath": path}, protocol=Protocol.TCP,
+                target=f"localhost:{dst_sock_port}")
 
             assert session.port is not None, "Failed to open session"
             assert len(await src_peer.api.session_list_clients(Protocol.TCP)) == 1
@@ -355,7 +360,9 @@ async def test_session_communication_with_a_udp_echo_server(src: str, dest: str,
         await asyncio.sleep(1.0)
 
         dst_sock_port = server.port
-        session = await src_peer.api.session_client(dest_peer.peer_id, path={"Hops": 0}, protocol=Protocol.UDP, target=f"localhost:{dst_sock_port}")
+        session = await src_peer.api.session_client(
+            dest_peer.peer_id, path={"Hops": 0}, protocol=Protocol.UDP,
+            target=f"localhost:{dst_sock_port}")
 
         assert session.port is not None, "Failed to open session"
         assert len(await src_peer.api.session_list_clients(Protocol.UDP)) == 1
@@ -411,7 +418,7 @@ async def test_session_communication_with_udp_loopback_service(src: str, dest: s
     # Service 0 session will loop back all the data at Exit back to the Entry
     # Therefore, we do not need the Echo service here
     session: Session | None = await src_peer.api.session_client(
-        dest_peer.peer_id, path={"Hops": 0}, protocol=Protocol.UDP, target=f"0", service=True
+        dest_peer.peer_id, path={"Hops": 0}, protocol=Protocol.UDP, target="0", service=True
     )
 
     assert session.port is not None, "Failed to open session"
@@ -487,7 +494,9 @@ async def test_session_communication_over_n_hop_with_a_udp_echo_server(route, sw
             await asyncio.sleep(1.0)
 
             dst_sock_port = server.port
-            session = await src_peer.api.session_client(dest_peer.peer_id, path={"IntermediatePath": path}, protocol=Protocol.UDP, target=f"localhost:{dst_sock_port}")
+            session = await src_peer.api.session_client(
+                dest_peer.peer_id, path={"IntermediatePath": path}, protocol=Protocol.UDP,
+                target=f"localhost:{dst_sock_port}")
 
             assert session.port is not None, "Failed to open session"
             assert len(await src_peer.api.session_list_clients(Protocol.UDP)) == 1
@@ -533,7 +542,9 @@ async def test_session_communication_with_an_https_server(src: str, dest: str, s
         string.ascii_letters + string.digits, k=file_len))
 
     with run_https_server(expected) as dst_sock_port:
-        session = await src_peer.api.session_client(dest_peer.peer_id, path={"Hops": 0}, protocol=Protocol.TCP, target=f"localhost:{dst_sock_port}", sealed_target=True)
+        session = await src_peer.api.session_client(
+            dest_peer.peer_id, path={"Hops": 0}, protocol=Protocol.TCP,
+            target=f"localhost:{dst_sock_port}", sealed_target=True)
         assert session.port is not None, "Failed to open session"
         assert len(await src_peer.api.session_list_clients(Protocol.TCP)) == 1
 
@@ -584,7 +595,9 @@ async def test_session_communication_over_n_hop_with_an_https_server(
             string.ascii_letters + string.digits, k=file_len))
 
         with run_https_server(expected) as dst_sock_port:
-            session = await src_peer.api.session_client(dest_peer.peer_id, path={"IntermediatePath": path}, protocol=Protocol.TCP, target=f"localhost:{dst_sock_port}")
+            session = await src_peer.api.session_client(
+                dest_peer.peer_id, path={"IntermediatePath": path},
+                protocol=Protocol.TCP, target=f"localhost:{dst_sock_port}")
             assert session.port is not None, "Failed to open session"
             assert len(await src_peer.api.session_list_clients(Protocol.TCP)) == 1
 
@@ -641,7 +654,10 @@ async def test_session_with_wireguard_tunnel(route, swarm7: dict[str, Node]):
 
         logging.info(f"Opening session for route '{route}'")
 
-        session = await src_peer.api.session_client(dest_peer.peer_id, path={"IntermediatePath": path}, protocol=Protocol.UDP, target=wireguard_tunnel, listen_on="127.0.0.1:60006", capabilities=SessionCapabilitiesBody(segment=True))
+        session = await src_peer.api.session_client(
+            dest_peer.peer_id, path={"IntermediatePath": path}, protocol=Protocol.UDP,
+            target=wireguard_tunnel, listen_on="127.0.0.1:60006",
+            capabilities=SessionCapabilitiesBody(segment=True))
 
         assert session.port is not None, "Failed to open session"
         assert len(await src_peer.api.session_list_clients(Protocol.UDP)) == 1

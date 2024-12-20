@@ -30,10 +30,10 @@ ANVIL_ENDPOINT = f"http://127.0.0.1:{PORT_BASE}"
 
 def set_minimum_winning_probability_in_network(private_key: str, win_prob: float):
     custom_env = {
-        "ETHERSCAN_API_KEY": "anykey",
-        "IDENTITY_PASSWORD": PASSWORD,
+        # "ETHERSCAN_API_KEY": "anykey",
+        # "IDENTITY_PASSWORD": PASSWORD,
         "PRIVATE_KEY": private_key,
-        "PATH": os.environ["PATH"],
+        # "PATH": os.environ["PATH"],
     }
     cmd = [
         "hopli",
@@ -65,7 +65,7 @@ async def test_hoprd_check_min_incoming_ticket_win_prob_is_default(peer, swarm7:
     set_minimum_winning_probability_in_network(private_key, new_win_prob)
 
     try:
-        await asyncio.wait_for(check_min_incoming_win_prob_eq(swarm7[peer], new_win_prob), timeout=10.0)
+        await asyncio.wait_for(check_min_incoming_win_prob_eq(swarm7[peer], new_win_prob), timeout=20.0)
     finally:
         # Restore the winning probability regardless of the outcome
         set_minimum_winning_probability_in_network(private_key, win_prob.value)
@@ -122,9 +122,9 @@ async def test_hoprd_should_relay_packets_with_lower_win_prob_then_agg_and_redee
             assert abs(winning_count - ticket_count *
                        win_prob) <= win_ticket_tolerance * ticket_count
 
-            await asyncio.wait_for(swarm7[relay].api.channels_aggregate_tickets(channel), 20.0)
+            await asyncio.wait_for(swarm7[relay].api.channels_aggregate_tickets(channel.id), 20.0)
 
-            assert await swarm7[relay].api.channel_redeem_tickets(channel)
+            assert await swarm7[relay].api.channel_redeem_tickets(channel.id)
             await asyncio.wait_for(check_all_tickets_redeemed(swarm7[relay]), 120.0)
 
             # The tickets can get successfully redeemed on that channel

@@ -8,7 +8,6 @@ import pytest
 
 from sdk.python.api import HoprdAPI
 from sdk.python.api.channelstatus import ChannelStatus
-from sdk.python.api.response_objects import Balances
 from sdk.python.localcluster.constants import (
     OPEN_CHANNEL_FUNDING_VALUE_HOPR,
     RESERVED_TAG_UPPER_BOUND,
@@ -403,7 +402,8 @@ async def test_hoprd_sanity_check_channel_status(swarm7: dict[str, Node]):
         open_channels.all), "Open and closed channels should be present"
 
     statuses = [c.status for c in open_and_closed_channels.all]
-    assert ChannelStatus.Closed in statuses or ChannelStatus.PendingToClose in statuses, "Closed channels should be present"
+    assert ChannelStatus.Closed in statuses or ChannelStatus.PendingToClose in statuses, \
+        "Closed channels should be present"
 
 
 @pytest.mark.asyncio

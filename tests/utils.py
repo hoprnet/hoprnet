@@ -3,7 +3,6 @@ import random
 from contextlib import asynccontextmanager
 
 from sdk.python.api.channelstatus import ChannelStatus
-from sdk.python.api.response_objects import Balances
 from sdk.python.localcluster.constants import (
     RESERVED_TAG_UPPER_BOUND,
     TICKET_AGGREGATION_THRESHOLD,

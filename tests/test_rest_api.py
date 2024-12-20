@@ -13,7 +13,7 @@ async def test_hoprd_rest_api_should_reject_connection_without_any_auth(swarm7: 
     url = f"http://{swarm7[peer].host_addr}:{swarm7[peer].api_port}/api/v3/node/version"
 
     async with aiohttp.ClientSession() as s:
-        assert (await s.get(url).status) == 401
+        assert (await s.get(url)).status == 401
 
 
 @pytest.mark.asyncio
@@ -24,7 +24,7 @@ async def test_hoprd_rest_api_should_reject_connection_with_invalid_token(peer: 
     headers = {"X-Auth-Token": invalid_token}
 
     async with aiohttp.ClientSession(headers=headers) as s:
-        assert (await s.get(url).status) == 401
+        assert (await s.get(url)).status == 401
 
 
 @pytest.mark.asyncio
@@ -34,4 +34,4 @@ async def test_hoprd_rest_api_should_accept_connection_with_valid_token(peer: st
     headers = {"X-Auth-Token": swarm7[peer].api_token}
 
     async with aiohttp.ClientSession(headers=headers) as s:
-        assert (await s.get(url).status) == 200
+        assert (await s.get(url)).status == 200

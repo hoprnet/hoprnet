@@ -1,8 +1,8 @@
 import json
 import logging
 import os
-from pathlib import Path
 import random
+from pathlib import Path
 from subprocess import CalledProcessError, run
 
 import pytest
@@ -15,7 +15,6 @@ from sdk.python.localcluster.constants import (
     NETWORK1,
     PASSWORD,
     PORT_BASE,
-    ROOT_DIR,
 )
 from sdk.python.localcluster.node import Node
 from sdk.python.localcluster.utils import load_private_key
@@ -27,8 +26,10 @@ PASSWORD_NEW = "e2e-test-new"
 
 ANVIL_ENDPOINT = f"http://127.0.0.1:{PORT_BASE}"
 
+
 def remove_identity(folder: Path, filename: str):
     run(["rm", "-f", folder.joinpath(filename)], check=True, capture_output=True)
+
 
 def run_cast_cmd(cmd: str, params: list[str]):
     cast_cmd = ["cast", cmd, "-r", ANVIL_ENDPOINT] + params
@@ -55,7 +56,7 @@ def faucet(private_key: str, hopr_amount: str, native_amount: str):
         NETWORK1,
         "--identity-prefix",
         FIXTURES_PREFIX,
-        "--identity-directory", # TODO: change the directory
+        "--identity-directory",  # TODO: change the directory
         MAIN_DIR,
         "--contracts-root",
         "./ethereum/contracts",
@@ -451,7 +452,8 @@ async def test_hopli_create_update_read_identity():
     assert res_first_read == res_second_read
 
     # Remove the created identity
-    remove_identity(MAIN_DIR.joinpath("test_hopli"), f"{FIXTURES_PREFIX_NEW}{extra_prefix}0.id")
+    remove_identity(MAIN_DIR.joinpath("test_hopli"),
+                    f"{FIXTURES_PREFIX_NEW}{extra_prefix}0.id")
 
 
 @pytest.mark.asyncio
@@ -489,14 +491,12 @@ async def test_hopli_should_be_able_to_create_safe_module(swarm7: dict[str, Node
     assert res_registration == safe_address.lower()
 
     # Remove the created identity
-    remove_identity(MAIN_DIR.joinpath("test_hopli"), f"{FIXTURES_PREFIX_NEW}{extra_prefix}0.id")
-
+    remove_identity(MAIN_DIR.joinpath("test_hopli"),
+                    f"{FIXTURES_PREFIX_NEW}{extra_prefix}0.id")
 
 
 @pytest.mark.asyncio
 async def test_hopli_should_be_able_to_set_and_read_win_prob():
-    test_suite_name = __name__.split(".")[-1]
-
     # READ CONTRACT ADDRESS
     with open(INPUT_DEPLOYMENTS_SUMMARY_FILE, "r") as file:
         address_data: dict = json.load(file)
