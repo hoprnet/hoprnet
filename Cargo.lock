@@ -4267,11 +4267,10 @@ dependencies = [
 
 [[package]]
 name = "hopr-internal-types"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "anyhow",
  "aquamarine",
- "async-std",
  "bincode",
  "bindings",
  "bloomfilter",
@@ -4285,11 +4284,8 @@ dependencies = [
  "lazy_static",
  "multiaddr",
  "num_enum",
- "rand 0.8.5",
- "rayon",
  "serde",
  "serde_bytes",
- "serde_repr",
  "smart-default",
  "strum",
  "thiserror",
@@ -4530,7 +4526,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-p2p"
-version = "0.5.2"
+version = "0.5.3"
 dependencies = [
  "anyhow",
  "async-std",
@@ -8588,17 +8584,6 @@ dependencies = [
  "percent-encoding",
  "serde",
  "thiserror",
-]
-
-[[package]]
-name = "serde_repr"
-version = "0.1.19"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6c64451ba24fc7a6a2d60fc75dd9c83c90903b19028d4eff35e88fc1e86564e9"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.87",
 ]
 
 [[package]]

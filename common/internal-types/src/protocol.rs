@@ -264,7 +264,6 @@ mod tests {
     use super::*;
     use hopr_crypto_random::random_bytes;
 
-    use crate::prelude::TicketBuilder;
     use hex_literal::hex;
 
     const PRIVATE_KEY: [u8; 32] = hex!("51d3003d908045a4d76d0bfc0d84f6ff946b5934b7ea6a2958faf02fead4567a");
@@ -280,40 +279,6 @@ mod tests {
         let serialized = cbor4ii::serde::to_vec(buf, &ack)?;
 
         const EXPECTED_V2_BINARY_REPRESENTATION_CBOR_HEX: [u8; 213] = hex!("a36d61636b5f7369676e6174757265a1697369676e617475726598401859182418be184818a218c318cb1869186018270218391853186c18ff18e018b518d9187b187900188218da184e1869187518ec1828181b081821187718bb0c18ba18f418331218ea187c1880182318d6189f189f18d7141876186a1890186b1885189718a718b9189018fc18bc18260918e318a5182a006d61636b5f6b65795f7368617265a164686b6579982000000000000000000000000000000000000000000000000000000000000000016976616c696461746564f5");
-
-        assert_eq!(&serialized, &EXPECTED_V2_BINARY_REPRESENTATION_CBOR_HEX);
-
-        Ok(())
-    }
-
-    #[test]
-    fn ticket_binary_compatibility_with_the_v2_format() -> anyhow::Result<()> {
-        let kp = ChainKeypair::from_secret(&hex!(
-            "492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775"
-        ))?;
-
-        let ticket = TicketBuilder::default()
-            .addresses(
-                hex!("5aaeb6053f3e94c9b9a09f33669435e7ef1beaed"),
-                hex!("fb6916095ca1df60bb79ce92ce3ea74c37c5d359"),
-            )
-            .balance(BalanceType::HOPR.balance(100))
-            .index_offset(1)
-            .index(1)
-            .challenge(EthereumChallenge::new(&hex!(
-                "045a4d76d0bfc0d84f6ff946b5934b7ea6a2958f"
-            )))
-            .channel_epoch(1)
-            .build_signed(
-                &kp,
-                &Hash::from(hex!("51d3003d908045a4d76d0bfc0d84f6ff946b5934b7ea6a2958faf02fead4567a")),
-            )?
-            .leak();
-
-        let buf = Vec::new();
-        let serialized = cbor4ii::serde::to_vec(buf, &ticket)?;
-
-        const EXPECTED_V2_BINARY_REPRESENTATION_CBOR_HEX: [u8; 0] = [];
 
         assert_eq!(&serialized, &EXPECTED_V2_BINARY_REPRESENTATION_CBOR_HEX);
 
