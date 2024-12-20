@@ -21,7 +21,7 @@ NETWORK1 = "anvil-localhost"
 API_TOKEN = "e2e-API-token^^"
 PASSWORD = "e2e-test"
 
-PORT_BASE = 19000
+PORT_BASE = 3000
 
 SUITE_NAME = "hopr-localcluster"
 ROOT_DIR = Path("/tmp")
