@@ -136,7 +136,7 @@ class TicketStatistics(ApiResponseObject):
 
 
 class Configuration(ApiResponseObject):
-    keys = {"probability": "hopr/protocol/outgoing_ticket_winning_prob"}
+    keys = {"safe_address": "hopr/safe_module/safe_address", "module_address": "hopr/safe_module/module_address"}
 
 
 class OpenedChannel(ApiResponseObject):

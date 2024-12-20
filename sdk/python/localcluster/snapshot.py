@@ -2,7 +2,12 @@ import shutil
 from pathlib import Path
 
 from .cluster import Cluster
-from .constants import NODE_NAME_PREFIX, logging
+from .constants import (
+    ANVIL_FOLDER,
+    ANVIL_FOLDER_NAME,
+    NODE_NAME_PREFIX,
+    logging,
+)
 
 EXPECTED_FILES_FOR_SNAPSHOT = [
     "db/hopr_index.db",
@@ -11,6 +16,7 @@ EXPECTED_FILES_FOR_SNAPSHOT = [
     "db/hopr_logs.db",
     "db/hopr_logs.db-shm",
     "db/hopr_logs.db-wal",
+    "hoprd.id",
 ]
 
 
@@ -29,15 +35,13 @@ class Snapshot:
         # create new snapshot
         self.sdir.mkdir(parents=True, exist_ok=True)
 
-        # copy anvil state
-        shutil.copy(anvil_file, self.sdir)
-
         # copy configuration files
         for f in self.parent_dir.glob("*.cfg.yaml"):
             shutil.copy(f, self.sdir)
 
-        # copy protocol config file
-        shutil.copy(self.parent_dir.joinpath("protocol-config.json"), self.sdir)
+        # copy anvil files
+        shutil.copytree(ANVIL_FOLDER, self.sdir.joinpath(ANVIL_FOLDER_NAME))
+        shutil.rmtree(ANVIL_FOLDER, ignore_errors=True)
 
         # copy node data and env files
         for i in range(self.cluster.size):
@@ -51,44 +55,30 @@ class Snapshot:
                 shutil.copy(source_dir.joinpath(file), db_target_dir)
 
             shutil.copy(source_dir.joinpath("./hoprd.id"), target_dir)
-            shutil.copy(source_dir.joinpath("./.env"), target_dir)
 
     def reuse(self):
         logging.info("Re-using snapshot")
 
-        # copy anvil state
-        shutil.copy(self.sdir.joinpath("anvil.state.json"), self.parent_dir)
+        # remove all files and folder in self.dir which are not snashot
 
-        # copy configuration files
-        for f in self.sdir.glob("*.cfg.yaml"):
-            self.parent_dir.joinpath(f.name).unlink(missing_ok=True)
-            shutil.copy(f, self.parent_dir)
+        for entry in self.parent_dir.glob("*"):
+            if entry.is_dir():
+                if entry.name == "snapshot":
+                    continue
+                shutil.rmtree(entry, ignore_errors=True)
+            else:
+                entry.unlink(missing_ok=True)
 
-        # copy protocol-config.json
-        shutil.copy(self.sdir.joinpath("protocol-config.json"), self.parent_dir)
-
-        # copy node data
-        for i in range(self.cluster.size):
-            source_dir: Path = self.sdir.joinpath(f"{NODE_NAME_PREFIX}_{i+1}")
-            target_dir = self.parent_dir.joinpath(f"{NODE_NAME_PREFIX}_{i+1}")
-            db_target_dir = target_dir.joinpath("db/")
-
-            shutil.rmtree(db_target_dir, ignore_errors=True)
-            db_target_dir.mkdir(parents=True, exist_ok=True)
-
-            for file in EXPECTED_FILES_FOR_SNAPSHOT:
-                shutil.copy(source_dir.joinpath(file), db_target_dir)
-
-            shutil.copy(source_dir.joinpath("./hoprd.id"), target_dir)
-            shutil.copy(source_dir.joinpath("./.env"), target_dir)
+        # copy snapshot files
+        shutil.copytree(self.sdir, self.parent_dir, dirs_exist_ok=True)
 
     @property
     def usable(self):
         expected_files = [
-            self.sdir.joinpath("anvil.state.json"),
+            self.sdir.joinpath(ANVIL_FOLDER_NAME),
+            self.sdir.joinpath("barebone-lower-win-prob.cfg.yaml"),
             self.sdir.joinpath("barebone.cfg.yaml"),
             self.sdir.joinpath("default.cfg.yaml"),
-            self.sdir.joinpath("protocol-config.json"),
         ]
         for i in range(self.cluster.size):
             node_dir = self.sdir.joinpath(f"{NODE_NAME_PREFIX}_{i+1}")

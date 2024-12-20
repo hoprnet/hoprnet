@@ -10,21 +10,17 @@ from .anvil import Anvil, AnvilState
 from .cluster import Cluster
 from .constants import (
     ANVIL_CONFIG_FILE,
-    ANVIL_LOG_FILE,
-    ANVIL_STATE_FILE,
-    INPUT_DEPLOYMENTS_SUMMARY_FILE,
+    ANVIL_FOLDER,
+    CONTRACTS_ADDRESSES,
     MAIN_DIR,
-    NETWORK1,
+    NETWORK,
     PORT_BASE,
-    PROTOCOL_CONFIG_FILE,
     logging,
 )
 from .snapshot import Snapshot
 
 SEED = int.from_bytes(os.urandom(8), byteorder="big")
 random.seed(SEED)
-
-# TODO (jean): implement the fully connected switch
 
 
 async def bringup(
@@ -39,8 +35,8 @@ async def bringup(
     with open(config, "r") as f:
         config = yaml.safe_load(f)
 
-    cluster = Cluster(config, ANVIL_CONFIG_FILE, PROTOCOL_CONFIG_FILE)
-    anvil = Anvil(ANVIL_LOG_FILE, ANVIL_CONFIG_FILE, ANVIL_STATE_FILE)
+    cluster = Cluster(config, ANVIL_CONFIG_FILE, ANVIL_FOLDER.joinpath("protocol-config.json"))
+    anvil = Anvil(ANVIL_FOLDER.joinpath("anvil.log"), ANVIL_CONFIG_FILE, ANVIL_FOLDER.joinpath("anvil.state.json"))
 
     snapshot = Snapshot(PORT_BASE, MAIN_DIR, cluster)
 
@@ -53,10 +49,10 @@ async def bringup(
         # START NEW LOCAL ANVIL SERVER
         anvil.run()
         anvil.mirror_contracts(
-            INPUT_DEPLOYMENTS_SUMMARY_FILE,
-            PROTOCOL_CONFIG_FILE,
-            NETWORK1,
-            NETWORK1,
+            CONTRACTS_ADDRESSES,
+            ANVIL_FOLDER.joinpath("protocol-config.json"),
+            NETWORK,
+            NETWORK,
         )
 
         # SETUP NODES USING STORED IDENTITIES
@@ -75,7 +71,7 @@ async def bringup(
         # delay to ensure anvil is stopped and state file closed
         await asyncio.sleep(1)
 
-        snapshot.create(ANVIL_STATE_FILE)
+        snapshot.create(ANVIL_FOLDER.joinpath("anvil.state.json"))
 
     snapshot.reuse()
 

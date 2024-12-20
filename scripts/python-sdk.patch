@@ -1,0 +1,78 @@
+--- hoprd_sdk/api_client.py
++++ hoprd_sdk/api_client.py
+@@ -10,6 +10,7 @@
+ """
+ from __future__ import absolute_import
+ 
++import atexit
+ import datetime
+ import json
+ import mimetypes
+@@ -58,6 +59,7 @@ class ApiClient(object):
+         'datetime': datetime.datetime,
+         'object': object,
+     }
++    _pool = None
+ 
+     def __init__(self, configuration=None, header_name=None, header_value=None,
+                  cookie=None):
+@@ -65,7 +67,6 @@ class ApiClient(object):
+             configuration = Configuration()
+         self.configuration = configuration
+ 
+-        self.pool = ThreadPool()
+         self.rest_client = rest.RESTClientObject(configuration)
+         self.default_headers = {}
+         if header_name is not None:
+@@ -74,9 +75,30 @@ class ApiClient(object):
+         # Set default User-Agent.
+         self.user_agent = 'Swagger-Codegen//python'
+ 
+-    def __del__(self):
+-        self.pool.close()
+-        self.pool.join()
++    def __enter__(self):
++        return self
++
++    def __exit__(self, exc_type, exc_value, traceback):
++        self.close()
++
++    def close(self):
++        if self._pool:
++            self._pool.close()
++            self._pool.join()
++            self._pool = None
++
++            if hasattr(atexit, "unregister"):
++                atexit.unregister(self.close)
++
++    @property
++    def pool(self):
++        """Create thread pool on first request, avoids instantiating unused threadpool
++        for blocking clients."""
++        if self._pool is None:
++            atexit.register(self.close)
++            self._pool = ThreadPool()
++
++        return self._pool
+ 
+     @property
+     def user_agent(self):
+@@ -242,7 +264,7 @@ class ApiClient(object):
+         if data is None:
+             return None
+ 
+-        if type(klass) == str:
++        if isinstance(klass, str):
+             if klass.startswith('list['):
+                 sub_kls = re.match(r'list\[(.*)\]', klass).group(1)
+                 return [self.__deserialize(sub_data, sub_kls)
+@@ -437,7 +459,7 @@ class ApiClient(object):
+             for k, v in six.iteritems(files):
+                 if not v:
+                     continue
+-                file_names = v if type(v) is list else [v]
++                file_names = v if isinstance(v, list) else [v]
+                 for n in file_names:
+                     with open(n, 'rb') as f:
+                         filename = os.path.basename(f.name)

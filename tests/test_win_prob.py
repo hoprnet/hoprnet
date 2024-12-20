@@ -5,7 +5,7 @@ import pytest
 
 from sdk.python.localcluster.constants import (
     ANVIL_CONFIG_FILE,
-    NETWORK1,
+    NETWORK,
     PORT_BASE,
     TICKET_PRICE_PER_HOP,
 )
@@ -33,7 +33,7 @@ def set_minimum_winning_probability_in_network(private_key: str, win_prob: float
         "win-prob",
         "set",
         "--network",
-        NETWORK1,
+        NETWORK,
         "--contracts-root",
         "./ethereum/contracts",
         "--winning-probability",

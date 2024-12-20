@@ -10,13 +10,10 @@ import websocket
 import websockets
 from websockets.asyncio.client import connect
 
-from sdk.python.localcluster.constants import API_TOKEN
 from sdk.python.localcluster.node import Node
 
 from .conftest import nodes_with_auth, random_distinct_pairs_from, to_ws_url
 from .test_session import STANDARD_MTU_SIZE, EchoServer, SocketType
-
-EXTRA_HEADERS = [("X-Auth-Token", API_TOKEN)]
 
 DEFAULT_ARGS = [
     ("hops", 0),
@@ -108,7 +105,7 @@ def test_hoprd_websocket_api_should_accept_a_connection_with_a_valid_token(
             swarm7[src].api_port,
             args=DEFAULT_ARGS + [("destination", f"{swarm7[dest].peer_id}")],
         )
-        ws.connect(url, header={"X-Auth-Token": API_TOKEN})
+        ws.connect(url, header={"X-Auth-Token": swarm7[src].api_token})
 
     time.sleep(0.5)
 
@@ -124,7 +121,7 @@ def test_hoprd_websocket_api_should_accept_a_connection_with_a_query_param_passe
         url = to_ws_url(
             swarm7[src].host_addr,
             swarm7[src].api_port,
-            args=[("apiToken", API_TOKEN)] + DEFAULT_ARGS + [("destination", f"{swarm7[dest].peer_id}")],
+            args=[("apiToken", swarm7[src].api_token)] + DEFAULT_ARGS + [("destination", f"{swarm7[dest].peer_id}")],
         )
         ws.connect(url)
 
@@ -141,7 +138,7 @@ def test_hoprd_websocket_api_should_accept_a_connection_with_a_valid_bearer_toke
             swarm7[src].api_port,
             args=DEFAULT_ARGS + [("destination", f"{swarm7[dest].peer_id}")],
         )
-        ws.connect(url, header={"Authorization": "Bearer " + API_TOKEN})
+        ws.connect(url, header={"Authorization": "Bearer " + swarm7[src].api_token})
 
     time.sleep(0.5)
 
@@ -155,7 +152,7 @@ def test_hoprd_websocket_api_should_reject_connection_on_invalid_path(src: str, 
             f"{swarm7[src].api_port}/defIniteLY_InVAliD_paTh",
             args=DEFAULT_ARGS + [("destination", f"{swarm7[dest].peer_id}")],
         )
-        ws.connect(url, header={"X-Auth-Token": API_TOKEN})
+        ws.connect(url, header={"X-Auth-Token": swarm7[src].api_token})
     except websocket.WebSocketBadStatusException as e:
         assert "404 Not Found" in str(e)
     else:
@@ -176,7 +173,7 @@ async def test_websocket_send_receive_messages(src: str, dest: str, swarm7: dict
                 + DEFAULT_ARGS
                 + [("destination", f"{swarm7[dest].peer_id}")],
             ),
-            additional_headers=EXTRA_HEADERS,
+            additional_headers=[("X-Auth-Token", swarm7[src].api_token)],
         ) as ws:
             for i in range(message_target_count):
                 body = f"hello msg #{i} from peer {swarm7[src].peer_id} to peer {swarm7[dest].peer_id}"
@@ -201,16 +198,20 @@ def to_ws_url_deprecated(host, port):
 async def ws_connections(swarm7: dict[str, Node]):
     async with (
         websockets.connect(
-            to_ws_url_deprecated(swarm7["1"].host_addr, swarm7["1"].api_port), extra_headers=EXTRA_HEADERS
+            to_ws_url_deprecated(swarm7["1"].host_addr, swarm7["1"].api_port),
+            extra_headers=[("X-Auth-Token", swarm7["1"].api_token)],
         ) as ws1,
         websockets.connect(
-            to_ws_url_deprecated(swarm7["2"].host_addr, swarm7["2"].api_port), extra_headers=EXTRA_HEADERS
+            to_ws_url_deprecated(swarm7["2"].host_addr, swarm7["2"].api_port),
+            extra_headers=[("X-Auth-Token", swarm7["2"].api_token)],
         ) as ws2,
         websockets.connect(
-            to_ws_url_deprecated(swarm7["3"].host_addr, swarm7["3"].api_port), extra_headers=EXTRA_HEADERS
+            to_ws_url_deprecated(swarm7["3"].host_addr, swarm7["3"].api_port),
+            extra_headers=[("X-Auth-Token", swarm7["3"].api_token)],
         ) as ws3,
         websockets.connect(
-            to_ws_url_deprecated(swarm7["4"].host_addr, swarm7["4"].api_port), extra_headers=EXTRA_HEADERS
+            to_ws_url_deprecated(swarm7["4"].host_addr, swarm7["4"].api_port),
+            extra_headers=[("X-Auth-Token", swarm7["4"].api_token)],
         ) as ws4,
     ):
         yield {"1": ws1, "2": ws2, "3": ws3, "4": ws4}

@@ -4,7 +4,7 @@ from enum import Enum, auto
 from pathlib import Path
 from subprocess import run
 
-from .constants import INPUT_PROTOCOL_CONFIG_FILE, PORT_BASE, PWD, logging
+from .constants import PORT_BASE, PWD, logging
 
 
 class AnvilState(Enum):
@@ -36,12 +36,12 @@ class Anvil:
             """.split(),
             check=True,
             capture_output=True,
-            cwd=PWD.parent.joinpath("scripts"),
+            cwd=PWD.joinpath("scripts"),
         )
 
     def mirror_contracts(self, src_file: Path, dest_file: Path, src_network: str, dest_network: str):
         logging.info("Mirror contract data because of anvil-deploy node only writing to localhost")
-        shutil.copy(INPUT_PROTOCOL_CONFIG_FILE, dest_file)
+        shutil.copy(PWD.joinpath("scripts", "protocol-config-anvil.json"), dest_file)
 
         with open(src_file, "r") as file:
             src_data = json.load(file)
@@ -64,4 +64,4 @@ class Anvil:
     @classmethod
     def kill(cls):
         logging.info("Stop any local anvil server running")
-        run(f"make -s kill-anvil port={PORT_BASE}".split(), cwd=PWD.parent, check=True)
+        run(f"make -s kill-anvil port={PORT_BASE}".split(), cwd=PWD, check=True)

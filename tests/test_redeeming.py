@@ -5,13 +5,13 @@ import pytest
 
 from sdk.python.api.hopr import HoprdAPI
 from sdk.python.localcluster.constants import (
-    TICKET_AGGREGATION_THRESHOLD,
     TICKET_PRICE_PER_HOP,
 )
 from sdk.python.localcluster.node import Node
 
 from .conftest import barebone_nodes
 from .utils import (
+    TICKET_AGGREGATION_THRESHOLD,
     PARAMETERIZED_SAMPLE_SIZE,
     check_all_tickets_redeemed,
     check_unredeemed_tickets_value,

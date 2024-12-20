@@ -33,6 +33,7 @@ from .response_objects import (
     Balances,
     Channel,
     Channels,
+    Configuration,
     ConnectedPeer,
     Infos,
     Message,
@@ -330,6 +331,14 @@ class HoprdAPI:
         is_ok, response = await self.__call_api(HTTPMethod.GET, "account/addresses")
 
         return Addresses(response) if is_ok else None
+
+    async def config(self) -> Optional[Configuration]:
+        """
+        Returns some configurations value of the node.
+        """
+        is_ok, response = await self.__call_api(HTTPMethod.GET, "node/configuration")
+
+        return Configuration(response) if is_ok else None
 
     async def node_info(self) -> Optional[Infos]:
         """

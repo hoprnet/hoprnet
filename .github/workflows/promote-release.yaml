@@ -80,6 +80,7 @@ jobs:
             git push --set-upstream origin release/${release_name}
           fi
         working-directory: ./hoprd-sdk-python
+
   new_release:
     name: Open new release
     needs:

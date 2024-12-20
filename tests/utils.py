@@ -3,18 +3,16 @@ import random
 from contextlib import asynccontextmanager
 
 from sdk.python.api.channelstatus import ChannelStatus
-from sdk.python.localcluster.constants import (
-    RESERVED_TAG_UPPER_BOUND,
-    TICKET_AGGREGATION_THRESHOLD,
-    TICKET_PRICE_PER_HOP,
-)
+from sdk.python.localcluster.constants import TICKET_PRICE_PER_HOP
 from sdk.python.localcluster.node import Node
 
 # if os.getenv("CI", default="false") == "false" else 3
+TICKET_AGGREGATION_THRESHOLD = 100
 PARAMETERIZED_SAMPLE_SIZE = 1
 AGGREGATED_TICKET_PRICE = TICKET_AGGREGATION_THRESHOLD * TICKET_PRICE_PER_HOP
 MULTIHOP_MESSAGE_SEND_TIMEOUT = 30.0
 CHECK_RETRY_INTERVAL = 0.5
+RESERVED_TAG_UPPER_BOUND = 1023
 APPLICATION_TAG_THRESHOLD_FOR_SESSIONS = RESERVED_TAG_UPPER_BOUND + 1
 
 

@@ -6,13 +6,12 @@ from subprocess import run
 
 from . import utils
 from .constants import (
-    FIXTURES_PREFIX,
+    IDENTITY_PREFIX,
     MAIN_DIR,
-    NETWORK1,
+    NETWORK,
     NODE_NAME_PREFIX,
     PASSWORD,
     PORT_BASE,
-    PREGENERATED_IDENTITIES_DIR,
     PWD,
     logging,
 )
@@ -46,7 +45,7 @@ class Cluster:
         logging.info("Setting up nodes with protocol config files")
         for node in self.nodes.values():
             logging.debug(f"Setting up {node}")
-            node.setup(PASSWORD, self.protocol_config, PWD.parent)
+            node.setup(PASSWORD, self.protocol_config, PWD)
 
         # WAIT FOR NODES TO BE UP
         logging.info(f"Waiting up to {GLOBAL_TIMEOUT}s for nodes to start up")
@@ -86,7 +85,7 @@ class Cluster:
                 logging.error(f"Node {node} did not return addresses")
 
         # WAIT FOR NODES TO CONNECT TO ALL PEERS
-        logging.info(f"Waiting up to {2*GLOBAL_TIMEOUT}s for nodes to connect to all peers")
+        logging.info(f"Waiting up to {GLOBAL_TIMEOUT}s for nodes to connect to all peers")
 
         tasks = []
         for node in self.nodes.values():
@@ -111,9 +110,9 @@ class Cluster:
                 "hopli",
                 "faucet",
                 "--network",
-                NETWORK1,
+                NETWORK,
                 "--identity-prefix",
-                FIXTURES_PREFIX,
+                IDENTITY_PREFIX,
                 "--identity-directory",
                 MAIN_DIR,
                 "--contracts-root",
@@ -128,7 +127,7 @@ class Cluster:
             env=os.environ | custom_env,
             check=True,
             capture_output=True,
-            cwd=PWD.parent,
+            cwd=PWD,
         )
 
     def copy_identities(self):
@@ -149,22 +148,25 @@ class Cluster:
         logging.info(f"Removed '*.log' files in {MAIN_DIR} subfolders")
 
         # Copy new identity files
-        for node_id in range(self.size):
-            f = f"{NODE_NAME_PREFIX}_{node_id+1}.id"
+        for idx, node in enumerate(self.nodes.values(), start=1):
             shutil.copy(
-                PREGENERATED_IDENTITIES_DIR.joinpath(f),
-                MAIN_DIR.joinpath(f"{NODE_NAME_PREFIX}_{node_id+1}", "hoprd.id"),
+                PWD.joinpath(node.identity_path),
+                MAIN_DIR.joinpath(f"{NODE_NAME_PREFIX}_{idx}", "hoprd.id"),
             )
         logging.info(f"Copied '*.id' files to {MAIN_DIR}")
 
         # Copy new config files
-        for f in PWD.glob("*.cfg.yaml"):
+        for f in PWD.joinpath("sdk").glob("*.cfg.yaml"):
             shutil.copy(f, MAIN_DIR.joinpath(f.name))
         logging.info(f"Copied '*.cfg.yaml' files to {MAIN_DIR}")
 
     def load_addresses(self):
         for node in self.nodes.values():
             node.load_addresses()
+
+    def get_safe_and_module_addresses(self):
+        for node in self.node.values():
+            node.get_safe_and_module_addresses()
 
     async def alias_peers(self):
         logging.info("Aliasing every other node")

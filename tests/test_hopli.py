@@ -9,10 +9,10 @@ import pytest
 
 from sdk.python.localcluster.constants import (
     ANVIL_CONFIG_FILE,
-    FIXTURES_PREFIX,
-    INPUT_DEPLOYMENTS_SUMMARY_FILE,
+    IDENTITY_PREFIX,
+    CONTRACTS_ADDRESSES,
     MAIN_DIR,
-    NETWORK1,
+    NETWORK,
     PASSWORD,
     PORT_BASE,
 )
@@ -53,10 +53,10 @@ def faucet(private_key: str, hopr_amount: str, native_amount: str):
         "hopli",
         "faucet",
         "--network",
-        NETWORK1,
+        NETWORK,
         "--identity-prefix",
-        FIXTURES_PREFIX,
-        "--identity-directory",  # TODO: change the directory
+        IDENTITY_PREFIX,
+        "--identity-directory",
         MAIN_DIR,
         "--contracts-root",
         "./ethereum/contracts",
@@ -83,7 +83,7 @@ def manager_deregister(private_key: str, node_addr: str):
             "network-registry",
             "manager-deregister",
             "--network",
-            NETWORK1,
+            NETWORK,
             "--node-address",
             node_addr,
             "--contracts-root",
@@ -108,7 +108,7 @@ def manager_register(private_key: str, node_addr: str, safe_addr: str):
             "network-registry",
             "manager-register",
             "--network",
-            NETWORK1,
+            NETWORK,
             "--contracts-root",
             "./ethereum/contracts",
             "--node-address",
@@ -135,7 +135,7 @@ def manager_force_sync(private_key: str, safes: str, eligibility: str):
             "network-registry",
             "manager-force-sync",
             "--network",
-            NETWORK1,
+            NETWORK,
             "--safe-address",
             safes,
             "--contracts-root",
@@ -233,7 +233,7 @@ def create_safe_module(extra_prefix: str, private_key: str, manager_private_key:
             "safe-module",
             "create",
             "--network",
-            NETWORK1,
+            NETWORK,
             "--identity-prefix",
             FIXTURES_PREFIX_NEW + extra_prefix,
             "--identity-directory",
@@ -311,7 +311,7 @@ def manager_set_win_prob(private_key: str, win_prob: str):
             "win-prob",
             "set",
             "--network",
-            NETWORK1,
+            NETWORK,
             "--winning-probability",
             win_prob,
             "--contracts-root",
@@ -333,7 +333,7 @@ def get_win_prob():
             "win-prob",
             "get",
             "--network",
-            NETWORK1,
+            NETWORK,
             "--contracts-root",
             "./ethereum/contracts",
             "--provider-url",
@@ -377,9 +377,9 @@ async def test_hopli_should_be_able_to_fund_nodes(peer: str, swarm7: dict[str, N
 async def test_hopli_should_be_able_to_deregister_nodes_and_register_it(peer: str, swarm7: dict[str, Node]):
     private_key = load_private_key(ANVIL_CONFIG_FILE)
 
-    with open(INPUT_DEPLOYMENTS_SUMMARY_FILE, "r") as file:
+    with open(CONTRACTS_ADDRESSES, "r") as file:
         address_data: dict = json.load(file)
-        network_registry_contract = address_data["networks"][NETWORK1]["addresses"]["network_registry"]
+        network_registry_contract = address_data["networks"][NETWORK]["addresses"]["network_registry"]
 
     res_before = run_cast_cmd(
         "call", [network_registry_contract, "nodeRegisterdToAccount(address)(address)", swarm7[peer].address]
@@ -454,9 +454,9 @@ async def test_hopli_should_be_able_to_create_safe_module(swarm7: dict[str, Node
     extra_prefix = "two"
 
     # READ CONTRACT ADDRESS
-    with open(INPUT_DEPLOYMENTS_SUMMARY_FILE, "r") as file:
+    with open(CONTRACTS_ADDRESSES, "r") as file:
         address_data: dict = json.load(file)
-        network_registry_contract_1 = address_data["networks"][NETWORK1]["addresses"]["network_registry"]
+        network_registry_contract_1 = address_data["networks"][NETWORK]["addresses"]["network_registry"]
         # network_registry_contract_2 = address_data["networks"][NETWORK2]["addresses"]["network_registry"]
 
     # create identity
@@ -485,9 +485,9 @@ async def test_hopli_should_be_able_to_create_safe_module(swarm7: dict[str, Node
 @pytest.mark.asyncio
 async def test_hopli_should_be_able_to_set_and_read_win_prob():
     # READ CONTRACT ADDRESS
-    with open(INPUT_DEPLOYMENTS_SUMMARY_FILE, "r") as file:
+    with open(CONTRACTS_ADDRESSES, "r") as file:
         address_data: dict = json.load(file)
-        win_prob_oracle = address_data["networks"][NETWORK1]["addresses"]["winning_probability_oracle"]
+        win_prob_oracle = address_data["networks"][NETWORK]["addresses"]["winning_probability_oracle"]
 
     # get current win prob
     get_win_prob()

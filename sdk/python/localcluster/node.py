@@ -33,13 +33,16 @@ def load_env_file(env_file: str) -> dict:
 
 
 class Node:
-    def __init__(self, id: int, api_token: str, host_addr: str, network: str, cfg_file: str, alias: str):
+    def __init__(
+        self, id: int, api_token: str, host_addr: str, network: str, identity_path: str, cfg_file: str, alias: str
+    ):
         # initialized
         self.id = id
         self.alias = alias
         self.host_addr: str = host_addr
         self.api_token: str = api_token
         self.network: str = network
+        self.identity_path: str = identity_path
 
         # optional
         self.cfg_file: str = cfg_file
@@ -117,7 +120,7 @@ class Node:
             check=True,
             capture_output=True,
             text=True,
-            cwd=PWD.parent,
+            cwd=PWD,
         )
 
         for el in res.stdout.split("\n"):
@@ -202,8 +205,7 @@ class Node:
 
         while not ready:
             peers = [p.peer_id for p in await asyncio.wait_for(self.api.peers(), timeout=20)]
-            missing_peers = [p for p in required_peers if p not in peers]
-            ready = len(missing_peers) == 0
+            ready = [p for p in required_peers if p not in peers] == []
 
             if not ready:
                 await asyncio.sleep(0.5)
@@ -220,7 +222,7 @@ class Node:
         if "api_token" in config:
             token = config["api_token"]
 
-        return cls(index, token, config["host"], network, config["config_file"], alias)
+        return cls(index, token, config["host"], network, config["identity_path"], config["config_file"], alias)
 
     async def alias_peers(self, aliases_dict: dict[str, str]):
         for peer_id, alias in aliases_dict.items():

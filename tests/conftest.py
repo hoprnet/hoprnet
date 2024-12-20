@@ -109,7 +109,7 @@ def to_ws_url(host, port, args: list[tuple[str, str]]):
 
 def run_hopli_cmd(cmd: list[str], custom_env):
     env = os.environ | custom_env
-    proc = Popen(cmd, env=env, stdout=PIPE, stderr=STDOUT, bufsize=0, cwd=PWD.parent)
+    proc = Popen(cmd, env=env, stdout=PIPE, stderr=STDOUT, bufsize=0, cwd=PWD)
     # filter out ansi color codes
     color_regex = re.compile(r"\x1b\[\d{,3}m")
     with proc.stdout:

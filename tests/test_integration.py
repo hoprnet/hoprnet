@@ -10,17 +10,17 @@ from sdk.python.api import HoprdAPI
 from sdk.python.api.channelstatus import ChannelStatus
 from sdk.python.localcluster.constants import (
     OPEN_CHANNEL_FUNDING_VALUE_HOPR,
-    RESERVED_TAG_UPPER_BOUND,
-    TICKET_AGGREGATION_THRESHOLD,
     TICKET_PRICE_PER_HOP,
 )
 from sdk.python.localcluster.node import Node
 
 from .conftest import barebone_nodes, default_nodes, random_distinct_pairs_from
 from .utils import (
+    TICKET_AGGREGATION_THRESHOLD,
     AGGREGATED_TICKET_PRICE,
     MULTIHOP_MESSAGE_SEND_TIMEOUT,
     PARAMETERIZED_SAMPLE_SIZE,
+    RESERVED_TAG_UPPER_BOUND,
     check_all_tickets_redeemed,
     check_native_balance_below,
     check_received_packets_with_peek,
