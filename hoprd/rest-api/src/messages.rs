@@ -58,7 +58,8 @@ pub(crate) struct SizeResponse {
     "tag": 2000
 }))]
 pub(crate) struct SendMessageBodyRequest {
-    /// The message tag used to filter messages based on application
+    /// The message tag used to filter messages based on application, must be from range <1024,65535>
+    #[schema(minimum = 1024, maximum = 65535)]
     tag: u16,
     /// Message to be transmitted over the network
     #[serde_as(as = "Bytes")]
@@ -75,6 +76,7 @@ pub(crate) struct SendMessageBodyRequest {
     #[validate(length(min = 0, max = 3))]
     #[schema(value_type = Option<Vec<String>>)]
     path: Option<Vec<PeerOrAddress>>,
+    #[schema(minimum = 0, maximum = 3)]
     #[validate(range(min = 0, max = 3))]
     hops: Option<u16>,
 }

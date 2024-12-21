@@ -107,7 +107,7 @@ impl TicketBuilder {
     /// Sets channel id based on the `source` and `destination`.
     /// This, [TicketBuilder::channel_id] or [TicketBuilder::direction] must be set.
     #[must_use]
-    pub fn addresses<T: Into<Address>>(mut self, source: T, destination: T) -> Self {
+    pub fn addresses<T: Into<Address>, U: Into<Address>>(mut self, source: T, destination: U) -> Self {
         self.channel_id = Some(generate_channel_id(&source.into(), &destination.into()));
         self
     }

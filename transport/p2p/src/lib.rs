@@ -49,7 +49,6 @@ use serde::{Deserialize, Serialize};
 
 use core_network::messaging::ControlMessage;
 use hopr_internal_types::legacy;
-use hopr_internal_types::prelude::*;
 use hopr_internal_types::protocol::Acknowledgement;
 
 use crate::constants::{
@@ -82,8 +81,10 @@ pub struct HoprNetworkBehavior {
     pub heartbeat: libp2p::request_response::cbor::Behaviour<Ping, Pong>,
     pub msg: libp2p::request_response::cbor::Behaviour<Box<[u8]>, ()>,
     pub ack: libp2p::request_response::cbor::Behaviour<Acknowledgement, ()>,
-    pub ticket_aggregation:
-        libp2p::request_response::cbor::Behaviour<Vec<legacy::AcknowledgedTicket>, std::result::Result<Ticket, String>>,
+    pub ticket_aggregation: libp2p::request_response::cbor::Behaviour<
+        Vec<legacy::AcknowledgedTicket>,
+        std::result::Result<legacy::Ticket, String>,
+    >,
 }
 
 impl Debug for HoprNetworkBehavior {
@@ -150,7 +151,7 @@ impl HoprNetworkBehavior {
             ),
             ticket_aggregation: libp2p::request_response::cbor::Behaviour::<
                 Vec<legacy::AcknowledgedTicket>,
-                std::result::Result<Ticket, String>,
+                std::result::Result<legacy::Ticket, String>,
             >::new(
                 [(
                     StreamProtocol::new(HOPR_TICKET_AGGREGATION_PROTOCOL_V_0_1_0),
@@ -175,7 +176,7 @@ pub enum HoprNetworkBehaviorEvent {
     Message(libp2p::request_response::Event<Box<[u8]>, ()>),
     Acknowledgement(libp2p::request_response::Event<Acknowledgement, ()>),
     TicketAggregation(
-        libp2p::request_response::Event<Vec<legacy::AcknowledgedTicket>, std::result::Result<Ticket, String>>,
+        libp2p::request_response::Event<Vec<legacy::AcknowledgedTicket>, std::result::Result<legacy::Ticket, String>>,
     ),
     KeepAlive(void::Void),
 }
@@ -216,11 +217,14 @@ impl From<libp2p::request_response::Event<Box<[u8]>, ()>> for HoprNetworkBehavio
     }
 }
 
-impl From<libp2p::request_response::Event<Vec<legacy::AcknowledgedTicket>, std::result::Result<Ticket, String>>>
+impl From<libp2p::request_response::Event<Vec<legacy::AcknowledgedTicket>, std::result::Result<legacy::Ticket, String>>>
     for HoprNetworkBehaviorEvent
 {
     fn from(
-        event: libp2p::request_response::Event<Vec<legacy::AcknowledgedTicket>, std::result::Result<Ticket, String>>,
+        event: libp2p::request_response::Event<
+            Vec<legacy::AcknowledgedTicket>,
+            std::result::Result<legacy::Ticket, String>,
+        >,
     ) -> Self {
         Self::TicketAggregation(event)
     }
