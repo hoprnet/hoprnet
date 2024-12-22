@@ -7,21 +7,21 @@ use std::task::{Context, Poll, Waker};
 use std::time::{Duration, Instant};
 
 #[derive(Debug)]
-struct DelayEntryWrapper<T> {
+struct DelayedEntry<T> {
     item: T,
     at: Instant,
     cancelled: AtomicBool,
 }
 
-impl<T: PartialEq> PartialEq for DelayEntryWrapper<T> {
+impl<T: PartialEq> PartialEq for DelayedEntry<T> {
     fn eq(&self, other: &Self) -> bool {
         self.item == other.item
     }
 }
 
-impl<T: Eq> Eq for DelayEntryWrapper<T> {}
+impl<T: Eq> Eq for DelayedEntry<T> {}
 
-impl<T: Ord> Ord for DelayEntryWrapper<T> {
+impl<T: Ord> Ord for DelayedEntry<T> {
     fn cmp(&self, other: &Self) -> Ordering {
         if other.item != self.item {
             match self.at.cmp(&other.at) {
@@ -34,41 +34,57 @@ impl<T: Ord> Ord for DelayEntryWrapper<T> {
     }
 }
 
-impl<T: Ord> PartialOrd for DelayEntryWrapper<T> {
+impl<T: Ord> PartialOrd for DelayedEntry<T> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
+/// A queue of [items](DelayedItem) with attached [`Instant`] that determines a deadline
+/// at which it should be yielded from the [`Stream`](futures::Stream) side of the queue.
+/// The queue also has the cancellation ability: an item that has been pushed into the
+/// queue earlier can be canceled before it meets its deadline.
+/// A canceled item will then be skipped in the output stream.
+///
+/// The items are internally sorted based on their deadline.
+/// In a case when two items have equal deadlines, they are sorted according
+/// to their values; therefore, items must implement [`Ord`].
 pub struct SkipDelayQueue<T> {
-    entries: BTreeSet<DelayEntryWrapper<T>>,
+    entries: BTreeSet<DelayedEntry<T>>,
     next_wakeup: Option<futures_time::task::SleepUntil>,
     rx_waker: Option<Waker>,
     is_closed: bool,
 }
 
+/// An item with deadline, which can be pushed into the [`SkipDelayQueue`].
+///
+/// For convenience, the type implements From traits from
+/// `(T, Instant)`, `(T, Duration)` and `(T, Skip)`.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub enum DelayedEntry<T> {
+pub enum DelayedItem<T> {
+    /// Adds a new item with a deadline.
     New(T, Instant),
+    /// Cancel a previously added item.
     Cancel(T),
 }
 
+/// A marker type for canceling items pushed into the [`SkipDelayQueue`].
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Skip;
 
-impl<T> From<(T, Duration)> for DelayedEntry<T> {
+impl<T> From<(T, Duration)> for DelayedItem<T> {
     fn from(value: (T, Duration)) -> Self {
         Self::New(value.0, Instant::now() + value.1)
     }
 }
 
-impl<T> From<(T, Instant)> for DelayedEntry<T> {
+impl<T> From<(T, Instant)> for DelayedItem<T> {
     fn from(value: (T, Instant)) -> Self {
         Self::New(value.0, value.1)
     }
 }
 
-impl<T> From<(T, Skip)> for DelayedEntry<T> {
+impl<T> From<(T, Skip)> for DelayedItem<T> {
     fn from(value: (T, Skip)) -> Self {
         Self::Cancel(value.0)
     }
@@ -136,7 +152,7 @@ impl<T: Ord> futures::Stream for SkipDelayQueue<T> {
     }
 }
 
-impl<T: Ord + std::fmt::Debug> futures::Sink<DelayedEntry<T>> for SkipDelayQueue<T> {
+impl<T: Ord + std::fmt::Debug> futures::Sink<DelayedItem<T>> for SkipDelayQueue<T> {
     type Error = std::io::Error;
 
     fn poll_ready(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -146,21 +162,21 @@ impl<T: Ord + std::fmt::Debug> futures::Sink<DelayedEntry<T>> for SkipDelayQueue
         Poll::Ready(Ok(()))
     }
 
-    fn start_send(mut self: Pin<&mut Self>, item: DelayedEntry<T>) -> Result<(), Self::Error> {
+    fn start_send(mut self: Pin<&mut Self>, item: DelayedItem<T>) -> Result<(), Self::Error> {
         if self.is_closed {
             return Err(std::io::ErrorKind::BrokenPipe.into());
         }
 
         match item {
-            DelayedEntry::New(item, at) => {
+            DelayedItem::New(item, at) => {
                 tracing::trace!("SkipDelayQueue::start_send inserting");
-                self.entries.insert(DelayEntryWrapper {
+                self.entries.insert(DelayedEntry {
                     item,
                     at,
                     cancelled: AtomicBool::new(false),
                 });
             }
-            DelayedEntry::Cancel(item) => {
+            DelayedItem::Cancel(item) => {
                 tracing::trace!("SkipDelayQueue::start_send cancelling");
                 self.entries
                     .iter()
