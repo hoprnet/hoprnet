@@ -1,20 +1,19 @@
 mod skip_queue;
 
+use std::collections::VecDeque;
 use std::pin::Pin;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
-use std::collections::VecDeque;
 
 use futures::channel::mpsc::UnboundedSender;
 use futures::stream::BoxStream;
-use futures::{AsyncRead, AsyncWrite, FutureExt, StreamExt};
+use futures::{AsyncRead, AsyncWrite, StreamExt};
 use rand::distributions::Bernoulli;
 use rand::prelude::{thread_rng, Distribution, Rng, SeedableRng, StdRng};
 use rand_distr::Normal;
 use ringbuffer::{AllocRingBuffer, RingBuffer};
-
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) struct RetryToken {
@@ -140,7 +139,9 @@ impl<const C: usize> AsyncWrite for FaultyNetwork<'_, C> {
         }
 
         if let Some(stats) = &self.stats {
-            stats.bytes_sent.fetch_add(buf.len(), std::sync::atomic::Ordering::Relaxed);
+            stats
+                .bytes_sent
+                .fetch_add(buf.len(), std::sync::atomic::Ordering::Relaxed);
             stats.packets_sent.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         }
 
@@ -166,8 +167,12 @@ impl<const C: usize> AsyncRead for FaultyNetwork<'_, C> {
                 buf[..len].copy_from_slice(&item.as_ref()[..len]);
 
                 if let Some(stats) = &self.stats {
-                    stats.bytes_received.fetch_add(len, std::sync::atomic::Ordering::Relaxed);
-                    stats.packets_received.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    stats
+                        .bytes_received
+                        .fetch_add(len, std::sync::atomic::Ordering::Relaxed);
+                    stats
+                        .packets_received
+                        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                 }
 
                 tracing::trace!("FaultyNetwork::poll_read: {len} bytes ready");

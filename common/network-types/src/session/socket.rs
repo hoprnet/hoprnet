@@ -1,14 +1,14 @@
-use std::num::NonZeroU32;
 use asynchronous_codec::Framed;
+use dashmap::{DashMap, Entry};
 use futures::{pin_mut, Sink, SinkExt, StreamExt, TryStreamExt};
 use futures_concurrency::stream::Merge;
+use governor::prelude::StreamRateLimitExt;
+use governor::{Quota, RateLimiter};
+use std::num::NonZeroU32;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::Duration;
-use dashmap::{DashMap, Entry};
-use governor::prelude::StreamRateLimitExt;
-use governor::{Quota, RateLimiter};
 
 use crate::prelude::errors::SessionError;
 use crate::prelude::protocol::{FrameAcknowledgements, SessionCodec, SessionMessage};
@@ -22,7 +22,7 @@ struct SocketState<const C: usize> {
     ctl_tx: futures::channel::mpsc::UnboundedSender<SessionMessage<C>>,
     downstream_segment_in: Pin<Box<dyn Sink<Segment, Error = SessionError> + Send>>,
     incoming_frame_retries: Arc<DashMap<FrameId, RetryToken>>,
-    outgoing_frame_retries: Arc<DashMap<FrameId, RetryToken>>
+    outgoing_frame_retries: Arc<DashMap<FrameId, RetryToken>>,
 }
 
 impl<const C: usize> SocketState<C> {
@@ -73,7 +73,8 @@ impl<const C: usize> SocketState<C> {
     }
 
     async fn incoming_retransmission_request(&mut self, retransmit: SegmentRequest<C>) -> Result<(), SessionError> {
-        let missing = retransmit.into_iter()
+        let missing = retransmit
+            .into_iter()
             .inspect(|s| {
                 // Frame partially acknowledged, we won't need to resend it
                 self.outgoing_frame_retries.remove(&s.0);
