@@ -342,4 +342,43 @@ mod tests {
 
         Ok(())
     }
+
+
+    #[test_log::test(async_std::test)]
+    async fn skip_delay_queue_should_continuously_yield_items() -> anyhow::Result<()> {
+        let (mut tx, rx) = SkipDelayQueue::new().split();
+
+        let items = [5,2,1,4,3];
+
+        let now = Instant::now();
+        let timed_items = (0..5)
+            .map(|i| (items[i], now + Duration::from_millis(200) * (i as u32)))
+            .collect::<Vec<_>>();
+
+        let timed_items_clone = timed_items.clone();
+        let jh = async_std::task::spawn(async move {
+            for (n, time) in timed_items_clone {
+                tx.send((n, time).into()).await?;
+                async_std::task::sleep(Duration::from_millis(100)).await;
+            }
+            tx.close().await?;
+            Ok::<_, std::io::Error>(())
+        });
+
+        let collected = rx.map(|item| (item, Instant::now())).collect::<Vec<_>>().await;
+
+        assert_eq!(timed_items.len(), collected.len());
+
+        for (i, (item, received_at)) in collected.into_iter().enumerate() {
+            assert_eq!(timed_items[i].0, item);
+            if received_at < timed_items[i].1 {
+                assert!(timed_items[i].1.saturating_duration_since(received_at) < Duration::from_millis(20));
+            } else {
+                assert!(received_at.saturating_duration_since(timed_items[i].1) < Duration::from_millis(20));
+            }
+        }
+
+        jh.await?;
+        Ok(())
+    }
 }
