@@ -6,6 +6,7 @@ use std::sync::atomic::AtomicBool;
 use std::task::{Context, Poll, Waker};
 use std::time::{Duration, Instant};
 
+/// An internal type used by the [`SkipDelayQueue`].
 #[derive(Debug)]
 struct DelayedEntry<T> {
     item: T,
@@ -91,8 +92,12 @@ impl<T> From<(T, Skip)> for DelayedItem<T> {
 }
 
 impl<T> SkipDelayQueue<T> {
-    const TOLERANCE: Duration = Duration::from_millis(10);
+    const TOLERANCE: Duration = Duration::from_millis(5);
 
+    /// Creates new instance.
+    ///
+    /// As a common practice, [`futures::StreamExt::split`] can be called to
+    /// get separate sending and receiving part of the queue.
     pub fn new() -> Self {
         Self {
             entries: BTreeSet::new(),
@@ -359,7 +364,6 @@ mod tests {
         Ok(())
     }
 
-
     #[test_log::test(async_std::test)]
     async fn skip_delay_queue_should_continuously_yield_items() -> anyhow::Result<()> {
         let (mut tx, rx) = SkipDelayQueue::new().split();
@@ -368,14 +372,14 @@ mod tests {
 
         let now = Instant::now();
         let timed_items = (0..5)
-            .map(|i| (items[i], now + Duration::from_millis(200) * (i as u32)))
+            .map(|i| (items[i], now + Duration::from_millis(100) * (i as u32)))
             .collect::<Vec<_>>();
 
         let timed_items_clone = timed_items.clone();
         let jh = async_std::task::spawn(async move {
             for (n, time) in timed_items_clone {
                 tx.send((n, time).into()).await?;
-                async_std::task::sleep(Duration::from_millis(100)).await;
+                async_std::task::sleep(Duration::from_millis(50)).await;
             }
             tx.close().await?;
             Ok::<_, std::io::Error>(())
