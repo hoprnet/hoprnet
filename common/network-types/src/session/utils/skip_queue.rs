@@ -1,4 +1,4 @@
-use futures::FutureExt;
+use futures::{FutureExt, StreamExt};
 use std::cmp::Ordering;
 use std::collections::BTreeSet;
 use std::pin::Pin;
@@ -57,7 +57,7 @@ pub struct SkipDelayQueue<T> {
     is_closed: bool,
 }
 
-/// An item with deadline, which can be pushed into the [`SkipDelayQueue`].
+/// An item with a deadline, which can be pushed into the [`SkipDelayQueue`].
 ///
 /// For convenience, the type implements From traits from
 /// `(T, Instant)`, `(T, Duration)` and `(T, Skip)`.
@@ -157,7 +157,7 @@ impl<T: Ord> futures::Stream for SkipDelayQueue<T> {
     }
 }
 
-impl<T: Ord + std::fmt::Debug> futures::Sink<DelayedItem<T>> for SkipDelayQueue<T> {
+impl<T: Ord> futures::Sink<DelayedItem<T>> for SkipDelayQueue<T> {
     type Error = std::io::Error;
 
     fn poll_ready(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -217,6 +217,10 @@ impl<T: Ord + std::fmt::Debug> futures::Sink<DelayedItem<T>> for SkipDelayQueue<
     }
 }
 
+pub fn channel<T: Ord>() -> (impl futures::Sink<DelayedItem<T>, Error = std::io::Error>, impl futures::Stream<Item = T>) {
+    SkipDelayQueue::new().split()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -225,7 +229,7 @@ mod tests {
 
     #[test_log::test(async_std::test)]
     async fn skip_delay_queue_should_yield_items() -> anyhow::Result<()> {
-        let (mut tx, rx) = SkipDelayQueue::new().split();
+        let (mut tx, rx) = channel();
         pin_mut!(rx);
 
         let now = Instant::now();
@@ -241,7 +245,7 @@ mod tests {
 
     #[test_log::test(async_std::test)]
     async fn skip_delay_queue_yielded_items_should_be_apart() -> anyhow::Result<()> {
-        let (mut tx, rx) = SkipDelayQueue::new().split();
+        let (mut tx, rx) = channel();
         pin_mut!(rx);
 
         let now1 = Instant::now();
@@ -262,7 +266,7 @@ mod tests {
 
     #[test_log::test(async_std::test)]
     async fn skip_delay_queue_should_not_yield_cancelled_items() -> anyhow::Result<()> {
-        let (mut tx, rx) = SkipDelayQueue::new().split();
+        let (mut tx, rx) = channel();
         pin_mut!(rx);
 
         let now = Instant::now();
@@ -277,7 +281,7 @@ mod tests {
 
     #[test_log::test(async_std::test)]
     async fn skip_delay_queue_should_yield_past_items_immediately() -> anyhow::Result<()> {
-        let (mut tx, rx) = SkipDelayQueue::new().split();
+        let (mut tx, rx) = channel();
         pin_mut!(rx);
 
         let now = Instant::now();
@@ -297,7 +301,7 @@ mod tests {
 
     #[test_log::test(async_std::test)]
     async fn skip_delay_queue_should_not_yield_future_cancelled_items() -> anyhow::Result<()> {
-        let (mut tx, rx) = SkipDelayQueue::new().split();
+        let (mut tx, rx) = channel();
         pin_mut!(rx);
 
         let now = Instant::now();
@@ -315,7 +319,7 @@ mod tests {
 
     #[test_log::test(async_std::test)]
     async fn skip_delay_queue_should_discard_duplicate_entries() -> anyhow::Result<()> {
-        let (mut tx, rx) = SkipDelayQueue::new().split();
+        let (mut tx, rx) = channel();
         pin_mut!(rx);
 
         let now = Instant::now();
@@ -331,7 +335,7 @@ mod tests {
 
     #[test_log::test(async_std::test)]
     async fn skip_delay_queue_should_yield_items_in_order() -> anyhow::Result<()> {
-        let (mut tx, rx) = SkipDelayQueue::new().split();
+        let (mut tx, rx) = channel();
         pin_mut!(rx);
 
         let now = Instant::now();
@@ -348,7 +352,7 @@ mod tests {
 
     #[test_log::test(async_std::test)]
     async fn skip_delay_queue_should_yield_fed_items_in_order() -> anyhow::Result<()> {
-        let (mut tx, rx) = SkipDelayQueue::new().split();
+        let (mut tx, rx) = channel();
         pin_mut!(rx);
 
         let now = Instant::now();
@@ -366,7 +370,7 @@ mod tests {
 
     #[test_log::test(async_std::test)]
     async fn skip_delay_queue_should_continuously_yield_items() -> anyhow::Result<()> {
-        let (mut tx, rx) = SkipDelayQueue::new().split();
+        let (mut tx, rx) = channel();
 
         let items = [5,2,1,4,3];
 

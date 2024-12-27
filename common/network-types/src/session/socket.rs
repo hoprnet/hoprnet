@@ -128,17 +128,20 @@ impl<const C: usize> SessionSocket<C> {
 
         // Forward acknowledged frames chunked as a Control messages
         let ctl_tx_clone = ctl_tx.clone();
-        let id_clone = session_id.clone();
+        let id = session_id.clone();
         hopr_async_runtime::prelude::spawn(async move {
             // TODO: chunk size and rate limit should be configurable
             let ack_rate_limiter = RateLimiter::direct(Quota::per_second(NonZeroU32::MIN));
-            ack_rx
+            if let Err(error) = ack_rx
                 .ready_chunks(FrameAcknowledgements::<C>::MAX_ACK_FRAMES)
                 .map(|v| Ok(SessionMessage::Acknowledge(v.into())))
                 .ratelimit_stream(&ack_rate_limiter)
                 .forward(ctl_tx_clone)
-                .await;
-            tracing::trace!(session_id = id_clone, "acknowledgement forwarding done");
+                .await {
+                tracing::error!(session_id = id, %error, "acknowledgement forwarding failed");
+            } else {
+                tracing::trace!(session_id = id, "acknowledgement forwarding done");
+            }
         });
 
         let outgoing_frame_retries = Arc::new(DashMap::new());
@@ -146,7 +149,7 @@ impl<const C: usize> SessionSocket<C> {
 
         // Frames coming out from the Reconstructor can be read Upstream
         let incoming_frame_retries_clone = incoming_frame_retries.clone();
-        let id_clone = session_id.clone();
+        let id = session_id.clone();
         let downstream_frames_out = Box::pin(
             downstream_frames_out
                 .filter_map(move |maybe_frame| {
@@ -154,13 +157,13 @@ impl<const C: usize> SessionSocket<C> {
                         Ok(frame) => {
                             // TODO: ack_tx gets dropped when downstream_frames_out is dropped?
                             if let Err(error) = ack_tx.try_send(frame.frame_id) {
-                                tracing::error!(session_id = id_clone, frame_id = frame.frame_id, %error, "failed to acknowledge frame");
+                                tracing::error!(session_id = id, frame_id = frame.frame_id, %error, "failed to acknowledge frame");
                             }
                             incoming_frame_retries_clone.remove(&frame.frame_id);
                             futures::future::ready(Some(Ok(frame)))
                         },
                         Err(SessionError::FrameDiscarded(frame_id)) | Err(SessionError::IncompleteFrame(frame_id)) => {
-                            tracing::warn!(session_id = id_clone, frame_id, "frame discarded");
+                            tracing::warn!(session_id = id, frame_id, "frame discarded");
                             incoming_frame_retries_clone.remove(&frame_id);
                             futures::future::ready(None) // skip discarded frames
                         }
