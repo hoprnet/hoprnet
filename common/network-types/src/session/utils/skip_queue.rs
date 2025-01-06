@@ -1,8 +1,9 @@
-use futures::{FutureExt, StreamExt};
+use futures::FutureExt;
 use std::cmp::Ordering;
 use std::collections::BTreeSet;
 use std::pin::Pin;
 use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
 use std::task::{Context, Poll, Waker};
 use std::time::{Duration, Instant};
 
@@ -41,16 +42,8 @@ impl<T: Ord> PartialOrd for DelayedEntry<T> {
     }
 }
 
-/// A queue of [items](DelayedItem) with attached [`Instant`] that determines a deadline
-/// at which it should be yielded from the [`Stream`](futures::Stream) side of the queue.
-/// The queue also has the cancellation ability: an item that has been pushed into the
-/// queue earlier can be canceled before it meets its deadline.
-/// A canceled item will then be skipped in the output stream.
-///
-/// The items are internally sorted based on their deadline.
-/// In a case when two items have equal deadlines, they are sorted according
-/// to their values; therefore, items must implement [`Ord`].
-pub struct SkipDelayQueue<T> {
+/// Internal type used by the the [`skip_delay_channel`].
+struct SkipDelayQueue<T> {
     entries: BTreeSet<DelayedEntry<T>>,
     next_wakeup: Option<futures_time::task::SleepUntil>,
     rx_waker: Option<Waker>,
@@ -108,46 +101,62 @@ impl<T> SkipDelayQueue<T> {
     }
 }
 
-impl<T: Ord> futures::Stream for SkipDelayQueue<T> {
+/// Receiver part for the [`skip_delay_channel`].
+pub struct SkipDelayReceiver<T>(Arc<std::sync::Mutex<SkipDelayQueue<T>>>);
+
+impl<T> Drop for SkipDelayReceiver<T> {
+    fn drop(&mut self) {
+        // When the receiver is dropped, clear the poison and mark the queue as closed.
+        tracing::trace!("SkipDelayQueueSender::drop");
+        self.0.clear_poison();
+        let mut queue = self.0.lock().expect("cannot panic because poison is cleared");
+        queue.is_closed = true;
+        queue.rx_waker = None;
+    }
+}
+
+impl<T: Ord> futures::Stream for SkipDelayReceiver<T> {
     type Item = T;
 
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         tracing::trace!("SkipDelayQueue::poll_next");
 
-        // Wait until the timer's done, if any
-        if let Some(next_wakeup) = self.next_wakeup.as_mut() {
+        let mut queue = self.0.lock().unwrap();
+
+        // Wait until the timer is done, if any
+        if let Some(next_wakeup) = queue.next_wakeup.as_mut() {
             tracing::trace!("SkipDelayQueue::poll_next polling timer");
             let _ = futures::ready!(next_wakeup.poll_unpin(cx));
-            self.next_wakeup = None;
+            queue.next_wakeup = None;
         }
 
         tracing::trace!("SkipDelayQueue::poll_next timer finished");
 
         let now = Instant::now();
-        while let Some(e) = self.entries.first() {
+        while let Some(e) = queue.entries.first() {
             if !e.cancelled.load(std::sync::atomic::Ordering::SeqCst) {
-                return if e.at.saturating_duration_since(now) < Self::TOLERANCE {
+                return if e.at.saturating_duration_since(now) < SkipDelayQueue::<T>::TOLERANCE {
                     // If the item is already in the past, yield it
                     tracing::trace!("SkipDelayQueue::poll_next ready");
-                    Poll::Ready(self.entries.pop_first().map(|e| e.item))
+                    Poll::Ready(queue.entries.pop_first().map(|e| e.item))
                 } else {
                     // The next item is in the future, set up the timer and wake us up to start it
                     tracing::trace!("SkipDelayQueue::poll_next pending new timer");
-                    self.next_wakeup = Some(futures_time::task::sleep_until(e.at.into()));
+                    queue.next_wakeup = Some(futures_time::task::sleep_until(e.at.into()));
                     cx.waker().wake_by_ref();
                     Poll::Pending
                 };
             } else {
                 // If the item has been canceled, remove it and continue
-                self.entries.pop_first();
+                queue.entries.pop_first();
                 tracing::trace!("SkipDelayQueue::poll_next item cancelled");
             }
         }
 
-        if !self.is_closed {
+        if !queue.is_closed {
             // Need more data, wake us up when some are added
             tracing::trace!("SkipDelayQueue::poll_next pending for data");
-            self.rx_waker = Some(cx.waker().clone());
+            queue.rx_waker = Some(cx.waker().clone());
             Poll::Pending
         } else {
             // We're done
@@ -157,25 +166,62 @@ impl<T: Ord> futures::Stream for SkipDelayQueue<T> {
     }
 }
 
-impl<T: Ord> futures::Sink<DelayedItem<T>> for SkipDelayQueue<T> {
+/// Sender part for the [`skip_delay_channel`].
+pub struct SkipDelaySender<T> {
+    queue: Arc<std::sync::Mutex<SkipDelayQueue<T>>>,
+    is_closed: bool,
+}
+
+impl<T> Clone for SkipDelaySender<T> {
+    fn clone(&self) -> Self {
+        Self {
+            queue: self.queue.clone(),
+            is_closed: false,
+        }
+    }
+}
+
+impl<T> Drop for SkipDelaySender<T> {
+    fn drop(&mut self) {
+        let count_holders = Arc::strong_count(&self.queue);
+        tracing::trace!(count_holders, "SkipDelayQueueSender::drop");
+        self.is_closed = true;
+        if count_holders == 2 {
+            // Just this instance and the Receiver
+            self.queue.clear_poison();
+            let mut queue = self.queue.lock().expect("cannot panic because poison is cleared");
+            queue.is_closed = true;
+            queue.rx_waker = None;
+        }
+    }
+}
+
+impl<T: Ord> futures::Sink<DelayedItem<T>> for SkipDelaySender<T> {
     type Error = std::io::Error;
 
     fn poll_ready(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         if self.is_closed {
-            return Poll::Ready(Err(std::io::ErrorKind::BrokenPipe.into()));
+            return Poll::Ready(Err(std::io::ErrorKind::NotConnected.into()));
         }
         Poll::Ready(Ok(()))
     }
 
-    fn start_send(mut self: Pin<&mut Self>, item: DelayedItem<T>) -> Result<(), Self::Error> {
+    fn start_send(self: Pin<&mut Self>, item: DelayedItem<T>) -> Result<(), Self::Error> {
         if self.is_closed {
+            return Err(std::io::ErrorKind::NotConnected.into());
+        }
+
+        let mut queue = self.queue.lock().map_err(|_| std::io::ErrorKind::BrokenPipe)?;
+
+        // This can happen only when the receiver was dropped.
+        if queue.is_closed {
             return Err(std::io::ErrorKind::BrokenPipe.into());
         }
 
         match item {
             DelayedItem::New(item, at) => {
                 tracing::trace!("SkipDelayQueue::start_send inserting");
-                self.entries.insert(DelayedEntry {
+                queue.entries.insert(DelayedEntry {
                     item,
                     at,
                     cancelled: AtomicBool::new(false),
@@ -183,7 +229,8 @@ impl<T: Ord> futures::Sink<DelayedItem<T>> for SkipDelayQueue<T> {
             }
             DelayedItem::Cancel(item) => {
                 tracing::trace!("SkipDelayQueue::start_send cancelling");
-                self.entries
+                queue
+                    .entries
                     .iter()
                     .filter(|e| item == e.item)
                     .for_each(|e| e.cancelled.store(true, std::sync::atomic::Ordering::SeqCst));
@@ -193,13 +240,15 @@ impl<T: Ord> futures::Sink<DelayedItem<T>> for SkipDelayQueue<T> {
         Ok(())
     }
 
-    fn poll_flush(mut self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         if self.is_closed {
-            return Poll::Ready(Err(std::io::ErrorKind::BrokenPipe.into()));
+            return Poll::Ready(Err(std::io::ErrorKind::NotConnected.into()));
         }
 
+        let mut queue = self.queue.lock().unwrap();
+
         tracing::trace!("SkipDelayQueue::poll_flush");
-        if let Some(waker) = self.rx_waker.take() {
+        if let Some(waker) = queue.rx_waker.take() {
             waker.wake();
         }
 
@@ -208,7 +257,7 @@ impl<T: Ord> futures::Sink<DelayedItem<T>> for SkipDelayQueue<T> {
 
     fn poll_close(mut self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         if self.is_closed {
-            return Poll::Ready(Err(std::io::ErrorKind::BrokenPipe.into()));
+            return Poll::Ready(Err(std::io::ErrorKind::NotConnected.into()));
         }
 
         tracing::trace!("SkipDelayQueue::poll_close");
@@ -217,8 +266,24 @@ impl<T: Ord> futures::Sink<DelayedItem<T>> for SkipDelayQueue<T> {
     }
 }
 
-pub fn channel<T: Ord>() -> (impl futures::Sink<DelayedItem<T>, Error = std::io::Error>, impl futures::Stream<Item = T>) {
-    SkipDelayQueue::new().split()
+/// A MPSC queue of [items](DelayedItem) with attached [`Instant`] that determines a deadline
+/// at which it should be yielded from the [`Stream`](futures::Stream) side of the queue.
+/// The queue also has the cancellation ability: an item that has been pushed into the
+/// queue earlier can be canceled before it meets its deadline.
+/// A canceled item will then be skipped in the output stream.
+///
+/// The items are internally sorted based on their deadline.
+/// In a case when two items have equal deadlines, they are sorted according
+/// to their values; therefore, items must implement [`Ord`].
+pub fn skip_delay_channel<T: Ord>() -> (SkipDelaySender<T>, SkipDelayReceiver<T>) {
+    let queue = Arc::new(std::sync::Mutex::new(SkipDelayQueue::new()));
+    (
+        SkipDelaySender {
+            queue: queue.clone(),
+            is_closed: false,
+        },
+        SkipDelayReceiver(queue),
+    )
 }
 
 #[cfg(test)]
@@ -229,7 +294,7 @@ mod tests {
 
     #[test_log::test(async_std::test)]
     async fn skip_delay_queue_should_yield_items() -> anyhow::Result<()> {
-        let (mut tx, rx) = channel();
+        let (mut tx, rx) = skip_delay_channel();
         pin_mut!(rx);
 
         let now = Instant::now();
@@ -245,7 +310,7 @@ mod tests {
 
     #[test_log::test(async_std::test)]
     async fn skip_delay_queue_yielded_items_should_be_apart() -> anyhow::Result<()> {
-        let (mut tx, rx) = channel();
+        let (mut tx, rx) = skip_delay_channel();
         pin_mut!(rx);
 
         let now1 = Instant::now();
@@ -266,7 +331,7 @@ mod tests {
 
     #[test_log::test(async_std::test)]
     async fn skip_delay_queue_should_not_yield_cancelled_items() -> anyhow::Result<()> {
-        let (mut tx, rx) = channel();
+        let (mut tx, rx) = skip_delay_channel();
         pin_mut!(rx);
 
         let now = Instant::now();
@@ -281,7 +346,7 @@ mod tests {
 
     #[test_log::test(async_std::test)]
     async fn skip_delay_queue_should_yield_past_items_immediately() -> anyhow::Result<()> {
-        let (mut tx, rx) = channel();
+        let (mut tx, rx) = skip_delay_channel();
         pin_mut!(rx);
 
         let now = Instant::now();
@@ -301,7 +366,7 @@ mod tests {
 
     #[test_log::test(async_std::test)]
     async fn skip_delay_queue_should_not_yield_future_cancelled_items() -> anyhow::Result<()> {
-        let (mut tx, rx) = channel();
+        let (mut tx, rx) = skip_delay_channel();
         pin_mut!(rx);
 
         let now = Instant::now();
@@ -319,7 +384,7 @@ mod tests {
 
     #[test_log::test(async_std::test)]
     async fn skip_delay_queue_should_discard_duplicate_entries() -> anyhow::Result<()> {
-        let (mut tx, rx) = channel();
+        let (mut tx, rx) = skip_delay_channel();
         pin_mut!(rx);
 
         let now = Instant::now();
@@ -335,7 +400,7 @@ mod tests {
 
     #[test_log::test(async_std::test)]
     async fn skip_delay_queue_should_yield_items_in_order() -> anyhow::Result<()> {
-        let (mut tx, rx) = channel();
+        let (mut tx, rx) = skip_delay_channel();
         pin_mut!(rx);
 
         let now = Instant::now();
@@ -352,7 +417,7 @@ mod tests {
 
     #[test_log::test(async_std::test)]
     async fn skip_delay_queue_should_yield_fed_items_in_order() -> anyhow::Result<()> {
-        let (mut tx, rx) = channel();
+        let (mut tx, rx) = skip_delay_channel();
         pin_mut!(rx);
 
         let now = Instant::now();
@@ -370,9 +435,9 @@ mod tests {
 
     #[test_log::test(async_std::test)]
     async fn skip_delay_queue_should_continuously_yield_items() -> anyhow::Result<()> {
-        let (mut tx, rx) = channel();
+        let (mut tx, rx) = skip_delay_channel();
 
-        let items = [5,2,1,4,3];
+        let items = [5, 2, 1, 4, 3];
 
         let now = Instant::now();
         let timed_items = (0..5)

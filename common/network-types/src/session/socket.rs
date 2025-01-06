@@ -137,7 +137,8 @@ impl<const C: usize> SessionSocket<C> {
                 .map(|v| Ok(SessionMessage::Acknowledge(v.into())))
                 .ratelimit_stream(&ack_rate_limiter)
                 .forward(ctl_tx_clone)
-                .await {
+                .await
+            {
                 tracing::error!(session_id = id, %error, "acknowledgement forwarding failed");
             } else {
                 tracing::trace!(session_id = id, "acknowledgement forwarding done");
