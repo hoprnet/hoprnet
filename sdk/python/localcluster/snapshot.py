@@ -2,12 +2,7 @@ import shutil
 from pathlib import Path
 
 from .cluster import Cluster
-from .constants import (
-    ANVIL_FOLDER,
-    ANVIL_FOLDER_NAME,
-    NODE_NAME_PREFIX,
-    logging,
-)
+from .constants import ANVIL_FOLDER, ANVIL_FOLDER_NAME, NODE_NAME_PREFIX, logging
 
 EXPECTED_FILES_FOR_SNAPSHOT = [
     "db/hopr_index.db",
@@ -16,7 +11,6 @@ EXPECTED_FILES_FOR_SNAPSHOT = [
     "db/hopr_logs.db",
     "db/hopr_logs.db-shm",
     "db/hopr_logs.db-wal",
-    "hoprd.id",
 ]
 
 
@@ -45,7 +39,8 @@ class Snapshot:
 
         # copy node data and env files
         for i in range(self.cluster.size):
-            source_dir: Path = self.parent_dir.joinpath(f"{NODE_NAME_PREFIX}_{i+1}")
+            source_dir: Path = self.parent_dir.joinpath(
+                f"{NODE_NAME_PREFIX}_{i+1}")
             target_dir = self.sdir.joinpath(f"{NODE_NAME_PREFIX}_{i+1}")
             db_target_dir = target_dir.joinpath("db/")
 
@@ -55,6 +50,7 @@ class Snapshot:
                 shutil.copy(source_dir.joinpath(file), db_target_dir)
 
             shutil.copy(source_dir.joinpath("./hoprd.id"), target_dir)
+            shutil.copy(source_dir.joinpath("./.env"), target_dir)
 
     def reuse(self):
         logging.info("Re-using snapshot")
@@ -82,7 +78,8 @@ class Snapshot:
         ]
         for i in range(self.cluster.size):
             node_dir = self.sdir.joinpath(f"{NODE_NAME_PREFIX}_{i+1}")
-            expected_files.extend([node_dir.joinpath(file) for file in EXPECTED_FILES_FOR_SNAPSHOT])
+            expected_files.extend([node_dir.joinpath(file)
+                                  for file in EXPECTED_FILES_FOR_SNAPSHOT])
 
         for f in expected_files:
             if not f.exists():
