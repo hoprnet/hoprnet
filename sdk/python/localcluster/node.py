@@ -79,8 +79,7 @@ class Node:
         self.safe_address = loaded_env.get("HOPRD_SAFE_ADDRESS")
         self.module_address = loaded_env.get("HOPRD_MODULE_ADDRESS")
         if self.safe_address is None or self.module_address is None:
-            raise ValueError(
-                "Critical addresses are missing in the environment file.")
+            raise ValueError("Critical addresses are missing in the environment file.")
 
     def create_local_safe(self, anvil_config: Path):
         logging.debug(f"Creating safe and module for {self}")
@@ -139,15 +138,12 @@ class Node:
                 env_file.write(f"HOPRD_MODULE_ADDRESS={self.module_address}\n")
             return True
 
-        logging.error(
-            f"Failed to create safe for node {self.id}: {res.stdout} - {res.stderr}")
+        logging.error(f"Failed to create safe for node {self.id}: {res.stdout} - {res.stderr}")
         return False
 
     def setup(self, password: str, config_file: Path, dir: Path):
-        trace_telemetry = "true" if os.getenv(
-            "TRACE_TELEMETRY") is not None else "false"
-        log_level = "trace" if os.getenv(
-            "TRACE_TELEMETRY") is not None else "debug"
+        trace_telemetry = "true" if os.getenv("TRACE_TELEMETRY") is not None else "false"
+        log_level = "trace" if os.getenv("TRACE_TELEMETRY") is not None else "debug"
 
         api_token_param = f"--api-token={self.api_token}" if self.api_token else "--disableApiAuthentication"
         custom_env = {
@@ -241,8 +237,7 @@ class Node:
             if peer_id == self.peer_id:
                 continue
             tasks.append(
-                asyncio.create_task(self.api.open_channel(
-                    peer_id, f"{OPEN_CHANNEL_FUNDING_VALUE_HOPR*1e18:.0f}"))
+                asyncio.create_task(self.api.open_channel(peer_id, f"{OPEN_CHANNEL_FUNDING_VALUE_HOPR*1e18:.0f}"))
             )
 
         await asyncio.gather(*tasks)
@@ -256,8 +251,7 @@ class Node:
         print(
             f"\t\tRest API:\thttp://{self.host_addr}:{self.api_port}/scalar | http://{self.host_addr}:{self.api_port}/swagger-ui/index.html"
         )
-        print(
-            f"\t\tAdmin UI:\thttp://{self.host_addr}:4677/?{admin_ui_params}", end="\n\n")
+        print(f"\t\tAdmin UI:\thttp://{self.host_addr}:4677/?{admin_ui_params}", end="\n\n")
 
     def __eq__(self, other):
         return self.peer_id == other.peer_id

@@ -39,8 +39,7 @@ class Snapshot:
 
         # copy node data and env files
         for i in range(self.cluster.size):
-            source_dir: Path = self.parent_dir.joinpath(
-                f"{NODE_NAME_PREFIX}_{i+1}")
+            source_dir: Path = self.parent_dir.joinpath(f"{NODE_NAME_PREFIX}_{i+1}")
             target_dir = self.sdir.joinpath(f"{NODE_NAME_PREFIX}_{i+1}")
             db_target_dir = target_dir.joinpath("db/")
 
@@ -78,8 +77,7 @@ class Snapshot:
         ]
         for i in range(self.cluster.size):
             node_dir = self.sdir.joinpath(f"{NODE_NAME_PREFIX}_{i+1}")
-            expected_files.extend([node_dir.joinpath(file)
-                                  for file in EXPECTED_FILES_FOR_SNAPSHOT])
+            expected_files.extend([node_dir.joinpath(file) for file in EXPECTED_FILES_FOR_SNAPSHOT])
 
         for f in expected_files:
             if not f.exists():
