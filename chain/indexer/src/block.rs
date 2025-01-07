@@ -122,13 +122,24 @@ where
         // we skip on addresses which have no topics
         let mut addresses = vec![];
         let mut topics = vec![];
+        let mut address_topics = vec![];
         logs_handler.contract_addresses().iter().for_each(|address| {
             let contract_topics = logs_handler.contract_address_topics(*address);
             if !contract_topics.is_empty() {
                 addresses.push(*address);
-                topics.extend(contract_topics);
+                for topic in contract_topics {
+                    address_topics.push((*address, Hash::from(topic)));
+                    topics.push(topic);
+                }
             }
         });
+
+        // Check that the contract addresses and topics are consistent with what is in the logs DB,
+        // or if the DB is empty, prime it with the given addresses and topics.
+        // If this check fails, panic here.
+        db.ensure_logs_origin(address_topics).await.expect(
+            "The synced logs in the DB are inconsistent or corrupted. Please delete the DB and restart the indexer.",
+        );
 
         let log_filter = LogFilter {
             address: addresses,

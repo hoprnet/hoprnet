@@ -22,10 +22,32 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(LogTopicInfo::Topic).string_len(64).not_null())
                     .to_owned(),
             )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .if_not_exists()
+                    .name("idx_contract_log_topic")
+                    .table(LogTopicInfo::Table)
+                    .col(LogTopicInfo::Address)
+                    .col(LogTopicInfo::Topic)
+                    .unique()
+                    .to_owned(),
+            )
             .await
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_index(
+                Index::drop()
+                    .name("idx_contract_log_topic")
+                    .table(LogTopicInfo::Table)
+                    .to_owned(),
+            )
+            .await?;
+
         manager
             .drop_table(Table::drop().table(LogTopicInfo::Table).to_owned())
             .await

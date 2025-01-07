@@ -13,8 +13,8 @@ use hopr_crypto_types::prelude::Hash;
 use hopr_db_api::errors::{DbError, Result};
 use hopr_db_api::logs::HoprDbLogOperations;
 use hopr_db_entity::errors::DbEntityError;
-use hopr_db_entity::prelude::{Log, LogStatus};
-use hopr_db_entity::{log, log_status};
+use hopr_db_entity::prelude::{Log, LogStatus, LogTopicInfo};
+use hopr_db_entity::{log, log_status, log_topic_info};
 use hopr_primitive_types::prelude::*;
 
 use crate::db::HoprDb;
@@ -342,6 +342,52 @@ impl HoprDbLogOperations for HoprDb {
                         }
                         Err(e) => Err(DbError::from(DbSqlError::from(e))),
                     }
+                })
+            })
+            .await
+    }
+
+    async fn ensure_logs_origin(&self, contract_address_topics: Vec<(Address, Hash)>) -> Result<()> {
+        self.nest_transaction_in_db(None, TargetDb::Logs)
+            .await?
+            .perform(|tx| {
+                Box::pin(async move {
+                    let log_count = Log::find()
+                        .count(tx.as_ref())
+                        .await
+                        .map_err(|e| DbError::from(DbSqlError::from(e)))?;
+                    let log_topic_count = LogTopicInfo::find()
+                        .count(tx.as_ref())
+                        .await
+                        .map_err(|e| DbError::from(DbSqlError::from(e)))?;
+
+                    if log_count == 0 && log_topic_count == 0 {
+                        // Prime the DB with the values
+                        LogTopicInfo::insert_many(contract_address_topics.into_iter().map(|(addr, topic)| {
+                            log_topic_info::ActiveModel {
+                                address: Set(addr.to_string()),
+                                topic: Set(topic.to_string()),
+                                ..Default::default()
+                            }
+                        }))
+                        .exec(tx.as_ref())
+                        .await
+                        .map_err(|e| DbError::from(DbSqlError::from(e)))?;
+                    } else {
+                        // Check that all contract addresses and topics are in the DB
+                        for (addr, topic) in contract_address_topics {
+                            let log_topic_count = LogTopicInfo::find()
+                                .filter(log_topic_info::Column::Address.eq(addr.to_string()))
+                                .filter(log_topic_info::Column::Topic.eq(topic.to_string()))
+                                .count(tx.as_ref())
+                                .await
+                                .map_err(|e| DbError::from(DbSqlError::from(e)))?;
+                            if log_topic_count != 1 {
+                                return Err(DbError::InconsistentLogs);
+                            }
+                        }
+                    }
+                    Ok(())
                 })
             })
             .await
