@@ -207,8 +207,7 @@ impl<T> Stream for Receiver<T> {
                 trace!("reseting the timer");
                 channel.timer.reset(remaining);
 
-                let timer = std::pin::pin!(&mut channel.timer);
-                let res = timer.poll(cx);
+                let _ = futures::ready!(timer.poll_unpin(cx));
 
                 return match res {
                     Poll::Ready(_) => {
