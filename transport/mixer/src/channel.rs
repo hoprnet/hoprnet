@@ -5,7 +5,7 @@ use std::{
     collections::BinaryHeap,
     future::poll_fn,
     sync::{
-        atomic::{AtomicBool, AtomicUsize},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
         Arc, Mutex,
     },
     task::Poll,
@@ -49,9 +49,24 @@ struct Channel<T> {
     buffer: BinaryHeap<Reverse<DelayedData<T>>>,
     timer: futures_timer::Delay,
     waker: Option<std::task::Waker>,
-    sender_count: usize,
-    receiver_active: bool,
     cfg: MixerConfig,
+}
+
+/// Channel with sender and receiver counters allowing closure tracking.
+struct TrackedChannel<T> {
+    channel: Arc<Mutex<Channel<T>>>,
+    sender_count: Arc<AtomicUsize>,
+    receiver_active: Arc<AtomicBool>,
+}
+
+impl<T> Clone for TrackedChannel<T> {
+    fn clone(&self) -> Self {
+        Self {
+            channel: self.channel.clone(),
+            sender_count: self.sender_count.clone(),
+            receiver_active: self.receiver_active.clone(),
+        }
+    }
 }
 
 /// Error returned by the [`Sender`].
@@ -68,26 +83,30 @@ pub enum SenderError {
 
 /// Sender object interacting with the mixing channel.
 pub struct Sender<T> {
-    channel: Arc<Mutex<Channel<T>>>,
+    channel: TrackedChannel<T>,
 }
 
 impl<T> Clone for Sender<T> {
     fn clone(&self) -> Self {
-        let mut channel = self.channel.lock().unwrap();
-        channel.sender_count += 1;
+        let channel = self.channel.clone();
+        channel.sender_count.fetch_add(1, Ordering::Relaxed);
 
-        Sender {
-            channel: self.channel.clone(),
-        }
+        Sender { channel }
     }
 }
 
 impl<T> Drop for Sender<T> {
     fn drop(&mut self) {
-        let mut channel = self.channel.lock().unwrap();
-        channel.sender_count -= 1;
-        if channel.sender_count == 0 && !channel.receiver_active {
-            channel.waker = None;
+        self.channel.sender_count.fetch_sub(1, Ordering::Relaxed);
+        if self.channel.sender_count.load(Ordering::Relaxed) == 0
+            && !self.channel.receiver_active.load(Ordering::Relaxed)
+        {
+            let channel = self.channel.channel.lock();
+            if let Ok(mut channel) = channel {
+                channel.waker = None;
+            } else {
+                trace!("Failed to lock the mixer channel for cleanup after Sender drop");
+            };
         }
     }
 }
@@ -104,7 +123,7 @@ impl<T> futures::sink::Sink<T> for Sender<T> {
     type Error = SenderError;
 
     fn poll_ready(self: std::pin::Pin<&mut Self>, _cx: &mut std::task::Context<'_>) -> Poll<Result<(), Self::Error>> {
-        let is_active = self.channel.lock().map_err(|_| SenderError::Lock)?.receiver_active;
+        let is_active = self.channel.receiver_active.load(Ordering::Relaxed);
         if is_active {
             Poll::Ready(Ok(()))
         } else {
@@ -114,8 +133,11 @@ impl<T> futures::sink::Sink<T> for Sender<T> {
 
     #[tracing::instrument(level = "trace", skip(self, item))]
     fn start_send(self: std::pin::Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
-        let mut channel = self.channel.lock().map_err(|_| SenderError::Lock)?;
-        if channel.receiver_active {
+        let is_active = self.channel.receiver_active.load(Ordering::Relaxed);
+
+        if is_active {
+            let mut channel = self.channel.channel.lock().map_err(|_| SenderError::Lock)?;
+
             let random_delay = channel.cfg.random_delay();
 
             trace!(delay_in_ms = random_delay.as_millis(), "generated mixer delay",);
@@ -170,7 +192,7 @@ pub enum ReceiverError {
 /// The receiver receives already mixed elements without any knowledge of
 /// the original order.
 pub struct Receiver<T> {
-    channel: Arc<Mutex<Channel<T>>>,
+    channel: TrackedChannel<T>,
 }
 
 impl<T> Stream for Receiver<T> {
@@ -178,9 +200,9 @@ impl<T> Stream for Receiver<T> {
 
     #[tracing::instrument(level = "trace", skip(self, cx))]
     fn poll_next(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Option<Self::Item>> {
-        let mut channel = self.channel.lock().unwrap();
         let now = std::time::Instant::now();
-        if channel.sender_count > 0 {
+        if self.channel.sender_count.load(Ordering::Relaxed) > 0 {
+            let mut channel = self.channel.channel.lock().unwrap();
             if channel.buffer.peek().map(|x| x.0.release_at < now).unwrap_or(false) {
                 let data = channel
                     .buffer
@@ -240,7 +262,7 @@ impl<T> Stream for Receiver<T> {
             trace!(from = "direct", "pending");
             Poll::Pending
         } else {
-            channel.receiver_active = false;
+            self.channel.receiver_active.store(false, Ordering::Relaxed);
             Poll::Ready(None)
         }
     }
@@ -265,14 +287,16 @@ pub fn channel<T>(cfg: crate::config::MixerConfig) -> (Sender<T>, Receiver<T>) {
     let mut buffer = BinaryHeap::new();
     buffer.reserve(cfg.capacity);
 
-    let channel = Arc::new(Mutex::new(Channel::<T> {
-        buffer,
-        timer: Delay::new(Duration::from_secs(0)),
-        waker: None,
-        sender_count: 1,
-        receiver_active: true,
-        cfg,
-    }));
+    let channel = TrackedChannel {
+        channel: Arc::new(Mutex::new(Channel::<T> {
+            buffer,
+            timer: Delay::new(Duration::from_secs(0)),
+            waker: None,
+            cfg,
+        })),
+        sender_count: Arc::new(AtomicUsize::new(1)),
+        receiver_active: Arc::new(AtomicBool::new(true)),
+    };
     (
         Sender {
             channel: channel.clone(),
