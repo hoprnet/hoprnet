@@ -2,7 +2,10 @@
 
 # prevent sourcing of this script, only allow execution
 $(return >/dev/null 2>&1)
-test "$?" -eq "0" && { echo "This script should only be executed." >&2; exit 1; }
+test "$?" -eq "0" && {
+  echo "This script should only be executed." >&2
+  exit 1
+}
 
 # exit on errors, undefined variables, ensure errors in pipes are not hidden
 set -Eeuo pipefail
@@ -35,7 +38,10 @@ usage() {
 }
 
 # return early with help info when requested
-{ [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; } && { usage; exit 0; }
+{ [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; } && {
+  usage
+  exit 0
+}
 
 # verify and set parameters
 : "${HOPRD_API_TOKEN?"Missing environment variable HOPRD_API_TOKEN"}"
@@ -58,10 +64,10 @@ trap cleanup SIGINT SIGTERM ERR EXIT
 # get IPs of newly started VMs which run hoprd
 declare node_ips
 node_ips=$(gcloud_get_managed_instance_group_instances_ips "${instance_group}")
-declare node_ips_arr=( ${node_ips} )
+declare node_ips_arr=(${node_ips})
 
 log "Gcloud machine information for cluster: ${instance_group}"
-echo "HOPR ADDRESS,NATIVE ADDRESS,IP" > "${info_file}"
+echo "HOPR ADDRESS,NATIVE ADDRESS,IP" >"${info_file}"
 
 declare native_address hopr_address
 for ip in ${node_ips}; do
@@ -69,6 +75,6 @@ for ip in ${node_ips}; do
   hopr_address="$(get_hopr_address "${api_token}@${ip}:3001")"
 
   echo "${hopr_address},${native_address},${ip}"
-done >> "${info_file}"
+done >>"${info_file}"
 
 column -t -s',' "${info_file}"

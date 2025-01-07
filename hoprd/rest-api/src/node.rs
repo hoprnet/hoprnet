@@ -5,15 +5,16 @@ use axum::{
 };
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
+use hopr_crypto_types::prelude::Hash;
+use hopr_lib::{Address, AsUnixTimestamp, GraphExportConfig, Health, Multiaddr, ToHex};
 use libp2p_identity::PeerId;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use std::{collections::HashMap, sync::Arc};
 
-use hopr_crypto_types::prelude::Hash;
-use hopr_lib::{Address, AsUnixTimestamp, GraphExportConfig, Health, Multiaddr, ToHex};
-
-use crate::{ApiError, ApiErrorStatus, InternalState, BASE_PATH};
+use crate::{
+    checksum_address_serializer, option_checksum_address_serializer, ApiError, ApiErrorStatus, InternalState, BASE_PATH,
+};
 
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[schema(example = json!({
@@ -90,7 +91,7 @@ pub(crate) struct PeerInfo {
     #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String)]
     peer_id: PeerId,
-    #[serde_as(as = "Option<DisplayFromStr>")]
+    #[serde(serialize_with = "option_checksum_address_serializer")]
     #[schema(value_type = Option<String>)]
     peer_address: Option<Address>,
     #[serde_as(as = "Option<DisplayFromStr>")]
@@ -117,7 +118,7 @@ pub(crate) struct AnnouncedPeer {
     #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String)]
     peer_id: PeerId,
-    #[serde_as(as = "DisplayFromStr")]
+    #[serde(serialize_with = "checksum_address_serializer")]
     #[schema(value_type = String)]
     peer_address: Address,
     #[serde_as(as = "Option<DisplayFromStr>")]
@@ -202,7 +203,7 @@ pub(super) async fn peers(
                 success: info.heartbeats_succeeded,
             },
             last_seen: info.last_seen.as_unix_timestamp().as_millis(),
-            last_seen_latency: info.last_seen_latency.as_millis(),
+            last_seen_latency: info.last_seen_latency.as_millis() / 2,
             quality: info.get_average_quality(),
             backoff: info.backoff,
             is_new: info.heartbeats_sent == 0u64,
@@ -264,23 +265,30 @@ pub(super) async fn metrics() -> impl IntoResponse {
     }
 }
 
-#[serde_as]
-#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
-#[schema(example = json!({
-        "ignore_disconnected_components": true,
-        "ignore_non_opened_channels": true
-    }))]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct GraphExportRequest {
+#[derive(Debug, Clone, Deserialize, Default, utoipa::IntoParams, utoipa::ToSchema)]
+#[into_params(parameter_in = Query)]
+#[serde(default, rename_all = "camelCase")]
+pub(crate) struct GraphExportQuery {
     /// If set, nodes that are not connected to this node (via open channels) will not be exported.
     /// This setting automatically implies `ignore_non_opened_channels`.
+    #[schema(required = false)]
+    #[serde(default)]
     pub ignore_disconnected_components: bool,
     /// Do not export channels that are not in the `Open` state.
+    #[schema(required = false)]
+    #[serde(default)]
     pub ignore_non_opened_channels: bool,
+    /// Export the entire graph in raw JSON format, that can be later
+    /// used to load the graph into e.g. a unit test.
+    ///
+    /// Note that `ignore_disconnected_components` and `ignore_non_opened_channels` are ignored.
+    #[schema(required = false)]
+    #[serde(default)]
+    pub raw_graph: bool,
 }
 
-impl From<GraphExportRequest> for GraphExportConfig {
-    fn from(value: GraphExportRequest) -> Self {
+impl From<GraphExportQuery> for GraphExportConfig {
+    fn from(value: GraphExportQuery) -> Self {
         Self {
             ignore_disconnected_components: value.ignore_disconnected_components,
             ignore_non_opened_channels: value.ignore_non_opened_channels,
@@ -288,14 +296,11 @@ impl From<GraphExportRequest> for GraphExportConfig {
     }
 }
 
-/// Retrieve node's channel graph in DOT (graphviz) format.
+/// Retrieve node's channel graph in DOT or JSON format.
 #[utoipa::path(
     get,
     path = const_format::formatcp!("{BASE_PATH}/node/graph"),
-    request_body(
-            content = GraphExportRequest,
-            description = "Graph export configuration",
-            content_type = "application/json"),
+    params(GraphExportQuery),
     responses(
             (status = 200, description = "Fetched channel graph", body = String),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
@@ -308,13 +313,24 @@ impl From<GraphExportRequest> for GraphExportConfig {
 )]
 pub(super) async fn channel_graph(
     State(state): State<Arc<InternalState>>,
-    Json(args): Json<GraphExportRequest>,
+    Query(args): Query<GraphExportQuery>,
 ) -> impl IntoResponse {
-    (StatusCode::OK, state.hopr.export_channel_graph(args.into()).await).into_response()
+    if args.raw_graph {
+        match state.hopr.export_raw_channel_graph().await {
+            Ok(raw_graph) => (StatusCode::OK, raw_graph).into_response(),
+            Err(error) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                ApiErrorStatus::UnknownFailure(error.to_string()),
+            )
+                .into_response(),
+        }
+    } else {
+        (StatusCode::OK, state.hopr.export_channel_graph(args.into()).await).into_response()
+    }
 }
 
 #[serde_as]
-#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[schema(example = json!({
         "announcedAddress": [
             "/ip4/10.0.2.100/tcp/19092"
@@ -349,22 +365,22 @@ pub(crate) struct NodeInfoResponse {
     listening_address: Vec<Multiaddr>,
     chain: String,
     provider: String,
-    #[serde_as(as = "DisplayFromStr")]
+    #[serde(serialize_with = "checksum_address_serializer")]
     #[schema(value_type = String)]
     hopr_token: Address,
-    #[serde_as(as = "DisplayFromStr")]
+    #[serde(serialize_with = "checksum_address_serializer")]
     #[schema(value_type = String)]
     hopr_channels: Address,
-    #[serde_as(as = "DisplayFromStr")]
+    #[serde(serialize_with = "checksum_address_serializer")]
     #[schema(value_type = String)]
     hopr_network_registry: Address,
-    #[serde_as(as = "DisplayFromStr")]
+    #[serde(serialize_with = "checksum_address_serializer")]
     #[schema(value_type = String)]
     hopr_node_safe_registry: Address,
-    #[serde_as(as = "DisplayFromStr")]
+    #[serde(serialize_with = "checksum_address_serializer")]
     #[schema(value_type = String)]
     hopr_management_module: Address,
-    #[serde_as(as = "DisplayFromStr")]
+    #[serde(serialize_with = "checksum_address_serializer")]
     #[schema(value_type = String)]
     hopr_node_safe: Address,
     is_eligible: bool,

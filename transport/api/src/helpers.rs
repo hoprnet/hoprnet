@@ -7,7 +7,8 @@ use tracing::trace;
 use chain_types::chain_events::NetworkRegistryStatus;
 use core_path::{
     path::TransportPath,
-    selectors::{legacy::LegacyPathSelector, PathSelector},
+    selectors::dfs::{DfsPathSelector, DfsPathSelectorConfig, RandomizedEdgeWeighting},
+    selectors::PathSelector,
 };
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_db_sql::HoprDbAllOperations;
@@ -18,12 +19,10 @@ use hopr_transport_session::{errors::TransportSessionError, traits::SendMsg};
 
 use hopr_network_types::prelude::RoutingOptions;
 use hopr_transport_session::errors::SessionManagerError;
-#[cfg(all(feature = "prometheus", not(test)))]
-use {core_path::path::Path, hopr_metrics::metrics::SimpleHistogram};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_PATH_LENGTH: SimpleHistogram = SimpleHistogram::new(
+    static ref METRIC_PATH_LENGTH: hopr_metrics::metrics::SimpleHistogram = hopr_metrics::metrics::SimpleHistogram::new(
         "hopr_path_length",
         "Distribution of number of hops of sent messages",
         vec![0.0, 1.0, 2.0, 3.0, 4.0]
@@ -67,14 +66,23 @@ pub struct TicketStatistics {
 pub(crate) struct PathPlanner<T> {
     db: T,
     channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
+    selector: DfsPathSelector<RandomizedEdgeWeighting>,
 }
 
 impl<T> PathPlanner<T>
 where
     T: HoprDbAllOperations + std::fmt::Debug + Send + Sync + 'static,
 {
-    pub(crate) fn new(db: T, channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>) -> Self {
-        Self { db, channel_graph }
+    pub(crate) fn new(
+        db: T,
+        path_selector_cfg: DfsPathSelectorConfig,
+        channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
+    ) -> Self {
+        Self {
+            db,
+            channel_graph,
+            selector: DfsPathSelector::new(path_selector_cfg),
+        }
     }
 
     pub(crate) fn channel_graph(&self) -> Arc<RwLock<core_path::channel_graph::ChannelGraph>> {
@@ -113,11 +121,11 @@ where
                     .await
                     .map_err(hopr_db_sql::api::errors::DbError::from)?
                 {
-                    let selector = LegacyPathSelector::default();
                     let target_chain_key: Address = chain_key.try_into()?;
                     let cp = {
                         let cg = self.channel_graph.read().await;
-                        selector.select_path(&cg, cg.my_address(), target_chain_key, hops.into(), hops.into())?
+                        self.selector
+                            .select_path(&cg, cg.my_address(), target_chain_key, hops.into(), hops.into())?
                     };
 
                     let full_path = cp.into_path(&self.db, target_chain_key).await?;
@@ -133,7 +141,10 @@ where
         };
 
         #[cfg(all(feature = "prometheus", not(test)))]
-        SimpleHistogram::observe(&METRIC_PATH_LENGTH, (path.hops().len() - 1) as f64);
+        {
+            use core_path::path::Path;
+            hopr_metrics::SimpleHistogram::observe(&METRIC_PATH_LENGTH, (path.hops().len() - 1) as f64);
+        }
 
         Ok(path)
     }

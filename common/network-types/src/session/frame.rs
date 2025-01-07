@@ -92,7 +92,7 @@ pub fn segment(data: &[u8], max_segment_size: usize, frame_id: u32) -> crate::se
         return Err(SessionError::InvalidSegmentSize);
     }
 
-    let num_chunks = (data.len() + max_segment_size - 1) / max_segment_size;
+    let num_chunks = data.len().div_ceil(max_segment_size);
     if num_chunks > SeqNum::MAX as usize {
         return Err(SessionError::DataTooLong);
     }

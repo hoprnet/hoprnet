@@ -26,6 +26,7 @@ use futures::{
     Stream, StreamExt,
 };
 use futures_concurrency::stream::StreamExt as _;
+use std::ops::Deref;
 use std::{
     collections::HashMap,
     fmt::{Display, Formatter},
@@ -85,7 +86,7 @@ pub use {
         errors::{HoprTransportError, NetworkingError, ProtocolError},
         libp2p::identity::PeerId,
         ApplicationData, HalfKeyChallenge, Health, IncomingSession as HoprIncomingSession, Keypair, Multiaddr,
-        OffchainKeypair as HoprOffchainKeypair, SendMsg, Session as HoprSession, SessionCapability,
+        OffchainKeypair as HoprOffchainKeypair, SendMsg, ServiceId, Session as HoprSession, SessionCapability,
         SessionClientConfig, SessionId as HoprSessionId, SessionTarget, TicketStatistics, SESSION_USABLE_MTU_SIZE,
     },
 };
@@ -901,25 +902,42 @@ impl Hopr {
             let mut cg = channel_graph.write().await;
 
             info!("Syncing channels from the previous runs");
-            let channels = self.db.get_all_channels(None).await?;
+            let mut channel_stream = self
+                .db
+                .stream_active_channels()
+                .await
+                .map_err(hopr_db_sql::api::errors::DbError::from)?;
 
-            cg.sync_channels(channels).map_err(|e| {
-                HoprLibError::GeneralError(format!("failed to initialize channel graph from the DB: {e}"))
-            })?;
+            while let Some(maybe_channel) = channel_stream.next().await {
+                match maybe_channel {
+                    Ok(channel) => {
+                        cg.update_channel(channel);
+                    }
+                    Err(error) => error!(%error, "failed to sync channel into the graph"),
+                }
+            }
 
             // Sync all the qualities there too
+            info!("Syncing peer qualities from the previous runs");
             let mut peer_stream = self
                 .db
                 .get_network_peers(Default::default(), false)
                 .await
                 .map_err(hopr_db_sql::api::errors::DbError::from)?;
+
             while let Some(peer) = peer_stream.next().await {
                 if let Some(ChainKey(key)) = self.db.translate_key(None, peer.id.0).await? {
-                    cg.update_channel_quality(self.me_onchain(), key, peer.get_quality());
+                    cg.update_node_quality(&key, peer.get_quality());
                 } else {
                     error!(peer = %peer.id.1, "could not translate peer info:");
                 }
             }
+
+            info!(
+                channels = cg.count_channels(),
+                nodes = cg.count_nodes(),
+                "channel graph sync complete"
+            );
         }
 
         let socket = HoprSocket::new();
@@ -1076,6 +1094,8 @@ impl Hopr {
     }
 
     /// Ping another node in the network based on the PeerId
+    ///
+    /// Returns the RTT (round trip time), i.e. how long it took for the ping to return.
     pub async fn ping(&self, peer: &PeerId) -> errors::Result<(std::time::Duration, PeerStatus)> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
@@ -1474,5 +1494,10 @@ impl Hopr {
 
     pub async fn export_channel_graph(&self, cfg: GraphExportConfig) -> String {
         self.channel_graph.read().await.as_dot(cfg)
+    }
+
+    pub async fn export_raw_channel_graph(&self) -> errors::Result<String> {
+        let cg = self.channel_graph.read().await;
+        serde_json::to_string(cg.deref()).map_err(|e| HoprLibError::GeneralError(e.to_string()))
     }
 }

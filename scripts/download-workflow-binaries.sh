@@ -12,7 +12,10 @@ usage() {
 }
 
 # return early with help info when requested
-{ [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; } && { usage; exit 0; }
+{ [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; } && {
+  usage
+  exit 0
+}
 
 # set mydir
 declare mydir
@@ -27,6 +30,4 @@ while IFS= read -r line; do
   artifact_url=$(echo $line | awk '{print $2}')
   echo "Downloading ${artifact_name}"
   curl -L -s -o "binaries/${artifact_name}.zip" -H "Authorization: Bearer ${GH_TOKEN}" "${artifact_url}"
-done <<< "$artifacts"
-
-
+done <<<"$artifacts"
