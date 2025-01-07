@@ -1,10 +1,13 @@
-use futures::{Future, SinkExt, Stream, StreamExt};
+use futures::{FutureExt, SinkExt, Stream, StreamExt};
 use futures_timer::Delay;
 use std::{
     cmp::Reverse,
     collections::BinaryHeap,
     future::poll_fn,
-    sync::{Arc, Mutex},
+    sync::{
+        atomic::{AtomicBool, AtomicUsize},
+        Arc, Mutex,
+    },
     task::Poll,
     time::Duration,
 };
@@ -207,7 +210,9 @@ impl<T> Stream for Receiver<T> {
                 trace!("reseting the timer");
                 channel.timer.reset(remaining);
 
-                let _ = futures::ready!(timer.poll_unpin(cx));
+                // let timer = std::pin::pin!(&mut channel.timer);
+                // let res = timer.poll(cx);
+                let res = channel.timer.poll_unpin(cx);
 
                 return match res {
                     Poll::Ready(_) => {
