@@ -136,10 +136,7 @@ where
 
         // Check that the contract addresses and topics are consistent with what is in the logs DB,
         // or if the DB is empty, prime it with the given addresses and topics.
-        // If this check fails, panic here.
-        db.ensure_logs_origin(address_topics).await.expect(
-            "The synced logs in the DB are inconsistent or corrupted. Please delete the DB and restart the indexer.",
-        );
+        db.ensure_logs_origin(address_topics).await?;
 
         let log_filter = LogFilter {
             address: addresses,
