@@ -348,6 +348,12 @@ impl HoprDbLogOperations for HoprDb {
     }
 
     async fn ensure_logs_origin(&self, contract_address_topics: Vec<(Address, Hash)>) -> Result<()> {
+        if contract_address_topics.is_empty() {
+            return Err(DbError::LogicalError(
+                "contract address topics must not be empty".into(),
+            ));
+        }
+
         self.nest_transaction_in_db(None, TargetDb::Logs)
             .await?
             .perform(|tx| {
@@ -853,5 +859,28 @@ mod tests {
             updated_log_3.clone().checksum.unwrap(),
         );
         assert_ne!(updated_log_1, updated_log_3);
+    }
+
+    #[async_std::test]
+    async fn test_should_not_allow_inconsistent_logs_in_the_db() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
+        let addr_1 = Address::new(b"my address 123456789");
+        let addr_2 = Address::new(b"my 2nd address 12345");
+        let topic_1 = Hash::create(&[b"my topic 1"]).into();
+        let topic_2 = Hash::create(&[b"my topic 2"]).into();
+
+        db.ensure_logs_origin(vec![(addr_1, topic_1)]).await?;
+
+        db.ensure_logs_origin(vec![(addr_1, topic_2)])
+            .await
+            .expect_err("expected error due to inconsistent logs in the db");
+
+        db.ensure_logs_origin(vec![(addr_2, topic_1)])
+            .await
+            .expect_err("expected error due to inconsistent logs in the db");
+
+        db.ensure_logs_origin(vec![(addr_1, topic_1)]).await?;
+
+        Ok(())
     }
 }
