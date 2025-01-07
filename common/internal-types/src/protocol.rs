@@ -264,6 +264,27 @@ mod tests {
     use super::*;
     use hopr_crypto_random::random_bytes;
 
+    use hex_literal::hex;
+
+    const PRIVATE_KEY: [u8; 32] = hex!("51d3003d908045a4d76d0bfc0d84f6ff946b5934b7ea6a2958faf02fead4567a");
+
+    #[test]
+    fn acknowledgement_binary_compatibility_with_the_v2_format() -> anyhow::Result<()> {
+        let offchain_kp = OffchainKeypair::from_secret(&PRIVATE_KEY)?;
+        let mut ack = Acknowledgement::new(HalfKey::default(), &offchain_kp);
+
+        assert!(ack.validate(&offchain_kp.public()));
+
+        let buf = Vec::new();
+        let serialized = cbor4ii::serde::to_vec(buf, &ack)?;
+
+        const EXPECTED_V2_BINARY_REPRESENTATION_CBOR_HEX: [u8; 213] = hex!("a36d61636b5f7369676e6174757265a1697369676e617475726598401859182418be184818a218c318cb1869186018270218391853186c18ff18e018b518d9187b187900188218da184e1869187518ec1828181b081821187718bb0c18ba18f418331218ea187c1880182318d6189f189f18d7141876186a1890186b1885189718a718b9189018fc18bc18260918e318a5182a006d61636b5f6b65795f7368617265a164686b6579982000000000000000000000000000000000000000000000000000000000000000016976616c696461746564f5");
+
+        assert_eq!(&serialized, &EXPECTED_V2_BINARY_REPRESENTATION_CBOR_HEX);
+
+        Ok(())
+    }
+
     #[test]
     fn test_application_data() -> anyhow::Result<()> {
         let ad_1 = ApplicationData::new(Some(10), &[0_u8, 1_u8])?;

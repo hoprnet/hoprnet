@@ -72,7 +72,7 @@ pub enum AcknowledgedTicketStatus {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Ticket(crate::tickets::Ticket);
+pub struct Ticket(pub crate::tickets::Ticket);
 
 impl Serialize for Ticket {
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
@@ -85,7 +85,7 @@ impl Serialize for Ticket {
 
 struct TicketVisitor {}
 
-impl<'de> Visitor<'de> for TicketVisitor {
+impl Visitor<'_> for TicketVisitor {
     type Value = Ticket;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -189,7 +189,7 @@ mod tests {
     use ethers::utils::hex;
     use hex_literal::hex;
     use hopr_crypto_types::prelude::{ChainKeypair, Challenge, CurvePoint, HalfKey, Hash, Keypair};
-    use hopr_primitive_types::prelude::EthereumChallenge;
+    use hopr_primitive_types::prelude::{BalanceType, EthereumChallenge};
     use hopr_primitive_types::prelude::{IntoEndian, U256};
     use hopr_primitive_types::primitives::Address;
     use lazy_static::lazy_static;
@@ -213,6 +213,41 @@ mod tests {
         hopr_crypto_types::types::CurvePoint::from_exponent(&U256::one().to_be_bytes())
             .expect("curve point should exist")
             .into()
+    }
+
+    #[test]
+    fn ticket_binary_compatibility_with_the_v2_format() -> anyhow::Result<()> {
+        let kp = ChainKeypair::from_secret(&hex!(
+            "492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775"
+        ))?;
+
+        let ticket = TicketBuilder::default()
+            .addresses(
+                kp.public().to_address(),
+                hex!("fb6916095ca1df60bb79ce92ce3ea74c37c5d359"),
+            )
+            .balance(BalanceType::HOPR.balance(100))
+            .index_offset(1)
+            .index(1)
+            .win_prob(1.0)
+            .challenge(EthereumChallenge::new(&hex!(
+                "045a4d76d0bfc0d84f6ff946b5934b7ea6a2958f"
+            )))
+            .channel_epoch(1)
+            .build_signed(
+                &kp,
+                &Hash::from(hex!("51d3003d908045a4d76d0bfc0d84f6ff946b5934b7ea6a2958faf02fead4567a")),
+            )?
+            .leak();
+
+        let buf = Vec::new();
+        let serialized = cbor4ii::serde::to_vec(buf, &Ticket(ticket))?;
+
+        const EXPECTED_V2_BINARY_REPRESENTATION_CBOR_HEX: [u8; 150] = hex!("5894abc401a1657346845964c4f318e28e94a20c447eceaed5aa024f5b7345e5f46400000000000000000000006400000000000100000001000001ffffffffffffff045a4d76d0bfc0d84f6ff946b5934b7ea6a2958f103acd610d4728745bafb0c4e1fd3928d0f8a9d61b555f89e41598fa4aba60fc700eaea5f974dadd8c6517e7e3654851814c38d9d33b1cc39fbcdd1764057cfb");
+
+        assert_eq!(&serialized, &EXPECTED_V2_BINARY_REPRESENTATION_CBOR_HEX);
+
+        Ok(())
     }
 
     #[test]
