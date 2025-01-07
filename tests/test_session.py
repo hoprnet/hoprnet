@@ -248,9 +248,12 @@ async def test_session_communication_with_a_tcp_echo_server(src: str, dest: str,
         # otherwise a `ConnectionRefusedError: [Errno 61] Connection refused` will be encountered
         await asyncio.sleep(1.0)
 
-        dst_sock_port = server.port
         session = await src_peer.api.session_client(
-            dest_peer.peer_id, path={"Hops": 0}, protocol=Protocol.TCP, target=f"localhost:{dst_sock_port}"
+            dest_peer.peer_id,
+            path={"Hops": 0},
+            protocol=Protocol.TCP,
+            target=f"localhost:{server.port}",
+            capabilities=SessionCapabilitiesBody(retransmission=True, segmentation=True),
         )
 
         assert session.port is not None, "Failed to open session"
@@ -311,12 +314,12 @@ async def test_session_communication_over_n_hop_with_a_tcp_echo_server(route, sw
             # otherwise a `ConnectionRefusedError: [Errno 61] Connection refused` will be encountered
             await asyncio.sleep(1.0)
 
-            dst_sock_port = server.port
             session = await src_peer.api.session_client(
                 dest_peer.peer_id,
                 path={"IntermediatePath": path},
                 protocol=Protocol.TCP,
-                target=f"localhost:{dst_sock_port}",
+                target=f"localhost:{server.port}",
+                capabilities=SessionCapabilitiesBody(retransmission=True, segmentation=True),
             )
 
             assert session.port is not None, "Failed to open session"
@@ -358,14 +361,13 @@ async def test_session_communication_with_a_udp_echo_server(src: str, dest: str,
     with EchoServer(SocketType.UDP, HOPR_SESSION_MAX_PAYLOAD_SIZE) as server:
         await asyncio.sleep(1.0)
 
-        dst_sock_port = server.port
         session = await src_peer.api.session_client(
-            dest_peer.peer_id, path={"Hops": 0}, protocol=Protocol.UDP, target=f"localhost:{dst_sock_port}"
+            dest_peer.peer_id, path={"Hops": 0}, protocol=Protocol.UDP, target=f"localhost:{server.port}"
         )
 
         assert session.port is not None, "Failed to open session"
         assert len(await src_peer.api.session_list_clients(Protocol.UDP)) == 1
-        # logging.info(f"session to {dst_sock_port} opened successfully")
+        # logging.info(f"session to {server.port} opened successfully")
 
         addr = ("127.0.0.1", session.port)
         with connect_socket(SocketType.UDP, None) as s:
@@ -482,17 +484,16 @@ async def test_session_communication_over_n_hop_with_a_udp_echo_server(route, sw
         with EchoServer(SocketType.UDP, HOPR_SESSION_MAX_PAYLOAD_SIZE) as server:
             await asyncio.sleep(1.0)
 
-            dst_sock_port = server.port
             session = await src_peer.api.session_client(
                 dest_peer.peer_id,
                 path={"IntermediatePath": path},
                 protocol=Protocol.UDP,
-                target=f"localhost:{dst_sock_port}",
+                target=f"localhost:{server.port}",
             )
 
             assert session.port is not None, "Failed to open session"
             assert len(await src_peer.api.session_list_clients(Protocol.UDP)) == 1
-            # logging.info(f"session to {dst_sock_port} opened successfully")
+            # logging.info(f"session to {server.port} opened successfully")
 
             addr = ("127.0.0.1", session.port)
             with connect_socket(SocketType.UDP, None) as s:
@@ -537,6 +538,7 @@ async def test_session_communication_with_an_https_server(src: str, dest: str, s
             protocol=Protocol.TCP,
             target=f"localhost:{dst_sock_port}",
             sealed_target=True,
+            capabilities=SessionCapabilitiesBody(retransmission=True, segmentation=True),
         )
         assert session.port is not None, "Failed to open session"
         assert len(await src_peer.api.session_list_clients(Protocol.TCP)) == 1
@@ -588,6 +590,7 @@ async def test_session_communication_over_n_hop_with_an_https_server(route, swar
                 path={"IntermediatePath": path},
                 protocol=Protocol.TCP,
                 target=f"localhost:{dst_sock_port}",
+                capabilities=SessionCapabilitiesBody(retransmission=True, segmentation=True),
             )
             assert session.port is not None, "Failed to open session"
             assert len(await src_peer.api.session_list_clients(Protocol.TCP)) == 1
@@ -648,7 +651,7 @@ async def test_session_with_wireguard_tunnel(route, swarm7: dict[str, Node]):
             protocol=Protocol.UDP,
             target=wireguard_tunnel,
             listen_on="127.0.0.1:60006",
-            capabilities=SessionCapabilitiesBody(segment=True),
+            capabilities=SessionCapabilitiesBody(segmentation=True),
         )
 
         assert session.port is not None, "Failed to open session"

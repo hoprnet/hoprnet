@@ -470,7 +470,8 @@ class HoprdAPI:
         """
 
         is_ok, response = await self.__call_api(
-            HTTPMethod.DELETE, f"session/{session.protocol}/{session.ip}/{session.port}"
+            HTTPMethod.DELETE,
+            f"session/{session.protocol}/{session.ip}/{session.port}",
         )
 
         return is_ok
