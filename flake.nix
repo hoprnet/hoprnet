@@ -322,6 +322,7 @@
                 (fs.fileFilter (file: file.hasExt "sol") ./ethereum/contracts/src)
                 ./tests
                 ./scripts
+                ./sdk/python
                 ./ethereum/contracts/foundry.in.toml
                 ./ethereum/contracts/remappings.txt
               ];
