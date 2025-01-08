@@ -42,7 +42,7 @@ impl<T: Ord> PartialOrd for DelayedEntry<T> {
     }
 }
 
-/// Internal type used by the the [`skip_delay_channel`].
+/// Internal type used by the [`skip_delay_channel`].
 struct SkipDelayQueue<T> {
     entries: BTreeSet<DelayedEntry<T>>,
     next_wakeup: Option<futures_time::task::SleepUntil>,
@@ -167,32 +167,34 @@ impl<T: Ord> futures::Stream for SkipDelayReceiver<T> {
 }
 
 /// Sender part for the [`skip_delay_channel`].
-pub struct SkipDelaySender<T> {
-    queue: Arc<std::sync::Mutex<SkipDelayQueue<T>>>,
-    is_closed: bool,
-}
+pub struct SkipDelaySender<T>(Option<Arc<std::sync::Mutex<SkipDelayQueue<T>>>>);
 
 impl<T> Clone for SkipDelaySender<T> {
     fn clone(&self) -> Self {
-        Self {
-            queue: self.queue.clone(),
-            is_closed: false,
+        Self(self.0.clone())
+    }
+}
+
+impl<T> SkipDelaySender<T> {
+    fn ensure_closure(&mut self) {
+        if let Some(queue) = self.0.take() {
+            let count_holders = Arc::strong_count(&queue);
+            tracing::trace!(count_holders, "SkipDelayQueueSender::ensure_closure");
+
+            // Check if the last holders are this instance and (potentially) the receiver
+            if count_holders == 2 {
+                queue.clear_poison();
+                let mut queue = queue.lock().expect("cannot panic because poison is cleared");
+                queue.is_closed = true;
+                queue.rx_waker = None;
+            }
         }
     }
 }
 
 impl<T> Drop for SkipDelaySender<T> {
     fn drop(&mut self) {
-        let count_holders = Arc::strong_count(&self.queue);
-        tracing::trace!(count_holders, "SkipDelayQueueSender::drop");
-        self.is_closed = true;
-        if count_holders == 2 {
-            // Just this instance and the Receiver
-            self.queue.clear_poison();
-            let mut queue = self.queue.lock().expect("cannot panic because poison is cleared");
-            queue.is_closed = true;
-            queue.rx_waker = None;
-        }
+        self.ensure_closure();
     }
 }
 
@@ -200,68 +202,68 @@ impl<T: Ord> futures::Sink<DelayedItem<T>> for SkipDelaySender<T> {
     type Error = std::io::Error;
 
     fn poll_ready(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        if self.is_closed {
-            return Poll::Ready(Err(std::io::ErrorKind::NotConnected.into()));
+        if self.0.is_some() {
+            Poll::Ready(Ok(()))
+        } else {
+            Poll::Ready(Err(std::io::ErrorKind::NotConnected.into()))
         }
-        Poll::Ready(Ok(()))
     }
 
     fn start_send(self: Pin<&mut Self>, item: DelayedItem<T>) -> Result<(), Self::Error> {
-        if self.is_closed {
-            return Err(std::io::ErrorKind::NotConnected.into());
-        }
+        if let Some(queue) = self.0.as_ref() {
+            let mut queue = queue.lock().map_err(|_| std::io::ErrorKind::BrokenPipe)?;
 
-        let mut queue = self.queue.lock().map_err(|_| std::io::ErrorKind::BrokenPipe)?;
-
-        // This can happen only when the receiver was dropped.
-        if queue.is_closed {
-            return Err(std::io::ErrorKind::BrokenPipe.into());
-        }
-
-        match item {
-            DelayedItem::New(item, at) => {
-                tracing::trace!("SkipDelayQueue::start_send inserting");
-                queue.entries.insert(DelayedEntry {
-                    item,
-                    at,
-                    cancelled: AtomicBool::new(false),
-                });
+            // This can happen only when the receiver was dropped.
+            if queue.is_closed {
+                return Err(std::io::ErrorKind::BrokenPipe.into());
             }
-            DelayedItem::Cancel(item) => {
-                tracing::trace!("SkipDelayQueue::start_send cancelling");
-                queue
-                    .entries
-                    .iter()
-                    .filter(|e| item == e.item)
-                    .for_each(|e| e.cancelled.store(true, std::sync::atomic::Ordering::SeqCst));
-            }
-        }
 
-        Ok(())
+            match item {
+                DelayedItem::New(item, at) => {
+                    tracing::trace!("SkipDelayQueue::start_send inserting");
+                    queue.entries.insert(DelayedEntry {
+                        item,
+                        at,
+                        cancelled: AtomicBool::new(false),
+                    });
+                }
+                DelayedItem::Cancel(item) => {
+                    tracing::trace!("SkipDelayQueue::start_send cancelling");
+                    queue
+                        .entries
+                        .iter()
+                        .filter(|e| item == e.item)
+                        .for_each(|e| e.cancelled.store(true, std::sync::atomic::Ordering::SeqCst));
+                }
+            }
+
+            Ok(())
+        } else {
+            Err(std::io::ErrorKind::NotConnected.into())
+        }
     }
 
     fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        if self.is_closed {
-            return Poll::Ready(Err(std::io::ErrorKind::NotConnected.into()));
+        if let Some(queue) = self.0.as_ref() {
+            let mut queue = queue.lock().unwrap();
+
+            tracing::trace!("SkipDelayQueue::poll_flush");
+            if let Some(waker) = queue.rx_waker.take() {
+                waker.wake();
+            }
+
+            Poll::Ready(Ok(()))
+        } else {
+            Poll::Ready(Err(std::io::ErrorKind::NotConnected.into()))
         }
-
-        let mut queue = self.queue.lock().unwrap();
-
-        tracing::trace!("SkipDelayQueue::poll_flush");
-        if let Some(waker) = queue.rx_waker.take() {
-            waker.wake();
-        }
-
-        Poll::Ready(Ok(()))
     }
 
     fn poll_close(mut self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        if self.is_closed {
+        if self.0.is_none() {
             return Poll::Ready(Err(std::io::ErrorKind::NotConnected.into()));
         }
 
-        tracing::trace!("SkipDelayQueue::poll_close");
-        self.is_closed = true;
+        self.ensure_closure();
         Poll::Ready(Ok(()))
     }
 }
@@ -277,13 +279,7 @@ impl<T: Ord> futures::Sink<DelayedItem<T>> for SkipDelaySender<T> {
 /// to their values; therefore, items must implement [`Ord`].
 pub fn skip_delay_channel<T: Ord>() -> (SkipDelaySender<T>, SkipDelayReceiver<T>) {
     let queue = Arc::new(std::sync::Mutex::new(SkipDelayQueue::new()));
-    (
-        SkipDelaySender {
-            queue: queue.clone(),
-            is_closed: false,
-        },
-        SkipDelayReceiver(queue),
-    )
+    (SkipDelaySender(Some(queue.clone())), SkipDelayReceiver(queue))
 }
 
 #[cfg(test)]
@@ -303,6 +299,30 @@ mod tests {
 
         assert_eq!(Some(1), rx.next().await);
         assert!(now.elapsed() >= Duration::from_millis(100));
+        assert_eq!(None, rx.next().await);
+
+        Ok(())
+    }
+
+    #[test_log::test(async_std::test)]
+    async fn skip_delay_queue_should_yield_items_from_multiple_senders() -> anyhow::Result<()> {
+        let (mut tx, rx) = skip_delay_channel();
+        pin_mut!(rx);
+
+        let mut tx2 = tx.clone();
+
+        let now = Instant::now();
+        tx.send((2, now + Duration::from_millis(100)).into()).await?;
+        tx.close().await?;
+
+        tx2.send((1, now + Duration::from_millis(150)).into()).await?;
+        tx2.close().await?;
+
+        assert_eq!(Some(2), rx.next().await);
+        assert!(now.elapsed() >= Duration::from_millis(100));
+        assert_eq!(Some(1), rx.next().await);
+        assert!(now.elapsed() >= Duration::from_millis(150));
+
         assert_eq!(None, rx.next().await);
 
         Ok(())
@@ -428,6 +448,21 @@ mod tests {
 
         assert_eq!(Some(1), rx.next().await);
         assert_eq!(Some(2), rx.next().await);
+        assert_eq!(None, rx.next().await);
+
+        Ok(())
+    }
+
+    #[test_log::test(async_std::test)]
+    async fn skip_delay_queue_should_not_send_items_when_closed() -> anyhow::Result<()> {
+        let (mut tx, rx) = skip_delay_channel();
+        pin_mut!(rx);
+        tx.close().await?;
+
+        let now = Instant::now();
+        tx.send((1, now).into()).await.unwrap_err();
+        tx.close().await.unwrap_err();
+
         assert_eq!(None, rx.next().await);
 
         Ok(())
