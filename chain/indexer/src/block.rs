@@ -58,7 +58,7 @@ pub struct Indexer<T, U, Db>
 where
     T: HoprIndexerRpcOperations + Send + 'static,
     U: ChainLogHandler + Send + 'static,
-    Db: HoprDbGeneralModelOperations + Clone + Send + Sync + 'static,
+    Db: HoprDbGeneralModelOperations + HoprDbInfoOperations + HoprDbLogOperations + Clone + Send + Sync + 'static,
 {
     rpc: Option<T>,
     db_processor: Option<U>,
@@ -74,7 +74,7 @@ impl<T, U, Db> Indexer<T, U, Db>
 where
     T: HoprIndexerRpcOperations + Sync + Send + 'static,
     U: ChainLogHandler + Send + Sync + 'static,
-    Db: HoprDbGeneralModelOperations + Clone + Send + Sync + 'static,
+    Db: HoprDbGeneralModelOperations + HoprDbInfoOperations + HoprDbLogOperations + Clone + Send + Sync + 'static,
 {
     pub fn new(
         rpc: T,
@@ -103,7 +103,7 @@ where
     where
         T: HoprIndexerRpcOperations + 'static,
         U: ChainLogHandler + 'static,
-        Db: HoprDbGeneralModelOperations + HoprDbInfoOperations + HoprDbLogOperations + 'static,
+        Db: HoprDbGeneralModelOperations + HoprDbInfoOperations + HoprDbLogOperations + Clone + Send + Sync + 'static,
     {
         if self.rpc.is_none() || self.db_processor.is_none() {
             return Err(CoreEthereumIndexerError::ProcessError(
@@ -396,6 +396,15 @@ where
                                         }
                                     }
                                 }
+                            }
+
+                            // finally update the block number in the database to the last
+                            // processed block
+                            match db.set_indexer_state_info(None, block_id as u32).await {
+                                Ok(_) => {
+                                    trace!(block_id, "updated indexer state info");
+                                }
+                                Err(error) => error!(block_id, %error, "failed to update indexer state info"),
                             }
                         }
                         Err(error) => error!(block_id, %error, "failed to update checksums for logs from block"),
