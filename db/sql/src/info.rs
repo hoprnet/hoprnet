@@ -467,11 +467,9 @@ impl HoprDbInfoOperations for HoprDb {
                         .one(tx.as_ref())
                         .await?
                         .ok_or(DbSqlError::MissingFixedTableEntry("chain_info".into()))
-                        .and_then(|m| {
-                            Ok(IndexerStateInfo {
-                                latest_block_number: m.last_indexed_block as u32,
-                                ..Default::default()
-                            })
+                        .map(|m| IndexerStateInfo {
+                            latest_block_number: m.last_indexed_block as u32,
+                            ..Default::default()
                         })
                 })
             })
