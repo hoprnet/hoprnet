@@ -295,8 +295,14 @@
           plutoSrc = fs.toSource {
             root = ./.;
             fileset = fs.unions [
-              ./scripts/setup-local-cluster.sh
-              ./scripts/topologies/full_interconnected_cluster.sh
+              (fs.fileFilter (file: file.hasExt "sol") ./vendor/solidity)
+              ./sdk/python
+              ./ethereum/contracts
+              ./tests/requirements.txt
+              ./scripts/run-local-cluster.sh
+              ./scripts/run-local-anvil.sh
+              ./scripts/utils.sh
+              ./Makefile
             ];
           };
           pluto-docker = pkgs.dockerTools.buildLayeredImage {
@@ -304,9 +310,27 @@
             tag = "latest";
             # breaks binary reproducibility, but makes usage easier
             created = "now";
-            contents = [ plutoSrc ];
-            fromImage = anvil-docker;
+            contents = [ pkgs.foundry-bin pkgs.python39 plutoSrc solcDefault pkgs.tini pkgs.runtimeShellPackage pkgs.jq pkgs.lsof pkgs.curl pkgs.coreutils pkgs.which pkgs.jq pkgs.findutils pkgs.time pkgs.gnumake ];
+            enableFakechroot = true;
+            fakeRootCommands = ''
+              #!${pkgs.runtimeShell}
+              ${pkgs.foundry-bin}/bin/forge build
+              mkdir /tmp/
+            '';
+            config = {
+              Cmd = [
+                "/bin/tini"
+                "--"
+                "bash"
+                "/scripts/run-local-cluster.sh"
+              ];
+              ExposedPorts = {
+                "8545/tcp" = { };
+              };
+            };
           };
+
+          # bash scripts/run-local-anvil.sh -l /tmp/hopr-localcluster/anvil/anvil.log -c /tmp/hopr-localcluster/anvil/anvil.cfg -p 3000 -ds /tmp/hopr-localcluster/anvil/anvil.state.json
 
           dockerImageUploadScript = image: pkgs.writeShellScriptBin "docker-image-upload" ''
             set -eu
