@@ -16,6 +16,11 @@
     treefmt-nix.url = github:numtide/treefmt-nix;
     flake-root.url = github:srid/flake-root;
 
+    # python dependency management
+    pyproject-nix.url = github:pyproject-nix/pyproject.nix;
+    uv2nix.url = github:pyproject-nix/uv2nix;
+    pyproject-build-systems.url = github:pyproject-nix/build-system-pkgs;
+
     crane.inputs.nixpkgs.follows = "nixpkgs";
     flake-parts.inputs.nixpkgs-lib.follows = "nixpkgs";
     foundry.inputs.flake-utils.follows = "flake-utils";
@@ -26,9 +31,17 @@
     solc.inputs.flake-utils.follows = "flake-utils";
     solc.inputs.nixpkgs.follows = "nixpkgs";
     treefmt-nix.inputs.nixpkgs.follows = "nixpkgs";
+    pyproject-nix.inputs.nixpkgs.follows = "nixpkgs";
+    uv2nix.inputs.pyproject-nix.follows = "pyproject-nix";
+    uv2nix.inputs.nixpkgs.follows = "nixpkgs";
+    pyproject-build-systems.inputs.pyproject-nix.follows = "pyproject-nix";
+    pyproject-build-systems.inputs.uv2nix.follows = "uv2nix";
+    pyproject-build-systems.inputs.nixpkgs.follows = "nixpkgs";
   };
 
-  outputs = { self, nixpkgs, flake-utils, flake-parts, flake-root, rust-overlay, crane, foundry, solc, pre-commit, treefmt-nix, ... }@inputs:
+  outputs = { self, nixpkgs, flake-utils, flake-parts, flake-root, rust-overlay,
+  crane, foundry, solc, pre-commit, treefmt-nix, uv2nix, pyproject-nix,
+  pyproject-build-systems,  ... }@inputs:
     flake-parts.lib.mkFlake { inherit inputs; } {
       imports = [
         inputs.treefmt-nix.flakeModule
@@ -43,6 +56,26 @@
           pkgs = import nixpkgs {
             inherit localSystem overlays;
           };
+
+          # prepare python venvs for smoke tests
+          pyWorkspace = uv2nix.lib.workspace.loadWorkspace { workspaceRoot = ./.; };
+          pyOverlay = pyWorkspace.mkPyprojectOverlay {
+            sourcePreference = "wheel";
+          };
+          pyprojectOverrides = _final: _prev: {};
+          pythonSet =
+            (pkgs.callPackage pyproject-nix.build.packages {
+              python = pkgs.python39;
+            }).overrideScope
+            (
+              lib.composeManyExtensions
+              [
+                pyproject-build-systems.overlays.default
+                pyOverlay
+                pyprojectOverrides
+              ]
+              );
+
           solcDefault = solc.mkDefault pkgs pkgs.solc_0_8_19;
           craneLib = (crane.mkLib pkgs).overrideToolchain (p: p.rust-bin.stable.latest.default);
           hoprdCrateInfoOriginal = craneLib.crateNameFromCargoToml {
@@ -314,8 +347,21 @@
             buildDocs = true;
           });
 
-          # set up base smoke test derivation
-          create-smoke-tests = suite: pkgs.stdenv.mkDerivation {
+          smokeTestPythonEnv = pythonSet.mkVirtualEnv "smoke-test-env" pyWorkspace.deps.default;
+
+          # set up Python environment including all dependencies for the smoke
+          # tests
+          pythonEnv = pkgs.python39.withPackages (ps: with ps; [
+            pytest
+            pytest-asyncio
+            pytest-timeout
+            requests
+            rlp
+            websocket-client
+            websockets
+          ]);
+          # set up function to generate moke test derivation
+          mkSmokeTest = suite: pkgs.stdenv.mkDerivation {
             pname = "hoprd-smoke-tests-${suite}";
             version = hoprdCrateInfo.version;
             src = fs.toSource {
@@ -333,17 +379,9 @@
               solcDefault
               hopli-debug
               hoprd-debug
-              python39
+              pythonEnv
             ];
-            buildPhase = ''
-              unset SOURCE_DATE_EPOCH
-              python -m venv .venv
-              source .venv/bin/activate
-              pip install -U pip setuptools wheel
-              pip install -r tests/requirements.txt
-            '';
             checkPhase = ''
-              source .venv/bin/activate
               python3 -m pytest tests/test_${suite}.py
             '';
             doCheck = true;
@@ -351,13 +389,13 @@
 
           # instantiate derivation for each smoke test suite
           smoke-tests = {
-            smoke-tests-websocket-api = create-smoke-tests "websocket_api";
-            smoke-tests-integration = create-smoke-tests "integration";
-            smoke-tests-redeeming = create-smoke-tests "redeeming";
-            smoke-tests-rest-api = create-smoke-tests "rest_api";
-            smoke-tests-session = create-smoke-tests "session";
-            smoke-tests-win-prob = create-smoke-tests "win_prob";
-            smoke-tests-hopli = create-smoke-tests "hopli";
+            smoke-tests-websocket-api = mkSmokeTest "websocket_api";
+            smoke-tests-integration = mkSmokeTest "integration";
+            smoke-tests-redeeming = mkSmokeTest "redeeming";
+            smoke-tests-rest-api = mkSmokeTest "rest_api";
+            smoke-tests-session = mkSmokeTest "session";
+            smoke-tests-win-prob = mkSmokeTest "win_prob";
+            smoke-tests-hopli = mkSmokeTest "hopli";
           };
 
           pre-commit-check = pre-commit.lib.${system}.run {

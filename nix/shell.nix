@@ -54,6 +54,7 @@ craneLib.devShell {
     ## python is required by integration tests
     python39
     python39Packages.venvShellHook
+    uv
 
     ## formatting
     config.treefmt.build.wrapper
