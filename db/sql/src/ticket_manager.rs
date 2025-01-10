@@ -145,9 +145,9 @@ impl TicketManager {
                                                 .exec(tx.as_ref())
                                                 .await?;
 
-                                            if deleted.rows_affected < offset {
+                                            if deleted.rows_affected > offset {
                                                 return Err(DbSqlError::LogicalError(format!(
-                                                    "deleted ticket count ({}) must be least the ticket index offset {offset}",
+                                                    "deleted ticket count ({}) must not be more than the ticket index offset {offset}",
                                                     deleted.rows_affected,
                                                 )));
                                             }
