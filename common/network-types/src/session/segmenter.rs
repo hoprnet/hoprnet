@@ -8,6 +8,7 @@ use crate::session::frame::FrameId;
 use crate::session::frame::SeqNum;
 use crate::session::Segment;
 
+/// `C` is MTU size, `F` is frame size.
 pub struct Segmenter<const C: usize, const F: usize> {
     seg_buffer: Vec<u8>,
     ready_segments: Vec<Segment>,
