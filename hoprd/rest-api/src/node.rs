@@ -6,7 +6,7 @@ use axum::{
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
 use hopr_crypto_types::prelude::Hash;
-use hopr_lib::{Address, AsUnixTimestamp, GraphExportConfig, Health, Multiaddr, ToHex};
+use hopr_lib::{Address, AsUnixTimestamp, GraphExportConfig, Health, Multiaddr};
 use libp2p_identity::PeerId;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
@@ -354,8 +354,10 @@ pub(super) async fn channel_graph(
         ],
         "network": "anvil-localhost",
         "indexerBlock": 123456,
-        "indexerChecksum": "cfde556a7e9ff0848998aa4a9a9f2ccfde556a7e9ff0848998aa4a0cfd8863ae",
-        "indexBlockPrevChecksum": 123450,
+        "indexerChecksum": "0000000000000000000000000000000000000000000000000000000000000000",
+        "indexBlockPrevChecksum": 0,
+        "indexerLastLogBlock": 123450,
+        "indexerLastLogChecksum": "cfde556a7e9ff0848998aa4a9a9f2ccfde556a7e9ff0848998aa4a0cfd8863ae",
     }))]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct NodeInfoResponse {
@@ -397,6 +399,10 @@ pub(crate) struct NodeInfoResponse {
     #[schema(value_type = String)]
     indexer_checksum: Hash,
     index_block_prev_checksum: u32,
+    indexer_last_log_block: u32,
+    #[serde_as(as = "DisplayFromStr")]
+    #[schema(value_type = String)]
+    indexer_last_log_checksum: Hash,
 }
 
 /// Get information about this HOPR Node.
@@ -420,15 +426,8 @@ pub(super) async fn info(State(state): State<Arc<InternalState>>) -> Result<impl
     let safe_config = hopr.get_safe_config();
     let network = hopr.network();
 
-    let (indexer_block, indexer_checksum) = match hopr.get_indexer_state().await {
-        Ok(Some(slog)) => (
-            slog.block_number as u32,
-            match slog.checksum {
-                Some(checksum) => Hash::from_hex(checksum.as_str())?,
-                None => Hash::default(),
-            },
-        ),
-        Ok(None) => (0u32, Hash::default()),
+    let indexer_state_info = match hopr.get_indexer_state().await {
+        Ok(info) => info,
         Err(error) => return Ok((StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(error)).into_response()),
     };
 
@@ -449,11 +448,15 @@ pub(super) async fn info(State(state): State<Arc<InternalState>>) -> Result<impl
                 is_eligible: hopr.is_allowed_to_access_network(&hopr.me_peer_id()).await?,
                 connectivity_status: hopr.network_health().await,
                 channel_closure_period: channel_closure_notice_period.as_secs(),
-                indexer_block,
-                indexer_checksum,
+                indexer_block: indexer_state_info.latest_block_number,
                 // FIXME: this is only done for backwards-compatibility, ideally we don't return
                 // this value
-                index_block_prev_checksum: indexer_block,
+                indexer_checksum: Hash::default(),
+                // FIXME: this is only done for backwards-compatibility, ideally we don't return
+                // this value
+                index_block_prev_checksum: 0,
+                indexer_last_log_block: indexer_state_info.latest_log_block_number,
+                indexer_last_log_checksum: indexer_state_info.latest_log_checksum,
             };
 
             Ok((StatusCode::OK, Json(body)).into_response())
