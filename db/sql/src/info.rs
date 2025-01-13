@@ -4,6 +4,7 @@ use sea_orm::{
     ActiveModelBehavior, ActiveModelTrait, ColumnTrait, EntityOrSelect, EntityTrait, IntoActiveModel, PaginatorTrait,
     QueryFilter, Set,
 };
+use tracing::trace;
 
 use hopr_crypto_types::prelude::Hash;
 use hopr_db_api::info::*;
@@ -19,13 +20,12 @@ use crate::errors::DbSqlError::MissingFixedTableEntry;
 use crate::errors::{DbSqlError, Result};
 use crate::{HoprDbGeneralModelOperations, OptTx, TargetDb, SINGULAR_TABLE_FIXED_ID};
 
-/// Enumerates different domain separators
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct DescribedBlock {
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+pub struct IndexerStateInfo {
+    // the latest block number that has been indexed and persisted to the database
     pub latest_block_number: u32,
-    pub checksum: Hash,
-    pub block_prior_to_checksum_update: u32,
-    pub log_count: u32,
+    pub latest_log_block_number: u32,
+    pub latest_log_checksum: Hash,
 }
 
 /// Defines DB access API for various node information.
@@ -98,6 +98,12 @@ pub trait HoprDbInfoOperations {
     /// To retrieve the stored ticket price, use [`HoprDbInfoOperations::get_indexer_data`],
     /// note that this setter should invalidate the cache.
     async fn update_ticket_price<'a>(&'a self, tx: OptTx<'a>, price: Balance) -> Result<()>;
+
+    /// Gets the indexer state info.
+    async fn get_indexer_state_info<'a>(&'a self, tx: OptTx<'a>) -> Result<IndexerStateInfo>;
+
+    /// Updates the indexer state info.
+    async fn set_indexer_state_info<'a>(&'a self, tx: OptTx<'a>, block_num: u32) -> Result<()>;
 
     /// Updates the network registry state.
     /// To retrieve the stored network registry state, use [`HoprDbInfoOperations::get_indexer_data`],
@@ -450,6 +456,53 @@ impl HoprDbInfoOperations for HoprDb {
             .invalidate(&CachedValueDiscriminants::IndexerDataCache)
             .await;
         Ok(())
+    }
+
+    async fn get_indexer_state_info<'a>(&'a self, tx: OptTx<'a>) -> Result<IndexerStateInfo> {
+        self.nest_transaction(tx)
+            .await?
+            .perform(|tx| {
+                Box::pin(async move {
+                    chain_info::Entity::find_by_id(SINGULAR_TABLE_FIXED_ID)
+                        .one(tx.as_ref())
+                        .await?
+                        .ok_or(DbSqlError::MissingFixedTableEntry("chain_info".into()))
+                        .map(|m| IndexerStateInfo {
+                            latest_block_number: m.last_indexed_block as u32,
+                            ..Default::default()
+                        })
+                })
+            })
+            .await
+    }
+
+    async fn set_indexer_state_info<'a>(&'a self, tx: OptTx<'a>, block_num: u32) -> Result<()> {
+        self.nest_transaction(tx)
+            .await?
+            .perform(|tx| {
+                Box::pin(async move {
+                    let model = chain_info::Entity::find_by_id(SINGULAR_TABLE_FIXED_ID)
+                        .one(tx.as_ref())
+                        .await?
+                        .ok_or(MissingFixedTableEntry("chain_info".into()))?;
+
+                    let current_last_indexed_block = model.last_indexed_block;
+
+                    let mut active_model = model.into_active_model();
+
+                    trace!(
+                        old_block = current_last_indexed_block,
+                        new_block = block_num,
+                        "update block"
+                    );
+
+                    active_model.last_indexed_block = Set(block_num as i32);
+                    active_model.update(tx.as_ref()).await?;
+
+                    Ok::<_, DbSqlError>(())
+                })
+            })
+            .await
     }
 
     async fn set_network_registry_enabled<'a>(&'a self, tx: OptTx<'a>, enabled: bool) -> Result<()> {

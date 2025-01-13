@@ -58,7 +58,7 @@ pub struct Indexer<T, U, Db>
 where
     T: HoprIndexerRpcOperations + Send + 'static,
     U: ChainLogHandler + Send + 'static,
-    Db: HoprDbGeneralModelOperations + Clone + Send + Sync + 'static,
+    Db: HoprDbGeneralModelOperations + HoprDbInfoOperations + HoprDbLogOperations + Clone + Send + Sync + 'static,
 {
     rpc: Option<T>,
     db_processor: Option<U>,
@@ -74,7 +74,7 @@ impl<T, U, Db> Indexer<T, U, Db>
 where
     T: HoprIndexerRpcOperations + Sync + Send + 'static,
     U: ChainLogHandler + Send + Sync + 'static,
-    Db: HoprDbGeneralModelOperations + Clone + Send + Sync + 'static,
+    Db: HoprDbGeneralModelOperations + HoprDbInfoOperations + HoprDbLogOperations + Clone + Send + Sync + 'static,
 {
     pub fn new(
         rpc: T,
@@ -103,7 +103,7 @@ where
     where
         T: HoprIndexerRpcOperations + 'static,
         U: ChainLogHandler + 'static,
-        Db: HoprDbGeneralModelOperations + HoprDbInfoOperations + HoprDbLogOperations + 'static,
+        Db: HoprDbGeneralModelOperations + HoprDbInfoOperations + HoprDbLogOperations + Clone + Send + Sync + 'static,
     {
         if self.rpc.is_none() || self.db_processor.is_none() {
             return Err(CoreEthereumIndexerError::ProcessError(
@@ -122,13 +122,21 @@ where
         // we skip on addresses which have no topics
         let mut addresses = vec![];
         let mut topics = vec![];
+        let mut address_topics = vec![];
         logs_handler.contract_addresses().iter().for_each(|address| {
             let contract_topics = logs_handler.contract_address_topics(*address);
             if !contract_topics.is_empty() {
                 addresses.push(*address);
-                topics.extend(contract_topics);
+                for topic in contract_topics {
+                    address_topics.push((*address, Hash::from(topic)));
+                    topics.push(topic);
+                }
             }
         });
+
+        // Check that the contract addresses and topics are consistent with what is in the logs DB,
+        // or if the DB is empty, prime it with the given addresses and topics.
+        db.ensure_logs_origin(address_topics).await?;
 
         let log_filter = LogFilter {
             address: addresses,
@@ -389,6 +397,15 @@ where
                                     }
                                 }
                             }
+
+                            // finally update the block number in the database to the last
+                            // processed block
+                            match db.set_indexer_state_info(None, block_id as u32).await {
+                                Ok(_) => {
+                                    trace!(block_id, "updated indexer state info");
+                                }
+                                Err(error) => error!(block_id, %error, "failed to update indexer state info"),
+                            }
                         }
                         Err(error) => error!(block_id, %error, "failed to update checksums for logs from block"),
                     },
@@ -603,7 +620,15 @@ mod tests {
         let mut rpc = MockHoprIndexerOps::new();
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
-        handlers.expect_contract_addresses().return_const(vec![]);
+        let addr = Address::new(b"my address 123456789");
+        let topic = Hash::create(&[b"my topic"]);
+        db.ensure_logs_origin(vec![(addr, topic)]).await?;
+
+        handlers.expect_contract_addresses().return_const(vec![addr]);
+        handlers
+            .expect_contract_address_topics()
+            .withf(move |x| x == &addr)
+            .return_const(vec![topic.into()]);
 
         let head_block = 1000;
         rpc.expect_block_number().return_once(move || Ok(head_block));
@@ -640,7 +665,15 @@ mod tests {
         let head_block = 1000;
         let latest_block = 15u64;
 
-        handlers.expect_contract_addresses().return_const(vec![]);
+        let addr = Address::new(b"my address 123456789");
+        let topic = Hash::create(&[b"my topic"]);
+
+        handlers.expect_contract_addresses().return_const(vec![addr]);
+        handlers
+            .expect_contract_address_topics()
+            .withf(move |x| x == &addr)
+            .return_const(vec![topic.into()]);
+        db.ensure_logs_origin(vec![(addr, topic)]).await?;
 
         rpc.expect_block_number().return_once(move || Ok(head_block));
 
@@ -697,7 +730,12 @@ mod tests {
 
         let cfg = IndexerConfig::default();
 
-        handlers.expect_contract_addresses().return_const(vec![]);
+        let addr = Address::new(b"my address 123456789");
+        handlers.expect_contract_addresses().return_const(vec![addr]);
+        handlers
+            .expect_contract_address_topics()
+            .withf(move |x| x == &addr)
+            .return_const(vec![Hash::create(&[b"my topic"]).into()]);
 
         let (mut tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
         rpc.expect_try_stream_logs()
@@ -739,6 +777,9 @@ mod tests {
     async fn test_indexer_fast_sync_full_with_resume() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
+        let addr = Address::new(b"my address 123456789");
+        let topic = Hash::create(&[b"my topic"]);
+
         // Run 1: Fast sync enabled, index empty
         {
             let logs = vec![
@@ -748,6 +789,8 @@ mod tests {
             .into_iter()
             .flatten()
             .collect::<Vec<_>>();
+
+            assert!(db.ensure_logs_origin(vec![(addr, topic)]).await.is_ok());
 
             for log in logs {
                 assert!(db.store_log(log).await.is_ok());
@@ -768,7 +811,11 @@ mod tests {
                 .return_once(move |_, _| Ok(Box::pin(rx)));
 
             let mut handlers = MockChainLogHandler::new();
-            handlers.expect_contract_addresses().return_const(vec![]);
+            handlers.expect_contract_addresses().return_const(vec![addr]);
+            handlers
+                .expect_contract_address_topics()
+                .withf(move |x| x == &addr)
+                .return_const(vec![topic.into()]);
             handlers
                 .expect_collect_block_events()
                 .times(2)
@@ -814,6 +861,8 @@ mod tests {
             .flatten()
             .collect::<Vec<_>>();
 
+            assert!(db.ensure_logs_origin(vec![(addr, topic)]).await.is_ok());
+
             for log in logs {
                 assert!(db.store_log(log).await.is_ok());
             }
@@ -833,7 +882,12 @@ mod tests {
                 .return_once(move |_, _| Ok(Box::pin(rx)));
 
             let mut handlers = MockChainLogHandler::new();
-            handlers.expect_contract_addresses().return_const(vec![]);
+            handlers.expect_contract_addresses().return_const(vec![addr]);
+            handlers
+                .expect_contract_address_topics()
+                .withf(move |x| x == &addr)
+                .return_const(vec![topic.into()]);
+
             handlers
                 .expect_collect_block_events()
                 .times(2)
@@ -867,8 +921,13 @@ mod tests {
 
         let cfg = IndexerConfig::default();
 
-        // Set to be an empty list because we don't want to index anything really
-        handlers.expect_contract_addresses().return_const(vec![]);
+        // We don't want to index anything really
+        let addr = Address::new(b"my address 123456789");
+        handlers.expect_contract_addresses().return_const(vec![addr]);
+        handlers
+            .expect_contract_address_topics()
+            .withf(move |x| x == &addr)
+            .return_const(vec![Hash::create(&[b"my topic"]).into()]);
 
         let (mut tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
         // Expected to be called once starting at 0 and yield the respective blocks
@@ -930,6 +989,10 @@ mod tests {
 
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
+        let addr = Address::new(b"my address 123456789");
+        let topic = Hash::create(&[b"my topic"]);
+        assert!(db.ensure_logs_origin(vec![(addr, topic)]).await.is_ok());
+
         // insert and process latest block
         let log_1 = SerializableLog {
             address: Address::new(b"my address 123456789"),
@@ -973,7 +1036,11 @@ mod tests {
         tx.start_send(block)?;
 
         let mut handlers = MockChainLogHandler::new();
-        handlers.expect_contract_addresses().return_const(vec![]);
+        handlers.expect_contract_addresses().return_const(vec![addr]);
+        handlers
+            .expect_contract_address_topics()
+            .withf(move |x| x == &addr)
+            .return_const(vec![topic.into()]);
 
         let indexer_cfg = IndexerConfig {
             start_block_number: 0,

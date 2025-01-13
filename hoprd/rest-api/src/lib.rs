@@ -430,7 +430,7 @@ impl IntoResponse for ApiErrorStatus {
 
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
-        (StatusCode::INTERNAL_SERVER_ERROR, self).into_response()
+        (StatusCode::INTERNAL_SERVER_ERROR, Json(self)).into_response()
     }
 }
 
@@ -451,5 +451,24 @@ where
             status: ApiErrorStatus::UnknownFailure("unknown error".to_string()).to_string(),
             error: Some(value.to_string()),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ApiError;
+
+    use axum::http::StatusCode;
+    use axum::response::IntoResponse;
+
+    #[test]
+    fn test_api_error_to_response() {
+        let error = ApiError {
+            status: StatusCode::INTERNAL_SERVER_ERROR.to_string(),
+            error: Some("Invalid value passed in parameter 'XYZ'".to_string()),
+        };
+
+        let response = error.into_response();
+        assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
     }
 }

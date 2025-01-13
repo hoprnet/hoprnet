@@ -1,12 +1,25 @@
 use async_trait::async_trait;
 
 use hopr_crypto_types::prelude::Hash;
-use hopr_primitive_types::prelude::SerializableLog;
+use hopr_primitive_types::prelude::{Address, SerializableLog};
 
 use crate::errors::Result;
 
 #[async_trait]
 pub trait HoprDbLogOperations {
+    /// Ensures that logs in this database have been created by scanning the given contract address
+    /// and their corresponding topics. If the log DB is empty, the given addresses and topics
+    /// are used to prime the table.
+    ///
+    /// # Arguments
+    /// * `contract_address_topics` - list of topics for a contract address. There may be multiple topics
+    /// with the same contract address.
+    ///
+    /// # Returns
+    /// A `Result` which is `Ok(())` if the database contains correct log data,
+    /// or it has been primed successfully. An `Err` is returned otherwise.
+    async fn ensure_logs_origin(&self, contract_address_topics: Vec<(Address, Hash)>) -> Result<()>;
+
     /// Stores a single log entry in the database.
     ///
     /// # Arguments
