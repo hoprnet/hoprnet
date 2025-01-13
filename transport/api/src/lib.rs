@@ -279,11 +279,10 @@ where
     pub async fn run(
         &self,
         version: String,
-        network: Arc<Network<T>>,
         tbf_path: String,
         on_transport_output: UnboundedSender<ApplicationData>,
         transport_updates: UnboundedReceiver<PeerDiscovery>,
-        new_session_notifier: UnboundedSender<IncomingSession>,
+        on_incoming_session: UnboundedSender<IncomingSession>,
     ) -> HashMap<HoprTransportProcess, JoinHandle<()>> {
         let mut processes: HashMap<HoprTransportProcess, JoinHandle<()>> = HashMap::new();
 
@@ -304,7 +303,7 @@ where
             ping_cfg,
             ping_tx.clone(),
             network_notifier::PingExternalInteractions::new(
-                network.clone(),
+                self.network.clone(),
                 self.db.clone(),
                 self.path_planner.channel_graph(),
                 network_events_tx,
@@ -339,7 +338,7 @@ where
                 .get()
                 .expect("Ping should be initialized at this point")
                 .clone(),
-            core_network::heartbeat::HeartbeatExternalInteractions::new(network.clone()),
+            core_network::heartbeat::HeartbeatExternalInteractions::new(self.network.clone()),
             Box::new(|dur| Box::pin(sleep(dur))),
         );
 
@@ -407,7 +406,7 @@ where
         let msg_sender = helpers::MessageSender::new(self.process_packet_send.clone(), self.path_planner.clone());
 
         self.smgr
-            .start(msg_sender, new_session_notifier)
+            .start(msg_sender, on_incoming_session)
             .expect("failed to start session manager")
             .into_iter()
             .enumerate()

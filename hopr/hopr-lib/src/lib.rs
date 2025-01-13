@@ -259,7 +259,7 @@ where
         async move {
 
         let resolved = indexer_action_tracker.match_and_resolve(&event).await;
-        debug!("resolved {} indexer expectations in {event}", resolved.len());
+        debug!(count = resolved.len(), event = %event, "resolved indexer expectations", );
 
         match event.event_type {
                 ChainEventType::Announcement{peer, address, multiaddresses} => {
@@ -274,7 +274,7 @@ where
                         if ! mas.is_empty() {
                             if let Err(e) = network.add(&peer, PeerOrigin::NetworkRegistry, mas.clone()).await
                             {
-                                error!("failed to record '{peer}' from the NetworkRegistry: {e}");
+                                error!(%peer, %error, "failed to record peer from the NetworkRegistry");
                             }
 
                             if db
@@ -288,7 +288,7 @@ where
                             }
                         } else { None }
                     } else {
-                        debug!("Skipping announcements for myself ({peer})");
+                        debug!("Skipping announcements for myself");
                         None
                     }
                 }
@@ -345,12 +345,12 @@ where
                                 match allowed {
                                     chain_types::chain_events::NetworkRegistryStatus::Allowed => {
                                         if let Err(e) = network.add(&peer_id, PeerOrigin::NetworkRegistry, vec![]).await {
-                                            error!(peer = %peer_id, error = %e, "failed to allow locally (already allowed on-chain)")
+                                            error!(peer = %peer_id, error = %e, "Failed to allow locally (already allowed on-chain)")
                                         }
                                     },
                                     chain_types::chain_events::NetworkRegistryStatus::Denied => {
                                         if let Err(e) = network.remove(&peer_id).await {
-                                            error!(peer = %peer_id, error = %e, "failed to ban locally (already banned on-chain)")
+                                            error!(peer = %peer_id, error = %e, "Failed to ban locally (already banned on-chain)")
                                         }
                                     },
                                 };
@@ -363,13 +363,13 @@ where
 
                         }
                         Err(e) => {
-                            error!(error = %e, "on_network_registry_node_allowed failed with");
+                            error!(error = %e, "on_network_registry_node_allowed failed");
                             None
                         },
                     }
                 }
                 ChainEventType::NodeSafeRegistered(safe_address) =>  {
-                    info!(%safe_address, "node safe registered");
+                    info!(%safe_address, "Node safe registered");
                     None
                 }
             }
@@ -386,7 +386,7 @@ where
                     PeerEligibility::Eligible => Some(vec![PeerDiscovery::Allow(peer)]),
                     PeerEligibility::Ineligible => {
                         if let Err(e) = network.remove(&peer).await {
-                            error!(%peer, error = %e, "failed to remove peer from the local registry")
+                            error!(%peer, error = %e, "Failed to remove peer from the local registry")
                         }
                         Some(vec![PeerDiscovery::Ban(peer)])
                     }
@@ -586,7 +586,7 @@ impl Hopr {
 
             // Calling get_ticket_statistics will initialize the respective metrics on tickets
             if let Err(e) = futures::executor::block_on(db.get_ticket_statistics(None)) {
-                error!(error = %e,"failed to initialize ticket statistics metrics");
+                error!(error = %e, "Failed to initialize ticket statistics metrics");
             }
         }
 
@@ -800,10 +800,11 @@ impl Hopr {
         }
         // TODO: wait here for the confirmation that the node is allowed in the registry
 
+        // TODO(20250113): move this to the transport initialization
         info!("Loading initial peers from the storage");
         for (peer, _address, multiaddresses) in self.transport_api.get_public_nodes().await? {
             if self.is_allowed_to_access_network(&peer).await? {
-                debug!("Using initial public node '{peer}' with '{:?}'", multiaddresses);
+                debug!(%peer, ?multiaddresses, "Using initial public node");
                 if let Err(e) = to_process_tx
                     .send(IndexerTransportEvent::EligibilityUpdate(
                         peer,
@@ -811,14 +812,14 @@ impl Hopr {
                     ))
                     .await
                 {
-                    error!(error = %e,"Failed to send index update event to transport");
+                    error!(error = %e, "Failed to send index update event (eligibility) to transport");
                 }
 
                 if let Err(e) = to_process_tx
                     .send(IndexerTransportEvent::Announce(peer, multiaddresses.clone()))
                     .await
                 {
-                    error!(error = %e, "Failed to send index update event to transport");
+                    error!(error = %e, "Failed to send index update event (announce) to transport");
                 }
 
                 // Self-reference is not needed in the network storage
@@ -910,14 +911,14 @@ impl Hopr {
                 .announce(&multiaddresses_to_announce, &self.me)
                 .await
             {
-                Ok(_) => info!("Announcing node on chain: {:?}", multiaddresses_to_announce),
+                Ok(_) => info!(?multiaddresses_to_announce, "Announcing node on chain",),
                 Err(ChainActionsError::AlreadyAnnounced) => {
-                    info!("Node already announced on chain as {:?}", multiaddresses_to_announce)
+                    info!(multiaddresses_announced = ?multiaddresses_to_announce, "Node already announced on chain", )
                 }
                 // If the announcement fails, we keep going to prevent the node from retrying
                 // after restart.
                 // Functionality is limited, and users must check the logs for errors.
-                Err(e) => error!(error = %e, "Failed to transmit node announcement: {e}"),
+                Err(e) => error!(error = %e, "Failed to transmit node announcement"),
             }
         }
 
@@ -937,7 +938,7 @@ impl Hopr {
                     Ok(channel) => {
                         cg.update_channel(channel);
                     }
-                    Err(error) => error!(%error, "failed to sync channel into the graph"),
+                    Err(error) => error!(%error, "Failed to sync channel into the graph"),
                 }
             }
 
@@ -953,14 +954,14 @@ impl Hopr {
                 if let Some(ChainKey(key)) = self.db.translate_key(None, peer.id.0).await? {
                     cg.update_node_quality(&key, peer.get_quality());
                 } else {
-                    error!(peer = %peer.id.1, "could not translate peer info:");
+                    error!(peer = %peer.id.1, "Could not translate peer information");
                 }
             }
 
             info!(
                 channels = cg.count_channels(),
                 nodes = cg.count_nodes(),
-                "channel graph sync complete"
+                "Channel graph sync complete"
             );
         }
 
@@ -981,7 +982,7 @@ impl Hopr {
                     )
                     .await
                     {
-                        error!(%error, "failed to process acknowledged winning ticket with the strategy");
+                        error!(%error, "Failed to process acknowledged winning ticket with the strategy");
                     }
                 }
             }),
@@ -1000,12 +1001,12 @@ impl Hopr {
                         match serve_handler.process(session).await {
                             Ok(_) => debug!(
                                 session_id = ?session_id,
-                                "client session processed successfully"
+                                "Client session processed successfully"
                             ),
                             Err(e) => error!(
                                 session_id = ?session_id,
                                 error = %e,
-                                "client session processing failed"
+                                "Client session processing failed"
                             ),
                         }
                     }
@@ -1017,7 +1018,6 @@ impl Hopr {
             .transport_api
             .run(
                 String::from(constants::APP_VERSION),
-                self.transport_api.network(),
                 join(&[&self.cfg.db.data, "tbf"]).map_err(|e| {
                     errors::HoprLibError::GeneralError(format!("Failed to construct the bloom filter: {e}"))
                 })?,
@@ -1040,8 +1040,8 @@ impl Hopr {
                     let db_clone = db_clone.clone();
                     async move {
                         match db_clone.persist_outgoing_ticket_indices().await {
-                            Ok(n) => debug!(count = n, "successfully flushed states of outgoing ticket indices"),
-                            Err(e) => error!(error = %e, "failed to flush ticket indices"),
+                            Ok(n) => debug!(count = n, "Successfully flushed states of outgoing ticket indices"),
+                            Err(e) => error!(error = %e, "Failed to flush ticket indices"),
                         }
                     }
                 },
