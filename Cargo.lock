@@ -4507,12 +4507,14 @@ dependencies = [
  "hopr-network-types",
  "hopr-platform",
  "hopr-primitive-types",
+ "hopr-transport-identity",
  "hopr-transport-p2p",
  "hopr-transport-protocol",
  "hopr-transport-session",
  "lazy_static",
- "libp2p",
+ "libp2p-identity",
  "moka",
+ "multiaddr",
  "proc-macro-regex",
  "rust-stream-ext-concurrent",
  "serde",
@@ -4522,6 +4524,16 @@ dependencies = [
  "tracing",
  "uuid 1.11.0",
  "validator",
+]
+
+[[package]]
+name = "hopr-transport-identity"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "libp2p-identity",
+ "multiaddr",
+ "thiserror",
 ]
 
 [[package]]
@@ -4536,6 +4548,7 @@ dependencies = [
  "hopr-crypto-types",
  "hopr-internal-types",
  "hopr-metrics",
+ "hopr-transport-identity",
  "hopr-transport-protocol",
  "lazy_static",
  "libp2p",

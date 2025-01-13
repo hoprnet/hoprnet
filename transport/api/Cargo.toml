@@ -46,8 +46,9 @@ async-trait = { workspace = true }
 async-lock = { workspace = true }
 futures = { workspace = true }
 lazy_static = { workspace = true }
-libp2p = { workspace = true, features = ["request-response"] }
+libp2p-identity = { workspace = true }
 moka = { workspace = true }
+multiaddr = { workspace = true }
 proc-macro-regex = { workspace = true }
 rust-stream-ext-concurrent = { workspace = true }
 serde = { workspace = true }
@@ -70,6 +71,7 @@ hopr-metrics = { workspace = true, optional = true }
 hopr-platform = { workspace = true }
 hopr-primitive-types = { workspace = true }
 hopr-network-types = { workspace = true, features = ["serde"] }
+hopr-transport-identity = { workspace = true }
 hopr-transport-p2p = { workspace = true }
 hopr-transport-protocol = { workspace = true }
 hopr-transport-session = { workspace = true }

@@ -1,5 +1,6 @@
 use async_lock::RwLock;
-use libp2p::{Multiaddr, PeerId};
+use libp2p_identity::PeerId;
+use multiaddr::Multiaddr;
 use std::sync::{Arc, OnceLock};
 use tracing::trace;
 

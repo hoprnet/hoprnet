@@ -44,6 +44,7 @@ core-network = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-internal-types = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
+hopr-transport-identity = { workspace = true }
 hopr-transport-protocol = { workspace = true }
 
 [dev-dependencies]

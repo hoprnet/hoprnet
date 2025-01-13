@@ -28,7 +28,6 @@ use futures::{
     future::{select, Either},
     pin_mut, FutureExt, StreamExt,
 };
-
 use std::time::Duration;
 use std::{
     collections::HashMap,
@@ -39,9 +38,9 @@ use tracing::{error, info, trace, warn};
 use core_network::{
     heartbeat::Heartbeat,
     ping::{PingConfig, PingQueryReplier, Pinger, Pinging},
-    PeerId,
 };
 use core_path::path::TransportPath;
+use core_path::selectors::dfs::DfsPathSelectorConfig;
 use hopr_async_runtime::prelude::{sleep, spawn, JoinHandle};
 use hopr_db_sql::{
     api::tickets::{AggregationPrerequisites, HoprDbTicketOperations},
@@ -63,14 +62,6 @@ use hopr_transport_protocol::{
 };
 use hopr_transport_session::{DispatchResult, SessionManager, SessionManagerConfig};
 
-use crate::{
-    constants::{RESERVED_SESSION_TAG_UPPER_LIMIT, RESERVED_SUBPROTOCOL_TAG_UPPER_LIMIT},
-    errors::HoprTransportError,
-};
-
-use crate::helpers::PathPlanner;
-
-use core_path::selectors::dfs::DfsPathSelectorConfig;
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_transport_session::types::transfer_session;
 pub use {
@@ -80,21 +71,26 @@ pub use {
         types::{HalfKeyChallenge, Hash, OffchainPublicKey},
     },
     hopr_internal_types::protocol::ApplicationData,
-    hopr_transport_p2p::{
-        libp2p, libp2p::swarm::derive_prelude::Multiaddr, multiaddrs::strip_p2p_protocol,
-        swarm::HoprSwarmWithProcessors, PeerDiscovery,
-    },
+    hopr_network_types::prelude::RoutingOptions,
+    hopr_transport_identity::{multiaddrs::strip_p2p_protocol, Multiaddr, PeerId},
+    hopr_transport_p2p::{swarm::HoprSwarmWithProcessors, PeerDiscovery},
     hopr_transport_protocol::execute_on_tick,
+    hopr_transport_session::types::{ServiceId, SessionTarget},
     hopr_transport_session::{
         errors::TransportSessionError, traits::SendMsg, Capability as SessionCapability, IncomingSession, Session,
         SessionClientConfig, SessionId, SESSION_USABLE_MTU_SIZE,
     },
 };
 
-use crate::constants::SESSION_INITIATION_TIMEOUT_BASE;
+use crate::{
+    constants::{
+        RESERVED_SESSION_TAG_UPPER_LIMIT, RESERVED_SUBPROTOCOL_TAG_UPPER_LIMIT, SESSION_INITIATION_TIMEOUT_BASE,
+    },
+    errors::HoprTransportError,
+    helpers::PathPlanner,
+};
+
 pub use crate::helpers::{IndexerTransportEvent, PeerEligibility, TicketStatistics};
-pub use hopr_network_types::prelude::RoutingOptions;
-pub use hopr_transport_session::types::{ServiceId, SessionTarget};
 
 /*#[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -671,16 +667,17 @@ where
             .local_multiaddresses()
             .into_iter()
             .filter(|ma| {
-                hopr_transport_p2p::multiaddrs::is_supported(ma)
-                    && (self.cfg.transport.announce_local_addresses || !hopr_transport_p2p::multiaddrs::is_private(ma))
+                hopr_transport_identity::multiaddrs::is_supported(ma)
+                    && (self.cfg.transport.announce_local_addresses
+                        || !hopr_transport_identity::multiaddrs::is_private(ma))
             })
             .map(|ma| strip_p2p_protocol(&ma))
             .filter(|v| !v.is_empty())
             .collect::<Vec<_>>();
 
         mas.sort_by(|l, r| {
-            let is_left_dns = hopr_transport_p2p::multiaddrs::is_dns(l);
-            let is_right_dns = hopr_transport_p2p::multiaddrs::is_dns(r);
+            let is_left_dns = hopr_transport_identity::multiaddrs::is_dns(l);
+            let is_right_dns = hopr_transport_identity::multiaddrs::is_dns(r);
 
             if !(is_left_dns ^ is_right_dns) {
                 std::cmp::Ordering::Equal

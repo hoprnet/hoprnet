@@ -6,6 +6,7 @@ use tracing::{debug, error, info, trace, warn};
 
 use core_network::{messaging::ControlMessage, network::NetworkTriggeredEvent, ping::PingQueryReplier};
 use hopr_internal_types::prelude::*;
+use hopr_transport_identity::multiaddrs::{replace_transport_with_unspecified, resolve_dns_if_any, Multiaddr};
 use hopr_transport_protocol::{
     config::ProtocolConfig,
     ticket_aggregation::processor::{
@@ -17,7 +18,6 @@ use crate::{
     constants,
     errors::Result,
     libp2p::{request_response::ResponseChannel, swarm::SwarmEvent},
-    multiaddrs::{replace_transport_with_unspecified, resolve_dns_if_any, Multiaddr},
     HoprNetworkBehavior, HoprNetworkBehaviorEvent, PeerDiscovery, Ping, Pong,
 };
 
