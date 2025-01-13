@@ -59,7 +59,7 @@ use hopr_db_sql::{
     api::{info::SafeInfo, resolver::HoprDbResolverOperations, tickets::HoprDbTicketOperations},
     channels::HoprDbChannelOperations,
     db::{HoprDb, HoprDbConfig},
-    info::HoprDbInfoOperations,
+    info::{HoprDbInfoOperations, IndexerStateInfo},
     prelude::{ChainOrPacketKey::ChainKey, DbSqlError, HoprDbPeersOperations},
     HoprDbAllOperations, HoprDbGeneralModelOperations,
 };
@@ -1084,8 +1084,23 @@ impl Hopr {
     }
 
     /// Returns the most recently indexed log, if any.
-    pub async fn get_indexer_state(&self) -> errors::Result<Option<SerializableLog>> {
-        Ok(self.db.get_last_checksummed_log().await?)
+    pub async fn get_indexer_state(&self) -> errors::Result<IndexerStateInfo> {
+        let indexer_state_info = self.db.get_indexer_state_info(None).await?;
+
+        match self.db.get_last_checksummed_log().await? {
+            Some(log) => {
+                let checksum = match log.checksum {
+                    Some(checksum) => Hash::from_hex(checksum.as_str())?,
+                    None => Hash::default(),
+                };
+                Ok(IndexerStateInfo {
+                    latest_log_block_number: log.block_number as u32,
+                    latest_log_checksum: checksum,
+                    ..indexer_state_info
+                })
+            }
+            None => Ok(indexer_state_info),
+        }
     }
 
     /// Test whether the peer with PeerId is allowed to access the network

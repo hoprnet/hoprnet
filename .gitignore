@@ -33,7 +33,7 @@ logs.txt
 /.secrets
 
 *.id
-!/tests/identities/*.id
+!/sdk/identities/*.id
 
 # local foundry installation
 /.foundry/
@@ -205,9 +205,6 @@ vendor/cargo/.DS_Store
 # technical docs
 /docs/*/.structurizr
 /docs/*/workspace.json
-
-# generated SDK
-/hoprd-sdk-python/
 
 # nix generated files
 /result
