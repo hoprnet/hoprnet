@@ -46,9 +46,7 @@ async-trait = { workspace = true }
 async-lock = { workspace = true }
 futures = { workspace = true }
 lazy_static = { workspace = true }
-libp2p-identity = { workspace = true }
 moka = { workspace = true }
-multiaddr = { workspace = true }
 proc-macro-regex = { workspace = true }
 rust-stream-ext-concurrent = { workspace = true }
 serde = { workspace = true }

@@ -73,8 +73,7 @@ pub use {
     hopr_internal_types::protocol::ApplicationData,
     hopr_network_types::prelude::RoutingOptions,
     hopr_transport_identity::{multiaddrs::strip_p2p_protocol, Multiaddr, PeerId},
-    hopr_transport_p2p::{swarm::HoprSwarmWithProcessors, PeerDiscovery},
-    hopr_transport_protocol::execute_on_tick,
+    hopr_transport_protocol::{execute_on_tick, PeerDiscovery},
     hopr_transport_session::types::{ServiceId, SessionTarget},
     hopr_transport_session::{
         errors::TransportSessionError, traits::SendMsg, Capability as SessionCapability, IncomingSession, Session,
@@ -355,7 +354,7 @@ where
             Box::new(|dur| Box::pin(sleep(dur))),
         );
 
-        // initiate the libp2p transport layer
+        // initiate the transport layer
         let (ack_to_send_tx, ack_to_send_rx) = futures::channel::mpsc::unbounded::<(PeerId, Acknowledgement)>();
         let (ack_received_tx, ack_received_rx) = futures::channel::mpsc::unbounded::<(PeerId, Acknowledgement)>();
 

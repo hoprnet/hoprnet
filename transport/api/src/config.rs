@@ -1,4 +1,3 @@
-use multiaddr::Multiaddr;
 use proc_macro_regex::regex;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
@@ -10,6 +9,7 @@ use std::time::Duration;
 use validator::{Validate, ValidationError};
 
 pub use core_network::{config::NetworkConfig, heartbeat::HeartbeatConfig};
+use hopr_transport_identity::Multiaddr;
 pub use hopr_transport_protocol::config::ProtocolConfig;
 
 use crate::errors::HoprTransportError;

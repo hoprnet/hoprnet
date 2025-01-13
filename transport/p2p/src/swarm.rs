@@ -1,25 +1,25 @@
 use futures::{pin_mut, select, StreamExt};
 use futures_concurrency::stream::Merge;
-use libp2p::{request_response::OutboundRequestId, PeerId};
+use libp2p::{request_response::OutboundRequestId, request_response::ResponseChannel, swarm::SwarmEvent};
+
 use std::{num::NonZeroU8, sync::Arc};
 use tracing::{debug, error, info, trace, warn};
 
 use core_network::{messaging::ControlMessage, network::NetworkTriggeredEvent, ping::PingQueryReplier};
 use hopr_internal_types::prelude::*;
-use hopr_transport_identity::multiaddrs::{replace_transport_with_unspecified, resolve_dns_if_any, Multiaddr};
+use hopr_transport_identity::{
+    multiaddrs::{replace_transport_with_unspecified, resolve_dns_if_any},
+    Multiaddr, PeerId,
+};
 use hopr_transport_protocol::{
     config::ProtocolConfig,
     ticket_aggregation::processor::{
         TicketAggregationActions, TicketAggregationFinalizer, TicketAggregationInteraction, TicketAggregationProcessed,
     },
+    PeerDiscovery,
 };
 
-use crate::{
-    constants,
-    errors::Result,
-    libp2p::{request_response::ResponseChannel, swarm::SwarmEvent},
-    HoprNetworkBehavior, HoprNetworkBehaviorEvent, PeerDiscovery, Ping, Pong,
-};
+use crate::{constants, errors::Result, HoprNetworkBehavior, HoprNetworkBehaviorEvent, Ping, Pong};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleGauge;

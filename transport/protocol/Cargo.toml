@@ -20,7 +20,6 @@ async-lock = { workspace = true }
 futures = { workspace = true }
 hex-literal = { workspace = true }
 lazy_static = { workspace = true }
-libp2p-identity = { workspace = true }
 libp2p = { workspace = true, features = ["noise", "request-response"] }
 rust-stream-ext-concurrent = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
@@ -30,6 +29,7 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 validator = { workspace = true }
 
+hopr-async-runtime = { workspace = true }
 hopr-crypto-random = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-crypto-packet = { workspace = true }
@@ -39,7 +39,7 @@ hopr-metrics = { optional = true, workspace = true }
 hopr-platform = { workspace = true }
 hopr-internal-types = { workspace = true }
 hopr-primitive-types = { workspace = true }
-hopr-async-runtime = { workspace = true }
+hopr-transport-identity = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }

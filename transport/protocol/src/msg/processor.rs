@@ -2,7 +2,7 @@ use futures::pin_mut;
 use futures::{future::Either, SinkExt};
 use hopr_crypto_packet::errors::PacketError;
 use hopr_db_api::protocol::TransportPacketWithChainData;
-use libp2p_identity::PeerId;
+use hopr_transport_identity::PeerId;
 use tracing::error;
 
 use core_path::path::{Path, TransportPath};

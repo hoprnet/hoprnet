@@ -61,13 +61,13 @@ pub mod msg;
 pub mod ticket_aggregation;
 
 pub mod timer;
+use hopr_transport_identity::Multiaddr;
 pub use timer::execute_on_tick;
 
 pub use msg::processor::DEFAULT_PRICE_PER_PACKET;
 
 use core_path::path::TransportPath;
 use futures::{SinkExt, StreamExt};
-use libp2p::PeerId;
 use msg::processor::{PacketSendFinalizer, PacketUnwrapping, PacketWrapping};
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use std::collections::HashMap;
@@ -77,6 +77,7 @@ use hopr_async_runtime::prelude::{sleep, spawn};
 use hopr_crypto_types::prelude::*;
 use hopr_db_api::protocol::HoprDbProtocolOperations;
 use hopr_internal_types::protocol::{Acknowledgement, ApplicationData};
+use hopr_transport_identity::PeerId;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::{MultiCounter, SimpleCounter, SimpleGauge};
@@ -119,6 +120,14 @@ lazy_static::lazy_static! {
         "Average mixer packet delay averaged over a packet window"
     )
     .unwrap();
+}
+
+/// Processed indexer generated events.
+#[derive(Debug)]
+pub enum PeerDiscovery {
+    Allow(PeerId),
+    Ban(PeerId),
+    Announce(PeerId, Vec<Multiaddr>),
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
