@@ -319,17 +319,6 @@ where
         let ticket_agg_proc = TicketAggregationInteraction::new(self.db.clone(), &self.me_onchain);
         let tkt_agg_writer = ticket_agg_proc.writer();
 
-        let transport_layer = HoprSwarm::new(
-            (&self.me).into(),
-            network_events_rx,
-            transport_updates,
-            ping_rx,
-            ticket_agg_proc,
-            self.my_multiaddresses.clone(),
-            self.cfg.protocol,
-        )
-        .await;
-
         let (external_msg_send, external_msg_rx) =
             futures::channel::mpsc::unbounded::<(ApplicationData, TransportPath, PacketSendFinalizer)>();
 
@@ -360,6 +349,17 @@ where
 
         let (msg_to_send_tx, msg_to_send_rx) = futures::channel::mpsc::unbounded::<(PeerId, Box<[u8]>)>();
         let (msg_received_tx, msg_received_rx) = futures::channel::mpsc::unbounded::<(PeerId, Box<[u8]>)>();
+
+        let transport_layer = HoprSwarm::new(
+            (&self.me).into(),
+            network_events_rx,
+            transport_updates,
+            ping_rx,
+            ticket_agg_proc,
+            self.my_multiaddresses.clone(),
+            self.cfg.protocol,
+        )
+        .await;
 
         let transport_layer = transport_layer.with_processors(
             ack_to_send_rx,
