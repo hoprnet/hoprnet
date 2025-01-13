@@ -232,31 +232,21 @@ impl<T> Stream for Receiver<T> {
                 trace!("reseting the timer");
                 channel.timer.reset(remaining);
 
-                // let timer = std::pin::pin!(&mut channel.timer);
-                // let res = timer.poll(cx);
-                let res = channel.timer.poll_unpin(cx);
+                futures::ready!(channel.timer.poll_unpin(cx));
 
-                return match res {
-                    Poll::Ready(_) => {
-                        trace!(from = "timer", "yield item");
+                trace!(from = "timer", "yield item");
 
-                        #[cfg(all(feature = "prometheus", not(test)))]
-                        METRIC_QUEUE_SIZE.decrement(1.0f64);
+                #[cfg(all(feature = "prometheus", not(test)))]
+                METRIC_QUEUE_SIZE.decrement(1.0f64);
 
-                        Poll::Ready(Some(
-                            channel
-                                .buffer
-                                .pop()
-                                .expect("The value should be present within the locked access")
-                                .0
-                                .item,
-                        ))
-                    }
-                    Poll::Pending => {
-                        trace!(from = "timer", "pending");
-                        Poll::Pending
-                    }
-                };
+                return Poll::Ready(Some(
+                    channel
+                        .buffer
+                        .pop()
+                        .expect("The value should be present within the locked access")
+                        .0
+                        .item,
+                ));
             }
 
             trace!(from = "direct", "pending");
