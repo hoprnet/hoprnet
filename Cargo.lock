@@ -4518,6 +4518,7 @@ dependencies = [
  "serde",
  "serde_with",
  "smart-default",
+ "strum",
  "thiserror",
  "tracing",
  "uuid 1.11.0",

@@ -118,15 +118,23 @@ lazy_static::lazy_static! {
     ).unwrap();
 }*/
 
-#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, strum::Display)]
 pub enum HoprTransportProcess {
-    Heartbeat,
-    Swarm,
+    #[strum(to_string = "component responsible for the transport medium (libp2p swarm)")]
+    Medium,
+    #[strum(to_string = "HOPR protocol processing: ack ingress")]
     ProtocolAckIn,
+    #[strum(to_string = "HOPR protocol processing: ack egress")]
     ProtocolAckOut,
+    #[strum(to_string = "HOPR protocol processing: msg ingress")]
     ProtocolMsgIn,
+    #[strum(to_string = "HOPR protocol processing: msg egress")]
     ProtocolMsgOut,
+    #[strum(to_string = "session manager sub-process #{0}")]
     SessionsManagement(usize),
+    #[strum(to_string = "heartbeat component responsible for maintaining the network quality measurements")]
+    Heartbeat,
+    #[strum(to_string = "save operation for the bloom filter")]
     BloomFilterSave,
 }
 
@@ -475,7 +483,7 @@ where
             tkt_agg_writer,
         );
 
-        processes.insert(HoprTransportProcess::Swarm, spawn(transport_layer.run(version)));
+        processes.insert(HoprTransportProcess::Medium, spawn(transport_layer.run(version)));
 
         // initiate the msg-ack protocol stack over the wire transport
         let packet_cfg = PacketInteractionConfig::new(
