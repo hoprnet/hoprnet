@@ -21,6 +21,8 @@ pub mod constants;
 pub mod errors;
 pub mod helpers;
 pub mod network_notifier;
+/// Objects used and possibly exported by the crate for re-use for transport functionality
+pub mod proxy;
 
 use async_lock::RwLock;
 use futures::{
@@ -40,13 +42,12 @@ use core_network::{
     heartbeat::Heartbeat,
     ping::{PingConfig, PingQueryReplier, Pinger, Pinging},
 };
-use core_path::path::TransportPath;
-use core_path::selectors::dfs::DfsPathSelectorConfig;
-use hopr_async_runtime::prelude::{sleep, spawn, JoinHandle};
-use hopr_db_sql::{
-    api::tickets::{AggregationPrerequisites, HoprDbTicketOperations},
-    HoprDbAllOperations,
+use core_path::{
+    path::TransportPath,
+    selectors::dfs::DfsPathSelectorConfig
 };
+use hopr_async_runtime::prelude::{sleep, spawn, JoinHandle};
+use hopr_db_sql::HoprDbAllOperations;
 use hopr_internal_types::prelude::*;
 use hopr_platform::time::native::current_time;
 use hopr_primitive_types::prelude::*;
@@ -58,7 +59,7 @@ use hopr_transport_protocol::{
     errors::ProtocolError,
     msg::processor::{MsgSender, PacketInteractionConfig, PacketSendFinalizer},
     ticket_aggregation::processor::{
-        AwaitingAggregator, TicketAggregationActions, TicketAggregationInteraction, TicketAggregatorTrait,
+        TicketAggregationActions, TicketAggregationInteraction, TicketAggregatorTrait,
     },
 };
 use hopr_transport_session::{DispatchResult, SessionManager, SessionManagerConfig};
@@ -90,33 +91,15 @@ use crate::{
     helpers::PathPlanner,
 };
 
-pub use crate::helpers::{PeerEligibility, TicketStatistics};
+pub use crate::{
+    config::HoprTransportConfig,
+    helpers::{PeerEligibility, TicketStatistics}
+};
 
-/*#[cfg(all(feature = "prometheus", not(test)))]
+// Needs lazy-static, since Duration multiplication by a constant is yet not a const-operation.
 lazy_static::lazy_static! {
-    static ref METRIC_ACTIVE_SESSIONS: hopr_metrics::SimpleGauge = hopr_metrics::SimpleGauge::new(
-        "hopr_session_num_active_session",
-        "Number of currently active HOPR sessions"
-    ).unwrap();
-    static ref METRIC_NUM_ESTABLISHED_SESSIONS: hopr_metrics::SimpleCounter = hopr_metrics::SimpleCounter::new(
-        "hopr_session_established_sessions",
-        "Number of sessions that were successfully established as an Exit node"
-    ).unwrap();
-    static ref METRIC_NUM_INITIATED_SESSIONS: hopr_metrics::SimpleCounter = hopr_metrics::SimpleCounter::new(
-        "hopr_session_initiated_sessions",
-        "Number of sessions that were successfully initiated as an Entry node"
-    ).unwrap();
-    static ref METRIC_RECEIVED_SESSION_ERRS: hopr_metrics::MultiCounter = hopr_metrics::MultiCounter::new(
-        "hopr_session_received_error_counts",
-        "Number of HOPR session errors received from an Exit node",
-        &["kind"]
-    ).unwrap();
-    static ref METRIC_SENT_SESSION_ERRS: hopr_metrics::MultiCounter = hopr_metrics::MultiCounter::new(
-        "hopr_session_sent_error_counts",
-        "Number of HOPR session errors sent to an Entry node",
-        &["kind"]
-    ).unwrap();
-}*/
+    static ref SESSION_INITIATION_TIMEOUT_MAX: std::time::Duration = 2 * constants::SESSION_INITIATION_TIMEOUT_BASE * RoutingOptions::MAX_INTERMEDIATE_HOPS as u32;
+}
 
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, strum::Display)]
 pub enum HoprTransportProcess {
@@ -132,69 +115,10 @@ pub enum HoprTransportProcess {
     ProtocolMsgOut,
     #[strum(to_string = "session manager sub-process #{0}")]
     SessionsManagement(usize),
-    #[strum(to_string = "heartbeat component responsible for maintaining the network quality measurements")]
+    #[strum(to_string = "heartbeat performing the network quality measurements")]
     Heartbeat,
-    #[strum(to_string = "save operation for the bloom filter")]
+    #[strum(to_string = "periodic bloom filter save")]
     BloomFilterSave,
-}
-
-#[derive(Debug, Clone)]
-pub struct TicketAggregatorProxy<Db>
-where
-    Db: HoprDbTicketOperations + Send + Sync + Clone + std::fmt::Debug,
-{
-    db: Db,
-    maybe_writer: Arc<OnceLock<TicketAggregationActions<TicketAggregationResponseType, TicketAggregationRequestType>>>,
-    agg_timeout: std::time::Duration,
-}
-
-impl<Db> TicketAggregatorProxy<Db>
-where
-    Db: HoprDbTicketOperations + Send + Sync + Clone + std::fmt::Debug,
-{
-    pub fn new(
-        db: Db,
-        maybe_writer: Arc<
-            OnceLock<TicketAggregationActions<TicketAggregationResponseType, TicketAggregationRequestType>>,
-        >,
-        agg_timeout: std::time::Duration,
-    ) -> Self {
-        Self {
-            db,
-            maybe_writer,
-            agg_timeout,
-        }
-    }
-}
-
-#[async_trait::async_trait]
-impl<Db> TicketAggregatorTrait for TicketAggregatorProxy<Db>
-where
-    Db: HoprDbTicketOperations + Send + Sync + Clone + std::fmt::Debug,
-{
-    async fn aggregate_tickets(
-        &self,
-        channel: &Hash,
-        prerequisites: AggregationPrerequisites,
-    ) -> hopr_transport_protocol::errors::Result<()> {
-        if let Some(writer) = self.maybe_writer.clone().get() {
-            AwaitingAggregator::new(self.db.clone(), writer.clone(), self.agg_timeout)
-                .aggregate_tickets(channel, prerequisites)
-                .await
-        } else {
-            Err(ProtocolError::TransportError(
-                "Ticket aggregation writer not available, the object was not yet initialized".to_string(),
-            ))
-        }
-    }
-}
-
-pub struct HoprTransportConfig {
-    pub transport: config::TransportConfig,
-    pub network: core_network::config::NetworkConfig,
-    pub protocol: hopr_transport_protocol::config::ProtocolConfig,
-    pub heartbeat: core_network::heartbeat::HeartbeatConfig,
-    pub session: config::SessionGlobalConfig,
 }
 
 /// Interface into the physical transport mechanism allowing all off-chain HOPR-related tasks on
@@ -216,11 +140,6 @@ where
     process_ticket_aggregate:
         Arc<OnceLock<TicketAggregationActions<TicketAggregationResponseType, TicketAggregationRequestType>>>,
     smgr: SessionManager<helpers::MessageSender<T>>,
-}
-
-// Needs lazy-static, since Duration multiplication by a constant is yet not a const-operation.
-lazy_static::lazy_static! {
-    static ref SESSION_INITIATION_TIMEOUT_MAX: std::time::Duration = 2 * constants::SESSION_INITIATION_TIMEOUT_BASE * RoutingOptions::MAX_INTERMEDIATE_HOPS as u32;
 }
 
 impl<T> HoprTransport<T>
@@ -574,7 +493,7 @@ where
     }
 
     pub fn ticket_aggregator(&self) -> Arc<dyn TicketAggregatorTrait + Send + Sync + 'static> {
-        Arc::new(TicketAggregatorProxy::new(
+        Arc::new(proxy::TicketAggregatorProxy::new(
             self.db.clone(),
             self.process_ticket_aggregate.clone(),
             self.cfg.protocol.ticket_aggregation.timeout,
@@ -705,7 +624,7 @@ where
             return Err(ProtocolError::ChannelClosed.into());
         }
 
-        Ok(Arc::new(TicketAggregatorProxy::new(
+        Ok(Arc::new(proxy::TicketAggregatorProxy::new(
             self.db.clone(),
             self.process_ticket_aggregate.clone(),
             self.cfg.protocol.ticket_aggregation.timeout,

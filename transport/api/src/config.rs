@@ -14,6 +14,14 @@ pub use hopr_transport_protocol::config::ProtocolConfig;
 
 use crate::errors::HoprTransportError;
 
+pub struct HoprTransportConfig {
+    pub transport: TransportConfig,
+    pub network: core_network::config::NetworkConfig,
+    pub protocol: hopr_transport_protocol::config::ProtocolConfig,
+    pub heartbeat: core_network::heartbeat::HeartbeatConfig,
+    pub session: SessionGlobalConfig,
+}
+
 regex!(is_dns_address_regex "^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)*[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$");
 
 /// Check whether the string looks like a valid domain.
