@@ -13,7 +13,7 @@ on:
   pull_request:
     types:
       - closed
-      # - synchronize
+      - synchronize
 
 concurrency:
   group: merge
@@ -23,78 +23,78 @@ permissions:
   contents: write
 
 jobs:
-  cleanup_actions:
-    name: Cleanup Actions
-    runs-on: self-hosted-hoprnet-small
-    steps:
-      - name: Checkout hoprnet repository
-        uses: actions/checkout@v4
+  # cleanup_actions:
+  #   name: Cleanup Actions
+  #   runs-on: self-hosted-hoprnet-small
+  #   steps:
+  #     - name: Checkout hoprnet repository
+  #       uses: actions/checkout@v4
 
-      - name: Cleanup
-        run: |
-          gh extension install actions/gh-actions-cache
+  #     - name: Cleanup
+  #       run: |
+  #         gh extension install actions/gh-actions-cache
 
-          REPO=${{ github.repository }}
-          BRANCH="refs/pull/${{ github.event.pull_request.number }}/merge"
+  #         REPO=${{ github.repository }}
+  #         BRANCH="refs/pull/${{ github.event.pull_request.number }}/merge"
 
-          echo "Fetching list of cache key"
-          cacheKeysForPR=$(gh actions-cache list -R $REPO -B $BRANCH | cut -f 1 )
+  #         echo "Fetching list of cache key"
+  #         cacheKeysForPR=$(gh actions-cache list -R $REPO -B $BRANCH | cut -f 1 )
 
-          ## Setting this to not fail the workflow while deleting cache keys.
-          set +e
-          echo "Deleting caches..."
-          for cacheKey in $cacheKeysForPR
-          do
-            gh actions-cache delete $cacheKey -R $REPO -B $BRANCH --confirm
-          done
-          echo "Done"
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  #         ## Setting this to not fail the workflow while deleting cache keys.
+  #         set +e
+  #         echo "Deleting caches..."
+  #         for cacheKey in $cacheKeysForPR
+  #         do
+  #           gh actions-cache delete $cacheKey -R $REPO -B $BRANCH --confirm
+  #         done
+  #         echo "Done"
+  #       env:
+  #         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: "Undeploy PR deployment"
-        if: contains(github.event.pull_request.labels.*.name, 'deploy_nodes')
-        # Remove the deploy_nodes label to indicate that the PR deployment has been cleaned up
-        run: |
-          gh pr edit ${{ github.event.pull_request.number }} --remove-label "deploy_nodes"
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  #     - name: "Undeploy PR deployment"
+  #       if: contains(github.event.pull_request.labels.*.name, 'deploy_nodes')
+  #       # Remove the deploy_nodes label to indicate that the PR deployment has been cleaned up
+  #       run: |
+  #         gh pr edit ${{ github.event.pull_request.number }} --remove-label "deploy_nodes"
+  #       env:
+  #         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  build_docker:
-    strategy:
-      matrix:
-        package:
-          - hopli
-          - hoprd
-    name: Build ${{ matrix.package }}
-    uses: ./.github/workflows/build-docker.yaml
-    with:
-      branch: ${{ github.event.pull_request.base.ref }}
-      package: ${{ matrix.package }}
-      production: true
-    secrets: inherit
+  # build_docker:
+  #   strategy:
+  #     matrix:
+  #       package:
+  #         - hopli
+  #         - hoprd
+  #   name: Build ${{ matrix.package }}
+  #   uses: ./.github/workflows/build-docker.yaml
+  #   with:
+  #     branch: ${{ github.event.pull_request.base.ref }}
+  #     package: ${{ matrix.package }}
+  #     production: true
+  #   secrets: inherit
 
-  load_test:
-    name: Load tests
-    if: contains(github.event.pull_request.labels.*.name, 'load_tests') && contains(github.event.pull_request.base.ref, 'master')
-    needs:
-      - build_docker
-    uses: ./.github/workflows/load-tests.yaml
-    with:
-      test_id: pr-${{ github.event.pull_request.number }}
-      cluster_nodes: core
-      topology: many2many
-      workload: constant
-      duration: ${{ vars.LOAD_TESTING_DURATION }}
-      vu: ${{ vars.LOAD_TESTING_VU }}
-      rate: ${{ vars.LOAD_TESTING_RATE }}
-    secrets: inherit
+  # load_test:
+  #   name: Load tests
+  #   if: contains(github.event.pull_request.labels.*.name, 'load_tests') && contains(github.event.pull_request.base.ref, 'master')
+  #   needs:
+  #     - build_docker
+  #   uses: ./.github/workflows/load-tests.yaml
+  #   with:
+  #     test_id: pr-${{ github.event.pull_request.number }}
+  #     cluster_nodes: core
+  #     topology: many2many
+  #     workload: constant
+  #     duration: ${{ vars.LOAD_TESTING_DURATION }}
+  #     vu: ${{ vars.LOAD_TESTING_VU }}
+  #     rate: ${{ vars.LOAD_TESTING_RATE }}
+  #   secrets: inherit
 
   create_release:
     name: Create Release
     runs-on: ubuntu-latest-4-cores # Cannot use a self-hosted runner because of the docker daemon not running
     if: contains(github.event.pull_request.labels.*.name, 'release')
-    needs:
-      - build_docker
+    # needs:
+    #   - build_docker
     steps:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4
@@ -116,6 +116,8 @@ jobs:
       - name: Setup workspace
         id: setup
         run: |
+          apt-get update
+          apt-get install -y gh jq
           current_version=$(./scripts/get-current-version.sh semver)
           echo "current_version=${current_version}" >> $GITHUB_OUTPUT
           if [[ $current_version == *"-rc."* ]]; then
@@ -124,6 +126,7 @@ jobs:
             echo "prerelease=false" >> $GITHUB_OUTPUT
           fi
           ./scripts/download-workflow-binaries.sh ${{ github.event.pull_request.number }}
+          exit 1
         env:
           GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
 
