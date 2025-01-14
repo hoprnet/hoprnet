@@ -123,7 +123,7 @@ lazy_static::lazy_static! {
 }
 
 /// Processed indexer generated events.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum PeerDiscovery {
     Allow(PeerId),
     Ban(PeerId),

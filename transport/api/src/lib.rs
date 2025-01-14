@@ -26,14 +26,15 @@ use async_lock::RwLock;
 use futures::{
     channel::mpsc::{UnboundedReceiver, UnboundedSender},
     future::{select, Either},
-    pin_mut, FutureExt, StreamExt,
+    pin_mut, FutureExt, SinkExt, StreamExt,
 };
+use hopr_transport_identity::multiaddrs::strip_p2p_protocol;
 use std::time::Duration;
 use std::{
     collections::HashMap,
     sync::{Arc, OnceLock},
 };
-use tracing::{error, info, trace, warn};
+use tracing::{debug, error, info, trace, warn};
 
 use core_network::{
     heartbeat::Heartbeat,
@@ -72,7 +73,7 @@ pub use {
     },
     hopr_internal_types::protocol::ApplicationData,
     hopr_network_types::prelude::RoutingOptions,
-    hopr_transport_identity::{multiaddrs::strip_p2p_protocol, Multiaddr, PeerId},
+    hopr_transport_identity::{Multiaddr, PeerId},
     hopr_transport_protocol::{execute_on_tick, PeerDiscovery},
     hopr_transport_session::types::{ServiceId, SessionTarget},
     hopr_transport_session::{
@@ -89,7 +90,7 @@ use crate::{
     helpers::PathPlanner,
 };
 
-pub use crate::helpers::{IndexerTransportEvent, PeerEligibility, TicketStatistics};
+pub use crate::helpers::{PeerEligibility, TicketStatistics};
 
 /*#[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -281,9 +282,115 @@ where
         version: String,
         tbf_path: String,
         on_transport_output: UnboundedSender<ApplicationData>,
-        transport_updates: UnboundedReceiver<PeerDiscovery>,
+        discovery_updates: UnboundedReceiver<PeerDiscovery>,
         on_incoming_session: UnboundedSender<IncomingSession>,
-    ) -> HashMap<HoprTransportProcess, JoinHandle<()>> {
+    ) -> crate::errors::Result<HashMap<HoprTransportProcess, JoinHandle<()>>> {
+        let (mut internal_discovery_update_tx, internal_discovery_update_rx) =
+            futures::channel::mpsc::unbounded::<PeerDiscovery>();
+
+        let network_clone = self.network.clone();
+        let db_clone = self.db.clone();
+        let me_peerid = self.me_peerid;
+        let discovery_updates =
+            futures_concurrency::stream::StreamExt::merge(discovery_updates, internal_discovery_update_rx)
+                .filter_map(move |event| {
+                    let network = network_clone.clone();
+                    let db = db_clone.clone();
+                    let me = me_peerid;
+
+                    async move {
+                        match event {
+                            PeerDiscovery::Allow(peer_id) => {
+                                if let Ok(pk) = OffchainPublicKey::try_from(peer_id) {
+                                    if !network.has(&peer_id).await {
+                                        let mas = db
+                                            .get_account(None, hopr_db_sql::accounts::ChainOrPacketKey::PacketKey(pk))
+                                            .await
+                                            .map(|entry| {
+                                                entry
+                                                    .map(|v| Vec::from_iter(v.get_multiaddr().into_iter()))
+                                                    .unwrap_or(vec![])
+                                            })
+                                            .unwrap_or(vec![]);
+
+                                        if let Err(e) = network.add(&peer_id, PeerOrigin::NetworkRegistry, mas).await {
+                                            error!(peer = %peer_id, error = %e, "Failed to allow locally (already allowed on-chain)");
+                                            return None;
+                                        } 
+                                    }
+
+                                    return Some(PeerDiscovery::Allow(peer_id))
+                                } else {
+                                    error!(peer = %peer_id, "Failed to allow locally (already allowed on-chain): peer id not convertible to off-chain public key")
+                                }
+                            }
+                            PeerDiscovery::Ban(peer_id) => {
+                                if let Err(e) = network.remove(&peer_id).await {
+                                    error!(peer = %peer_id, error = %e, "Failed to ban locally (already banned on-chain)")
+                                } else {
+                                    return Some(PeerDiscovery::Ban(peer_id))
+                                }
+                            }
+                            PeerDiscovery::Announce(peer, multiaddresses) => {
+                                if peer != me {
+                                    // decapsulate the `p2p/<peer_id>` to remove duplicities
+                                    let mas = multiaddresses
+                                        .into_iter()
+                                        .map(|ma| strip_p2p_protocol(&ma))
+                                        .filter(|v| !v.is_empty())
+                                        .collect::<Vec<_>>();
+
+                                    if ! mas.is_empty() {
+                                        if let Ok(pk) = OffchainPublicKey::try_from(peer) {
+                                            if let Ok(Some(key)) = db.translate_key(None, hopr_db_sql::accounts::ChainOrPacketKey::PacketKey(pk)).await {
+                                                let key: Result<Address, _> = key.try_into();
+
+                                                if let Ok(key) = key {
+                                                    if db
+                                                        .is_allowed_in_network_registry(None, key)
+                                                        .await
+                                                        .unwrap_or(false)
+                                                    {
+                                                        if let Err(e) = network.add(&peer, PeerOrigin::NetworkRegistry, mas.clone()).await
+                                                        {
+                                                            error!(%peer, error = %e, "failed to record peer from the NetworkRegistry");
+                                                        } else {
+                                                            return Some(PeerDiscovery::Announce(peer, mas))
+                                                        }
+                                                    }
+                                                }
+                                            } else {
+                                                error!(%peer, "Failed to announce peer due to convertibility error");
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        None
+                    }
+                });
+
+        info!("Loading initial peers from the storage");
+
+        let nodes = self.get_public_nodes().await?;
+        for (peer, _address, multiaddresses) in nodes {
+            if self.is_allowed_to_access_network(&peer).await? {
+                debug!(%peer, ?multiaddresses, "Using initial public node");
+
+                internal_discovery_update_tx
+                    .send(PeerDiscovery::Allow(peer))
+                    .await
+                    .map_err(|e| HoprTransportError::Api(e.to_string()))?;
+
+                internal_discovery_update_tx
+                    .send(PeerDiscovery::Announce(peer, multiaddresses.clone()))
+                    .await
+                    .map_err(|e| HoprTransportError::Api(e.to_string()))?;
+            }
+        }
+
         let mut processes: HashMap<HoprTransportProcess, JoinHandle<()>> = HashMap::new();
 
         // network event processing channel
@@ -352,7 +459,7 @@ where
         let transport_layer = HoprSwarm::new(
             (&self.me).into(),
             network_events_rx,
-            transport_updates,
+            discovery_updates,
             ping_rx,
             ticket_agg_proc,
             self.my_multiaddresses.clone(),
@@ -455,7 +562,7 @@ where
             }),
         );
 
-        processes
+        Ok(processes)
     }
 
     pub fn ticket_aggregator(&self) -> Arc<dyn TicketAggregatorTrait + Send + Sync + 'static> {

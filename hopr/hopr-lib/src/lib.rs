@@ -25,7 +25,6 @@ use futures::{
     channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender},
     Stream, StreamExt,
 };
-use futures_concurrency::stream::StreamExt as _;
 use std::ops::Deref;
 use std::{
     collections::HashMap,
@@ -66,8 +65,7 @@ use hopr_db_sql::{
 use hopr_platform::file::native::{join, remove_dir_all};
 use hopr_strategy::strategy::{MultiStrategy, SingularStrategy};
 use hopr_transport::{
-    execute_on_tick, ChainKeypair, Hash, HoprTransport, HoprTransportConfig, HoprTransportProcess, IncomingSession,
-    IndexerTransportEvent, Network, OffchainKeypair, PeerDiscovery, PeerEligibility, PeerOrigin, PeerStatus,
+    execute_on_tick, ChainKeypair, Hash, HoprTransport, HoprTransportConfig, HoprTransportProcess, IncomingSession, OffchainKeypair, PeerDiscovery, PeerStatus,
 };
 pub use {
     chain_actions::errors::ChainActionsError,
@@ -231,66 +229,31 @@ impl From<HoprTransportProcess> for HoprLibProcesses {
 ///   If the Indexer is not synced, it will not generate any events.
 /// * `preloading_event_stream` - a stream used by the components to preload the data from the objects (db, channel graph...)
 #[allow(clippy::too_many_arguments)] // TODO: refactor this function into a reasonable group of components once fully rearchitected
-pub async fn chain_events_to_transport_events<StreamIn, StreamInPreloading, Db>(
+pub async fn chain_events_to_transport_events<StreamIn, Db>(
     event_stream: StreamIn,
-    preloading_event_stream: StreamInPreloading,
-    me: PeerId,
     me_onchain: Address,
     db: Db,
     multi_strategy: Arc<MultiStrategy>,
     channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
     indexer_action_tracker: Arc<IndexerActionTracker>,
-    network: Arc<Network<Db>>,
 ) -> impl Stream<Item = PeerDiscovery> + Send + 'static
 where
     Db: HoprDbAllOperations + Clone + Send + Sync + std::fmt::Debug + 'static,
     StreamIn: Stream<Item = SignificantChainEvent> + Send + 'static,
-    StreamInPreloading: Stream<Item = IndexerTransportEvent> + Send + 'static,
 {
-    let network_clone = network.clone();
-
     Box::pin(event_stream.filter_map(move |event| {
         let db = db.clone();
         let multi_strategy = multi_strategy.clone();
         let channel_graph = channel_graph.clone();
         let indexer_action_tracker = indexer_action_tracker.clone();
-        let network = network.clone();
 
         async move {
+            let resolved = indexer_action_tracker.match_and_resolve(&event).await;
+            debug!(count = resolved.len(), event = %event, "resolved indexer expectations", );
 
-        let resolved = indexer_action_tracker.match_and_resolve(&event).await;
-        debug!(count = resolved.len(), event = %event, "resolved indexer expectations", );
-
-        match event.event_type {
-                ChainEventType::Announcement{peer, address, multiaddresses} => {
-                    if peer != me {
-                        // decapsulate the `p2p/<peer_id>` to remove duplicities
-                        let mas = multiaddresses
-                            .into_iter()
-                            .map(|ma| hopr_transport::strip_p2p_protocol(&ma))
-                            .filter(|v| !v.is_empty())
-                            .collect::<Vec<_>>();
-
-                        if ! mas.is_empty() {
-                            if let Err(e) = network.add(&peer, PeerOrigin::NetworkRegistry, mas.clone()).await
-                            {
-                                error!(%peer, %error, "failed to record peer from the NetworkRegistry");
-                            }
-
-                            if db
-                                .is_allowed_in_network_registry(None, address)
-                                .await
-                                .unwrap_or(false)
-                            {
-                                Some(vec![IndexerTransportEvent::Announce(peer, mas), IndexerTransportEvent::EligibilityUpdate(peer, PeerEligibility::Eligible)])
-                            } else {
-                                Some(vec![IndexerTransportEvent::Announce(peer, mas)])
-                            }
-                        } else { None }
-                    } else {
-                        debug!("Skipping announcements for myself");
-                        None
-                    }
+            match event.event_type {
+                ChainEventType::Announcement{peer, multiaddresses, ..} => {
+                    Some(PeerDiscovery::Announce(peer, multiaddresses))
                 }
                 ChainEventType::ChannelOpened(channel) |
                 ChainEventType::ChannelClosureInitiated(channel) |
@@ -339,28 +302,24 @@ where
                     match packet_key {
                         Ok(pk) => {
                             if let Some(pk) = pk {
-                                let offchain_key: OffchainPublicKey = pk.try_into().expect("must be an offchain key at this point");
-                                let peer_id = offchain_key.into();
+                                let offchain_key: Result<OffchainPublicKey, _> = pk.try_into();
+                                
+                                if let Ok(offchain_key) = offchain_key {
+                                    let peer_id = offchain_key.into();
 
-                                match allowed {
-                                    chain_types::chain_events::NetworkRegistryStatus::Allowed => {
-                                        if let Err(e) = network.add(&peer_id, PeerOrigin::NetworkRegistry, vec![]).await {
-                                            error!(peer = %peer_id, error = %e, "Failed to allow locally (already allowed on-chain)")
-                                        }
-                                    },
-                                    chain_types::chain_events::NetworkRegistryStatus::Denied => {
-                                        if let Err(e) = network.remove(&peer_id).await {
-                                            error!(peer = %peer_id, error = %e, "Failed to ban locally (already banned on-chain)")
-                                        }
-                                    },
-                                };
+                                    let res = match allowed {
+                                        chain_types::chain_events::NetworkRegistryStatus::Allowed => PeerDiscovery::Allow(peer_id),
+                                        chain_types::chain_events::NetworkRegistryStatus::Denied => PeerDiscovery::Ban(peer_id),
+                                    };
 
-                            Some(vec![IndexerTransportEvent::EligibilityUpdate(
-                                peer_id,
-                                allowed.clone().into()
-                            )])
-                            } else { None }
-
+                                    Some(res)
+                                } else {
+                                    error!("Failed to unwrap as offchain key at this point");
+                                    None
+                                }
+                            } else {
+                                None
+                            }
                         }
                         Err(e) => {
                             error!(error = %e, "on_network_registry_node_allowed failed");
@@ -373,31 +332,8 @@ where
                     None
                 }
             }
-    }})
-    .flat_map(futures::stream::iter))
-    // merge the indexer source with the init source
-    .merge(preloading_event_stream)
-    .filter_map(move |event| {
-        let network = network_clone.clone();
-
-        async move {
-            match event {
-                IndexerTransportEvent::EligibilityUpdate(peer, eligibility) => match eligibility {
-                    PeerEligibility::Eligible => Some(vec![PeerDiscovery::Allow(peer)]),
-                    PeerEligibility::Ineligible => {
-                        if let Err(e) = network.remove(&peer).await {
-                            error!(%peer, error = %e, "Failed to remove peer from the local registry")
-                        }
-                        Some(vec![PeerDiscovery::Ban(peer)])
-                    }
-                },
-                IndexerTransportEvent::Announce(peer, multiaddress) => {
-                    Some(vec![PeerDiscovery::Announce(peer, multiaddress)])
-                }
-            }
         }
-    })
-    .flat_map(futures::stream::iter)
+    }))
 }
 
 /// Represents the socket behavior of the hopr-lib spawned [`Hopr`] object.
@@ -749,20 +685,15 @@ impl Hopr {
 
         self.state.store(HoprState::Indexing, Ordering::Relaxed);
 
-        let (to_process_tx, to_process_rx) = async_channel::unbounded::<IndexerTransportEvent>();
-
         let (indexer_peer_update_tx, indexer_peer_update_rx) = futures::channel::mpsc::unbounded::<PeerDiscovery>();
 
         let indexer_event_pipeline = chain_events_to_transport_events(
             self.rx_indexer_significant_events.clone(),
-            to_process_rx,
-            self.me_peer_id(),
             self.me_onchain(),
             self.db.clone(),
             self.multistrategy.clone(),
             self.channel_graph.clone(),
             self.chain_api.action_state(),
-            self.transport_api.network(),
         )
         .await;
 
@@ -799,42 +730,6 @@ impl Hopr {
             }
         }
         // TODO: wait here for the confirmation that the node is allowed in the registry
-
-        // TODO(20250113): move this to the transport initialization
-        info!("Loading initial peers from the storage");
-        for (peer, _address, multiaddresses) in self.transport_api.get_public_nodes().await? {
-            if self.is_allowed_to_access_network(&peer).await? {
-                debug!(%peer, ?multiaddresses, "Using initial public node");
-                if let Err(e) = to_process_tx
-                    .send(IndexerTransportEvent::EligibilityUpdate(
-                        peer,
-                        PeerEligibility::Eligible,
-                    ))
-                    .await
-                {
-                    error!(error = %e, "Failed to send index update event (eligibility) to transport");
-                }
-
-                if let Err(e) = to_process_tx
-                    .send(IndexerTransportEvent::Announce(peer, multiaddresses.clone()))
-                    .await
-                {
-                    error!(error = %e, "Failed to send index update event (announce) to transport");
-                }
-
-                // Self-reference is not needed in the network storage
-                if peer != self.me_peer_id() {
-                    if let Err(e) = self
-                        .transport_api
-                        .network()
-                        .add(&peer, PeerOrigin::Initialization, multiaddresses)
-                        .await
-                    {
-                        error!(error = %e, "Failed to store the peer observation");
-                    }
-                }
-            }
-        }
 
         // Check Safe-module status:
         // 1) if the node is already included into the module
@@ -1025,7 +920,7 @@ impl Hopr {
                 indexer_peer_update_rx,
                 session_tx,
             )
-            .await
+            .await?
             .into_iter()
         {
             processes.insert(id.into(), proc);

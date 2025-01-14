@@ -45,6 +45,7 @@ prometheus = [
 async-trait = { workspace = true }
 async-lock = { workspace = true }
 futures = { workspace = true }
+futures-concurrency = { workspace = true }
 lazy_static = { workspace = true }
 moka = { workspace = true }
 proc-macro-regex = { workspace = true }
