@@ -28,6 +28,11 @@ rm -rf ./binaries && mkdir -p ./binaries
 while IFS= read -r line; do
   artifact_name=$(echo $line | awk '{print $1}')
   artifact_url=$(echo $line | awk '{print $2}')
-  echo "Downloading binary file ${artifact_name}"
-  curl -L -s -o "binaries/${artifact_name}.zip" -H "Authorization: Bearer ${GH_TOKEN}" "${artifact_url}"
+  if ! curl -L -s -f -o "binaries/${artifact_name}.zip" -H "Authorization: Bearer ${GH_TOKEN}" "${artifact_url}"; then {
+    echo "Error: Failed to download binary file ${artifact_name}"
+    exit 1
+  } else {
+    echo "Downloaded binary file ${artifact_name}..."
+  }
+
 done <<<"$artifacts"
