@@ -5,7 +5,7 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, str::FromStr, sync::Arc};
 
 use hoprd_db_api::aliases::HoprdDbAliasesOperations;
 use hoprd_db_api::errors::DbError;
@@ -25,6 +25,18 @@ pub(crate) struct PeerIdResponse {
     #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String)]
     pub peer_id: String,
+}
+
+#[serde_as]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
+#[schema(example = json!({
+        "address": "12D3KooWRWeTozREYHzWTbuCYskdYhED1MXpDwTrmccwzFrd2mEA"
+    }))]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct AddressResponse {
+    #[serde_as(as = "DisplayFromStr")]
+    #[schema(value_type = String)]
+    pub address: String,
 }
 
 #[serde_as]
@@ -72,6 +84,61 @@ pub(super) async fn aliases(State(state): State<Arc<InternalState>>) -> impl Int
                 .map(|alias| (alias.alias.clone(), alias.peer_id.clone()))
                 .collect::<HashMap<_, _>>();
             (StatusCode::OK, Json(aliases)).into_response()
+        }
+        Err(DbError::BackendError(_)) => (StatusCode::NOT_FOUND, ApiErrorStatus::AliasNotFound).into_response(),
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, ApiErrorStatus::DatabaseError).into_response(),
+    }
+}
+
+/// (deprecated, will be removed in v3.0) Get each previously set alias and its corresponding ETH address as a hashmap.
+#[utoipa::path(
+        get,
+        path = const_format::formatcp!("{BASE_PATH}/aliases_addresses"),
+        responses(
+            (status = 200, description = "Each alias with its corresponding Address", body = HashMap<String, String>, example = json!({
+                    "alice": "12D3KooWPWD5P5ZzMRDckgfVaicY5JNoo7JywGotoAv17d7iKx1z",
+                    "me": "12D3KooWJmLm8FnBfvYQ5BAZ5qcYBxQFFBzAAEYUBUNJNE8cRsYS"
+            })),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
+            (status = 404, description = "No aliases found", body = ApiError),
+        ),
+        security(
+            ("api_token" = []),
+            ("bearer_token" = [])
+        ),
+        tag = "Alias",
+    )]
+pub(super) async fn aliases_addresses(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
+    let aliases = state.hoprd_db.get_aliases().await;
+
+    match aliases {
+        Ok(aliases) => {
+            let aliases = aliases
+                .into_iter()
+                .map(|alias| (alias.alias.clone(), alias.peer_id.clone()))
+                .collect::<HashMap<_, _>>();
+
+            let aliases_addresses_futures = aliases.into_iter().map(|(alias, peer_id)| {
+                let hopr = state.hopr.clone();
+                async move {
+                    let peer_or_address = match PeerOrAddress::from_str(peer_id.as_str()) {
+                        Ok(destination) => destination,
+                        Err(_) => return (alias, "Invalid PeerId".to_string()),
+                    };
+
+                    match HoprIdentifier::new_with(peer_or_address, hopr.peer_resolver()).await {
+                        Ok(destination) => (alias, destination.address.to_string()),
+                        Err(_) => (alias, "Invalid PeerId".to_string()),
+                    }
+                }
+            });
+
+            let aliases_addresses = futures::future::join_all(aliases_addresses_futures)
+                .await
+                .into_iter()
+                .collect::<HashMap<_, _>>();
+
+            (StatusCode::OK, Json(aliases_addresses)).into_response()
         }
         Err(DbError::BackendError(_)) => (StatusCode::NOT_FOUND, ApiErrorStatus::AliasNotFound).into_response(),
         Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, ApiErrorStatus::DatabaseError).into_response(),
@@ -178,6 +245,61 @@ pub(super) async fn get_alias(
 
     match state.hoprd_db.resolve_alias(alias.clone()).await {
         Ok(Some(entry)) => (StatusCode::OK, Json(PeerIdResponse { peer_id: entry })).into_response(),
+        Ok(None) => (StatusCode::NOT_FOUND, ApiErrorStatus::AliasNotFound).into_response(),
+        Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
+    }
+}
+
+/// (deprecated, will be removed in v3.0) Get alias for the address (ETH address) that have this alias assigned to it.
+#[utoipa::path(
+        get,
+        path = const_format::formatcp!("{BASE_PATH}/aliases_addresses/{{alias}}"),
+        params(
+            ("alias" = String, Path, description = "Alias to be shown"),
+        ),
+        responses(
+            (status = 200, description = "Get ETH address for an alias", body = AddressResponse),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
+            (status = 404, description = "Address not found", body = ApiError),
+        ),
+        security(
+            ("api_token" = []),
+            ("bearer_token" = [])
+        ),
+        tag = "Alias",
+    )]
+pub(super) async fn get_alias_address(
+    Path(GetAliasRequest { alias }): Path<GetAliasRequest>,
+    State(state): State<Arc<InternalState>>,
+) -> impl IntoResponse {
+    let hopr = state.hopr.clone();
+
+    let alias = urlencoding::decode(&alias);
+
+    if alias.is_err() {
+        return (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidInput).into_response();
+    }
+
+    let alias = alias.unwrap().into_owned();
+
+    match state.hoprd_db.resolve_alias(alias.clone()).await {
+        Ok(Some(entry)) => {
+            let peer_or_address = match PeerOrAddress::from_str(entry.as_str()) {
+                Ok(destination) => destination,
+                Err(_) => return (StatusCode::NOT_FOUND, ApiErrorStatus::AliasNotFound).into_response(),
+            };
+
+            match HoprIdentifier::new_with(peer_or_address, hopr.peer_resolver()).await {
+                Ok(destination) => (
+                    StatusCode::OK,
+                    Json(AddressResponse {
+                        address: destination.address.to_string(),
+                    }),
+                )
+                    .into_response(),
+                Err(_) => (StatusCode::BAD_REQUEST, ApiErrorStatus::PeerNotFound).into_response(),
+            }
+        }
         Ok(None) => (StatusCode::NOT_FOUND, ApiErrorStatus::AliasNotFound).into_response(),
         Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
     }

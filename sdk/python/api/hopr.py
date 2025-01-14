@@ -2,7 +2,7 @@ import asyncio
 import base64
 import logging
 import random
-from typing import Optional
+from typing import Optional, Union
 
 import aiohttp
 import base58
@@ -30,6 +30,7 @@ from .request_objects import (
 from .response_objects import (
     Addresses,
     Alias,
+    AliasAddress,
     Balances,
     Channel,
     Channels,
@@ -156,13 +157,30 @@ class HoprdAPI:
             logging.error(f"TimeoutError calling {method} {endpoint}")
             return (False, None)
 
-    async def aliases_get_alias(self, alias: str):
+    async def aliases_get_aliases(self, return_address: bool = False):
+        """
+        Returns all aliases.
+        :param: return_address: bool. If true, returns addresses instead of peer_ids
+        :return: aliases: list
+        """
+        if return_address:
+            is_ok, response = await self.__call_api(HTTPMethod.GET, "aliases_addresses")
+            return response if is_ok else None
+        else:
+            is_ok, response = await self.__call_api(HTTPMethod.GET, "aliases")
+            return response if is_ok else None
+
+    async def aliases_get_alias(self, alias: str, return_address: bool = False) -> Optional[Union[Alias, AliasAddress]]:
         """
         Returns the peer id recognized by the node.
-        :return: peer_id: str
+        :return: alias: Alias
         """
-        is_ok, response = await self.__call_api(HTTPMethod.GET, f"aliases/{alias}")
-        return Alias(response) if is_ok else None
+        if return_address:
+            is_ok, response = await self.__call_api(HTTPMethod.GET, f"aliases_addresses/{alias}")
+            return AliasAddress(response) if is_ok else None
+        else:
+            is_ok, response = await self.__call_api(HTTPMethod.GET, f"aliases/{alias}")
+            return Alias(response) if is_ok else None
 
     async def aliases_set_alias(self, alias: str, destination: str):
         """
