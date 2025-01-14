@@ -123,12 +123,12 @@ pub(super) async fn aliases_addresses(State(state): State<Arc<InternalState>>) -
                 async move {
                     let peer_or_address = match PeerOrAddress::from_str(peer_id.as_str()) {
                         Ok(destination) => destination,
-                        Err(_) => return (alias, "Invalid PeerId".to_string()),
+                        Err(_) => return (alias, ApiErrorStatus::PeerNotFound.to_string()),
                     };
 
                     match HoprIdentifier::new_with(peer_or_address, hopr.peer_resolver()).await {
                         Ok(destination) => (alias, destination.address.to_string()),
-                        Err(_) => (alias, "Invalid PeerId".to_string()),
+                        Err(_) => (alias, ApiErrorStatus::PeerNotFound.to_string()),
                     }
                 }
             });

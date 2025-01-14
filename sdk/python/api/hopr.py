@@ -163,24 +163,20 @@ class HoprdAPI:
         :param: return_address: bool. If true, returns addresses instead of peer_ids
         :return: aliases: list
         """
-        if return_address:
-            is_ok, response = await self.__call_api(HTTPMethod.GET, "aliases_addresses")
-            return response if is_ok else None
-        else:
-            is_ok, response = await self.__call_api(HTTPMethod.GET, "aliases")
-            return response if is_ok else None
+        endpoint = f"aliases_addresses" if return_address else f"aliases"
+        is_ok, response = await self.__call_api(HTTPMethod.GET, endpoint)
+        return response if is_ok else None
 
     async def aliases_get_alias(self, alias: str, return_address: bool = False) -> Optional[Union[Alias, AliasAddress]]:
         """
         Returns the peer id recognized by the node.
         :return: alias: Alias
         """
-        if return_address:
-            is_ok, response = await self.__call_api(HTTPMethod.GET, f"aliases_addresses/{alias}")
-            return AliasAddress(response) if is_ok else None
-        else:
-            is_ok, response = await self.__call_api(HTTPMethod.GET, f"aliases/{alias}")
-            return Alias(response) if is_ok else None
+
+        endpoint = f"aliases_addresses/{alias}" if return_address else f"aliases/{alias}"
+        response_class = AliasAddress if return_address else Alias
+        is_ok, response = await self.__call_api(HTTPMethod.GET, endpoint)
+        return response_class(response) if is_ok else None
 
     async def aliases_set_alias(self, alias: str, destination: str):
         """
