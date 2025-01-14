@@ -218,8 +218,6 @@ async fn peer_setup_for(count: usize) -> anyhow::Result<(Vec<WireChannels>, Vec<
         hopr_transport_protocol::run_msg_ack_protocol(
             cfg,
             db,
-            &PEERS[i],
-            &PEERS_CHAIN[i],
             None,
             (wire_ack_recv_tx, wire_ack_send_rx),
             (wire_msg_recv_tx, wire_msg_send_rx),
