@@ -6,6 +6,11 @@ if [ -z "${HOPRD_API_TOKEN}" ]; then
   exit 1
 fi
 
+if [ -z "${METRICS_PUSH_KEY}" ]; then
+  echo "Error: METRICS_PUSH_KEY is not set. Get from Bitwarden secret 'Prometheus Pushgateway Hoprd Node'"
+  exit 1
+fi
+
 METRICS_PUSH_URL=${1}
 if [ -z "${METRICS_PUSH_URL}" ]; then
   echo "Error: METRICS_PUSH_URL argument is required"
@@ -23,7 +28,7 @@ while true; do
   fi
 
   # Push metrics with timeout
-  if ! echo "${metrics}" | curl -s --max-time 10 --data-binary @- "${METRICS_PUSH_URL}"; then
+  if ! echo "${metrics}" | curl -s --max-time 10 -u ${METRICS_PUSH_KEY} --data-binary @- "${METRICS_PUSH_URL}"; then
     echo "Error: Failed to push metrics to ${METRICS_PUSH_URL}"
   fi
   sleep 15
