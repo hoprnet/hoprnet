@@ -3,6 +3,7 @@ use axum::{
     http::status::StatusCode,
     response::IntoResponse,
 };
+use hopr_lib::Address;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use std::{collections::HashMap, str::FromStr, sync::Arc};
@@ -36,7 +37,7 @@ pub(crate) struct PeerIdResponse {
 pub(crate) struct AddressResponse {
     #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String)]
-    pub address: String,
+    pub address: Address,
 }
 
 #[serde_as]
@@ -293,7 +294,7 @@ pub(super) async fn get_alias_address(
                 Ok(destination) => (
                     StatusCode::OK,
                     Json(AddressResponse {
-                        address: destination.address.to_string(),
+                        address: destination.address,
                     }),
                 )
                     .into_response(),
