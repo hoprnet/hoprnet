@@ -123,7 +123,7 @@ jobs:
           else
             echo "prerelease=false" >> $GITHUB_OUTPUT
           fi
-          ./scripts/download-workflow-binaries.sh "bot/close-${{ github.event.pull_request.number }}"
+          ./scripts/download-workflow-binaries.sh "bot/close-${current_version}"
         env:
           GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
 
