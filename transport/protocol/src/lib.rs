@@ -74,7 +74,6 @@ use std::collections::HashMap;
 use tracing::{error, trace};
 
 use hopr_async_runtime::prelude::{sleep, spawn};
-use hopr_crypto_types::prelude::*;
 use hopr_db_api::protocol::HoprDbProtocolOperations;
 use hopr_internal_types::protocol::{Acknowledgement, ApplicationData};
 use hopr_transport_identity::PeerId;
@@ -143,8 +142,6 @@ pub enum ProtocolProcesses {
 pub async fn run_msg_ack_protocol<Db>(
     cfg: msg::processor::PacketInteractionConfig,
     db: Db,
-    me: &OffchainKeypair,
-    me_onchain: &ChainKeypair,
     bloom_filter_persistent_path: Option<String>,
     wire_ack: (
         impl futures::Sink<(PeerId, Acknowledgement)> + Send + Sync + 'static,
@@ -162,6 +159,9 @@ pub async fn run_msg_ack_protocol<Db>(
 where
     Db: HoprDbProtocolOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
 {
+    let me = cfg.packet_keypair.clone();
+    let me_onchain = &cfg.chain_keypair.clone();
+
     let mut processes = HashMap::new();
 
     #[cfg(all(feature = "prometheus", not(test)))]

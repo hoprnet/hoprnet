@@ -353,6 +353,7 @@ impl HoprSocket {
 /// As such, the `hopr_lib` serves mainly as an integration point into Rust programs.
 pub struct Hopr {
     me: OffchainKeypair,
+    me_chain: ChainKeypair,
     cfg: config::HoprLibConfig,
     state: Arc<AtomicHoprState>,
     transport_api: HoprTransport<HoprDb>,
@@ -433,7 +434,6 @@ impl Hopr {
 
         let hopr_transport_api = HoprTransport::new(
             me,
-            me_onchain,
             HoprTransportConfig {
                 transport: cfg.transport.clone(),
                 network: cfg.network_options.clone(),
@@ -503,6 +503,7 @@ impl Hopr {
 
         Ok(Self {
             me: me.clone(),
+            me_chain: me_onchain.clone(),
             cfg,
             state: Arc::new(AtomicHoprState::new(HoprState::Uninitialized)),
             transport_api: hopr_transport_api,
@@ -887,6 +888,7 @@ impl Hopr {
         for (id, proc) in self
             .transport_api
             .run(
+                &self.me_chain,
                 String::from(constants::APP_VERSION),
                 join(&[&self.cfg.db.data, "tbf"]).map_err(|e| {
                     HoprLibError::GeneralError(format!("Failed to construct the bloom filter: {e}"))

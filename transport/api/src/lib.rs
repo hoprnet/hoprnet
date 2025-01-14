@@ -47,7 +47,7 @@ use core_path::{
     selectors::dfs::DfsPathSelectorConfig
 };
 use hopr_async_runtime::prelude::{sleep, spawn, JoinHandle};
-use hopr_db_sql::HoprDbAllOperations;
+use hopr_db_sql::{accounts::ChainOrPacketKey, HoprDbAllOperations};
 use hopr_internal_types::prelude::*;
 use hopr_platform::time::native::current_time;
 use hopr_primitive_types::prelude::*;
@@ -129,7 +129,6 @@ where
 {
     me: OffchainKeypair,
     me_peerid: PeerId, // Cache to avoid an expensive conversion: OffchainPublicKey -> PeerId
-    me_onchain: ChainKeypair,
     cfg: HoprTransportConfig,
     db: T,
     ping: Arc<OnceLock<Pinger<network_notifier::PingExternalInteractions<T>>>>,
@@ -148,7 +147,6 @@ where
 {
     pub fn new(
         me: &OffchainKeypair,
-        me_onchain: &ChainKeypair,
         cfg: HoprTransportConfig,
         db: T,
         channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
@@ -161,7 +159,6 @@ where
         Self {
             me: me.clone(),
             me_peerid,
-            me_onchain: me_onchain.clone(),
             ping: Arc::new(OnceLock::new()),
             network: Arc::new(Network::new(
                 me_peerid,
@@ -206,6 +203,7 @@ where
     #[allow(clippy::too_many_arguments)]
     pub async fn run(
         &self,
+        me_onchain: &ChainKeypair,
         version: String,
         tbf_path: String,
         on_transport_output: UnboundedSender<ApplicationData>,
@@ -349,7 +347,7 @@ where
             .set(ping)
             .expect("must set the ping executor only once");
 
-        let ticket_agg_proc = TicketAggregationInteraction::new(self.db.clone(), &self.me_onchain);
+        let ticket_agg_proc = TicketAggregationInteraction::new(self.db.clone(), me_onchain);
         let tkt_agg_writer = ticket_agg_proc.writer();
 
         let (external_msg_send, external_msg_rx) =
@@ -407,7 +405,7 @@ where
         // initiate the msg-ack protocol stack over the wire transport
         let packet_cfg = PacketInteractionConfig::new(
             &self.me,
-            &self.me_onchain,
+            me_onchain,
             self.cfg.protocol.outgoing_ticket_winning_prob,
         );
 
@@ -415,8 +413,6 @@ where
         for (k, v) in hopr_transport_protocol::run_msg_ack_protocol(
             packet_cfg,
             self.db.clone(),
-            &self.me,
-            &self.me_onchain,
             Some(tbf_path),
             (ack_to_send_tx, ack_received_rx),
             (msg_to_send_tx, msg_received_rx),
@@ -773,7 +769,11 @@ where
             .await
             .map_err(hopr_db_sql::api::errors::DbError::from)?
         {
-            if channel.destination == self.me_onchain.public().to_address() {
+            let own_address: Address = self.db.translate_key(None, ChainOrPacketKey::PacketKey(self.me.public().clone())).await?.ok_or_else(|| {
+                HoprTransportError::Api("Failed to translate the off-chain key to on-chain address".into())
+            })?.try_into()?;
+
+            if channel.destination == own_address {
                 Ok(Some(self.db.get_tickets((&channel).into()).await?))
             } else {
                 Ok(None)
