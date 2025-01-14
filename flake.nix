@@ -391,10 +391,8 @@
               Cmd = [
                 "/bin/tini"
                 "--"
-                "sleep"
-                "inf"
-                # "bash"
-                # "/scripts/run-local-cluster.sh"
+                "bash"
+                "/scripts/run-local-cluster.sh"
               ];
               ExposedPorts = {
                 "8545/tcp" = { };
