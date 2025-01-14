@@ -30,7 +30,7 @@ pub(crate) struct PeerIdResponse {
 #[serde_as]
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[schema(example = json!({
-        "address": "12D3KooWRWeTozREYHzWTbuCYskdYhED1MXpDwTrmccwzFrd2mEA"
+        "address": "0x07eaf07d6624f741e04f4092a755a9027aaab7f6"
     }))]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct AddressResponse {
@@ -96,8 +96,8 @@ pub(super) async fn aliases(State(state): State<Arc<InternalState>>) -> impl Int
         path = const_format::formatcp!("{BASE_PATH}/aliases_addresses"),
         responses(
             (status = 200, description = "Each alias with its corresponding Address", body = HashMap<String, String>, example = json!({
-                    "alice": "12D3KooWPWD5P5ZzMRDckgfVaicY5JNoo7JywGotoAv17d7iKx1z",
-                    "me": "12D3KooWJmLm8FnBfvYQ5BAZ5qcYBxQFFBzAAEYUBUNJNE8cRsYS"
+                    "alice": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
+                    "me": "0x07eaf07d6624f741e04f4092a755a9027aaab7f6"
             })),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "No aliases found", body = ApiError),
