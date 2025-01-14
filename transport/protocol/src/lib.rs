@@ -129,13 +129,18 @@ pub enum PeerDiscovery {
     Announce(PeerId, Vec<Multiaddr>),
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, strum::Display)]
 pub enum ProtocolProcesses {
+    #[strum(to_string = "HOPR ack ingress")]
     AckIn,
+    #[strum(to_string = "HOPR ack egress")]
     AckOut,
+    #[strum(to_string = "HOPR msg ingress")]
     MsgIn,
+    #[strum(to_string = "HOPR msg egress")]
     MsgOut,
-    BloomPersist,
+    #[strum(to_string = "periodic bloom filter save")]
+    BloomFilterSave,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -182,7 +187,7 @@ where
         let tbf = bloom::WrappedTagBloomFilter::new(bloom_filter_persistent_path);
         let tbf_2 = tbf.clone();
         processes.insert(
-            ProtocolProcesses::BloomPersist,
+            ProtocolProcesses::BloomFilterSave,
             spawn(Box::pin(execute_on_tick(
                 std::time::Duration::from_secs(90),
                 move || {

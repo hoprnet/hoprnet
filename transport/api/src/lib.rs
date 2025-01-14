@@ -105,20 +105,12 @@ lazy_static::lazy_static! {
 pub enum HoprTransportProcess {
     #[strum(to_string = "component responsible for the transport medium (libp2p swarm)")]
     Medium,
-    #[strum(to_string = "HOPR protocol processing: ack ingress")]
-    ProtocolAckIn,
-    #[strum(to_string = "HOPR protocol processing: ack egress")]
-    ProtocolAckOut,
-    #[strum(to_string = "HOPR protocol processing: msg ingress")]
-    ProtocolMsgIn,
-    #[strum(to_string = "HOPR protocol processing: msg egress")]
-    ProtocolMsgOut,
+    #[strum(to_string = "HOPR protocol ({0})")]
+    Protocol(hopr_transport_protocol::ProtocolProcesses),
     #[strum(to_string = "session manager sub-process #{0}")]
     SessionsManagement(usize),
     #[strum(to_string = "heartbeat performing the network quality measurements")]
     Heartbeat,
-    #[strum(to_string = "periodic bloom filter save")]
-    BloomFilterSave,
 }
 
 /// Interface into the physical transport mechanism allowing all off-chain HOPR-related tasks on
@@ -190,10 +182,6 @@ where
         }
     }
 
-    pub fn network(&self) -> Arc<Network<T>> {
-        self.network.clone()
-    }
-
     /// Execute all processes of the [`crate::HoprTransport`] object.
     ///
     /// This method will spawn the [`crate::HoprTransportProcess::Heartbeat`], [`crate::HoprTransportProcess::BloomFilterSave`],
@@ -206,7 +194,7 @@ where
         me_onchain: &ChainKeypair,
         version: String,
         tbf_path: String,
-        on_transport_output: UnboundedSender<ApplicationData>,
+        on_incoming_data: UnboundedSender<ApplicationData>,
         discovery_updates: UnboundedReceiver<PeerDiscovery>,
         on_incoming_session: UnboundedSender<IncomingSession>,
     ) -> crate::errors::Result<HashMap<HoprTransportProcess, JoinHandle<()>>> {
@@ -421,16 +409,7 @@ where
         .await
         .into_iter()
         {
-            processes.insert(
-                match k {
-                    hopr_transport_protocol::ProtocolProcesses::AckIn => HoprTransportProcess::ProtocolAckIn,
-                    hopr_transport_protocol::ProtocolProcesses::AckOut => HoprTransportProcess::ProtocolAckOut,
-                    hopr_transport_protocol::ProtocolProcesses::MsgIn => HoprTransportProcess::ProtocolMsgIn,
-                    hopr_transport_protocol::ProtocolProcesses::MsgOut => HoprTransportProcess::ProtocolMsgOut,
-                    hopr_transport_protocol::ProtocolProcesses::BloomPersist => HoprTransportProcess::BloomFilterSave,
-                },
-                v,
-            );
+            processes.insert( HoprTransportProcess::Protocol(k), v);
         }
 
         let msg_sender = helpers::MessageSender::new(self.process_packet_send.clone(), self.path_planner.clone());
@@ -469,7 +448,7 @@ where
                     }
                 })
                 .map(Ok)
-                .forward(on_transport_output)
+                .forward(on_incoming_data)
                 .await;
             }),
         );

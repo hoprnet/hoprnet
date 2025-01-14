@@ -4591,6 +4591,7 @@ dependencies = [
  "serde_with",
  "serial_test",
  "smart-default",
+ "strum",
  "thiserror",
  "tracing",
  "tracing-test",
