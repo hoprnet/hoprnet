@@ -9,6 +9,7 @@ use axum::{
 };
 use futures::{sink::SinkExt, stream::StreamExt};
 use futures_concurrency::stream::Merge;
+use hopr_crypto_types::types::Hash;
 use serde::Deserialize;
 use serde_json::json;
 use serde_with::{serde_as, Bytes, DisplayFromStr, DurationMilliSeconds};
@@ -91,6 +92,9 @@ pub(crate) struct SendMessageResponse {
     #[serde_as(as = "DurationMilliSeconds<u64>")]
     #[schema(value_type = u64)]
     timestamp: std::time::Duration,
+    #[serde_as(as = "DisplayFromStr")]
+    #[schema(value_type = String)]
+    challenge: Hash,
 }
 
 #[serde_as]
@@ -226,7 +230,14 @@ pub(super) async fn send_message(
     let timestamp = std::time::SystemTime::now().as_unix_timestamp();
 
     match hopr.send_message(msg_body, peer_id, options, Some(args.tag)).await {
-        Ok(_) => Ok((StatusCode::ACCEPTED, Json(SendMessageResponse { timestamp })).into_response()),
+        Ok(_) => Ok((
+            StatusCode::ACCEPTED,
+            Json(SendMessageResponse {
+                timestamp,
+                challenge: Hash::create(&[b"This value is useless and is present only for backwards compatibility"]),
+            }),
+        )
+            .into_response()),
         Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(_, _))) => {
             Err((StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response())
         }
