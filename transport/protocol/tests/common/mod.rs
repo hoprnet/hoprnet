@@ -33,7 +33,7 @@ use hopr_transport_protocol::{
 use tracing::debug;
 
 lazy_static! {
-    static ref PEERS: Vec<OffchainKeypair> = [
+    pub static ref PEERS: Vec<OffchainKeypair> = [
         hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775"),
         hex!("5bf21ea8cccd69aa784346b07bf79c84dac606e00eecaa68bf8c31aff397b1ca"),
         hex!("3477d7de923ba3a7d5d72a7d6c43fd78395453532d03b2a1e2b9a7cc9b61bafa"),
@@ -46,7 +46,7 @@ lazy_static! {
 }
 
 lazy_static! {
-    static ref PEERS_CHAIN: Vec<ChainKeypair> = [
+    pub static ref PEERS_CHAIN: Vec<ChainKeypair> = [
         hex!("4db3ac225fdcc7e20bf887cd90bbd62dc6bd41ce8ba5c23cc9ae0bf56e20d056"),
         hex!("1d40c69c179528bbdf49c2254e93400b485f47d7d2fa84aae280af5a31c1918b"),
         hex!("99facd2cd33664d65826ad220920a6b356e31d18c1ce1734303b70a962664d71"),
@@ -153,14 +153,16 @@ type WireChannels = (
     ),
 );
 
-type LogicalChannels = (
+pub type LogicalChannels = (
     futures::channel::mpsc::UnboundedSender<(ApplicationData, TransportPath, PacketSendFinalizer)>,
     futures::channel::mpsc::UnboundedReceiver<ApplicationData>,
 );
 
-type TicketChannel = futures::channel::mpsc::UnboundedReceiver<AcknowledgedTicket>;
+pub type TicketChannel = futures::channel::mpsc::UnboundedReceiver<AcknowledgedTicket>;
 
-async fn peer_setup_for(count: usize) -> anyhow::Result<(Vec<WireChannels>, Vec<LogicalChannels>, Vec<TicketChannel>)> {
+pub async fn peer_setup_for(
+    count: usize,
+) -> anyhow::Result<(Vec<WireChannels>, Vec<LogicalChannels>, Vec<TicketChannel>)> {
     let peer_count = count;
 
     assert!(peer_count <= PEERS.len());
@@ -237,7 +239,7 @@ async fn peer_setup_for(count: usize) -> anyhow::Result<(Vec<WireChannels>, Vec<
 }
 
 #[tracing::instrument(level = "debug", skip(components))]
-async fn emulate_channel_communication(pending_packet_count: usize, mut components: Vec<WireChannels>) {
+pub async fn emulate_channel_communication(pending_packet_count: usize, mut components: Vec<WireChannels>) {
     for i in 0..components.len() {
         for j in 0..pending_packet_count {
             debug!("Component: {i} on packet {j}");
@@ -304,7 +306,7 @@ impl HoprDbResolverOperations for TestResolver {
     }
 }
 
-async fn resolve_mock_path(
+pub async fn resolve_mock_path(
     me: Address,
     peers_offchain: Vec<PeerId>,
     peers_onchain: Vec<Address>,

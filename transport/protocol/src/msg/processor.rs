@@ -251,7 +251,7 @@ impl PacketSendAwaiter {
 
 pub type SendMsgInput = (ApplicationData, TransportPath, PacketSendFinalizer);
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MsgSender {
     tx: futures::channel::mpsc::UnboundedSender<SendMsgInput>,
 }
@@ -270,7 +270,7 @@ impl MsgSender {
             .clone()
             .send((data, path, tx.into()))
             .await
-            .map_err(|_| TransportError("Failed to send a message".to_owned()))
+            .map_err(|e| TransportError(format!("Failed to send a message: {e}")))
             .map(move |_| {
                 let awaiter: PacketSendAwaiter = rx.into();
                 awaiter

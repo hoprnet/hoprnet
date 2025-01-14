@@ -45,8 +45,15 @@ hopr-transport-identity = { workspace = true }
 [dev-dependencies]
 anyhow = { workspace = true }
 async-std = { workspace = true }
+tokio = { workspace = true }
+bytesize = { workspace = true }
+criterion = { workspace = true, features = ["async_futures", "async_tokio"] }
 hopr-db-sql = { workspace = true, features = ["runtime-async-std"] }
 more-asserts = { workspace = true }
 parameterized = { workspace = true }
 serial_test = { workspace = true }
 tracing-test = { workspace = true }
+
+[[bench]]
+name = "protocol_throughput_emulated"
+harness = false
