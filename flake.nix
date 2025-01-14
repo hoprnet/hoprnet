@@ -307,7 +307,7 @@
                 's|../../vendor/|/vendor/|g' \
                 /ethereum/contracts/remappings.txt
 
-              cd /ethereum/contracts && ${pkgs.foundry-bin}/bin/forge build
+              ${pkgs.foundry-bin}/bin/forge build
             '';
             config = {
               Cmd = [
@@ -325,14 +325,20 @@
           plutoSrc = fs.toSource {
             root = ./.;
             fileset = fs.unions [
-              (fs.fileFilter (file: file.hasExt "sol") ./vendor/solidity)
-              ./sdk/python
-              ./ethereum/contracts
-              ./tests/requirements.txt
-              ./scripts/run-local-cluster.sh
+              ./ethereum/contracts/contracts-addresses.json
+              ./ethereum/contracts/foundry.in.toml
+              ./ethereum/contracts/remappings.txt
+              ./ethereum/contracts/Makefile
               ./scripts/run-local-anvil.sh
+              ./scripts/run-local-cluster.sh
               ./scripts/utils.sh
+              ./sdk/python
+              ./tests/requirements.txt
               ./Makefile
+              (fs.fileFilter (file: file.hasExt "sol") ./vendor/solidity)
+              (fs.fileFilter (file: file.hasExt "sol") ./ethereum/contracts/src)
+              (fs.fileFilter (file: file.hasExt "sol") ./ethereum/contracts/script)
+              (fs.fileFilter (file: file.hasExt "sol") ./ethereum/contracts/test)
             ];
           };
           pluto-docker = pkgs.dockerTools.buildLayeredImage {
@@ -359,15 +365,36 @@
             enableFakechroot = true;
             fakeRootCommands = ''
               #!${pkgs.runtimeShell}
+              # must generate the foundry.toml here
+              if ! grep -q "solc = \"${solcDefault}/bin/solc\"" /ethereum/contracts/foundry.toml; then
+                echo "solc = \"${solcDefault}/bin/solc\""
+                echo "Generating foundry.toml file!"
+                sed "s|# solc = .*|solc = \"${solcDefault}/bin/solc\"|g" \
+                  /ethereum/contracts/foundry.in.toml >| \
+                  /ethereum/contracts/foundry.toml
+              else
+                echo "foundry.toml file already exists!"
+              fi
+
+              # rewrite remappings to use absolute paths to fix solc checks
+              sed -i \
+                's|../../vendor/|/vendor/|g' \
+                /ethereum/contracts/remappings.txt
+
               ${pkgs.foundry-bin}/bin/forge build
+
               mkdir /tmp/
+              mkdir /tmp/hopr-localcluster
+              mkdir /tmp/hopr-localcluster/anvil
             '';
             config = {
               Cmd = [
                 "/bin/tini"
                 "--"
-                "bash"
-                "/scripts/run-local-cluster.sh"
+                "sleep"
+                "inf"
+                # "bash"
+                # "/scripts/run-local-cluster.sh"
               ];
               ExposedPorts = {
                 "8545/tcp" = { };

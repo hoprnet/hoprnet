@@ -9,6 +9,7 @@ libs = []
 verbosity = 3
 fs_permissions = [
   { access = "read-write", path = "./" },
+  { access = "read", path = "/ethereum/contracts/contracts-addresses.json" }
 ] # to write logs into a local `./test.txt` file
 allow_paths = ["../../vendor/solidity"]
 offline = false
