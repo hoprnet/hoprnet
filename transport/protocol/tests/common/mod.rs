@@ -8,7 +8,6 @@ use hex_literal::hex;
 use hopr_crypto_random::{random_bytes, random_integer};
 use lazy_static::lazy_static;
 use libp2p::{Multiaddr, PeerId};
-use serial_test::serial;
 
 use core_path::{
     channel_graph::ChannelGraph,
@@ -305,7 +304,11 @@ impl HoprDbResolverOperations for TestResolver {
     }
 }
 
-async fn resolve_mock_path(me: Address, peers_offchain: Vec<PeerId>, peers_onchain: Vec<Address>) -> TransportPath {
+async fn resolve_mock_path(
+    me: Address,
+    peers_offchain: Vec<PeerId>,
+    peers_onchain: Vec<Address>,
+) -> anyhow::Result<TransportPath> {
     let peers_addrs = peers_offchain
         .iter()
         .zip(peers_onchain)
@@ -331,24 +334,30 @@ async fn resolve_mock_path(me: Address, peers_offchain: Vec<PeerId>, peers_oncha
         cg.update_channel(c);
         last_addr = *addr;
     }
-    TransportPath::resolve(peers_offchain, &TestResolver(peers_addrs), &cg)
-        .await
-        .expect("should produce a valid path")
-        .0
+    Ok(TransportPath::resolve(peers_offchain, &TestResolver(peers_addrs), &cg)
+        .await?
+        .0)
 }
 
-pub async fn packet_relayer_workflow_n_peers(peer_count: usize, pending_packets: usize) -> anyhow::Result<()> {
-    assert!(peer_count >= 3, "invalid peer count given");
-    assert!(pending_packets >= 1, "at least one packet must be given");
-
-    const TIMEOUT_SECONDS: std::time::Duration = std::time::Duration::from_secs(10);
-
-    let mut test_msgs = (0..pending_packets)
+pub fn random_packets_of_count(size: usize) -> Vec<ApplicationData> {
+    (0..size)
         .map(|i| ApplicationData {
             application_tag: (i == 0).then(|| random_integer(1, Some(65535)) as Tag),
             plain_text: random_bytes::<300>().into(),
         })
-        .collect::<Vec<_>>();
+        .collect::<Vec<_>>()
+}
+
+pub async fn send_relay_receive_channel_of_n_peers(
+    peer_count: usize,
+    mut test_msgs: Vec<ApplicationData>,
+) -> anyhow::Result<()> {
+    let packet_count = test_msgs.len();
+
+    assert!(peer_count >= 3, "invalid peer count given");
+    assert!(test_msgs.len() >= 1, "at least one packet must be given");
+
+    const TIMEOUT_SECONDS: std::time::Duration = std::time::Duration::from_secs(10);
 
     let (wire_apis, mut apis, ticket_channels) = peer_setup_for(peer_count).await?;
 
@@ -361,13 +370,14 @@ pub async fn packet_relayer_workflow_n_peers(peer_count: usize, pending_packets:
             .map(|key| key.public().to_address())
             .collect(),
     )
-    .await;
+    .await?;
+
     assert_eq!(peer_count - 1, packet_path.length(), "path has invalid length");
 
-    async_std::task::spawn(emulate_channel_communication(pending_packets, wire_apis));
+    async_std::task::spawn(emulate_channel_communication(packet_count, wire_apis));
 
     let mut sent_packet_count = 0;
-    for i in 0..pending_packets {
+    for i in 0..packet_count {
         let sender = MsgSender::new(apis[0].0.clone());
 
         let awaiter = sender.send_packet(test_msgs[i].clone(), packet_path.clone()).await?;
@@ -382,7 +392,7 @@ pub async fn packet_relayer_workflow_n_peers(peer_count: usize, pending_packets:
     }
 
     assert_eq!(
-        sent_packet_count, pending_packets,
+        sent_packet_count, packet_count,
         "not all packets were successfully sent"
     );
 
@@ -390,7 +400,7 @@ pub async fn packet_relayer_workflow_n_peers(peer_count: usize, pending_packets:
         let last_node_recv = apis.remove(peer_count - 1).1;
 
         let mut recv_packets = last_node_recv
-            .take(pending_packets)
+            .take(packet_count)
             .map(|packet| packet)
             .collect::<Vec<_>>()
             .await;
@@ -414,11 +424,7 @@ pub async fn packet_relayer_workflow_n_peers(peer_count: usize, pending_packets:
     assert_eq!(ticket_channels.len(), peer_count);
 
     for (i, rx) in ticket_channels.into_iter().enumerate() {
-        let expected_tickets = if i != 0 && i != peer_count - 1 {
-            pending_packets
-        } else {
-            0
-        };
+        let expected_tickets = if i != 0 && i != peer_count - 1 { packet_count } else { 0 };
 
         assert_eq!(
             rx.take(expected_tickets)
