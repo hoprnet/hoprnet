@@ -89,7 +89,6 @@ hopr-crypto-random = { workspace = true }
 name = "reconstructor_bench"
 harness = false
 
-
 [[bench]]
 name = "session"
 harness = false

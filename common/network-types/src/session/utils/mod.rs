@@ -1,4 +1,4 @@
-mod skip_queue;
+pub mod skip_queue;
 
 use std::collections::VecDeque;
 use std::pin::Pin;

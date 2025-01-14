@@ -1,28 +1,29 @@
+use std::future::Future;
 use asynchronous_codec::Framed;
-use dashmap::{DashMap, Entry};
 use futures::{pin_mut, Sink, SinkExt, StreamExt, TryStreamExt};
 use futures_concurrency::stream::Merge;
 use governor::prelude::StreamRateLimitExt;
 use governor::{Quota, RateLimiter};
 use std::num::NonZeroU32;
 use std::pin::Pin;
-use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::Duration;
-
+use futures::future::BoxFuture;
 use crate::prelude::errors::SessionError;
 use crate::prelude::protocol::{FrameAcknowledgements, SessionCodec, SessionMessage};
 use crate::prelude::{frame_reconstructor, FrameId, Segment};
+use crate::session::Frame;
 use crate::session::protocol::SegmentRequest;
 use crate::session::segmenter::Segmenter;
-use crate::session::utils::{offloaded_ringbuffer, OffloadedRbConsumer, RetryToken};
+use crate::session::utils::{offloaded_ringbuffer, OffloadedRbConsumer};
+use crate::session::utils::skip_queue::{skip_delay_channel, Skip, SkipDelaySender};
 
 struct SocketState<const C: usize> {
     rb: OffloadedRbConsumer<Segment>,
     ctl_tx: futures::channel::mpsc::UnboundedSender<SessionMessage<C>>,
     downstream_segment_in: Pin<Box<dyn Sink<Segment, Error = SessionError> + Send>>,
-    incoming_frame_retries: Arc<DashMap<FrameId, RetryToken>>,
-    outgoing_frame_retries: Arc<DashMap<FrameId, RetryToken>>,
+    incoming_frame_retries_tx: SkipDelaySender<FrameId>,
+    outgoing_frame_retries_tx: SkipDelaySender<FrameId>,
 }
 
 impl<const C: usize> SocketState<C> {
@@ -35,54 +36,46 @@ impl<const C: usize> SocketState<C> {
             .await
             .map_err(|e| SessionError::ProcessingError(e.to_string()))?;
 
-        match self.incoming_frame_retries.entry(id.0) {
-            Entry::Occupied(e) => {
-                // Receiving a frame segment restarts the retry token for this frame
-                let rt = *e.get();
-                e.replace_entry(rt.replenish());
-                // TODO: once the period is based on number of segments, is restarting not desired?
-            }
-            Entry::Vacant(v) => {
-                // Create the retry token for this frame
-                // TODO: base retry period on the number of segments in a frame
-                v.insert(RetryToken::new(1.5));
-            }
-        }
+        // TODO: condition this below only when retransmission is enabled
+
+        // Register future requesting of segments for this frame
+        let first_request = Duration::from_secs(1); // TODO: take this from the config
+        self.incoming_frame_retries_tx
+            .send((id.0, first_request).into())
+            .await
+            .map_err(|e| SessionError::ProcessingError(e.to_string()))?;
+
 
         Ok(())
     }
 
-    fn incoming_acknowledged_frames(&mut self, ack: FrameAcknowledgements<C>) -> Result<(), SessionError> {
+    async fn incoming_acknowledged_frames(&mut self, ack: FrameAcknowledgements<C>) -> Result<(), SessionError> {
         for frame_id in ack {
             // Frame acknowledged, we won't need to resend it
-            if let Some((_, rt)) = self.outgoing_frame_retries.remove(&frame_id) {
-                let to_ack = rt.time_since_creation();
-                tracing::trace!(
-                    //session_id = self.session_id,
-                    frame_id,
-                    duration_in_ms = to_ack.as_millis(),
-                    "frame acknowledgement"
-                );
-
-                // #[cfg(all(feature = "prometheus", not(test)))]
-                // METRIC_TIME_TO_ACK.observe(&[self.session_id()], to_ack.as_secs_f64())
-            }
+            tracing::trace!(frame_id, "frame acknowledged");
+            self.outgoing_frame_retries_tx.feed((frame_id, Skip).into())
+                .await
+                .map_err(|e| SessionError::ProcessingError(format!("failed to acknowledge frame {frame_id}: {e}")))?;
         }
+        self.outgoing_frame_retries_tx
+            .flush()
+            .await.map_err(|e| SessionError::ProcessingError(format!("failed to acknowledge frames: {e}")))?;
 
         Ok(())
     }
 
     async fn incoming_retransmission_request(&mut self, retransmit: SegmentRequest<C>) -> Result<(), SessionError> {
-        let missing = retransmit
-            .into_iter()
-            .inspect(|s| {
-                // Frame partially acknowledged, we won't need to resend it
-                self.outgoing_frame_retries.remove(&s.0);
-            })
-            .collect::<Vec<_>>();
+        let missing = retransmit.into_iter().collect::<Vec<_>>();
 
-        // Perform one find to lock only once
+        // Perform one find to lock the RB only once
         let segments = self.rb.find(|s| missing.contains(&s.id()));
+
+        // Partially acknowledged frames won't need to be fully resent in the future
+        self.outgoing_frame_retries_tx
+            .send_all(&mut futures::stream::iter(missing)
+                .map(|seg_id| Ok((seg_id.0, Skip).into()))
+            )
+            .await?;
 
         self.downstream_segment_in
             .send_all(&mut futures::stream::iter(segments).map(Ok))
@@ -93,7 +86,7 @@ impl<const C: usize> SocketState<C> {
         match message {
             SessionMessage::Segment(s) => self.incoming_segment(s).await,
             SessionMessage::Request(r) => self.incoming_retransmission_request(r).await,
-            SessionMessage::Acknowledge(a) => self.incoming_acknowledged_frames(a),
+            SessionMessage::Acknowledge(a) => self.incoming_acknowledged_frames(a).await,
         }
     }
 }
@@ -145,33 +138,47 @@ impl<const C: usize> SessionSocket<C> {
             }
         });
 
-        let outgoing_frame_retries = Arc::new(DashMap::new());
-        let incoming_frame_retries = Arc::new(DashMap::new());
+        let (incoming_frame_retries_tx, incoming_frame_retries_rx) = skip_delay_channel();
+        let (outgoing_frame_retries_tx, outgoing_frame_retries_rx) = skip_delay_channel();
 
         // Frames coming out from the Reconstructor can be read Upstream
-        let incoming_frame_retries_clone = incoming_frame_retries.clone();
+        let incoming_frame_retries_tx_clone = incoming_frame_retries_tx.clone();
         let id = session_id.clone();
         let downstream_frames_out = Box::pin(
             downstream_frames_out
                 .filter_map(move |maybe_frame| {
-                    match maybe_frame {
+                    let r : BoxFuture<Option<Result<Frame, std::io::Error>>> = match maybe_frame {
                         Ok(frame) => {
                             // TODO: ack_tx gets dropped when downstream_frames_out is dropped?
                             if let Err(error) = ack_tx.try_send(frame.frame_id) {
                                 tracing::error!(session_id = id, frame_id = frame.frame_id, %error, "failed to acknowledge frame");
                             }
-                            incoming_frame_retries_clone.remove(&frame.frame_id);
-                            futures::future::ready(Some(Ok(frame)))
+                            let mut incoming_frame_retries_tx_clone = incoming_frame_retries_tx_clone.clone();
+                            let session_id = id.clone();
+                            Box::pin(async move {
+                                if let Err(error) = incoming_frame_retries_tx_clone.send((frame.frame_id, Skip).into()).await {
+                                    tracing::error!(session_id, frame_id = frame.frame_id, %error, "failed to cancel retry of acknowledged frame");
+                                }
+                                Some(Ok(frame))
+                            })
                         },
                         Err(SessionError::FrameDiscarded(frame_id)) | Err(SessionError::IncompleteFrame(frame_id)) => {
                             tracing::warn!(session_id = id, frame_id, "frame discarded");
-                            incoming_frame_retries_clone.remove(&frame_id);
-                            futures::future::ready(None) // skip discarded frames
+                            let mut incoming_frame_retries_tx_clone = incoming_frame_retries_tx_clone.clone();
+                            let session_id = id.clone();
+                            Box::pin(async move {
+                                if let Err(error) = incoming_frame_retries_tx_clone.send((frame_id, Skip).into()).await {
+                                    tracing::error!(session_id, frame_id, %error, "failed to cancel retry of acknowledged frame");
+                                }
+                                // Downstream skips discarded frames
+                                None
+                            })
                         }
                         Err(err) => {
-                            futures::future::ready(Some(Err(std::io::Error::other(err))))
+                            Box::pin(futures::future::ready(Some(Err(std::io::Error::other(err)))))
                         },
-                    }
+                    };
+                    r
                 })
                 .into_async_read(),
         );
@@ -182,33 +189,43 @@ impl<const C: usize> SessionSocket<C> {
         let (rb_tx, rb_rx) = offloaded_ringbuffer(1024);
 
         // Messages incoming from Upstream and from the State go downstream as Packets
-        let outgoing_frame_retries_clone = outgoing_frame_retries.clone();
+        let outgoing_frame_retries_tx_clone = outgoing_frame_retries_tx.clone();
         hopr_async_runtime::prelude::spawn(
             (
                 ctl_rx,
                 segmented_data_rx
-                    .inspect(move |s| {
-                        // When the last segment of a frame has been sent,
-                        // add it to outgoing retries
-                        if s.is_last() {
-                            // TODO: retry token period should be set dynamic based on s.seq_len
-                            outgoing_frame_retries_clone.insert(s.frame_id, RetryToken::new(1.0));
-                        }
+                    .then(move |s| {
                         rb_tx.push(s.clone());
-                    })
-                    .map(SessionMessage::<C>::Segment),
+
+                        let mut outgoing_frame_retries_tx_clone = outgoing_frame_retries_tx_clone.clone();
+                        async move {
+                            // When the last segment of a frame has been sent,
+                            // add it to outgoing retries
+                            if s.is_last() {
+                                // TODO: retry token period should be set dynamic based on s.seq_len
+                                if let Err(error) = outgoing_frame_retries_tx_clone.send((s.frame_id, Duration::from_secs(1)).into()).await {
+                                    tracing::trace!(frame_id = s.frame_id, %error, "failed to insert outgoing retry of a frame");
+                                }
+                            }
+                            SessionMessage::<C>::Segment(s)
+                        }
+                    }),
             )
                 .merge()
                 .map(Ok)
                 .forward(packets_out),
         );
 
+        // Outgoing frame resends (that haven't been acknowledged by the counterparty)
+
+        // Incoming segment resends (that are incomplete for too long)
+
         let mut state = SocketState {
             rb: rb_rx,
             ctl_tx,
             downstream_segment_in: Box::pin(downstream_segment_in),
-            incoming_frame_retries,
-            outgoing_frame_retries,
+            incoming_frame_retries_tx,
+            outgoing_frame_retries_tx,
         };
 
         // Packets incoming from Downstream

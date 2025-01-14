@@ -56,7 +56,7 @@ struct SkipDelayQueue<T> {
 /// `(T, Instant)`, `(T, Duration)` and `(T, Skip)`.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum DelayedItem<T> {
-    /// Adds a new item with a deadline.
+    /// Adds new (or replaces an existing) item with a deadline.
     New(T, Instant),
     /// Cancel a previously added item.
     Cancel(T),
@@ -221,7 +221,7 @@ impl<T: Ord> futures::Sink<DelayedItem<T>> for SkipDelaySender<T> {
             match item {
                 DelayedItem::New(item, at) => {
                     tracing::trace!("SkipDelayQueue::start_send inserting");
-                    queue.entries.insert(DelayedEntry {
+                    queue.entries.replace(DelayedEntry {
                         item,
                         at,
                         cancelled: AtomicBool::new(false),
@@ -299,6 +299,23 @@ mod tests {
 
         assert_eq!(Some(1), rx.next().await);
         assert!(now.elapsed() >= Duration::from_millis(100));
+        assert_eq!(None, rx.next().await);
+
+        Ok(())
+    }
+
+    #[test_log::test(async_std::test)]
+    async fn skip_delay_queue_should_replace_and_yield_items() -> anyhow::Result<()> {
+        let (mut tx, rx) = skip_delay_channel();
+        pin_mut!(rx);
+
+        let now = Instant::now();
+        tx.send((1, now + Duration::from_millis(100)).into()).await?;
+        tx.send((1, now + Duration::from_millis(200)).into()).await?;
+        tx.close().await?;
+
+        assert_eq!(Some(1), rx.next().await);
+        assert!(now.elapsed() >= Duration::from_millis(200));
         assert_eq!(None, rx.next().await);
 
         Ok(())
