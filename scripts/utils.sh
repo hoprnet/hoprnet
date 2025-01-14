@@ -322,7 +322,3 @@ get_eth_block_number() {
 }
 
 setup_colors
-
-# Ensure that jq and curl are installed
-check_package jq
-check_package curl

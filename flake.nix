@@ -254,11 +254,17 @@
           anvilSrc = fs.toSource {
             root = ./.;
             fileset = fs.unions [
-              (fs.fileFilter (file: file.hasExt "sol") ./vendor/solidity)
-              ./ethereum/contracts
+              ./ethereum/contracts/contracts-addresses.json
+              ./ethereum/contracts/foundry.in.toml
+              ./ethereum/contracts/remappings.txt
+              ./ethereum/contracts/Makefile
               ./scripts/run-local-anvil.sh
               ./scripts/utils.sh
               ./Makefile
+              (fs.fileFilter (file: file.hasExt "sol") ./vendor/solidity)
+              (fs.fileFilter (file: file.hasExt "sol") ./ethereum/contracts/src)
+              (fs.fileFilter (file: file.hasExt "sol") ./ethereum/contracts/script)
+              (fs.fileFilter (file: file.hasExt "sol") ./ethereum/contracts/test)
             ];
           };
           anvil-docker = pkgs.dockerTools.buildLayeredImage {
@@ -266,18 +272,42 @@
             tag = "latest";
             # breaks binary reproducibility, but makes usage easier
             created = "now";
-            contents = [ pkgs.foundry-bin anvilSrc solcDefault pkgs.tini pkgs.runtimeShellPackage pkgs.jq pkgs.lsof pkgs.curl pkgs.coreutils pkgs.which pkgs.jq pkgs.findutils pkgs.time  pkgs.gnumake ];
+            contents = with pkgs; [
+              anvilSrc
+              coreutils
+              curl
+              findutils
+              foundry-bin
+              gnumake
+              jq
+              lsof
+              runtimeShellPackage
+              solcDefault
+              time
+              tini
+              which
+            ];
             enableFakechroot = true;
             fakeRootCommands = ''
               #!${pkgs.runtimeShell}
-              ${pkgs.foundry-bin}/bin/forge build
-              mkdir /tmp/
-              /scripts/run-local-anvil.sh
-              sleep 2
-              lsof -i :8545 -s TCP:LISTEN -t | xargs -I {} -n 1 kill {} || :
-              rm -rf /ethereum/contracts/broadcast/
-              rm -f /tmp/*.log
-              rm -f /.anvil.state.json
+
+              # must generate the foundry.toml here
+              if ! grep -q "solc = \"${solcDefault}/bin/solc\"" /ethereum/contracts/foundry.toml; then
+                echo "solc = \"${solcDefault}/bin/solc\""
+                echo "Generating foundry.toml file!"
+                sed "s|# solc = .*|solc = \"${solcDefault}/bin/solc\"|g" \
+                  /ethereum/contracts/foundry.in.toml >| \
+                  /ethereum/contracts/foundry.toml
+              else
+                echo "foundry.toml file already exists!"
+              fi
+
+              # rewrite remappings to use absolute paths to fix solc checks
+              sed -i \
+                's|../../vendor/|/vendor/|g' \
+                /ethereum/contracts/remappings.txt
+
+              cd /ethereum/contracts && ${pkgs.foundry-bin}/bin/forge build
             '';
             config = {
               Cmd = [
@@ -310,7 +340,22 @@
             tag = "latest";
             # breaks binary reproducibility, but makes usage easier
             created = "now";
-            contents = [ pkgs.foundry-bin pkgs.python39 plutoSrc solcDefault pkgs.tini pkgs.runtimeShellPackage pkgs.jq pkgs.lsof pkgs.curl pkgs.coreutils pkgs.which pkgs.jq pkgs.findutils pkgs.time pkgs.gnumake ];
+            contents = with pkgs; [
+              coreutils
+              curl
+              findutils
+              foundry-bin
+              gnumake
+              jq
+              lsof
+              plutoSrc
+              python39
+              runtimeShellPackage
+              solcDefault
+              time
+              tini
+              which
+            ];
             enableFakechroot = true;
             fakeRootCommands = ''
               #!${pkgs.runtimeShell}
