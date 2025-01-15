@@ -59,28 +59,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
 
-      - name: Checkout hoprd-sdk-python repository
-        uses: actions/checkout@v4
-        with:
-          repository: hoprnet/hoprd-sdk-python
-          path: ./hoprd-sdk-python
-          ref: master
-
-      - name: Promote release hoprd-sdk-python
-        run: |
-          git fetch --all
-          # Create new branch or reuse an existing branch
-          release_name="${{ steps.promote_release.outputs.release_name }}"
-          if git branch -al release/${release_name} | grep ${release_name};
-          then
-            echo "Branch release/${release_name} already exists. Skipping promotion..."
-            exit 0
-          else
-            git checkout -b release/${release_name}
-            git push --set-upstream origin release/${release_name}
-          fi
-        working-directory: ./hoprd-sdk-python
-
   new_release:
     name: Open new release
     needs:
