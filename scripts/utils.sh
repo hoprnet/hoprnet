@@ -101,6 +101,7 @@ try_cmd() {
   else
     # the output needs to be captured to not mess up the return result
     # also exit on error needs to be disabled for execution of the command and re-enabled afterwards again
+    mkdir -p /tmp
     output_file="$(mktemp -q)"
     rm -f "${output_file}"
     set +Eeo pipefail

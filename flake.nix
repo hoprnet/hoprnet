@@ -307,7 +307,14 @@
                 's|../../vendor/|/vendor/|g' \
                 /ethereum/contracts/remappings.txt
 
-              ${pkgs.foundry-bin}/bin/forge build
+              # unlink all linked files/directories, because forge does
+              # not work well with those
+              cp -R -L /ethereum/contracts /ethereum/contracts-unlinked
+              rm -rf /ethereum/contracts
+              mv /ethereum/contracts-unlinked /ethereum/contracts
+
+              # need to point to the contracts directory for forge to work
+              ${pkgs.foundry-bin}/bin/forge build --root /ethereum/contracts
             '';
             config = {
               Cmd = [
@@ -365,6 +372,7 @@
             enableFakechroot = true;
             fakeRootCommands = ''
               #!${pkgs.runtimeShell}
+
               # must generate the foundry.toml here
               if ! grep -q "solc = \"${solcDefault}/bin/solc\"" /ethereum/contracts/foundry.toml; then
                 echo "solc = \"${solcDefault}/bin/solc\""

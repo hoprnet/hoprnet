@@ -8,7 +8,7 @@ import "../test/utils/ERC1820Registry.sol";
 import "../test/utils/PermittableToken.sol";
 import "./utils/NetworkConfig.s.sol";
 import "./utils/BoostUtilsLib.sol";
-import { WinProb } from "../src/WinningProbabilityOracle.sol";
+import { WinProb } from "src/WinningProbabilityOracle.sol";
 
 /**
  * @title Deploy all the required contracts in development, staging and production environment
