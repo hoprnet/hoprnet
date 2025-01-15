@@ -217,9 +217,9 @@ where
                                             .map(|entry| {
                                                 entry
                                                     .map(|v| Vec::from_iter(v.get_multiaddr().into_iter()))
-                                                    .unwrap_or(vec![])
+                                                    .unwrap_or_default()
                                             })
-                                            .unwrap_or(vec![]);
+                                            .unwrap_or_default();
 
                                         if let Err(e) = network.add(&peer_id, PeerOrigin::NetworkRegistry, mas).await {
                                             error!(peer = %peer_id, error = %e, "Failed to allow locally (already allowed on-chain)");
@@ -742,7 +742,7 @@ where
         {
             let own_address: Address = self
                 .db
-                .translate_key(None, ChainOrPacketKey::PacketKey(self.me.public().clone()))
+                .translate_key(None, ChainOrPacketKey::PacketKey(*self.me.public()))
                 .await?
                 .ok_or_else(|| {
                     HoprTransportError::Api("Failed to translate the off-chain key to on-chain address".into())
