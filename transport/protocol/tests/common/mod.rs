@@ -72,7 +72,7 @@ fn create_dummy_channel(from: Address, to: Address) -> ChannelEntry {
     )
 }
 
-async fn create_dbs(amount: usize) -> anyhow::Result<Vec<HoprDb>> {
+pub async fn create_dbs(amount: usize) -> anyhow::Result<Vec<HoprDb>> {
     Ok(
         futures::future::join_all((0..amount).map(|i| HoprDb::new_in_memory(PEERS_CHAIN[i].clone())))
             .await
@@ -82,7 +82,7 @@ async fn create_dbs(amount: usize) -> anyhow::Result<Vec<HoprDb>> {
     )
 }
 
-async fn create_minimal_topology(dbs: &mut Vec<HoprDb>) -> anyhow::Result<()> {
+pub async fn create_minimal_topology(dbs: &mut Vec<HoprDb>) -> anyhow::Result<()> {
     let mut previous_channel: Option<ChannelEntry> = None;
 
     for index in 0..dbs.len() {
@@ -142,7 +142,7 @@ async fn create_minimal_topology(dbs: &mut Vec<HoprDb>) -> anyhow::Result<()> {
     Ok(())
 }
 
-type WireChannels = (
+pub type WireChannels = (
     (
         futures::channel::mpsc::UnboundedSender<(PeerId, Acknowledgement)>,
         futures::channel::mpsc::UnboundedReceiver<(PeerId, Acknowledgement)>,
@@ -210,7 +210,7 @@ pub async fn peer_setup_for(
             check_unrealized_balance: true,
             packet_keypair: opk.clone(),
             chain_keypair: ock.clone(),
-            mixer: MixerConfig::default(), // TODO: unnecessary, can be removed
+            mixer: MixerConfig::default(),
             outgoing_ticket_win_prob: 1.0,
         };
 
