@@ -65,7 +65,8 @@ use hopr_db_sql::{
 use hopr_platform::file::native::{join, remove_dir_all};
 use hopr_strategy::strategy::{MultiStrategy, SingularStrategy};
 use hopr_transport::{
-    execute_on_tick, ChainKeypair, Hash, HoprTransport, HoprTransportConfig, HoprTransportProcess, IncomingSession, OffchainKeypair, PeerDiscovery, PeerStatus,
+    execute_on_tick, ChainKeypair, Hash, HoprTransport, HoprTransportConfig, HoprTransportProcess, IncomingSession,
+    OffchainKeypair, PeerDiscovery, PeerStatus,
 };
 pub use {
     chain_actions::errors::ChainActionsError,
@@ -91,8 +92,8 @@ pub use {
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_transport::transfer_session;
 
-use crate::constants::{MIN_NATIVE_BALANCE, ONBOARDING_INFORMATION_INTERVAL, SUGGESTED_NATIVE_BALANCE};
 use crate::config::SafeModule;
+use crate::constants::{MIN_NATIVE_BALANCE, ONBOARDING_INFORMATION_INTERVAL, SUGGESTED_NATIVE_BALANCE};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use {
@@ -278,7 +279,7 @@ where
                         Ok(pk) => {
                             if let Some(pk) = pk {
                                 let offchain_key: Result<OffchainPublicKey, _> = pk.try_into();
-                                
+
                                 if let Ok(offchain_key) = offchain_key {
                                     let peer_id = offchain_key.into();
 
@@ -520,9 +521,7 @@ impl Hopr {
         if self.status() == state {
             Ok(())
         } else {
-            Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(
-                state, error,
-            )))
+            Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(state, error)))
         }
     }
 
@@ -742,9 +741,7 @@ impl Hopr {
             info!("Registering safe by node");
 
             if self.me_onchain() == self.cfg.safe_module.safe_address {
-                return Err(HoprLibError::GeneralError(
-                    "cannot self as staking safe address".into(),
-                ));
+                return Err(HoprLibError::GeneralError("cannot self as staking safe address".into()));
             }
 
             if let Err(e) = self
@@ -890,9 +887,8 @@ impl Hopr {
             .run(
                 &self.me_chain,
                 String::from(constants::APP_VERSION),
-                join(&[&self.cfg.db.data, "tbf"]).map_err(|e| {
-                    HoprLibError::GeneralError(format!("Failed to construct the bloom filter: {e}"))
-                })?,
+                join(&[&self.cfg.db.data, "tbf"])
+                    .map_err(|e| HoprLibError::GeneralError(format!("Failed to construct the bloom filter: {e}")))?,
                 transport_output_tx,
                 indexer_peer_update_rx,
                 session_tx,
@@ -1305,9 +1301,7 @@ impl Hopr {
                 tx_hash: confirmation.tx_hash,
                 status: ChannelStatus::Closed,
             }),
-            _ => Err(HoprLibError::GeneralError(
-                "close channel transaction failed".into(),
-            )),
+            _ => Err(HoprLibError::GeneralError("close channel transaction failed".into())),
         }
     }
 

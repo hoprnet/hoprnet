@@ -42,10 +42,7 @@ use core_network::{
     heartbeat::Heartbeat,
     ping::{PingConfig, PingQueryReplier, Pinger, Pinging},
 };
-use core_path::{
-    path::TransportPath,
-    selectors::dfs::DfsPathSelectorConfig
-};
+use core_path::{path::TransportPath, selectors::dfs::DfsPathSelectorConfig};
 use hopr_async_runtime::prelude::{sleep, spawn, JoinHandle};
 use hopr_db_sql::{accounts::ChainOrPacketKey, HoprDbAllOperations};
 use hopr_internal_types::prelude::*;
@@ -58,9 +55,7 @@ use hopr_transport_p2p::{
 use hopr_transport_protocol::{
     errors::ProtocolError,
     msg::processor::{MsgSender, PacketInteractionConfig, PacketSendFinalizer},
-    ticket_aggregation::processor::{
-        TicketAggregationActions, TicketAggregationInteraction, TicketAggregatorTrait,
-    },
+    ticket_aggregation::processor::{TicketAggregationActions, TicketAggregationInteraction, TicketAggregatorTrait},
 };
 use hopr_transport_session::{DispatchResult, SessionManager, SessionManagerConfig};
 
@@ -93,7 +88,7 @@ use crate::{
 
 pub use crate::{
     config::HoprTransportConfig,
-    helpers::{PeerEligibility, TicketStatistics}
+    helpers::{PeerEligibility, TicketStatistics},
 };
 
 // Needs lazy-static, since Duration multiplication by a constant is yet not a const-operation.
@@ -229,7 +224,7 @@ where
                                         if let Err(e) = network.add(&peer_id, PeerOrigin::NetworkRegistry, mas).await {
                                             error!(peer = %peer_id, error = %e, "Failed to allow locally (already allowed on-chain)");
                                             return None;
-                                        } 
+                                        }
                                     }
 
                                     return Some(PeerDiscovery::Allow(peer_id))
@@ -391,11 +386,8 @@ where
         processes.insert(HoprTransportProcess::Medium, spawn(transport_layer.run(version)));
 
         // initiate the msg-ack protocol stack over the wire transport
-        let packet_cfg = PacketInteractionConfig::new(
-            &self.me,
-            me_onchain,
-            self.cfg.protocol.outgoing_ticket_winning_prob,
-        );
+        let packet_cfg =
+            PacketInteractionConfig::new(&self.me, me_onchain, self.cfg.protocol.outgoing_ticket_winning_prob);
 
         let (tx_from_protocol, rx_from_protocol) = futures::channel::mpsc::unbounded::<ApplicationData>();
         for (k, v) in hopr_transport_protocol::run_msg_ack_protocol(
@@ -409,7 +401,7 @@ where
         .await
         .into_iter()
         {
-            processes.insert( HoprTransportProcess::Protocol(k), v);
+            processes.insert(HoprTransportProcess::Protocol(k), v);
         }
 
         let msg_sender = helpers::MessageSender::new(self.process_packet_send.clone(), self.path_planner.clone());
@@ -748,9 +740,14 @@ where
             .await
             .map_err(hopr_db_sql::api::errors::DbError::from)?
         {
-            let own_address: Address = self.db.translate_key(None, ChainOrPacketKey::PacketKey(self.me.public().clone())).await?.ok_or_else(|| {
-                HoprTransportError::Api("Failed to translate the off-chain key to on-chain address".into())
-            })?.try_into()?;
+            let own_address: Address = self
+                .db
+                .translate_key(None, ChainOrPacketKey::PacketKey(self.me.public().clone()))
+                .await?
+                .ok_or_else(|| {
+                    HoprTransportError::Api("Failed to translate the off-chain key to on-chain address".into())
+                })?
+                .try_into()?;
 
             if channel.destination == own_address {
                 Ok(Some(self.db.get_tickets((&channel).into()).await?))

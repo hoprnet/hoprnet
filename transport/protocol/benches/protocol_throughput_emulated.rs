@@ -109,7 +109,7 @@ pub fn protocol_throughput_sender(c: &mut Criterion) {
                                 }
                             })
                             .for_each_concurrent(Some(40), |v| async {
-                                let _ = v.await;
+                                assert!(v.await.is_ok());
                             })
                             .await;
 
