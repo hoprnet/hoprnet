@@ -4303,7 +4303,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-lib"
-version = "2.2.0-rc.1"
+version = "2.2.0-rc.2"
 dependencies = [
  "anyhow",
  "async-channel 2.3.1",

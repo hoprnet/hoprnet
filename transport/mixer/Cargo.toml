@@ -30,7 +30,7 @@ hopr-metrics = { workspace = true, optional = true }
 anyhow = { workspace = true }
 async-std = { workspace = true, features = ["attributes"] }
 bytesize = { version = "1.3.0", features = ["serde"] }
-criterion = { workspace = true, features = ["async_futures", "async_tokio"] }
+criterion = { workspace = true, features = ["async_futures", "async_std"] }
 futures = { workspace = true }
 mockall = { workspace = true }
 more-asserts = { workspace = true }
