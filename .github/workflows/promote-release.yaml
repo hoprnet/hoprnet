@@ -12,7 +12,6 @@ on:
         required: true
         description: 'New release name'
         options:
-          - singapore
           - kaunas
       tag_name:
         type: string
