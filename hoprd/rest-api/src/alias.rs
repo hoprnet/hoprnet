@@ -91,7 +91,7 @@ pub(super) async fn aliases(State(state): State<Arc<InternalState>>) -> impl Int
     }
 }
 
-/// (deprecated, will be removed in v3.0) Get each previously set alias and its corresponding ETH address as a hashmap.
+// TODO(deprecated, will be removed in v3.0) Get each previously set alias and its corresponding ETH address as a hashmap.
 #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/aliases_addresses"),
@@ -251,7 +251,7 @@ pub(super) async fn get_alias(
     }
 }
 
-/// (deprecated, will be removed in v3.0) Get alias for the address (ETH address) that have this alias assigned to it.
+// TODO(deprecated, will be removed in v3.0) Get alias for the address (ETH address) that have this alias assigned to it.
 #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/aliases_addresses/{{alias}}"),
