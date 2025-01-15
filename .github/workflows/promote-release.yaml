@@ -36,7 +36,7 @@ jobs:
       - name: Promote release
         id: promote_release
         run: |
-          git fetch --all
+          git fetch --all --tags
           # Checkout to tag revision
           if ! git tag -l ${{ github.event.inputs.tag_name }} | grep ${{ github.event.inputs.tag_name }}; then
             echo "Git tag ${{ github.event.inputs.tag_name }} does not exists"
