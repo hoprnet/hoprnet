@@ -1,0 +1,125 @@
+Below there is a list with the contents of this release
+
+### 🚀 New Features
+
+- #5937 - Acknowledge *every* packet
+
+### 🐛 Bug
+
+- #6647 - Invalid alias record entry attempt after hoprd node start
+- #6411 - The Hops: 0 specification fails to send a message
+- #6349 - The pipeline does not produce a release build of hoprd for the docker image
+- #6753 - Add back challenge into the send_message endpoint
+- #6747 - Merge back bug fixes from 2.1.5
+- #6683 - `rust-libp2p` configuration tweaks to improve the hopr-lib throughput
+- #6642 - Fix API v2.2 compatibility when opening a channel
+- #6610 - Handle restricted self registration
+- #6592 - tests: Cleanup the forgotten alias after test runs randomly breaking consequent alias tests
+- #6589 - Alias to an existing peer_id or an existing alias should fail
+- #6570 - Fix packet payload size checks
+- #6488 - Fix peer list to always load the more active peers
+- #6475 - Fix setup-local-cluster script execution
+- #6455 - Fix neglecting and redeeming metrics updates
+
+### ⚡ Other
+
+- #6270 - Refacor the msg-ack flow to facilitate future libp2p_stream or other streaming capabilities
+- #5725 - Reserve Application tag ranges through the API for internal use
+- #6762 - Fix ticket deletion check
+- #6758 - rest-api: Fix recursion in error conversion
+- #6757 - Include `apiVersion` into `node/version` endpoint
+- #6756 - api: Add additional indexer info
+- #6755 - Ensure consistency of the Logs DB
+- #6754 - cfg: Cleanup the example configuration
+- #6751 - Fix backwards compatibility to 2.1.x in `ack` and `ticket_aggregation` protocol
+- #6750 - Porting schema fixes from 2.1.5
+- #6749 - Output `Address` in the EIP-55 checksum format in the REST API
+- #6748 - Extract localcluster from `conftest.py` and restore snapshoting
+- #6745 - Output routing options in the Session listing
+- #6737 - api: Fix missing items in the openAPI spec
+- #6728 - Auto-path finding improvements
+- #6723 - Session configuration tweaks
+- #6720 - Update nix to 24.11
+- #6712 - Add Loopback service to simplify usage for the CT
+- #6707 - Add endpoint for exporting Channel Graph in DOT format
+- #6706 - Improve ticket redemption handling
+- #6692 - hopli: Cleanup unnecessary dependencies
+- #6691 - nix: Fix cross-build on same platform
+- #6690 - docker: Set default session ip to random
+- #6686 - docker: Preset session listen host
+- #6685 - toolchain: fix watch_file directive in .envrc
+- #6681 - Allow to launch binaries manually
+- #6680 - Update the logging to remove the offline peer error on heartbeat
+- #6675 - Fix tokio stack overflow crash during indexing
+- #6673 - tokio: Pin main loop on heap
+- #6671 - indexer: Reduce on-chain rpc calls
+- #6669 - Fix message API request bodies and session target acceptance
+- #6668 - Do not purge peers with records fresher than 5 mins from the DB on restart
+- #6667 - Update the docker-compose deployment .env.sample default configuration
+- #6666 - Heartbeat improvements and configurability
+- #6661 - Add default session listen host option
+- #6657 - Early initialize lazy static metrics to prime them
+- #6655 - Return backwards compatible configuration with 2.1.x versions
+- #6651 - nix: Add patchelf step to cross-builds
+- #6649 - Improve some Logs DB queries
+- #6645 - Fix Fast-Sync CLI parameters and behavior when full re-sync is required
+- #6644 - Fix bugs in log processing and fast-sync
+- #6640 - Change load testing to use the websocket implementation
+- #6637 - Properly remove Session from the list when it terminates spontaneously
+- #6636 - Replace `ReaderStream` with `AsyncStreamReader` in WS Session handler
+- #6633 - Fix TagBloomFilter behavior after updating the crate to 2.0
+- #6632 - Fix websocket authentication
+- #6630 - Remove ticket validation from the last hop
+- #6628 - `Network::get` should retrieve peer even if it is ignored
+- #6624 - Add data counters to WS Session adapter and log them
+- #6623 - Disable default `transport-quic` feature
+- #6622 - deps: Update libp2p to the 0.54.1
+- #6621 - db: Add index to improve log_status queries
+- #6619 - Add criterion benchmarks for crypto-packet crate
+- #6618 - Enable explicit path routing feature
+- #6614 - Remove single ticket redeem bound in AutoRedeem strategy
+- #6612 - Add auto-redeem strategy changes missed in the merge-back
+- #6609 - Add constants for session protocol and transport config
+- #6607 - Use the quic-v1 multiaddress as a default for announcement
+- #6604 - Improvements to 2.2.0-rc.1 ergonomics
+- #6603 - Update renovate.json to remove the Dependency Dashboard issue
+- #6602 - Fix redeem actions tests to run on Nightly
+- #6601 - Update crate dependencies and tokio
+- #6599 - Fix prometheus dependencies and sanitize metrics paths
+- #6595 - Fix backwards compatibility with the 2.1.x
+- #6594 - Fix obsolete commands in envrc
+- #6590 - Bump the rust version to 1.82 and update library dependencies
+- #6583 - Fix the network heartbeat behavior to be more robust and work with /node/peers
+- #6578 - Add README section for the additional optional environment var based configuration
+- #6576 - api: Add swagger-ui as API browser back as additional option
+- #6563 - Fix heartbeat bug causing the heartbeat to terminate prematurely on the first result
+- #6559 - Rework websocket to be compliant with session behavior of client creation
+- #6558 - Handle rejected tickets without altering unredeemed metrics
+- #6556 - Add test for fully interconnected cluster with placeholder
+- #6550 - Improve logs to extract more information in a structured format
+- #6549 - Enable Snapshot testing for RPC
+- #6542 - Add support for the JSON format in the logger output
+- #6540 - Add feature to support building hoprd node with quic-v1 
+- #6538 - Docs updates
+- #6532 - Allow PeerId and Address in API calls
+- #6531 - Batching of network segments in the Session protocol
+- #6526 - Add check on safe module on start
+- #6520 - Include provider url in info endpoint
+- #6519 - Using different port on hopr-admin UI for compose deployment
+- #6518 - Fix failing sync due to missing winning probability SC address
+- #6513 - Add a instrumentation build for the tokio runtime
+- #6512 - Do not use the nightly features for rustfmt
+- #6511 - Add E2E tests for lowered winning probabilities
+- #6508 - Update the toolchain and dependencies
+- #6506 - Add a separate test for wireguard tunnel
+- #6503 - Improve Session UDP tests
+- #6501 - Add contract for winning probability and hopli command to interact with the new contract
+- #6494 - Allow configurable winning probabilities
+- #6492 - Fix failing unit tests
+- #6486 - Ensure errors in Ping API are properly propagated
+- #6481 - Session improvements
+- #6478 - Update default strategy execution interval handling
+- #6477 - Improvements to logging and safe code
+- #6457 - Merge-back from 2.1.4 Saint Louis
+- #6456 - Dependency updates 2024-08-16
+- #6435 - Introduce UDP session listener to HOPRd

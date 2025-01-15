@@ -18,10 +18,13 @@ use crate::{
 
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[schema(example = json!({
-        "version": "2.1.0"
+        "version": "2.1.0",
+        "apiVersion": "3.10.0"
     }))]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct NodeVersionResponse {
     version: String,
+    api_version: String,
 }
 
 /// Get the release version of the running node.
@@ -40,8 +43,8 @@ pub(crate) struct NodeVersionResponse {
     )]
 pub(super) async fn version(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
     let version = state.hopr.version();
-
-    (StatusCode::OK, Json(NodeVersionResponse { version })).into_response()
+    let api_version = env!("CARGO_PKG_VERSION").to_owned();
+    (StatusCode::OK, Json(NodeVersionResponse { version, api_version })).into_response()
 }
 
 /// Get the configuration of the running node.
