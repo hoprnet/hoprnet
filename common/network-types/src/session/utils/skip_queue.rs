@@ -192,6 +192,61 @@ impl<T> SkipDelaySender<T> {
     }
 }
 
+impl<T: Ord> SkipDelaySender<T> {
+    fn send_internal<I: Iterator<Item = DelayedItem<T>>>(&self, items: I, flush: bool) -> Result<(), std::io::Error> {
+        if let Some(queue) = self.0.as_ref() {
+            let mut queue = queue.lock().map_err(|_| std::io::ErrorKind::BrokenPipe)?;
+
+            // This can happen only when the receiver was dropped.
+            if queue.is_closed {
+                return Err(std::io::ErrorKind::BrokenPipe.into());
+            }
+
+            for item in items {
+                match item {
+                    DelayedItem::New(item, at) => {
+                        tracing::trace!("SkipDelayQueue::send_internal inserting");
+                        queue.entries.replace(DelayedEntry {
+                            item,
+                            at,
+                            cancelled: AtomicBool::new(false),
+                        });
+                    }
+                    DelayedItem::Cancel(item) => {
+                        tracing::trace!("SkipDelayQueue::send_internal cancelling");
+                        queue
+                            .entries
+                            .iter()
+                            .filter(|e| item == e.item)
+                            .for_each(|e| e.cancelled.store(true, std::sync::atomic::Ordering::SeqCst));
+                    }
+                }
+            }
+
+            if flush {
+                tracing::trace!("SkipDelayQueue::send_internal flushing");
+                if let Some(waker) = queue.rx_waker.take() {
+                    waker.wake();
+                }
+            }
+
+            Ok(())
+        } else {
+            Err(std::io::ErrorKind::NotConnected.into())
+        }
+    }
+
+    /// Sends the given single item and flushes the queue.
+    pub fn send_one<I: Into<DelayedItem<T>>>(&mut self, item: I) -> Result<(), std::io::Error> {
+        self.send_internal(std::iter::once(item.into()), true)
+    }
+
+    /// Sends many items at once and then flushes the queue.
+    pub fn send_many<I: IntoIterator<Item = DelayedItem<T>>>(&mut self, items: I) -> Result<(), std::io::Error> {
+        self.send_internal(items.into_iter(), true)
+    }
+}
+
 impl<T> Drop for SkipDelaySender<T> {
     fn drop(&mut self) {
         self.ensure_closure();
@@ -210,42 +265,14 @@ impl<T: Ord> futures::Sink<DelayedItem<T>> for SkipDelaySender<T> {
     }
 
     fn start_send(self: Pin<&mut Self>, item: DelayedItem<T>) -> Result<(), Self::Error> {
-        if let Some(queue) = self.0.as_ref() {
-            let mut queue = queue.lock().map_err(|_| std::io::ErrorKind::BrokenPipe)?;
-
-            // This can happen only when the receiver was dropped.
-            if queue.is_closed {
-                return Err(std::io::ErrorKind::BrokenPipe.into());
-            }
-
-            match item {
-                DelayedItem::New(item, at) => {
-                    tracing::trace!("SkipDelayQueue::start_send inserting");
-                    queue.entries.replace(DelayedEntry {
-                        item,
-                        at,
-                        cancelled: AtomicBool::new(false),
-                    });
-                }
-                DelayedItem::Cancel(item) => {
-                    tracing::trace!("SkipDelayQueue::start_send cancelling");
-                    queue
-                        .entries
-                        .iter()
-                        .filter(|e| item == e.item)
-                        .for_each(|e| e.cancelled.store(true, std::sync::atomic::Ordering::SeqCst));
-                }
-            }
-
-            Ok(())
-        } else {
-            Err(std::io::ErrorKind::NotConnected.into())
-        }
+        self.send_internal(std::iter::once(item), false)
     }
 
     fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         if let Some(queue) = self.0.as_ref() {
-            let mut queue = queue.lock().unwrap();
+            let Ok(mut queue) = queue.lock() else {
+                return Poll::Ready(Err(std::io::ErrorKind::BrokenPipe.into()));
+            };
 
             tracing::trace!("SkipDelayQueue::poll_flush");
             if let Some(waker) = queue.rx_waker.take() {

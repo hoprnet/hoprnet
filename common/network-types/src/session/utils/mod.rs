@@ -252,6 +252,12 @@ impl<T> OffloadedRbProducer<T> {
 #[derive(Debug)]
 pub(crate) struct OffloadedRbConsumer<T>(Arc<std::sync::Mutex<AllocRingBuffer<T>>>);
 
+impl<T> Clone for OffloadedRbConsumer<T> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
 impl<T: Clone> OffloadedRbConsumer<T> {
     pub fn find<F: Fn(&T) -> bool>(&self, predicate: F) -> Vec<T> {
         self.0
