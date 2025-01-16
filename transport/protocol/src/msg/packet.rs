@@ -1,5 +1,5 @@
 use hopr_db_api::protocol::TransportPacketWithChainData;
-use libp2p_identity::PeerId;
+use hopr_transport_identity::PeerId;
 
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::protocol::Acknowledgement;

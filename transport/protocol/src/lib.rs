@@ -61,22 +61,22 @@ pub mod msg;
 pub mod ticket_aggregation;
 
 pub mod timer;
+use hopr_transport_identity::Multiaddr;
 pub use timer::execute_on_tick;
 
 pub use msg::processor::DEFAULT_PRICE_PER_PACKET;
 
 use core_path::path::TransportPath;
 use futures::{SinkExt, StreamExt};
-use libp2p::PeerId;
 use msg::processor::{PacketSendFinalizer, PacketUnwrapping, PacketWrapping};
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use std::collections::HashMap;
 use tracing::{error, trace};
 
 use hopr_async_runtime::prelude::{sleep, spawn};
-use hopr_crypto_types::prelude::*;
 use hopr_db_api::protocol::HoprDbProtocolOperations;
 use hopr_internal_types::protocol::{Acknowledgement, ApplicationData};
+use hopr_transport_identity::PeerId;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::{MultiCounter, SimpleCounter, SimpleGauge};
@@ -121,21 +121,32 @@ lazy_static::lazy_static! {
     .unwrap();
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+/// Processed indexer generated events.
+#[derive(Debug, Clone)]
+pub enum PeerDiscovery {
+    Allow(PeerId),
+    Ban(PeerId),
+    Announce(PeerId, Vec<Multiaddr>),
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, strum::Display)]
 pub enum ProtocolProcesses {
+    #[strum(to_string = "HOPR ack ingress")]
     AckIn,
+    #[strum(to_string = "HOPR ack egress")]
     AckOut,
+    #[strum(to_string = "HOPR msg ingress")]
     MsgIn,
+    #[strum(to_string = "HOPR msg egress")]
     MsgOut,
-    BloomPersist,
+    #[strum(to_string = "periodic bloom filter save")]
+    BloomFilterSave,
 }
 
 #[allow(clippy::too_many_arguments)]
 pub async fn run_msg_ack_protocol<Db>(
     cfg: msg::processor::PacketInteractionConfig,
     db: Db,
-    me: &OffchainKeypair,
-    me_onchain: &ChainKeypair,
     bloom_filter_persistent_path: Option<String>,
     wire_ack: (
         impl futures::Sink<(PeerId, Acknowledgement)> + Send + Sync + 'static,
@@ -153,6 +164,9 @@ pub async fn run_msg_ack_protocol<Db>(
 where
     Db: HoprDbProtocolOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
 {
+    let me = cfg.packet_keypair.clone();
+    let me_onchain = &cfg.chain_keypair.clone();
+
     let mut processes = HashMap::new();
 
     #[cfg(all(feature = "prometheus", not(test)))]
@@ -173,7 +187,7 @@ where
         let tbf = bloom::WrappedTagBloomFilter::new(bloom_filter_persistent_path);
         let tbf_2 = tbf.clone();
         processes.insert(
-            ProtocolProcesses::BloomPersist,
+            ProtocolProcesses::BloomFilterSave,
             spawn(Box::pin(execute_on_tick(
                 std::time::Duration::from_secs(90),
                 move || {
