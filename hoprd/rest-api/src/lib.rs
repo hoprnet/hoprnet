@@ -91,8 +91,10 @@ pub(crate) struct InternalState {
         account::balances,
         account::withdraw,
         alias::aliases,
+        alias::aliases_addresses,
         alias::set_alias,
         alias::get_alias,
+        alias::get_alias_address,
         alias::delete_alias,
         alias::clear_aliases,
         channels::close_channel,
@@ -279,9 +281,11 @@ async fn build_api(
             BASE_PATH,
             Router::new()
                 .route("/aliases", get(alias::aliases))
+                .route("/aliases_addresses", get(alias::aliases_addresses))
                 .route("/aliases", post(alias::set_alias))
                 .route("/aliases", delete(alias::clear_aliases))
                 .route("/aliases/:alias", get(alias::get_alias))
+                .route("/aliases_addresses/:alias", get(alias::get_alias_address))
                 .route("/aliases/:alias", delete(alias::delete_alias))
                 .route("/account/addresses", get(account::addresses))
                 .route("/account/balances", get(account::balances))
