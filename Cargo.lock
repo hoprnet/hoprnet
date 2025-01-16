@@ -1653,7 +1653,7 @@ checksum = "773648b94d0e5d620f64f280777445740e61fe701025087ec8b57f45c791888b"
 
 [[package]]
 name = "core-network"
-version = "0.6.4"
+version = "0.6.5"
 dependencies = [
  "anyhow",
  "async-std",
@@ -4303,7 +4303,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-lib"
-version = "2.2.0-rc.2"
+version = "3.0.0"
 dependencies = [
  "anyhow",
  "async-channel 2.3.1",
@@ -4320,7 +4320,6 @@ dependencies = [
  "core-path",
  "ethers",
  "futures",
- "futures-concurrency",
  "futures-timer",
  "hex-literal",
  "hopr-async-runtime",
@@ -4506,6 +4505,7 @@ dependencies = [
  "core-network",
  "core-path",
  "futures",
+ "futures-concurrency",
  "hopr-async-runtime",
  "hopr-crypto-packet",
  "hopr-crypto-random",
@@ -4516,12 +4516,12 @@ dependencies = [
  "hopr-network-types",
  "hopr-platform",
  "hopr-primitive-types",
+ "hopr-transport-identity",
  "hopr-transport-mixer",
  "hopr-transport-p2p",
  "hopr-transport-protocol",
  "hopr-transport-session",
  "lazy_static",
- "libp2p",
  "moka",
  "proc-macro-regex",
  "rust-stream-ext-concurrent",
@@ -4533,6 +4533,16 @@ dependencies = [
  "tracing",
  "uuid 1.11.0",
  "validator",
+]
+
+[[package]]
+name = "hopr-transport-identity"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "libp2p-identity",
+ "multiaddr",
+ "thiserror",
 ]
 
 [[package]]
@@ -4559,7 +4569,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-p2p"
-version = "0.5.3"
+version = "0.5.4"
 dependencies = [
  "anyhow",
  "async-std",
@@ -4569,6 +4579,7 @@ dependencies = [
  "hopr-crypto-types",
  "hopr-internal-types",
  "hopr-metrics",
+ "hopr-transport-identity",
  "hopr-transport-protocol",
  "lazy_static",
  "libp2p",
@@ -4589,7 +4600,9 @@ dependencies = [
  "async-lock 3.4.0",
  "async-std",
  "async-trait",
+ "bytesize",
  "core-path",
+ "criterion",
  "futures",
  "hex-literal",
  "hopr-async-runtime",
@@ -4602,10 +4615,10 @@ dependencies = [
  "hopr-metrics",
  "hopr-platform",
  "hopr-primitive-types",
+ "hopr-transport-identity",
  "hopr-transport-mixer",
  "lazy_static",
  "libp2p",
- "libp2p-identity",
  "more-asserts",
  "parameterized",
  "rust-stream-ext-concurrent",

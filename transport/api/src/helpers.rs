@@ -1,6 +1,5 @@
 use async_lock::RwLock;
 use futures::channel::mpsc::Sender;
-use libp2p::{Multiaddr, PeerId};
 use std::sync::{Arc, OnceLock};
 use tracing::trace;
 
@@ -13,12 +12,14 @@ use core_path::{
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_db_sql::HoprDbAllOperations;
 use hopr_internal_types::protocol::ApplicationData;
-use hopr_primitive_types::primitives::Address;
-use hopr_transport_protocol::msg::processor::{MsgSender, SendMsgInput};
-use hopr_transport_session::{errors::TransportSessionError, traits::SendMsg};
-
 use hopr_network_types::prelude::RoutingOptions;
-use hopr_transport_session::errors::SessionManagerError;
+use hopr_primitive_types::primitives::Address;
+use hopr_transport_identity::PeerId;
+use hopr_transport_protocol::msg::processor::{MsgSender, SendMsgInput};
+use hopr_transport_session::{
+    errors::{SessionManagerError, TransportSessionError},
+    traits::SendMsg,
+};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -44,12 +45,6 @@ impl From<NetworkRegistryStatus> for PeerEligibility {
             NetworkRegistryStatus::Denied => Self::Ineligible,
         }
     }
-}
-
-/// Indexer events triggered externally from the [`crate::HoprTransport`] object.
-pub enum IndexerTransportEvent {
-    EligibilityUpdate(PeerId, PeerEligibility),
-    Announce(PeerId, Vec<Multiaddr>),
 }
 
 /// Ticket statistics data exposed by the ticket mechanism.

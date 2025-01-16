@@ -1,25 +1,25 @@
-use futures::{pin_mut, select, SinkExt, StreamExt};
+use futures::{pin_mut, select, SinkExt, Stream, StreamExt};
 use futures_concurrency::stream::Merge;
-use libp2p::{request_response::OutboundRequestId, PeerId};
+use libp2p::{request_response::OutboundRequestId, request_response::ResponseChannel, swarm::SwarmEvent};
+
 use std::{num::NonZeroU8, sync::Arc};
 use tracing::{debug, error, info, trace, warn};
 
 use core_network::{messaging::ControlMessage, network::NetworkTriggeredEvent, ping::PingQueryReplier};
 use hopr_internal_types::prelude::*;
+use hopr_transport_identity::{
+    multiaddrs::{replace_transport_with_unspecified, resolve_dns_if_any},
+    Multiaddr, PeerId,
+};
 use hopr_transport_protocol::{
     config::ProtocolConfig,
     ticket_aggregation::processor::{
         TicketAggregationActions, TicketAggregationFinalizer, TicketAggregationInteraction, TicketAggregationProcessed,
     },
+    PeerDiscovery,
 };
 
-use crate::{
-    constants,
-    errors::Result,
-    libp2p::{request_response::ResponseChannel, swarm::SwarmEvent},
-    multiaddrs::{replace_transport_with_unspecified, resolve_dns_if_any, Multiaddr},
-    HoprNetworkBehavior, HoprNetworkBehaviorEvent, PeerDiscovery, Ping, Pong,
-};
+use crate::{constants, errors::Result, HoprNetworkBehavior, HoprNetworkBehaviorEvent, Ping, Pong};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleGauge;
@@ -35,17 +35,20 @@ lazy_static::lazy_static! {
 /// Build objects comprising the p2p network.
 ///
 /// Returns a built [libp2p::Swarm] object implementing the HoprNetworkBehavior functionality.
-async fn build_p2p_network(
+async fn build_p2p_network<U>(
     me: libp2p::identity::Keypair,
     network_update_input: futures::channel::mpsc::Receiver<NetworkTriggeredEvent>,
-    indexer_update_input: futures::channel::mpsc::UnboundedReceiver<PeerDiscovery>,
+    indexer_update_input: U,
     heartbeat_requests: futures::channel::mpsc::UnboundedReceiver<(PeerId, PingQueryReplier)>,
     ticket_aggregation_interactions: TicketAggregationInteraction<
         TicketAggregationResponseType,
         TicketAggregationRequestType,
     >,
     protocol_cfg: ProtocolConfig,
-) -> Result<libp2p::Swarm<HoprNetworkBehavior>> {
+) -> Result<libp2p::Swarm<HoprNetworkBehavior>>
+where
+    U: Stream<Item = PeerDiscovery> + Send + 'static,
+{
     let tcp_upgrade = libp2p::core::upgrade::SelectUpgrade::new(
         {
             let num_streams = std::env::var("HOPR_INTERNAL_LIBP2P_YAMUX_MAX_NUM_STREAMS")
@@ -135,10 +138,10 @@ pub struct HoprSwarm {
 }
 
 impl HoprSwarm {
-    pub async fn new(
+    pub async fn new<U>(
         identity: libp2p::identity::Keypair,
         network_update_input: futures::channel::mpsc::Receiver<NetworkTriggeredEvent>,
-        indexer_update_input: futures::channel::mpsc::UnboundedReceiver<PeerDiscovery>,
+        indexer_update_input: U,
         heartbeat_requests: futures::channel::mpsc::UnboundedReceiver<(PeerId, PingQueryReplier)>,
         ticket_aggregation_interactions: TicketAggregationInteraction<
             TicketAggregationResponseType,
@@ -146,7 +149,10 @@ impl HoprSwarm {
         >,
         my_multiaddresses: Vec<Multiaddr>,
         protocol_cfg: ProtocolConfig,
-    ) -> Self {
+    ) -> Self
+    where
+        U: Stream<Item = PeerDiscovery> + Send + 'static,
+    {
         let mut swarm = build_p2p_network(
             identity,
             network_update_input,
@@ -540,7 +546,7 @@ where
                     SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::TicketAggregationBehavior(event)) => {
                         let _span = tracing::span!(tracing::Level::DEBUG, "swarm behavior", behavior="ticket aggregation");
 
-                        trace!(event = tracing::field::debug(&event), "Received a discovery event");
+                        trace!(event = tracing::field::debug(&event), "Received a ticket aggregation event");
                         match event {
                             TicketAggregationProcessed::Send(peer, acked_tickets, finalizer) => {
                                 let ack_tkt_count = acked_tickets.len();

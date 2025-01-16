@@ -61,22 +61,22 @@ pub mod msg;
 pub mod ticket_aggregation;
 
 pub mod timer;
+use hopr_transport_identity::Multiaddr;
 pub use timer::execute_on_tick;
 
-pub use msg::processor::DEFAULT_PRICE_PER_PACKET;
-use msg::processor::{PacketSendFinalizer, PacketUnwrapping, PacketWrapping};
-
 use futures::{SinkExt, StreamExt};
-use libp2p::PeerId;
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use std::collections::HashMap;
 use tracing::error;
 
 use core_path::path::TransportPath;
 use hopr_async_runtime::prelude::spawn;
-use hopr_crypto_types::prelude::*;
 use hopr_db_api::protocol::HoprDbProtocolOperations;
 use hopr_internal_types::protocol::{Acknowledgement, ApplicationData};
+use hopr_transport_identity::PeerId;
+
+pub use msg::processor::DEFAULT_PRICE_PER_PACKET;
+use msg::processor::{PacketSendFinalizer, PacketUnwrapping, PacketWrapping};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::{MultiCounter, SimpleCounter};
@@ -125,16 +125,21 @@ pub enum ProtocolProcesses {
     MsgOut,
     #[strum(to_string = "HOPR [msg] - mixer")]
     Mixer,
-    #[strum(to_string = "bloom filter persistence")]
+    #[strum(to_string = "bloom filter persistence (periodic)")]
     BloomPersist,
+}
+/// Processed indexer generated events.
+#[derive(Debug, Clone)]
+pub enum PeerDiscovery {
+    Allow(PeerId),
+    Ban(PeerId),
+    Announce(PeerId, Vec<Multiaddr>),
 }
 
 #[allow(clippy::too_many_arguments)]
 pub async fn run_msg_ack_protocol<Db>(
     cfg: msg::processor::PacketInteractionConfig,
     db: Db,
-    me: &OffchainKeypair,
-    me_onchain: &ChainKeypair,
     bloom_filter_persistent_path: Option<String>,
     wire_ack: (
         impl futures::Sink<(PeerId, Acknowledgement)> + Send + Sync + 'static,
@@ -152,6 +157,9 @@ pub async fn run_msg_ack_protocol<Db>(
 where
     Db: HoprDbProtocolOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
 {
+    let me = cfg.packet_keypair.clone();
+    let me_onchain = &cfg.chain_keypair.clone();
+
     let mut processes = HashMap::new();
 
     #[cfg(all(feature = "prometheus", not(test)))]

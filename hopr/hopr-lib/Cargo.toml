@@ -1,6 +1,6 @@
 [package]
 name = "hopr-lib"
-version = "2.2.0-rc.2"
+version = "3.0.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "HOPR library containing the entire functionality importable without the HOPRd daemon"
@@ -53,7 +53,6 @@ atomic_enum = { workspace = true }
 backon = { version = "1.2.0", default-features = false }
 const_format = { workspace = true }
 futures = { workspace = true }
-futures-concurrency = { workspace = true }
 futures-timer = "3.0.3"
 lazy_static = { workspace = true }
 tracing = { workspace = true }
