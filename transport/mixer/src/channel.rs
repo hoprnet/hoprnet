@@ -20,9 +20,9 @@ use hopr_metrics::metrics::SimpleGauge;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_QUEUE_SIZE: SimpleGauge =
+    pub static ref METRIC_QUEUE_SIZE: SimpleGauge =
         SimpleGauge::new("hopr_mixer_queue_size", "Current mixer queue size").unwrap();
-    static ref METRIC_MIXER_AVERAGE_DELAY: SimpleGauge = SimpleGauge::new(
+    pub static ref METRIC_MIXER_AVERAGE_DELAY: SimpleGauge = SimpleGauge::new(
         "hopr_mixer_average_packet_delay",
         "Average mixer packet delay averaged over a packet window"
     )

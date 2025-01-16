@@ -10,7 +10,7 @@ license = "GPL-3.0-only"
 crate-type = ["rlib"]
 
 [features]
-default = []
+default = ["mixer-stream"]
 transport-quic = []
 runtime-async-std = [
   "core-network/runtime-async-std",
@@ -36,10 +36,13 @@ prometheus = [
   "core-path/prometheus",
   "hopr-db-sql/prometheus",
   "hopr-network-types/prometheus",
+  "hopr-transport-mixer/prometheus",
   "hopr-transport-p2p/prometheus",
   "hopr-transport-protocol/prometheus",
   "hopr-transport-session/prometheus",
 ]
+mixer-stream = []
+mixer-channel = []
 
 [dependencies]
 async-trait = { workspace = true }

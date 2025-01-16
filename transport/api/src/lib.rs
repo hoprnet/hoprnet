@@ -67,6 +67,9 @@ use hopr_transport_protocol::{
 };
 use hopr_transport_session::{DispatchResult, SessionManager, SessionManagerConfig};
 
+#[cfg(feature = "mixer-stream")]
+use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
+
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_transport_session::types::transfer_session;
 pub use {
@@ -415,7 +418,7 @@ where
             Box::new(|dur| Box::pin(sleep(dur))),
         );
 
-        // initiate the libp2p transport layer
+        // initiate the transport layer
         let (ack_to_send_tx, ack_to_send_rx) = mpsc::unbounded::<(PeerId, Acknowledgement)>();
         let (ack_received_tx, ack_received_rx) =
             mpsc::channel::<(PeerId, Acknowledgement)>(MAXIMUM_ACK_INCOMING_BUFFER_SIZE);
@@ -448,7 +451,42 @@ where
                 .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_CAPACITY),
             ..MixerConfig::default()
         };
-        let (mixer_channel_tx, mixer_channel_rx) = hopr_transport_mixer::channel::<(PeerId, Box<[u8]>)>(mixer_cfg);
+        #[cfg(feature = "mixer-channel")]
+        let (mixing_channel_tx, mixing_channel_rx) = hopr_transport_mixer::channel::<(PeerId, Box<[u8]>)>(mixer_cfg);
+
+        #[cfg(feature = "mixer-stream")]
+        let (mixing_channel_tx, mixing_channel_rx) = {
+            let (tx, rx) = futures::channel::mpsc::channel::<(PeerId, Box<[u8]>)>(MAXIMUM_MSG_OUTGOING_BUFFER_SIZE);
+            let rx = rx.then_concurrent(move |v| {
+                let cfg = mixer_cfg;
+
+                async move {
+                    let random_delay = cfg.random_delay();
+                    trace!(delay_in_ms = random_delay.as_millis(), "Created random mixer delay",);
+
+                    #[cfg(all(feature = "prometheus", not(test)))]
+                    hopr_transport_mixer::channel::METRIC_QUEUE_SIZE.decrement(1.0f64);
+
+                    sleep(random_delay).await;
+
+                    #[cfg(all(feature = "prometheus", not(test)))]
+                    {
+                        hopr_transport_mixer::channel::METRIC_QUEUE_SIZE.decrement(1.0f64);
+
+                        let weight = 1.0f64 / cfg.metric_delay_window as f64;
+                        hopr_transport_mixer::channel::METRIC_MIXER_AVERAGE_DELAY.set(
+                            (weight * random_delay.as_millis() as f64)
+                                + ((1.0f64 - weight) * hopr_transport_mixer::channel::METRIC_MIXER_AVERAGE_DELAY.get()),
+                        );
+                    }
+
+                    v
+                }
+            });
+
+            (tx, rx)
+        };
+
         let (msg_received_tx, msg_received_rx) = mpsc::channel::<(PeerId, Box<[u8]>)>(MAXIMUM_MSG_INCOMING_BUFFER_SIZE);
 
         let transport_layer = HoprSwarm::new(
@@ -465,7 +503,7 @@ where
         let transport_layer = transport_layer.with_processors(
             ack_to_send_rx,
             ack_received_tx,
-            mixer_channel_rx,
+            mixing_channel_rx,
             msg_received_tx,
             tkt_agg_writer,
         );
@@ -482,7 +520,7 @@ where
             self.db.clone(),
             Some(tbf_path),
             (ack_to_send_tx, ack_received_rx),
-            (mixer_channel_tx, msg_received_rx),
+            (mixing_channel_tx, msg_received_rx),
             (tx_from_protocol, external_msg_rx),
         )
         .await
