@@ -11,7 +11,7 @@ use std::time::Duration;
 
 use crate::prelude::errors::SessionError;
 use crate::prelude::protocol::{FrameAcknowledgements, SessionCodec, SessionMessage};
-use crate::prelude::{frame_reconstructor, FrameId, Segment};
+use crate::prelude::{frame_reconstructor, frame_reconstructor_with_inspector, FrameId, Segment};
 use crate::session::protocol::SegmentRequest;
 use crate::session::segmenter::Segmenter;
 use crate::session::utils::{offloaded_ringbuffer, OffloadedRbConsumer};
@@ -156,7 +156,7 @@ impl<const C: usize> SessionSocket<C> {
         let session_id = id.to_string();
 
         // Downstream Segments get reconstructed into Frames
-        let (downstream_segment_in, downstream_frames_out) = frame_reconstructor(Duration::from_secs(10), 1024);
+        let (downstream_segment_in, downstream_frames_out, frame_inspector) = frame_reconstructor_with_inspector(Duration::from_secs(10), 1024);
 
         // Upstream frames get segmented and are yielded by the data_rx stream
         let (upstream_frames_in, segmented_data_rx) = Segmenter::<C, 1500>::new(1024);
@@ -268,7 +268,7 @@ impl<const C: usize> SessionSocket<C> {
                        if let Err(error) = outgoing_frame_retries_tx_clone.send_one((next, retry_at)) {
                            tracing::error!(frame_id, %error, "failed to register next retry of frame");
                        } else {
-                           tracing::debug!(frame_id, retry_at, "next resend of outgoing frame");
+                           tracing::debug!(frame_id, ?retry_at, "next resend of outgoing frame");
                        }
                    }
                    frame_id
@@ -290,7 +290,7 @@ impl<const C: usize> SessionSocket<C> {
         let mut incoming_frame_retries_tx_clone = incoming_frame_retries_tx.clone();
         let ctl_tx_clone = ctl_tx.clone();
         hopr_async_runtime::prelude::spawn(async move {
-            incoming_frame_retries_rx
+            if let Err(error) = incoming_frame_retries_rx
                 .map(|rf| {
                     let frame_id = rf.frame_id;
                     // TODO: take frame max_retries from the config
@@ -301,11 +301,19 @@ impl<const C: usize> SessionSocket<C> {
                         if let Err(error) = incoming_frame_retries_tx_clone.send_one((next, retry_at)) {
                             tracing::error!(frame_id, %error, "failed to register next resend of incoming frame");
                         } else {
-                            tracing::debug!(frame_id, retry_at, "next resend request of incoming frame segments");
+                            tracing::debug!(frame_id, ?retry_at, "next resend request of incoming frame segments");
                         }
                     }
-                    frame_id
+                    (frame_id, frame_inspector.missing_segments(&frame_id).unwrap_or_default())
                 })
+                .ready_chunks(SegmentRequest::<C>::MAX_ENTRIES)
+                .map(|a| Ok(SessionMessage::<C>::Request(a.into_iter().collect())))
+                .forward(ctl_tx_clone)
+                .await {
+                tracing::error!(%error, "error while processing incoming frame resends");
+            } else {
+                tracing::trace!("incoming segment resends processing done");
+            }
         });
 
         let mut state = SocketState {
