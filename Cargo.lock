@@ -1133,6 +1133,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "bytesize"
+version = "1.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a3e368af43e418a04d52505cf3dbc23dda4e3407ae2fa99fd0e4f308ce546acc"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "camino"
 version = "1.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1652,7 +1661,7 @@ checksum = "773648b94d0e5d620f64f280777445740e61fe701025087ec8b57f45c791888b"
 
 [[package]]
 name = "core-network"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "anyhow",
  "async-std",
@@ -4354,7 +4363,6 @@ dependencies = [
  "core-path",
  "ethers",
  "futures",
- "futures-concurrency",
  "futures-timer",
  "hex-literal",
  "hopr-async-runtime",
@@ -4531,7 +4539,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.8.4"
+version = "0.9.0"
 dependencies = [
  "async-lock 3.4.0",
  "async-trait",
@@ -4539,6 +4547,7 @@ dependencies = [
  "core-network",
  "core-path",
  "futures",
+ "futures-concurrency",
  "hopr-async-runtime",
  "hopr-crypto-packet",
  "hopr-crypto-types",
@@ -4548,19 +4557,31 @@ dependencies = [
  "hopr-network-types",
  "hopr-platform",
  "hopr-primitive-types",
+ "hopr-transport-identity",
  "hopr-transport-p2p",
  "hopr-transport-protocol",
  "hopr-transport-session",
  "lazy_static",
- "libp2p",
+ "moka",
  "proc-macro-regex",
  "serde",
  "serde_with",
  "smart-default",
+ "strum",
  "thiserror 1.0.68",
  "tracing",
  "uuid 1.11.0",
  "validator",
+]
+
+[[package]]
+name = "hopr-transport-identity"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "libp2p-identity",
+ "multiaddr",
+ "thiserror 1.0.68",
 ]
 
 [[package]]
@@ -4575,6 +4596,7 @@ dependencies = [
  "hopr-crypto-types",
  "hopr-internal-types",
  "hopr-metrics",
+ "hopr-transport-identity",
  "hopr-transport-protocol",
  "lazy_static",
  "libp2p",
@@ -4595,7 +4617,9 @@ dependencies = [
  "async-lock 3.4.0",
  "async-std",
  "async-trait",
+ "bytesize",
  "core-path",
+ "criterion",
  "futures",
  "hex-literal",
  "hopr-async-runtime",
@@ -4608,17 +4632,19 @@ dependencies = [
  "hopr-metrics",
  "hopr-platform",
  "hopr-primitive-types",
+ "hopr-transport-identity",
  "lazy_static",
  "libp2p",
- "libp2p-identity",
  "more-asserts",
  "rust-stream-ext-concurrent",
  "serde",
  "serde_with",
  "serial_test",
  "smart-default",
+ "strum",
  "thiserror 1.0.68",
  "tracing",
+ "tracing-test",
  "validator",
 ]
 
