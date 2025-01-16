@@ -346,7 +346,7 @@ Prerequisites:
 - swagger-codegen3
 - build the repository to get the `hoprd-api-schema` generated
 
-The generated SDK will be available in the `/tmp/hoprd-sdk-python/` directory. You can modify the script to generate SDKs for different programming languages supported by swagger-codegen3.
+The generated SDK will be available in the `/tmp/hoprd-sdk-python/` directory. Modify the script to generate SDKs for different programming languages supported by swagger-codegen3.
 
 For usage examples of the generated SDK, refer to the generated README.md file in the SDK directory.
 
