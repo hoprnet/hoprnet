@@ -7,7 +7,6 @@ use futures::{
     pin_mut,
 };
 use libp2p::request_response::{OutboundRequestId, ResponseChannel};
-use libp2p_identity::PeerId;
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use std::{pin::Pin, task::Poll};
 use tracing::{error, warn};
@@ -19,6 +18,7 @@ use hopr_db_api::{
     tickets::{AggregationPrerequisites, HoprDbTicketOperations},
 };
 use hopr_internal_types::prelude::*;
+use hopr_transport_identity::PeerId;
 
 use crate::errors::{
     ProtocolError::{Retry, TransportError},
