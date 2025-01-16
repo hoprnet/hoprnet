@@ -9,6 +9,8 @@ use anyhow::Context;
 fn main() -> anyhow::Result<()> {
     let cargo_manifest_dir = &env::var("CARGO_MANIFEST_DIR")?;
     let bindings_codegen_path = Path::new(&cargo_manifest_dir).join("src/codegen");
+    std::fs::create_dir_all(bindings_codegen_path.clone())?;
+
     let contracts_package_path = Path::new(&cargo_manifest_dir)
         .parent()
         .context("must have a parent")?
@@ -45,6 +47,12 @@ fn main() -> anyhow::Result<()> {
         "cargo:rerun-if-changed={}",
         vendor_path.to_str().context("must be convertible to string")?
     );
+
+    assert!(std::fs::metadata(&bindings_codegen_path)
+        .context("must be a path")?
+        .is_dir());
+
+    assert!(Command::new("forge").args(["--version"]).status()?.success());
 
     assert!(Command::new("forge")
         .args([
