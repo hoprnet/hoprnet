@@ -250,7 +250,7 @@ impl PacketSendAwaiter {
 
 pub type SendMsgInput = (ApplicationData, TransportPath, PacketSendFinalizer);
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MsgSender<T>
 where
     T: Sink<SendMsgInput> + Send + Sync + Clone + 'static + std::marker::Unpin,

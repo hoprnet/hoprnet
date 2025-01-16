@@ -62,6 +62,7 @@ pub mod ticket_aggregation;
 
 pub mod timer;
 use hopr_transport_identity::Multiaddr;
+pub use hopr_transport_mixer::MixerConfig;
 pub use timer::execute_on_tick;
 
 use futures::{SinkExt, StreamExt};
@@ -138,7 +139,8 @@ pub enum PeerDiscovery {
 
 #[allow(clippy::too_many_arguments)]
 pub async fn run_msg_ack_protocol<Db>(
-    cfg: msg::processor::PacketInteractionConfig,
+    packet_cfg: msg::processor::PacketInteractionConfig,
+    mixer_cfg: MixerConfig,
     db: Db,
     bloom_filter_persistent_path: Option<String>,
     wire_ack: (
@@ -157,8 +159,8 @@ pub async fn run_msg_ack_protocol<Db>(
 where
     Db: HoprDbProtocolOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
 {
-    let me = cfg.packet_keypair.clone();
-    let me_onchain = &cfg.chain_keypair.clone();
+    let me = packet_cfg.packet_keypair.clone();
+    let me_onchain = &packet_cfg.chain_keypair.clone();
 
     let mut processes = HashMap::new();
 
@@ -196,7 +198,7 @@ where
 
     let ack_processor_read = ack::processor::AcknowledgementProcessor::new(db.clone(), me_onchain);
     let ack_processor_write = ack_processor_read.clone();
-    let msg_processor_read = msg::processor::PacketProcessor::new(db.clone(), tbf, cfg);
+    let msg_processor_read = msg::processor::PacketProcessor::new(db.clone(), tbf, packet_cfg);
     let msg_processor_write = msg_processor_read.clone();
 
     processes.insert(
@@ -254,35 +256,7 @@ where
 
     // TODO: mixer strictly does not have to be here, but a better abstraction of the transport layer is needed to lift it
     let msg_to_send_tx = wire_msg.0.clone();
-    let (mixer_channel_tx, mixer_channel_rx) =
-        hopr_transport_mixer::channel::<(PeerId, Box<[u8]>)>(hopr_transport_mixer::MixerConfig {
-            min_delay: std::time::Duration::from_millis(
-                std::env::var("HOPR_INTERNAL_MIXER_MINIMUM_DELAY_IN_MS")
-                    .map(|v| {
-                        v.trim()
-                            .parse::<u64>()
-                            .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS)
-                    })
-                    .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS),
-            ),
-            delay_range: std::time::Duration::from_millis(
-                std::env::var("HOPR_INTERNAL_MIXER_DELAY_RANGE_IN_MS")
-                    .map(|v| {
-                        v.trim()
-                            .parse::<u64>()
-                            .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_DEFAULT_DELAY_RANGE_IN_MS)
-                    })
-                    .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_DEFAULT_DELAY_RANGE_IN_MS),
-            ),
-            capacity: std::env::var("HOPR_INTERNAL_MIXER_CAPACITY")
-                .map(|v| {
-                    v.trim()
-                        .parse::<usize>()
-                        .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_CAPACITY)
-                })
-                .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_CAPACITY),
-            ..hopr_transport_mixer::MixerConfig::default()
-        });
+    let (mixer_channel_tx, mixer_channel_rx) = hopr_transport_mixer::channel::<(PeerId, Box<[u8]>)>(mixer_cfg);
 
     processes.insert(
         ProtocolProcesses::Mixer,

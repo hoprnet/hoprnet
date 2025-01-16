@@ -19,6 +19,7 @@ prometheus = ["dep:hopr-metrics", "dep:lazy_static"]
 futures = { workspace = true }
 futures-timer = { workspace = true }
 lazy_static = { workspace = true, optional = true }
+rust-stream-ext-concurrent = { workspace = true }
 smart-default = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
@@ -34,7 +35,6 @@ criterion = { workspace = true, features = ["async_futures", "async_std"] }
 futures = { workspace = true }
 mockall = { workspace = true }
 more-asserts = { workspace = true }
-rust-stream-ext-concurrent = { workspace = true }
 tracing-test = { workspace = true }
 
 [[bench]]

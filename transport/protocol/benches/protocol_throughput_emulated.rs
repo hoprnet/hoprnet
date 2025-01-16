@@ -8,10 +8,8 @@ use criterion::{async_executor::AsyncExecutor, criterion_group, criterion_main, 
 use futures::StreamExt;
 use hopr_crypto_types::keypairs::Keypair;
 use hopr_internal_types::protocol::{Acknowledgement, ApplicationData};
-use hopr_transport_protocol::msg::{
-    mixer::MixerConfig,
-    processor::{MsgSender, PacketInteractionConfig, PacketSendFinalizer},
-};
+use hopr_transport_mixer::MixerConfig;
+use hopr_transport_protocol::msg::processor::{MsgSender, PacketInteractionConfig, PacketSendFinalizer};
 use libp2p::PeerId;
 
 const SAMPLE_SIZE: usize = 10;
@@ -67,12 +65,12 @@ pub fn protocol_throughput_sender(c: &mut Criterion) {
                             check_unrealized_balance: true,
                             packet_keypair: (&PEERS[TESTED_PEER_ID]).clone(),
                             chain_keypair: (&PEERS_CHAIN[TESTED_PEER_ID]).clone(),
-                            mixer: MixerConfig::default(),
                             outgoing_ticket_win_prob: 1.0,
                         };
 
                         let processes = hopr_transport_protocol::run_msg_ack_protocol(
                             cfg,
+                            MixerConfig::default(),
                             dbs[TESTED_PEER_ID].clone(),
                             None,
                             (wire_ack_recv_tx, wire_ack_send_rx),

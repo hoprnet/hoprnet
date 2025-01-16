@@ -23,11 +23,9 @@ use hopr_db_sql::{
 };
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
+use hopr_transport_mixer::config::MixerConfig;
 use hopr_transport_protocol::{
-    msg::{
-        mixer::MixerConfig,
-        processor::{MsgSender, PacketInteractionConfig, PacketSendFinalizer},
-    },
+    msg::processor::{MsgSender, PacketInteractionConfig, PacketSendFinalizer},
     DEFAULT_PRICE_PER_PACKET,
 };
 use tracing::debug;
@@ -206,18 +204,18 @@ pub async fn peer_setup_for(
 
         let opk: &OffchainKeypair = &PEERS[i];
         let ock: &ChainKeypair = &PEERS_CHAIN[i];
-        let cfg = PacketInteractionConfig {
+        let packet_cfg = PacketInteractionConfig {
             check_unrealized_balance: true,
             packet_keypair: opk.clone(),
             chain_keypair: ock.clone(),
-            mixer: MixerConfig::default(),
             outgoing_ticket_win_prob: 1.0,
         };
 
         db.start_ticket_processing(Some(received_ack_tickets_tx))?;
 
         hopr_transport_protocol::run_msg_ack_protocol(
-            cfg,
+            packet_cfg,
+            MixerConfig::default(),
             db,
             None,
             (wire_ack_recv_tx, wire_ack_send_rx),

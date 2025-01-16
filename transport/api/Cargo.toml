@@ -62,6 +62,7 @@ validator = { workspace = true }
 core-network = { workspace = true }
 chain-types = { workspace = true }
 core-path = { workspace = true }
+hopr-async-runtime = { workspace = true }
 hopr-crypto-packet = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-crypto-random = { workspace = true }
@@ -72,10 +73,10 @@ hopr-platform = { workspace = true }
 hopr-primitive-types = { workspace = true }
 hopr-network-types = { workspace = true, features = ["serde"] }
 hopr-transport-identity = { workspace = true }
+hopr-transport-mixer = { workspace = true }
 hopr-transport-p2p = { workspace = true }
 hopr-transport-protocol = { workspace = true }
 hopr-transport-session = { workspace = true }
-hopr-async-runtime = { workspace = true }
 
 [dev-dependencies]
 async-std = { workspace = true }

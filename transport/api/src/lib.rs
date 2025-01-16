@@ -32,6 +32,7 @@ use futures::{
     pin_mut, FutureExt, SinkExt, StreamExt,
 };
 use hopr_transport_identity::multiaddrs::strip_p2p_protocol;
+use hopr_transport_mixer::MixerConfig;
 use std::time::Duration;
 use std::{
     collections::HashMap,
@@ -447,9 +448,39 @@ where
         let packet_cfg =
             PacketInteractionConfig::new(&self.me, me_onchain, self.cfg.protocol.outgoing_ticket_winning_prob);
 
+        let mixer_cfg = MixerConfig {
+            min_delay: std::time::Duration::from_millis(
+                std::env::var("HOPR_INTERNAL_MIXER_MINIMUM_DELAY_IN_MS")
+                    .map(|v| {
+                        v.trim()
+                            .parse::<u64>()
+                            .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS)
+                    })
+                    .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS),
+            ),
+            delay_range: std::time::Duration::from_millis(
+                std::env::var("HOPR_INTERNAL_MIXER_DELAY_RANGE_IN_MS")
+                    .map(|v| {
+                        v.trim()
+                            .parse::<u64>()
+                            .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_DEFAULT_DELAY_RANGE_IN_MS)
+                    })
+                    .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_DEFAULT_DELAY_RANGE_IN_MS),
+            ),
+            capacity: std::env::var("HOPR_INTERNAL_MIXER_CAPACITY")
+                .map(|v| {
+                    v.trim()
+                        .parse::<usize>()
+                        .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_CAPACITY)
+                })
+                .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_CAPACITY),
+            ..MixerConfig::default()
+        };
+
         let (tx_from_protocol, rx_from_protocol) = mpsc::unbounded::<ApplicationData>();
         for (k, v) in hopr_transport_protocol::run_msg_ack_protocol(
             packet_cfg,
+            mixer_cfg,
             self.db.clone(),
             Some(tbf_path),
             (ack_to_send_tx, ack_received_rx),
