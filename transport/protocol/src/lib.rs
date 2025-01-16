@@ -62,7 +62,6 @@ pub mod ticket_aggregation;
 
 pub mod timer;
 use hopr_transport_identity::Multiaddr;
-pub use hopr_transport_mixer::MixerConfig;
 pub use timer::execute_on_tick;
 
 use futures::{SinkExt, StreamExt};
@@ -137,10 +136,13 @@ pub enum PeerDiscovery {
     Announce(PeerId, Vec<Multiaddr>),
 }
 
+/// Run all processes responsible for handling the msg and acknowledgment protocols.
+///
+/// The pipeline does not handle the mixing itself, that needs to be injected as a separate process
+/// overlayed on top of the `wire_msg` Stream or Sink.
 #[allow(clippy::too_many_arguments)]
 pub async fn run_msg_ack_protocol<Db>(
     packet_cfg: msg::processor::PacketInteractionConfig,
-    mixer_cfg: MixerConfig,
     db: Db,
     bloom_filter_persistent_path: Option<String>,
     wire_ack: (
@@ -254,17 +256,7 @@ where
         }),
     );
 
-    // TODO: mixer strictly does not have to be here, but a better abstraction of the transport layer is needed to lift it
     let msg_to_send_tx = wire_msg.0.clone();
-    let (mixer_channel_tx, mixer_channel_rx) = hopr_transport_mixer::channel::<(PeerId, Box<[u8]>)>(mixer_cfg);
-
-    processes.insert(
-        ProtocolProcesses::Mixer,
-        spawn(async move {
-            let _neverending = mixer_channel_rx.map(Ok).forward(wire_msg.0).await;
-        }),
-    );
-
     processes.insert(
         ProtocolProcesses::MsgOut,
         spawn(async move {
@@ -293,7 +285,7 @@ where
                 })
                 .filter_map(|v| async move { v })
                 .map(Ok)
-                .forward(mixer_channel_tx)
+                .forward(msg_to_send_tx)
                 .await;
         }),
     );
@@ -311,7 +303,7 @@ where
                 })
                 .filter_map(move |v| {
                     let mut internal_ack_send = internal_ack_send.clone();
-                    let mut msg_to_send_tx = msg_to_send_tx.clone();
+                    let mut msg_to_send_tx = wire_msg.0.clone();
                     let me = me.clone();
 
                     async move {

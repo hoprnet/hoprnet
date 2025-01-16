@@ -420,34 +420,6 @@ where
         let (ack_received_tx, ack_received_rx) =
             mpsc::channel::<(PeerId, Acknowledgement)>(MAXIMUM_ACK_INCOMING_BUFFER_SIZE);
 
-        let (msg_to_send_tx, msg_to_send_rx) = mpsc::unbounded::<(PeerId, Box<[u8]>)>();
-        let (msg_received_tx, msg_received_rx) = mpsc::channel::<(PeerId, Box<[u8]>)>(MAXIMUM_MSG_INCOMING_BUFFER_SIZE);
-
-        let transport_layer = HoprSwarm::new(
-            (&self.me).into(),
-            network_events_rx,
-            discovery_updates,
-            ping_rx,
-            ticket_agg_proc,
-            self.my_multiaddresses.clone(),
-            self.cfg.protocol,
-        )
-        .await;
-
-        let transport_layer = transport_layer.with_processors(
-            ack_to_send_rx,
-            ack_received_tx,
-            msg_to_send_rx,
-            msg_received_tx,
-            tkt_agg_writer,
-        );
-
-        processes.insert(HoprTransportProcess::Medium, spawn(transport_layer.run(version)));
-
-        // initiate the msg-ack protocol stack over the wire transport
-        let packet_cfg =
-            PacketInteractionConfig::new(&self.me, me_onchain, self.cfg.protocol.outgoing_ticket_winning_prob);
-
         let mixer_cfg = MixerConfig {
             min_delay: std::time::Duration::from_millis(
                 std::env::var("HOPR_INTERNAL_MIXER_MINIMUM_DELAY_IN_MS")
@@ -476,15 +448,41 @@ where
                 .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_CAPACITY),
             ..MixerConfig::default()
         };
+        let (mixer_channel_tx, mixer_channel_rx) = hopr_transport_mixer::channel::<(PeerId, Box<[u8]>)>(mixer_cfg);
+        let (msg_received_tx, msg_received_rx) = mpsc::channel::<(PeerId, Box<[u8]>)>(MAXIMUM_MSG_INCOMING_BUFFER_SIZE);
+
+        let transport_layer = HoprSwarm::new(
+            (&self.me).into(),
+            network_events_rx,
+            discovery_updates,
+            ping_rx,
+            ticket_agg_proc,
+            self.my_multiaddresses.clone(),
+            self.cfg.protocol,
+        )
+        .await;
+
+        let transport_layer = transport_layer.with_processors(
+            ack_to_send_rx,
+            ack_received_tx,
+            mixer_channel_rx,
+            msg_received_tx,
+            tkt_agg_writer,
+        );
+
+        processes.insert(HoprTransportProcess::Medium, spawn(transport_layer.run(version)));
+
+        // initiate the msg-ack protocol stack over the wire transport
+        let packet_cfg =
+            PacketInteractionConfig::new(&self.me, me_onchain, self.cfg.protocol.outgoing_ticket_winning_prob);
 
         let (tx_from_protocol, rx_from_protocol) = mpsc::unbounded::<ApplicationData>();
         for (k, v) in hopr_transport_protocol::run_msg_ack_protocol(
             packet_cfg,
-            mixer_cfg,
             self.db.clone(),
             Some(tbf_path),
             (ack_to_send_tx, ack_received_rx),
-            (msg_to_send_tx, msg_received_rx),
+            (mixer_channel_tx, msg_received_rx),
             (tx_from_protocol, external_msg_rx),
         )
         .await

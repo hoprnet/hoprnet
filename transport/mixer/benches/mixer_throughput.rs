@@ -8,11 +8,20 @@ const SAMPLE_SIZE: usize = 10;
 /// 512 characters long string of random gibberish
 const RANDOM_GIBBERISH: &str = "abcdferjskdiq7LGuzjfXMEI2tTCUIZsCDsHnfycUbPcA1boJ48Jm7xBBNIvxsrbK3bNCevOMXYMqrhsVBXfmKy23K7ItgbuObTmqk0ndfceAhugLZveAhp4Xx1vHCAROY69sOTJiia3EBC2aXSBpUfb3WHSJDxHRMHwzCwd0BPj4WFi4Ig884Ph6altlFWzpL3ILsHmLxy9KoPCAtolb3YEegMCI4y9BsoWyCtcZdBHBrqXaSzuJivw5J1DBudj3Z6oORrEfRuFIQLi0l89Emc35WhSyzOdguC1x9PS8AiIAu7UoXlp3VIaqVUu4XGUZ21ABxI9DyMzxGbOOlsrRGFFN9G8di9hqIX1UOZpRgMNmtDwZoyoU2nGLoWGM58buwuvbNkLjGu2X9HamiiDsRIR4vxi5i61wIP6VueVOb68wvbz8csR88OhFsExjGBD9XXtJvUjy1nwdkikBOblNm2FUbyq8aHwHocoMqZk8elbYMHgbjme9d1CxZQKRwOR";
 
+#[inline]
+fn minimal_delay_mixer_cfg() -> MixerConfig {
+    MixerConfig {
+        min_delay: std::time::Duration::from_millis(0),
+        delay_range: std::time::Duration::from_millis(1),
+        ..MixerConfig::default()
+    }
+}
+
 pub fn mixer_throughput(
     c: &mut Criterion,
     cfg: MixerConfig,
     description: &str,
-    f: impl for<'a> Fn(&'a str, usize, MixerConfig) -> BoxFuture<'a, ()>,
+    f: impl Fn(&'static str, usize, MixerConfig) -> BoxFuture<'static, ()>,
 ) {
     let mut group = c.benchmark_group("mixer_throughput");
     group.sample_size(SAMPLE_SIZE);
@@ -29,12 +38,12 @@ pub fn mixer_throughput(
                 bytesize::ByteSize::b(*bytes as u64),
                 description
             )),
-            &RANDOM_GIBBERISH.to_string(),
-            |b, data| {
+            bytes,
+            |b, _| {
                 let runtime = criterion::async_executor::AsyncStdExecutor {};
 
                 b.to_async(runtime)
-                    .iter(|| f(data.as_str(), bytes / RANDOM_GIBBERISH.len(), cfg));
+                    .iter(|| f(RANDOM_GIBBERISH, bytes / RANDOM_GIBBERISH.len(), cfg));
             },
         );
     }
@@ -55,16 +64,45 @@ fn send_continuous_channel_load(item: &str, iterations: usize, cfg: MixerConfig)
     })
 }
 
+// Benchmark the throughput of the mixer channel when used in a pipe
+fn send_continuous_channel_load_through_sink_pipe(
+    item: &'static str,
+    iterations: usize,
+    cfg: MixerConfig,
+) -> BoxFuture<'_, ()> {
+    Box::pin(async move {
+        let (o_tx, o_rx) = futures::channel::mpsc::unbounded();
+        let (tx, mut rx) = channel(cfg);
+
+        let pipe = async_std::task::spawn(o_rx.map(Ok).forward(tx));
+
+        for _ in 0..iterations {
+            o_tx.unbounded_send(item).expect("send must succeed");
+        }
+
+        for _ in 0..iterations {
+            rx.next().await.expect("receive must succeed");
+        }
+
+        pipe.cancel().await;
+    })
+}
+
 pub fn mixer_channel_throughput_minimal_mixing(c: &mut Criterion) {
     mixer_throughput(
         c,
-        MixerConfig {
-            min_delay: std::time::Duration::from_millis(0),
-            delay_range: std::time::Duration::from_millis(1),
-            ..MixerConfig::default()
-        },
+        minimal_delay_mixer_cfg(),
         "mixer channel",
         send_continuous_channel_load,
+    );
+}
+
+pub fn mixer_channel_throughput_through_sink_minimal_mixing(c: &mut Criterion) {
+    mixer_throughput(
+        c,
+        minimal_delay_mixer_cfg(),
+        "mixer channel through sink pipe",
+        send_continuous_channel_load_through_sink_pipe,
     );
 }
 
@@ -97,11 +135,7 @@ fn send_continuous_stream_load(item: &str, iterations: usize, cfg: MixerConfig) 
 pub fn mixer_stream_throughput_minimal_mixing(c: &mut Criterion) {
     mixer_throughput(
         c,
-        MixerConfig {
-            min_delay: std::time::Duration::from_millis(0),
-            delay_range: std::time::Duration::from_millis(1),
-            ..MixerConfig::default()
-        },
+        minimal_delay_mixer_cfg(),
         "mixer stream",
         send_continuous_stream_load,
     );
@@ -110,6 +144,7 @@ pub fn mixer_stream_throughput_minimal_mixing(c: &mut Criterion) {
 criterion_group!(
     benches,
     mixer_channel_throughput_minimal_mixing,
+    mixer_channel_throughput_through_sink_minimal_mixing,
     mixer_stream_throughput_minimal_mixing
 );
 criterion_main!(benches);

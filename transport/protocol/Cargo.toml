@@ -41,7 +41,6 @@ core-path = { workspace = true }
 hopr-platform = { workspace = true }
 hopr-primitive-types = { workspace = true }
 hopr-transport-identity = { workspace = true }
-hopr-transport-mixer = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
@@ -53,6 +52,7 @@ more-asserts = { workspace = true }
 parameterized = { workspace = true }
 serial_test = { workspace = true }
 tracing-test = { workspace = true }
+hopr-transport-mixer = { workspace = true }
 
 [[bench]]
 name = "protocol_throughput_emulated"

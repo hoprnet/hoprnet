@@ -8,11 +8,10 @@ use criterion::{async_executor::AsyncExecutor, criterion_group, criterion_main, 
 use futures::StreamExt;
 use hopr_crypto_types::keypairs::Keypair;
 use hopr_internal_types::protocol::{Acknowledgement, ApplicationData};
-use hopr_transport_mixer::MixerConfig;
 use hopr_transport_protocol::msg::processor::{MsgSender, PacketInteractionConfig, PacketSendFinalizer};
 use libp2p::PeerId;
 
-const SAMPLE_SIZE: usize = 10;
+const SAMPLE_SIZE: usize = 20;
 
 pub fn protocol_throughput_sender(c: &mut Criterion) {
     const PAYLOAD_SIZE: usize = 490;
@@ -46,14 +45,15 @@ pub fn protocol_throughput_sender(c: &mut Criterion) {
                     let dbs = dbs.clone();
 
                     async move {
-                        let (_wire_ack_send_tx, wire_ack_send_rx) =
+                        let (wire_ack_send_tx, _wire_ack_send_rx) =
                             futures::channel::mpsc::unbounded::<(PeerId, Acknowledgement)>();
-                        let (wire_ack_recv_tx, _wire_ack_recv_rx) =
+                        let (_wire_ack_recv_tx, wire_ack_recv_rx) =
                             futures::channel::mpsc::unbounded::<(PeerId, Acknowledgement)>();
 
-                        let (_wire_msg_send_tx, wire_msg_send_rx) =
+                        let (wire_msg_send_tx, wire_msg_send_rx) =
                             futures::channel::mpsc::unbounded::<(PeerId, Box<[u8]>)>();
-                        let (wire_msg_recv_tx, _wire_msg_recv_rx) =
+
+                        let (_wire_msg_recv_tx, wire_msg_recv_rx) =
                             futures::channel::mpsc::unbounded::<(PeerId, Box<[u8]>)>();
 
                         let (api_send_tx, api_send_rx) =
@@ -70,11 +70,10 @@ pub fn protocol_throughput_sender(c: &mut Criterion) {
 
                         let processes = hopr_transport_protocol::run_msg_ack_protocol(
                             cfg,
-                            MixerConfig::default(),
                             dbs[TESTED_PEER_ID].clone(),
                             None,
-                            (wire_ack_recv_tx, wire_ack_send_rx),
-                            (wire_msg_recv_tx, wire_msg_send_rx),
+                            (wire_ack_send_tx, wire_ack_recv_rx),
+                            (wire_msg_send_tx, wire_msg_recv_rx),
                             (api_recv_tx, api_send_rx),
                         )
                         .await;
@@ -92,24 +91,20 @@ pub fn protocol_throughput_sender(c: &mut Criterion) {
 
                         let sender = MsgSender::new(api_send_tx);
 
+                        let count = packets.len();
                         futures::stream::iter(packets)
                             .map(|packet| {
                                 let sender = sender.clone();
                                 let path = path.clone();
 
-                                async move {
-                                    sender
-                                        .send_packet(packet, path.clone())
-                                        .await
-                                        .expect("sending packet must succeed")
-                                        .consume_and_wait(std::time::Duration::from_secs(1))
-                                        .await
-                                }
+                                async move { sender.send_packet(packet, path.clone()).await }
                             })
-                            .for_each_concurrent(Some(40), |v| async {
+                            .for_each_concurrent(Some(50), |v| async {
                                 assert!(v.await.is_ok());
                             })
                             .await;
+
+                        assert_eq!(wire_msg_send_rx.take(count).count().await, count);
 
                         for (_, jh) in processes {
                             jh.cancel().await;
