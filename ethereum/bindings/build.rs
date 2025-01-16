@@ -49,7 +49,11 @@ fn main() -> anyhow::Result<()> {
     );
 
     assert!(std::fs::metadata(&bindings_codegen_path)
-        .context("must be a path")?
+        .context(format!("{bindings_codegen_path:?} must be a path"))?
+        .is_dir());
+
+    assert!(std::fs::metadata(&contracts_package_path)
+        .context(format!("{contracts_package_path:?} must be a path"))?
         .is_dir());
 
     assert!(Command::new("forge").args(["--version"]).status()?.success());
