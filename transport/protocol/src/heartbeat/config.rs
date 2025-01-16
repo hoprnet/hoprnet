@@ -10,6 +10,6 @@ use validator::Validate;
 pub struct HeartbeatProtocolConfig {
     /// Maximum duration before the request times out
     #[serde_as(as = "DurationSeconds<u64>")]
-    #[default(Duration::from_secs(7))]
+    #[default(Duration::from_secs(15))]
     pub timeout: Duration,
 }
