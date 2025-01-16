@@ -8,7 +8,8 @@ use validator::Validate;
 #[serde_as]
 #[derive(Debug, Copy, Clone, smart_default::SmartDefault, Validate, Serialize, Deserialize, Eq, PartialEq)]
 pub struct HeartbeatProtocolConfig {
-    /// Maximum duration before the request times out
+    /// Maximum duration before the request times out.
+    /// The default is chosen to be close to the maximum expected worst-case roundtrip time.
     #[serde_as(as = "DurationSeconds<u64>")]
     #[default(Duration::from_secs(7))]
     pub timeout: Duration,
