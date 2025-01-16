@@ -123,7 +123,7 @@ jobs:
           else
             echo "prerelease=false" >> $GITHUB_OUTPUT
           fi
-          ./scripts/download-workflow-binaries.sh ${{ github.event.pull_request.number }}
+          ./scripts/download-workflow-binaries.sh "bot/close-${current_version}"
         env:
           GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
 
@@ -272,4 +272,3 @@ jobs:
           content: |
             The PR ${{ github.event.pull_request.number }} has changed the folder `deploy/` which contains the deployment files for hoprnet.
             Review the changes manually and update the `uhttp-docker` repository accordingly.
-
