@@ -32,6 +32,9 @@ craneLib.devShell {
     gnumake
     which
 
+    # docs utilities
+    graphviz
+
     # github integration
     gh
 
@@ -40,6 +43,7 @@ craneLib.devShell {
 
     # documentation utilities
     swagger-codegen3
+    vacuum-go
 
     # docker image inspection and handling
     dive
@@ -60,7 +64,6 @@ craneLib.devShell {
   venvDir = "./.venv";
   postVenvCreation = ''
     unset SOURCE_DATE_EPOCH
-    make generate-python-sdk
     pip install -U pip setuptools wheel
     pip install -r tests/requirements.txt
   '' + pkgs.lib.optionalString pkgs.stdenv.isLinux ''
@@ -71,7 +74,7 @@ craneLib.devShell {
       echo "solc = \"${solcDefault}/bin/solc\""
       echo "Generating foundry.toml file!"
       sed "s|# solc = .*|solc = \"${solcDefault}/bin/solc\"|g" \
-        ethereum/contracts/foundry.toml.in >| \
+        ethereum/contracts/foundry.in.toml >| \
         ethereum/contracts/foundry.toml
     else
       echo "foundry.toml file already exists!"

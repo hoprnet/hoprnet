@@ -11,6 +11,7 @@ pub mod types;
 
 pub use manager::{DispatchResult, SessionManager, SessionManagerConfig};
 
+use crate::types::SessionTarget;
 use hopr_network_types::prelude::state::SessionFeature;
 pub use hopr_network_types::types::*;
 use libp2p_identity::PeerId;
@@ -71,11 +72,8 @@ pub struct SessionClientConfig {
     /// The fixed path options for the session.
     pub path_options: RoutingOptions,
 
-    /// Protocol to be used to connect to the target
-    pub target_protocol: IpProtocol,
-
-    /// Optionally encrypted target of the session.
-    pub target: SealedHost,
+    /// Contains target protocol and optionally encrypted target of the session.
+    pub target: SessionTarget,
 
     /// Capabilities offered by the session.
     pub capabilities: Vec<Capability>,

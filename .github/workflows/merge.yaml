@@ -123,7 +123,7 @@ jobs:
           else
             echo "prerelease=false" >> $GITHUB_OUTPUT
           fi
-          ./scripts/download-workflow-binaries.sh ${{ github.event.pull_request.number }}
+          ./scripts/download-workflow-binaries.sh "bot/close-${current_version}"
         env:
           GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
 
@@ -198,6 +198,20 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
 
+      - name: Notify release
+        uses: zulip/github-actions-zulip/send-message@v1
+        with:
+          api-key: ${{ secrets.ZULIP_API_KEY }}
+          email: ${{ secrets.ZULIP_EMAIL }}
+          organization-url: "https://hopr.zulipchat.com"
+          type: "stream"
+          to: "Releases"
+          topic: "main"
+          content: |
+            I'm thrilled to inform the new hoprd version v${{ steps.setup.outputs.current_version }} has been released.
+            [Release Notes](https://github.com/hoprnet/hoprnet/releases/tag/v${{ steps.setup.outputs.current_version }})
+            [Docker Hub](https://hub.docker.com/repository/docker/hoprnet/hoprd/tags)
+
   new_release:
     name: Open new release
     if: contains(github.event.pull_request.labels.*.name, 'release')
@@ -215,16 +229,6 @@ jobs:
     needs:
       - create_release
     uses: ./.github/workflows/generate-dappnode-pr.yaml
-    with:
-      base_branch: ${{ github.event.pull_request.base.ref }}
-    secrets: inherit
-
-  generate_sdk:
-    name: Generate SDK
-    if: contains(github.event.pull_request.labels.*.name, 'release')
-    needs:
-      - create_release
-    uses: ./.github/workflows/generate-sdk.yaml
     with:
       base_branch: ${{ github.event.pull_request.base.ref }}
     secrets: inherit
@@ -272,4 +276,3 @@ jobs:
           content: |
             The PR ${{ github.event.pull_request.number }} has changed the folder `deploy/` which contains the deployment files for hoprnet.
             Review the changes manually and update the `uhttp-docker` repository accordingly.
-

@@ -28,6 +28,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f26201604c87b1e01bd3d98f8d5d9a8fcbb815e8cedb41ffccbeb4bf593a35fe"
 
 [[package]]
+name = "adler2"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "512761e0bb2578dd7380c6baaa0f4ce03e84f95e960231d1dec8bf4d7d6e2627"
+
+[[package]]
 name = "aead"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -831,7 +837,7 @@ dependencies = [
  "cc",
  "cfg-if",
  "libc",
- "miniz_oxide",
+ "miniz_oxide 0.7.4",
  "object",
  "rustc-demangle",
 ]
@@ -891,12 +897,6 @@ dependencies = [
  "num-traits",
  "serde",
 ]
-
-[[package]]
-name = "bimap"
-version = "0.6.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "230c5f1ca6a325a32553f8640d31ac9b49f2411e901e427570154868b46da4f7"
 
 [[package]]
 name = "bincode"
@@ -1125,6 +1125,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "bytesize"
+version = "1.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a3e368af43e418a04d52505cf3dbc23dda4e3407ae2fa99fd0e4f308ce546acc"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "camino"
 version = "1.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1220,7 +1229,7 @@ dependencies = [
 
 [[package]]
 name = "chain-actions"
-version = "0.7.2"
+version = "0.7.3"
 dependencies = [
  "anyhow",
  "async-channel 2.3.1",
@@ -1281,7 +1290,7 @@ dependencies = [
 
 [[package]]
 name = "chain-indexer"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "anyhow",
  "async-channel 2.3.1",
@@ -1644,7 +1653,7 @@ checksum = "773648b94d0e5d620f64f280777445740e61fe701025087ec8b57f45c791888b"
 
 [[package]]
 name = "core-network"
-version = "0.6.4"
+version = "0.6.5"
 dependencies = [
  "anyhow",
  "async-std",
@@ -1677,7 +1686,7 @@ dependencies = [
 
 [[package]]
 name = "core-path"
-version = "0.3.0"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "async-std",
@@ -1690,12 +1699,16 @@ dependencies = [
  "hopr-db-sql",
  "hopr-internal-types",
  "hopr-metrics",
+ "hopr-platform",
  "hopr-primitive-types",
  "lazy_static",
  "libp2p-identity",
  "petgraph",
  "regex",
  "serde",
+ "serde_with",
+ "smart-default",
+ "test-log",
  "thiserror",
  "tracing",
 ]
@@ -2171,6 +2184,27 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.87",
+]
+
+[[package]]
+name = "derive_more"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4a9b99b9cbbe49445b21764dc0625032a89b145a2642e67603e1c936f5458d05"
+dependencies = [
+ "derive_more-impl",
+]
+
+[[package]]
+name = "derive_more-impl"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cb7330aeadfbe296029522e6c40f315320aba36fc43a5b3632f3795348f3bd22"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.87",
+ "unicode-xid",
 ]
 
 [[package]]
@@ -2800,12 +2834,12 @@ checksum = "1d674e81391d1e1ab681a28d99df07927c6d4aa5b027d7da16ba32d1d21ecd99"
 
 [[package]]
 name = "flate2"
-version = "1.0.31"
+version = "1.0.35"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f211bbe8e69bbd0cfdea405084f128ae8b4aaa6b0b522fc8f2b009084797920"
+checksum = "c936bfdafb507ebbf50b8074c54fa31c5be9a1e7e5f467dd659697041407d07c"
 dependencies = [
  "crc32fast",
- "miniz_oxide",
+ "miniz_oxide 0.8.0",
 ]
 
 [[package]]
@@ -4000,7 +4034,6 @@ dependencies = [
  "hopr-crypto-random",
  "hopr-crypto-types",
  "hopr-internal-types",
- "hopr-lib",
  "hopr-primitive-types",
  "hoprd-keypair",
  "rpassword",
@@ -4125,7 +4158,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-crypto-types"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "blake2",
@@ -4155,7 +4188,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-api"
-version = "0.5.3"
+version = "0.6.0"
 dependencies = [
  "async-trait",
  "futures",
@@ -4203,7 +4236,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-sql"
-version = "0.8.4"
+version = "0.11.1"
 dependencies = [
  "anyhow",
  "async-lock 3.4.0",
@@ -4239,16 +4272,14 @@ dependencies = [
  "strum",
  "thiserror",
  "tracing",
- "tracing-test",
 ]
 
 [[package]]
 name = "hopr-internal-types"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "anyhow",
  "aquamarine",
- "async-std",
  "bincode",
  "bindings",
  "bloomfilter",
@@ -4262,11 +4293,8 @@ dependencies = [
  "lazy_static",
  "multiaddr",
  "num_enum",
- "rand 0.8.5",
- "rayon",
  "serde",
  "serde_bytes",
- "serde_repr",
  "smart-default",
  "strum",
  "thiserror",
@@ -4275,7 +4303,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-lib"
-version = "2.2.0-rc.1"
+version = "3.0.0"
 dependencies = [
  "anyhow",
  "async-channel 2.3.1",
@@ -4292,7 +4320,6 @@ dependencies = [
  "core-path",
  "ethers",
  "futures",
- "futures-concurrency",
  "futures-timer",
  "hex-literal",
  "hopr-async-runtime",
@@ -4311,6 +4338,7 @@ dependencies = [
  "hopr-transport-session",
  "lazy_static",
  "serde",
+ "serde_json",
  "serde_with",
  "serde_yaml",
  "smart-default",
@@ -4398,7 +4426,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-primitive-types"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -4410,6 +4438,7 @@ dependencies = [
  "regex",
  "rlp",
  "serde",
+ "sha3",
  "strum",
  "thiserror",
 ]
@@ -4467,7 +4496,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.8.1"
+version = "0.9.0"
 dependencies = [
  "async-lock 3.4.0",
  "async-std",
@@ -4476,6 +4505,7 @@ dependencies = [
  "core-network",
  "core-path",
  "futures",
+ "futures-concurrency",
  "hopr-async-runtime",
  "hopr-crypto-packet",
  "hopr-crypto-random",
@@ -4486,17 +4516,18 @@ dependencies = [
  "hopr-network-types",
  "hopr-platform",
  "hopr-primitive-types",
+ "hopr-transport-identity",
  "hopr-transport-p2p",
  "hopr-transport-protocol",
  "hopr-transport-session",
  "lazy_static",
- "libp2p",
  "moka",
  "proc-macro-regex",
  "rust-stream-ext-concurrent",
  "serde",
  "serde_with",
  "smart-default",
+ "strum",
  "thiserror",
  "tracing",
  "uuid 1.11.0",
@@ -4504,8 +4535,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "hopr-transport-identity"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "libp2p-identity",
+ "multiaddr",
+ "thiserror",
+]
+
+[[package]]
 name = "hopr-transport-p2p"
-version = "0.5.2"
+version = "0.5.4"
 dependencies = [
  "anyhow",
  "async-std",
@@ -4515,6 +4556,7 @@ dependencies = [
  "hopr-crypto-types",
  "hopr-internal-types",
  "hopr-metrics",
+ "hopr-transport-identity",
  "hopr-transport-protocol",
  "lazy_static",
  "libp2p",
@@ -4535,7 +4577,9 @@ dependencies = [
  "async-lock 3.4.0",
  "async-std",
  "async-trait",
+ "bytesize",
  "core-path",
+ "criterion",
  "futures",
  "hex-literal",
  "hopr-async-runtime",
@@ -4548,9 +4592,9 @@ dependencies = [
  "hopr-metrics",
  "hopr-platform",
  "hopr-primitive-types",
+ "hopr-transport-identity",
  "lazy_static",
  "libp2p",
- "libp2p-identity",
  "more-asserts",
  "parameterized",
  "rust-stream-ext-concurrent",
@@ -4558,6 +4602,7 @@ dependencies = [
  "serde_with",
  "serial_test",
  "smart-default",
+ "strum",
  "thiserror",
  "tracing",
  "tracing-test",
@@ -4566,7 +4611,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-session"
-version = "0.3.1"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "aquamarine",
@@ -4650,7 +4695,7 @@ dependencies = [
 
 [[package]]
 name = "hoprd-api"
-version = "3.7.2"
+version = "3.10.0"
 dependencies = [
  "anyhow",
  "async-broadcast",
@@ -4658,7 +4703,6 @@ dependencies = [
  "axum",
  "axum-extra",
  "base64 0.22.1",
- "bimap",
  "const_format",
  "futures",
  "futures-concurrency",
@@ -4670,12 +4714,10 @@ dependencies = [
  "hopr-network-types",
  "hopr-transport-session",
  "hoprd-db-api",
- "hoprd-db-entity",
- "hoprd-db-migration",
  "hoprd-inbox",
  "lazy_static",
  "libp2p-identity",
- "mime",
+ "oas3",
  "regex",
  "serde",
  "serde_json",
@@ -4683,9 +4725,7 @@ dependencies = [
  "smart-default",
  "strum",
  "tokio",
- "tokio-retry",
  "tokio-stream",
- "tokio-util",
  "tower 0.5.1",
  "tower-http",
  "tracing",
@@ -5959,6 +5999,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "libyml"
+version = "0.0.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3302702afa434ffa30847a83305f0a69d6abd74293b6554c18ec85c7ef30c980"
+dependencies = [
+ "anyhow",
+ "version_check",
+]
+
+[[package]]
 name = "libz-sys"
 version = "1.1.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6119,6 +6169,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b8a240ddb74feaf34a79a7add65a741f3167852fba007066dcac1ca548d89c08"
 dependencies = [
  "adler",
+]
+
+[[package]]
+name = "miniz_oxide"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e2d80299ef12ff69b16a84bb182e3b9df68b5a91574d3d4fa6e41b65deec4df1"
+dependencies = [
+ "adler2",
 ]
 
 [[package]]
@@ -6510,6 +6569,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5c7398b9c8b70908f6371f47ed36737907c87c52af34c268fed0bf0ceb92ead9"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "oas3"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "caad8a11807e43c49ab8f9527c96d0ec926f525549e65e5cd3b502115704a58e"
+dependencies = [
+ "derive_more 1.0.0",
+ "http 1.1.0",
+ "log",
+ "once_cell",
+ "regex",
+ "semver 1.0.23",
+ "serde",
+ "serde_json",
+ "serde_yml",
+ "url",
 ]
 
 [[package]]
@@ -8124,7 +8201,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "eca070c12893629e2cc820a9761bedf6ce1dcddc9852984d1dc734b8bd9bd024"
 dependencies = [
  "cfg-if",
- "derive_more",
+ "derive_more 0.99.18",
  "parity-scale-codec",
  "scale-info-derive",
 ]
@@ -8534,17 +8611,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "serde_repr"
-version = "0.1.19"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6c64451ba24fc7a6a2d60fc75dd9c83c90903b19028d4eff35e88fc1e86564e9"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.87",
-]
-
-[[package]]
 name = "serde_spanned"
 version = "0.6.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8606,6 +8672,21 @@ dependencies = [
  "ryu",
  "serde",
  "unsafe-libyaml",
+]
+
+[[package]]
+name = "serde_yml"
+version = "0.0.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "59e2dd588bf1597a252c3b920e0143eb99b0f76e4e082f4c92ce34fbc9e71ddd"
+dependencies = [
+ "indexmap 2.4.0",
+ "itoa",
+ "libyml",
+ "memchr",
+ "ryu",
+ "serde",
+ "version_check",
 ]
 
 [[package]]

@@ -25,7 +25,7 @@ use crate::{
 };
 use bindings::hopr_winning_probability_oracle::HoprWinningProbabilityOracle;
 use clap::Parser;
-use hopr_lib::{f64_to_win_prob, win_prob_to_f64};
+use hopr_internal_types::prelude::{f64_to_win_prob, win_prob_to_f64};
 use tracing::{debug, info};
 
 /// CLI arguments for `hopli win-prob`

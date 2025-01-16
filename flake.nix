@@ -4,7 +4,7 @@
   inputs = {
     flake-utils.url = github:numtide/flake-utils;
     flake-parts.url = github:hercules-ci/flake-parts;
-    nixpkgs.url = github:NixOS/nixpkgs/release-24.05;
+    nixpkgs.url = github:NixOS/nixpkgs/release-24.11;
     rust-overlay.url = github:oxalica/rust-overlay/master;
     # using a fork with an added source filter
     crane.url = github:hoprnet/crane/tb/20240117-find-filter;
@@ -44,9 +44,8 @@
             inherit localSystem overlays;
           };
           solcDefault = solc.mkDefault pkgs pkgs.solc_0_8_19;
-          rustNightly = pkgs.rust-bin.selectLatestNightlyWith (toolchain: toolchain.default);
-          craneLibNightly = (crane.mkLib pkgs).overrideToolchain rustNightly;
-          hoprdCrateInfoOriginal = craneLibNightly.crateNameFromCargoToml {
+          craneLib = (crane.mkLib pkgs).overrideToolchain (p: p.rust-bin.stable.latest.default);
+          hoprdCrateInfoOriginal = craneLib.crateNameFromCargoToml {
             cargoToml = ./hopr/hopr-lib/Cargo.toml;
           };
           hoprdCrateInfo = {
@@ -74,7 +73,7 @@
               ./README.md
               ./hopr/hopr-lib/data
               ./ethereum/contracts/contracts-addresses.json
-              ./ethereum/contracts/foundry.toml.in
+              ./ethereum/contracts/foundry.in.toml
               ./ethereum/contracts/remappings.txt
               ./hoprd/hoprd/example_cfg.yaml
               (fs.fileFilter (file: file.hasExt "rs") ./.)
@@ -96,26 +95,31 @@
           rust-builder-x86_64-linux = import ./nix/rust-builder.nix {
             inherit nixpkgs rust-overlay crane foundry solc localSystem;
             crossSystem = pkgs.lib.systems.examples.gnu64;
+            isCross = true;
           };
 
           rust-builder-x86_64-darwin = import ./nix/rust-builder.nix {
             inherit nixpkgs rust-overlay crane foundry solc localSystem;
             crossSystem = pkgs.lib.systems.examples.x86_64-darwin;
+            isCross = true;
           };
 
           rust-builder-aarch64-linux = import ./nix/rust-builder.nix {
             inherit nixpkgs rust-overlay crane foundry solc localSystem;
             crossSystem = pkgs.lib.systems.examples.aarch64-multiplatform;
+            isCross = true;
           };
 
           rust-builder-aarch64-darwin = import ./nix/rust-builder.nix {
             inherit nixpkgs rust-overlay crane foundry solc localSystem;
             crossSystem = pkgs.lib.systems.examples.aarch64-darwin;
+            isCross = true;
           };
 
           rust-builder-armv7l-linux = import ./nix/rust-builder.nix {
             inherit nixpkgs rust-overlay crane foundry solc localSystem;
             crossSystem = pkgs.lib.systems.examples.armv7l-hf-multiplatform;
+            isCross = true;
           };
 
           hoprdBuildArgs = {
@@ -183,7 +187,7 @@
 
             # if the default listen host has not been set by the user,
             # we will set it to the container's ip address
-            # defaulting to port 50000
+            # defaulting to random port
 
             listen_host="''${HOPRD_DEFAULT_SESSION_LISTEN_HOST:-}"
             listen_host_preset_ip="''${listen_host%%:*}"
@@ -193,7 +197,7 @@
               listen_host_ip="$(hostname -i)"
 
               if [ -z "''${listen_host_preset_port:-}" ]; then
-                listen_host="''${listen_host_ip}:50000"
+                listen_host="''${listen_host_ip}:0"
               else
                 listen_host="''${listen_host_ip}:''${listen_host_preset_port}"
               fi
@@ -318,7 +322,8 @@
                 (fs.fileFilter (file: file.hasExt "sol") ./ethereum/contracts/src)
                 ./tests
                 ./scripts
-                ./ethereum/contracts/foundry.toml.in
+                ./sdk/python
+                ./ethereum/contracts/foundry.in.toml
                 ./ethereum/contracts/remappings.txt
               ];
             };
@@ -393,26 +398,67 @@
           treefmt = {
             inherit (config.flake-root) projectRootFile;
 
+            settings.global.excludes = [
+              "**/*.id"
+              "**/.cargo-ok"
+              "**/.gitignore"
+              ".actrc"
+              ".dockerignore"
+              ".editorconfig"
+              ".gcloudignore"
+              ".gitattributes"
+              ".yamlfmt"
+              "LICENSE"
+              "Makefile"
+              "db/entity/src/codegen/*"
+              "deploy/compose/grafana/config.monitoring"
+              "docs/*"
+              "ethereum/bindings/src/codegen/*"
+              "ethereum/contracts/Makefile"
+              "ethereum/contracts/broadcast/*"
+              "ethereum/contracts/contracts-addresses.json"
+              "ethereum/contracts/remappings.txt"
+              "ethereum/contracts/src/static/*"
+              "hopr/hopr-lib/tests/snapshots/*"
+              "hoprd/.dockerignore"
+              "hoprd/rest-api/.cargo/config"
+              "nix/setup-hook-darwin.sh"
+              "target/*"
+              "tests/pytest.ini"
+              "tests/requirements.txt"
+              "vendor/*"
+            ];
+
+            programs.shfmt.enable = true;
+            settings.formatter.shfmt.includes = [
+              "*.sh"
+              "deploy/compose/.env.sample"
+              "deploy/compose/.env-secrets.sample"
+              "ethereum/contracts/.env.example"
+            ];
+
             programs.yamlfmt.enable = true;
-            settings.formatter.yamlfmt.includes = [ "./.github/labeler.yml" "./.github/workflows/*.yaml" ];
-            settings.formatter.yamlfmt.excludes = [ "./vendor/*" ];
+            settings.formatter.yamlfmt.includes = [ ".github/labeler.yml" ".github/workflows/*.yaml" ];
+            # trying setting from https://github.com/google/yamlfmt/blob/main/docs/config-file.md
+            settings.formatter.yamlfmt.settings = {
+              formatter.type = "basic";
+              formatter.max_line_length = 120;
+              formatter.trim_trailing_whitespace = true;
+              formatter.scan_folded_as_literal = true;
+              formatter.include_document_start = true;
+            };
 
             programs.prettier.enable = true;
-            settings.formatter.prettier.includes = [ "*.md" "*.json" "./ethereum/contracts/README.md" ];
-            settings.formatter.prettier.excludes = [ "./vendor/*" "./ethereum/contracts/*" "*.yml" "*.yaml" ];
+            settings.formatter.prettier.includes = [ "*.md" "*.json" "ethereum/contracts/README.md" ];
+            settings.formatter.prettier.excludes = [ "ethereum/contracts/*" "*.yml" "*.yaml" ];
 
             programs.rustfmt.enable = true;
-            settings.formatter.rustfmt.excludes = [ "./vendor/*" "./db/entity/src/codegen/*" "./ethereum/bindings/src/codegen/*" ];
 
             programs.nixpkgs-fmt.enable = true;
-            settings.formatter.nixpkgs-fmt.excludes = [ "./vendor/*" ];
 
             programs.taplo.enable = true;
-            settings.formatter.taplo.excludes = [ "./vendor/*" "./ethereum/contracts/*" ];
 
-            # FIXME: currently broken in treefmt
-            # programs.ruff.check = true;
-            # settings.formatter.ruff.check.excludes = [ "./vendor/*" ];
+            programs.ruff-format.enable = true;
 
             settings.formatter.solc = {
               command = "sh";
@@ -425,7 +471,7 @@
                     echo "solc = \"${solcDefault}/bin/solc\""
                     echo "Generating foundry.toml file!"
                     sed "s|# solc = .*|solc = \"${solcDefault}/bin/solc\"|g" \
-                      ethereum/contracts/foundry.toml.in >| \
+                      ethereum/contracts/foundry.in.toml >| \
                       ethereum/contracts/foundry.toml
                   else
                     echo "foundry.toml file already exists!"
@@ -439,7 +485,6 @@
                 "--"
               ];
               includes = [ "*.sol" ];
-              excludes = [ "./vendor/*" "./ethereum/contracts/src/static/*" ];
             };
           };
 

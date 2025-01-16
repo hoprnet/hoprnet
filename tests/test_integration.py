@@ -6,24 +6,22 @@ from contextlib import AsyncExitStack, asynccontextmanager
 
 import pytest
 
-from .conftest import (
+from sdk.python.api import HoprdAPI
+from sdk.python.api.channelstatus import ChannelStatus
+from sdk.python.localcluster.constants import (
     OPEN_CHANNEL_FUNDING_VALUE_HOPR,
-    RESERVED_TAG_UPPER_BOUND,
-    TICKET_AGGREGATION_THRESHOLD,
     TICKET_PRICE_PER_HOP,
-    barebone_nodes,
-    default_nodes,
-    random_distinct_pairs_from,
 )
-from .hopr import HoprdAPI
-from .node import Node
+from sdk.python.localcluster.node import Node
+
+from .conftest import barebone_nodes, default_nodes, random_distinct_pairs_from
 from .utils import (
+    TICKET_AGGREGATION_THRESHOLD,
     AGGREGATED_TICKET_PRICE,
     MULTIHOP_MESSAGE_SEND_TIMEOUT,
     PARAMETERIZED_SAMPLE_SIZE,
-    balance_str_to_int,
+    RESERVED_TAG_UPPER_BOUND,
     check_all_tickets_redeemed,
-    check_min_incoming_win_prob_eq,
     check_native_balance_below,
     check_received_packets_with_peek,
     check_rejected_tickets_value,
@@ -46,7 +44,7 @@ async def test_hoprd_swarm_connectivity(swarm7: dict[str, Node]):
     async def check_all_connected(me: Node, others: list[str]):
         others2 = set(others)
         while True:
-            current_peers = set([x["peer_id"] for x in await me.api.peers()])
+            current_peers = set([x.peer_id for x in await me.api.peers()])
             if current_peers.intersection(others) == others2:
                 break
             else:
@@ -65,7 +63,7 @@ async def test_hoprd_swarm_connectivity(swarm7: dict[str, Node]):
     ticket_price = await random.choice(list(swarm7.values())).api.ticket_price()
     if ticket_price is not None:
         global TICKET_PRICE_PER_HOP, AGGREGATED_TICKET_PRICE
-        TICKET_PRICE_PER_HOP = ticket_price
+        TICKET_PRICE_PER_HOP = ticket_price.value
         AGGREGATED_TICKET_PRICE = TICKET_AGGREGATION_THRESHOLD * TICKET_PRICE_PER_HOP
     else:
         print("Could not get ticket price from API, using default value")
@@ -74,13 +72,11 @@ async def test_hoprd_swarm_connectivity(swarm7: dict[str, Node]):
 @pytest.mark.asyncio
 async def test_hoprd_protocol_check_balances_without_prior_tests(swarm7: dict[str, Node]):
     for node in swarm7.values():
-        addr = await node.api.addresses("native")
-        assert re.match("^0x[0-9a-fA-F]{40}$", addr) is not None
+        addr = await node.api.addresses()
+        assert re.match("^0x[0-9a-fA-F]{40}$", addr.native) is not None
         balances = await node.api.balances()
-        native_balance = int(balances.native.split(" ")[0])
-        hopr_balance = int(balances.safe_hopr.split(" ")[0])
-        assert native_balance > 0
-        assert hopr_balance > 0
+        assert int(balances.native) > 0
+        assert int(balances.safe_hopr) > 0
 
 
 @pytest.mark.asyncio
@@ -95,7 +91,7 @@ async def test_hoprd_should_be_able_to_remove_existing_aliases(peer: str, swarm7
 
     assert await swarm7[peer].api.aliases_get_alias("Alice") is None
     assert await swarm7[peer].api.aliases_set_alias("Alice", alice.address) is True
-    assert await swarm7[peer].api.aliases_get_alias("Alice") == alice.peer_id
+    assert (await swarm7[peer].api.aliases_get_alias("Alice")).peer_id == alice.peer_id
 
     assert await swarm7[peer].api.aliases_remove_alias("Alice")
     assert await swarm7[peer].api.aliases_get_alias("Alice") is None
@@ -128,7 +124,7 @@ async def test_hoprd_should_not_be_able_to_set_multiple_aliases_to_a_single_peer
 @pytest.mark.asyncio
 @pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
 async def test_hoprd_should_contain_self_alias_automatically(peer: str, swarm7: dict[str, Node]):
-    assert await swarm7[peer].api.aliases_get_alias("me") == swarm7[peer].peer_id
+    assert (await swarm7[peer].api.aliases_get_alias("me")).peer_id == swarm7[peer].peer_id
 
 
 @pytest.mark.asyncio
@@ -195,36 +191,31 @@ async def test_hoprd_should_fail_sending_a_message_that_is_too_large(src: str, d
 async def test_hoprd_api_channel_should_register_fund_increase_using_fund_endpoint(
     src: str, dest: str, swarm7: dict[str, Node]
 ):
-    hopr_amount = f"{OPEN_CHANNEL_FUNDING_VALUE_HOPR * 1e18:.0f}"  # convert HOPR to weiHOPR
+    # convert HOPR to weiHOPR
+    hopr_amount = OPEN_CHANNEL_FUNDING_VALUE_HOPR * 1e18
 
     async with create_channel(swarm7[src], swarm7[dest], funding=TICKET_PRICE_PER_HOP) as channel:
         balance_before = await swarm7[src].api.balances()
-        channel_before = await swarm7[src].api.get_channel(channel)
+        channel_before = await swarm7[src].api.get_channel(channel.id)
 
-        assert await swarm7[src].api.channels_fund_channel(channel, hopr_amount)
+        assert await swarm7[src].api.fund_channel(channel.id, hopr_amount)
 
-        channel_after = await swarm7[src].api.get_channel(channel)
+        channel_after = await swarm7[src].api.get_channel(channel.id)
 
         # Updated channel balance is visible immediately
-        assert balance_str_to_int(channel_after.balance) - balance_str_to_int(
-            channel_before.balance
-        ) == balance_str_to_int(hopr_amount)
+        assert channel_after.balance - channel_before.balance == hopr_amount
 
         # Wait until the safe balance has decreased
         await asyncio.wait_for(
-            check_safe_balance(
-                swarm7[src], balance_str_to_int(balance_before.safe_hopr) - balance_str_to_int(hopr_amount)
-            ),
+            check_safe_balance(swarm7[src], balance_before.safe_hopr - hopr_amount),
             20.0,
         )
 
         # Safe allowance can be checked too at this point
         balance_after = await swarm7[src].api.balances()
-        assert balance_str_to_int(balance_before.safe_hopr_allowance) - balance_str_to_int(
-            balance_after.safe_hopr_allowance
-        ) == balance_str_to_int(hopr_amount)
+        assert balance_before.safe_hopr_allowance - balance_after.safe_hopr_allowance == hopr_amount
 
-        await asyncio.wait_for(check_native_balance_below(swarm7[src], balance_str_to_int(balance_before.native)), 20.0)
+        await asyncio.wait_for(check_native_balance_below(swarm7[src], balance_before.native), 20.0)
 
 
 @pytest.mark.asyncio
@@ -233,11 +224,11 @@ async def test_reset_ticket_statistics_from_metrics(src: Node, dest: Node, swarm
     def count_metrics(metrics: str):
         types = ["neglected", "redeemed", "rejected"]
         count = 0
-        for line in metrics.split("\\n"):
+        for line in metrics.splitlines():
             count += (
                 line.startswith("hopr_tickets_incoming_statistics")
                 and any(t in line for t in types)
-                and line.split(" ")[-1] != "0"
+                and line.split()[-1] != "0"
             )
         return count
 
@@ -365,8 +356,6 @@ async def test_hoprd_default_strategy_automatic_ticket_aggregation_and_redeeming
         statistics_before = await swarm7[mid].api.get_tickets_statistics()
         assert statistics_before is not None
 
-        redeemed_value_at_start = balance_str_to_int(statistics_before.redeemed_value)
-
         packets = [f"Ticket aggregation test: #{i:08d}" for i in range(ticket_count)]
         await send_and_receive_packets_with_pop(packets, src=swarm7[src], dest=swarm7[dest], path=[swarm7[mid].peer_id])
 
@@ -376,8 +365,7 @@ async def test_hoprd_default_strategy_automatic_ticket_aggregation_and_redeeming
                 statistics_now = await api.get_tickets_statistics()
                 assert statistics_now is not None
 
-                redeemed_value_now = balance_str_to_int(statistics_now.redeemed_value)
-                redeemed_value_diff = redeemed_value_now - redeemed_value_at_start
+                redeemed_value_diff = statistics_now.redeemed_value - statistics_before.redeemed_value
 
                 # break out of the loop if the aggregated value is reached
                 if redeemed_value_diff >= AGGREGATED_TICKET_PRICE:
@@ -403,7 +391,9 @@ async def test_hoprd_sanity_check_channel_status(swarm7: dict[str, Node]):
     assert len(open_and_closed_channels.all) >= len(open_channels.all), "Open and closed channels should be present"
 
     statuses = [c.status for c in open_and_closed_channels.all]
-    assert "Closed" in statuses or "PendingToClose" in statuses, "Closed channels should be present"
+    assert (
+        ChannelStatus.Closed in statuses or ChannelStatus.PendingToClose in statuses
+    ), "Closed channels should be present"
 
 
 @pytest.mark.asyncio
@@ -460,8 +450,8 @@ async def test_hoprd_check_native_withdraw(peer, swarm7: dict[str, Node]):
 async def test_hoprd_check_ticket_price_is_default(peer, swarm7: dict[str, Node]):
     price = await swarm7[peer].api.ticket_price()
 
-    assert isinstance(price, int)
-    assert price > 0
+    assert isinstance(price.value, int)
+    assert price.value > 0
 
 
 @pytest.mark.asyncio
@@ -512,7 +502,7 @@ async def test_peeking_messages_with_timestamp(src: str, dest: str, swarm7: dict
     )
 
     packets = await dest_peer.api.messages_peek_all(random_tag)
-    timestamps = sorted([message.received_at for message in packets.messages])
+    timestamps = sorted([message.received_at for message in packets])
 
     # ts_for_query set right before (1ms before) the first message of the second batch.
     # This is to ensure that the first message of the second batch will be returned by the query.
@@ -522,7 +512,7 @@ async def test_peeking_messages_with_timestamp(src: str, dest: str, swarm7: dict
     async def peek_the_messages():
         packets = await dest_peer.api.messages_peek_all(random_tag, ts_for_query)
 
-        assert len(packets.messages) == message_count - split_index
+        assert len(packets) == message_count - split_index
 
     await asyncio.wait_for(peek_the_messages(), MULTIHOP_MESSAGE_SEND_TIMEOUT)
 

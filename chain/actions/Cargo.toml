@@ -1,6 +1,6 @@
 [package]
 name = "chain-actions"
-version = "0.7.2"
+version = "0.7.3"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "High-level Core-Ethereum functions that translate to on-chain transactions"

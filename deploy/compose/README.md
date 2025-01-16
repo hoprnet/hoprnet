@@ -58,7 +58,7 @@ Navigate to the Dashboards page and open the desired dashboard
 
 4. Run hopr node with an external monitoring system using Prometheus pushgateway
 
-Before running this profile, make sure that you modify the variable `METRICS_PUSH_URL` to point to your prometheus pushgateway instance and that you name your hoprd node accordingly among other nodes.
+Before running this profile, make sure that you modify the variable `METRICS_PUSH_URL` to point to your prometheus pushgateway instance and that you name your hoprd node accordingly among other nodes. Modify the variable `METRICS_PUSH_KEY` to set the user and password available for the Prometheus Pushgateway. Get it from Bitwarden Secret 'Prometheus Pushgateway Hoprd Node'.
 
 ```shell
 COMPOSE_PROFILES=hoprd,metrics-push docker compose up -d
