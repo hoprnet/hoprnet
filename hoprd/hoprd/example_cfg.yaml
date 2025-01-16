@@ -90,9 +90,6 @@ hopr:
         # The unrealized balance in this case is the proportion of the channel balance allocated in unredeemed unaggregated tickets.
         # This condition is independent of `aggregation_threshold`.
         unrealized_balance_ratio: 0.9
-        # Maximum time to wait for the ticket aggregation to complete.
-        # This does not affect the runtime of the strategy `on_acknowledged_ticket` event processing.
-        aggregation_timeout: 60
         # If set, the strategy will automatically aggregate tickets in channel that has transitioned
         # to the `PendingToClose` state. This happens regardless if `aggregation_threshold`
         # or `unrealized_balance_ratio` thresholds are met on that channel.
@@ -105,9 +102,10 @@ hopr:
         # a winning acknowledged ticket
         #
       - !AutoRedeeming
-        #
         # If set, the strategy will redeem only aggregated tickets.
         redeem_only_aggregated: true
+        # Sets the minimum value of a ticket to be able to redeem it.
+        minimum_redeem_ticket_value: "0 HOPR"
         #
         ############################################
         #
