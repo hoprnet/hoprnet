@@ -338,9 +338,11 @@ nix run .#lint
 This will in particular run `clippy` for the entire Rust codebase.
 
 #### Generate the Python SDK
+
 No Python SDK is available to connect to the HOPRd API. However, you can generate one using the [generate-python-sdk.sh](/scripts/generate-python-sdk.sh) script.
 
 Prerequisites:
+
 - swagger-codegen3
 - build the repository to get the `hoprd-api-schema` generated
 
