@@ -275,7 +275,7 @@ where
             .clone()
             .send((data, path, tx.into()))
             .await
-            .map_err(|_| TransportError(format!("Failed to send a message")))
+            .map_err(|_| TransportError("Failed to send a message".into()))
             .map(move |_| {
                 let awaiter: PacketSendAwaiter = rx.into();
                 awaiter

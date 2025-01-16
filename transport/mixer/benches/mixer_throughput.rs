@@ -1,5 +1,3 @@
-use std::future::Future;
-
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use futures::{future::BoxFuture, StreamExt};
 use hopr_transport_mixer::{channel, config::MixerConfig};
@@ -10,19 +8,12 @@ const SAMPLE_SIZE: usize = 10;
 /// 512 characters long string of random gibberish
 const RANDOM_GIBBERISH: &str = "abcdferjskdiq7LGuzjfXMEI2tTCUIZsCDsHnfycUbPcA1boJ48Jm7xBBNIvxsrbK3bNCevOMXYMqrhsVBXfmKy23K7ItgbuObTmqk0ndfceAhugLZveAhp4Xx1vHCAROY69sOTJiia3EBC2aXSBpUfb3WHSJDxHRMHwzCwd0BPj4WFi4Ig884Ph6altlFWzpL3ILsHmLxy9KoPCAtolb3YEegMCI4y9BsoWyCtcZdBHBrqXaSzuJivw5J1DBudj3Z6oORrEfRuFIQLi0l89Emc35WhSyzOdguC1x9PS8AiIAu7UoXlp3VIaqVUu4XGUZ21ABxI9DyMzxGbOOlsrRGFFN9G8di9hqIX1UOZpRgMNmtDwZoyoU2nGLoWGM58buwuvbNkLjGu2X9HamiiDsRIR4vxi5i61wIP6VueVOb68wvbz8csR88OhFsExjGBD9XXtJvUjy1nwdkikBOblNm2FUbyq8aHwHocoMqZk8elbYMHgbjme9d1CxZQKRwOR";
 
-async fn send_continuous_channel_load(item: &str, iterations: usize, cfg: MixerConfig) {
-    let (tx, mut rx) = channel(cfg);
-
-    for _ in 0..iterations {
-        tx.send(item).expect("send must succeed");
-    }
-
-    for _ in 0..iterations {
-        rx.next().await.expect("receive must succeed");
-    }
-}
-
-pub fn mixer_channel_throughput(c: &mut Criterion, cfg: MixerConfig, description: &str) {
+pub fn mixer_throughput(
+    c: &mut Criterion,
+    cfg: MixerConfig,
+    description: &str,
+    f: impl for<'a> Fn(&'a str, usize, MixerConfig) -> BoxFuture<'a, ()>,
+) {
     let mut group = c.benchmark_group("mixer_throughput");
     group.sample_size(SAMPLE_SIZE);
     for bytes in [
@@ -43,15 +34,29 @@ pub fn mixer_channel_throughput(c: &mut Criterion, cfg: MixerConfig, description
                 let runtime = criterion::async_executor::AsyncStdExecutor {};
 
                 b.to_async(runtime)
-                    .iter(|| send_continuous_channel_load(data.as_str(), bytes / RANDOM_GIBBERISH.len(), cfg));
+                    .iter(|| f(data.as_str(), bytes / RANDOM_GIBBERISH.len(), cfg));
             },
         );
     }
     group.finish();
 }
 
+fn send_continuous_channel_load(item: &str, iterations: usize, cfg: MixerConfig) -> BoxFuture<'_, ()> {
+    Box::pin(async move {
+        let (tx, mut rx) = channel(cfg);
+
+        for _ in 0..iterations {
+            tx.send(item).expect("send must succeed");
+        }
+
+        for _ in 0..iterations {
+            rx.next().await.expect("receive must succeed");
+        }
+    })
+}
+
 pub fn mixer_channel_throughput_minimal_mixing(c: &mut Criterion) {
-    mixer_channel_throughput(
+    mixer_throughput(
         c,
         MixerConfig {
             min_delay: std::time::Duration::from_millis(0),
@@ -59,63 +64,38 @@ pub fn mixer_channel_throughput_minimal_mixing(c: &mut Criterion) {
             ..MixerConfig::default()
         },
         "mixer channel",
+        send_continuous_channel_load,
     );
 }
 
-async fn send_continuous_stream_load(item: &str, iterations: usize, cfg: MixerConfig) {
-    let (tx, rx) = futures::channel::mpsc::unbounded();
+fn send_continuous_stream_load(item: &str, iterations: usize, cfg: MixerConfig) -> BoxFuture<'_, ()> {
+    Box::pin(async move {
+        let (tx, rx) = futures::channel::mpsc::unbounded();
 
-    let mut rx = rx.then_concurrent(|v| {
-        let cfg = cfg;
+        let mut rx = rx.then_concurrent(|v| {
+            let cfg = cfg;
 
-        async move {
-            let random_delay = cfg.random_delay();
+            async move {
+                let random_delay = cfg.random_delay();
 
-            async_std::task::sleep(random_delay).await;
+                async_std::task::sleep(random_delay).await;
 
-            v
+                v
+            }
+        });
+
+        for _ in 0..iterations {
+            tx.unbounded_send(item).expect("send must succeed");
         }
-    });
 
-    for _ in 0..iterations {
-        tx.unbounded_send(item).expect("send must succeed");
-    }
-
-    for _ in 0..iterations {
-        rx.next().await.expect("receive must succeed");
-    }
-}
-
-pub fn mixer_stream_throughput(c: &mut Criterion, cfg: MixerConfig, description: &str) {
-    let mut group = c.benchmark_group("mixer_throughput");
-    group.sample_size(SAMPLE_SIZE);
-    for bytes in [
-        10 * 1024 * 2 * RANDOM_GIBBERISH.len(),
-        40 * 1024 * 2 * RANDOM_GIBBERISH.len(),
-    ]
-    .iter()
-    {
-        group.throughput(Throughput::Bytes(*bytes as u64));
-        group.bench_with_input(
-            BenchmarkId::from_parameter(format!(
-                "random data with size {} through a {}",
-                bytesize::ByteSize::b(*bytes as u64),
-                description
-            )),
-            &RANDOM_GIBBERISH.to_string(),
-            |b, data| {
-                let runtime = criterion::async_executor::AsyncStdExecutor {};
-
-                b.to_async(runtime)
-                    .iter(|| send_continuous_stream_load(data.as_str(), bytes / RANDOM_GIBBERISH.len(), cfg));
-            },
-        );
-    }
-    group.finish();
+        for _ in 0..iterations {
+            rx.next().await.expect("receive must succeed");
+        }
+    })
 }
 
 pub fn mixer_stream_throughput_minimal_mixing(c: &mut Criterion) {
-    mixer_stream_throughput(
+    mixer_throughput(
         c,
         MixerConfig {
             min_delay: std::time::Duration::from_millis(0),
@@ -123,6 +103,7 @@ pub fn mixer_stream_throughput_minimal_mixing(c: &mut Criterion) {
             ..MixerConfig::default()
         },
         "mixer stream",
+        send_continuous_stream_load,
     );
 }
 
