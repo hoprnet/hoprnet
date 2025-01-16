@@ -8,6 +8,7 @@
 , foundryBin
 , git
 , html-tidy
+, isCross ? false
 , lib
 , libiconv
 , makeSetupHook
@@ -30,8 +31,6 @@ let
   hostPlatform = stdenv.hostPlatform;
 
   # The target interpreter is used to patch the interpreter in the binary
-  isCross = buildPlatform != hostPlatform;
-
   targetInterpreter =
     if hostPlatform.isLinux && hostPlatform.isx86_64 then "/lib64/ld-linux-x86-64.so.2"
     else if hostPlatform.isLinux && hostPlatform.isAarch64 then "/lib64/ld-linux-aarch64.so.1"
@@ -147,7 +146,7 @@ builder (args // {
     export CARGO_BUILD_JOBS=$NIX_BUILD_CORES
     echo "# placeholder" > vendor/cargo/config.toml
     sed "s|# solc = .*|solc = \"${solcDefault}/bin/solc\"|g" \
-      ethereum/contracts/foundry.toml.in > \
+      ethereum/contracts/foundry.in.toml > \
       ethereum/contracts/foundry.toml
   '';
 

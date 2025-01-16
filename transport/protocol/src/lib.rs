@@ -61,26 +61,22 @@ pub mod msg;
 pub mod ticket_aggregation;
 
 pub mod timer;
-use ack::processor::AckResult;
-use core_path::path::TransportPath;
-use hopr_crypto_types::keypairs::{ChainKeypair, OffchainKeypair};
+use hopr_transport_identity::Multiaddr;
 pub use timer::execute_on_tick;
 
-use futures::{SinkExt, StreamExt};
 pub use msg::processor::DEFAULT_PRICE_PER_PACKET;
-use msg::processor::{PacketSendFinalizer, PacketUnwrapping, PacketWrapping};
 
-use libp2p::PeerId;
+use core_path::path::TransportPath;
+use futures::{SinkExt, StreamExt};
+use msg::processor::{PacketSendFinalizer, PacketUnwrapping, PacketWrapping};
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use std::collections::HashMap;
 use tracing::{error, trace};
 
 use hopr_async_runtime::prelude::{sleep, spawn};
 use hopr_db_api::protocol::HoprDbProtocolOperations;
-use hopr_internal_types::{
-    protocol::{Acknowledgement, ApplicationData},
-    tickets::AcknowledgedTicket,
-};
+use hopr_internal_types::protocol::{Acknowledgement, ApplicationData};
+use hopr_transport_identity::PeerId;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::{MultiCounter, SimpleCounter, SimpleGauge};
@@ -125,23 +121,33 @@ lazy_static::lazy_static! {
     .unwrap();
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+/// Processed indexer generated events.
+#[derive(Debug, Clone)]
+pub enum PeerDiscovery {
+    Allow(PeerId),
+    Ban(PeerId),
+    Announce(PeerId, Vec<Multiaddr>),
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, strum::Display)]
 pub enum ProtocolProcesses {
+    #[strum(to_string = "HOPR ack ingress")]
     AckIn,
+    #[strum(to_string = "HOPR ack egress")]
     AckOut,
+    #[strum(to_string = "HOPR msg ingress")]
     MsgIn,
+    #[strum(to_string = "HOPR msg egress")]
     MsgOut,
-    BloomPersist,
+    #[strum(to_string = "periodic bloom filter save")]
+    BloomFilterSave,
 }
 
 #[allow(clippy::too_many_arguments)]
 pub async fn run_msg_ack_protocol<Db>(
     cfg: msg::processor::PacketInteractionConfig,
     db: Db,
-    me: &OffchainKeypair,
-    me_onchain: &ChainKeypair,
     bloom_filter_persistent_path: Option<String>,
-    on_ack_ticket: impl futures::Sink<AcknowledgedTicket> + Send + Sync + 'static,
     wire_ack: (
         impl futures::Sink<(PeerId, Acknowledgement)> + Send + Sync + 'static,
         impl futures::Stream<Item = (PeerId, Acknowledgement)> + Send + Sync + 'static,
@@ -158,6 +164,9 @@ pub async fn run_msg_ack_protocol<Db>(
 where
     Db: HoprDbProtocolOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
 {
+    let me = cfg.packet_keypair.clone();
+    let me_onchain = &cfg.chain_keypair.clone();
+
     let mut processes = HashMap::new();
 
     #[cfg(all(feature = "prometheus", not(test)))]
@@ -178,7 +187,7 @@ where
         let tbf = bloom::WrappedTagBloomFilter::new(bloom_filter_persistent_path);
         let tbf_2 = tbf.clone();
         processes.insert(
-            ProtocolProcesses::BloomPersist,
+            ProtocolProcesses::BloomFilterSave,
             spawn(Box::pin(execute_on_tick(
                 std::time::Duration::from_secs(90),
                 move || {
@@ -204,38 +213,30 @@ where
         spawn(async move {
             let _neverending = wire_ack
                 .1
-                .then_concurrent(move |(peer, ack)| {
+                .for_each_concurrent(None, move |(peer, ack)| {
                     let ack_processor = ack_processor_read.clone();
 
-                    async move { ack_processor.recv(&peer, ack).await }
-                })
-                .filter_map(|v| async move {
-                    #[cfg(all(feature = "prometheus", not(test)))]
-                    match &v {
-                        Ok(AckResult::Sender(_)) => {
-                            METRIC_RECEIVED_ACKS.increment(&["true"]);
-                        }
-                        Ok(AckResult::RelayerWinning(_)) => {
-                            METRIC_RECEIVED_ACKS.increment(&["true"]);
-                            METRIC_TICKETS_COUNT.increment(&["winning"]);
-                        }
-                        Ok(AckResult::RelayerLosing) => {
-                            METRIC_RECEIVED_ACKS.increment(&["true"]);
-                            METRIC_TICKETS_COUNT.increment(&["losing"]);
-                        }
-                        Err(_e) => {
-                            METRIC_RECEIVED_ACKS.increment(&["false"]);
+                    async move {
+                        let _ack_result = ack_processor.recv(&peer, ack).await;
+                        #[cfg(all(feature = "prometheus", not(test)))]
+                        match &_ack_result {
+                            Ok(hopr_db_api::prelude::AckResult::Sender(_)) => {
+                                METRIC_RECEIVED_ACKS.increment(&["true"]);
+                            }
+                            Ok(hopr_db_api::prelude::AckResult::RelayerWinning(_)) => {
+                                METRIC_RECEIVED_ACKS.increment(&["true"]);
+                                METRIC_TICKETS_COUNT.increment(&["winning"]);
+                            }
+                            Ok(hopr_db_api::prelude::AckResult::RelayerLosing) => {
+                                METRIC_RECEIVED_ACKS.increment(&["true"]);
+                                METRIC_TICKETS_COUNT.increment(&["losing"]);
+                            }
+                            Err(_) => {
+                                METRIC_RECEIVED_ACKS.increment(&["false"]);
+                            }
                         }
                     }
-
-                    if let Ok(AckResult::RelayerWinning(acknowledged_ticket)) = v {
-                        Some(acknowledged_ticket)
-                    } else {
-                        None
-                    }
                 })
-                .map(Ok)
-                .forward(on_ack_ticket)
                 .await;
         }),
     );

@@ -351,16 +351,22 @@ impl BytesRepresentable for Challenge {
     const SIZE: usize = CurvePoint::SIZE_COMPRESSED;
 }
 
-/// Represents a half-key used for Proof of Relay
+/// Represents a half-key used for the Proof-of-Relay.
+///
 /// Half-key is equivalent to a non-zero scalar in the field used by secp256k1, but the type
-/// itself does not validate nor enforce this fact,
+/// itself does not validate nor enforce this fact.
+// TODO: change this to HalfKey([u8; Self::SIZE]) in 3.0
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub struct HalfKey([u8; Self::SIZE]);
+pub struct HalfKey {
+    hkey: [u8; Self::SIZE],
+}
 
 impl Default for HalfKey {
     fn default() -> Self {
-        let mut ret = Self([0u8; Self::SIZE]);
-        ret.0.copy_from_slice(
+        let mut ret = Self {
+            hkey: [0u8; Self::SIZE],
+        };
+        ret.hkey.copy_from_slice(
             NonZeroScalar::<Secp256k1>::from_uint(1u16.into())
                 .unwrap()
                 .to_bytes()
@@ -371,15 +377,17 @@ impl Default for HalfKey {
 }
 
 impl HalfKey {
-    /// Generates random half key, useful for tests.
+    /// Generates random half-key, useful for tests.
     pub fn random() -> Self {
-        Self(random_group_element().0)
+        Self {
+            hkey: random_group_element().0,
+        }
     }
 
     /// Converts the non-zero scalar represented by this half-key into the half-key challenge.
     /// This operation naturally enforces the underlying scalar to be non-zero.
     pub fn to_challenge(&self) -> HalfKeyChallenge {
-        CurvePoint::from_exponent(&self.0)
+        CurvePoint::from_exponent(&self.hkey)
             .map(|cp| HalfKeyChallenge::new(cp.as_compressed().as_bytes()))
             .expect("invalid public key")
     }
@@ -387,7 +395,7 @@ impl HalfKey {
 
 impl AsRef<[u8]> for HalfKey {
     fn as_ref(&self) -> &[u8] {
-        &self.0
+        &self.hkey
     }
 }
 
@@ -395,7 +403,9 @@ impl TryFrom<&[u8]> for HalfKey {
     type Error = GeneralError;
 
     fn try_from(value: &[u8]) -> std::result::Result<Self, Self::Error> {
-        Ok(Self(value.try_into().map_err(|_| ParseError("HalfKey".into()))?))
+        Ok(Self {
+            hkey: value.try_into().map_err(|_| ParseError("HalfKey".into()))?,
+        })
     }
 }
 
@@ -1040,8 +1050,12 @@ impl From<[u8; Self::SIZE]> for Response {
 }
 
 /// Represents an EdDSA signature using Ed25519 Edwards curve.
+// TODO: change this to OffchainSignature([u8; Self::SIZE]) in 3.0
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct OffchainSignature(#[serde(with = "arrays")] [u8; Self::SIZE]);
+pub struct OffchainSignature {
+    #[serde(with = "arrays")]
+    signature: [u8; Self::SIZE],
+}
 
 impl OffchainSignature {
     /// Sign the given message using the [OffchainKeypair].
@@ -1060,7 +1074,7 @@ impl OffchainSignature {
 
     /// Verify this signature of the given message and [OffchainPublicKey].
     pub fn verify_message(&self, msg: &[u8], public_key: &OffchainPublicKey) -> bool {
-        let sgn = ed25519_dalek::Signature::from_slice(&self.0).expect("corrupted OffchainSignature");
+        let sgn = ed25519_dalek::Signature::from_slice(&self.signature).expect("corrupted OffchainSignature");
         let pk = ed25519_dalek::VerifyingKey::from_bytes(public_key.0.as_bytes()).unwrap();
         pk.verify_strict(msg, &sgn).is_ok()
     }
@@ -1068,7 +1082,7 @@ impl OffchainSignature {
 
 impl AsRef<[u8]> for OffchainSignature {
     fn as_ref(&self) -> &[u8] {
-        &self.0
+        &self.signature
     }
 }
 
@@ -1089,8 +1103,10 @@ impl BytesRepresentable for OffchainSignature {
 
 impl From<ed25519_dalek::Signature> for OffchainSignature {
     fn from(value: ed25519_dalek::Signature) -> Self {
-        let mut ret = Self([0u8; Self::SIZE]);
-        ret.0.copy_from_slice(value.to_bytes().as_ref());
+        let mut ret = Self {
+            signature: [0u8; Self::SIZE],
+        };
+        ret.signature.copy_from_slice(value.to_bytes().as_ref());
         ret
     }
 }
@@ -1103,12 +1119,12 @@ impl TryFrom<([u8; 32], [u8; 32])> for OffchainSignature {
     }
 }
 
-/// Represents an ECDSA signature based on the secp256k1 curve with recoverable public key.
+/// Represents an ECDSA signature based on the secp256k1 curve with a recoverable public key.
 /// This signature encodes the 2-bit recovery information into the
 /// uppermost bits of MSB of the S value, which are never used by this ECDSA
 /// instantiation over secp256k1.
 /// The instance holds the byte array consisting of `R` and `S` values with the recovery bit
-/// alredy embedded in S.
+/// already embedded in S.
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct Signature(#[serde(with = "arrays")] [u8; Self::SIZE]);
 
@@ -1216,37 +1232,6 @@ impl PartialEq for Signature {
 
 impl Eq for Signature {}
 
-/// A method that turns all lower-cased hexadecimal address to a checksum-ed address
-/// according to `<https://eips.ethereum.org/EIPS/eip-55>`
-pub trait ToChecksum {
-    /// Checksum of self according to `<https://eips.ethereum.org/EIPS/eip-55>`
-    fn to_checksum(&self) -> String;
-}
-
-impl ToChecksum for Address {
-    /// Checksum of self according to `<https://eips.ethereum.org/EIPS/eip-55>`
-    fn to_checksum(&self) -> String {
-        let address_hex = &self.to_hex()[2..];
-
-        let mut hasher = EthDigest::default();
-        hasher.update(address_hex.as_bytes());
-        let hash = hasher.finalize();
-
-        let mut ret = String::with_capacity(Self::SIZE * 2 + 2);
-        ret.push_str("0x");
-
-        for (i, c) in address_hex.chars().enumerate() {
-            let nibble = hash[i / 2] >> (((i + 1) % 2) * 4) & 0xf;
-            if nibble >= 8 {
-                ret.push(c.to_ascii_uppercase());
-            } else {
-                ret.push(c);
-            }
-        }
-        ret
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use crate::utils::random_group_element;
@@ -1254,7 +1239,7 @@ mod tests {
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         types::{
             Challenge, CurvePoint, HalfKey, HalfKeyChallenge, Hash, OffchainPublicKey, OffchainSignature, PublicKey,
-            Response, Signature, ToChecksum,
+            Response, Signature,
         },
     };
     use ed25519_dalek::Signer;
@@ -1601,7 +1586,9 @@ mod tests {
 
     #[test]
     fn test_half_key() -> anyhow::Result<()> {
-        let hk1 = HalfKey([0u8; HalfKey::SIZE]);
+        let hk1 = HalfKey {
+            hkey: [0u8; HalfKey::SIZE],
+        };
         let hk2 = HalfKey::try_from(hk1.as_ref())?;
 
         assert_eq!(hk1, hk2, "failed to match deserialized half-key");
@@ -1633,76 +1620,6 @@ mod tests {
         assert_eq!(
             hash1.hash(),
             Hash::try_from(hex!("1c4d8d521eccee7225073ea180e0fa075a6443afb7ca06076a9566b07d29470f").as_ref())?
-        );
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_address_to_checksum_all_caps() -> anyhow::Result<()> {
-        let addr_1 = Address::from_str("52908400098527886e0f7030069857d2e4169ee7")?;
-        let value_1 = addr_1.to_checksum();
-        let addr_2 = Address::from_str("8617e340b3d01fa5f11f306f4090fd50e238070d")?;
-        let value_2 = addr_2.to_checksum();
-
-        assert_eq!(
-            value_1, "0x52908400098527886E0F7030069857D2E4169EE7",
-            "checksumed address does not match"
-        );
-        assert_eq!(
-            value_2, "0x8617E340B3D01FA5F11F306F4090FD50E238070D",
-            "checksumed address does not match"
-        );
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_address_to_checksum_all_lower() -> anyhow::Result<()> {
-        let addr_1 = Address::from_str("de709f2102306220921060314715629080e2fb77")?;
-        let value_1 = addr_1.to_checksum();
-        let addr_2 = Address::from_str("27b1fdb04752bbc536007a920d24acb045561c26")?;
-        let value_2 = addr_2.to_checksum();
-
-        assert_eq!(
-            value_1, "0xde709f2102306220921060314715629080e2fb77",
-            "checksumed address does not match"
-        );
-        assert_eq!(
-            value_2, "0x27b1fdb04752bbc536007a920d24acb045561c26",
-            "checksumed address does not match"
-        );
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_address_to_checksum_all_normal() -> anyhow::Result<()> {
-        let addr_1 = Address::from_str("5aaeb6053f3e94c9b9a09f33669435e7ef1beaed")?;
-        let addr_2 = Address::from_str("fb6916095ca1df60bb79ce92ce3ea74c37c5d359")?;
-        let addr_3 = Address::from_str("dbf03b407c01e7cd3cbea99509d93f8dddc8c6fb")?;
-        let addr_4 = Address::from_str("d1220a0cf47c7b9be7a2e6ba89f429762e7b9adb")?;
-
-        let value_1 = addr_1.to_checksum();
-        let value_2 = addr_2.to_checksum();
-        let value_3 = addr_3.to_checksum();
-        let value_4 = addr_4.to_checksum();
-
-        assert_eq!(
-            value_1, "0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed",
-            "checksumed address does not match"
-        );
-        assert_eq!(
-            value_2, "0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359",
-            "checksumed address does not match"
-        );
-        assert_eq!(
-            value_3, "0xdbF03B407c01E7cD3CBea99509d93f8DDDC8C6FB",
-            "checksumed address does not match"
-        );
-        assert_eq!(
-            value_4, "0xD1220A0cf47c7B9Be7A2E6BA89F429762e7b9aDb",
-            "checksumed address does not match"
         );
 
         Ok(())

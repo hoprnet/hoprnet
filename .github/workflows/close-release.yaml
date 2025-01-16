@@ -22,7 +22,6 @@ on:
         required: true
         description: 'Name of the release'
         options:
-          - saint-louis
           - singapore
           - kaunas
 concurrency:

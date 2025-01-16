@@ -3,9 +3,6 @@
 //! It can be configured to automatically redeem all tickets or only aggregated tickets (which results in far fewer on-chain transactions being issued).
 //!
 //! For details on default parameters, see [AutoRedeemingStrategyConfig].
-use crate::errors::StrategyError::CriteriaNotSatisfied;
-use crate::strategy::SingularStrategy;
-use crate::Strategy;
 use async_trait::async_trait;
 use chain_actions::redeem::TicketRedeemActions;
 use hopr_db_sql::api::tickets::HoprDbTicketOperations;
@@ -18,6 +15,10 @@ use serde_with::{serde_as, DisplayFromStr};
 use std::fmt::{Debug, Display, Formatter};
 use tracing::{debug, error, info};
 use validator::Validate;
+
+use crate::errors::StrategyError::CriteriaNotSatisfied;
+use crate::strategy::SingularStrategy;
+use crate::Strategy;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleCounter;
@@ -176,8 +177,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::auto_redeeming::{AutoRedeemingStrategy, AutoRedeemingStrategyConfig};
-    use crate::strategy::SingularStrategy;
+    use super::*;
     use async_trait::async_trait;
     use chain_actions::action_queue::{ActionConfirmation, PendingAction};
     use chain_actions::redeem::TicketRedeemActions;
@@ -187,12 +187,11 @@ mod tests {
     use hex_literal::hex;
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::prelude::*;
+    use hopr_db_sql::api::tickets::TicketSelector;
     use hopr_db_sql::channels::HoprDbChannelOperations;
     use hopr_db_sql::db::HoprDb;
     use hopr_db_sql::{api::info::DomainSeparator, info::HoprDbInfoOperations};
     use hopr_db_sql::{HoprDbGeneralModelOperations, TargetDb};
-    use hopr_internal_types::prelude::*;
-    use hopr_primitive_types::prelude::*;
     use mockall::mock;
     use std::ops::Add;
     use std::time::{Duration, SystemTime};
@@ -236,12 +235,13 @@ mod tests {
                 &self,
                 counterparty: &Address,
                 only_aggregated: bool,
-            ) -> chain_actions::errors::Result<Vec<PendingAction >>;
+            ) -> chain_actions::errors::Result<Vec<PendingAction>>;
             async fn redeem_tickets_in_channel(
                 &self,
                 channel: &ChannelEntry,
                 only_aggregated: bool,
             ) -> chain_actions::errors::Result<Vec<PendingAction >>;
+            async fn redeem_tickets(&self, selector: TicketSelector) -> chain_actions::errors::Result<Vec<PendingAction>>;
             async fn redeem_ticket(&self, ack: AcknowledgedTicket) -> chain_actions::errors::Result<PendingAction>;
         }
     }

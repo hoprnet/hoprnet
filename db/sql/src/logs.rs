@@ -13,8 +13,8 @@ use hopr_crypto_types::prelude::Hash;
 use hopr_db_api::errors::{DbError, Result};
 use hopr_db_api::logs::HoprDbLogOperations;
 use hopr_db_entity::errors::DbEntityError;
-use hopr_db_entity::prelude::{Log, LogStatus};
-use hopr_db_entity::{log, log_status};
+use hopr_db_entity::prelude::{Log, LogStatus, LogTopicInfo};
+use hopr_db_entity::{log, log_status, log_topic_info};
 use hopr_primitive_types::prelude::*;
 
 use crate::db::HoprDb;
@@ -342,6 +342,58 @@ impl HoprDbLogOperations for HoprDb {
                         }
                         Err(e) => Err(DbError::from(DbSqlError::from(e))),
                     }
+                })
+            })
+            .await
+    }
+
+    async fn ensure_logs_origin(&self, contract_address_topics: Vec<(Address, Hash)>) -> Result<()> {
+        if contract_address_topics.is_empty() {
+            return Err(DbError::LogicalError(
+                "contract address topics must not be empty".into(),
+            ));
+        }
+
+        self.nest_transaction_in_db(None, TargetDb::Logs)
+            .await?
+            .perform(|tx| {
+                Box::pin(async move {
+                    let log_count = Log::find()
+                        .count(tx.as_ref())
+                        .await
+                        .map_err(|e| DbError::from(DbSqlError::from(e)))?;
+                    let log_topic_count = LogTopicInfo::find()
+                        .count(tx.as_ref())
+                        .await
+                        .map_err(|e| DbError::from(DbSqlError::from(e)))?;
+
+                    if log_count == 0 && log_topic_count == 0 {
+                        // Prime the DB with the values
+                        LogTopicInfo::insert_many(contract_address_topics.into_iter().map(|(addr, topic)| {
+                            log_topic_info::ActiveModel {
+                                address: Set(addr.to_string()),
+                                topic: Set(topic.to_string()),
+                                ..Default::default()
+                            }
+                        }))
+                        .exec(tx.as_ref())
+                        .await
+                        .map_err(|e| DbError::from(DbSqlError::from(e)))?;
+                    } else {
+                        // Check that all contract addresses and topics are in the DB
+                        for (addr, topic) in contract_address_topics {
+                            let log_topic_count = LogTopicInfo::find()
+                                .filter(log_topic_info::Column::Address.eq(addr.to_string()))
+                                .filter(log_topic_info::Column::Topic.eq(topic.to_string()))
+                                .count(tx.as_ref())
+                                .await
+                                .map_err(|e| DbError::from(DbSqlError::from(e)))?;
+                            if log_topic_count != 1 {
+                                return Err(DbError::InconsistentLogs);
+                            }
+                        }
+                    }
+                    Ok(())
                 })
             })
             .await
@@ -807,5 +859,28 @@ mod tests {
             updated_log_3.clone().checksum.unwrap(),
         );
         assert_ne!(updated_log_1, updated_log_3);
+    }
+
+    #[async_std::test]
+    async fn test_should_not_allow_inconsistent_logs_in_the_db() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
+        let addr_1 = Address::new(b"my address 123456789");
+        let addr_2 = Address::new(b"my 2nd address 12345");
+        let topic_1 = Hash::create(&[b"my topic 1"]).into();
+        let topic_2 = Hash::create(&[b"my topic 2"]).into();
+
+        db.ensure_logs_origin(vec![(addr_1, topic_1)]).await?;
+
+        db.ensure_logs_origin(vec![(addr_1, topic_2)])
+            .await
+            .expect_err("expected error due to inconsistent logs in the db");
+
+        db.ensure_logs_origin(vec![(addr_2, topic_1)])
+            .await
+            .expect_err("expected error due to inconsistent logs in the db");
+
+        db.ensure_logs_origin(vec![(addr_1, topic_1)]).await?;
+
+        Ok(())
     }
 }

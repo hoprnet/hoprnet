@@ -116,6 +116,13 @@ pub const SESSION_USABLE_MTU_SIZE: usize =
 trait AsyncReadWrite: futures::AsyncWrite + futures::AsyncRead + Send {}
 impl<T: futures::AsyncWrite + futures::AsyncRead + Send> AsyncReadWrite for T {}
 
+/// Describes a node service target.
+/// These are specialized [`SessionTargets`](SessionTarget::ExitNode)
+/// that are local to the Exit node and have different purposes, such as Cover Traffic.
+///
+/// These targets cannot be [sealed](SealedHost) from the Entry node.
+pub type ServiceId = u32;
+
 /// Defines what should happen with the data at the recipient where the
 /// data from the established session are supposed to be forwarded to some `target`.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -125,8 +132,8 @@ pub enum SessionTarget {
     UdpStream(SealedHost),
     /// Target is running over TCP with the given address and port.
     TcpStream(SealedHost),
-    /// Target is a service directly at the exit node with a given service ID.
-    ExitNode(u32),
+    /// Target is a service directly at the exit node with the given service ID.
+    ExitNode(ServiceId),
 }
 
 /// Wrapper for incoming [Session] along with other information
@@ -165,11 +172,19 @@ impl Session {
             // This is a very coarse assumption, that it takes max 2 seconds for each hop one way.
             let rto_base = 2 * Duration::from_secs(2) * (routing_options.count_hops() + 1) as u32;
 
+            let expiration_coefficient = if capabilities.contains(&Capability::Retransmission)
+                || capabilities.contains(&Capability::RetransmissionAckOnly)
+            {
+                4
+            } else {
+                1
+            };
+
             // TODO: tweak the default Session protocol config
             let cfg = SessionConfig {
                 enabled_features: capabilities.iter().cloned().flatten().collect(),
                 acknowledged_frames_buffer: 100_000, // Can hold frames for > 40 sec at 2000 frames/sec
-                frame_expiration_age: rto_base * 10,
+                frame_expiration_age: rto_base * expiration_coefficient,
                 rto_base_receiver: rto_base, // Ask for segment resend, if not yet complete after this period
                 rto_base_sender: rto_base * 2, // Resend frame if not acknowledged after this period
                 ..Default::default()
@@ -424,7 +439,17 @@ impl futures::AsyncWrite for InnerSession {
         }
     }
 
-    fn poll_flush(self: std::pin::Pin<&mut Self>, _cx: &mut std::task::Context<'_>) -> Poll<std::io::Result<()>> {
+    fn poll_flush(mut self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<std::io::Result<()>> {
+        if self.closed {
+            return Poll::Ready(Err(Error::new(ErrorKind::BrokenPipe, "session closed")));
+        }
+
+        while let Poll::Ready(Some(result)) = self.tx_buffer.poll_next_unpin(cx) {
+            if let Err(e) = result {
+                error!(error = %e, "failed to send message chunk inside session during flush");
+                return Poll::Ready(Err(Error::from(ErrorKind::BrokenPipe)));
+            }
+        }
         Poll::Ready(Ok(()))
     }
 
