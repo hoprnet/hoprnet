@@ -1,3 +1,5 @@
+mod state;
+
 use std::cmp::Ordering;
 use asynchronous_codec::Framed;
 use futures::{pin_mut, Sink, SinkExt, StreamExt, TryStreamExt};
@@ -8,10 +10,11 @@ use std::num::NonZeroU32;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
-
+use futures::stream::BoxStream;
 use crate::prelude::errors::SessionError;
 use crate::prelude::protocol::{FrameAcknowledgements, SessionCodec, SessionMessage};
-use crate::prelude::{frame_reconstructor, frame_reconstructor_with_inspector, FrameId, Segment};
+use crate::prelude::{frame_reconstructor_with_inspector, FrameId, Segment, SegmentId};
+use crate::session::frame::SeqNum;
 use crate::session::protocol::SegmentRequest;
 use crate::session::segmenter::Segmenter;
 use crate::session::utils::{offloaded_ringbuffer, OffloadedRbConsumer};
@@ -72,7 +75,7 @@ impl Ord for RetriedFrameId {
     }
 }
 
-struct SocketState<const C: usize> {
+struct SocketStateImpl<const C: usize> {
     rb: OffloadedRbConsumer<Segment>,
     ctl_tx: futures::channel::mpsc::UnboundedSender<SessionMessage<C>>,
     downstream_segment_in: Pin<Box<dyn Sink<Segment, Error = SessionError> + Send>>,
@@ -80,15 +83,12 @@ struct SocketState<const C: usize> {
     outgoing_frame_retries_tx: SkipDelaySender<RetriedFrameId>,
 }
 
-impl<const C: usize> SocketState<C> {
+impl<const C: usize> SocketStateImpl<C> {
     async fn incoming_segment(&mut self, segment: Segment) -> Result<(), SessionError> {
         let id = segment.id();
         tracing::trace!(%id, "RECEIVED: segment");
 
-        self.downstream_segment_in
-            .send(segment)
-            .await
-            .map_err(|e| SessionError::ProcessingError(e.to_string()))?;
+
 
         // TODO: condition this below only when retransmission is enabled
 
@@ -147,16 +147,39 @@ pub struct SessionSocket<const C: usize> {
     downstream_frames_out: Pin<Box<dyn futures::io::AsyncRead + Send>>,
 }
 
+/// Abstraction of the [SessionSocket] state.
+pub trait SocketState<'a, const C: usize>: Clone + Send + Sync {
+    /// Called when the Socket receives a new segment from Downstream.
+    fn incoming_segment(&mut self, id: &SegmentId, segment_count: SeqNum) -> Result<(), SessionError>;
+
+    /// Called when [segment retransmission request](SegmentRequest) is received from Downstream.
+    fn incoming_retransmission_request(&mut self, request: SegmentRequest<C>) -> Result<(), SessionError>;
+
+    /// Called when an [acknowledgement of frames](FrameAcknowledgements) is received from Downstream.
+    fn incoming_acknowledged_frames(&mut self, ack: FrameAcknowledgements<C>) -> Result<(), SessionError>;
+
+    /// Called when a complete Frame has been finalized from segments received from Downstream.
+    fn frame_received(&mut self, id: FrameId) -> Result<(), SessionError>;
+
+    /// Called when a frame could not be completed from the segments received from Downstream.
+    fn frame_discarded(&mut self, id: FrameId) -> Result<(), SessionError>;
+
+    /// Called when a segment of a Frame was sent to the Downstream.
+    fn segment_sent(&mut self, segment: &Segment) -> Result<(), SessionError>;
+
+    fn control_message_stream(&self) -> Option<BoxStream<'a, SessionMessage<C>>>;
+}
+
+
 impl<const C: usize> SessionSocket<C> {
-    pub fn new<T, I>(id: I, transport: T) -> Self
+    pub fn new<T, I, S>(id: I, transport: T, state: S) -> Self
     where
         T: futures::io::AsyncRead + futures::io::AsyncWrite + Send + Unpin + 'static,
         I: std::fmt::Display,
+        S: for<'a> SocketState<'a, C> + 'static
     {
-        let session_id = id.to_string();
-
         // Downstream Segments get reconstructed into Frames
-        let (downstream_segment_in, downstream_frames_out, frame_inspector) = frame_reconstructor_with_inspector(Duration::from_secs(10), 1024);
+        let (mut downstream_segment_in, downstream_frames_out, frame_inspector) = frame_reconstructor_with_inspector(Duration::from_secs(10), 1024);
 
         // Upstream frames get segmented and are yielded by the data_rx stream
         let (upstream_frames_in, segmented_data_rx) = Segmenter::<C, 1500>::new(1024);
@@ -165,10 +188,69 @@ impl<const C: usize> SessionSocket<C> {
         let (ctl_tx, ctl_rx) = futures::channel::mpsc::unbounded::<SessionMessage<C>>();
 
         // Acknowledgements get a special channel with fixed capacity
-        let (mut ack_tx, ack_rx) = futures::channel::mpsc::channel(200_000);
+        //let (mut ack_tx, ack_rx) = futures::channel::mpsc::channel(200_000);
+
+        //let (incoming_frame_retries_tx, incoming_frame_retries_rx) = skip_delay_channel();
+        //let (outgoing_frame_retries_tx, outgoing_frame_retries_rx) = skip_delay_channel();
+
+        // Frames coming out from the Reconstructor can be read Upstream
+        let session_id = id.to_string();
+        let mut state_clone = state.clone();
+        let downstream_frames_out = Box::pin(
+            downstream_frames_out
+                .filter_map(move |maybe_frame| {
+                    match maybe_frame {
+                        Ok(frame) => {
+                            tracing::trace!(session_id, frame_id = frame.frame_id, "frame complete");
+                            if let Err(error) = state_clone.frame_received(frame.frame_id) {
+                                tracing::error!(session_id, frame_id = frame.frame_id, %error, "failed to notify frame retrieval");
+                            }
+                            futures::future::ready(Some(Ok(frame)))
+                        },
+                        Err(SessionError::FrameDiscarded(frame_id)) | Err(SessionError::IncompleteFrame(frame_id)) => {
+                            tracing::warn!(session_id, frame_id, "frame discarded");
+                            if let Err(error) = state_clone.frame_discarded(frame_id) {
+                                tracing::error!(session_id, frame_id, %error, "failed to notify frame retrieval");
+                            }
+
+                            // Downstream skips discarded frames
+                            futures::future::ready(None)
+                        }
+                        Err(err) => {
+                            futures::future::ready(Some(Err(std::io::Error::other(err))))
+                        },
+                    }
+                })
+                .into_async_read(),
+        );
+
+        let (packets_out, packets_in) =
+            StreamExt::split::<SessionMessage<C>>(Framed::new(transport, SessionCodec::<C>));
+
+        //let (rb_tx, rb_rx) = offloaded_ringbuffer(1024);
+
+        // Messages incoming from Upstream and from the State go downstream as Packets
+        let mut state_clone = state.clone();
+        let session_id = id.to_string();
+        let ctl_rx = state.control_message_stream().unwrap_or(futures::stream::empty().boxed());
+        hopr_async_runtime::prelude::spawn(
+            (
+                ctl_rx, // TODO: refactor
+                segmented_data_rx
+                    .map(move |s| {
+                        if let Err(error) = state_clone.segment_sent(&s) {
+                            tracing::error!(session_id, %error, "failed to notify sent segment to the state");
+                        }
+                        SessionMessage::<C>::Segment(s)
+                    }),
+            )
+            .merge()
+            .map(Ok)
+            .forward(packets_out),
+        );
 
         // Forward acknowledged frames chunked as a Control messages
-        let ctl_tx_clone = ctl_tx.clone();
+        /*let ctl_tx_clone = ctl_tx.clone();
         let id = session_id.clone();
         hopr_async_runtime::prelude::spawn(async move {
             // TODO: chunk size and rate limit should be configurable
@@ -185,72 +267,6 @@ impl<const C: usize> SessionSocket<C> {
                 tracing::trace!(session_id = id, "acknowledgement forwarding done");
             }
         });
-
-        let (incoming_frame_retries_tx, incoming_frame_retries_rx) = skip_delay_channel();
-        let (outgoing_frame_retries_tx, outgoing_frame_retries_rx) = skip_delay_channel();
-
-        // Frames coming out from the Reconstructor can be read Upstream
-        let mut incoming_frame_retries_tx_clone = incoming_frame_retries_tx.clone();
-        let id = session_id.clone();
-        let downstream_frames_out = Box::pin(
-            downstream_frames_out
-                .filter_map(move |maybe_frame| {
-                    match maybe_frame {
-                        Ok(frame) => {
-                            // TODO: ack_tx gets dropped when downstream_frames_out is dropped?
-                            if let Err(error) = ack_tx.try_send(frame.frame_id) {
-                                tracing::error!(session_id = id, frame_id = frame.frame_id, %error, "failed to acknowledge frame");
-                            }
-                            if let Err(error) = incoming_frame_retries_tx_clone.send_one((RetriedFrameId::new(frame.frame_id), Skip)) {
-                                tracing::error!(session_id = id, frame_id = frame.frame_id, %error, "failed to cancel retry of acknowledged frame");
-                            }
-                            futures::future::ready(Some(Ok(frame)))
-                        },
-                        Err(SessionError::FrameDiscarded(frame_id)) | Err(SessionError::IncompleteFrame(frame_id)) => {
-                            tracing::warn!(session_id = id, frame_id, "frame discarded");
-                            if let Err(error) = incoming_frame_retries_tx_clone.send_one((RetriedFrameId::new(frame_id), Skip)) {
-                                tracing::error!(session_id = id, frame_id, %error, "failed to cancel retry of acknowledged frame");
-                            }
-                            // Downstream skips discarded frames
-                            futures::future::ready(None)
-                        }
-                        Err(err) => {
-                            futures::future::ready(Some(Err(std::io::Error::other(err))))
-                        },
-                    }
-                })
-                .into_async_read(),
-        );
-
-        let (packets_out, packets_in) =
-            StreamExt::split::<SessionMessage<C>>(Framed::new(transport, SessionCodec::<C>));
-
-        let (rb_tx, rb_rx) = offloaded_ringbuffer(1024);
-
-        // Messages incoming from Upstream and from the State go downstream as Packets
-        let mut outgoing_frame_retries_tx_clone = outgoing_frame_retries_tx.clone();
-        hopr_async_runtime::prelude::spawn(
-            (
-                ctl_rx,
-                segmented_data_rx
-                    .map(move |s| {
-                        rb_tx.push(s.clone());
-                        // When the last segment of a frame has been sent,
-                        // add it to outgoing retries
-                        if s.is_last() {
-                            // TODO: retry token period should be set dynamic based on s.seq_len
-                            let first_retry = Duration::from_secs(1);
-                            if let Err(error) = outgoing_frame_retries_tx_clone.send_one((RetriedFrameId::new(s.frame_id), first_retry)) {
-                                tracing::trace!(frame_id = s.frame_id, %error, "failed to insert outgoing retry of a frame");
-                            }
-                        }
-                        SessionMessage::<C>::Segment(s)
-                    }),
-            )
-                .merge()
-                .map(Ok)
-                .forward(packets_out),
-        );
 
         // Outgoing frame resends (that haven't been acknowledged by the counterparty)
         let rb_rx_clone = rb_rx.clone();
@@ -316,33 +332,50 @@ impl<const C: usize> SessionSocket<C> {
             }
         });
 
-        let mut state = SocketState {
+        let mut state = SocketStateImpl {
             rb: rb_rx,
             ctl_tx,
             downstream_segment_in: Box::pin(downstream_segment_in),
             incoming_frame_retries_tx,
             outgoing_frame_retries_tx,
-        };
+        };*/
 
         // Packets incoming from Downstream
-        hopr_async_runtime::prelude::spawn(async move {
-            pin_mut!(packets_in);
-
-            // TODO: refactor
-            while let Some(in_packet) = packets_in.next().await {
-                let res = match in_packet {
-                    Ok(msg) => state.handle_incoming_message(msg).await,
-                    Err(e) => Err(e), // errors are simply propagated
-                };
-                if let Err(e) = res {
-                    tracing::error!(error = %e, "failed to process incoming packet");
+        let session_id = id.to_string();
+        let state_clone = state.clone();
+        hopr_async_runtime::prelude::spawn({
+            let mut state_clone = state_clone.clone();
+            async move {
+                if let Err(error) = packets_in
+                    // TODO
+                    /*.then(|maybe_packet| async {
+                        if let Ok(SessionMessage::Segment(s)) = maybe_packet {
+                            downstream_segment_in
+                                .send(s.clone())
+                                .await
+                                .map_err(|e| SessionError::ProcessingError(e.to_string()))?;
+                            Ok(SessionMessage::Segment(s))
+                        } else {
+                            maybe_packet
+                        }
+                    })*/
+                    .try_for_each_concurrent(Some(10), |maybe_packet| {
+                        futures::future::ready(match maybe_packet {
+                            SessionMessage::Segment(s) => state_clone.incoming_segment(&s.id(), s.seq_len),
+                            SessionMessage::Request(r) => state_clone.incoming_retransmission_request(r),
+                            SessionMessage::Acknowledge(a) => state_clone.incoming_acknowledged_frames(a),
+                        })
+                    })
+                    .await {
+                    tracing::error!(session_id, %error, "downstream packet processing completed with error");
+                } else {
+                    tracing::debug!(session_id, "incoming downstream completed");
                 }
             }
-            tracing::trace!("incoming downstream completed");
         });
 
         Self {
-            session_id,
+            session_id: id.to_string(),
             upstream_frames_in: Box::pin(upstream_frames_in),
             downstream_frames_out,
         }
