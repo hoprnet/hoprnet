@@ -144,12 +144,16 @@ impl RoutingInfo {
                 extended_header.copy_within(0..header_len, routing_info_len);
 
                 let pub_key_size = <S::P as Keypair>::Public::SIZE;
-                extended_header[0..pub_key_size].copy_from_slice(path[inverted_idx + 1].as_ref());
-                extended_header[pub_key_size] = idx as u8;
-                extended_header[pub_key_size + PATH_POSITION_LEN..pub_key_size + PATH_POSITION_LEN + SimpleMac::SIZE]
+
+                // Path position must come first,to ensure prefix RELAYER_END_PREFIX prefix safety
+                // of Ed25519 public keys.
+                extended_header[0] = idx as u8;
+                extended_header[PATH_POSITION_LEN..PATH_POSITION_LEN + pub_key_size]
+                    .copy_from_slice(path[inverted_idx + 1].as_ref());
+                extended_header[PATH_POSITION_LEN + pub_key_size..PATH_POSITION_LEN + pub_key_size + SimpleMac::SIZE]
                     .copy_from_slice(&ret.mac);
-                extended_header[pub_key_size + PATH_POSITION_LEN + SimpleMac::SIZE
-                    ..pub_key_size + PATH_POSITION_LEN + SimpleMac::SIZE + additional_data_relayer[inverted_idx].len()]
+                extended_header[PATH_POSITION_LEN + pub_key_size + SimpleMac::SIZE
+                    ..PATH_POSITION_LEN + pub_key_size + SimpleMac::SIZE + additional_data_relayer[inverted_idx].len()]
                     .copy_from_slice(additional_data_relayer[inverted_idx]);
 
                 let key_stream = prg.digest(0, header_len);
@@ -230,22 +234,22 @@ pub fn forward_header<S: SphinxSuite>(
     xor_inplace(header, &key_stream);
 
     if header[0] != RELAYER_END_PREFIX {
+        // Path position
+        let path_pos: u8 = header[0];
+
         let pub_key_size = <S::P as Keypair>::Public::SIZE;
 
         // Try to deserialize the public key to validate it
-        let next_node: Box<[u8]> = (&header[0..pub_key_size]).into();
-
-        // Path position is the secret key index
-        let path_pos: u8 = header[pub_key_size];
+        let next_node: Box<[u8]> = (&header[PATH_POSITION_LEN..PATH_POSITION_LEN + pub_key_size]).into();
 
         // Authentication tag
         let mac: [u8; SimpleMac::SIZE] = (&header
-            [pub_key_size + PATH_POSITION_LEN..pub_key_size + PATH_POSITION_LEN + SimpleMac::SIZE])
+            [PATH_POSITION_LEN + pub_key_size..PATH_POSITION_LEN + pub_key_size + SimpleMac::SIZE])
             .try_into()
             .unwrap();
 
-        let additional_info: Box<[u8]> = (&header[pub_key_size + PATH_POSITION_LEN + SimpleMac::SIZE
-            ..pub_key_size + PATH_POSITION_LEN + SimpleMac::SIZE + additional_data_relayer_len])
+        let additional_info: Box<[u8]> = (&header[PATH_POSITION_LEN + pub_key_size + SimpleMac::SIZE
+            ..PATH_POSITION_LEN + pub_key_size + SimpleMac::SIZE + additional_data_relayer_len])
             .into();
 
         header.copy_within(routing_info_len.., 0);
@@ -320,7 +324,7 @@ mod tests {
         assert_eq!(0, second_filler.len());
     }
 
-    fn generic_test_generate_routing_info_and_forward<S>(keypairs: Vec<S::P>)
+    fn generic_test_generate_routing_info_and_forward<S>(keypairs: Vec<S::P>) -> anyhow::Result<()>
     where
         S: SphinxSuite,
     {
@@ -342,7 +346,7 @@ mod tests {
         last_mac.copy_from_slice(&rinfo.mac);
 
         for (i, secret) in shares.secrets.iter().enumerate() {
-            let fwd = forward_header::<S>(secret, &mut header, &last_mac, MAX_HOPS, 0, 0).unwrap();
+            let fwd = forward_header::<S>(secret, &mut header, &last_mac, MAX_HOPS, 0, 0)?;
 
             match fwd {
                 ForwardedHeader::RelayNode {
@@ -370,11 +374,13 @@ mod tests {
                 }
             }
         }
+
+        Ok(())
     }
 
     #[cfg(feature = "ed25519")]
     #[parameterized(amount = { 3, 2, 1 })]
-    fn test_ed25519_generate_routing_info_and_forward(amount: usize) {
+    fn test_ed25519_generate_routing_info_and_forward(amount: usize) -> anyhow::Result<()> {
         generic_test_generate_routing_info_and_forward::<crate::ec_groups::Ed25519Suite>(
             (0..amount).map(|_| OffchainKeypair::random()).collect(),
         )
@@ -382,7 +388,7 @@ mod tests {
 
     #[cfg(feature = "x25519")]
     #[parameterized(amount = { 3, 2, 1 })]
-    fn test_x25519_generate_routing_info_and_forward(amount: usize) {
+    fn test_x25519_generate_routing_info_and_forward(amount: usize) -> anyhow::Result<()> {
         generic_test_generate_routing_info_and_forward::<crate::ec_groups::X25519Suite>(
             (0..amount).map(|_| OffchainKeypair::random()).collect(),
         )
@@ -390,7 +396,7 @@ mod tests {
 
     #[cfg(feature = "secp256k1")]
     #[parameterized(amount = { 3, 2, 1 })]
-    fn test_secp256k1_generate_routing_info_and_forward(amount: usize) {
+    fn test_secp256k1_generate_routing_info_and_forward(amount: usize) -> anyhow::Result<()> {
         generic_test_generate_routing_info_and_forward::<crate::ec_groups::Secp256k1Suite>(
             (0..amount).map(|_| ChainKeypair::random()).collect(),
         )

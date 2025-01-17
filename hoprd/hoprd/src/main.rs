@@ -28,8 +28,6 @@ use hoprd_keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
 
 use hoprd::exit::HoprServerIpForwardingReactor;
 
-const WEBSOCKET_EVENT_BROADCAST_CAPACITY: usize = 10000;
-
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleHistogram;
 
@@ -262,11 +260,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    let (mut ws_events_tx, ws_events_rx) =
-        async_broadcast::broadcast::<ApplicationData>(WEBSOCKET_EVENT_BROADCAST_CAPACITY);
-    let ws_events_rx = ws_events_rx.deactivate(); // No need to copy the data unless the websocket is opened, but leaves the channel open
-    ws_events_tx.set_overflow(true); // Set overflow in case of full the oldest record is discarded
-
     let inbox_clone = inbox.clone();
 
     let node_clone = node.clone();
@@ -305,7 +298,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 hoprd_db,
                 inbox,
                 session_listener_sockets,
-                websocket_rx: ws_events_rx,
                 msg_encoder: Some(msg_encoder),
                 default_session_listen_host: cfg.session_ip_forwarding.default_entry_listen_host,
             })
@@ -343,15 +335,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                     #[cfg(all(feature = "prometheus", not(test)))]
                     METRIC_MESSAGE_LATENCY.observe(latency.as_secs_f64());
-
-                    if cfg.api.enable && ws_events_tx.receiver_count() > 0 {
-                        if let Err(e) = ws_events_tx.try_broadcast(ApplicationData {
-                            application_tag: data.application_tag,
-                            plain_text: msg.clone(),
-                        }) {
-                            error!(error = %e, "Failed to notify websockets about a new message");
-                        }
-                    }
 
                     if !inbox_clone
                         .write()

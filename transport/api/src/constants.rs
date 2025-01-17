@@ -6,6 +6,10 @@ pub const PACKET_QUEUE_TIMEOUT_MILLISECONDS: std::time::Duration = std::time::Du
 /// The maximum queue size for the network update events
 pub(crate) const MAXIMUM_NETWORK_UPDATE_EVENT_QUEUE_SIZE: usize = 4000;
 
+pub(crate) const MAXIMUM_MSG_INCOMING_BUFFER_SIZE: usize = 20000;
+pub(crate) const MAXIMUM_MSG_OUTGOING_BUFFER_SIZE: usize = 20000;
+pub(crate) const MAXIMUM_ACK_INCOMING_BUFFER_SIZE: usize = 20000;
+
 pub const RESERVED_TAG_UPPER_LIMIT: u16 = RESERVED_SESSION_TAG_UPPER_LIMIT;
 
 /// The upper limit value for the session reserved tag range.

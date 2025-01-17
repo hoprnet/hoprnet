@@ -361,18 +361,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "async-broadcast"
-version = "0.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "20cd0e2e25ea8e5f7e9df04578dc6cf5c83577fd09b1a46aaf5c85e1c33f2a7e"
-dependencies = [
- "event-listener 5.3.1",
- "event-listener-strategy",
- "futures-core",
- "pin-project-lite",
-]
-
-[[package]]
 name = "async-channel"
 version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4517,6 +4505,7 @@ dependencies = [
  "hopr-platform",
  "hopr-primitive-types",
  "hopr-transport-identity",
+ "hopr-transport-mixer",
  "hopr-transport-p2p",
  "hopr-transport-protocol",
  "hopr-transport-session",
@@ -4542,6 +4531,28 @@ dependencies = [
  "libp2p-identity",
  "multiaddr",
  "thiserror",
+]
+
+[[package]]
+name = "hopr-transport-mixer"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-std",
+ "bytesize",
+ "criterion",
+ "futures",
+ "futures-timer",
+ "hopr-crypto-random",
+ "hopr-metrics",
+ "lazy_static",
+ "mockall",
+ "more-asserts",
+ "rust-stream-ext-concurrent",
+ "smart-default",
+ "thiserror",
+ "tracing",
+ "tracing-test",
 ]
 
 [[package]]
@@ -4571,7 +4582,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-protocol"
-version = "0.3.1"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "async-lock 3.4.0",
@@ -4593,6 +4604,7 @@ dependencies = [
  "hopr-platform",
  "hopr-primitive-types",
  "hopr-transport-identity",
+ "hopr-transport-mixer",
  "lazy_static",
  "libp2p",
  "more-asserts",
@@ -4649,7 +4661,6 @@ name = "hoprd"
 version = "2.2.0-rc.1"
 dependencies = [
  "anyhow",
- "async-broadcast",
  "async-lock 3.4.0",
  "async-signal",
  "async-std",
@@ -4698,7 +4709,6 @@ name = "hoprd-api"
 version = "3.10.0"
 dependencies = [
  "anyhow",
- "async-broadcast",
  "async-lock 3.4.0",
  "axum",
  "axum-extra",

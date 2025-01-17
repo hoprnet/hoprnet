@@ -40,6 +40,7 @@ members = [
   "misc/platform",
   "transport/api",
   "transport/identity",
+  "transport/mixer",
   "transport/network",
   "transport/p2p",
   "transport/protocol",
@@ -51,7 +52,6 @@ aes = "0.8"
 anyhow = "1.0.93"
 aquamarine = "0.6.0"
 arrayvec = { version = "0.7.6", features = ["serde"] }
-async-broadcast = "0.7.1"
 async-channel = "2.3.1"
 async-lock = "3.4.0"
 async-signal = "0.2.8"
@@ -219,10 +219,11 @@ hopr-parallelize = { path = "common/parallelize" }
 hopr-platform = { path = "misc/platform" }
 hopr-primitive-types = { path = "common/primitive-types", default-features = false }
 hopr-strategy = { path = "logic/strategy", default-features = false }
-hopr-transport = { path = "transport/api", default-features = false }
+hopr-transport = { path = "transport/api" }
 hopr-transport-identity = { path = "transport/identity" }
-hopr-transport-protocol = { path = "transport/protocol", default-features = false }
-hopr-transport-p2p = { path = "transport/p2p", default-features = false }
+hopr-transport-mixer = { path = "transport/mixer" }
+hopr-transport-protocol = { path = "transport/protocol" }
+hopr-transport-p2p = { path = "transport/p2p" }
 hopr-transport-session = { path = "transport/session" }
 hoprd-api = { path = "hoprd/rest-api", default-features = false }
 hoprd-inbox = { path = "hoprd/inbox", default-features = false }
