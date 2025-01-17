@@ -102,6 +102,12 @@ pub use crate::{
     helpers::{PeerEligibility, TicketStatistics},
 };
 
+#[cfg(any(
+    all(feature = "mixer-channel", feature = "mixer-stream"),
+    all(not(feature = "mixer-channel"), not(feature = "mixer-stream"))
+))]
+compile_error!("Exactly one of the 'mixer-channel' or 'mixer-stream' features must be specified");
+
 // Needs lazy-static, since Duration multiplication by a constant is yet not a const-operation.
 lazy_static::lazy_static! {
     static ref SESSION_INITIATION_TIMEOUT_MAX: std::time::Duration = 2 * constants::SESSION_INITIATION_TIMEOUT_BASE * RoutingOptions::MAX_INTERMEDIATE_HOPS as u32;

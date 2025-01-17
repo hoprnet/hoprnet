@@ -11,7 +11,7 @@ use std::{
     task::Poll,
     time::Duration,
 };
-use tracing::trace;
+use tracing::{error, trace};
 
 use crate::{config::MixerConfig, data::DelayedData};
 
@@ -97,16 +97,15 @@ impl<T> Clone for Sender<T> {
 
 impl<T> Drop for Sender<T> {
     fn drop(&mut self) {
-        self.channel.sender_count.fetch_sub(1, Ordering::Relaxed);
-        if self.channel.sender_count.load(Ordering::Relaxed) == 0
+        if self.channel.sender_count.fetch_sub(1, Ordering::Relaxed) == 1
             && !self.channel.receiver_active.load(Ordering::Relaxed)
         {
-            let channel = self.channel.channel.lock();
-            if let Ok(mut channel) = channel {
-                channel.waker = None;
-            } else {
-                trace!("Failed to lock the mixer channel for cleanup after Sender drop");
-            };
+            let mut channel = self.channel.channel.lock().unwrap_or_else(|e| {
+                self.channel.channel.clear_poison();
+                e.into_inner()
+            });
+
+            channel.waker = None;
         }
     }
 }
@@ -202,7 +201,11 @@ impl<T> Stream for Receiver<T> {
     fn poll_next(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Option<Self::Item>> {
         let now = std::time::Instant::now();
         if self.channel.sender_count.load(Ordering::Relaxed) > 0 {
-            let mut channel = self.channel.channel.lock().unwrap();
+            let Ok(mut channel) = self.channel.channel.lock() else {
+                error!("mutex is poisoned, terminating stream");
+                return Poll::Ready(None);
+            };
+
             if channel.buffer.peek().map(|x| x.0.release_at < now).unwrap_or(false) {
                 let data = channel
                     .buffer
