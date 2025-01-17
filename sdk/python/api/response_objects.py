@@ -66,6 +66,10 @@ class Alias(ApiResponseObject):
     keys = {"peer_id": "peerId"}
 
 
+class AliasAddress(ApiResponseObject):
+    keys = {"address": "address"}
+
+
 class Balances(ApiResponseObject):
     keys = {
         "hopr": "hopr",

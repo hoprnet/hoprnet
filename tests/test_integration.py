@@ -16,11 +16,11 @@ from sdk.python.localcluster.node import Node
 
 from .conftest import barebone_nodes, default_nodes, random_distinct_pairs_from
 from .utils import (
-    TICKET_AGGREGATION_THRESHOLD,
     AGGREGATED_TICKET_PRICE,
     MULTIHOP_MESSAGE_SEND_TIMEOUT,
     PARAMETERIZED_SAMPLE_SIZE,
     RESERVED_TAG_UPPER_BOUND,
+    TICKET_AGGREGATION_THRESHOLD,
     check_all_tickets_redeemed,
     check_native_balance_below,
     check_received_packets_with_peek,
@@ -92,6 +92,10 @@ async def test_hoprd_should_be_able_to_remove_existing_aliases(peer: str, swarm7
     assert await swarm7[peer].api.aliases_get_alias("Alice") is None
     assert await swarm7[peer].api.aliases_set_alias("Alice", alice.address) is True
     assert (await swarm7[peer].api.aliases_get_alias("Alice")).peer_id == alice.peer_id
+    assert (await swarm7[peer].api.aliases_get_alias("Alice", True)).address == alice.address.lower()
+
+    assert (await swarm7[peer].api.aliases_get_aliases())["Alice"] == alice.peer_id
+    assert (await swarm7[peer].api.aliases_get_aliases(True))["Alice"] == alice.address.lower()
 
     assert await swarm7[peer].api.aliases_remove_alias("Alice")
     assert await swarm7[peer].api.aliases_get_alias("Alice") is None
