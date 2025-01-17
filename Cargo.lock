@@ -1653,7 +1653,7 @@ checksum = "773648b94d0e5d620f64f280777445740e61fe701025087ec8b57f45c791888b"
 
 [[package]]
 name = "core-network"
-version = "0.6.5"
+version = "0.6.6"
 dependencies = [
  "anyhow",
  "async-std",
@@ -4571,7 +4571,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-protocol"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "anyhow",
  "async-lock 3.4.0",
