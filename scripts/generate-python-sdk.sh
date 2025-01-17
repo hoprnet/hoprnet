@@ -29,7 +29,8 @@ if ! swagger-codegen3 generate \
   -l python \
   -o "${TARGET_DIR}" \
   -i /tmp/openapi.spec.json \
-  -c "${config_file}"; then
+  -c "${config_file}"; 
+then
   echo "Failed to generate SDK" >&2
   exit 1
 fi
