@@ -18,7 +18,7 @@ use tracing::{error, info, trace, warn};
 use tracing_subscriber::prelude::*;
 
 use hopr_async_runtime::prelude::{cancel_join_handle, spawn, JoinHandle};
-use hopr_lib::{ApplicationData, AsUnixTimestamp, HoprLibProcesses, ToHex};
+use hopr_lib::{AsUnixTimestamp, HoprLibProcesses, ToHex};
 use hopr_platform::file::native::join;
 use hoprd::cli::CliArgs;
 use hoprd::errors::HoprdError;
@@ -27,18 +27,6 @@ use hoprd_db_api::aliases::{HoprdDbAliasesOperations, ME_AS_ALIAS};
 use hoprd_keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
 
 use hoprd::exit::HoprServerIpForwardingReactor;
-
-#[cfg(all(feature = "prometheus", not(test)))]
-use hopr_metrics::metrics::SimpleHistogram;
-
-#[cfg(all(feature = "prometheus", not(test)))]
-lazy_static::lazy_static! {
-    static ref METRIC_MESSAGE_LATENCY: SimpleHistogram = SimpleHistogram::new(
-        "hopr_message_latency_sec",
-        "Histogram of measured received message latencies in seconds",
-        vec![0.01, 0.025, 0.050, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 20.0]
-    ).unwrap();
-}
 
 fn init_logger() -> Result<(), Box<dyn std::error::Error>> {
     let env_filter = match tracing_subscriber::EnvFilter::try_from_default_env() {
@@ -267,10 +255,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut processes: Vec<HoprdProcesses> = Vec::new();
 
     if cfg.api.enable {
-        // TODO: remove RLP in 3.0
-        let msg_encoder =
-            |data: &[u8]| hopr_lib::rlp::encode(data, hopr_platform::time::native::current_time().as_unix_timestamp());
-
         let node_cfg_str = cfg.as_redacted_string()?;
         let api_cfg = cfg.api.clone();
 
@@ -298,7 +282,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 hoprd_db,
                 inbox,
                 session_listener_sockets,
-                msg_encoder: Some(msg_encoder),
                 default_session_listen_host: cfg.session_ip_forwarding.default_entry_listen_host,
             })
             .await
@@ -319,39 +302,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut ingress = hopr_socket.reader();
     processes.push(HoprdProcesses::Inbox(spawn(async move {
         while let Some(data) = ingress.next().await {
-            let recv_at = SystemTime::now();
+            let tag = data.application_tag;
 
-            // TODO: remove RLP in 3.0
-            match hopr_lib::rlp::decode(&data.plain_text) {
-                Ok((msg, sent)) => {
-                    let latency = recv_at.as_unix_timestamp().saturating_sub(sent);
+            trace!(
+                ?tag,
+                receiged_at = DateTime::<Utc>::from(SystemTime::now()).to_rfc3339(),
+                "received message"
+            );
 
-                    trace!(
-                        tag = ?data.application_tag,
-                        latency_in_ms = latency.as_millis(),
-                        receiged_at = DateTime::<Utc>::from(recv_at).to_rfc3339(),
-                        "received message"
-                    );
-
-                    #[cfg(all(feature = "prometheus", not(test)))]
-                    METRIC_MESSAGE_LATENCY.observe(latency.as_secs_f64());
-
-                    if !inbox_clone
-                        .write()
-                        .await
-                        .push(ApplicationData {
-                            application_tag: data.application_tag,
-                            plain_text: msg,
-                        })
-                        .await
-                    {
-                        warn!(
-                            tag = data.application_tag,
-                            "Received a message with an ignored Inbox tag",
-                        )
-                    }
-                }
-                Err(e) => error!(error = %e, "RLP decoding failed"),
+            if !inbox_clone.write().await.push(data).await {
+                warn!(?tag, "Received a message with an ignored Inbox tag",)
             }
         }
     })));
