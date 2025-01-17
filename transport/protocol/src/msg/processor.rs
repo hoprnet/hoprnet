@@ -1,5 +1,5 @@
-use futures::pin_mut;
 use futures::{future::Either, SinkExt};
+use futures::{pin_mut, Sink};
 use hopr_crypto_packet::errors::PacketError;
 use hopr_db_api::protocol::TransportPacketWithChainData;
 use hopr_transport_identity::PeerId;
@@ -284,12 +284,18 @@ impl PacketSendAwaiter {
 pub type SendMsgInput = (ApplicationData, TransportPath, PacketSendFinalizer);
 
 #[derive(Debug, Clone)]
-pub struct MsgSender {
-    tx: futures::channel::mpsc::UnboundedSender<SendMsgInput>,
+pub struct MsgSender<T>
+where
+    T: Sink<SendMsgInput> + Send + Sync + Clone + 'static + std::marker::Unpin,
+{
+    tx: T,
 }
 
-impl MsgSender {
-    pub fn new(tx: futures::channel::mpsc::UnboundedSender<SendMsgInput>) -> Self {
+impl<T> MsgSender<T>
+where
+    T: Sink<SendMsgInput> + Send + Sync + Clone + 'static + std::marker::Unpin,
+{
+    pub fn new(tx: T) -> Self {
         Self { tx }
     }
 
@@ -302,7 +308,7 @@ impl MsgSender {
             .clone()
             .send((data, path, tx.into()))
             .await
-            .map_err(|e| TransportError(format!("Failed to send a message: {e}")))
+            .map_err(|_| TransportError("Failed to send a message".into()))
             .map(move |_| {
                 let awaiter: PacketSendAwaiter = rx.into();
                 awaiter

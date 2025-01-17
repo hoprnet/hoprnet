@@ -1,4 +1,5 @@
 use async_lock::RwLock;
+use futures::channel::mpsc::Sender;
 use std::sync::{Arc, OnceLock};
 use tracing::trace;
 
@@ -10,9 +11,11 @@ use hopr_internal_types::protocol::ApplicationData;
 use hopr_network_types::prelude::RoutingOptions;
 use hopr_primitive_types::primitives::Address;
 use hopr_transport_identity::PeerId;
-use hopr_transport_protocol::msg::processor::MsgSender;
-use hopr_transport_session::errors::SessionManagerError;
-use hopr_transport_session::{errors::TransportSessionError, traits::SendMsg};
+use hopr_transport_protocol::msg::processor::{MsgSender, SendMsgInput};
+use hopr_transport_session::{
+    errors::{SessionManagerError, TransportSessionError},
+    traits::SendMsg,
+};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -143,7 +146,7 @@ where
 
 #[derive(Clone)]
 pub(crate) struct MessageSender<T, S> {
-    pub process_packet_send: Arc<OnceLock<MsgSender>>,
+    pub process_packet_send: Arc<OnceLock<MsgSender<Sender<SendMsgInput>>>>,
     pub resolver: PathPlanner<T, S>,
 }
 
@@ -152,7 +155,10 @@ where
     T: HoprDbAllOperations + std::fmt::Debug + Send + Sync + 'static,
     S: PathSelector + Send + Sync,
 {
-    pub fn new(process_packet_send: Arc<OnceLock<MsgSender>>, resolver: PathPlanner<T, S>) -> Self {
+    pub fn new(
+        process_packet_send: Arc<OnceLock<MsgSender<Sender<SendMsgInput>>>>,
+        resolver: PathPlanner<T, S>,
+    ) -> Self {
         Self {
             process_packet_send,
             resolver,

@@ -25,12 +25,14 @@ pub mod network_notifier;
 pub mod proxy;
 
 use async_lock::RwLock;
+use constants::{MAXIMUM_ACK_INCOMING_BUFFER_SIZE, MAXIMUM_MSG_INCOMING_BUFFER_SIZE, MAXIMUM_MSG_OUTGOING_BUFFER_SIZE};
 use futures::{
-    channel::mpsc::{UnboundedReceiver, UnboundedSender},
+    channel::mpsc::{self, Sender, UnboundedReceiver, UnboundedSender},
     future::{select, Either},
     pin_mut, FutureExt, SinkExt, StreamExt,
 };
 use hopr_transport_identity::multiaddrs::strip_p2p_protocol;
+use hopr_transport_mixer::MixerConfig;
 use std::time::Duration;
 use std::{
     collections::HashMap,
@@ -47,7 +49,11 @@ use core_path::{
     selectors::dfs::{DfsPathSelector, DfsPathSelectorConfig, RandomizedEdgeWeighting},
 };
 use hopr_async_runtime::prelude::{sleep, spawn, JoinHandle};
-use hopr_db_sql::{accounts::ChainOrPacketKey, HoprDbAllOperations};
+use hopr_db_sql::{
+    accounts::ChainOrPacketKey,
+    api::tickets::{AggregationPrerequisites, HoprDbTicketOperations},
+    HoprDbAllOperations,
+};
 use hopr_internal_types::prelude::*;
 use hopr_platform::time::native::current_time;
 use hopr_primitive_types::prelude::*;
@@ -57,10 +63,15 @@ use hopr_transport_p2p::{
 };
 use hopr_transport_protocol::{
     errors::ProtocolError,
-    msg::processor::{MsgSender, PacketInteractionConfig, PacketSendFinalizer},
-    ticket_aggregation::processor::{TicketAggregationActions, TicketAggregationInteraction, TicketAggregatorTrait},
+    msg::processor::{MsgSender, PacketInteractionConfig, PacketSendFinalizer, SendMsgInput},
+    ticket_aggregation::processor::{
+        AwaitingAggregator, TicketAggregationActions, TicketAggregationInteraction, TicketAggregatorTrait,
+    },
 };
 use hopr_transport_session::{DispatchResult, SessionManager, SessionManagerConfig};
+
+#[cfg(feature = "mixer-stream")]
+use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_transport_session::types::transfer_session;
@@ -94,6 +105,12 @@ pub use crate::{
     helpers::{PeerEligibility, TicketStatistics},
 };
 
+#[cfg(any(
+    all(feature = "mixer-channel", feature = "mixer-stream"),
+    all(not(feature = "mixer-channel"), not(feature = "mixer-stream"))
+))]
+compile_error!("Exactly one of the 'mixer-channel' or 'mixer-stream' features must be specified");
+
 // Needs lazy-static, since Duration multiplication by a constant is yet not a const-operation.
 lazy_static::lazy_static! {
     static ref SESSION_INITIATION_TIMEOUT_MAX: std::time::Duration = 2 * constants::SESSION_INITIATION_TIMEOUT_BASE * RoutingOptions::MAX_INTERMEDIATE_HOPS as u32;
@@ -107,12 +124,63 @@ pub enum HoprTransportProcess {
     Protocol(hopr_transport_protocol::ProtocolProcesses),
     #[strum(to_string = "session manager sub-process #{0}")]
     SessionsManagement(usize),
-    #[strum(to_string = "heartbeat performing the network quality measurements")]
+    #[strum(to_string = "protocol [HOPR [heartbeat]]")]
     Heartbeat,
 }
 
 /// Currently used implementation of [`PathSelector`](core_path::selectors::PathSelector).
 type CurrentPathSelector = DfsPathSelector<RandomizedEdgeWeighting>;
+
+#[derive(Debug, Clone)]
+pub struct TicketAggregatorProxy<Db>
+where
+    Db: HoprDbTicketOperations + Send + Sync + Clone + std::fmt::Debug,
+{
+    db: Db,
+    maybe_writer: Arc<OnceLock<TicketAggregationActions<TicketAggregationResponseType, TicketAggregationRequestType>>>,
+    agg_timeout: std::time::Duration,
+}
+
+impl<Db> TicketAggregatorProxy<Db>
+where
+    Db: HoprDbTicketOperations + Send + Sync + Clone + std::fmt::Debug,
+{
+    pub fn new(
+        db: Db,
+        maybe_writer: Arc<
+            OnceLock<TicketAggregationActions<TicketAggregationResponseType, TicketAggregationRequestType>>,
+        >,
+        agg_timeout: std::time::Duration,
+    ) -> Self {
+        Self {
+            db,
+            maybe_writer,
+            agg_timeout,
+        }
+    }
+}
+
+#[async_trait::async_trait]
+impl<Db> TicketAggregatorTrait for TicketAggregatorProxy<Db>
+where
+    Db: HoprDbTicketOperations + Send + Sync + Clone + std::fmt::Debug,
+{
+    async fn aggregate_tickets(
+        &self,
+        channel: &Hash,
+        prerequisites: AggregationPrerequisites,
+    ) -> hopr_transport_protocol::errors::Result<()> {
+        if let Some(writer) = self.maybe_writer.clone().get() {
+            AwaitingAggregator::new(self.db.clone(), writer.clone(), self.agg_timeout)
+                .aggregate_tickets(channel, prerequisites)
+                .await
+        } else {
+            Err(ProtocolError::TransportError(
+                "Ticket aggregation writer not available, the object was not yet initialized".to_string(),
+            ))
+        }
+    }
+}
 
 /// Interface into the physical transport mechanism allowing all off-chain HOPR-related tasks on
 /// the transport, as well as off-chain ticket manipulation.
@@ -126,7 +194,7 @@ where
     db: T,
     ping: Arc<OnceLock<Pinger<network_notifier::PingExternalInteractions<T>>>>,
     network: Arc<Network<T>>,
-    process_packet_send: Arc<OnceLock<MsgSender>>,
+    process_packet_send: Arc<OnceLock<MsgSender<Sender<SendMsgInput>>>>,
     path_planner: PathPlanner<T, CurrentPathSelector>,
     my_multiaddresses: Vec<Multiaddr>,
     process_ticket_aggregate:
@@ -314,12 +382,11 @@ where
         let mut processes: HashMap<HoprTransportProcess, JoinHandle<()>> = HashMap::new();
 
         // network event processing channel
-        let (network_events_tx, network_events_rx) = futures::channel::mpsc::channel::<NetworkTriggeredEvent>(
-            constants::MAXIMUM_NETWORK_UPDATE_EVENT_QUEUE_SIZE,
-        );
+        let (network_events_tx, network_events_rx) =
+            mpsc::channel::<NetworkTriggeredEvent>(constants::MAXIMUM_NETWORK_UPDATE_EVENT_QUEUE_SIZE);
 
         // manual ping
-        let (ping_tx, ping_rx) = futures::channel::mpsc::unbounded::<(PeerId, PingQueryReplier)>();
+        let (ping_tx, ping_rx) = mpsc::unbounded::<(PeerId, PingQueryReplier)>();
 
         let ping_cfg = PingConfig {
             timeout: self.cfg.protocol.heartbeat.timeout,
@@ -346,7 +413,7 @@ where
         let tkt_agg_writer = ticket_agg_proc.writer();
 
         let (external_msg_send, external_msg_rx) =
-            futures::channel::mpsc::unbounded::<(ApplicationData, TransportPath, PacketSendFinalizer)>();
+            mpsc::channel::<(ApplicationData, TransportPath, PacketSendFinalizer)>(MAXIMUM_MSG_OUTGOING_BUFFER_SIZE);
 
         self.process_packet_send
             .clone()
@@ -370,11 +437,75 @@ where
         );
 
         // initiate the transport layer
-        let (ack_to_send_tx, ack_to_send_rx) = futures::channel::mpsc::unbounded::<(PeerId, Acknowledgement)>();
-        let (ack_received_tx, ack_received_rx) = futures::channel::mpsc::unbounded::<(PeerId, Acknowledgement)>();
+        let (ack_to_send_tx, ack_to_send_rx) = mpsc::unbounded::<(PeerId, Acknowledgement)>();
+        let (ack_received_tx, ack_received_rx) =
+            mpsc::channel::<(PeerId, Acknowledgement)>(MAXIMUM_ACK_INCOMING_BUFFER_SIZE);
 
-        let (msg_to_send_tx, msg_to_send_rx) = futures::channel::mpsc::unbounded::<(PeerId, Box<[u8]>)>();
-        let (msg_received_tx, msg_received_rx) = futures::channel::mpsc::unbounded::<(PeerId, Box<[u8]>)>();
+        let mixer_cfg = MixerConfig {
+            min_delay: std::time::Duration::from_millis(
+                std::env::var("HOPR_INTERNAL_MIXER_MINIMUM_DELAY_IN_MS")
+                    .map(|v| {
+                        v.trim()
+                            .parse::<u64>()
+                            .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS)
+                    })
+                    .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS),
+            ),
+            delay_range: std::time::Duration::from_millis(
+                std::env::var("HOPR_INTERNAL_MIXER_DELAY_RANGE_IN_MS")
+                    .map(|v| {
+                        v.trim()
+                            .parse::<u64>()
+                            .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_DEFAULT_DELAY_RANGE_IN_MS)
+                    })
+                    .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_DEFAULT_DELAY_RANGE_IN_MS),
+            ),
+            capacity: std::env::var("HOPR_INTERNAL_MIXER_CAPACITY")
+                .map(|v| {
+                    v.trim()
+                        .parse::<usize>()
+                        .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_CAPACITY)
+                })
+                .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_CAPACITY),
+            ..MixerConfig::default()
+        };
+        #[cfg(feature = "mixer-channel")]
+        let (mixing_channel_tx, mixing_channel_rx) = hopr_transport_mixer::channel::<(PeerId, Box<[u8]>)>(mixer_cfg);
+
+        #[cfg(feature = "mixer-stream")]
+        let (mixing_channel_tx, mixing_channel_rx) = {
+            let (tx, rx) = futures::channel::mpsc::channel::<(PeerId, Box<[u8]>)>(MAXIMUM_MSG_OUTGOING_BUFFER_SIZE);
+            let rx = rx.then_concurrent(move |v| {
+                let cfg = mixer_cfg;
+
+                async move {
+                    let random_delay = cfg.random_delay();
+                    trace!(delay_in_ms = random_delay.as_millis(), "Created random mixer delay",);
+
+                    #[cfg(all(feature = "prometheus", not(test)))]
+                    hopr_transport_mixer::channel::METRIC_QUEUE_SIZE.decrement(1.0f64);
+
+                    sleep(random_delay).await;
+
+                    #[cfg(all(feature = "prometheus", not(test)))]
+                    {
+                        hopr_transport_mixer::channel::METRIC_QUEUE_SIZE.decrement(1.0f64);
+
+                        let weight = 1.0f64 / cfg.metric_delay_window as f64;
+                        hopr_transport_mixer::channel::METRIC_MIXER_AVERAGE_DELAY.set(
+                            (weight * random_delay.as_millis() as f64)
+                                + ((1.0f64 - weight) * hopr_transport_mixer::channel::METRIC_MIXER_AVERAGE_DELAY.get()),
+                        );
+                    }
+
+                    v
+                }
+            });
+
+            (tx, rx)
+        };
+
+        let (msg_received_tx, msg_received_rx) = mpsc::channel::<(PeerId, Box<[u8]>)>(MAXIMUM_MSG_INCOMING_BUFFER_SIZE);
 
         let transport_layer = HoprSwarm::new(
             (&self.me).into(),
@@ -390,7 +521,7 @@ where
         let transport_layer = transport_layer.with_processors(
             ack_to_send_rx,
             ack_received_tx,
-            msg_to_send_rx,
+            mixing_channel_rx,
             msg_received_tx,
             tkt_agg_writer,
         );
@@ -405,13 +536,13 @@ where
             self.cfg.protocol.outgoing_ticket_price,
         );
 
-        let (tx_from_protocol, rx_from_protocol) = futures::channel::mpsc::unbounded::<ApplicationData>();
+        let (tx_from_protocol, rx_from_protocol) = mpsc::unbounded::<ApplicationData>();
         for (k, v) in hopr_transport_protocol::run_msg_ack_protocol(
             packet_cfg,
             self.db.clone(),
             Some(tbf_path),
             (ack_to_send_tx, ack_received_rx),
-            (msg_to_send_tx, msg_received_rx),
+            (mixing_channel_tx, msg_received_rx),
             (tx_from_protocol, external_msg_rx),
         )
         .await

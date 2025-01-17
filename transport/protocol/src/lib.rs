@@ -64,22 +64,22 @@ pub mod timer;
 use hopr_transport_identity::Multiaddr;
 pub use timer::execute_on_tick;
 
-pub use msg::processor::DEFAULT_PRICE_PER_PACKET;
-
-use core_path::path::TransportPath;
 use futures::{SinkExt, StreamExt};
-use msg::processor::{PacketSendFinalizer, PacketUnwrapping, PacketWrapping};
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use std::collections::HashMap;
-use tracing::{error, trace};
+use tracing::error;
 
-use hopr_async_runtime::prelude::{sleep, spawn};
+use core_path::path::TransportPath;
+use hopr_async_runtime::prelude::spawn;
 use hopr_db_api::protocol::HoprDbProtocolOperations;
 use hopr_internal_types::protocol::{Acknowledgement, ApplicationData};
 use hopr_transport_identity::PeerId;
 
+pub use msg::processor::DEFAULT_PRICE_PER_PACKET;
+use msg::processor::{PacketSendFinalizer, PacketUnwrapping, PacketWrapping};
+
 #[cfg(all(feature = "prometheus", not(test)))]
-use hopr_metrics::metrics::{MultiCounter, SimpleCounter, SimpleGauge};
+use hopr_metrics::metrics::{MultiCounter, SimpleCounter};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -111,18 +111,23 @@ lazy_static::lazy_static! {
     ).unwrap();
     static ref METRIC_REJECTED_TICKETS_COUNT: SimpleCounter =
         SimpleCounter::new("hopr_rejected_tickets_count", "Number of rejected tickets").unwrap();
-    // mixer
-    static ref METRIC_QUEUE_SIZE: SimpleGauge =
-        SimpleGauge::new("hopr_mixer_queue_size", "Current mixer queue size").unwrap();
-    static ref METRIC_MIXER_AVERAGE_DELAY: SimpleGauge = SimpleGauge::new(
-        "hopr_mixer_average_packet_delay",
-        "Average mixer packet delay averaged over a packet window"
-    )
-    .unwrap();
 }
 
-const ENV_MIXER_PACKET_MAX_DELAY_MILLIS: &str = "HOPR_INTERNAL_MIXER_PACKET_MAX_DELAY_MILLIS";
-
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, strum::Display)]
+pub enum ProtocolProcesses {
+    #[strum(to_string = "HOPR [ack] - ingress")]
+    AckIn,
+    #[strum(to_string = "HOPR [ack] - egress")]
+    AckOut,
+    #[strum(to_string = "HOPR [msg] - ingress")]
+    MsgIn,
+    #[strum(to_string = "HOPR [msg] - egress")]
+    MsgOut,
+    #[strum(to_string = "HOPR [msg] - mixer")]
+    Mixer,
+    #[strum(to_string = "bloom filter persistence (periodic)")]
+    BloomPersist,
+}
 /// Processed indexer generated events.
 #[derive(Debug, Clone)]
 pub enum PeerDiscovery {
@@ -131,23 +136,13 @@ pub enum PeerDiscovery {
     Announce(PeerId, Vec<Multiaddr>),
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, strum::Display)]
-pub enum ProtocolProcesses {
-    #[strum(to_string = "HOPR ack ingress")]
-    AckIn,
-    #[strum(to_string = "HOPR ack egress")]
-    AckOut,
-    #[strum(to_string = "HOPR msg ingress")]
-    MsgIn,
-    #[strum(to_string = "HOPR msg egress")]
-    MsgOut,
-    #[strum(to_string = "periodic bloom filter save")]
-    BloomFilterSave,
-}
-
+/// Run all processes responsible for handling the msg and acknowledgment protocols.
+///
+/// The pipeline does not handle the mixing itself, that needs to be injected as a separate process
+/// overlayed on top of the `wire_msg` Stream or Sink.
 #[allow(clippy::too_many_arguments)]
 pub async fn run_msg_ack_protocol<Db>(
-    cfg: msg::processor::PacketInteractionConfig,
+    packet_cfg: msg::processor::PacketInteractionConfig,
     db: Db,
     bloom_filter_persistent_path: Option<String>,
     wire_ack: (
@@ -166,8 +161,8 @@ pub async fn run_msg_ack_protocol<Db>(
 where
     Db: HoprDbProtocolOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
 {
-    let me = cfg.packet_keypair.clone();
-    let me_onchain = &cfg.chain_keypair.clone();
+    let me = packet_cfg.packet_keypair.clone();
+    let me_onchain = &packet_cfg.chain_keypair.clone();
 
     let mut processes = HashMap::new();
 
@@ -181,15 +176,13 @@ where
         lazy_static::initialize(&METRIC_PACKET_COUNT_PER_PEER);
         lazy_static::initialize(&METRIC_REPLAYED_PACKET_COUNT);
         lazy_static::initialize(&METRIC_REJECTED_TICKETS_COUNT);
-        lazy_static::initialize(&METRIC_QUEUE_SIZE);
-        lazy_static::initialize(&METRIC_MIXER_AVERAGE_DELAY);
     }
 
     let tbf = if let Some(bloom_filter_persistent_path) = bloom_filter_persistent_path {
         let tbf = bloom::WrappedTagBloomFilter::new(bloom_filter_persistent_path);
         let tbf_2 = tbf.clone();
         processes.insert(
-            ProtocolProcesses::BloomFilterSave,
+            ProtocolProcesses::BloomPersist,
             spawn(Box::pin(execute_on_tick(
                 std::time::Duration::from_secs(90),
                 move || {
@@ -207,7 +200,7 @@ where
 
     let ack_processor_read = ack::processor::AcknowledgementProcessor::new(db.clone(), me_onchain);
     let ack_processor_write = ack_processor_read.clone();
-    let msg_processor_read = msg::processor::PacketProcessor::new(db.clone(), tbf, cfg);
+    let msg_processor_read = msg::processor::PacketProcessor::new(db.clone(), tbf, packet_cfg);
     let msg_processor_write = msg_processor_read.clone();
 
     processes.insert(
@@ -265,14 +258,6 @@ where
 
     let msg_to_send_tx = wire_msg.0.clone();
 
-    let mixer_cfg = msg::mixer::MixerConfig::new(
-        0,
-        std::env::var(ENV_MIXER_PACKET_MAX_DELAY_MILLIS)
-            .ok()
-            .and_then(|v| v.parse::<u64>().ok())
-            .unwrap_or_else(|| msg::mixer::MixerConfig::default().delay_range().1),
-    );
-
     processes.insert(
         ProtocolProcesses::MsgOut,
         spawn(async move {
@@ -280,9 +265,6 @@ where
                 .1
                 .then_concurrent(|(data, path, finalizer)| {
                     let msg_processor = msg_processor_write.clone();
-
-                    #[cfg(all(feature = "prometheus", not(test)))]
-                    METRIC_QUEUE_SIZE.increment(1.0f64);
 
                     async move {
                         match PacketWrapping::send(&msg_processor, data, path).await {
@@ -296,9 +278,6 @@ where
                                 Some(v)
                             }
                             Err(e) => {
-                                #[cfg(all(feature = "prometheus", not(test)))]
-                                METRIC_QUEUE_SIZE.decrement(1.0f64);
-
                                 finalizer.finalize(Err(e));
                                 None
                             }
@@ -306,28 +285,8 @@ where
                     }
                 })
                 .filter_map(|v| async move { v })
-                // delay purposefully isolated into a separate concurrent task
-                .then_concurrent(|v| async move {
-                    let random_delay = mixer_cfg.random_delay();
-                    trace!(delay_in_ms = random_delay.as_millis(), "Created random mixer delay",);
-
-                    sleep(random_delay).await;
-
-                    #[cfg(all(feature = "prometheus", not(test)))]
-                    {
-                        METRIC_QUEUE_SIZE.decrement(1.0f64);
-
-                        let weight = 1.0f64 / mixer_cfg.metric_delay_window as f64;
-                        METRIC_MIXER_AVERAGE_DELAY.set(
-                            (weight * random_delay.as_millis() as f64)
-                                + ((1.0f64 - weight) * METRIC_MIXER_AVERAGE_DELAY.get()),
-                        );
-                    }
-
-                    v
-                })
                 .map(Ok)
-                .forward(wire_msg.0)
+                .forward(msg_to_send_tx)
                 .await;
         }),
     );
@@ -345,7 +304,7 @@ where
                 })
                 .filter_map(move |v| {
                     let mut internal_ack_send = internal_ack_send.clone();
-                    let mut msg_to_send_tx = msg_to_send_tx.clone();
+                    let mut msg_to_send_tx = wire_msg.0.clone();
                     let me = me.clone();
 
                     async move {
