@@ -23,11 +23,9 @@ use hopr_db_sql::{
 };
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
+use hopr_transport_mixer::config::MixerConfig;
 use hopr_transport_protocol::{
-    msg::{
-        mixer::MixerConfig,
-        processor::{MsgSender, PacketInteractionConfig, PacketSendFinalizer},
-    },
+    msg::processor::{MsgSender, PacketInteractionConfig, PacketSendFinalizer},
     DEFAULT_PRICE_PER_PACKET,
 };
 use tracing::debug;
@@ -149,7 +147,7 @@ pub type WireChannels = (
     ),
     (
         futures::channel::mpsc::UnboundedSender<(PeerId, Box<[u8]>)>,
-        futures::channel::mpsc::UnboundedReceiver<(PeerId, Box<[u8]>)>,
+        hopr_transport_mixer::channel::Receiver<(PeerId, Box<[u8]>)>,
     ),
 );
 
@@ -198,7 +196,8 @@ pub async fn peer_setup_for(
         let (wire_ack_recv_tx, wire_ack_recv_rx) = futures::channel::mpsc::unbounded::<(PeerId, Acknowledgement)>();
 
         let (wire_msg_send_tx, wire_msg_send_rx) = futures::channel::mpsc::unbounded::<(PeerId, Box<[u8]>)>();
-        let (wire_msg_recv_tx, wire_msg_recv_rx) = futures::channel::mpsc::unbounded::<(PeerId, Box<[u8]>)>();
+        let (mixer_channel_tx, mixer_channel_rx) =
+            hopr_transport_mixer::channel::<(PeerId, Box<[u8]>)>(MixerConfig::default());
 
         let (api_send_tx, api_send_rx) =
             futures::channel::mpsc::unbounded::<(ApplicationData, TransportPath, PacketSendFinalizer)>();
@@ -206,29 +205,28 @@ pub async fn peer_setup_for(
 
         let opk: &OffchainKeypair = &PEERS[i];
         let ock: &ChainKeypair = &PEERS_CHAIN[i];
-        let cfg = PacketInteractionConfig {
+        let packet_cfg = PacketInteractionConfig {
             check_unrealized_balance: true,
             packet_keypair: opk.clone(),
             chain_keypair: ock.clone(),
-            mixer: MixerConfig::default(),
             outgoing_ticket_win_prob: 1.0,
         };
 
         db.start_ticket_processing(Some(received_ack_tickets_tx))?;
 
         hopr_transport_protocol::run_msg_ack_protocol(
-            cfg,
+            packet_cfg,
             db,
             None,
             (wire_ack_recv_tx, wire_ack_send_rx),
-            (wire_msg_recv_tx, wire_msg_send_rx),
+            (mixer_channel_tx, wire_msg_send_rx),
             (api_recv_tx, api_send_rx),
         )
         .await;
 
         wire_channels.push((
             (wire_ack_send_tx, wire_ack_recv_rx),
-            (wire_msg_send_tx, wire_msg_recv_rx),
+            (wire_msg_send_tx, mixer_channel_rx),
         ));
 
         logical_channels.push((api_send_tx, api_recv_rx));

@@ -1,5 +1,5 @@
-use futures::pin_mut;
 use futures::{future::Either, SinkExt};
+use futures::{pin_mut, Sink};
 use hopr_crypto_packet::errors::PacketError;
 use hopr_db_api::protocol::TransportPacketWithChainData;
 use hopr_transport_identity::PeerId;
@@ -18,7 +18,6 @@ use hopr_primitive_types::prelude::*;
 
 use super::packet::OutgoingPacket;
 use crate::bloom;
-use crate::msg::mixer::MixerConfig;
 
 lazy_static::lazy_static! {
     /// Fixed price per packet to 0.01 HOPR
@@ -252,12 +251,18 @@ impl PacketSendAwaiter {
 pub type SendMsgInput = (ApplicationData, TransportPath, PacketSendFinalizer);
 
 #[derive(Debug, Clone)]
-pub struct MsgSender {
-    tx: futures::channel::mpsc::UnboundedSender<SendMsgInput>,
+pub struct MsgSender<T>
+where
+    T: Sink<SendMsgInput> + Send + Sync + Clone + 'static + std::marker::Unpin,
+{
+    tx: T,
 }
 
-impl MsgSender {
-    pub fn new(tx: futures::channel::mpsc::UnboundedSender<SendMsgInput>) -> Self {
+impl<T> MsgSender<T>
+where
+    T: Sink<SendMsgInput> + Send + Sync + Clone + 'static + std::marker::Unpin,
+{
+    pub fn new(tx: T) -> Self {
         Self { tx }
     }
 
@@ -270,7 +275,7 @@ impl MsgSender {
             .clone()
             .send((data, path, tx.into()))
             .await
-            .map_err(|e| TransportError(format!("Failed to send a message: {e}")))
+            .map_err(|_| TransportError("Failed to send a message".into()))
             .map(move |_| {
                 let awaiter: PacketSendAwaiter = rx.into();
                 awaiter
@@ -284,7 +289,6 @@ pub struct PacketInteractionConfig {
     pub check_unrealized_balance: bool,
     pub packet_keypair: OffchainKeypair,
     pub chain_keypair: ChainKeypair,
-    pub mixer: MixerConfig,
     pub outgoing_ticket_win_prob: f64,
 }
 
@@ -294,7 +298,6 @@ impl PacketInteractionConfig {
             packet_keypair: packet_keypair.clone(),
             chain_keypair: chain_keypair.clone(),
             check_unrealized_balance: true,
-            mixer: MixerConfig::default(),
             outgoing_ticket_win_prob,
         }
     }

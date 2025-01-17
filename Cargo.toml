@@ -40,6 +40,7 @@ members = [
   "misc/platform",
   "transport/api",
   "transport/identity",
+  "transport/mixer",
   "transport/network",
   "transport/p2p",
   "transport/protocol",
@@ -219,10 +220,11 @@ hopr-parallelize = { path = "common/parallelize" }
 hopr-platform = { path = "misc/platform" }
 hopr-primitive-types = { path = "common/primitive-types", default-features = false }
 hopr-strategy = { path = "logic/strategy", default-features = false }
-hopr-transport = { path = "transport/api", default-features = false }
+hopr-transport = { path = "transport/api" }
 hopr-transport-identity = { path = "transport/identity" }
-hopr-transport-protocol = { path = "transport/protocol", default-features = false }
-hopr-transport-p2p = { path = "transport/p2p", default-features = false }
+hopr-transport-mixer = { path = "transport/mixer" }
+hopr-transport-protocol = { path = "transport/protocol" }
+hopr-transport-p2p = { path = "transport/p2p" }
 hopr-transport-session = { path = "transport/session" }
 hoprd-api = { path = "hoprd/rest-api", default-features = false }
 hoprd-inbox = { path = "hoprd/inbox", default-features = false }

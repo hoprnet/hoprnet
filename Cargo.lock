@@ -4517,6 +4517,7 @@ dependencies = [
  "hopr-platform",
  "hopr-primitive-types",
  "hopr-transport-identity",
+ "hopr-transport-mixer",
  "hopr-transport-p2p",
  "hopr-transport-protocol",
  "hopr-transport-session",
@@ -4542,6 +4543,28 @@ dependencies = [
  "libp2p-identity",
  "multiaddr",
  "thiserror",
+]
+
+[[package]]
+name = "hopr-transport-mixer"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-std",
+ "bytesize",
+ "criterion",
+ "futures",
+ "futures-timer",
+ "hopr-crypto-random",
+ "hopr-metrics",
+ "lazy_static",
+ "mockall",
+ "more-asserts",
+ "rust-stream-ext-concurrent",
+ "smart-default",
+ "thiserror",
+ "tracing",
+ "tracing-test",
 ]
 
 [[package]]
@@ -4571,7 +4594,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-protocol"
-version = "0.3.1"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "async-lock 3.4.0",
@@ -4593,6 +4616,7 @@ dependencies = [
  "hopr-platform",
  "hopr-primitive-types",
  "hopr-transport-identity",
+ "hopr-transport-mixer",
  "lazy_static",
  "libp2p",
  "more-asserts",
