@@ -144,6 +144,9 @@ impl RoutingInfo {
                 extended_header.copy_within(0..header_len, routing_info_len);
 
                 let pub_key_size = <S::P as Keypair>::Public::SIZE;
+
+                // Path position must come first,to ensure prefix RELAYER_END_PREFIX prefix safety
+                // of Ed25519 public keys.
                 extended_header[0] = idx as u8;
                 extended_header[PATH_POSITION_LEN..PATH_POSITION_LEN + pub_key_size]
                     .copy_from_slice(path[inverted_idx + 1].as_ref());
