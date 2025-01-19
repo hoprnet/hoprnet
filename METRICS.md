@@ -66,6 +66,7 @@ scrape_configs:
 - `hopr_indexer_block_number`: Current last processed block number by the indexer
 - `hopr_indexer_sync_progress`: Sync progress of the historical data by the indexer
 - `hopr_indexer_checksum`: Contains an unsigned integer that represents the low 32-bits of the Indexer checksum.
+- `hopr_indexer_data_source`: Current data source of the Indexer, keys: `source`
 - `hopr_chain_actions_count`: Number of different chain actions and their results, keys: `action`, `result`
 - `hopr_indexer_contract_log_counters`: Counts of different HOPR contract logs processed by the Indexer, keys: `contract`
 - `hopr_tickets_incoming_statistics`: Ticket statistics for channels with incoming tickets, keys: `channel`, `statistic`
