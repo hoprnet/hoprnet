@@ -2,7 +2,10 @@
 
 # prevent sourcing of this script, only allow execution
 $(return >/dev/null 2>&1)
-test "$?" -eq "0" && { echo "This script should only be executed." >&2; exit 1; }
+test "$?" -eq "0" && {
+  echo "This script should only be executed." >&2
+  exit 1
+}
 
 # exit on errors, undefined variables, ensure errors in pipes are not hidden
 set -Eeuo pipefail
@@ -17,12 +20,12 @@ declare apitoken="${1:-}"
 # $2 = optional: endpoint, defaults to http://localhost:3001
 declare endpoint="${2:-localhost:3001}"
 
-if [[ -z "${apitoken}" ]]; then
-    msg "No <apitoken> is set"
-    exit 1
+if [[ -z ${apitoken} ]]; then
+  msg "No <apitoken> is set"
+  exit 1
 fi
-if [[ -z "${endpoint}" ]]; then
-    msg "No <endpoint> is set, use default value localhost:3001"
+if [[ -z ${endpoint} ]]; then
+  msg "No <endpoint> is set, use default value localhost:3001"
 fi
 
 declare url="${apitoken}@${endpoint}/api/v3/account/addresses"

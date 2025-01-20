@@ -1,23 +1,15 @@
 use axum::{
-    extract::{
-        ws::{Message, WebSocket, WebSocketUpgrade},
-        Json, Query, State,
-    },
+    extract::{Json, Query, State},
     http::status::StatusCode,
     response::IntoResponse,
-    Error,
 };
-use futures::{sink::SinkExt, stream::StreamExt};
-use futures_concurrency::stream::Merge;
+use hopr_crypto_types::types::Hash;
 use serde::Deserialize;
-use serde_json::json;
 use serde_with::{serde_as, Bytes, DisplayFromStr, DurationMilliSeconds};
 use std::{sync::Arc, time::Duration};
 use tracing::error;
-use tracing::{debug, trace};
 use validator::Validate;
 
-use hopr_lib::ApplicationData;
 use hopr_lib::{
     errors::{HoprLibError, HoprStatusError},
     AsUnixTimestamp, RoutingOptions, RESERVED_TAG_UPPER_LIMIT,
@@ -58,23 +50,21 @@ pub(crate) struct SizeResponse {
     "tag": 2000
 }))]
 pub(crate) struct SendMessageBodyRequest {
-    /// The message tag used to filter messages based on application
+    /// The message tag used to filter messages based on application, must be from range <1024,65535>
+    #[schema(minimum = 1024, maximum = 65535)]
     tag: u16,
     /// Message to be transmitted over the network
     #[serde_as(as = "Bytes")]
     body: Vec<u8>,
     /// The recipient HOPR PeerId or address
-    #[serde_as(as = "Option<DisplayFromStr>")]
+    #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String)]
-    destination: Option<PeerOrAddress>,
-    /// Deprecated: PeerId of the target node
-    #[serde_as(as = "Option<DisplayFromStr>")]
-    #[schema(value_type = String)]
-    peer_id: Option<hopr_lib::PeerId>,
+    destination: PeerOrAddress,
     #[serde_as(as = "Option<Vec<DisplayFromStr>>")]
     #[validate(length(min = 0, max = 3))]
     #[schema(value_type = Option<Vec<String>>)]
     path: Option<Vec<PeerOrAddress>>,
+    #[schema(minimum = 0, maximum = 3)]
     #[validate(range(min = 0, max = 3))]
     hops: Option<u16>,
 }
@@ -89,6 +79,9 @@ pub(crate) struct SendMessageResponse {
     #[serde_as(as = "DurationMilliSeconds<u64>")]
     #[schema(value_type = u64)]
     timestamp: std::time::Duration,
+    #[serde_as(as = "DisplayFromStr")]
+    #[schema(value_type = String)]
+    challenge: Hash,
 }
 
 #[serde_as]
@@ -144,25 +137,10 @@ pub(super) async fn send_message(
             .into_response()
     })?;
 
-    let destination = if let Some(destination) = args.destination {
-        destination
-    } else if let Some(peer_id) = args.peer_id {
-        PeerOrAddress::PeerId(peer_id)
-    } else {
-        return Ok((StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidInput).into_response());
-    };
-
-    let peer_id = match HoprIdentifier::new_with(destination, hopr.peer_resolver()).await {
+    let peer_id = match HoprIdentifier::new_with(args.destination, hopr.peer_resolver()).await {
         Ok(destination) => destination.peer_id,
         Err(e) => return Err(e.into_response()),
     };
-
-    // Use the message encoder, if any
-    let msg_body = state
-        .msg_encoder
-        .as_ref()
-        .map(|enc| enc(&args.body))
-        .unwrap_or_else(|| args.body.into_boxed_slice());
 
     #[cfg(not(feature = "explicit-path"))]
     if args.path.is_some() {
@@ -223,196 +201,22 @@ pub(super) async fn send_message(
 
     let timestamp = std::time::SystemTime::now().as_unix_timestamp();
 
-    match hopr.send_message(msg_body, peer_id, options, Some(args.tag)).await {
-        Ok(_) => Ok((StatusCode::ACCEPTED, Json(SendMessageResponse { timestamp })).into_response()),
+    match hopr
+        .send_message(args.body.into_boxed_slice(), peer_id, options, Some(args.tag))
+        .await
+    {
+        Ok(_) => Ok((
+            StatusCode::ACCEPTED,
+            Json(SendMessageResponse {
+                timestamp,
+                challenge: Hash::create(&[b"This value is useless and is present only for backwards compatibility"]),
+            }),
+        )
+            .into_response()),
         Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(_, _))) => {
             Err((StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response())
         }
         Err(e) => Err((StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response()),
-    }
-}
-
-#[derive(Debug, Default, Clone, Deserialize, utoipa::ToSchema)]
-#[schema(value_type = String)] //, format = Binary)]
-#[allow(dead_code)] // not dead code, just for codegen
-struct Text(String);
-
-type WebSocketSendMsg = SendMessageBodyRequest;
-
-#[derive(Debug, Clone, serde::Serialize)]
-struct WebSocketReadMsg {
-    #[serde(rename = "type")]
-    type_: String,
-    tag: u16,
-    body: String,
-}
-
-impl From<hopr_lib::ApplicationData> for WebSocketReadMsg {
-    fn from(value: hopr_lib::ApplicationData) -> Self {
-        Self {
-            type_: "message".into(),
-            tag: value.application_tag.unwrap_or(0),
-            // TODO: Byte order structures should be used instead of the String object
-            body: String::from_utf8_lossy(value.plain_text.as_ref()).to_string(),
-        }
-    }
-}
-
-/// Websocket endpoint exposing a subset of message functions.
-///
-/// Incoming messages from other nodes are sent to the websocket client.
-///
-/// The following message can be set to the server by the client:
-/// ```json
-/// {
-///     peerId: "SOME_PEER_ID",
-///     path: [],
-///     hops: 1,
-///     body: "asdasd",
-///     tag: 2
-/// }
-/// ```
-///
-/// The arguments follow the same semantics as in the dedicated API endpoint for sending messages.
-///
-/// The following messages may be sent by the server over the Websocket connection:
-/// ````json
-/// {
-///   type: "message",
-///   tag: 12,
-///   body: "my example message"
-/// }
-///
-/// Authentication (if enabled) is done by cookie `X-Auth-Token`.
-///
-/// Connect to the endpoint by using a WS client. No preview available. Example: `ws://127.0.0.1:3001/api/v3/messages/websocket
-#[allow(dead_code)] // not dead code, just for documentation
-#[utoipa::path(
-        get,
-        path = const_format::formatcp!("{BASE_PATH}/messages/websocket"),
-        responses(
-            (status = 206, description = "Incoming data", body = Text, content_type = "application/text"),
-            (status = 401, description = "Invalid authorization token.", body = ApiError),
-            (status = 422, description = "Unknown failure", body = ApiError)
-        ),
-        security(
-            ("api_token" = []),
-            ("bearer_token" = [])
-        ),
-        tag = "Messages",
-    )]
-pub(crate) async fn websocket(ws: WebSocketUpgrade, State(state): State<Arc<InternalState>>) -> impl IntoResponse {
-    ws.on_upgrade(move |socket| websocket_connection(socket, state))
-}
-
-enum WebSocketInput {
-    Network(ApplicationData),
-    WsInput(core::result::Result<Message, Error>),
-}
-
-#[tracing::instrument(level = "debug", skip(socket, state))]
-async fn websocket_connection(socket: WebSocket, state: Arc<InternalState>) {
-    let (mut sender, receiver) = socket.split();
-
-    let ws_rx = state.websocket_rx.activate_cloned();
-
-    let mut queue = (
-        receiver.map(WebSocketInput::WsInput),
-        ws_rx.map(WebSocketInput::Network),
-    )
-        .merge();
-
-    while let Some(v) = queue.next().await {
-        match v {
-            WebSocketInput::Network(net_in) => {
-                if let Err(e) = sender
-                    .send(Message::Text(json!(WebSocketReadMsg::from(net_in)).to_string()))
-                    .await
-                {
-                    error!(error = %e, "Failed to emit read data onto the websocket");
-                };
-            }
-            WebSocketInput::WsInput(ws_in) => match ws_in {
-                Ok(Message::Text(input)) => {
-                    if let Err(e) = handle_send_message(&input, state.clone()).await {
-                        error!(error = %e, "Failed to send message");
-                    }
-                }
-                Ok(Message::Close(_)) => {
-                    debug!("Received close frame, closing connection");
-                    break;
-                }
-                Ok(m) => trace!(message = ?m, "Skipping unsupported websocket message"),
-                Err(e) => {
-                    error!(error = %e, "Failed to get a valid websocket message, closing connection");
-                    break;
-                }
-            },
-        }
-    }
-}
-
-async fn handle_send_message(input: &str, state: Arc<InternalState>) -> Result<(), String> {
-    match serde_json::from_str::<WebSocketSendMsg>(input) {
-        Ok(msg) => {
-            let hopr = state.hopr.clone();
-
-            let destination = if let Some(destination) = msg.destination {
-                destination
-            } else if let Some(peer_id) = msg.peer_id {
-                PeerOrAddress::PeerId(peer_id)
-            } else {
-                return Err("missing destination".to_string());
-            };
-
-            let destination = match HoprIdentifier::new_with(destination, hopr.peer_resolver()).await {
-                Ok(destination) => destination.peer_id,
-                Err(_e) => return Err("invalid destination".to_string()),
-            };
-
-            // Use the message encoder, if any
-            // TODO: remove RLP in 3.0
-            let msg_body = state
-                .msg_encoder
-                .as_ref()
-                .map(|enc| enc(&msg.body))
-                .unwrap_or_else(|| msg.body.into_boxed_slice());
-
-            let options = if let Some(intermediate_path) = msg.path {
-                let peer_ids_future = intermediate_path
-                    .into_iter()
-                    .map(|address| HoprIdentifier::new_with(address, hopr.peer_resolver()))
-                    .collect::<Vec<_>>();
-
-                let path = match futures::future::try_join_all(peer_ids_future).await {
-                    Ok(fullfilled_path) => fullfilled_path.into_iter().map(|v| v.peer_id).collect::<Vec<_>>(),
-                    Err(e) => {
-                        return Err(format!("failed to fulfill path: {e}"));
-                    }
-                };
-
-                RoutingOptions::IntermediatePath(
-                    // get a vec of peer ids from the intermediate path
-                    path.try_into()
-                        .map_err(|_| "Invalid number of intermediate hops".to_string())?,
-                )
-            } else if let Some(hops) = msg.hops {
-                RoutingOptions::Hops(
-                    (hops as u8)
-                        .try_into()
-                        .map_err(|_| "invalid number of intermediate hops".to_string())?,
-                )
-            } else {
-                return Err("one of hops or intermediate path must be provided".to_string());
-            };
-
-            if let Err(e) = hopr.send_message(msg_body, destination, options, Some(msg.tag)).await {
-                return Err(e.to_string());
-            }
-
-            Ok(())
-        }
-        Err(e) => Err(format!("failed to parse websocket message: {e}")),
     }
 }
 
@@ -734,8 +538,7 @@ mod tests {
         let expected = SendMessageBodyRequest {
             tag: 5,
             body: test_sequence.to_vec(),
-            destination: Some(destination),
-            peer_id: None,
+            destination: destination,
             path: None,
             hops: None,
         };
@@ -762,8 +565,7 @@ mod tests {
         let expected = SendMessageBodyRequest {
             tag: 5,
             body: test_sequence.to_vec(),
-            destination: Some(destination),
-            peer_id: None,
+            destination: destination,
             path: None,
             hops: None,
         };

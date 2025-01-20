@@ -17,6 +17,7 @@ use hopr_lib::{
 };
 
 use crate::{
+    checksum_address_serializer,
     types::{HoprIdentifier, PeerOrAddress},
     ApiErrorStatus, InternalState, BASE_PATH,
 };
@@ -28,7 +29,7 @@ pub(crate) struct NodeChannel {
     #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String)]
     id: Hash,
-    #[serde_as(as = "DisplayFromStr")]
+    #[serde(serialize_with = "checksum_address_serializer")]
     #[schema(value_type = String)]
     peer_address: Address,
     #[serde_as(as = "DisplayFromStr")]
@@ -56,10 +57,10 @@ pub(crate) struct ChannelInfoResponse {
     #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String)]
     channel_id: Hash,
-    #[serde_as(as = "DisplayFromStr")]
+    #[serde(serialize_with = "checksum_address_serializer")]
     #[schema(value_type = String)]
     source_address: Address,
-    #[serde_as(as = "DisplayFromStr")]
+    #[serde(serialize_with = "checksum_address_serializer")]
     #[schema(value_type = String)]
     destination_address: Address,
     source_peer_id: String,
@@ -179,7 +180,7 @@ pub(super) async fn list_channels(
         let hopr_clone = hopr.clone();
         let topology = hopr
             .all_channels()
-            .and_then(move |channels| async move {
+            .and_then(|channels| async move {
                 futures::future::try_join_all(channels.iter().map(|c| query_topology_info(c, hopr_clone.as_ref())))
                     .await
             })
@@ -248,13 +249,9 @@ pub(super) async fn list_channels(
     }))]
 pub(crate) struct OpenChannelBodyRequest {
     /// On-chain address of the counterparty.
-    #[serde_as(as = "Option<DisplayFromStr>")]
+    #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String)]
-    destination: Option<PeerOrAddress>,
-    /// Deprecated: PeerId of the counterparty.
-    #[serde_as(as = "Option<DisplayFromStr>")]
-    #[schema(value_type = String)]
-    peer_address: Option<hopr_lib::Address>,
+    destination: PeerOrAddress,
     /// Initial amount of stake in HOPR tokens.
     amount: String,
 }
@@ -306,15 +303,7 @@ pub(super) async fn open_channel(
 ) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
-    let destination = if let Some(destination) = open_req.destination {
-        destination
-    } else if let Some(peer_address) = open_req.peer_address {
-        PeerOrAddress::Address(peer_address)
-    } else {
-        return (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidInput).into_response();
-    };
-
-    let address = match HoprIdentifier::new_with(destination, hopr.peer_resolver()).await {
+    let address = match HoprIdentifier::new_with(open_req.destination, hopr.peer_resolver()).await {
         Ok(destination) => destination.address,
         Err(e) => return (StatusCode::UNPROCESSABLE_ENTITY, e).into_response(),
     };

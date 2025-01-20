@@ -18,7 +18,7 @@ use tracing::{error, info, trace, warn};
 use tracing_subscriber::prelude::*;
 
 use hopr_async_runtime::prelude::{cancel_join_handle, spawn, JoinHandle};
-use hopr_lib::{ApplicationData, AsUnixTimestamp, HoprLibProcesses, ToHex};
+use hopr_lib::{AsUnixTimestamp, HoprLibProcesses, ToHex};
 use hopr_platform::file::native::join;
 use hoprd::cli::CliArgs;
 use hoprd::errors::HoprdError;
@@ -27,20 +27,6 @@ use hoprd_db_api::aliases::{HoprdDbAliasesOperations, ME_AS_ALIAS};
 use hoprd_keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
 
 use hoprd::exit::HoprServerIpForwardingReactor;
-
-const WEBSOCKET_EVENT_BROADCAST_CAPACITY: usize = 10000;
-
-#[cfg(all(feature = "prometheus", not(test)))]
-use hopr_metrics::metrics::SimpleHistogram;
-
-#[cfg(all(feature = "prometheus", not(test)))]
-lazy_static::lazy_static! {
-    static ref METRIC_MESSAGE_LATENCY: SimpleHistogram = SimpleHistogram::new(
-        "hopr_message_latency_sec",
-        "Histogram of measured received message latencies in seconds",
-        vec![0.01, 0.025, 0.050, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 20.0]
-    ).unwrap();
-}
 
 fn init_logger() -> Result<(), Box<dyn std::error::Error>> {
     let env_filter = match tracing_subscriber::EnvFilter::try_from_default_env() {
@@ -156,22 +142,9 @@ impl std::fmt::Debug for HoprdProcesses {
     }
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    #[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
-    let res = tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .thread_stack_size(2 * 1024 * 1024)
-        .build()
-        .expect("The tokio runtime must be buildable")
-        .block_on(Box::pin(inner_main()));
-
-    #[cfg(feature = "runtime-async-std")]
-    let res = async_std::task::block_on(async { inner_main().await });
-
-    res
-}
-
-async fn inner_main() -> Result<(), Box<dyn std::error::Error>> {
+#[cfg_attr(all(feature = "runtime-tokio", not(feature = "runtime-async-std")), tokio::main)]
+#[cfg_attr(feature = "runtime-async-std", async_std::main)]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     init_logger()?;
 
     if hopr_crypto_random::is_rng_fixed() {
@@ -275,11 +248,6 @@ async fn inner_main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    let (mut ws_events_tx, ws_events_rx) =
-        async_broadcast::broadcast::<ApplicationData>(WEBSOCKET_EVENT_BROADCAST_CAPACITY);
-    let ws_events_rx = ws_events_rx.deactivate(); // No need to copy the data unless the websocket is opened, but leaves the channel open
-    ws_events_tx.set_overflow(true); // Set overflow in case of full the oldest record is discarded
-
     let inbox_clone = inbox.clone();
 
     let node_clone = node.clone();
@@ -287,10 +255,6 @@ async fn inner_main() -> Result<(), Box<dyn std::error::Error>> {
     let mut processes: Vec<HoprdProcesses> = Vec::new();
 
     if cfg.api.enable {
-        // TODO: remove RLP in 3.0
-        let msg_encoder =
-            |data: &[u8]| hopr_lib::rlp::encode(data, hopr_platform::time::native::current_time().as_unix_timestamp());
-
         let node_cfg_str = cfg.as_redacted_string()?;
         let api_cfg = cfg.api.clone();
 
@@ -318,8 +282,6 @@ async fn inner_main() -> Result<(), Box<dyn std::error::Error>> {
                 hoprd_db,
                 inbox,
                 session_listener_sockets,
-                websocket_rx: ws_events_rx,
-                msg_encoder: Some(msg_encoder),
                 default_session_listen_host: cfg.session_ip_forwarding.default_entry_listen_host,
             })
             .await
@@ -340,48 +302,16 @@ async fn inner_main() -> Result<(), Box<dyn std::error::Error>> {
     let mut ingress = hopr_socket.reader();
     processes.push(HoprdProcesses::Inbox(spawn(async move {
         while let Some(data) = ingress.next().await {
-            let recv_at = SystemTime::now();
+            let tag = data.application_tag;
 
-            // TODO: remove RLP in 3.0
-            match hopr_lib::rlp::decode(&data.plain_text) {
-                Ok((msg, sent)) => {
-                    let latency = recv_at.as_unix_timestamp().saturating_sub(sent);
+            trace!(
+                ?tag,
+                receiged_at = DateTime::<Utc>::from(SystemTime::now()).to_rfc3339(),
+                "received message"
+            );
 
-                    trace!(
-                        tag = ?data.application_tag,
-                        latency_in_ms = latency.as_millis(),
-                        receiged_at = DateTime::<Utc>::from(recv_at).to_rfc3339(),
-                        "received message"
-                    );
-
-                    #[cfg(all(feature = "prometheus", not(test)))]
-                    METRIC_MESSAGE_LATENCY.observe(latency.as_secs_f64());
-
-                    if cfg.api.enable && ws_events_tx.receiver_count() > 0 {
-                        if let Err(e) = ws_events_tx.try_broadcast(ApplicationData {
-                            application_tag: data.application_tag,
-                            plain_text: msg.clone(),
-                        }) {
-                            error!(error = %e, "Failed to notify websockets about a new message");
-                        }
-                    }
-
-                    if !inbox_clone
-                        .write()
-                        .await
-                        .push(ApplicationData {
-                            application_tag: data.application_tag,
-                            plain_text: msg,
-                        })
-                        .await
-                    {
-                        warn!(
-                            tag = data.application_tag,
-                            "Received a message with an ignored Inbox tag",
-                        )
-                    }
-                }
-                Err(e) => error!(error = %e, "RLP decoding failed"),
+            if !inbox_clone.write().await.push(data).await {
+                warn!(?tag, "Received a message with an ignored Inbox tag",)
             }
         }
     })));
@@ -405,7 +335,7 @@ async fn inner_main() -> Result<(), Box<dyn std::error::Error>> {
                             | HoprdProcesses::Inbox(jh)
                             | HoprdProcesses::RestApi(jh) => join_handles.push(jh),
                             HoprdProcesses::ListenerSockets(jhs) => {
-                                join_handles.extend(jhs.write().await.drain().map(|(_, (_, jh))| jh));
+                                join_handles.extend(jhs.write().await.drain().map(|(_, entry)| entry.jh));
                             }
                         }
                         futures::stream::iter(join_handles)

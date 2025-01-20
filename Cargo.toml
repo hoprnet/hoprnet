@@ -39,6 +39,8 @@ members = [
   "misc/metrics",
   "misc/platform",
   "transport/api",
+  "transport/identity",
+  "transport/mixer",
   "transport/network",
   "transport/p2p",
   "transport/protocol",
@@ -50,7 +52,6 @@ aes = "0.8"
 anyhow = "1.0.93"
 aquamarine = "0.6.0"
 arrayvec = { version = "0.7.6", features = ["serde"] }
-async-broadcast = "0.7.1"
 async-channel = "2.3.1"
 async-lock = "3.4.0"
 async-signal = "0.2.8"
@@ -65,6 +66,7 @@ bimap = "0.6.3"
 bincode = "1.3.3"
 bitvec = "1.0.1"
 bloomfilter = { version = "2.0.0", features = ["serde"] }
+bytesize = { version = "1.3.0", features = ["serde"] }
 chrono = { version = "0.4.38", default-features = false }
 clap = { version = "4.5.20", features = ["derive", "env", "string"] }
 const_format = "0.2.33"
@@ -94,7 +96,7 @@ hex-literal = "0.4.1"
 hickory-resolver = "0.24.1"
 http-types = "2.12.0"
 lazy_static = "1.4.0"
-libp2p = { version = "0.54.1" } # intentionally kept back due to breaking change in dialing
+libp2p = { version = "0.54.1" }
 libp2p-identity = { version = "0.2.9", features = [
   "peerid",
   "ed25519",
@@ -112,7 +114,7 @@ opentelemetry-otlp = { version = "0.17.0", default-features = false }
 opentelemetry_sdk = { version = "0.24.0" }
 tracing-opentelemetry = { version = "0.25.0" }
 parameterized = "2.0.0"
-petgraph = { version = "0.6.5" }
+petgraph = { version = "0.6.5", features = ["serde-1"] }
 primitive-types = { version = "0.12.2", features = [
   "serde",
 ] } # cannot be updated until the ethers-rs is replaced with alloy-rs
@@ -196,8 +198,7 @@ chain-indexer = { path = "chain/indexer", default-features = false }
 chain-types = { path = "chain/types", default-features = false }
 core-network = { path = "transport/network", default-features = false }
 core-path = { path = "logic/path", default-features = false }
-hopr-transport-protocol = { path = "transport/protocol", default-features = false }
-hopr-transport = { path = "transport/api", default-features = false }
+
 hopr-async-runtime = { path = "common/async-runtime" }
 hopr-chain-rpc = { path = "chain/rpc", default-features = false }
 hopr-crypto-packet = { path = "crypto/packet", default-features = false }
@@ -218,7 +219,11 @@ hopr-parallelize = { path = "common/parallelize" }
 hopr-platform = { path = "misc/platform" }
 hopr-primitive-types = { path = "common/primitive-types", default-features = false }
 hopr-strategy = { path = "logic/strategy", default-features = false }
-hopr-transport-p2p = { path = "transport/p2p", default-features = false }
+hopr-transport = { path = "transport/api" }
+hopr-transport-identity = { path = "transport/identity" }
+hopr-transport-mixer = { path = "transport/mixer" }
+hopr-transport-protocol = { path = "transport/protocol" }
+hopr-transport-p2p = { path = "transport/p2p" }
 hopr-transport-session = { path = "transport/session" }
 hoprd-api = { path = "hoprd/rest-api", default-features = false }
 hoprd-inbox = { path = "hoprd/inbox", default-features = false }

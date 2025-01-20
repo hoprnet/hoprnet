@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport"
-version = "0.8.1"
+version = "0.9.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Implements the main HOPR interface for the core library"
 edition = "2021"
@@ -10,7 +10,7 @@ license = "GPL-3.0-only"
 crate-type = ["rlib"]
 
 [features]
-default = []
+default = ["mixer-stream"]
 transport-quic = []
 runtime-async-std = [
   "core-network/runtime-async-std",
@@ -36,23 +36,27 @@ prometheus = [
   "core-path/prometheus",
   "hopr-db-sql/prometheus",
   "hopr-network-types/prometheus",
+  "hopr-transport-mixer/prometheus",
   "hopr-transport-p2p/prometheus",
   "hopr-transport-protocol/prometheus",
   "hopr-transport-session/prometheus",
 ]
+mixer-stream = []
+mixer-channel = []
 
 [dependencies]
 async-trait = { workspace = true }
 async-lock = { workspace = true }
 futures = { workspace = true }
+futures-concurrency = { workspace = true }
 lazy_static = { workspace = true }
-libp2p = { workspace = true, features = ["request-response"] }
 moka = { workspace = true }
 proc-macro-regex = { workspace = true }
 rust-stream-ext-concurrent = { workspace = true }
 serde = { workspace = true }
 serde_with = { workspace = true }
 smart-default = { workspace = true }
+strum = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 uuid = { workspace = true, features = ["v4", "fast-rng"] }
@@ -61,6 +65,7 @@ validator = { workspace = true }
 core-network = { workspace = true }
 chain-types = { workspace = true }
 core-path = { workspace = true }
+hopr-async-runtime = { workspace = true }
 hopr-crypto-packet = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-crypto-random = { workspace = true }
@@ -70,14 +75,16 @@ hopr-metrics = { workspace = true, optional = true }
 hopr-platform = { workspace = true }
 hopr-primitive-types = { workspace = true }
 hopr-network-types = { workspace = true, features = ["serde"] }
+hopr-transport-identity = { workspace = true }
+hopr-transport-mixer = { workspace = true }
 hopr-transport-p2p = { workspace = true }
 hopr-transport-protocol = { workspace = true }
 hopr-transport-session = { workspace = true }
-hopr-async-runtime = { workspace = true }
 
 [dev-dependencies]
 async-std = { workspace = true }
 hopr-db-sql = { workspace = true, features = ["runtime-async-std"] }
 core-network = { workspace = true, features = ["runtime-async-std"] }
+hopr-transport-mixer = { workspace = true }
 hopr-transport-protocol = { workspace = true, features = ["runtime-async-std"] }
 hopr-transport-p2p = { workspace = true, features = ["runtime-async-std"] }

@@ -13,6 +13,9 @@ pub enum DbError {
     #[error("log not found")]
     MissingLog,
 
+    #[error("addresses and topics used to fetch logs are inconsistent")]
+    InconsistentLogs,
+
     #[error("account entry for announcement not found")]
     MissingAccount,
 

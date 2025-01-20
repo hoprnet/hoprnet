@@ -13,8 +13,8 @@ use hopr_crypto_types::prelude::Hash;
 use hopr_db_api::errors::{DbError, Result};
 use hopr_db_api::logs::HoprDbLogOperations;
 use hopr_db_entity::errors::DbEntityError;
-use hopr_db_entity::prelude::{Log, LogStatus};
-use hopr_db_entity::{log, log_status};
+use hopr_db_entity::prelude::{Log, LogStatus, LogTopicInfo};
+use hopr_db_entity::{log, log_status, log_topic_info};
 use hopr_primitive_types::prelude::*;
 
 use crate::db::HoprDb;
@@ -170,19 +170,21 @@ impl HoprDbLogOperations for HoprDb {
         &'a self,
         block_number: Option<u64>,
         block_offset: Option<u64>,
+        processed: Option<bool>,
     ) -> Result<Vec<u64>> {
         let min_block_number = block_number.unwrap_or(0);
         let max_block_number = block_offset.map(|v| min_block_number + v + 1);
 
-        Log::find()
+        LogStatus::find()
             .select_only()
-            .column(log::Column::BlockNumber)
+            .column(log_status::Column::BlockNumber)
             .distinct()
-            .filter(log::Column::BlockNumber.gte(min_block_number.to_be_bytes().to_vec()))
+            .filter(log_status::Column::BlockNumber.gte(min_block_number.to_be_bytes().to_vec()))
             .apply_if(max_block_number, |q, v| {
-                q.filter(log::Column::BlockNumber.lt(v.to_be_bytes().to_vec()))
+                q.filter(log_status::Column::BlockNumber.lt(v.to_be_bytes().to_vec()))
             })
-            .order_by_asc(log::Column::BlockNumber)
+            .apply_if(processed, |q, v| q.filter(log_status::Column::Processed.eq(v)))
+            .order_by_asc(log_status::Column::BlockNumber)
             .into_model::<BlockNumber>()
             .all(self.conn(TargetDb::Logs))
             .await
@@ -283,7 +285,7 @@ impl HoprDbLogOperations for HoprDb {
         }
     }
 
-    async fn update_logs_checksums(&self) -> Result<()> {
+    async fn update_logs_checksums(&self) -> Result<Hash> {
         self.nest_transaction_in_db(None, TargetDb::Logs)
             .await?
             .perform(|tx| {
@@ -328,18 +330,70 @@ impl HoprDbLogOperations for HoprDb {
                                 match updated_status.update(tx.as_ref()).await {
                                     Ok(_) => {
                                         last_checksum = next_checksum;
-                                        trace!("Generated log checksum {next_checksum} @ {slog}");
+                                        trace!(log = %slog, checksum = %next_checksum, "Generated log checksum");
                                     }
-                                    Err(e) => {
-                                        error!("Failed to update log status checksum in db: {:?}", e);
+                                    Err(error) => {
+                                        error!(%error, "Failed to update log status checksum in db");
                                         break;
                                     }
                                 }
                             }
-                            Ok(())
+                            Ok(last_checksum)
                         }
                         Err(e) => Err(DbError::from(DbSqlError::from(e))),
                     }
+                })
+            })
+            .await
+    }
+
+    async fn ensure_logs_origin(&self, contract_address_topics: Vec<(Address, Hash)>) -> Result<()> {
+        if contract_address_topics.is_empty() {
+            return Err(DbError::LogicalError(
+                "contract address topics must not be empty".into(),
+            ));
+        }
+
+        self.nest_transaction_in_db(None, TargetDb::Logs)
+            .await?
+            .perform(|tx| {
+                Box::pin(async move {
+                    let log_count = Log::find()
+                        .count(tx.as_ref())
+                        .await
+                        .map_err(|e| DbError::from(DbSqlError::from(e)))?;
+                    let log_topic_count = LogTopicInfo::find()
+                        .count(tx.as_ref())
+                        .await
+                        .map_err(|e| DbError::from(DbSqlError::from(e)))?;
+
+                    if log_count == 0 && log_topic_count == 0 {
+                        // Prime the DB with the values
+                        LogTopicInfo::insert_many(contract_address_topics.into_iter().map(|(addr, topic)| {
+                            log_topic_info::ActiveModel {
+                                address: Set(addr.to_string()),
+                                topic: Set(topic.to_string()),
+                                ..Default::default()
+                            }
+                        }))
+                        .exec(tx.as_ref())
+                        .await
+                        .map_err(|e| DbError::from(DbSqlError::from(e)))?;
+                    } else {
+                        // Check that all contract addresses and topics are in the DB
+                        for (addr, topic) in contract_address_topics {
+                            let log_topic_count = LogTopicInfo::find()
+                                .filter(log_topic_info::Column::Address.eq(addr.to_string()))
+                                .filter(log_topic_info::Column::Topic.eq(topic.to_string()))
+                                .count(tx.as_ref())
+                                .await
+                                .map_err(|e| DbError::from(DbSqlError::from(e)))?;
+                            if log_topic_count != 1 {
+                                return Err(DbError::InconsistentLogs);
+                            }
+                        }
+                    }
+                    Ok(())
                 })
             })
             .await
@@ -387,7 +441,6 @@ fn create_log(raw_log: log::Model, status: log_status::Model) -> crate::errors::
 mod tests {
     use super::*;
 
-    use futures::StreamExt;
     use hopr_crypto_types::prelude::{ChainKeypair, Hash, Keypair};
 
     #[async_std::test]
@@ -684,7 +737,7 @@ mod tests {
             tx_hash: Hash::create(&[b"tx_hash1"]).into(),
             log_index: 1,
             removed: false,
-            processed: Some(false),
+            processed: Some(true),
             ..Default::default()
         };
 
@@ -702,16 +755,45 @@ mod tests {
             ..Default::default()
         };
 
-        db.store_logs(vec![log_1.clone(), log_2.clone()])
+        let log_3 = SerializableLog {
+            address: Address::new(b"my address 323456789"),
+            topics: [Hash::create(&[b"topic3"]).into()].into(),
+            data: [1, 2, 3, 4].into(),
+            tx_index: 3,
+            block_number: 3,
+            block_hash: Hash::create(&[b"block_hash3"]).into(),
+            tx_hash: Hash::create(&[b"tx_hash3"]).into(),
+            log_index: 3,
+            removed: false,
+            processed: Some(false),
+            ..Default::default()
+        };
+
+        db.store_logs(vec![log_1.clone(), log_2.clone(), log_3.clone()])
             .await
             .unwrap()
             .into_iter()
             .for_each(|r| assert!(r.is_ok()));
 
-        let block_numbers = db.get_logs_block_numbers(Some(1), Some(0)).await.unwrap();
+        let block_numbers_all = db.get_logs_block_numbers(None, None, None).await.unwrap();
+        assert_eq!(block_numbers_all.len(), 3);
+        assert_eq!(block_numbers_all, [1, 2, 3]);
 
-        assert_eq!(block_numbers.len(), 1);
-        assert_eq!(block_numbers[0], 1);
+        let block_numbers_first_only = db.get_logs_block_numbers(Some(1), Some(0), None).await.unwrap();
+        assert_eq!(block_numbers_first_only.len(), 1);
+        assert_eq!(block_numbers_first_only[0], 1);
+
+        let block_numbers_last_only = db.get_logs_block_numbers(Some(3), Some(0), None).await.unwrap();
+        assert_eq!(block_numbers_last_only.len(), 1);
+        assert_eq!(block_numbers_last_only[0], 3);
+
+        let block_numbers_processed = db.get_logs_block_numbers(None, None, Some(true)).await.unwrap();
+        assert_eq!(block_numbers_processed.len(), 1);
+        assert_eq!(block_numbers_processed[0], 1);
+
+        let block_numbers_unprocessed_second = db.get_logs_block_numbers(Some(2), Some(0), Some(false)).await.unwrap();
+        assert_eq!(block_numbers_unprocessed_second.len(), 1);
+        assert_eq!(block_numbers_unprocessed_second[0], 2);
     }
 
     #[async_std::test]
@@ -777,5 +859,28 @@ mod tests {
             updated_log_3.clone().checksum.unwrap(),
         );
         assert_ne!(updated_log_1, updated_log_3);
+    }
+
+    #[async_std::test]
+    async fn test_should_not_allow_inconsistent_logs_in_the_db() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
+        let addr_1 = Address::new(b"my address 123456789");
+        let addr_2 = Address::new(b"my 2nd address 12345");
+        let topic_1 = Hash::create(&[b"my topic 1"]).into();
+        let topic_2 = Hash::create(&[b"my topic 2"]).into();
+
+        db.ensure_logs_origin(vec![(addr_1, topic_1)]).await?;
+
+        db.ensure_logs_origin(vec![(addr_1, topic_2)])
+            .await
+            .expect_err("expected error due to inconsistent logs in the db");
+
+        db.ensure_logs_origin(vec![(addr_2, topic_1)])
+            .await
+            .expect_err("expected error due to inconsistent logs in the db");
+
+        db.ensure_logs_origin(vec![(addr_1, topic_1)]).await?;
+
+        Ok(())
     }
 }

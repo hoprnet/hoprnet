@@ -82,7 +82,7 @@ All releases and associated changelogs are located in the [official releases](ht
 The following instructions show how any `$RELEASE` may be installed, to select the release, override the `$RELEASE` variable, e.g.:
 
 - `export RELEASE=latest` to track the latest changes on the repository's `master` branch
-- `export RELEASE=saint-louis` to track the latest changes on the repository's `release/saint-louis` branch (2.1.X)
+- `export RELEASE=singapore` to track the latest changes on the repository's `release/singapore` branch (2.2.X)
 - `export RELEASE=<version>` to get a specific `<version>`
 
 Container image has the format
@@ -94,7 +94,7 @@ where:
 Pull the container image with `docker`:
 
 ```shell
-$ docker pull europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd:saint-louis
+$ docker pull europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd:singapore
 ```
 
 It is recommended to setup an alias `hoprd` for the docker command invocation.
@@ -210,8 +210,13 @@ On top of the default configuration options generated for the command line, the 
 - `HOPR_INTERNAL_LIBP2P_MAX_CONCURRENTLY_DIALED_PEER_COUNT` - the maximum number of concurrently dialed peers in libp2p
 - `HOPR_INTERNAL_LIBP2P_MAX_NEGOTIATING_INBOUND_STREAM_COUNT` - the maximum number of negotiating inbound streams
 - `HOPR_INTERNAL_LIBP2P_YAMUX_MAX_NUM_STREAMS` - the maximum number of used yamux streams
+- `HOPR_INTERNAL_LIBP2P_MSG_ACK_MAX_TOTAL_STREAMS` - the maximum number of used outbound and inbound streams for the `msg` and `ack` protocols
 - `HOPR_INTERNAL_LIBP2P_SWARM_IDLE_TIMEOUT` - timeout for all idle libp2p swarm connections in seconds
 - `HOPR_INTERNAL_DB_PEERS_PERSISTENCE_AFTER_RESTART_IN_SECONDS` - cutoff duration from now to not retain the peers with older records in the peers database (e.g. after a restart)
+- `HOPR_INTERNAL_REST_API_MAX_CONCURRENT_WEBSOCKET_COUNT` - the maximum number of concurrent websocket opened through the REST API
+- `HOPR_INTERNAL_MIXER_CAPACITY` - capacity of the mixer buffer
+- `HOPR_INTERNAL_MIXER_MINIMUM_DELAY_IN_MS` - the minimum mixer delay in milliseconds
+- `HOPR_INTERNAL_MIXER_DELAY_RANGE_IN_MS` - the maximum range of the mixer delay from the minimum value in milliseconds
 - `ENV_WORKER_THREADS` - the number of environment worker threads for the tokio executor
 - `HOPRD_SESSION_PORT_RANGE` - allows restricting the port range (syntax: `start:end` inclusive) of Session listener automatic port selection (when port 0 is specified).
 
@@ -498,7 +503,9 @@ The following files in the node's database folder are required:
 
 ### Post-sync Behavior
 
-- If index data exists, the node will skip fast sync and start in normal sync mode
+- If index data exists but is incomplete, the node will resume fast sync at the
+  last processed log
+- If index data exists and is complete, the node will skip fast sync and start in normal sync mode
 - After fast sync completes, the node automatically switches to normal sync mode
 
 ## Profiling & Instrumentation

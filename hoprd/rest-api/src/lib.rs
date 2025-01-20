@@ -33,10 +33,10 @@ use axum::{
     Router,
 };
 use serde::Serialize;
-use std::collections::HashMap;
 use std::error::Error;
 use std::iter::once;
 use std::sync::Arc;
+use std::{collections::HashMap, sync::atomic::AtomicU16};
 use tokio::net::TcpListener;
 use tower::ServiceBuilder;
 use tower_http::{
@@ -51,10 +51,11 @@ use utoipa::{Modify, OpenApi};
 use utoipa_scalar::{Scalar, Servable as ScalarServable};
 use utoipa_swagger_ui::SwaggerUi;
 
-use crate::config::Auth;
-use crate::session::SessionTargetSpec;
-use hopr_lib::{errors::HoprLibError, ApplicationData, Hopr};
+use hopr_lib::{errors::HoprLibError, Address, Hopr};
 use hopr_network_types::prelude::IpProtocol;
+
+use crate::config::Auth;
+use crate::session::StoredSessionEntry;
 
 pub(crate) const BASE_PATH: &str = "/api/v3";
 
@@ -68,8 +69,7 @@ pub type MessageEncoder = fn(&[u8]) -> Box<[u8]>;
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct ListenerId(pub IpProtocol, pub std::net::SocketAddr);
 
-pub type ListenerJoinHandles =
-    Arc<RwLock<HashMap<ListenerId, (SessionTargetSpec, hopr_async_runtime::prelude::JoinHandle<()>)>>>;
+pub type ListenerJoinHandles = Arc<RwLock<HashMap<ListenerId, StoredSessionEntry>>>;
 
 #[derive(Clone)]
 pub(crate) struct InternalState {
@@ -78,8 +78,7 @@ pub(crate) struct InternalState {
     pub hopr: Arc<Hopr>,
     pub inbox: Arc<RwLock<hoprd_inbox::Inbox>>,
     pub hoprd_db: Arc<hoprd_db_api::db::HoprdDb>,
-    pub websocket_rx: async_broadcast::InactiveReceiver<ApplicationData>,
-    pub msg_encoder: Option<MessageEncoder>,
+    pub websocket_active_count: Arc<AtomicU16>,
     pub open_listeners: ListenerJoinHandles,
     pub default_listen_host: std::net::SocketAddr,
 }
@@ -117,6 +116,7 @@ pub(crate) struct InternalState {
         node::entry_nodes,
         node::info,
         node::metrics,
+        node::channel_graph,
         node::peers,
         node::version,
         peers::ping_peer,
@@ -144,9 +144,9 @@ pub(crate) struct InternalState {
             network::TicketPriceResponse,
             network::TicketProbabilityResponse,
             node::EntryNode, node::NodeInfoResponse, node::NodePeersQueryRequest,
-            node::HeartbeatInfo, node::PeerInfo, node::AnnouncedPeer, node::NodePeersResponse, node::NodeVersionResponse,
+            node::HeartbeatInfo, node::PeerInfo, node::AnnouncedPeer, node::NodePeersResponse, node::NodeVersionResponse, node::GraphExportQuery,
             peers::NodePeerInfoResponse, peers::PingResponse,
-            session::SessionClientRequest, session::SessionClientResponse, session::SessionCloseClientRequest,
+            session::SessionClientRequest, session::SessionCapability, session::RoutingOptions, session::SessionTargetSpec, session::SessionClientResponse, session::IpProtocol,
             tickets::NodeTicketStatisticsResponse, tickets::ChannelTicket,
         )
     ),
@@ -197,8 +197,6 @@ pub struct RestApiParameters {
     pub hoprd_db: Arc<hoprd_db_api::db::HoprdDb>,
     pub inbox: Arc<RwLock<hoprd_inbox::Inbox>>,
     pub session_listener_sockets: ListenerJoinHandles,
-    pub websocket_rx: async_broadcast::InactiveReceiver<ApplicationData>,
-    pub msg_encoder: Option<MessageEncoder>,
     pub default_session_listen_host: std::net::SocketAddr,
 }
 
@@ -212,8 +210,6 @@ pub async fn serve_api(params: RestApiParameters) -> Result<(), std::io::Error> 
         hoprd_db,
         inbox,
         session_listener_sockets,
-        websocket_rx,
-        msg_encoder,
         default_session_listen_host,
     } = params;
 
@@ -224,8 +220,6 @@ pub async fn serve_api(params: RestApiParameters) -> Result<(), std::io::Error> 
         inbox,
         hoprd_db,
         session_listener_sockets,
-        websocket_rx,
-        msg_encoder,
         default_session_listen_host,
     )
     .await;
@@ -240,8 +234,6 @@ async fn build_api(
     inbox: Arc<RwLock<hoprd_inbox::Inbox>>,
     hoprd_db: Arc<hoprd_db_api::db::HoprdDb>,
     open_listeners: ListenerJoinHandles,
-    websocket_rx: async_broadcast::InactiveReceiver<ApplicationData>,
-    msg_encoder: Option<MessageEncoder>,
     default_listen_host: std::net::SocketAddr,
 ) -> Router {
     let state = AppState { hopr };
@@ -249,12 +241,11 @@ async fn build_api(
         auth: Arc::new(cfg.auth.clone()),
         hoprd_cfg,
         hopr: state.hopr.clone(),
-        msg_encoder,
         inbox,
         hoprd_db,
-        websocket_rx,
         open_listeners,
         default_listen_host,
+        websocket_active_count: Arc::new(AtomicU16::new(0)),
     };
 
     Router::new()
@@ -310,7 +301,6 @@ async fn build_api(
                 .route("/messages/peek", post(messages::peek))
                 .route("/messages/peek-all", post(messages::peek_all))
                 .route("/messages/size", get(messages::size))
-                .route("/messages/websocket", get(messages::websocket))
                 .route("/network/price", get(network::price))
                 .route("/network/probability", get(network::probability))
                 .route("/node/version", get(node::version))
@@ -319,13 +309,21 @@ async fn build_api(
                 .route("/node/peers", get(node::peers))
                 .route("/node/entryNodes", get(node::entry_nodes))
                 .route("/node/metrics", get(node::metrics))
+                .route("/node/graph", get(node::channel_graph))
                 .route("/peers/:destination/ping", post(peers::ping_peer))
                 .route("/session/websocket", get(session::websocket))
                 .route("/session/:protocol", post(session::create_client))
                 .route("/session/:protocol", get(session::list_clients))
-                .route("/session/:protocol", delete(session::close_client))
+                .route("/session/:protocol/:ip/:port", delete(session::close_client))
                 .with_state(inner_state.clone().into())
-                .layer(middleware::from_fn_with_state(inner_state, preconditions::authenticate)),
+                .layer(middleware::from_fn_with_state(
+                    inner_state.clone(),
+                    preconditions::authenticate,
+                ))
+                .layer(middleware::from_fn_with_state(
+                    inner_state,
+                    preconditions::cap_websockets,
+                )),
         )
         .layer(
             ServiceBuilder::new()
@@ -342,6 +340,18 @@ async fn build_api(
                 .layer(ValidateRequestHeaderLayer::accept("application/json"))
                 .layer(SetSensitiveRequestHeadersLayer::new(once(AUTHORIZATION))),
         )
+}
+
+fn checksum_address_serializer<S: serde::Serializer>(a: &Address, s: S) -> Result<S::Ok, S::Error> {
+    s.serialize_str(&a.to_checksum())
+}
+
+fn option_checksum_address_serializer<S: serde::Serializer>(a: &Option<Address>, s: S) -> Result<S::Ok, S::Error> {
+    if let Some(addr) = a {
+        s.serialize_some(&addr.to_checksum())
+    } else {
+        s.serialize_none()
+    }
 }
 
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
@@ -377,8 +387,10 @@ enum ApiErrorStatus {
     UnsupportedFeature,
     Timeout,
     Unauthorized,
+    TooManyOpenWebsocketConnections,
     InvalidQuality,
     NotReady,
+    ListenHostAlreadyUsed,
     #[strum(serialize = "INVALID_PATH")]
     InvalidPath(String),
     #[strum(serialize = "UNKNOWN_FAILURE")]
@@ -406,7 +418,7 @@ impl IntoResponse for ApiErrorStatus {
 
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
-        (StatusCode::INTERNAL_SERVER_ERROR, self).into_response()
+        (StatusCode::INTERNAL_SERVER_ERROR, Json(self)).into_response()
     }
 }
 
@@ -427,5 +439,24 @@ where
             status: ApiErrorStatus::UnknownFailure("unknown error".to_string()).to_string(),
             error: Some(value.to_string()),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ApiError;
+
+    use axum::http::StatusCode;
+    use axum::response::IntoResponse;
+
+    #[test]
+    fn test_api_error_to_response() {
+        let error = ApiError {
+            status: StatusCode::INTERNAL_SERVER_ERROR.to_string(),
+            error: Some("Invalid value passed in parameter 'XYZ'".to_string()),
+        };
+
+        let response = error.into_response();
+        assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
     }
 }

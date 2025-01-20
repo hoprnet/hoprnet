@@ -7,13 +7,14 @@ name: Promote Release
 on:
   workflow_dispatch:
     inputs:
+      tag_release_name:
+        type: string
+        required: true
+        description: 'Release name for tag'
       new_release_name:
-        type: choice
+        type: string
         required: true
         description: 'New release name'
-        options:
-          - singapore
-          - kaunas
       tag_name:
         type: string
         required: true
@@ -37,19 +38,16 @@ jobs:
       - name: Promote release
         id: promote_release
         run: |
-          git fetch --all
+          git fetch --all --tags
           # Checkout to tag revision
-          if ! git tag -l ${{ github.event.inputs.tag_name }} | grep ${{ github.event.inputs.tag_name }};
-          then 
+          if ! git tag -l ${{ github.event.inputs.tag_name }} | grep ${{ github.event.inputs.tag_name }}; then
             echo "Git tag ${{ github.event.inputs.tag_name }} does not exists"
             exit 1
           fi
-
           # Create new branch or reuse an existing branch
           release_name="${{ vars.BRANCH_MASTER_RELEASE_NAME }}"
           echo "release_name=${release_name}"  >> $GITHUB_OUTPUT
-          if git branch -al release/${release_name} | grep ${release_name};
-          then
+          if git branch -al release/${release_name} | grep ${release_name}; then
             echo "Branch release/${release_name} already exists. Skipping promotion..."
             exit 0
           else
@@ -62,28 +60,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
 
-      - name: Checkout hoprd-sdk-python repository
-        uses: actions/checkout@v4
-        with:
-          repository: hoprnet/hoprd-sdk-python
-          path: ./hoprd-sdk-python
-          ref: master
-
-      - name: Promote release hoprd-sdk-python
-        run: |
-          git fetch --all
-          # Create new branch or reuse an existing branch
-          release_name="${{ steps.promote_release.outputs.release_name }}"
-          if git branch -al release/${release_name} | grep ${release_name};
-          then
-            echo "Branch release/${release_name} already exists. Skipping promotion..."
-            exit 0
-          else
-            git checkout -b release/${release_name}
-            git push --set-upstream origin release/${release_name}
-          fi
-        working-directory: ./hoprd-sdk-python
-
   new_release:
     name: Open new release
     needs:
@@ -91,5 +67,5 @@ jobs:
     uses: ./.github/workflows/open-release.yaml
     with:
       release_type: Patch
-      base_branch: "release/${{ vars.BRANCH_RELEASE_RELEASE_NAME }}"
+      base_branch: "release/${{ github.event.inputs.tag_release_name }}"
     secrets: inherit

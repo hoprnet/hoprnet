@@ -1,28 +1,29 @@
 use async_lock::RwLock;
-use libp2p::{Multiaddr, PeerId};
+use futures::channel::mpsc::Sender;
 use std::sync::{Arc, OnceLock};
 use tracing::trace;
 
 use chain_types::chain_events::NetworkRegistryStatus;
 use core_path::{
     path::TransportPath,
-    selectors::{legacy::LegacyPathSelector, PathSelector},
+    selectors::dfs::{DfsPathSelector, DfsPathSelectorConfig, RandomizedEdgeWeighting},
+    selectors::PathSelector,
 };
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_db_sql::HoprDbAllOperations;
 use hopr_internal_types::protocol::ApplicationData;
-use hopr_primitive_types::primitives::Address;
-use hopr_transport_protocol::msg::processor::MsgSender;
-use hopr_transport_session::{errors::TransportSessionError, traits::SendMsg};
-
 use hopr_network_types::prelude::RoutingOptions;
-use hopr_transport_session::errors::SessionManagerError;
-#[cfg(all(feature = "prometheus", not(test)))]
-use {core_path::path::Path, hopr_metrics::metrics::SimpleHistogram};
+use hopr_primitive_types::primitives::Address;
+use hopr_transport_identity::PeerId;
+use hopr_transport_protocol::msg::processor::{MsgSender, SendMsgInput};
+use hopr_transport_session::{
+    errors::{SessionManagerError, TransportSessionError},
+    traits::SendMsg,
+};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_PATH_LENGTH: SimpleHistogram = SimpleHistogram::new(
+    static ref METRIC_PATH_LENGTH: hopr_metrics::metrics::SimpleHistogram = hopr_metrics::metrics::SimpleHistogram::new(
         "hopr_path_length",
         "Distribution of number of hops of sent messages",
         vec![0.0, 1.0, 2.0, 3.0, 4.0]
@@ -46,12 +47,6 @@ impl From<NetworkRegistryStatus> for PeerEligibility {
     }
 }
 
-/// Indexer events triggered externally from the [`crate::HoprTransport`] object.
-pub enum IndexerTransportEvent {
-    EligibilityUpdate(PeerId, PeerEligibility),
-    Announce(PeerId, Vec<Multiaddr>),
-}
-
 /// Ticket statistics data exposed by the ticket mechanism.
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct TicketStatistics {
@@ -66,14 +61,23 @@ pub struct TicketStatistics {
 pub(crate) struct PathPlanner<T> {
     db: T,
     channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
+    selector: DfsPathSelector<RandomizedEdgeWeighting>,
 }
 
 impl<T> PathPlanner<T>
 where
     T: HoprDbAllOperations + std::fmt::Debug + Send + Sync + 'static,
 {
-    pub(crate) fn new(db: T, channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>) -> Self {
-        Self { db, channel_graph }
+    pub(crate) fn new(
+        db: T,
+        path_selector_cfg: DfsPathSelectorConfig,
+        channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
+    ) -> Self {
+        Self {
+            db,
+            channel_graph,
+            selector: DfsPathSelector::new(path_selector_cfg),
+        }
     }
 
     pub(crate) fn channel_graph(&self) -> Arc<RwLock<core_path::channel_graph::ChannelGraph>> {
@@ -89,8 +93,7 @@ where
         let path = match options {
             RoutingOptions::IntermediatePath(path) => {
                 let complete_path = Vec::from_iter(path.into_iter().chain([destination]));
-
-                trace!(full_path = format!("{complete_path:?}"), "Resolved a specific path");
+                trace!(full_path = ?complete_path, "resolved a specific path");
 
                 let cg = self.channel_graph.read().await;
 
@@ -99,11 +102,11 @@ where
                     .map(|(p, _)| p)?
             }
             RoutingOptions::Hops(hops) if u32::from(hops) == 0 => {
-                trace!(hops = 0, %destination, "Resolved zero-hop path");
+                trace!(hops = 0, %destination, "resolved zero-hop path");
                 TransportPath::direct(destination)
             }
             RoutingOptions::Hops(hops) => {
-                trace!(hops = tracing::field::display(hops), "Resolved path using hop count");
+                trace!(%hops, "resolved path using hop count");
 
                 let pk = OffchainPublicKey::try_from(destination)?;
 
@@ -113,14 +116,17 @@ where
                     .await
                     .map_err(hopr_db_sql::api::errors::DbError::from)?
                 {
-                    let selector = LegacyPathSelector::default();
                     let target_chain_key: Address = chain_key.try_into()?;
                     let cp = {
                         let cg = self.channel_graph.read().await;
-                        selector.select_path(&cg, cg.my_address(), target_chain_key, hops.into(), hops.into())?
+                        self.selector
+                            .select_path(&cg, cg.my_address(), target_chain_key, hops.into(), hops.into())?
                     };
 
-                    cp.into_path(&self.db, target_chain_key).await?
+                    let full_path = cp.into_path(&self.db, target_chain_key).await?;
+                    trace!(%full_path, "resolved automatic path");
+
+                    full_path
                 } else {
                     return Err(HoprTransportError::Api(
                         "send msg: unknown destination peer id encountered".to_owned(),
@@ -130,7 +136,10 @@ where
         };
 
         #[cfg(all(feature = "prometheus", not(test)))]
-        SimpleHistogram::observe(&METRIC_PATH_LENGTH, (path.hops().len() - 1) as f64);
+        {
+            use core_path::path::Path;
+            hopr_metrics::SimpleHistogram::observe(&METRIC_PATH_LENGTH, (path.hops().len() - 1) as f64);
+        }
 
         Ok(path)
     }
@@ -138,7 +147,7 @@ where
 
 #[derive(Clone)]
 pub(crate) struct MessageSender<T> {
-    pub process_packet_send: Arc<OnceLock<MsgSender>>,
+    pub process_packet_send: Arc<OnceLock<MsgSender<Sender<SendMsgInput>>>>,
     pub resolver: PathPlanner<T>,
 }
 
@@ -146,7 +155,7 @@ impl<T> MessageSender<T>
 where
     T: HoprDbAllOperations + std::fmt::Debug + Send + Sync + 'static,
 {
-    pub fn new(process_packet_send: Arc<OnceLock<MsgSender>>, resolver: PathPlanner<T>) -> Self {
+    pub fn new(process_packet_send: Arc<OnceLock<MsgSender<Sender<SendMsgInput>>>>, resolver: PathPlanner<T>) -> Self {
         Self {
             process_packet_send,
             resolver,
