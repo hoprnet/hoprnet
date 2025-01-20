@@ -60,7 +60,7 @@ pub type HeartbeatSendPingTx = UnboundedSender<(PeerId, PingQueryReplier)>;
 #[derive(Debug, Clone, PartialEq, Eq, smart_default::SmartDefault)]
 pub struct PingConfig {
     /// The maximum total allowed concurrent heartbeat ping count
-    #[default = 14]
+    #[default = 25]
     pub max_parallel_pings: usize,
     /// The timeout duration for an indiviual ping
     #[default(std::time::Duration::from_secs(30))]

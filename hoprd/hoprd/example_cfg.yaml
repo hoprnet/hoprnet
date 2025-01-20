@@ -201,7 +201,7 @@ hopr:
     # Size of the quality moving average window.
     quality_avg_window_size: 25
     # Indicates how long (in seconds) a node is considered "ignored"
-    ignore_timeframe: 240
+    ignore_timeframe: 120
     # Backoff exponent when probing nodes
     backoff_exponent: 1.5
     # Minimum backoff (in seconds) when probing nodes
@@ -224,7 +224,7 @@ hopr:
     # Heartbeat sub-protocol configuration
     heartbeat:
       # Timeout in seconds
-      timeout: 15
+      timeout: 6
     # Message sub-protocol configuration
     ticket_aggregation:
       # Timeout in seconds
