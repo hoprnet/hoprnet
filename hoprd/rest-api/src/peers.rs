@@ -140,6 +140,12 @@ pub(super) async fn ping_peer(
                 Ok((StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::Timeout).into_response())
             }
             Err(HoprLibError::TransportError(HoprTransportError::NetworkError(
+                hopr_lib::NetworkingError::Timeout(_),
+            ))) => Ok((StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::Timeout).into_response()),
+            Err(HoprLibError::TransportError(HoprTransportError::NetworkError(
+                hopr_lib::NetworkingError::PingerError(_, e),
+            ))) => Ok((StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::PingError(e)).into_response()),
+            Err(HoprLibError::TransportError(HoprTransportError::NetworkError(
                 hopr_lib::NetworkingError::NonExistingPeer,
             ))) => Ok((StatusCode::NOT_FOUND, ApiErrorStatus::PeerNotFound).into_response()),
             Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(_, _))) => {
