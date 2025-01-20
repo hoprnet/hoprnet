@@ -177,7 +177,7 @@ hopr:
   # other nodes in the HOPR network.
   heartbeat:
     # The maximum number of concurrent heartbeat probes
-    max_parallel_probes: 14
+    max_parallel_probes: 25
     # Interval in which the heartbeat is triggered in seconds
     interval: 60
     # The time interval for which to consider peer heartbeat renewal in seconds
