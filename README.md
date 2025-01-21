@@ -32,6 +32,7 @@
     - [Nix flake outputs](#nix-flake-outputs)
     - [Code Formatting](#code-formatting)
     - [Code Linting](#code-linting)
+    - [Generate the Python SDK](#generate-the-python-sdk)
   - [Local node with safe staking service (local network)](#local-node-with-safe-staking-service-local-network)
   - [Local node with safe staking service (dufour network)](#local-node-with-safe-staking-service-dufour-network)
 - [Local cluster](#local-cluster)
@@ -325,6 +326,19 @@ nix run .#lint
 ```
 
 This will in particular run `clippy` for the entire Rust codebase.
+
+#### Generate the Python SDK
+
+No Python SDK is available to connect to the HOPRd API. However, you can generate one using the [generate-python-sdk.sh](/scripts/generate-python-sdk.sh) script.
+
+Prerequisites:
+
+- swagger-codegen3
+- build the repository to get the `hoprd-api-schema` generated
+
+The generated SDK will be available in the `/tmp/hoprd-sdk-python/` directory. Modify the script to generate SDKs for different programming languages supported by swagger-codegen3.
+
+For usage examples of the generated SDK, refer to the generated README.md file in the SDK directory.
 
 ### Local node with safe staking service (local network)
 
