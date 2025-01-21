@@ -49,25 +49,17 @@ async fn build_p2p_network<U>(
 where
     U: Stream<Item = PeerDiscovery> + Send + 'static,
 {
-    let tcp_upgrade = libp2p::core::upgrade::SelectUpgrade::new(
-        {
-            let num_streams = std::env::var("HOPR_INTERNAL_LIBP2P_YAMUX_MAX_NUM_STREAMS")
-                .and_then(|v| v.parse::<usize>().map_err(|_e| std::env::VarError::NotPresent))
-                .unwrap_or(1024);
-
-            let mut cfg = libp2p::yamux::Config::default();
-            cfg.set_max_num_streams(num_streams);
-            cfg
-        },
-        libp2p_mplex::MplexConfig::new()
-            .set_max_num_streams(1024)
-            .set_max_buffer_size(32)
-            .set_split_send_size(8 * 1024)
-            .set_max_buffer_behaviour(libp2p_mplex::MaxBufferBehaviour::Block)
-            .clone(),
-    );
-
     let me_peerid: PeerId = me.public().into();
+
+    let tcp_upgrade = {
+        let num_streams = std::env::var("HOPR_INTERNAL_LIBP2P_YAMUX_MAX_NUM_STREAMS")
+            .and_then(|v| v.parse::<usize>().map_err(|_e| std::env::VarError::NotPresent))
+            .unwrap_or(1024);
+
+        let mut cfg = libp2p::yamux::Config::default();
+        cfg.set_max_num_streams(num_streams);
+        cfg
+    };
 
     #[cfg(feature = "runtime-async-std")]
     let swarm = libp2p::SwarmBuilder::with_existing_identity(me)
@@ -75,7 +67,7 @@ where
         .with_tcp(
             libp2p::tcp::Config::default().nodelay(true),
             libp2p::noise::Config::new,
-            move || tcp_upgrade,
+            || tcp_upgrade,
         )
         .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?
         .with_quic()
@@ -356,6 +348,7 @@ where
                             libp2p::request_response::Event::<Box<[u8]>, ()>::Message {
                                 peer,
                                 message,
+                                ..
                             } => match message {
                                 libp2p::request_response::Message::<Box<[u8]>, ()>::Request {
                                     request_id, request, channel
@@ -381,7 +374,7 @@ where
                             } => {
                                 error!(%peer, %error,  "Failed to send a message");
                             },
-                            libp2p::request_response::Event::<Box<[u8]>, ()>::InboundFailure {peer, request_id, error} => {
+                            libp2p::request_response::Event::<Box<[u8]>, ()>::InboundFailure {peer, request_id, error, ..} => {
                                 warn!(%peer, %request_id, error = %error, "Failed to receive a message");
                             }
                             libp2p::request_response::Event::<Box<[u8]>, ()>::ResponseSent {..} => {
@@ -394,7 +387,8 @@ where
                         match event {
                             libp2p::request_response::Event::<Acknowledgement,()>::Message {
                                 peer,
-                                message
+                                message,
+                                ..
                             } => match message {
                                 libp2p::request_response::Message::<Acknowledgement,()>::Request {
                                     request_id, request, channel
@@ -416,11 +410,11 @@ where
                                 }
                             },
                             libp2p::request_response::Event::<Acknowledgement,()>::OutboundFailure {
-                                peer, error, request_id
+                                peer, error, request_id, ..
                             } => {
                                 error!(%peer, %request_id, %error, "Failed to send an acknowledgement");
                             },
-                            libp2p::request_response::Event::<Acknowledgement,()>::InboundFailure {peer, request_id, error} => {
+                            libp2p::request_response::Event::<Acknowledgement,()>::InboundFailure {peer, request_id, error, ..} => {
                                 warn!(%peer, %request_id, %error, "Failed to receive an acknowledgement");
                             }
                             libp2p::request_response::Event::<Acknowledgement,()>::ResponseSent {..} => {
@@ -433,7 +427,8 @@ where
                         match event {
                             libp2p::request_response::Event::<Vec<legacy::AcknowledgedTicket>, std::result::Result<legacy::Ticket,String>>::Message {
                                 peer,
-                                message
+                                message,
+                                ..
                             } => {
                                 match message {
                                     libp2p::request_response::Message::<Vec<legacy::AcknowledgedTicket>, std::result::Result<legacy::Ticket,String>>::Request {
@@ -456,12 +451,12 @@ where
                                 }
                             },
                             libp2p::request_response::Event::<Vec<legacy::AcknowledgedTicket>, std::result::Result<legacy::Ticket,String>>::OutboundFailure {
-                                peer, request_id, error,
+                                peer, request_id, error, ..
                             } => {
                                 error!(%peer, %request_id, %error, "Failed to send an aggregation request");
                             },
                             libp2p::request_response::Event::<Vec<legacy::AcknowledgedTicket>, std::result::Result<legacy::Ticket,String>>::InboundFailure {
-                                peer, request_id, error
+                                peer, request_id, error, ..
                             } => {
                                 warn!(%peer, %request_id, %error, "Failed to receive an aggregated ticket");
                             },
@@ -475,7 +470,8 @@ where
                         match event {
                             libp2p::request_response::Event::<Ping,Pong>::Message {
                                 peer,
-                                message
+                                message,
+                                ..
                             } => {
                                 match message {
                                     libp2p::request_response::Message::<Ping,Pong>::Request {
@@ -508,7 +504,7 @@ where
                                 }
                             },
                             libp2p::request_response::Event::<Ping,Pong>::OutboundFailure {
-                                peer, request_id, error,
+                                peer, request_id, error, ..
                             } => {
                                 active_pings.invalidate(&request_id).await;
                                 if matches!(error, libp2p::request_response::OutboundFailure::DialFailure) {
@@ -518,7 +514,7 @@ where
                                 }
                             },
                             libp2p::request_response::Event::<Ping,Pong>::InboundFailure {
-                                peer, request_id, error
+                                peer, request_id, error, ..
                             } => {
                                 warn!(%peer, %request_id, "Failed to receive a Pong request: {error}");
                             },
