@@ -79,26 +79,23 @@ fn init_logger() -> Result<(), Box<dyn std::error::Error>> {
     {
         match std::env::var("HOPRD_USE_OPENTELEMETRY") {
             Ok(v) if v == "true" => {
-                let tracer = opentelemetry_otlp::new_pipeline()
-                    .tracing()
-                    .with_exporter(
-                        opentelemetry_otlp::new_exporter()
-                            .tonic()
-                            .with_protocol(opentelemetry_otlp::Protocol::Grpc)
-                            .with_timeout(std::time::Duration::from_secs(5)),
-                    )
-                    .with_trace_config(
-                        opentelemetry_sdk::trace::Config::default()
-                            .with_sampler(Sampler::AlwaysOn)
-                            .with_id_generator(RandomIdGenerator::default())
-                            .with_max_events_per_span(64)
-                            .with_max_attributes_per_span(16)
-                            .with_resource(opentelemetry_sdk::Resource::new(vec![opentelemetry::KeyValue::new(
-                                "service.name",
-                                std::env::var("OTEL_SERVICE_NAME").unwrap_or(env!("CARGO_PKG_NAME").into()),
-                            )])),
-                    )
-                    .install_batch(opentelemetry_sdk::runtime::Tokio)?
+                let exporter = opentelemetry_otlp::SpanExporter::builder()
+                    .with_tonic()
+                    .with_protocol(opentelemetry_otlp::Protocol::Grpc)
+                    .with_timeout(std::time::Duration::from_secs(5))
+                    .build()?;
+
+                let tracer = opentelemetry_sdk::trace::TracerProvider::builder()
+                    .with_batch_exporter(exporter, opentelemetry_sdk::runtime::Tokio)
+                    .with_sampler(Sampler::AlwaysOn)
+                    .with_id_generator(RandomIdGenerator::default())
+                    .with_max_events_per_span(64)
+                    .with_max_attributes_per_span(16)
+                    .with_resource(opentelemetry_sdk::Resource::new(vec![opentelemetry::KeyValue::new(
+                        "service.name",
+                        std::env::var("OTEL_SERVICE_NAME").unwrap_or(env!("CARGO_PKG_NAME").into()),
+                    )]))
+                    .build()
                     .tracer(env!("CARGO_PKG_NAME"));
 
                 telemetry = Some(tracing_opentelemetry::layer().with_tracer(tracer))
