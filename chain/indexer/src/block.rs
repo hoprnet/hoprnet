@@ -1,4 +1,4 @@
-use futures::{stream, StreamExt};
+use futures::{stream, FutureExt, StreamExt};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use tracing::{debug, error, info, trace};
@@ -197,6 +197,8 @@ where
             }
         }
 
+        let (tx, mut rx) = futures::channel::mpsc::channel::<()>(1);
+
         // Perform the fast-sync if requested
         if FastSyncMode::None != will_perform_fast_sync {
             let processed = match will_perform_fast_sync {
@@ -229,7 +231,6 @@ where
         }
 
         info!("Building rpc indexer background process");
-        let (tx, mut rx) = futures::channel::mpsc::channel::<()>(1);
 
         let next_block_to_process = if let Some(last_log) = self.db.get_last_checksummed_log().await? {
             info!(
@@ -264,7 +265,7 @@ where
             let event_stream = rpc
                 .try_stream_logs(next_block_to_process, log_filter)
                 .expect("block stream should be constructible")
-                .then(|block| async {
+                .then(|block| {
                     Self::calculate_sync_process(
                         "rpc",
                         block.block_id,
@@ -274,8 +275,7 @@ where
                         next_block_to_process,
                         tx.clone().into(),
                     )
-                    .await;
-                    block
+                    .map(|_| block)
                 })
                 .filter_map(|block| {
                     let db = db.clone();
@@ -1066,7 +1066,7 @@ mod tests {
             .return_once(move |_, _| Ok(Box::pin(rx)));
 
         rpc.expect_block_number()
-            .times(2)
+            .times(3)
             .returning(move || Ok(last_processed_block + 1));
 
         let block = BlockWithLogs {
