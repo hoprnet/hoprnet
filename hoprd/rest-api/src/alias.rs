@@ -12,8 +12,7 @@ use hoprd_db_api::errors::DbError;
 
 use crate::{
     types::{HoprIdentifier, PeerOrAddress},
-    ApiErrorStatus, InternalState, BASE_PATH,
-    ApiError
+    ApiError, ApiErrorStatus, InternalState, BASE_PATH,
 };
 
 #[serde_as]

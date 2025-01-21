@@ -20,10 +20,7 @@ serde = [
   "hopr-network-types/serde",
 ]
 runtime-async-std = ["hopr-network-types/runtime-async-std"]
-runtime-tokio = [
-  "hopr-network-types/runtime-tokio",
-  "dep:tokio",
-]
+runtime-tokio = ["hopr-network-types/runtime-tokio", "dep:tokio"]
 prometheus = ["dep:hopr-metrics", "dep:lazy_static"]
 
 [dependencies]

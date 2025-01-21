@@ -12,7 +12,7 @@ use hopr_lib::{
     Address, Balance, BalanceType, U256,
 };
 
-use crate::{ApiErrorStatus, InternalState, BASE_PATH, ApiError};
+use crate::{ApiError, ApiErrorStatus, InternalState, BASE_PATH};
 
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[schema(example = json!({
