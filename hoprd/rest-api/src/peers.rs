@@ -110,6 +110,7 @@ pub(crate) struct PingResponse {
         (status = 400, description = "Invalid peer id", body = ApiError),
         (status = 401, description = "Invalid authorization token.", body = ApiError),
         (status = 404, description = "Peer id not found in the network.", body = ApiError),
+        (status = 408, description = "Peer timed out.", body = ApiError),
         (status = 412, description = "The node is not ready."),
         (status = 422, description = "Unknown failure", body = ApiError)
     ),
@@ -137,8 +138,14 @@ pub(super) async fn ping_peer(
                 Ok((StatusCode::OK, resp).into_response())
             }
             Err(HoprLibError::TransportError(HoprTransportError::Protocol(hopr_lib::ProtocolError::Timeout))) => {
-                Ok((StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::Timeout).into_response())
+                Ok((StatusCode::REQUEST_TIMEOUT, ApiErrorStatus::Timeout).into_response())
             }
+            Err(HoprLibError::TransportError(HoprTransportError::NetworkError(
+                hopr_lib::NetworkingError::Timeout(_),
+            ))) => Ok((StatusCode::REQUEST_TIMEOUT, ApiErrorStatus::Timeout).into_response()),
+            Err(HoprLibError::TransportError(HoprTransportError::NetworkError(
+                hopr_lib::NetworkingError::PingerError(_, e),
+            ))) => Ok((StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::PingError(e)).into_response()),
             Err(HoprLibError::TransportError(HoprTransportError::NetworkError(
                 hopr_lib::NetworkingError::NonExistingPeer,
             ))) => Ok((StatusCode::NOT_FOUND, ApiErrorStatus::PeerNotFound).into_response()),

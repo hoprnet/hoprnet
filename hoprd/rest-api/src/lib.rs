@@ -386,6 +386,7 @@ enum ApiErrorStatus {
     DatabaseError,
     UnsupportedFeature,
     Timeout,
+    PingError(String),
     Unauthorized,
     TooManyOpenWebsocketConnections,
     InvalidQuality,
