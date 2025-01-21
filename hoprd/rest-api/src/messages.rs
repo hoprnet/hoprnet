@@ -142,13 +142,6 @@ pub(super) async fn send_message(
         Err(e) => return Err(e.into_response()),
     };
 
-    // Use the message encoder, if any
-    let msg_body = state
-        .msg_encoder
-        .as_ref()
-        .map(|enc| enc(&args.body))
-        .unwrap_or_else(|| args.body.into_boxed_slice());
-
     #[cfg(not(feature = "explicit-path"))]
     if args.path.is_some() {
         return Err((
@@ -208,7 +201,10 @@ pub(super) async fn send_message(
 
     let timestamp = std::time::SystemTime::now().as_unix_timestamp();
 
-    match hopr.send_message(msg_body, peer_id, options, Some(args.tag)).await {
+    match hopr
+        .send_message(args.body.into_boxed_slice(), peer_id, options, Some(args.tag))
+        .await
+    {
         Ok(_) => Ok((
             StatusCode::ACCEPTED,
             Json(SendMessageResponse {

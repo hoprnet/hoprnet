@@ -77,7 +77,6 @@ pub use {
     hopr_internal_types::prelude::*,
     hopr_network_types::prelude::{IpProtocol, RoutingOptions},
     hopr_primitive_types::prelude::*,
-    hopr_primitive_types::rlp,
     hopr_strategy::Strategy,
     hopr_transport::{
         config::{looks_like_domain, HostConfig, HostType},

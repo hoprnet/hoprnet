@@ -79,7 +79,6 @@ pub(crate) struct InternalState {
     pub inbox: Arc<RwLock<hoprd_inbox::Inbox>>,
     pub hoprd_db: Arc<hoprd_db_api::db::HoprdDb>,
     pub websocket_active_count: Arc<AtomicU16>,
-    pub msg_encoder: Option<MessageEncoder>,
     pub open_listeners: ListenerJoinHandles,
     pub default_listen_host: std::net::SocketAddr,
 }
@@ -198,7 +197,6 @@ pub struct RestApiParameters {
     pub hoprd_db: Arc<hoprd_db_api::db::HoprdDb>,
     pub inbox: Arc<RwLock<hoprd_inbox::Inbox>>,
     pub session_listener_sockets: ListenerJoinHandles,
-    pub msg_encoder: Option<MessageEncoder>,
     pub default_session_listen_host: std::net::SocketAddr,
 }
 
@@ -212,7 +210,6 @@ pub async fn serve_api(params: RestApiParameters) -> Result<(), std::io::Error> 
         hoprd_db,
         inbox,
         session_listener_sockets,
-        msg_encoder,
         default_session_listen_host,
     } = params;
 
@@ -223,7 +220,6 @@ pub async fn serve_api(params: RestApiParameters) -> Result<(), std::io::Error> 
         inbox,
         hoprd_db,
         session_listener_sockets,
-        msg_encoder,
         default_session_listen_host,
     )
     .await;
@@ -238,7 +234,6 @@ async fn build_api(
     inbox: Arc<RwLock<hoprd_inbox::Inbox>>,
     hoprd_db: Arc<hoprd_db_api::db::HoprdDb>,
     open_listeners: ListenerJoinHandles,
-    msg_encoder: Option<MessageEncoder>,
     default_listen_host: std::net::SocketAddr,
 ) -> Router {
     let state = AppState { hopr };
@@ -246,7 +241,6 @@ async fn build_api(
         auth: Arc::new(cfg.auth.clone()),
         hoprd_cfg,
         hopr: state.hopr.clone(),
-        msg_encoder,
         inbox,
         hoprd_db,
         open_listeners,
@@ -392,6 +386,7 @@ enum ApiErrorStatus {
     DatabaseError,
     UnsupportedFeature,
     Timeout,
+    PingError(String),
     Unauthorized,
     TooManyOpenWebsocketConnections,
     InvalidQuality,
