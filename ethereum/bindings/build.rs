@@ -58,14 +58,16 @@ fn main() -> anyhow::Result<()> {
 
     assert!(Command::new("forge").args(["--version"]).status()?.success());
 
+    let bindings_codegen_path_str = bindings_codegen_path
+        .to_str()
+        .context("must be convertible to string")?;
+    println!("Bindings codegen path: {bindings_codegen_path_str}");
     assert!(Command::new("forge")
         .args([
             "bind",
             "--offline", // ensure we are not installing any missing solc at this point
             "--bindings-path",
-            bindings_codegen_path
-                .to_str()
-                .context("must be convertible to string")?,
+            bindings_codegen_path_str,
             "--module",
             "--ethers",
             "--overwrite",
