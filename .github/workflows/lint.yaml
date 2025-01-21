@@ -45,4 +45,4 @@ jobs:
           USER: runner
 
       - name: Run linter
-        run: nix run .#check
+        run: nix run -L .#check
