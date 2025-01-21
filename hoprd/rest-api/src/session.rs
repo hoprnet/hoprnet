@@ -813,7 +813,7 @@ pub(crate) async fn close_client(
     Ok::<_, (StatusCode, ApiErrorStatus)>((StatusCode::NO_CONTENT, "").into_response())
 }
 
-async fn try_restricted_bind<'a, F, S, Fut>(
+async fn try_restricted_bind<F, S, Fut>(
     addrs: Vec<std::net::SocketAddr>,
     range_str: &str,
     binder: F,
