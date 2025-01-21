@@ -60,8 +60,9 @@ async-std-resolver = { version = "0.24.2" }
 async-stream = "0.3.6"
 async-trait = "0.1.85"
 atomic_enum = "0.3.0"
-axum = { version = "0.7.7", features = ["ws", "http2"] }
-backon = { version = "1.2.0", default-features = false }
+axum = { version = "^0.8.0", features = ["ws", "http2"] }
+axum-extra = { version = "0.10.0", features = ["query"] }
+backon = { version = "1.3.0", default-features = false }
 base64 = "0.22.1"
 bimap = "0.6.3"
 bincode = "1.3.3"
@@ -93,7 +94,7 @@ futures-concurrency = "7.6.2"
 futures-timer = "3.0.3"
 generic-array = { version = "0.14.7", features = ["zeroize"] }
 getrandom = "0.2.15"
-governor = { version = "0.7" }
+governor = { version = "0.8" }
 hex = "0.4.3"
 hex-literal = "0.4.1"
 hickory-resolver = "0.24.2"
@@ -106,9 +107,9 @@ libp2p-identity = { version = "0.2.9", features = [
   "rand",
 ] }
 libp2p-mplex = "0.42.0"
-mockall = "0.13.0"
-mockito = "1.4.0"
-moka = { version = "0.12.7", features = ["future"] }
+mockall = "0.13.1"
+mockito = "1.6.1"
+moka = { version = "0.12.10", features = ["future"] }
 more-asserts = "0.3.1"
 multiaddr = "0.18.2"
 num_enum = "0.7.2"
@@ -117,7 +118,7 @@ opentelemetry-otlp = { version = "0.17.0", default-features = false }
 opentelemetry_sdk = { version = "0.24.0" }
 tracing-opentelemetry = { version = "0.25.0" }
 parameterized = "2.0.0"
-petgraph = { version = "0.6.5", features = ["serde-1"] }
+petgraph = { version = "0.7.1", features = ["serde-1"] }
 primitive-types = { version = "0.12.2", features = [
   "serde",
 ] } # cannot be updated until the ethers-rs is replaced with alloy-rs
@@ -155,7 +156,7 @@ serde_json = "1.0.137"
 serde_repr = "0.1.19"
 serde_with = { version = "3.12.0", features = ["base64"] }
 serde_yaml = { version = "0.9.33" }
-serial_test = "3.1.1"
+serial_test = "3.2.0"
 sha3 = "0.10"
 signal-hook = "0.3.17"
 smart-default = "0.7.1"
@@ -168,10 +169,10 @@ sqlx = { version = "0.8.3", default-features = false, features = [
 strum = { version = "0.26.3", features = ["derive"] }
 surf = { version = "2.3.2" }
 surf-governor = { version = "0.2.0" }
-tempfile = "3.13.0"
+tempfile = "3.15.0"
 test-log = { version = "0.2.17", features = ["trace"] }
 thiserror = "1.0.68"
-tokio = { version = "1.41.0", features = [
+tokio = { version = "1.43.0", features = [
   "rt-multi-thread",
   "macros",
   "tracing",
@@ -188,8 +189,8 @@ tracing-subscriber = { version = "0.3.19", features = [
 ] }
 tracing-test = { version = "0.2.5", features = ["no-env-filter"] }
 typenum = "1.17.0"
-uuid = { version = "1.11.0" }
-validator = { version = "0.19.0", features = ["derive"] }
+uuid = { version = "1.12.1" }
+validator = { version = "0.20.0", features = ["derive"] }
 vergen-gix = { version = "1.0.6", features = ["build"] }
 void = "1.0.2"
 zeroize = { version = "1.8.1" }
