@@ -1,7 +1,7 @@
 use crate::prelude::FrameId;
 use thiserror::Error;
 
-#[derive(Error, Debug, Clone)]
+#[derive(Error, Debug)]
 pub enum SessionError {
     #[error("error while processing frame or segment: {0}")]
     ProcessingError(String),
@@ -30,13 +30,16 @@ pub enum SessionError {
     #[error("cannot reassemble frame {0}, because it is not complete")]
     IncompleteFrame(FrameId),
 
+    #[error("there are too many incomplete frames in the reassembler")]
+    TooManyIncompleteFrames,
+
     #[error("segment could not be parsed correctly")]
     InvalidSegment,
 
     #[error("received a segment of a frame {0} that was already completed or evicted")]
     OldSegment(FrameId),
 
-    #[error("frame {0} has expired and has been evicted")]
+    #[error("frame {0} has expired or has been discarded")]
     FrameDiscarded(FrameId),
 
     #[error("frame reassembler is closed")]
@@ -44,6 +47,9 @@ pub enum SessionError {
 
     #[error("invalid size of a segment was specified")]
     InvalidSegmentSize,
+
+    #[error(transparent)]
+    IoError(#[from] std::io::Error),
 }
 
 pub type Result<T> = std::result::Result<T, SessionError>;

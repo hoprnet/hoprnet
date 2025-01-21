@@ -280,11 +280,11 @@ impl<const C: usize> SessionState<C> {
                     Entry::Occupied(e) => {
                         // Receiving a frame segment restarts the retry token for this frame
                         let rt = *e.get();
-                        e.replace_entry(rt.replenish(Instant::now(), self.cfg.backoff_base));
+                        e.replace_entry(rt.replenish());
                     }
                     Entry::Vacant(v) => {
                         // Create the retry token for this frame
-                        v.insert(RetryToken::new(Instant::now(), self.cfg.backoff_base));
+                        v.insert(RetryToken::new(self.cfg.backoff_base));
                     }
                 }
             }
@@ -429,7 +429,7 @@ impl<const C: usize> SessionState<C> {
                         frame_id = info.frame_id,
                         "frame does not have a retry token"
                     );
-                    v.insert(RetryToken::new(now, self.cfg.backoff_base));
+                    v.insert(RetryToken::from_instant(now, self.cfg.backoff_base));
                     to_retry.push(info);
                 }
             }
@@ -636,7 +636,7 @@ impl<const C: usize> SessionState<C> {
             .await
             .map_err(|e| SessionError::ProcessingError(e.to_string()))?;
         self.outgoing_frame_resends
-            .insert(frame_id, RetryToken::new(Instant::now(), self.cfg.backoff_base));
+            .insert(frame_id, RetryToken::new(self.cfg.backoff_base));
 
         trace!(
             session_id = self.session_id,

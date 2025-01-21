@@ -1,5 +1,8 @@
+pub mod skip_queue;
+
+use std::collections::VecDeque;
 use std::pin::Pin;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
@@ -9,6 +12,8 @@ use futures::stream::BoxStream;
 use futures::{AsyncRead, AsyncWrite, StreamExt};
 use rand::distributions::Bernoulli;
 use rand::prelude::{thread_rng, Distribution, Rng, SeedableRng, StdRng};
+use rand_distr::Normal;
+use ringbuffer::{AllocRingBuffer, RingBuffer};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) struct RetryToken {
@@ -26,7 +31,11 @@ pub(crate) enum RetryResult {
 }
 
 impl RetryToken {
-    pub fn new(now: Instant, backoff_base: f64) -> Self {
+    pub fn new(backoff_base: f64) -> Self {
+        Self::from_instant(Instant::now(), backoff_base)
+    }
+
+    pub fn from_instant(now: Instant, backoff_base: f64) -> Self {
         Self {
             num_retry: 0,
             started_at: now,
@@ -35,12 +44,12 @@ impl RetryToken {
         }
     }
 
-    pub fn replenish(self, now: Instant, backoff_base: f64) -> Self {
+    pub fn replenish(self) -> Self {
         Self {
             num_retry: 0,
-            started_at: now,
+            started_at: Instant::now(),
             created_at: self.created_at,
-            backoff_base,
+            backoff_base: self.backoff_base,
         }
     }
 
@@ -130,8 +139,10 @@ impl<const C: usize> AsyncWrite for FaultyNetwork<'_, C> {
         }
 
         if let Some(stats) = &self.stats {
-            stats.bytes_sent.fetch_add(buf.len(), Ordering::Relaxed);
-            stats.packets_sent.fetch_add(1, Ordering::Relaxed);
+            stats
+                .bytes_sent
+                .fetch_add(buf.len(), std::sync::atomic::Ordering::Relaxed);
+            stats.packets_sent.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         }
 
         tracing::trace!("FaultyNetwork::poll_write {} bytes", buf.len());
@@ -156,8 +167,12 @@ impl<const C: usize> AsyncRead for FaultyNetwork<'_, C> {
                 buf[..len].copy_from_slice(&item.as_ref()[..len]);
 
                 if let Some(stats) = &self.stats {
-                    stats.bytes_received.fetch_add(len, Ordering::Relaxed);
-                    stats.packets_received.fetch_add(1, Ordering::Relaxed);
+                    stats
+                        .bytes_received
+                        .fetch_add(len, std::sync::atomic::Ordering::Relaxed);
+                    stats
+                        .packets_received
+                        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                 }
 
                 tracing::trace!("FaultyNetwork::poll_read: {len} bytes ready");
@@ -196,6 +211,78 @@ impl<const C: usize> FaultyNetwork<'_, C> {
 
         Self { ingress, egress, stats }
     }
+}
+
+/// Sample an index between `0` and `len - 1` using the given distribution and RNG.
+pub fn sample_index<T: Distribution<f64>, R: Rng>(dist: &mut T, rng: &mut R, len: usize) -> usize {
+    let f: f64 = dist.sample(rng);
+    (f.max(0.0).round() as usize).min(len - 1)
+}
+
+/// Shuffles the given `vec` by taking the next element with index `|N(0,factor^2)`|, where
+/// `N` denotes normal distribution.
+/// When used on frame segments vector, it will shuffle the segments in a controlled manner;
+/// such that an entire frame can unlikely swap position with another, if `factor` ~ frame length in segments.
+pub fn linear_half_normal_shuffle<T, R: Rng>(rng: &mut R, mut vec: VecDeque<T>, factor: f64) -> Vec<T> {
+    if factor == 0.0 || vec.is_empty() {
+        return vec.into(); // no mixing
+    }
+
+    let mut dist = Normal::new(0.0, factor).unwrap();
+    let mut ret = Vec::new();
+    while !vec.is_empty() {
+        ret.push(vec.remove(sample_index(&mut dist, rng, vec.len())).unwrap());
+    }
+    ret
+}
+
+#[derive(Debug)]
+pub(crate) struct OffloadedRbProducer<T>(UnboundedSender<T>);
+
+impl<T> OffloadedRbProducer<T> {
+    pub fn push(&self, item: T) -> bool {
+        self.0.unbounded_send(item).is_ok()
+    }
+
+    pub fn is_open(&self) -> bool {
+        !self.0.is_closed()
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct OffloadedRbConsumer<T>(Arc<std::sync::Mutex<AllocRingBuffer<T>>>);
+
+impl<T> Clone for OffloadedRbConsumer<T> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
+impl<T: Clone> OffloadedRbConsumer<T> {
+    pub fn find<F: Fn(&T) -> bool>(&self, predicate: F) -> Vec<T> {
+        self.0
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|item| predicate(item))
+            .cloned()
+            .collect()
+    }
+}
+
+pub(crate) fn offloaded_ringbuffer<T: Send + 'static>(
+    capacity: usize,
+) -> (OffloadedRbProducer<T>, OffloadedRbConsumer<T>) {
+    let (rb_tx, rb_rx) = futures::channel::mpsc::unbounded();
+    let rb = Arc::new(std::sync::Mutex::new(AllocRingBuffer::new(capacity)));
+
+    let rb_clone = rb.clone();
+    hopr_async_runtime::prelude::spawn(rb_rx.for_each(move |item| {
+        rb_clone.lock().unwrap().push(item);
+        futures::future::ready(())
+    }));
+
+    (OffloadedRbProducer(rb_tx), OffloadedRbConsumer(rb))
 }
 
 #[cfg(test)]
