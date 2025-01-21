@@ -1216,6 +1216,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "cbor4ii"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "189a2a2e5eec2f203b2bb8bc4c2db55c7253770d2c6bf3ae5f79ace5a15c305f"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "cc"
 version = "1.1.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1291,7 +1300,7 @@ dependencies = [
  "multiaddr",
  "serde",
  "smart-default",
- "thiserror 1.0.68",
+ "thiserror 2.0.11",
  "tracing",
 ]
 
@@ -1318,7 +1327,7 @@ dependencies = [
  "serde_with",
  "smart-default",
  "strum",
- "thiserror 1.0.68",
+ "thiserror 2.0.11",
  "tracing",
  "validator",
 ]
@@ -1353,7 +1362,7 @@ dependencies = [
  "sea-orm",
  "smart-default",
  "test-log",
- "thiserror 1.0.68",
+ "thiserror 2.0.11",
  "tracing",
 ]
 
@@ -1714,7 +1723,7 @@ dependencies = [
  "serde_with",
  "smart-default",
  "strum",
- "thiserror 1.0.68",
+ "thiserror 2.0.11",
  "tracing",
  "validator",
 ]
@@ -1744,7 +1753,7 @@ dependencies = [
  "serde_with",
  "smart-default",
  "test-log",
- "thiserror 1.0.68",
+ "thiserror 2.0.11",
  "tracing",
 ]
 
@@ -4164,7 +4173,7 @@ dependencies = [
  "serde_json",
  "serde_with",
  "tempfile",
- "thiserror 1.0.68",
+ "thiserror 2.0.11",
  "tracing",
  "tracing-subscriber",
  "uuid 1.12.1",
@@ -4214,7 +4223,7 @@ dependencies = [
  "surf-governor",
  "tempfile",
  "test-log",
- "thiserror 1.0.68",
+ "thiserror 2.0.11",
  "tokio",
  "tracing",
  "validator",
@@ -4241,7 +4250,7 @@ dependencies = [
  "libp2p-identity",
  "mockall",
  "parameterized",
- "thiserror 1.0.68",
+ "thiserror 2.0.11",
  "tracing",
  "typenum",
 ]
@@ -4303,7 +4312,7 @@ dependencies = [
  "sha2 0.10.8",
  "sha3",
  "subtle",
- "thiserror 1.0.68",
+ "thiserror 2.0.11",
  "tracing",
  "typenum",
  "zeroize",
@@ -4322,7 +4331,7 @@ dependencies = [
  "multiaddr",
  "num_enum",
  "strum",
- "thiserror 1.0.68",
+ "thiserror 2.0.11",
  "tracing",
  "tracing-test",
 ]
@@ -4343,7 +4352,7 @@ dependencies = [
  "sea-orm",
  "sea-orm-cli",
  "sea-orm-migration",
- "thiserror 1.0.68",
+ "thiserror 2.0.11",
  "tokio",
 ]
 
@@ -4393,7 +4402,7 @@ dependencies = [
  "smart-default",
  "sqlx",
  "strum",
- "thiserror 1.0.68",
+ "thiserror 2.0.11",
  "tracing",
 ]
 
@@ -4406,7 +4415,7 @@ dependencies = [
  "bincode",
  "bindings",
  "bloomfilter",
- "cbor4ii",
+ "cbor4ii 1.0.0",
  "criterion",
  "ethers",
  "hex-literal",
@@ -4420,7 +4429,7 @@ dependencies = [
  "serde_bytes",
  "smart-default",
  "strum",
- "thiserror 1.0.68",
+ "thiserror 2.0.11",
  "tracing",
 ]
 
@@ -4467,7 +4476,7 @@ dependencies = [
  "smart-default",
  "strum",
  "test-log",
- "thiserror 1.0.68",
+ "thiserror 2.0.11",
  "tokio",
  "tokio-util",
  "tracing",
@@ -4523,7 +4532,7 @@ dependencies = [
  "socket2 0.5.8",
  "strum",
  "test-log",
- "thiserror 1.0.68",
+ "thiserror 2.0.11",
  "tokio",
  "tokio-util",
  "tracing",
@@ -4544,7 +4553,7 @@ dependencies = [
 name = "hopr-platform"
 version = "0.2.1"
 dependencies = [
- "thiserror 1.0.68",
+ "thiserror 2.0.11",
 ]
 
 [[package]]
@@ -4561,7 +4570,7 @@ dependencies = [
  "serde",
  "sha3",
  "strum",
- "thiserror 1.0.68",
+ "thiserror 2.0.11",
 ]
 
 [[package]]
@@ -4610,7 +4619,7 @@ dependencies = [
  "smart-default",
  "strum",
  "test-log",
- "thiserror 1.0.68",
+ "thiserror 2.0.11",
  "tracing",
  "validator",
 ]
@@ -4650,7 +4659,7 @@ dependencies = [
  "serde_with",
  "smart-default",
  "strum",
- "thiserror 1.0.68",
+ "thiserror 2.0.11",
  "tracing",
  "uuid 1.12.1",
  "validator",
@@ -4663,7 +4672,7 @@ dependencies = [
  "anyhow",
  "libp2p-identity",
  "multiaddr",
- "thiserror 1.0.68",
+ "thiserror 2.0.11",
 ]
 
 [[package]]
@@ -4683,7 +4692,7 @@ dependencies = [
  "more-asserts",
  "rust-stream-ext-concurrent",
  "smart-default",
- "thiserror 1.0.68",
+ "thiserror 2.0.11",
  "tracing",
  "tracing-test",
 ]
@@ -4708,7 +4717,7 @@ dependencies = [
  "moka",
  "multiaddr",
  "serde",
- "thiserror 1.0.68",
+ "thiserror 2.0.11",
  "tracing",
  "void",
 ]
@@ -4748,7 +4757,7 @@ dependencies = [
  "serial_test",
  "smart-default",
  "strum",
- "thiserror 1.0.68",
+ "thiserror 2.0.11",
  "tracing",
  "tracing-test",
  "validator",
@@ -4783,7 +4792,7 @@ dependencies = [
  "smart-default",
  "strum",
  "test-log",
- "thiserror 1.0.68",
+ "thiserror 2.0.11",
  "tokio",
  "tokio-util",
  "tracing",
@@ -4826,7 +4835,7 @@ dependencies = [
  "smart-default",
  "strum",
  "tempfile",
- "thiserror 1.0.68",
+ "thiserror 2.0.11",
  "tokio",
  "tokio-retry",
  "tokio-util",
@@ -4897,7 +4906,7 @@ dependencies = [
  "libp2p-identity",
  "sea-orm",
  "sqlx",
- "thiserror 1.0.68",
+ "thiserror 2.0.11",
  "tracing",
  "tracing-test",
 ]
@@ -4916,7 +4925,7 @@ dependencies = [
  "sea-orm-cli",
  "sea-orm-migration",
  "serde",
- "thiserror 1.0.68",
+ "thiserror 2.0.11",
 ]
 
 [[package]]
@@ -4962,7 +4971,7 @@ dependencies = [
  "serde_json",
  "sha3",
  "tempfile",
- "thiserror 1.0.68",
+ "thiserror 2.0.11",
  "tracing",
  "typenum",
  "uuid 1.12.1",
@@ -5997,7 +6006,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1356c9e376a94a75ae830c42cdaea3d4fe1290ba409a22c809033d1b7dcab0a6"
 dependencies = [
  "async-trait",
- "cbor4ii",
+ "cbor4ii 0.3.2",
  "futures",
  "futures-bounded",
  "futures-timer",
