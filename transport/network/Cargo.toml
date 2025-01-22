@@ -1,5 +1,5 @@
 [package]
-name = "core-network"
+name = "hopr-transport-network"
 version = "0.7.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"

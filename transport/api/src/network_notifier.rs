@@ -4,14 +4,14 @@ use async_lock::RwLock;
 use async_trait::async_trait;
 use tracing::{debug, error};
 
-use core_network::{
+use core_path::channel_graph::ChannelGraph;
+use hopr_crypto_types::types::OffchainPublicKey;
+use hopr_db_sql::api::resolver::HoprDbResolverOperations;
+use hopr_transport_network::{
     network::{Network, NetworkTriggeredEvent},
     ping::PingExternalAPI,
     HoprDbPeersOperations, PeerId,
 };
-use core_path::channel_graph::ChannelGraph;
-use hopr_crypto_types::types::OffchainPublicKey;
-use hopr_db_sql::api::resolver::HoprDbResolverOperations;
 
 /// Implementor of the ping external API.
 ///
@@ -29,7 +29,7 @@ where
     resolver: T,
     channel_graph: Arc<RwLock<ChannelGraph>>,
     /// Implementation of the network interface allowing emitting events
-    /// based on the [core_network::network::Network] events into the p2p swarm.
+    /// based on the [hopr_transport_network::network::Network] events into the p2p swarm.
     emitter: futures::channel::mpsc::Sender<NetworkTriggeredEvent>,
 }
 
@@ -61,7 +61,7 @@ where
     async fn on_finished_ping(
         &self,
         peer: &PeerId,
-        result: &core_network::errors::Result<std::time::Duration>,
+        result: &hopr_transport_network::errors::Result<std::time::Duration>,
         version: String,
     ) {
         let result = match &result {

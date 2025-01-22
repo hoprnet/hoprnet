@@ -1713,39 +1713,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "773648b94d0e5d620f64f280777445740e61fe701025087ec8b57f45c791888b"
 
 [[package]]
-name = "core-network"
-version = "0.7.0"
-dependencies = [
- "anyhow",
- "async-std",
- "async-stream",
- "async-trait",
- "futures",
- "hopr-async-runtime",
- "hopr-crypto-random",
- "hopr-crypto-sphinx",
- "hopr-crypto-types",
- "hopr-db-api",
- "hopr-db-sql",
- "hopr-metrics",
- "hopr-platform",
- "hopr-primitive-types",
- "lazy_static",
- "libp2p-identity",
- "mockall",
- "more-asserts",
- "multiaddr",
- "rand 0.8.5",
- "serde",
- "serde_with",
- "smart-default",
- "strum",
- "thiserror 2.0.11",
- "tracing",
- "validator",
-]
-
-[[package]]
 name = "core-path"
 version = "0.5.0"
 dependencies = [
@@ -4618,7 +4585,6 @@ dependencies = [
  "async-trait",
  "chain-actions",
  "chain-types",
- "core-network",
  "futures",
  "hex-literal",
  "hopr-async-runtime",
@@ -4629,6 +4595,7 @@ dependencies = [
  "hopr-metrics",
  "hopr-platform",
  "hopr-primitive-types",
+ "hopr-transport-network",
  "hopr-transport-protocol",
  "lazy_static",
  "mockall",
@@ -4652,7 +4619,6 @@ dependencies = [
  "async-std",
  "async-trait",
  "chain-types",
- "core-network",
  "core-path",
  "futures",
  "futures-concurrency",
@@ -4667,6 +4633,7 @@ dependencies = [
  "hopr-primitive-types",
  "hopr-transport-identity",
  "hopr-transport-mixer",
+ "hopr-transport-network",
  "hopr-transport-p2p",
  "hopr-transport-protocol",
  "hopr-transport-session",
@@ -4716,17 +4683,50 @@ dependencies = [
 ]
 
 [[package]]
+name = "hopr-transport-network"
+version = "0.7.0"
+dependencies = [
+ "anyhow",
+ "async-std",
+ "async-stream",
+ "async-trait",
+ "futures",
+ "hopr-async-runtime",
+ "hopr-crypto-random",
+ "hopr-crypto-sphinx",
+ "hopr-crypto-types",
+ "hopr-db-api",
+ "hopr-db-sql",
+ "hopr-metrics",
+ "hopr-platform",
+ "hopr-primitive-types",
+ "lazy_static",
+ "libp2p-identity",
+ "mockall",
+ "more-asserts",
+ "multiaddr",
+ "rand 0.8.5",
+ "serde",
+ "serde_with",
+ "smart-default",
+ "strum",
+ "thiserror 2.0.11",
+ "tracing",
+ "validator",
+]
+
+[[package]]
 name = "hopr-transport-p2p"
 version = "0.5.4"
 dependencies = [
  "anyhow",
  "async-std",
- "core-network",
  "futures",
  "futures-concurrency",
  "hopr-internal-types",
  "hopr-metrics",
  "hopr-transport-identity",
+ "hopr-transport-network",
  "hopr-transport-protocol",
  "lazy_static",
  "libp2p",

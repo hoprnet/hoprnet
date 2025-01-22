@@ -13,7 +13,7 @@ crate-type = ["rlib"]
 default = ["mixer-stream"]
 transport-quic = []
 runtime-async-std = [
-  "core-network/runtime-async-std",
+  "hopr-transport-network/runtime-async-std",
   "hopr-async-runtime/runtime-async-std",
   "hopr-db-sql/runtime-async-std",
   "hopr-transport-p2p/runtime-async-std",
@@ -22,7 +22,7 @@ runtime-async-std = [
   "hopr-network-types/runtime-async-std",
 ]
 runtime-tokio = [
-  "core-network/runtime-tokio",
+  "hopr-transport-network/runtime-tokio",
   "hopr-async-runtime/runtime-tokio",
   "hopr-db-sql/runtime-tokio",
   "hopr-transport-p2p/runtime-tokio",
@@ -32,7 +32,7 @@ runtime-tokio = [
 ]
 prometheus = [
   "dep:hopr-metrics",
-  "core-network/prometheus",
+  "hopr-transport-network/prometheus",
   "core-path/prometheus",
   "hopr-db-sql/prometheus",
   "hopr-network-types/prometheus",
@@ -61,7 +61,7 @@ tracing = { workspace = true }
 uuid = { workspace = true, features = ["v4", "fast-rng"] }
 validator = { workspace = true }
 
-core-network = { workspace = true }
+hopr-transport-network = { workspace = true }
 chain-types = { workspace = true }
 core-path = { workspace = true }
 hopr-async-runtime = { workspace = true }
@@ -82,7 +82,7 @@ hopr-transport-session = { workspace = true }
 [dev-dependencies]
 async-std = { workspace = true }
 hopr-db-sql = { workspace = true, features = ["runtime-async-std"] }
-core-network = { workspace = true, features = ["runtime-async-std"] }
+hopr-transport-network = { workspace = true, features = ["runtime-async-std"] }
 hopr-transport-mixer = { workspace = true }
 hopr-transport-protocol = { workspace = true, features = ["runtime-async-std"] }
 hopr-transport-p2p = { workspace = true, features = ["runtime-async-std"] }

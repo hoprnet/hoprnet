@@ -13,7 +13,7 @@ use libp2p::{
     PeerId,
 };
 
-use core_network::ping::PingQueryReplier;
+use hopr_transport_network::ping::PingQueryReplier;
 
 #[derive(Debug)]
 pub enum Event {

@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-pub use core_network::errors::NetworkingError;
+pub use hopr_transport_network::errors::NetworkingError;
 pub use hopr_transport_protocol::errors::ProtocolError;
 
 /// Errors produced by the crate.
@@ -35,7 +35,7 @@ pub enum HoprTransportError {
     Types(#[from] hopr_internal_types::errors::CoreTypesError),
 
     #[error("Network monitoring error: {0}")]
-    NetworkError(#[from] core_network::errors::NetworkingError),
+    NetworkError(#[from] hopr_transport_network::errors::NetworkingError),
 }
 
 /// Result produced by the crate, uses the [HoprTransportError] as the error type.
