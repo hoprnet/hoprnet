@@ -102,7 +102,6 @@ hopr:
         # a winning acknowledged ticket
         #
       - !AutoRedeeming
-        #
         # If set, the strategy will redeem only aggregated tickets.
         redeem_only_aggregated: true
         # If set, all tickets will be redeemed on channel closure.
